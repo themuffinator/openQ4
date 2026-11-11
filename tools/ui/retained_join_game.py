@@ -55,7 +55,14 @@ ROW_H = 18.0                               # u: its itemheight
 REVEAL_MS = 120                            # row.reveal (section 8): each row's fade
 REVEAL_STAGGER_MS = 15                     # one row after another, capped at 90 ms in all
 REVEAL_STAGGER_CAP_MS = 90
-HEADER = (22.0, 54.0, 587.0, 37.0)         # u: mp_browse_header
+# The top section (user note, 11 November 2026: the stock header band,
+# mp_browse_header at 22,54 u, drew its top rail through the MOD and SOURCE
+# row that stands from 46 u, and past its own fill). Two flat strips as wide
+# as the list's rows take its place: a toolbar behind MOD and SOURCE, its
+# upper-leading corner cut, and the columns' headings under it down to the
+# list.
+TOOLBAR = (19.0, 43.0, 596.0, 22.0)        # u: left, top, width, height
+HEADINGS_STRIP = (66.0, 17.0)              # u: top and height, down to the list at 83 u
 HEADING_TOP = 70.0                         # u: the headings' row
 # The columns: the session's sort for each (serverSort_t), its heading (a
 # symbol column has none), its tab stop and width in the list (u) and its sort
@@ -217,6 +224,147 @@ def quality_bars(doc: Document, ident: str, key: str, left: float) -> tuple:
     return bars, text_left
 
 
+# The list's two views (user note, 11 November 2026: "add list display
+# options such as combo image/text list or bigger modern tiles"). Rows are the
+# stock list. Tiles stand each server 40 u tall: its map's levelshot, its
+# name over its game type and map, the ping and players at the trailing end
+# of the first line and the symbols under them. ui_browserView keeps the
+# choice; the toolbar's LAYOUT button changes it. A tall view and a larger
+# text size keep rows, which have their own layouts there.
+TILE_H = 40.0                              # u
+TILE_SHOT = (6.0, 4.5, 68.0, 51.0)         # dp: a tile's levelshot, 4:3
+TILE_LINES = (3.0, 30.0)                   # dp: its two lines' tops
+TILE_NAME_TEXT = 16.5                      # dp
+# Where each column stands in a tile: its left (u), its line, and its width (u) where that changes.
+TILE_CELLS = {"name": (55.0, 0, 370.0), "ping": (440.0, 0, None), "players": (522.0, 0, None), "type": (55.0, 1, 150.0),
+              "map": (210.0, 1, 225.0), "fav": (518.0, 1, None), "lock": (534.0, 1, None), "ded": (550.0, 1, None), "rep": (566.0, 1, None)}
+VIEW_BUTTON = (296.0, 46.0, 24.0, 16.0)    # u: between the MOD spinner and SOURCE
+
+
+def view_button(doc: Document) -> dict:
+    """The toolbar's LAYOUT button: the list's view, rows or tiles, drawn as
+    the view it shows now. It asks for the other (settings.player.set on
+    ui_browserView, which the page reads back as join.view)."""
+    doc.state["join.view"] = {"type": "number", "initial": 0, "cvar": "ui_browserView"}
+    for action, value in (("joinViewRows", 0), ("joinViewTiles", 1)):
+        doc.actions[action] = {"operation": "settings.player.set", "arguments": {"cvar": "ui_browserView", "value": value}}
+    tiles = {"op": "==", "args": [{"state": "join.view"}, 1]}
+    doc.events["joinViewToggle"] = [{"op": "if", "condition": tiles, "then": [{"op": "action", "action": "joinViewRows"}],
+                                     "else": [{"op": "action", "action": "joinViewTiles"}]}]
+    left, top, width, height = VIEW_BUTTON
+    w, h = U * width, U * height
+    whole = absolute(left=0, top=0, width=w, height=h)
+    ink = solid([1, 1, 1, 0.85])
+    plate = vector("join_view-plate", {**whole, "opacity": number(0.45), "pointer-events": keyword("none")}, [
+        path("plate", [(0, 0), (w, 0), (w, h), (0, h)], fill=solid(rgb(OLIVE, 0.4)), stroke=stroke(solid(rgb(OLIVE)), 1))])
+    bars = [path(f"bar{index}", [(8, 6 + index * 5), (w - 8, 6 + index * 5), (w - 8, 8 + index * 5), (8, 8 + index * 5)], fill=ink)
+            for index in range(3)]
+    rows_icon = vector("join_view-rows", {**whole, "display": keyword("block"), "pointer-events": keyword("none")}, bars)
+    blocks = []
+    for index in range(2):
+        y = 5 + index * 8
+        blocks += [path(f"shot{index}", [(8, y), (15, y), (15, y + 6), (8, y + 6)], fill=ink),
+                   path(f"line{index}", [(18, y + 2), (w - 8, y + 2), (w - 8, y + 4), (18, y + 4)], fill=ink)]
+    tiles_icon = vector("join_view-tiles", {**whole, "display": keyword("none"), "pointer-events": keyword("none")}, blocks)
+    doc.bind("join_view-rows.display", "join_view-rows", "display", {"op": "select", "args": [tiles, "none", "block"]})
+    doc.bind("join_view-tiles.display", "join_view-tiles", "display", {"op": "select", "args": [tiles, "block", "none"]})
+    ids = doc.states("join_view", {
+        "default": [("join_view-plate", "opacity", number(0.45))], "hover": [("join_view-plate", "opacity", number(0.85))],
+        "focus": [("join_view-plate", "opacity", number(1))], "pressed": [("join_view-plate", "opacity", number(1))],
+        "disabled": [("join_view-plate", "opacity", number(0.2))],
+    })
+    return group("join_view", absolute(left=U * left, top=U * top, width=w, height=h), [plate, rows_icon, tiles_icon],
+                 control={"role": "button", "label": "#str_42932", "event": "joinViewToggle", "states": ids})
+
+
+def tile_view(result: dict) -> dict:
+    """The list's tiles, over the finished page: while join.view is 1, in a
+    landscape view at 100 % text, each server's row is TILE_H tall with its
+    cells where TILE_CELLS puts them and its levelshot shown. Each property
+    keeps whatever else binds it (the text size, a tall view) as the value
+    it has while the tiles are off."""
+    from build_retained_screens import LARGER, walk_nodes
+    from retained_tall import TallLayout
+    nodes = {node["id"]: node for node in walk_nodes(result["root"])}
+    bound = {(binding["node"], binding["property"]): binding for binding in result["bindings"]}
+    tall = TallLayout(result).condition
+    # One number says whether the tiles show (join.tiles), so each of the
+    # tiles' two thousand bindings reads a state, not the view, the aspect
+    # and the text size: the page's expressions stay within the document's
+    # budget. The page's own programs keep it: each arrival, and the LAYOUT
+    # button with its request. (A number, not a Boolean: check_text_bindings
+    # tries either value of a Boolean a text binding reads.)
+    result["state"]["join.tiles"] = {"type": "number", "initial": 0}
+    fits = {"op": "&&", "args": [{"op": "!", "args": [tall]}, {"op": "!", "args": [LARGER]}]}
+    wanted = {"op": "==", "args": [{"state": "join.view"}, 1]}
+    result["events"].setdefault("onActivate", []).append(
+        {"op": "setState", "values": {"join.tiles": {"op": "select", "args": [{"op": "&&", "args": [wanted, fits]}, 1, 0]}}})
+    result["events"]["joinViewToggle"] = [{"op": "if", "condition": wanted,
+                                           "then": [{"op": "action", "action": "joinViewRows"}, {"op": "setState", "values": {"join.tiles": 0}}],
+                                           "else": [{"op": "action", "action": "joinViewTiles"},
+                                                    {"op": "setState", "values": {"join.tiles": {"op": "select", "args": [fits, 1, 0]}}}]}]
+    tiles = {"op": "==", "args": [{"state": "join.tiles"}, 1]}
+
+    def put(ident: str, prop: str, value) -> None:
+        found = bound.get((ident, prop))
+        if found is not None:
+            found["value"] = {"op": "select", "args": [tiles, value, found["value"]]}
+            return
+        authored = nodes[ident]["properties"][prop]["value"]
+        entry = {"id": f"view.{ident}.{prop}", "node": ident, "property": prop, "value": {"op": "select", "args": [tiles, value, authored]}}
+        result["bindings"].append(entry)
+        bound[(ident, prop)] = entry
+
+    row_h = U * ROW_H
+    for index in range(JOIN_ROWS):
+        ident = f"server-{index}"
+        row = nodes[ident]
+        put(ident, "height", U * TILE_H)
+        put(f"{ident}-shot", "display", "block")
+        for child in row["children"]:
+            name, props = child["id"], child.get("properties", {})
+            if name == f"{ident}-shot":
+                continue
+            column = name[len(ident) + 1:]
+            if column.startswith("bar-"):
+                column = "ping"
+            if column not in TILE_CELLS:
+                # The row's lights and rule span the row: they take its height.
+                if child.get("type") == "vector" and props.get("height", {}).get("value") == row_h:
+                    put(name, "height", U * TILE_H)
+                continue
+            left, line, width = TILE_CELLS[column]
+            stock_left = next(entry[3] for entry in COLUMNS if entry[0] == column)
+            put(name, "left", round(props["left"]["value"] + U * (left - stock_left), 3))
+            put(name, "top", round(props["top"]["value"] + TILE_LINES[line], 3))
+            if width is not None and child.get("type") == "text":
+                put(name, "width", U * width - 4)
+            if column == "name":
+                put(name, "font-size", TILE_NAME_TEXT)
+    return result
+
+
+def browser_header() -> dict:
+    """The browser's top section: the toolbar strip behind MOD and SOURCE
+    (black, fading toward the trailing end, its upper-leading corner cut 8 u
+    with an orange line along the cut that fades out along the top) and the
+    headings' strip under it (olive at 0.20 over a dark seam, a rule at its
+    foot where the list starts). Every edge ends with the strips."""
+    left, top, width, bar_h = TOOLBAR
+    head_top, head_h = HEADINGS_STRIP
+    w, h = U * width, U * (head_top + head_h - top)
+    bar, head, cut = U * bar_h, U * (head_top - top), U * 8
+    return vector("join-header", {**absolute(left=U * left, top=U * top, width=w, height=h), "pointer-events": keyword("none")}, [
+        path("toolbar", [(cut, 0), (w, 0), (w, bar), (0, bar), (0, cut)],
+             fill=linear((0, 0), (w, 0), [(0, [0, 0, 0, 0.66]), (0.7, [0, 0, 0, 0.52]), (1, [0, 0, 0, 0.3])])),
+        path("accent", [(0.75, bar), (0.75, cut), (cut, 0.75), (U * 150, 0.75)], closed=False,
+             stroke=stroke(linear((0, 0), (U * 150, 0), [(0, rgb(ORANGE)), (0.25, rgb(ORANGE, 0.8)), (1, rgb(ORANGE, 0))]), 1.5)),
+        path("headings", [(0, head), (w, head), (w, h), (0, h)], fill=solid(rgb(OLIVE, 0.2))),
+        path("seam", [(0, (bar + head) / 2), (w, (bar + head) / 2)], closed=False, stroke=stroke(solid([0, 0, 0, 0.55]), head - bar)),
+        path("rule", [(0, h - 0.6), (w, h - 0.6)], closed=False, stroke=stroke(solid(rgb(OLIVE, 0.75)), 1.2)),
+    ])
+
+
 def server_row(doc: Document, index: int, row_w: float) -> dict:
     """One of the list's rows: a server's symbols (favorite, password,
     dedicated server, repeater) and its name, ping, players, game type and map
@@ -259,6 +407,13 @@ def server_row(doc: Document, index: int, row_w: float) -> dict:
                           "then": [{"op": "focus", "control": "join_server"}],
                           "else": [{"op": "setState", "values": {"join.pick": index}}, {"op": "action", "action": "joinPick"}]}]
     ids = row_states(doc, ident, tuple(texts), tuple(tint for _ in texts))
+    # The server's levelshot, which the tiles show (tile_view).
+    from build_retained_screens import picture
+    doc.state[f"{key}.shot"] = {"type": "string", "initial": ""}
+    shot = picture(f"{ident}-shot", "", {**absolute(left=TILE_SHOT[0], top=TILE_SHOT[1], width=TILE_SHOT[2], height=TILE_SHOT[3]),
+                                         "display": keyword("none"), "pointer-events": keyword("none")}, fit="fill")
+    doc.bind(f"{ident}-shot.image", f"{ident}-shot", "image", {"state": f"{key}.shot"})
+    cells.append(shot)
     # The row's opacity rests at 1; row.reveal fades it in (rowReveal).
     return group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(height),
                          "flex-shrink": number(0), "opacity": number(1)}, [*row_plates(ident, width, height, selectable=True), *cells],
@@ -788,11 +943,12 @@ def join_game_document() -> dict:
     })
     heading_tint = {**typeface("marine", TAG_TEXT, U * 16, [1, 1, 1, 0.5]), "white-space": keyword("nowrap"), "overflow": keyword("hidden")}
     tags = source_tags()
-    parts = [header_band("join-header", *HEADER),
+    parts = [browser_header(),
              label("join-source", "#str_200032", {**absolute(left=U * SOURCE[0], top=U * SOURCE[1],
                                                              width=U * (tags[0][2] - TAG_GAP - SOURCE[0]), height=U * 16), **heading_tint})]
     parts += [source_tag(doc, f"join_{ident}", key, left, width, verb, lan) for ident, key, left, width, verb, lan in tags]
     parts += mod_filter(doc)
+    parts.append(view_button(doc))
     parts += filter_row(doc)
     parts += [heading(doc, column, sort, key, left, width, verb) for column, sort, key, left, width, verb in COLUMNS]
 
@@ -876,7 +1032,7 @@ def join_game_document() -> dict:
     # The chosen server's levelshot (the session's join.shot), in the stock
     # frame between the list's actions and JOIN SERVER.
     doc.state["join.shot"] = {"type": "string", "initial": ""}
-    parts += picture_frame("join-shot", *SHOT)
+    parts += picture_frame("join-shot", *SHOT, fit="fill")   # a levelshot: a square texture of a 4:3 picture
     doc.bind("join-shot.image", "join-shot", "image", {"state": "join.shot"})
     join = primary_plate(doc, "join_server", "#str_200031", *JOIN, action="joinServer", label_box=(43.0, 6.0, 180.0, 25.0), text=23.7,
                          marker=(13.0, 9.5, 18.0))
@@ -922,7 +1078,7 @@ def join_game_document() -> dict:
     result = subpage_document(doc, "join", "#str_200002", "#str_200187", "join_newlist", [*parts, join, spectate, favorite, back, detail],
                               [join_ip_modal(doc), find_modal(doc)], stretch=("servers-list",))
     grow_status(doc, result)
-    return tall_join_page(result)
+    return tile_view(tall_join_page(result))
 
 
 def grow_empty_line(doc: Document, sentence: dict, plates: list) -> None:

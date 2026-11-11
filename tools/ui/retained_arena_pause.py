@@ -58,7 +58,7 @@ def match_block(doc: Document) -> dict:
         b.marker_path("mark", 14, 16, 8, rgb(MARKER)),
     ])
     pw, ph = w - 30, U * 118
-    shot = picture("match-shot", "", {**absolute(left=15, top=header + 12, width=pw, height=ph)})
+    shot = b.level_picture("match-shot", 15, header + 12, pw, ph)
     shot_frame = vector("match-shot-frame", absolute(left=15, top=header + 12, width=pw, height=ph), [
         path("frame", [(0.5, 0.5), ({"fraction": 1, "dp": -0.5}, 0.5), ({"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -0.5}),
                        (0.5, {"fraction": 1, "dp": -0.5})], stroke=stroke(solid(rgb(PICTURE)), 1.5))])

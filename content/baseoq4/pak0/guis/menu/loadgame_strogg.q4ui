@@ -226,6 +226,7 @@
   "deleteModal.visible": {"type": "boolean", "initial": false},
   "deleteModal.contents": {"type": "boolean", "initial": false},
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
+  "motion_reduced": {"type": "boolean", "initial": false, "cvar": "ui_retainedReducedMotion"},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "view.safeLeft": {"type": "number", "initial": 0, "view": "safeLeft"},
   "view.safeTop": {"type": "number", "initial": 0, "view": "safeTop"},
@@ -860,11 +861,13 @@
   ],
   "deleteModalShown": [
    {"op": "setState", "values": {"deleteModal.contents": true}},
-   {"op": "playTimeline", "timeline": "deleteModalTranslate"}
+   {"op": "playTimeline", "timeline": "deleteModalTranslate"},
+   {"op": "playTimeline", "timeline": "deleteModalEnergy"}
   ],
   "deleteModalHide": [
    {"op": "setState", "values": {"deleteModal.contents": false}},
-   {"op": "playTimeline", "timeline": "deleteModalLeave"}
+   {"op": "playTimeline", "timeline": "deleteModalLeave"},
+   {"op": "cancelTimeline", "timeline": "deleteModalEnergy", "policy": "base"}
   ],
   "deleteModalHidden": [{"op": "setState", "values": {"deleteModal.visible": false}}],
   "deleteRequested": [
@@ -13527,53 +13530,53 @@
     "op": "select",
     "args": [
      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-     234.579,
+     241.142,
      {
       "op": "select",
       "args": [
        {"op": "==", "args": [{"state": "language"}, "czech"]},
-       211.759,
+       218.322,
        {
         "op": "select",
         "args": [
          {"op": "==", "args": [{"state": "language"}, "english"]},
-         225.083,
+         231.646,
          {
           "op": "select",
           "args": [
            {"op": "==", "args": [{"state": "language"}, "french"]},
-           193.874,
+           200.437,
            {
             "op": "select",
             "args": [
              {"op": "==", "args": [{"state": "language"}, "german"]},
-             249.095,
+             255.658,
              {
               "op": "select",
               "args": [
                {"op": "==", "args": [{"state": "language"}, "italian"]},
-               259.425,
+               265.988,
                {
                 "op": "select",
                 "args": [
                  {"op": "==", "args": [{"state": "language"}, "polish"]},
-                 183.597,
+                 190.159,
                  {
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "russian"]},
-                   213.603,
+                   220.165,
                    {
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "spanish"]},
-                     261.599,
+                     268.161,
                      {
                       "op": "select",
                       "args": [
                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                       191.199,
-                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 221.308, 270.076]}
+                       197.761,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 227.87, 276.638]}
                       ]
                      }
                     ]
@@ -13762,6 +13765,25 @@
    "node": "deleteModal_no-label",
    "property": "line-height",
    "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "deleteModal-energy.display",
+   "node": "deleteModal-energy",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "deleteModal.contents"}, {"op": "!", "args": [{"state": "motion_reduced"}]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "text.deleteModal-energy-fit.display",
+   "node": "deleteModal-energy-fit",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "none", "block"]}
   },
   {
    "id": "text.deleteModal-dialog.height",
@@ -22743,10 +22765,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22801,10 +22823,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22859,10 +22881,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.185, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [5.185, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -23023,10 +23045,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -23081,10 +23103,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [4.185, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -23139,10 +23161,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.185, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [5.185, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -35471,10 +35493,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.6, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [3.6, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -35529,10 +35551,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.6, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [3.6, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -35587,10 +35609,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.6, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [4.6, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -37300,6 +37322,60 @@
    ]
   },
   {
+   "id": "deleteModalEnergy",
+   "durationMs": 7200.0,
+   "tracks": [
+    {
+     "node": "deleteModal-energy-run",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "deleteModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "deleteModal-energy-halo",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.35}},
+      {"atMs": 3600.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0.35}}
+     ]
+    },
+    {
+     "node": "deleteModal-energy-wave",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 900.0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 204.0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 204.0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "deleteModal-energy-wave",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}},
+      {"atMs": 900.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 1100.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2200.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2400.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ],
+   "iterations": 0
+  },
+  {
    "id": "deleteModalEnter",
    "durationMs": 200,
    "tracks": [
@@ -37576,10 +37652,12 @@
          {
           "id": "back",
           "commands": [
-           {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+           {"id": "p0", "op": "move", "points": [[{"fraction": 0.075716}, {"fraction": 0.0}]]},
            {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
-           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-           {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.912409}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.886426}, {"fraction": 1}]]},
+           {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+           {"id": "p5", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.058394}]]},
            {"id": "close", "op": "close"}
           ],
           "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.6]}}
@@ -37597,6 +37675,23 @@
          "top": {"type": "length", "value": 118.5, "unit": "dp"},
          "width": {"type": "length", "value": 271.5, "unit": "dp"},
          "height": {"type": "length", "value": 202.5, "unit": "dp"}
+        },
+        "mask": {
+         "paths": [
+          {
+           "id": "cut",
+           "commands": [
+            {"id": "p0", "op": "move", "points": [[19.262, 0]]},
+            {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+            {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -17.121}]]},
+            {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -29.654}, {"fraction": 1}]]},
+            {"id": "p4", "op": "line", "points": [[0, {"fraction": 1}]]},
+            {"id": "p5", "op": "line", "points": [[0, 11.121]]},
+            {"id": "close", "op": "close"}
+           ],
+           "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+          }
+         ]
         }
        },
        {
@@ -37614,10 +37709,12 @@
          {
           "id": "border",
           "commands": [
-           {"id": "p0", "op": "move", "points": [[{"fraction": 0.002732}, {"fraction": 0.00365}]]},
+           {"id": "p0", "op": "move", "points": [[{"fraction": 0.076845}, {"fraction": 0.00365}]]},
            {"id": "p1", "op": "line", "points": [[{"fraction": 0.997268}, {"fraction": 0.00365}]]},
-           {"id": "p2", "op": "line", "points": [[{"fraction": 0.997268}, {"fraction": 0.99635}]]},
-           {"id": "p3", "op": "line", "points": [[{"fraction": 0.002732}, {"fraction": 0.99635}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 0.997268}, {"fraction": 0.9109}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.885297}, {"fraction": 0.99635}]]},
+           {"id": "p4", "op": "line", "points": [[{"fraction": 0.002732}, {"fraction": 0.99635}]]},
+           {"id": "p5", "op": "line", "points": [[{"fraction": 0.002732}, {"fraction": 0.059903}]]},
            {"id": "close", "op": "close"}
           ],
           "stroke": {
@@ -37627,6 +37724,66 @@
            "join": "miter",
            "cap": "butt"
           }
+         },
+         {
+          "id": "rail-lead",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[{"fraction": 0.002732}, {"fraction": 0.5}]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 0.002732}, {"fraction": 0.059903}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 0.076845}, {"fraction": 0.00365}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 0.00365}]]}
+          ],
+          "stroke": {
+           "paint": {
+            "type": "linear",
+            "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+            "to": [{"fraction": 0.5}, {"fraction": 0.9}],
+            "stops": [
+             {"at": 0, "color": {"type": "color", "value": [0.9608, 0.5843, 0.0706, 0.85]}},
+             {"at": 0.34, "color": {"type": "color", "value": [0.9608, 0.5843, 0.0706, 0]}},
+             {"at": 1, "color": {"type": "color", "value": [0.9608, 0.5843, 0.0706, 0]}}
+            ]
+           },
+           "widthDp": 2.25,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         },
+         {
+          "id": "rail-trail",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[{"fraction": 0.997268}, {"fraction": 0.5}]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 0.997268}, {"fraction": 0.9109}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 0.885297}, {"fraction": 0.99635}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 0.99635}]]}
+          ],
+          "stroke": {
+           "paint": {
+            "type": "linear",
+            "from": [{"fraction": 1}, {"fraction": 1}],
+            "to": [{"fraction": 0.5}, {"fraction": 0.1}],
+            "stops": [
+             {"at": 0, "color": {"type": "color", "value": [0.9608, 0.5843, 0.0706, 0.85]}},
+             {"at": 0.34, "color": {"type": "color", "value": [0.9608, 0.5843, 0.0706, 0]}},
+             {"at": 1, "color": {"type": "color", "value": [0.9608, 0.5843, 0.0706, 0]}}
+            ]
+           },
+           "widthDp": 2.25,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         },
+         {
+          "id": "mark",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[{"fraction": 0.958106}, {"fraction": 0.021898}]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 0.983607}, {"fraction": 0.021898}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 0.983607}, {"fraction": 0.055961}]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.9608, 0.5843, 0.0706, 0.8]}}
          }
         ]
        },
@@ -57114,6 +57271,204 @@
           }
          },
          {
+          "id": "deleteModal-energy-fit",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "height": {"type": "length", "value": 100, "unit": "%"},
+           "display": {"type": "keyword", "value": "block"},
+           "pointer-events": {"type": "keyword", "value": "none"}
+          },
+          "children": [
+           {
+            "id": "deleteModal-energy",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "children": [
+             {
+              "id": "deleteModal-energy-halo",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 480.0, "unit": "dp"},
+               "height": {"type": "length", "value": 204.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 0.35}
+              },
+              "paths": [
+               {
+                "id": "halo",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[6.562, 3.562]]},
+                 {"id": "p1", "op": "line", "points": [[13.125, 3.562]]},
+                 {"id": "p2", "op": "line", "points": [[42.569, 20.562]]},
+                 {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
+                 {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
+                 {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
+                 {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
+                 {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
+                 {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.8, 0.0, 0.3]}},
+                 "widthDp": 10.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                },
+                "blend": "additive"
+               }
+              ]
+             },
+             {
+              "id": "deleteModal-energy-wave",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -16, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 512.0, "unit": "dp"},
+               "height": {"type": "length", "value": 46.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 0},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}
+              },
+              "paths": [
+               {
+                "id": "wave",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [0, 0],
+                 "to": [0, {"fraction": 1}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0]}},
+                  {"at": 0.6, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0.7]}},
+                  {"at": 1, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0]}}
+                 ]
+                },
+                "blend": "additive"
+               }
+              ]
+             },
+             {
+              "id": "deleteModal-energy-run",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -32.776, "unit": "dp"},
+               "top": {"type": "length", "value": -170.776, "unit": "dp"},
+               "width": {"type": "length", "value": 545.552, "unit": "dp"},
+               "height": {"type": "length", "value": 545.552, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "children": [
+               {
+                "id": "deleteModal-energy-line",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "paths": [
+                 {
+                  "id": "line",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                   {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                   {"id": "p2", "op": "line", "points": [[75.345, 191.338]]},
+                   {"id": "p3", "op": "line", "points": [[367.082, 191.338]]},
+                   {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                   {"id": "p5", "op": "line", "points": [[506.214, 174.338]]},
+                   {"id": "p6", "op": "line", "points": [[506.214, 369.432]]},
+                   {"id": "p7", "op": "line", "points": [[77.338, 369.432]]},
+                   {"id": "p8", "op": "line", "points": [[39.338, 347.492]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.8, 0.0, 0.9]}},
+                   "widthDp": 10.5,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               }
+              ],
+              "mask": {
+               "paths": [
+                {
+                 "id": "first",
+                 "commands": [
+                  {"id": "p0", "op": "move", "points": [[272.776, 272.776]]},
+                  {"id": "p1", "op": "line", "points": [[102.822, 38.855]]},
+                  {"id": "p2", "op": "line", "points": [[183.426, -2.215]]},
+                  {"id": "p3", "op": "line", "points": [[272.776, -16.367]]},
+                  {"id": "close", "op": "close"}
+                 ],
+                 "fill": {
+                  "type": "linear",
+                  "from": [102.822, 38.855],
+                  "to": [272.776, -16.367],
+                  "stops": [
+                   {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                  ]
+                 }
+                },
+                {
+                 "id": "second",
+                 "commands": [
+                  {"id": "p0", "op": "move", "points": [[272.776, 272.776]]},
+                  {"id": "p1", "op": "line", "points": [[442.73, 506.697]]},
+                  {"id": "p2", "op": "line", "points": [[362.126, 547.767]]},
+                  {"id": "p3", "op": "line", "points": [[272.776, 561.919]]},
+                  {"id": "close", "op": "close"}
+                 ],
+                 "fill": {
+                  "type": "linear",
+                  "from": [442.73, 506.697],
+                  "to": [272.776, 561.919],
+                  "stops": [
+                   {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                  ]
+                 }
+                }
+               ]
+              }
+             }
+            ]
+           }
+          ]
+         },
+         {
           "id": "deleteModal-frame",
           "type": "vector",
           "properties": {
@@ -57192,10 +57547,10 @@
             "type": "vector",
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
-             "left": {"type": "length", "value": 10.875, "unit": "dp"},
+             "left": {"type": "length", "value": 4.312, "unit": "dp"},
              "top": {"type": "length", "value": 3.562, "unit": "dp"},
-             "width": {"type": "length", "value": 270.076, "unit": "dp"},
-             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "width": {"type": "length", "value": 276.638, "unit": "dp"},
+             "height": {"type": "length", "value": 19.25, "unit": "dp"},
              "pointer-events": {"type": "keyword", "value": "none"}
             },
             "paths": [
@@ -57205,7 +57560,8 @@
                {"id": "p0", "op": "move", "points": [[0, 0]]},
                {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -29.444}, 0]]},
                {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
-               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 1}, 19.25]]},
+               {"id": "p4", "op": "line", "points": [[0, 19.25]]},
                {"id": "close", "op": "close"}
               ],
               "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
@@ -57263,7 +57619,7 @@
              "text": {"type": "text", "value": "#str_200021"},
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 42.569, "unit": "dp"},
-             "top": {"type": "length", "value": -5.945, "unit": "dp"},
+             "top": {"type": "length", "value": -2.945, "unit": "dp"},
              "width": {"type": "length", "value": 291.737, "unit": "dp"},
              "height": {"type": "length", "value": 24, "unit": "dp"},
              "font-family": {"type": "font", "value": "strogg"},
@@ -57281,7 +57637,7 @@
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 39.569, "unit": "dp"},
-             "top": {"type": "length", "value": -7.0, "unit": "dp"},
+             "top": {"type": "length", "value": -4.0, "unit": "dp"},
              "width": {"type": "length", "value": 297.737, "unit": "dp"},
              "height": {"type": "length", "value": 30.0, "unit": "dp"},
              "opacity": {"type": "number", "value": 1},

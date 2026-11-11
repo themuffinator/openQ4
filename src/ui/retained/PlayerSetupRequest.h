@@ -4,7 +4,7 @@
 
 namespace openq4::ui {
 
-enum class PlayerSetupField { Name, Clan, Model, Page, Rail, Rotation };
+enum class PlayerSetupField { Name, Clan, Model, Page, Rail, Rotation, ForceModel };
 struct PlayerSetupRequest {
     PlayerSetupField field = PlayerSetupField::Name;
     StateValue value;

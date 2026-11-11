@@ -5096,10 +5096,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5154,10 +5154,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5212,10 +5212,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [8.065, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [8.065, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5376,10 +5376,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5434,10 +5434,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5492,10 +5492,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [8.065, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [8.065, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5656,10 +5656,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5714,10 +5714,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [7.065, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -5772,10 +5772,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [8.065, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [8.065, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -10970,10 +10970,12 @@
          {
           "id": "back",
           "commands": [
-           {"id": "p0", "op": "move", "points": [[0, 0]]},
+           {"id": "p0", "op": "move", "points": [[12.0, 0]]},
            {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -18.0}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -18.0}, {"fraction": 1}]]},
+           {"id": "p4", "op": "line", "points": [[0, {"fraction": 1}]]},
+           {"id": "p5", "op": "line", "points": [[0, 12.0]]},
            {"id": "close", "op": "close"}
           ],
           "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.6]}}
@@ -10985,12 +10987,29 @@
         "type": "image",
         "properties": {
          "image": {"type": "image", "value": ""},
-         "image-fit": {"type": "keyword", "value": "contain"},
+         "image-fit": {"type": "keyword", "value": "fill"},
          "position": {"type": "keyword", "value": "absolute"},
          "left": {"type": "length", "value": 594.0, "unit": "dp"},
          "top": {"type": "length", "value": 117.0, "unit": "dp"},
          "width": {"type": "length", "value": 207.0, "unit": "dp"},
          "height": {"type": "length", "value": 154.5, "unit": "dp"}
+        },
+        "mask": {
+         "paths": [
+          {
+           "id": "cut",
+           "commands": [
+            {"id": "p0", "op": "move", "points": [[11.121, 0]]},
+            {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+            {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -17.121}]]},
+            {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -17.121}, {"fraction": 1}]]},
+            {"id": "p4", "op": "line", "points": [[0, {"fraction": 1}]]},
+            {"id": "p5", "op": "line", "points": [[0, 11.121]]},
+            {"id": "close", "op": "close"}
+           ],
+           "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+          }
+         ]
         }
        },
        {
@@ -11008,10 +11027,12 @@
          {
           "id": "border",
           "commands": [
-           {"id": "p0", "op": "move", "points": [[0.75, 0.75]]},
+           {"id": "p0", "op": "move", "points": [[12.31, 0.75]]},
            {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, 0.75]]},
-           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -0.75}]]},
-           {"id": "p3", "op": "line", "points": [[0.75, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -18.31}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -18.31}, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p4", "op": "line", "points": [[0.75, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p5", "op": "line", "points": [[0.75, 12.31]]},
            {"id": "close", "op": "close"}
           ],
           "stroke": {
@@ -11021,6 +11042,66 @@
            "join": "miter",
            "cap": "butt"
           }
+         },
+         {
+          "id": "rail-lead",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[0.75, {"fraction": 0.5}]]},
+           {"id": "p1", "op": "line", "points": [[0.75, 12.31]]},
+           {"id": "p2", "op": "line", "points": [[12.31, 0.75]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, 0.75]]}
+          ],
+          "stroke": {
+           "paint": {
+            "type": "linear",
+            "from": [0, 0],
+            "to": [{"fraction": 0.5}, {"fraction": 0.9}],
+            "stops": [
+             {"at": 0, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.85]}},
+             {"at": 0.34, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}},
+             {"at": 1, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}}
+            ]
+           },
+           "widthDp": 2.25,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         },
+         {
+          "id": "rail-trail",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 0.5}]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -18.31}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -18.31}, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 1, "dp": -0.75}]]}
+          ],
+          "stroke": {
+           "paint": {
+            "type": "linear",
+            "from": [{"fraction": 1}, {"fraction": 1}],
+            "to": [{"fraction": 0.5}, {"fraction": 0.1}],
+            "stops": [
+             {"at": 0, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.85]}},
+             {"at": 0.34, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}},
+             {"at": 1, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}}
+            ]
+           },
+           "widthDp": 2.25,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         },
+         {
+          "id": "mark",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[{"fraction": 1, "dp": -11.5}, 4.5]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -4.5}, 4.5]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -4.5}, 11.5]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.8]}}
          }
         ]
        }
@@ -11054,10 +11135,12 @@
          {
           "id": "back",
           "commands": [
-           {"id": "p0", "op": "move", "points": [[0, 0]]},
+           {"id": "p0", "op": "move", "points": [[12.0, 0]]},
            {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -18.0}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -18.0}, {"fraction": 1}]]},
+           {"id": "p4", "op": "line", "points": [[0, {"fraction": 1}]]},
+           {"id": "p5", "op": "line", "points": [[0, 12.0]]},
            {"id": "close", "op": "close"}
           ],
           "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.6]}}
@@ -11069,12 +11152,29 @@
         "type": "image",
         "properties": {
          "image": {"type": "image", "value": ""},
-         "image-fit": {"type": "keyword", "value": "contain"},
+         "image-fit": {"type": "keyword", "value": "fill"},
          "position": {"type": "keyword", "value": "absolute"},
          "left": {"type": "length", "value": 594.0, "unit": "dp"},
          "top": {"type": "length", "value": 117.0, "unit": "dp"},
          "width": {"type": "length", "value": 207.0, "unit": "dp"},
          "height": {"type": "length", "value": 154.5, "unit": "dp"}
+        },
+        "mask": {
+         "paths": [
+          {
+           "id": "cut",
+           "commands": [
+            {"id": "p0", "op": "move", "points": [[11.121, 0]]},
+            {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+            {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -17.121}]]},
+            {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -17.121}, {"fraction": 1}]]},
+            {"id": "p4", "op": "line", "points": [[0, {"fraction": 1}]]},
+            {"id": "p5", "op": "line", "points": [[0, 11.121]]},
+            {"id": "close", "op": "close"}
+           ],
+           "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+          }
+         ]
         }
        },
        {
@@ -11092,10 +11192,12 @@
          {
           "id": "border",
           "commands": [
-           {"id": "p0", "op": "move", "points": [[0.75, 0.75]]},
+           {"id": "p0", "op": "move", "points": [[12.31, 0.75]]},
            {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, 0.75]]},
-           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -0.75}]]},
-           {"id": "p3", "op": "line", "points": [[0.75, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -18.31}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -18.31}, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p4", "op": "line", "points": [[0.75, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p5", "op": "line", "points": [[0.75, 12.31]]},
            {"id": "close", "op": "close"}
           ],
           "stroke": {
@@ -11105,6 +11207,66 @@
            "join": "miter",
            "cap": "butt"
           }
+         },
+         {
+          "id": "rail-lead",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[0.75, {"fraction": 0.5}]]},
+           {"id": "p1", "op": "line", "points": [[0.75, 12.31]]},
+           {"id": "p2", "op": "line", "points": [[12.31, 0.75]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, 0.75]]}
+          ],
+          "stroke": {
+           "paint": {
+            "type": "linear",
+            "from": [0, 0],
+            "to": [{"fraction": 0.5}, {"fraction": 0.9}],
+            "stops": [
+             {"at": 0, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.85]}},
+             {"at": 0.34, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}},
+             {"at": 1, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}}
+            ]
+           },
+           "widthDp": 2.25,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         },
+         {
+          "id": "rail-trail",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 0.5}]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -18.31}]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -18.31}, {"fraction": 1, "dp": -0.75}]]},
+           {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 1, "dp": -0.75}]]}
+          ],
+          "stroke": {
+           "paint": {
+            "type": "linear",
+            "from": [{"fraction": 1}, {"fraction": 1}],
+            "to": [{"fraction": 0.5}, {"fraction": 0.1}],
+            "stops": [
+             {"at": 0, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.85]}},
+             {"at": 0.34, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}},
+             {"at": 1, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}}
+            ]
+           },
+           "widthDp": 2.25,
+           "minimumPixels": 1,
+           "join": "miter",
+           "cap": "butt"
+          }
+         },
+         {
+          "id": "mark",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[{"fraction": 1, "dp": -11.5}, 4.5]]},
+           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -4.5}, 4.5]]},
+           {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -4.5}, 11.5]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.8]}}
          }
         ]
        }

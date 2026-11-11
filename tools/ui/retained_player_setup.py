@@ -10,7 +10,8 @@ from build_retained_screens import (CANVAS_W, FULL, OLIVE, ORANGE, TEXT, VALUE, 
                                     label, length, linear, number, path, rgb, solid, stroke, text_sum, text_times, text_width, transform,
                                     typeface, vector)
 from retained_create_server import text_row
-from retained_mp_menus import any_text, in_game_plate, stack_row, value_row
+from retained_mp_menus import (APPEARANCE_ROWS, OUTLINE_WIDTHS, any_text, cvar_state, in_game_plate, setting_action, stack_row,
+                               value_row)
 from retained_saves import table_text
 
 MODEL_ROWS = 128  # Bounded choice page, not a limit on the installed catalog.
@@ -135,6 +136,87 @@ def player_setup(doc: Document) -> dict:
                           value={"state": "setup.rotation"}, action=action, slider=(0, 360, 5, 0), row_h=ROW_H, wrap=True))
     rail, rail_controls = rail_row(doc)
     rows.append(rail)
+    own = [row["id"] for row in rows]
+    # The page held the player's own name, model and rail color. It now has
+    # three tabs (user note, 11 November 2026): PLAYER, those rows and the
+    # handicap; OPPONENTS and TEAMMATES, how each side is drawn: its outline,
+    # rim light, their color, its brightskin and that color, the settings the
+    # in-game card's Settings page has (retained_mp_menus.settings_page), set
+    # the same way (settings.player.set, read back from each CVar). The
+    # outline's width, which both sides share, stands on OPPONENTS, and
+    # TEAMMATES says that its rows apply in team modes.
+    rows.append(value_row(doc, "setup-handicap", "#str_223001", "slider", WIDTH, VALUE_X, value=cvar_state(doc, "ui_handicap", "number"),
+                          action=setting_action(doc, "ui_handicap", "number"), slider=(1, 100, 1, 0), row_h=ROW_H, wrap=True))
+    own.append("setup-handicap")
+    sides = {1: [], 2: []}
+    # OPPONENTS' first row forces a model on every other player outside team
+    # modes (g_forceModel), from the same catalog page as the player's own
+    # model, through the same proposal: Off, then the page's models. The
+    # in-game card's Settings page forces the two teams' models, which depend
+    # on the team the player is on.
+    doc.state.update({"setup.force_row": {"type": "number", "initial": -1}, "setup.observed_force": {"type": "string", "initial": ""}})
+    forced = [(("#str_41207", 0), -1)] + [({"state": f"setup.model.{row}.name"}, row) for row in range(MODEL_ROWS)]
+    rows.append(value_row(doc, "setup-enemy-model", "#str_41204", "choice", WIDTH, VALUE_X, value={"state": "setup.force_row"},
+                          action=proposal(doc, "force", "force_model", value={"input": "value"}, expected="setup.observed_force",
+                                          kind="number"),
+                          entries=forced, count={"op": "+", "args": [{"state": "setup.model_count"}, 1]}, row_h=ROW_H,
+                          placement="setup-fields", wrap=True))
+    sides[1].append("setup-enemy-model")
+    for tab, side in ((1, "enemy"), (2, "team")):
+        for label_key, enemy, team, list_key, values in APPEARANCE_ROWS:
+            cvar = enemy if tab == 1 else team
+            node = f"setup-{side}-{cvar.split('_', 2)[2].replace('_' + side, '').replace('_', '-')}"
+            rows.append(value_row(doc, node, label_key, "choice", WIDTH, VALUE_X, value=cvar_state(doc, cvar, "string"),
+                                  action=setting_action(doc, cvar, "string"),
+                                  entries=[((list_key, option), value) for option, value in enumerate(values)], row_h=ROW_H,
+                                  placement="setup-fields", wrap=True))
+            sides[tab].append(node)
+    rows.append(value_row(doc, "setup-outline-width", "#str_41211", "choice", WIDTH, VALUE_X,
+                          value=cvar_state(doc, "cl_player_outline_width", "string"), action=setting_action(doc, "cl_player_outline_width", "string"),
+                          entries=[(("#str_41214", option), value) for option, value in enumerate(OUTLINE_WIDTHS)], row_h=ROW_H,
+                          placement="setup-fields", wrap=True))
+    sides[1].append("setup-outline-width")
+    team_note = label("setup-team-note", "#str_41212", {"position": keyword("relative"), "width": length(WIDTH), "height": length(40),
+                                                        **typeface("lowpixel", 14, 20, [1, 1, 1, 0.6]), "white-space": keyword("normal"),
+                                                        "overflow": keyword("hidden"), "display": keyword("block")})
+    rows.append(team_note)
+    sides[2].append("setup-team-note")
+    value_rows = [ident for ident in sides[1] + sides[2] if ident != "setup-team-note"] + ["setup-handicap"]
+    # Each row shows on its tab alone.
+    doc.state["setup.tab"] = {"type": "number", "initial": 0}
+    by_id = {row["id"]: row for row in rows}
+    for tab, idents in ((0, own), (1, sides[1]), (2, sides[2])):
+        for ident in idents:
+            row = by_id[ident]
+            shown = row["properties"].get("display", keyword("block"))["value"]
+            row["properties"]["display"] = keyword(shown if tab == 0 else "none")
+            doc.bind(f"{ident}.tab", ident, "display", {"op": "select", "args": [{"op": "==", "args": [{"state": "setup.tab"}, tab]}, shown, "none"]})
+    # The tabs: three plates across the rows' width, the shown one underlined.
+    # One text size for the three, the largest (up to the plates' 20 dp) at
+    # which every language's labels fit across the rows' width, each tab as
+    # wide as its longest label needs and a share of what is left.
+    names = (("setup-tab-player", "#str_200255"), ("setup-tab-opponents", "#str_42037"), ("setup-tab-teammates", "#str_42038"))
+    widest = [max(text_width("marine", text, 1) for text in table_text(key).values()) for _, key in names]
+    room = WIDTH - 12
+    tab_text = min(20.0, int((room - 36 * len(names)) / sum(widest) * 2) / 2)
+    spare = (room - sum(36 + tab_text * width for width in widest)) / len(names)
+    tabs, tab_left = [], 0.0
+    for tab, (ident, key) in enumerate(names):
+        tab_w = round(36 + tab_text * widest[tab] + spare, 3)
+        doc.events[f"setupTab{tab}"] = [{"op": "setState", "values": {"setup.tab": tab}}]
+        plate = in_game_plate(doc, ident, key, round(tab_left, 3), 0, width=tab_w, event=f"setupTab{tab}")
+        tab_left += tab_w + 6
+        caption = next(node for node in plate["children"] if node["id"].endswith("-label"))
+        caption["properties"]["font-size"] = length(tab_text)
+        mark = vector(f"{ident}-shown", {**absolute(left=20, top=38, width=tab_w - 40, height=3), "display": keyword("none"),
+                                         "pointer-events": keyword("none")},
+                      [path("bar", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, 3), (0, 3)], fill=solid(rgb(ORANGE)))])
+        doc.bind(f"{ident}-shown.display", f"{ident}-shown", "display",
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "setup.tab"}, tab]}, "block", "none"]})
+        plate["children"].append(mark)
+        tabs.append(plate)
+    rows.insert(0, group("setup-tabs", {"position": keyword("relative"), "width": length(WIDTH), "height": length(44),
+                                        "flex-shrink": number(0)}, tabs))
     doc.session("playerSetupClose", "playerSetupClose")
     rows.append(in_game_plate(doc, "setup-close", "#str_230045", 0, 0, width=WIDTH, action="playerSetupClose"))
     # Let the rows flow in a viewport: enlarged text and narrow windows retain
@@ -145,8 +227,10 @@ def player_setup(doc: Document) -> dict:
     # Above 100 % text each setting's value stands under its label and the
     # rows scroll (section 2's reflow); the plates are furniture.
     for row in rows:
-        if row["id"] in ("setup-name", "setup-clan", "setup-model", "setup-rotation"):
+        if row["id"] in ("setup-name", "setup-clan", "setup-model", "setup-rotation", *value_rows):
             stack_row(doc, row, WIDTH, VALUE_X, ROW_H)
+        elif row["id"] == "setup-team-note":
+            doc.bind("text.setup-team-note.height", "setup-team-note", "height", text_times(40))
         elif row["id"] == "setup-rail":
             stack_rail(doc, row)
         else:
@@ -180,7 +264,8 @@ def player_setup(doc: Document) -> dict:
     pane = group("setup-panel", {**absolute(left=0, top=0, width=CANVAS_W, height=720), "display": keyword("none")},
                  [model, heading, current, fields, notice])
     doc.bind("setup-panel.display", "setup-panel", "display", {"op": "select", "args": [{"state": "setup.open"}, "block", "none"]})
-    tall_player_setup(doc, pane, rows)
+    # A tall view sizes the rows for the tab with the most: the player's.
+    tall_player_setup(doc, pane, [row for row in rows if row["id"] in ("setup-tabs", "setup-close", *own)])
     return pane
 
 

@@ -48,6 +48,7 @@ OUTPUTS = {
     "savegame_strogg": PAK0 / "guis" / "menu" / "savegame_strogg.q4ui",
     "restartlevel_strogg": PAK0 / "guis" / "menu" / "restartlevel_strogg.q4ui",
     "restartmenu": PAK0 / "guis" / "menu" / "restartmenu.q4ui",
+    "msgbox": PAK0 / "guis" / "menu" / "msgbox.q4ui",
     "credits": PAK0 / "guis" / "menu" / "credits.q4ui",
     "demos": PAK0 / "guis" / "menu" / "demos.q4ui",
     "arena": PAK0 / "guis" / "menu" / "arena.q4ui",
@@ -82,6 +83,7 @@ RAIL_DARK = "#CCCC51"
 RAIL_CARD = "#A0A040"
 GLOW = "#616F26"
 GLOW_MODAL = "#454E1B"   # popup_bg plateau (Appendix B.1)
+ENERGY_HOT = "#EEF2A2"   # the pop-up's running pulses: the rail's #CCCC51, hot
 RIM = "#626934"
 PLINTH = "#3E4A21"
 PROGRESS = "#E06C00"
@@ -123,6 +125,15 @@ def image(source: str) -> dict:
 
 def transform(tx: float = 0, ty: float = 0, sx: float = 1, sy: float = 1) -> dict:
     return {"type": "transform", "unit": "dp", "value": [round(tx, 3), round(ty, 3), sx, sy, 0]}
+
+
+def pop(width: float, tx: float = 0, ty: float = 0) -> dict:
+    """A hot plate label's 3 % pop, held at its leading edge. The scale is
+    about the label box's middle, so alone it ran the first letter 1.5 % of
+    the box's width back over the plate's corner marker (user note,
+    11 November 2026); this moves the box that far on, and the label grows
+    away from the marker. `width` is the label box's, in dp."""
+    return transform(tx=tx + width * 0.015, ty=ty, sx=1.03, sy=1.03)
 
 
 def absolute(left=None, top=None, width=None, height=None, right=None, bottom=None) -> dict:
@@ -399,7 +410,8 @@ def section_summaries(doc: Document, details: dict, sections: list) -> tuple:
         if shot_state:
             doc.state[shot_state] = {"type": "string", "initial": ""}
             left, top, width, height = SUMMARY_SHOT
-            frame = picture_frame(f"{summary_id(ident)}-shot", left, top, width, height)
+            # A save's 4:3 picture or a levelshot, a square texture of one: either fills the 4:3 frame.
+            frame = picture_frame(f"{summary_id(ident)}-shot", left, top, width, height, fit="fill")
             shots.append(group(f"{summary_id(ident)}-shots", {**absolute(left=0, top=0, width=CANVAS_W, height=720),
                                                                 "opacity": number(0), "pointer-events": keyword("none")}, frame))
             doc.bind(f"{summary_id(ident)}-shots.opacity", f"{summary_id(ident)}-shots", "opacity", shown(index))
@@ -947,13 +959,13 @@ def navigation_plate(doc: Document, ident: str, key: str, *, action: str | None 
                                 (f"{ident}-label", "color", colour([1, 1, 1, 0.8])), (f"{ident}-label", "transform", transform())], False),
         "hover": with_detail([(f"{ident}-plate", "opacity", number(0.8)), (f"{ident}-marker", "opacity", number(0)),
                               (f"{ident}-marker-hot", "opacity", number(1)), (f"{ident}-focus", "opacity", number(0)),
-                              (f"{ident}-label", "color", colour(rgb(ORANGE))), (f"{ident}-label", "transform", transform(sx=1.03, sy=1.03))], True),
+                              (f"{ident}-label", "color", colour(rgb(ORANGE))), (f"{ident}-label", "transform", pop(U * 314))], True),
         "focus": with_detail([(f"{ident}-plate", "opacity", number(0.8)), (f"{ident}-marker", "opacity", number(0)),
                               (f"{ident}-marker-hot", "opacity", number(1)), (f"{ident}-focus", "opacity", number(1)),
-                              (f"{ident}-label", "color", colour(rgb(ORANGE))), (f"{ident}-label", "transform", transform(sx=1.03, sy=1.03))], True),
+                              (f"{ident}-label", "color", colour(rgb(ORANGE))), (f"{ident}-label", "transform", pop(U * 314))], True),
         "pressed": with_detail([(f"{ident}-plate", "opacity", number(1)), (f"{ident}-marker", "opacity", number(0)),
                                 (f"{ident}-marker-hot", "opacity", number(1)), (f"{ident}-focus", "opacity", number(1)),
-                                (f"{ident}-label", "color", colour(rgb(ORANGE))), (f"{ident}-label", "transform", transform(tx=1, ty=1, sx=1.03, sy=1.03))], True),
+                                (f"{ident}-label", "color", colour(rgb(ORANGE))), (f"{ident}-label", "transform", pop(U * 314, 1, 1))], True),
         "disabled": with_detail([(f"{ident}-plate", "opacity", number(0.4)), (f"{ident}-marker", "opacity", number(0.4)),
                                  (f"{ident}-marker-hot", "opacity", number(0)), (f"{ident}-focus", "opacity", number(0)),
                                  (f"{ident}-label", "color", colour([1, 1, 1, 0.4])), (f"{ident}-label", "transform", transform())], False),
@@ -1314,11 +1326,11 @@ def action_plate(doc: Document, ident: str, key: str, left: float, top: float, *
         "default": [(f"{ident}-plate", "opacity", number(0.4)), (f"{ident}-marker", "opacity", number(0.4)), (f"{ident}-marker-hot", "opacity", number(0)),
                     (f"{ident}-focus", "opacity", number(0)), (f"{ident}-label", "color", colour([1, 1, 1, 0.8])), (f"{ident}-label", "transform", transform())],
         "hover": [(f"{ident}-plate", "opacity", number(0.8)), (f"{ident}-marker", "opacity", number(0)), (f"{ident}-marker-hot", "opacity", number(1)),
-                  (f"{ident}-focus", "opacity", number(0)), (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", transform(sx=1.03, sy=1.03))],
+                  (f"{ident}-focus", "opacity", number(0)), (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", pop(width - 30))],
         "focus": [(f"{ident}-plate", "opacity", number(0.8)), (f"{ident}-marker", "opacity", number(0)), (f"{ident}-marker-hot", "opacity", number(1)),
-                  (f"{ident}-focus", "opacity", number(1)), (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", transform(sx=1.03, sy=1.03))],
+                  (f"{ident}-focus", "opacity", number(1)), (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", pop(width - 30))],
         "pressed": [(f"{ident}-plate", "opacity", number(1)), (f"{ident}-marker", "opacity", number(0)), (f"{ident}-marker-hot", "opacity", number(1)),
-                    (f"{ident}-focus", "opacity", number(1)), (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", transform(tx=1, ty=1, sx=1.03, sy=1.03))],
+                    (f"{ident}-focus", "opacity", number(1)), (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", pop(width - 30, 1, 1))],
         "disabled": [(f"{ident}-plate", "opacity", number(0.4)), (f"{ident}-marker", "opacity", number(0.4)), (f"{ident}-marker-hot", "opacity", number(0)),
                      (f"{ident}-focus", "opacity", number(0)), (f"{ident}-label", "color", colour([1, 1, 1, 0.4])), (f"{ident}-label", "transform", transform())],
     })
@@ -1358,22 +1370,114 @@ SOFT_FOCUS_SATURATION = 0.8
 CLOSE_W = 210.0  # a notice's lone action is wider than YES and NO, so every language's CLOSE fits
 
 
-def modal_silhouette(width: float, height: float):
+MODAL_CORNER = 13.0              # dp: the raised section's trailing corner, cut at 45 degrees
+MODAL_LUG = (4.0, 38.0, 56.0)    # dp: the trailing edge's lug: how far out, how far under the raised line, its run
+MODAL_NOTCH = (6.0, 58.0, 88.0)  # dp: the foot's notch: its depth, how far from the trailing edge, its run
+
+
+def modal_silhouette(width: float, height: float, notch: bool = True):
     """The stock popup art's silhouette in a `width` x `height` dp dialog:
     popup_top, popup_mid and popup_btm stretch 512 texels across the rect, the
     art starting at texel 7 and ending after 504 (6.5625 dp in from each side
     at 480 dp); the raised sections start 4 of popup_top's 32 rows down
     (3.5625 dp) and the bottom edge leaves 6 of popup_btm's 64 rows (5.34 dp).
     The tooth's top ends at texel 14 and the slot opens to texel 388, about 73%
-    of the width; black at 0.70 with a 17 dp slot and a 38 dp chamfer."""
+    of the width; black at 0.70 with a 17 dp slot and a 38 dp chamfer.
+
+    The stock rectangle's plain trailing side and foot take the family's
+    45-degree steps (user note, 11 November 2026): the raised section's
+    trailing corner is cut, a lug stands 4 dp out of the trailing edge under
+    it, and the foot has a notch 6 dp deep toward its trailing end, through
+    which the glow shows. `notch` is false where a dialog's actions stand too
+    near its foot for one. Every step lies inside the dialog's lit margin."""
     inset, raised, bottom = width * 7 / 512, 3.5625, height - 5.34375
     slot_lead, slot_trail = width * 14 / 512, width * 388 / 512
     slot_depth, chamfer = 17.0, 38.0
     right = width - inset
+    out, under, run = MODAL_LUG
+    lug = raised + under
+    depth, clear, span = MODAL_NOTCH
+    trail, lead = right - clear, right - clear - span
+    foot = [(trail, bottom), (trail - depth, bottom - depth), (lead + depth, bottom - depth), (lead, bottom)] if notch else []
     return path("frame", [(inset, raised), (slot_lead, raised), (slot_lead + slot_depth, raised + slot_depth),
-                          (slot_trail - slot_depth, raised + slot_depth), (slot_trail, raised), (right, raised),
-                          (right, bottom), (inset + chamfer, bottom), (inset, bottom - chamfer)],
+                          (slot_trail - slot_depth, raised + slot_depth), (slot_trail, raised), (right - MODAL_CORNER, raised),
+                          (right, raised + MODAL_CORNER), (right, lug), (right + out, lug + out), (right + out, lug + run - out),
+                          (right, lug + run), (right, bottom), *foot, (inset + chamfer, bottom), (inset, bottom - chamfer)],
                 fill=solid([0, 0, 0, 0.7]))
+
+
+ENERGY_PERIOD_MS = 7200.0   # one turn of the frame's two pulses: one passes a point every 3.6 s
+ENERGY_TAIL = 0.1           # of a turn: a pulse's bright head and the tail behind it
+ENERGY_SWEEP = (46.0, 1500.0, 900.0)   # the wave through the glow: its height (dp), its run and its start (ms)
+
+
+def modal_energy(doc: "Document", ident: str, commands: list, width: float, height: float, rim_w: float,
+                 glow_tint: str, hot: str, shown: dict) -> dict:
+    """The pop-up's glow in motion (user note, 11 November 2026: energy
+    pulses, industrial rather than a soft light): under the frame and over
+    the glow,
+    - a faint light along the whole outline, 3 dp of it showing outside the
+      black frame, that swells and settles once a turn;
+    - two pulses that run around the outline, each a bright head with a tail
+      a tenth of a turn long: the outline drawn hot under a mask of two
+      wedges that turns about the dialog's centre, the outline inside it
+      turning back so it stays put (the emblem's old glint, sharpened);
+    - a wave of the glow's own light that falls through the dialog once a
+      turn, faint through the frame's fill and plain in its slot, its notch
+      and the margins.
+    It shows with the dialog's contents (`shown`) and never under reduced
+    motion; the looping timeline starts as the contents show and is
+    cancelled as the dialog hides. Returns the group, for the dialog."""
+    cx, cy = width / 2, height / 2
+    reach = round(math.hypot(cx, cy) + 12, 3)
+    side = 2 * reach
+
+    def outline(dx: float = 0.0, dy: float = 0.0) -> list:
+        moved = json.loads(json.dumps(commands))
+        for command in moved:
+            for at in command.get("points", []):
+                at[0], at[1] = round(at[0] + dx, 4), round(at[1] + dy, 4)
+        return moved
+
+    def spoke(angle: float) -> tuple:
+        return (round(reach + 1.06 * reach * math.sin(angle), 3), round(reach - 1.06 * reach * math.cos(angle), 3))
+
+    tail = 2 * math.pi * ENERGY_TAIL
+
+    def pulse(name: str, at: float) -> dict:
+        return path(name, [(reach, reach), spoke(at - tail), spoke(at - tail / 2), spoke(at)],
+                    fill=linear(spoke(at - tail), spoke(at), [(0, [1, 1, 1, 0]), (0.72, [1, 1, 1, 0.5]), (1, [1, 1, 1, 1])]))
+
+    whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
+    halo = vector(f"{ident}-energy-halo", {**absolute(left=0, top=0, width=width, height=height), "opacity": number(0.35)}, [
+        {"id": "halo", "commands": outline(), "stroke": stroke(solid(rgb(hot, 0.3)), rim_w + 6), "blend": "additive"}])
+    band, run, start = ENERGY_SWEEP
+    sweep = vector(f"{ident}-energy-wave", {**absolute(left=-16, top=0, width=width + 32, height=band), "opacity": number(0),
+                                            "transform": transform(ty=-band)}, [
+        path("wave", whole, fill=linear((0, 0), (0, {"fraction": 1}), [(0, rgb(glow_tint, 0)), (0.6, rgb(glow_tint, 0.7)),
+                                                                        (1, rgb(glow_tint, 0))]), blend="additive")])
+    runner = group(f"{ident}-energy-run", {**absolute(left=round(cx - reach, 3), top=round(cy - reach, 3), width=side, height=side),
+                                           "transform": rotation(0)}, [
+        vector(f"{ident}-energy-line", {**absolute(left=0, top=0, width=side, height=side), "transform": rotation(0)}, [
+            {"id": "line", "commands": outline(reach - cx, reach - cy), "stroke": stroke(solid(rgb(hot, 0.9)), rim_w + 6),
+             "blend": "additive"}])],
+        mask={"paths": [pulse("first", 0), pulse("second", math.pi)]})
+    if "motion_reduced" not in doc.state:
+        doc.state["motion_reduced"] = {"type": "boolean", "initial": False, "cvar": "ui_retainedReducedMotion"}
+    node = group(f"{ident}-energy", {**FULL, "display": keyword("none"), "pointer-events": keyword("none")}, [halo, sweep, runner])
+    doc.bind(f"{ident}-energy.display", f"{ident}-energy", "display",
+             {"op": "select", "args": [{"op": "&&", "args": [shown, {"op": "!", "args": [{"state": "motion_reduced"}]}]}, "block", "none"]})
+    period = ENERGY_PERIOD_MS
+    doc.timelines.add(f"{ident}Energy", period, [
+        track(f"{ident}-energy-run", "transform", [(0, rotation(0)), (period, rotation(360))]),
+        track(f"{ident}-energy-line", "transform", [(0, rotation(0)), (period, rotation(-360))]),
+        track(f"{ident}-energy-halo", "opacity", [(0, number(0.35)), (period / 2, number(1)), (period, number(0.35))]),
+        track(f"{ident}-energy-wave", "transform", [(0, transform(ty=-band)), (start, transform(ty=-band)),
+                                                    (start + run, transform(ty=height)), (period, transform(ty=height))]),
+        track(f"{ident}-energy-wave", "opacity", [(0, number(0)), (start, number(0)), (start + 200, number(1)),
+                                                  (start + run - 200, number(1)), (start + run, number(0)), (period, number(0))]),
+    ], iterations=0)
+    return node
 
 
 def from_foot(paths: list, height: float, foot: float, axis: int = 1) -> list:
@@ -1461,7 +1565,9 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     # A Strogg shoulder keeps the slot's depth and runs 30 degrees.
     flank = round(slot_depth * STROGG_SHOULDER, 4) if strogg else slot_depth
     right = width - inset
-    silhouette = strogg_modal_silhouette(width, height) if strogg else [modal_silhouette(width, height)]
+    # The foot's notch needs the actions' bands 3 dp clear of it.
+    notched = U * actions_u + 40 + 3 <= height - 5.34375 - MODAL_NOTCH[0]
+    silhouette = strogg_modal_silhouette(width, height) if strogg else [modal_silhouette(width, height, notched)]
     # Pop-ups carry a neat, thin, opaque black frame (user rule, 5 November
     # 2026): the silhouette's outline drawn in black on top of the glow, which
     # stays as it is around it, 3 dp so it reads at a glance. The Strogg frame
@@ -1470,6 +1576,7 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     rim_w = 4.5 if strogg else 3.0
     rim = {"id": "rim", "commands": json.loads(json.dumps(silhouette[0]["commands"])),
            "stroke": stroke(solid([0, 0, 0, 1]), rim_w)}
+    energy_outline = json.loads(json.dumps(silhouette[0]["commands"]))
     silhouette = [silhouette[0], rim, *silhouette[1:]]
     glow_tint = ST_LIGHT if strogg else GLOW_MODAL
     whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
@@ -1504,7 +1611,10 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     foot = slot_lead + flank
     title_end = right - 6 if wide_title else slot_trail - flank
     face, title_tint = ("r_strogg", rgb(ST_READ, 0.9)) if strogg else ("marine", [1, 1, 1, 0.9])
-    if title_key.startswith("#str_"):
+    # A title the session says (the placeholder key, bound by the caller) has
+    # no text to measure: it takes the whole slot.
+    known_title = title_key.startswith("#str_") and title_key != "#str_230030"
+    if known_title:
         # 20 dp at -0.075 em: every shipped language's title must fit its
         # box, which clips the outline while the fill runs on.
         needed, language = max((text_width(face, text, 20) - 1.5 * (len(text) - 1), language)
@@ -1519,37 +1629,47 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     # follows the running language's title, capped where the slot's trailing
     # flank begins; a title that is not a localization key takes the whole
     # slot.
+    # Refined 11 November 2026 (user note): the tab starts at the frame's
+    # leading edge and takes the tooth with it, where it started at the slot
+    # and left the tooth a lighter strip beside it; its foot is the slot
+    # floor's outline's, where the floor's outline began a step in from the
+    # tab's own end; the Marine tab carries the family's corner marker before
+    # the title, and the title stands in the middle of the tab's height.
     raised, tab_pad = 3.5625, 10.0
-    tab_left = slot_lead - rim_w / 2
+    tab_left = inset - rim_w / 2
     tab_cap = slot_trail - flank
+    tab_h = slot_depth + rim_w / 2
     def tab_width(run: float) -> float:
         return round(min(foot + run + tab_pad, tab_cap) + flank - tab_left, 3)
-    if title_key.startswith("#str_"):
+    if known_title:
         widths = {language: tab_width(text_width(face, text, 20) - 1.5 * (len(text) - 1))
                   for language, text in merged_text(title_key).items()}
     else:
         widths = {"english": tab_width(tab_cap)}
     tab_edge = [(0, 0), ({"fraction": 1, "dp": -flank}, 0), ({"fraction": 1}, slot_depth)]
-    tab_paths = [path("tab", [*tab_edge, (0, slot_depth)], fill=solid([0, 0, 0, 1])),
+    tab_paths = [path("tab", [*tab_edge, ({"fraction": 1}, tab_h), (0, tab_h)], fill=solid([0, 0, 0, 1])),
                  path("tab-rim", tab_edge, closed=False, stroke=stroke(solid([0, 0, 0, 1]), rim_w))]
     if strogg:
         tab_paths.append(path("tab-rail", tab_edge, closed=False, stroke=stroke(solid(rgb(ST_LINE, 0.75)), 1.5)))
-    tab = vector(f"{ident}-tab", {**absolute(left=round(tab_left, 4), top=raised, width=max(widths.values()), height=slot_depth),
+    else:
+        tab_paths.append(marker_path("tab-mark", round(foot - tab_left - 14, 3), round((tab_h - 6) / 2, 3), 6, rgb(ORANGE, 0.9)))
+    tab = vector(f"{ident}-tab", {**absolute(left=round(tab_left, 4), top=raised, width=max(widths.values()), height=tab_h),
                                   "pointer-events": keyword("none")}, tab_paths)
     if len(set(widths.values())) > 1:
         doc.bind(f"{ident}-tab.width", f"{ident}-tab", "width", per_language(doc, widths))
     frame["children"] = [*frame.get("children", []), tab]
     title_style = {**typeface(face, 20, 24, title_tint), "letter-spacing": length(-0.075, "em"), "white-space": keyword("nowrap")}
-    title_box = absolute(left=round(foot, 4), top=-4, width=round(title_end - foot, 4), height=24)
+    title_top = -1.0   # the capitals in the middle of the tab, 3 dp under where they hung from its top line
+    title_box = absolute(left=round(foot, 4), top=title_top, width=round(title_end - foot, 4), height=24)
     if strogg:
         # The outline and its fill translate as one, so the pop keeps them
         # registered; the rune copy shares their baseline.
         pad = 3.0
-        title = [label(f"{ident}-title-rune", title_key, {**absolute(left=round(foot, 4), top=round(-4 - rune_rise(20), 3),
+        title = [label(f"{ident}-title-rune", title_key, {**absolute(left=round(foot, 4), top=round(title_top - rune_rise(20), 3),
                                                                      width=round(title_end - foot, 4), height=24),
                        **typeface("strogg", round(20 * RUNE_SCALE, 3), 24, [*rgb(ST_SELECT)[:3], 0]), "white-space": keyword("nowrap"),
                        "transform": transform(), "pointer-events": keyword("none")}),
-                 group(f"{ident}-title-latin", {**absolute(left=round(foot - pad, 4), top=-4 - pad, width=round(title_end - foot + 2 * pad, 4),
+                 group(f"{ident}-title-latin", {**absolute(left=round(foot - pad, 4), top=title_top - pad, width=round(title_end - foot + 2 * pad, 4),
                                                            height=24 + 2 * pad), "opacity": number(1), "transform": transform(),
                                                 "pointer-events": keyword("none")},
                        outlined_label(f"{ident}-title", title_key, absolute(left=pad, top=pad, width=round(title_end - foot, 4), height=24),
@@ -1607,11 +1727,21 @@ def confirmation(doc: Document, ident: str, title_key: str, body_key: str, yes_a
     for plate in actions:
         fixed_text(doc, plate)
     shown_contents = group(f"{ident}-contents", {**FULL, "display": keyword("none")}, [*title, *body, *actions])
-    dialog = group(f"{ident}-dialog", absolute(left=left, top=top, width=width, height=height),
-                   [glow, soft_glow, frame, shown_contents])
     known_body = body_nodes is None and body_key.startswith("#str_") and body_key != "#str_230030"
+    energy = modal_energy(doc, ident, energy_outline, width, height, rim_w, glow_tint, ST_SELECT if strogg else ENERGY_HOT,
+                          {"state": contents})
     if known_body or contents_grow is not None:
+        # The energy follows the authored outline, so a dialog that grows with
+        # the text goes without it above 100 %. Its own node says so: a text
+        # binding answers for the text size alone (check_text_bindings).
         text_source(doc)
+        energy = group(f"{ident}-energy-fit", {**FULL, "display": keyword("block"), "pointer-events": keyword("none")}, [energy])
+        doc.bind(f"text.{ident}-energy-fit.display", f"{ident}-energy-fit", "display", {"op": "select", "args": [LARGER, "none", "block"]})
+    doc.events[shown].append({"op": "playTimeline", "timeline": f"{ident}Energy"})
+    doc.events[hide].append({"op": "cancelTimeline", "timeline": f"{ident}Energy", "policy": "base"})
+    dialog = group(f"{ident}-dialog", absolute(left=left, top=top, width=width, height=height),
+                   [glow, soft_glow, energy, frame, shown_contents])
+    if known_body or contents_grow is not None:
         if known_body:
             box = body[0]["properties"]
             body_face, body_size = box["font-family"]["value"], box["font-size"]["value"]
@@ -2579,57 +2709,107 @@ EMBLEM = [
 ]
 
 
-# The ring's center in the emblem window, and a reach from it past the spike's foot.
+# The ring's center in the emblem window.
 RING_CENTER = (129.7, 89.5)
-GLINT_REACH = 170.0
-GLINT_PERIOD_MS = 9000
-GLINT_FRACTION = 0.12
+EMBLEM_PERIOD_MS = 6400.0    # one charge
+CHARGE_MS = 1700.0           # its climb from the spike's tip to over the ring
+CHARGE_BAND = 64.0           # u: the lit band: a bright front and the tail it leaves under it
+SURGE_AT, SURGE_MS = 1150.0, 900.0   # the ring's flare as the charge fills it
+# The reticle's two rings about the ring's center: radius (u), the step (degrees, signed), the steps that bring
+# the ring back onto itself, and a step's hold and move (ms).
+RETICLE = ((104.0, 30.0, 4, 2700.0, 500.0), (97.0, -10.0, 9, 1380.0, 220.0))
 
 
 def rotation(degrees: float) -> dict:
     return {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, degrees]}
 
 
+def ring_arc(radius: float, start: float, end: float, centre: float, step: float = 3.0) -> list:
+    """Points along a circle of `radius` dp about (`centre`, `centre`), from
+    `start` to `end` degrees clockwise from the top."""
+    count = max(1, round((end - start) / step))
+    return [(round(centre + radius * math.sin(math.radians(start + (end - start) * index / count)), 3),
+             round(centre - radius * math.cos(math.radians(start + (end - start) * index / count)), 3)) for index in range(count + 1)]
+
+
 def emblem(doc: Document) -> dict:
     """The watermark's darkening blend multiplies the lit field by
-    rgb(168,166,57); a rim light at 0.20 follows its outline, and a glint
-    runs around it every 9 s (section 13.8).
+    rgb(168,166,57), and a rim light at 0.20 follows its outline (section
+    13.8). Over it the emblem is charged (user note, 11 November 2026: an
+    industrial, alien effect in place of the glint that ran around the rim):
 
-    The glint is the rim drawn bright under a wedge mask 12% of a turn wide
-    that turns about the ring's center; the rim inside it turns back, so the
-    outline stays put and only the lit stretch moves. Its light falls off
-    toward the wedge's edges. Reduced motion hides it, keeping only the rim."""
+    - a charge climbs it every 6.4 s, from the spike's tip up both arms of
+      the ring: the rim drawn bright under a band mask with a hard front and
+      a 64 u tail, which rises as the rim inside it sinks, so the outline
+      stays put and only the lit stretch moves;
+    - the whole rim flares as the charge fills the ring, and settles;
+    - a reticle indexes about the ring's center, two faint rings of the HUD's
+      line: three arcs with end ticks that step 30 degrees one way, and a
+      gauge's ticks that step 10 the other. Each ring holds, then moves a
+      step, as a mechanism does; a loop ends where the ring lies on itself
+      again. Each ring is one path, compiled only while it moves.
+
+    Reduced motion hides the charge and the flare and stops the reticle."""
     outline = [(U * x, U * y) for x, y in EMBLEM]
     cx, cy = RING_CENTER
-    side = U * 2 * GLINT_REACH
-    centre = side / 2
-    shifted = [(U * (x - cx) + centre, U * (y - cy) + centre) for x, y in EMBLEM]
-    half = math.pi * GLINT_FRACTION
-    reach = side * 0.55
-
-    def spoke(angle: float) -> tuple:
-        return (round(centre + reach * math.sin(angle), 3), round(centre - reach * math.cos(angle), 3))
-
-    wedge = [(centre, centre), spoke(-half), spoke(0), spoke(half)]
-    left, right = spoke(-half), spoke(half)
-    falloff = linear(left, right, [(0, [1, 1, 1, 0]), (0.5, [1, 1, 1, 1]), (1, [1, 1, 1, 0])])
-    glint = group("emblem-glint", {**absolute(left=U * cx - centre, top=U * cy - centre, width=side, height=side),
-                                   "transform": rotation(0), "display": keyword("block")}, [
-        vector("emblem-glint-rim", {**absolute(left=0, top=0, width=side, height=side), "transform": rotation(0)}, [
-            path("glint", shifted, stroke=stroke(solid(rgb(RAIL_DARK, 0.8)), 1.5, minimum=1, join="round"), blend="additive")]),
-    ], mask={"paths": [path("wedge", wedge, fill=falloff)]})
+    side, band = U * 260, U * CHARGE_BAND
     doc.state["motion_reduced"] = {"type": "boolean", "initial": False, "cvar": "ui_retainedReducedMotion"}
-    doc.bind("emblem-glint.display", "emblem-glint", "display", {"op": "select", "args": [{"state": "motion_reduced"}, "none", "block"]})
-    doc.timelines.add("emblemGlint", GLINT_PERIOD_MS, [
-        track("emblem-glint", "transform", [(0, rotation(0)), (GLINT_PERIOD_MS, rotation(360))]),
-        track("emblem-glint-rim", "transform", [(0, rotation(0)), (GLINT_PERIOD_MS, rotation(-360))])], iterations=0)
-    doc.events.setdefault("onInit", []).append({"op": "playTimeline", "timeline": "emblemGlint"})
+    moving = {"op": "select", "args": [{"state": "motion_reduced"}, "none", "block"]}
+    hot = stroke(solid(rgb(RAIL_DARK, 0.85)), 1.6, minimum=1, join="round")
+    whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
+    front = linear((0, 0), (0, {"fraction": 1}), [(0, [1, 1, 1, 0]), (0.06, [1, 1, 1, 1]), (0.3, [1, 1, 1, 0.45]), (1, [1, 1, 1, 0])])
+    below, above = transform(ty=side), transform(ty=-band)
+    charge = group("emblem-charge", {**absolute(left=0, top=0, width=side, height=band), "transform": below, "display": keyword("block")}, [
+        vector("emblem-charge-rim", {**absolute(left=0, top=0, width=side, height=side), "transform": transform(ty=-side)}, [
+            path("charge", outline, stroke=hot, blend="additive")]),
+    ], mask={"paths": [path("front", whole, fill=front)]})
+    surge = vector("emblem-surge", {**absolute(left=0, top=0, width=side, height=side), "opacity": number(0), "display": keyword("block")}, [
+        path("surge", outline, stroke=stroke(solid(rgb(RAIL_DARK, 0.5)), 2.4, minimum=1, join="round"), blend="additive")])
+    for ident in ("emblem-charge", "emblem-surge"):
+        doc.bind(f"{ident}.display", ident, "display", moving)
+    doc.timelines.add("emblemCharge", EMBLEM_PERIOD_MS, [
+        track("emblem-charge", "transform", [(0, below, ACCEL), (CHARGE_MS, above), (EMBLEM_PERIOD_MS, above)]),
+        track("emblem-charge-rim", "transform", [(0, transform(ty=-side), ACCEL), (CHARGE_MS, transform(ty=band)),
+                                                 (EMBLEM_PERIOD_MS, transform(ty=band))]),
+        track("emblem-surge", "opacity", [(0, number(0)), (SURGE_AT, number(0)), (SURGE_AT + 140, number(1)),
+                                          (SURGE_AT + SURGE_MS, number(0)), (EMBLEM_PERIOD_MS, number(0))]),
+    ], iterations=0)
+    start = [{"op": "playTimeline", "timeline": "emblemCharge"}]
+    rings = []
+    for index, (radius, step, steps, hold, move) in enumerate(RETICLE):
+        reach = U * (radius + 6)
+        centre = reach
+        r = U * radius
+        if index == 0:
+            # Three arcs of 84 degrees, each ending in a tick toward the emblem.
+            strokes = []
+            for part in range(3):
+                a = part * 120 + 18
+                strokes += [ring_arc(r, a, a + 84, centre)] + [[ring_arc(r, at, at, centre)[0], ring_arc(r - U * 4, at, at, centre)[0]]
+                                                               for at in (a, a + 84)]
+        else:
+            # A gauge: a tick every 10 degrees, every ninth one long.
+            strokes = [[ring_arc(r, part * 10, part * 10, centre)[0],
+                        ring_arc(r + U * (4.5 if part % 9 == 0 else 1.8), part * 10, part * 10, centre)[0]] for part in range(36)]
+        commands = [{"id": f"s{part}p{at}", "op": "line" if at else "move", "points": [point(x, y)]}
+                    for part, points in enumerate(strokes) for at, (x, y) in enumerate(points)]
+        ident = f"emblem-reticle-{index + 1}"
+        rings.append(vector(ident, {**absolute(left=round(U * cx - reach, 3), top=round(U * cy - reach, 3), width=2 * reach, height=2 * reach),
+                                    "transform": rotation(0)}, [
+            {"id": "ring", "commands": commands, "stroke": stroke(solid(rgb(RAIL_DARK, 0.2)), 1.2, minimum=1), "blend": "additive"}]))
+        keys = []
+        for at in range(steps):
+            keys += [(at * (hold + move), rotation(step * at)), (at * (hold + move) + hold, rotation(step * at), EASE_OUT)]
+        keys.append((steps * (hold + move), rotation(step * steps)))
+        doc.timelines.add(f"emblemReticle{index + 1}", steps * (hold + move), [track(ident, "transform", keys)], iterations=0)
+        start.append({"op": "playTimeline", "timeline": f"emblemReticle{index + 1}"})
+    doc.events.setdefault("onInit", []).extend(start)
     return group("emblem", absolute(left=U * 380, top=U * 125, width=U * 260, height=U * 260), [
         vector("emblem-art", absolute(left=0, top=0, width=U * 260, height=U * 260), [
             path("shadow", outline, fill=solid(rgb("#A8A639")), blend="multiply"),
             path("rim", outline, stroke=stroke(solid(rgb(RAIL_DARK, 0.2)), 1.35, minimum=1, join="round"), blend="additive"),
         ]),
-        glint,
+        *rings, surge, charge,
     ])
 
 
@@ -3036,6 +3216,23 @@ def by_language(doc: Document, prefix: str, fits: dict) -> list:
     return steps
 
 
+CAMPAIGN_TILES = (313.0, 44.0, 6.5, 8.0)   # u: the two tiles' run from the plates' label inset, their height, the gap, and the room under them
+
+
+def campaign_mark(tint: list, centre: float, middle: float, height: float, rising: bool) -> list:
+    """A campaign tile's art (dp): the Quake emblem `height` tall about
+    (`centre`, `middle`); THE AWAKENING's stands over a rising arc."""
+    scale = height / (257.33 - 3.55)
+    top = middle - height / 2
+    mark = [path("emblem", [(round(centre + (x - 129.7) * scale, 3), round(top + (y - 3.55) * scale, 3)) for x, y in EMBLEM], fill=solid(tint))]
+    if rising:
+        radius = height * 0.78
+        arc = [(round(centre + radius * math.sin(math.radians(angle)), 3), round(middle + height * 0.36 - radius * math.cos(math.radians(angle)), 3))
+               for angle in range(-70, 71, 10)]
+        mark.insert(0, path("dawn", arc, closed=False, stroke=stroke(solid(tint), 1.5)))
+    return mark
+
+
 def campaign_document(campaigns: bool) -> dict:
     """Single Player page and Campaign sub-page, specification sections 8/9
     and the sub-page level of 1.10.
@@ -3088,17 +3285,28 @@ def campaign_document(campaigns: bool) -> dict:
                           "awakening_chosen": {"type": "boolean", "initial": False},
                           "campaign.awakening": {"type": "boolean", "initial": False},
                           "from_chapters": {"type": "boolean", "initial": False}})
-        for ident, key, event, awakening in (("quake4", "#str_230039", "chooseQuake4", False),
-                                             ("awakening", "#str_230040", "chooseAwakening", True)):
-            row = navigation_plate(doc, ident, key, event=event)
-            mark = vector(f"chosen-{ident}", {**absolute(left=NAV_LEAD + U * 25, top=U * 10, width=U * 5, height=U * 10), "opacity": number(0)},
-                          [path("rail", [(0, 0), (U * 3, 0), (U * 3, U * 10), (0, U * 10)], fill=solid(rgb(ORANGE)))])
-            row["children"].append(mark)
+        # The two campaigns were the first two plates of one list with the
+        # page's actions (user note, 11 November 2026). They are the page's
+        # choice, so they stand side by side as tiles over the plates, each
+        # under the emblem (THE AWAKENING's over a rising arc), the chosen one
+        # lit; NEW GAME, CHAPTERS and BACK are the only plates.
+        from retained_tiles import choice_tile
+        tile_w = (CAMPAIGN_TILES[0] - CAMPAIGN_TILES[2]) / 2
+        tiles = []
+        for index, (ident, key, event, awakening) in enumerate((("quake4", "#str_230039", "chooseQuake4", False),
+                                                                ("awakening", "#str_230040", "chooseAwakening", True))):
             chosen = {"state": "campaign.awakening"} if awakening else {"op": "!", "args": [{"state": "campaign.awakening"}]}
-            doc.bind(f"chosen-{ident}.opacity", f"chosen-{ident}", "opacity", {"op": "select", "args": [chosen, 1, 0]})
+            tile = choice_tile(doc, ident, key, 44 + index * (tile_w + CAMPAIGN_TILES[2]), 0, tile_w, CAMPAIGN_TILES[1], chosen=chosen,
+                               event=event, art=lambda tint, rising=awakening: campaign_mark(tint, U * tile_w / 2, 22.0, 26.0, rising))
+            # In the navigation column's box, which starts NAV_LEAD before the canvas.
+            tile["properties"]["left"] = length(NAV_LEAD + tile["properties"]["left"]["value"])
+            fixed_text(doc, tile)
             doc.events[event] = [{"op": "setState", "values": {"campaign.awakening": awakening}}, {"op": "focus", "control": "newgame"}]
-            buttons.append(row)
+            tiles.append(tile)
         doc.bind("awakening.enabled", "awakening", "enabled", {"state": "awakening_ready"})
+        choice_row = group("campaign-choice", {"position": keyword("relative"), "display": keyword("block"), "margin-left": length(-NAV_LEAD),
+                                               "width": length(NAV_LEAD + U * 357), "height": length(U * (CAMPAIGN_TILES[1] + CAMPAIGN_TILES[3]))},
+                           tiles)
         rows = [("newgame", "#str_200000", "campaignNew"), ("chapters", "#str_231280", "campaignChapters")]
     else:
         rows = [("campaign", "#str_230038", "campaigns"), ("arena", "#str_42002", "campaignArena")]
@@ -3114,6 +3322,14 @@ def campaign_document(campaigns: bool) -> dict:
         buttons.append(navigation_plate(doc, ident, key, action=action, subject=summary_subject(ident, summaries)))
     buttons.append(navigation_plate(doc, "back", "#str_230045", action="back"))
     wrap_menu(buttons)
+    if campaigns:
+        # The tiles step to each other with Left and Right, and join the
+        # plates' loop: Up from NEW GAME and Down from BACK reach QUAKE 4.
+        for tile in tiles:
+            tile["control"]["navigation"] = {"up": "back", "down": "newgame", "left": "quake4", "right": "awakening"}
+        buttons[0]["control"]["navigation"]["up"] = "quake4"
+        buttons[-1]["control"]["navigation"]["down"] = "quake4"
+        buttons = [choice_row, *buttons]
     details = []
     if campaigns:
         for ident, key in [("available", "#str_230041"), ("partial", "#str_230042"), ("absent", "#str_230043")]:
@@ -3383,7 +3599,7 @@ def level_block(doc: Document) -> dict:
         marker_path("mark", 14, 16, 8, rgb(MARKER)),
     ])
     pw, ph = w - 30, U * LEVEL_SHOT
-    shot = picture("level-shot", "", {**absolute(left=15, top=header + 12, width=pw, height=ph)})
+    shot = level_picture("level-shot", 15, header + 12, pw, ph)
     shot_frame = vector("level-shot-frame", absolute(left=15, top=header + 12, width=pw, height=ph), [
         path("frame", [(0.5, 0.5), ({"fraction": 1, "dp": -0.5}, 0.5), ({"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -0.5}), (0.5, {"fraction": 1, "dp": -0.5})],
              stroke=stroke(solid(rgb(PICTURE)), 1.5))])
@@ -3428,6 +3644,15 @@ def level_block(doc: Document) -> dict:
 
 
 LEVEL_PICTURE_GONE = 1.9   # text size from which the level block's picture has given all its room to the lines
+LEVEL_PICTURE_ASPECT = 4 / 3   # a levelshot is a square texture of a 4:3 picture
+
+
+def level_picture(ident: str, left: float, top: float, width: float, height: float) -> dict:
+    """A levelshot in the middle of a frame `width` by `height` dp, at 4:3
+    and the frame's height: a frame wider than that shows the card's black
+    either side of it."""
+    shown = min(width, height * LEVEL_PICTURE_ASPECT)
+    return picture(ident, "", {**absolute(left=left + (width - shown) / 2, top=top, width=shown, height=height)}, fit="fill")
 
 
 def reflow_level_block(doc: Document, block: dict, strogg: bool = False) -> None:
@@ -3458,6 +3683,11 @@ def reflow_level_block(doc: Document, block: dict, strogg: bool = False) -> None
         bind(ident, "height", picture)
         nodes[ident]["properties"]["display"] = keyword("block")
         doc.bind(f"text.{ident}.display", ident, "display", hidden)
+    # The picture keeps its 4:3 in the middle of the frame as it shrinks.
+    frame_left, frame_w = authored("level-shot-frame", "left"), authored("level-shot-frame", "width")
+    shown = {"op": "min", "args": [frame_w, {"op": "*", "args": [picture, LEVEL_PICTURE_ASPECT]}]}
+    bind("level-shot", "width", shown)
+    bind("level-shot", "left", {"op": "+", "args": [frame_left, {"op": "/", "args": [{"op": "-", "args": [frame_w, shown]}, 2]}]})
     # Under the picture (shot_top + its height + 10 dp): the level (fixed),
     # 2 dp, the difficulty, 8 dp, the objectives heading (fixed), 4 dp, then
     # the objectives' rows.
@@ -4007,7 +4237,7 @@ def strogg_level_block(doc: Document, translation: Translation, start: float) ->
                                   "overflow": keyword("hidden"), "pointer-events": keyword("none")}, tiles)
     pw, ph = w - 30, U * LEVEL_SHOT
     px, py, chamfer = 15, header + 12, U * 6
-    shot = picture("level-shot", "", {**absolute(left=px, top=py, width=pw, height=ph)})
+    shot = level_picture("level-shot", px, py, pw, ph)
     corners = vector("level-shot-frame", absolute(left=px, top=py, width=pw, height=ph), [
         path("lead", [(0, 0), (chamfer, 0), (0, chamfer)], fill=solid(rgb(ST_CARD))),
         path("trail", [({"fraction": 1}, {"fraction": 1, "dp": -chamfer}), ({"fraction": 1}, {"fraction": 1}),
@@ -4949,6 +5179,7 @@ def main() -> int:
     from retained_difficulty import restart_level_document
     from retained_demos import demos_document
     from retained_death import restart_menu_document
+    from retained_msgbox import message_box_document
     from retained_credits import credits_document
     from retained_arena import arena_document
     from retained_mp_page import multiplayer_document
@@ -4971,6 +5202,7 @@ def main() -> int:
                  "restartlevel_strogg": restart_level_document(STROGG),
                  "demos": demos_document(),
                  "restartmenu": restart_menu_document(),
+                 "msgbox": message_box_document(),
                  "credits": credits_document(),
                  "arena": arena_document(),
                  "multiplayer": multiplayer_document(),

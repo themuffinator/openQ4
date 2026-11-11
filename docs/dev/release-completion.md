@@ -231,6 +231,49 @@ See [player release status](../user/release-status.md).
   `tools/tests/material_constant_registers_contract.py`; the
   `rendererPBRMaterialSelfTest` command.
 
+## Livelier pop-ups, tiles and tabs in the menus, and pictures at the right shape, 11 November 2026
+
+- **Pop-ups.** Questions such as Exit Game have a new frame in the new
+  interface: cut corners and stepped edges in the Quake 4 style, a neater
+  title tab, and light that moves, with pulses that run around the frame's
+  edge. Reduced motion keeps the frame still.
+- **Engine messages use the same pop-up.** The answer from Updates, a failed
+  connection, a password prompt and other messages no longer switch to the
+  old box over the new menus.
+- **Preview pictures.** Level pictures on the pause menu, Chapters, Create
+  Server, Join Game and Demos are shown at their true 4:3 shape; several
+  were cropped or squeezed. Preview pictures also have a Quake 4 style frame
+  with cut corners.
+- **The title screen.** The emblem charges up and a targeting ring steps
+  around it, in place of the soft glint. A highlighted menu item's text no
+  longer slides over its corner marker.
+- **Campaign pages.** Choosing a campaign, a difficulty and Turbo Mode no
+  longer means reading down one long list. The campaigns and the five ranks
+  are tiles you pick from, Turbo Mode is a switch, and the buttons under
+  them are just New Game, Chapters, Start Game and Back. On Chapters, a
+  padlock marks a level you have not reached and a save mark one with a
+  start autosave.
+- **Player Setup.** Three tabs: Player, Opponents and Teammates. Opponents
+  and Teammates hold the outline, rim light and brightskin settings that
+  were only on the in-game menu, and Opponents can force a model on other
+  players in free-for-all modes.
+- **Create Server.** Advanced Server Options is split into Server, Match and
+  Rules tabs and fits the screen again. New rows: Shuffle Teams, Overtime
+  (seconds), Mercy Lead and Round Limit.
+- **Join Game.** The server list can show larger tiles with each map's
+  picture: use the layout button beside Source, and the game remembers your
+  choice. The strip above the list is tidier and no longer draws lines
+  through the Mod and Source controls.
+- **Sliders.** Each line on a slider is now one step, so one press of Left
+  or Right moves the marker to the next line.
+- **Fixes.**
+  - Load Game and Save Game opened from the pause menu no longer show the
+    level through a gap in the top and bottom frame.
+  - Create Server's header no longer overlaps the page title.
+  - On Chapters, Start Chapter and Back no longer sit on the list's scroll
+    bar.
+- Evidence: [menu round from annotated screens](ui/menu-notes-round.md#evidence-11-november-2026).
+
 ## Menu pages that open without a pause, 11 November 2026
 
 - **Settings pages open at once.** The first time you opened Controls, Game

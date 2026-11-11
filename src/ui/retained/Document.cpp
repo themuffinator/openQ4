@@ -443,7 +443,9 @@ private:
 	}
 	Expression ReadExpression(const Json::Value& value, const std::string& path, unsigned depth = 0, bool allowPresentation = false,
 		std::optional<size_t> inputType = std::nullopt) {
-		Require(depth <= 32 && ++expressionCount <= 65536,value,path,"Expression node/depth budget exceeded");
+		// 131072 nodes: Join Game's rows, whose cells each bind for the text
+		// size, a tall view and the list's tiles, hold about 75,000.
+		Require(depth <= 32 && ++expressionCount <= 131072,value,path,"Expression node/depth budget exceeded");
 		Expression result;
 		if (value.isNumeric()) result.literal = Numeric(value,path,-1000000000000.0,1000000000000.0);
 		else if (value.isBool()) result.literal = value.asBool();

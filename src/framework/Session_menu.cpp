@@ -99,6 +99,7 @@ idCVar ui_retainedMultiplayer( "ui_retainedMultiplayer", "0", CVAR_GUI | CVAR_BO
 // so an explicit player preference persists across launches.
 idCVar ui_retained( "ui_retained", "1", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE, "use the retained interface by default; 0 selects the stock interface" );
 idCVar ui_hudScale( "ui_hudScale", "1", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE, "retained status bar scale, independent of menus", .5f, 2.0f );
+idCVar ui_browserView( "ui_browserView", "0", CVAR_GUI | CVAR_INTEGER | CVAR_ARCHIVE, "the server browser's list: 0 rows, 1 tiles with each map's levelshot", 0, 1 );
 idCVar ui_hudSafeInset( "ui_hudSafeInset", "0", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE, "retained status bar safe inset in percent of viewport", 0.0f, 10.0f );
 idCVar ui_retainedCaptureLoadFade( "ui_retainedCaptureLoadFade", "0", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT, "diagnostic: use the engine screenshot command to capture the middle and end of the retained loading fade" );
 
@@ -138,6 +139,8 @@ static bool Session_RetainedSystemEnabled( void ) {
 // while it is open over a match: Escape, and Welcome while the player has not
 // answered the join offer.
 static const char *const RETAINED_MP_ESCAPE_GUI = "guis/menu/mp_escape.q4ui";
+// The session's message box (guis/msg.gui) as the retained pop-up.
+static const char *const RETAINED_MSGBOX_GUI = "guis/menu/msgbox.q4ui";
 static const char *const RETAINED_MP_WELCOME_GUI = "guis/menu/mp_welcome.q4ui";
 // The version of the game's answer to retainedMultiplayerCover that the card
 // relies on; a game module without it keeps its stock menu.
@@ -1973,6 +1976,12 @@ bool idSessionLocal::PublishRetainedPlayerSetup( idUserInterface *gui, bool rebu
 		gui->SetStateString( va("setup.observed_%s",field), value );
 	}
 	gui->SetStateString( "setup.observed_model", retainedSetupValue.c_str() );
+	// OPPONENTS' forced model: its row on this catalog page, or none.
+	const idStr forcedModel = cvarSystem->GetCVarString( "g_forceModel" );
+	const int forcedIndex = forcedModel.Length() ? retainedSetupModels.FindIndex( forcedModel ) : -1;
+	gui->SetStateInt( "setup.force_row", forcedIndex >= retainedSetupFirst && forcedIndex < retainedSetupFirst + int(PlayerSetupModelRows) ?
+		forcedIndex-retainedSetupFirst : -1 );
+	gui->SetStateString( "setup.observed_force", forcedModel.c_str() );
 	const char *tint = cvarSystem->GetCVarString("ui_hitscanTint");
 	gui->SetStateString( "setup.observed_rail", tint );
 	float hue=0,saturation=0,brightness=0;
@@ -2024,6 +2033,17 @@ void idSessionLocal::HandleRetainedPlayerSetupRequest( idUserInterface *gui, con
 			if ( !MainMenuExtractPlayerModelInfo(wanted.c_str(),model,head,skin,description,team) ||
 				!MainMenuModelAllowedForTeam(team,MainMenuIsTeamGame(),MainMenuResolveModelTeam()) ) { notice("#str_231548"); return; }
 			cvar=retainedSetupCvar.c_str(); break;
+		}
+		case PlayerSetupField::ForceModel: {
+			// The model every other player shows outside team modes: a row of the
+			// catalog page, or none.
+			const int row = int(std::get<double>(request.value));
+			if ( row >= 0 ) {
+				const long long index = static_cast<long long>(retainedSetupFirst) + row;
+				if ( index >= retainedSetupModels.Num() ) { notice("#str_231548"); return; }
+				wanted=retainedSetupModels[int(index)];
+			}
+			cvar="g_forceModel"; break;
 		}
 		case PlayerSetupField::Rail: {
 			static const int hues[7] = {0,30,60,120,180,240,330};
@@ -3939,7 +3959,7 @@ void idSessionLocal::SetMainMenuGuiVars( bool refreshCatalogs ) {
 		SetModsMenuGuiVars();
 	}
 
-	guiMsg->SetStateString( "visible_hasxp", fileSystem->HasD3XP() ? "1" : "0" );
+	( guiMsgStock != NULL ? guiMsgStock : guiMsg )->SetStateString( "visible_hasxp", fileSystem->HasD3XP() ? "1" : "0" );
 
 #if defined( __linux__ )
 	guiMainMenu->SetStateString( "driver_prompt", "1" );
@@ -5472,6 +5492,8 @@ void idSessionLocal::DispatchCommand( idUserInterface *gui, const char *menuComm
 			// The death screen stays: closing it would leave a player with no
 			// level and no way back, and the stock screen took no Escape.
 			else if ( gui == guiRetainedRestartMenu ) {}
+			// A message box answers through its buttons alone.
+			else if ( gui == guiMsg ) {}
 			else if ( gui == guiActive ) ExitMenu();
 		}
 		return;
@@ -6092,6 +6114,40 @@ void idSessionLocal::GuiFrameEvents() {
 
 /*
 =================
+idSessionLocal::SelectMessageBox
+
+The box the next message presents. `retained` asks for the retained pop-up
+(guis/menu/msgbox.q4ui), which takes the stock box's state under the same
+names and answers with its commands (HandleRetainedSessionRequest); it
+presents where the retained screens do and its document loads and draws.
+Otherwise, and for the boxes it has no part for (the download progress), the
+stock guis/msg.gui presents. Only between boxes: a box that is up keeps its
+screen.
+=================
+*/
+void idSessionLocal::SelectMessageBox( bool retained ) {
+	if ( guiMsgStock == NULL ) {
+		guiMsgStock = guiMsg;
+	}
+#ifndef ID_DEDICATED
+	if ( guiMsgRetained != NULL && UI_RetainedViewFailed( guiMsgRetained ) ) {
+		common->Warning( "retained UI: '%s' stopped drawing; the stock screen presents instead", RETAINED_MSGBOX_GUI );
+		retainedStock.AddUnique( RETAINED_MSGBOX_GUI );
+		guiMsgRetained = NULL;
+	}
+	if ( retained && Session_RetainedScreensEnabled() && guiMsgRetained == NULL ) {
+		guiMsgRetained = FindRetainedGui( RETAINED_MSGBOX_GUI, true, false );
+	}
+	if ( retained && Session_RetainedScreensEnabled() && guiMsgRetained != NULL ) {
+		guiMsg = guiMsgRetained;
+		return;
+	}
+#endif
+	guiMsg = guiMsgStock;
+}
+
+/*
+=================
 idSessionLocal::BoxDialogSanityCheck
 =================
 */
@@ -6126,6 +6182,7 @@ const char* idSessionLocal::MessageBox( msgBoxType_t type, const char *message, 
 	if ( !BoxDialogSanityCheck() ) {
 		return NULL;
 	}
+	SelectMessageBox( true );
 
 	guiMsg->SetStateString( "title", title ? title : "" );
 	guiMsg->SetStateString( "message", message ? message : "" );
@@ -6308,6 +6365,7 @@ void idSessionLocal::DownloadProgressBox( backgroundDownload_t *bgl, const char 
 	if ( !BoxDialogSanityCheck() ) {
 		return;
 	}
+	SelectMessageBox( false );	// the progress bar is the stock box's
 
 	guiMsg->SetStateString( "visible_msgbox", "1" );
 	guiMsg->SetStateString( "visible_waitbox", "0" );
@@ -6687,6 +6745,11 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createBuying",		"buying",		"si_isBuyingEnabled",		0, 1,	true },
 	{ "createBots",			"bots",			"bot_minPlayers",			0, 16,	false },
 	{ "createBotSkill",		"botskill",		"bot_skill",				1, 5,	false },
+	// openQ4's match rules, on the advanced dialog's MATCH and RULES tabs.
+	{ "createShuffle",		"shuffle",		"si_shuffle",				0, 1,	true },
+	{ "createOvertime",		"overtime",		"si_overtime",				0, 999,	false },
+	{ "createMercy",		"mercy",		"si_mercyLimit",			0, 999,	false },
+	{ "createRoundLimit",	"roundlimit",	"si_roundLimit",			0, 60,	false },
 };
 static const int RETAINED_CREATE_SETTING_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_SETTINGS ) / sizeof( RETAINED_CREATE_SETTINGS[0] ) );
 // The page's text fields: the verb a field asks with once its text is in its
@@ -7672,6 +7735,14 @@ void idSessionLocal::ShowSaveRestoreFailure( const char *saveName ) {
 
 void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
+	// The retained message box's buttons answer as the stock box's commands.
+	if ( request != NULL && gui != NULL && gui == guiMsgRetained ) {
+		if ( gui == guiActive && gui == guiMsg ) {
+			HandleMsgCommands( !idStr::Icmp( request, "msgLeft" ) ? "left" : !idStr::Icmp( request, "msgRight" ) ? "right" :
+				!idStr::Icmp( request, "msgMid" ) ? "mid" : "" );
+		}
+		return;
+	}
 	// The retained AUDIO and GAME OPTIONS pages' verbs, while they present.
 	if ( request != NULL && gui != NULL && gui == guiRetainedAudio ) {
 		if ( gui == guiActive ) {
@@ -9622,6 +9693,11 @@ void idSessionLocal::PublishRetainedJoinGame( idUserInterface *gui ) {
 		gui->SetStateBool( va( "join.row%d.lock", row ), server != NULL && server->serverInfo.GetBool( "si_usePass" ) );
 		gui->SetStateBool( va( "join.row%d.ded", row ), server != NULL && server->serverInfo.GetInt( "net_serverDedicated" ) != 0 );
 		gui->SetStateBool( va( "join.row%d.rep", row ), server != NULL && server->serverInfo.GetBool( "si_repeater" ) );
+		// The row's levelshot, which the list's tiles show (ui_browserView 1);
+		// the rows look none up.
+		const char *rowMap = server != NULL ? server->serverInfo.GetString( "si_map" ) : "";
+		gui->SetStateString( va( "join.row%d.shot", row ), server == NULL || ui_browserView.GetInteger() != 1 ? "" :
+			idServerScan::ValidMapPath( rowMap ) ? RetainedPauseShot( rowMap ).c_str() : "gfx/guis/loadscreens/generic" );
 		gui->SetStateString( va( "join.row%d.name", row ), name.c_str() );
 		gui->SetStateString( va( "join.row%d.ping", row ), ping.c_str() );
 		// The browser hears no packet loss, so the ping alone sets the bars.
@@ -9694,7 +9770,11 @@ void idSessionLocal::UpdateRetainedJoinGame() {
 	if ( guiRetainedJoin == NULL || guiActive != guiRetainedJoin ) {
 		return;
 	}
-	if ( idAsyncNetwork::client.serverList.GetRevision() != retainedJoinRevision ) {
+	// The list's view changed: the tiles' levelshots are published with the rows.
+	static int viewPublished = -1;
+	const bool viewChanged = ui_browserView.GetInteger() != viewPublished;
+	viewPublished = ui_browserView.GetInteger();
+	if ( viewChanged || idAsyncNetwork::client.serverList.GetRevision() != retainedJoinRevision ) {
 		PublishRetainedJoinGame( guiRetainedJoin );
 	} else if ( guiRetainedJoin->State().GetInt( "join.detail", "-1" ) != retainedJoinDetailRow ) {
 		PublishRetainedJoinDetail( guiRetainedJoin );

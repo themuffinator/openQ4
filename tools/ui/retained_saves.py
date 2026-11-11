@@ -43,10 +43,12 @@ The confirmations take the Strogg family too, as the Strogg pause's own do
 """
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
 from build_retained_screens import fit_narrow
+from build_retained_screens import pop
 from build_retained_screens import (CANVAS_W, CLOSE_W, FULL, LANGUAGES, MARKER, OLIVE, ORANGE, PICTURE, RAIL_DARK, ST_FILL, ST_LINE,
                                     ST_OBJ_FRAME, PAGE_BAR_LEFT, ST_READ, ST_SELECT, STRINGS, U, VERB_DELETE, VERB_LOAD, VERB_SAVE,
                                     Document, absolute, action_plate, colour, confirmation, fixed_text, font, group, keyword, label,
@@ -177,13 +179,13 @@ def section_plate(doc: Document, ident: str, key: str, left: float, top: float, 
                     (f"{ident}-label", "color", colour(read)), (f"{ident}-label", "transform", transform())],
         "hover": [(f"{ident}-plate", "opacity", number(0.8)), (f"{ident}-marker", "opacity", rest),
                   (f"{ident}-marker-hot", "opacity", lit), (f"{ident}-focus", "opacity", rest),
-                  (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", transform(sx=1.03, sy=1.03))],
+                  (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", pop(U * label_w))],
         "focus": [(f"{ident}-plate", "opacity", number(0.8)), (f"{ident}-marker", "opacity", rest),
                   (f"{ident}-marker-hot", "opacity", lit), (f"{ident}-focus", "opacity", lit),
-                  (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", transform(sx=1.03, sy=1.03))],
+                  (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", pop(U * label_w))],
         "pressed": [(f"{ident}-plate", "opacity", number(1)), (f"{ident}-marker", "opacity", rest),
                     (f"{ident}-marker-hot", "opacity", lit), (f"{ident}-focus", "opacity", lit),
-                    (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", transform(tx=1, ty=1, sx=1.03, sy=1.03))],
+                    (f"{ident}-label", "color", colour(rgb(hot))), (f"{ident}-label", "transform", pop(U * label_w, 1, 1))],
         "disabled": [(f"{ident}-plate", "opacity", number(0.4)), (f"{ident}-marker", "opacity", number(0.4)),
                      (f"{ident}-marker-hot", "opacity", rest), (f"{ident}-focus", "opacity", rest),
                      (f"{ident}-label", "color", colour(family.tint(0.3))), (f"{ident}-label", "transform", transform())],
@@ -458,17 +460,59 @@ def pager_row(doc: Document, ident: str, key: str, action: str, shown: dict, row
                  control={"role": "button", "label": key, "action": action, "states": ids})
 
 
-def picture_frame(ident: str, left: float, top: float, width: float, height: float, frame: str = PICTURE) -> list:
+FRAME_CUTS = (8.0, 12.0)   # u: a picture frame's upper-leading and lower-trailing corner cuts
+
+
+def picture_frame(ident: str, left: float, top: float, width: float, height: float, frame: str = PICTURE,
+                  fit: str = "contain", accent: str = RAIL_DARK, strogg: bool = False) -> list:
     """The save's picture in the stock preview (load_mapshot): black 0.60
-    behind it and a 1 u #414624 border (`frame`), the picture fitted inside."""
+    behind it and a 1 u #414624 border (`frame`), the picture fitted inside.
+    A save's picture keeps its own shape (`fit` contain). A levelshot is a
+    square texture of a 4:3 picture, so a 4:3 frame of levelshots fills
+    (`fit` fill): contained, it stood square between two bars.
+
+    The stock rectangle takes the family's frame (user note, 11 November
+    2026): its upper-leading and lower-trailing corners are cut at 45
+    degrees (8 and 12 u; the Strogg family's 30-degree shoulders), the
+    picture cut with them by a mask, and each cut corner carries a rail in
+    `accent` that runs along the two edges it joins and fades out by their
+    middle, as a plate's rail does; the corner marker stands in the upper
+    trailing corner. Every point is a fraction of the frame, so the three
+    nodes still follow whatever sizes them."""
     box = absolute(left=U * left, top=U * top, width=U * width, height=U * height)
-    inner = [(0.75, 0.75), ({"fraction": 1, "dp": -0.75}, 0.75), ({"fraction": 1, "dp": -0.75}, {"fraction": 1, "dp": -0.75}),
-             (0.75, {"fraction": 1, "dp": -0.75})]
+    lean = STROGG_SHOULDER if strogg else 1.0
+    lead, trail = U * FRAME_CUTS[0], U * FRAME_CUTS[1]
+
+    def far(dp: float = 0.0) -> dict:
+        return {"fraction": 1, "dp": round(-dp, 3)} if dp else {"fraction": 1}
+
+    def outline(inset: float, nudge: float = 0.0) -> list:
+        """The cut rectangle `inset` dp inside the frame, its cuts `nudge` dp
+        further along the edges (a diagonal inset by `inset` meets them there)."""
+        a_x, a_y = round(lead * lean + nudge, 3), round(lead + nudge, 3)
+        b_x, b_y = round(trail * lean + nudge, 3), round(trail + nudge, 3)
+        return [(a_x, inset), (far(inset), inset), (far(inset), far(b_y)), (far(b_x), far(inset)), (inset, far(inset)), (inset, a_y)]
+
+    # The picture's box is 1 u inside the frame; its mask keeps it inside the
+    # border's inner edge along the cuts.
+    held = 1.5 * math.sqrt(2) - 2 * U
+    cut_a, cut_b = round(lead + held, 3), round(trail + held, 3)
+    mask = [(round(cut_a * lean, 3), 0), (far(), 0), (far(), far(cut_b)), (far(round(cut_b * lean, 3)), far()), (0, far()), (0, cut_a)]
+    middle_x, middle_y = {"fraction": 0.5}, {"fraction": 0.5}
+    fade = [(0, rgb(accent, 0.85)), (0.34, rgb(accent, 0)), (1, rgb(accent, 0))]
+    line = outline(0.75, 0.31)
+    lead_rail = path("rail-lead", [(0.75, middle_y), line[5], line[0], (middle_x, 0.75)], closed=False,
+                     stroke=stroke(linear((0, 0), ({"fraction": 0.5}, {"fraction": 0.9}), fade), 2.25))
+    trail_rail = path("rail-trail", [(far(0.75), middle_y), line[2], line[3], (middle_x, far(0.75))], closed=False,
+                      stroke=stroke(linear((far(), far()), ({"fraction": 0.5}, {"fraction": 0.1}), fade), 2.25))
+    mark = path("mark", [(far(4.5 + 7), 4.5), (far(4.5), 4.5), (far(4.5), 4.5 + 7)], fill=solid(rgb(accent, 0.8)))
+    shot = picture(ident, "", {**absolute(left=U * (left + 1), top=U * (top + 1), width=U * (width - 2), height=U * (height - 2))}, fit=fit)
+    shot["mask"] = {"paths": [path("cut", mask, fill=solid([1, 1, 1, 1]))]}
     return [
-        vector(f"{ident}-back", box, [path("back", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})],
-                                           fill=solid([0, 0, 0, 0.6]))]),
-        picture(ident, "", {**absolute(left=U * (left + 1), top=U * (top + 1), width=U * (width - 2), height=U * (height - 2))}, fit="contain"),
-        vector(f"{ident}-border", {**box, "pointer-events": keyword("none")}, [path("border", inner, stroke=stroke(solid(rgb(frame)), U * 1))]),
+        vector(f"{ident}-back", box, [path("back", outline(0), fill=solid([0, 0, 0, 0.6]))]),
+        shot,
+        vector(f"{ident}-border", {**box, "pointer-events": keyword("none")}, [
+            path("border", line, stroke=stroke(solid(rgb(frame)), U * 1)), lead_rail, trail_rail, mark]),
     ]
 
 
@@ -707,7 +751,7 @@ def load_game_document(family: Family = MARINE) -> dict:
 
     # The leading side: the selected save's picture, its date and time, its
     # difficulty and play time, and the section plates.
-    shot_parts = picture_frame("load-shot", *PREVIEW, frame=family.frame)
+    shot_parts = picture_frame("load-shot", *PREVIEW, frame=family.frame, accent=family.rail, strogg=family.strogg)
     doc.bind("load-shot.image", "load-shot", "image", {"state": "load.shot"})
     error_box = absolute(left=U * ERROR_STRIP[0], top=U * ERROR_STRIP[1], width=U * ERROR_STRIP[2], height=U * ERROR_STRIP[3])
     error = group("load-error", {**error_box, "display": keyword("none"), "background-color": colour([0, 0, 0, 0.8])}, [

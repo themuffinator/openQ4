@@ -31,6 +31,11 @@ Select a row to see its map preview, then choose **Join Server** to play, or
 in the new menus **Spectate** to join it watching. Passworded servers use the
 existing password prompt.
 
+In the new menus the layout button beside **Source** switches the list
+between rows and larger tiles, which show each server's map picture with its
+name, game type, map, ping and players. The game remembers the choice
+(`ui_browserView`: `0` rows, `1` tiles).
+
 Choose a column heading to sort, and **Clear Sorting** to list servers in the
 order they answered. **Mod** shows one mod's servers; the `gui_filter_*`
 console settings can also hide full or empty servers, passworded servers or

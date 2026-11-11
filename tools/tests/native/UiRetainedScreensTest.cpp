@@ -57,7 +57,9 @@ struct ScreenHost final : Host {
 		{"cl_player_brightskin_enemy_color",std::string("1 0.05 0.02")},{"cl_player_brightskin_team_color",std::string("1 0.05 0.02")},
 		// The HUD settings (section 13.9) at their defaults.
 		{"ui_hudOpacity",1.0},{"ui_hudDamageDirection",true},{"ui_hudPickups",true},{"ui_hudWeaponStrip",true},
-		{"ui_reducedFlashing",false}};
+		{"ui_reducedFlashing",false},
+		// Join Game's list view: rows.
+		{"ui_browserView",0.0}};
 	bool ReadCVar(const std::string& name, size_t type, StateValue& value) override {
 		if (type == 2 && name == "sys_lang") { value = language; return true; }
 		if (const auto found = cvars.find(name); found != cvars.end()) {
@@ -281,7 +283,7 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createGameType","createLan","createDedicated","createAutoBalance","createFragLimit","createCaptureLimit","createControlTime",
 	"createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit","createUsePass",
 	"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
-	"createBuying","createBots","createBotSkill",
+	"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
@@ -332,6 +334,13 @@ static void CheckSessionActions(const Document& document) {
 					std::get<std::string>(cvar->second.literal) == "s_voiceChatTest" &&
 					!action.arguments.at("value").inputValue && !std::get<bool>(action.arguments.at("value").literal),
 					"leaving the Voice page can only stop the local microphone test");
+				continue;
+			}
+			if (id == "joinViewRows" || id == "joinViewTiles") {
+				Check(cvar != action.arguments.end() && action.arguments.size() == 2 &&
+					std::get<std::string>(cvar->second.literal) == "ui_browserView" && !action.arguments.at("value").inputValue &&
+					std::get<double>(action.arguments.at("value").literal) == (id == "joinViewTiles" ? 1 : 0),
+					"Join Game's layout button asks for rows or tiles alone");
 				continue;
 			}
 			Check(cvar != action.arguments.end() && action.arguments.size() == 2 && PlayerSettings.contains(std::get<std::string>(cvar->second.literal)) &&
@@ -5052,7 +5061,7 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 	const char* const verbs[] = {"createLan","createDedicated","createGameType","createAutoBalance","createFragLimit","createCaptureLimit",
 		"createControlTime","createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit",
 		"createUsePass","createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup",
-		"createVoice","createBuying","createBots","createBotSkill"};
+		"createVoice","createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit"};
 	for (const char* verb : verbs) {
 		const auto found = document.Model().actions.find(verb);
 		Check(found != document.Model().actions.end() && found->second.operation == "session.menuValue" &&
@@ -5143,12 +5152,25 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 	Check(runtime.RunEvent("advancedModalShow",1.3,effects,error),"ADVANCED OPTIONS opens its dialog");
 	runtime.Frame(viewport,1.55);
 	Check(text("advancedModal","display") == "block" && text("advancedModal-contents","display") == "block" &&
-		text("create-bots","display") == "block" && text("create-mapcycle","display") == "block","the dialog shows the advanced options");
+		text("create-usepass","display") == "block" && text("create-mapcycle","display") == "block" &&
+		text("create-bots","display") == "none" && text("create-overtime","display") == "none",
+		"the dialog shows the advanced options' SERVER tab");
 	// The password rows follow Use password, as the stock popup's do; Set
 	// password dims and hides its text while Use password is off.
 	const auto usepass = bounds("create-usepass"), password = bounds("create-password"), rcon = bounds("create-rconpassword");
-	Check(Near(password.y,usepass.y+24*u,1) && Near(rcon.y,usepass.y+48*u,1) && Near(bounds("create-servermods").y,usepass.y+72*u,1),
+	Check(Near(password.y,usepass.y+24*u,1) && Near(rcon.y,usepass.y+48*u,1) && Near(bounds("create-pure").y,usepass.y+72*u,1),
 		"Set password and the remote console password follow Use password");
+	// MATCH and RULES show their own rows, and each opening starts on SERVER.
+	Check(runtime.RunEvent("advancedTab1",1.552,effects,error),"the MATCH tab");
+	runtime.Frame(viewport,1.554);
+	Check(text("create-bots","display") == "block" && text("create-shuffle","display") == "block" && text("create-usepass","display") == "none",
+		"MATCH shows the match's rows");
+	Check(runtime.RunEvent("advancedTab2",1.556,effects,error),"the RULES tab");
+	runtime.Frame(viewport,1.558);
+	Check(text("create-overtime","display") == "block" && text("create-roundlimit","display") == "block" && text("create-bots","display") == "none",
+		"RULES shows the rules' rows");
+	Check(runtime.RunEvent("advancedTab0",1.559,effects,error),"the SERVER tab");
+	runtime.Frame(viewport,1.5595);
 	Check(runtime.GetControlState("create-password") == ControlState::Disabled && text("create-password-viewport","display") == "none" &&
 		runtime.GetControlState("create-rconpassword") != ControlState::Disabled,"without Use password, Set password is locked and its text hidden");
 	Check(runtime.SetState({{"create.usepass",true}},error,1.56),"Use password");
@@ -6125,29 +6147,34 @@ int main(int argc, char** argv) {
 		runtime.Frame(viewport,5.5);
 		Check(runtime.GetBounds("nav_settings-focus",focus),"focus rail laid out");
 		Check(runtime.HasEvent("exitModalShow") && runtime.HasEvent("onBack"),"Back asks before leaving the game");
-		// The emblem's glint turns once every 9 s under its wedge mask while
-		// the rim inside turns back; reduced motion keeps only the rim.
+		// The emblem is charged: every 6.4 s a lit band climbs its rim over
+		// 1.7 s under a band mask while the rim inside it sinks, so the outline
+		// stays put; its reticle indexes in steps. Reduced motion hides the charge.
 		Runtime::EventEffects init;
 		Check(runtime.RunEvent("onInit",6,init,error),"the title starts its ambient loops");
-		runtime.Frame(viewport,6+4.5);
-		const auto glint = runtime.PresentedValue("emblem-glint","transform");
-		const auto rim = runtime.PresentedValue("emblem-glint-rim","transform");
-		Check(glint && rim && Near(static_cast<float>(glint->data[4]),180,1) && Near(static_cast<float>(rim->data[4]),-180,1),
-			"half way round at 4.5 s, the rim held in place");
-		// Statistics are per frame, and the glint is the title's only mask.
-		Check(runtime.Statistics().maskApplications == 1,"the wedge masks the glint");
-		// A settled title draws its artwork from cache: only the turning wedge
-		// tessellates again (its counter-turned rim stays put within float
-		// jitter), and the zero-opacity rails, markers and lines take no layers.
-		runtime.Frame(viewport,6+4.6);
-		Check(runtime.Statistics().vectorPathsCompiled == 1,"a settled title tessellates only the turning wedge");
+		runtime.Frame(viewport,6+0.85);
+		const auto charge = runtime.PresentedValue("emblem-charge","transform");
+		const auto rim = runtime.PresentedValue("emblem-charge-rim","transform");
+		Check(charge && rim && Near(static_cast<float>(charge->data[1]+rim->data[1]),0,.01f) && charge->data[1] < 390 && charge->data[1] > -96,
+			"the charge part way up at 0.85 s, the rim held in place");
+		// Statistics are per frame, and the charge is the title's only mask.
+		Check(runtime.Statistics().maskApplications == 1,"the band masks the charge");
+		// A settled title draws its artwork from cache: the charge has passed,
+		// both reticle rings hold between their steps, and the zero-opacity
+		// rails, markers and lines take no layers.
+		runtime.Frame(viewport,6+3.5);
+		runtime.Frame(viewport,6+3.6);
+		Check(runtime.Statistics().vectorPathsCompiled == 0,"a settled title tessellates nothing");
 		Check(runtime.Statistics().layerElisions > 0,"zero-opacity controls take no composition layers");
-		const auto shown = runtime.PresentedValue("emblem-glint","display");
+		// The gauge ring steps from 4.58 s to 4.8 s: one ring, one path.
+		runtime.Frame(viewport,6+4.7);
+		Check(runtime.Statistics().vectorPathsCompiled == 1,"a step of the gauge compiles its ring alone");
+		const auto shown = runtime.PresentedValue("emblem-charge","display");
 		host.reducedMotion = true;
 		runtime.Frame(viewport,11);
-		const auto hidden = runtime.PresentedValue("emblem-glint","display");
+		const auto hidden = runtime.PresentedValue("emblem-charge","display");
 		Check(shown && shown->text == "block" && hidden && hidden->text == "none" && runtime.Statistics().maskApplications == 0,
-			"reduced motion hides the glint");
+			"reduced motion hides the charge");
 		host.reducedMotion = false;
 		// Depth (section 13.8): the backdrop leans 6 dp away from the pointer and
 		// the frame a third of that; reduced motion holds both still.
@@ -6158,7 +6185,8 @@ int main(int argc, char** argv) {
 			!runtime.PresentedValue("depth-frame","transform"),"the scene leans while vector furniture stays anchored");
 		Check(runtime.SetState({{"pointer_x",.913},{"pointer_y",-.417}},error,11.61),"move scene by a fractional pixel");
 		runtime.Frame(viewport,11.62);
-		Check(runtime.Statistics().vectorPathsCompiled == 1,"pointer motion does not retessellate vector furniture");
+		// The emblem's loops stopped with reduced motion, so nothing compiles.
+		Check(runtime.Statistics().vectorPathsCompiled == 0,"pointer motion does not retessellate vector furniture");
 		host.reducedMotion = true;
 		runtime.Frame(viewport,11.7);
 		const auto still = runtime.PresentedValue("depth-backdrop","transform");
@@ -6222,7 +6250,7 @@ int main(int argc, char** argv) {
 				runtime.GetBounds("exitModal-title-outline",outline) && runtime.GetBounds("exitModal-title-outline-1",left) &&
 				runtime.GetBounds("exitModal-title-outline-4",below) && runtime.GetBounds("exitModal-body",body),"the confirmation is laid out");
 			Check(Near(dialog.x,240+240*1.5f) && Near(dialog.width,480*1.5f),"the dialog is the stock 320 u rect");
-			Check(Near(title.x-dialog.x,30.125f*1.5f) && Near(title.y-dialog.y,-4*1.5f),"the title hangs from the slot's foot");
+			Check(Near(title.x-dialog.x,30.125f*1.5f) && Near(title.y-dialog.y,-1*1.5f),"the title stands in its tab from the slot's foot");
 			Check(Near(left.x-title.x,-1.5f,.01f) && Near(left.y-title.y,0,.01f) && Near(below.y-title.y,1.5f,.01f),
 				"the outline copies extrude 1 dp");
 			Check(outline.x <= left.x && outline.y <= title.y-1.5f && outline.x+outline.width >= title.x+title.width+1.5f,
@@ -6304,7 +6332,8 @@ int main(int argc, char** argv) {
 			runtime.Frame(viewport,16.64);
 			Check(host.softened.size() == 2 && Near(host.softened[1].sigma,11.25f,.01f) && Near(host.softened[1].saturation,.8f,.001f),
 				"modal.enter ends at a 7.5 dp blur and 0.80 saturation");
-			Check(runtime.Statistics().maskApplications == 2,"the glow's side fade masks it, beside the emblem glint");
+			// Beside the emblem's charge, and the pop-up's pulses once its contents show.
+			Check(runtime.Statistics().maskApplications >= 2,"the glow's side fade masks it");
 			Check(runtime.RunEvent("exitModalHide",16.65,hidden,error),"the exit confirmation closes");
 			runtime.Frame(viewport,16.67);
 			Check(host.softened.size() == 3 && Near(host.softened[2].sigma,11.25f,.01f),"leave holds the soft focus for 50 ms");

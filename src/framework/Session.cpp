@@ -4194,6 +4194,7 @@ void idSessionLocal::Clear() {
 	// uiManager owns and frees these, and an engine reload frees them with it.
 	// Init finds them again; a dedicated server's session leaves them NULL.
 	guiMainMenu = guiRestartMenu = guiGameOver = guiMsg = guiTakeNotes = guiIntro = NULL;
+	guiMsgStock = guiMsgRetained = NULL;
 	guiInGame = guiLoading = guiTest = NULL;
 	guiSystem = guiSystemParent = NULL;
 	guiSystemParentHandle = NULL;
@@ -4364,6 +4365,7 @@ idSessionLocal::idSessionLocal() {
 	guiInGame = guiMainMenu = guiIntro \
 		= guiRestartMenu = guiLoading = guiGameOver = guiActive \
 		= guiTest = guiMsg = guiMsgRestore = guiTakeNotes = guiDemoMenu = NULL;
+	guiMsgStock = guiMsgRetained = NULL;
 	guiDemoList = NULL;
 	
 	menuSoundWorld = NULL;
@@ -7517,6 +7519,8 @@ void idSessionLocal::PublishCampaignChapters( idUserInterface *gui, int select )
 			gui->SetStateString( va( "chapter.row%d.name", i ), names[i].c_str() );
 			gui->SetStateString( va( "chapter.row%d.location", i ), language->GetString( status ) );
 			gui->SetStateBool( va( "chapter.row%d.open", i ), open );
+			// The row's save mark: a level reached that has its start autosave.
+			gui->SetStateBool( va( "chapter.row%d.saved", i ), open && saves[i].Length() > 0 );
 		} else {
 			// A locked row reads gray: the stock list cannot disable one.
 			gui->SetStateString( va( "chapters_item_%d", i ), va( open ? "%s\t%s" : S_COLOR_GRAY "%s\t" S_COLOR_GRAY "%s",
@@ -11028,7 +11032,10 @@ void idSessionLocal::Init() {
 		idAsyncNetwork::client.serverList.GUIConfig( guiMainMenu, "serverList" );
 		guiRestartMenu = uiManager->FindGui( "guis/restart.gui", true, false, true );
 		guiGameOver = uiManager->FindGui( "guis/gameover.gui", true, false, true );
-		guiMsg = uiManager->FindGui( "guis/msg.gui", true, false, true );
+		// The stock box; a box that the retained pop-up can present finds that
+		// when it is first needed (SelectMessageBox).
+		guiMsgStock = guiMsg = uiManager->FindGui( "guis/msg.gui", true, false, true );
+		guiMsgRetained = NULL;
 		guiTakeNotes = uiManager->FindGui( "guis/takeNotes.gui", true, false, true );
 		guiIntro = uiManager->FindGui( "guis/intro.gui", true, false, true );
 		InitDemoSystem();

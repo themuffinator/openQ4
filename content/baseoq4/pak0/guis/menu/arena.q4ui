@@ -85,6 +85,7 @@
   "resultModal.contents": {"type": "boolean", "initial": false},
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "motion_reduced": {"type": "boolean", "initial": false, "cvar": "ui_retainedReducedMotion"},
   "resetModal.visible": {"type": "boolean", "initial": false},
   "resetModal.contents": {"type": "boolean", "initial": false},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
@@ -187,10 +188,14 @@
    {"op": "setState", "values": {"resultModal.visible": true, "resultModal.contents": false}},
    {"op": "playTimeline", "timeline": "resultModalEnter"}
   ],
-  "resultModalShown": [{"op": "setState", "values": {"resultModal.contents": true}}],
+  "resultModalShown": [
+   {"op": "setState", "values": {"resultModal.contents": true}},
+   {"op": "playTimeline", "timeline": "resultModalEnergy"}
+  ],
   "resultModalHide": [
    {"op": "setState", "values": {"resultModal.contents": false}},
-   {"op": "playTimeline", "timeline": "resultModalLeave"}
+   {"op": "playTimeline", "timeline": "resultModalLeave"},
+   {"op": "cancelTimeline", "timeline": "resultModalEnergy", "policy": "base"}
   ],
   "resultModalHidden": [{"op": "setState", "values": {"resultModal.visible": false}}],
   "resultRetry": [
@@ -213,10 +218,14 @@
    {"op": "setState", "values": {"resetModal.visible": true, "resetModal.contents": false}},
    {"op": "playTimeline", "timeline": "resetModalEnter"}
   ],
-  "resetModalShown": [{"op": "setState", "values": {"resetModal.contents": true}}],
+  "resetModalShown": [
+   {"op": "setState", "values": {"resetModal.contents": true}},
+   {"op": "playTimeline", "timeline": "resetModalEnergy"}
+  ],
   "resetModalHide": [
    {"op": "setState", "values": {"resetModal.contents": false}},
-   {"op": "playTimeline", "timeline": "resetModalLeave"}
+   {"op": "playTimeline", "timeline": "resetModalLeave"},
+   {"op": "cancelTimeline", "timeline": "resetModalEnergy", "policy": "base"}
   ],
   "resetModalHidden": [{"op": "setState", "values": {"resetModal.visible": false}}],
   "resetConfirmed": [{"op": "call", "event": "resetModalHide"}, {"op": "action", "action": "resetConfirm"}],
@@ -1944,53 +1953,53 @@
     "op": "select",
     "args": [
      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-     278.004,
+     286.125,
      {
       "op": "select",
       "args": [
        {"op": "==", "args": [{"state": "language"}, "czech"]},
-       297.695,
+       305.816,
        {
         "op": "select",
         "args": [
          {"op": "==", "args": [{"state": "language"}, "english"]},
-         210.367,
+         218.488,
          {
           "op": "select",
           "args": [
            {"op": "==", "args": [{"state": "language"}, "french"]},
-           235.238,
+           243.359,
            {
             "op": "select",
             "args": [
              {"op": "==", "args": [{"state": "language"}, "german"]},
-             271.633,
+             279.754,
              {
               "op": "select",
               "args": [
                {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-               263.898,
+               272.02,
                {
                 "op": "select",
                 "args": [
                  {"op": "==", "args": [{"state": "language"}, "italian"]},
-                 268.941,
+                 277.062,
                  {
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "polish"]},
-                   307.793,
+                   315.914,
                    {
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "russian"]},
-                     175.393,
+                     183.514,
                      {
                       "op": "select",
                       "args": [
                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                       165.199,
-                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 211.42, 325.695]}
+                       173.32,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 219.541, 333.816]}
                       ]
                      }
                     ]
@@ -2143,6 +2152,25 @@
    "node": "resultModal_no-label",
    "property": "line-height",
    "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "resultModal-energy.display",
+   "node": "resultModal-energy",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "resultModal.contents"}, {"op": "!", "args": [{"state": "motion_reduced"}]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "text.resultModal-energy-fit.display",
+   "node": "resultModal-energy-fit",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "none", "block"]}
   },
   {
    "id": "text.resultModal-dialog.height",
@@ -2585,53 +2613,53 @@
     "op": "select",
     "args": [
      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-     310.316,
+     316.879,
      {
       "op": "select",
       "args": [
        {"op": "==", "args": [{"state": "language"}, "czech"]},
-       259.738,
+       266.301,
        {
         "op": "select",
         "args": [
          {"op": "==", "args": [{"state": "language"}, "english"]},
-         238.949,
+         245.512,
          {
           "op": "select",
           "args": [
            {"op": "==", "args": [{"state": "language"}, "french"]},
-           216.309,
+           222.871,
            {
             "op": "select",
             "args": [
              {"op": "==", "args": [{"state": "language"}, "german"]},
-             304.594,
+             311.156,
              {
               "op": "select",
               "args": [
                {"op": "==", "args": [{"state": "language"}, "italian"]},
-               263.605,
+               270.168,
                {
                 "op": "select",
                 "args": [
                  {"op": "==", "args": [{"state": "language"}, "polish"]},
-                 255.656,
+                 262.219,
                  {
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "russian"]},
-                   253.854,
+                   260.416,
                    {
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "spanish"]},
-                     294.883,
+                     301.445,
                      {
                       "op": "select",
                       "args": [
                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                       276.738,
-                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 228.201, 320.613]}
+                       283.301,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 234.764, 327.176]}
                       ]
                      }
                     ]
@@ -2784,6 +2812,25 @@
    "node": "resetModal_no-label",
    "property": "line-height",
    "value": {"op": "/", "args": [45, {"state": "view.text"}]}
+  },
+  {
+   "id": "resetModal-energy.display",
+   "node": "resetModal-energy",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "resetModal.contents"}, {"op": "!", "args": [{"state": "motion_reduced"}]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "text.resetModal-energy-fit.display",
+   "node": "resetModal-energy-fit",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "none", "block"]}
   },
   {
    "id": "text.resetModal-dialog.height",
@@ -14841,10 +14888,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [2.002, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [2.002, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -14899,10 +14946,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [2.002, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [2.002, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -14957,10 +15004,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.002, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [3.002, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15163,10 +15210,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15221,10 +15268,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15279,10 +15326,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.45, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [4.45, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15443,10 +15490,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15501,10 +15548,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [3.45, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15559,10 +15606,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.45, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [4.45, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15624,6 +15671,60 @@
      ]
     }
    ]
+  },
+  {
+   "id": "resultModalEnergy",
+   "durationMs": 7200.0,
+   "tracks": [
+    {
+     "node": "resultModal-energy-run",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "resultModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "resultModal-energy-halo",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.35}},
+      {"atMs": 3600.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0.35}}
+     ]
+    },
+    {
+     "node": "resultModal-energy-wave",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 900.0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 375.0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 375.0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "resultModal-energy-wave",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}},
+      {"atMs": 900.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 1100.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2200.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2400.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ],
+   "iterations": 0
   },
   {
    "id": "resultModalEnter",
@@ -15880,10 +15981,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15938,10 +16039,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -15996,10 +16097,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.625, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [3.625, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -16160,10 +16261,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -16218,10 +16319,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [2.625, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -16276,10 +16377,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [3.625, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [3.625, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -16341,6 +16442,60 @@
      ]
     }
    ]
+  },
+  {
+   "id": "resetModalEnergy",
+   "durationMs": 7200.0,
+   "tracks": [
+    {
+     "node": "resetModal-energy-run",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "resetModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "resetModal-energy-halo",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.35}},
+      {"atMs": 3600.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0.35}}
+     ]
+    },
+    {
+     "node": "resetModal-energy-wave",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 900.0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 225.0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 225.0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "resetModal-energy-wave",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}},
+      {"atMs": 900.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 1100.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2200.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2400.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ],
+   "iterations": 0
   },
   {
    "id": "resetModalEnter",
@@ -20372,10 +20527,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.365, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [4.365, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -20430,10 +20585,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [4.365, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [4.365, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -20488,10 +20643,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.365, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [5.365, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -28974,10 +29129,12 @@
        {
         "id": "back",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+         {"id": "p0", "op": "move", "points": [[{"fraction": 0.035398}, {"fraction": 0.0}]]},
          {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
-         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.892857}]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0.946903}, {"fraction": 1}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+         {"id": "p5", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.071429}]]},
          {"id": "close", "op": "close"}
         ],
         "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.6]}}
@@ -28997,6 +29154,23 @@
        "height": {"type": "length", "value": 165.0, "unit": "dp"},
        "margin-top": {"type": "length", "value": -271.5, "unit": "dp"},
        "display": {"type": "keyword", "value": "block"}
+      },
+      "mask": {
+       "paths": [
+        {
+         "id": "cut",
+         "commands": [
+          {"id": "p0", "op": "move", "points": [[11.121, 0]]},
+          {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+          {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -17.121}]]},
+          {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -17.121}, {"fraction": 1}]]},
+          {"id": "p4", "op": "line", "points": [[0, {"fraction": 1}]]},
+          {"id": "p5", "op": "line", "points": [[0, 11.121]]},
+          {"id": "close", "op": "close"}
+         ],
+         "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
+        }
+       ]
       }
      },
      {
@@ -29130,10 +29304,12 @@
        {
         "id": "border",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0.002212}, {"fraction": 0.004464}]]},
+         {"id": "p0", "op": "move", "points": [[{"fraction": 0.036313}, {"fraction": 0.004464}]]},
          {"id": "p1", "op": "line", "points": [[{"fraction": 0.997788}, {"fraction": 0.004464}]]},
-         {"id": "p2", "op": "line", "points": [[{"fraction": 0.997788}, {"fraction": 0.995536}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 0.002212}, {"fraction": 0.995536}]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 0.997788}, {"fraction": 0.891012}]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0.945988}, {"fraction": 0.995536}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 0.002212}, {"fraction": 0.995536}]]},
+         {"id": "p5", "op": "line", "points": [[{"fraction": 0.002212}, {"fraction": 0.073274}]]},
          {"id": "close", "op": "close"}
         ],
         "stroke": {
@@ -29143,6 +29319,66 @@
          "join": "miter",
          "cap": "butt"
         }
+       },
+       {
+        "id": "rail-lead",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[{"fraction": 0.002212}, {"fraction": 0.5}]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 0.002212}, {"fraction": 0.073274}]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 0.036313}, {"fraction": 0.004464}]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 0.004464}]]}
+        ],
+        "stroke": {
+         "paint": {
+          "type": "linear",
+          "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+          "to": [{"fraction": 0.5}, {"fraction": 0.9}],
+          "stops": [
+           {"at": 0, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.85]}},
+           {"at": 0.34, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}},
+           {"at": 1, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}}
+          ]
+         },
+         "widthDp": 2.25,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       },
+       {
+        "id": "rail-trail",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[{"fraction": 0.997788}, {"fraction": 0.5}]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 0.997788}, {"fraction": 0.891012}]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 0.945988}, {"fraction": 0.995536}]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 0.995536}]]}
+        ],
+        "stroke": {
+         "paint": {
+          "type": "linear",
+          "from": [{"fraction": 1}, {"fraction": 1}],
+          "to": [{"fraction": 0.5}, {"fraction": 0.1}],
+          "stops": [
+           {"at": 0, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.85]}},
+           {"at": 0.34, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}},
+           {"at": 1, "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0]}}
+          ]
+         },
+         "widthDp": 2.25,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       },
+       {
+        "id": "mark",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[{"fraction": 0.966077}, {"fraction": 0.026786}]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 0.986726}, {"fraction": 0.026786}]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 0.986726}, {"fraction": 0.068452}]]},
+         {"id": "close", "op": "close"}
+        ],
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0.8, 0.8, 0.3176, 0.8]}}
        }
       ]
      },
@@ -30576,6 +30812,222 @@
           }
          },
          {
+          "id": "resultModal-energy-fit",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "height": {"type": "length", "value": 100, "unit": "%"},
+           "display": {"type": "keyword", "value": "block"},
+           "pointer-events": {"type": "keyword", "value": "none"}
+          },
+          "children": [
+           {
+            "id": "resultModal-energy",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "children": [
+             {
+              "id": "resultModal-energy-halo",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 594.0, "unit": "dp"},
+               "height": {"type": "length", "value": 375.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 0.35}
+              },
+              "paths": [
+               {
+                "id": "halo",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[8.121, 3.562]]},
+                 {"id": "p1", "op": "line", "points": [[16.242, 3.562]]},
+                 {"id": "p2", "op": "line", "points": [[33.242, 20.562]]},
+                 {"id": "p3", "op": "line", "points": [[433.141, 20.562]]},
+                 {"id": "p4", "op": "line", "points": [[450.141, 3.562]]},
+                 {"id": "p5", "op": "line", "points": [[572.879, 3.562]]},
+                 {"id": "p6", "op": "line", "points": [[585.879, 16.562]]},
+                 {"id": "p7", "op": "line", "points": [[585.879, 41.562]]},
+                 {"id": "p8", "op": "line", "points": [[589.879, 45.562]]},
+                 {"id": "p9", "op": "line", "points": [[589.879, 93.562]]},
+                 {"id": "p10", "op": "line", "points": [[585.879, 97.562]]},
+                 {"id": "p11", "op": "line", "points": [[585.879, 369.656]]},
+                 {"id": "p12", "op": "line", "points": [[527.879, 369.656]]},
+                 {"id": "p13", "op": "line", "points": [[521.879, 363.656]]},
+                 {"id": "p14", "op": "line", "points": [[445.879, 363.656]]},
+                 {"id": "p15", "op": "line", "points": [[439.879, 369.656]]},
+                 {"id": "p16", "op": "line", "points": [[46.121, 369.656]]},
+                 {"id": "p17", "op": "line", "points": [[8.121, 331.656]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.3]}},
+                 "widthDp": 9.0,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                },
+                "blend": "additive"
+               }
+              ]
+             },
+             {
+              "id": "resultModal-energy-wave",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -16, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 626.0, "unit": "dp"},
+               "height": {"type": "length", "value": 46.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 0},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}
+              },
+              "paths": [
+               {
+                "id": "wave",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [0, 0],
+                 "to": [0, {"fraction": 1}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0.2706, 0.3059, 0.1059, 0]}},
+                  {"at": 0.6, "color": {"type": "color", "value": [0.2706, 0.3059, 0.1059, 0.7]}},
+                  {"at": 1, "color": {"type": "color", "value": [0.2706, 0.3059, 0.1059, 0]}}
+                 ]
+                },
+                "blend": "additive"
+               }
+              ]
+             },
+             {
+              "id": "resultModal-energy-run",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -66.234, "unit": "dp"},
+               "top": {"type": "length", "value": -175.734, "unit": "dp"},
+               "width": {"type": "length", "value": 726.468, "unit": "dp"},
+               "height": {"type": "length", "value": 726.468, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "children": [
+               {
+                "id": "resultModal-energy-line",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 726.468, "unit": "dp"},
+                 "height": {"type": "length", "value": 726.468, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "paths": [
+                 {
+                  "id": "line",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[74.355, 179.296]]},
+                   {"id": "p1", "op": "line", "points": [[82.476, 179.296]]},
+                   {"id": "p2", "op": "line", "points": [[99.476, 196.296]]},
+                   {"id": "p3", "op": "line", "points": [[499.375, 196.296]]},
+                   {"id": "p4", "op": "line", "points": [[516.375, 179.296]]},
+                   {"id": "p5", "op": "line", "points": [[639.113, 179.296]]},
+                   {"id": "p6", "op": "line", "points": [[652.113, 192.296]]},
+                   {"id": "p7", "op": "line", "points": [[652.113, 217.296]]},
+                   {"id": "p8", "op": "line", "points": [[656.113, 221.296]]},
+                   {"id": "p9", "op": "line", "points": [[656.113, 269.296]]},
+                   {"id": "p10", "op": "line", "points": [[652.113, 273.296]]},
+                   {"id": "p11", "op": "line", "points": [[652.113, 545.39]]},
+                   {"id": "p12", "op": "line", "points": [[594.113, 545.39]]},
+                   {"id": "p13", "op": "line", "points": [[588.113, 539.39]]},
+                   {"id": "p14", "op": "line", "points": [[512.113, 539.39]]},
+                   {"id": "p15", "op": "line", "points": [[506.113, 545.39]]},
+                   {"id": "p16", "op": "line", "points": [[112.355, 545.39]]},
+                   {"id": "p17", "op": "line", "points": [[74.355, 507.39]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                   "widthDp": 9.0,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               }
+              ],
+              "mask": {
+               "paths": [
+                {
+                 "id": "first",
+                 "commands": [
+                  {"id": "p0", "op": "move", "points": [[363.234, 363.234]]},
+                  {"id": "p1", "op": "line", "points": [[136.92, 51.74]]},
+                  {"id": "p2", "op": "line", "points": [[244.254, -2.949]]},
+                  {"id": "p3", "op": "line", "points": [[363.234, -21.794]]},
+                  {"id": "close", "op": "close"}
+                 ],
+                 "fill": {
+                  "type": "linear",
+                  "from": [136.92, 51.74],
+                  "to": [363.234, -21.794],
+                  "stops": [
+                   {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                  ]
+                 }
+                },
+                {
+                 "id": "second",
+                 "commands": [
+                  {"id": "p0", "op": "move", "points": [[363.234, 363.234]]},
+                  {"id": "p1", "op": "line", "points": [[589.548, 674.728]]},
+                  {"id": "p2", "op": "line", "points": [[482.214, 729.417]]},
+                  {"id": "p3", "op": "line", "points": [[363.234, 748.262]]},
+                  {"id": "close", "op": "close"}
+                 ],
+                 "fill": {
+                  "type": "linear",
+                  "from": [589.548, 674.728],
+                  "to": [363.234, 748.262],
+                  "stops": [
+                   {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                  ]
+                 }
+                }
+               ]
+              }
+             }
+            ]
+           }
+          ]
+         },
+         {
           "id": "resultModal-frame",
           "type": "vector",
           "properties": {
@@ -30595,10 +31047,19 @@
              {"id": "p2", "op": "line", "points": [[33.242, 20.562]]},
              {"id": "p3", "op": "line", "points": [[433.141, 20.562]]},
              {"id": "p4", "op": "line", "points": [[450.141, 3.562]]},
-             {"id": "p5", "op": "line", "points": [[585.879, 3.562]]},
-             {"id": "p6", "op": "line", "points": [[585.879, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p7", "op": "line", "points": [[46.121, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p8", "op": "line", "points": [[8.121, {"fraction": 1, "dp": -43.344}]]},
+             {"id": "p5", "op": "line", "points": [[572.879, 3.562]]},
+             {"id": "p6", "op": "line", "points": [[585.879, 16.562]]},
+             {"id": "p7", "op": "line", "points": [[585.879, 41.562]]},
+             {"id": "p8", "op": "line", "points": [[589.879, 45.562]]},
+             {"id": "p9", "op": "line", "points": [[589.879, 93.562]]},
+             {"id": "p10", "op": "line", "points": [[585.879, 97.562]]},
+             {"id": "p11", "op": "line", "points": [[585.879, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p12", "op": "line", "points": [[527.879, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p13", "op": "line", "points": [[521.879, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p14", "op": "line", "points": [[445.879, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p15", "op": "line", "points": [[439.879, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p16", "op": "line", "points": [[46.121, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p17", "op": "line", "points": [[8.121, {"fraction": 1, "dp": -43.344}]]},
              {"id": "close", "op": "close"}
             ],
             "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.7]}}
@@ -30611,10 +31072,19 @@
              {"id": "p2", "op": "line", "points": [[33.242, 20.562]]},
              {"id": "p3", "op": "line", "points": [[433.141, 20.562]]},
              {"id": "p4", "op": "line", "points": [[450.141, 3.562]]},
-             {"id": "p5", "op": "line", "points": [[585.879, 3.562]]},
-             {"id": "p6", "op": "line", "points": [[585.879, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p7", "op": "line", "points": [[46.121, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p8", "op": "line", "points": [[8.121, {"fraction": 1, "dp": -43.344}]]},
+             {"id": "p5", "op": "line", "points": [[572.879, 3.562]]},
+             {"id": "p6", "op": "line", "points": [[585.879, 16.562]]},
+             {"id": "p7", "op": "line", "points": [[585.879, 41.562]]},
+             {"id": "p8", "op": "line", "points": [[589.879, 45.562]]},
+             {"id": "p9", "op": "line", "points": [[589.879, 93.562]]},
+             {"id": "p10", "op": "line", "points": [[585.879, 97.562]]},
+             {"id": "p11", "op": "line", "points": [[585.879, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p12", "op": "line", "points": [[527.879, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p13", "op": "line", "points": [[521.879, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p14", "op": "line", "points": [[445.879, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p15", "op": "line", "points": [[439.879, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p16", "op": "line", "points": [[46.121, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p17", "op": "line", "points": [[8.121, {"fraction": 1, "dp": -43.344}]]},
              {"id": "close", "op": "close"}
             ],
             "stroke": {
@@ -30632,10 +31102,10 @@
             "type": "vector",
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
-             "left": {"type": "length", "value": 14.742, "unit": "dp"},
+             "left": {"type": "length", "value": 6.621, "unit": "dp"},
              "top": {"type": "length", "value": 3.562, "unit": "dp"},
-             "width": {"type": "length", "value": 325.695, "unit": "dp"},
-             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "width": {"type": "length", "value": 333.816, "unit": "dp"},
+             "height": {"type": "length", "value": 18.5, "unit": "dp"},
              "pointer-events": {"type": "keyword", "value": "none"}
             },
             "paths": [
@@ -30645,7 +31115,8 @@
                {"id": "p0", "op": "move", "points": [[0, 0]]},
                {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
                {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
-               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 1}, 18.5]]},
+               {"id": "p4", "op": "line", "points": [[0, 18.5]]},
                {"id": "close", "op": "close"}
               ],
               "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
@@ -30664,6 +31135,16 @@
                "join": "miter",
                "cap": "butt"
               }
+             },
+             {
+              "id": "tab-mark",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[12.621, 6.25]]},
+               {"id": "p1", "op": "line", "points": [[18.621, 6.25]]},
+               {"id": "p2", "op": "line", "points": [[18.621, 12.25]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.9]}}
              }
             ]
            }
@@ -30687,7 +31168,7 @@
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 30.242, "unit": "dp"},
-             "top": {"type": "length", "value": -7.0, "unit": "dp"},
+             "top": {"type": "length", "value": -4.0, "unit": "dp"},
              "width": {"type": "length", "value": 405.898, "unit": "dp"},
              "height": {"type": "length", "value": 30.0, "unit": "dp"},
              "opacity": {"type": "number", "value": 0.85},
@@ -30847,7 +31328,7 @@
              "text": {"type": "text", "value": "#str_42080"},
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 33.242, "unit": "dp"},
-             "top": {"type": "length", "value": -4, "unit": "dp"},
+             "top": {"type": "length", "value": -1.0, "unit": "dp"},
              "width": {"type": "length", "value": 399.898, "unit": "dp"},
              "height": {"type": "length", "value": 24, "unit": "dp"},
              "font-family": {"type": "font", "value": "marine"},
@@ -31900,6 +32381,222 @@
           }
          },
          {
+          "id": "resetModal-energy-fit",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "height": {"type": "length", "value": 100, "unit": "%"},
+           "display": {"type": "keyword", "value": "block"},
+           "pointer-events": {"type": "keyword", "value": "none"}
+          },
+          "children": [
+           {
+            "id": "resetModal-energy",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "children": [
+             {
+              "id": "resetModal-energy-halo",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 480.0, "unit": "dp"},
+               "height": {"type": "length", "value": 225.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 0.35}
+              },
+              "paths": [
+               {
+                "id": "halo",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[6.562, 3.562]]},
+                 {"id": "p1", "op": "line", "points": [[13.125, 3.562]]},
+                 {"id": "p2", "op": "line", "points": [[30.125, 20.562]]},
+                 {"id": "p3", "op": "line", "points": [[346.75, 20.562]]},
+                 {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
+                 {"id": "p5", "op": "line", "points": [[460.438, 3.562]]},
+                 {"id": "p6", "op": "line", "points": [[473.438, 16.562]]},
+                 {"id": "p7", "op": "line", "points": [[473.438, 41.562]]},
+                 {"id": "p8", "op": "line", "points": [[477.438, 45.562]]},
+                 {"id": "p9", "op": "line", "points": [[477.438, 93.562]]},
+                 {"id": "p10", "op": "line", "points": [[473.438, 97.562]]},
+                 {"id": "p11", "op": "line", "points": [[473.438, 219.656]]},
+                 {"id": "p12", "op": "line", "points": [[415.438, 219.656]]},
+                 {"id": "p13", "op": "line", "points": [[409.438, 213.656]]},
+                 {"id": "p14", "op": "line", "points": [[333.438, 213.656]]},
+                 {"id": "p15", "op": "line", "points": [[327.438, 219.656]]},
+                 {"id": "p16", "op": "line", "points": [[44.562, 219.656]]},
+                 {"id": "p17", "op": "line", "points": [[6.562, 181.656]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.3]}},
+                 "widthDp": 9.0,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                },
+                "blend": "additive"
+               }
+              ]
+             },
+             {
+              "id": "resetModal-energy-wave",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -16, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 512.0, "unit": "dp"},
+               "height": {"type": "length", "value": 46.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 0},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}
+              },
+              "paths": [
+               {
+                "id": "wave",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 0]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [0, 0],
+                 "to": [0, {"fraction": 1}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0.2706, 0.3059, 0.1059, 0]}},
+                  {"at": 0.6, "color": {"type": "color", "value": [0.2706, 0.3059, 0.1059, 0.7]}},
+                  {"at": 1, "color": {"type": "color", "value": [0.2706, 0.3059, 0.1059, 0]}}
+                 ]
+                },
+                "blend": "additive"
+               }
+              ]
+             },
+             {
+              "id": "resetModal-energy-run",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -37.059, "unit": "dp"},
+               "top": {"type": "length", "value": -164.559, "unit": "dp"},
+               "width": {"type": "length", "value": 554.118, "unit": "dp"},
+               "height": {"type": "length", "value": 554.118, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "children": [
+               {
+                "id": "resetModal-energy-line",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 554.118, "unit": "dp"},
+                 "height": {"type": "length", "value": 554.118, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "paths": [
+                 {
+                  "id": "line",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[43.621, 168.121]]},
+                   {"id": "p1", "op": "line", "points": [[50.184, 168.121]]},
+                   {"id": "p2", "op": "line", "points": [[67.184, 185.121]]},
+                   {"id": "p3", "op": "line", "points": [[383.809, 185.121]]},
+                   {"id": "p4", "op": "line", "points": [[400.809, 168.121]]},
+                   {"id": "p5", "op": "line", "points": [[497.497, 168.121]]},
+                   {"id": "p6", "op": "line", "points": [[510.497, 181.121]]},
+                   {"id": "p7", "op": "line", "points": [[510.497, 206.121]]},
+                   {"id": "p8", "op": "line", "points": [[514.497, 210.121]]},
+                   {"id": "p9", "op": "line", "points": [[514.497, 258.121]]},
+                   {"id": "p10", "op": "line", "points": [[510.497, 262.121]]},
+                   {"id": "p11", "op": "line", "points": [[510.497, 384.215]]},
+                   {"id": "p12", "op": "line", "points": [[452.497, 384.215]]},
+                   {"id": "p13", "op": "line", "points": [[446.497, 378.215]]},
+                   {"id": "p14", "op": "line", "points": [[370.497, 378.215]]},
+                   {"id": "p15", "op": "line", "points": [[364.497, 384.215]]},
+                   {"id": "p16", "op": "line", "points": [[81.621, 384.215]]},
+                   {"id": "p17", "op": "line", "points": [[43.621, 346.215]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                   "widthDp": 9.0,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               }
+              ],
+              "mask": {
+               "paths": [
+                {
+                 "id": "first",
+                 "commands": [
+                  {"id": "p0", "op": "move", "points": [[277.059, 277.059]]},
+                  {"id": "p1", "op": "line", "points": [[104.437, 39.465]]},
+                  {"id": "p2", "op": "line", "points": [[186.306, -2.25]]},
+                  {"id": "p3", "op": "line", "points": [[277.059, -16.624]]},
+                  {"id": "close", "op": "close"}
+                 ],
+                 "fill": {
+                  "type": "linear",
+                  "from": [104.437, 39.465],
+                  "to": [277.059, -16.624],
+                  "stops": [
+                   {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                  ]
+                 }
+                },
+                {
+                 "id": "second",
+                 "commands": [
+                  {"id": "p0", "op": "move", "points": [[277.059, 277.059]]},
+                  {"id": "p1", "op": "line", "points": [[449.681, 514.653]]},
+                  {"id": "p2", "op": "line", "points": [[367.812, 556.368]]},
+                  {"id": "p3", "op": "line", "points": [[277.059, 570.742]]},
+                  {"id": "close", "op": "close"}
+                 ],
+                 "fill": {
+                  "type": "linear",
+                  "from": [449.681, 514.653],
+                  "to": [277.059, 570.742],
+                  "stops": [
+                   {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                  ]
+                 }
+                }
+               ]
+              }
+             }
+            ]
+           }
+          ]
+         },
+         {
           "id": "resetModal-frame",
           "type": "vector",
           "properties": {
@@ -31919,10 +32616,19 @@
              {"id": "p2", "op": "line", "points": [[30.125, 20.562]]},
              {"id": "p3", "op": "line", "points": [[346.75, 20.562]]},
              {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
-             {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
-             {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -43.344}]]},
+             {"id": "p5", "op": "line", "points": [[460.438, 3.562]]},
+             {"id": "p6", "op": "line", "points": [[473.438, 16.562]]},
+             {"id": "p7", "op": "line", "points": [[473.438, 41.562]]},
+             {"id": "p8", "op": "line", "points": [[477.438, 45.562]]},
+             {"id": "p9", "op": "line", "points": [[477.438, 93.562]]},
+             {"id": "p10", "op": "line", "points": [[473.438, 97.562]]},
+             {"id": "p11", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p12", "op": "line", "points": [[415.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p13", "op": "line", "points": [[409.438, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p14", "op": "line", "points": [[333.438, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p15", "op": "line", "points": [[327.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p16", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p17", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -43.344}]]},
              {"id": "close", "op": "close"}
             ],
             "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.7]}}
@@ -31935,10 +32641,19 @@
              {"id": "p2", "op": "line", "points": [[30.125, 20.562]]},
              {"id": "p3", "op": "line", "points": [[346.75, 20.562]]},
              {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
-             {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
-             {"id": "p6", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p7", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
-             {"id": "p8", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -43.344}]]},
+             {"id": "p5", "op": "line", "points": [[460.438, 3.562]]},
+             {"id": "p6", "op": "line", "points": [[473.438, 16.562]]},
+             {"id": "p7", "op": "line", "points": [[473.438, 41.562]]},
+             {"id": "p8", "op": "line", "points": [[477.438, 45.562]]},
+             {"id": "p9", "op": "line", "points": [[477.438, 93.562]]},
+             {"id": "p10", "op": "line", "points": [[473.438, 97.562]]},
+             {"id": "p11", "op": "line", "points": [[473.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p12", "op": "line", "points": [[415.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p13", "op": "line", "points": [[409.438, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p14", "op": "line", "points": [[333.438, {"fraction": 1, "dp": -11.344}]]},
+             {"id": "p15", "op": "line", "points": [[327.438, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p16", "op": "line", "points": [[44.562, {"fraction": 1, "dp": -5.344}]]},
+             {"id": "p17", "op": "line", "points": [[6.562, {"fraction": 1, "dp": -43.344}]]},
              {"id": "close", "op": "close"}
             ],
             "stroke": {
@@ -31956,10 +32671,10 @@
             "type": "vector",
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
-             "left": {"type": "length", "value": 11.625, "unit": "dp"},
+             "left": {"type": "length", "value": 5.062, "unit": "dp"},
              "top": {"type": "length", "value": 3.562, "unit": "dp"},
-             "width": {"type": "length", "value": 320.613, "unit": "dp"},
-             "height": {"type": "length", "value": 17.0, "unit": "dp"},
+             "width": {"type": "length", "value": 327.176, "unit": "dp"},
+             "height": {"type": "length", "value": 18.5, "unit": "dp"},
              "pointer-events": {"type": "keyword", "value": "none"}
             },
             "paths": [
@@ -31969,7 +32684,8 @@
                {"id": "p0", "op": "move", "points": [[0, 0]]},
                {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -17.0}, 0]]},
                {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
-               {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 1}, 18.5]]},
+               {"id": "p4", "op": "line", "points": [[0, 18.5]]},
                {"id": "close", "op": "close"}
               ],
               "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
@@ -31988,6 +32704,16 @@
                "join": "miter",
                "cap": "butt"
               }
+             },
+             {
+              "id": "tab-mark",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[11.062, 6.25]]},
+               {"id": "p1", "op": "line", "points": [[17.062, 6.25]]},
+               {"id": "p2", "op": "line", "points": [[17.062, 12.25]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.9]}}
              }
             ]
            }
@@ -32011,7 +32737,7 @@
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 27.125, "unit": "dp"},
-             "top": {"type": "length", "value": -7.0, "unit": "dp"},
+             "top": {"type": "length", "value": -4.0, "unit": "dp"},
              "width": {"type": "length", "value": 322.625, "unit": "dp"},
              "height": {"type": "length", "value": 30.0, "unit": "dp"},
              "opacity": {"type": "number", "value": 0.85},
@@ -32171,7 +32897,7 @@
              "text": {"type": "text", "value": "#str_42011"},
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 30.125, "unit": "dp"},
-             "top": {"type": "length", "value": -4, "unit": "dp"},
+             "top": {"type": "length", "value": -1.0, "unit": "dp"},
              "width": {"type": "length", "value": 316.625, "unit": "dp"},
              "height": {"type": "length", "value": 24, "unit": "dp"},
              "font-family": {"type": "font", "value": "marine"},

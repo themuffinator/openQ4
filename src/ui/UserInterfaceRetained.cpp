@@ -256,6 +256,7 @@ bool SessionMenuCommand(const std::string& command) {
         "joinSourceLan","joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers",
         "joinSortGameType","joinSortMap","joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext",
         "joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters",
+        "msgLeft","msgRight","msgMid",
         "noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout",
         "settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults",
         "joinConnect","joinSearch","joinSearchClear","joinSortNext",
@@ -328,7 +329,7 @@ bool SessionMenuValueCommand(const std::string& command) {
 		"createGameType","createLan","createDedicated","createAutoBalance","createFragLimit","createCaptureLimit","createControlTime",
 		"createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit","createUsePass",
 		"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
-		"createBuying","createBots","createBotSkill",
+		"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers",
 		"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
@@ -352,6 +353,8 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		"1 0.1 0.85","1 1 1"};
 	static const std::map<std::string,PlayerSetting> settings = {
 		{"ui_handicap",{0,1,100,true}},
+		// Join Game's list view: rows or tiles.
+		{"ui_browserView",{0,0,1,true,{},{0,1}}},
 		{"cl_player_outline_enemy",{2,0,0,false,levels}},{"cl_player_outline_team",{2,0,0,false,levels}},
 		{"cl_player_rimlight_enemy",{2,0,0,false,levels}},{"cl_player_rimlight_team",{2,0,0,false,levels}},
 		{"cl_player_brightskin_enemy",{2,0,0,false,levels}},{"cl_player_brightskin_team",{2,0,0,false,levels}},

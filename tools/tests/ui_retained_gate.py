@@ -268,6 +268,8 @@ struct Game {
     }
 } gameObject, *game = &gameObject;
 struct CVar { bool value = false; bool GetBool() const { return value; } } ui_retained, ui_retainedSystem, ui_retainedMultiplayer;
+// Join Game's list view (0 rows, 1 tiles).
+struct IntegerCVar { int value = 0; int GetInteger() const { return value; } } ui_browserView;
 // Key bindings: a bound command's key as the key lists name it ("^ikHH"),
 // and a key's name by number.
 struct idKeyInput {
@@ -598,6 +600,9 @@ public:
     bool retainedHomeReturning = false;
     // A stock message box (guiMsg) over the GUI it covers (guiMsgRestore).
     idUserInterface *guiMsg = nullptr, *guiMsgRestore = nullptr; bool retainedHomeUnderMessage = false;
+    // The retained message box and the command its buttons answer with.
+    idUserInterface *guiMsgRetained = nullptr; std::string messageCommand;
+    void HandleMsgCommands(const char *command) { messageCommand = command; }
     // A join from Join Game under way: a return to the menu finds its list.
     bool retainedJoinReturn = false;
     idStrList retainedStock;
@@ -5489,8 +5494,16 @@ def main() -> int:
                        'guis/menu/demos.q4ui', 'guis/menu/restartmenu.q4ui', 'guis/menu/credits.q4ui', 'guis/menu/arena.q4ui',
                        'guis/menu/multiplayer.q4ui', 'guis/menu/createserver.q4ui', 'guis/menu/joingame.q4ui',
                        'guis/menu/arena_pause.q4ui', 'guis/menu/settings/audio.q4ui', 'guis/menu/settings/game.q4ui',
-                       'guis/menu/settings/controls.q4ui', 'guis/menu/settings.q4ui'}
+                       'guis/menu/settings/controls.q4ui', 'guis/menu/settings.q4ui', 'guis/menu/msgbox.q4ui'}
             assert path in allowed, f'{name} names an ungated retained document {path}'
+    # The message box presents the retained pop-up only behind the gate, found
+    # through FindRetainedGui; the download progress keeps the stock box.
+    select_box = function_body(menu, 'void idSessionLocal::SelectMessageBox(')
+    assert 'if ( retained && Session_RetainedScreensEnabled() && guiMsgRetained == NULL ) {' in select_box
+    assert 'guiMsgRetained = FindRetainedGui( RETAINED_MSGBOX_GUI, true, false );' in select_box
+    assert 'guiMsg = guiMsgStock;' in select_box
+    assert 'SelectMessageBox( true );' in function_body(menu, 'const char* idSessionLocal::MessageBox(')
+    assert 'SelectMessageBox( false );' in function_body(menu, 'void idSessionLocal::DownloadProgressBox(')
     # Every retained document loads through FindRetainedGui, which falls back to
     # the stock screen; the SYSTEM page and the campaign selectors fall back too.
     assert not re.search(r'uiManager->FindGui\(\s*(?:RETAINED_|"[^"]+\.q4ui")', menu + session), 'retained documents load only through FindRetainedGui'

@@ -14,6 +14,7 @@ std::optional<PlayerSetupField> Field(const std::string& name) {
     if (name=="page") return PlayerSetupField::Page;
     if (name=="rail") return PlayerSetupField::Rail;
     if (name=="rotation") return PlayerSetupField::Rotation;
+    if (name=="force_model") return PlayerSetupField::ForceModel;
     return {};
 }
 bool Literal(const Expression& expression) {
@@ -32,6 +33,8 @@ bool ValidFieldValue(PlayerSetupField field, const StateValue& value) {
     if (field==PlayerSetupField::Rotation) return *number>=0 && *number<=360;
     if (*number!=std::floor(*number)) return false;
     if (field==PlayerSetupField::Model) return *number>=0 && *number<PlayerSetupModelRows;
+    // A row of the catalog page, or -1 for no forced model.
+    if (field==PlayerSetupField::ForceModel) return *number>=-1 && *number<PlayerSetupModelRows;
     if (field==PlayerSetupField::Page) return *number==-1 || *number==1;
     return *number>=0 && *number<7;
 }

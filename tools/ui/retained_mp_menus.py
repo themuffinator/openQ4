@@ -357,9 +357,9 @@ def in_game_plate(doc: Document, ident: str, key: str, left: float, top: float, 
                 (f"{ident}-label", "color", colour(tint)), (f"{ident}-label", "transform", moved)]
     ids = doc.states(ident, {
         "default": state(rest, rest, 0, 0, [1, 1, 1, 0.8], transform()),
-        "hover": state(0.8, 0, 1, 0, rgb(ORANGE), transform(sx=1.03, sy=1.03)),
-        "focus": state(1, 0, 1, 1, rgb(ORANGE), transform(sx=1.03, sy=1.03)),
-        "pressed": state(1, 0, 1, 1, rgb(ORANGE), transform(tx=1, ty=1, sx=1.03, sy=1.03)),
+        "hover": state(0.8, 0, 1, 0, rgb(ORANGE), b.pop(width - 30)),
+        "focus": state(1, 0, 1, 1, rgb(ORANGE), b.pop(width - 30)),
+        "pressed": state(1, 0, 1, 1, rgb(ORANGE), b.pop(width - 30, 1, 1)),
         "disabled": state(rest, rest, 0, 0, [1, 1, 1, 0.8], transform()),
     })
     control = {"role": "button", "label": key, "states": ids}
@@ -1524,7 +1524,7 @@ def value_row(doc: Document, ident: str, label_key: str | None, kind: str, width
         minimum, maximum, step, decimals = slider
         track_w = value_w - 56
         ticks = []
-        steps = 20
+        steps = slider_ticks(minimum, maximum, step)
         for tick in range(steps + 1):
             x = round(track_w * tick / steps, 3)
             ticks.append(path(f"tick{tick}", [(x, 13 - 3 - 5 * tick / steps), (x, 13 + 3 + 5 * tick / steps)], closed=False,
@@ -1549,6 +1549,25 @@ def value_row(doc: Document, ident: str, label_key: str | None, kind: str, width
     if allowed is not None:
         doc.bind(f"{ident}.opacity", ident, "opacity", {"op": "select", "args": [allowed, 1, 0.38]})
     return row
+
+
+SLIDER_TICKS_MAX = 40   # more lines than this stand closer than 5 dp on a settings track
+
+
+def slider_ticks(minimum: float, maximum: float, step: float) -> int:
+    """The intervals a slider's track shows: one for each step the control
+    takes, so every line is a place the thumb stops. A slider of more steps
+    than the track can show lines for marks every second, fourth, fifth or
+    tenth step, whichever first divides its steps evenly and fits."""
+    if not step or maximum <= minimum:
+        return 20
+    steps = max(1, round((maximum - minimum) / step))
+    if steps <= SLIDER_TICKS_MAX:
+        return steps
+    for group in (2, 4, 5, 10, 20, 25, 40, 50, 100, 200, 250, 400, 500, 1000, 2000, 5000):
+        if steps % group == 0 and steps // group <= SLIDER_TICKS_MAX:
+            return steps // group
+    return 20
 
 
 def stack_row(doc: Document, row: dict, width: float, value_x: float, row_h: float) -> None:

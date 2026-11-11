@@ -11715,20 +11715,6 @@
                      {
                       "id": "tick1",
                       "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.05}, {"fraction": 0.375}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.05}, {"fraction": 0.625}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick2",
-                      "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.1}, {"fraction": 0.365385}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.1}, {"fraction": 0.634615}]]}
                       ],
@@ -11741,21 +11727,7 @@
                       }
                      },
                      {
-                      "id": "tick3",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.15}, {"fraction": 0.355769}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.15}, {"fraction": 0.644231}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick4",
+                      "id": "tick2",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.2}, {"fraction": 0.346154}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.2}, {"fraction": 0.653846}]]}
@@ -11769,21 +11741,7 @@
                       }
                      },
                      {
-                      "id": "tick5",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.336538}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.663462}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick6",
+                      "id": "tick3",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.3}, {"fraction": 0.326923}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.3}, {"fraction": 0.673077}]]}
@@ -11797,21 +11755,7 @@
                       }
                      },
                      {
-                      "id": "tick7",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.35}, {"fraction": 0.317308}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.35}, {"fraction": 0.682692}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick8",
+                      "id": "tick4",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.4}, {"fraction": 0.307692}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.4}, {"fraction": 0.692308}]]}
@@ -11825,21 +11769,7 @@
                       }
                      },
                      {
-                      "id": "tick9",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.45}, {"fraction": 0.298077}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.45}, {"fraction": 0.701923}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick10",
+                      "id": "tick5",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.5}, {"fraction": 0.288462}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 0.711538}]]}
@@ -11853,21 +11783,7 @@
                       }
                      },
                      {
-                      "id": "tick11",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.55}, {"fraction": 0.278846}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.55}, {"fraction": 0.721154}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick12",
+                      "id": "tick6",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.6}, {"fraction": 0.269231}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.6}, {"fraction": 0.730769}]]}
@@ -11881,21 +11797,7 @@
                       }
                      },
                      {
-                      "id": "tick13",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.65}, {"fraction": 0.259615}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.65}, {"fraction": 0.740385}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick14",
+                      "id": "tick7",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.7}, {"fraction": 0.25}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.7}, {"fraction": 0.75}]]}
@@ -11909,21 +11811,7 @@
                       }
                      },
                      {
-                      "id": "tick15",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.75}, {"fraction": 0.240385}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.759615}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick16",
+                      "id": "tick8",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.8}, {"fraction": 0.230769}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.8}, {"fraction": 0.769231}]]}
@@ -11937,21 +11825,7 @@
                       }
                      },
                      {
-                      "id": "tick17",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.85}, {"fraction": 0.221154}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.85}, {"fraction": 0.778846}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick18",
+                      "id": "tick9",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.9}, {"fraction": 0.211538}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.9}, {"fraction": 0.788462}]]}
@@ -11965,21 +11839,7 @@
                       }
                      },
                      {
-                      "id": "tick19",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.95}, {"fraction": 0.201923}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.95}, {"fraction": 0.798077}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick20",
+                      "id": "tick10",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 1.0}, {"fraction": 0.192308}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.807692}]]}
@@ -17598,20 +17458,6 @@
                      {
                       "id": "tick1",
                       "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.05}, {"fraction": 0.375}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.05}, {"fraction": 0.625}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick2",
-                      "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.099999}, {"fraction": 0.365385}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.099999}, {"fraction": 0.634615}]]}
                       ],
@@ -17624,21 +17470,7 @@
                       }
                      },
                      {
-                      "id": "tick3",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.149999}, {"fraction": 0.355769}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.149999}, {"fraction": 0.644231}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick4",
+                      "id": "tick2",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.199999}, {"fraction": 0.346154}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.199999}, {"fraction": 0.653846}]]}
@@ -17652,21 +17484,7 @@
                       }
                      },
                      {
-                      "id": "tick5",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.249999}, {"fraction": 0.336538}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.249999}, {"fraction": 0.663462}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick6",
+                      "id": "tick3",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.299998}, {"fraction": 0.326923}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.299998}, {"fraction": 0.673077}]]}
@@ -17680,21 +17498,7 @@
                       }
                      },
                      {
-                      "id": "tick7",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.349998}, {"fraction": 0.317308}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.349998}, {"fraction": 0.682692}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick8",
+                      "id": "tick4",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.399998}, {"fraction": 0.307692}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.399998}, {"fraction": 0.692308}]]}
@@ -17708,21 +17512,7 @@
                       }
                      },
                      {
-                      "id": "tick9",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.449997}, {"fraction": 0.298077}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.449997}, {"fraction": 0.701923}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick10",
+                      "id": "tick5",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.500003}, {"fraction": 0.288462}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.500003}, {"fraction": 0.711538}]]}
@@ -17736,21 +17526,7 @@
                       }
                      },
                      {
-                      "id": "tick11",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.550003}, {"fraction": 0.278846}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.550003}, {"fraction": 0.721154}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick12",
+                      "id": "tick6",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.600002}, {"fraction": 0.269231}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.600002}, {"fraction": 0.730769}]]}
@@ -17764,21 +17540,7 @@
                       }
                      },
                      {
-                      "id": "tick13",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.650002}, {"fraction": 0.259615}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.650002}, {"fraction": 0.740385}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick14",
+                      "id": "tick7",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.700002}, {"fraction": 0.25}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.700002}, {"fraction": 0.75}]]}
@@ -17792,21 +17554,7 @@
                       }
                      },
                      {
-                      "id": "tick15",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.750001}, {"fraction": 0.240385}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.750001}, {"fraction": 0.759615}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick16",
+                      "id": "tick8",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.800001}, {"fraction": 0.230769}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.800001}, {"fraction": 0.769231}]]}
@@ -17820,21 +17568,7 @@
                       }
                      },
                      {
-                      "id": "tick17",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.850001}, {"fraction": 0.221154}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.850001}, {"fraction": 0.778846}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick18",
+                      "id": "tick9",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.900001}, {"fraction": 0.211538}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.900001}, {"fraction": 0.788462}]]}
@@ -17848,21 +17582,7 @@
                       }
                      },
                      {
-                      "id": "tick19",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.95}, {"fraction": 0.201923}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.95}, {"fraction": 0.798077}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick20",
+                      "id": "tick10",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 1.0}, {"fraction": 0.192308}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.807692}]]}
@@ -18178,20 +17898,6 @@
                      {
                       "id": "tick1",
                       "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.05}, {"fraction": 0.375}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.05}, {"fraction": 0.625}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick2",
-                      "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.099999}, {"fraction": 0.365385}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.099999}, {"fraction": 0.634615}]]}
                       ],
@@ -18204,21 +17910,7 @@
                       }
                      },
                      {
-                      "id": "tick3",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.149999}, {"fraction": 0.355769}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.149999}, {"fraction": 0.644231}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick4",
+                      "id": "tick2",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.199999}, {"fraction": 0.346154}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.199999}, {"fraction": 0.653846}]]}
@@ -18232,21 +17924,7 @@
                       }
                      },
                      {
-                      "id": "tick5",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.249999}, {"fraction": 0.336538}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.249999}, {"fraction": 0.663462}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick6",
+                      "id": "tick3",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.299998}, {"fraction": 0.326923}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.299998}, {"fraction": 0.673077}]]}
@@ -18260,21 +17938,7 @@
                       }
                      },
                      {
-                      "id": "tick7",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.349998}, {"fraction": 0.317308}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.349998}, {"fraction": 0.682692}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick8",
+                      "id": "tick4",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.399998}, {"fraction": 0.307692}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.399998}, {"fraction": 0.692308}]]}
@@ -18288,21 +17952,7 @@
                       }
                      },
                      {
-                      "id": "tick9",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.449997}, {"fraction": 0.298077}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.449997}, {"fraction": 0.701923}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick10",
+                      "id": "tick5",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.500003}, {"fraction": 0.288462}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.500003}, {"fraction": 0.711538}]]}
@@ -18316,21 +17966,7 @@
                       }
                      },
                      {
-                      "id": "tick11",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.550003}, {"fraction": 0.278846}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.550003}, {"fraction": 0.721154}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick12",
+                      "id": "tick6",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.600002}, {"fraction": 0.269231}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.600002}, {"fraction": 0.730769}]]}
@@ -18344,21 +17980,7 @@
                       }
                      },
                      {
-                      "id": "tick13",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.650002}, {"fraction": 0.259615}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.650002}, {"fraction": 0.740385}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick14",
+                      "id": "tick7",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.700002}, {"fraction": 0.25}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.700002}, {"fraction": 0.75}]]}
@@ -18372,21 +17994,7 @@
                       }
                      },
                      {
-                      "id": "tick15",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.750001}, {"fraction": 0.240385}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.750001}, {"fraction": 0.759615}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick16",
+                      "id": "tick8",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.800001}, {"fraction": 0.230769}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.800001}, {"fraction": 0.769231}]]}
@@ -18400,21 +18008,7 @@
                       }
                      },
                      {
-                      "id": "tick17",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.850001}, {"fraction": 0.221154}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.850001}, {"fraction": 0.778846}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick18",
+                      "id": "tick9",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 0.900001}, {"fraction": 0.211538}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 0.900001}, {"fraction": 0.788462}]]}
@@ -18428,21 +18022,7 @@
                       }
                      },
                      {
-                      "id": "tick19",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.95}, {"fraction": 0.201923}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.95}, {"fraction": 0.798077}]]}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     },
-                     {
-                      "id": "tick20",
+                      "id": "tick10",
                       "commands": [
                        {"id": "p0", "op": "move", "points": [[{"fraction": 1.0}, {"fraction": 0.192308}]]},
                        {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.807692}]]}

@@ -185,7 +185,10 @@ count you want the match held at and the server fills the rest, releasing the
 slots again as real players connect.
 
 Both settings are also on the multiplayer create-server screen, under **Advanced
-Server Options**: **Fill With Bots** is `bot_minPlayers` and **Bot Skill** is
+Server Options** (its **Match** tab in the new menus, beside **Shuffle Teams**;
+the **Rules** tab holds **Overtime**, **Mercy Lead** and **Round Limit**, which
+are `si_overtime`, `si_mercyLimit` and `si_roundLimit`): **Fill With Bots** is
+`bot_minPlayers` and **Bot Skill** is
 `bot_skill`, named with the same ladder the Arena campaign uses - Training,
 Rookie, Veteran, Nightmare, Impossible. They are archived like every other bot
 cvar, so a value picked in the menu is still there the next time you host.

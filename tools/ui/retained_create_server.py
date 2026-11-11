@@ -50,9 +50,12 @@ GAMETYPE_NAMES = "#str_200929"
 MAP_ROWS = 64                             # RETAINED_CREATE_MAP_ROWS in the session
 
 # Section 9, measured from the stock p_mp_create (source units).
-HEADER = (44.0, 37.0, 587.0, 37.0)        # mp_create_header
-MAPS_HEAD = (58.0, 53.0, 185.0)           # mp_create_mapsel
-OPTIONS_HEAD = (256.0, 53.0, 329.0)       # mp_create_servopt
+# mp_create_header stood from 37 u, under the stepped top band and over the
+# page's title in its notch; it starts where the settings pages' strip does
+# (STRIP_TOP, 46 u) and keeps its foot, the headings centred in what is left.
+HEADER = (44.0, 46.0, 587.0, 28.0)
+MAPS_HEAD = (58.0, 52.0, 185.0)           # mp_create_mapsel
+OPTIONS_HEAD = (256.0, 52.0, 329.0)       # mp_create_servopt
 SHOT = (45.0, 75.0, 183.0, 137.0)         # mp_create_mapshot
 MAP_LIST = (42.0, 219.0, 186.0, 210.0)    # mp_create_maplist: 20 u items, the scrollbar in its last 16 u
 MAP_ROW_H = 20.0
@@ -97,7 +100,25 @@ ADVANCED = (
     ("buying", "createBuying", "#str_222000", "toggle", 0, 1, None),
     ("bots", "createBots", "#str_42210", "choice", 0, 16, None),
     ("botskill", "createBotSkill", "#str_42212", "choice", 1, 5, None),
+    # openQ4's match rules a host sets most (si_shuffle, si_overtime,
+    # si_mercyLimit, si_roundLimit), under the Match Control page's labels.
+    ("shuffle", "createShuffle", "#str_201044", "toggle", 0, 1, None),
+    ("overtime", "createOvertime", "#str_41310", "number", 0, 999, "#str_231123"),   # seconds; the long label outgrows the column in Russian
+    ("mercy", "createMercy", "#str_41638", "number", 0, 999, "#str_231123"),
+    ("roundlimit", "createRoundLimit", "#str_41404", "number", 0, 60, "#str_231125"),
 )
+# The advanced dialog's tabs (user note, 11 November 2026: its sixteen rows
+# outgrew the view): each tab's name and its rows, in order. SERVER holds who
+# may join and what the server runs; MATCH how a match gathers and who fills
+# it; RULES what changes play.
+ADVANCED_TABS = (
+    ("#str_231007", ("create-usepass", "create-password", "create-rconpassword", "create-pure", "create-servermods", "create-rate",
+                     "create-mapcycle", "create-banlist")),
+    ("#str_231004", ("create-ready", "create-warmup", "create-spectators", "create-voice", "create-shuffle", "create-bots",
+                     "create-botskill")),
+    ("#str_41704", ("create-weaponstay", "create-buying", "create-overtime", "create-mercy", "create-roundlimit")),
+)
+ADVANCED_TAB_H = 32.0   # u: the tab strip and the gap under it
 # Each choice's stock list and its values.
 CHOICES = {
     "lan": ("#str_200056", (0, 1)),
@@ -419,20 +440,54 @@ def advanced_dialog(doc: Document) -> dict:
     doc.session("createBanList", "createBanList")
     doc.events["banListOpen"] = [{"op": "action", "action": "createBanList"}, {"op": "call", "event": "banModalShow"}]
     rows.append(link_row(doc, "create-banlist", "#str_200948", U * 377, U * ROW_PITCH, "banListOpen"))
-    rows_end = ADVANCED_ROWS_TOP + ROW_PITCH * len(rows)
+    # The rows in their tabs' order, each shown on its tab alone; the tabs are
+    # three plates over the rows, the shown one underlined. The dialog is as
+    # tall as its longest tab.
+    from retained_mp_menus import in_game_plate
+    by_id = {row["id"]: row for row in rows}
+    assert sorted(by_id) == sorted(ident for _, idents in ADVANCED_TABS for ident in idents), sorted(by_id)
+    rows = [by_id[ident] for _, idents in ADVANCED_TABS for ident in idents]
+    doc.state["create.advanced_tab"] = {"type": "number", "initial": 0}
+    tab_w = round((U * 377 - 12) / len(ADVANCED_TABS), 3)
+    tabs = []
+    for tab, (key, idents) in enumerate(ADVANCED_TABS):
+        on_tab = {"op": "==", "args": [{"state": "create.advanced_tab"}, tab]}
+        for ident in idents:
+            shown = by_id[ident]["properties"].get("display", keyword("block"))["value"]
+            by_id[ident]["properties"]["display"] = keyword(shown if tab == 0 else "none")
+            doc.bind(f"{ident}.tab", ident, "display", {"op": "select", "args": [on_tab, shown, "none"]})
+        doc.events[f"advancedTab{tab}"] = [{"op": "setState", "values": {"create.advanced_tab": tab}}]
+        plate = in_game_plate(doc, f"advanced-tab-{tab}", key, tab * (tab_w + 6), 0, width=tab_w, event=f"advancedTab{tab}")
+        # The tab's label at the largest size, up to the plates' 20 dp, that fits it in every language.
+        caption = next(node for node in plate["children"] if node["id"].endswith("-label"))
+        widest = max(text_width("marine", text, 1) for text in table_text(key).values())
+        caption["properties"]["font-size"] = length(min(20.0, int((tab_w - 36) / widest * 2) / 2))
+        mark = vector(f"advanced-tab-{tab}-shown", {**absolute(left=20, top=38, width=tab_w - 40, height=3), "display": keyword("none"),
+                                                    "pointer-events": keyword("none")},
+                      [path("bar", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, 3), (0, 3)], fill=solid(rgb(ORANGE)))])
+        doc.bind(f"advanced-tab-{tab}-shown.display", f"advanced-tab-{tab}-shown", "display", {"op": "select", "args": [on_tab, "block", "none"]})
+        plate["children"].append(mark)
+        tabs.append(plate)
+    strip = group("advanced-tabs", absolute(left=U * 25, top=U * ADVANCED_ROWS_TOP, width=U * 377, height=45), tabs)
+    most = max(len(idents) for _, idents in ADVANCED_TABS)
+    rows_end = ADVANCED_ROWS_TOP + ADVANCED_TAB_H + ROW_PITCH * most
     height_u = rows_end + ADVANCED_GAP + ADVANCED_FOOT
     top_u = min(ADVANCED_TOP, (480 - height_u) / 2)
     # Above 100 % text each row's value stands under its label (section 2's
     # reflow) and the rows scroll in the dialog's room.
     for row in rows:
         stack_row(doc, row, U * 377, U * ADVANCED_VALUE_X, U * ROW_PITCH)
-    column = group("advanced-rows", {**absolute(left=U * 25, top=U * ADVANCED_ROWS_TOP, width=U * 377,
-                                                height=U * ROW_PITCH * len(rows)),
+    column = group("advanced-rows", {**absolute(left=U * 25, top=U * (ADVANCED_ROWS_TOP + ADVANCED_TAB_H), width=U * 377,
+                                                height=U * ROW_PITCH * most),
                                      "display": keyword("flex"), "flex-direction": keyword("column"), "overflow": keyword("auto")}, rows)
     close_w = round(min(width - 66, max(210.0, max(text_width("marine", text, 20) for text in table_text("#str_200075").values()) + 50)), 1)
     modal = confirmation(doc, "advancedModal", "#str_200066", PLACEHOLDER, None, close_key="#str_200075", wide_title=True,
-                         height_u=height_u, top_u=top_u, actions_u=rows_end + ADVANCED_GAP, contents=[column],
+                         height_u=height_u, top_u=top_u, actions_u=rows_end + ADVANCED_GAP, contents=[strip, column],
                          width_dp=width, close_w=close_w, initial="create-usepass")
+    # Each opening starts on SERVER, where its first focus is.
+    doc.events["advancedModalShow"].insert(0, {"op": "setState", "values": {"create.advanced_tab": 0}})
+    from build_retained_screens import fixed_text as keep_size
+    keep_size(doc, strip)
     # PLAYER BAN LIST nests in this dialog's scope, as the stock popup opened
     # over its own: it stands over it, and closing it returns the focus here.
     bans = ban_list_modal(doc)
@@ -506,7 +561,7 @@ def create_server_document() -> dict:
     })
 
     # The map selection: the chosen map's levelshot over the list.
-    shot = picture_frame("create-shot", *SHOT)
+    shot = picture_frame("create-shot", *SHOT, fit="fill")
     doc.bind("create-shot.image", "create-shot", "image", {"state": "create.shot"})
     heading = {**typeface("lowpixel", 14, U * 16, [1, 1, 1, 0.4]), "white-space": keyword("nowrap"), "overflow": keyword("hidden")}
     headings = [

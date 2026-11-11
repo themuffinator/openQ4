@@ -455,7 +455,7 @@ Motion blur (`r_motionBlur 1`, on in the `ultra` preset) smears the scene along 
 
 These optional client-side cvars add player outlines, rim lighting, and bright skins in multiplayer. Defaults keep the effects off; set one or more strength values above `0` to enable them. They do not change hit detection, snapshots, or server authority.
 
-All of them are exposed in `Multiplayer -> Settings -> Appearance`, under the **Enemy** and **Teammate** tabs, with a live preview of the selected model. Colors and outline width are preset dropdowns there; the cvars accept any value in range if you prefer to set them from a config.
+All of them are exposed in `Multiplayer -> Settings -> Appearance`, under the **Enemy** and **Teammate** tabs, with a live preview of the selected model. Colors and outline width are preset dropdowns there; the cvars accept any value in range if you prefer to set them from a config. In the new menus they are also on the main menu's **Multiplayer > Player Setup** page, under its **Opponents** and **Teammates** tabs; **Opponents** also has **Force Model**, which shows every other player as one model in free-for-all modes (`g_forceModel`).
 
 | Setting | Default | What it does |
 |---|---:|---|

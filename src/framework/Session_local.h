@@ -911,7 +911,9 @@ public:
 	idUserInterface *	guiTest;
 	idUserInterface *	guiTakeNotes;
 	
-	idUserInterface *	guiMsg;
+	idUserInterface *	guiMsg;						// the message box in use: one of the two below
+	idUserInterface *	guiMsgStock;				// guis/msg.gui
+	idUserInterface *	guiMsgRetained;				// the retained pop-up (NULL until a box needs it)
 	idUserInterface *	guiMsgRestore;				// store the calling GUI for restore
 	idStr				msgFireBack[ 2 ];
 	bool				msgRunning;
@@ -1120,6 +1122,7 @@ public:
 	void				HandleIntroMenuCommands( const char *menuCommand );
 	void				HandleRestartMenuCommands( const char *menuCommand );
 	void				HandleMsgCommands( const char *menuCommand );
+	void				SelectMessageBox( bool retained );
 	void				HandleNoteCommands( const char *menuCommand );
 	void				GetSaveGameList( idStrList &fileList, idList<fileTIME_T> &fileTimes );
 	void				TakeNotes( const char * p, bool extended = false );

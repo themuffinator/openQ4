@@ -81,9 +81,9 @@ def child_transition(ui, doc, level, choices, parent_key):
     return carry
 
 CHAPTER_ROWS=32  # the most levels a campaign has (Quake 4's 31): the session publishes them all
-CHAPTER_LEFT,CHAPTER_TOP,CHAPTER_ROW_W,CHAPTER_LIST_H=21.0,112.0,394.0,270.0
+CHAPTER_LEFT,CHAPTER_TOP,CHAPTER_ROW_W,CHAPTER_LIST_H=21.0,112.0,390.0,270.0
 CHAPTER_PICTURE=(428.0,112.0,183.0,137.0)  # the Load Game page's preview size
-CHAPTER_PLATE_LABEL=200.0  # u: a plate's label may run on to the canvas edge
+CHAPTER_PLATE_LABEL=196.0  # u: a plate's label may run on to the canvas edge
 CHAPTER_DETAIL_W=200.0  # u: the explanation under the picture runs on to the canvas edge too
 CHAPTER_STATUS_X=262.0  # u: the STATUS column, past the longest level name
 
@@ -163,6 +163,7 @@ def grow_chapter_detail(ui, doc, shot, name, detail, plates):
         doc.bind(f"text.{plate['id']}.top",plate['id'],'top',larger(under,prop(plate,'top')))
 
 def chapter_view(ui, doc):
+    from retained_arena import padlock
     """The campaign's chapters (docs/user/campaigns.md): every level of the
     campaign in campaign order, the ones not reached yet disabled, under the
     Load Game page's LEVEL and STATUS columns. A row's first Accept chooses
@@ -183,10 +184,31 @@ def chapter_view(ui, doc):
         rows.append(save_row(doc,i,'chapter',CHAPTER_ROW_W,[{'op':'action','action':'chapterStart'}],CHAPTER_STATUS_X))
         doc.state[f'chapter.row{i}.open']={'type':'boolean','initial':False}
         doc.bind(f'row-{i}.enabled',f'row-{i}','enabled',{'state':f'chapter.row{i}.open'})
+        # A row said its status in words (Locked, Autosave, Fresh start). It
+        # shows it instead (user note, 11 November 2026): a padlock on a
+        # level not yet reached and a save mark on one with a start autosave,
+        # at the row's trailing end under STATUS; a level that starts fresh
+        # has neither. The chosen level's panel still says it in full. A tall
+        # view's two-line rows keep the words on their second line.
+        doc.state[f'chapter.row{i}.saved']={'type':'boolean','initial':False}
+        row=rows[-1]
+        words=next(node for node in ui.walk_nodes(row) if node['id']==f'row-{i}-location')
+        words['properties']['display']=ui.keyword('none')
+        doc.bind(f'row-{i}-location.display',f'row-{i}-location','display',{'op':'select','args':[ui.tall_condition(doc),'block','none']})
+        lock=padlock(f'row-{i}-lock',0,round((U*ROW_H-14)/2,3),ui.rgb(ui.OLIVE,.85))
+        saved=ui.vector(f'row-{i}-saved',{**ui.absolute(top=round((U*ROW_H-13)/2,3),width=13,height=13),'display':ui.keyword('none'),
+            'pointer-events':ui.keyword('none')},[
+            ui.path('body',[(1,1),(9,1),(12,4),(12,12),(1,12)],stroke=ui.stroke(ui.solid(ui.rgb(ui.RAIL_DARK,.9)),1.5)),
+            ui.path('label',[(3.5,7),(9.5,7),(9.5,12),(3.5,12)],fill=ui.solid(ui.rgb(ui.RAIL_DARK,.9)))])
+        for mark in (lock,saved):
+            mark['properties'].pop('left',None);mark['properties']['right']=ui.length(U*6)
+        doc.bind(f'row-{i}-lock.display',f'row-{i}-lock','display',{'op':'select','args':[{'state':f'chapter.row{i}.open'},'none','block']})
+        doc.bind(f'row-{i}-saved.display',f'row-{i}-saved','display',{'op':'select','args':[{'state':f'chapter.row{i}.saved'},'block','none']})
+        row['children']+= [lock,saved]
     heading={**ui.typeface('lowpixel',13,U*14,[1,1,1,.4]),'white-space':ui.keyword('nowrap'),'overflow':ui.keyword('hidden')}
     headings=[ui.label('chapter-head-level','#str_231281',{**ui.absolute(left=U*CHAPTER_LEFT,top=U*(CHAPTER_TOP-15),width=U*(CHAPTER_STATUS_X-4),height=U*14),**heading}),
         ui.label('chapter-head-status','#str_231282',{**ui.absolute(left=U*(CHAPTER_LEFT+CHAPTER_STATUS_X-1),top=U*(CHAPTER_TOP-15),
-            width=U*(CHAPTER_ROW_W-CHAPTER_STATUS_X),height=U*14),**heading}),
+            width=U*(CHAPTER_ROW_W-CHAPTER_STATUS_X-2),height=U*14),**heading,'text-align':ui.keyword('right')}),   # over the rows' marks
         ui.vector('chapter-rule',ui.absolute(left=U*CHAPTER_LEFT,top=U*(CHAPTER_TOP-.4)-.6,width=U*(CHAPTER_ROW_W+16),height=1.2),[
             ui.path('rule',[(0,.6),({'fraction':1},.6)],closed=False,stroke=ui.stroke(ui.solid(ui.rgb(ui.OLIVE,.26)),1.2))])]
     column=ui.group('chapter-column',{'position':ui.keyword('relative'),'display':ui.keyword('flex'),'flex-direction':ui.keyword('column')},rows)
@@ -195,7 +217,7 @@ def chapter_view(ui, doc):
     scrollbar=ui.objectives_scrollbar(doc,'chapter_scroll','chapter-list',ui.OLIVE,ui.ORANGE,U*(CHAPTER_LEFT+CHAPTER_ROW_W+8)-18,
         U*CHAPTER_TOP,U*CHAPTER_LIST_H,line_step=U*ROW_H,key='#str_231280')
     left,top,width,height=CHAPTER_PICTURE
-    shot=picture_frame('chapter-shot',left,top,width,height)
+    shot=picture_frame('chapter-shot',left,top,width,height,fit='fill')
     doc.bind('chapter-shot.image','chapter-shot','image',{'state':'chapter.shot'})
     name=ui.label('chapter-name','#str_230030',{**ui.absolute(left=U*left,top=U*(top+height+5),width=U*width,height=U*18),
         **ui.typeface('marine',18,U*18,[1,1,1,.9]),'white-space':ui.keyword('nowrap'),'overflow':ui.keyword('hidden')})
@@ -203,9 +225,10 @@ def chapter_view(ui, doc):
         **ui.typeface('lowpixel',15,20,ui.rgb(ui.OLIVE)),'white-space':ui.keyword('normal'),'overflow':ui.keyword('hidden')})
     doc.bind('chapter-name.text','chapter-name','text',{'state':'chapter.name'})
     doc.bind('chapter-detail.text','chapter-detail','text',{'state':'chapter.detail'})
-    start=section_plate(doc,'chapter_start','#str_231289',left-8,top+height+90,action='chapterStart',label_w=CHAPTER_PLATE_LABEL)
+    # The plates start 5 u past the list's scrollbar: 8 u before the picture their rails stood on it.
+    start=section_plate(doc,'chapter_start','#str_231289',left-4,top+height+90,action='chapterStart',label_w=CHAPTER_PLATE_LABEL)
     doc.bind('chapter_start.enabled','chapter_start','enabled',{'state':'chapter.open'})
-    back=section_plate(doc,'chapter_back','#str_230045',left-8,top+height+120,action='back',label_w=CHAPTER_PLATE_LABEL)
+    back=section_plate(doc,'chapter_back','#str_230045',left-4,top+height+120,action='back',label_w=CHAPTER_PLATE_LABEL)
     # Above 100 % text the levels' rows and the chosen level's name and
     # explanation grow with it (section 2's reflow); the headings and plates
     # are furniture and keep their size.
@@ -284,35 +307,58 @@ def chapters_document(ui):
     tall_chapters(ui,tall,{'op':'-','args':[0,{'op':'-','args':[{'op':'/','args':[VIEW_HEIGHT,2]},360]}]})
     return result
 
+# The difficulty page's grid (u): its leading edge (the plates' label inset)
+# and top, a tile, and the gap between tiles; then the plates under it.
+SKILL_GRID=(44.0,154.0,(100.0,44.0),6.5)
+SKILL_PLATES_GAP=8.0
+SKILL_ART_MIDDLE=21.0   # dp: the middle of a tile's art, over its label
+
 def skill_document(ui):
     U=ui.U;doc=ui.Document('openq4.campaign-skill')
     doc.state.update({'skill':{'type':'number','initial':1},'turbo':{'type':'boolean','initial':False},
         'campaign_title':{'type':'string','initial':'#str_230039'},'skill_description':{'type':'string','initial':'#str_200019'}})
     skill_keys=['#str_200014','#str_200015','#str_200016','#str_200017','#str_41117']
-    buttons=[]
+    # The page chose its difficulty and Turbo from one list of eight plates
+    # with START GAME and BACK (user note, 11 November 2026: "this long list
+    # is senseless and cluttered"). What it chooses now stands as tiles in a
+    # grid under DIFFICULTY: the five ranks, each under its chevrons, the
+    # chosen one lit, and TURBO MODE as a switch in the sixth place. What it
+    # does, START GAME and BACK, are the only plates.
+    from retained_tiles import chevrons,choice_tile
+    left,top,(tile_w,tile_h),gap=SKILL_GRID
+    def place(index): return left+(index%3)*(tile_w+gap),top+(index//3)*(tile_h+gap)
+    middle=U*tile_w/2
+    tiles=[]
     for i,key in enumerate(skill_keys):
         action=doc.session('skill'+str(i),'campaignSkill'+str(i))
-        row=ui.navigation_plate(doc,'skill'+str(i),key,action=action)
-        mark=ui.vector('selected'+str(i),{**ui.absolute(left=ui.NAV_LEAD+U*25,top=U*10,width=U*5,height=U*10),'opacity':ui.number(0)},
-                       [ui.path('rail',[(0,0),(U*3,0),(U*3,U*10),(0,U*10)],fill=ui.solid(ui.rgb(ui.ORANGE)))])
-        row['children'].append(mark);doc.bind('selected'+str(i)+'.opacity','selected'+str(i),'opacity',{'op':'select','args':[{'op':'==','args':[{'state':'skill'},i]},1,0]})
-        buttons.append(row)
-    for ident,key,command in [('turbo','#str_41119','campaignSkillTurbo'),('start','#str_200020','campaignSkillStart')]:
-        doc.session(ident,command);buttons.append(ui.navigation_plate(doc,ident,key,action=ident))
-    doc.session('back','campaignSkillBack');buttons.append(ui.navigation_plate(doc,'back','#str_230045',action='back'))
+        tiles.append(choice_tile(doc,'skill'+str(i),key,*place(i),tile_w,tile_h,chosen={'op':'==','args':[{'state':'skill'},i]},action=action,
+            art=lambda tint,count=i+1:chevrons(count,middle,round(SKILL_ART_MIDDLE-3.25*count,3),tint)))
+    doc.session('turbo','campaignSkillTurbo')
+    def switch(on):
+        # A 34 dp track with its knob at the leading end, or the trailing one while Turbo is on.
+        x,y=middle-17,SKILL_ART_MIDDLE-8;knob=x+(34-3-12 if on else 3)
+        return lambda tint:[ui.path('track',[(x,y),(x+34,y),(x+34,y+16),(x,y+16)],stroke=ui.stroke(ui.solid(tint),1.5)),
+                            ui.path('knob',[(knob,y+3),(knob+12,y+3),(knob+12,y+13),(knob,y+13)],fill=ui.solid(tint))]
+    tiles.append(choice_tile(doc,'turbo','#str_41119',*place(5),tile_w,tile_h,chosen={'state':'turbo'},action='turbo',art=switch(False),
+                             lit_art=switch(True)))
+    heading=ui.label('skill-heading','#str_42009',{**ui.absolute(left=U*left,top=U*(top-14),width=U*200,height=U*12),
+        **ui.typeface('lowpixel',13,U*12,[1,1,1,.55]),'white-space':ui.keyword('nowrap')})
+    doc.session('start','campaignSkillStart');doc.session('back','campaignSkillBack')
+    buttons=[ui.navigation_plate(doc,'start','#str_200020',action='start'),ui.navigation_plate(doc,'back','#str_230045',action='back')]
     doc.events['onBack']=[{'op':'action','action':'back'}]
-    bands,content,title_group=detail_page_frame(ui,doc,'#str_230039',[
-        ui.group('navigation',{**ui.absolute(left=0,top=U*172,width=U*357),'display':ui.keyword('flex'),'flex-direction':ui.keyword('column')},buttons),
-        ui.label('description','#str_200019',{**ui.absolute(left=U*387,top=U*184,width=U*226,height=U*148),**ui.typeface('lowpixel',18,26,ui.rgb(ui.OLIVE)),'display':ui.keyword('block')}),
-        ui.label('turbo-value','#str_41121',{**ui.absolute(left=U*270,top=U*325,width=U*77,height=U*25),**ui.typeface('marine',18,26,ui.rgb(ui.ORANGE)),'pointer-events':ui.keyword('none'),'display':ui.keyword('block')})])
+    grid_foot=top+2*tile_h+gap
+    bands,content,title_group=detail_page_frame(ui,doc,'#str_230039',[heading,*tiles,
+        ui.group('navigation',{**ui.absolute(left=0,top=U*(grid_foot+SKILL_PLATES_GAP),width=U*357),'display':ui.keyword('flex'),'flex-direction':ui.keyword('column')},buttons),
+        ui.label('description','#str_200019',{**ui.absolute(left=U*387,top=U*184,width=U*226,height=U*148),**ui.typeface('lowpixel',18,26,ui.rgb(ui.OLIVE)),'display':ui.keyword('block')})])
     # Above 100 % text the chosen difficulty's description grows as a page's
-    # content column does, and TURBO's value keeps its size on its plate.
+    # content column does; the tiles and the heading are furniture and keep
+    # their size.
     from retained_difficulty import DIFFICULTIES
     parts={node['id']:node for node in content['children']}
     ui.reflow_details(doc,parts['description'],[key for _,key in DIFFICULTIES])
-    ui.fixed_text(doc,parts['turbo-value'])
+    for node in [heading,*tiles]:
+        ui.fixed_text(doc,node)
     doc.bind('description.text','description','text',{'state':'skill_description'})
-    doc.bind('turbo-value.text','turbo-value','text',{'op':'select','args':[{'state':'turbo'},'#str_41120','#str_41121']})
     doc.bind('title.text','title','text',{'state':'campaign_title'})
     # Each arrival focuses the chosen difficulty, as Restart Level's page does.
     doc.events['onActivate'] += [{'op':'focus','control':'skill0'},*[{'op':'if','condition':{'op':'==','args':[{'state':'skill'},i]},
@@ -344,7 +390,11 @@ def tall_skill_page(ui,result):
     U,grow=ui.U,TALL_SKILL_GROW
     tall=TallLayout(result)
     navigation=tall.nodes['navigation']
-    plates_h=U*TALL_SKILL_PLATE*len(navigation['children'])*grow
+    # The grid, then the two plates under it.
+    left,top,(tile_w,tile_h),gap=SKILL_GRID
+    grid_ids=('skill-heading',*(node['id'] for node in tall.nodes['content']['children'] if node['id'].startswith('skill') and node['id']!='skill-heading'),'turbo')
+    grid_h=U*(2*tile_h+gap+14)*grow
+    plates_h=grid_h+16+U*TALL_SKILL_PLATE*len(navigation['children'])*grow
     width=ui.CANVAS_W-ui.TALL_MARGIN*(1+grow)
     style=tall.nodes['description']['properties']
     size,line=style['font-size']['value'],style['line-height']['value']
@@ -362,7 +412,8 @@ def tall_skill_page(ui,result):
                                                                                                  described)]},2]}]}
     shift={'op':'-','args':[centred,box_top]}
     origin=(0,tall.dp('navigation','top'))
-    tall.block(('navigation','turbo-value'),origin,(0,TALL_SKILL_TOP),grow,shift)
+    tall.block(grid_ids,(U*left,U*(top-14)),(U*left*grow,TALL_SKILL_TOP),grow,shift)
+    tall.block(('navigation',),origin,(0,TALL_SKILL_TOP+grid_h+16),grow,shift)
     tall.block(('description',),(tall.dp('description','left'),tall.dp('description','top')),
                (ui.TALL_MARGIN*grow,TALL_SKILL_TOP+plates_h+24),grow,shift)
     tall.set('description','width',width)

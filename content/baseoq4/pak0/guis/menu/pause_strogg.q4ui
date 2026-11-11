@@ -22,6 +22,7 @@
   "soft_focus": {"type": "boolean", "initial": false, "cvar": "ui_retainedSoftFocus"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "view.text": {"type": "number", "initial": 1, "view": "text"},
+  "motion_reduced": {"type": "boolean", "initial": false, "cvar": "ui_retainedReducedMotion"},
   "exitModal.visible": {"type": "boolean", "initial": false},
   "exitModal.contents": {"type": "boolean", "initial": false},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
@@ -83,11 +84,13 @@
   ],
   "quitModalShown": [
    {"op": "setState", "values": {"quitModal.contents": true}},
-   {"op": "playTimeline", "timeline": "quitModalTranslate"}
+   {"op": "playTimeline", "timeline": "quitModalTranslate"},
+   {"op": "playTimeline", "timeline": "quitModalEnergy"}
   ],
   "quitModalHide": [
    {"op": "setState", "values": {"quitModal.contents": false}},
-   {"op": "playTimeline", "timeline": "quitModalLeave"}
+   {"op": "playTimeline", "timeline": "quitModalLeave"},
+   {"op": "cancelTimeline", "timeline": "quitModalEnergy", "policy": "base"}
   ],
   "quitModalHidden": [{"op": "setState", "values": {"quitModal.visible": false}}],
   "exitModalShow": [
@@ -97,11 +100,13 @@
   ],
   "exitModalShown": [
    {"op": "setState", "values": {"exitModal.contents": true}},
-   {"op": "playTimeline", "timeline": "exitModalTranslate"}
+   {"op": "playTimeline", "timeline": "exitModalTranslate"},
+   {"op": "playTimeline", "timeline": "exitModalEnergy"}
   ],
   "exitModalHide": [
    {"op": "setState", "values": {"exitModal.contents": false}},
-   {"op": "playTimeline", "timeline": "exitModalLeave"}
+   {"op": "playTimeline", "timeline": "exitModalLeave"},
+   {"op": "cancelTimeline", "timeline": "exitModalEnergy", "policy": "base"}
   ],
   "exitModalHidden": [{"op": "setState", "values": {"exitModal.visible": false}}],
   "onBack": [{"op": "action", "action": "resume"}],
@@ -160,43 +165,43 @@
     "op": "select",
     "args": [
      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-     309.437,
+     315.999,
      {
       "op": "select",
       "args": [
        {"op": "==", "args": [{"state": "language"}, "czech"]},
-       338.283,
+       344.845,
        {
         "op": "select",
         "args": [
          {"op": "==", "args": [{"state": "language"}, "english"]},
-         297.822,
+         304.384,
          {
           "op": "select",
           "args": [
            {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-           293.013,
+           299.576,
            {
             "op": "select",
             "args": [
              {"op": "==", "args": [{"state": "language"}, "italian"]},
-             265.47,
+             272.033,
              {
               "op": "select",
               "args": [
                {"op": "==", "args": [{"state": "language"}, "polish"]},
-               325.345,
+               331.908,
                {
                 "op": "select",
                 "args": [
                  {"op": "==", "args": [{"state": "language"}, "russian"]},
-                 341.353,
+                 347.915,
                  {
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                   314.173,
-                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 317.13, 352.875]}
+                   320.736,
+                   {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 323.693, 359.438]}
                   ]
                  }
                 ]
@@ -577,6 +582,25 @@
      {"op": "/", "args": [45, {"state": "view.text"}]}
     ]
    }
+  },
+  {
+   "id": "quitModal-energy.display",
+   "node": "quitModal-energy",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "quitModal.contents"}, {"op": "!", "args": [{"state": "motion_reduced"}]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "text.quitModal-energy-fit.display",
+   "node": "quitModal-energy-fit",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "none", "block"]}
   },
   {
    "id": "text.quitModal-dialog.height",
@@ -2866,53 +2890,53 @@
     "op": "select",
     "args": [
      {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-     229.511,
+     236.074,
      {
       "op": "select",
       "args": [
        {"op": "==", "args": [{"state": "language"}, "czech"]},
-       219.986,
+       226.548,
        {
         "op": "select",
         "args": [
          {"op": "==", "args": [{"state": "language"}, "english"]},
-         189.431,
+         195.993,
          {
           "op": "select",
           "args": [
            {"op": "==", "args": [{"state": "language"}, "french"]},
-           163.779,
+           170.341,
            {
             "op": "select",
             "args": [
              {"op": "==", "args": [{"state": "language"}, "german"]},
-             248.617,
+             255.179,
              {
               "op": "select",
               "args": [
                {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-               166.367,
+               172.929,
                {
                 "op": "select",
                 "args": [
                  {"op": "==", "args": [{"state": "language"}, "italian"]},
-                 207.585,
+                 214.148,
                  {
                   "op": "select",
                   "args": [
                    {"op": "==", "args": [{"state": "language"}, "polish"]},
-                   218.472,
+                   225.034,
                    {
                     "op": "select",
                     "args": [
                      {"op": "==", "args": [{"state": "language"}, "russian"]},
-                     233.587,
+                     240.15,
                      {
                       "op": "select",
                       "args": [
                        {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                       220.816,
-                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 202.642, 271.281]}
+                       227.378,
+                       {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 209.204, 277.843]}
                       ]
                      }
                     ]
@@ -3297,6 +3321,25 @@
      {"op": "/", "args": [45, {"state": "view.text"}]}
     ]
    }
+  },
+  {
+   "id": "exitModal-energy.display",
+   "node": "exitModal-energy",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "exitModal.contents"}, {"op": "!", "args": [{"state": "motion_reduced"}]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "text.exitModal-energy-fit.display",
+   "node": "exitModal-energy-fit",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "none", "block"]}
   },
   {
    "id": "text.exitModal-dialog.height",
@@ -6350,6 +6393,174 @@
    "node": "level-shot-frame",
    "property": "display",
    "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1.9]}, "none", "block"]}
+  },
+  {
+   "id": "text.level-shot.width",
+   "node": "level-shot",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 820.2]
+         }
+        ]
+       },
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1]},
+         {
+          "op": "min",
+          "args": [
+           363.0,
+           {
+            "op": "*",
+            "args": [
+             {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]},
+             1.3333333333333333
+            ]
+           }
+          ]
+         },
+         220.0
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "min",
+        "args": [
+         363.0,
+         {
+          "op": "*",
+          "args": [
+           {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]},
+           1.3333333333333333
+          ]
+         }
+        ]
+       },
+       220.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.level-shot.left",
+   "node": "level-shot",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 820.2]
+         }
+        ]
+       },
+       {
+        "op": "select",
+        "args": [
+         {"op": ">", "args": [{"state": "view.text"}, 1]},
+         {
+          "op": "+",
+          "args": [
+           15,
+           {
+            "op": "/",
+            "args": [
+             {
+              "op": "-",
+              "args": [
+               363.0,
+               {
+                "op": "min",
+                "args": [
+                 363.0,
+                 {
+                  "op": "*",
+                  "args": [
+                   {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]},
+                   1.3333333333333333
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             2
+            ]
+           }
+          ]
+         },
+         86.5
+        ]
+       }
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [
+         15,
+         {
+          "op": "/",
+          "args": [
+           {
+            "op": "-",
+            "args": [
+             363.0,
+             {
+              "op": "min",
+              "args": [
+               363.0,
+               {
+                "op": "*",
+                "args": [
+                 {"op": "max", "args": [0, {"op": "+", "args": [266, {"op": "*", "args": [-133, {"state": "view.text"}]}]}]},
+                 1.3333333333333333
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           2
+          ]
+         }
+        ]
+       },
+       86.5
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "text.level-name.top",
@@ -15938,34 +16149,6 @@
    }
   },
   {
-   "id": "tall.level-shot.left",
-   "node": "level-shot",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-     {
-      "op": "*",
-      "args": [
-       {
-        "op": "min",
-        "args": [
-         1.6,
-         {
-          "op": "/",
-          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 820.2]
-         }
-        ]
-       },
-       15
-      ]
-     },
-     15
-    ]
-   }
-  },
-  {
    "id": "tall.level-shot.top",
    "node": "level-shot",
    "property": "top",
@@ -15990,34 +16173,6 @@
       ]
      },
      52.0
-    ]
-   }
-  },
-  {
-   "id": "tall.level-shot.width",
-   "node": "level-shot",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-     {
-      "op": "*",
-      "args": [
-       {
-        "op": "min",
-        "args": [
-         1.6,
-         {
-          "op": "/",
-          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 820.2]
-         }
-        ]
-       },
-       363.0
-      ]
-     },
-     363.0
     ]
    }
   },
@@ -19404,6 +19559,113 @@
    }
   },
   {
+   "id": "tall.quitModal-energy-halo.transform",
+   "node": "quitModal-energy-halo",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 480.0]}]},
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 204.0]}]},
+      0
+     ]
+    },
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.quitModal-energy-wave.left",
+   "node": "quitModal-energy-wave",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -16]}, -16]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-wave.width",
+   "node": "quitModal-energy-wave",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 512.0]}, 512.0]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-wave.height",
+   "node": "quitModal-energy-wave",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 46.0]}, 46.0]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-run.left",
+   "node": "quitModal-energy-run",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -32.776]}, -32.776]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-run.top",
+   "node": "quitModal-energy-run",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -170.776]}, -170.776]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-run.width",
+   "node": "quitModal-energy-run",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-run.height",
+   "node": "quitModal-energy-run",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-line.width",
+   "node": "quitModal-energy-line",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
+   "id": "tall.quitModal-energy-line.height",
+   "node": "quitModal-energy-line",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
    "id": "tall.quitModal-frame.transform",
    "node": "quitModal-frame",
    "property": "transform",
@@ -19625,43 +19887,43 @@
            "op": "select",
            "args": [
             {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-            309.437,
+            315.999,
             {
              "op": "select",
              "args": [
               {"op": "==", "args": [{"state": "language"}, "czech"]},
-              338.283,
+              344.845,
               {
                "op": "select",
                "args": [
                 {"op": "==", "args": [{"state": "language"}, "english"]},
-                297.822,
+                304.384,
                 {
                  "op": "select",
                  "args": [
                   {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-                  293.013,
+                  299.576,
                   {
                    "op": "select",
                    "args": [
                     {"op": "==", "args": [{"state": "language"}, "italian"]},
-                    265.47,
+                    272.033,
                     {
                      "op": "select",
                      "args": [
                       {"op": "==", "args": [{"state": "language"}, "polish"]},
-                      325.345,
+                      331.908,
                       {
                        "op": "select",
                        "args": [
                         {"op": "==", "args": [{"state": "language"}, "russian"]},
-                        341.353,
+                        347.915,
                         {
                          "op": "select",
                          "args": [
                           {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                          314.173,
-                          {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 317.13, 352.875]}
+                          320.736,
+                          {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 323.693, 359.438]}
                          ]
                         }
                        ]
@@ -19689,7 +19951,7 @@
      "op": "select",
      "args": [
       {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 17.0]}]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 19.25]}]},
       0
      ]
     },
@@ -19704,7 +19966,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 10.875]}, 10.875]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 4.312]}, 4.312]
    }
   },
   {
@@ -19731,7 +19993,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -5.945]}, -5.945]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -2.945]}, -2.945]
    }
   },
   {
@@ -19767,7 +20029,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -7.0]}, -7.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -4.0]}, -4.0]
    }
   },
   {
@@ -20869,6 +21131,113 @@
    }
   },
   {
+   "id": "tall.exitModal-energy-halo.transform",
+   "node": "exitModal-energy-halo",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 480.0]}]},
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 204.0]}]},
+      0
+     ]
+    },
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.exitModal-energy-wave.left",
+   "node": "exitModal-energy-wave",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -16]}, -16]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-wave.width",
+   "node": "exitModal-energy-wave",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 512.0]}, 512.0]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-wave.height",
+   "node": "exitModal-energy-wave",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 46.0]}, 46.0]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-run.left",
+   "node": "exitModal-energy-run",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -32.776]}, -32.776]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-run.top",
+   "node": "exitModal-energy-run",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -170.776]}, -170.776]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-run.width",
+   "node": "exitModal-energy-run",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-run.height",
+   "node": "exitModal-energy-run",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-line.width",
+   "node": "exitModal-energy-line",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
+   "id": "tall.exitModal-energy-line.height",
+   "node": "exitModal-energy-line",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 545.552]}, 545.552]
+   }
+  },
+  {
    "id": "tall.exitModal-frame.transform",
    "node": "exitModal-frame",
    "property": "transform",
@@ -21013,53 +21382,53 @@
            "op": "select",
            "args": [
             {"op": "==", "args": [{"state": "language"}, "brazilian"]},
-            229.511,
+            236.074,
             {
              "op": "select",
              "args": [
               {"op": "==", "args": [{"state": "language"}, "czech"]},
-              219.986,
+              226.548,
               {
                "op": "select",
                "args": [
                 {"op": "==", "args": [{"state": "language"}, "english"]},
-                189.431,
+                195.993,
                 {
                  "op": "select",
                  "args": [
                   {"op": "==", "args": [{"state": "language"}, "french"]},
-                  163.779,
+                  170.341,
                   {
                    "op": "select",
                    "args": [
                     {"op": "==", "args": [{"state": "language"}, "german"]},
-                    248.617,
+                    255.179,
                     {
                      "op": "select",
                      "args": [
                       {"op": "==", "args": [{"state": "language"}, "hungarian"]},
-                      166.367,
+                      172.929,
                       {
                        "op": "select",
                        "args": [
                         {"op": "==", "args": [{"state": "language"}, "italian"]},
-                        207.585,
+                        214.148,
                         {
                          "op": "select",
                          "args": [
                           {"op": "==", "args": [{"state": "language"}, "polish"]},
-                          218.472,
+                          225.034,
                           {
                            "op": "select",
                            "args": [
                             {"op": "==", "args": [{"state": "language"}, "russian"]},
-                            233.587,
+                            240.15,
                             {
                              "op": "select",
                              "args": [
                               {"op": "==", "args": [{"state": "language"}, "turkish"]},
-                              220.816,
-                              {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 202.642, 271.281]}
+                              227.378,
+                              {"op": "select", "args": [{"op": "==", "args": [{"state": "language"}, "ukrainian"]}, 209.204, 277.843]}
                              ]
                             }
                            ]
@@ -21091,7 +21460,7 @@
      "op": "select",
      "args": [
       {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 17.0]}]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 19.25]}]},
       0
      ]
     },
@@ -21106,7 +21475,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 10.875]}, 10.875]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 4.312]}, 4.312]
    }
   },
   {
@@ -21133,7 +21502,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -5.945]}, -5.945]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -2.945]}, -2.945]
    }
   },
   {
@@ -21169,7 +21538,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -7.0]}, -7.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -4.0]}, -4.0]
    }
   },
   {
@@ -24435,6 +24804,60 @@
    ]
   },
   {
+   "id": "quitModalEnergy",
+   "durationMs": 7200.0,
+   "tracks": [
+    {
+     "node": "quitModal-energy-run",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "quitModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "quitModal-energy-halo",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.35}},
+      {"atMs": 3600.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0.35}}
+     ]
+    },
+    {
+     "node": "quitModal-energy-wave",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 900.0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 204.0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 204.0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "quitModal-energy-wave",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}},
+      {"atMs": 900.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 1100.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2200.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2400.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ],
+   "iterations": 0
+  },
+  {
    "id": "quitModalEnter",
    "durationMs": 200,
    "tracks": [
@@ -25285,6 +25708,60 @@
      "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
     }
    ]
+  },
+  {
+   "id": "exitModalEnergy",
+   "durationMs": 7200.0,
+   "tracks": [
+    {
+     "node": "exitModal-energy-run",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "exitModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "exitModal-energy-halo",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.35}},
+      {"atMs": 3600.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0.35}}
+     ]
+    },
+    {
+     "node": "exitModal-energy-wave",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 900.0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
+      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 204.0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 204.0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "exitModal-energy-wave",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}},
+      {"atMs": 900.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 1100.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2200.0, "value": {"type": "number", "value": 1}},
+      {"atMs": 2400.0, "value": {"type": "number", "value": 0}},
+      {"atMs": 7200.0, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ],
+   "iterations": 0
   },
   {
    "id": "exitModalEnter",
@@ -36737,11 +37214,11 @@
             "type": "image",
             "properties": {
              "image": {"type": "image", "value": ""},
-             "image-fit": {"type": "keyword", "value": "cover"},
+             "image-fit": {"type": "keyword", "value": "fill"},
              "position": {"type": "keyword", "value": "absolute"},
-             "left": {"type": "length", "value": 15, "unit": "dp"},
+             "left": {"type": "length", "value": 86.5, "unit": "dp"},
              "top": {"type": "length", "value": 52.0, "unit": "dp"},
-             "width": {"type": "length", "value": 363.0, "unit": "dp"},
+             "width": {"type": "length", "value": 220.0, "unit": "dp"},
              "height": {"type": "length", "value": 165.0, "unit": "dp"},
              "display": {"type": "keyword", "value": "block"}
             }
@@ -42354,6 +42831,205 @@
             }
            },
            {
+            "id": "quitModal-energy-fit",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "block"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "children": [
+             {
+              "id": "quitModal-energy",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "display": {"type": "keyword", "value": "none"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "children": [
+               {
+                "id": "quitModal-energy-halo",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 480.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 204.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0.35},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "paths": [
+                 {
+                  "id": "halo",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6.562, 3.562]]},
+                   {"id": "p1", "op": "line", "points": [[13.125, 3.562]]},
+                   {"id": "p2", "op": "line", "points": [[42.569, 20.562]]},
+                   {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
+                   {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
+                   {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
+                   {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
+                   {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
+                   {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.8, 0.0, 0.3]}},
+                   "widthDp": 10.5,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               },
+               {
+                "id": "quitModal-energy-wave",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -16, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 512.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 46.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}
+                },
+                "paths": [
+                 {
+                  "id": "wave",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {
+                   "type": "linear",
+                   "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                   "to": [{"fraction": 0.0}, {"fraction": 1}],
+                   "stops": [
+                    {"at": 0, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0]}},
+                    {"at": 0.6, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0.7]}},
+                    {"at": 1, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0]}}
+                   ]
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               },
+               {
+                "id": "quitModal-energy-run",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "quitModal-energy-line",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                  },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.07210678358799895}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.08413680089157405}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.13810782473531394}, {"fraction": 0.3507236707041675}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.6728634483972197}, {"fraction": 0.3507236707041675}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.7268344722409597}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p5", "op": "line", "points": [[{"fraction": 0.9278932164120011}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p6", "op": "line", "points": [[{"fraction": 0.9278932164120011}, {"fraction": 0.6771710121125025}]]},
+                     {"id": "p7", "op": "line", "points": [[{"fraction": 0.14176100536704106}, {"fraction": 0.6771710121125025}]]},
+                     {"id": "p8", "op": "line", "points": [[{"fraction": 0.07210678358799895}, {"fraction": 0.6369548640642871}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.8, 0.0, 0.9]}},
+                     "widthDp": 10.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
+                  {
+                   "id": "first",
+                   "commands": [
+                    {"id": "p0", "op": "move", "points": [[272.776, 272.776]]},
+                    {"id": "p1", "op": "line", "points": [[102.822, 38.855]]},
+                    {"id": "p2", "op": "line", "points": [[183.426, -2.215]]},
+                    {"id": "p3", "op": "line", "points": [[272.776, -16.367]]},
+                    {"id": "close", "op": "close"}
+                   ],
+                   "fill": {
+                    "type": "linear",
+                    "from": [102.822, 38.855],
+                    "to": [272.776, -16.367],
+                    "stops": [
+                     {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                    ]
+                   }
+                  },
+                  {
+                   "id": "second",
+                   "commands": [
+                    {"id": "p0", "op": "move", "points": [[272.776, 272.776]]},
+                    {"id": "p1", "op": "line", "points": [[442.73, 506.697]]},
+                    {"id": "p2", "op": "line", "points": [[362.126, 547.767]]},
+                    {"id": "p3", "op": "line", "points": [[272.776, 561.919]]},
+                    {"id": "close", "op": "close"}
+                   ],
+                   "fill": {
+                    "type": "linear",
+                    "from": [442.73, 506.697],
+                    "to": [272.776, 561.919],
+                    "stops": [
+                     {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              ]
+             }
+            ]
+           },
+           {
             "id": "quitModal-frame",
             "type": "vector",
             "properties": {
@@ -42433,10 +43109,10 @@
               "type": "vector",
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
-               "left": {"type": "length", "value": 10.875, "unit": "dp"},
+               "left": {"type": "length", "value": 4.312, "unit": "dp"},
                "top": {"type": "length", "value": 3.562, "unit": "dp"},
-               "width": {"type": "length", "value": 352.875, "unit": "dp"},
-               "height": {"type": "length", "value": 17.0, "unit": "dp"},
+               "width": {"type": "length", "value": 359.438, "unit": "dp"},
+               "height": {"type": "length", "value": 19.25, "unit": "dp"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
@@ -42447,7 +43123,8 @@
                  {"id": "p0", "op": "move", "points": [[0, 0]]},
                  {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -29.444}, 0]]},
                  {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
-                 {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 1}, 19.25]]},
+                 {"id": "p4", "op": "line", "points": [[0, 19.25]]},
                  {"id": "close", "op": "close"}
                 ],
                 "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
@@ -42505,7 +43182,7 @@
                "text": {"type": "text", "value": "#str_200004"},
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 42.569, "unit": "dp"},
-               "top": {"type": "length", "value": -5.945, "unit": "dp"},
+               "top": {"type": "length", "value": -2.945, "unit": "dp"},
                "width": {"type": "length", "value": 424.868, "unit": "dp"},
                "height": {"type": "length", "value": 24, "unit": "dp"},
                "font-family": {"type": "font", "value": "strogg"},
@@ -42523,7 +43200,7 @@
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 39.569, "unit": "dp"},
-               "top": {"type": "length", "value": -7.0, "unit": "dp"},
+               "top": {"type": "length", "value": -4.0, "unit": "dp"},
                "width": {"type": "length", "value": 430.868, "unit": "dp"},
                "height": {"type": "length", "value": 30.0, "unit": "dp"},
                "opacity": {"type": "number", "value": 1},
@@ -43350,6 +44027,205 @@
             }
            },
            {
+            "id": "exitModal-energy-fit",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "block"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "children": [
+             {
+              "id": "exitModal-energy",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "display": {"type": "keyword", "value": "none"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "children": [
+               {
+                "id": "exitModal-energy-halo",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 480.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 204.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0.35},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "paths": [
+                 {
+                  "id": "halo",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6.562, 3.562]]},
+                   {"id": "p1", "op": "line", "points": [[13.125, 3.562]]},
+                   {"id": "p2", "op": "line", "points": [[42.569, 20.562]]},
+                   {"id": "p3", "op": "line", "points": [[334.306, 20.562]]},
+                   {"id": "p4", "op": "line", "points": [[363.75, 3.562]]},
+                   {"id": "p5", "op": "line", "points": [[473.438, 3.562]]},
+                   {"id": "p6", "op": "line", "points": [[473.438, 198.656]]},
+                   {"id": "p7", "op": "line", "points": [[44.562, 198.656]]},
+                   {"id": "p8", "op": "line", "points": [[6.562, 176.716]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.8, 0.0, 0.3]}},
+                   "widthDp": 10.5,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               },
+               {
+                "id": "exitModal-energy-wave",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -16, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 512.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 46.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}
+                },
+                "paths": [
+                 {
+                  "id": "wave",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {
+                   "type": "linear",
+                   "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                   "to": [{"fraction": 0.0}, {"fraction": 1}],
+                   "stops": [
+                    {"at": 0, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0]}},
+                    {"at": 0.6, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0.7]}},
+                    {"at": 1, "color": {"type": "color", "value": [0.4196, 0.1647, 0.0549, 0]}}
+                   ]
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               },
+               {
+                "id": "exitModal-energy-run",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "exitModal-energy-line",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                  },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.07210678358799895}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.08413680089157405}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.13810782473531394}, {"fraction": 0.3507236707041675}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.6728634483972197}, {"fraction": 0.3507236707041675}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.7268344722409597}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p5", "op": "line", "points": [[{"fraction": 0.9278932164120011}, {"fraction": 0.3195625714872276}]]},
+                     {"id": "p6", "op": "line", "points": [[{"fraction": 0.9278932164120011}, {"fraction": 0.6771710121125025}]]},
+                     {"id": "p7", "op": "line", "points": [[{"fraction": 0.14176100536704106}, {"fraction": 0.6771710121125025}]]},
+                     {"id": "p8", "op": "line", "points": [[{"fraction": 0.07210678358799895}, {"fraction": 0.6369548640642871}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.8, 0.0, 0.9]}},
+                     "widthDp": 10.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
+                  {
+                   "id": "first",
+                   "commands": [
+                    {"id": "p0", "op": "move", "points": [[272.776, 272.776]]},
+                    {"id": "p1", "op": "line", "points": [[102.822, 38.855]]},
+                    {"id": "p2", "op": "line", "points": [[183.426, -2.215]]},
+                    {"id": "p3", "op": "line", "points": [[272.776, -16.367]]},
+                    {"id": "close", "op": "close"}
+                   ],
+                   "fill": {
+                    "type": "linear",
+                    "from": [102.822, 38.855],
+                    "to": [272.776, -16.367],
+                    "stops": [
+                     {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                    ]
+                   }
+                  },
+                  {
+                   "id": "second",
+                   "commands": [
+                    {"id": "p0", "op": "move", "points": [[272.776, 272.776]]},
+                    {"id": "p1", "op": "line", "points": [[442.73, 506.697]]},
+                    {"id": "p2", "op": "line", "points": [[362.126, 547.767]]},
+                    {"id": "p3", "op": "line", "points": [[272.776, 561.919]]},
+                    {"id": "close", "op": "close"}
+                   ],
+                   "fill": {
+                    "type": "linear",
+                    "from": [442.73, 506.697],
+                    "to": [272.776, 561.919],
+                    "stops": [
+                     {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
+                    ]
+                   }
+                  }
+                 ]
+                }
+               }
+              ]
+             }
+            ]
+           },
+           {
             "id": "exitModal-frame",
             "type": "vector",
             "properties": {
@@ -43429,10 +44305,10 @@
               "type": "vector",
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
-               "left": {"type": "length", "value": 10.875, "unit": "dp"},
+               "left": {"type": "length", "value": 4.312, "unit": "dp"},
                "top": {"type": "length", "value": 3.562, "unit": "dp"},
-               "width": {"type": "length", "value": 271.281, "unit": "dp"},
-               "height": {"type": "length", "value": 17.0, "unit": "dp"},
+               "width": {"type": "length", "value": 277.843, "unit": "dp"},
+               "height": {"type": "length", "value": 19.25, "unit": "dp"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
@@ -43443,7 +44319,8 @@
                  {"id": "p0", "op": "move", "points": [[0, 0]]},
                  {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -29.444}, 0]]},
                  {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 17.0]]},
-                 {"id": "p3", "op": "line", "points": [[0, 17.0]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 1}, 19.25]]},
+                 {"id": "p4", "op": "line", "points": [[0, 19.25]]},
                  {"id": "close", "op": "close"}
                 ],
                 "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}}
@@ -43501,7 +44378,7 @@
                "text": {"type": "text", "value": "#str_200169"},
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 42.569, "unit": "dp"},
-               "top": {"type": "length", "value": -5.945, "unit": "dp"},
+               "top": {"type": "length", "value": -2.945, "unit": "dp"},
                "width": {"type": "length", "value": 291.737, "unit": "dp"},
                "height": {"type": "length", "value": 24, "unit": "dp"},
                "font-family": {"type": "font", "value": "strogg"},
@@ -43519,7 +44396,7 @@
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 39.569, "unit": "dp"},
-               "top": {"type": "length", "value": -7.0, "unit": "dp"},
+               "top": {"type": "length", "value": -4.0, "unit": "dp"},
                "width": {"type": "length", "value": 297.737, "unit": "dp"},
                "height": {"type": "length", "value": 30.0, "unit": "dp"},
                "opacity": {"type": "number", "value": 1},

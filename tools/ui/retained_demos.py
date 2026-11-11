@@ -200,7 +200,7 @@ def demos_document() -> dict:
 
     # The leading side: the selected demo's map, its kind and status, and the
     # section plates.
-    shot_parts = picture_frame("demo-shot", *PREVIEW)
+    shot_parts = picture_frame("demo-shot", *PREVIEW, fit="fill")   # the demo's levelshot: a square texture of a 4:3 picture
     doc.bind("demo-shot.image", "demo-shot", "image", {"state": "demos.shot"})
     error_box = absolute(left=U * ERROR_STRIP[0], top=U * ERROR_STRIP[1], width=U * ERROR_STRIP[2], height=U * ERROR_STRIP[3])
     error = group("demo-error", {**error_box, "display": keyword("none"), "background-color": colour([0, 0, 0, 0.8])}, [

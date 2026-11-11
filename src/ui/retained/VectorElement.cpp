@@ -258,17 +258,22 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 	if (sliding && !state.scissor_region.Valid()) {
 		// The view's region slides across a moving element, and each new block
 		// would recompile it (a scrolling data layer several views tall). Its
-		// own box does not move in this space: cover that instead, while it is
-		// no larger than a few views, and keep the phases' compilations.
+		// own box does not move in this space: cover that as well, while the
+		// two are no larger than a few views, and keep the phases' compilations.
+		// The view's region stays covered: a path may draw outside its box (a
+		// framing band reaches far past the view so a dock slide never shows
+		// its end), and the box alone cut the band where it had slid from.
 		const auto& t = options.transform;
 		const double xs[4] = {t.tx,t.tx+t.a*options.widthDp,t.tx+t.c*options.heightDp,t.tx+t.a*options.widthDp+t.c*options.heightDp};
 		const double ys[4] = {t.ty,t.ty+t.b*options.widthDp,t.ty+t.d*options.heightDp,t.ty+t.b*options.widthDp+t.d*options.heightDp};
 		const VectorPixelBounds own{lower(*std::min_element(xs,xs+4)),lower(*std::min_element(ys,ys+4)),
 			upper(*std::max_element(xs,xs+4)),upper(*std::max_element(ys,ys+4))};
-		const double ownArea = double(own.right-own.left)*double(own.bottom-own.top);
 		const bool outgrows = own.left < cachedBounds.left || own.top < cachedBounds.top || own.right > cachedBounds.right ||
 			own.bottom > cachedBounds.bottom;
-		if (outgrows && ownArea <= 4.0*std::max(1.0,double(viewport.x)*double(viewport.y))) cachedBounds = own;
+		const VectorPixelBounds both{std::min(own.left,cachedBounds.left),std::min(own.top,cachedBounds.top),
+			std::max(own.right,cachedBounds.right),std::max(own.bottom,cachedBounds.bottom)};
+		const double bothArea = double(both.right-both.left)*double(both.bottom-both.top);
+		if (outgrows && bothArea <= 4.0*std::max(1.0,double(viewport.x)*double(viewport.y))) cachedBounds = both;
 	}
 	if (localMesh) cachedBounds = {}; // Final clipping belongs to the render manager.
 	else options.pixelBounds = cachedBounds;
