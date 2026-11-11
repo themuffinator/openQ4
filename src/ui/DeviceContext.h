@@ -77,6 +77,9 @@ public:
 	int					FindFont( const char *name );
 	void				SetupFonts();
 	bool				ReloadFonts();
+	// The fonts are rasterised for the display's height. After a display change
+	// that did not restart the device, the next use rebuilds them once.
+	static void			DisplayChanged();
 
 	idRegion			*GetTextRegion(const char *text, float textScale, idRectangle rectDraw, float xStart, float yStart);
 

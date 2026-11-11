@@ -2556,11 +2556,12 @@ Completion must advance through the existing dependencies:
   fallback to the restart unchanged.
   On a visible desktop every mode change and undo was a transition on both
   back ends, and Vulkan kept fullscreen and the return to a window.
+  A transition no longer advances the restart count, which had made the
+  retained interface reload every document (2 to 5 s to the first frame, now
+  under 0.3 s), and a window that leaves fullscreen is centred.
   Remaining, in order: a focused Keep under borderless and exclusive
-  fullscreen, and any Keep on OpenGL (the test window had no focus); the
-  OpenGL restore that missed its present deadline twice while unfocused; the
-  window placed at 0,0 after leaving fullscreen through Apply; MSAA as a
-  scene-target rebuild (Vulkan first; OpenGL's window is
+  fullscreen, and any Keep on OpenGL (the test window had no focus); MSAA as
+  a scene-target rebuild (Vulkan first; OpenGL's window is
   itself multisampled) and OpenGL's upload stream in place; a material
   re-parse so `image_ignoreHighQuality` applies in the session; the
   rendering API and GPU switch from inside a game; and an image reload

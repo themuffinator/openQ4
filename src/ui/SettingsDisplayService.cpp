@@ -9,6 +9,8 @@
 
 using namespace openq4;
 using namespace openq4::ui;
+// DeviceContext.cpp: the classic GUI fonts rebuild for the display on their next use.
+void UI_ClassicFontsDisplayChanged( void );
 bool EngineSettingsDisplayHost::SupportsMultisampling() const {
 	rendererDisplayState_t state{};
 	if (!R_RendererModule_QueryDisplay(&state) || !state.rendererReady || !state.windowValid || !state.presentation.available)
@@ -512,6 +514,10 @@ bool EngineSettingsDisplayHost::Restart(bool restoring, SettingsDisplayObservati
 	bool transitioned=false;
 	if (DisplayTransition(plan,before)) {
 		transitioned=R_RendererModule_TryDisplayTransition(&plan.request,diagnostic,sizeof(diagnostic));
+		// The renderer's restart count stays where it was: nothing was lost, and
+		// advancing it makes the retained interface reload every document. The
+		// classic GUI fonts are sized for the display and rebuild on next use.
+		if (transitioned) UI_ClassicFontsDisplayChanged();
 		if (!transitioned && cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("UI_SETTINGS_TRANSITION_REFUSED restore=%d detail=%s\n",restoring?1:0,diagnostic);
 	}
 	if (!transitioned) {

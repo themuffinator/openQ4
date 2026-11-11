@@ -218,7 +218,12 @@ bool BuildDisplayRequest(const StateValues& values, const rendererDisplayState_t
 	} else {
 		expected.logicalWidth=p.width; expected.logicalHeight=p.height;
 		expected.positionValid=topology.absolutePlacement; plan.checkPosition=topology.absolutePlacement;
-		if (captured.window.positionValid && captured.window.displayId==display->id) { expected.windowX=captured.window.windowX; expected.windowY=captured.window.windowY; }
+		// A bordered window keeps its place on its display. A fullscreen or
+		// borderless window sits at the display's origin, which would put the
+		// new window's title bar off the screen, so that one is centred.
+		const bool placed=captured.window.positionValid && captured.window.displayId==display->id &&
+			!captured.window.fullscreen && !captured.window.borderless;
+		if (placed) { expected.windowX=captured.window.windowX; expected.windowY=captured.window.windowY; }
 		else { expected.windowX=Coordinate(int64_t(display->x)+(int64_t(display->width)-p.width)/2); expected.windowY=Coordinate(int64_t(display->y)+(int64_t(display->height)-p.height)/2); }
 	}
 	if (plan.checkPosition) { request.restorePlacement=true; request.windowX=expected.windowX; request.windowY=expected.windowY; }

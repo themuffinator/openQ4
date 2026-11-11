@@ -1276,6 +1276,24 @@ void idDeviceContext::EnsureFontsCurrent() {
 	}
 }
 
+/*
+================
+idDeviceContext::DisplayChanged
+
+A display change applied to the running device (R_TryDisplayTransition) leaves
+the renderer's restart count alone, because no GPU resource was lost. These
+fonts are still rasterised for the old display height, so forget which restart
+they were built for: EnsureFontsCurrent rebuilds them on their next use.
+================
+*/
+void idDeviceContext::DisplayChanged() {
+	fontsVideoRestartCount = -1;
+}
+
+void UI_ClassicFontsDisplayChanged( void ) {
+	idDeviceContext::DisplayChanged();
+}
+
 void idDeviceContext::SetFont( int num ) {
 	EnsureFontsCurrent();
 

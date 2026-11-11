@@ -5891,7 +5891,7 @@ Applies a strict display request to the running device. The window changes
 mode, size, display, borders or swap interval in place: OpenGL keeps its
 context and Vulkan rebuilds its swapchain. Every image, buffer and font atlas
 and the world's derived data stay, which is what a full restart spends its
-time rebuilding.
+time rebuilding, and videoRestartCount stays where it was.
 
 The request is refused before anything changes when it needs a new device: a
 window's sample count is fixed when its context is created. A failure once the
@@ -5947,11 +5947,16 @@ bool R_TryDisplayTransition( const renderWindowRequest_t *request, char *error, 
 	if ( !applied ) return R_RendererRestartError( error, errorSize, "The running device could not take the requested display" );
 	(void)R_ClearPendingGLErrors();
 	// The context survived, but the UI viewport may have changed. Re-rasterise
-	// the fixed-cell sheet at the new display scale; cached GUI fonts and other
-	// size-dependent resources follow videoRestartCount, as after a partial
-	// vid_restart.
+	// the fixed-cell sheet at the new display scale.
+	//
+	// videoRestartCount does not advance: it tells its readers that every GPU
+	// resource was lost, and none was. The retained interface answers it by
+	// shutting down and reloading every document, which held the first frame
+	// after a transition for seconds (and for over half a minute on a busy
+	// machine). Whatever depends on the output size already follows the size
+	// itself, as it does when the window is resized by hand; the caller
+	// re-rasterises the classic GUI fonts, which are sized for the display.
 	R_RefreshConsoleFontAtlas();
-	tr.videoRestartCount = tr.videoRestartCount < 0x7fffffff ? tr.videoRestartCount + 1 : 1;
 	return true;
 }
 

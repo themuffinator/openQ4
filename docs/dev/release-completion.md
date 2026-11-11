@@ -77,7 +77,11 @@ See [player release status](../user/release-status.md).
   window of the running game: nothing is torn down or reloaded. They still
   ask you to keep or revert, and the previous display returns if you do not
   answer. If the running renderer cannot take a change, the game restarts
-  the renderer for it instead, as before.
+  the renderer for it instead, as before. The menu is back within a fraction
+  of a second, where the first version of this change paused for 2 to 5
+  seconds while every menu page reloaded.
+- **A window that leaves fullscreen is centred.** It used to land in the
+  top-left corner of the display with its title bar off the screen.
 - **Still a restart.** An MSAA change restarts the renderer and asks you to
   keep or revert. High-quality texture flags still finish at the next start.
 - **Nothing to do.** The classic interface (`ui_retained 0`) is unchanged.
@@ -91,7 +95,10 @@ See [player release status](../user/release-status.md).
   visible 2560 by 1440 desktop, fullscreen, borderless and exclusive
   fullscreen each applied and were undone in place on both back ends, and
   Vulkan kept fullscreen and the return to a window; keeping a change on
-  OpenGL was not confirmed because the test window had no focus.
+  OpenGL was not confirmed because the test window had no focus. First frame
+  after a 1280 by 720 to 2560 by 1440 change: 2.0 to 5.0 s before the reload
+  was removed, under 0.3 s after, with the page identical pixel for pixel to
+  one drawn after a device restart.
   `tools/tests/ui_settings_display_service.py`,
   `tools/tests/ui_settings_effect_journal.py`,
   `tools/tests/ui_system_settings_host.py`.

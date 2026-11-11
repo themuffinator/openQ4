@@ -109,10 +109,16 @@ already had for the tail of a device start:
   request's interval.
 
 Each reports a new presentation generation, so the caller's evidence is what
-a restart gave it. The console font sheet is re-rasterised and
-`videoRestartCount` advances, as after `vid_restart partial`, so size-dependent
-resources follow. Nothing is purged: images, buffers, font atlases and the
-world's derived data stay.
+a restart gave it. The console font sheet is re-rasterised. Nothing is purged:
+images, buffers, font atlases and the world's derived data stay.
+
+`videoRestartCount` does not advance (see
+[the two findings](#the-two-findings-fixed-the-same-day)). It tells its
+readers that every GPU resource was lost, and none was. Whatever depends on
+the output size follows the size itself, as it does when the window is
+resized by hand; the executor asks the classic GUI fonts, which are
+rasterised for the display's height, to rebuild on their next use
+(`idDeviceContext::DisplayChanged`).
 
 The service refuses, before any change, a request whose window sample count
 differs from the device's: a count is fixed when the context is created. A
@@ -188,7 +194,7 @@ focus.
 Not confirmed: Keep under borderless or exclusive fullscreen on either back
 end, and any Keep on OpenGL, because the window had no focus in those runs.
 
-Two observations for follow-up, neither changed here:
+Two observations from these runs, both fixed the same day (next section):
 
 - In two of the unfocused OpenGL runs the window presented about one frame a
   second for a few seconds after an undo, and the controller reported
@@ -199,6 +205,44 @@ Two observations for follow-up, neither changed here:
   the fullscreen window's origin (0,0), because the request keeps the captured
   window's position (`BuildDisplayRequest`). An undo returns it to where it
   was.
+
+### The two findings, fixed the same day
+
+**The missed deadline was a reload the transition caused.** As first written,
+`R_TryDisplayTransition` advanced `videoRestartCount`, as `vid_restart partial`
+does. The retained interface answers that count by saving, shutting down and
+reloading every document (`RefreshResources` in `RetainedUI.cpp`), which is
+right after a device was lost and pointless after a window changed in place.
+Measured on a hidden window with the DISPLAY page open, a transition from
+1280 by 720 to 2560 by 1440 and one back:
+
+| | Transition call | First new frame after it | Documents reloaded |
+| --- | --- | --- | --- |
+| Vulkan, count advanced | 56 ms, 31 ms | 4990 ms, 4722 ms | 20, 20 |
+| Vulkan, count left alone | 73 ms, 42 ms | 289 ms, 157 ms | 0, 0 |
+| OpenGL, count advanced | 12 ms, 13 ms | 1989 ms, 2911 ms | 20, 20 |
+| OpenGL, count left alone | 10 ms, 8 ms | 210 ms, 114 ms | 0, 0 |
+
+The frame counter was polled every 100 ms, so the last two rows are bounded
+by the poll, not measured to the millisecond. On a machine other sessions had
+saturated, a Vulkan run with the count advanced took 35.7 s and 46.6 s to its
+first new frame. The controller allows a restored display 20 s to present,
+which is the deadline the unfocused OpenGL runs missed.
+
+The count now stays where it was. The page drawn after a transition to 1600
+by 900 is identical, pixel for pixel, to the page drawn after a device restart
+at that size, on both back ends. The page flow and the in-map transition
+above pass again on the changed build, with the count unchanged across each
+transition and advanced by the device restart. What was not run: the classic
+fonts' rebuild in the engine (the display service test covers the request),
+and the visible unfocused OpenGL case that showed the deadline.
+
+**A window that leaves fullscreen is centred.** `BuildDisplayRequest` keeps a
+bordered window's position on its display, and now centres the new window when
+the captured one was fullscreen or borderless: that window sits at the
+display's origin, where a bordered window's title bar would be off the
+screen. This applies to the restart path as well. Covered by
+`tools/tests/ui_system_display.py`; not run on a visible desktop.
 
 ## What this stage does not do
 

@@ -369,6 +369,17 @@ int main() {
     assert(plan.request.displayId==2 && plan.request.parms.width==1280 && plan.request.parms.height==720);
     assert(plan.request.restorePlacement && plan.request.windowX==1960 && plan.request.windowY==50 && !plan.request.maximized);
     assert(MatchesDisplay(plan,Observed(plan),error));Portable(plan,topology);
+    // A window that leaves fullscreen or borderless is centred on its display:
+    // the captured window sits at the display's origin, where a bordered
+    // window's title bar would be off the screen. A bordered one keeps its place.
+    {auto covering=actual;auto& w=covering.window;w.windowX=1920;w.windowY=0;w.logicalWidth=w.pixelWidth=1920;w.logicalHeight=w.pixelHeight=1080;
+     SystemDisplayPlan left;w.fullscreen=w.fullscreenDesktop=true;
+     assert(BuildDisplayRequest(values,covering,topology,left,error) && left.request.windowX==1920+320 && left.request.windowY==180);
+     assert(left.request.restorePlacement && MatchesDisplay(left,Observed(left),error));
+     w.fullscreen=w.fullscreenDesktop=false;w.borderless=true;
+     assert(BuildDisplayRequest(values,covering,topology,left,error) && left.request.windowX==1920+320 && left.request.windowY==180);
+     w.borderless=false;
+     assert(BuildDisplayRequest(values,covering,topology,left,error) && left.request.windowX==1920 && left.request.windowY==0);}
     // Vulkan's window is single-sample; r_multiSamples reaches only its scene targets.
     auto sampled=values;sampled["r_multiSamples"]=4.0;
     assert(BuildDisplayRequest(sampled,actual,topology,plan,error,false) && plan.request.parms.multiSamples==0);

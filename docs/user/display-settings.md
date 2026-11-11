@@ -86,7 +86,7 @@ In the modern interface, choose the preset on **Settings > Display** and press *
 
 **V-Sync** on that page applies as soon as you press **Apply Changes**, with no renderer restart and no keep-or-revert question. Texture quality changes made there reload the textures in place the same way.
 
-**Resolution, window size, fullscreen, borderless, display and refresh rate** changes on that page also apply to the running game: the window changes and nothing is reloaded. They still ask you to keep or revert, and your previous display comes back if you do not answer. If the running renderer cannot take a change, openQ4 restarts the renderer for it instead, as it used to. Changing **MSAA** still restarts the renderer.
+**Resolution, window size, fullscreen, borderless, display and refresh rate** changes on that page also apply to the running game: the window changes and nothing is reloaded. They still ask you to keep or revert, and your previous display comes back if you do not answer. A window that leaves fullscreen or borderless is centred on its display. If the running renderer cannot take a change, openQ4 restarts the renderer for it instead, as it used to. Changing **MSAA** still restarts the renderer.
 
 `autoDetectPerformancePreset` takes no arguments. It recommends and applies a starting point using the **active renderer and GPU**, system RAM, CPU concurrency, platform power hints and current drawable resolution. It does not run a benchmark or promise a particular frame rate. Every preset but Maximum can be recommended; Maximum has no frame-rate target and remains a manual choice.
 

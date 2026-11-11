@@ -163,7 +163,9 @@ static bool VulkanRefuses(const renderWindowRequest_t* r,char* error,int size){
 }
 // The running device takes a request in place unless it needs another window
 // sample count, which it refuses before any change. A case can make it fail.
-static int transitions=0;static bool transitionOkay=true;
+static int transitions=0,fontRefreshes=0;static bool transitionOkay=true;
+// The classic GUI fonts rebuild for the display after a transition, which leaves the restart count alone.
+void UI_ClassicFontsDisplayChanged(){trace.push_back("classic-fonts");++fontRefreshes;}
 bool R_RendererModule_TryDisplayTransition(const renderWindowRequest_t* r,char* error,int size){
     trace.push_back("transition");++transitions;
     if(r->parms.multiSamples!=actual.presentation.samples)return GeometryError(error,size,"The requested window samples need a new device");
@@ -192,7 +194,7 @@ static void ResetFixture(){
     geometry={actual.window.windowX,actual.window.windowY,1280,720,actual.window.windowX,actual.window.windowY,1280,720,true};
     trace.clear();writes=0;moduleStatus.activeApi=RENDER_MODULE_API_GL;lastRequest={};
     selectionFault=0;selectionReportValid=true;selectionReport={};selectionReportSerial=0;PublishSelection();
-    soundState=SOUND_OUTPUT_READY;soundRestarts=0;transitions=0;transitionOkay=true;
+    soundState=SOUND_OUTPUT_READY;soundRestarts=0;transitions=0;fontRefreshes=0;transitionOkay=true;
 }
 static void MultisamplingCapability(){
     ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
@@ -1003,6 +1005,7 @@ static void TransitionCases(){
      Check(host.Restart(false,seen,error) && transitions==1 && restarts==0 && seen.ready && actual.window.logicalWidth==960 &&
            actual.presentation.generation>generation,"the running device takes a window size change in place");
      Check(TracedPrefix("UI_SETTINGS_TRANSITION restore=0 ") && !TracedPrefix("UI_SETTINGS_DEVICE"),"the trace names the transition");
+     Check(fontRefreshes==1,"a transition asks the classic fonts to rebuild for the display");
      Present();Check(host.Observe(false,seen,error),"the transitioned display matches its plan");
      if(restore){StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
       Check(settings.Write(back,error) && host.Restart(true,seen,error) && transitions==2 && restarts==0 && actual.window.logicalWidth==1280,
@@ -1016,6 +1019,7 @@ static void TransitionCases(){
      Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change whose transition fails");
      transitionOkay=false;traceEnabled=true;SettingsDisplayObservation seen;
      Check(host.Restart(false,seen,error) && transitions==1 && restarts==1 && actual.window.logicalWidth==960,"a failed transition falls back to a device restart");
+     Check(fontRefreshes==0,"a restarted device rebuilds the fonts itself");
      Check(TracedPrefix("UI_SETTINGS_TRANSITION_REFUSED restore=0 detail=transition failed") && TracedPrefix("UI_SETTINGS_DEVICE restore=0 "),
            "the trace names the refusal and the restart");
      Present();Check(host.Observe(false,seen,error) && host.PersistConfirmation(a,error) && host.Finish(false,error),"the restarted attempt keeps");}
