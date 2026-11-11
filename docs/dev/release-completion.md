@@ -67,8 +67,8 @@ See [player release status](../user/release-status.md).
   renderer first. The reload still takes a moment.
 - **Presets apply faster.** Under Vulkan no Performance Preset restarts the
   renderer any more. Under OpenGL a preset restarts it only when it changes
-  anti-aliasing (MSAA) or the renderer's upload buffers. Otherwise its
-  effects switch at once and its textures reload in place.
+  anti-aliasing (MSAA). Otherwise its effects switch at once and its
+  textures reload in place.
 - **The precompressed textures setting applies from the console.** Changing
   `image_usePrecompressedTextures` reloads the textures by itself, without a
   `vid_restart`.
@@ -120,7 +120,10 @@ See [player release status](../user/release-status.md).
   start. Restart Renderer from the pause menu in Air Defense 1 went Vulkan
   to OpenGL and OpenGL to Vulkan, each time back in the map at the same
   position. A GPU change, the Awakening campaign and the classic
-  interface were not run.
+  interface were not run. On OpenGL the upload buffers changed size three
+  times in a running Air Defense 1 with no device start, and the preset
+  walk restarted the renderer six times, once per MSAA change, where it
+  was seven.
   `tools/tests/ui_settings_display_service.py`,
   `tools/tests/ui_settings_effect_journal.py`,
   `tools/tests/ui_system_settings_host.py`.

@@ -171,6 +171,7 @@ private:
 
 	bool CreateFrameBuffers( uploadPath_t requestedPath );
 	void ShutdownFrameBuffers( void );
+	void ResizeFrameStream( void );
 	bool RetireFrameFence( frameBuffer_t &frame, bool allowBlocking );
 	bool SelectFrameBufferForFrame( int preferredFrameBuffer );
 	void FenceCurrentFrame( void );

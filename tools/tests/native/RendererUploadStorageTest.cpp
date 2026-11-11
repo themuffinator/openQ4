@@ -44,7 +44,7 @@ static std::atomic<uint64_t> rg_uploadStorageGeneration{1};
 static idUploadManager rg_uploadManager;
 struct Backend {
     std::map<unsigned,int> buffers;
-    unsigned next=1,bound=0,error=0,calls=0,allocated=0,deleted=0,mapped=0,unmapped=0;
+    unsigned next=1,bound=0,error=0,calls=0,allocated=0,deleted=0,mapped=0,unmapped=0,finishes=0;
     std::string failure;
     int failAt=0,seen=0;
     bool persistentOnly=false;
@@ -73,6 +73,7 @@ static unsigned char Unmap(unsigned){++gl.calls;++gl.unmapped;return 1;}
 static GLsync Fence(unsigned,unsigned){return nullptr;}
 static unsigned Wait(GLsync,unsigned,GLuint64){return 0;}
 static void DeleteSync(GLsync){++gl.calls;}
+static void Finish(){++gl.calls;++gl.finishes;}
 static auto glGetError=&GetError;
 static auto glGenBuffersARB=&Gen;
 static auto glDeleteBuffersARB=&Delete;
@@ -84,6 +85,7 @@ static auto glUnmapBuffer=&Unmap;
 static auto glFenceSync=&Fence;
 static auto glClientWaitSync=&Wait;
 static auto glDeleteSync=&DeleteSync;
+static auto glFinish=&Finish;
 struct idVertexCache {
     static void InvalidateBufferBindings(){}
     static void BindArrayBuffer(unsigned name){++gl.calls;if(name)CHECK(gl.error==0);if(gl.Hit("bind")){gl.error=9;return;}gl.bound=name;}
@@ -172,6 +174,32 @@ static void Unavailable(){
     Reset();const auto before=rg_uploadStorageGeneration.load();rg_uploadStorageGeneration=(std::numeric_limits<uint64_t>::max)();
     manager.Init(Caps(3));Refused(manager);CHECK(gl.buffers.empty());manager.Shutdown();rg_uploadStorageGeneration=before;
 }
+// The stream follows its two settings on the running device: BeginFrame replaces
+// the frame buffers alone and reports the new storage under a new generation.
+static void Resize(){
+    for(unsigned path:{1u,2u,3u}){
+        Reset();idUploadManager manager;manager.Init(Caps(path));rendererUploadStorage_t out{};CHECK(manager.QueryStorage(out));
+        const auto generation=out.generation;manager.BeginFrame(1);CHECK(manager.QueryStorage(out)&&out.generation==generation&&gl.finishes==0);
+        r_rendererUploadMegs.value=16;r_rendererUploadFrameBuffers.value=8;manager.BeginFrame(2);
+        CHECK(manager.QueryStorage(out));CHECK(out.generation>generation&&out.path==path&&out.requestedMegs==16&&out.requestedBuffers==8);
+        CHECK(out.bytesPerBuffer==16*1024*1024&&out.bufferCount==8&&!out.persistentFallback&&gl.finishes==1);
+        CHECK(gl.buffers.size()==8&&manager.FrameCapacity()==out.bytesPerBuffer&&manager.stats.dynamicFrameBridge);
+        for(auto& [name,size]:gl.buffers)CHECK(name&&size==out.bytesPerBuffer);
+        const auto second=out.generation;manager.BeginFrame(3);CHECK(manager.QueryStorage(out)&&out.generation==second&&gl.finishes==1);
+        r_rendererUploadFrameBuffers.value=3;manager.BeginFrame(4);CHECK(manager.QueryStorage(out)&&out.bufferCount==3&&gl.buffers.size()==3);
+        manager.Shutdown();CHECK(gl.buffers.empty()&&gl.allocated==gl.deleted&&gl.mapped==gl.unmapped);
+    }
+    // A persistent stream that cannot be created at the new size falls back, as at start.
+    Reset();idUploadManager manager;manager.Init(Caps(3));rendererUploadStorage_t out{};CHECK(manager.QueryStorage(out)&&out.path==3);
+    r_rendererUploadMegs.value=32;gl.failure="map-null";gl.failAt=1;gl.persistentOnly=true;gl.seen=0;manager.BeginFrame(1);
+    CHECK(manager.QueryStorage(out));CHECK(out.path==2&&out.persistentFallback&&!manager.hasSync&&out.bytesPerBuffer==32*1024*1024&&gl.buffers.size()==3);
+    manager.Shutdown();CHECK(gl.allocated==gl.deleted&&gl.mapped==gl.unmapped);
+    // A stream that cannot be created at all retires to the legacy uploads and is not retried every frame.
+    Reset();manager.Init(Caps(1));r_rendererUploadMegs.value=4;gl.failure="allocate";gl.failAt=-1;manager.BeginFrame(1);
+    Refused(manager);CHECK(gl.buffers.empty()&&!manager.stats.dynamicFrameBridge&&manager.FrameCapacity()==0);
+    const auto calls=gl.calls;gl.failure.clear();manager.BeginFrame(2);CHECK(gl.buffers.empty()&&gl.calls==calls);
+    manager.Shutdown();CHECK(gl.allocated==gl.deleted);
+}
 // ShutdownOpenGL (a client turning into a dedicated server) leaves the vertex
 // cache's buffer names behind; the context took them with it, so a later free
 // drops the name without a GL call into the dead context.
@@ -180,4 +208,4 @@ static void NoContext(){
     R_RendererUpload_DeleteBufferName(vbo);glConfig.isInitialized=true;
     CHECK(vbo==0&&gl.calls==calls);
 }
-int main(){try{Basic();Failures();Orphan();Unavailable();NoContext();std::printf("%u checks passed\n",checks);return 0;}catch(const std::exception& e){std::printf("%s\n",e.what());return 1;}}
+int main(){try{Basic();Failures();Orphan();Resize();Unavailable();NoContext();std::printf("%u checks passed\n",checks);return 0;}catch(const std::exception& e){std::printf("%s\n",e.what());return 1;}}

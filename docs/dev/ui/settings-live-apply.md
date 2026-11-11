@@ -1,6 +1,6 @@
 # Applying display settings without a device restart
 
-This note records the four stages of making Settings > Display apply its
+This note records the five stages of making Settings > Display apply its
 changes to the running renderer. It is the record for the changes of
 11 November 2026 and supersedes, for the settings named here, what
 [effect execution](settings-effect-execution.md#combined-executor),
@@ -23,8 +23,8 @@ did every texture setting and every Performance Preset.
 | Texture reduction (`image_downSize*`, `image_picmip`) | Device restart | The running device reloads its file-backed images in place. |
 | Precompressed textures (`image_usePrecompressedTextures`) | Device restart; a console change needed `vid_restart` | Reloads in place, from the page and from the console. |
 | Benchmark budget (`r_rendererBenchmarkPreset`) | Device restart | Nothing to do: it is read on each use. |
-| Upload stream (`r_rendererUploadMegs`, `r_rendererUploadFrameBuffers`) | Device restart | Vulkan: nothing to do, it reads neither. OpenGL: still a device restart, because the stream is allocated when the device starts. |
-| A Performance Preset | Device restart, always | Stage 1: no device restart on Vulkan unless the preset changes MSAA. Stage 3: none on Vulkan at all. OpenGL restarts when the preset changes MSAA or the upload stream. |
+| Upload stream (`r_rendererUploadMegs`, `r_rendererUploadFrameBuffers`) | Device restart | Vulkan: nothing to do, it reads neither. OpenGL: a device restart until stage 5, which resizes the stream at the next frame. |
+| A Performance Preset | Device restart, always | Stage 1: no device restart on Vulkan unless the preset changes MSAA. Stage 3: none on Vulkan at all. Stage 5: OpenGL restarts only when the preset changes MSAA. |
 | High-quality texture hints (`image_ignoreHighQuality`) | Written, finished at the next start | Stage 4: the materials that read the hint are re-parsed in the session. |
 | Rendering API and GPU (`r_renderApi`, `r_renderDevice`) | Restart Renderer at the main menu only | Stage 4: also inside a single-player game, which is saved, reloaded around and resumed. |
 
@@ -302,7 +302,8 @@ MSAA change in the engine, and 8x or 16x.
   only for the window's own count. Removing it means a single-sample OpenGL
   window with the direct 3D views routed through a multisampled target, as
   Vulkan's window view is.
-- OpenGL's upload stream, which is allocated when the device starts.
+- OpenGL's upload stream, which was allocated when the device starts
+  ([stage 5](#stage-5-opengls-upload-stream-on-the-running-device) resizes it).
 
 ## Stage 4: the high-quality hint, and the renderer switch inside a game
 
@@ -410,6 +411,74 @@ a save that fails to load after the reload, the classic HUD's materials
   a page's atlas) keeps drawing the image it had; it reloads on its next
   bind if it was purged.
 
+## Stage 5: OpenGL's upload stream on the running device
+
+`r_rendererUploadMegs` and `r_rendererUploadFrameBuffers` size the per-frame
+upload stream of the OpenGL family. `idUploadManager::Init` read them once,
+when the device started, so a change of either restarted the device. A
+Performance Preset moves both, which was the one reason left for OpenGL to
+restart on a preset that keeps MSAA.
+
+Nothing outlives a frame in that stream: an allocation belongs to the frame
+that made it, and `idUploadManager::BeginFrame` runs after the previous
+frame's back end has finished recording. `ResizeFrameStream` therefore
+replaces the stream alone, there, when either setting differs from the
+request the stream was built for:
+
+- one `glFinish`, then the old frame buffers are unmapped and deleted and new
+  ones are created on the path the device chose at start;
+- a persistent stream that cannot be created at the new size falls back to
+  map-range as it does at start, and a stream that cannot be created at all
+  retires to the legacy uploads and is not retried every frame;
+- the static buffers, their pool and their counters are untouched;
+- the storage readback reports the new size under a new generation.
+
+A console change behaves the same way. `EngineSettingsDisplayHost::
+DeviceRestart` now restarts only for the display itself or the `r_renderer`
+fallback, on every back end; `UploadStreamChanged` is gone.
+
+### Engine checks, stage 5
+
+Hidden window, console verbs only, working tree on `39e4ce8a1`.
+
+- **In a map** (`game/airdefense1`, OpenGL): 16 MB x 4 to 64 MB x 8 to
+  2 MB x 3 and back from the console. One resize line per step, the
+  persistent path kept, no device start, the presentation generation
+  unchanged, no warning, and the frames drawn. Vulkan, which reads neither
+  setting, did nothing and restarted nothing. The scene's brightness varies
+  between screenshots with and without a resize (a control run with the
+  settings left alone shows the same), so the screenshots were not compared
+  pixel for pixel.
+- **Every preset on the page** (OpenGL): six device restarts, one for each
+  step that changes MSAA, where there were seven. Low to Performance, which
+  changes only the upload stream among the device settings, resized it in
+  place.
+
+### What is left on OpenGL: the MSAA Apply
+
+An MSAA change on the Display page still restarts OpenGL's device, because
+OpenGL's window carries the sample count. The main scene already follows
+`r_multiSamples` on the next frame (stage 3). Removing the restart means a
+single-sample window, and that is a larger change than the others here:
+
+- The window's samples antialias every 3D view drawn straight to it: remote
+  cameras, mirrors and other capture-backed subviews before they are copied
+  into their textures, and GUI `renderDef` windows. Vulkan needed its own
+  window-view target to match
+  ([Vulkan captures](../vulkan-captures.md)). OpenGL would need the same.
+- The back end's own scene target and the capture copy take their sample
+  count from the window (`R_DefaultFramebufferSamples`), not from the
+  setting.
+- Where multisample textures are missing (Apple's OpenGL 2.1 context) the
+  window is the only MSAA there is, so that context has to keep it, and the
+  choice has to be made before the context exists.
+- OpenGL's pictures are the reference the Vulkan renderer was qualified
+  against, so the change needs the view-capture comparison
+  (`tools/tests/renderer_view_capture.py`) run against the stored OpenGL
+  images.
+
+It is not started.
+
 ## What these stages do not do
 
 - The image reload still blocks while textures load. It is shorter than a
@@ -418,7 +487,7 @@ a save that fails to load after the reload, the classic HUD's materials
 - The in-place route has no readback of image dimensions. Its evidence is the
   exact settings readback, the same device generation and a later presented
   frame, as for the combined executor's restart.
-- OpenGL's MSAA Apply and upload stream are later work
+- OpenGL's MSAA Apply is later work
   ([roadmap](../roadmap.md), UI-01).
 
 ## Engine checks, 11 November 2026
@@ -449,6 +518,14 @@ device reopened.
 
 ## Tests
 
+- `tools/tests/renderer_upload_storage.py`
+  (`tools/tests/native/RendererUploadStorageTest.cpp`, stage 5): a changed
+  size or depth replaces the frame buffers alone at `BeginFrame`, on each
+  upload path, under a new generation with nothing leaked; the persistent
+  fallback and a stream that cannot be created at all.
+- `tools/tests/ui_settings_display_service.py` (stage 5): a preset that
+  keeps the display restarts nothing on OpenGL, and an upload change rides
+  along with a window transition.
 - `tools/tests/material_quality_reparse_contract.py` (stage 4): every
   non-forced hint site marks the material; the check runs at the start of a
   frame, stays pending during a level load, re-parses only stale readers,

@@ -92,7 +92,6 @@ private:
 	// as one without device work does.
 	bool DeviceRestart() const;
 	// The batch changes OpenGL's upload stream.
-	bool UploadStreamChanged() const;
 	// A DeviceRestart attempt whose only reason is the display itself, on a
 	// presenting device whose window keeps its sample count: the renderer
 	// applies the request to its window in place (mode, size, display, borders)

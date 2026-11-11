@@ -20,7 +20,7 @@ def main():
         'static bool R_RendererUpload_BoundStorageMatches(',
         'static void R_RendererUpload_DeleteBufferName(',
         'idUploadManager::idUploadManager()', 'void idUploadManager::Init(',
-        'void idUploadManager::Shutdown(', 'void idUploadManager::BeginFrame(',
+        'void idUploadManager::Shutdown(', 'void idUploadManager::ResizeFrameStream(', 'void idUploadManager::BeginFrame(',
         'int idUploadManager::FrameCapacity(', 'bool idUploadManager::CreateFrameBuffers(',
         'void idUploadManager::ShutdownFrameBuffers(', 'bool idUploadManager::QueryStorage(',
         'const char *idUploadManager::PathName(']

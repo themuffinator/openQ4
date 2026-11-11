@@ -500,7 +500,92 @@ void idUploadManager::Shutdown( void ) {
 	storage = {};
 }
 
+/*
+========================
+idUploadManager::ResizeFrameStream
+
+r_rendererUploadMegs and r_rendererUploadFrameBuffers size the per-frame
+stream. They were read once, when the device started, so a change of either
+(a Performance Preset moves both) restarted the whole device. Nothing outlives
+a frame in the stream: its allocations belong to the frame that made them, and
+BeginFrame runs after the previous frame's back end has finished recording.
+So the stream alone is replaced here, on the running device. Static buffers,
+their pool and their counters are untouched.
+
+The path the device chose is kept. A persistent stream that cannot be created
+at the new size falls back as it does at start, and a stream that cannot be
+created at all retires to the legacy uploads, as a failed orphan does below.
+========================
+*/
+void idUploadManager::ResizeFrameStream( void ) {
+	storage.requestedMegs = r_rendererUploadMegs.GetInteger();
+	storage.requestedBuffers = r_rendererUploadFrameBuffers.GetInteger();
+	if ( path == UPLOAD_PATH_DISABLED ) {
+		// no stream was allocated: the next device start decides again
+		return;
+	}
+
+	const uploadPath_t previousPath = path;
+	const bool syncAvailable = hasSync;
+	const int ringBytes = idMath::ClampInt( RENDERER_UPLOAD_MIN_MEGS, RENDERER_UPLOAD_MAX_MEGS, storage.requestedMegs ) * 1024 * 1024;
+	const int bufferCount = idMath::ClampInt( RENDERER_UPLOAD_MIN_FRAME_BUFFERS, RENDERER_UPLOAD_MAX_FRAME_BUFFERS, storage.requestedBuffers );
+
+	// The GPU may still be reading earlier frames out of the old storage. One
+	// finish, on a settings change, is cheaper to reason about than a fence
+	// per slot, and the map-range and subdata paths keep no fences.
+	glFinish();
+	ShutdownFrameBuffers();
+
+	frameBufferCount = bufferCount;
+	currentFrameBuffer = 0;
+	stats.ringSizeBytes = ringBytes;
+	stats.ringBufferCount = bufferCount;
+	storage.generation = R_RendererUpload_NextStorageGeneration();
+	storage.persistentFallback = false;
+
+	uploadPath_t requestedPath = previousPath;
+	bool created = storage.generation && CreateFrameBuffers( requestedPath );
+	if ( !created && requestedPath == UPLOAD_PATH_PERSISTENT && storage.generation ) {
+		common->Warning( "Renderer upload manager: persistent mapped stream failed at the new size, falling back to map-range streaming" );
+		ShutdownFrameBuffers();
+		requestedPath = glMapBufferRange != NULL ? UPLOAD_PATH_MAP_RANGE : UPLOAD_PATH_SUBDATA;
+		storage.persistentFallback = true;
+		created = CreateFrameBuffers( requestedPath );
+	}
+	if ( !created ) {
+		ShutdownFrameBuffers();
+		path = UPLOAD_PATH_DISABLED;
+		frameBufferCount = 0;
+		stats.ringSizeBytes = stats.ringBufferCount = 0;
+		common->Warning( "Renderer upload manager: frame storage allocation failed at the new size; using legacy uploads" );
+	}
+
+	stats.persistentMapped = path == UPLOAD_PATH_PERSISTENT;
+	stats.mapRangeFallback = path == UPLOAD_PATH_MAP_RANGE;
+	hasSync = path == UPLOAD_PATH_PERSISTENT && syncAvailable;
+	stats.fenceSyncAvailable = hasSync;
+	stats.dynamicFrameBridge = path != UPLOAD_PATH_DISABLED;
+	if ( created ) {
+		ring.Init( ringBytes, stats.persistentMapped );
+	} else {
+		ring.Shutdown();
+	}
+	storage.bytesPerBuffer = created ? ringBytes : 0;
+	storage.bufferCount = frameBufferCount;
+	storage.path = static_cast<unsigned int>( path );
+	storageReady = created;
+
+	common->Printf( "Renderer upload manager: frame stream resized on the running device, frameStream=%s, buffers=%d, ring=%dKB\n",
+		PathName(), frameBufferCount, stats.ringSizeBytes / 1024 );
+}
+
 void idUploadManager::BeginFrame( int frameCount ) {
+	// the stream follows its two settings on the running device
+	if ( initialized && ( r_rendererUploadMegs.GetInteger() != storage.requestedMegs
+			|| r_rendererUploadFrameBuffers.GetInteger() != storage.requestedBuffers ) ) {
+		ResizeFrameStream();
+	}
+
 	stats.frameUploadBytes = 0;
 	stats.frameStaticUploadBytes = 0;
 	stats.frameStalls = 0;

@@ -765,7 +765,7 @@ static void CombinedCases(){
      auto wrong=a;wrong.completion=SettingsCompletion::UserConfirmation;auto shown=CombinedAttempt(settings,true);shown.completion=SettingsCompletion::Automatic;
      Check(!host.Prepare(wrong,error) && !host.Prepare(shown,error) && leases.empty() && files.empty() && !geometryToken && writes==0,
            "a combined attempt asks for confirmation exactly when it changes the display");}
-    // Without a display change: one restart on the same display, automatic.
+    // Without a display change: the running device takes the batch, automatic.
     {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,false);
      Check(host.Prepare(a,error),"prepare a combined attempt");
      Check(writes==0 && restarts==0 && soundRestarts==0 && configWrites==0 && leases.contains(lockFile) && geometryToken,
@@ -789,7 +789,7 @@ static void CombinedCases(){
      Check(j.imageRestore.size()==image && j.audioTarget.size()==audio && j.deferredRestore.size()==deferred && j.resourceTarget.size()==resource &&
            image==9 && audio==3 && deferred==3 && resource==4,"each domain holds exactly its catalog settings");
      Check(settings.Write(a.patch,error),"write the combined patch");SettingsDisplayObservation seen;
-     Check(host.Restart(false,seen,error) && restarts==1 && soundRestarts==1 && seen.ready,"one device restart and one sound restart apply the batch");
+     Check(host.Restart(false,seen,error) && restarts==0 && soundRestarts==1 && seen.ready,"no device restart and one sound restart apply the batch");
      Present();Check(host.Observe(false,seen,error) && !seen.effectsReady,"the attempt waits while the sound device restarts");
      soundState=SOUND_OUTPUT_READY;Check(host.Observe(false,seen,error) && seen.effectsReady,"a reopened sound device completes the effects");
      Check(host.PersistConfirmation(a,error) && EffectJournal().state==SettingsJournalState::Confirmed && configWrites==1,"Confirmed precedes the configuration");
@@ -799,11 +799,11 @@ static void CombinedCases(){
     // A sound device that does not come back fails the attempt.
     {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=CombinedAttempt(settings,false);
      Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a combined attempt whose sound device fails");SettingsDisplayObservation seen;
-     Check(host.Restart(false,seen,error),"the device restarts");soundState=SOUND_OUTPUT_FAILED;
+     Check(host.Restart(false,seen,error) && restarts==0,"the batch is taken in place");soundState=SOUND_OUTPUT_FAILED;
      Check(!host.Observe(false,seen,error),"a sound device that did not reopen fails the attempt");
      // The restore asks nothing of a device that is not open; the sound system retries on its own.
      StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
-     Check(settings.Write(back,error) && host.Restart(true,seen,error) && restarts==2 && soundRestarts==1,"restore restarts the device on the baseline");
+     Check(settings.Write(back,error) && host.Restart(true,seen,error) && restarts==0 && soundRestarts==1,"restore is taken in place on the baseline");
      Present();Check(host.Observe(true,seen,error) && seen.effectsReady && host.Finish(true,error) && configWrites==0 && !files.contains(journalFile) && !geometryToken,
            "a restored combined attempt never archives its candidate");}
     // A restore while the forward sound restart is still pending waits for it too.
@@ -926,9 +926,9 @@ static void CombinedCases(){
                 "the texture batch commits");
      Check(!files.contains(journalFile) && !geometryToken && leases.empty() && Same(geometry,leased) && !host.RecoveryActive(),
            "both leases retire and the placement never moved");}
-    // OpenGL allocates its upload stream when its device starts (the case
-    // above restarts it); Vulkan reads neither setting, so a preset needs no
-    // new device there. The sound device still reopens.
+    // Vulkan reads neither upload setting and OpenGL resizes its stream at the
+    // next frame, so a preset needs no new device. The sound device still
+    // reopens.
     {ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_VULKAN;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
      auto a=CombinedAttempt(settings,false);Check(a.patch.contains("r_rendererUploadMegs"),"the preset fixture changes the upload stream");
      Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a preset batch on Vulkan");SettingsDisplayObservation seen;
@@ -954,7 +954,8 @@ static void CombinedCases(){
     // A restart names an interval in its request and then owns it, so one that
     // keeps the display carries the batch's own, in both directions.
     for(bool renderer:{false,true}){ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
-     auto a=renderer?RendererAttempt(settings):CombinedAttempt(settings,false);a.target["r_swapInterval"]=0.0;a.patch["r_swapInterval"]=0.0;
+     // (A combined batch restarts only for the display or the renderer fallback, so this one names the fallback.)
+     auto a=renderer?RendererAttempt(settings):CombinedAttempt(settings,false,true);a.target["r_swapInterval"]=0.0;a.patch["r_swapInterval"]=0.0;
      Check(SystemSettingsHost::ApplyClassOf(a.baseline,a.target)==(renderer?SystemApplyClass::Renderer:SystemApplyClass::Combined) && host.Prepare(a,error),
            "prepare a restart that keeps the display and turns V-Sync off");
      const auto j=EffectJournal();
@@ -1051,8 +1052,8 @@ static void TransitionCases(){
      SettingsDisplayObservation seen;
      Check(host.Restart(false,seen,error) && transitions==0 && restarts==1 && actual.presentation.samples==0,"a request for another sample count restarts the device");
      host.Shutdown();}
-    // Inside a combined batch: textures ride along and reload in place; a
-    // renderer fallback or OpenGL's upload stream still needs a new device.
+    // Inside a combined batch: textures and the upload stream ride along; a
+    // renderer fallback still needs a new device.
     for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN}){ResetFixture();moduleStatus.activeApi=api;
      SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings,true);
      a.completion=SettingsCompletion::UserConfirmation;
@@ -1067,8 +1068,12 @@ static void TransitionCases(){
      SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings,false,false,true);
      a.completion=SettingsCompletion::UserConfirmation;
      Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window and upload stream batch");SettingsDisplayObservation seen;
-     const bool gl=api==RENDER_MODULE_API_GL;
-     Check(host.Restart(false,seen,error) && transitions==(gl?0:1) && restarts==(gl?1:0),"only OpenGL restarts for its upload stream");host.Shutdown();}
+     Check(host.Restart(false,seen,error) && transitions==1 && restarts==0,"an upload stream change rides along: OpenGL resizes its stream on the running device");host.Shutdown();}
+    // A preset that leaves the display alone restarts nothing on OpenGL either.
+    {ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_GL;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     auto a=CombinedAttempt(settings,false);Check(a.patch.contains("r_rendererUploadMegs"),"the preset fixture changes the upload stream");
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a preset batch on OpenGL");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==0 && transitions==0 && soundRestarts==1,"OpenGL takes a preset that keeps the display without a new device");host.Shutdown();}
 }
 
 // The display lists' inputs: the stamp, the topology, the window's display

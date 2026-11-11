@@ -2572,8 +2572,10 @@ Completion must advance through the existing dependencies:
   Remaining, in order: a focused Keep under borderless and exclusive
   fullscreen, and any Keep on OpenGL (the test window had no focus);
   OpenGL's MSAA Apply (a single-sample window with the direct 3D views
-  through a multisampled target, as Vulkan has) and OpenGL's upload stream
-  in place; and an image reload spread across frames.
+  through a multisampled target, as Vulkan has; the record lists what it
+  touches); and an image reload spread across frames.
+  OpenGL now resizes its upload stream on the running device, so a preset
+  restarts OpenGL only when it changes MSAA.
   Stage 4, the same day: a changed `image_ignoreHighQuality` re-parses the
   materials that read the hint, in the session, and Restart Renderer works
   inside a single-player game, which is saved, reloaded around and resumed

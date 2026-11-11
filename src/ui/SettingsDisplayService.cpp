@@ -62,16 +62,10 @@ bool EngineSettingsDisplayHost::DeviceRestart() const {
 	if (kind != Kind::Combined) return DeviceWork();
 	if (!DeviceWork()) return false;
 	// The display itself, and the renderer fallback a new device must resolve.
-	if ((effects.plan.domainMask & SystemSettingDisplayRestart) != 0 || effects.patch.contains("r_renderer")) return true;
-	// Texture settings reload in place on either back end, and the benchmark
-	// budget is read on each use.
-	return UploadStreamChanged();
-}
-bool EngineSettingsDisplayHost::UploadStreamChanged() const {
-	// OpenGL allocates its upload stream when its device starts. Vulkan stages
-	// through its own allocator and reads neither setting.
-	return kind == Kind::Combined && WindowMultisampling() &&
-		(effects.patch.contains("r_rendererUploadMegs") || effects.patch.contains("r_rendererUploadFrameBuffers"));
+	// Everything else finishes on the running device: texture settings reload
+	// in place, the benchmark budget is read on each use, and OpenGL resizes
+	// its upload stream at the next frame (Vulkan reads neither upload setting).
+	return (effects.plan.domainMask & SystemSettingDisplayRestart) != 0 || effects.patch.contains("r_renderer");
 }
 bool EngineSettingsDisplayHost::DisplayTransition(const SystemDisplayPlan& plan, const rendererDisplayState_t& before) const {
 	// Only the display itself changed, on a device that is presenting, and the
@@ -80,7 +74,7 @@ bool EngineSettingsDisplayHost::DisplayTransition(const SystemDisplayPlan& plan,
 	// window is single-sample: MSAA lives in the scene targets, which the game
 	// rebuilds on its next scene when r_multiSamples changed, so the request
 	// below asks for the window the device already has.
-	if (!DisplayOwned() || RendererOwned() || UploadStreamChanged()) return false;
+	if (!DisplayOwned() || RendererOwned()) return false;
 	const auto& patch = kind == Kind::Display ? journal.patch : effects.patch;
 	if (patch.contains("r_multiSamples") && WindowMultisampling()) return false;
 	return before.rendererReady && before.windowValid && before.presentation.available != 0 &&
