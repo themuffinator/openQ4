@@ -16,19 +16,21 @@ bool RB_RequestSavePreview() {
 	return true;
 }
 
-void RB_QueueSavePreview() {
+// Queues the readback of a requested preview: the window's back buffer as it
+// is bound for the swap (framebuffer 0 here), or a VR eye target's colour.
+static void RB_QueueSavePreviewRead( GLuint framebuffer, int width, int height ) {
 	if ( savePreviewState != 1 || tr.takingScreenshot ) return;
 	savePreviewState = -1;
-	savePreviewWidth = glConfig.vidWidth;
-	savePreviewHeight = glConfig.vidHeight;
+	savePreviewWidth = width;
+	savePreviewHeight = height;
 	const int64 pixels = (int64)savePreviewWidth * savePreviewHeight;
 	if ( savePreviewWidth <= 0 || savePreviewHeight <= 0 || pixels > 33554432 ) return;
-	GLint oldBuffer = 0, oldReadBuffer = 0;
+	GLint oldBuffer = 0, oldReadBuffer = 0, oldReadFramebuffer = 0;
 	const GLenum packNames[] = { GL_PACK_ALIGNMENT, GL_PACK_ROW_LENGTH, GL_PACK_SKIP_PIXELS, GL_PACK_SKIP_ROWS };
 	GLint oldPack[4];
 	for ( int i = 0; i < 4; ++i ) glGetIntegerv( packNames[i], &oldPack[i] );
 	glGetIntegerv( GL_PIXEL_PACK_BUFFER_BINDING, &oldBuffer );
-	glGetIntegerv( GL_READ_BUFFER, &oldReadBuffer );
+	glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &oldReadFramebuffer );
 	glGenBuffersARB( 1, &savePreviewBuffer );
 	if ( savePreviewBuffer == 0 ) return;
 	glBindBufferARB( GL_PIXEL_PACK_BUFFER_ARB, savePreviewBuffer );
@@ -40,13 +42,33 @@ void RB_QueueSavePreview() {
 		return;
 	}
 	for ( int i = 0; i < 4; ++i ) glPixelStorei( packNames[i], i == 0 ? 1 : 0 );
-	glReadBuffer( GL_BACK );
+	// the window is read as the swap has it bound; an eye target is bound for the read
+	const bool target = framebuffer != 0;
+	if ( target ) {
+		glBindFramebuffer( GL_READ_FRAMEBUFFER, framebuffer );
+	}
+	// the read buffer is per framebuffer: read the one bound now, put it back
+	glGetIntegerv( GL_READ_BUFFER, &oldReadBuffer );
+	glReadBuffer( target ? GL_COLOR_ATTACHMENT0 : GL_BACK );
 	glReadPixels( 0, 0, savePreviewWidth, savePreviewHeight, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
 	savePreviewFence = glFenceSync( GL_SYNC_GPU_COMMANDS_COMPLETE, 0 );
 	glReadBuffer( oldReadBuffer );
+	if ( target ) {
+		glBindFramebuffer( GL_READ_FRAMEBUFFER, (GLuint)oldReadFramebuffer );
+	}
 	glBindBufferARB( GL_PIXEL_PACK_BUFFER_ARB, oldBuffer );
 	for ( int i = 0; i < 4; ++i ) glPixelStorei( packNames[i], oldPack[i] );
 	if ( savePreviewFence != NULL ) savePreviewState = 2;
+}
+
+void RB_QueueSavePreview() {
+	RB_QueueSavePreviewRead( 0, glConfig.vidWidth, glConfig.vidHeight );
+}
+
+void RB_QueueSavePreviewFromFramebuffer( unsigned int framebuffer, int width, int height ) {
+	if ( framebuffer != 0 ) {
+		RB_QueueSavePreviewRead( (GLuint)framebuffer, width, height );
+	}
 }
 
 int RB_PollSavePreview( const byte *&pixels, int &width, int &height, bool &topDown, bool &bgra ) {

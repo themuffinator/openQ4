@@ -10,6 +10,7 @@
 
 #include "../Game_local.h"
 #include "HitFeedback.h"
+#include "ObjectiveMarkerLayout.h"
 #include "../../game/gamesys/HudPrimitives.h"
 
 /*
@@ -298,6 +299,59 @@ void rvDamageNumbers::ClientReceive( const idBitMsg &msg ) {
 
 /*
 ================
+DamageNumberHud
+
+openQ4 VR: in the headset the numbers are drawn on the HUD, a layer the
+runtime hangs in front of the tracked head, not over either eye's image. They
+project through that plane from the head, as the objective markers do; the
+renderer's last view, which GlobalToNormalizedDeviceCoordinates reads, is the
+right eye, so the numbers sat off their targets by its offset and frustum.
+Keep these dimensions aligned with OpenXRSystem::EndFrame's HUD quad.
+================
+*/
+struct damageNumberHud_t {
+	idVec3	origin;
+	idMat3	axis;
+	float	distance;
+	float	width;
+	float	offset;
+	float	canvasWidth;
+};
+
+// DAMAGENUMBER_PROJECT_*: what a frame's numbers project through
+enum {
+	DAMAGENUMBER_PROJECT_NONE = -1,		// stereo without a tracked head: nothing to project from
+	DAMAGENUMBER_PROJECT_VIEW = 0,		// the flat view the scene was just rendered from
+	DAMAGENUMBER_PROJECT_HUD = 1		// the headset's HUD layer
+};
+
+static int DamageNumberHud( damageNumberHud_t &hud ) {
+	idPlayer *viewer = gameLocal.GetLocalPlayer();
+	vrFrameState_t vrFrame;
+	float trackingYaw;
+	if ( viewer == NULL || !viewer->GetVRView( vrFrame, trackingYaw ) || !vrFrame.stereo ) {
+		return DAMAGENUMBER_PROJECT_VIEW;
+	}
+	if ( !vrFrame.head.valid ) {
+		return DAMAGENUMBER_PROJECT_NONE;
+	}
+	idVec3 eyeOrigin;
+	idMat3 eyeAxis;
+	viewer->GetPresentationViewPos( eyeOrigin, eyeAxis );
+	eyeOrigin.z += viewer->VRCrouchLift( vrFrame );
+	vrPose_t head = vrFrame.head;
+	head.origin += VR_HeadOffsetCorrection( vrFrame );
+	VR_PoseToWorld( head, eyeOrigin, trackingYaw, hud.origin, hud.axis );
+	hud.distance = idMath::ClampFloat( 0.5f, 5.0f, cvarSystem->GetCVarFloat( "vr_hudDistance" ) );
+	hud.width = idMath::ClampFloat( 0.3f, 4.0f, cvarSystem->GetCVarFloat( "vr_hudWidth" ) );
+	hud.offset = ( vrFrame.aimMode == VR_AIM_HAND && !cvarSystem->GetCVarBool( "vr_hudOnSight" ) )
+		? cvarSystem->GetCVarFloat( "vr_hudHeightOffset" ) : 0.0f;
+	hud.canvasWidth = SCREEN_HEIGHT * static_cast<float>( renderSystem->GetScreenWidth() ) / static_cast<float>( Max( 1, renderSystem->GetScreenHeight() ) );
+	return DAMAGENUMBER_PROJECT_HUD;
+}
+
+/*
+================
 rvDamageNumbers::Draw
 
 A number is projected fresh every frame and then carried along a screen space
@@ -315,6 +369,12 @@ void rvDamageNumbers::Draw( const renderView_t *view ) {
 
 	if ( charSetMaterial == NULL ) {
 		charSetMaterial = declManager->FindMaterial( "fonts/english/bigchars" );
+	}
+
+	damageNumberHud_t hud;
+	const int projection = DamageNumberHud( hud );
+	if ( projection == DAMAGENUMBER_PROJECT_NONE ) {
+		return;
 	}
 
 	scale = idMath::ClampFloat( 0.25f, 4.0f, hud_damageNumberScale.GetFloat() );
@@ -338,14 +398,31 @@ void rvDamageNumbers::Draw( const renderView_t *view ) {
 			continue;
 		}
 
-		// behind the near plane, so there is nothing meaningful to project
-		if ( ( number->origin - view->vieworg ) * view->viewaxis[ 0 ] < NUMBER_NEAR_CLIP ) {
-			continue;
-		}
+		if ( projection == DAMAGENUMBER_PROJECT_HUD ) {
+			// where the line from the head to the number meets the HUD layer;
+			// a number off the layer's edge has nowhere to be drawn
+			const idVec3 delta = number->origin - hud.origin;
+			const float forward = delta * hud.axis[ 0 ];
+			if ( forward < NUMBER_NEAR_CLIP ) {
+				continue;
+			}
+			objectiveMarker::Placement placement;
+			if ( !objectiveMarker::ProjectOnHud( -( delta * hud.axis[ 1 ] ), delta * hud.axis[ 2 ], forward,
+					hud.distance, hud.width, hud.offset, hud.canvasWidth, SCREEN_HEIGHT, 0.0f, 0.0f, placement ) || placement.edge ) {
+				continue;
+			}
+			x = placement.x * SCREEN_WIDTH / hud.canvasWidth;
+			y = placement.y;
+		} else {
+			// behind the near plane, so there is nothing meaningful to project
+			if ( ( number->origin - view->vieworg ) * view->viewaxis[ 0 ] < NUMBER_NEAR_CLIP ) {
+				continue;
+			}
 
-		renderSystem->GlobalToNormalizedDeviceCoordinates( number->origin, ndc );
-		x = ( ndc.x * 0.5f + 0.5f ) * SCREEN_WIDTH;
-		y = ( 0.5f - ndc.y * 0.5f ) * SCREEN_HEIGHT;
+			renderSystem->GlobalToNormalizedDeviceCoordinates( number->origin, ndc );
+			x = ( ndc.x * 0.5f + 0.5f ) * SCREEN_WIDTH;
+			y = ( 0.5f - ndc.y * 0.5f ) * SCREEN_HEIGHT;
+		}
 
 		elapsed = MS2SEC( elapsed );
 		x += number->screenVelocity.x * elapsed;

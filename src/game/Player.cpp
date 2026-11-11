@@ -1255,6 +1255,9 @@ idPlayer::idPlayer() {
 	vrVehicleDeltaYaw = 0.0f;
 	vrVehicleYaw = 0.0f;
 	vrVehicleYawValid = false;
+	vrVehicleSeatPending = false;
+	vrRoomScaleStep.Zero();
+	vrRoomScaleStepTime = -1;
 	memset( &usercmd, 0, sizeof( usercmd ) );
 
 	alreadyDidTeamAnnouncerSound = false;
@@ -2728,9 +2731,15 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
  	memset( usercmd.angles, 0, sizeof( usercmd.angles ) );
 	SetViewAngles( viewAngles );
 	spawnAnglesSet = true;
-	// openQ4 VR: a seat restored in a vehicle faces the way the view did
+	// openQ4 VR: a restored seat faces the vehicle's eye, as boarding does
+	// (FaceVRVehicleSeat). Its facing was never saved, and deltaViewAngles in a
+	// vehicle carries the bind master's turns, which are no facing at all; a
+	// load takes the headset's body yaw again from the first usercmd, so the
+	// seat waits for that (UpdateVRVehicleFrame)
 	vrVehicleDeltaYaw = deltaViewAngles.yaw;
 	vrVehicleYawValid = false;
+	vrVehicleSeatPending = true;
+	vrRoomScaleStepTime = -1;
 
 	savefile->ReadInt( buttonMask );
  	savefile->ReadInt( oldButtons );
@@ -9423,28 +9432,13 @@ bool idPlayer::EnterVehicle( idEntity* vehicle ) {
 	}
 	vrVehicleDeltaYaw = facing;
 	vrVehicleYawValid = false;
+	vrVehicleSeatPending = false;
 	const rvVehicle *entered = vehicleController.GetVehicle();
 	const rvVehiclePosition *seat = entered != NULL ? entered->GetPosition( vehicleController.GetPosition() ) : NULL;
 	vrFrameState_t vrFrame;
 	float vrTrackingYaw;
 	if ( seat != NULL && GetVRView( vrFrame, vrTrackingYaw ) ) {
-		// in the headset the seat faces where the vehicle's eye looks, as the
-		// flat view does at once: a rear gun must not end up behind a player
-		// who climbed aboard facing forwards
-		idVec3 eyeOrigin;
-		idMat3 eyeAxis;
-		seat->GetEyePosition( eyeOrigin, eyeAxis );
-		const float headYaw = vrFrame.head.valid ? vrFrame.head.axis[ 0 ].ToYaw() : 0.0f;
-		vrVehicleDeltaYaw = idMath::AngleNormalize180( eyeAxis[ 0 ].ToYaw() - vrFrame.bodyYaw - headYaw );
-		// the seat follows the vehicle's turns from here, not from the first
-		// frame it is driven: m07's race seats the player on the speeder and
-		// only then turns it 165 degrees, which a later start left behind, so
-		// the head-steered turret ran to its stop chasing the old facing
-		const idVec3 &nose = entered->GetAxis()[ 0 ];
-		if ( nose.ToVec2().LengthSqr() >= 0.01f ) {
-			vrVehicleYaw = nose.ToYaw();
-			vrVehicleYawValid = true;
-		}
+		FaceVRVehicleSeat( entered, seat, vrFrame );
 		if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
 			gameLocal.Printf( "VR vehicle %s: %s\n", entered->GetClassname(),
 				seat->TurretAlignsVehicle() ? "steers after its turret, the view stays put" : "its turns carry the view" );
@@ -9474,6 +9468,7 @@ bool idPlayer::ExitVehicle ( bool force ) {
 		return false;
 	}
 	vrVehicleYawValid = false;
+	vrVehicleSeatPending = false;
 
 	SetViewAngles( viewAxis[0].ToAngles() );
 	// openQ4 VR: stepping out keeps the world where the seat had it, rather
@@ -12892,8 +12887,58 @@ void idPlayer::UpdateVRRoomScale( void ) {
 	const idVec3 walked = physicsObj.VRWalk( ( offset * ( ( distance - freeRadius ) / distance ) ) * tracking );
 	idVec3 walkedTracking = walked * tracking.Transpose();
 	walkedTracking.z = 0.0f;
-	if ( walkedTracking.LengthSqr() > 0.0f ) {
-		vrSystem->ShiftTrackingOrigin( walkedTracking );
+	if ( walkedTracking.LengthSqr() > 0.0f && vrSystem->ShiftTrackingOrigin( walkedTracking ) ) {
+		// the eye is drawn interpolated towards this tic's sample, while the
+		// tracking space moved by the whole step now: GetPresentationViewPos
+		// adds the part of the step the eye has still to cover
+		vrRoomScaleStep = walkedTracking * tracking;
+		vrRoomScaleStepTime = gameLocal.time;
+	}
+}
+
+/*
+===============
+idPlayer::VRRoomScaleLag
+
+openQ4 VR: how far an eye drawn between two presentation samples lags the
+tracked head after room scale moved the tracking space by a whole step. The
+step belongs to the tic of the current sample; the eye still has the rest of
+it to cover, a fraction of one tic's walk. Without it a walk about the room
+shimmered by up to a tic's step, at every tic.
+===============
+*/
+idVec3 idPlayer::VRRoomScaleLag( float fraction ) const {
+	if ( vrRoomScaleStepTime < 0 || vrRoomScaleStepTime != presentationViewTime || fraction >= 1.0f ) {
+		return vec3_origin;
+	}
+	return vrRoomScaleStep * ( 1.0f - Max( fraction, 0.0f ) );
+}
+
+/*
+===============
+idPlayer::FaceVRVehicleSeat
+
+openQ4 VR: in the headset a seat faces where the vehicle's eye looks, as the
+flat view does at once: a rear gun must not end up behind a player who
+climbed aboard facing forwards, nor a seat restored from a save face
+wherever the saved view's bind left it.
+===============
+*/
+void idPlayer::FaceVRVehicleSeat( const rvVehicle *vehicle, const rvVehiclePosition *seat, const vrFrameState_t &frame ) {
+	idVec3 eyeOrigin;
+	idMat3 eyeAxis;
+	seat->GetEyePosition( eyeOrigin, eyeAxis );
+	const float headYaw = frame.head.valid ? frame.head.axis[ 0 ].ToYaw() : 0.0f;
+	vrVehicleDeltaYaw = idMath::AngleNormalize180( eyeAxis[ 0 ].ToYaw() - frame.bodyYaw - headYaw );
+	vrVehicleYawValid = false;
+	// the seat follows the vehicle's turns from here, not from the first
+	// frame it is driven: m07's race seats the player on the speeder and
+	// only then turns it 165 degrees, which a later start left behind, so
+	// the head-steered turret ran to its stop chasing the old facing
+	const idVec3 &nose = vehicle->GetAxis()[ 0 ];
+	if ( nose.ToVec2().LengthSqr() >= 0.01f ) {
+		vrVehicleYaw = nose.ToYaw();
+		vrVehicleYawValid = true;
 	}
 }
 
@@ -12918,9 +12963,17 @@ void idPlayer::UpdateVRVehicleFrame( void ) {
 	const rvVehiclePosition *position = vehicle != NULL ? vehicle->GetPosition( vehicleController.GetPosition() ) : NULL;
 	if ( position == NULL || health <= 0 ) {
 		vrVehicleYawValid = false;
+		// a load on foot has no seat to face
+		vrVehicleSeatPending = position != NULL && vrVehicleSeatPending;
 		return;
 	}
 	const bool stereo = GetVRView( frame, trackingYaw );
+	// a seat restored from a save faces the vehicle's eye once the headset's
+	// body yaw is known again: the first usercmd VR aimed takes it afresh
+	if ( stereo && vrVehicleSeatPending && ( usercmd.buttons & BUTTON_VRAIM ) != 0 ) {
+		FaceVRVehicleSeat( vehicle, position, frame );
+		vrVehicleSeatPending = false;
+	}
 	if ( !stereo ) {
 		vrVehicleYawValid = false;
 		// on the floating screen (vr_vehicleStereo 0) the stick still arrives
@@ -13245,6 +13298,8 @@ void idPlayer::GetPresentationViewPos( idVec3 &origin, idMat3 &axis ) const {
 		const float fraction = GetPresentationViewBlendFraction();
 		origin.Lerp( presentationPrevViewOrigin, presentationCurViewOrigin, fraction );
 		axis = gameLocal.InterpolatePresentationAxis( presentationPrevViewAxis, presentationCurViewAxis, fraction );
+		// openQ4 VR: a room-scale step already moved the tracked head by all of it
+		origin += VRRoomScaleLag( fraction );
 	}
 	ApplyPresentationLookToView( origin, axis );
 }

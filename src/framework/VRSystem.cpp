@@ -87,7 +87,7 @@ idCVar vr_standingHeight( "vr_standingHeight", "0", CVAR_SYSTEM | CVAR_ARCHIVE |
 idCVar vr_pauseOnFocusLoss( "vr_pauseOnFocusLoss", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
 	"single player: 1 = open the pause menu when the headset comes off or its own menu takes the controllers" );
 idCVar vr_debug( "vr_debug", "0", CVAR_SYSTEM | CVAR_INTEGER,
-	"1 = log OpenXR session and frame events, 2 = also log every submitted frame", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+	"1 = log OpenXR session and frame events, 2 = also log every submitted frame and, in gameplay, the head each frame is drawn from", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
 /*
 ===============================================================================
@@ -122,8 +122,9 @@ public:
 		(void)amplitude;
 		(void)durationMsec;
 	}
-	virtual void			ShiftTrackingOrigin( const idVec3 &trackingDelta ) {
+	virtual bool			ShiftTrackingOrigin( const idVec3 &trackingDelta ) {
 		(void)trackingDelta;
+		return false;
 	}
 };
 

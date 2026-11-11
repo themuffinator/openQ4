@@ -6,6 +6,55 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## VR: room-scale steps without a stutter, vehicle saves that load facing forward, and damage numbers on their targets, 11 November 2026
+
+- **Walking about your room no longer stutters.** As your character caught
+  up with a step you took, the view slipped back and forward again for a
+  frame: by up to the whole step in single player, and by a few units every
+  frame of the walk in multiplayer. The view now stays on your head while
+  your character follows.
+- **A save made in a vehicle loads facing the way you saved.** Loading a save
+  made in a vehicle or turret seat could leave you facing somewhere else, with
+  a head-steered turret swinging round after you (about 100 degrees in a
+  walker). The seat now faces the vehicle's sights, as it does when you board.
+- **Multiplayer: your own steps no longer darken the view.** The comfort
+  vignette darkened whenever you walked about your room, because multiplayer
+  moves your character after you as the stick would. Now only the stick and
+  smooth turning darken it, as in single player; a fall still does.
+- **Multiplayer: damage numbers sit on the player you hit.** They were placed
+  through the right eye's view, so on the HUD they sat below and beside their
+  targets. They now sit where the hit is.
+- **Demos recorded in VR play back cleanly.** A demo played back from the
+  right eye, with both eyes' laser dots and comfort vignettes drawn over it in
+  the wrong places. It now plays what the desktop mirror shows: your left eye
+  and the HUD. Screen fades, which the headset draws into each eye, are not
+  recorded.
+- **Checkpoint pictures show the game.** A checkpoint's picture in the load
+  menu showed the desktop window: black with the mirror off (`vr_mirror 0`),
+  only the HUD with the mirror on the floating screen. It now shows your left
+  eye.
+- **For testers.** `vr_debug 2` also logs, each frame, where the head the eyes
+  are drawn from stands and how dark the comfort vignette is.
+  `testVehicle <name> enter` boards a vehicle without a console script, so a
+  save made in it loads. `testHudOverlays [damage] [distance]` stages its
+  damage number at a chosen distance.
+- **Not yet checked on a headset.** No headset was available; every change was
+  verified on the simulated OpenXR runtime. Each new check was also run
+  against a build with its fix switched off, and failed there (the fixed
+  build's figures in brackets): the drawn head strayed 14.25 units after a
+  single-player step (0.00) and 1.94 in multiplayer (0.00), the multiplayer
+  vignette reached 0.283 (0), a damage number straight ahead landed at
+  (271, 222) on the 640x480 HUD (317, 169), a demo frame wrote four views and
+  the laser dot (two views, no dot), a checkpoint preview with the mirror off
+  was black (lit), and a walker seat loaded 104 degrees from where it was
+  saved (4.4).
+- Evidence: `openxr_vr_playspace_smoke.py` (the step's drawn head and
+  vignette; a seat run with the demo, the checkpoint and the walker save),
+  `openxr_vr_mp_smoke.py` (the walk's drawn head and vignette; the damage
+  number on the HUD layer, OpenGL), `openxr_vr_contract.py`, and the VR
+  smokes, lifecycle fault cases and stereo-share and temporal smokes on OpenGL
+  and Vulkan; [VR roadmap](roadmap.md#vr-task-evidence-and-acceptance).
+
 ## Retained interface documents are now `.rui` files, 11 November 2026
 
 - The new interface's menus, HUDs and optics overlays are now `.rui` (Retained

@@ -1274,8 +1274,10 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int render
 	}
 
 	// now write delete commands for any modified-but-not-visible entities, and
-	// add the renderView command to the demo
-	if ( session->writeDemo && !independent ) {
+	// add the renderView command to the demo. A demo recorded in VR plays the
+	// left eye, as the desktop mirror shows it: playback renders a frame's last
+	// view, which would otherwise be the right eye's
+	if ( session->writeDemo && !independent && R_VR_FrontEndEye() != 1 ) {
 		WriteRenderView( renderView );
 	}
 

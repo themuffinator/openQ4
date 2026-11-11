@@ -318,7 +318,7 @@ public:
 	virtual bool			GetUsercmdInput( float otherYawDelta, float currentYaw, vrUsercmdInput_t &input );
 	virtual void			DrawMenuPointer( void );
 	virtual void			Vibrate( int hand, float amplitude, int durationMsec );
-	virtual void			ShiftTrackingOrigin( const idVec3 &trackingDelta );
+	virtual bool			ShiftTrackingOrigin( const idVec3 &trackingDelta );
 
 	void					RequestRestart( void ) { restartRequested = true; }
 	void					RequestRecenter( void ) { recenterRequested = true; }
@@ -2787,18 +2787,21 @@ idVRSystemOpenXR::ShiftTrackingOrigin
 
 The recentre pose (a heading and a position in LOCAL space) moves by the
 distance the body walked, horizontally only, and the poses already handed
-out for this frame move with it, so the camera stays on the head.
+out for this frame move with it, so the camera stays on the head. Returns
+whether it moved, which the game needs to know: the eye it draws is a tic
+behind the body, and has to carry the part of a taken step it has not
+covered yet.
 ====================
 */
-void idVRSystemOpenXR::ShiftTrackingOrigin( const idVec3 &trackingDelta ) {
+bool idVRSystemOpenXR::ShiftTrackingOrigin( const idVec3 &trackingDelta ) {
 	const float unitsPerMetre = vr_worldScale.GetFloat();
 	if ( !sessionRunning || unitsPerMetre <= 0.0f || !VR_IsFinite( VR_Vec3( trackingDelta.x, trackingDelta.y, trackingDelta.z ) ) ) {
-		return;
+		return false;
 	}
 	// In multiplayer the local player reports every tic's movement; only a
 	// room-scale walk's, or its coast to a stop, belongs to the tracking space.
 	if ( idAsyncNetwork::IsActive() && ( !roomScaleStickIdle || Sys_Milliseconds() - roomScaleWalkMsec > 400 ) ) {
-		return;
+		return false;
 	}
 	const idVec3 horizontal( trackingDelta.x, trackingDelta.y, 0.0f );
 	const vrVec3_t xr = VR_Scale( VR_EngineToXrDirection( VR_Vec3( horizontal.x, horizontal.y, 0.0f ) ), 1.0f / unitsPerMetre );
@@ -2816,6 +2819,7 @@ void idVRSystemOpenXR::ShiftTrackingOrigin( const idVec3 &trackingDelta ) {
 		frame.aim[i].origin -= horizontal;
 	}
 	Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
+	return true;
 }
 
 /*

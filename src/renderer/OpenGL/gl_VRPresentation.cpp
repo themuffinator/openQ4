@@ -12,6 +12,7 @@
 
 #include "../tr_local.h"
 #include "../TemporalPresentation.h"
+#include "../SavePreviewCapture.h"
 
 #if defined( OPENQ4_RENDERER_GL_MODULE ) && defined( _WIN32 )
 #include <windows.h>
@@ -472,6 +473,13 @@ bool RB_VR_PresentFrame( void ) {
 				tr.vrFrameResult.eyeRendered[eye] = false;
 			}
 		}
+	}
+
+	// a checkpoint's preview is the left eye, whatever the desktop mirror
+	// shows (vr_mirror 0 leaves the window black, 2 shows only the HUD); a
+	// frame without one (a menu) leaves it to the window's swap
+	if ( tr.vrFrameResult.eyeRendered[0] && rb_vrCleared[1] && tr.vrTargets[1] != NULL ) {
+		RB_QueueSavePreviewFromFramebuffer( tr.vrTargets[1]->GetDeviceHandle(), tr.vrFrame.eyeWidth, tr.vrFrame.eyeHeight );
 	}
 
 	RB_VR_DrawMirror();

@@ -15,6 +15,15 @@ Checks:
 - room scale: a server moves bodies only from usercmds, so half a metre's step
   forward walks the body after the head through the usercmd, and once it has
   coasted to a stop the head is within a few units of the tracking origin;
+- while it walks, the head the eyes are drawn from stays where the step put
+  it (the tracking space takes each tic's step whole while the eye is drawn
+  between tic samples, so an eye that did not carry the rest shimmered by up
+  to a tic's walk), and the comfort vignette stays off: the walk has the
+  stick's velocity but is the player's own step. vr_debug 2 logs each drawn
+  head and vignette; vr_headOffsetLimit is raised past the step for it;
+- on OpenGL, a damage number staged straight ahead of the head shows on the
+  HUD layer where that line meets it: the numbers project through the layer
+  the headset hangs in front of the head, not through the last eye rendered;
 - with vr_roomScale 0 the same step stays a lean of the whole distance;
 - the log carries no errors.
 """
@@ -22,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -31,6 +41,36 @@ from mp_round_remote_smoke import verify_runtime_is_current
 
 ROOT = Path(__file__).resolve().parents[2]
 STEP_UNITS = 0.5 * 39.37
+DRAWN_HEAD = re.compile(r"VR drawn head (\d+) \(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\) "
+                        r"vignette (-?\d+(?:\.\d+)?)")
+# The HUD layer (metres): a 1.2 m wide plane 1.4 m ahead of the head, hung
+# 0.1 m low while the hand aims, at the 16:9 window's shape. A number straight
+# ahead of the head meets it at the centre across and 0.1 / 1.4 of the height
+# tangent above it: 240 - (0.1 / 1.4) * 240 / (0.6 / 1.4 * 9 / 16) = 168.9 on
+# the 640x480 canvas. Through the right eye's off-axis frustum, as the numbers
+# were placed, it landed near (268, 225).
+HUD_DISTANCE, HUD_WIDTH, HUD_OFFSET = 1.4, 1.2, -0.1
+NUMBER_AHEAD = (320.0, 240.0 + (HUD_OFFSET / HUD_DISTANCE) * 240.0 / (HUD_WIDTH / 2.0 / HUD_DISTANCE * 9.0 / 16.0))
+
+
+def damage_number_centre(shots: Path) -> tuple[float, float] | None:
+    """Where the staged number's red glyphs sit on the HUD layer, in 640x480 units."""
+    from PIL import Image, ImageChops
+    with Image.open(shots / "vr_mp_numbers_on.tga") as on, Image.open(shots / "vr_mp_numbers_off.tga") as off:
+        on, off = on.convert("RGB"), off.convert("RGB")
+        delta = ImageChops.difference(on, off).convert("L").load()
+        pixels = on.load()
+        xs, ys = [], []
+        for y in range(on.height):
+            for x in range(on.width):
+                r, g, b = pixels[x, y]
+                # a severe hit's red, and only where the frames differ
+                if r > 150 and g < 90 and b < 90 and delta[x, y] > 24:
+                    xs.append(x)
+                    ys.append(y)
+        if len(xs) < 40:
+            return None
+        return sum(xs) / len(xs) * 640.0 / on.width, sum(ys) / len(ys) * 480.0 / on.height
 
 
 def read_events(path: Path) -> list[dict]:
@@ -87,10 +127,21 @@ def main(argv: list[str] | None = None) -> None:
         f"when {marker('exit')} exit",
     ]
     (profile / "xr_script.txt").write_text("\n".join(script) + "\n", encoding="utf-8")
+    numbers = [] if options.render_api == "vulkan" else [
+        # a damage number staged 128 units along the aim, on the HUD layer
+        # (OpenGL names that target; Vulkan keeps its targets to itself)
+        'screenshot image _vrScreenColor "screenshots/vr_mp_numbers_off.tga"',
+        "developer 1", "testHudOverlays 75 2000", "developer 0", "waitMsec 60",
+        'screenshot image _vrScreenColor "screenshots/vr_mp_numbers_on.tga"', "waitMsec 1500",
+    ]
+    for stale in (game / "screenshots").glob("vr_mp_numbers_*.tga") if (game / "screenshots").is_dir() else []:
+        stale.unlink()
     commands = [
-        "waitMsec 4000", "echo VR_MP_ACTIVE", "vr_status",
+        "waitMsec 4000", "echo VR_MP_ACTIVE", "vr_status", *numbers,
         # room scale: the step walks the body through the usercmd, then coasts to a stop
-        "vr_roomScale 1", "condump vr_marker_walk.txt", "waitMsec 2500", "echo VR_MP_WALKED", "vr_status",
+        "vr_roomScale 1", "vr_headOffsetLimit 24", "vr_debug 2", "echo VR_MP_STEP_TRACE",
+        "condump vr_marker_walk.txt", "waitMsec 2500", "vr_debug 1", "echo VR_MP_WALKED", "vr_status",
+        "vr_headOffsetLimit 16",
         "vr_roomScale 0", "condump vr_marker_lean.txt", "waitMsec 2000", "echo VR_MP_LEANED", "vr_status",
         "condump vr_marker_back.txt", "waitMsec 600", "vr_recenter", "vr_roomScale 1", "waitMsec 600",
         "condump vr_marker_exit.txt", "waitMsec 1500",
@@ -117,7 +168,12 @@ def main(argv: list[str] | None = None) -> None:
         "g_autoExecAfterMapLoad": "openxr_vr_mp_smoke.cfg", "g_autoExecAfterMapLoadDelayMs": "1000",
         "com_skipLoadingContinue": "1", "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
         "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_roomScale": "1",
-        "net_serverDedicated": "0", "si_gameType": "DM", "sv_cheats": "1", "net_serverAllowServerMod": "0",
+        "vr_headOffsetLimit": "16", "vr_comfortVignette": "0.5",
+        # the HUD layer the damage number is placed on (HUD_* below)
+        "vr_hudDistance": str(HUD_DISTANCE), "vr_hudWidth": str(HUD_WIDTH), "vr_hudHeightOffset": str(HUD_OFFSET),
+        "hud_damageNumbers": "1", "hud_damageNumberScale": "1",
+        "net_serverDedicated": "0", "si_gameType": "DM", "sv_cheats": "1", "net_allowCheats": "1",
+        "net_serverAllowServerMod": "0",
         # the listen server and its one client stay on loopback, without a
         # master-server heartbeat
         "net_ip": "127.0.0.1", "net_LANServer": "1",
@@ -173,8 +229,31 @@ def main(argv: list[str] | None = None) -> None:
         f"a 0.5 m step should walk the body after the head through the usercmd, leaving it within 6 units, not {walked:.1f}"
     assert abs(leaned - walked - STEP_UNITS) < 1.5, \
         f"with vr_roomScale 0 another 0.5 m step should stay a {STEP_UNITS:.1f}-unit lean, moved {leaned - walked:.1f}"
+
+    # the drawn head holds still while the body walks after it, undarkened
+    trace = text.partition("VR_MP_STEP_TRACE")[2].partition("VR_MP_WALKED")[0]
+    heads = [(float(m.group(2)), float(m.group(3)), float(m.group(5))) for m in DRAWN_HEAD.finditer(trace)]
+    assert len(heads) >= 20, f"vr_debug 2 logged {len(heads)} drawn heads around the step"
+    stepped = next((i for i, h in enumerate(heads) if math.dist(h[:2], heads[0][:2]) > STEP_UNITS * 0.5), None)
+    assert stepped is not None and len(heads) - stepped >= 10, "the drawn head never took the step"
+    strayed = max(math.dist(h[:2], heads[-1][:2]) for h in heads[stepped:])
+    assert strayed < 1.0, \
+        f"after the step the drawn head strayed {strayed:.2f} units while the body walked after it: the eye lagged the tracking space"
+    darkest = max(h[2] for h in heads)
+    assert darkest < 0.01, f"a room-scale step darkened the view: vignette {darkest:.3f}"
+
+    # a damage number straight ahead of the head sits where the HUD layer meets
+    # that line (it rises a few pixels in the frames before the capture)
+    number = ""
+    if numbers:
+        centre = damage_number_centre(game / "screenshots")
+        assert centre is not None, "the staged damage number never reached the HUD layer"
+        assert abs(centre[0] - NUMBER_AHEAD[0]) < 15.0 and -25.0 < centre[1] - NUMBER_AHEAD[1] < 10.0, \
+            (f"a damage number straight ahead should sit near ({NUMBER_AHEAD[0]:.0f}, {NUMBER_AHEAD[1]:.0f}) on the HUD "
+             f"layer, not ({centre[0]:.0f}, {centre[1]:.0f}): it was not projected through the HUD")
+        number = f", damage number at ({centre[0]:.0f}, {centre[1]:.0f})"
     print(f"OpenXR VR multiplayer smoke ({options.render_api}): PASS (room-scale walk left the head {walked:.1f} units out, "
-          f"lean {leaned - walked:.1f}); evidence={profile}")
+          f"the drawn head strayed {strayed:.2f} with no vignette, lean {leaned - walked:.1f}{number}); evidence={profile}")
 
 
 if __name__ == "__main__":

@@ -80,6 +80,11 @@ Use `screenshot image _vrScreenColor "screenshots/vr-hud.tga"` to capture the
 separate HUD surface. The Vulkan renderer keeps its eye targets to itself, so
 those image names exist only on OpenGL.
 
+A checkpoint's picture in the load menu shows your left eye's view, whatever
+the desktop window shows. A demo recorded in VR (`recordDemo`) plays back
+flat, the way the desktop mirror shows VR: your left eye and the HUD, without
+the laser dot or the comfort vignette. Screen fades are not recorded.
+
 If the desktop window is minimized or hidden behind the headset's own
 display, the headset keeps rendering; only the desktop mirror waits for the
 window to come back.
@@ -289,11 +294,15 @@ of tipping you onto your back.
 | --- | --- | --- |
 | `vr_vehicleStereo` | 1 | 1 vehicles and turrets in stereo, turned by your head; 0 on the floating screen, aimed with the controller |
 
+A save made in a vehicle or turret seat loads with you facing along its
+sights, as when you climbed in.
+
 ## Multiplayer
 
 VR players can join any openQ4 server. Your aim reaches the server the same
 way a mouse's does. In multiplayer, shots leave from your eyes along your
 controller's aim; in single player they leave from the gun in your hand.
+Damage numbers rise on the HUD from the player you hit.
 
 A server built before the current development build can leave your shots a
 fixed angle above or below the laser after you respawn or teleport, because

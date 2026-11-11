@@ -1023,8 +1023,8 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 	eyeOrigin.z += player->VRCrouchLift( vrFrame );
 
 	// the listener follows the tracked head
+	idVec3 headOrigin = eyeOrigin;
 	if ( vrFrame.head.valid ) {
-		idVec3 headOrigin;
 		idMat3 headAxis;
 		vrPose_t head = vrFrame.head;
 		head.origin += VR_HeadOffsetCorrection( vrFrame );
@@ -1045,6 +1045,11 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 	// the edges of each eye darken while the stick moves or turns the player
 	const float vignette = VRComfortVignette( vrFrame );
 	const idMaterial *vignetteMaterial = vignette > 0.01f ? declManager->FindMaterial( "_white" ) : NULL;
+	// vr_debug 2 logs every frame: where the drawn head stands in the world,
+	// which a room-scale walk must not move, and the vignette over it
+	if ( vrFrame.head.valid && cvarSystem->GetCVarInteger( "vr_debug" ) >= 2 ) {
+		common->Printf( "VR drawn head %d (%s) vignette %.3f\n", vrFrame.frameNumber, headOrigin.ToString( 2 ), vignette );
+	}
 
 	for ( int eye = 0; eye < VR_NUM_EYES; eye++ ) {
 		if ( !renderSystem->SetVRRenderTarget( eye ) ) {
@@ -1083,9 +1088,12 @@ idPlayerView::VRComfortVignette
 
 openQ4 VR: how strongly to vignette this frame (vr_comfortVignette). It
 follows artificial motion only: the stick's walking and running (the
-player's velocity, which a room-scale step leaves alone) and smooth turning
-(the rate of the tracking yaw). A change of more than 15 degrees in one frame
-is a snap turn or a recentre, a cut rather than motion, and is ignored.
+player's velocity) and smooth turning (the rate of the tracking yaw). A
+change of more than 15 degrees in one frame is a snap turn or a recentre, a
+cut rather than motion, and is ignored. Multiplayer walks the body after a
+room-scale step through the usercmd, which gives it the stick's velocity:
+while the tracking space takes such a step its horizontal speed is the
+player's own walk and leaves the edges open; a fall still counts.
 ===================
 */
 float idPlayerView::VRComfortVignette( const vrFrameState_t &vrFrame ) {
@@ -1101,7 +1109,10 @@ float idPlayerView::VRComfortVignette( const vrFrameState_t &vrFrame ) {
 	}
 	vrComfortYaw = vrFrame.bodyYaw;
 	vrComfortTime = now;
-	const float target = setting > 0.0f ? VR_ComfortMotion( player->GetPhysics()->GetLinearVelocity().Length(), turnRate ) : 0.0f;
+	const idPhysics *physics = player->GetPhysics();
+	const idVec3 &velocity = physics->GetLinearVelocity();
+	const float speed = player->VRRoomScaleStepping() ? idMath::Fabs( velocity * physics->GetGravityNormal() ) : velocity.Length();
+	const float target = setting > 0.0f ? VR_ComfortMotion( speed, turnRate ) : 0.0f;
 	vrComfort = VR_ComfortEase( vrComfort, target, seconds );
 	return vrComfort * setting;
 }

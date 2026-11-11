@@ -7628,18 +7628,19 @@ bool RB_RequestSavePreview() {
 	return true;
 }
 
-void RB_QueueSavePreview() {
-	if ( vkSavePreview.state != 1 || !vkExec.frameOpen || VK_Exec_DefaultColorImage() == VK_NULL_HANDLE ) return;
+// The host buffer a requested preview is read into, for an image of this
+// format and size. The request counts as failed from here until the copy is
+// recorded.
+static bool VK_PrepareSavePreview( VkFormat previewFormat, int width, int height ) {
 	vkSavePreview.state = -1;
-	vkSavePreview.width = (int)VK_Exec_DefaultExtent().width;
-	vkSavePreview.height = (int)VK_Exec_DefaultExtent().height;
+	vkSavePreview.width = width;
+	vkSavePreview.height = height;
 	const int64 pixels = (int64)vkSavePreview.width * vkSavePreview.height;
-	if ( pixels <= 0 || pixels > 33554432 ) return;
-	const VkFormat previewFormat = VK_Exec_DefaultColorFormat();
+	if ( pixels <= 0 || pixels > 33554432 ) return false;
 	vkSavePreview.bgra = previewFormat == VK_FORMAT_B8G8R8A8_UNORM ||
 		previewFormat == VK_FORMAT_B8G8R8A8_SRGB;
 	if ( !vkSavePreview.bgra && previewFormat != VK_FORMAT_R8G8B8A8_UNORM &&
-		previewFormat != VK_FORMAT_R8G8B8A8_SRGB ) return;
+		previewFormat != VK_FORMAT_R8G8B8A8_SRGB ) return false;
 	VkBufferCreateInfo buffer = {};
 	buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buffer.size = (VkDeviceSize)pixels * 4;
@@ -7649,17 +7650,21 @@ void RB_QueueSavePreview() {
 	allocation.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	VmaAllocationInfo mapped = {};
 	if ( vmaCreateBuffer( vkCtx.allocator, &buffer, &allocation, &vkSavePreview.buffer,
-		&vkSavePreview.allocation, &mapped ) != VK_SUCCESS ) return;
+		&vkSavePreview.allocation, &mapped ) != VK_SUCCESS ) return false;
 	vkSavePreview.mapped = mapped.pMappedData;
-	VK_Exec_EndMainRendering();
-	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+	return true;
+}
+
+// Records the copy of an image waiting in TRANSFER_SRC_OPTIMAL into the
+// prepared buffer, made visible to the host when this frame's slot retires.
+static void VK_RecordSavePreviewCopy( VkCommandBuffer cmd, VkImage image ) {
 	VkBufferImageCopy copy = {};
 	copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	copy.imageSubresource.layerCount = 1;
 	copy.imageExtent.width = vkSavePreview.width;
 	copy.imageExtent.height = vkSavePreview.height;
 	copy.imageExtent.depth = 1;
-	vkCmdCopyImageToBuffer( vkExec.cmd, VK_Exec_DefaultColorImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	vkCmdCopyImageToBuffer( cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		vkSavePreview.buffer, 1, &copy );
 	VkBufferMemoryBarrier2 barrier = {};
 	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -7675,10 +7680,37 @@ void RB_QueueSavePreview() {
 	dependency.bufferMemoryBarrierCount = 1;
 	dependency.pBufferMemoryBarriers = &barrier;
 	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
-	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
-	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	vkCmdPipelineBarrier2( cmd, &dependency );
 	vkSavePreview.slot = vkExec.frameSlot;
 	vkSavePreview.state = 2;
+}
+
+void RB_QueueSavePreview() {
+	if ( vkSavePreview.state != 1 || !vkExec.frameOpen || VK_Exec_DefaultColorImage() == VK_NULL_HANDLE ) return;
+	if ( !VK_PrepareSavePreview( VK_Exec_DefaultColorFormat(),
+		(int)VK_Exec_DefaultExtent().width, (int)VK_Exec_DefaultExtent().height ) ) return;
+	VK_Exec_EndMainRendering();
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+	VK_RecordSavePreviewCopy( vkExec.cmd, VK_Exec_DefaultColorImage() );
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+}
+
+/*
+====================
+VK_QueueSavePreviewFromImage
+
+A VR frame's preview is its left eye, whatever the desktop mirror shows
+(vr_mirror 0 leaves the window black, 2 shows only the HUD).
+vk_VRPresentation.cpp calls this at the swap while the eye waits in
+TRANSFER_SRC_OPTIMAL for its copy into the runtime's image; the window's
+own readback at submission then finds the request taken.
+====================
+*/
+bool VK_QueueSavePreviewFromImage( VkCommandBuffer cmd, VkImage image, VkFormat format, int width, int height ) {
+	if ( vkSavePreview.state != 1 || !vkExec.frameOpen || cmd == VK_NULL_HANDLE || image == VK_NULL_HANDLE ) return false;
+	if ( !VK_PrepareSavePreview( format, width, height ) ) return false;
+	VK_RecordSavePreviewCopy( cmd, image );
+	return true;
 }
 
 static void VK_ConsumeSavePreview( int slot ) {

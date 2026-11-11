@@ -27,8 +27,27 @@ Checks, on STAGE:
   body;
 - room scale on STAGE: a half-metre step walks the body about half a metre,
   once, and leaves the head near the origin, never the step twice;
+- and the head the eyes are drawn from stays where the step put it while the
+  body walks after it, with no comfort vignette. Single player walks the body
+  the whole step in one tic and the tracking space takes it at once, while
+  the eye is drawn interpolated between tic samples: an eye that did not
+  carry the step's rest jumped back by up to a tic's step and forward again.
+  vr_debug 2 logs each drawn head; vr_headOffsetLimit is raised past the
+  step for it, so the lean limit holds nothing back;
 then with OPENQ4_XR_TEST_SPACES=local_floor standing play uses LOCAL_FLOOR,
 and with none it falls back to head-relative play with a warning.
+
+A seat run boards a walker without a console script (testVehicle enter: a
+save made after the console runs a script does not load), saves in it and
+loads the save. A seat's facing is not saved and the vehicle's bind disturbs
+the view angles a load restores, so a loaded seat once faced anywhere (about
+104 degrees off here, with the head-steered turret swinging round after it);
+it must face the seat's eye, as boarding does, and so where it was saved.
+Before boarding, the same run
+records a demo, which plays flat as the desktop mirror shows VR: the left
+eye's views only (both eyes' views and 2D, the laser dot among it, were
+written), and makes a checkpoint save with vr_mirror 0, whose preview must
+show the left eye rather than the black desktop window.
 
 The LOCAL_FLOOR run also recentres from the headset: the runtime announces
 that the space will move under the head some seconds ahead, as the
@@ -105,7 +124,7 @@ def run(options, staged: Path, executable: str, manifest: Path, profile: Path, s
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
         # the profile persists between runs: every setting this smoke reads starts fresh
         "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_roomScale": "0", "vr_physicalCrouch": "1",
-        "vr_playSpace": "2", "vr_standingHeight": "0",
+        "vr_playSpace": "2", "vr_standingHeight": "0", "vr_headOffsetLimit": "16",
         # after the launch configuration's own r_renderApi, so this one wins
         "r_renderApi": options.render_api,
     }
@@ -191,6 +210,37 @@ def near(value: float, expected: float, tolerance: float, what: str) -> None:
     assert abs(value - expected) <= tolerance, f"{what}: expected {expected:.1f} +/- {tolerance:.1f}, got {value:.1f}"
 
 
+def seat_yaws(text: str, tag: str) -> tuple[float, float]:
+    """The view yaw getviewpos printed after tag, and the eye yaw testVehicle printed for the player's seat."""
+    tail = after(text, tag)
+    seat = re.search(r"testVehicleSeat: name=\S+ seat=\d+ eye=\([^)]*\) eyeYaw=(-?\d+(?:\.\d+)?)", tail)
+    assert seat, f"testVehicle after {tag} printed no seat: is the player in the vehicle?"
+    return view_yaw(text, tag), float(seat.group(1))
+
+
+DRAWN_HEAD = re.compile(r"VR drawn head (\d+) \(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\) "
+                        r"vignette (-?\d+(?:\.\d+)?)")
+
+
+def drawn_heads(text: str, start: str, end: str) -> list[tuple[float, float, float]]:
+    """Each frame's drawn head (x, y) and vignette that vr_debug 2 logged between two markers."""
+    section = after(text, start).partition(end)[0]
+    return [(float(m.group(2)), float(m.group(3)), float(m.group(5))) for m in DRAWN_HEAD.finditer(section)]
+
+
+def step_hold(heads: list[tuple[float, float, float]], step: float) -> tuple[int, float, float]:
+    """The frame a head step shows in, how far a later drawn head strayed from
+    where the step put it, and the strongest vignette across the trace."""
+    assert len(heads) >= 20, f"vr_debug 2 logged {len(heads)} drawn heads around the step"
+    first = heads[0][:2]
+    stepped = next((i for i, h in enumerate(heads) if math.dist(h[:2], first) > step * 0.5), None)
+    assert stepped is not None and len(heads) - stepped >= 10, \
+        f"the drawn head never took the step: {[tuple(round(v, 1) for v in h[:2]) for h in heads[:12]]}"
+    settled = heads[-1][:2]
+    strayed = max(math.dist(h[:2], settled) for h in heads[stepped:])
+    return stepped, strayed, max(h[2] for h in heads)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--basepath", type=Path, required=True, help="installed retail Quake 4 assets")
@@ -253,8 +303,12 @@ def main(argv: list[str] | None = None) -> None:
         # standing again: the calibrated height, the body where it was
         "vr_playSpace 2", "waitMsec 600", "echo VR_PS_STANDING_AGAIN", "vr_status", "getviewpos",
         # room scale on STAGE: one half-metre step, walked once
-        "vr_recenter", "waitMsec 300", "vr_roomScale 1", "waitMsec 300", "echo VR_PS_WALK_FROM", "getviewpos",
-        "condump vr_marker_step.txt", "waitMsec 2500", "echo VR_PS_WALK_TO", "vr_status", "getviewpos",
+        # (a lean limit beyond the step, so it is the walk alone that moves the body)
+        "vr_recenter", "waitMsec 300", "vr_roomScale 1", "vr_headOffsetLimit 24", "waitMsec 300",
+        "echo VR_PS_WALK_FROM", "getviewpos",
+        "vr_debug 2", "echo VR_PS_STEP_TRACE", "condump vr_marker_step.txt", "waitMsec 1500",
+        "vr_debug 1", "echo VR_PS_STEP_TRACED", "waitMsec 1000", "vr_headOffsetLimit 16",
+        "echo VR_PS_WALK_TO", "vr_status", "getviewpos",
         "vr_roomScale 0", "echo VR_PLAYSPACE_COMPLETE", "quit",
     ]
     text = run(options, staged, executable, manifest, profile, "stage", commands, script)
@@ -310,6 +364,13 @@ def main(argv: list[str] | None = None) -> None:
     head_xy = re.search(r"head tracked \( (-?\d+\.\d) (-?\d+\.\d) (-?\d+\.\d) \)", tail)
     assert head_xy and math.hypot(float(head_xy.group(1)), float(head_xy.group(2))) < 6.0, \
         "room scale on STAGE: the head should end near the tracking origin after the walk"
+    # the drawn head holds still once the head has stepped: the body's walk
+    # after it moves the tracking space, never the eye, and darkens nothing
+    step_frame, strayed, step_vignette = step_hold(drawn_heads(text, "VR_PS_STEP_TRACE", "VR_PS_STEP_TRACED"), drop)
+    assert strayed < 0.5, \
+        (f"room scale on STAGE: after the step (frame {step_frame} of the trace) the drawn head strayed {strayed:.2f} "
+         f"units while the body walked after it: the eye lagged the tracking space")
+    assert step_vignette < 0.01, f"room scale on STAGE: a real step darkened the view (vignette {step_vignette:.3f})"
 
     # --- LOCAL_FLOOR and no floor at all
     short = ["waitMsec 2500", "echo VR_PS_START", "vr_status", "echo VR_PLAYSPACE_COMPLETE", "quit"]
@@ -403,10 +464,60 @@ def main(argv: list[str] | None = None) -> None:
     space, _ = status(none, "VR_PS_START")
     assert "standing asked for; the runtime knows no floor" in space, space
 
+    # a seat saved and loaded: boarded without a console script, so the save loads
+    seat_profile = output / f"seat-{options.render_api}"
+    seat_game = seat_profile / "baseoq4"
+    seat_game.mkdir(parents=True, exist_ok=True)
+    seat_commands = ["waitMsec 2500", "god", "notarget",
+                     # a demo recorded in VR: the left eye's views and the virtual screen's 2D, as the mirror shows it
+                     "r_showDemo 1", "echo VR_PS_DEMO", "recordDemo vr_playspace_demo", "waitMsec 1500", "stopRecording",
+                     "r_showDemo 0", "echo VR_PS_DEMO_DONE",
+                     # a checkpoint's preview shows the left eye, even with the desktop mirror black
+                     "vr_mirror 0", "savegame checkPoint", "waitMsec 2500", "vr_mirror 1",
+                     'spawn vehicle_walker name vr_ps_walker origin "10094 -6825 60" angle 150.7', "waitMsec 2500",
+                     "testVehicle vr_ps_walker enter", "waitMsec 2000",
+                     "echo VR_PS_SEAT_IN", "getviewpos", "testVehicle vr_ps_walker",
+                     "savegame vr_playspace_seat", "waitMsec 2500",
+                     "set g_autoExecAfterMapLoad openxr_vr_playspace_seat.cfg", "loadgame vr_playspace_seat"]
+    seat_loaded = ["waitMsec 2500", "echo VR_PS_SEAT_LOADED", "getviewpos", "testVehicle vr_ps_walker",
+                   "echo VR_PLAYSPACE_COMPLETE", "quit"]
+    (seat_game / "openxr_vr_playspace_seat.cfg").write_text("\n".join(frame_guarded(seat_loaded)) + "\n", encoding="utf-8")
+    for stale in (seat_game / "savegames").glob("*") if (seat_game / "savegames").is_dir() else []:
+        stale.unlink()
+    seat = run(options, staged, executable, manifest, seat_profile, "stage", seat_commands, [])
+    # the demo: one eye's views a frame (airdefense1's portal sky, then the
+    # view), never the eyes' 2D such as the laser's red dot
+    recorded = after(seat, "VR_PS_DEMO").partition("VR_PS_DEMO_DONE")[0].split("write DC_END_FRAME")[1:-1]
+    # (r_showDemo's report of every surface slows recording to a few frames a second)
+    assert len(recorded) >= 5, f"the demo recorded {len(recorded)} complete frames"
+    views = sorted({frame.count("write DC_RENDERVIEW") for frame in recorded})
+    assert views == [2], f"a demo recorded in VR should write the left eye's portal sky and view each frame, not {views}"
+    laser = re.findall(r"gui surface \d+: _white color=1\.00 0\.15 0\.10", after(seat, "VR_PS_DEMO").partition("VR_PS_DEMO_DONE")[0])
+    assert not laser, f"a demo recorded in VR wrote {len(laser)} surfaces of the eyes' laser dot"
+    # the checkpoint's preview, taken with vr_mirror 0 (a black desktop window)
+    from PIL import Image, ImageStat
+    previews = [p for p in (seat_game / "savegames").glob("*.tga") if p.stem != "vr_playspace_seat"]
+    assert len(previews) == 1, f"the checkpoint wrote {[p.name for p in previews]}"
+    with Image.open(previews[0]) as preview:
+        preview_luma = ImageStat.Stat(preview.convert("L")).mean[0]
+    assert preview_luma > 8.0, \
+        f"the checkpoint's preview is black (mean {preview_luma:.1f}): it read the black desktop mirror, not the left eye"
+    assert "testVehicle: action=enter name=vr_ps_walker success=1" in seat, "testVehicle could not board the walker"
+    boarded_view, boarded_eye = seat_yaws(seat, "VR_PS_SEAT_IN")
+    near(turned(boarded_eye, boarded_view), 0.0, 3.0, "boarding: the seat faces the walker's eye")
+    loaded_view, loaded_eye = seat_yaws(seat, "VR_PS_SEAT_LOADED")
+    # the walker's turret follows the head, so a seat loaded facing elsewhere
+    # swings the turret round after it: the view must stay where it was saved
+    near(turned(boarded_view, loaded_view), 0.0, 10.0,
+         "a save made in the walker's seat should load facing where it was saved; the loaded seat turned")
+    near(turned(loaded_eye, loaded_view), 0.0, 3.0, "the loaded seat faces the walker's eye")
+
     print(f"OpenXR VR play-space smoke ({options.render_api}): PASS (STAGE learned 1.60 m, crouched recentre kept the floor, "
-          f"calibrated 1.75 m, seated and back without moving the body, room-scale step walked {walked:.1f} units; "
-          f"LOCAL_FLOOR, the headset's own recentre followed when the space moved, no-floor fallback, and a level "
-          f"and a save start facing as they should after snap turns); evidence={output}")
+          f"calibrated 1.75 m, seated and back without moving the body, room-scale step walked {walked:.1f} units "
+          f"with the drawn head still after it (strayed {strayed:.2f}); "
+          f"LOCAL_FLOOR, the headset's own recentre followed when the space moved, no-floor fallback, a level "
+          f"and a save start facing as they should after snap turns, and a seat saved in a walker loads facing "
+          f"where it was saved ({turned(boarded_view, loaded_view):+.1f}); evidence={output}")
 
 
 if __name__ == "__main__":

@@ -2530,7 +2530,9 @@ static void Cmd_TestHudOverlays_f(const idCmdArgs& args) {
 	idPlayer* player=gameLocal.GetLocalPlayer();
 	if (!player || !gameLocal.CheatsOk()) return;
 	idVec3 origin;idMat3 axis;player->GetViewPos(origin,axis);
-	gameLocal.mpGame.damageNumbers.Add(origin+axis[0]*128.0f,args.Argc()>1?atoi(args.Argv(1)):75,1,0);
+	// [damage] [distance]: far away, the number's origin jitter barely moves it on screen
+	const float distance=args.Argc()>2?Max(8.0f,static_cast<float>(atof(args.Argv(2)))):128.0f;
+	gameLocal.mpGame.damageNumbers.Add(origin+axis[0]*distance,args.Argc()>1?atoi(args.Argv(1)):75,1,0);
 	gameLocal.lagometer.Update(20,2);
 	rvHitMarker::Trigger(75,0,HITMARKER_PRECISE);
 }

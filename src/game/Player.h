@@ -432,6 +432,15 @@ public:
 	float					vrVehicleDeltaYaw;
 	float					vrVehicleYaw;
 	bool					vrVehicleYawValid;
+	// openQ4 VR: a seat restored from a save faces the vehicle's eye once the
+	// headset's frame is known again (UpdateVRVehicleFrame)
+	bool					vrVehicleSeatPending;
+	// openQ4 VR: the horizontal world step room scale walked the body, and the
+	// game time of the tic it walked in (UpdateVRRoomScale). The tracking space
+	// took the whole step at once, so an eye interpolated towards that tic's
+	// sample carries what it has not covered yet. Draw-only: never saved.
+	idVec3					vrRoomScaleStep;
+	int						vrRoomScaleStepTime;
 	bool					presentationCanInterpolate;
 	idVec3					presentationPrevViewOrigin;
 	idMat3					presentationPrevViewAxis;
@@ -618,9 +627,11 @@ public:
 	bool					GetVRAimMarker( vrAimMarker_t &marker ) const;
 	// Room scale: walks the body after the tracked head (vr_roomScale).
 	void					UpdateVRRoomScale( void );
+	idVec3					VRRoomScaleLag( float fraction ) const;
 	// In a vehicle: the stick drives it the way it faces, and its turns
 	// carry the tracked view unless it steers after the driver's turret.
 	void					UpdateVRVehicleFrame( void );
+	void					FaceVRVehicleSeat( const class rvVehicle *vehicle, const class rvVehiclePosition *seat, const vrFrameState_t &frame );
 	// What turns the driven turret: the head, or the controller on the
 	// floating screen. seatAim leaves out the vehicle's own turns, which
 	// carry a turret already; worldAim is where it points. True for the head.

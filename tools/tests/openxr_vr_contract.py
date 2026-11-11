@@ -309,6 +309,40 @@ def check_engine() -> None:
     # a vehicle's turns carry the seat from boarding: scripts turn vehicles as they seat the player
     require(player, "// the seat follows the vehicle's turns from here, not from the first",
             "the seat's turn carry starts when the player boards")
+    require(player, "\t\tFaceVRVehicleSeat( entered, seat, vrFrame );",
+            "boarding faces the seat along the vehicle's eye")
+    # a seat restored from a save faces the vehicle's eye again: its facing is
+    # not saved, and the body yaw a load resets returns with the first VR usercmd
+    require(player, "\tvrVehicleSeatPending = true;\n\tvrRoomScaleStepTime = -1;",
+            "a restored seat waits to face the vehicle's eye")
+    require(player, "if ( stereo && vrVehicleSeatPending && ( usercmd.buttons & BUTTON_VRAIM ) != 0 ) {\n\t\tFaceVRVehicleSeat( vehicle, position, frame );",
+            "the restored seat faces the vehicle's eye once VR drives the usercmd")
+    # room scale moves the tracking space a whole step at once; the eye drawn a
+    # tic behind the body carries the rest of the step (both game modules)
+    for module in ("src/game/Player.cpp", "src/mpgame/Player.cpp"):
+        source = read(module)
+        require(source, "\t\torigin += VRRoomScaleLag( fraction );\n\t}\n\tApplyPresentationLookToView( origin, axis );",
+                f"{module}: the interpolated eye carries the room-scale step it has not covered")
+        require(source, "vrSystem->ShiftTrackingOrigin(", f"{module}: room scale shifts the tracking space")
+        require(source, "vrRoomScaleStepTime = gameLocal.time;", f"{module}: a taken step belongs to its tic's sample")
+    require(read("src/mpgame/PlayerView.cpp"),
+            "player->VRRoomScaleStepping() ? idMath::Fabs( velocity * physics->GetGravityNormal() ) : velocity.Length()",
+            "multiplayer's vignette leaves a room-scale step's speed out")
+    # VR damage numbers project through the headset's HUD layer, not the last eye
+    require(read("src/mpgame/mp/HitFeedback.cpp"), "objectiveMarker::ProjectOnHud(",
+            "damage numbers in the headset project through the HUD layer")
+    # demos recorded in VR keep the eyes' 2D out and play the left eye
+    require(read("src/renderer/GuiModel.cpp"), "tr.guiRecursionLevel != 0 || R_VR_FrontEndEye() >= 0 ) {",
+            "a demo records no eye's 2D")
+    require(read("src/renderer/RenderWorld.cpp"), "if ( session->writeDemo && !independent && R_VR_FrontEndEye() != 1 ) {",
+            "a demo recorded in VR plays the left eye")
+    # checkpoint previews in VR read the left eye, not the desktop mirror
+    require(read("src/renderer/OpenGL/gl_VRPresentation.cpp"),
+            "RB_QueueSavePreviewFromFramebuffer( tr.vrTargets[1]->GetDeviceHandle(), tr.vrFrame.eyeWidth, tr.vrFrame.eyeHeight );\n\t}\n\n\tRB_VR_DrawMirror();",
+            "an OpenGL VR frame's preview is read from the left eye before the mirror")
+    require(read("src/renderer/Vulkan/vk_VRPresentation.cpp"),
+            "VK_QueueSavePreviewFromImage( cmd, left.color, left.format, left.width, left.height );",
+            "a Vulkan VR frame's preview is copied from the left eye")
     # world GUIs, characters and usable things answer the weapon hand where it points
     require(player, "start = GetEyePosition();\n\t// openQ4 VR: the weapon hand points at world GUIs",
             "the focus trace starts where the weapon hand aims")

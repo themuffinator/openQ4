@@ -561,11 +561,14 @@ R_DemoGuiTarget
 
 The model a flushed 2D batch belongs to while a render demo records: the
 frame's screen model, a retained layer's content, or NULL for any other
-target (scene captures, crops, render textures of the game).
+target (scene captures, crops, render textures of the game, and a headset
+eye: its aim marker, comfort vignette and fades are laid out over that eye's
+own frustum, and a demo plays flat, as the desktop mirror shows a VR frame,
+with the virtual screen's 2D as its screen).
 ================
 */
 idGuiModel *R_DemoGuiTarget() {
-	if ( session->writeDemo == NULL || tr.currentRenderCrop != 0 || tr.guiRecursionLevel != 0 ) {
+	if ( session->writeDemo == NULL || tr.currentRenderCrop != 0 || tr.guiRecursionLevel != 0 || R_VR_FrontEndEye() >= 0 ) {
 		return NULL;
 	}
 	if ( tr.activeRenderTexture == NULL ) {

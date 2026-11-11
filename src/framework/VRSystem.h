@@ -141,7 +141,8 @@ public:
 	// Room scale: the body walked after the head by this horizontal distance
 	// in tracking space (engine axes, game units). The tracking origin moves
 	// with it, so every pose read afterwards is that much nearer the origin.
-	virtual void			ShiftTrackingOrigin( const idVec3 &trackingDelta ) = 0;
+	// True when it moved: in multiplayer only a room-scale walk's tics move it.
+	virtual bool			ShiftTrackingOrigin( const idVec3 &trackingDelta ) = 0;
 };
 
 extern idVRSystem *			vrSystem;

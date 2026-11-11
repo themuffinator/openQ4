@@ -1421,6 +1421,8 @@ idPlayer::idPlayer() {
 
 	vrRoomScaleOrigin.Zero();
 	vrRoomScaleOriginValid = false;
+	vrRoomScaleStep.Zero();
+	vrRoomScaleStepTime = -1;
 
 	alreadyDidTeamAnnouncerSound = false;
 
@@ -13172,6 +13174,7 @@ void idPlayer::ReportVRRoomScaleWalk( void ) {
 	}
 	if ( spectating || noclip || health <= 0 || !GetVRView( frame, trackingYaw ) || !frame.roomScale ) {
 		vrRoomScaleOriginValid = false;
+		vrRoomScaleStepTime = -1;
 		return;
 	}
 	const idVec3 origin = physicsObj.GetOrigin();
@@ -13181,11 +13184,47 @@ void idPlayer::ReportVRRoomScaleWalk( void ) {
 		if ( moved.LengthSqr() > 0.0f && moved.LengthSqr() < 32.0f * 32.0f ) {
 			idVec3 movedTracking = moved * VR_TrackingAxis( trackingYaw ).Transpose();
 			movedTracking.z = 0.0f;
-			vrSystem->ShiftTrackingOrigin( movedTracking );
+			if ( vrSystem->ShiftTrackingOrigin( movedTracking ) ) {
+				// a real step: the eye drawn towards this tic's sample still has
+				// part of it to cover, and the vignette leaves its speed out
+				vrRoomScaleStep = moved;
+				vrRoomScaleStepTime = gameLocal.time;
+			}
 		}
 	}
 	vrRoomScaleOrigin = origin;
 	vrRoomScaleOriginValid = true;
+}
+
+/*
+===============
+idPlayer::VRRoomScaleLag
+
+openQ4 VR: how far an eye drawn between two presentation samples lags the
+tracked head after the tracking space took a room-scale step whole. The step
+belongs to the tic of the current sample; the eye still has the rest of it
+to cover, a fraction of one tic's walk. Without it a walk about the room
+shimmered by up to a tic's step, at every tic.
+===============
+*/
+idVec3 idPlayer::VRRoomScaleLag( float fraction ) const {
+	if ( vrRoomScaleStepTime < 0 || vrRoomScaleStepTime != presentationViewTime || fraction >= 1.0f ) {
+		return vec3_origin;
+	}
+	return vrRoomScaleStep * ( 1.0f - Max( fraction, 0.0f ) );
+}
+
+/*
+===============
+idPlayer::VRRoomScaleStepping
+
+openQ4 VR: the latest predicted tic moved the body by a room-scale step the
+tracking space took: a step the player made about the room, through the
+usercmd, not motion the body does not feel.
+===============
+*/
+bool idPlayer::VRRoomScaleStepping( void ) const {
+	return vrRoomScaleStepTime >= 0 && vrRoomScaleStepTime == presentationViewTime;
 }
 
 /*
@@ -13440,6 +13479,8 @@ void idPlayer::GetPresentationViewPos( idVec3 &origin, idMat3 &axis ) const {
 		const float fraction = GetPresentationViewBlendFraction();
 		origin.Lerp( presentationPrevViewOrigin, presentationCurViewOrigin, fraction );
 		axis = gameLocal.InterpolatePresentationAxis( presentationPrevViewAxis, presentationCurViewAxis, fraction );
+		// openQ4 VR: a room-scale step already moved the tracked head by all of it
+		origin += VRRoomScaleLag( fraction );
 	}
 	ApplyPresentationLookToView( origin, axis );
 }

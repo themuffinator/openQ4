@@ -1941,13 +1941,20 @@ and AND-05.
   saves starting turned by earlier snap turns; a weapon wheel the hand could
   not steer under the retained interface; the runtime's recentre applied
   before its change time; no pause when the headset loses focus; zoom that
-  snapped; and a mirror that ignored window resizes. Verified leads left for
-  the headset run or a later round: room-scale steps against the interpolated
-  eye (up to one tic's walk of shimmer), a save made in a vehicle seat loading
-  with an arbitrary seat facing, the multiplayer comfort vignette firing on
-  real room-scale steps, multiplayer damage numbers projected from the right
-  eye, render demos recorded in VR storing both eyes' 2D, and checkpoint
-  thumbnails capturing the desktop mirror.
+  snapped; and a mirror that ignored window resizes.
+  11 November: six leads that audit verified are fixed
+  ([release record](release-completion.md#vr-room-scale-steps-without-a-stutter-vehicle-saves-that-load-facing-forward-and-damage-numbers-on-their-targets-11-november-2026)):
+  the interpolated eye carries the room-scale step the tracking space already
+  took (`ShiftTrackingOrigin` reports whether it took it; up to a tic's walk
+  of shimmer before, both game modules); a seat restored from a save faces the
+  vehicle's eye once VR drives the usercmd again; multiplayer's vignette
+  leaves a room-scale step's speed out; multiplayer damage numbers project
+  through the HUD layer, not the right eye; a demo recorded in VR writes the
+  left eye's views and none of the eyes' 2D; and a checkpoint preview reads
+  the left eye, not the desktop mirror. The play-space and multiplayer smokes
+  check each one, and each check fails on a build with its fix switched off.
+  One lead from that audit remains: on OpenGL a frame whose virtual-screen
+  copy fails stays marked presented.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and

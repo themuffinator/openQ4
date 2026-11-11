@@ -80,6 +80,7 @@ here: it waits on the AND-05 distribution decision.
 | 4.5 | With room scale on, walk into a wall and around a crate. | The character stops at the wall; walking around the crate does not drift the view from the body. |
 | 4.6 | Walk with the stick (both **Walk Direction** settings), snap-turn and smooth-turn. | Movement follows the chosen direction; turning is comfortable; the comfort vignette darkens only while the stick moves or turns you. |
 | 4.7 | In multiplayer, walk in the room and around the arena with a flat client watching. | The flat client sees you move once (no doubled movement) and your own view does not correct back. |
+| 4.8 | With room scale on, take a few slow steps about the room, in single player and in multiplayer, watching a nearby edge. | The view glides with your head while the character follows: no shimmer or step back each moment, and in multiplayer the comfort vignette stays open. |
 
 ## 5. Vehicles, cinematics and transitions (VR-02)
 
@@ -89,6 +90,7 @@ here: it waits on the AND-05 distribution decision.
 | 5.2 | Watch a cinematic and a loading screen. | They play on the floating screen at a comfortable distance. |
 | 5.3 | Die, respawn, and load a save. | Each transition is free of flashes or a view stuck at the wrong height. |
 | 5.4 | Snap-turn several times, then finish a level, and separately load a save. | The next level starts facing the way its start faces, and the save loads facing the way it was saved, not turned by the earlier snap turns. |
+| 5.5 | Save in the walker's seat facing somewhere other than straight ahead, load the save, and look around. | The view loads facing the way you saved, along the walker's sights; nothing swings round after the load. |
 
 ## 6. Menus, HUD and screens in the world (VR-01, VR-02)
 
@@ -98,6 +100,7 @@ here: it waits on the AND-05 distribution decision.
 | 6.2 | Read the HUD, objective text and a terminal screen. | Text is sharp and readable at the default HUD distance and width. |
 | 6.3 | In single player, point the weapon hand at a door panel and a lift call screen and pull the trigger. | The cursor sits where the laser meets the screen and the screen responds. |
 | 6.4 | In multiplayer, look at the objective markers in CTF (`mp/q4ctf1`). | Markers sit at HUD depth, follow your head and stay inside the HUD. |
+| 6.5 | In multiplayer, hit another player (or `testHudOverlays`) and watch the damage number. | The number rises from the player you hit, not below or beside them. |
 
 ## 7. Temporal anti-aliasing by eye (VR-05)
 

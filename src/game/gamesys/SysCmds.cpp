@@ -2461,8 +2461,9 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 	const bool selecting = args.Argc() == 4 && !idStr::Icmp( args.Argv( 2 ), "select" ) && idStr::IsNumeric( args.Argv( 3 ) );
 	if ( !selecting && ( args.Argc() < 2 || args.Argc() > 3 || ( args.Argc() == 3
 			&& idStr::Icmp( args.Argv( 2 ), "fire" ) != 0
-			&& idStr::Icmp( args.Argv( 2 ), "exit" ) != 0 ) ) ) {
-		gameLocal.Printf( "usage: testVehicle <entity name> [fire|exit|select <index>] (omit action for status)\n" );
+			&& idStr::Icmp( args.Argv( 2 ), "exit" ) != 0
+			&& idStr::Icmp( args.Argv( 2 ), "enter" ) != 0 ) ) ) {
+		gameLocal.Printf( "usage: testVehicle <entity name> [enter|fire|exit|select <index>] (omit action for status)\n" );
 		return;
 	}
 	idEntity *entity = gameLocal.FindEntity( args.Argv( 1 ) );
@@ -2472,7 +2473,12 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 	}
 	rvVehicle *vehicle = static_cast<rvVehicle *>( entity );
 	int seat = player->GetVehicleController().GetVehicle() == vehicle ? player->GetVehicleController().GetPosition() : -1;
-	if ( args.Argc() >= 3 ) {
+	if ( args.Argc() == 3 && idStr::Icmp( args.Argv( 2 ), "enter" ) == 0 ) {
+		// boards as a map script would, without compiling a console script:
+		// that leaves a thread behind which a save then cannot load
+		const bool entered = !player->IsInVehicle() && player->EnterVehicle( vehicle );
+		gameLocal.Printf( "testVehicle: action=enter name=%s success=%d\n", vehicle->name.c_str(), entered );
+	} else if ( args.Argc() >= 3 ) {
 		if ( seat < 0 || seat >= vehicle->GetNumPositions() || vehicle->GetPosition( seat )->GetDriver() != player ) {
 			gameLocal.Printf( "testVehicle: action requires the local player in this vehicle\n" );
 			return;
@@ -2501,6 +2507,14 @@ static void Cmd_TestVehicle_f( const idCmdArgs &args ) {
 		vehicle->name.c_str(), vehicle->GetClassname(), gameLocal.time, vehicle->GetPhysics()->GetOrigin().ToString( 3 ),
 		vehicle->GetNumPositions(), vehicle->GetNumDrivers(), seat, vehicle->IsLocked(), vehicle->IsHidden(),
 		vehicle->IsMovementEnabled(), vehicle->IsShootingEnabled(), vehicle->health );
+	if ( seat >= 0 && seat < vehicle->GetNumPositions() ) {
+		// where the seat's eye looks, which a VR seat faces when boarded or loaded
+		idVec3 eyeOrigin;
+		idMat3 eyeAxis;
+		vehicle->GetPosition( seat )->GetEyePosition( eyeOrigin, eyeAxis );
+		gameLocal.Printf( "testVehicleSeat: name=%s seat=%d eye=(%s) eyeYaw=%.1f vehicleYaw=%.1f\n", vehicle->name.c_str(), seat,
+			eyeOrigin.ToString( 1 ), eyeAxis[ 0 ].ToYaw(), vehicle->GetAxis()[ 0 ].ToYaw() );
+	}
 	if ( vehicle->GetHud() != NULL ) {
 		gameLocal.Printf( "testVehicleHud: name=%s health=%g shield=%g\n", vehicle->name.c_str(),
 			vehicle->GetHud()->State().GetFloat( "vehicle_health" ), vehicle->GetHud()->State().GetFloat( "vehicle_shield" ) );
