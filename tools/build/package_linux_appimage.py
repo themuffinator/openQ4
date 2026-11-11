@@ -626,7 +626,8 @@ def build_appimage(args: argparse.Namespace) -> Path:
         appimagetool_env = tool_env.copy()
         appimagetool_env["ARCH"] = appimage_arch(arch)
         # With update information appimagetool embeds it in the runtime and
-        # writes <output>.zsync beside the image.
+        # runs zsyncmake in its working directory, which writes
+        # <image name>.zsync there; it is moved beside the image below.
         update_arguments = ["--updateinformation", update_information] if update_information else []
         run_checked(
             [
@@ -645,6 +646,13 @@ def build_appimage(args: argparse.Namespace) -> Path:
         )
 
         os.chmod(output, 0o755)
+        if update_information:
+            # temp_root is deleted on return, so a .zsync left there is lost
+            # (the first release to ship one, 0.14.1, failed on exactly that).
+            produced = temp_root / (output.name + ".zsync")
+            beside = output.with_name(output.name + ".zsync")
+            if produced.is_file() and produced.resolve() != beside.resolve():
+                shutil.move(str(produced), str(beside))
         validate_type2_appimage(output, arch)
         if update_information:
             validate_embedded_update_information(output, update_information)
