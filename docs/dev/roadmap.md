@@ -1032,10 +1032,21 @@ diagnostics establish whole-frame ownership or production performance.
   refraction views were jittered and retired the main history every frame),
   withheld presents retried a 1 s acquire per command (~27 s per frame), and
   capture frames presented screen-space effects without depth. See
-  [temporal qualification](temporal-presentation.md#validation). Remaining:
-  human review of ghosting/shimmer/disocclusion on the reference display, and
-  physical Linux/macOS/Android. Native UI separation stays covered natively;
-  capture frames cannot show it.
+  [temporal qualification](temporal-presentation.md#validation).
+  Progress, 11 November (#216): the resolved image moved by the whole jitter
+  step every frame on both backends, because history was reprojected through
+  each frame's jittered projection. History now lives on the unjittered grid
+  (aligned previous camera, recentered upscaling input, the unjittered portal
+  sky sampled in place), posed surfaces that were not re-posed keep exact
+  motion, and `renderer_temporal_stability.py` measures the picture at rest.
+  See [stability qualification](temporal-presentation.md#stability-qualification-11-november-2026-issue-216).
+  Remaining: human review of ghosting and disocclusion on the reference
+  display, and physical Linux/macOS/Android; a negative texture LOD bias while
+  upscaling (at 50% scale the image holds about half the native texture
+  detail, and neither backend has LOD-bias plumbing); and the 8% lower texture
+  sharpness of plain Vulkan frames against OpenGL, which temporal AA only
+  preserves. Native UI separation stays covered natively; capture frames
+  cannot show it.
 - [ ] **REN-05 — P1, qualification: remaining PBR quality and portability.**
   Reproduce strict residual Intel SSAO and lavapipe scalar/texture differences and
   recorded cutout/normal diagnostic mismatches; fix or explicitly bound exceptions.

@@ -3977,7 +3977,7 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 		}
 		idList<byte> pixels;
 		if ( !image->ReadPixelsRGBA8( pixels ) ) {
-			common->Printf( "screenshot image: readback requires a loaded single-sample RGBA8 2D image up to 8192x8192\n" );
+			common->Printf( "screenshot image: readback requires a loaded single-sample RGBA8 or RGBA16F 2D image up to 8192x8192\n" );
 			return;
 		}
 		const int width = image->GetUploadWidth(), height = image->GetUploadHeight();

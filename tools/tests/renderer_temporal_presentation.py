@@ -240,6 +240,56 @@ def main() -> int:
         raise AssertionError(
             "OpenGL reactive policy must see restored native view/scissor coordinates"
         )
+    # Issue #216: nothing that reprojects into the unjittered history may carry
+    # either frame's projection jitter. The front end aligns the previous
+    # camera to the current frame's jitter; both resolves add the reprojected
+    # motion to the output position; Vulkan aligns its own velocity history.
+    core = read(RENDERER / "TemporalHistoryCore.h")
+    require(core, "TemporalHistoryCore_AlignPreviousProjectionOffsets(", "jitter-free reprojection policy")
+    temporal_front = read(RENDERER / "TemporalPresentation.cpp")
+    finalize = function_body(temporal_front,
+        "void R_TemporalPresentation_FinalizeViewProjection( viewDef_t *viewDef )")
+    for token in (
+        "TemporalHistoryCore_AlignPreviousProjectionOffsets(",
+        "viewDef->temporalPreviousNeutralProjectionOffset.ToFloatPtr()",
+        "slot->camera.projectInfo[2] = neutralOffset[0];",
+        "slot->camera.projectInfo[3] = neutralOffset[1];",
+    ):
+        require(finalize, token, "jitter-free camera history")
+    if "slot->camera.projectInfo[2] = viewDef->projectionMatrix[8]" in temporal_front:
+        raise AssertionError("camera history must not store the jittered projection offsets")
+    require(function_body(temporal_front,
+        "struct vertCache_s *R_TemporalPresentation_PreviousPositionCache("),
+        "tri->positionsFrame > 0 && tri->positionsFrame != tr.frameCount",
+        "a posed surface drawn without being re-posed keeps exact motion")
+    gl_resolve_source = read(RENDERER / "draw_common.cpp")
+    for token in (
+        "vec2 previousUV = cameraValid ? outputUV + ( CameraPreviousUV( sceneUV, depthMin ) - sceneUV ) : outputUV;",
+        "+ ( CurrentViewOrigin.xyz - PreviousViewOrigin.xyz );",
+        "vec3 steady = texture2D( Scene, clamp( outputUV - CurrentJitter, vec2( 0.0 ), vec2( 1.0 ) ) ).rgb;",
+        "sceneUV = outputUV;",
+        "R_TemporalPresentation_AppliedJitterUV( viewDef, jitter );",
+        "const bool registerScene = sceneWidth != outputWidth || sceneHeight != outputHeight;",
+    ):
+        require(gl_resolve_source, token, "OpenGL jitter-free temporal resolve")
+    vk_resolve_shader = read(RENDERER / "Vulkan" / "shaders" / "temporal_resolve.frag")
+    for token in (
+        "+ (CameraPreviousUV(sceneCameraUV, depthMin) - sceneCameraUV)",
+        "+ (temporal.currentViewOrigin.xyz - temporal.previousViewOrigin.xyz);",
+        "vec3 steady = SceneColorAt(outputCameraUV - temporal.temporalParams.xy);",
+        "sceneCameraUV = outputCameraUV;",
+    ):
+        require(vk_resolve_shader, token, "Vulkan jitter-free temporal resolve")
+    vk_post_source = read(RENDERER / "Vulkan" / "vk_PostProcess.cpp")
+    require(function_body(vk_post_source, "idImage *VK_PostProcess_TemporalMotionVectors("),
+        "VK_Post_MotionAlignPreviousState( currentState, vkTemporalMotionViewHistory, alignedPrevious );",
+        "Vulkan temporal velocity jitter alignment")
+    vk_resolve_source = read(RENDERER / "Vulkan" / "vk_GuiExecutor.cpp")
+    require(vk_resolve_source, "R_TemporalPresentation_AppliedJitterUV( viewDef, block.temporalParams );",
+        "Vulkan applied-jitter uniform")
+    require(function_body(vk_resolve_source, "static bool VK_TemporalPresentation_DrawResolvedColorToSwap("),
+        "block.temporalParams[0] = block.temporalParams[1] = 0.0f;",
+        "the presented history is not recentered again")
     # REN-04: a subview copies its parent view; it must not inherit the
     # parent's temporal preparation (jitter, identity), or Vulkan's direct
     # render of a mirror retires the main view's history every frame.

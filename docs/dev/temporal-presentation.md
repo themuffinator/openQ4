@@ -99,7 +99,13 @@ The previous positions come from the front end. `idMD5Mesh::UpdateSurface`
 reuses each entity's triangle surface, so just before a new pose overwrites
 `verts`, `R_TemporalPresentation_CapturePreviousPositions` copies the pose that
 was drawn on the immediately preceding frame (`positionsFrame == frame - 1`;
-animation-LOD frames that redraw the old pose keep the chain continuous). For a
+animation-LOD frames that redraw the old pose keep the chain continuous). A
+posed surface that is drawn again without being posed at all this frame (game
+time stopped, a render frame between two game tics, an entity at rest whose
+cached model was kept) records the same thing from
+`R_TemporalPresentation_PreviousPositionCache`: its previous positions are its
+current ones, and the vector comes from the model transform. Such frames used
+to have no capture, so the surface was reactive on each of them. For a
 main-view drawSurf whose geometry is still that surface, `R_AddDrawSurf`
 uploads the capture as a frame-temp `idVec3` stream
 (`drawSurf->previousPositionCache`). OpenGL binds it to texture coordinate 1;
@@ -122,14 +128,61 @@ unavailable. Root 2D UI is never part of the temporal history or scene scaling.
 `rendererTemporalPresentationStatus` prints the last pass's counts:
 `Temporal ownership: rigid= posed= weapon= reactive= missed= complete=`.
 
+### Jitter and the history grid
+
+The history is an image on the unjittered output grid: what the player sees is
+that image, sharpened. Each frame is drawn with a sub-pixel projection offset
+(eight-sample Halton), so three rules keep that offset out of the history
+(issue #216):
+
+- **No reprojection carries jitter.** The camera history stores each frame's
+  jitter-free projection offsets (`projectionMatrix[8]`/`[9]` before
+  `R_SetupProjection` adds the sample). `R_TemporalPresentation_FinalizeViewProjection`
+  publishes the previous camera as those offsets plus the jitter applied to the
+  current frame (`TemporalHistoryCore_AlignPreviousProjectionOffsets`, the
+  rule motion blur already used). The current frame's depth is reconstructed
+  with its own jittered projection, so reprojecting a scene texel through the
+  aligned previous camera returns that texel plus its motion and nothing else:
+  a still camera maps every pixel onto itself. The resolve samples history at
+  `output position + (reprojected texel - texel)`. OpenGL's velocity pass takes
+  the same aligned camera from the view; Vulkan aligns the camera it keeps for
+  its own velocity history (`VK_PostProcess_TemporalMotionVectors`). The world
+  position is formed relative to the camera, not in absolute coordinates,
+  whose rounding was a constant sub-pixel history offset per pixel.
+- **The scene is sampled where the output pixel lies.** At native resolution
+  the raw jittered samples are the sub-pixel samples the history integrates.
+  When the scene is smaller than the output (TAAU), each output pixel samples
+  the scene recentered by the applied jitter, so successive frames register on
+  the output grid. The jitter comes from the projection itself
+  (`R_TemporalPresentation_AppliedJitterUV`: half the difference between the
+  applied and jitter-free offsets), which holds for every viewport and scene
+  target route.
+- **What the jittered view did not draw is sampled in place.** A portal sky is
+  drawn without jitter into the same target before the main view. Where depth
+  is still cleared at both positions and no reactive surface covers the pixel,
+  the recentered position would move that backdrop by the jitter.
+
+Where history is rejected (reactive coverage, no usable history, the first
+frame after a cut) the current frame shows through; at native resolution that
+share is taken from the recentered frame, so the surface does not shake by the
+jitter. The pass that presents the resolved history never recenters it.
+
+Before this, history was reprojected through each frame's jittered projection.
+With a still camera every stored frame was resampled onto the current frame's
+jitter, so the presented image moved by the whole jitter step each frame (up
+to 0.99 px at native resolution and 1.78 px at 50% scale) and was softened by
+the resampling.
+
 ### Resolve
 
 Both resolve shaders (`draw_common.cpp` builtin, `temporal_resolve.frag`) share
 one algorithm:
 
-- a 3x3 neighbourhood in YCoCg gives a mean/variance box (1.25 sigma,
-  intersected with the sample range); history is clipped toward the box centre
-  rather than clamped per channel;
+- a 3x3 neighbourhood in YCoCg gives a mean/variance box (1.25 sigma times
+  the upscale factor, at most 3.75, intersected with the sample range);
+  history is clipped toward the box centre rather than clamped per channel. A
+  low-resolution frame under-samples what the history holds per output pixel,
+  so its box is wider;
 - when the nearest-depth texel of the 3x3 carries an exact object vector, that
   vector is used, so a moving silhouette carries its motion onto the
   background texels around it; a still occluder never pins the moving
@@ -142,6 +195,10 @@ one algorithm:
   anti-aliasing off at exactly the high-contrast edges that need it;
 - feedback (`r_temporalAAFeedback`, 0.9) falls by up to 30% for fast motion,
   and the blend is luminance-weighted so a single bright sample cannot flicker.
+  A pixel at rest (under 0.05 output pixels per frame, fading out by 0.5) takes
+  half the usual share of each new frame, and proportionally less again when
+  upscaling: 0.945 at native resolution, 0.9675 at 50%. That halves the ripple
+  each jittered sample leaves on a still edge; nothing at rest can ghost.
 
 The image the player sees gets contrast-adaptive sharpening
 (`r_temporalAASharpness`, 0.5, AMD CAS cross pattern). It is applied only when
@@ -155,9 +212,10 @@ backend frame, view identity, generation, model identity and scene extent to
 match. Captures, cuts, resizes, missing previous geometry and failed resource
 admission cannot reuse old vectors. Its single-sample RGBA16F velocity target
 tests fragments against the current resolved scene depth, including MSAA scenes.
-Vectors include camera motion and jitter once, use scene-pixel units, and scale
-to native presentation pixels in the resolve. Unsupported geometry keeps its
-explicit reactive ownership.
+Vectors carry camera and object motion only (the stored previous camera is
+aligned to the current frame's jitter before the pass), use scene-pixel units,
+and scale to native presentation pixels in the resolve. Unsupported geometry
+keeps its explicit reactive ownership.
 
 `rendererTemporalPresentationStatus` also reports Vulkan's eligible/drawn rigid
 surfaces, whether the last vector pass was complete, and completed vector views.
@@ -360,11 +418,77 @@ withheld frames; surface and device loss reseed once and continue. The
 screen-space qualification below also found Vulkan capture frames presenting
 without depth; that fix keeps screenshots' screen-space effects.
 
-Not covered: a human review of visual stability (ghosting, shimmer,
-disocclusion trails) on the reference display; physical Linux, macOS and
-Android; and runtime capture of the native UI composition, which screenshots
-cannot show because capture frames bypass history (the separation is checked
-natively by `renderer_native_ui_output.py`).
+Not covered: a human review of ghosting and disocclusion trails on the
+reference display (image stability at rest is measured below); physical Linux,
+macOS and Android; and runtime capture of the native UI composition, which
+screenshots cannot show because capture frames bypass history (the separation
+is checked natively by `renderer_native_ui_output.py`).
+
+### Stability qualification, 11 November 2026 (issue #216)
+
+`tools/tests/renderer_temporal_stability.py` is the opt-in runtime gate for
+the picture itself. It launches the staged client into `game/airdefense1` at a
+fixed skyline pose, stops game time (`g_stopTime`), lets the history converge
+and reads the resolved history back on 24 consecutive frames with
+`screenshot image` (a readback, not a capture frame; it now also reads the
+backend-owned RGBA16F histories `_backendTemporalHistory*` and
+`_vkTemporalDirectHistory*`). Between consecutive frames it measures the
+global sub-pixel translation (least-squares optical flow) and the share of
+pixels changing by more than 4/255, and over the last jitter cycle the mean
+distance from the cycle mean.
+
+Windows x64, GeForce RTX 4060 Laptop GPU, 1280 x 720 hidden window, uncapped,
+on a shared machine. "Before" is the unfixed tree (55bbe166a for native
+resolution, a 10 November build for the upscaled cases):
+
+| Case | Backend | Before: largest step | Before: pixels changing | After: largest step | After: pixels changing | After: ripple |
+|---|---|---:|---:|---:|---:|---:|
+| Native (`r_temporalAA 1`) | OpenGL | 0.99 px | 13.4% | 0.032 px | 0.05% | 0.05 |
+| Native | Vulkan | 0.98 px | 12.7% | 0.030 px | 0.05% | 0.05 |
+| Upscaled from 75% | OpenGL | 1.24 px | 12.7% | 0.001 px | 0.03% | 0.03 |
+| Upscaled from 75% | Vulkan | 1.24 px | 11.8% | 0.001 px | 0.03% | 0.02 |
+| Upscaled from 50% | OpenGL | 1.78 px | 13.5% | 0.003 px | 0.05% | 0.03 |
+| Upscaled from 50% | Vulkan | 1.74 px | 12.6% | 0.003 px | 0.05% | 0.03 |
+| Native, 4x MSAA | OpenGL | not run | not run | 0.032 px | 0.05% | 0.05 |
+| Native, 4x MSAA | Vulkan | not run | not run | 0.030 px | 0.04% | 0.04 |
+| 67%, sharpened scale mode | OpenGL | not run | not run | 0.002 px | 0.04% | 0.03 |
+| 67%, sharpened scale mode | Vulkan | not run | not run | 0.002 px | 0.03% | 0.03 |
+
+Before the fix the ripple was 0.77 to 0.85 in every measured case. The
+multiplayer case (backend-owned history, `mp/q4dm1`) cannot stop game time and
+spawns at a random point, so it is judged on the median of a 4 x 3 grid of
+screen cells: 0.05 to 0.13 px across runs on either backend, against 1.0 px
+for the unfixed single-player resolve by the same statistic. The unfixed build
+cannot read that history back, so multiplayer has no direct "before".
+
+While the camera pans (12 degrees per second at 60 FPS, about 3 pixels per
+frame) gradient energy is unchanged within run-to-run variation (native 4.83
+before and 4.86 after on OpenGL, 4.60 and 4.50 on Vulkan; 50% scale 2.91 and
+2.80, 2.51 and 2.52), and the captured frames show no trails.
+
+The unfixed translation matched the Halton jitter step frame for frame (a fit
+of 1.1 times the step). What remains at native resolution fits 0.05 times the
+jitter sample, which is the at-rest share of one raw sample; an upscaled frame
+is sampled recentered and has no such term. In a textured crop, gradient
+energy rose from 81% to 100% of the fixed native result at native resolution,
+from 58% to 71% at 75% scale and from 40% to 52% at 50%, because history is no
+longer resampled every frame. `renderer_temporal_qualification.py` passes
+unchanged on both backends (13 cases, 23 runs, no unexpected fallback).
+
+Findings left open:
+
+- **Upscaled texture detail.** At 50% scale the image holds about half the
+  native detail. Most of the gap is texture mip selection: the scene is
+  rendered, and its mips chosen, at the lower resolution. Temporal upscaling
+  needs a negative texture LOD bias (log2 of the scale) on both backends to
+  recover it; no LOD-bias plumbing exists yet.
+- **Vulkan texture sharpness.** In plain frames without temporal AA, the same
+  crop has 92% of OpenGL's gradient energy under Vulkan. The resolve preserves
+  that difference; it is not a temporal AA effect.
+- **Reactive surfaces.** A surface that rejects history shows the recentered
+  current frame: it does not move, but its edges are not anti-aliased and their
+  aliasing changes with the jitter phase. Multiplayer cannot stop game time,
+  so its case holds only the global translation to a limit.
 
 `rendererVulkanTemporalMotionSelfTest` numerically reads GPU velocity and resolve
 attachments for positive/negative translation, rotation, perspective interpolation, camera plus jitter,

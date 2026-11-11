@@ -463,6 +463,12 @@ See [release status](../../user/release-status.md) and the
   compile faster too, to identical output.
 - A navigation file with damaged tactical data loads without those positions
   and a warning, instead of letting AI read past the end of the data.
+- Temporal anti-aliasing no longer makes the 3D view tremble. With nothing
+  moving, the whole picture used to shift by a fraction of a pixel every
+  frame, at native resolution (`r_temporalAA 1`) and in the automatic
+  upscaling the lower presets use. It now holds still, and is sharper too,
+  because the same fault blurred it slightly every frame. Characters standing
+  still also keep their smooth edges. Nothing to change.
 - On Vulkan, temporal AA keeps working while a mirror, security-camera screen
   or refraction effect is in view; it used to switch off for those frames.
   Mirrors are also drawn without temporal AA's sub-pixel jitter.

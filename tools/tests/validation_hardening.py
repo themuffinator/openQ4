@@ -915,6 +915,7 @@ def validate_validation_wiring() -> None:
         "renderer_screen_space_effects_qualification.py",
         "renderer_shadow_motion_qualification.py",
         "renderer_temporal_qualification.py",
+        "renderer_temporal_stability.py",
         "renderer_vulkan_descriptor_pressure.py",
         "renderer_vulkan_pipeline_pressure.py",
         "renderer_vulkan_uniform_pressure.py",

@@ -9585,8 +9585,7 @@ static void VK_TemporalPresentation_FillResolveBlock(
 	block.previousViewAxis0[3] = screenEffects[5];
 	block.previousViewAxis1[3] = screenEffects[6];
 	block.previousViewAxis2[3] = screenEffects[7];
-	block.temporalParams[0] = viewDef->temporalJitterPixels.x / outputWidth;
-	block.temporalParams[1] = viewDef->temporalJitterPixels.y / outputHeight;
+	R_TemporalPresentation_AppliedJitterUV( viewDef, block.temporalParams );
 	block.motionParams[1] = useHistory && depthValid
 		&& viewDef->temporalPreviousProjectionValid
 		&& idMath::Fabs( projectionX ) > 0.00001f
@@ -9841,6 +9840,9 @@ static bool VK_TemporalPresentation_DrawResolvedColorToSwap(
 	vkTemporalResolveBlock_t block;
 	VK_TemporalPresentation_FillResolveBlock( presentCommand,
 		outputWidth, outputHeight, false, false, false, 0, block );
+	// The resolved history already sits on the unjittered output grid: this
+	// pass must not recenter it by the view's jitter again.
+	block.temporalParams[0] = block.temporalParams[1] = 0.0f;
 	// Sharpen only the presented image; the history keeps its unsharpened
 	// samples. A history-less block reads no reactive regions, so slot 1
 	// carries the amount (temporal_resolve.frag flag 16).
@@ -10297,9 +10299,14 @@ static bool VK_TemporalPresentation_ResolveTargetsRecorded(
 			| TemporalHistoryCore_MotionDomainBit( TEMPORAL_MOTION_DOMAIN_DEFORM )
 			| TemporalHistoryCore_MotionDomainBit( TEMPORAL_MOTION_DOMAIN_VIEW_MODEL ) )
 		: 0u;
+	// An upscaled scene is sampled where each output pixel lies in the
+	// jittered frame, so successive frames register on the output grid and
+	// accumulate detail. At native resolution the raw jittered samples are the
+	// sub-pixel samples the history integrates.
+	const bool registerScene = sceneWidth != outputWidth || sceneHeight != outputHeight;
 	vkTemporalResolveBlock_t normalBlock;
 	VK_TemporalPresentation_FillResolveBlock( command, sceneWidth,
-		sceneHeight, historyValid, depthReady, false, 0, normalBlock,
+		sceneHeight, historyValid, depthReady, registerScene, 0, normalBlock,
 		exactMotionDomains, velocityImage != NULL, perPixelOwnership );
 	if ( !VK_TemporalPresentation_DrawResolve(
 			command.historyWriteTarget, sceneImage, sceneEntry,
@@ -10333,7 +10340,7 @@ static bool VK_TemporalPresentation_ResolveTargetsRecorded(
 	if ( debugMode != 0 ) {
 		vkTemporalResolveBlock_t debugBlock;
 		VK_TemporalPresentation_FillResolveBlock( command, sceneWidth,
-			sceneHeight, historyValid, depthReady, false,
+			sceneHeight, historyValid, depthReady, registerScene,
 			debugMode, debugBlock, exactMotionDomains, velocityImage != NULL,
 			perPixelOwnership );
 		const bool presented = VK_TemporalPresentation_DrawResolve(
@@ -17028,7 +17035,9 @@ static bool VK_Exec_TestTemporalMotionCase( int width, int height, int fixture, 
 		space.modelMatrix[1] = 1;
 		space.modelMatrix[4] = -1;
 	} else if ( fixture == 3 ) {
-		// Camera motion and projection jitter contribute exactly once.
+		// A camera move and a projection change contribute exactly once. (The
+		// temporal AA jitter itself is cancelled before this pass: see
+		// VK_PostProcess_TemporalMotionVectors.)
 		view.worldSpace.modelViewMatrix[12] = previousX;
 		view.worldSpace.modelViewMatrix[13] = previousY;
 		view.projectionMatrix[12] = 1.0f / width;

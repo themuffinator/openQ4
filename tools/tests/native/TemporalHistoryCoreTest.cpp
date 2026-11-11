@@ -46,6 +46,32 @@ int main() {
 			"jitter must remain inside one pixel" );
 	}
 
+	// Issue #216: history lives on the unjittered grid, so the previous camera
+	// the backends reproject through carries its own jitter-free offsets plus
+	// the jitter applied to the current frame.
+	{
+		const float neutral[2] = { 0.0125f, -0.004f };	// an off-axis (VR eye) projection
+		for ( std::uint32_t i = 0; i < 8; ++i ) {
+			const temporalJitterSample_t now = TemporalHistoryCore_Jitter( i + 1 );
+			const float applied[2] = {
+				neutral[0] + 2.0f * now.x / 1920.0f, neutral[1] + 2.0f * now.y / 1080.0f };
+			float aligned[2];
+			TemporalHistoryCore_AlignPreviousProjectionOffsets( applied, neutral, neutral, aligned );
+			Check( aligned[0] == applied[0] && aligned[1] == applied[1],
+				"a still camera must reproject every pixel onto itself, whatever the jitter" );
+
+			// ndc = scale * x / -z - offset: the reprojection of a current texel
+			// is (current ndc) + (current offset) - (aligned previous offset)
+			const float previousNeutral[2] = { neutral[0] + 0.03f, neutral[1] - 0.02f };
+			TemporalHistoryCore_AlignPreviousProjectionOffsets( applied, neutral, previousNeutral, aligned );
+			const float motion[2] = { applied[0] - aligned[0], applied[1] - aligned[1] };
+			const float expected[2] = { neutral[0] - previousNeutral[0], neutral[1] - previousNeutral[1] };
+			Check( std::fabs( motion[0] - expected[0] ) < 1.0e-6f
+					&& std::fabs( motion[1] - expected[1] ) < 1.0e-6f,
+				"a projection change must reproject by the jitter-free difference only" );
+		}
+	}
+
 	const temporalCameraPolicy_t policy = TemporalHistoryCore_DefaultCameraPolicy();
 	temporalCameraState_t previous = Camera( 10 );
 	temporalCameraState_t current = Camera( 11 );

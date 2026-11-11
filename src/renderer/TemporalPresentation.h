@@ -123,6 +123,11 @@ typedef enum {
 void R_TemporalPresentation_RecordResolve( temporalResolveOutcome_t outcome,
 	const char *fallbackReason, int velocity );
 void R_TemporalPresentation_FinalizeViewProjection( struct viewDef_s *viewDef );
+// The sub-pixel offset the view's projection actually applies, as a fraction
+// of the scene extent: a point at unjittered position uv is drawn at
+// uv - jitterUV (bottom-left origin). Zero without temporal jitter.
+void R_TemporalPresentation_AppliedJitterUV( const struct viewDef_s *viewDef,
+	float jitterUV[2] );
 unsigned long long R_TemporalPresentation_ViewIdentity(
 	const struct viewDef_s *viewDef );
 const char *R_TemporalPresentation_HistoryResetReasonName(

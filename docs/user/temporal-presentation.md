@@ -4,7 +4,8 @@
 
 openQ4's temporal anti-aliasing (TAA) collects detail from several frames. On
 OpenGL and Vulkan it smooths edges and upscales a lower-resolution 3D scene
-back to your screen far more cleanly than a plain stretch.
+back to your screen far more cleanly than a plain stretch. The picture stays
+still while it does so: when nothing moves, nothing on screen moves.
 
 ## Automatic upscaling (default)
 
@@ -23,7 +24,7 @@ OpenGL ES and on OpenGL contexts without GLSL 1.30.
 |---|---:|---|
 | `r_temporalAA` | `2` | `0` off, `1` always on (native resolution too), `2` automatic: on below native resolution |
 | `r_temporalAASharpness` | `0.5` | Sharpening applied to the image you see (`0..1`); the frames TAA accumulates stay unsharpened |
-| `r_temporalAAFeedback` | `0.9` | How much of the previous frames is kept (`0..0.98`); higher is smoother and slower to react |
+| `r_temporalAAFeedback` | `0.9` | How much of the previous frames is kept (`0..0.98`); higher is smoother and slower to react. Parts of the picture that are not moving keep a little more |
 | `r_temporalAAReactiveEffects` | `0.85` | How strongly particles, effects and moving glass reject old frames (`0..1`), which keeps them from smearing |
 | `r_temporalAAReactiveScale` | `1.0` | Multiplies every reactive rejection (`0..2`) |
 
@@ -35,6 +36,10 @@ r_temporalAA 1
 
 In VR, `r_temporalAA 1` gives each eye its own history; automatic mode and
 dynamic resolution stay off there. See the [VR guide](vr.md#display).
+
+Builds made before 11 November 2026, 0.13.2 included, had a fault that made
+the whole 3D view tremble by a fraction of a pixel while temporal AA was on.
+If you see that, set `r_temporalAA 0` until you update.
 
 ## What moves correctly
 

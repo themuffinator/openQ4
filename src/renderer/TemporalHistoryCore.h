@@ -324,6 +324,21 @@ inline temporalJitterSample_t TemporalHistoryCore_Jitter(
 	return sample;
 }
 
+// History lives on the unjittered output grid, so nothing that reprojects into
+// it may see either frame's sub-pixel jitter. The current frame is drawn (and
+// its depth reconstructed) with its jittered projection; giving the previous
+// camera its own jitter-free offsets plus the jitter applied to this frame
+// makes every reprojection - camera/depth, rigid, posed, view weapon - return
+// (current position + motion) exactly: a still camera reprojects each pixel
+// onto itself. Offsets are projectionMatrix[8]/[9].
+inline void TemporalHistoryCore_AlignPreviousProjectionOffsets(
+		const float currentApplied[2], const float currentNeutral[2],
+		const float previousNeutral[2], float out[2] ) {
+	for ( int i = 0; i < 2; ++i ) {
+		out[i] = previousNeutral[i] + ( currentApplied[i] - currentNeutral[i] );
+	}
+}
+
 inline float TemporalHistoryCore_Dot3( const float *a, const float *b ) {
 	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }

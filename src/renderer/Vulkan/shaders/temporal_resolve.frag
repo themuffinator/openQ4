@@ -10,7 +10,9 @@ layout(std140, set = 6, binding = 0) uniform TemporalResolveBlock {
     vec4 sceneOutputExtent;
     // xy = inverse projection scale; zw = current projection offsets.
     vec4 currentReconstruct;
-    // xy = previous projection scale; zw = previous jittered offsets.
+    // xy = previous projection scale; zw = the previous camera's jitter-free
+    // offsets plus the jitter applied to the current frame, so a reprojected
+    // scene texel is that texel plus its motion (no jitter from either frame).
     vec4 previousProject;
     // xy = current depth projection; z = feedback; w = reactive scale.
     vec4 depthFeedback;
@@ -25,13 +27,15 @@ layout(std140, set = 6, binding = 0) uniform TemporalResolveBlock {
     vec4 previousViewAxis0;
     vec4 previousViewAxis1;
     vec4 previousViewAxis2;
-    // xy = current jitter in native normalized coordinates;
+    // xy = jitter the current projection applies, as a fraction of the scene
+    // extent (a point at unjittered uv is drawn at uv - jitter);
     // z = use history; w = debug mode.
     vec4 temporalParams;
     // x = use object velocity;
     // y = camera reprojection valid; z = depth valid;
-    // w = flags: recenter jitter (1), flip scene/depth/history Y (2/4/8),
-    //     sharpen the presented history (16).
+    // w = flags: sample the scene recentered (1: spatial presents and
+    //     upscaling), flip scene/depth/history Y (2/4/8), sharpen the
+    //     presented history (16).
     vec4 motionParams;
     // Conservative current-frame regions whose packet motion domains lack an
     // exact Vulkan velocity stream. Invalid entries have non-positive extent.
@@ -108,9 +112,11 @@ vec2 CameraPreviousUV(vec2 cameraUV, float depth) {
         -viewZ * (ndc.y + temporal.currentReconstruct.w)
             * temporal.currentReconstruct.y,
         viewZ);
-    vec3 worldPosition = temporal.currentViewOrigin.xyz
-        + CurrentViewToWorldDirection(viewPosition);
-    vec3 delta = worldPosition - temporal.previousViewOrigin.xyz;
+    // Relative to the previous origin without passing through absolute world
+    // coordinates: their rounding is a constant sub-pixel history offset per
+    // pixel, which a still camera would integrate into blur.
+    vec3 delta = CurrentViewToWorldDirection(viewPosition)
+        + (temporal.currentViewOrigin.xyz - temporal.previousViewOrigin.xyz);
     return ProjectPreviousView(vec3(
         -dot(delta, temporal.previousViewAxis1.xyz),
         dot(delta, temporal.previousViewAxis2.xyz),
@@ -396,9 +402,21 @@ void main() {
     vec2 sceneCameraUV = clamp(outputCameraUV
         - temporal.temporalParams.xy * float(int(temporal.motionParams.w + 0.5) & 1),
         vec2(0.0), vec2(1.0));
+    float centerDepth = SceneDepthAt(sceneCameraUV);
+    // What lies behind the jittered view (a portal sky) was drawn without
+    // jitter. Where nothing of this view covers the pixel - cleared depth at
+    // both positions and no reactive surface over it - the recentered position
+    // would move that backdrop by the jitter, so sample it in place. Without a
+    // depth image nothing is known to be backdrop.
+    if ((int(temporal.motionParams.w + 0.5) & 1) != 0
+            && temporal.motionParams.z > 0.5 && centerDepth >= 0.99999
+            && SceneDepthAt(outputCameraUV) >= 0.99999
+            && (temporal.motionParams.x < 0.5
+                || texture(objectMotion, sceneCameraUV).b <= 0.0)) {
+        sceneCameraUV = outputCameraUV;
+    }
     vec2 sceneTextureUV = CameraToTextureUV(sceneCameraUV);
     vec4 current = texture(currentScene, StoredTextureUV(sceneTextureUV, 2));
-    float centerDepth = texture(sceneDepth, StoredTextureUV(sceneTextureUV, 4)).r;
     if (temporal.currentViewOrigin.w > 0.5) {
         vec3 centerPosition = centerDepth < 0.99999
             ? CurrentViewPosition(sceneCameraUV, centerDepth)
@@ -446,8 +464,14 @@ void main() {
     }
     vec3 mean = moment1 / 9.0;
     vec3 sigma = sqrt(max(moment2 / 9.0 - mean * mean, vec3(0.0)));
-    vec3 neighborhoodMin = max(mean - sigma * 1.25, sampleMin);
-    vec3 neighborhoodMax = min(mean + sigma * 1.25, sampleMax);
+    // One low-resolution frame under-samples what the history has built up per
+    // output pixel, so the box widens with the upscale factor (it stays inside
+    // the sample range): a tight box pulled every accumulated edge toward
+    // wherever this frame's aliased edge happened to fall.
+    float clipSigma = 1.25 * clamp(temporal.sceneOutputExtent.z
+        * temporal.sceneOutputExtent.x, 1.0, 3.0);
+    vec3 neighborhoodMin = max(mean - sigma * clipSigma, sampleMin);
+    vec3 neighborhoodMax = min(mean + sigma * clipSigma, sampleMax);
 
     // Vectors use bottom-up camera coordinates and scene-pixel units. The
     // scene/history targets use top-down texture coordinates. Blue carries the
@@ -463,8 +487,12 @@ void main() {
     bool objectValid = objectVelocity.a > 0.5;
     bool cameraValid = temporal.motionParams.y > 0.5
         && temporal.motionParams.z > 0.5;
+    // previousProject carries the previous camera aligned to this frame's
+    // jitter, so the reprojection of a scene texel is that texel plus its
+    // motion; the history itself lives on the unjittered output grid.
     vec2 previousCameraUV = cameraValid
-        ? CameraPreviousUV(sceneCameraUV, depthMin)
+        ? outputCameraUV
+            + (CameraPreviousUV(sceneCameraUV, depthMin) - sceneCameraUV)
         : outputCameraUV;
     if (objectValid) {
         previousCameraUV = outputCameraUV
@@ -500,10 +528,27 @@ void main() {
     if (!historyUsable || reactiveMask >= 0.999) {
         reactive = 1.0;
     }
+    // Where history is rejected the current frame shows through. Its raw
+    // samples sit at this frame's jittered positions, which reads as the
+    // surface shaking; take the recentered frame for that share instead.
+    if ((int(temporal.motionParams.w + 0.5) & 1) == 0 && reactive > 0.0
+            && temporal.currentViewOrigin.w < 0.5) {
+        vec3 steady = SceneColorAt(outputCameraUV - temporal.temporalParams.xy);
+        current.rgb = mix(current.rgb, steady, reactive);
+    }
     // Fast motion keeps less history: it cannot be anti-aliased anyway, and
     // every reprojection resamples it.
     float feedback = temporal.depthFeedback.z
         * (1.0 - 0.3 * smoothstep(16.0, 96.0, speed));
+    // A pixel at rest keeps integrating: it takes half the usual share of each
+    // new frame, and less again when upscaling, where one frame holds only a
+    // fraction of the output samples. That shrinks the ripple each jittered
+    // sample leaves on a still edge; nothing at rest can ghost, and any motion
+    // returns to the base feedback.
+    float sceneShare = min(1.0, 1.0
+        / (temporal.sceneOutputExtent.z * temporal.sceneOutputExtent.x));
+    feedback += (1.0 - feedback) * feedback * (1.0 - 0.5 * sceneShare)
+        * (1.0 - smoothstep(0.05, 0.5, speed));
     float historyWeight = historyUsable
         ? feedback * (1.0 - reactive)
         : 0.0;

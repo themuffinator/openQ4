@@ -4956,8 +4956,11 @@ static bool RB_EnsureTemporalResolveProgram( void ) {
 		"\tfloat viewZ = ViewZFromDepth( depth );\n"
 		"\tvec3 viewPosition = vec3( -viewZ * ( ndc.x + CurrentReconstructInfo.z ) * CurrentReconstructInfo.x,\n"
 		"\t\t-viewZ * ( ndc.y + CurrentReconstructInfo.w ) * CurrentReconstructInfo.y, viewZ );\n"
-		"\tvec3 worldPosition = CurrentViewOrigin.xyz + CurrentViewToWorldDirection( viewPosition );\n"
-		"\tvec3 delta = worldPosition - PreviousViewOrigin.xyz;\n"
+		// Relative to the previous origin without passing through absolute
+		// world coordinates: their rounding is a constant sub-pixel history
+		// offset per pixel, which a still camera would integrate into blur.
+		"\tvec3 delta = CurrentViewToWorldDirection( viewPosition )\n"
+		"\t\t+ ( CurrentViewOrigin.xyz - PreviousViewOrigin.xyz );\n"
 		"\treturn ProjectPreviousView( vec3( -dot( delta, PreviousViewAxis1.xyz ),\n"
 		"\t\tdot( delta, PreviousViewAxis2.xyz ), -dot( delta, PreviousViewAxis0.xyz ) ) );\n"
 		"}\n"
@@ -5128,8 +5131,18 @@ static bool RB_EnsureTemporalResolveProgram( void ) {
 		"void main() {\n"
 		"\tvec2 outputUV = gl_TexCoord[0].st;\n"
 		"\tvec2 sceneUV = clamp( outputUV - CurrentJitter * MotionParams.w, vec2( 0.0 ), vec2( 1.0 ) );\n"
-		"\tvec4 current = texture2D( Scene, sceneUV );\n"
 		"\tfloat centerDepth = texture2D( DepthBuffer, sceneUV ).r;\n"
+		// What lies behind the jittered view (a portal sky) was drawn without
+		// jitter. Where nothing of this view covers the pixel - cleared depth
+		// at both positions and no reactive surface over it - the recentered
+		// position would move that backdrop by the jitter, so sample it in place.
+		// Without a depth image nothing is known to be backdrop.
+		"\tif ( MotionParams.w > 0.5 && MotionParams.z > 0.5 && centerDepth >= 0.99999\n"
+		"\t\t\t&& texture2D( DepthBuffer, outputUV ).r >= 0.99999\n"
+		"\t\t\t&& ( MotionParams.x < 0.5 || texture2D( VelocityBuffer, sceneUV ).b <= 0.0 ) ) {\n"
+		"\t\tsceneUV = outputUV;\n"
+		"\t}\n"
+		"\tvec4 current = texture2D( Scene, sceneUV );\n"
 		"\tif ( ScreenEffects0.x > 0.5 ) {\n"
 		"\t\tvec3 centerPosition = centerDepth < 0.99999 ? CurrentViewPosition( sceneUV, centerDepth ) : vec3( 0.0, 0.0, -ScreenEffects0.z );\n"
 		"\t\tvec3 centerNormal = centerDepth < 0.99999 ? DepthNormal( sceneUV, centerPosition ) : vec3( 0.0, 0.0, 1.0 );\n"
@@ -5164,8 +5177,13 @@ static bool RB_EnsureTemporalResolveProgram( void ) {
 		"\t}\n"
 		"\tvec3 mean = moment1 / 9.0;\n"
 		"\tvec3 sigma = sqrt( max( moment2 / 9.0 - mean * mean, vec3( 0.0 ) ) );\n"
-		"\tvec3 neighborhoodMin = max( mean - sigma * 1.25, sampleMin );\n"
-		"\tvec3 neighborhoodMax = min( mean + sigma * 1.25, sampleMax );\n"
+		// One low-resolution frame under-samples what the history has built up
+		// per output pixel, so the box widens with the upscale factor (it stays
+		// inside the sample range): a tight box pulled every accumulated edge
+		// toward wherever this frame's aliased edge happened to fall.
+		"\tfloat clipSigma = 1.25 * clamp( OutputSize.x * InvSceneSize.x, 1.0, 3.0 );\n"
+		"\tvec3 neighborhoodMin = max( mean - sigma * clipSigma, sampleMin );\n"
+		"\tvec3 neighborhoodMax = min( mean + sigma * clipSigma, sampleMax );\n"
 		// Dilate only toward a moving object: a still occluder's edge must not
 		// pin the moving background beside it.
 		"\tvec4 closestVelocity = MotionParams.x > 0.5 ? texture2D( VelocityBuffer, closestUV ) : vec4( 0.0 );\n"
@@ -5174,7 +5192,10 @@ static bool RB_EnsureTemporalResolveProgram( void ) {
 		"\tfloat reactiveMask = max( closestVelocity.b, centerVelocity.b );\n"
 		"\tbool objectValid = objectVelocity.a > 0.5;\n"
 		"\tbool cameraValid = MotionParams.y > 0.5 && MotionParams.z > 0.5;\n"
-		"\tvec2 previousUV = cameraValid ? CameraPreviousUV( sceneUV, depthMin ) : outputUV;\n"
+		// PreviousProjectInfo carries the previous camera aligned to this
+		// frame's jitter, so the reprojection of a scene texel is that texel
+		// plus its motion; the history itself lives on the unjittered output.
+		"\tvec2 previousUV = cameraValid ? outputUV + ( CameraPreviousUV( sceneUV, depthMin ) - sceneUV ) : outputUV;\n"
 		"\tif ( objectValid ) previousUV = outputUV - objectVelocity.xy * InvSceneSize;\n"
 		"\tbool inside = previousUV.x >= 0.0 && previousUV.y >= 0.0 && previousUV.x <= 1.0 && previousUV.y <= 1.0;\n"
 		"\tbool historyUsable = TemporalParams.z > 0.5 && inside && ( objectValid || cameraValid );\n"
@@ -5192,9 +5213,23 @@ static bool RB_EnsureTemporalResolveProgram( void ) {
 		// A full mask (no previous clip position, a newly visible surface, a
 		// subview) owns no history at all, whatever the reactive scale.
 		"\tif ( !historyUsable || reactiveMask >= 0.999 ) reactive = 1.0;\n"
+		// Where history is rejected the current frame shows through. Its raw
+		// samples sit at this frame's jittered positions, which reads as the
+		// surface shaking; take the recentered frame for that share instead.
+		"\tif ( MotionParams.w < 0.5 && reactive > 0.0 && ScreenEffects0.x < 0.5 ) {\n"
+		"\t\tvec3 steady = texture2D( Scene, clamp( outputUV - CurrentJitter, vec2( 0.0 ), vec2( 1.0 ) ) ).rgb;\n"
+		"\t\tcurrent.rgb = mix( current.rgb, steady, reactive );\n"
+		"\t}\n"
 		// Fast motion keeps less history: it cannot be anti-aliased anyway,
 		// and every reprojection resamples it.
 		"\tfloat feedback = TemporalParams.x * ( 1.0 - 0.3 * smoothstep( 16.0, 96.0, speed ) );\n"
+		// A pixel at rest keeps integrating: it takes half the usual share of
+		// each new frame, and less again when upscaling, where one frame holds
+		// only a fraction of the output samples. That shrinks the ripple each
+		// jittered sample leaves on a still edge; nothing at rest can ghost,
+		// and any motion returns to the base feedback.
+		"\tfloat sceneShare = min( 1.0, 1.0 / ( OutputSize.x * InvSceneSize.x ) );\n"
+		"\tfeedback += ( 1.0 - feedback ) * feedback * ( 1.0 - 0.5 * sceneShare ) * ( 1.0 - smoothstep( 0.05, 0.5, speed ) );\n"
 		"\tfloat historyWeight = historyUsable ? feedback * ( 1.0 - reactive ) : 0.0;\n"
 		// Luminance-weighted blend: one bright jittered sample cannot flicker.
 		"\tfloat currentWeight = ( 1.0 - historyWeight ) / ( 1.0 + Luma( current.rgb ) );\n"
@@ -6063,10 +6098,8 @@ static bool RB_DrawTemporalResolvePass( const resolveTemporalPresentationCommand
 	const GLfloat depthProjection[2] = {
 		viewDef->projectionMatrix[10], viewDef->projectionMatrix[14]
 	};
-	const GLfloat jitter[2] = {
-		viewDef->temporalJitterPixels.x / static_cast<GLfloat>( Max( 1, outputWidth ) ),
-		viewDef->temporalJitterPixels.y / static_cast<GLfloat>( Max( 1, outputHeight ) )
-	};
+	GLfloat jitter[2];
+	R_TemporalPresentation_AppliedJitterUV( viewDef, jitter );
 	const GLfloat temporalParams[4] = {
 		idMath::ClampFloat( 0.0f, 0.98f, command.feedback ),
 		idMath::ClampFloat( 0.0f, 2.0f, command.reactiveScale ),
@@ -6149,9 +6182,16 @@ static bool RB_ResolveTemporalPresentationRecorded( const resolveTemporalPresent
 	const int outputHeight = command.presentation.outputHeight;
 	idImage *sceneImage = RB_TemporalColorImage( command.sceneColorTarget );
 	const bool captureFrame = command.captureFrame || tr.takingScreenshot;
+	// Output pixels the jittered scene sits away from its unjittered place,
+	// taken from the projection itself: temporalJitterPixels is in units of
+	// the view's own viewport, which is the scene extent when the game renders
+	// a scaled scene.
 	idVec2 spatialJitter( 0.0f, 0.0f );
 	if ( command.viewDef != NULL ) {
-		spatialJitter = command.viewDef->temporalJitterPixels;
+		float appliedJitter[2];
+		R_TemporalPresentation_AppliedJitterUV( command.viewDef, appliedJitter );
+		spatialJitter.Set( appliedJitter[0] * static_cast<float>( Max( 1, outputWidth ) ),
+			appliedJitter[1] * static_cast<float>( Max( 1, outputHeight ) ) );
 	}
 	if ( command.viewDef == NULL || sceneWidth <= 0 || sceneHeight <= 0
 			|| outputWidth <= 0 || outputHeight <= 0
@@ -6311,10 +6351,15 @@ static bool RB_ResolveTemporalPresentationRecorded( const resolveTemporalPresent
 			0.0f, 0.0f, 1.0f, 1.0f );
 	}
 
+	// An upscaled scene is sampled where each output pixel lies in the
+	// jittered frame, so successive frames register on the output grid and
+	// accumulate detail. At native resolution the raw jittered samples are the
+	// sub-pixel samples the history integrates.
+	const bool registerScene = sceneWidth != outputWidth || sceneHeight != outputHeight;
 	if ( !RB_DrawTemporalResolvePass( command, sceneImage, depthImage,
 			historyReadImage, velocityValid ? rbMotionVectorImage : NULL,
 			command.historyWriteTarget, &motionPolicy,
-			useHistory, velocityValid, false, false, 0 ) ) {
+			useHistory, velocityValid, registerScene, false, 0 ) ) {
 		RB_RejectTemporalHistoryWrite( command );
 		record.outcome = TEMPORAL_RESOLVE_FALLBACK;
 		record.reason = "resolve pass failed";
@@ -6334,7 +6379,7 @@ static bool RB_ResolveTemporalPresentationRecorded( const resolveTemporalPresent
 	if ( debugMode > 0 && RB_DrawTemporalResolvePass( command, sceneImage, depthImage,
 			historyReadImage, velocityValid ? rbMotionVectorImage : NULL,
 			NULL, &motionPolicy,
-			useHistory, velocityValid, false, preserveFarDepth, debugMode ) ) {
+			useHistory, velocityValid, registerScene, preserveFarDepth, debugMode ) ) {
 		return true;
 	}
 	return RB_PresentTemporalSpatialFallback( historyWriteImage,

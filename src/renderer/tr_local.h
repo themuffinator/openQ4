@@ -382,7 +382,10 @@ typedef struct viewDef_s {
 	idVec2				temporalJitterPixels;
 	idVec3				temporalPreviousViewOrigin;
 	idMat3				temporalPreviousViewAxis;
+	// previous camera: xy = projection scale, zw = its jitter-free offsets
+	// aligned to this frame's applied jitter (FinalizeViewProjection)
 	idVec4				temporalPreviousProjectInfo;
+	idVec2				temporalPreviousNeutralProjectionOffset;
 	idVec2				temporalPreviousJitterPixels;
 	// projectionMatrix[8]/[9] before any jitter (R_SetupProjection)
 	idVec2				temporalNeutralProjectionOffset;

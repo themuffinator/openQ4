@@ -2286,7 +2286,15 @@ idImage *VK_PostProcess_TemporalMotionVectors( const viewDef_t *viewDef,
 		VK_PostProcess_ResetTemporalMotion();
 		return NULL;
 	}
-	const bool drawn = VK_Post_RenderMotionVectors( viewDef, vkTemporalMotionViewHistory,
+	// The history is on the unjittered output grid: give the previous camera
+	// its jitter-free offsets plus this frame's applied jitter, so the vectors
+	// carry motion only (TemporalHistoryCore_AlignPreviousProjectionOffsets).
+	vkPostMotionViewState_t currentState;
+	vkPostMotionViewState_t alignedPrevious = vkTemporalMotionViewHistory;
+	if ( VK_Post_BuildMotionViewState( viewDef, currentState, width, height ) ) {
+		VK_Post_MotionAlignPreviousState( currentState, vkTemporalMotionViewHistory, alignedPrevious );
+	}
+	const bool drawn = VK_Post_RenderMotionVectors( viewDef, alignedPrevious,
 		depthImage, VK_Exec_ActiveRenderTexture(), vkTemporalMotionEntityHistory,
 		vkTemporalMotionImage, vkTemporalMotionTarget, width, height, true, complete );
 	vkTemporalMotionComplete = complete;

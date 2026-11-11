@@ -45,14 +45,28 @@
 #include "vk_Image.h"
 #include "vk_ExecutorHooks.h"
 
+// RGBA16F images (the backend-owned temporal history) read back clamped to
+// [0,1], as OpenGL's unsigned-byte readback does.
 bool idImage::ReadPixelsRGBA8( idList<byte> &pixels ) {
 	pixels.Clear();
-	if ( !IsLoaded() || opts.textureType != TT_2D || opts.format != FMT_RGBA8
+	if ( !IsLoaded() || opts.textureType != TT_2D
+			|| ( opts.format != FMT_RGBA8 && opts.format != FMT_RGBA16F )
 			|| opts.numMSAASamples != 0 || opts.width < 1 || opts.height < 1
 			|| opts.width > 8192 || opts.height > 8192 ) {
 		return false;
 	}
-	return VK_Exec_ReadImageScreenshot( this, pixels );
+	if ( opts.format == FMT_RGBA8 ) {
+		return VK_Exec_ReadImageScreenshot( this, pixels );
+	}
+	idList<float> values;
+	if ( !VK_Exec_ReadLinearScreenshot( this, values ) || values.Num() != opts.width * opts.height * 4 ) {
+		return false;
+	}
+	pixels.SetNum( values.Num() );
+	for ( int i = 0; i < values.Num(); i++ ) {
+		pixels[i] = static_cast<byte>( idMath::ClampFloat( 0.0f, 1.0f, values[i] ) * 255.0f + 0.5f );
+	}
+	return true;
 }
 
 extern idCVar image_anisotropy;

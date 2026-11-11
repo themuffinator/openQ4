@@ -6,6 +6,38 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Temporal AA holds the picture still (#216), 11 November 2026
+
+- **The 3D view no longer trembles with temporal AA on.** With nothing moving,
+  the whole picture used to shift by a fraction of a pixel every frame, in an
+  eight-frame cycle, as if it were vibrating. It did this at native resolution
+  (`r_temporalAA 1`) and, more strongly, in the automatic upscaling that the
+  lower presets and dynamic resolution use. The picture now stays put.
+- **It is sharper as well.** The same fault blurred the image a little on
+  every frame. Native-resolution temporal AA keeps about a quarter more fine
+  detail, and upscaled scenes about a fifth to a third more.
+- **Characters standing still keep their smooth edges.** An animated model
+  that was not re-posed on a frame (a paused game, a frame between two game
+  updates at high frame rates, a body at rest) lost its anti-aliasing for that
+  frame. It now keeps it.
+- **Nothing to do.** No setting changes. OpenGL and Vulkan, single player and
+  multiplayer behave the same way.
+- Evidence: `renderer_temporal_stability.py` on Windows x64, Air Defense 1,
+  1280 x 720, game time stopped, 24 consecutive frames of the resolved image
+  per case. Largest frame-to-frame movement before and after:
+  OpenGL 0.99 px to 0.032 px and Vulkan 0.98 px to 0.030 px at native
+  resolution; 1.24 px to 0.001 px (both) from 75% scale; 1.78 px (OpenGL) and
+  1.74 px (Vulkan) to 0.003 px or less from 50% scale. Pixels changing
+  between frames fell from 12-13% to 0.05% or less. 4x MSAA, the sharpened
+  scale mode and the multiplayer path pass the same gate.
+  `renderer_temporal_qualification.py` (13 cases, 23 runs, no unexpected fallback),
+  `renderer_temporal_presentation.py`, the temporal resolve shader pin, the
+  native temporal history test and the VR per-eye temporal smoke (test OpenXR
+  runtime, both backends) pass. Not measured: ghosting while moving, by eye,
+  on the reference display; Linux, macOS, Android and a headset. Open findings
+  (texture detail when upscaling, Vulkan texture sharpness) are in
+  [temporal presentation](temporal-presentation.md#stability-qualification-11-november-2026-issue-216).
+
 ## Heat haze no longer smears your weapon into the scene, 11 November 2026
 
 - **The view weapon stays out of heat haze.** Heat haze from fires, jets and

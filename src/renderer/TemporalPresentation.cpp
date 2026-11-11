@@ -531,6 +531,7 @@ void R_TemporalPresentation_PrepareView( viewDef_t *viewDef ) {
 	viewDef->temporalPreviousViewOrigin.Zero();
 	viewDef->temporalPreviousViewAxis.Identity();
 	viewDef->temporalPreviousProjectInfo.Zero();
+	viewDef->temporalPreviousNeutralProjectionOffset.Zero();
 	viewDef->temporalPreviousJitterPixels.Zero();
 	viewDef->temporalHistoryResetReason = TEMPORAL_HISTORY_RESET_FIRST_SAMPLE;
 	viewDef->temporalJitterEnabled = false;
@@ -593,6 +594,9 @@ void R_TemporalPresentation_PrepareView( viewDef_t *viewDef ) {
 		viewDef->temporalPreviousProjectInfo.Set(
 			previous.projectInfo[0], previous.projectInfo[1],
 			previous.projectInfo[2], previous.projectInfo[3] );
+		// jitter-free; FinalizeViewProjection aligns .zw to this frame's jitter
+		viewDef->temporalPreviousNeutralProjectionOffset.Set(
+			previous.projectInfo[2], previous.projectInfo[3] );
 		viewDef->temporalPreviousJitterPixels.Set(
 			previous.jitterPixels[0], previous.jitterPixels[1] );
 		viewDef->temporalPreviousProjectionValid = true;
@@ -648,6 +652,28 @@ void R_TemporalPresentation_FinalizeViewProjection( viewDef_t *viewDef ) {
 			|| viewDef->temporalCaptureFrame ) {
 		return;
 	}
+	// The history keeps this camera's jitter-free offsets. What the backends
+	// consume as the previous projection is aligned to the jitter applied to
+	// the current frame, so no reprojection into the unjittered history carries
+	// either frame's sub-pixel offset (issue #216: the resolved image used to
+	// follow the jitter instead of cancelling it). Derived from the stored
+	// neutral offsets every time, so a repeated call cannot shift it twice.
+	const float appliedOffset[2] = {
+		viewDef->projectionMatrix[8], viewDef->projectionMatrix[9] };
+	const float neutralOffset[2] = {
+		viewDef->temporalNeutralProjectionValid
+			? viewDef->temporalNeutralProjectionOffset.x : appliedOffset[0],
+		viewDef->temporalNeutralProjectionValid
+			? viewDef->temporalNeutralProjectionOffset.y : appliedOffset[1] };
+	if ( viewDef->temporalPreviousProjectionValid ) {
+		float aligned[2];
+		TemporalHistoryCore_AlignPreviousProjectionOffsets( appliedOffset,
+			neutralOffset, viewDef->temporalPreviousNeutralProjectionOffset.ToFloatPtr(),
+			aligned );
+		viewDef->temporalPreviousProjectInfo.z = aligned[0];
+		viewDef->temporalPreviousProjectInfo.w = aligned[1];
+	}
+
 	temporalViewHistorySlot_t *slot = R_TemporalPresentation_FindViewHistory(
 		viewDef->temporalViewIdentity, false );
 	if ( slot == NULL || slot->camera.historyGeneration
@@ -656,14 +682,30 @@ void R_TemporalPresentation_FinalizeViewProjection( viewDef_t *viewDef ) {
 	}
 	slot->camera.projectInfo[0] = viewDef->projectionMatrix[0];
 	slot->camera.projectInfo[1] = viewDef->projectionMatrix[5];
-	slot->camera.projectInfo[2] = viewDef->projectionMatrix[8];
-	slot->camera.projectInfo[3] = viewDef->projectionMatrix[9];
+	slot->camera.projectInfo[2] = neutralOffset[0];
+	slot->camera.projectInfo[3] = neutralOffset[1];
 	slot->camera.depthProjection[0] = viewDef->projectionMatrix[10];
 	slot->camera.depthProjection[1] = viewDef->projectionMatrix[14];
 	slot->camera.jitterPixels[0] = viewDef->temporalJitterPixels.x;
 	slot->camera.jitterPixels[1] = viewDef->temporalJitterPixels.y;
 	slot->camera.valid = true;
 	slot->camera.projectionValid = true;
+}
+
+void R_TemporalPresentation_AppliedJitterUV( const viewDef_t *viewDef,
+		float jitterUV[2] ) {
+	jitterUV[0] = jitterUV[1] = 0.0f;
+	if ( viewDef == NULL || !viewDef->temporalJitterEnabled
+			|| !viewDef->temporalNeutralProjectionValid ) {
+		return;
+	}
+	// ndc = scale * x / -z - projectionMatrix[8]: the offset the jitter added to
+	// [8]/[9] is the whole shift in NDC, whatever viewport or scene target
+	// the view was scaled into.
+	jitterUV[0] = 0.5f * ( viewDef->projectionMatrix[8]
+		- viewDef->temporalNeutralProjectionOffset.x );
+	jitterUV[1] = 0.5f * ( viewDef->projectionMatrix[9]
+		- viewDef->temporalNeutralProjectionOffset.y );
 }
 
 void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
@@ -1024,7 +1066,18 @@ struct vertCache_s *R_TemporalPresentation_PreviousPositionCache(
 			|| !R_TemporalPresentation_PreviousPositionsRequested() ) {
 		return NULL;
 	}
-	const srfTriangles_t *tri = drawSurf->geo;
+	srfTriangles_t *tri = const_cast<srfTriangles_t *>( drawSurf->geo );
+	if ( tri->positionsFrame > 0 && tri->positionsFrame != tr.frameCount ) {
+		// A posed surface drawn again without being posed this frame: game time
+		// is stopped, this render frame falls between two game tics, or the
+		// entity is at rest and its cached model was kept. The pose is the one
+		// drawn before, so its previous positions are its current ones and the
+		// vector comes from the model transform alone - exactly what an
+		// animation-LOD redraw records. Without this the surface had no capture
+		// and was rejected as reactive on every such frame.
+		R_TemporalPresentation_CapturePreviousPositions( tri );
+		R_TemporalPresentation_MarkPositionsDrawn( tri );
+	}
 	if ( tri->previousPositions == NULL || tri->previousPositionsFrame != tr.frameCount
 			|| tri->numVerts <= 0 || tri->numPreviousPositions != tri->numVerts
 			|| !drawSurf->material->IsDrawn()

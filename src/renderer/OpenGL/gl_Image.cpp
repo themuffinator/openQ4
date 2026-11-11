@@ -54,9 +54,12 @@ GLES module through the same branches rather than duplicating them.
 #endif
 #include "../GLPixelTransferScope.h"
 
+// RGBA16F images (the backend-owned temporal history) read back clamped to
+// [0,1], which glGetTexImage does when asked for unsigned bytes.
 bool idImage::ReadPixelsRGBA8( idList<byte> &pixels ) {
 	pixels.Clear();
-	if ( !IsLoaded() || opts.textureType != TT_2D || opts.format != FMT_RGBA8
+	if ( !IsLoaded() || opts.textureType != TT_2D
+			|| ( opts.format != FMT_RGBA8 && opts.format != FMT_RGBA16F )
 			|| opts.numMSAASamples != 0 || opts.width < 1 || opts.height < 1
 			|| opts.width > 8192 || opts.height > 8192 ) {
 		return false;
@@ -67,7 +70,8 @@ bool idImage::ReadPixelsRGBA8( idList<byte> &pixels ) {
 	glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width );
 	glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height );
 	glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format );
-	if ( width != opts.width || height != opts.height || format != GL_RGBA8
+	if ( width != opts.width || height != opts.height
+			|| format != ( opts.format == FMT_RGBA16F ? GL_RGBA16F : GL_RGBA8 )
 			|| glGetTexImage == NULL ) {
 		return false;
 	}
