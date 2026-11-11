@@ -64,6 +64,9 @@ void R_BindTextureForDirectAccess(int,unsigned){++metadataNative;}
 using GLenum=int;enum{RENDERER_CONTEXT_PROFILE_ES=1,GL_COLOR_ATTACHMENT0=2,GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT=3,GL_RGBA8=10,GL_RGB8,GL_RGBA,GL_RGB,GL_SRGB8_ALPHA8,GL_SRGB8,GL_RGB565,GL_RGB5_A1,GL_RGBA4,GL_UNSIGNED_BYTE,FMT_RGBA8,GL_DEPTH_COMPONENT,GL_DEPTH_COMPONENT16,GL_DEPTH_COMPONENT24,GL_DEPTH_COMPONENT32,GL_DEPTH_COMPONENT32F,GL_DEPTH24_STENCIL8,GL_DEPTH32F_STENCIL8,GL_FLOAT,FMT_DEPTH};
 bool idImage::NeedsColorCopyRespecification(int w,int h)const{return IsFileBacked()&&opts.textureType==TT_2D&&(opts.format!=FMT_RGBA8||opts.numLevels!=1||opts.width!=w||opts.height!=h);}
 struct RenderTexture{int GetNumColorImages()const{return 0;}};struct{RenderTexture* renderTexture=nullptr;}backEnd;struct{struct{int profile=0;}backendCaps;}glConfig;
+// No window view's multisampled stand-in is bound here (cb24ae86d's read path).
+static unsigned R_DefaultFramebufferHandle(){return 0;}
+static int R_DefaultFramebufferSamples(){return 0;}
 '''
 TESTS = r'''
 static void Failed(){Reset();allocationFailure=true;Run(false);allocationFailure=false;metadataNative=0;}

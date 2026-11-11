@@ -5956,7 +5956,16 @@ def main() -> int:
             if path == ROOT / 'src/game/gamesys/RetainedScope.h':
                 continue
             if path.suffix.lower() in {'.gui', '.def', '.cfg', '.script', '.mtr', '.cpp', '.h'} and path.is_file():
-                assert '.rui' not in path.read_text(encoding='utf-8', errors='replace'), f'{path} names a retained document'
+                text = path.read_text(encoding='utf-8', errors='replace')
+                if path.name == 'SaveGame.cpp' and path.parent.name == 'gamesys':
+                    # Saves written before the .q4ui -> .rui rename (822de6800)
+                    # still record the old name, and the restore maps it. That
+                    # migration is the only mention a save file may carry.
+                    for line in ('// the format as .rui; saves written before then still name the old file.',
+                                 'name.SetFileExtension( ".rui" );'):
+                        assert text.count(line) == 1, f'{path} lost its .q4ui save migration'
+                        text = text.replace(line, '')
+                assert '.rui' not in text, f'{path} names a retained document'
 
     # Behaviour: the production session code against counted doubles.
     start = menu.index('static const char *const RETAINED_TITLE_GUI')

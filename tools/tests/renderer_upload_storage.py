@@ -40,7 +40,9 @@ def main():
             ('orphan-proof','storageReady = R_RendererUpload_BoundStorageMatches(stats.ringSizeBytes);','storageReady = R_RendererUpload_BoundStorageMatches(stats.ringSizeBytes) || clean;'),
             ('query-thread','!R_ImagePolicyRendererThread() || !initialized','!initialized'),
             ('query-generation','!storageReady || !storage.generation ||','!storageReady ||'),
-            ('fallback-fence','hasSync = path == UPLOAD_PATH_PERSISTENT && syncAvailable;','hasSync = requestedPath != UPLOAD_PATH_DISABLED && syncAvailable;'),
+            # Init's copy: ResizeFrameStream repeats the line after a blank one, and this harness never resizes.
+            ('fallback-fence','legacy uploads");\n\t}\n\tstats.persistentMapped = path == UPLOAD_PATH_PERSISTENT;\n\tstats.mapRangeFallback = path == UPLOAD_PATH_MAP_RANGE;\n\thasSync = path == UPLOAD_PATH_PERSISTENT && syncAvailable;',
+             'legacy uploads");\n\t}\n\tstats.persistentMapped = path == UPLOAD_PATH_PERSISTENT;\n\tstats.mapRangeFallback = path == UPLOAD_PATH_MAP_RANGE;\n\thasSync = requestedPath != UPLOAD_PATH_DISABLED && syncAvailable;'),
             ('no-context-delete','if ( glConfig.isInitialized && glDeleteBuffersARB != NULL ) {','if ( glDeleteBuffersARB != NULL ) {'),
         ]
     results=[]
