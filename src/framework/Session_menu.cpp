@@ -1982,6 +1982,25 @@ bool idSessionLocal::PublishRetainedPlayerSetup( idUserInterface *gui, bool rebu
 	gui->SetStateInt( "setup.force_row", forcedIndex >= retainedSetupFirst && forcedIndex < retainedSetupFirst + int(PlayerSetupModelRows) ?
 		forcedIndex-retainedSetupFirst : -1 );
 	gui->SetStateString( "setup.observed_force", forcedModel.c_str() );
+	// Its parts and name, for OPPONENTS' preview: the forced model as the
+	// player's own is named, or none.
+	idStr forcedBody, forcedHead, forcedSkin, forcedDescription, forcedTeam, forcedHeadSkin;
+	if ( forcedIndex >= 0 && MainMenuExtractPlayerModelInfo( forcedModel.c_str(), forcedBody, forcedHead, forcedSkin, forcedDescription, forcedTeam ) ) {
+		if ( forcedHead.Length() ) {
+			const idDeclEntityDef *head = static_cast<const idDeclEntityDef *>( declManager->FindType( DECL_ENTITYDEF, forcedHead.c_str(), false ) );
+			if ( head != NULL ) {
+				forcedHeadSkin = head->dict.GetString( "skin" );
+			}
+		}
+	} else {
+		forcedBody.Clear(); forcedHead.Clear(); forcedSkin.Clear();
+	}
+	gui->SetStateString( "setup.force_body", forcedBody.c_str() );
+	gui->SetStateString( "setup.force_head", forcedHead.c_str() );
+	gui->SetStateString( "setup.force_skin", forcedSkin.c_str() );
+	gui->SetStateString( "setup.force_head_skin", forcedHeadSkin.c_str() );
+	gui->SetStateString( "setup.force_name", forcedIndex >= 0 && forcedBody.Length() ?
+		Session_RetainedPlayerText( retainedSetupNames[ forcedIndex ].c_str(), 256, 1 ).c_str() : "" );
 	const char *tint = cvarSystem->GetCVarString("ui_hitscanTint");
 	gui->SetStateString( "setup.observed_rail", tint );
 	float hue=0,saturation=0,brightness=0;

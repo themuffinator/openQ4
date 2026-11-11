@@ -270,7 +270,10 @@ See [player release status](../user/release-status.md).
 - **Player Setup.** Three tabs: Player, Opponents and Teammates. Opponents
   and Teammates hold the outline, rim light and brightskin settings that
   were only on the in-game menu, and Opponents can force a model on other
-  players in free-for-all modes.
+  players in free-for-all modes; the preview then shows that model. Press Q
+  and E, or a controller's shoulder buttons, to change tab. Every row and
+  Back fit on the page without scrolling, and colour settings show a chip
+  of the colour.
 - **Create Server.** Advanced Server Options is split into Server, Match and
   Rules tabs and fits the screen again. New rows: Shuffle Teams, Overtime
   (seconds), Mercy Lead and Round Limit.

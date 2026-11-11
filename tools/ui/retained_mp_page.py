@@ -126,7 +126,8 @@ def multiplayer_document() -> dict:
         content_node = next(node for node in content["children"] if node["id"]==ident)
         content_node["properties"]["display"] = keyword("block" if ident=="details" else "flex")
         doc.bind(f"{ident}.setup-display",ident,"display",{"op":"select","args":[{"state":"setup.open"},"none","block" if ident=="details" else "flex"]})
-    doc.events["setupOpen"] = [{"op":"setState","values":{"setup.open":True}}, {"op":"focus","control":"setup-name"}]
+    # Each opening starts on the PLAYER tab, where its first focus is.
+    doc.events["setupOpen"] = [{"op":"setState","values":{"setup.open":True,"setup.tab":0}}, {"op":"focus","control":"setup-name"}]
     doc.events["setupClose"] = [{"op":"setState","values":{"setup.open":False}}, {"op":"focus","control":"setup"}]
     # Going deeper, the section's label carries from its row into the slot at
     # the step's foot (title.carry, 300 ms).

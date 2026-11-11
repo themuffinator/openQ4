@@ -190,6 +190,34 @@ session answers with the row it stands on (`setup.force_row`). The two
 teams' forced models depend on the team the player is on and stay on the
 in-game page.
 
+### A second pass on Player Setup
+
+A further round on the page alone, the same day:
+
+- **The tab strip.** The three tabs were plates with an underline, their
+  labels shrunk to 13 dp to hold the longest translations. They are the
+  in-game card's strip (`retained_mp_menus.tab_strip`): the shown tab rises
+  in the tab green inside its outline, each tab is as wide as its label in
+  the running language and a share of the rest, and the Q and E keycaps at
+  its ends, or a controller's shoulder buttons, step through the tabs
+  (`onTabPrevious`, `onTabNext`) and take the focus to the shown one. Each
+  opening starts on PLAYER.
+- **Room for every row.** The page stood from 130 u, so two tabs' last rows
+  and BACK had to be scrolled to. It stands from 72 u, under the docked top
+  band, with 312 u for its rows, and every tab shows all its rows and BACK.
+  The rows are 540 dp wide, which the strip needs in its widest language.
+  PREVIOUS and NEXT, which page a catalog of more than 128 models, give
+  their row's place while the catalog has one page.
+- **Colours.** Effect Color and Bright Color show a chip of the colour
+  beside its name (`colour_chip`), and Rail Color's label takes the rows'
+  own style on the row's middle line.
+- **The preview.** On OPPONENTS, while a model is forced, the preview shows
+  that model and names it, where it always showed the player's own; the
+  session publishes the forced model's parts and name (`setup.force_body`,
+  `_head`, `_skin`, `_head_skin`, `_name`) as it does the player's. Under
+  the figure stands a bay (`preview_bay`): a ground ring where it stands and
+  corner brackets around it, in the HUD's line at low strength.
+
 ## Create Server's advanced options
 
 ADVANCED SERVER OPTIONS listed sixteen rows in one column, taller than the
@@ -256,6 +284,9 @@ screens are in `.tmp/menu-round/screens-2026-11-11/new/`.
 - Player Setup's tabs, with Outline set to Low and a model forced on
   OPPONENTS (`cl_player_outline_enemy` 0.35, `g_forceModel` read back):
   `n4/n-setup-tabs`, `n5/n-setup-tabs`.
+- Player Setup's second pass, each tab without scrolling, the tabs stepped
+  with the Q and E events, and another model forced and shown in the
+  preview: `p2/n-setup-tabs`.
 - Create Server's tabs, with Shuffle Teams set (`si_shuffle` 1):
   `n4/n-create-tabs`.
 - Join Game's top section and both list views over a loopback server, the

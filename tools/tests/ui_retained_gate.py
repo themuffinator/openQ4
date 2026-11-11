@@ -4688,9 +4688,10 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
     # OPTIONS, DISPLAY (SYSTEM) and AUDIO sub-pages.
     assert documents == 28, documents
     # The cards' and the settings sub-pages' tab keys take the shoulders, as do
-    # the Escape and Welcome cards' Tabs prompts; every Accept and Back prompt
-    # follows Swap Confirm and Back.
-    assert shoulders == 16, shoulders
+    # the Escape and Welcome cards' Tabs prompts and Player Setup's tab strip
+    # on the Multiplayer page; every Accept and Back prompt follows Swap
+    # Confirm and Back.
+    assert shoulders == 18, shoulders
     assert swapping == 55, swapping
     print(f'ui_retained gate: prompt glyphs follow the active device in {documents} documents')
 
