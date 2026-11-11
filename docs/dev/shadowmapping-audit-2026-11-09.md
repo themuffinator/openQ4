@@ -67,6 +67,7 @@ cache (sixteen at most) against forty cubes in view.
 | **Light-facing one-sided geometry cast in maps and never in stencil.** A stencil volume is built from the triangles that face away from the light and from nothing else, and the levels are lit on that understanding: a lamp shines through the one-sided floor it hangs over. The automatic caster mode drew every open surface two-sided, so the same floor blocked its light. storage2's fourteen alarm lights lit almost nothing with shadow maps on: at eight beam angles the mapped picture differed from the stencil one in up to 32,000 pixels on Vulkan and 73,000 on OpenGL. Recorded in September as a contact-detail decision; it is a missing light. | **Fixed, both backends.** Open geometry stores the triangles that face away from the light; a sealed hull keeps its near shell. See "Which triangles cast" below. |
 | **The near shell of a sealed hull was its far shell under every parallel and distant point light**, and under any projector whose right and up vectors are left-handed against its direction. Those projections show the light's view mirrored, which swaps the face the rasterizer reports for every triangle, and the culling took no account of it. A sealed hull has the same silhouette either way, so it showed only as the detached contact shadow the near shell was chosen to avoid. | **Fixed, both backends.** The face to discard follows the projection's handedness. See "Which triangles cast" below. |
 | **OpenGL lit a surface harder under a shadow map than without one.** Its two shadow receivers normalized the stock normal-map sample, which the classic interaction and Vulkan use as stored. A filtered sample is shorter than a unit vector wherever the relief turns, so every raised edge was drawn brighter with shadow maps on than with stencil shadows or none: in one test view 44,000 pixels were brighter than the picture with no shadows at all. | **Fixed (OpenGL).** See "Receiver lighting on OpenGL" below. |
+| On OpenGL a shadow-mapped stock light is about 0.4% brighter than the same light without a map: one level of 255 in up to four mid-bright pixels in ten. The unshadowed light is drawn by the game's own ARB program, which reads its light vector from an 8-bit normalization cube that decodes to 0.996 of unit length; the receivers normalize exactly, as Vulkan does on every path. | **By design.** Matching it would mean reading that cube in the receivers; Vulkan has no such split and is exact. See "Receiver lighting on OpenGL" below. |
 | CSM lights are unshadowed past `r_shadowMapCascadeDistance`. Maximum only. | **Open.** |
 
 ### Resources
@@ -1009,6 +1010,42 @@ two renderers now agree with stencil equally.
 A loose copy of the two shaders under the save path had no effect on the
 picture; the change showed only once a build had packed them.
 
+**What is left on the stock path.** After the change the mapped picture is
+still brighter than the unshadowed one by exactly one level in 345,000 pixels
+of that view, by two in 1,300, and by more than eight in 400. The share rises
+with brightness, from 3% of dark channels to 41% around mid-grey, which is a
+light about 0.4% too strong, not an offset. On OpenGL a stock light without a
+map is drawn by the game's own ARB program (`interaction.vfp`), not by
+`material_interaction.fs`, which serves cel banding and the enhanced
+materials. That program reads the light vector from the normalization cube,
+stored as `128 + 127 v` and read back as `2 c / 255 - 1`: 0.996 of unit
+length. The receivers normalize exactly. The size fits; neither side was
+changed to prove it. Vulkan draws both with one shader and shows no pixel
+brighter under a map than without one.
+
+**The PBR branch.** Checked in the PBR laboratory (24 authored stations, a
+point light and a projector that cast, two fills that do not), built on this
+session's binaries, with the stations captured unshadowed, under stencil and
+under maps in one process. A PBR receiver, mapped or not, is lit by one
+function that takes the shadow factor as its argument (`OpenQ4PBRDirect`),
+and the pictures agree:
+
+| Pixels brighter than the unshadowed capture, outside the translucent station | Stencil | Projector mapped | Point light mapped too |
+|---|---:|---:|---:|
+| Vulkan | 0 | 0 | 0 |
+| OpenGL | 0 | 10,843, by one level | 88,061, by two at most |
+
+OpenGL and Vulkan differ from each other in 5 to 14 pixels of these captures.
+The one or two levels on OpenGL do not follow the filter (the same with one
+tap) or the translucent receiver setting; their cause was not found.
+
+One station is lighter whenever shadows are on, on both renderers and under
+stencil as much as under maps: the translucent one. That is the ownership
+rule, not the receivers. A view in which a shadow-casting light reaches a
+translucent receiver hands every translucent surface back to the classic
+path, because a light replayed at the blend stage cannot carry its shadow
+(`RB_GLPBR_TranslucentViewAdmits`, `VK_PBRTransparentViewAdmits`).
+
 Checked for this change, on the final build: the figures above; the fourteen
 scenarios on both back ends; the continuous-motion qualification; the
 in-engine self-tests on both renderers; and the 74 static tests that read the
@@ -1045,6 +1082,10 @@ whether Enhanced can now map point lights on Vulkan.
 6. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
    cubes. It needs a resident entry two passes of a view can share.
+7. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
+   most, than the same light unshadowed, in up to a tenth of the view. Not
+   the filter and not the translucent setting; Vulkan is exact. Invisible,
+   and unexplained.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters").
