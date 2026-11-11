@@ -1777,7 +1777,14 @@ optimization has landed.
   storage2's alarm lights had been blocked by a one-sided floor.) (OpenGL's
   shadow receivers no longer normalize the stock normal-map sample, which lit
   every raised edge harder under a shadow map than without one; OpenGL now
-  agrees with stencil as closely as Vulkan does.)
+  agrees with stencil as closely as Vulkan does.) (A still light's maps are no
+  longer rendered again when two of its casters change places in the view's
+  entity order, or when a rising frame rate makes a caster at rest count as moving
+  again: the static signature is a sum of per-caster hashes and the oldest frame
+  that counts as recent never moves back. On two walks in the airdefense1 arena
+  every fresh map was for the order, 8 and 8 on Vulkan and 8 and 20 on OpenGL,
+  and none is left. The world's geometry joins a still light's casters only when
+  a door connects an area, which the map needs.)
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

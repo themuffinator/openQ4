@@ -46,6 +46,8 @@ cache (sixteen at most) against forty cubes in view.
 | **Vulkan copied every reused projected map into the view's atlas**, each view, only to sample it there. The copy serves a view that has moving casters to draw over the map and nothing else. With static cutouts it was the largest shadow phase left in convoy2's start view: 0.54 ms for eleven maps, ten of which had nothing live. | **Fixed (Vulkan).** A reused map with no moving caster is read where it lives. See "Resident projected tiles on Vulkan" below. |
 | **A light's cached maps were rendered again whenever a static caster's stencil volume entered or left the view.** The signature that names the cached depth hashed, for each static caster, whether the view also saw that caster's volume. It flips as the player walks past, and the depth does not change. On a walk through hub2 one light with 77 static casters re-rendered both of its cubes nine times in five seconds for it. | **Fixed, both backends.** The signature no longer carries that bit; about half of the maps rendered fresh on a walk were for it. See "Walking" below. |
 | **Which still casters a map held followed the camera too.** The shadow LOD admitted an entity's shadow within 768 units and dropped it beyond, in the static map as anywhere, and a model's first snapshot counted as the model moving for a quarter of a second. Each change rendered the light's maps again. | **Fixed, both backends.** A static caster of a still light is in the map at any distance, and a first snapshot is not motion. See "Static membership" below. |
+| **A still light's maps were rendered again when two of its casters changed places in the list.** The signature chained every static caster into one running hash, in the order the casters reached the light. That order follows the view: entities are sorted by model and, within one model, by where the frame's memory happened to put them, so two door frames or two crates of one model change places as the camera moves. The casters and the depth they write are the same, and the signature was another. In the airdefense1 arena every map rendered fresh on two short walks was for this: 8 and 8 on Vulkan, 8 and 20 on OpenGL. | **Fixed, both backends.** Each caster is hashed by itself and the hashes are added up. See "Caster order and the live window" below. |
+| **A caster that had just come to rest could count as moving again.** A caster is live while it has changed within the frames of a quarter second, and that number of frames comes from a frame time that drops at once on a fast frame. When the frame rate rose the window grew by several frames in one step, and a door that had left it a frame earlier was inside it again: out of its lights' static maps and back in, each a change of signature. | **Fixed, both backends.** The oldest frame that still counts as recent never moves back. See "Caster order and the live window" below. |
 | **GL timer queries ran in every shadow phase of every light**, whether or not anything read them. A view with more phases than the 64 query slots polled all 64 unfinished queries for each further phase. | **Fixed.** Queries are issued only while `r_shadowMapReport` or `r_shadowMapDebugOverlay` is on. This alone was about half of the OpenGL CPU frame in hub2. |
 | **The point receiver's per-texel path was the common path.** Each of the nine taps compared four texels against their own point on the receiver plane, with a cube-face selection each: 36 comparisons that read a four-by-four block of texels. | **Fixed, both backends.** The default kernel (nine fixed taps, one texel radius, hardware comparison) is one pass over the sixteen texels with the same weights, or nine plain bilinear lookups where the bias covers the block. Other tap counts, radii and the rotated mode keep the tap-by-tap path. 1.6 to 2.6 ms of GPU in hub2 against the old path, in two launches. |
 | **Receivers filtered shadows for fragments the light does not reach** (outside the falloff, turned away). | **Fixed, both backends**, in the stock-material path. The PBR variants still sample first. |
@@ -1053,6 +1055,105 @@ touched files. The enhanced-material branch of the receivers reads the same
 as the classic shader's; the PBR branch was not compared with its unshadowed
 counterpart.
 
+### Caster order and the live window
+
+Added on 11 November, for the open item "the world's own geometry joins and
+leaves a light's casters area by area as the player moves", which had been
+seen on hub2's two moving lights and not measured on still ones. A temporary
+front-end diagnostic compared, for every light, the static casters of one
+main view with those of the next, and wherever the signature of a light that
+holds still had changed it named the casters gained, lost or altered and the
+rule that had turned a lost one away.
+
+The walks themselves gave the first answer before the diagnostic had named
+anything: lights whose signature changed with no caster gained or lost.
+
+- **The same casters in another order.** The signature was one running hash:
+  each static caster was hashed on top of the result of the one before it.
+  Casters reach a light in the order the view's entities are walked, and
+  `R_SortViewEntities` orders them by model and, within a model, by the
+  address the frame's allocator gave each view entity. Two entities that
+  share a model therefore change places as the camera moves and others enter
+  the view. Nothing in a map depends on the order its casters are drawn in.
+  Each caster is now hashed from the same start, its bits are spread, and the
+  results are added (`R_RecordShadowMapCaster`); a sum is the same in any
+  order. The cache keys carry the static caster count beside the signature,
+  so nothing reads a zero sum as "no caster".
+
+With the sum in place the diagnostic reported sixteen changes of signature on
+still lights over hub2's -y walk, 300 steps. They were of three kinds, and
+only the last is the item as it was written.
+
+- **A caster at rest counted as moving again.** `R_ShadowMapCasterIsDynamic`
+  asked whether the caster had changed since "this frame less the window",
+  and the window is a quarter second's worth of frames at the smoothed frame
+  time, which follows a fast frame at once and a slow one gradually. One
+  fast frame lengthened the window by several frames, so the limit moved
+  back: a door static at frame 953 was live at 955 and static at 956, in
+  the maps of three lights. Six of the sixteen changes. The limit is now
+  kept from frame to frame and only advances
+  (`R_ShadowMapLiveCasterSinceFrame`); a window that shrinks is followed at
+  once, and a frame counter that starts again starts the limit again.
+- **Doors that move.** A door is live from the frame it starts to open until
+  a quarter second after it stops, and the static map is rendered without it
+  and then with it. Nine of the sixteen: the two leaves of one lift door,
+  under three lights. That is the composition rule doing its work: the
+  door's shadow is drawn over the stored map each frame while it moves.
+- **An area joining.** Once, a still light gained fifteen casters in a single
+  view when that door opened: surfaces of the world model of the area behind
+  it, and two light fixtures there. A caster in an area that no chain of
+  open portals connects
+  to the view is left out of the map (`R_ShadowMapEntityTouchesConnectedArea`):
+  nothing in that area can be seen, and a light by a door would otherwise
+  draw the room behind it into every map. When the door opens the room can
+  be seen and its casters are needed. Apart from that door, no still light
+  on the walk gained or lost a surface of the world.
+
+So the world does not join a still light's casters area by area as the player
+walks. It joins when a door connects an area, the map needs it then, and it
+costs one render of that light's maps at that moment. Not changed.
+
+Maps rendered fresh, Quality, the old signature against the sum in separate
+launches of one build, with the live window as it was:
+
+| Walk | Vulkan | OpenGL | Views that rendered any, Vulkan | OpenGL |
+|---|---:|---:|---:|---:|
+| hub2, +x, 300 steps | 18 to 18 | 15 to 15 | 2 to 2 | 5 to 5 |
+| hub2, -y, 300 steps | 63 to 57 | 37 to 31 | 20 to 19 | 15 to 14 |
+| airdefense1 arena, -x, 120 steps | 8 to 0 | 8 to 0 | 2 to 0 | 2 to 0 |
+| airdefense1 arena, +y, 120 steps | 8 to 0 | 20 to 0 | 2 to 0 | 5 to 0 |
+
+The kept limit took the diagnostic's count on hub2's -y walk from sixteen
+changes to ten. It does not show in fresh maps on these walks. Vulkan's
+counts did not move, most likely because its cache still held the map of the
+signature a light came back to. OpenGL's hub2 +x walk gave 15, 15, 14 and 16
+in four launches (the old signature, the sum, the sum with the limit, and
+the final build), which is the spread of that walk and not a difference:
+OpenGL's walks are not the same views from launch to launch. The change is
+kept for what it removes, a caster at rest classed as moving, and not for a
+figure. What is left on the two hub2 walks is first renders of lights
+entering the view, the doors, and the one area.
+
+The final build, one launch of each walk: Vulkan 18, 57, 0 and 0; OpenGL 16,
+31, 0 and 0.
+
+Nothing here changes a picture. A map is rendered again less often; what it
+holds is what it held.
+
+Checked for this change, on the final build with the diagnostic and its
+switches removed: the walks above; the fourteen scenarios on both back ends;
+the continuous-motion qualification, eight cases; the in-engine self-tests on
+both renderers, which now exercise the kept limit; and the static tests that
+read the touched files. The qualification's OpenGL image case failed once, at
+a pose where two captures of the same frozen frame differed from each other,
+while other tests were compiling on the machine; run alone it passed. Of 72
+static tests 64 pass, four need arguments and two were stopped at four
+minutes. Two fail for reasons outside this change: `validation_hardening.py`
+(a test added on 11 November is not wired into the push workflow) and
+`ui_choice_scroll_runtime.py` (its native extract links against libraries of
+another build type). No frame-time figure, for the reason given under
+"Walking".
+
 ## Presets
 
 Unchanged. Enhanced keeps point lights on stencil: mapping them still costs
@@ -1066,23 +1167,20 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. The world's own geometry joins and leaves a light's casters area by area
-   as the player moves (seen on the two moving lights of hub2; not measured on
-   still ones).
-3. Static-world volumes are still built once for every mapped light and kept
+2. Static-world volumes are still built once for every mapped light and kept
    for the fallback. Leaving them out too would need the same rebuild on
    return, for every surface the light touches.
-4. The OpenGL projected cache is the atlas, four full tiles at Quality and
+3. The OpenGL projected cache is the atlas, four full tiles at Quality and
    Ultra, so it holds one crowded view and nothing of the view just left.
    Vulkan holds eight maps' worth.
-5. On Vulkan a projected light's tile size is fitted as if every map of the
+4. On Vulkan a projected light's tile size is fitted as if every map of the
    view needed an atlas block. Maps read where they live need none, so a
    crowded view could keep more of its lights at full size. The fit decides
    the cache key, so it must not follow what happens to be cached.
-6. One static cube for both ownerships of a composed Vulkan light, as on
+5. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
    cubes. It needs a resident entry two passes of a view can share.
-7. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
+6. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
    most, than the same light unshadowed, in up to a tenth of the view. Not
    the filter and not the translucent setting; Vulkan is exact. Invisible,
    and unexplained.

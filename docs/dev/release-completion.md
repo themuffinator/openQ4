@@ -800,6 +800,13 @@ there is no double-click word selection.
   and changes nothing in the stored shadow. On a walk through the Nexus Hub
   about half of all shadow redraws were of this kind, on both renderers; they
   no longer happen, so far fewer frames spend time on shadows while you move.
+- **Stored shadows survive the game shuffling its lists.** A light's stored
+  shadow was also drawn again whenever the same objects reached the light in
+  a different order, which changes as you move and look around, and when a
+  door that had just stopped was counted as moving again for a frame because
+  the frame rate rose. Neither changes the shadow. On short walks through one
+  part of Air Defense Bunker these were all of the shadow redraws, on both
+  renderers, and none are left there. The picture is unchanged.
 - **Soft shadow edges no longer shimmer when nothing in them moves.** The fine
   grain that softens a spotlight's shadow edge was tied to where the shadow
   happened to be stored, so it changed pattern as you looked around or as

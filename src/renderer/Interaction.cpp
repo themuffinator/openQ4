@@ -643,7 +643,12 @@ static bool R_ShadowMapCasterIsDynamic( const idRenderEntityLocal *entityDef, co
 	// entity the game updates once a tic is untouched on the frames between
 	// tics whenever the display outruns the tic rate, and a one-frame window
 	// then moved it into the static set and back every tic.
-	const int recentFrame = tr.frameCount - R_ShadowMapDynamicCasterFrames();
+	//
+	// The frame a change must postdate never moves back
+	// (R_ShadowMapLiveCasterSinceFrame): asked afresh as the current frame
+	// less the window, a caster that had aged out was live again whenever the
+	// frame rate rose and the window grew.
+	const int recentFrame = R_ShadowMapLiveCasterSinceFrame();
 	if ( entityDef->lastModifiedFrameNum >= recentFrame ) {
 		return true;
 	}
@@ -690,7 +695,15 @@ static void R_RecordShadowMapCaster( viewLight_t *vLight,
 	if ( dynamicCaster ) {
 		return;
 	}
-	int hash = ( vLight->shadowMapCasterSignature != 0 ) ? vLight->shadowMapCasterSignature : static_cast<int>( 2166136261u );
+	// Each caster is hashed by itself and the hashes are added up. Casters
+	// reach a light in the order their entities are walked, and that order
+	// follows the view: R_SortViewEntities sorts by model and then by the
+	// address this frame happened to give each view entity, so two casters
+	// that share a model change places as the camera moves. The depth they
+	// write does not depend on the order, and chained into one running hash
+	// it did: a still light with still casters rendered its maps again for
+	// nothing. A sum does not care which caster came first.
+	int hash = static_cast<int>( 2166136261u );
 	hash = R_ShadowMapHashInt( hash, entityDef != NULL ? entityDef->index : -1 );
 	hash = R_ShadowMapHashInt( hash, shader != NULL ? static_cast<int>( shader->Coverage() ) : -1 );
 	hash = R_ShadowMapHashString( hash, shader != NULL ? shader->GetName() : NULL );
@@ -726,7 +739,18 @@ static void R_RecordShadowMapCaster( viewLight_t *vLight,
 			hash = R_ShadowMapHashFloat( hash, entityDef->modelMatrix[i] );
 		}
 	}
-	vLight->shadowMapCasterSignature = hash;
+	// spread the bits before adding, so that two casters differing in one
+	// field do not cancel against two others differing the same way
+	unsigned int mixed = static_cast<unsigned int>( hash );
+	mixed ^= mixed >> 16;
+	mixed *= 0x85ebca6bu;
+	mixed ^= mixed >> 13;
+	mixed *= 0xc2b2ae35u;
+	mixed ^= mixed >> 16;
+	// Unsigned, so the sum wraps. Nothing reads zero as "no static caster":
+	// the cache keys carry the static caster count beside the signature.
+	vLight->shadowMapCasterSignature = static_cast<int>(
+		static_cast<unsigned int>( vLight->shadowMapCasterSignature ) + mixed );
 }
 
 static void R_RecordShadowMapRejectedCaster( viewLight_t *vLight, const shadowMapCasterRejectReason_t reason ) {

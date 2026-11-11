@@ -290,8 +290,20 @@ static int shadowMapMovingLightFrames = SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES;
 static int shadowMapDynamicCasterFrames = SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES;
 static int shadowMapLastFrameMsec = 0;
 static float shadowMapSmoothedFrameMsec = 0.0f;
+static int shadowMapLiveCasterSinceFrame = 0;
+static int shadowMapLiveCasterUpdatedFrame = 0;
 
-void R_ShadowMapBeginFrame( int nowMsec ) {
+int R_ShadowMapAdvanceLiveCasterSince( const int liveSince, const int updatedFrame,
+		const int frame, const int windowFrames ) {
+	const int fromWindow = frame - windowFrames;
+	if ( frame < updatedFrame ) {
+		// the frame counter started again: nothing older is worth keeping
+		return fromWindow;
+	}
+	return Max( liveSince, fromWindow );
+}
+
+static void R_ShadowMapUpdateFrameWindows( const int nowMsec ) {
 	const int elapsed = nowMsec - shadowMapLastFrameMsec;
 	shadowMapLastFrameMsec = nowMsec;
 	if ( elapsed <= 0 || elapsed > 1000 ) {
@@ -313,6 +325,19 @@ void R_ShadowMapBeginFrame( int nowMsec ) {
 		R_ShadowMapDynamicCasterFramesFor( shadowMapSmoothedFrameMsec );
 	shadowMapMovingLightFrames =
 		R_ShadowMapMovingLightFramesFor( shadowMapSmoothedFrameMsec );
+}
+
+void R_ShadowMapBeginFrame( int nowMsec ) {
+	R_ShadowMapUpdateFrameWindows( nowMsec );
+	// tr.frameCount is already this frame's: BeginFrame advances it first
+	shadowMapLiveCasterSinceFrame = R_ShadowMapAdvanceLiveCasterSince(
+		shadowMapLiveCasterSinceFrame, shadowMapLiveCasterUpdatedFrame,
+		tr.frameCount, shadowMapDynamicCasterFrames );
+	shadowMapLiveCasterUpdatedFrame = tr.frameCount;
+}
+
+int R_ShadowMapLiveCasterSinceFrame( void ) {
+	return shadowMapLiveCasterSinceFrame;
 }
 
 bool R_ShadowMapLightIsMoving( const idRenderLightLocal *lightDef, int frame ) {
@@ -596,8 +621,35 @@ bool R_ShadowMapCachePolicySelfTest( void ) {
 		}
 	}
 	// a stalled or broken clock holds casters live rather than freezing them
-	return R_ShadowMapDynamicCasterFramesFor( 0.0f ) == SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES
-		&& R_ShadowMapDynamicCasterFramesFor( 1000.0f ) == SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES;
+	if ( R_ShadowMapDynamicCasterFramesFor( 0.0f ) != SHADOWMAP_DYNAMIC_CASTER_MAX_FRAMES
+			|| R_ShadowMapDynamicCasterFramesFor( 1000.0f ) != SHADOWMAP_DYNAMIC_CASTER_MIN_FRAMES ) {
+		return false;
+	}
+	// The frame a change must postdate to count as live never moves back. A
+	// frame rate that doubles doubles the window: the caster that aged out at
+	// frame 1000 under a 15-frame window must not be live again at frame 1001
+	// under a 30-frame one.
+	int liveSince = 0;
+	int updated = 0;
+	for ( int frame = 900; frame <= 1000; ++frame ) {
+		liveSince = R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, frame, 15 );
+		updated = frame;
+	}
+	if ( liveSince != 985 ) {
+		return false;
+	}
+	for ( int frame = 1001; frame <= 1040; ++frame ) {
+		const int next = R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, frame, 30 );
+		if ( next < liveSince || next != Max( 985, frame - 30 ) ) {
+			return false;
+		}
+		liveSince = next;
+		updated = frame;
+	}
+	// a window that shrinks is followed at once, and a frame counter that
+	// starts again does not leave every caster of the new count looking old
+	return R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 1041, 4 ) == 1037
+		&& R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 10, 30 ) == -20;
 }
 
 bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] ) {

@@ -8134,10 +8134,51 @@ def validate_point_cache_parity_and_receiver_cost_contract() -> None:
         "live caster window")
     dynamic = braced_body(interaction, "static bool R_ShadowMapCasterIsDynamic(",
         "live caster classification")
-    require(dynamic, "const int recentFrame = tr.frameCount - R_ShadowMapDynamicCasterFrames();",
+    require(dynamic, "const int recentFrame = R_ShadowMapLiveCasterSinceFrame();",
         "live caster window spans a game tic at any display rate")
     require(read("src/renderer/RenderSystem.cpp"), "R_ShadowMapBeginFrame( Sys_Milliseconds() );",
         "live caster window follows rendered frames")
+    # The window is counted in frames from a frame time that drops at once on
+    # a fast frame, so it can grow by several frames between two frames. Taken
+    # afresh each frame as "this frame less the window", a caster that had
+    # just aged out was live again for a frame or two, and each visit took it
+    # out of its lights' static maps and put it back. The frame a change must
+    # postdate therefore never moves back.
+    if "tr.frameCount - R_ShadowMapDynamicCasterFrames()" in interaction:
+        raise AssertionError("The live caster window must be read through R_ShadowMapLiveCasterSinceFrame")
+    classification_cpp = read("src/renderer/ShadowMapClassification.cpp")
+    require_order(
+        braced_body(classification_cpp, "int R_ShadowMapAdvanceLiveCasterSince(", "live caster window latch"),
+        (
+            "const int fromWindow = frame - windowFrames;",
+            "if ( frame < updatedFrame ) {",
+            "return fromWindow;",
+            "return Max( liveSince, fromWindow );",
+        ),
+        "the oldest live frame never moves back, except when the frame counter starts again",
+    )
+    require_order(
+        braced_body(classification_cpp, "void R_ShadowMapBeginFrame(", "live caster window per frame"),
+        (
+            "R_ShadowMapUpdateFrameWindows( nowMsec );",
+            "shadowMapLiveCasterSinceFrame = R_ShadowMapAdvanceLiveCasterSince(",
+            "tr.frameCount, shadowMapDynamicCasterFrames );",
+            "shadowMapLiveCasterUpdatedFrame = tr.frameCount;",
+        ),
+        "the latch advances once a frame, from the window of that frame",
+    )
+    require_order(
+        braced_body(classification_cpp, "bool R_ShadowMapCachePolicySelfTest(", "cache policy self-test"),
+        (
+            "liveSince = R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, frame, 15 );",
+            "if ( liveSince != 985 ) {",
+            "const int next = R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, frame, 30 );",
+            "if ( next < liveSince || next != Max( 985, frame - 30 ) ) {",
+            "R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 1041, 4 ) == 1037",
+            "R_ShadowMapAdvanceLiveCasterSince( liveSince, updated, 10, 30 ) == -20;",
+        ),
+        "the latch is exercised by the in-engine self-test",
+    )
     require(read("src/renderer/ModernShadowPlanner.cpp"), "R_ShadowMapCachePolicySelfTest()",
         "cache policy self-test runs with the shadow diagnostics")
 
@@ -8999,9 +9040,48 @@ def validate_static_signature_view_independence_contract() -> None:
             "hash = R_ShadowMapHashInt( hash, entityDef->lastModifiedFrameNum );",
             "hash = R_ShadowMapHashInt( hash, entityDef->dynamicModelFrameCount );",
             "hash = R_ShadowMapHashFloat( hash, entityDef->modelMatrix[i] );",
-            "vLight->shadowMapCasterSignature = hash;",
         ),
         "what a static caster contributes to the signature",
+    )
+    # Nor does it follow the order the casters arrive in. They reach a light
+    # in the order their entities are walked, R_SortViewEntities orders
+    # entities that share a model by the address the frame gave each view
+    # entity, and two such casters change places as the camera moves. Chained
+    # into one running hash, the same set of casters then had another
+    # signature and every map of a still light rendered again. Each caster is
+    # hashed from the same start, its bits are spread, and the results are
+    # added: a sum is the same in any order.
+    require_order(
+        record,
+        (
+            "int hash = static_cast<int>( 2166136261u );",
+            "hash = R_ShadowMapHashInt( hash, entityDef != NULL ? entityDef->index : -1 );",
+            "hash = R_ShadowMapHashFloat( hash, entityDef->modelMatrix[i] );",
+            "unsigned int mixed = static_cast<unsigned int>( hash );",
+            "mixed *= 0x85ebca6bu;",
+            "mixed *= 0xc2b2ae35u;",
+            "vLight->shadowMapCasterSignature = static_cast<int>(",
+            "static_cast<unsigned int>( vLight->shadowMapCasterSignature ) + mixed );",
+        ),
+        "the static signature is a sum of per-caster hashes",
+    )
+    chained = [
+        line.strip() for line in record.splitlines()
+        if "shadowMapCasterSignature" in line and "+ mixed" not in line
+        and "vLight->shadowMapCasterSignature = static_cast<int>(" not in line
+        and not line.strip().startswith("//")
+    ]
+    if chained:
+        raise AssertionError(
+            "A caster's hash must not start from the light's running signature: " + chained[0]
+        )
+    require_order(
+        read("src/renderer/tr_light.cpp"),
+        (
+            "const size_t leftEntityKey = reinterpret_cast<size_t>( left );",
+            "qsort( sortedEntities, count, sizeof( sortedEntities[0] ), R_QsortViewEntitiesByModel );",
+        ),
+        "the entity order the signature must not depend on",
     )
     hashed = [line for line in record.splitlines() if "Hash" in line and "expandedCaster" in line]
     if hashed:
