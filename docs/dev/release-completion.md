@@ -65,10 +65,10 @@ See [player release status](../user/release-status.md).
 - **Texture quality reloads in place.** A texture quality change reloads the
   textures while the game keeps running. It used to restart the whole
   renderer first. The reload still takes a moment.
-- **Presets apply faster.** A Performance Preset now restarts the renderer
-  only when it changes anti-aliasing (MSAA) or, under OpenGL, the renderer's
-  upload buffers. Otherwise its effects switch at once and its textures
-  reload in place.
+- **Presets apply faster.** Under Vulkan no Performance Preset restarts the
+  renderer any more. Under OpenGL a preset restarts it only when it changes
+  anti-aliasing (MSAA) or the renderer's upload buffers. Otherwise its
+  effects switch at once and its textures reload in place.
 - **The precompressed textures setting applies from the console.** Changing
   `image_usePrecompressedTextures` reloads the textures by itself, without a
   `vid_restart`.
@@ -82,8 +82,13 @@ See [player release status](../user/release-status.md).
   seconds while every menu page reloaded.
 - **A window that leaves fullscreen is centred.** It used to land in the
   top-left corner of the display with its title bar off the screen.
-- **Still a restart.** An MSAA change restarts the renderer and asks you to
-  keep or revert. High-quality texture flags still finish at the next start.
+- **MSAA applies in place under Vulkan.** Changing anti-aliasing no longer
+  restarts the renderer there; it still asks you to keep or revert. From the
+  console, `r_multiSamples` now reaches the 3D scene on the next frame on
+  both renderers, without `vid_restart`.
+- **Still a restart.** Under OpenGL an MSAA change on the Display page
+  restarts the renderer. High-quality texture flags still finish at the next
+  start.
 - **Nothing to do.** The classic interface (`ui_retained 0`) is unchanged.
 - Evidence: [applying without a device restart](ui/settings-live-apply.md),
   with engine checks on OpenGL and Vulkan: V-Sync toggled twice with no
@@ -98,7 +103,10 @@ See [player release status](../user/release-status.md).
   OpenGL was not confirmed because the test window had no focus. First frame
   after a 1280 by 720 to 2560 by 1440 change: 2.0 to 5.0 s before the reload
   was removed, under 0.3 s after, with the page identical pixel for pixel to
-  one drawn after a device restart.
+  one drawn after a device restart. MSAA changed 0 to 4 to 0 to 2 in a
+  running Air Defense 1 on both renderers with the reported count following
+  each step and no device start, and the Display page applied and kept an
+  MSAA step in place under Vulkan.
   `tools/tests/ui_settings_display_service.py`,
   `tools/tests/ui_settings_effect_journal.py`,
   `tools/tests/ui_system_settings_host.py`.

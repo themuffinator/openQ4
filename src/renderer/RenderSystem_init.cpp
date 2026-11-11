@@ -4724,9 +4724,9 @@ static bool R_GfxInfoObservedMSAA( const int requestedMSAA, const int glMaxSampl
 			// image allocation clamps a multisample texture to the limit
 			msaaReason = "gl-max-clamp";
 		} else {
-			// A target keeps the count it was created with: an r_multiSamples
-			// change waits for vid_restart or a map load, and a refused count
-			// retries lower.
+			// A target keeps the count it was created with: the game rebuilds
+			// its targets on the first scene after an r_multiSamples change,
+			// and a refused count retries lower.
 			msaaReason = "scene-target";
 		}
 	} else {

@@ -1,6 +1,6 @@
 # Applying display settings without a device restart
 
-This note records the first two stages of making Settings > Display apply its
+This note records the first three stages of making Settings > Display apply its
 changes to the running renderer. It is the record for the changes of
 11 November 2026 and supersedes, for the settings named here, what
 [effect execution](settings-effect-execution.md#combined-executor),
@@ -24,7 +24,7 @@ did every texture setting and every Performance Preset.
 | Precompressed textures (`image_usePrecompressedTextures`) | Device restart; a console change needed `vid_restart` | Reloads in place, from the page and from the console. |
 | Benchmark budget (`r_rendererBenchmarkPreset`) | Device restart | Nothing to do: it is read on each use. |
 | Upload stream (`r_rendererUploadMegs`, `r_rendererUploadFrameBuffers`) | Device restart | Vulkan: nothing to do, it reads neither. OpenGL: still a device restart, because the stream is allocated when the device starts. |
-| A Performance Preset | Device restart, always | No device restart on Vulkan unless the preset changes MSAA. OpenGL also restarts when the preset changes the upload stream. |
+| A Performance Preset | Device restart, always | Stage 1: no device restart on Vulkan unless the preset changes MSAA. Stage 3: none on Vulkan at all. OpenGL restarts when the preset changes MSAA or the upload stream. |
 
 Unchanged in stage 1 (see [stage 2](#stage-2-display-changes-on-the-running-device)
 for the display itself): a display change (mode, size, fullscreen, borderless,
@@ -140,9 +140,10 @@ Keep or Revert, restore and cold recovery are unchanged. The trace line is
 A texture setting in the same Apply reloads through the image manager when the
 frame ends, as in stage 1.
 
-Still a device restart: an MSAA change on either back end (Vulkan creates its
-scene targets with the device), an `r_renderer` change, and OpenGL's upload
-stream.
+Still a device restart at this stage: an MSAA change on either back end, an
+`r_renderer` change, and OpenGL's upload stream.
+[Stage 3](#stage-3-msaa-on-the-running-device) takes Vulkan's MSAA change out
+of that list.
 
 `rendererDisplayProbe transition <width> <height> [interval] [samples]` runs
 the service on a hidden window, with `apply`'s arguments.
@@ -244,6 +245,62 @@ display's origin, where a bordered window's title bar would be off the
 screen. This applies to the restart path as well. Covered by
 `tools/tests/ui_system_display.py`; not run on a visible desktop.
 
+## Stage 3: MSAA on the running device
+
+MSAA lives in two places. The game owns the main scene's forward target and
+builds it at `r_multiSamples` (`idGameLocal::InitGameRenderSystem`). Under
+OpenGL the window also has a sample count, fixed when its context is created
+and used only by the 3D views drawn straight to the window. Vulkan's window is
+single-sample, and its own targets (the temporal scene target and the window
+view target) already compared their sample count with `r_multiSamples` on
+every frame.
+
+So the one thing that waited for a restart was the game's target: it was
+rebuilt only when the renderer's restart count changed, or when a map loaded.
+
+- **The game follows the setting.** `idGameLocal::RenderScene` now rebuilds
+  its targets when `r_multiSamples` differs from the request they were built
+  for, as it already did for the HDR scene format. This is in the game module,
+  so it holds on both back ends and for a console change.
+- **Vulkan's Apply is a transition.** `DisplayTransition` no longer refuses an
+  attempt that holds `r_multiSamples` unless the back end multisamples its
+  window. On Vulkan the request asks for the single-sample window the device
+  already has, the swapchain is rebuilt, and the game rebuilds its targets on
+  the next scene. `r_multiSamples` stays in the display domain, so the attempt
+  still asks Keep or Revert and its record is unchanged.
+- **OpenGL's Apply still restarts.** An MSAA change there is a change to the
+  window's sample count, which the strict display request names and checks.
+
+With stage 1 this means no Performance Preset restarts Vulkan's device.
+
+### Engine checks, stage 3
+
+Hidden window, console verbs only, 11 November 2026, on the build of the
+working tree at `56e1f6c08` plus this change.
+
+- **In a map** (`game/airdefense1`, from the console), on both back ends:
+  `r_multiSamples` 0 to 4 to 0 to 2. Each step rebuilt the game's targets
+  once, `Forward render target MSAA` reported the requested count as the
+  effective one, `gfxInfo` agreed (`vulkan-scene` on Vulkan, `active` on
+  OpenGL), no device was started, the presentation generation and the restart
+  count did not move, and no warning was printed. The Vulkan frame at 4x was
+  looked at and draws correctly.
+- **On the page**, MSAA one step up, applied and kept. Vulkan traced
+  `UI_SETTINGS_TRANSITION` with no device start; OpenGL traced
+  `UI_SETTINGS_DEVICE`. Both ended with `r_multiSamples` at 2.
+
+Not run: an MSAA change from the pause menu's page inside a map (the page
+flow ran at the main menu, the map check from the console), a revert of an
+MSAA change in the engine, and 8x or 16x.
+
+### What stage 3 leaves
+
+- OpenGL's Apply. Its main scene already follows the setting; the restart is
+  only for the window's own count. Removing it means a single-sample OpenGL
+  window with the direct 3D views routed through a multisampled target, as
+  Vulkan's window view is.
+- OpenGL's upload stream, which is allocated when the device starts.
+
 ## What this stage does not do
 
 - The image reload still blocks while textures load. It is shorter than a
@@ -252,8 +309,9 @@ screen. This applies to the restart path as well. Covered by
 - The in-place route has no readback of image dimensions. Its evidence is the
   exact settings readback, the same device generation and a later presented
   frame, as for the combined executor's restart.
-- MSAA, the high-quality texture flag and switching the rendering API from
-  inside a game are later stages ([roadmap](../roadmap.md), UI-01).
+- OpenGL's MSAA Apply and upload stream, the high-quality texture flag and
+  switching the rendering API from inside a game are later stages
+  ([roadmap](../roadmap.md), UI-01).
 
 ## Engine checks, 11 November 2026
 

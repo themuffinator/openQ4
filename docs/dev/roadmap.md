@@ -2559,10 +2559,14 @@ Completion must advance through the existing dependencies:
   A transition no longer advances the restart count, which had made the
   retained interface reload every document (2 to 5 s to the first frame, now
   under 0.3 s), and a window that leaves fullscreen is centred.
+  The game now rebuilds its scene targets when `r_multiSamples` changes, on
+  both back ends, and Vulkan applies an MSAA change as a transition, so no
+  Performance Preset restarts Vulkan's device.
   Remaining, in order: a focused Keep under borderless and exclusive
-  fullscreen, and any Keep on OpenGL (the test window had no focus); MSAA as
-  a scene-target rebuild (Vulkan first; OpenGL's window is
-  itself multisampled) and OpenGL's upload stream in place; a material
+  fullscreen, and any Keep on OpenGL (the test window had no focus);
+  OpenGL's MSAA Apply (a single-sample window with the direct 3D views
+  through a multisampled target, as Vulkan has) and OpenGL's upload stream
+  in place; a material
   re-parse so `image_ignoreHighQuality` applies in the session; the
   rendering API and GPU switch from inside a game; and an image reload
   spread across frames.

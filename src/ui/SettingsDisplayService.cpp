@@ -15,7 +15,8 @@ bool EngineSettingsDisplayHost::SupportsMultisampling() const {
 	rendererDisplayState_t state{};
 	if (!R_RendererModule_QueryDisplay(&state) || !state.rendererReady || !state.windowValid || !state.presentation.available)
 		return false;
-	// Vulkan multisamples the scene targets its device restart re-creates.
+	// Vulkan multisamples its scene targets, which follow r_multiSamples on the
+	// running device.
 	return WindowMultisampling() || R_RendererModule_GetStatus().activeApi == RENDER_MODULE_API_VULKAN;
 }
 bool EngineSettingsDisplayHost::WindowMultisampling() const {
@@ -75,10 +76,13 @@ bool EngineSettingsDisplayHost::UploadStreamChanged() const {
 bool EngineSettingsDisplayHost::DisplayTransition(const SystemDisplayPlan& plan, const rendererDisplayState_t& before) const {
 	// Only the display itself changed, on a device that is presenting, and the
 	// window keeps its sample count: a count is fixed when the device is
-	// created, and Vulkan's scene targets take r_multiSamples at that point too.
+	// created. Under OpenGL an MSAA change is a change to that count. Vulkan's
+	// window is single-sample: MSAA lives in the scene targets, which the game
+	// rebuilds on its next scene when r_multiSamples changed, so the request
+	// below asks for the window the device already has.
 	if (!DisplayOwned() || RendererOwned() || UploadStreamChanged()) return false;
 	const auto& patch = kind == Kind::Display ? journal.patch : effects.patch;
-	if (patch.contains("r_multiSamples")) return false;
+	if (patch.contains("r_multiSamples") && WindowMultisampling()) return false;
 	return before.rendererReady && before.windowValid && before.presentation.available != 0 &&
 		(before.presentation.parametersValid & RDP_PARAMETER_SAMPLES) != 0 &&
 		before.presentation.samples == plan.request.parms.multiSamples;

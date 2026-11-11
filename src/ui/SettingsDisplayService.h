@@ -98,6 +98,9 @@ private:
 	// applies the request to its window in place (mode, size, display, borders)
 	// and keeps the device. The attempt journals, confirms and recovers exactly
 	// as one that restarts, and falls back to a restart if the renderer refuses.
+	// An MSAA change qualifies under Vulkan, whose window is single-sample and
+	// whose scene targets the game rebuilds; under OpenGL it changes the
+	// window's own sample count and restarts the device.
 	bool DisplayTransition(const openq4::ui::SystemDisplayPlan& plan, const rendererDisplayState_t& before) const;
 	bool DisplayOwned() const;
 	bool RendererOwned() const;

@@ -936,6 +936,7 @@ void idGameLocal::ShutdownGameRenderSystem( void ) {
 	gameRender.postProcessAvailable = false;
 	gameRender.smaaAvailable = false;
 	gameRender.forwardRenderSamples = 0;
+	gameRender.forwardRenderRequestedSamples = 0;
 	gameRender.hdrSceneTarget = false;
 	gameRender.renderTargetWidth = 0;
 	gameRender.renderTargetHeight = 0;
@@ -1242,6 +1243,11 @@ idGameLocal::InitGameRenderSystem
 void idGameLocal::InitGameRenderSystem(void) {
 	ShutdownGameRenderSystem();
 
+	// Record the request before any early return, so RenderScene's check for a
+	// changed request cannot ask for the same rebuild on every frame.
+	const int requestedMsaaSamples = Max( 0, cvarSystem->GetCVarInteger( "r_multiSamples" ) );
+	gameRender.forwardRenderRequestedSamples = requestedMsaaSamples;
+
 	if ( !renderSystem->IsOpenGLRunning() ) {
 		return;
 	}
@@ -1251,7 +1257,6 @@ void idGameLocal::InitGameRenderSystem(void) {
 	const renderPresentationState_t presentation = openQ4_GetPresentationState();
 	const int targetWidth = presentation.sceneWidth;
 	const int targetHeight = presentation.sceneHeight;
-	const int requestedMsaaSamples = Max( 0, cvarSystem->GetCVarInteger( "r_multiSamples" ) );
 	gameRender.hdrSceneTarget = openQ4_HDRSceneTargetRequested();
 
 	gameRender.forwardRenderPassRT = openQ4_CreateForwardRenderTarget(
@@ -1432,6 +1437,17 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 	if ( gameRender.hdrSceneTarget != openQ4_HDRSceneTargetRequested() ) {
 		common->Printf( "Reinitializing game scene targets for %s rendering\n",
 			openQ4_HDRSceneTargetRequested() ? "HDR" : "LDR" );
+		InitGameRenderSystem();
+	}
+	// The forward target is built at r_multiSamples. A change used to wait for
+	// a renderer restart or the next map; rebuild the targets for it here, as
+	// for the scene format above, so it reaches the running game. Under OpenGL
+	// the window keeps its own sample count until the device restarts, which
+	// matters only to the 3D views drawn straight to the window.
+	const int requestedMsaaSamples = Max( 0, cvarSystem->GetCVarInteger( "r_multiSamples" ) );
+	if ( gameRender.forwardRenderRequestedSamples != requestedMsaaSamples ) {
+		common->Printf( "Reinitializing game scene targets for MSAA %d (was %d)\n",
+			requestedMsaaSamples, gameRender.forwardRenderRequestedSamples );
 		InitGameRenderSystem();
 	}
 

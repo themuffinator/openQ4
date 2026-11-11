@@ -309,7 +309,7 @@ static void VulkanMultisampling(){
      auto a=Attempt(settings,dimensions);Check(host.Prepare(a,error),"prepare a Vulkan MSAA change");
      Check(Journal().displayTarget.at("samples")==StateValue(0.0) && a.target.at("r_multiSamples")==StateValue(4.0),"the Vulkan target window is single-sample");
      Check(settings.Write(a.patch,error),"write the Vulkan MSAA change");SettingsDisplayObservation seen;
-     Check(host.Restart(false,seen,error) && lastRequest.parms.multiSamples==0 && actual.presentation.samples==0,"the Vulkan restart asks for no window samples");
+     Check(host.Restart(false,seen,error) && lastRequest.parms.multiSamples==0 && actual.presentation.samples==0,"the Vulkan change asks for no window samples");
      Present();Check(host.PersistConfirmation(a,error) && configWrites==1,"the Vulkan MSAA change keeps");
      Check(host.Finish(false,error) && !files.contains(journalFile) && Live(settings).at("r_multiSamples")==StateValue(4.0),"the kept Vulkan change leaves r_multiSamples at the request");}
     {ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_VULKAN;localCVarSystem.variables.at("r_multiSamples").value="8";
@@ -1027,13 +1027,25 @@ static void TransitionCases(){
      Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change whose transition and restart fail");
      transitionOkay=false;restartOkay=false;SettingsDisplayObservation seen;
      Check(!host.Restart(false,seen,error) && transitions==1 && restarts==1 && host.RecoveryActive(),"a failed fallback fails the attempt");host.Shutdown();}
-    // A window's sample count is fixed when its device is created: an MSAA
-    // change never tries a transition, on either back end, and neither does a
-    // window whose actual count differs from the request.
+    // A window's sample count is fixed when its device is created. Under
+    // OpenGL an MSAA change is a change to that count and never tries a
+    // transition. Vulkan's window is single-sample and its scene targets
+    // follow r_multiSamples on the running device, so there the change is a
+    // transition that asks for the window it already has. A window whose
+    // actual count differs from the request restarts on either back end.
     for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN}){ResetFixture();moduleStatus.activeApi=api;
      SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=Attempt(settings);
      Check(a.patch.contains("r_multiSamples") && host.Prepare(a,error) && settings.Write(a.patch,error),"prepare an MSAA change");SettingsDisplayObservation seen;
-     Check(host.Restart(false,seen,error) && transitions==0 && restarts==1,"an MSAA change restarts the device");host.Shutdown();}
+     const bool gl=api==RENDER_MODULE_API_GL;
+     Check(host.Restart(false,seen,error) && transitions==(gl?0:1) && restarts==(gl?1:0),"an MSAA change restarts OpenGL's device and transitions on Vulkan");
+     Check(gl || (lastRequest.parms.multiSamples==0 && actual.presentation.samples==0),"the Vulkan transition keeps the single-sample window");
+     Present();Check(host.Observe(false,seen,error) && host.PersistConfirmation(a,error) && host.Finish(false,error) && configWrites==1 &&
+                     Live(settings).at("r_multiSamples")==StateValue(4.0),"the MSAA change keeps");}
+    // A Vulkan preset that changes MSAA and the upload stream needs no new device either.
+    {ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_VULKAN;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     auto a=CombinedAttempt(settings,true);Check(a.patch.contains("r_multiSamples") && a.patch.contains("r_rendererUploadMegs"),"the fixture changes MSAA and the upload stream");
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a Vulkan preset that changes MSAA");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==1 && restarts==0 && soundRestarts==1,"it transitions and reopens the sound device");host.Shutdown();}
     {ResetFixture();actual.presentation.samples=2;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=WindowAttempt(settings);
      Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change on a window whose samples differ from the setting");
      SettingsDisplayObservation seen;
