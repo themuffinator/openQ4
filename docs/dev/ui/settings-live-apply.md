@@ -1,6 +1,6 @@
 # Applying display settings without a device restart
 
-This note records the first three stages of making Settings > Display apply its
+This note records the four stages of making Settings > Display apply its
 changes to the running renderer. It is the record for the changes of
 11 November 2026 and supersedes, for the settings named here, what
 [effect execution](settings-effect-execution.md#combined-executor),
@@ -25,14 +25,17 @@ did every texture setting and every Performance Preset.
 | Benchmark budget (`r_rendererBenchmarkPreset`) | Device restart | Nothing to do: it is read on each use. |
 | Upload stream (`r_rendererUploadMegs`, `r_rendererUploadFrameBuffers`) | Device restart | Vulkan: nothing to do, it reads neither. OpenGL: still a device restart, because the stream is allocated when the device starts. |
 | A Performance Preset | Device restart, always | Stage 1: no device restart on Vulkan unless the preset changes MSAA. Stage 3: none on Vulkan at all. OpenGL restarts when the preset changes MSAA or the upload stream. |
+| High-quality texture hints (`image_ignoreHighQuality`) | Written, finished at the next start | Stage 4: the materials that read the hint are re-parsed in the session. |
+| Rendering API and GPU (`r_renderApi`, `r_renderDevice`) | Restart Renderer at the main menu only | Stage 4: also inside a single-player game, which is saved, reloaded around and resumed. |
 
 Unchanged in stage 1 (see [stage 2](#stage-2-display-changes-on-the-running-device)
 for the display itself): a display change (mode, size, fullscreen, borderless,
 display, refresh, MSAA) still restarts the device and asks Keep or Revert. An
 `r_renderer` change still restarts it and waits for the renderer's selection
 report. A speaker layout or EFX change still reopens the sound device.
-`image_ignoreHighQuality` and `s_maxSoundsPerShader` still finish at the next
-start.
+`s_maxSoundsPerShader` still finishes at the next start, as
+`image_ignoreHighQuality` did until
+[stage 4](#stage-4-the-high-quality-hint-and-the-renderer-switch-inside-a-game).
 
 ## How it works
 
@@ -301,7 +304,113 @@ MSAA change in the engine, and 8x or 16x.
   Vulkan's window view is.
 - OpenGL's upload stream, which is allocated when the device starts.
 
-## What this stage does not do
+## Stage 4: the high-quality hint, and the renderer switch inside a game
+
+Two settings were left that no device operation could finish: one is read
+while a material is parsed, and the other replaces the renderer itself.
+
+### The high-quality hint
+
+`image_ignoreHighQuality` decides, while a material is parsed, whether a stage
+that asks for `highquality` or `uncompressed` gets the uncompressed image
+identity or the ordinary one, which the texture reduction settings shrink. A
+level load re-parses only the materials that level owns. Menu, HUD and
+light materials parsed outside a level kept the old answer, so the page wrote
+the setting and reported that it finished at the next start.
+
+`R_CheckMaterialQualityInputs` (`Material.cpp`) now applies a change in the
+session:
+
+- Each parse records whether it resolved a non-forced hint
+  (`ReadsHighQualityHint`) and the answer it used
+  (`ParsedIgnoringHighQuality`). `forceHighQuality` ignores the setting and
+  does not count.
+- A changed setting re-parses, in place, the parsed materials that read the
+  hint under the other answer. Stock Quake 4 has about 25 such materials, so
+  the pass is short. Material pointers do not change.
+- It runs at the start of `idRenderSystemLocal::BeginFrame`, after the
+  previous frame's back end has finished and before the frame has a draw
+  surface, so nothing references the stages being rebuilt. It waits while a
+  level load or a checked image-policy attempt is running.
+- An image a re-parsed material stops using is purged unless another parsed
+  material still holds it. The image that replaces it inherits whether a
+  level load may purge it, so a toggle does not turn level images into
+  permanent residents.
+- The materials are found through a registry of parsed materials, not through
+  the declaration manager, whose `DeclByIndex` allocates a material object
+  for every declaration it is asked about.
+
+A console change behaves the same way. `SystemSettingsHost::
+ChangedNeedsNextStart` no longer names the setting, so the page's notice
+`#str_230076` now appears only for the per-sound sample limit.
+
+A new renderer's first frame runs the same check, because every setting
+starts out marked as changed. On a fresh profile it re-parsed one material
+that had been parsed before the configuration set the value.
+
+### Restart Renderer inside a single-player game
+
+Another rendering API or GPU still needs the renderer module replaced, which
+is an engine reload. The page offered that at the main menu only, because a
+reload ends the running game.
+
+In a single-player game the restart now carries the game across the reload:
+
+1. `idSessionLocal::SaveForRendererRestart` writes the `RendererRestart`
+   autosave and waits for it to finish. Like the Android `Suspended` save it
+   takes no screenshot, shows no HUD message and rolls over each time. The
+   Load page lists it under the Restart Renderer label.
+2. The settings are written and the saved selection is armed, as before.
+3. `idSessionLocal::QueueRendererRestart` queues `reloadEngine menu` with the
+   post command `resumeAfterRendererRestart`, which loads that save. If the
+   save does not load, the player is left at the main menu, where the reload
+   alone would have put them.
+
+`settings.render.canRestart` is true in such a game, and the notice reads
+`#str_231767` (Restarting the renderer saves your game and resumes it
+afterwards), added in the twelve interface languages. The restart is not
+offered, and the notice still asks for the main menu, where a save would be
+refused or would not resume cleanly: multiplayer, a load in progress, demos,
+the editor, a cinematic, death or a failed objective. A save that fails stops
+the restart before anything is written.
+
+The switch is not instant. It is one engine reload and one load of the saved
+game inside the running program.
+
+### Engine checks, stage 4
+
+Hidden window, console verbs only, working tree on `d3a73d37d`, OpenGL and
+Vulkan. The build also held another session's two uncommitted OpenGL shadow
+shader edits.
+
+- **The hint at the title screen.** `image_ignoreHighQuality` 0 to 1 to 0 to
+  1 from the console: one pass per change, 2 of 2 materials re-parsed and 2
+  images released each time, 2 to 6 ms, no device start, no warning.
+- **The hint in a map** (`game/airdefense1`, under a 128 texel ceiling): one
+  pass per change, 5 of 5 materials re-parsed and 6 images released each time,
+  7 to 44 ms, the presentation generation unchanged, no warning.
+- **Presets on the page** (Vulkan): the two steps that change the setting
+  each ran one pass, and the next-start notice did not appear.
+- **Restart Renderer in a map**, from the pause menu's Display page with the
+  other API chosen: `RendererRestart` saved, one engine reload, the other
+  renderer module loaded and the game back in the map at the same position
+  and view angle (moved 0.0 units), with the HUD drawn. Vulkan to OpenGL and
+  OpenGL to Vulkan each passed twice.
+
+Not run: a GPU change (the test machine exposes one usable Vulkan device), the
+Awakening campaign, a restart that the refusals above block in a real game,
+a save that fails to load after the reload, the classic HUD's materials
+(`ui_retained 0`), and timing of the reload.
+
+### What stage 4 leaves
+
+- `s_maxSoundsPerShader` still finishes at the next start.
+- A multiplayer client or server is not carried across a renderer restart.
+- A holder of an image pointer outside the materials (a cached light image,
+  a page's atlas) keeps drawing the image it had; it reloads on its next
+  bind if it was purged.
+
+## What these stages do not do
 
 - The image reload still blocks while textures load. It is shorter than a
   device restart because the device, fonts, generated images, vertex caches
@@ -309,8 +418,7 @@ MSAA change in the engine, and 8x or 16x.
 - The in-place route has no readback of image dimensions. Its evidence is the
   exact settings readback, the same device generation and a later presented
   frame, as for the combined executor's restart.
-- OpenGL's MSAA Apply and upload stream, the high-quality texture flag and
-  switching the rendering API from inside a game are later stages
+- OpenGL's MSAA Apply and upload stream are later work
   ([roadmap](../roadmap.md), UI-01).
 
 ## Engine checks, 11 November 2026
@@ -341,6 +449,16 @@ device reopened.
 
 ## Tests
 
+- `tools/tests/material_quality_reparse_contract.py` (stage 4): every
+  non-forced hint site marks the material; the check runs at the start of a
+  frame, stays pending during a level load, re-parses only stale readers,
+  passes on the level-load lifetime and purges only unheld images; the
+  in-game restart saves, writes the settings, then queues the reload.
+- `tools/tests/ui_rendering_settings.py` (stage 4): the restart is offered
+  in a game that can be saved and refused in one that cannot; a failed save
+  or a failed settings write queues nothing; the main-menu path is unchanged.
+- `tools/tests/ui_system_settings_host.py` (stage 4): the high-quality
+  setting no longer waits for the next start; the sound limit still does.
 - `tools/tests/ui_settings_display_service.py` (stage 2): a window change
   transitions on OpenGL and Vulkan, kept and reverted; a failed transition
   falls back to a restart, and a failed fallback fails the attempt; an MSAA

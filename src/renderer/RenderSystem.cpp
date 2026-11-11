@@ -1521,6 +1521,10 @@ void idRenderSystemLocal::BeginFrame( int windowWidth, int windowHeight ) {
 		}
 	}
 
+	// a changed image_ignoreHighQuality re-parses the materials that read it,
+	// here, where no draw surface of this frame references a stage yet
+	R_CheckMaterialQualityInputs();
+
 	guiModel->Clear();
 	if ( demoFrameGuiModel != NULL ) {
 		// a frame's recorded 2D starts empty, whatever the last frame drew

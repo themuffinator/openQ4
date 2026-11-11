@@ -86,9 +86,17 @@ See [player release status](../user/release-status.md).
   restarts the renderer there; it still asks you to keep or revert. From the
   console, `r_multiSamples` now reaches the 3D scene on the next frame on
   both renderers, without `vid_restart`.
+- **High-quality texture flags apply at once.** The setting used to wait for
+  the next start of the game. It now takes effect when you apply it, from
+  the Display page, a preset or the console (`image_ignoreHighQuality`).
+- **Switch renderer or GPU without leaving your game.** Restart Renderer now
+  works inside a single-player game: it saves, restarts the renderer and
+  puts you back where you were. It used to be offered at the main menu
+  only. During multiplayer, a cinematic or after dying it still asks you to
+  return to the main menu first. The save stays in the Load list as Restart
+  Renderer.
 - **Still a restart.** Under OpenGL an MSAA change on the Display page
-  restarts the renderer. High-quality texture flags still finish at the next
-  start.
+  restarts the renderer.
 - **Nothing to do.** The classic interface (`ui_retained 0`) is unchanged.
 - Evidence: [applying without a device restart](ui/settings-live-apply.md),
   with engine checks on OpenGL and Vulkan: V-Sync toggled twice with no
@@ -106,7 +114,13 @@ See [player release status](../user/release-status.md).
   one drawn after a device restart. MSAA changed 0 to 4 to 0 to 2 in a
   running Air Defense 1 on both renderers with the reported count following
   each step and no device start, and the Display page applied and kept an
-  MSAA step in place under Vulkan.
+  MSAA step in place under Vulkan. The high-quality flag changed 0 to 1 to
+  0 to 1 at the title screen and in Air Defense 1 on both renderers, each
+  change re-parsing every material that reads it (2 and 5) with no device
+  start. Restart Renderer from the pause menu in Air Defense 1 went Vulkan
+  to OpenGL and OpenGL to Vulkan, each time back in the map at the same
+  position. A GPU change, the Awakening campaign and the classic
+  interface were not run.
   `tools/tests/ui_settings_display_service.py`,
   `tools/tests/ui_settings_effect_journal.py`,
   `tools/tests/ui_system_settings_host.py`.
@@ -676,6 +690,10 @@ there is no double-click word selection.
   cast a shadow, on both renderers. Nothing needs changing;
   `r_shadowMapCasterCulling 4` brings the earlier behaviour back for
   comparison.
+- **OpenGL lights surfaces the same with shadow maps on as with them off.**
+  With shadow maps on, the OpenGL renderer lit the fine relief of walls and
+  machinery harder than it does otherwise, so raised edges were outlined
+  brighter than under the original shadows or on Vulkan. The two now match.
 - **Vulkan gives shadow memory back.** The working copies Vulkan keeps for
   point-light shadows were never released, so one view of a great many lights
   (2.0 GB in our test) stayed allocated for the rest of the session. They now

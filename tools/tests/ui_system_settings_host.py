@@ -275,10 +275,11 @@ int main() {
     candidate=original;candidate["com_performancePreset"]=std::string("ultra");assert(classOf()==SystemApplyClass::Immediate);
     candidate["r_multiSamples"]=std::get<double>(original.at("r_multiSamples"))+1;assert(classOf()==SystemApplyClass::Display);
     candidate["image_picmip"]=std::get<double>(original.at("image_picmip"))+1;assert(classOf()==SystemApplyClass::Combined);
-    // Only these two wait for the next start: declarations already parsed keep the old value.
+    // Only the sound setting waits for the next start: shaders already parsed keep the old value.
     candidate=original;assert(!SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
     candidate["image_downSize"]=!std::get<bool>(original.at("image_downSize"));assert(!SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
-    candidate["image_ignoreHighQuality"]=!std::get<bool>(original.at("image_ignoreHighQuality"));assert(SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
+    // The renderer re-parses the materials that read it, so it is finished in the session.
+    candidate["image_ignoreHighQuality"]=!std::get<bool>(original.at("image_ignoreHighQuality"));assert(!SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
     candidate=original;candidate["s_maxSoundsPerShader"]=std::get<double>(original.at("s_maxSoundsPerShader"))+1;
     assert(SystemSettingsHost::ChangedNeedsNextStart(original,candidate));
     std::vector<std::string> deferredKeys,rendererKeys;

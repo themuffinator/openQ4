@@ -54,9 +54,8 @@ public:
 	static SystemApplyClass ApplyClassOf(const StateValues& before, const StateValues& target);
 	static bool RequiresDeviceWork(const StateValues& before, const StateValues& target);
 	// The changed settings that a Combined apply writes but this session cannot
-	// finish: image_ignoreHighQuality and s_maxSoundsPerShader are read when a
-	// material or a sound shader is parsed, so declarations already parsed keep
-	// the old value until the game next starts.
+	// finish: s_maxSoundsPerShader is read when a sound shader is parsed, so the
+	// shaders already parsed keep the old value until the game next starts.
 	static bool ChangedNeedsNextStart(const StateValues& before, const StateValues& target);
 
  // Pure typed profile expansion. Caller publishes with EditGenerated so

@@ -19,6 +19,8 @@ bool Desktop() {
 }
 bool Fail(std::string& error,const char* text) { error=text; return false; }
 bool AtMainMenu() { return session && !sessLocal.IsMapSpawned() && !session->IsLoadingSaveGame(); }
+// A single-player game the restart can save and load again around the reload.
+bool CanCarryGame() { return session && sessLocal.CanSaveForRendererRestart(); }
 bool SameCatalog(const renderDeviceCatalog_t& a,const renderDeviceCatalog_t& b) {
 	if (a.count!=b.count) return false;
 	for (unsigned i=0; i<a.count; ++i)
@@ -86,12 +88,13 @@ void RenderingSettings::Read(const StateValues& draft,bool clean,StateValues& va
 	values["settings.render.pending"]=pending;
 	values["settings.render.autoDetect"]=!pending;
 	values["settings.render.canChoose"]=!overrideDevice; // Auto also repairs a missing saved GPU on GL-only hosts.
-	values["settings.render.canRestart"]=clean && pending && AtMainMenu();
+	const bool menu=AtMainMenu(), carry=!menu && CanCarryGame();
+	values["settings.render.canRestart"]=clean && pending && (menu || carry);
 	values["settings.render.vulkan"]=vulkan;
 	values["settings.render.gl"]=Desktop();
 	values["settings.render.gles"]=!Desktop();
 	values["settings.render.notice"]=std::string(overrideDevice?"#str_230151":pending?
-		(clean?(AtMainMenu()?"#str_230148":"#str_230149"):"#str_230147"):
+		(clean?(menu?"#str_230148":carry?"#str_231767":"#str_230149"):"#str_230147"):
 		selected==RENDER_DEVICE_LIMIT?"#str_230150":fallback?"#str_230156":
 		status.activeApi==RENDER_MODULE_API_GL || status.activeApi==RENDER_MODULE_API_GL_MODULE || status.activeApi==RENDER_MODULE_API_GLES?
 		"#str_230146":"#str_230145");
@@ -125,12 +128,16 @@ bool RenderingSettings::Backend(const std::string& api,StateValues& patch,std::s
 	error.clear(); return true;
 }
 bool RenderingSettings::Restart(std::string& error) {
-	// No saved game is discarded by a settings action. Gameplay must be left
-	// through the ordinary menu flow before this separate restart is offered.
-	if(!AtMainMenu()) return Fail(error,"Return to the main menu before restarting the renderer");
+	// No game is discarded by a settings action. A single-player game is saved
+	// first and loaded again by the reload; anything that cannot be saved has
+	// to be left through the ordinary menu flow before the restart is offered.
+	const bool menu=AtMainMenu();
+	if(!menu && !CanCarryGame()) return Fail(error,"Return to the main menu before restarting the renderer");
+	if(!menu && !sessLocal.SaveForRendererRestart()) return Fail(error,"The game could not be saved before restarting the renderer");
 	if(!Common_WriteSettingsConfiguration(false,error)) return false;
 	R_RendererModule_UseSavedSelectionOnReload();
-	cmdSystem->BufferCommandText(CMD_EXEC_APPEND,"reloadEngine menu\n");
+	if(menu) cmdSystem->BufferCommandText(CMD_EXEC_APPEND,"reloadEngine menu\n");
+	else sessLocal.QueueRendererRestart();
 	error.clear(); return true;
 }
 }

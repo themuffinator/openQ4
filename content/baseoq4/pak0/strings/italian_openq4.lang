@@ -1599,4 +1599,5 @@
 	"#str_231764"	"Dimensione mirino"
 	"#str_231765"	"Colore mirino"
 	"#str_231766"	"MODIFICA"
+	"#str_231767"	"Il riavvio del renderer salva la partita e poi la riprende."
 }

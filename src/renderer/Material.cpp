@@ -33,6 +33,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "RendererResourceSettings.h"
 
 #include <cstdlib>
+#include <mutex>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 /*
 
@@ -70,6 +74,7 @@ typedef struct mtrParsingData_s {
 	bool			registersAreConstant;
 	bool			forceOverlays;
 	materialQualityInputs_t qualityInputs;
+	bool			readsHighQualityHint;	// a stage asked for "highquality" or "uncompressed"
 } mtrParsingData_t;
 
 static void R_ResetSpecularProbeMaterialInfo( specularProbeMaterialInfo_t &info ) {
@@ -295,6 +300,8 @@ void idMaterial::CommonInit() {
 	numStages = 0;
 	numAmbientStages = 0;
 	hasCustomGLSLLightingStage = false;
+	readsHighQualityHint = false;
+	parsedIgnoringHighQuality = false;
 	stages = NULL;
 	editorImage = NULL;
 	lightFalloffImage = NULL;
@@ -345,6 +352,32 @@ void idMaterial::CommonInit() {
 
 /*
 =============
+R_ParsedMaterials
+
+Every material that has been parsed at least once. A changed
+image_ignoreHighQuality walks this instead of the declaration manager's list,
+whose DeclByIndex allocates a material object for every declaration it is asked
+about, parsed or not. The registry is never destroyed, so a material that
+outlives the renderer's other statics can still leave it.
+=============
+*/
+struct parsedMaterials_t {
+	std::mutex mutex;
+	std::unordered_set<idMaterial *> materials;
+};
+static parsedMaterials_t &R_ParsedMaterials() {
+	static parsedMaterials_t *registry = new parsedMaterials_t;
+	return *registry;
+}
+
+static void R_ForgetParsedMaterial( idMaterial *material ) {
+	parsedMaterials_t &registry = R_ParsedMaterials();
+	const std::lock_guard<std::mutex> lock( registry.mutex );
+	registry.materials.erase( material );
+}
+
+/*
+=============
 idMaterial::idMaterial
 =============
 */
@@ -362,6 +395,7 @@ idMaterial::~idMaterial
 =============
 */
 idMaterial::~idMaterial() {
+	R_ForgetParsedMaterial( this );
 	R_ImagePolicyResourceDestroyed();
 }
 
@@ -1426,6 +1460,7 @@ void idMaterial::ParseFragmentMap( idLexer &src, newShaderStage_t *newStage ) {
 
 		if ( !token.Icmp( "uncompressed" ) || !token.Icmp( "highquality" ) ) {
 			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, false );
+			pd->readsHighQualityHint = true;
 			continue;
 		}
 		if ( !token.Icmp( "nopicmip" ) ) {
@@ -1777,6 +1812,7 @@ void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) 
 		}
 		if ( !token.Icmp( "uncompressed" ) || !token.Icmp( "highquality" ) ) {
 			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, false );
+			pd->readsHighQualityHint = true;
 			continue;
 		}
 		if ( !token.Icmp( "nopicmip" ) ) {
@@ -2120,6 +2156,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 		}
 		if ( !token.Icmp( "uncompressed" ) || !token.Icmp( "highquality" ) ) {
 			td = R_ResolveMaterialHighQualityUsage( pd->qualityInputs, td, false );
+			pd->readsHighQualityHint = true;
 			continue;
 		}
 		if ( !token.Icmp( "forceHighQuality" ) ) {
@@ -4218,6 +4255,16 @@ bool idMaterial::Parse( const char *text, const int textLength ) {
 	// per-surface
 	CheckForConstantRegisters();
 
+	// what a later image_ignoreHighQuality change has to re-parse: only the
+	// materials whose images depended on the answer, and only when it differs
+	readsHighQualityHint = pd->readsHighQualityHint;
+	parsedIgnoringHighQuality = qualityInputs.ignoreHighQuality;
+	{
+		parsedMaterials_t &registry = R_ParsedMaterials();
+		const std::lock_guard<std::mutex> lock( registry.mutex );
+		registry.materials.insert( this );
+	}
+
 	pd = NULL;	// the pointer will be invalid after exiting this function
 
 	// finish things up
@@ -5925,4 +5972,186 @@ void idMaterial::ReloadImages( bool force ) const
 	if ( specularProbeInfo.enabled && specularProbeInfo.cubeImage != NULL ) {
 		specularProbeInfo.cubeImage->Reload( force );
 	}
+}
+
+/*
+===================
+idMaterial::CollectImages
+
+Every image slot of the parsed material in one fixed order, empty slots
+included, so two parses of the same text line up entry for entry.
+===================
+*/
+void idMaterial::CollectImages( idList<idImage *> &images ) const {
+	for ( int i = 0; i < numStages; i++ ) {
+		images.Append( stages[i].texture.image );
+		const newShaderStage_t *newStage = stages[i].newStage;
+		if ( newStage == NULL ) {
+			continue;
+		}
+		for ( int j = 0; j < newStage->numFragmentProgramImages; j++ ) {
+			images.Append( newStage->fragmentProgramImages[j] );
+		}
+		for ( int j = 0; j < newStage->numShaderTextures; j++ ) {
+			images.Append( newStage->shaderTextureImages[j] );
+		}
+	}
+	images.Append( portalImage );
+	images.Append( lightFalloffImage );
+
+	const pbrMaterialTexture_t *pbrTextures[] = {
+		&pbrInfo.albedo, &pbrInfo.normal, &pbrInfo.orm, &pbrInfo.metallic,
+		&pbrInfo.roughness, &pbrInfo.ao, &pbrInfo.emissive,
+		&pbrInfo.legacyBump, &pbrInfo.legacyDiffuse,
+		&pbrInfo.legacySpecular, &pbrInfo.legacyEmissive
+	};
+	for ( unsigned int i = 0; i < sizeof( pbrTextures ) / sizeof( pbrTextures[0] ); ++i ) {
+		images.Append( pbrTextures[i]->present ? pbrTextures[i]->image : NULL );
+	}
+	images.Append( specularProbeInfo.enabled ? specularProbeInfo.cubeImage : NULL );
+}
+
+/*
+===================
+idMaterial::ReparseForQualityInputs
+
+Parses the declaration text again, in place, the way the declaration manager
+does after a purge, without touching the declaration's level-load lifetime.
+False when there is no text left to parse; the material is then unchanged.
+===================
+*/
+bool idMaterial::ReparseForQualityInputs() {
+	const int length = GetTextLength();
+	if ( length <= 0 ) {
+		return false;
+	}
+	idTempArray<char> text( length + 1 );
+	GetText( text.Ptr() );
+	text[length] = '\0';
+
+	FreeData();
+	Parse( text.Ptr(), length );
+	return true;
+}
+
+/*
+===================
+R_CheckMaterialQualityInputs
+
+image_ignoreHighQuality is read while a material is parsed. It decides whether
+a stage that asks for "highquality" or "uncompressed" gets the uncompressed
+image identity, or the ordinary one that the texture reduction settings shrink.
+A level load re-parses only the materials that level owns, so menu and HUD
+materials, the main users of the hint, kept the old answer until the game was
+started again.
+
+Re-parse the materials that read the hint under the other answer. This runs at
+the start of a frame, after the previous frame's back end has finished and
+before any draw surface of the new frame exists, so nothing references the
+stages being rebuilt. Material pointers do not change.
+===================
+*/
+void R_CheckMaterialQualityInputs( void ) {
+	if ( !image_ignoreHighQuality.IsModified() ) {
+		return;
+	}
+	// A level load is re-parsing its materials and has deferred every image
+	// load, and a checked image-policy attempt owns content mutation. The
+	// change stays pending until either is over.
+	if ( globalImages->insideLevelLoad || R_ImagePolicyActive() ) {
+		return;
+	}
+	image_ignoreHighQuality.ClearModified();
+
+	const bool ignoring = image_ignoreHighQuality.GetBool();
+	std::vector<idMaterial *> parsed;
+	{
+		parsedMaterials_t &registry = R_ParsedMaterials();
+		const std::lock_guard<std::mutex> lock( registry.mutex );
+		parsed.assign( registry.materials.begin(), registry.materials.end() );
+	}
+	idList<idMaterial *> stale;
+	int readers = 0;
+	for ( idMaterial *material : parsed ) {
+		if ( material->GetState() != DS_PARSED || !material->ReadsHighQualityHint() ) {
+			continue;
+		}
+		readers++;
+		if ( material->ParsedIgnoringHighQuality() != ignoring ) {
+			stale.Append( material );
+		}
+	}
+	if ( stale.Num() == 0 ) {
+		common->DPrintf( "High-quality texture hints %s: none of %d parsed materials (%d read the hint) needs another parse\n",
+			ignoring ? "ignored" : "honoured", static_cast<int>( parsed.size() ), readers );
+		return;
+	}
+
+	R_RenderThread_Sync( "material quality" );
+	const int startMsec = Sys_Milliseconds();
+
+	// An image first loaded outside a level load is never purged by one. The
+	// images this pass loads stand in for images that already had a lifetime,
+	// so they take that lifetime rather than becoming permanent residents.
+	std::unordered_map<const idImage *, bool> outsideBefore;
+	for ( int i = 0; i < globalImages->images.Num(); i++ ) {
+		outsideBefore[globalImages->images[i]] = globalImages->images[i]->IsReferencedOutsideLevelLoad();
+	}
+	const auto wasOutside = [&outsideBefore]( const idImage *image ) {
+		const auto found = outsideBefore.find( image );
+		return found != outsideBefore.end() && found->second;
+	};
+
+	std::unordered_map<idImage *, bool> replacements;
+	std::unordered_set<idImage *> dropped;
+	idList<idImage *> oldImages, newImages;
+	int reparsed = 0;
+	for ( int i = 0; i < stale.Num(); i++ ) {
+		oldImages.SetNum( 0, false );
+		newImages.SetNum( 0, false );
+		stale[i]->CollectImages( oldImages );
+		if ( !stale[i]->ReparseForQualityInputs() ) {
+			continue;
+		}
+		reparsed++;
+		stale[i]->CollectImages( newImages );
+		const bool aligned = oldImages.Num() == newImages.Num();
+		for ( int k = 0; k < oldImages.Num(); k++ ) {
+			idImage *was = oldImages[k];
+			idImage *now = aligned ? newImages[k] : NULL;
+			if ( was == NULL || now == was ) {
+				continue;
+			}
+			dropped.insert( was );
+			if ( now != NULL ) {
+				bool &outside = replacements[now];
+				outside = outside || wasOutside( was );
+			}
+		}
+	}
+	for ( const auto &replacement : replacements ) {
+		replacement.first->SetLevelLoadLifetime( replacement.second || wasOutside( replacement.first ) );
+	}
+
+	// Release what no material holds any more. Anything else still holding one
+	// of these loads it again when it next binds it.
+	std::unordered_set<const idImage *> held;
+	idList<idImage *> images;
+	for ( const idMaterial *material : parsed ) {
+		images.SetNum( 0, false );
+		material->CollectImages( images );
+		for ( int k = 0; k < images.Num(); k++ ) {
+			held.insert( images[k] );
+		}
+	}
+	int released = 0;
+	for ( idImage *image : dropped ) {
+		if ( held.find( image ) == held.end() && image->IsLoaded() && image->IsFileBacked() ) {
+			image->PurgeImage();
+			released++;
+		}
+	}
+
+	common->Printf( "High-quality texture hints %s: re-parsed %d of %d materials, released %d images (%d msec)\n",
+		ignoring ? "ignored" : "honoured", reparsed, stale.Num(), released, Sys_Milliseconds() - startMsec );
 }

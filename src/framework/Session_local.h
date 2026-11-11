@@ -496,6 +496,10 @@ public:
 	void				PublishRetainedControls( idUserInterface *gui );
 	void				HandleRetainedControlsRequest( idUserInterface *gui, const char *request );
 	bool				SaveForSuspension( void );
+	// Single player carried across a renderer restart, which is an engine reload.
+	bool				CanSaveForRendererRestart( void ) const;
+	bool				SaveForRendererRestart( void );
+	void				QueueRendererRestart( void );
 	bool				RetainedControlsKey( const sysEvent_t *event );
 	void				PushRetainedNotice( const char *text, int kind, const char *action, const char *subject, int undo,
 							bool persistent );

@@ -25,8 +25,12 @@ choices are preserved. Selecting Vulkan explicitly does not enable VR.
 
 Choose a named GPU to select that device and Vulkan together. Choose
 **Automatic (high performance)** to restore automatic backend/device selection.
-Apply the changes, then use **Restart Renderer** at the main menu. During a
-game, first return to the main menu through the normal game flow. The active
+Apply the changes, then use **Restart Renderer**. At the main menu it restarts
+the renderer at once. During a single-player game it saves your game first,
+restarts the renderer and puts you back where you were; the save stays in
+the Load list as Restart Renderer and is replaced the next time. This takes
+about as long as loading a saved game. During multiplayer, a cinematic or
+after dying, return to the main menu first. The active
 backend and device remain visible while changes await restart; Auto-Detect is
 available after the chosen hardware starts. This restart supersedes backend
 and GPU overrides supplied for the current launch. Launchers that supply those
@@ -82,7 +86,7 @@ To adopt the revised settings on an existing configuration, select the preset ag
 
 Performance presets write video, texture-allocation, texture-sampling, and audio backend cvars. Anisotropy is capped to the maximum supported by the active GPU. Run `vid_restart` after applying one from the console so renderer, texture allocation, and sampler changes take effect; run `s_restart` as well if you want speaker/EAX/emitter-budget changes to rebuild the active sound backend immediately.
 
-In the modern interface, choose the preset on **Settings > Display** and press **Apply Changes**. Most of a preset applies to the running game: its effects switch at once and its textures reload in place, which takes a moment. Under Vulkan no preset restarts the renderer. Under OpenGL the renderer restarts only when the preset changes anti-aliasing (MSAA) or the renderer's upload buffers. A preset that changes MSAA asks you to keep or revert on either. The sound device restarts when the speaker layout or reverb setting changed. High-quality texture flags and the per-sound sample limit fully change when the game next starts; the page tells you when your changes include one of them.
+In the modern interface, choose the preset on **Settings > Display** and press **Apply Changes**. Most of a preset applies to the running game: its effects switch at once and its textures reload in place, which takes a moment. Under Vulkan no preset restarts the renderer. Under OpenGL the renderer restarts only when the preset changes anti-aliasing (MSAA) or the renderer's upload buffers. A preset that changes MSAA asks you to keep or revert on either. The sound device restarts when the speaker layout or reverb setting changed. The per-sound sample limit fully changes when the game next starts; the page tells you when your changes include it.
 
 **V-Sync** on that page applies as soon as you press **Apply Changes**, with no renderer restart and no keep-or-revert question. Texture quality changes made there reload the textures in place the same way.
 
@@ -336,8 +340,9 @@ does not replace or remove the OpenGL renderer.
   stay on OpenGL. Vulkan's experimental qualification is unchanged.
 - Vulkan is a **runtime option, not a separate download**. There is no third
   macOS package to install and nothing to enable at install time.
-- Choose Vulkan in the System menu and Apply, then Restart Renderer from the
-  main menu; or set `r_renderApi vulkan` in the console and relaunch openQ4.
+- Choose Vulkan in the System menu and Apply, then Restart Renderer, from the
+  main menu or inside a single-player game; or set `r_renderApi vulkan` in
+  the console and relaunch openQ4.
   Check the active renderer readout or `gfxInfo` to confirm what started.
 - **Expect problems.** The Vulkan renderer is experimental on macOS,
   and on macOS only one player has reported it working (openQ4 0.12.0 on an

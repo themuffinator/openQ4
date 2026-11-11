@@ -1646,4 +1646,5 @@
 	"#str_231764"	"Rozmiar celownika"
 	"#str_231765"	"Kolor celownika"
 	"#str_231766"	"ZMIEŃ"
+	"#str_231767"	"Ponowne uruchomienie renderera zapisuje grę i potem ją wznawia."
 }

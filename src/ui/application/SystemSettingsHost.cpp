@@ -370,7 +370,9 @@ SystemApplyClass SystemSettingsHost::ApplyClassOf(const StateValues& before, con
 		deferred ? SystemApplyClass::Deferred : SystemApplyClass::Immediate;
 }
 bool SystemSettingsHost::ChangedNeedsNextStart(const StateValues& before, const StateValues& target) {
-	return Changed(before,target,"image_ignoreHighQuality") || Changed(before,target,"s_maxSoundsPerShader");
+	// image_ignoreHighQuality left this list when the renderer began re-parsing
+	// the materials that read it (R_CheckMaterialQualityInputs).
+	return Changed(before,target,"s_maxSoundsPerShader");
 }
 bool SystemSettingsHost::RequiresDeviceWork(const StateValues& before, const StateValues& target) {
 	return (ChangedEffects(before,target) & ~SystemSettingEngineRestart) != 0;

@@ -225,6 +225,9 @@ public:
 	bool		HoldsGeneratedCacheContent() const { return generatedCacheContent && IsLoaded(); }
 
 	void		SetReferencedOutsideLevelLoad() { referencedOutsideLevelLoad = true; }
+	bool		IsReferencedOutsideLevelLoad() const { return referencedOutsideLevelLoad; }
+	// An image that replaces another takes over whether a level load may purge it.
+	void		SetLevelLoadLifetime( bool outsideLevelLoad ) { referencedOutsideLevelLoad = outsideLevelLoad; }
 	void		SetReferencedInsideLevelLoad() { levelLoadReferenced = true; }
 	void		ClearUseCount() { useCount = 0; }
 	void		AddUseCount( int count ) { useCount += count; }

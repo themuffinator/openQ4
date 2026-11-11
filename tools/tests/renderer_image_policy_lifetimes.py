@@ -93,7 +93,7 @@ def main():
   assert 'const uint64_t' in text and 'imagePolicyIdentity' in text
  ctor=method(image,'ID_INLINE idImage::idImage(').replace('ID_INLINE ','')
  destructor=method(image,'~idImage()').replace('~idImage()', 'idImage::~idImage()',1)
- ctors='#include "support.h"\n'+ctor+'\n'+destructor+'\n'+method(material,'idMaterial::idMaterial()')+'\n'+method(material,'idMaterial::~idMaterial()')+'\n idImage earlyImage("before-provider");idMaterial earlyMaterial;\n'
+ ctors='#include "support.h"\nstatic void R_ForgetParsedMaterial( idMaterial * ) {}\n'+ctor+'\n'+destructor+'\n'+method(material,'idMaterial::idMaterial()')+'\n'+method(material,'idMaterial::~idMaterial()')+'\n idImage earlyImage("before-provider");idMaterial earlyMaterial;\n'
  ctors+='\nstatic bool permit=true;static int contentCalls=0,mutations=0;bool R_ImagePolicyContentMutation(){++contentCalls;R_ImagePolicyLifecycleChanged();return permit;}void PermitContent(bool value){permit=value;}int ContentCalls(){return contentCalls;}int Mutations(){return mutations;}\n'
  for signature,guard,tail in [('void idMaterial::FreeData()', 'if ( !R_ImagePolicyContentMutation() ) return;', '++mutations;'),('bool idMaterial::Parse( const char *text, const int textLength )', 'if ( !R_ImagePolicyContentMutation() ) return false;', '++mutations;return true;')]:
   body=material[material.index(signature):];brace=body.index('{');assert body[brace+1:].lstrip().startswith(guard)

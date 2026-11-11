@@ -1590,4 +1590,5 @@
 	"#str_231764"	"Tamaño de Mira"
 	"#str_231765"	"Color de Punto de Mira"
 	"#str_231766"	"CAMBIAR"
+	"#str_231767"	"Reiniciar el renderizador guarda la partida y la reanuda después."
 }

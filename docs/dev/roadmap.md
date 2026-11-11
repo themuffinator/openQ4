@@ -1774,7 +1774,10 @@ optimization has landed.
   stencil rule for which triangles cast: open geometry stores the ones that face
   away from the light, sealed hulls keep their near shell, and the face to discard
   follows the handedness of each light's projection, `r_shadowMapCasterCulling`.
-  storage2's alarm lights had been blocked by a one-sided floor.)
+  storage2's alarm lights had been blocked by a one-sided floor.) (OpenGL's
+  shadow receivers no longer normalize the stock normal-map sample, which lit
+  every raised edge harder under a shadow map than without one; OpenGL now
+  agrees with stencil as closely as Vulkan does.)
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur
@@ -2570,10 +2573,13 @@ Completion must advance through the existing dependencies:
   fullscreen, and any Keep on OpenGL (the test window had no focus);
   OpenGL's MSAA Apply (a single-sample window with the direct 3D views
   through a multisampled target, as Vulkan has) and OpenGL's upload stream
-  in place; a material
-  re-parse so `image_ignoreHighQuality` applies in the session; the
-  rendering API and GPU switch from inside a game; and an image reload
-  spread across frames.
+  in place; and an image reload spread across frames.
+  Stage 4, the same day: a changed `image_ignoreHighQuality` re-parses the
+  materials that read the hint, in the session, and Restart Renderer works
+  inside a single-player game, which is saved, reloaded around and resumed
+  (both directions between OpenGL and Vulkan ran in Air Defense 1). A GPU
+  change, the Awakening campaign and multiplayer were not run; multiplayer
+  is not carried.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

@@ -8684,6 +8684,65 @@ void Session_SuspendSave( void ) {
 
 /*
 ===============
+idSessionLocal::SaveForRendererRestart
+
+Another rendering API or GPU is taken up by an engine reload, and a reload ends
+the running game. Single player is carried across it in the "RendererRestart"
+autosave, like the "Suspended" save above: it needs no screenshot, shows no HUD
+message and rolls over each time. The reload's post command loads it again.
+
+Nothing is offered where a save would be refused or would not resume cleanly:
+multiplayer, loading, demos, the editor, cinematics, death or a failed
+objective. The Rendering page then asks for the main menu, as it always did.
+===============
+*/
+static const char *const SESSION_RENDERER_RESTART_SAVE = "RendererRestart";
+
+bool idSessionLocal::CanSaveForRendererRestart( void ) const {
+#ifdef ID_DEDICATED
+	return false;
+#else
+	if ( !mapSpawned || insideExecuteMapChange || loadingSaveGame || readDemo || IsDemoPlaybackActive()
+			|| com_editorActive || game == NULL || idAsyncNetwork::IsActive() ) {
+		return false;
+	}
+	return !game->InCinematic() && !objectiveFailed && game->GetPersistentPlayerInfo( 0 ).GetInt( "health" ) > 0;
+#endif
+}
+
+bool idSessionLocal::SaveForRendererRestart( void ) {
+#ifdef ID_DEDICATED
+	return false;
+#else
+	if ( !CanSaveForRendererRestart() || IsMultiplayer()
+			|| Sys_GetDriveFreeSpace( cvarSystem->GetCVarString( "fs_savepath" ) ) < 25 ) {
+		common->Printf( "Not restarting the renderer: the game cannot be saved now\n" );
+		return false;
+	}
+	common->Printf( "Saving '%s' to carry the game across the renderer restart\n", SESSION_RENDERER_RESTART_SAVE );
+	return SaveGame( SESSION_RENDERER_RESTART_SAVE, ST_AUTO ) && FinishPendingSave( true );
+#endif
+}
+
+void idSessionLocal::QueueRendererRestart( void ) {
+	idCmdArgs resume;
+	resume.AppendArg( "resumeAfterRendererRestart" );
+	cmdSystem->SetupReloadEngineMenu( resume );
+}
+
+#ifndef ID_DEDICATED
+// The reload's post command. A save that will not load leaves the player at the
+// main menu, where the reload would have put them, rather than at a blank screen.
+static void Session_ResumeAfterRendererRestart_f( const idCmdArgs &args ) {
+	if ( !sessLocal.LoadGame( SESSION_RENDERER_RESTART_SAVE ) ) {
+		common->Warning( "The game saved before the renderer restart could not be loaded" );
+		sessLocal.StartMenu();
+	}
+}
+#endif
+
+/*
+===============
 Session_AppForeground
 
 The SDL pump's return from the Android background. A multiplayer client
@@ -8867,6 +8926,9 @@ bool idSessionLocal::SaveGame( const char *saveName, saveType_t saveType ) {
 	idStr menuDescription = "^:";
 	if ( explicitSaveName && saveType == ST_REGULAR ) {
 		menuDescription += saveSlotName;
+	} else if ( explicitSaveName && saveType == ST_AUTO && !saveSlotName.Icmp( SESSION_RENDERER_RESTART_SAVE ) ) {
+		// It is not a map start: name it after the action that wrote it.
+		menuDescription += common->GetLanguageDict()->GetString( "#str_230153" );
 	} else {
 		menuDescription += common->GetLanguageDict()->GetString( Session_GetGeneratedSaveLabel( saveType ) );
 	}
@@ -10891,6 +10953,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "saveGame", SaveGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "saves a game" );
 	cmdSystem->AddCommand( "testAutoSave", TestAutoSave_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "writes a named autosave for developer lifecycle validation" );
 	cmdSystem->AddCommand( "loadGame", LoadGame_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "loads a game", idCmdSystem::ArgCompletion_SaveGame );
+	cmdSystem->AddCommand( "resumeAfterRendererRestart", Session_ResumeAfterRendererRestart_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "loads the game that a renderer restart saved" );
 #endif
 
 	cmdSystem->AddCommand( "takeViewNotes", TakeViewNotes_f, CMD_FL_SYSTEM, "take notes about the current map from the current view" );

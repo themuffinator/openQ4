@@ -1590,4 +1590,5 @@
 	"#str_231764"	"Crosshair Size"
 	"#str_231765"	"Crosshair Color"
 	"#str_231766"	"CHANGE"
+	"#str_231767"	"Restarting the renderer saves your game and resumes it afterwards."
 }

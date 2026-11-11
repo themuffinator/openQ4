@@ -29,7 +29,8 @@ static int checks=0;
 using namespace openq4::ui;
 static renderDeviceCatalog_t inventory{};
 static bool inventoryAvailable=true,persist=true,mapSpawned=false,loading=false;
-static int captures=0,persists=0,queued=0,reloads=0;
+static bool carry=false,saveOk=true;
+static int captures=0,persists=0,queued=0,reloads=0,saves=0,carried=0;
 static std::string bootApi="gl",bootDevice="auto";
 struct Cvars {
  int overrideDevice=-1;
@@ -39,6 +40,10 @@ struct Cvars {
 struct Session {
  bool IsLoadingSaveGame()const { return loading; }
  bool IsMapSpawned()const { return mapSpawned; }
+ // A single-player game the restart may save, reload around and load again.
+ bool CanSaveForRendererRestart()const { return mapSpawned && !loading && carry; }
+ bool SaveForRendererRestart() { CHECK(mapSpawned && carry);++saves;return saveOk; }
+ void QueueRendererRestart() { CHECK(saveOk);++carried; }
 } sessLocal,*session=&sessLocal;
 struct GLConfig { const char* renderer_string="Actual OpenGL GPU"; };
 struct Renderer { GLConfig config;const GLConfig& GetGLConfig()const {return config;} } renderer,*renderSystem=&renderer;
@@ -49,7 +54,7 @@ bool R_RendererModule_QueryRenderingDevices(renderDeviceCatalog_t& output) {
  ++captures;output=inventoryAvailable?inventory:renderDeviceCatalog_t{};return inventoryAvailable;
 }
 bool R_RendererModule_RenderSelectionPending(const char* api,const char* device) { return api!=bootApi || device!=bootDevice; }
-void R_RendererModule_UseSavedSelectionOnReload() { CHECK(persist && persists==2);++reloads; }
+void R_RendererModule_UseSavedSelectionOnReload() { CHECK(persist && persists>=2);++reloads; }
 bool Common_WriteSettingsConfiguration(bool locked,std::string& error) {
  ++persists;CHECK(!locked);if(!persist)error="persistence refused";return persist;
 }
@@ -95,10 +100,26 @@ int main() {
  hardware.Read(draft,false,values);CHECK(std::get<bool>(values.at("settings.render.pending")) && !std::get<bool>(values.at("settings.render.autoDetect")) && !std::get<bool>(values.at("settings.render.canRestart")));
  hardware.Read(draft,true,values);CHECK(std::get<bool>(values.at("settings.render.canRestart")));
  mapSpawned=true;hardware.Read(draft,true,values);CHECK(!std::get<bool>(values.at("settings.render.canRestart")));
- CHECK(!RenderingSettings::Restart(error) && !persists && !queued);mapSpawned=false;
+ CHECK(std::get<std::string>(values.at("settings.render.notice"))=="#str_230149");
+ CHECK(!RenderingSettings::Restart(error) && !persists && !queued && !saves);
+ // A game that can be saved is carried: the restart is offered inside it, and
+ // a save that fails stops it before anything is written or queued.
+ carry=true;hardware.Read(draft,true,values);CHECK(std::get<bool>(values.at("settings.render.canRestart")));
+ CHECK(std::get<std::string>(values.at("settings.render.notice"))=="#str_231767");
+ hardware.Read(draft,false,values);CHECK(!std::get<bool>(values.at("settings.render.canRestart")));
+ saveOk=false;CHECK(!RenderingSettings::Restart(error) && saves==1 && !persists && !queued && !carried && !reloads);
+ saveOk=true;loading=true;hardware.Read(draft,true,values);CHECK(!std::get<bool>(values.at("settings.render.canRestart")));
+ CHECK(!RenderingSettings::Restart(error) && saves==1 && !persists);loading=false;
+ carry=false;mapSpawned=false;
  loading=true;CHECK(!RenderingSettings::Restart(error) && !persists && !queued);loading=false;
  persist=false;CHECK(!RenderingSettings::Restart(error) && persists==1 && !queued && !reloads);
- persist=true;CHECK(RenderingSettings::Restart(error) && persists==2 && queued==1 && reloads==1);
+ persist=true;CHECK(RenderingSettings::Restart(error) && persists==2 && queued==1 && reloads==1 && !carried && saves==1);
+ hardware.Read(draft,true,values);CHECK(std::get<std::string>(values.at("settings.render.notice"))=="#str_230148");
+ // Inside the game: save, write the settings, then the reload that loads the save.
+ mapSpawned=true;carry=true;
+ persist=false;CHECK(!RenderingSettings::Restart(error) && saves==2 && persists==3 && !carried && reloads==1);
+ persist=true;CHECK(RenderingSettings::Restart(error) && saves==3 && persists==4 && carried==1 && queued==1 && reloads==2);
+ mapSpawned=false;carry=false;
  bootApi="vulkan";bootDevice=std::get<std::string>(draft.at("r_renderDevice"));
  hardware.Read(draft,true,values);CHECK(!std::get<bool>(values.at("settings.render.pending")) && std::get<bool>(values.at("settings.render.autoDetect")));
  draft["r_renderDevice"]=std::string("ffffffffffffffffffffffffffffffff");

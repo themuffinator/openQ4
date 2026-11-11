@@ -586,6 +586,14 @@ public:
 
 	virtual void		ReloadImages(bool force) const;
 
+	// image_ignoreHighQuality is consumed by the parse. These let a change of it
+	// re-parse the materials that read a "highquality" or "uncompressed" hint
+	// under the other answer (R_CheckMaterialQualityInputs).
+	bool				ReadsHighQualityHint(void) const { return readsHighQualityHint; }
+	bool				ParsedIgnoringHighQuality(void) const { return parsedIgnoringHighQuality; }
+	bool				ReparseForQualityInputs(void);
+	void				CollectImages(idList<idImage*>& images) const;
+
 	// returns number of stages this material contains
 	const int			GetNumStages(void) const { return numStages; }
 
@@ -1028,11 +1036,15 @@ private:
 	// walking every stage; register conditions are still evaluated when set.
 	bool				hasCustomGLSLLightingStage;
 	int					refCount;
+	bool				readsHighQualityHint;		// the parse resolved a non-forced quality hint
+	bool				parsedIgnoringHighQuality;	// image_ignoreHighQuality as that parse read it
 };
 
 // Parser-free regression hook for custom GLSL receiver compatibility helpers.
 bool R_MaterialCustomGLSLReceiverHelperSelfTest( void );
 bool R_PBRMaterialParserSelfTest( void );
+// Start of a frame: apply a changed image_ignoreHighQuality to parsed materials.
+void R_CheckMaterialQualityInputs( void );
 bool R_SpecularProbeMaterialParserSelfTest( void );
 
 typedef idList<const idMaterial*> idMatList;

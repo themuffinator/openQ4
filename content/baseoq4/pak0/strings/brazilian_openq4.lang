@@ -1590,4 +1590,5 @@
 	"#str_231764"	"Tamanho da mira"
 	"#str_231765"	"Cor da mira"
 	"#str_231766"	"ALTERAR"
+	"#str_231767"	"Reiniciar o renderizador salva o jogo e o retoma em seguida."
 }
