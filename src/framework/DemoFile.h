@@ -47,12 +47,15 @@ typedef enum {
 	DS_SESSION
 } demoSystem_t;
 
-// The records a DS_SESSION token introduces. Every record is a dictionary.
+// The records a DS_SESSION token introduces. Every record is a dictionary,
+// except DSC_FRAME_TIME, which one int follows.
 typedef enum {
 	DSC_HEADER = 1,		// once, after DS_VERSION: game directory, campaign, mode, tic rate
 	DSC_SEGMENT,		// a level (map) begins; both sides then reset the hash-string table
 	DSC_SEGMENT_READY,	// the segment's world and sound state are complete
-	DSC_END				// a clean stop; nothing after it is part of the stream
+	DSC_END,			// a clean stop; nothing after it is part of the stream
+	DSC_FRAME_TIME		// v13: the microseconds since the previous recorded frame,
+						// written just before the frame's DC_END_FRAME
 } demoSessionRecord_t;
 
 // A raw summary appended after the compressed stream of a cleanly stopped

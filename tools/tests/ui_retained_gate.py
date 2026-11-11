@@ -5776,7 +5776,7 @@ def main() -> int:
     assert 'player->inventory.objectiveNames[ i ].screenshot' in images[:images.index('gui->SetStateInt( "level_image_count", images );')]
     draw = session[session.index('} else if ( mapSpawned ) {'):]
     draw = draw[:draw.index('} else {')]
-    assert draw.index('gameDraw = game->Draw( GetLocalClientNum() );') < draw.index('renderSystem->WriteDemoPics();') < \
+    assert draw.index('gameDraw = game->Draw( GetLocalClientNum() );') < draw.index('EndRenderDemoRecordFrame();') < \
         draw.index('guiRetainedReleasing->Redraw( presentationTime );')
     assert session.count('guiRetainedReleasing->Redraw(') == 1
     release_ms = int(re.search(r'static const int RETAINED_RELEASE_MSEC = (\d+);', menu).group(1))

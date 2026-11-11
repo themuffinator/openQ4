@@ -4155,7 +4155,6 @@ void idSessionLocal::Clear() {
 	renderDemoSeekMuteOwned = false;
 	renderDemoSeekRestoreMute = false;
 	renderDemoPlaybackRate = 1.0f;
-	renderDemoFrameAccumulator = 0.0;
 	renderDemoStartViewTime = 0;
 	renderDemoKnownDurationMS = -1;
 	renderDemoSeekTargetMS = 0;
@@ -4167,8 +4166,18 @@ void idSessionLocal::Clear() {
 	renderDemoRecordStartMsec = 0;
 	renderDemoRecordSegments.Clear();
 	renderDemoNextSegmentReason.Clear();
+	renderDemoRecordTimeUS = 0;
+	renderDemoRecordLastFrameClockUS = 0.0;
+	renderDemoRecordLastFrameDraw = 0;
+	renderDemoDrawSerial = 0;
 	renderDemoFrameClock = false;
 	renderDemoUserCmdHz = 0;
+	renderDemoTimedFrames = false;
+	renderDemoFrameTimeUS = 0;
+	renderDemoPrevFrameTimeUS = 0;
+	renderDemoPendingFrameDeltaUS = -1;
+	renderDemoPlayClockUS = 0.0;
+	renderDemoPlayRealClockUS = -1.0;
 	renderDemoPlayHeader.Clear();
 	renderDemoPlaySegments.Clear();
 	renderDemoPlaySegment = -1;
@@ -5438,6 +5447,7 @@ void idSessionLocal::StartRecordingRenderDemo( const char *demoName ) {
 
 	renderDemoRecordPath = demoName;
 	renderDemoRecordFrames = 0;
+	renderDemoRecordTimeUS = 0;
 	renderDemoRecordStartMsec = Sys_Milliseconds();
 	renderDemoRecordSegments.Clear();
 	renderDemoNextSegmentReason.Clear();
@@ -5537,9 +5547,12 @@ void idSessionLocal::StopRecordingRenderDemo() {
 		return;
 	}
 
+	// the last frame's time, where the timeline ends
+	const int durationMS = static_cast<int>( Min( renderDemoRecordTimeUS / 1000, static_cast<int64>( idMath::INT_MAX ) ) );
 	idDict end;
 	end.SetInt( "frames", renderDemoRecordFrames );
 	end.SetInt( "segments", renderDemoRecordSegments.Num() );
+	end.SetInt( "durationMS", durationMS );
 	file->WriteInt( DS_SESSION );
 	file->WriteInt( DSC_END );
 	file->WriteDict( end );
@@ -5547,22 +5560,26 @@ void idSessionLocal::StopRecordingRenderDemo() {
 	idDict summary;
 	summary.SetInt( "version", OPENQ4_RENDERDEMO_CURRENT_VERSION );
 	summary.SetInt( "frames", renderDemoRecordFrames );
+	summary.SetInt( "durationMS", durationMS );
 	summary.SetInt( "userCmdHz", common->GetUserCmdHz() );
 	summary.SetInt( "segments", renderDemoRecordSegments.Num() );
 	summary.Set( "game", fileSystem->GetActiveGameDir() );
 	for ( int i = 0; i < renderDemoRecordSegments.Num(); i++ ) {
 		const renderDemoSegment_t &segment = renderDemoRecordSegments[i];
-		summary.Set( va( "segment%d", i ), va( "%d %s %s %s", segment.startFrame, segment.reason.c_str(),
-			segment.map.c_str(), segment.entityFilter.IsEmpty() ? "-" : segment.entityFilter.c_str() ) );
+		// v13 appends the start time, which earlier readers never look for
+		summary.Set( va( "segment%d", i ), va( "%d %s %s %s %d", segment.startFrame, segment.reason.c_str(),
+			segment.map.c_str(), segment.entityFilter.IsEmpty() ? "-" : segment.entityFilter.c_str(),
+			segment.startMS >= 0 ? segment.startMS : durationMS ) );
 	}
 	const bool summarized = file->CloseWithTrailer( summary );
 	delete file;
 	common->Printf( "stopped recording %s: %d frames, %d s over %d segment%s%s.\n", path.c_str(),
-		renderDemoRecordFrames, Session_RenderDemoFramesToMS( renderDemoRecordFrames, common->GetUserCmdHz() ) / 1000,
+		renderDemoRecordFrames, durationMS / 1000,
 		renderDemoRecordSegments.Num(), renderDemoRecordSegments.Num() == 1 ? "" : "s",
 		summarized ? "" : "; its summary could not be written" );
 	renderDemoRecordSegments.Clear();
 	renderDemoRecordFrames = 0;
+	renderDemoRecordTimeUS = 0;
 }
 
 /*
@@ -5603,7 +5620,9 @@ void idSessionLocal::StopPlayingRenderDemo() {
 	renderDemoStepPending = false;
 	renderDemoFramePayloadPending = false;
 	renderDemoPlaybackRate = 1.0f;
-	renderDemoFrameAccumulator = 0.0;
+	renderDemoTimedFrames = false;
+	renderDemoPendingFrameDeltaUS = -1;
+	renderDemoPlayRealClockUS = -1.0;
 	if ( sw != NULL ) {
 		sw->SetSlowmoSpeed( 1.0f );
 		if ( sw->IsPaused() ) {
@@ -5711,8 +5730,8 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 	activeRenderDemoName = demoName;
 	// A campaign demo's summary gives its duration and level starts up front.
 	ResetRenderDemoPlaybackSession();
-	if ( renderDemoUserCmdHz > 0 && renderDemoPlayHeader.GetInt( "frames" ) > 0 ) {
-		cachedDuration = RenderDemoFramesToMS( renderDemoPlayHeader.GetInt( "frames" ) - 1 );
+	if ( renderDemoPlayHeader.GetInt( "durationMS", "-1" ) >= 0 ) {
+		cachedDuration = renderDemoPlayHeader.GetInt( "durationMS" );
 		renderDemoDurationName = demoName;
 	}
 	renderDemoPaused = false;
@@ -5722,7 +5741,12 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 	renderDemoStepPending = false;
 	renderDemoFramePayloadPending = false;
 	renderDemoPlaybackRate = 1.0f;
-	renderDemoFrameAccumulator = 0.0;
+	renderDemoTimedFrames = false;
+	renderDemoFrameTimeUS = 0;
+	renderDemoPrevFrameTimeUS = 0;
+	renderDemoPendingFrameDeltaUS = -1;
+	renderDemoPlayClockUS = 0.0;
+	renderDemoPlayRealClockUS = -1.0;
 	renderDemoStartViewTime = 0;
 	renderDemoKnownDurationMS = cachedDuration;
 	renderDemoSeekDeadlineMS = 0;
@@ -5765,7 +5789,8 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 	}
 	renderDemoStartViewTime = currentDemoRenderView.time;
 
-	lastDemoTic = -1;
+	// the first frame is on screen; the next one is due after its own duration
+	SyncRenderDemoPlayClock();
 	timeDemoStartTime = Sys_Milliseconds();
 	if ( restoreDemoMenu && guiDemoMenu != NULL ) {
 		// The menu chooses its visual mode in onActivate, so publish the current
@@ -5872,6 +5897,8 @@ void idSessionLocal::AVIRenderDemo( const char *_demoName ) {
 	}
 
 	BeginAVICapture( demoName.c_str() ) ;
+	// capture from here on steps a fixed interval, from the middle of one
+	SyncRenderDemoPlayClock();
 
 	// I don't understand why I need to do this twice, something
 	// strange with the nvidia swapbuffers?
@@ -9697,47 +9724,37 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 		ProcessRenderDemoSeekBudget();
 		return;
 	}
-	if ( lastDemoTic == -1 ) {
-		lastDemoTic = latchedTicNumber - 1;
-	}
-
-	int skipFrames = 0;
-
-	if ( !aviCaptureMode && !timeDemo && !singleFrameOnly ) {
-		const int scheduledDemoTic =
-			latchedTicNumber - latchedTicNumber % USERCMD_PER_DEMO_FRAME;
-		if ( renderDemoPaused && !renderDemoStepPending ) {
-			lastDemoTic = scheduledDemoTic;
-			return;
-		}
+	// One frame for a step, a seek or a timedemo. Otherwise every frame whose
+	// time the playback clock has passed: the clock runs at the playback rate
+	// in real time (fixed steps while capturing), and the frame on screen is
+	// the first one whose time is still ahead of it. A recording keeps its own
+	// frame rate this way, whatever the rate of the display playing it.
+	static const int RENDER_DEMO_MAX_FRAMES_PER_UPDATE = 64;
+	int framesLeft = 1;
+	bool paced = false;
+	bool stepped = false;
+	if ( !timeDemo && !singleFrameOnly ) {
 		if ( renderDemoStepPending ) {
 			renderDemoStepPending = false;
-			skipFrames = 0;
+			stepped = true;
 		} else {
-			const int elapsedDemoFrames = Max( 0,
-				( scheduledDemoTic - lastDemoTic ) / USERCMD_PER_DEMO_FRAME );
-			lastDemoTic = scheduledDemoTic;
-			if ( elapsedDemoFrames <= 0 ) {
+			const double elapsedUS = RenderDemoPlaybackElapsedUS();
+			if ( renderDemoPaused ) {
 				return;
 			}
-			renderDemoFrameAccumulator +=
-				elapsedDemoFrames *
-				idMath::ClampFloat( 0.05f, 16.0f, renderDemoPlaybackRate );
-			int framesToAdvance = static_cast<int>( renderDemoFrameAccumulator );
-			if ( framesToAdvance <= 0 ) {
+			renderDemoPlayClockUS += aviCaptureMode
+				? elapsedUS
+				: elapsedUS * idMath::ClampFloat( 0.05f, 16.0f, renderDemoPlaybackRate );
+			if ( static_cast<double>( renderDemoFrameTimeUS ) > renderDemoPlayClockUS ) {
+				// the frame on screen is not over yet
 				return;
 			}
-			framesToAdvance = Min( framesToAdvance, 64 );
-			renderDemoFrameAccumulator -= framesToAdvance;
-			skipFrames = framesToAdvance - 1;
+			framesLeft = RENDER_DEMO_MAX_FRAMES_PER_UPDATE;
+			paced = true;
 		}
-		lastDemoTic = scheduledDemoTic;
-	} else {
-		// always advance a single frame with avidemo and timedemo
-		lastDemoTic = latchedTicNumber; 
 	}
 
-	while( skipFrames > -1 ) {
+	while( framesLeft > 0 ) {
 		if ( renderDemoSeeking && singleFrameOnly &&
 			 renderDemoSeekDeadlineMS > 0 &&
 			 Sys_Milliseconds() > renderDemoSeekDeadlineMS ) {
@@ -9784,9 +9801,7 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 				StartMenu( false );
 				break;
 			}
-			renderDemoKnownDurationMS = renderDemoFrameClock
-				? RenderDemoFramesToMS( numDemoFrames - 1 )
-				: Max( 0, currentDemoRenderView.time - renderDemoStartViewTime );
+			renderDemoKnownDurationMS = RenderDemoCurrentTimeMS();
 			renderDemoDurationName = activeRenderDemoName;
 			if ( numDemoFrames != 1 ) {
 				// if the demo has a single frame (a demoShot), continuously replay
@@ -9801,8 +9816,18 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 			if ( rw->ProcessDemoCommand( readDemo, &currentDemoRenderView, &demoTimeOffset ) ) {
 				// The render world returns true once the full frame payload has been consumed.
 				renderDemoFramePayloadPending = false;
-				skipFrames--;
-				numDemoFrames++;
+				if ( !CompleteRenderDemoFrame() ) {
+					common->Warning( "Render demo '%s' has a frame without its time; playback stopped safely",
+						activeRenderDemoName.c_str() );
+					Stop();
+					StartMenu( false );
+					break;
+				}
+				framesLeft--;
+				if ( paced && static_cast<double>( renderDemoFrameTimeUS ) > renderDemoPlayClockUS ) {
+					// this frame is still ahead of the clock: it is the one to show
+					framesLeft = 0;
+				}
 			}
 			continue;
 		}
@@ -9843,7 +9868,7 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 					StartMenu( false );
 					break;
 				}
-				renderDemoKnownDurationMS = RenderDemoFramesToMS( numDemoFrames - 1 );
+				renderDemoKnownDurationMS = RenderDemoCurrentTimeMS();
 				renderDemoDurationName = activeRenderDemoName;
 				if ( numDemoFrames != 1 ) {
 					Stop();
@@ -9877,6 +9902,7 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 				break;
 			}
 			renderdemoVersion = streamVersion;
+			renderDemoTimedFrames = renderdemoVersion >= OPENQ4_RENDERDEMO_FRAME_TIME_VERSION;
 			common->Printf( "reading a v%d render demo\n", renderdemoVersion );
 			// set the savegameVersion to current for render demo paths that share the savegame paths
 			savegameVersion = SAVEGAME_VERSION;
@@ -9889,8 +9915,18 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 		break;
 	}
 
+	if ( readDemo != NULL &&
+		 ( stepped || ( paced && static_cast<double>( renderDemoFrameTimeUS ) <= renderDemoPlayClockUS ) ) ) {
+		// A step shows its frame for the frame's own duration, and playback too
+		// far behind to catch up in one update drops what it owes rather than
+		// racing through it on the following ones.
+		SyncRenderDemoPlayClock();
+	}
+
 	if ( com_showDemo.GetBool() ) {
-		common->Printf( "frame:%i DemoTic:%i latched:%i skip:%i\n", numDemoFrames, lastDemoTic, latchedTicNumber, skipFrames );
+		// the recorded view's own time shows how fast the recorded action plays
+		common->Printf( "frame:%i timeUS:%lld clockUS:%.0f view:%i\n", numDemoFrames,
+			static_cast<long long>( renderDemoFrameTimeUS ), renderDemoPlayClockUS, currentDemoRenderView.time );
 	}
 
 }
@@ -10103,6 +10139,8 @@ idSessionLocal::Draw
 ===============
 */
 void idSessionLocal::Draw() {
+	// a recording tells consecutive gameplay frames from ones a menu or a load came between
+	renderDemoDrawSerial++;
 	if ( guiActive != NULL || mapSpawned ) RetainedUI_EndInitialization();
 	Session_RestoreLoadingBackground();
 	static const int fallbackMenuDelayMs = 3000;
@@ -10233,11 +10271,9 @@ void idSessionLocal::Draw() {
 
 		// save off the 2D drawing from the game, and end the recorded frame:
 		// only gameplay draws make frames, so a recording skips menus,
-		// pauses and loading screens
+		// pauses and loading screens, and every one of them is recorded
 		if ( writeDemo ) {
-			renderSystem->WriteDemoPics();
-			renderSystem->WriteDemoEndFrame();
-			renderDemoRecordFrames++;
+			EndRenderDemoRecordFrame();
 		}
 		// A pause screen that just closed releases the softened view.
 		if ( guiRetainedReleasing != NULL ) {
@@ -10494,30 +10530,17 @@ void idSessionLocal::Frame() {
 	}
 	const int previousLatchedTicNumber = latchedTicNumber;
 
-	// Phase 2 decouples presentation from simulation: only demos / fixed-rate capture
-	// still wait for exact async tics before the foreground frame proceeds.
+	// Phase 2 decouples presentation from simulation: only fixed-rate capture
+	// still waits for exact async tics before the foreground frame proceeds.
+	// Render demos no longer do: a recording (v13) stamps every gameplay frame
+	// with its own time instead of holding the game to two tics a frame, which
+	// ran it at 30 Hz, and playback paces frames on those times
+	// (AdvanceRenderDemo).
 	int	minTic = previousLatchedTicNumber + 1;
 	if ( com_minTics.GetInteger() > 1 ) {
 		minTic = lastGameTic + com_minTics.GetInteger();
 	}
-	
-	if ( readDemo ) {
-		if ( renderDemoSeeking ) {
-			// Replay-seek work is main-thread budgeted and does not represent
-			// real-time presentation, so do not throttle it to the 30 Hz demo
-			// cadence.
-			minTic = previousLatchedTicNumber;
-		} else if ( !timeDemo && numDemoFrames != 1 ) {
-			minTic = lastDemoTic + USERCMD_PER_DEMO_FRAME;
-		} else {
-			// timedemos and demoshots will run as fast as they can, other demos
-			// will not run more than 30 hz
-			minTic = latchedTicNumber;
-		}
-	} else if ( writeDemo ) {
-		minTic = lastGameTic + USERCMD_PER_DEMO_FRAME;		// demos are recorded at 30 hz
-	}
-	
+
 	// fixedTic lets us run a forced number of usercmd each frame without timing
 	if ( com_fixedTic.GetInteger() ) {
 		minTic = previousLatchedTicNumber;
@@ -10530,7 +10553,7 @@ void idSessionLocal::Frame() {
 
 	int requestedWaitMsec = 0;
 	int actualWaitMsec = 0;
-	const bool shouldWaitForGameTic = readDemo || writeDemo || aviCaptureMode;
+	const bool shouldWaitForGameTic = aviCaptureMode;
 	const int latchedTicBeforeWait = previousLatchedTicNumber;
 
 	if ( shouldWaitForGameTic && minTic > latchedTicBeforeWait ) {
@@ -10612,12 +10635,7 @@ void idSessionLocal::Frame() {
 		numCmdsToRun = 0;
 	}
 
-	// don't let a long onDemand sound load unsync everything; a recording
-	// runs exactly USERCMD_PER_DEMO_FRAME tics a frame, and skipping tics
-	// under it would fail the fixed-tic check below
-	if ( timeHitch && writeDemo ) {
-		timeHitch = 0;
-	}
+	// don't let a long onDemand sound load unsync everything
 	if ( timeHitch ) {
 		int	skip = common->GetUserCmdTicsForMsecFloor( timeHitch );
 		lastGameTic += skip;
@@ -10630,17 +10648,7 @@ void idSessionLocal::Frame() {
 		lastGameTic = latchedTicNumber - 10;
 	}
 
-	// never use more than USERCMD_PER_DEMO_FRAME,
-	// which makes it go into slow motion when recording
-	if ( writeDemo ) {
-		int fixedTic = USERCMD_PER_DEMO_FRAME;
-		// we should have waited long enough
-		if ( numCmdsToRun < fixedTic ) {
-			common->Error( "idSessionLocal::Frame: numCmdsToRun < fixedTic" );
-		}
-		// we may need to dump older commands
-		lastGameTic = latchedTicNumber - fixedTic;
-	} else if ( com_fixedTic.GetInteger() > 0 ) {
+	if ( com_fixedTic.GetInteger() > 0 ) {
 		// this may cause commands run in a previous frame to
 		// be run again if we are going at above the real time rate
 		lastGameTic = latchedTicNumber - com_fixedTic.GetInteger();

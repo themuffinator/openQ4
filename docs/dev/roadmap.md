@@ -2950,7 +2950,7 @@ historical saves and recovering safely from damage.
 | Q4-06 — Partial; optional P3 | Raw inventory and field codecs restored; v5 portable stamp/encoding implemented; Windows/Linux bidirectional stock/Awakening cross-loads pass. | Confirm outstanding CI/Apple codec runs; macOS and another ARM64 runtime cross-load/resave directions; publish player migration guidance with accepted scope. |
 | Q4-07 — Partial | Original-writer Windows corpus substantially qualified; v2 stamp reporting repaired; exact HiDef fixture investigated. | Resolve #123 against the reporter's actual GUI/content; other ABIs; recover/reproduce absent stage-two artifacts before claiming independently reviewable acceptance. |
 | Q4-08 — Partial | Durable commit/recovery implemented; 56 process-interruption points, locked-file failure and NTFS/ext4/WSL 9p checks recorded. | APFS result, removable/network filesystems and actual power-cut behavior; retain measured CRC/sync costs and last-valid-save preservation. |
-| Q4-09 — Partial | Render demo v11: one recording spans levels, save loads, death reloads and restarts as self-contained segments; gameplay-only frames; level loads, continuous timeline and level markers in playback; campaign-aware library and gate; whole retained HUD and in-world screens recorded. Render demo v12 predicts animated-entity joints exactly, a quarter smaller. Windows checks pass with stock and Awakening content: GL recording, GL and Vulkan playback. | Vulkan recording, Linux and macOS, a long multi-level session with seek timing and file size, the 2D, sound and effect records that now dominate the size, the masked retained HUD groups that replay unmasked, and local sounds already playing at a segment start. |
+| Q4-09 — Partial | Render demo v11: one recording spans levels, save loads, death reloads and restarts as self-contained segments; gameplay-only frames; level loads, continuous timeline and level markers in playback; campaign-aware library and gate; whole retained HUD and in-world screens recorded. Render demo v12 predicts animated-entity joints exactly, a quarter smaller. Render demo v13 records every frame at the played frame rate instead of 30 Hz. Windows checks pass with stock and Awakening content: GL recording, GL and Vulkan playback. | Vulkan recording, Linux and macOS, a long multi-level session with seek timing and file size, the 2D, sound and effect records that now dominate the size, the masked retained HUD groups that replay unmasked, and local sounds already playing at a segment start. |
 
 Completion substeps must keep three forms of evidence distinct:
 
@@ -3592,6 +3592,19 @@ Completion substeps must keep three forms of evidence distinct:
   0.92 MB per second); it replayed all 500 frames on GL and Vulkan with every
   record verified, the three-level v11 demo still played in full, and paused
   frames of the two recordings matched in view and pose.
+  Render demo v13 (11 November 2026) records at the frame rate the game is played
+  at ([frame-rate recording](multiview-demos.md#frame-rate-recording-v13-11-november-2026)).
+  Recording had held the live game to two tics a frame, 30 Hz, and multiplayer
+  render demos, which recorded every frame, played back in slow motion. Every
+  gameplay frame now carries its own time and playback paces every demo on frame
+  times. Hidden-window GL checks: the game kept its 60 Hz (and a 45 Hz) cap while
+  recording, both recordings and the v11 and v12 demos replayed every frame,
+  recorded action played at real time at 1x, 2x and 0.5x, and a multiplayer
+  recording that `main` played at 0.48x speed played at real time. A review
+  of the change also found that playback stopped on a joint checksum when an
+  animated entity took a freed handle with the same joint count (v12 too);
+  playback now starts a fresh joint history at every raw record, and both
+  reproductions play in full.
   Remaining: Vulkan recording, Linux and macOS, a long session with measured seek
   times (rewinds replay from the start) and size, the 2D model, sound and effect
   records that now make up most of a recording, the retained HUD's masked

@@ -164,14 +164,7 @@ static idStr DemoFormatTime( int milliseconds, bool unknownAllowed = true ) {
 }
 
 static int DemoCurrentRenderTimeMS( const idSessionLocal &session ) {
-	if ( session.readDemo == NULL ) {
-		return 0;
-	}
-	if ( session.renderDemoFrameClock ) {
-		// A campaign demo's levels restart their game clocks; its frames do not.
-		return session.RenderDemoFramesToMS( Max( 0, session.numDemoFrames - 1 ) );
-	}
-	return Max( 0, session.currentDemoRenderView.time - session.renderDemoStartViewTime );
+	return session.RenderDemoCurrentTimeMS();
 }
 
 // A campaign render demo (v11) as the library and the content check see it,
@@ -234,7 +227,8 @@ static idStr DemoCampaignName( const char *gameDir ) {
 	return DemoSanitizeText( gameDir, 32 );
 }
 
-// "startFrame reason map entityFilter", as StopRecordingRenderDemo writes it.
+// "startFrame reason map entityFilter [startMS]", as StopRecordingRenderDemo
+// writes it; v13 adds the start time, -1 when absent.
 static bool DemoParseSegmentSummary( const char *text, idSessionLocal::renderDemoSegment_t &segment ) {
 	idStrList fields;
 	idStr field;
@@ -261,7 +255,27 @@ static bool DemoParseSegmentSummary( const char *text, idSessionLocal::renderDem
 	if ( fields.Num() > 3 && fields[3] != "-" ) {
 		segment.entityFilter = fields[3];
 	}
+	segment.startMS = fields.Num() > 4 && fields[4].IsNumeric() ? atoi( fields[4].c_str() ) : -1;
 	return segment.startFrame >= 0;
+}
+
+// A render demo's length, from its summary trailer: v13 records it, earlier
+// recordings are two tics a frame.
+static int DemoSummaryDurationMS( const idDict &summary ) {
+	const int frames = summary.GetInt( "frames" );
+	if ( frames <= 0 ) {
+		return -1;
+	}
+	if ( summary.GetInt( "version" ) >= OPENQ4_RENDERDEMO_FRAME_TIME_VERSION ) {
+		return summary.GetInt( "durationMS", "-1" );
+	}
+	return Session_RenderDemoFramesToMS( frames - 1, summary.GetInt( "userCmdHz" ) );
+}
+
+// The high-resolution clock in microseconds: the recording stamps its frames
+// with it and playback runs its clock from it.
+static double DemoClockUS() {
+	return Sys_GetClockTicks() * 1000000.0 / Sys_ClockTicksPerSecond();
 }
 
 static bool DemoEntryMatchesFilter( const demoLibraryEntry_t &entry, const idStr &filter ) {
@@ -459,10 +473,7 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 				}
 				const int levels = info.summarized ? info.summary.GetInt( "segments" ) : 0;
 				if ( info.summarized ) {
-					const int frames = info.summary.GetInt( "frames" );
-					entry.durationMS = frames > 0
-						? Session_RenderDemoFramesToMS( frames - 1, info.summary.GetInt( "userCmdHz" ) )
-						: -1;
+					entry.durationMS = DemoSummaryDurationMS( info.summary );
 					entry.cleanEnd = true;
 				}
 				idStr recordingPath = sessLocal.renderDemoRecordPath;
@@ -1163,7 +1174,8 @@ void idSessionLocal::SetDemoPaused( bool paused ) {
 		idAsyncNetwork::multiViewDemo.SetPaused( paused );
 	} else if ( readDemo != NULL && !timeDemo && !aviCaptureMode ) {
 		renderDemoPaused = paused;
-		renderDemoFrameAccumulator = 0.0;
+		// the clock resumes where it stopped, not where real time went meanwhile
+		renderDemoPlayRealClockUS = -1.0;
 		if ( sw != NULL ) {
 			if ( paused ) {
 				sw->Pause();
@@ -1190,7 +1202,6 @@ void idSessionLocal::SetDemoSpeed( float speed ) {
 		idAsyncNetwork::multiViewDemo.SetPlaybackScale( clamped );
 	} else if ( readDemo != NULL && !timeDemo && !aviCaptureMode ) {
 		renderDemoPlaybackRate = clamped;
-		renderDemoFrameAccumulator = 0.0;
 		if ( sw != NULL ) {
 			sw->SetSlowmoSpeed( clamped );
 		}
@@ -1214,6 +1225,8 @@ void idSessionLocal::FinishRenderDemoSeek() {
 	renderDemoSeekWorkDeferred = false;
 	renderDemoSeekTargetMS = 0;
 	renderDemoSeekDeadlineMS = 0;
+	// playback goes on from the frame the seek reached
+	SyncRenderDemoPlayClock();
 }
 
 /*
@@ -1264,7 +1277,6 @@ void idSessionLocal::ProcessRenderDemoSeekBudget() {
 		}
 
 		renderDemoPlaybackRate = oldRate;
-		renderDemoFrameAccumulator = 0.0;
 		renderDemoPaused = wasPaused;
 		renderDemoStepPending = false;
 		if ( sw != NULL ) {
@@ -1716,10 +1728,173 @@ bool Session_RenderDemoContentMatches( const char *path, idStr &reason ) {
 /*
 ================
 idSessionLocal::RenderDemoFramesToMS
+
+The time of a frame of a recording made before v13, two tics a frame.
 ================
 */
 int idSessionLocal::RenderDemoFramesToMS( int frames ) const {
 	return Session_RenderDemoFramesToMS( frames, renderDemoUserCmdHz > 0 ? renderDemoUserCmdHz : common->GetUserCmdHz() );
+}
+
+/*
+================
+idSessionLocal::RenderDemoCurrentTimeMS
+
+Where the frame on screen is on the demo's timeline.
+================
+*/
+int idSessionLocal::RenderDemoCurrentTimeMS() const {
+	if ( readDemo == NULL ) {
+		return 0;
+	}
+	if ( renderDemoFrameClock ) {
+		// A campaign demo's levels restart their game clocks; its frames do not.
+		return static_cast<int>( Min( Max( renderDemoFrameTimeUS, static_cast<int64>( 0 ) ) / 1000,
+			static_cast<int64>( idMath::INT_MAX ) ) );
+	}
+	return Max( 0, currentDemoRenderView.time - renderDemoStartViewTime );
+}
+
+/*
+================
+idSessionLocal::CompleteRenderDemoFrame
+
+A frame's DC_END_FRAME was read: count it and place it on the timeline. A v13
+frame is its DSC_FRAME_TIME after the frame before it; an earlier one is two
+tics at the recording's tic rate. False when a v13 frame came without its time.
+================
+*/
+bool idSessionLocal::CompleteRenderDemoFrame() {
+	const int deltaUS = renderDemoPendingFrameDeltaUS;
+	renderDemoPendingFrameDeltaUS = -1;
+	if ( renderDemoTimedFrames && deltaUS < 0 ) {
+		return false;
+	}
+	numDemoFrames++;
+	renderDemoPrevFrameTimeUS = renderDemoFrameTimeUS;
+	if ( numDemoFrames == 1 ) {
+		renderDemoPrevFrameTimeUS = 0;
+		renderDemoFrameTimeUS = 0;
+	} else if ( renderDemoTimedFrames ) {
+		renderDemoFrameTimeUS += deltaUS;
+	} else {
+		const int userCmdHz = Max( 1, renderDemoUserCmdHz > 0 ? renderDemoUserCmdHz : common->GetUserCmdHz() );
+		renderDemoFrameTimeUS = static_cast<int64>( numDemoFrames - 1 ) * USERCMD_PER_DEMO_FRAME * 1000000 / userCmdHz;
+	}
+	// The levels met before this frame whose starts the trailer did not give,
+	// one that drew nothing included, start at this frame.
+	for ( int i = 0; i < renderDemoPlaySegments.Num(); i++ ) {
+		renderDemoSegment_t &segment = renderDemoPlaySegments[i];
+		if ( segment.startMS < 0 && segment.startFrame == numDemoFrames - 1 ) {
+			segment.startMS = RenderDemoCurrentTimeMS();
+		}
+	}
+	return true;
+}
+
+/*
+================
+idSessionLocal::SyncRenderDemoPlayClock
+
+Puts the playback clock in the middle of the frame on screen, which runs from
+the previous frame's time to its own, so the next frame is due after half
+this one's duration. Halfway, not at the start: a clock on a frame boundary
+would make each later update a coin flip between two frames whenever the
+display runs at the recording's rate, or capture steps by its frame time.
+================
+*/
+void idSessionLocal::SyncRenderDemoPlayClock() {
+	if ( aviCaptureMode ) {
+		// Capture steps a fixed interval: half of one before the frame on
+		// screen ends, every step samples the middle of an interval.
+		renderDemoPlayClockUS = static_cast<double>( renderDemoFrameTimeUS ) - 0.5 * RenderDemoCaptureStepUS();
+	} else {
+		renderDemoPlayClockUS = 0.5 * ( static_cast<double>( renderDemoPrevFrameTimeUS ) +
+			static_cast<double>( renderDemoFrameTimeUS ) );
+	}
+	renderDemoPlayRealClockUS = -1.0;
+}
+
+/*
+================
+idSessionLocal::RenderDemoCaptureStepUS
+
+The recording time one captured frame covers: com_aviDemoTics tics.
+================
+*/
+double idSessionLocal::RenderDemoCaptureStepUS() const {
+	const int userCmdHz = Max( 1, renderDemoUserCmdHz > 0 ? renderDemoUserCmdHz : common->GetUserCmdHz() );
+	return com_aviDemoTics.GetInteger() * 1000000.0 / userCmdHz;
+}
+
+/*
+================
+idSessionLocal::RenderDemoPlaybackElapsedUS
+
+Real time since the last playback update, for the playback clock. A long
+stall (a level load, a hitch) counts as a quarter of a second at most, so
+playback never races to catch up with it. Capture steps a fixed
+com_aviDemoTics tics a frame instead.
+================
+*/
+double idSessionLocal::RenderDemoPlaybackElapsedUS() {
+	if ( aviCaptureMode ) {
+		return RenderDemoCaptureStepUS();
+	}
+	static const double MAX_PLAYBACK_STEP_US = 250000.0;
+	const double now = DemoClockUS();
+	if ( renderDemoPlayRealClockUS < 0.0 ) {
+		renderDemoPlayRealClockUS = now;
+		return 0.0;
+	}
+	const double elapsed = Min( Max( now - renderDemoPlayRealClockUS, 0.0 ), MAX_PLAYBACK_STEP_US );
+	renderDemoPlayRealClockUS = now;
+	return elapsed;
+}
+
+/*
+================
+idSessionLocal::EndRenderDemoRecordFrame
+
+Ends the gameplay frame just drawn as a recorded frame: its 2D, its time and
+DC_END_FRAME. Every gameplay draw is a frame, so the recording keeps the frame
+rate the game was played at. A frame's time is the real time since the
+previous recorded frame when that was the draw before this one; after a menu,
+a pause or a level load, which leave no frames, it is one tic. A hitch counts
+as a quarter of a second at most, more than the game itself catches up on.
+================
+*/
+void idSessionLocal::EndRenderDemoRecordFrame() {
+	if ( writeDemo == NULL ) {
+		return;
+	}
+	static const double MAX_RECORDED_FRAME_US = 250000.0;
+	renderSystem->WriteDemoPics();
+
+	const double now = DemoClockUS();
+	int deltaUS = 0;
+	if ( renderDemoRecordFrames > 0 ) {
+		if ( renderDemoRecordLastFrameDraw == renderDemoDrawSerial - 1 ) {
+			deltaUS = static_cast<int>( Min( Max( now - renderDemoRecordLastFrameClockUS, 0.0 ), MAX_RECORDED_FRAME_US ) );
+		} else {
+			deltaUS = 1000000 / Max( 1, common->GetUserCmdHz() );
+		}
+	}
+	writeDemo->WriteInt( DS_SESSION );
+	writeDemo->WriteInt( DSC_FRAME_TIME );
+	writeDemo->WriteInt( deltaUS );
+	renderSystem->WriteDemoEndFrame();
+
+	renderDemoRecordTimeUS += deltaUS;
+	renderDemoRecordFrames++;
+	renderDemoRecordLastFrameClockUS = now;
+	renderDemoRecordLastFrameDraw = renderDemoDrawSerial;
+	// The levels begun since the last frame start with this one, including a
+	// level that was left again before it drew anything.
+	const int startMS = static_cast<int>( Min( renderDemoRecordTimeUS / 1000, static_cast<int64>( idMath::INT_MAX ) ) );
+	for ( int i = renderDemoRecordSegments.Num() - 1; i >= 0 && renderDemoRecordSegments[i].startMS < 0; i-- ) {
+		renderDemoRecordSegments[i].startMS = startMS;
+	}
 }
 
 /*
@@ -1742,6 +1917,9 @@ void idSessionLocal::BeginRenderDemoSegment( const char *reason ) {
 	}
 	renderDemoSegment_t segment;
 	segment.startFrame = renderDemoRecordFrames;
+	segment.startMS = -1;		// its first frame's time, once drawn
+	// the level load in between is no time on the timeline
+	renderDemoRecordLastFrameDraw = idMath::INT_MIN;
 	segment.map = mapSpawnData.serverInfo.GetString( "si_map", currentMapName.c_str() );
 	segment.entityFilter = mapSpawnData.serverInfo.GetString( "si_entityFilter", "" );
 	segment.reason = reason != NULL && reason[0] != '\0' ? reason : "level";
@@ -1835,7 +2013,7 @@ void idSessionLocal::PrintRenderDemoRecordStatus() {
 		? &renderDemoRecordSegments[renderDemoRecordSegments.Num() - 1] : NULL;
 	common->Printf( "RENDER_DEMO_RECORDING state=%s path=%s frames=%d seconds=%d segments=%d map=%s elapsed=%d\n",
 		states[state], renderDemoRecordPath.IsEmpty() ? "-" : renderDemoRecordPath.c_str(),
-		renderDemoRecordFrames, Session_RenderDemoFramesToMS( renderDemoRecordFrames, common->GetUserCmdHz() ) / 1000,
+		renderDemoRecordFrames, static_cast<int>( renderDemoRecordTimeUS / 1000000 ),
 		renderDemoRecordSegments.Num(), segment != NULL ? segment->map.c_str() : "-",
 		IsRenderDemoRecording() ? ( Sys_Milliseconds() - renderDemoRecordStartMsec ) / 1000 : 0 );
 }
@@ -1864,6 +2042,8 @@ void idSessionLocal::ResetRenderDemoPlaybackSession() {
 	}
 	renderDemoUserCmdHz = idMath::ClampInt( 0, 1000, summary.GetInt( "userCmdHz" ) );
 	renderDemoPlayHeader.SetInt( "frames", Max( 0, summary.GetInt( "frames" ) ) );
+	renderDemoPlayHeader.SetInt( "durationMS", DemoSummaryDurationMS( summary ) );
+	const bool timedFrames = summary.GetInt( "version" ) >= OPENQ4_RENDERDEMO_FRAME_TIME_VERSION;
 	const int count = idMath::ClampInt( 0, 4096, summary.GetInt( "segments" ) );
 	for ( int i = 0; i < count; i++ ) {
 		renderDemoSegment_t segment;
@@ -1871,6 +2051,9 @@ void idSessionLocal::ResetRenderDemoPlaybackSession() {
 			// A malformed list is only a convenience lost; segments are still met.
 			renderDemoPlaySegments.Clear();
 			break;
+		}
+		if ( !timedFrames ) {
+			segment.startMS = RenderDemoFramesToMS( segment.startFrame );
 		}
 		if ( renderDemoPlaySegments.Num() > 0 &&
 			 segment.startFrame < renderDemoPlaySegments[renderDemoPlaySegments.Num() - 1].startFrame ) {
@@ -1916,6 +2099,18 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 	if ( readDemo->ReadInt( record ) != sizeof( record ) ) {
 		return false;
 	}
+	if ( record == DSC_FRAME_TIME ) {
+		// v13: the frame being read lasts this long after the one before it.
+		// One per frame, before its DC_END_FRAME; its single int is no dictionary.
+		static const int MAX_FRAME_TIME_US = 60 * 1000000;
+		int deltaUS = -1;
+		if ( !renderDemoTimedFrames || readDemo->ReadInt( deltaUS ) != sizeof( deltaUS ) ||
+			 deltaUS < 0 || deltaUS > MAX_FRAME_TIME_US || renderDemoPendingFrameDeltaUS >= 0 ) {
+			return false;
+		}
+		renderDemoPendingFrameDeltaUS = deltaUS;
+		return true;
+	}
 	idDict dict;
 	readDemo->ReadDict( dict );
 	if ( !readDemo->IsOpen() ) {
@@ -1938,6 +2133,8 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 		readDemo->ResetHashStrings();
 		renderDemoSegment_t segment;
 		segment.startFrame = numDemoFrames;
+		// a v13 level starts at its first frame's time (CompleteRenderDemoFrame)
+		segment.startMS = renderDemoTimedFrames ? -1 : RenderDemoFramesToMS( numDemoFrames );
 		segment.map = dict.GetString( "map" );
 		segment.entityFilter = dict.GetString( "entityFilter" );
 		segment.reason = dict.GetString( "reason", "level" );
@@ -1996,6 +2193,8 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 	}
 	case DSC_SEGMENT_READY:
 		CloseRenderDemoLevelLoad();
+		// the level load took real time the recording never had
+		renderDemoPlayRealClockUS = -1.0;
 		return true;
 	case DSC_END:
 		CloseRenderDemoLevelLoad();
@@ -2025,7 +2224,7 @@ bool idSessionLocal::SeekRenderDemoSegment( int direction ) {
 	int target = -1;
 	if ( direction > 0 ) {
 		for ( int i = 0; i < renderDemoPlaySegments.Num(); i++ ) {
-			const int start = RenderDemoFramesToMS( renderDemoPlaySegments[i].startFrame );
+			const int start = renderDemoPlaySegments[i].startMS;
 			if ( start > reference ) {
 				target = start;
 				break;
@@ -2034,8 +2233,9 @@ bool idSessionLocal::SeekRenderDemoSegment( int direction ) {
 	} else {
 		static const int RESTART_LEVEL_WINDOW_MS = 2000;
 		for ( int i = renderDemoPlaySegments.Num() - 1; i >= 0; i-- ) {
-			const int start = RenderDemoFramesToMS( renderDemoPlaySegments[i].startFrame );
-			if ( start < reference - RESTART_LEVEL_WINDOW_MS ) {
+			// a level whose start is not known yet (-1) is never before this one
+			const int start = renderDemoPlaySegments[i].startMS;
+			if ( start >= 0 && start < reference - RESTART_LEVEL_WINDOW_MS ) {
 				target = start;
 				break;
 			}

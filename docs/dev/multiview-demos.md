@@ -749,7 +749,7 @@ v11 adds session records (`DS_SESSION`, `DemoFile.h`). Each is a dictionary;
 readers skip unknown record kinds.
 
 ```text
-DS_VERSION 12 (11 before joint prediction; both play)
+DS_VERSION 13 (11 and 12 still play)
 DS_SESSION DSC_HEADER   game, campaign, mode, userCmdHz, skill, build
 per segment (one level):
   DS_SESSION DSC_SEGMENT        index, frame, map, entityFilter, reason, skill
@@ -757,8 +757,8 @@ per segment (one level):
   DS_SOUND  SCMD_STATE          the complete sound world
   DS_RENDER DC_LOADMAP          the level, then its portal states
   DS_SESSION DSC_SEGMENT_READY
-  frames ... DS_RENDER DC_END_FRAME
-DS_SESSION DSC_END              frames, segments
+  frames ... DS_SESSION DSC_FRAME_TIME int microseconds (v13), DS_RENDER DC_END_FRAME
+DS_SESSION DSC_END              frames, segments, durationMS (v13)
 raw trailer (outside the compressed stream): payload | int length | uint crc32 | "OQ4DSUM1"
 ```
 
@@ -770,8 +770,9 @@ earlier record ([joint prediction](#joint-prediction-v12-7-november-2026)). The 
 index instead of a linear search, and the per-segment reset keeps each table
 far below the 65,536-string bound over a long campaign.
 
-The trailer gives the library and the player the duration (frame count and
-tic rate) and every segment's start frame, reason and map without decoding the
+The trailer gives the library and the player the duration (from v13
+`durationMS`; earlier, the frame count and tic rate) and every segment's start
+frame, reason, map and, from v13, start time without decoding the
 stream. Its payload is a dictionary under a CRC; a recording that was killed has
 no trailer and is described as interrupted. `DSC_END` stops the reader before
 the trailer's bytes.
@@ -804,11 +805,10 @@ a level loads or before the first level.
   Shutdown ends any recording. An armed recording opens its file with its first
   level, so one cancelled or quit before any level leaves no file.
 - Only the gameplay branch of `idSessionLocal::Draw` ends a recorded frame
-  (`WriteDemoEndFrame`); `EndFrame` no longer does. Menus, pauses and loading
-  screens leave no frames, and the frame count equals the recorded game time:
-  a recording runs exactly `USERCMD_PER_DEMO_FRAME` tics per frame. A long
-  sound load (`timeHitch`) no longer skips tics under that fixed-tic check,
-  which would have stopped the engine.
+  (`EndRenderDemoRecordFrame`); `EndFrame` no longer does. Menus, pauses and
+  loading screens leave no frames. From v13 every gameplay draw is a frame,
+  stamped with its own time ([frame-rate recording](#frame-rate-recording-v13-11-november-2026));
+  v11 and v12 held the game to `USERCMD_PER_DEMO_FRAME` (two) tics per frame.
 - `demoRecordStatus` prints
   `RENDER_DEMO_RECORDING state= path= frames= seconds= segments= map= elapsed=`.
 
@@ -844,9 +844,10 @@ plays back as its unmasked content.
   opens a media load (`declManager`, `renderSystem`, `soundSystem`, BSE) that
   `DSC_SEGMENT_READY` closes, purging what the previous level used and this one
   does not, in `ExecuteMapChange`'s order.
-- The timeline counts frames at the recording's tic rate, so it continues across
-  levels whose game clocks restart. Seeking is the existing restart-and-replay
-  path, crossing segments as it goes.
+- The timeline is the time of the recorded frames (v13: each frame's own
+  duration; v11 and v12: two tics a frame at the recording's tic rate), so it
+  continues across levels whose game clocks restart. Seeking is the existing
+  restart-and-replay path, crossing segments as it goes.
 - Level starts are markers: `demoMarker next|prev` and the playback deck's
   marker buttons. Previous returns to the current level's start unless it is
   within two seconds of it. The overlay names the level (`Level 2/3: <name>`).
@@ -892,7 +893,11 @@ playback keep the same history per entity handle and both drop it at every
 `DC_LOADMAP`, a segment start or map load. A recording also drops a handle's
 history when the entity is freed and writes its next joints raw. Playback keeps
 it across `DC_DELETE_ENTITYDEF`, which a recording writes before every rewrite
-of an archived entity. A predicted record without a matching history, a
+of an archived entity, and starts a fresh one at every raw record, the only
+point where the recording's history is fresh too. Until 11 November it did
+not, so an entity that took a freed handle with the same joint count was
+predicted from the one before it and playback stopped on a checksum mismatch;
+v12 demos play with the fix as well. A predicted record without a matching history, a
 malformed residual, trailing bytes or a checksum mismatch stops playback with a
 warning instead of showing a wrong pose.
 
@@ -922,6 +927,84 @@ Validation, staged Windows client, hidden window, no input:
 - In an uncompressed v12 demo, one flipped residual bit stopped playback at that
   frame with "joints do not match their checksum", and a bad mode byte with
   "unknown joint record"; the client exited normally both times.
+
+### Frame-rate recording (v13), 11 November 2026
+
+**Why recordings were 30 fps.** The render demo inherited Doom 3's fixed
+cadence: `USERCMD_PER_DEMO_FRAME` is 2 and the tic rate 60. While `writeDemo`
+was set, `idSessionLocal::Frame` waited for `lastGameTic + 2` and then ran
+exactly two tics a frame (dropping older ones, and calling a fatal
+"numCmdsToRun < fixedTic" if it ever had fewer). The live game itself therefore
+ran at 30 Hz for as long as a recording lasted, whatever the frame cap, and each
+recorded frame meant 33.3 ms. Playback waited for the same two tics before each
+frame. Multiplayer never runs `idSessionLocal::Frame`, so a multiplayer render
+demo recorded every presented frame and then played them at 30 Hz: a recording
+made at 60 fps played its action at half speed (measured 0.48x), one made at
+240 fps at an eighth.
+
+**v13.** Nothing waits for tics any more except fixed-rate capture
+(`aviCaptureMode`). Every gameplay draw is a recorded frame, and
+`EndRenderDemoRecordFrame` writes a `DSC_FRAME_TIME` record, one int, before
+the frame's `DC_END_FRAME`: the microseconds since the previous recorded frame.
+That is the high-resolution clock between them when the previous frame was the
+draw just before; after anything that left no frame (a menu, the pause screen,
+a level load, the segment start) it is one tic, so the timeline never contains
+time the recording does not. A stall counts 250 ms at most. The trailer and
+`DSC_END` carry `durationMS`, and each trailer segment line appends its start
+time (older readers stop at the filter field).
+
+Playback paces every render demo on frame times. A playback clock runs at the
+playback rate in real time (`RenderDemoPlaybackElapsedUS`; capture steps
+`com_aviDemoTics` tics a frame instead); each update reads every frame the
+clock has passed and shows the first one still ahead of it, at most 64 a call.
+A pre-v13 frame is two tics, so those demos keep their 30 Hz cadence; a v13 frame
+missing its time stops playback with a warning. A step, the end of a seek and
+the first frame put the clock in the middle of the frame on screen, and a level
+load (`DSC_SEGMENT_READY`) or a pause restarts its real-time anchor, so neither
+plays as a jump. The middle, not the start: on a frame boundary every update
+would be a coin flip between two frames when the display runs at the
+recording's rate. Capture starts half a step before the frame on screen ends,
+so each fixed step samples the middle of an interval. Very high speeds on very
+high frame rates are limited by the 64 frames an update reads (a 500 fps
+recording at 16x on a 60 Hz display plays at about 8x). Because playback no
+longer blocks the main loop, the playback overlay runs at the display rate too.
+A level that drew no frame before the next began starts at that next frame.
+
+Recording every drawn frame repeats the last tic's joints on frames drawn
+between tics, and v12's history would then predict the next tic's motion as
+none. From v13 a joint that did not move keeps the step it last moved by (both
+ends, by the stream's version).
+
+Validation, staged Windows client, hidden window (its presentation cap is
+60 Hz), no input; cases, traces and their scripts under `.tmp/demo-fps/`
+(local only):
+
+- Two levels (airdefense1, then `map game/airdefense2`) recorded at the cap:
+  the game presented 60.0 Hz with one tic per frame while recording (it ran at
+  30 before), 965 frames over 16.5 s, level two one tic after level one's last
+  frame, 28.1 MB (1.7 MB/s; v12 at 30 fps was 0.92 MB/s). The same script at
+  `com_maxfps 45`: 45.0 Hz, 1.33 tics per frame, 732 frames, 22.6 MB.
+- `timeDemoQuit` played every frame of both on GL, the 45 fps one on Vulkan too,
+  with every joint record matching its checksum. The v11 and v12 clips (500
+  frames each) and the three-level v11 demo (745) still play in full.
+- Real-time playback, traced with `com_showDemo 1` (which now prints each
+  frame's time and the recorded view's game time): one recorded frame per
+  60 Hz update for the 60 fps demo, 1.33 for the 45 fps one, a frame every
+  other update for v12; the recorded action ran at 0.95-0.96x, which is real
+  time (the game clock adds 16 ms per 16.67 ms tic), at 2x and 0.5x as asked,
+  not at all while paused, one frame per `demoStep`, and on from the target
+  after `demoSeek` and level markers.
+- Multiplayer (listen server, three bots, 6 s): `main` recorded 361 frames it
+  called 12 s, whose action played at 0.48x; v13 recorded the same 361 frames
+  as 6 s, played at 0.96x, in 6.6 MB instead of 21.4 MB.
+- A reused handle (`spawn monster_strogg_marine`, `killmonsters`, spawn again,
+  twice, in airdefense1): playback of the v13 recording stopped at frame 353 of
+  482 on "entity 82 joints do not match their checksum" before the reader fix,
+  and `main`'s own v12 recording and playback stopped at frame 253 of 341. With
+  the fix both play every frame.
+- Capture (`aviDemo`, `com_aviDemoTics 2`): every frame of the v12 clip (500)
+  and of the three-level v11 demo (745) was shown exactly once, across level
+  changes; the 60 fps recording gave 496 captured frames for 16.5 s.
 
 ### Library
 

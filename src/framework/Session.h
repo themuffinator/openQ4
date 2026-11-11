@@ -46,7 +46,7 @@ typedef struct {
 } logStats_t;
 
 static const int	MAX_LOGGED_STATS = 60 * 120;		// log every half second 
-static const int	OPENQ4_RENDERDEMO_CURRENT_VERSION = 12;
+static const int	OPENQ4_RENDERDEMO_CURRENT_VERSION = 13;
 static const int	OPENQ4_RENDERDEMO_ENTITY_EXTRAS_VERSION = 3;
 static const int	OPENQ4_RENDERDEMO_LIGHT_EXTRAS_VERSION = 4;
 static const int	OPENQ4_RENDERDEMO_RENDER_VIEW_DECLS_VERSION = 5;
@@ -62,6 +62,10 @@ static const int	OPENQ4_RENDERDEMO_SESSION_VERSION = 11;
 // An animated entity's joints are predicted from the joints last recorded for
 // its handle; only the residuals of the joints that moved are stored.
 static const int	OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION = 12;
+// Every drawn gameplay frame is recorded with its own duration (DSC_FRAME_TIME),
+// so a recording keeps the frame rate it was played at and no longer holds
+// the game to two tics a frame. Earlier versions are two tics per frame.
+static const int	OPENQ4_RENDERDEMO_FRAME_TIME_VERSION = 13;
 
 typedef enum {
 	MSG_OK,

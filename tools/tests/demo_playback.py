@@ -277,9 +277,10 @@ def validate_playback_controls() -> None:
         "renderDemoSeekWorkDeferred",
     ):
         require(seek_processor, needle, "deferred/cooperative render-demo seeking")
-    require(session, "if ( renderDemoSeeking )", "render-demo seek pacing bypass")
+    require(session, "if ( renderDemoSeeking && !singleFrameOnly ) {", "seeks run on their budget, not the playback clock")
     require(session, "renderDemoDurationName = activeRenderDemoName;", "render-demo duration cache")
-    require(session, "elapsedDemoFrames *", "elapsed-time render-demo rate")
+    require(session, "elapsedUS * idMath::ClampFloat( 0.05f, 16.0f, renderDemoPlaybackRate )",
+            "elapsed-time render-demo rate")
     require(session, "if ( sw->IsPaused() )", "render-demo sound-world resume")
     require(session, "soundSystem->SetMute( restoreMuteOnFailure );", "render-demo failure mute restore")
     require(

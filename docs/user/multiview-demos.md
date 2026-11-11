@@ -54,8 +54,17 @@ across levels.
 
 A campaign demo stores what you saw and heard, including the HUD and in-world
 screens, not the game itself, so the camera cannot leave your view. Grouped HUD
-panels play back without their shaped edges. Busy levels use about 1 MB per
-second, so a long campaign recording needs several gigabytes of space.
+panels play back without their shaped edges.
+
+Recording no longer changes how the game runs. It keeps every frame you see, at
+your own frame rate, and plays back at that rate on a display fast enough to
+show it. Earlier openQ4 builds held the game to 30 frames per second while
+recording, and their demos still play at 30.
+
+File size grows with the frame rate. A busy level takes about 1.7 MB per second
+at 60 frames per second, so a long campaign recording needs several gigabytes of
+space. To record smaller files, lower your frame cap first, for example
+`com_maxfps 60`.
 
 ## Record a match
 
@@ -220,7 +229,10 @@ recording or playback.
 
 A render demo stores the recorded renderer, sound, and GUI presentation, not a
 complete multiplayer world. It therefore cannot provide genuine free roam or
-player following. Rewinding restarts it and silently replays its commands to
+player following. A render demo recorded in a multiplayer match by an earlier
+openQ4 build plays in slow motion, because those builds recorded each frame
+there but replayed them at 30 frames per second; record it again for real-time
+playback. Rewinding restarts it and silently replays its commands to
 the requested time in cooperative per-frame batches. The seeking overlay is
 shown before restart work begins; a single indivisible map load or renderer
 command can still take longer than the configured budget. Starting another

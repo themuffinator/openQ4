@@ -6,6 +6,44 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Demos record at your frame rate, 11 November 2026
+
+- **Recording a demo no longer drops the game to 30 frames per second.**
+  `recordDemo` used to hold the game at 30 frames per second for as long as
+  it recorded, and the demo played back at 30. The game now runs exactly as
+  it does without a recording, and the demo keeps every frame you saw at
+  your own frame rate.
+- **Demos play back at the rate they were recorded.** Each frame keeps its
+  own timing, so a demo plays as smoothly as your display allows and always
+  at the right speed. The playback controls and overlay stay smooth too.
+  Speed, pause, step, seeking and level markers work as before.
+- **Multiplayer render demos play at the right speed.** A render demo
+  recorded during a match used to play its action in slow motion, at half
+  speed or slower depending on your frame rate. It now plays in real time.
+- **Demos no longer stop partway with "joints do not match their checksum".**
+  When a character was removed and another of the same kind took its place,
+  playback could stop at that point. Every demo now plays through, including
+  ones recorded by earlier builds.
+- **What you need to know.** Demos from this build use render demo version
+  13 and need this build or later to play. Earlier openQ4 demos still play,
+  at their original 30 frames per second; a multiplayer render demo made by
+  an earlier build still plays slowly, so record it again. Size follows the
+  frame rate: about 1.7 MB per second on a busy level at 60 frames per
+  second. Lower `com_maxfps` before recording for smaller files.
+- Evidence: Windows x64, OpenGL, hidden window (presentation cap 60 Hz), no
+  input. Air Defense 1 then 2: the game presented 60.0 Hz while recording,
+  965 frames in 16.5 s (and 45.0 Hz, 732 frames, at `com_maxfps 45`); every
+  frame replayed with all joint records verified, on Vulkan as well; the
+  recorded action played at real time at 1x, 2x and 0.5x, held still when
+  paused and stepped one frame at a time. The v11 and v12 demos replayed in
+  full at 30 frames per second. A three-bot multiplayer recording played at
+  0.48x speed from `main` and at real time from this build. Two recordings in
+  which a monster's slot was reused stopped partway (`main`'s own at frame
+  253 of 341, this build's before the fix at 353 of 482) and now play in
+  full. Capture (`aviDemo`) shows every frame of a 30 fps demo exactly once.
+  Not measured: recording above 60 Hz in a visible window, Linux and macOS
+  ([frame-rate recording](multiview-demos.md#frame-rate-recording-v13-11-november-2026)).
+
 ## Temporal AA holds the picture still (#216), 11 November 2026
 
 - **The 3D view no longer trembles with temporal AA on.** With nothing moving,

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Structural contracts for campaign render demos (render demo v11 and v12).
+"""Structural contracts for campaign render demos (render demo v11 to v13).
 
 A campaign recording spans every single-player level it reaches as
 self-contained segments, records only gameplay frames, and ends with a raw
 summary trailer. Playback loads each segment's level, keeps one timeline and
 offers the level starts as markers. v12 predicts animated entities' joints
-from the joints last recorded for the same handle. These checks pin the
-ordering and gating that keep a long recording decodable and its library
-entry honest.
+from the joints last recorded for the same handle. v13 records every drawn
+gameplay frame with its own time instead of holding the game to two tics a
+frame (30 Hz), and playback paces frames on those times. These checks pin
+the ordering and gating that keep a long recording decodable and its
+library entry honest.
 """
 
 from __future__ import annotations
@@ -59,15 +61,16 @@ def require_order(text: str, needles: tuple[str, ...], context: str) -> None:
 
 def validate_format() -> None:
     session_h = read("src/framework/Session.h")
-    require(session_h, "OPENQ4_RENDERDEMO_CURRENT_VERSION = 12;", "current render-demo version")
+    require(session_h, "OPENQ4_RENDERDEMO_CURRENT_VERSION = 13;", "current render-demo version")
     require(session_h, "OPENQ4_RENDERDEMO_SESSION_VERSION = 11;", "session-record version")
     require(session_h, "OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION = 12;", "joint-prediction version")
+    require(session_h, "OPENQ4_RENDERDEMO_FRAME_TIME_VERSION = 13;", "frame-time version")
 
     demo_h = read("src/framework/DemoFile.h")
     require_order(demo_h, ("DS_FINISHED,", "DS_RENDER,", "DS_SOUND,", "DS_VERSION,", "DS_SESSION"),
                   "stable top-level demo tokens")
-    require_order(demo_h, ("DSC_HEADER = 1,", "DSC_SEGMENT,", "DSC_SEGMENT_READY,", "DSC_END"),
-                  "session record kinds")
+    require_order(demo_h, ("DSC_HEADER = 1,", "DSC_SEGMENT,", "DSC_SEGMENT_READY,", "DSC_END,", "DSC_FRAME_TIME"),
+                  "session record kinds only append")
     require(demo_h, '#define DEMO_TRAILER_MAGIC\t\t\t"OQ4DSUM1"', "summary trailer magic")
     for needle in ("void\t\t\tResetHashStrings();", "bool\t\t\tCloseWithTrailer( const idDict &summary );",
                    "static bool\t\tReadTrailer( const char *fileName, idDict &summary );",
@@ -122,12 +125,16 @@ def validate_recorder() -> None:
 
     draw = between(session, "} else if ( mapSpawned ) {", "guiRetainedReleasing->Redraw( presentationTime );", "gameplay draw")
     require_order(draw, ("gameDraw = game->Draw( GetLocalClientNum() );", "if ( writeDemo ) {",
-                         "renderSystem->WriteDemoPics();", "renderSystem->WriteDemoEndFrame();", "renderDemoRecordFrames++;"),
+                         "EndRenderDemoRecordFrame();"),
                   "only gameplay draws end recorded frames")
+    end_record = between(demo, "void idSessionLocal::EndRenderDemoRecordFrame", "void idSessionLocal::BeginRenderDemoSegment",
+                         "frame end")
+    require_order(end_record, ("renderSystem->WriteDemoPics();", "WriteInt( DS_SESSION );", "WriteInt( DSC_FRAME_TIME );",
+                               "WriteInt( deltaUS );", "renderSystem->WriteDemoEndFrame();", "renderDemoRecordFrames++;"),
+                  "a v13 frame ends with its 2D, its time, then DC_END_FRAME")
     end_frame = between(render_system, "void idRenderSystemLocal::EndFrame", "void idRenderSystemLocal::", "EndFrame")
     reject(end_frame, "DC_END_FRAME", "EndFrame frame terminator")
     require(render_system, "void idRenderSystemLocal::WriteDemoEndFrame() {", "session-driven frame terminator")
-    require(session, "if ( timeHitch && writeDemo ) {", "recording never skips tics under its fixed-tic check")
 
     start = between(session, "void idSessionLocal::StartRecordingRenderDemo", "idSessionLocal::OpenRenderDemoRecordFile", "start recording")
     require_order(start, ('BeginRenderDemoSegment( "start" );', "RENDER_DEMO_RECORD_ARMED"),
@@ -140,8 +147,10 @@ def validate_recorder() -> None:
                   "the stream starts with its version and header")
     stop_rec = between(session, "void idSessionLocal::StopRecordingRenderDemo", "idSessionLocal::StopPlayingRenderDemo", "stop recording")
     require_order(stop_rec, ("renderDemoRecordFile == NULL", "before any level loaded", "fileSystem->RemoveFile( path.c_str() );",
-                             "DSC_END", 'summary.SetInt( "frames"', 'va( "segment%d", i )', "CloseWithTrailer( summary )"),
-                  "an armed recording leaves no file; clean ones end with DSC_END and the trailer")
+                             "DSC_END", 'summary.SetInt( "frames"', 'summary.SetInt( "durationMS", durationMS );',
+                             'va( "segment%d", i )', '"%d %s %s %s %d"', "segment.startMS", "CloseWithTrailer( summary )"),
+                  "an armed recording leaves no file; clean ones end with DSC_END and the trailer, "
+                  "which gives the duration and each level's start time")
 
     segment = between(demo, "void idSessionLocal::BeginRenderDemoSegment", "void idSessionLocal::SuspendRenderDemoRecording", "segment writer")
     require_order(segment, ("renderDemoRecordFile == NULL && !OpenRenderDemoRecordFile()",
@@ -161,7 +170,7 @@ def validate_player() -> None:
     advance = between(session, "void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {", "idSessionLocal::Draw", "AdvanceRenderDemo")
     require(advance, "ds == DS_SESSION && renderdemoVersion >= OPENQ4_RENDERDEMO_SESSION_VERSION", "version-gated session records")
     require(advance, "malformed session record; playback stopped safely", "nonfatal session records")
-    require(advance, "RenderDemoFramesToMS( numDemoFrames - 1 )", "frame-clock duration")
+    require(advance, "renderDemoKnownDurationMS = RenderDemoCurrentTimeMS();", "frame-clock duration")
 
     start = between(session, "void idSessionLocal::StartPlayingRenderDemo", "idSessionLocal::TimeRenderDemo", "start playback")
     require_order(start, ("Session_RenderDemoContentMatches( demoName.c_str(), refusal )", "return;",
@@ -192,11 +201,17 @@ def validate_player() -> None:
             "the never-freed localSound stays outside SCMD_FREE")
 
     time = between(demo, "static int DemoCurrentRenderTimeMS", "struct demoRenderSessionInfo_t", "timeline")
-    require(time, "session.RenderDemoFramesToMS( Max( 0, session.numDemoFrames - 1 ) )", "monotonic campaign timeline")
-    require(demo, "static_cast<int64>( frames ) * USERCMD_PER_DEMO_FRAME * 1000 / userCmdHz", "frame duration")
+    require(time, "session.RenderDemoCurrentTimeMS()", "one timeline for every demo")
+    current = between(demo, "int idSessionLocal::RenderDemoCurrentTimeMS", "bool idSessionLocal::CompleteRenderDemoFrame",
+                      "current time")
+    require(current, "renderDemoFrameTimeUS", "monotonic campaign timeline from frame times")
+    require(demo, "static_cast<int64>( frames ) * USERCMD_PER_DEMO_FRAME * 1000 / userCmdHz",
+            "a pre-v13 frame is two tics")
 
     markers = between(demo, "bool idSessionLocal::SeekRenderDemoSegment", "idStr idSessionLocal::RenderDemoSegmentLabel", "markers")
     require(markers, "RESTART_LEVEL_WINDOW_MS", "previous level restarts the current one first")
+    require(markers, "renderDemoPlaySegments[i].startMS", "markers seek to each level's recorded start time")
+    reject(markers, "RenderDemoFramesToMS", "level starts computed as two tics a frame")
     require(markers, "return SeekDemoMS( target );", "markers seek through the shared controller")
     require(demo, "renderPlaying && renderDemoFrameClock && renderDemoPlaySegments.Num() > 1", "level marker buttons")
     require(demo, "SeekRenderDemoSegment( !idStr::Icmp( cmd, \"demoMarkerNext\" ) ? 1 : -1 );", "menu level markers")
@@ -291,9 +306,14 @@ def validate_joints() -> None:
     reject(prediction, "float", "floating-point prediction")
     store = between(world_demo, "void R_DemoStoreJointHistory", "ID_INLINE void R_DemoPutWord", "history update")
     require_order(store, ("history.numJoints == numJoints && history.current.Num() == numWords",
+                          "keepUnmovedSteps && history.hasPrevious",
+                          "memcmp( words + first, current, jointBytes ) != 0",
+                          "memcpy( history.previous.Ptr() + first, current, jointBytes );",
+                          "memcpy( current, words + first, jointBytes );", "return;",
                           "history.previous.Swap( history.current );", "history.hasPrevious = true;",
                           "history.hasPrevious = false;", "memcpy( history.current.Ptr(), words"),
-                  "a history keeps the last record and the one before it at the same joint count")
+                  "a history keeps the last record and the one before it at the same joint count; "
+                  "from v13 a joint that did not move keeps its last step")
 
     entity_writer = between(world_demo, "void\tidRenderWorldLocal::WriteRenderEntity", "bool\tidRenderWorldLocal::ReadRenderEntity", "entity writer")
     require(entity_writer, "WriteDemoJoints( handle, ent->joints, ent->numJoints );", "entity joints go through the joint coder")
@@ -308,19 +328,24 @@ def validate_joints() -> None:
     require_order(writer, ("history == NULL || history->numJoints != numJoints", "out[0] = DEMO_JOINTS_RAW;",
                            "memcmp( words + first, history->current.Ptr() + first",
                            "( residual << 1 ) ^ ( 0u - ( residual >> 31 ) )", "out[0] = DEMO_JOINTS_PREDICTED;",
-                           "R_DemoJointChecksum( words, numWords )", "R_DemoStoreJointHistory( *history, words, numJoints );"),
+                           "R_DemoJointChecksum( words, numWords )", "R_DemoStoreJointHistory( *history, words, numJoints, true );"),
                   "raw without a matching history, else moved joints' zigzagged residuals and a checksum")
     reader = between(world_demo, "bool idRenderWorldLocal::ReadDemoJoints", "/*\n==============\nProcessDemoCommand", "joint reader")
     require_order(reader, ("session->renderdemoVersion < OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION",
                            "R_DemoReadFloat( demo, data[j] )", "return true;"),
                   "older demos keep their raw joint floats")
+    require_order(reader, ("DEMO_JOINTS_RAW ) {", "R_DemoGetWord( demoJointBuffer.Ptr() + i * 4 )",
+                           "history->numJoints = 0;", "DEMO_JOINTS_PREDICTED ) {"),
+                  "a raw record starts a fresh history, as the recording's does, so a reused handle never "
+                  "predicts from the entity that had it before")
     for needle in ("predicts joints it never recorded", "joint payload of %d bytes is out of range",
                    "( shift == 28 && *cursor > 0x0Fu )", "malformed joint residual", "joint payload has trailing bytes",
                    "joints do not match their checksum", "unknown joint record %d"):
         require(reader, needle, "bounded, verified joint reader")
     require_order(reader, ("R_DemoJointChecksum( words, numWords )", "memcpy( joints, words",
-                           "R_DemoStoreJointHistory( *history, words, numJoints );"),
-                  "playback keeps the verified joints as its history")
+                           "R_DemoStoreJointHistory( *history, words, numJoints,",
+                           "session->renderdemoVersion >= OPENQ4_RENDERDEMO_FRAME_TIME_VERSION );"),
+                  "playback keeps the verified joints as its history, by the stream's own version's rule")
 
     # both sides drop the history at the same stream point, DC_LOADMAP
     load_writer = between(world_demo, "void\tidRenderWorldLocal::WriteLoadMap", "void\tidRenderWorldLocal::WriteVisibleDefs", "WriteLoadMap")
@@ -337,6 +362,73 @@ def validate_joints() -> None:
     require_order(free_entity, ("FreeDemoGuiSurfaces( entityHandle );", "session->writeDemo != NULL && this == session->rw",
                                 "ResetDemoJointHistory( entityHandle );"),
                   "only a recording drops a freed handle's history")
+
+
+def validate_frame_timing() -> None:
+    """v13: every drawn gameplay frame is recorded with its time; nothing holds the game to 30 Hz."""
+    session = read("src/framework/Session.cpp")
+    demo = read("src/framework/Session_demo.cpp")
+
+    frame = between(session, "void idSessionLocal::Frame() {", "idSessionLocal::RunGameTic", "Session Frame")
+    require(frame, "const bool shouldWaitForGameTic = aviCaptureMode;", "only fixed-rate capture waits for tics")
+    for needle in ("minTic = lastGameTic + USERCMD_PER_DEMO_FRAME", "minTic = lastDemoTic + USERCMD_PER_DEMO_FRAME",
+                   "numCmdsToRun < fixedTic", "if ( timeHitch && writeDemo )", "int fixedTic = USERCMD_PER_DEMO_FRAME"):
+        reject(frame, needle, "a recording or playback holding the game to two tics a frame")
+
+    end_record = between(demo, "void idSessionLocal::EndRenderDemoRecordFrame", "void idSessionLocal::BeginRenderDemoSegment",
+                         "frame end")
+    require_order(end_record, ("renderDemoRecordFrames > 0", "renderDemoRecordLastFrameDraw == renderDemoDrawSerial - 1",
+                               "now - renderDemoRecordLastFrameClockUS", "MAX_RECORDED_FRAME_US",
+                               "1000000 / Max( 1, common->GetUserCmdHz() )"),
+                  "a frame is the real time since the draw before it, or one tic after a menu, pause or load")
+    require(session, "renderDemoDrawSerial++;", "draws are counted")
+    segment = between(demo, "void idSessionLocal::BeginRenderDemoSegment", "void idSessionLocal::SuspendRenderDemoRecording",
+                      "segment writer")
+    require(segment, "renderDemoRecordLastFrameDraw = idMath::INT_MIN;", "a level load is no time on the timeline")
+
+    records = between(demo, "bool idSessionLocal::ProcessRenderDemoSessionRecord", "bool idSessionLocal::SeekRenderDemoSegment",
+                      "session records")
+    require_order(records, ("if ( record == DSC_FRAME_TIME ) {", "!renderDemoTimedFrames",
+                            "deltaUS < 0 || deltaUS > MAX_FRAME_TIME_US || renderDemoPendingFrameDeltaUS >= 0",
+                            "renderDemoPendingFrameDeltaUS = deltaUS;", "idDict dict;"),
+                  "a bounded frame time, one per frame, read before any dictionary")
+    require_order(records, ("case DSC_SEGMENT_READY:", "renderDemoPlayRealClockUS = -1.0;"),
+                  "a level load during playback never fast-forwards the clock")
+    complete = between(demo, "bool idSessionLocal::CompleteRenderDemoFrame", "void idSessionLocal::SyncRenderDemoPlayClock",
+                       "frame completion")
+    require_order(complete, ("renderDemoTimedFrames && deltaUS < 0", "return false;", "numDemoFrames++;",
+                             "renderDemoFrameTimeUS += deltaUS;", "USERCMD_PER_DEMO_FRAME * 1000000 / userCmdHz"),
+                  "v13 frames carry their time; older frames are two tics")
+    elapsed = between(demo, "double idSessionLocal::RenderDemoPlaybackElapsedUS", "void idSessionLocal::EndRenderDemoRecordFrame",
+                      "playback clock")
+    require_order(elapsed, ("if ( aviCaptureMode ) {", "return RenderDemoCaptureStepUS();", "MAX_PLAYBACK_STEP_US",
+                            "renderDemoPlayRealClockUS < 0.0"),
+                  "capture steps fixed tics; real-time playback re-anchors and never jumps")
+    sync = between(demo, "void idSessionLocal::SyncRenderDemoPlayClock", "double idSessionLocal::RenderDemoPlaybackElapsedUS",
+                   "clock sync")
+    require_order(sync, ("if ( aviCaptureMode ) {", "renderDemoFrameTimeUS ) - 0.5 * RenderDemoCaptureStepUS()",
+                         "0.5 * ( static_cast<double>( renderDemoPrevFrameTimeUS ) +"),
+                  "a sync puts the clock mid-interval, never on a frame boundary")
+    require(demo, "com_aviDemoTics.GetInteger() * 1000000.0 / userCmdHz", "a captured frame is com_aviDemoTics tics")
+    avi = between(session, "void idSessionLocal::AVIRenderDemo", "idSessionLocal::AVICmdDemo", "AVIRenderDemo")
+    require_order(avi, ("BeginAVICapture( demoName.c_str() ) ;", "SyncRenderDemoPlayClock();"),
+                  "capture starts mid-interval")
+    end_record_segments = between(demo, "void idSessionLocal::EndRenderDemoRecordFrame",
+                                  "void idSessionLocal::BeginRenderDemoSegment", "frame end")
+    require(end_record_segments, "i >= 0 && renderDemoRecordSegments[i].startMS < 0; i--",
+            "every level begun since the last frame, an empty one included, starts at this frame")
+
+    advance = between(session, "void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {", "idSessionLocal::Draw",
+                      "AdvanceRenderDemo")
+    require_order(advance, ("RenderDemoPlaybackElapsedUS()", "if ( renderDemoPaused ) {", "renderDemoPlayClockUS +=",
+                            "renderDemoFrameTimeUS ) > renderDemoPlayClockUS", "RENDER_DEMO_MAX_FRAMES_PER_UPDATE",
+                            "CompleteRenderDemoFrame()", "framesLeft = 0;", "SyncRenderDemoPlayClock();"),
+                  "playback reads every frame the clock has passed and shows the first one still ahead of it")
+    reject(advance, "latchedTicNumber % USERCMD_PER_DEMO_FRAME", "playback paced on the tic counter")
+    probe = between(demo, "static int DemoSummaryDurationMS", "static double DemoClockUS", "library duration")
+    require_order(probe, ("OPENQ4_RENDERDEMO_FRAME_TIME_VERSION", 'summary.GetInt( "durationMS", "-1" )',
+                          "Session_RenderDemoFramesToMS( frames - 1"),
+                  "the library reads a v13 duration, and older ones from their frames")
 
 
 def validate_localization() -> None:
@@ -362,6 +454,7 @@ def main() -> int:
     validate_library()
     validate_renderer()
     validate_joints()
+    validate_frame_timing()
     validate_localization()
     print("campaign demo contracts: ok")
     return 0

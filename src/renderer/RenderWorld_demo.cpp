@@ -165,10 +165,26 @@ ID_INLINE unsigned int R_DemoJointPrediction( const idRenderWorldLocal::demoJoin
 	return last + ( last - history.previous[word] );
 }
 
-// Keeps what was just written or read as the handle's history.
-void R_DemoStoreJointHistory( idRenderWorldLocal::demoJointHistory_t &history, const unsigned int *words, int numJoints ) {
+// Keeps what was just written or read as the handle's history. From v13 a
+// joint that did not move keeps the step it last moved by: a recording now
+// writes every drawn frame, so at a frame rate above the game's tic rate most
+// records repeat the last tic's joints, and shifting those in would predict
+// the next tic's motion as none.
+void R_DemoStoreJointHistory( idRenderWorldLocal::demoJointHistory_t &history, const unsigned int *words, int numJoints,
+	bool keepUnmovedSteps ) {
 	const int numWords = numJoints * DEMO_JOINT_WORDS;
 	if ( history.numJoints == numJoints && history.current.Num() == numWords ) {
+		if ( keepUnmovedSteps && history.hasPrevious ) {
+			const size_t jointBytes = DEMO_JOINT_WORDS * sizeof( unsigned int );
+			for ( int first = 0; first < numWords; first += DEMO_JOINT_WORDS ) {
+				unsigned int *current = history.current.Ptr() + first;
+				if ( memcmp( words + first, current, jointBytes ) != 0 ) {
+					memcpy( history.previous.Ptr() + first, current, jointBytes );
+					memcpy( current, words + first, jointBytes );
+				}
+			}
+			return;
+		}
 		history.previous.Swap( history.current );
 		history.hasPrevious = true;
 	} else {
@@ -616,7 +632,8 @@ void idRenderWorldLocal::WriteDemoJoints( qhandle_t handle, const idJointMat *jo
 		demo->Write( out, static_cast<int>( cursor - out ) );
 	}
 	if ( history != NULL ) {
-		R_DemoStoreJointHistory( *history, words, numJoints );
+		// a recording is always the current version
+		R_DemoStoreJointHistory( *history, words, numJoints, true );
 	}
 }
 
@@ -656,6 +673,13 @@ bool idRenderWorldLocal::ReadDemoJoints( qhandle_t handle, idJointMat *joints, i
 		}
 		for ( int i = 0; i < numWords; i++ ) {
 			words[i] = R_DemoGetWord( demoJointBuffer.Ptr() + i * 4 );
+		}
+		// A recording writes raw joints only from a fresh history: the handle's
+		// first joints, a new joint count, or the first joints after the entity
+		// was freed. Start one here too, or an entity that reuses a freed
+		// handle with the same joint count is predicted from the one before it.
+		if ( history != NULL ) {
+			history->numJoints = 0;
 		}
 	} else if ( static_cast<byte>( mode ) == DEMO_JOINTS_PREDICTED ) {
 		if ( history == NULL || history->numJoints != numJoints ) {
@@ -711,7 +735,8 @@ bool idRenderWorldLocal::ReadDemoJoints( qhandle_t handle, idJointMat *joints, i
 
 	memcpy( joints, words, numWords * sizeof( unsigned int ) );
 	if ( history != NULL ) {
-		R_DemoStoreJointHistory( *history, words, numJoints );
+		R_DemoStoreJointHistory( *history, words, numJoints,
+			session->renderdemoVersion >= OPENQ4_RENDERDEMO_FRAME_TIME_VERSION );
 	}
 	return true;
 }
