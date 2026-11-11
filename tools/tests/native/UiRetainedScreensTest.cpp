@@ -2987,6 +2987,10 @@ static void CheckCreditsPage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,6.0);
 	const float runes = value("screen1_ts_1","color",3);
 	Check(runes > .1f && runes < .8f && Near(value("screen1_t_1","color",3),0,.01f),"the heading's runes are fading in, its Latin not yet");
+	// In this 16:9 view the 4:3 frame's edge stands 160 dp inside the view:
+	// the waiting scan bar's head rests at the view's edge, not the frame's.
+	const auto resting = bounds("screen1_bar1");
+	Check(resting.x + resting.width < 8,"a waiting scan bar rests beyond the view's leading edge, not the 4:3 frame's");
 	runtime.Frame(viewport,7.5);
 	Check(value("screen1_t_1","color",3) > .2f && value("screen1_ts_1","color",3) < runes + .5f,"the heading translates from runes to Latin");
 	Check(value("screen1_bar1","opacity",0) > 0 && value("screen1_bar1","transform",0) > 0,"its scan bar has slid in from the leading edge");

@@ -168,7 +168,7 @@ def compile_screen(doc: Document, prefix: str, body: str, windows: dict, colours
     for (window, prop), keys in tracks.items():
         converted = typed(window, prop, keys.keys)
         if converted:
-            out.append(converted)
+            out.extend(converted if isinstance(converted, list) else [converted])
     return out, end
 
 
@@ -186,6 +186,53 @@ def scan_bar(ident: str, rect: list[float]) -> dict:
                           "transform": transform(), "pointer-events": keyword("none")},
                   [path("ramp", body, fill=ramp, blend="additive")],
                   mask={"paths": [path("edges", body, fill=edge)]})
+
+
+# A scan bar rests just past the 4:3 frame's edge and sweeps in over its
+# line. In a view wider than 4:3 that edge stands inside the view, so the
+# bar's bright head would wait there in plain sight and the sweep would start
+# mid-screen. Each bar therefore rides a carrier across a lane spanning the
+# view's margin beside the canvas, on the side it enters from: the carrier
+# stands at the view's edge at rest and reaches the canvas's edge as the
+# stock sweep ends, in step with it (sweep_tracks). At 4:3 and narrower the
+# lane is empty and the bar moves exactly as the stock bar does.
+SIDE_MARGIN = {"op": "max", "args": [0, {"op": "-", "args": [{"op": "*", "args": [{"state": "view.aspect"}, 360]}, CANVAS_W / 2]}]}
+
+
+def bar_side(name: str, body: str, windows: dict) -> int:
+    """-1 for a bar that sweeps in from the leading edge, 1 for one that
+    sweeps in from the trailing edge: its rest rect against its d_ rect."""
+    start = next((vec(args[1])[0] for _, op, args in schedule(body) if op == "set" and args[0] == f"{name}::rect"),
+                 vec(windows[name].get("rect", "0,0,0,0"))[0])
+    end = vec(windows.get(f"d_{name}", windows[name]).get("rect", "0,0,0,0"))[0]
+    return 1 if start > end else -1
+
+
+def bar_lane(doc: Document, bar: dict, side: int) -> dict:
+    """The bar in its carrier, in its lane over the view's margin on `side`."""
+    ident = bar["id"]
+    if side > 0:
+        bar["properties"]["left"] = length(bar["properties"]["left"]["value"] - CANVAS_W)
+    carrier = group(f"{ident}-carrier", {**absolute(left=length(0, "%"), top=0, width=0, height=0), "pointer-events": keyword("none")}, [bar])
+    lane = group(f"{ident}-lane", {**absolute(left=CANVAS_W if side > 0 else 0, top=0, width=0, height=0), "pointer-events": keyword("none")},
+                 [carrier])
+    doc.bind(f"wide.{ident}-lane.width", lane["id"], "width", SIDE_MARGIN)
+    if side < 0:
+        doc.bind(f"wide.{ident}-lane.left", lane["id"], "left", {"op": "-", "args": [0, SIDE_MARGIN]})
+    return lane
+
+
+def sweep_tracks(ident: str, side: int, keys: list) -> list:
+    """The carrier's track across its lane for a bar's rect keys: at the
+    view's edge while the bar rests, at the canvas's edge where its sweep
+    ends, eased as the sweep is."""
+    end = keys[-1][1][0]
+    reach = max(abs(v[0] - end) for _, v, _ in keys) or 1
+    out = []
+    for t, v, e in keys:
+        progress = min(1.0, max(0.0, 1 - abs(v[0] - end) / reach))
+        out.append((t, length(round(100 * (progress if side < 0 else 1 - progress), 4), "%"), e))
+    return [track(f"{ident}-carrier", "left", out)]
 
 
 TEXT_ROOM = (40.0, 436.0)     # u: a screen's lines stand under the title and over the prompt bar
@@ -243,9 +290,10 @@ def credits_document() -> dict:
     page = dict(blocks(text, "windowDef"))["p_credits"]
     windows = {name: own_properties(body) for name, body in blocks(page, "windowDef")}
     doc = Document("openq4.credits")
+    doc.state["view.aspect"] = {"type": "number", "initial": round(4 / 3, 4), "view": "aspect"}
     doc.session("back", "creditsBack")
     doc.events["onBack"] = [{"op": "action", "action": "back"}]
-    info, screens = {}, []
+    info, screens, sides = {}, [], {}
     screen_bodies = {int(name[len("p_screen"):]): body for name, body in blocks(page, "windowDef") if re.fullmatch(r"p_screen\d+", name)}
     for number_ in range(1, SCREENS + 1):
         nodes = []
@@ -256,6 +304,7 @@ def credits_document() -> dict:
             rect = vec(props.get("rect", "0,0,0,0"))
             if props.get("background", "").endswith("creditsbar"):
                 info[name] = {"kind": "bar", "rect": rect}
+                sides[name] = bar_side(name, screen_bodies[number_], windows)
                 nodes.append(scan_bar(name, rect))
                 continue
             face = FACES.get(props.get("font", ""), "lowpixel")
@@ -272,6 +321,7 @@ def credits_document() -> dict:
                                "pointer-events": keyword("none")}))
             doc.bind(f"{name}.text", name, "text", {"state": key})
         grow_screen(doc, screen_bodies[number_], nodes)
+        nodes = [bar_lane(doc, node, sides[node["id"]]) if node["id"] in sides else node for node in nodes]
         ident = f"p_screen{number_}"
         info[ident] = {"kind": "screen", "rect": [0, 0, 640, 480]}
         screens.append(group(ident, {**absolute(left=0, top=0, width=CANVAS_W, height=720), "opacity": number(0),
@@ -293,7 +343,8 @@ def credits_document() -> dict:
             return track(window, "transform", [(t, scaled(v), e) for t, v, e in keys])
         if prop == "rect" and node["kind"] in ("bar", "screen"):
             x, y = node["rect"][:2]
-            return track(window, "transform", [(t, transform(U * (v[0] - x), U * (v[1] - y)), e) for t, v, e in keys])
+            moved = track(window, "transform", [(t, transform(U * (v[0] - x), U * (v[1] - y)), e) for t, v, e in keys])
+            return [moved, *sweep_tracks(window, sides[window], keys)] if node["kind"] == "bar" else moved
         if prop == "matcolor" and node["kind"] == "bar":
             return track(window, "opacity", [(t, number(round(v[3] * max(v[:3]), 4)), e) for t, v, e in keys])
         if prop == "visible" and node["kind"] == "screen":

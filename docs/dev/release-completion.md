@@ -6,6 +6,19 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Credits scan bars sweep in from the screen's edge on wide screens, 11 November 2026
+
+- On the Credits page, the orange scan bars that translate each heading from
+  runes into English waited, lit, at the edge of the old 4:3 picture, which
+  on a widescreen display sits inside the screen, and then swept in from
+  there. They now wait beyond the edge of the screen and sweep in from it at
+  any width. At 4:3 and narrower nothing changes.
+- Each bar rides a lane over the view's side margin in the generated page
+  (`tools/ui/retained_credits.py`), moving in step with the stock sweep. The
+  native Credits check now fails if a waiting bar sits at the 4:3 edge in a
+  16:9 view; engine captures at 960x720, 1280x720 and 1720x720 (OpenGL)
+  show bars that settle where the stock ones do.
+
 ## Demos record at your frame rate, 11 November 2026
 
 - **Recording a demo no longer drops the game to 30 frames per second.**
