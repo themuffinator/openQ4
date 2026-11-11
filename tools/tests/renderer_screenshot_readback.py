@@ -298,10 +298,14 @@ def test_cube_face_captures_span_the_virtual_screen() -> None:
     # by the capture crop BeginFrame takes from tr.tiledViewport. Window pixels
     # drew each cube face into a larger viewport and the readback kept only its
     # top-left corner, unless the window was 640x480.
+    # The view is copied from tr.primaryRenderView, RenderScene's by-value copy.
+    # tr.primaryView points into per-frame memory that later frames reuse, and
+    # its stale globalMaterial crashed the third map of a batch bake (f08a72d24).
     require_order(
         bake,
         (
-            "renderView_t captureView = tr.primaryView->renderView;",
+            "renderView_t captureView = tr.primaryRenderView;",
+            "captureView.globalMaterial = NULL;",
             "captureView.width = SCREEN_WIDTH;",
             "captureView.height = SCREEN_HEIGHT;",
             "captureView.fov_x = 90.0f;",
@@ -309,6 +313,7 @@ def test_cube_face_captures_span_the_virtual_screen() -> None:
         ),
         "light-grid bake capture view",
     )
+    reject(bake, "renderView_t captureView = tr.primaryView->renderView;", "light-grid bake capture view")
     reject(bake, "captureView.width = glConfig.vidWidth", "light-grid bake capture view")
     reject(bake, "captureView.height = glConfig.vidHeight", "light-grid bake capture view")
     # the synchronous and the async PBO capture paths share that view

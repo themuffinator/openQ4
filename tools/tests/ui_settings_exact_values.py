@@ -20,6 +20,17 @@ from wrap_sources import wrap_source
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# StartupRenderer's replay loop. StartupCombined (b211275ce) repeats it after a
+# different validation, and the display harness needs each anchor to be unique.
+RENDERER_REPLAY = ('ValidateSavedTarget(record.baseline,record.target,error)) return false;\n\tStateValues live;\n'
+                   '\tif (!settings.Read(live,error)) return false;\n'
+                   '\tconst bool approved=record.state==SettingsJournalState::Confirmed;\n'
+                   '\tconst auto& wanted=approved?record.target:record.baseline;\n'
+                   '\tstartupTarget=live; StateValues replay;\n\tfor (const auto& [key,value]:record.patch) {\n\t\tif (')
+RENDERER_OWNERSHIP = ('!SettingsValueEqual(live.at(key),record.baseline.at(key)) && !SettingsValueEqual(live.at(key),value))\n'
+                      '\t\t\treturn Fail(error,"A settings recovery key changed outside the saved attempt");\n'
+                      '\t\tstartupTarget[key]=wanted.at(key);\n\t\tif (')
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -184,8 +195,10 @@ def main():
                 ('deferred-replay-ownership', '!SettingsValueEqual(live.at(key),saved.baseline.at(key)) && !SettingsValueEqual(live.at(key),value)', 'live.at(key)!=saved.baseline.at(key) && live.at(key)!=value'),
                 ('deferred-replay-patch', '!SettingsValueEqual(live.at(key),chosen.at(key))', 'live.at(key)!=chosen.at(key)'),
                 ('deferred-owned-drift', '!SettingsValueEqual(current->second,chosen->second)', 'current->second!=chosen->second'),
-                ('renderer-replay-ownership', '!SettingsValueEqual(live.at(key),record.baseline.at(key)) && !SettingsValueEqual(live.at(key),value)', 'live.at(key)!=record.baseline.at(key) && live.at(key)!=value'),
-                ('renderer-replay-patch', '!SettingsValueEqual(live.at(key),wanted.at(key))', 'live.at(key)!=wanted.at(key)')]
+                ('renderer-replay-ownership', RENDERER_REPLAY + '!SettingsValueEqual(live.at(key),record.baseline.at(key)) && !SettingsValueEqual(live.at(key),value)',
+                 RENDERER_REPLAY + 'live.at(key)!=record.baseline.at(key) && live.at(key)!=value'),
+                ('renderer-replay-patch', RENDERER_REPLAY + RENDERER_OWNERSHIP + '!SettingsValueEqual(live.at(key),wanted.at(key))',
+                 RENDERER_REPLAY + RENDERER_OWNERSHIP + 'live.at(key)!=wanted.at(key)')]
             for module, changes in (('ui_settings_service', service_changes), ('ui_settings_display_service', display_changes)):
                 for label, old, new in changes:
                     script = out / (label + '.py')
