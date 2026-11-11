@@ -219,9 +219,9 @@ int main() {
     auto* previewRuntime=runtime;
     left.runtime=RetainedUI_ViewRuntime(a); right.runtime=RetainedUI_ViewRuntime(b);
     std::vector<openq4::ui::Diagnostic> diagnostics;
-    assert(RetainedUI_LoadView(a,"document-a","a.q4ui",diagnostics));
-    assert(RetainedUI_LoadView(b,"document-b","b.q4ui",diagnostics));
-    assert(RetainedUI_LoadView(previewView,"preview","preview.q4ui",diagnostics));
+    assert(RetainedUI_LoadView(a,"document-a","a.rui",diagnostics));
+    assert(RetainedUI_LoadView(b,"document-b","b.rui",diagnostics));
+    assert(RetainedUI_LoadView(previewView,"preview","preview.rui",diagnostics));
     left.runtime->state=11; right.runtime->state=22; runtime->state=33;
     SetApplicationOpen(true);
     auto* empty=RetainedUI_CreateView(nullptr,nullptr);
@@ -251,7 +251,7 @@ int main() {
         assert(right.runtime->state==22 && runtime->state==33);
         assert(left.runtime==RetainedUI_ViewRuntime(a));
         left.runtime->failSave=left.runtime->failLoad=left.runtime->failRestore=false;
-        assert(RetainedUI_LoadView(a,"document-a","a.q4ui",diagnostics));
+        assert(RetainedUI_LoadView(a,"document-a","a.rui",diagnostics));
         left.runtime->state=11;
     }
     openq4::ui::Viewport viewport;

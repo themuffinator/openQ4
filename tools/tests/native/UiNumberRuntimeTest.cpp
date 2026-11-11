@@ -38,7 +38,7 @@ static Json::Value Box(const char* id,double x,double y,double width,double heig
 }
 static void Colour(Json::Value& node,std::initializer_list<double> colour) { node["properties"]["background-color"]=Typed("color",Array(colour)); }
 static std::string Source(bool transformed=false,bool framed=false,bool hostSource=false) {
-	Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="number-runtime";
+	Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="number-runtime";
 	source["state"]["value"]["type"]="number";source["state"]["value"]["initial"]=1.05;
 	if(hostSource)source["state"]["value"]["cvar"]="r_number_test";
 	source["actions"]["edit"]["input"]="number";source["actions"]["edit"]["operation"]="test.edit";source["actions"]["edit"]["arguments"]["value"]["input"]="value";
@@ -119,7 +119,7 @@ struct View {
 	TestHost host;Runtime runtime{host};Viewport viewport;double time=1;std::string error,source;
 	View(float ratio=1,bool transformed=false,bool framed=false,bool hostSource=false){
 		viewport.width=1280;viewport.height=720;viewport.displayScale=ratio;
-		source=Source(transformed,framed,hostSource);std::vector<Diagnostic> diagnostics;const bool loaded=runtime.LoadDocument(source,"number-runtime.q4ui",diagnostics);
+		source=Source(transformed,framed,hostSource);std::vector<Diagnostic> diagnostics;const bool loaded=runtime.LoadDocument(source,"number-runtime.rui",diagnostics);
 		for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"authored Number runtime fixture loads");
 		runtime.SetReducedMotion(true,time);Frame();
 	}
@@ -248,7 +248,7 @@ static void RangeMessageAndDecimals(){
 		return text->IsVisible(true)&&text->GetNumChildren()==1?static_cast<Rml::ElementText*>(text->GetChild(0))->GetText():std::string("<hidden>");};
 	std::vector<Diagnostic> diagnostics;
 	{
-	View view;view.host.strings["#str_range"]="Enter a number from %s to %s.";Check(view.runtime.LoadDocument(ranged("decimals"),"number-range.q4ui",diagnostics),"a two-place field loads");view.Frame();
+	View view;view.host.strings["#str_range"]="Enter a number from %s to %s.";Check(view.runtime.LoadDocument(ranged("decimals"),"number-range.rui",diagnostics),"a two-place field loads");view.Frame();
 	const auto shown=[&]{auto* text=view.Element("text");return text->GetNumChildren()?static_cast<Rml::ElementText*>(text->GetChild(0))->GetText():std::string();};
 	Check(shown()=="1.05","the field shows its value to its places");
 	Check(view.runtime.SetState({{"value",1.5}},view.error,view.time),"a value with one place");view.Frame();
@@ -268,7 +268,7 @@ static void RangeMessageAndDecimals(){
 	Check(!Document().Load(both,diagnostics),"decimal places and an integer policy exclude each other");
 	}
 	View whole;whole.host.strings["#str_range"]="Enter a number from %s to %s.";
-	Check(whole.runtime.LoadDocument(ranged("integer"),"number-range.q4ui",diagnostics),"a whole-number field loads");whole.Frame();
+	Check(whole.runtime.LoadDocument(ranged("integer"),"number-range.rui",diagnostics),"a whole-number field loads");whole.Frame();
 	whole.Begin();whole.Text("1.5");whole.Frame();
 	Check(message(whole)=="Enter a number from 0 to 32000.","a whole-number field names its range in whole numbers");
 }
@@ -332,7 +332,7 @@ static void SnapshotDraftsAndResourceRecreation(){
 		Check(!view.runtime.RestoreSnapshot(Encode(bad),view.error,view.time)&&!view.error.empty(),"malformed durable Number snapshot rejected");
 		Check(view.Identity()==identity&&view.Widget().number->state.text==before.text&&Same(view.Geometry().caret,geometry.caret)&&view.runtime.TakeActions().empty(),"late snapshot failure preserves live editor, geometry and action state");
 	}
-	view.runtime.Shutdown();std::vector<Diagnostic> diagnostics;Check(view.runtime.LoadDocument(view.source,"number-runtime.q4ui",diagnostics),"resource-style recreation reloads exact source");
+	view.runtime.Shutdown();std::vector<Diagnostic> diagnostics;Check(view.runtime.LoadDocument(view.source,"number-runtime.rui",diagnostics),"resource-style recreation reloads exact source");
 	Check(view.runtime.RestoreSnapshot(saved,view.error,view.time),"restore durable Number draft after complete Runtime resource recreation");view.Frame();
 	Check(view.Widget().number&&!view.Widget().number->active&&view.Widget().number->state.text=="1e-"&&!view.runtime.GetNumberGeometry("number"),"recreated field retains draft without old native ownership");
 	view.Begin();Check(view.Geometry().identity.session!=old.session,"recreated active field uses fresh rendered geometry and session");
@@ -413,7 +413,7 @@ static void DraftFocusAfterModalProgram(){
 		Json::Value open;open["op"]="setState";open["values"]["dialogOpen"]=true;source["events"]["open"].append(open);
 		auto close=open;close["values"]["dialogOpen"]=false;close["values"]["fieldVisible"]=!hideField;source["events"]["close"].append(close);
 		TestHost host;Runtime runtime(host);Viewport viewport;viewport.displayScale=density;std::vector<Diagnostic> diagnostics;std::string error;
-		const bool loaded=runtime.LoadDocument(Encode(source),"number-modal.q4ui",diagnostics);
+		const bool loaded=runtime.LoadDocument(Encode(source),"number-modal.rui",diagnostics);
 		for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"numeric modal fixture loads");
 		runtime.Frame(viewport,1);Check(runtime.FocusControl("number",1)&&runtime.BeginNumberEdit("number",error,1),"edit number before modal");
 		auto edit=runtime.GetWidgetState("number")->number.value();
@@ -441,7 +441,7 @@ static void GrowingValidationRevealsField(){
 		auto scroller=Box("scroller",20,20,400,150);scroller["properties"]["overflow"]=Typed("keyword","auto");scroller["children"].append(number);
 		source["root"]["children"].clear();source["root"]["children"].append(scroller);
 		TestHost host;Runtime runtime(host);Viewport screen;screen.displayScale=density;std::vector<Diagnostic> diagnostics;std::string error;
-		const bool loaded=runtime.LoadDocument(Encode(source),"number-validation-scroll.q4ui",diagnostics);
+		const bool loaded=runtime.LoadDocument(Encode(source),"number-validation-scroll.rui",diagnostics);
 		for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"growing validation fixture loads");
 		runtime.Frame(screen,1);Check(runtime.FocusControl("number",1)&&runtime.BeginNumberEdit("number",error,1),"focus number in scrolling body");runtime.Frame(screen,1.1);
 		auto edit=runtime.GetWidgetState("number")->number.value();
@@ -542,7 +542,7 @@ static void PaddedEditingRectangles(){
             if(part["id"]=="composition")p["height"]=Typed("length",4,"dp");
         }
         v.runtime.CloseDocument();Json::StreamWriterBuilder writer;writer["indentation"]="";std::vector<Diagnostic> diagnostics;
-        Check(v.runtime.LoadDocument(Json::writeString(writer,source),"padded-number.q4ui",diagnostics),"padded Number parts are valid authored source");v.Frame();v.Begin();v.Selection(4,1);v.Frame();
+        Check(v.runtime.LoadDocument(Json::writeString(writer,source),"padded-number.rui",diagnostics),"padded Number parts are valid authored source");v.Frame();v.Begin();v.Selection(4,1);v.Frame();
         const auto geometry=v.Geometry();const auto caret=v.BoxOf("caret"),selection=v.BoxOf("selection");
         Check(Near(caret.width,4*ratio)&&Near(caret.height,geometry.caret.height)&&Near(caret.x,geometry.caret.x)&&Near(caret.y,geometry.caret.y),"padded caret actual border matches exact candidate geometry");
         const int size=v.host.FontSize();const float spacing=.25f*ratio;

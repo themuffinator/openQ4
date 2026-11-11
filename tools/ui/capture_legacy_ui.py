@@ -35,7 +35,7 @@ def main():
         'testGUI guis/msg.gui', 'waitMsec 500',
         'screenshot "screenshots/legacy-message.tga"', 'testGUI',
         'set ui_retained 1', 'waitMsec 500',
-        'testGUI guis/weapons/machinegun_scope.q4ui', 'waitMsec 500',
+        'testGUI guis/weapons/machinegun_scope.rui', 'waitMsec 500',
         'screenshot "screenshots/retained-scope.tga"', 'testGUI',
         'set ui_retained 0', 'waitMsec 300',
         'testGUI guis/weapons/machinegun_scope.gui', 'waitMsec 500',

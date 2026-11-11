@@ -1,6 +1,6 @@
 # Editable vector alpha masks
 
-8 September 2026. Canonical `.q4ui` nodes can mask their completed subtrees with
+8 September 2026. Canonical `.rui` nodes can mask their completed subtrees with
 editable vector paths. This adds shaped content clipping, holes and soft reveals
 to the [retained composition runtime](composition.md). Full GUI translation,
 production artwork and the visual editor remain incomplete under the
@@ -76,7 +76,7 @@ density changes. Failures at each of eight mask/content/snapshot/scratch
 allocations must restore base output and recover without leaking target leases.
 Document, retained runtime and vector native suites pass.
 
-The [mask fixture](../../../tools/ui/fixtures/mask-smoke.q4ui) compares matching
+The [mask fixture](../../../tools/ui/fixtures/mask-smoke.rui) compares matching
 panels containing localized text and a nested chamfered control mask. One panel
 also has a larger outer chamfer, an offset cubic hole and a horizontal alpha
 gradient. The [capture verifier](../../../tools/ui/verify_mask_capture.py)
@@ -130,7 +130,7 @@ Reproduce with a fully built/staged package and a new output directory:
 & tools/build/meson_setup.ps1 compile -C builddir
 & tools/build/meson_setup.ps1 test -C builddir --no-rebuild openq4-retained-ui openq4-ui-document openq4-ui-vector
 & tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
-python tools/ui/capture_legacy_baseline.py --assets 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4' --mode sp --renderer gl --retained-document tools/ui/fixtures/mask-smoke.q4ui --density 1.25 --shared-gui --video-restart --profile-frames 60 --output .tmp/ui/masks/sp-gl-new
+python tools/ui/capture_legacy_baseline.py --assets 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4' --mode sp --renderer gl --retained-document tools/ui/fixtures/mask-smoke.rui --density 1.25 --shared-gui --video-restart --profile-frames 60 --output .tmp/ui/masks/sp-gl-new
 python tools/ui/verify_mask_capture.py .tmp/ui/masks/sp-gl-new/save/baseoq4/screenshots/ui-baseline.tga --density 1.25
 ```
 

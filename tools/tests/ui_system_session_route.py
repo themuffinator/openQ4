@@ -127,7 +127,7 @@ struct Manager {
     std::function<void(idUserInterface*)> onLoad,onFree;
     idUserInterface* Make(const char* path){storage.push_back(std::make_unique<idUserInterface>(path));return storage.back().get();}
     idUserInterface* FindGui(const char* path,bool load,bool unique,bool forceShared) {
-        CHECK(std::string(path)=="guis/menu/settings/system.q4ui" && load && unique && !forceShared);++loads;
+        CHECK(std::string(path)=="guis/menu/settings/system.rui" && load && unique && !forceShared);++loads;
         events.push_back("load");if(missing)return nullptr;
         auto* gui=Make(path);gui->valid=valid;if(onLoad)onLoad(gui);return gui;
     }
@@ -141,7 +141,7 @@ static bool RetainedUI_IsOpen(){return preview;}
 static void RetainedUI_Close(){preview=false;}
 static void RetainedUI_FrameInput(){CHECK(false);}
 static bool UI_RetainedSettingsDocument(idUserInterface* gui){CHECK(gui && !gui->active);return gui->valid;}
-static bool UI_IsRetainedPath(const char* qpath){const std::string p=qpath?qpath:"";return p.size()>=5&&p.compare(p.size()-5,5,".q4ui")==0;}
+static bool UI_IsRetainedPath(const char* qpath){const std::string p=qpath?qpath:"";return p.size()>=4&&p.compare(p.size()-4,4,".rui")==0;}
 static bool UI_RetainedSettingsCanReturn(idUserInterface* gui){CHECK(gui && !gui->retired);return gui->canReturn;}
 static int menuProfileSaveVarsMsec=0,menuProfileMainVarsMsec=0;
 static int Sys_Milliseconds(){return 10;}
@@ -282,7 +282,7 @@ int main(){
         // level up as the other settings pages' does. The change begins and the
         // page stays until the hand-over, whose SetGUI of the SETTINGS page
         // closes it.
-        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.q4ui");s.parent->active=false;hub->active=true;
+        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.rui");s.parent->active=false;hub->active=true;
         s.session.guiActive=s.session.guiRetainedSettingsPage=hub;s.session.guiHandle=nullptr;
         CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;
         CHECK(child && child->active && !hub->active && s.session.guiSystemParent==hub && s.manager.loads==1 && s.session.subpages.empty());
@@ -299,7 +299,7 @@ int main(){
     {
         // Where the SETTINGS page presents at once (the stock screen, or reduced
         // motion), Back's change closes the page there and then.
-        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.q4ui");s.parent->active=false;hub->active=true;
+        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.rui");s.parent->active=false;hub->active=true;
         s.session.guiActive=s.session.guiRetainedSettingsPage=hub;s.session.guiHandle=nullptr;s.session.presentsAtOnce=true;
         CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;
         CHECK(s.session.ReturnSystemSettings() && s.session.subpages.size()==1 && !s.session.retainedSubpageFrom);
@@ -308,7 +308,7 @@ int main(){
     {
         // A draft not applied asks first, from the SETTINGS page as from the
         // stock screen; once settled, the authored dismiss begins the change.
-        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.q4ui");s.parent->active=false;hub->active=true;
+        Scenario s;auto* hub=s.manager.Make("guis/menu/settings.rui");s.parent->active=false;hub->active=true;
         s.session.guiActive=s.session.guiRetainedSettingsPage=hub;s.session.guiHandle=nullptr;
         CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;child->canReturn=false;
         child->onBack=[&]{child->close=true;};
@@ -320,7 +320,7 @@ int main(){
     {
         // Opened over the stock settings screen, Back returns there at once,
         // the SETTINGS page loaded or not.
-        Scenario s;s.session.guiRetainedSettingsPage=s.manager.Make("guis/menu/settings.q4ui");
+        Scenario s;s.session.guiRetainedSettingsPage=s.manager.Make("guis/menu/settings.rui");
         CHECK(s.session.OpenSystemSettings());auto* child=s.session.guiSystem;
         CHECK(s.session.ReturnSystemSettings() && child->retired && s.parent->active && s.session.subpages.empty() && !s.session.retainedSubpageFrom);
     }
@@ -348,7 +348,7 @@ int main(){
         CHECK(!s.session.ReturnSystemSettings() && !child->retired);
         {   // A retained front-end screen without a level plays the menu's sounds;
             // a retained screen over a level, such as the death screen, the game's.
-            idUserInterface* active=s.session.guiActive;idUserInterface front("guis/menu/singleplayer.q4ui");
+            idUserInterface* active=s.session.guiActive;idUserInterface front("guis/menu/singleplayer.rui");
             s.session.guiActive=&front;s.session.mapSpawned=false;s.session.SetPlayingSoundWorld();
             CHECK(s.session.requestedSoundWorld==&s.menuSound);
             s.session.mapSpawned=true;s.session.SetPlayingSoundWorld();CHECK(s.session.requestedSoundWorld==&s.gameSound);

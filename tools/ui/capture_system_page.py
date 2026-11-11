@@ -22,7 +22,7 @@ import time
 from zipfile import BadZipFile, ZipFile
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGE = 'guis/menu/settings/system.q4ui'
+PAGE = 'guis/menu/settings/system.rui'
 # Match the retained document loader's source bound, including CRLF checkouts.
 MAX_SOURCE_BYTES = 16 * 1024 * 1024
 PARENT = 'guis/mainmenu.gui'

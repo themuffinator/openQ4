@@ -76,7 +76,7 @@ struct Manager {
     idUserInterface* FindGui(const char* path,bool autoLoad,bool needUnique,bool forceUnique) {
         requests.push_back({path,autoLoad,needUnique,forceUnique});
         events.push_back(std::string("load:")+path);
-        if(!std::strcmp(path,"missing.q4ui")) return nullptr;
+        if(!std::strcmp(path,"missing.rui")) return nullptr;
         // Model the manager's shared cache when uniqueness was not requested.
         if(!needUnique)for(auto& gui:storage)
             if(!gui->retired && !std::strcmp(gui->Name(),path))return gui.get();
@@ -161,11 +161,11 @@ MAIN = r'''
 int main() {
     {
         Scenario s;
-        auto* active=s.Active("same.q4ui");
+        auto* active=s.Active("same.rui");
         s.session.TestGUI(active->Name());
         auto* test=s.session.guiTest;
         assert(test && test!=active && test->active && test->activated==1);
-        assert(std::string(test->Name())=="same.q4ui");
+        assert(std::string(test->Name())=="same.rui");
         assert(s.session.guiActive==active && active->active && active->activated==1);
         assert(active->deactivated==0 && active->frees==0);
         s.session.TestGUI(nullptr);
@@ -177,21 +177,21 @@ int main() {
     }
     {
         Scenario s;
-        s.session.TestGUI("first.q4ui"); auto* first=s.session.guiTest;
+        s.session.TestGUI("first.rui"); auto* first=s.session.guiTest;
         events.clear();
         first->onDeactivate=[&] { assert(!s.session.guiTest); };
         s.manager.onFree=[&] { assert(!s.session.guiTest); };
-        s.session.TestGUI("second.q4ui"); auto* second=s.session.guiTest;
+        s.session.TestGUI("second.rui"); auto* second=s.session.guiTest;
         assert(second && second!=first && second->active && !second->retired);
         assert(first->retired && first->frees==1 && first->deactivated==1);
-        assert((events==std::vector<std::string>{"load:second.q4ui","deactivate:1","free:1","activate:2"}));
+        assert((events==std::vector<std::string>{"load:second.rui","deactivate:1","free:1","activate:2"}));
         s.session.TestGUI("");
         assert(!s.session.guiTest && second->frees==1 && second->deactivated==1);
     }
     {
         Scenario s;
         // A caller may pass Name() from the very instance being replaced.
-        const std::string longName="guis/"+std::string(240,'a')+".q4ui";
+        const std::string longName="guis/"+std::string(240,'a')+".rui";
         s.session.TestGUI(longName.c_str()); auto* first=s.session.guiTest;
         const char* borrowed=first->Name(); events.clear();
         s.session.TestGUI(borrowed); auto* replacement=s.session.guiTest;
@@ -203,18 +203,18 @@ int main() {
     }
     {
         Scenario s;
-        auto* active=s.Active("active.q4ui");
-        s.session.TestGUI("working.q4ui"); auto* working=s.session.guiTest;
+        auto* active=s.Active("active.rui");
+        s.session.TestGUI("working.rui"); auto* working=s.session.guiTest;
         const auto storage=s.manager.storage.size(); events.clear();
-        s.session.TestGUI("missing.q4ui");
+        s.session.TestGUI("missing.rui");
         assert(s.session.guiTest==working && working->active && !working->retired);
         assert(working->activated==1 && working->deactivated==0 && working->frees==0);
         assert(active->active && active->deactivated==0 && active->frees==0);
-        assert(s.manager.storage.size()==storage && events==std::vector<std::string>{"load:missing.q4ui"});
+        assert(s.manager.storage.size()==storage && events==std::vector<std::string>{"load:missing.rui"});
         s.session.TestGUI(nullptr); events.clear();
-        s.session.TestGUI("missing.q4ui");
+        s.session.TestGUI("missing.rui");
         assert(!s.session.guiTest && s.session.guiActive==active && active->active);
-        assert(events==std::vector<std::string>{"load:missing.q4ui"});
+        assert(events==std::vector<std::string>{"load:missing.rui"});
     }
     {
         Scenario s;
@@ -226,7 +226,7 @@ int main() {
         assert(!s.session.guiTest && active->active && active->deactivated==0 && active->frees==0);
         assert(events.empty());
         s.session.guiTest=active;
-        s.session.TestGUI("missing.q4ui");
+        s.session.TestGUI("missing.rui");
         assert(s.session.guiTest==active && active->active && active->deactivated==0);
         events.clear();
         s.session.TestGUI(active->Name()); auto* test=s.session.guiTest;
@@ -238,7 +238,7 @@ int main() {
     }
     {
         Scenario s;
-        s.session.TestGUI("frame-close.q4ui"); auto* test=s.session.guiTest;
+        s.session.TestGUI("frame-close.rui"); auto* test=s.session.guiTest;
         test->command="close";
         s.session.onDispatch=[&](idUserInterface* gui,const char* command) {
             assert(gui==test && std::string(command)=="close");
@@ -253,7 +253,7 @@ int main() {
     {
         Scenario s;
         auto* active=s.Active("normal-menu.gui");
-        s.session.TestGUI("frame-over-menu.q4ui"); auto* test=s.session.guiTest;
+        s.session.TestGUI("frame-over-menu.rui"); auto* test=s.session.guiTest;
         test->command="close";
         s.session.onDispatch=[&](idUserInterface* gui,const char*) {
             assert(gui==test); s.session.TestGUI(nullptr);
@@ -264,11 +264,11 @@ int main() {
     }
     {
         Scenario s;
-        s.session.TestGUI("frame-first.q4ui"); auto* first=s.session.guiTest;
+        s.session.TestGUI("frame-first.rui"); auto* first=s.session.guiTest;
         first->command="replace";
         s.session.onDispatch=[&](idUserInterface* gui,const char* command) {
             assert(gui==first && std::string(command)=="replace");
-            s.session.TestGUI("frame-replacement.q4ui");
+            s.session.TestGUI("frame-replacement.rui");
         };
         s.session.GuiFrameEvents();
         auto* replacement=s.session.guiTest;

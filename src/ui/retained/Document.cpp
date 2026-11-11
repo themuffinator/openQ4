@@ -271,7 +271,8 @@ public:
 	State Read(const Json::Value& root, bool treeCheck) {
 		if (treeCheck) FiniteTree(root);
 		Fields(root,"",{"format","version","id","canvas","tokens","symbols","root","timelines","state","bindings","actions","presentationVariables","aliases","events","detail","editor","extensions"});
-		Require(root["format"] == "openq4-ui",root,"/format","Expected format 'openq4-ui'");
+		// "openq4-ui" is the name the format had before the id Tech 4 ports shared it.
+		Require(root["format"] == "retained-ui" || root["format"] == "openq4-ui",root,"/format","Expected format 'retained-ui'");
 		Require(root["version"].isUInt() && root["version"].asUInt() == 1,root["version"],"/version","Unsupported document version; expected 1");
 		model.id = Id(root["id"],"/id");
 		if (root.isMember("extensions")) {

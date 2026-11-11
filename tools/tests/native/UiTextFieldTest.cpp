@@ -36,7 +36,7 @@ static void Colour(Json::Value& node,std::initializer_list<double> colour) { nod
 // A host-bound name reads back from the host instead. `masked` and
 // `allowEmpty` make it a password field's.
 static Json::Value Source(bool hostBound=false,bool masked=false,bool allowEmpty=false) {
-	Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="text-field";
+	Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="text-field";
 	source["state"]["name"]["type"]="string";source["state"]["name"]["initial"]="";
 	if(hostBound)source["state"]["name"]["cvar"]="ui_text_test";
 	source["actions"]["rename"]["input"]="string";source["actions"]["rename"]["operation"]="test.rename";source["actions"]["rename"]["arguments"]["value"]["input"]="value";
@@ -92,7 +92,7 @@ struct View {
 	TestHost host;Runtime runtime{host};Viewport viewport;double time=1;std::string error,source;
 	explicit View(bool hostBound=false,bool masked=false,bool allowEmpty=false){
 		viewport.width=1280;viewport.height=720;viewport.displayScale=1;source=Encode(Source(hostBound,masked,allowEmpty));
-		std::vector<Diagnostic> diagnostics;const bool loaded=runtime.LoadDocument(source,"text-field.q4ui",diagnostics);
+		std::vector<Diagnostic> diagnostics;const bool loaded=runtime.LoadDocument(source,"text-field.rui",diagnostics);
 		for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"authored text field fixture loads");
 		if(!hostBound)Check(runtime.SetState({{"name",std::string("Quicksave")}},error,time),"the name arrives as state");
 		runtime.SetReducedMotion(true,time);Frame();
@@ -124,7 +124,7 @@ static void DocumentRules(){
 	// Each fixture fails for the named reason, not an incidental one.
 	const auto rejects=[](const Json::Value& document,const char* reason,const char* message){
 		TestHost host;host.quiet=true;Runtime runtime{host};std::vector<Diagnostic> diagnostics;
-		const bool loaded=runtime.LoadDocument(Encode(document),"text-field-bad.q4ui",diagnostics);bool named=false;
+		const bool loaded=runtime.LoadDocument(Encode(document),"text-field-bad.rui",diagnostics);bool named=false;
 		for(const auto& d:diagnostics)named=named||d.message.find(reason)!=std::string::npos;
 		if(!named)for(const auto& d:diagnostics)std::fprintf(stderr,"  %s: %s\n",d.pointer.c_str(),d.message.c_str());
 		Check(!loaded&&named,message);

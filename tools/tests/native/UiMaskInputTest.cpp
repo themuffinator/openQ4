@@ -31,7 +31,7 @@ static Json::Value Button(Json::Value& source, const char* id, double x, double 
 	Colour(node,{.2,.3,.4,1});return node;
 }
 static Json::Value MaskSource() {
-	Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="mask-input";
+	Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="mask-input";
 	auto root=Box("root",0,0,640,400);
 	root["children"].append(Button(source,"behind",20,20,160,120));
 	auto masked=Box("mask",20,20,160,120);masked["mask"]=Mask(160,120,true);

@@ -1068,7 +1068,7 @@ def check_retained_tab_strips_take_the_pointer() -> None:
     the tree as a ring, so the strip also follows Back: a tab's last row leads
     on to Back, and Back to the strip, the order the page reads in."""
     for page, name in (("game", "game"), ("controls", "controls"), ("system", "settings")):
-        text = read(ROOT / f"content/baseoq4/pak0/guis/menu/settings/{page}.q4ui")
+        text = read(ROOT / f"content/baseoq4/pak0/guis/menu/settings/{page}.rui")
         document = json.loads("\n".join(line for line in text.split("\n") if not line.startswith("//")))
         found = {}
 
@@ -1085,13 +1085,13 @@ def check_retained_tab_strips_take_the_pointer() -> None:
         back = found.get(f"{name}_back")
         pages = [path for ident, path in found.items() if ident.startswith(f"{name}-page-")]
         if strip is None or back is None or not pages:
-            raise AssertionError(f"{page}.q4ui: no tab strip, Back or tab pages found")
+            raise AssertionError(f"{page}.rui: no tab strip, Back or tab pages found")
         # later in tree order, and not inside a page: drawn above every page
         for path in pages:
             if strip[:len(path)] == path or strip < path:
-                raise AssertionError(f"{page}.q4ui: the tab strip must follow every tab page in the tree")
+                raise AssertionError(f"{page}.rui: the tab strip must follow every tab page in the tree")
         if strip < back:
-            raise AssertionError(f"{page}.q4ui: the tab strip must follow Back, or Next leaves a tab's last row for the strip")
+            raise AssertionError(f"{page}.rui: the tab strip must follow Back, or Next leaves a tab's last row for the strip")
 
 
 def main() -> None:

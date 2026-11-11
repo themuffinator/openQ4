@@ -14,7 +14,7 @@ static void CheckSummary(ScreenHost& host, const char* path) {
 	Check(root.children.size() == 3 && root.children[0].id == "scene-softfocus" && root.children[1].id == "scrim" &&
 		root.children[2].id == "chrome","the softened view, its scrim stand-in, then the card");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_summary.q4ui",diagnostics),"the summary card loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_summary.rui",diagnostics),"the summary card loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error;
 	Runtime::EventEffects effects;

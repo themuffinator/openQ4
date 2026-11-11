@@ -26,7 +26,7 @@ extern idCVar r_skipGuiShaders;
 #include <unordered_map>
 
 namespace {
-constexpr const char* Artwork="guis/hud/artwork.q4ui";
+constexpr const char* Artwork="guis/hud/artwork.rui";
 constexpr const char* Registry="guis/hud/coverage.json";
 bool Read(const char* path,std::string& result) {
 	void* data=nullptr; const int size=fileSystem->ReadFile(path,&data);
@@ -207,32 +207,32 @@ struct RemasteredRoute { const char* source; const char* document; };
 // Awakening's on-foot HUDs carry the stock groups plus their own expansion
 // panels, which their documents cover behind the Marine/Strogg family.
 constexpr RemasteredRoute RemasteredRoutes[]={
-	{"guis/hud.gui","guis/hud/remastered_marine.q4ui"},
-	{"guis/q4xhud.gui","guis/hud/remastered_marine_awakening.q4ui"},
-	{"guis/hud_strogg.gui","guis/hud/remastered_strogg.q4ui"},
-	{"guis/q4xhud_strogg.gui","guis/hud/remastered_strogg_awakening.q4ui"},
-	{"guis/mphud.gui","guis/hud/remastered_mp.q4ui"},
+	{"guis/hud.gui","guis/hud/remastered_marine.rui"},
+	{"guis/q4xhud.gui","guis/hud/remastered_marine_awakening.rui"},
+	{"guis/hud_strogg.gui","guis/hud/remastered_strogg.rui"},
+	{"guis/q4xhud_strogg.gui","guis/hud/remastered_strogg_awakening.rui"},
+	{"guis/mphud.gui","guis/hud/remastered_mp.rui"},
 	// The walker's and the hover tank's shared vehicle HUD (14.12).
-	{"guis/vehicles/hud.gui","guis/hud/remastered_vehicle.q4ui"},
+	{"guis/vehicles/hud.gui","guis/hud/remastered_vehicle.rui"},
 	// The air-defence cannon's optic, transmission display and HUD prompt (14.12).
-	{"guis/vehicles/airdef_cannon.gui","guis/hud/remastered_airdef.q4ui"},
+	{"guis/vehicles/airdef_cannon.gui","guis/hud/remastered_airdef.rui"},
 	// The Awakening's space cannon with its ship-status panel (14.12).
-	{"guis/vehicles/airassault/turretplayerhud.gui","guis/hud/remastered_turret.q4ui"},
+	{"guis/vehicles/airassault/turretplayerhud.gui","guis/hud/remastered_turret.rui"},
 	// The Awakening's MCC cannon with the MCC's hull readout (14.12).
-	{"guis/vehicles/mcc/cannonplayerhud.gui","guis/hud/remastered_mcc.q4ui"},
+	{"guis/vehicles/mcc/cannonplayerhud.gui","guis/hud/remastered_mcc.rui"},
 	// openQ4's HUD for the Awakening's chaingun turret: the gunner's gauges and the barrel heat (14.12).
-	{"guis/vehicles/turret_hud.gui","guis/hud/remastered_chaingun_turret.q4ui"},
+	{"guis/vehicles/turret_hud.gui","guis/hud/remastered_chaingun_turret.rui"},
 	// The Awakening's speeder bike with the m07 race display (14.12).
-	{"guis/vehicles/speederplayerhud.gui","guis/hud/remastered_speeder.q4ui"},
+	{"guis/vehicles/speederplayerhud.gui","guis/hud/remastered_speeder.rui"},
 	// The Awakening's GEV, drawn from scratch since its art never shipped (14.12).
-	{"guis/vehicles/gev_hud.gui","guis/hud/remastered_gev.q4ui"},
+	{"guis/vehicles/gev_hud.gui","guis/hud/remastered_gev.rui"},
 	// Medical Labs' implant activation at the end of stroggification (14.19).
-	{"guis/vehicles/medchange.gui","guis/hud/remastered_medchange.q4ui"},
+	{"guis/vehicles/medchange.gui","guis/hud/remastered_medchange.rui"},
 	// The objectives display and its notices (14.11).
-	{"guis/wristcomm.gui","guis/hud/remastered_objectives.q4ui"},
-	{"guis/wristcomm_strogg.gui","guis/hud/remastered_objectives_strogg.q4ui"},
+	{"guis/wristcomm.gui","guis/hud/remastered_objectives.rui"},
+	{"guis/wristcomm_strogg.gui","guis/hud/remastered_objectives_strogg.rui"},
 	// The scoreboard (14.14), Tourney's bracket tree included.
-	{"guis/scoreboard.gui","guis/hud/remastered_scoreboard.q4ui"},
+	{"guis/scoreboard.gui","guis/hud/remastered_scoreboard.rui"},
 };
 constexpr int AudioColumns=40;   // the playback graph's 650 ms history (section 14.8)
 // ui_hudProfile N: where a Remastered HUD's frame goes, averaged over N frames
@@ -456,7 +456,7 @@ int chatPresentedTime=-100000;
 }
 idRemasteredHud::idRemasteredHud(const char* document) : impl(std::make_unique<Impl>()) {
 	impl->document=document;
-	impl->chat=!idStr::Icmp(document,"guis/hud/remastered_mp.q4ui");
+	impl->chat=!idStr::Icmp(document,"guis/hud/remastered_mp.rui");
 }
 idRemasteredHud::~idRemasteredHud() = default;
 bool idRemasteredHud::Failed() const { return impl->failed; }
@@ -486,8 +486,8 @@ void idRemasteredHud::Rejoin() {
 const char* idRemasteredHud::AirDocumentFor(const char* source) {
 	if (!source) return nullptr;
 	const auto key=Key(source);
-	if (key=="guis/hud.gui" || key=="guis/q4xhud.gui") return "guis/hud/air_marine.q4ui";
-	if (key=="guis/hud_strogg.gui" || key=="guis/q4xhud_strogg.gui") return "guis/hud/air_strogg.q4ui";
+	if (key=="guis/hud.gui" || key=="guis/q4xhud.gui") return "guis/hud/air_marine.rui";
+	if (key=="guis/hud_strogg.gui" || key=="guis/q4xhud_strogg.gui") return "guis/hud/air_strogg.rui";
 	return nullptr;
 }
 void idRemasteredHud::Preload(const char* source) {

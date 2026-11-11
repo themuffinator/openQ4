@@ -223,7 +223,7 @@ static void SystemCandidate(const std::string& source) {
     // A 9:16 view takes the tall single column, its list rows a fractional 25.3105 px.
     for(const auto& [width,height]:{std::pair{1280,720},std::pair{1920,1080},std::pair{800,600},std::pair{540,960}}) {
         SystemHost host;Runtime runtime(host);std::vector<Diagnostic> diagnostics;std::string error;double time=1;
-        Check(runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics),"SYSTEM candidate loads");
+        Check(runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics),"SYSTEM candidate loads");
         Viewport viewport;viewport.width=width;viewport.height=height;viewport.canvasHeight=720;viewport.canvasMinWidth=960;
         const auto frame=[&]{time+=.01;++host.frame;runtime.Frame(viewport,time);Check(host.errors==0,"SYSTEM authored choice layout has no runtime errors");};
         const auto key=[&](MenuInput input){runtime.MenuAction(input,true,time);runtime.MenuAction(input,false,time);};
@@ -299,7 +299,7 @@ static void SemanticPopupRuntime(TestHost& host) {
         Check(!view.runtime.ScrollChoicePopup("choice",successor,ScrollStep::End,view.time)&&!view.runtime.CloseChoicePopup("choice",successor,view.time),"zero viewport refuses semantic operations");
         view.viewport.width=1280;view.Frame();
         std::vector<Diagnostic> diagnostics;
-        Check(view.runtime.LoadDocument(Text(ScrollChoice()),"replacement.q4ui",diagnostics),"replace canonical source");view.Frame();
+        Check(view.runtime.LoadDocument(Text(ScrollChoice()),"replacement.rui",diagnostics),"replace canonical source");view.Frame();
         Check(view.runtime.FocusControl("choice",view.time)&&view.runtime.OpenChoicePopup("choice",view.time),"replacement gets its own popup");view.Frame();
         Check(!view.runtime.CloseChoicePopup("choice",successor,view.time),"source replacement invalidates original opening");
         Check(view.runtime.SetControlEnabled("choice",false,view.time),"disable unbound choice");view.Frame();

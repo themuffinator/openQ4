@@ -526,9 +526,9 @@ def main():
     for strogg in (False,True):
         for awakening in (False,True):
             name=('strogg' if strogg else 'marine')+('_awakening' if awakening else '')
-            path=ROOT/'content/baseoq4/pak0/guis/hud'/('weapon_wheel_'+name+'.q4ui')
+            path=ROOT/'content/baseoq4/pak0/guis/hud'/('weapon_wheel_'+name+'.rui')
             write(path,document(strogg,awakening),args.check)
-    write(ROOT/'content/baseoq4/pak0/guis/hud/quick_chat.q4ui',chat_document(),args.check)
+    write(ROOT/'content/baseoq4/pak0/guis/hud/quick_chat.rui',chat_document(),args.check)
     print('Native weapon wheel documents are current')
 
 

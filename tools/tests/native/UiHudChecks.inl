@@ -82,7 +82,7 @@ static void CheckHud(const char* path) {
 	Check(diagnostics.empty(),"HUD artwork validates as an editable canonical document");
 	ScreenHost host; Runtime runtime(host);
 	// RmlUi sees a VFS resource name, never a host drive path/protocol.
-	const char* resource="guis/hud/artwork.q4ui";
+	const char* resource="guis/hud/artwork.rui";
 	Check(runtime.LoadDocument(source,resource,diagnostics),"HUD catalog loads through retained runtime");
 	Viewport viewport; viewport.width=1280;viewport.height=720;
 	std::string error;

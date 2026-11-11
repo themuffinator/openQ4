@@ -120,43 +120,43 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "Semantic button/device ownership fixtures; no full widget, text, touch or platform acceptance.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182"
     },
     "interaction-foundation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/interaction.md",
       "scope": "Button focus/modal/navigation fixtures; authored path/mask-aware interaction and full control set unfinished.",
-      "sha256": "3847d1e918d456fa1be709edbadf7deb3aaef46a26ab7be822082c076ef8c4de"
+      "sha256": "02a5c2b71c7d4744c0c72a811ec9261385e87848b02d89ab3ee0bfb7df261c7b"
     },
     "vector-foundation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/vector-paths.md",
       "scope": "Native paths, fills, stroke unions and linear paints; all required primitive variants, production artwork and editor unfinished.",
-      "sha256": "9345e60e1286351f1abd72f9c430672f0696a766f38bb227719f546f5ad6326e"
+      "sha256": "608b78816ec75d669aed15213678182b39307c569fc1ebe8adfb266cae24b723"
     },
     "coverage-foundation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/coverage-antialiasing.md",
       "scope": "Independent analytic coverage checks and limited backend captures; broad matrix and optimized fractional motion unfinished.",
-      "sha256": "480b52b3e4475ae48da45cca77d80572aaf71b8cf1702e44a69336f037667621"
+      "sha256": "dda88d57d66ba260388d334ceb30a8e6d8def2f1473393e6dcd7267344d648bf"
     },
     "composition-foundation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/composition.md",
       "scope": "Isolated opacity with GL/Vulkan fixture evidence; complete surfaces, clipping, GPU lifetime and resource qualification unfinished.",
-      "sha256": "6c4b7eec442ec27ec772875e10bd96d4cdd4a77f89da7f4005327f2a66a32ac3"
+      "sha256": "9adedebb2e9cbd4928cea54043b0627a1dfff13f9e66d2cda9cb5fc3174bd880"
     },
     "mask-foundation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/masks.md",
       "scope": "Canonical editable alpha masks with holes and nesting; transformed overflow/input agreement and full platform/corpus evidence unfinished.",
-      "sha256": "0b7781ee04773103507bc6f3ff2ec01376f2ac00d653495236f5c06e68bb5dd5"
+      "sha256": "a7043a24615e105d6813f13b13592ea4676b68f2c17dc4c21d8311e3863ad9b5"
     },
     "instance-foundation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/instances.md",
       "scope": "Independent core contexts and same-host-frame target guard; engine multi-view/world surfaces and durable snapshots unfinished.",
-      "sha256": "fc6707c5a78a4676b5f0f25048b51781f9c9a7431231c44c4cbd2cdc7bcd6452"
+      "sha256": "035119efb8c027f15fa58178b4a1229f02fa74faa9e0b3c95bbaacc21fbafe3c"
     },
     "bridge-foundation": {
       "kind": "implementation_checkpoint",
@@ -180,13 +180,13 @@
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/instance-persistence.md",
       "scope": "Historical checkpoint b87b703b: M1 foundation: private manager-neutral ownership, canonical subset snapshots, preview renderer/language restoration and backend-aware full restart. Native and production-method tests pass; reviewed hidden windowed SP/OpenGL 125% and MP/Vulkan 200% gameplay captures preserve checkpoint, modal/focus/availability and input ownership through same-language reload and full video restart. Normal retained adapter, complete widget/script snapshots, engine multi-view/world rendering and game-save framing remain unfinished. No production GUI or final gate accepted.",
-      "sha256": "024b78f4b84c3c8b4d74f33d358abadecfc078763764eac02a2707973bfcdf0d",
+      "sha256": "7cb354926b2a9bbf94eb9d9cb01d09a0153d49aa981afd35dccc1388702af968",
       "local_capture_summary": ".tmp/ui/persistence-review/summary.json"
     },
     "managed-application-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/managed-application.md",
-      "sha256": "43a14a53a2cf4e238a00f365da63c9d646f0b9cbb02395626e093163bfe2fc77",
+      "sha256": "9cb441ab7d00642f4995522cc599a1977aef72d25effa2ec1f3c3a5392cd48c0",
       "baseline_engine_revision": "b87b703b799cbf120d74b4aed122883a42b0ad68",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/managed-review/summary.json",
@@ -195,7 +195,7 @@
     "presentation-alias-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/presentation-aliases.md",
-      "sha256": "c3f33b7d15d4d1b1c67e86d4eea91322df4e3a2c478a747d62759e04d356208c",
+      "sha256": "4e5b2ec9c71e4f409030b2807a861305d1d1bf3d563d9364b547ce1e4a9f6730",
       "scope": "M1 subset: explicit root/qualified aliases, shared typed metadata independent of State(), canonical property/rect/visible/noevents conversion, atomic explicit/transient expression ownership, snapshot version 2 with exact-source version 1 reads, and immediate ancestor input eligibility. Six native suites and the production adapter harness qualify this implementation subset. Five source/binary-bound hidden windowed Windows SP/OpenGL and MP/Vulkan alias captures plus a sixth typed-settings regression passed their semantic oracles; four alias captures include independent peer lifetime and same-language/video reconstruction. Reviewed SDR render-target images and brightness/gamma comparisons remain limited to the recorded host/backend cases. Full semantic lowering, components/events, material/vector paint mappings, production GUI acceptance, game-save/demo compatibility and the native editor remain open. No requirement or migration entry is accepted by this checkpoint.",
       "baseline_engine_revision": "e075e4a2e64e0ff790a1f435ae0854aa51650308",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
@@ -204,7 +204,7 @@
     "event-program-foundation": {
       "kind": "qualified_foundation_checkpoint",
       "path": "docs/dev/ui/event-programs.md",
-      "sha256": "2a4c3c45b29368c72b11219864645198e0a3d7891f946c31a37c784a866a8395",
+      "sha256": "6ba02ccf305ead77c2cf7061315eae3291fc63064ad4aac76ffdc0fd5611d6a6",
       "baseline_engine_revision": "25813aaf96f0a9dfe36e1be0fd29bbce8cea93df",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "local_capture_summary": ".tmp/ui/events-review/capture-evidence.json",
@@ -264,7 +264,7 @@
       "scope": "Qualified M2 implementation subset: the default-off normal SYSTEM page presents 16 typed value controls, retaining 53 draft/baseline fields and editable vector parts. Dirty Back offers localized Keep editing, ordered Cancel/discard-and-exit and typed Apply-and-exit. The private one-use receipt binds owner/request and permits return only after immediate success or successful Keep and completed persistence; failures, Revert, timeout and recovery cancel exit intent. Authored modal scopes establish safe focus before first draw, restore eligible prior focus, quarantine held sources and reject stale queued Back/click/value descriptors across scope replacement. Snapshot version 4 preserves authored scope history and pending focus while fresh host readbacks win. Repeated wheel routing avoids unchanged pointer replay. The final Windows build, 15 native UI suites, 79 settings-service scenarios, 173 Session checks, adapter checks, 29 capture-tool tests, 5,747 page checks and 12 localized-label CPU layout cases passed. Four source-bound hidden windowed SP/OpenGL at 125% and MP/Vulkan at 200% normal Session captures after active gameplay cover 92 stages and 34 reviewed engine images, including VSync, Revert/Keep, parent return and persisted reopening. Source/build inputs, binaries, packages, tools, logs, images and bounded warning accounting are hash-bound. Full effects and renderer parity, UI-only native-resolution composition, precise numeric entry/IME, all 31 settings, display catalogs, Defaults/presets/Auto-Detect, complete modal/scrollbar behavior, source-derived artwork/transitions, native editor round trips and the complete platform/language/display/physical-input matrix remain required. No requirement, milestone, production screen or migration is accepted.",
       "local_capture_summary": ".tmp/ui/system-exit-review/capture-evidence.json",
       "local_capture_summary_sha256": "ddde52034403036ca1821dbb75aed11961404b311032149d1d2ff1c35f213b74",
-      "sha256": "6c0405bc293f0c4329c151fd2a4a500986af16f826e894baf02f154a3198ff36"
+      "sha256": "d19c15f27b619e9cb51423876794c8b59a12079645565bd5b83d86b8a5fa06ec"
     },
     "native-output-foundation": {
       "kind": "implementation_checkpoint",
@@ -292,7 +292,7 @@
     "numeric-fields": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/numeric-fields.md",
-      "sha256": "84687f3a6d1b0c05f05b11c79daa6520f76c2b3f329a9b1e6e57cbf978b31a5e",
+      "sha256": "111369937278c0aae2de0c4e1c45bac5131d340b493846c7b7ffc4e719d44a6f",
       "baseline_engine_revision": "17b106daa1827d6e50c786f99ea5970b1e8b91cf",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Canonical Number role with exact decimal proposals, local invalid/conflicting drafts, explicit conflict decisions, bounded undo/redo and inactive snapshot restoration. Font drawing and numeric geometry share bounded immutable unshaped scalar runs; authored selection/caret/preedit ink uses actual Rml line placement and scroll. Current host readbacks guard edits, numeric dispatch and success acknowledgement. Final Windows build and21 retained-UI suites pass. Hidden windowed SP/OpenGL125% and MP/Vulkan200% managed diagnostic fixtures after gameplay qualify the recorded semantic/rendered subset; ordinary SYSTEM regression preserves tested native UI pixels. Event-journal decoding/ownership checks retain historical native layout. No native field keyboard/clipboard/IME route, full shaping/grapheme/bidi, production precise-entry integration, editor, screen/migration or product acceptance.",
@@ -325,7 +325,7 @@
       "baseline_engine_revision": "a20fd8dde759b0f056b3f0ba438af803a272350b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Paired precise SYSTEM brightness fields, localized validation and checked clipboard commands; complete local draft barriers guard Apply, Defaults, colliding edits and exit. Completed cancellation precedes local Discard; Keep Editing refreshes real projected layout before resuming the field. Windows build and 32 UI suites pass, including real-Rml modal focus and growing-validation scroll regressions. SP/OpenGL at 125% and MP/Vulkan at 200% each reach gameplay, then pass 37 semantic operations with 17 reviewed engine images; notices, safe draft continuation, Apply, Discard and reopen are covered within this subset. Generated slider tick noise and very small ambient CVar readback remain open precision defects. SDL checked consumption and owned event collections plus portable multi-offer composition reconciliation are implemented; native activation remains disabled. No native character/IME, full international text, complete page/editor, platform, migration or product acceptance.",
-      "sha256": "84687f3a6d1b0c05f05b11c79daa6520f76c2b3f329a9b1e6e57cbf978b31a5e",
+      "sha256": "111369937278c0aae2de0c4e1c45bac5131d340b493846c7b7ffc4e719d44a6f",
       "local_capture_summary": ".tmp/ui/native-editing-integration/validation-evidence.json",
       "local_capture_summary_sha256": "42a470e87f6fc1e0014c62a21cc4bb7fd4c313a697f9e5f86833420f1ab4e5f3"
     },
@@ -337,7 +337,7 @@
       "scope": "SYSTEM authored slider ticks retain clean decimal text and fixed CVar serialization preserves tested small and custom values. Windows build and 36 UI suites pass; SP/OpenGL 125% and MP/Vulkan 200% each pass 38 semantic operations with 12 reviewed engine images after gameplay. Actual Runtime/Rml owns complete native Number presentation, directed selection and all composition ranges while preserving stable local history; checked preparation precedes native synchronization and allocation-free local publication. Windows SDK collection scopes and copied SDL hooks admit exact callbacks, while the portable coordinator reconciles owned FIFO offers. Live managed/provider/Session integration remains pending and native activation is disabled. Focus reveal spacing, exact persistent recovery, actual native IME, full page/editor/platform/migration and product qualification remain open.",
       "local_capture_summary": ".tmp/ui/native-field-binding-integration/validation-evidence.json",
       "local_capture_summary_sha256": "60fcd7fdb106e2ce6c0fa27372e09a8a48ba93c06cba59a629d4fa6330582720",
-      "sha256": "84687f3a6d1b0c05f05b11c79daa6520f76c2b3f329a9b1e6e57cbf978b31a5e"
+      "sha256": "111369937278c0aae2de0c4e1c45bac5131d340b493846c7b7ffc4e719d44a6f"
     },
     "native-managed-bridge": {
       "kind": "implementation_checkpoint",
@@ -348,7 +348,7 @@
       "qualification_status": "bounded_checkpoint_qualified",
       "local_capture_summary": ".tmp/ui/native-managed-bridge-integration/validation-evidence.json",
       "local_capture_summary_sha256": "bf2732fa8c57a7947b73af55ccc525d3856220080badd6eab1b0e1039b9f8573",
-      "sha256": "84687f3a6d1b0c05f05b11c79daa6520f76c2b3f329a9b1e6e57cbf978b31a5e"
+      "sha256": "111369937278c0aae2de0c4e1c45bac5131d340b493846c7b7ffc4e719d44a6f"
     },
     "performance-preset-drafts": {
       "kind": "implementation_checkpoint",
@@ -373,7 +373,7 @@
     "settings-effect-foundations": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293",
       "baseline_engine_revision": "efcfdb0ffe6eaffa11dbf2ced026495539156478",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Automatic completion waits for real effect readiness and a fresh present; owner close during commit preparation restores before persistence. Checked OpenAL leases gain untouched cancellation and non-releasing finalization. Schema2 adds strict versioned effect-plan envelopes and immutable decoding while the production host remains schema1. Full mixed execution, portable renderer/audio reconstruction and live recovery remain required.",
@@ -403,7 +403,7 @@
     "renderer-image-recovery": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293",
       "baseline_engine_revision": "d6abeabc7e2e348ea11ce50a7671b830e77a15b1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Checked coalesced image/material restart, original failed-recovery inventory, monotonic resource instance IDs and metadata mutation invalidation. Full engine/modules and49 UI suites pass. Four render-target images after SP/OpenGL125% and MP/Vulkan200% gameplay/ordinary restart qualify compatibility only. Actual checked-policy Apply, portable consumed-policy/content reconstruction, complete settings/editor/migration remain unaccepted.",
@@ -423,7 +423,7 @@
     "consumed-settings-recovery": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293",
       "baseline_engine_revision": "b2cb00dfb87cc8663cd8e895dcccce37d9c1faa1",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Portable no-effect audio requested/observed state and captured renderer policy/output completion records. Full build and56 UI suites pass; four reviewed render-target images after windowed gameplay and ordinary video restart qualify compatibility only. Content identity, DDS/cube exact reduction, cold recovery, full EFX and mixed settings Apply remain unaccepted.",
@@ -443,7 +443,7 @@
     "checked-image-reduction": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293",
       "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "DDS mip reachability resolves once from the original source; decoded cube reduction is atomic across six faces, resampling is exact or refused, and binary 2D/cube assembly checks every allocation/caller. Full build and ordinary windowed GL/Vulkan gameplay/restart qualify compatibility. Content identity, portable reconstruction, checked driver failure and mixed SYSTEM Apply remain unaccepted.",
@@ -453,7 +453,7 @@
     "checked-upload-storage": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550",
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293",
       "baseline_engine_revision": "5e0d3ebf20234415815a72c914fe788953e4367b",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Actual GL dynamic upload allocation metadata, partial cleanup and persistent-to-streaming fallback bookkeeping are qualified by production-method tests and ordinary gameplay. Queries preserve outputs on refusal and call no graphics getter. Upload completion, Vulkan allocation readback and complete renderer resource accounting remain required.",
@@ -588,7 +588,7 @@
       "scope": "17 September plan audit: actual ancestor vector-mask pointer queries, positive-alpha hole/stroke/gradient coverage and empty-mask subtree focus. Repairs eight stale settings status translation keys. All 83 UI suites and final bounded SP/OpenGL and MP/Vulkan SYSTEM gameplay captures passed. No full control/mask focus intersection, transformed overflow, physical input, optimized/platform qualification or product acceptance.",
       "local_capture_summary": ".tmp/ui/masked-input-review/validation-evidence.json",
       "local_capture_summary_sha256": "05dda04d28ea4da2171537901a60a30c8408961efd1814a585f649e60c54d7bb",
-      "sha256": "076582fd4f01fb3030c8938d230b3a4061ede5470684fc7042994e5800e22390"
+      "sha256": "4c4aaaeb053fde32dd7d011be9e7dbaa5cb41a8616f203b8eb3cd984dd7fc5eb"
     },
     "independent-text-scale": {
       "kind": "implementation_checkpoint",
@@ -634,139 +634,139 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Opt-in retained title, single-player pause and stock loading screens behind the single ui_retained gate, with image nodes, additive and multiply path blends, a view-height canvas, typed session menu requests and exact overflow clipping under translation and scale. Windowed OpenGL/Vulkan 16:9, OpenGL 4:3 and gate-off engine captures only; the Objectives action, the Strogg variant, soft focus, Remastered loading details, multiplayer menus, GLES and complete product acceptance stay open.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-loading-progress": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained loading screen's Remastered progress behind ui_retained: the levelshot drift, the difficulty line, LOADING over a 240 u bar with the loader's phase and its place or asset count, the percentage, the load time and a continue prompt that follows the last input family. Real single-player loads traced the phases in order on OpenGL and Vulkan; the rendered line was captured through testGUI. Tips, touch and device-family glyphs, the Remastered multiplayer screen and complete product acceptance stay open.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-loading-multiplayer": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained loading screen's Remastered multiplayer composition behind ui_retained: the bottom band kept low, a section 6 server card on the leading side with the server name, address, mode and limits, JOINING when a multiplayer load ends, and the name strip darkening the message line. Captured through testGUI on OpenGL and Vulkan; players by team, the server message, the arsenal, the Welcome hand-off and complete product acceptance stay open.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-title-carry": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Section 13.8 refinements on the retained title and single-player pause menus behind ui_retained: the soft additive focus glow beside the focus rail, the emblem's rim light and glint, and the title carry, in which a page hand-off carries the chosen navigation label into the page title slot as the bands dock. Captured on OpenGL and Vulkan; the depth shift, the high-contrast rail, symbols, tags, HDR rules and complete product acceptance stay open.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-title-depth": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Section 13.8 depth on the retained title behind ui_retained: the backdrop, the light and grid, and the framing bands lean up to 6 dp away from the pointer the session publishes, deeper layers further, while content stays fixed; reduced motion holds them still. Captured on OpenGL and Vulkan; the right stick, device tilt, the Phone default and complete product acceptance stay open.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-title-depth-stick": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained title's depth lean follows a held look stick while it leads and the pointer otherwise. Qualified by ui_retained_gate.py compiling the production session frame code against counted doubles, not by an engine capture, since no input is injected. Device tilt, the Phone default and complete product acceptance stay open.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-modal-confirmation": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained confirmation modal at the 480 dp confirmation width behind ui_retained, in its opaque-backing form: the stock glow column across the dialog's 320 u rectangle with the stock art's black 0.70 silhouette inset 6.5625 dp from each side, 3.5625 dp at the top and 5.34 dp at the bottom, so the lit margin and slot outline it; the leading tooth, title slot, raised trailing section, 38 dp lower-leading chamfer and square trailing corners without rails; the title at the foot of the slot's leading flank with its capitals hanging from the raised top line and a 1 dp black outline at 0.85 composited once behind the fill; the first body baseline 87.5 dp down and the actions at the stock row. Captured on OpenGL and Vulkan at 16:9 and OpenGL at 4:3 beside an engine capture of the stock exit dialog; the capture record names ART-036, which ART-037 supersedes. Soft focus, the other four widths, modal motion and complete product acceptance stay open.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-modal-motion": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained title and single-player pause screens behind ui_retained author the stock screen choreography with the section 8 tokens: menu.fade over 250 ms; frame.dock and screen.depart accel(250, 250) over 500 ms from 50 ms with the home layer sweeping 640 u; content.out of the home content over 250 ms; the bands' return from 0 ms and content.in over 150 ms. Their confirmations run modal.enter (scrim, glow and frame over 200 ms, contents together at 200 ms, no scale) and modal.leave (contents at once, then after 50 ms the scrim and glow over 250 ms and the frame over 200 ms for Exit or 250 ms), on timeline completion programs. Modal timing is qualified by native runtime tests; no engine capture of the transitions, and no sampled comparison with the stock timelines.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-motion-tokens": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained title and single-player pause screens fade the plinth and its secondary links over 50 ms on depart while the home plates take 250 ms, bring them back with content.in, give hover feedback at once, and dim the wordmark to 40% gray while the title's Exit modal is open. Qualified by the native screens test; no engine capture.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-motion-engine": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Engine captures, on OpenGL and Vulkan at 1280x720, of the retained title's exit confirmation entering, open, leaving and closed, and of the plinth gone 30 ms into a depart, from a candidate runtime of the pushed code; with the host fix that keeps additive pictures from blacking out their rectangle inside a fading composition layer. Frame times follow console waits and are approximate.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-modal-softfocus": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Backdrop soft focus behind the retained title's exit and the pause menu's quit confirmations on OpenGL and Vulkan: a two-pass separable Gaussian of 5 u at 0.80 saturation ramping with modal.enter and modal.leave, the glow cut to the dialog, and the scrim and stock column for the opaque-backing option and renderers without GLSL; engine captures at 1280x720 on both backends and 1920x1080 on OpenGL, native tests, a host harness and its mutants.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-pause-softfocus": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained single-player pause screen over the paused view softened with modal.softfocus's values, never dimmed, ramping in with menu.fade on every pause, with a darkening scrim and vignette for the opaque-backing option and renderers that cannot soften; engine captures on OpenGL and Vulkan at 1280x720 over airdefense1, native tests and generator mutants.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "system-dialog-softfocus": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Soft focus behind the SYSTEM page's Apply/Keep/Revert confirmation and unapplied-changes dialogs, with their 0.6 backing as the fallback; qualified by native tests against the real document and the SYSTEM updater checks, without an engine capture.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-stock-fallback": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "ui_retained on by default and archived. Each retained screen presents its stock GUI when its document is not installed (quietly) or cannot load (reported once), when the legacy main menu lacks a page the title and pause screens hand off to (a mod's own menu), or when its view fails after a renderer or language change; the SYSTEM page joins the default only once it offers every stock setting, and it and the campaign selectors fall back from the click that asked for them; ui_retainedStatus lists the fallbacks. Qualified by ui_retained_gate.py and ui_system_session_route.py compiling the production session code against counted doubles, and by engine captures on OpenGL and Vulkan at 1280x720 and OpenGL at 1024x768 in which a private mod hides or replaces content.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-pause-objectives": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained pause screen's level block lists the objectives the player holds, newest first, each on a row behind the atlas marker, and the time in the mission as '0:42:10 in mission' under a faint rule. The session asks the game with the retainedPauseState menu command when the screen opens; a game module that publishes neither leaves the map's own objective summary and no time line. Qualified by the gate test compiling the production session code, the native screens test and engine captures on OpenGL and Vulkan at 1280x720.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-pause-strogg": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "After Kane's stroggification the retained single-player pause takes the Strogg family: the bands' 30-degree shoulders, downward teeth, #F59512 rim light and etched circuit traces, plates ending in a 30-degree shoulder with slanted markers, R_Strogg labels turning #FFCC00 on focus, a chamfered level block under the stock Strogg HUD static, and every label arriving in runes and playing the short credits translation (GAME PAUSED from 60 ms over 500 ms under the scan bar, the actions 120 + 45 ms per row over 200 ms, the level block after them; the focused plate runs the scan bar; reduced motion shows the translated labels at once). The session asks the game once a level with the retainedPauseFamily menu command, and the Marine pause stands in when the Strogg pause cannot present. Qualified by the gate test compiling the production session code, the native screens test and engine captures on OpenGL and Vulkan at 1280x720 and OpenGL at 1024x768, with the gate off loading nothing retained.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-pause-objectives-page": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The single-player pause lists its seven actions with OBJECTIVES, which opens the objectives display as a page of the pause in both families: the bands dock and the label carries into the title slot, the stock entry motion brings the back bar and the plates of every open objective, newest first, with its title, screenshot and description wrapping without a limit, then the objectives completed on the map under COMPLETED, the serial and an empty state; the list scrolls under its bar and Back returns with the bands. The level block lists the objectives with their state and a time line with the last save's age. The game publishes descriptions, screenshots and completed objectives (kept per map, unsaved) and lists the level's objective screenshots, which the session resolves inside the level load. Qualified by the gate test compiling the production session code, the native screens test and engine captures on OpenGL and Vulkan at 1280x720 and OpenGL at 1024x768.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-pause-release": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "RESUME closes the single-player pause screen at once while its softened view, or the scrim standing in for it, releases over 250 ms over the running game in both families; pausing again during the release reopens the screen, a disconnect or level load ends it, and every activation after a release shows the screen and ramps the softening back in. Qualified by the gate test compiling the production session code, the native screens test and engine captures on OpenGL and Vulkan at 1280x720, with the gate off.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-mod-loading": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "A mod's own copy of a stock loading screen, supplied by the mod's own game directory, presents instead of the retained loading screen, file by file; openQ4's, the stock game's and the Awakening's stock screens are still replaced. Qualified by the gate test compiling the production session code and engine runs on OpenGL and Vulkan as a private mod.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-loading-arsenal": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "A multiplayer load fills the retained loading screen's arsenal with each kind of item as it spawns, two rows of ten in the thick band, each fading in over 150 ms in its color code read from the item's colour-coded material. Qualified by the gate test, the native screens test, a listen server's mp/q4dm1 load and captures on OpenGL and Vulkan at 1280x720.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-subpage": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The sub-page level for the retained Single Player page and its Campaign sub-page: the sub-page state, the per-language crumb fit, both changes and their timing, the reversal of a change going deeper and the reduced-motion hand-over. Qualified by the gate test compiling the production session code, the native screens test and engine captures on OpenGL and Vulkan at 1280x720, OpenGL at 1024x768, reduced motion and the gate off.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-loading-tips": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Single player loading tips: a TIP tag over one two-line tip in the loading band's leading part while the level loads, changing every 6 s with a 250 ms cross-fade, 18 verified tips in all seven languages. Qualified by the gate test compiling the production session code and measuring every tip, the native screens test, engine captures on OpenGL and Vulkan and in three more languages, and a real map load's trace.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-server-card": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The multiplayer server card's players and message: the players by team (one list outside team modes) with spectators and players connecting, and the server's message (si_motd), captured on the host, on a map change and on a fresh connection through an optional connect-response roster block. Qualified by the gate test compiling the production sanitizer, roster and publish, the codec's native test, the native screens test, engine captures on OpenGL and Vulkan and in three more languages, and traces from a listen host and a second client.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "runtime-choice-lists": {
       "kind": "implementation_checkpoint",
@@ -778,13 +778,13 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
       "scope": "Render API 20 settings reports: the renderer's r_renderer resolution and each level load's light-grid outcome, with the committed preload policy pulled from the settings service once per load. Qualified by a contract test, the settings service harness and SP map loads on OpenGL and Vulkan.",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550"
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293"
     },
     "deferred-light-grid-executor": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
       "scope": "Deferred executor for the next map's light-grid preload: one executor per Apply, a schema-2 next-map journal with automatic completion after a later presented frame, the committed policy for level loads until persistence, Apply and Exit on a committed target, cold-start replay in both directions, and the neutral recovery title. Qualified by production-body service, host, catalog and controller tests, a mutation pass and a cold-recovery probe.",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550"
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293"
     },
     "system-render-options": {
       "kind": "implementation_checkpoint",
@@ -796,7 +796,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/settings-effect-execution.md",
       "scope": "Renderer fallback executor: r_renderer applies automatically through a checked device restart on the captured display, proved by the renderer's own selection report, with schema-2 renderer-domain recovery and startup replay. Qualified by the host, service and exact-value harnesses, a mutation pass and the full Meson suite.",
-      "sha256": "4df9a7785a93598ef895a6e1479387fe982f8c1fe4535f62d23cfc91c7564550"
+      "sha256": "5d1e570c3f431cda6a48381a85e381ce0058b799547c07bae235674d33ff8293"
     },
     "system-renderer-fallback": {
       "kind": "implementation_checkpoint",
@@ -820,7 +820,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "SYSTEM route prerequisites for the retained default: the multiplayer menu's SYSTEM route opens the retained page through a main-menu timeline, with its stock fallback, and a refusal while the page is available (no current state makes one) shows the stock page for that request. Qualified by the compiled session route harness on Windows and Linux, the gate test, a mutation pass and live captures, one through a listen server's in-game menu.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-system-resolution": {
       "kind": "implementation_checkpoint",
@@ -832,13 +832,13 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "The controller menu pump pairs each navigation step with its release on every retained input target, so a stick push no longer leaves focus moving on the Single Player, Campaign and SYSTEM pages. Qualified by a compiled pump test, a mutation pass and the session tests.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182"
     },
     "event-focus-tabs": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/event-programs.md",
       "scope": "Event programs can move focus (the focus instruction, including after a layout and from completion programs), and Q/E and the shoulders run a document's tab events. Qualified by the behavior, document and runtime suites, the adapter test and a mutation pass; no document uses them yet.",
-      "sha256": "2a4c3c45b29368c72b11219864645198e0a3d7891f946c31a37c784a866a8395"
+      "sha256": "6ba02ccf305ead77c2cf7061315eae3291fc63064ad4aac76ffdc0fd5611d6a6"
     },
     "retained-mp-escape": {
       "kind": "implementation_checkpoint",
@@ -880,7 +880,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained loading screen holds a Welcome join at JOINING until the card presents, then fades out over it, in place of the load's wipe. Qualified by the gate's compiled hold case, the native screens test, a mutation pass and live probes on a listen server and a remote client, OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-mp-match": {
       "kind": "implementation_checkpoint",
@@ -912,7 +912,7 @@
       "scope": "Separate Marine/Strogg wheels, reserve and hub artwork, sampled transmission/translation motion, physical-stick selection, tap/cancel/release ownership, scale and safe fitting. Native production-code fixtures and isolated Windows gameplay qualify the recorded cases; no physical-device, full-platform or product acceptance.",
       "local_capture_summary": ".tmp/claude-continuation/hud/wheel-validation-evidence.json",
       "local_capture_summary_sha256": "188157459c79953ed99af5d68d1f2eaf7b9443038a8c603a699e87ee52aa08f6",
-      "sha256": "c5ea997ab329abd3ed20e90efde9377e55a84f84251ed75bc5f28deee6e3c973"
+      "sha256": "e07ea5e2c3124eae75cc173c4a709bbcadd472efabf74f4371a45ec299a81239"
     },
     "hud-gauge-continuation-20261009": {
       "kind": "implementation_checkpoint",
@@ -920,127 +920,127 @@
       "scope": "Classic canvas and gauge artwork, clipped family-specific traces, repeating Strogg grain, per-readout ammo gains and notice separation; compact readiness/live match cards, complete round clocks, respawn countdowns, vote glyphs, arena sudden-death state, Tourney wording/instructions/banners, and bounded chat. Native and Windows engine evidence is limited to the cases in the linked record. The remaining HUD review, full aspect/device/backend matrix and product acceptance remain open.",
       "local_capture_summary": ".tmp/claude-continuation/hud/validation-summary.json",
       "local_capture_summary_sha256": "835d3b0f478bc9d5b9f9863f3e6e9b2c6f3831d2b3b9e9ebc322ab41ef5f428f",
-      "sha256": "6eaccd2f1d063bb3953fa457bea00d61a70a441175402b70a13065c1299dc0fa"
+      "sha256": "7c88cebbb59b8f7bfa02bc62d9e1a834e1dc197a39788811187a981d0047d592"
     },
     "retained-loadgame-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained Load Game page and its list, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan at three aspects and three languages.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-savegame-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The text control role, committed characters into retained fields and the retained Save Game page, qualified by the native text field test, the gate, the native screens check, the adapter harness and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-restartlevel-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained Restart Level page, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-demos-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained Demos page, qualified by the gate, the native screens check, the demo contract test and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-mods-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The title's MODS list dialog, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-restartmenu-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained restart screen after a death, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-credits-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained Credits page, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-arena-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained Arena sub-page, qualified by the gate, the native screens check, the Arena campaign contract test and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-multiplayer-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The retained Multiplayer page, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-createserver-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Multiplayer's retained Create Server sub-page, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-createserver-passwords-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Masked text fields and Create Server's password rows, qualified by the native text field, number view and screens checks, the clipboard executor test, the gate and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-createserver-banlist-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Create Server's ban list, retail's stock Create Server commands and the retained page as the default, qualified by the gate, the native screens check and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-joingame-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Multiplayer's Join Game sub-page (opt-in) and loopback favorites, qualified by the gate, the native screens check, the server browser contract and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-joingame-symbols-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Join Game's list symbols, mod filter, favorite toggle and levelshot, qualified by the gate, the native screens check, the server browser contract and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-joingame-default-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Join Game as the default, with JOIN IP ADDRESS and FIND PLAYER/CLAN in entry dialogs, qualified by the gate, the native screens check, the server browser contract and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-joingame-progress-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The scan's progress under both server browsers' lists, qualified by the gate, the native screens check, the server browser contract and live captures on OpenGL and Vulkan, retained and classic.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-joingame-details-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "A server's details in the scan and the classic browser's server tooltip, qualified by the server browser contract, the session harnesses and live captures on OpenGL and Vulkan, classic and retained.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-detail-card-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The runtime's detail card (the hover card anchored to the pointer's or the focused control) and Join Game's server details card, qualified by the document, runtime and screens native tests, the gate and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-face-buttons-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/event-programs.md",
       "scope": "A controller's west and north face buttons run a document's secondary and tertiary events; Join Game refreshes the list on west and sorts it by the next column on north. Qualified by the adapter harness, the screens native test, the gate and live captures on OpenGL and Vulkan.",
-      "sha256": "2a4c3c45b29368c72b11219864645198e0a3d7891f946c31a37c784a866a8395"
+      "sha256": "6ba02ccf305ead77c2cf7061315eae3291fc63064ad4aac76ffdc0fd5611d6a6"
     },
     "retained-prompt-glyphs-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "Prompts follow the active device: the SDL family, the Prompt Style override, the adapter's prompt.glyphs and the vector glyphs of the prompt bars and the loading prompt, qualified by the gate, the adapter harness, the screens native test and live captures on OpenGL and Vulkan.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182"
     },
     "retained-card-glyphs-evidence": {
       "kind": "implementation_checkpoint",
@@ -1052,19 +1052,19 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/input-routing.md",
       "scope": "Swap Confirm and Back: the setting, the translation in every menu input path and the prompts that follow it, qualified by the adapter harness, the input test, the gate, the screens native test and live captures on OpenGL and Vulkan.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a"
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182"
     },
     "retained-network-quality-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Network quality beside each server browser row's ping, qualified by the gate, the screens native test and live captures on OpenGL and Vulkan.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-strogg-pages-evidence": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "The Strogg pause's Load Game, Save Game and Restart Level pages in the Strogg family, qualified by the gate test compiling the production session hand-off and fallback, the native screens check and pointer reach of all three documents, and live captures from game/recomp on OpenGL and Vulkan at 1280x720.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "retained-mp-admin": {
       "kind": "implementation_checkpoint",
@@ -1076,13 +1076,13 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/retained-screens.md",
       "scope": "Join Game's filter row under a ten-row server list: the game type's spinner (ALL GAME TYPES, or the type's name, round the browser's twelve public types) and the NOT FULL, NOT EMPTY and NO PASSWORD filter tags (set at 0.60 with the close cross, unset at 0.28, Accept toggling), over the scan's gui_filter_* CVars with the players filter's bits in the stock choices' order, and the master server asked for every server so a changed filter never needs a new list. Qualified by the gate test compiling the session verbs, the native page checks, the production scan's browser contract and an OpenGL capture against a loopback dedicated server at 1280x720.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660"
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce"
     },
     "remastered-hud-objectives-awakening": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/remastered-hud.md",
       "scope": "The Remastered HUD documents as recorded: the objectives display held on the scores button in play (every objective three at a time, a COMPLETED section, weapon-cycle scrolling, Toggle Objectives through g_objectivesToggle with its HUD prompt), the new-objective and objective-complete notices on their own timers and OBJECTIVE FAILED, in both families; The Awakening's on-foot documents (the expansion's strip roster, Falcon's squad emblem on the transmission display, the ship panel on foot) and vehicle documents (the space cannon's ship-status panel, the MCC cannon's hull readout, the speeder's status bar, race display, boost and prompts, the GEV's cluster), with the capture scenarios that drive each (objectives, objectives-toggle, turret, mcc, speeder, gev). A documentation checkpoint of work landed with the Remastered HUD; it does not qualify the aspect-ratio, layout or device matrices.",
-      "sha256": "6eaccd2f1d063bb3953fa457bea00d61a70a441175402b70a13065c1299dc0fa"
+      "sha256": "7c88cebbb59b8f7bfa02bc62d9e1a834e1dc197a39788811187a981d0047d592"
     },
     "inventory-stage-one": {
       "kind": "source_inventory_revision",
@@ -1157,7 +1157,7 @@
       "baseline_engine_revision": "e3cf8d037b1458c8ed49b9b423bf76201a194879",
       "companion_revision": "e3cf8d037b1458c8ed49b9b423bf76201a194879",
       "scope": "UI-03 Strogg confirmations: the Strogg pause's QUIT TO MENU and EXIT and the Strogg Save/Load pages' delete, overwrite and notice dialogs in the Strogg family (30-degree shoulders, Strogg card fill and #F59512 rail, R_Strogg text, Strogg action plates), every label translating from runes as the contents show; ids, focus, soft focus and timing stay the stock dialog's and Marine documents are byte-identical. Native screens groups, the session gate and the document check pass; OpenGL English 1280x720, OpenGL French 1024x768 and Vulkan Russian 1920x1080 engine captures were reviewed. The art derives from section 13.7 and awaits UI-05 review; no acceptance.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/strogg-confirmations/validation-evidence.json",
       "local_capture_summary_sha256": "eaa963119faf7b24401189911309b07e78a456e2433ea2afeb433663b56a1b50"
     },
@@ -1167,7 +1167,7 @@
       "baseline_engine_revision": "2f6c628a306b9dc42f752df505ebce5f26595996",
       "companion_revision": "2f6c628a306b9dc42f752df505ebce5f26595996",
       "scope": "UI-02 focus-following prompt verbs: buttons may declare a prompt (localization key or string expression); Runtime::AcceptPrompt answers for the focused control, the bar's SELECT otherwise and nothing while no focused control can act; the adapter publishes prompt.accept before each frame, once per change; the page bars show it and drop Accept when empty. LOAD, DELETE, SAVE and PLAY are new capitals in all twelve tables, JOIN reuses the card's. Runtime, adapter and native page checks pass with the session gate and document check; OpenGL English and Vulkan French captures of the Load and Save pages were reviewed. Contextual west/north prompts, the home bars and device/touch plates remain.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/prompt-verbs/validation-evidence.json",
       "local_capture_summary_sha256": "71816710d9c56e5637f37b311deddf278eaf32122fe0710fbf49418a408720e2"
     },
@@ -1177,7 +1177,7 @@
       "baseline_engine_revision": "8d821202d70ca746d58a2608b1aab3c69bcbf56f",
       "companion_revision": "8d821202d70ca746d58a2608b1aab3c69bcbf56f",
       "scope": "UI-03 save details: idPlayer::SavePersistantInfo adds the run's play time (the persistent info's carried time plus the map's game time, zero for a new game, absent for a run a save from an earlier build began) and difficulty to the persistent player info every save header already holds; the menus read the first client's info from the header. CONTINUE's detail names the mission, difficulty and play time (or the save time for an earlier save), the Load Game page gives date and time on one line then the difficulty and play time, and the pause's level block gives the mission time with the run's total over the last save's age. Completed objectives are kept among the player's spawn arguments and restored with a save. Two play-time phrases are in all twelve tables. Session gate, native page checks and the generator's fit checks pass; an OpenGL English in-game capture across a save load and a level change shows every state, and a Vulkan German one the pauses and the Load Game detail lines (its title and first page screenshots ran early on a loaded machine). A save's chapter number, touch and other devices remain.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/save-details/validation-evidence.json",
       "local_capture_summary_sha256": "f5e59281e2543d90a21a79da6582413744761e0ceb79c26db0249514888e40a7"
     },
@@ -1187,7 +1187,7 @@
       "baseline_engine_revision": "35a1e919c828b8fd5326f46e1dda9a975c8549aa",
       "companion_revision": "35a1e919c828b8fd5326f46e1dda9a975c8549aa",
       "scope": "UI-02/UI-03 controller settings, list paging and Join Game focus: Prompt Style (in_promptStyle) and Swap Confirm and Back (in_swapConfirmBack) as stock choice rows in Game Options > Controller in every shipped language, the later rows, hovers, anchors and scroll extent moved; PageUp/PageDown and Home/End moving focus a visible page through the scrolling list that holds a focused button or toggle (Runtime::Impl::PageList), the triggers sending them where a document declares no section events and stepping a focused slider coarsely; Join Game's row focus following its server through new orders, refreshes and filters onto its page. Settings coverage and GUI contracts, the focus reveal test at two densities with button and toggle rows, the adapter and session gate harnesses and an OpenGL English Settings and Load Game capture pass. Trigger and other button glyphs, right-stick detail scrolling and physical controller runs remain.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/controller-settings-paging/validation-evidence.json",
       "local_capture_summary_sha256": "4ee88d83dbf0f98347f95fa70529aeb463fc20bb7725aaad1f905b6a5a82831c"
     },
@@ -1197,7 +1197,7 @@
       "baseline_engine_revision": "1ce1599f4357cdf28b0ceffec83c0b3d2fb51fe6",
       "companion_revision": "1ce1599f4357cdf28b0ceffec83c0b3d2fb51fe6",
       "scope": "UI-02/INP-011: the gamepad Menu button runs a retained document's onMenuButton, once per press, where declared (Back elsewhere); Save Game, Restart Level and in-game Load Game ask the session for menuResume, which returns the pause and runs its RESUME during a single-player game.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/menu-button-resume/validation-evidence.json",
       "local_capture_summary_sha256": "7d791a2d806b2f192709d210e04b984d5ba59b3a49860c5564c28448e1af3782"
     },
@@ -1207,7 +1207,7 @@
       "baseline_engine_revision": "2bfcb60cc42b51d700b36386d065c104c0d9daf5",
       "companion_revision": "2bfcb60cc42b51d700b36386d065c104c0d9daf5",
       "scope": "UI-02/INP-011: the Menu button applies pending changes on the opt-in SYSTEM page (update_system_menu_button.py) and the Escape card's Admin page, and the adapter keeps it Back while a dialog or an open list holds the input (Runtime::ModalOpen, the focused widget's popupOpen).",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/menu-button-apply/validation-evidence.json",
       "local_capture_summary_sha256": "f8fea2394b50fc49215af334f825208e7b17f9fe35970f45b7adb3e9945665c6"
     },
@@ -1217,7 +1217,7 @@
       "baseline_engine_revision": "55ed6f210da77490d2389849e04d46faad92e9c0",
       "companion_revision": "55ed6f210da77490d2389849e04d46faad92e9c0",
       "scope": "UI-02/INP-011: section 13.5's trigger glyphs (LT/RT, L2/R2, ZL/ZR, Steam Deck's outlined L2/R2, generic chevrons) end the Escape card's Match and Admin section strips, a legend for a controller only.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/trigger-glyphs/validation-evidence.json",
       "local_capture_summary_sha256": "1de24fafd097c2ba6f764a6b37406e5972111dc88c79fa6b55a74db617779d59"
     },
@@ -1227,7 +1227,7 @@
       "baseline_engine_revision": "d610d54794ca41f13b6f8c9878023e4d8912e6c8",
       "companion_revision": "d610d54794ca41f13b6f8c9878023e4d8912e6c8",
       "scope": "UI-02/TXT-005: list joins (#str_231533, Session_RetainedList), the time in the mission (#str_231532), a save's date and time (#str_231535) and the load time's decimal mark and unit (#str_231534) come from every shipped table; the Demos page's plates and headings use capital keys in every language (#str_231530, #str_231531, #str_231536, the stock MAP and DATE, the PLAY and DELETE verbs).",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/joined-strings/validation-evidence.json",
       "local_capture_summary_sha256": "9142f36637682668facf126154792e78c6d94b1235fbe0585b47010438cee682"
     },
@@ -1237,7 +1237,7 @@
       "baseline_engine_revision": "b038777b2b1cec823b34b80256d0c3f7d50ccc64",
       "companion_revision": "b038777b2b1cec823b34b80256d0c3f7d50ccc64",
       "scope": "UI-02/INP-011: section 13.5's Menu button glyphs (Xbox disc, PlayStation Options pill, Nintendo plus, Steam Deck ring, generic outlined pill) end the Escape card's Admin Apply changes plate, which the button presses, for a controller only.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/menu-glyphs/validation-evidence.json",
       "local_capture_summary_sha256": "c2bc17f9841b34b99304af21faa4c2f65104a3c8dad2af5a484488d67fa2a4cf"
     },
@@ -1247,7 +1247,7 @@
       "baseline_engine_revision": "d376ec693290957f26728185cdf287e81d3c5147",
       "companion_revision": "d376ec693290957f26728185cdf287e81d3c5147",
       "scope": "UI-02/INP-010: section 13.4's wrapping menus in the title, both pauses, the Arena pause and the Single Player, Campaign and Multiplayer pages (wrap_menu), and authored navigation that passes a move through a target that cannot take focus (Interaction::Authored).",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/menu-wrap/validation-evidence.json",
       "local_capture_summary_sha256": "c6e0cce45e07d6b112980a2399eb413fc22ad7d596deacc620a976f7b545739f"
     },
@@ -1257,7 +1257,7 @@
       "baseline_engine_revision": "fb6547f03d0f2c8b70fa4c120cad8943253be23a",
       "companion_revision": "fb6547f03d0f2c8b70fa4c120cad8943253be23a",
       "scope": "UI-02/INP-010: a confirmation's two actions wrap Left and Right (every retained confirmation), and Restart Level's five difficulties loop through RESTART LEVEL (section 13.4).",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/menu-wrap-dialogs/validation-evidence.json",
       "local_capture_summary_sha256": "950ee588fc31835335cb205174b5607db8e11dca821498d2d75cd8c66dfc91ff"
     },
@@ -1267,7 +1267,7 @@
       "baseline_engine_revision": "623165435f858b70cfc2a0053fa8d240cc6696c9",
       "companion_revision": "623165435f858b70cfc2a0053fa8d240cc6696c9",
       "scope": "UI-02/INP-010: each scrolling list (a scrollbar's viewport) remembers its last focused control, and a directional move entering the list from outside returns there (Interaction::Container, Remembered).",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/list-memory/validation-evidence.json",
       "local_capture_summary_sha256": "9c98d8f5eb69eefe7cff9d0178b72b6d6793ee74ac3e62fc9688e289ab72b090"
     },
@@ -1277,7 +1277,7 @@
       "baseline_engine_revision": "53e31d1e90b2284dc6fe6b16472caf81bad16714",
       "companion_revision": "53e31d1e90b2284dc6fe6b16472caf81bad16714",
       "scope": "UI-04/FLOW-062: the retained implant overlay driven through the Medical Labs script itself (nanocyteFade and determineScream through `script`, the level's own functions) and a real save, at 4:3, 16:9, 21:9, 32:9 and 9:16 and in German: activation, the hide by 4650 ms, a mid-sequence restart, the hurt pulse while hidden, the localized save notice and reduced motion.",
-      "sha256": "6eaccd2f1d063bb3953fa457bea00d61a70a441175402b70a13065c1299dc0fa",
+      "sha256": "7c88cebbb59b8f7bfa02bc62d9e1a834e1dc197a39788811187a981d0047d592",
       "local_capture_summary": ".tmp/ui/implant-overlay/validation-evidence.json",
       "local_capture_summary_sha256": "1c1e411486a484bbee29a4fde2c2d27ee482cc6bd75aef5b0db8d5800a1a9980"
     },
@@ -1287,7 +1287,7 @@
       "baseline_engine_revision": "116b00bfd21a8c0ed101da46b3c84e94448ffa7d",
       "companion_revision": "116b00bfd21a8c0ed101da46b3c84e94448ffa7d",
       "scope": "UI-02/INP-011: the View button runs a retained document's onViewButton (Back elsewhere and in dialogs or open lists); Join Game's hides or shows its server details card; JOY8's default bind in play is _impulse19 (scores or objectives while held).",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/view-button/validation-evidence.json",
       "local_capture_summary_sha256": "d34fdad0c627ab5312d76888a780f35eee9f61cf8e8e0d39a52e03f19d7f1e7c"
     },
@@ -1307,7 +1307,7 @@
       "baseline_engine_revision": "f8d3b30a153d12939457dd2ba07c101eec446535",
       "companion_revision": "f8d3b30a153d12939457dd2ba07c101eec446535",
       "scope": "UI-02/LAY-021 (bounded): the title, both pauses, the Arena pause, the Multiplayer page and the death screen fit views narrower than 4:3 (canvas.minWidth 960, centred canvas groups, bottom band and prompt bar at the view's bottom); the multiplayer cards shrink to fit with their margins. Wider views are unchanged.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/narrow-fit/validation-evidence.json",
       "local_capture_summary_sha256": "8a2f2b92b83fe012a7649d4a5882b865d3eae801d6997c3f9ebd4db4f664411a"
     },
@@ -1317,7 +1317,7 @@
       "baseline_engine_revision": "e22da3be9914c88c36f7c18829f0cb96c1427f47",
       "companion_revision": "e22da3be9914c88c36f7c18829f0cb96c1427f47",
       "scope": "UI-02/LAY-021 (bounded): the pages with in-canvas prompt bars (Load and Save Game, Restart Level, Demos, Credits, Create Server, Join Game, Arena) fit views narrower than 4:3 through fit_narrow's page mode: full-height canvas groups whose parts centre, top-band parts keep the view's top and bottom-band parts (the prompt bar) its bottom; Join Game's details card stays runtime-placed. Wider views are unchanged.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/pages-fit/validation-evidence.json",
       "local_capture_summary_sha256": "cc5f11fad8fa0b33f019b57dc33c4d6e07db99cd2046ffeb89becb308e7629db"
     },
@@ -1327,7 +1327,7 @@
       "baseline_engine_revision": "87444682f370b0db50b18f943cd40e2299a67fe9",
       "companion_revision": "87444682f370b0db50b18f943cd40e2299a67fe9",
       "scope": "UI-02/INP-011 (bounded): the glyph families gain the View button (Xbox, PlayStation Create, Nintendo minus, Steam Deck, generic), shown at the top trailing corner of Join Game's server details card, which View hides, for a controller only; the keyboard shows none. The family shapes await art review under UI-05.",
-      "sha256": "1f98c29348f05b88d8ab4b8a8b37bcd65d42b16a4c8fbfd3fe903c625e20f50a",
+      "sha256": "a1459cd66decc68cd95d3913358e7c0e4d40fc5c7d11e761f966b2fce81d1182",
       "local_capture_summary": ".tmp/ui/view-glyphs/validation-evidence.json",
       "local_capture_summary_sha256": "d3870701f6e9d2e67bf53894eb59a5cc5ff0e8477369a2ac1e9f1ca658195d18"
     },
@@ -1337,7 +1337,7 @@
       "baseline_engine_revision": "e8a56dd5663cf7f85e7f48ea4e3262150fdfe750",
       "companion_revision": "e8a56dd5663cf7f85e7f48ea4e3262150fdfe750",
       "scope": "UI-03/WID-030 (bounded): empty lists carry the action row that fixes them: CLEAR FILTERS on Load and Save Game, Demos and Join Game while a filter hides everything, GET NEW LIST when Join Game's scan holds no server, and Join Game's empty line gains a heading in every shipped language; joinClearFilters clears every Join Game filter at once. The More popover and loading rows of WID-030 remain.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/empty-actions/validation-evidence.json",
       "local_capture_summary_sha256": "b6ac9bfa909d37afecfa59d210f880116dcbb3db8cb8810af29596ee6744e47f"
     },
@@ -1347,7 +1347,7 @@
       "baseline_engine_revision": "d8649f29d839060f27c27cc8f4ecd224bf006204",
       "companion_revision": "d8649f29d839060f27c27cc8f4ecd224bf006204",
       "scope": "UI-03/WID-030 and MOT-009 (bounded): Join Game shows its visible rows at rest without labels while a scan has listed nothing (no shimmer, no spinner), and the first servers replace them with row.reveal (120 ms per row, 15 ms stagger capped at 90 ms), requested by the session only when servers replace the loading rows.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/loading-rows/validation-evidence.json",
       "local_capture_summary_sha256": "79800becfa36187923d93fc025c5577a7305bce83bbd7a04f66ab7349c6de10f"
     },
@@ -1357,7 +1357,7 @@
       "baseline_engine_revision": "563dec70115155ec478a37859b39718b5e3ed3aa",
       "companion_revision": "563dec70115155ec478a37859b39718b5e3ed3aa",
       "scope": "UI-03/WID-026 and MOT-009 (bounded): retained pages gain section 13.13's notices (header-band plates in the top band's trailing section, three stacked newest first, a status symbol, Lowpixel 14 dp text and an optional action; 4 s holds, 8 s with an action; notice.enter and notice.leave), owned by the session; Join Game's favorites use them and a removal offers Undo.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/notices/validation-evidence.json",
       "local_capture_summary_sha256": "b7b8363f05e30ffaa07a6441ccf17f7b4d1f9b314bf0ff3ecbd7424ae934fc5e"
     },
@@ -1367,7 +1367,7 @@
       "baseline_engine_revision": "4d12fb9c86dcdced701b7ac2b60bac7d7f38220e",
       "companion_revision": "4d12fb9c86dcdced701b7ac2b60bac7d7f38220e",
       "scope": "UI-03/WID-020 (bounded): Join Game's details card names its server in full (join.detail.name), up to two Lowpixel lines over the address, so a name its row cuts with an ellipsis can be read.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/card-name/validation-evidence.json",
       "local_capture_summary_sha256": "ceb19bdb11c43b0f9e39ce7e0921a0642b41dd3ea592beffed199bf5bc390b20"
     },
@@ -1377,7 +1377,7 @@
       "baseline_engine_revision": "e28992e8ffbccde281e04b7f25722de47b903d79",
       "companion_revision": "e28992e8ffbccde281e04b7f25722de47b903d79",
       "scope": "UI-03/WID-026 (bounded): notices become the session's layer over every retained menu but the loading screen, the Strogg pages and the multiplayer cards, following the showing menu with the home dropping them behind a page; section 13.7's lost-controller notice persists until a controller returns; Undo is a shared action.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/shared-notices/validation-evidence.json",
       "local_capture_summary_sha256": "1f4acec144f950b8a979122487bd200b0726242b2a9c7eb655ab71b06684dea5"
     },
@@ -1387,7 +1387,7 @@
       "baseline_engine_revision": "137bd8d4bf2c08fabf5dc1e2ddd7ab44e36160fb",
       "companion_revision": "137bd8d4bf2c08fabf5dc1e2ddd7ab44e36160fb",
       "scope": "UI-02/LAY-021 (bounded): in views taller than the canvas, Load and Save Game, Demos and Join Game give the extra height to their list (fit_narrow stretch): the list and scrollbar run from their top to their distance from the view's bottom, parts above the list's foot keep the top and parts below keep the bottom; at 720 dp tall nothing moves.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/stretch-lists/validation-evidence.json",
       "local_capture_summary_sha256": "9d19f3dae684625dddf4d8c25d1a835238c95dba2fd3a6e88fb0b50b5d4b9322"
     },
@@ -1397,7 +1397,7 @@
       "baseline_engine_revision": "0731899d9bf0db4762db45ae8dfe0f62bc1c5c07",
       "companion_revision": "0731899d9bf0db4762db45ae8dfe0f62bc1c5c07",
       "scope": "UI-01/FLOW-003 (bounded): the settings screen's AUDIO button opens a retained AUDIO page built from the SYSTEM page's construction with every stock row (levels, sound system and device, EAX, speakers, HRTF and the subtitle rows); each row asks the session with its own value verb, the session applies it at once as the stock controls do (the device rows through sound drivar/eax/speakers) and reads every value back; BACK returns to the settings screen; a page that cannot load opens the stock page.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/audio-page/validation-evidence.json",
       "local_capture_summary_sha256": "f0f46e7055163e08d7273c02c05e9d49079ad9a696fc711e5af49956bf602f71"
     },
@@ -1407,7 +1407,7 @@
       "baseline_engine_revision": "e5f11f92457f71145fcf7764f4b7ec5d012fac0e",
       "companion_revision": "e5f11f92457f71145fcf7764f4b7ec5d012fac0e",
       "scope": "UI-01/FLOW-003 (bounded): the settings screen's GAME OPTIONS button opens a retained page built from the SYSTEM page's construction with every stock row in eight sections; the 73 CVar rows read back and set through the adapter's allowlisted settings.player.set; gun position, pro skins, custom crosshair, corpse time and language go through the session and the stock main menu's choices; the Section row jumps; BACK returns; a page that cannot load opens the stock page.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/game-page/validation-evidence.json",
       "local_capture_summary_sha256": "17adbbf40a98666a7ce7b0d211ff96ef14e6437d64d28ae5b5f591c5db64cd75"
     },
@@ -1417,7 +1417,7 @@
       "baseline_engine_revision": "fce16a706b5174b225a9ae52b33dc04a00bc32cb",
       "companion_revision": "fce16a706b5174b225a9ae52b33dc04a00bc32cb",
       "scope": "UI-01/FLOW-003 (bounded): the multiplayer menu's Game Options hand-off (fromMp_toGameoptions) opens the retained GAME OPTIONS page over the main menu (openRetainedGameFromMp) and BACK returns to it; a page that cannot open sends fromMp_toGameoptionsStock, the stock route.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/game-mp-route/validation-evidence.json",
       "local_capture_summary_sha256": "5c206d03507d5d7da6e7d727a91eb580f3c14b37e0e02f4c9f40a1f5c35d69c4"
     },
@@ -1427,7 +1427,7 @@
       "baseline_engine_revision": "55fa2e034feb3da84a1428cbd3ddc8b19bcb7a57",
       "companion_revision": "55fa2e034feb3da84a1428cbd3ddc8b19bcb7a57",
       "scope": "UI-01/FLOW-003 (bounded): the settings screen's CONTROLS button and the multiplayer menu's Controls hand-off open a retained CONTROLS page with the stock page's 49 bindings in four sections; Accept waits for the next key, which the session takes before the page (Escape/Start/Back cancel, Backspace/Delete clear, other keys bind with the stock two-key rule); Delete or the west button clears a row; a page that cannot load opens the stock page.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/controls-page/validation-evidence.json",
       "local_capture_summary_sha256": "3a19a512122a15dc1d762dc02b36fb53fcbb38b33ab07b38c2c3a4e08a303283"
     },
@@ -1437,7 +1437,7 @@
       "baseline_engine_revision": "05d56ec9221a5eb184d2ffd0740d8e9e5b9ff9b8",
       "companion_revision": "05d56ec9221a5eb184d2ffd0740d8e9e5b9ff9b8",
       "scope": "UI-01/FLOW-003 (bounded): while the retained CONTROLS page is available, the stock settings screen arrives on no panel, titled SETTINGS, with every button showing and the stock rows' hit targets hidden, so its buttons choose the retained pages (DISPLAY and LOAD DEFAULTS stay stock); Back from a page returns to the screen as it was.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/ui/settings-screen/validation-evidence.json",
       "local_capture_summary_sha256": "652277bf025cb3180e6acebfa200d744de3dc48347f5919918b3f2cbaab5018c"
     },
@@ -1446,7 +1446,7 @@
       "path": "docs/dev/ui/retained-screens.md",
       "baseline_engine_revision": "52d4c3616eb391fa52c913f4cfc8274746b789ae",
       "scope": "UI-01/FLOW-003 bounded working-copy checkpoint: recovered SETTINGS/Load Defaults into main, fixed the Strogg pause route, preserved page/stock returns and missing-document fallback. Native suites, OpenGL gameplay and German portrait captures pass; Vulkan gameplay and serialized front-end routes pass; earlier unexpected front-end exits remain failed evidence. No product acceptance.",
-      "sha256": "88481b392eb9807b374cba571cfd2eda04c6425eafacdfa323b5fc8b771eb660",
+      "sha256": "d835d2ed233b0e20821c81ea58fe58792816d4732900d273e7c5ff2b1988c9ce",
       "local_capture_summary": ".tmp/retained-ui-completion/validation-evidence.json",
       "local_capture_summary_sha256": "3134111190d4c7c9882d6c498f73e5a2de478c3d517a0eac0e2d94dae12940f6"
     },

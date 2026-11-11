@@ -116,7 +116,7 @@ input, CVar-source and presentation-boundary script checks also pass.
 On 8 September 2026, hidden, windowed engine captures after actual gameplay
 additionally qualified the existing preview and renderer restart. Host mouse
 and controller input were disabled. The fixture was
-`tools/ui/fixtures/mask-smoke.q4ui`; the independent mask pixel oracle and visual
+`tools/ui/fixtures/mask-smoke.rui`; the independent mask pixel oracle and visual
 review passed. These captures are not evidence of multiple world surfaces,
 multiple native editor panes, a functional settings screen or full GUI parity.
 
@@ -148,7 +148,7 @@ optimized performance and frame pacing unqualified. Raw logs, source/binary
 hashes, pixel reports and review images are retained with the capture metadata.
 
 Reproduce with `capture_legacy_baseline.py --retained-document
-tools/ui/fixtures/mask-smoke.q4ui --profile-frames 60 --shared-gui`, supplying
+tools/ui/fixtures/mask-smoke.rui --profile-frames 60 --shared-gui`, supplying
 the installed assets path, a fresh output directory, mode/backend and the
 dimensions/density above; SP additionally uses `--video-restart`. Run
 `verify_mask_capture.py <engine-tga> --density <scale>` and visually inspect

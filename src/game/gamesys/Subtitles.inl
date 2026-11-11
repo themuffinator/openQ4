@@ -13,7 +13,7 @@ void idPlayerView::DrawSubtitles() {
 	soundSubtitle_t cues[2];
 	const int count = world->GetSubtitles(cues, 2);
 	if (!count) return;
-	if (!subtitleGui) subtitleGui = uiManager->FindGui("guis/hud/subtitles.q4ui", true, true);
+	if (!subtitleGui) subtitleGui = uiManager->FindGui("guis/hud/subtitles.rui", true, true);
 	if (!subtitleGui) return;
 	const float textScale = idMath::ClampFloat(0.75f, 2.0f, cvarSystem->GetCVarFloat("ui_retainedTextScale"));
 	const float size = 17.0f * idMath::ClampFloat(1.0f, 2.0f, cvarSystem->GetCVarFloat("ui_subtitleScale"));

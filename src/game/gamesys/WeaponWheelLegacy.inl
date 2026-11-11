@@ -1,4 +1,4 @@
-// Shared SP/MP classic wheel. Quake 4 SDK EULA. Retained mode uses authored q4ui instead.
+// Shared SP/MP classic wheel. Quake 4 SDK EULA. Retained mode uses authored .rui documents instead.
 namespace {
 const int	WEAPON_WHEEL_SLOT_COUNT			= 12;
 const int	WEAPON_WHEEL_WEDGE_SUBDIVISIONS	= 12;

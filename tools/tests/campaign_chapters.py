@@ -5,7 +5,7 @@ Every level of a campaign is a chapter in campaign order; a level start
 records it as reached, a start autosave on disk counts too, and starting a
 chapter loads that autosave or starts the level fresh (docs/user/campaigns.md).
 The retained menus reach them from Campaign's CHAPTERS, a fourth Single
-Player level of its own (chapters.q4ui) beside NEW GAME's difficulty page;
+Player level of its own (chapters.rui) beside NEW GAME's difficulty page;
 the stock campaign_menu.gui keeps them on its campaign page.
 """
 from __future__ import annotations
@@ -128,13 +128,13 @@ def main() -> int:
 
     # The retained pages: Campaign's NEW GAME and CHAPTERS, and CHAPTERS'
     # own page with a row for every chapter; the difficulty page has none.
-    campaigns = read("content/baseoq4/pak0/guis/menu/campaigns.q4ui")
+    campaigns = read("content/baseoq4/pak0/guis/menu/campaigns.rui")
     for needle in ('"id": "newgame"', '"id": "chapters"', '"campaignNew"', '"campaignChapters"', '"detailEnterChapters"'):
         require(campaigns, needle, "Campaign's NEW GAME and CHAPTERS")
-    skill = read("content/baseoq4/pak0/guis/menu/campaign_skill.q4ui")
+    skill = read("content/baseoq4/pak0/guis/menu/campaign_skill.rui")
     if "chapters-plate" in skill or "campaignChapterStart" in skill:
         raise AssertionError("the difficulty page no longer holds the chapters")
-    page = read("content/baseoq4/pak0/guis/menu/chapters.q4ui")
+    page = read("content/baseoq4/pak0/guis/menu/chapters.rui")
     rows = len(re.findall(r'"id": "row-\d+",\n\s*"type": "group"', page)) or len(set(re.findall(r'"row-(\d+)"', page)))
     if rows < len(QUAKE4):
         raise AssertionError(f"the CHAPTERS page holds {rows} chapter rows, fewer than Quake 4's {len(QUAKE4)} levels")

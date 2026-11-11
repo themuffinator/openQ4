@@ -486,7 +486,7 @@ def build():
               'expansionRoots':['guis/'+n+'.gui' for n in expansion],
               'openq4Roots':['guis/'+n+'.gui' for n in own],
               'imageAliases':{'gfx/guis/mainmenu/e3_0_add':'q4-add/gfx/guis/mainmenu/e3_0', **dict(sorted(image_aliases.items()))}}
-    return {'artwork.q4ui':document,'coverage.json':registry}
+    return {'artwork.rui':document,'coverage.json':registry}
 
 def canonical_numbers(value):
     """Discard platform libm roundoff far below the renderer's float precision."""

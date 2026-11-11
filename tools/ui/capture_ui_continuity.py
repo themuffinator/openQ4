@@ -27,7 +27,7 @@ def main():
         parser.error('choose a fresh directory under the project .tmp')
     args.gate='1';args.timeout=240
     capture.SCENARIOS['menus']=(None,[
-        'waitMsec 2000','testGUI guis/loading/initialization.q4ui','waitMsec 500',shot('initialization'),
+        'waitMsec 2000','testGUI guis/loading/initialization.rui','waitMsec 500',shot('initialization'),
         'set ui_retainedReducedMotion 1','openq4_retainedGui event onInit','waitMsec 300',shot('initialization-still'),
         'testGUI','set ui_retainedReducedMotion 0','campaignMenu','waitMsec 700',*accept('nav_campaign'),
         'waitMsec 700',shot('campaigns'),*accept('nav_newgame'),'waitMsec 130',shot('detail-enter'),
@@ -77,19 +77,19 @@ def main():
         log=(ROOT/result['log']).read_text(encoding='utf-8',errors='replace')
         assert 'frame geometry ring overflow' not in log, 'Vulkan geometry budget exceeded'
         if name=='menus':
-            assert 'RETAINED_INITIALIZATION' in log and 'RETAINED_DETAIL handover level=4 gui=guis/menu/campaign_skill.q4ui' in log
+            assert 'RETAINED_INITIALIZATION' in log and 'RETAINED_DETAIL handover level=4 gui=guis/menu/campaign_skill.rui' in log
             assert 'command=campaignSkill4 accepted=1' in log and 'command=campaignSkillTurbo accepted=1' in log
         if name=='recovery':
             assert log.count('RETAINED_RECOVERY until=')==3 and 'inBed=0' in log
         if name.startswith('death'):
-            assert 'RETAINED_GUI_LOADED guis/hud/view_effects.q4ui' in log, 'death must actually enter its scene effect'
+            assert 'RETAINED_GUI_LOADED guis/hud/view_effects.rui' in log, 'death must actually enter its scene effect'
         if name.startswith('crash'):
             assert log.count('RETAINED_CRASH wake ')==3 and log.count('RETAINED_CRASH close ')==2, 'three authored wakes and two blackouts must drive the effect'
         if name in ('death','death-reduced','progression'):
             from PIL import Image,ImageStat
             black=args.output/name/'save/baseoq4/screenshots/loading-fade-black.png'
             assert black.is_file() and max(high for low,high in ImageStat.Stat(Image.open(black)).extrema)==0, 'loading handover must be fully black'
-            if name.startswith('death'): assert 'RETAINED_GUI_LOADED guis/hud/view_effects.q4ui' in log
+            if name.startswith('death'): assert 'RETAINED_GUI_LOADED guis/hud/view_effects.rui' in log
             else: assert 'command=campaignSkillStart accepted=1' in log and 'Entering doom_main()' in log
         print(f"{name}: complete={result['complete']} shots={len(result['screenshots'])} errors={result['errors']} warnings={result['retained_warnings']}",flush=True)
     (args.output/'report.json').write_text(json.dumps(results,indent=2)+'\n',encoding='utf-8')

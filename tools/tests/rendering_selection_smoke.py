@@ -24,7 +24,7 @@ def menu(action):
 
 
 def observe_menu():
-    return ['testGUI guis/menu/settings/system.q4ui', 'waitMsec 2000', 'openq4_retainedGui report',
+    return ['testGUI guis/menu/settings/system.rui', 'waitMsec 2000', 'openq4_retainedGui report',
             *[f'openq4_guiGet "{node}::text"' for node in
               ('settings_backend-value', 'settings_gpu-value', 'rendering-active', 'rendering-notice')],
             'openq4_retainedGui widget settings_gpu']

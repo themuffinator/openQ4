@@ -170,7 +170,7 @@ def main():
               'installed_transcript': authored in phases.get('AUTHORED', {}),
               'audio_settings_reached': 'GUI_ACTION set_b_audio ' in log and
                   'HUD_STATE source=guis/mainmenu.gui key=gui_set_audio_scroll value=6' in log,
-              'no_document_error': not re.search(r'(?:WARNING|ERROR).*subtitles\.q4ui', log)}
+              'no_document_error': not re.search(r'(?:WARNING|ERROR).*subtitles\.rui', log)}
     saved = root / 'save/baseoq4/subtitle-settings.cfg'
     settings = saved.read_text() if saved.exists() else ''
     checks['archived_controls'] = all(f'seta {key} "{value}"' in settings for key,value in

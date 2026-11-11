@@ -32,24 +32,24 @@ struct ViewFixture {
     ViewFixture(){
         Check(history.Open(Source,{},diagnostics),"view history opens");
         view=RetainedUI_CreateView();Check(view!=nullptr,"real view registration");
-        Check(RetainedUI_LoadView(view,Source,"canvas.q4ui",diagnostics),"actual view load + resource entry");
-        options.sourcePath="edited.q4ui";options.seconds=1;
+        Check(RetainedUI_LoadView(view,Source,"canvas.rui",diagnostics),"actual view load + resource entry");
+        options.sourcePath="edited.rui";options.seconds=1;
     }
     ~ViewFixture(){RetainedUI_DestroyView(view);}
     retainedUIPreparedEdit_t* Prepare(){retainedUIEditIdentity_t expected;Check(RetainedUI_QueryEditIdentity(view,expected),"exact view query");return RetainedUI_PrepareEdit(view,expected,history,history.Identity(),operations,options,diagnostics);}
 };
 static void ViewPublication(){
     ViewFixture f;auto* runtime=f.view->runtime.get();auto* prepared=f.Prepare();Check(prepared!=nullptr,"actual service prepares edit");
-    Check(f.view->source==Source&&f.view->path=="canvas.q4ui"&&f.history.UndoCount()==0,"all cached source remains old");
+    Check(f.view->source==Source&&f.view->path=="canvas.rui"&&f.history.UndoCount()==0,"all cached source remains old");
     const auto calls=host.calls;DocumentEditReceipt out;bool accepted=false;
     deny=true;accepted=RetainedUI_PublishEdit(f.view,prepared,out);deny=false;
     Check(accepted&&host.calls==calls,"actual service publication has no allocation/callback");
-    Check(f.view->runtime.get()==runtime&&f.view->source==f.history.Current()->Source()&&f.view->path=="edited.q4ui","runtime/source/path publish together");
+    Check(f.view->runtime.get()==runtime&&f.view->source==f.history.Current()->Source()&&f.view->path=="edited.rui","runtime/source/path publish together");
     Check(runtime->SourceMatches(f.view->source,f.view->path),"resource cache matches exact loaded runtime");
     Check(!RetainedUI_PublishEdit(f.view,prepared,out),"consumed publication never repeats");
     RetainedUI_DestroyPreparedEdit(prepared);Check(ContextCount()==1,"service eventually disposes old context");
     ++renderer.generation;Check(RetainedUI_PrepareView(f.view),"resource reset uses newly published source/path");
-    Check(runtime->SourceMatches(f.history.Current()->Source(),"edited.q4ui"),"new source survives actual service reload");
+    Check(runtime->SourceMatches(f.history.Current()->Source(),"edited.rui"),"new source survives actual service reload");
 }
 static void PendingResources(){
     ViewFixture f;auto* prepared=f.Prepare();Check(prepared!=nullptr,"pending resource fixture");
@@ -72,7 +72,7 @@ static void OwnerDeathAndReentry(){
     host.callback=[&]{RetainedUI_DestroyView(old);Check(RegisteredView(old)&&!RetainedUI_ViewRuntime(old)&&!old->callback&&!old->owner,"destruction deferred only through callback; old owner immediately disabled");};
     auto* prepared=f.Prepare();Check(!prepared&&!RegisteredView(old)&&editWorkDepth==0&&ContextCount()==0,"deferred view destruction completes when stack unwinds");f.view=nullptr;
     f.view=RetainedUI_CreateView();Check(f.view&&f.view->edit->lifetime!=oldToken,"replacement view has nonreused lifetime");
-    Check(RetainedUI_LoadView(f.view,Source,"canvas.q4ui",f.diagnostics),"replacement loads");
+    Check(RetainedUI_LoadView(f.view,Source,"canvas.rui",f.diagnostics),"replacement loads");
     retainedUIEditIdentity_t expected;Check(RetainedUI_QueryEditIdentity(f.view,expected),"reentry fixture identity");
     host.callback=[&]{Check(!RetainedUI_PrepareEdit(f.view,expected,f.history,f.history.Identity(),f.operations,f.options,f.diagnostics),"nested prepare refuses");};
     Check(!RetainedUI_PrepareEdit(f.view,expected,f.history,f.history.Identity(),f.operations,f.options,f.diagnostics),"nested attempt invalidates outer envelope");
@@ -90,24 +90,24 @@ static void NoOpAndCopiedEnvelope(){
     auto* prepared=f.Prepare();Check(prepared!=nullptr&&host.calls==calls&&ContextCount()==contexts,"source no-op creates no canvas or host work");
     DocumentEditReceipt out;out.before={9,8};const auto identity=f.history.Identity();
     Check(RetainedUI_PublishEdit(f.view,prepared,out)&&!out.sourceChanged&&out.after==identity,"checked source no-op has no history revision");
-    Check(f.view->path=="canvas.q4ui"&&f.view->runtime->SourceMatches(Source,"canvas.q4ui")&&ContextCount()==contexts,"source no-op preserves source/path and canvas");
+    Check(f.view->path=="canvas.rui"&&f.view->runtime->SourceMatches(Source,"canvas.rui")&&ContextCount()==contexts,"source no-op preserves source/path and canvas");
     RetainedUI_DestroyPreparedEdit(prepared);
     f.operations[0]=ReplaceDocumentValue{"panel","/properties/left/value","70"};
     host.callback=[&]{f.options.sourcePath="../invalid-after-copy";f.options.viewport.width=0;};
     prepared=f.Prepare();Check(prepared!=nullptr,"caller options copied before first host callback");
     deny=true;const bool accepted=RetainedUI_PublishEdit(f.view,prepared,out);deny=false;
-    Check(accepted&&f.view->path=="edited.q4ui","publication uses immutable copied metadata");
-    RetainedUI_DestroyPreparedEdit(prepared);f.options.sourcePath="undo.q4ui";f.options.viewport.width=1280;
+    Check(accepted&&f.view->path=="edited.rui","publication uses immutable copied metadata");
+    RetainedUI_DestroyPreparedEdit(prepared);f.options.sourcePath="undo.rui";f.options.viewport.width=1280;
     retainedUIEditIdentity_t expected;Check(RetainedUI_QueryEditIdentity(f.view,expected),"undo cached view identity");
     prepared=RetainedUI_PrepareHistory(f.view,expected,f.history,f.history.Identity(),false,f.options,f.diagnostics);
     Check(prepared!=nullptr&&RetainedUI_PublishEdit(f.view,prepared,out),"actual service prepared undo");
-    Check(f.view->source==Source&&f.view->path=="undo.q4ui"&&f.history.RedoCount()==1,"undo publishes exact cache/history together");
+    Check(f.view->source==Source&&f.view->path=="undo.rui"&&f.history.RedoCount()==1,"undo publishes exact cache/history together");
     RetainedUI_DestroyPreparedEdit(prepared);
     Check(RetainedUI_QueryEditIdentity(f.view,expected),"current before stale identity rejection");const auto prior=expected;
     f.view->runtime->CancelInput(2);Check(!RetainedUI_PrepareEdit(f.view,prior,f.history,f.history.Identity(),f.operations,f.options,f.diagnostics),"stale canvas inside unchanged view refused");
-    f.view->path="divergent-cache.q4ui";Check(RetainedUI_QueryEditIdentity(f.view,expected),"view protocol query remains separate from source equality");
+    f.view->path="divergent-cache.rui";Check(RetainedUI_QueryEditIdentity(f.view,expected),"view protocol query remains separate from source equality");
     Check(!RetainedUI_PrepareEdit(f.view,expected,f.history,f.history.Identity(),f.operations,f.options,f.diagnostics),"exact cached path/runtime join required");
-    f.view->path="undo.q4ui";
+    f.view->path="undo.rui";
 }
 static void CrossEnvelopeAndAbort(){
     ViewFixture a,b;auto* prepared=a.Prepare();Check(prepared!=nullptr,"cross-view fixture");DocumentEditReceipt out;out.before={12,13};
@@ -129,7 +129,7 @@ static void DeferredShutdown(){
     auto* prepared=f.Prepare();Check(!prepared&&editWorkDepth==0&&!editShutdownPending,"failed preparation drains deferred shutdown");
     Check(host.resets==resets+1&&ContextCount()==0&&f.view->failed&&f.history.Identity()==identity&&f.view->source==Source,"shutdown waits for candidate stack then closes source contexts");
     Check(!RetainedUI_PrepareView(f.view),"shutdown does not silently reload failed owner");
-    Check(RetainedUI_LoadView(f.view,Source,"canvas.q4ui",f.diagnostics),"explicit later initialization occurs after complete cleanup");
+    Check(RetainedUI_LoadView(f.view,Source,"canvas.rui",f.diagnostics),"explicit later initialization occurs after complete cleanup");
     host.callback=[&]{RetainedUI_DestroyView(f.view);RetainedUI_Shutdown();};
     auto* old=f.view;prepared=f.Prepare();f.view=nullptr;
     Check(!prepared&&!RegisteredView(old)&&ContextCount()==0&&!editShutdownPending,"owner death plus deferred shutdown releases exact resources");
@@ -139,10 +139,10 @@ static void PopupCallbackLifetimes(){
     for(unsigned mode=0;mode<8;++mode){
         const auto source=PopupFixture::Text(PopupFixture::BoundedChoice());
         DocumentEdit history;std::vector<Diagnostic> diagnostics;Check(history.Open(source,{},diagnostics),"popup history opens");
-        auto* view=RetainedUI_CreateView();Check(view&&RetainedUI_LoadView(view,source,"popup.q4ui",diagnostics),"actual registered constrained popup");
+        auto* view=RetainedUI_CreateView();Check(view&&RetainedUI_LoadView(view,source,"popup.rui",diagnostics),"actual registered constrained popup");
         auto* live=view->runtime.get();Viewport viewport;
         if(mode==7){
-            retainedUIEditIdentity_t current;Check(RetainedUI_QueryEditIdentity(view,current),"popup prepared view association");RuntimeDocumentOptions options;options.sourcePath="popup.q4ui";
+            retainedUIEditIdentity_t current;Check(RetainedUI_QueryEditIdentity(view,current),"popup prepared view association");RuntimeDocumentOptions options;options.sourcePath="popup.rui";
             auto* prepared=RetainedUI_PrepareEdit(view,current,history,history.Identity(),std::array<DocumentEditOperation,1>{ReplaceDocumentValue{"choice","/properties/width/value","355"}},options,diagnostics);
             DocumentEditReceipt receipt;Check(prepared&&RetainedUI_PublishEdit(view,prepared,receipt),"popup context publication retains original Runtime control");RetainedUI_DestroyPreparedEdit(prepared);
         }
@@ -174,7 +174,7 @@ static void PopupCallbackLifetimes(){
             Check(!RegisteredView(view)&&ContextCount()==0,"outermost service return drains deleted original without later entry");
             auto* replacement=RetainedUI_CreateView();Check(replacement&&replacement->edit->lifetime!=lifetime,"replacement receives new lifetime after complete drain");RetainedUI_DestroyView(replacement);
         }else{
-            Check(RegisteredView(view)&&view->source==stableSource&&view->path=="popup.q4ui","refused callback preserves original cache/source metadata");
+            Check(RegisteredView(view)&&view->source==stableSource&&view->path=="popup.rui","refused callback preserves original cache/source metadata");
             Check(live->TakeActions().empty(),"stale callback cannot accept a popup row");
             Check(!live->HasActiveCanvasCallback(),"runtime callback scope always clears after refusal");
             if(mode==2)Check(view->failed&&ContextCount()==0&&host.resets==resets+1,"queued shutdown finishes before outer return");

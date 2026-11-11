@@ -8,7 +8,7 @@
 
 // Owned by one synchronous game snapshot. GUI instances remain alive while the
 // save graph is visited; any Save method that changes a GUI must invalidate it
-// first. Never reuse records across snapshots or for wall-clock-driven Q4UI.
+// first. Never reuse records across snapshots or for wall-clock-driven retained UI.
 class SaveUserInterfaceCache {
 public:
 	static constexpr std::size_t MaxEntries = 256;

@@ -9,7 +9,7 @@ and [visual specification](../ui-visual-design.md); it does not accept a milesto
 
 The register still contains 227 requirements: 66 partial, 160 pending and one
 verified. All 271 migration records and all seven final gates remain unaccepted.
-The source tree contains one production Q4UI document, SYSTEM, reached through
+The source tree contains one production retained (`.rui`) document, SYSTEM, reached through
 the default-off `ui_retainedSystem` route. Historical foundation reports describe
 bounded increments; they are not evidence of complete replacement.
 
@@ -19,7 +19,7 @@ bounded increments; they are not evidence of complete replacement.
 | M2 SYSTEM | Drafts, confirmation, numeric fields, presets, scrolling and constrained choices are implemented in part. Complete mixed-effect Apply/recovery and supported native text activation remain unfinished. | Finish the complete settings flow and source-derived responsive artwork before accepting the page. |
 | M2/M3 typography and controls | Six roles exist: button, toggle, slider, choice, number and scrollbar. Independent retained text scale, complete shaping/composition, radio groups, bindings, tables, tabs, tooltips and other required controls remain open. | Add missing behavior with language, input, narrow-layout and large-text evidence. |
 | M2/M3 targeting | Rendered alpha masks did not participate in pointer targeting; fully masked controls could retain focus. This increment repairs that gap below. | Complete arbitrary clip/mask intersection for focus, exact transformed overflow rendering/input and authored hit-region overrides. |
-| M2/M3 editor | Source-preserving edits, history, canvas publication and file services exist; the extensive visible Q4UI authoring workspace does not. | Deliver the required edit/path/timeline/localize/bind/save/reopen/package round trip in the native editor. |
+| M2/M3 editor | Source-preserving edits, history, canvas publication and file services exist; the extensive visible `.rui` authoring workspace does not. | Deliver the required edit/path/timeline/localize/bind/save/reopen/package round trip in the native editor. |
 | M4/M5 corpus and art | No legacy resource has behavioral and visual replacement acceptance. One SYSTEM page cannot establish menu, HUD, terminal, scope or vehicle parity. | Translate each family using the existing manifest, installed assets and measured vector artwork. |
 | M6 quality and performance | Debug tests and bounded Windows captures cannot establish release CPU/GPU budgets or the full platform/display/input matrix. | Measure optimized builds, renderer memory/reclamation, high refresh, extreme scale/aspect combinations and supported platforms before cutover. |
 

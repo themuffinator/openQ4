@@ -50,7 +50,7 @@ static Json::Value Slider(Json::Value& source, const char* id, const char* state
 	node["children"].append(Box(prefix+"-value",vertical?30:10,vertical?10:32,vertical?30:180,18,"text")); return node;
 }
 static std::string Source() {
-	Json::Value source; source["format"]="openq4-ui"; source["version"]=1; source["id"]="value-runtime";
+	Json::Value source; source["format"]="retained-ui"; source["version"]=1; source["id"]="value-runtime";
 	for (const auto& [name,value]:std::map<std::string,Json::Value>{{"flag",false},{"mixed",false},{"level",1.05},{"verticalLevel",1.0},{"choice",0},{"thirdEnabled",false}}) {
 		source["state"][name]["type"]=value.isBool()?"boolean":"number"; source["state"][name]["initial"]=value;
 	}

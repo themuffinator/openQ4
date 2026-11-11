@@ -489,7 +489,7 @@ def check_catalog_declarations():
     slots = f'SystemDisplayDeviceSlots = {catalog.DEVICE_SLOTS}, SystemDisplayModeSlots = {catalog.MODE_SLOTS}, SystemDisplayRefreshSlots = {catalog.REFRESH_SLOTS};'
     assert slots in header, 'the page declares different display list slot counts from the builder'
     # The page declares exactly these keys, with these types and initial values.
-    page = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/system.q4ui').read_text(encoding='utf-8')
+    page = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/system.rui').read_text(encoding='utf-8')
     state = json.loads(page[page.index('{'):])['state']
     declared = {key: value for key, value in state.items() if key.startswith(catalog.PREFIX)}
     assert declared == catalog.keys(), 'the page declares different display list keys'

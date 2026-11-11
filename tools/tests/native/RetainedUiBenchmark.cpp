@@ -201,20 +201,20 @@ void Load(const std::string& path, int repeats) {
 int main(int argc, char** argv) {
 	try {
 		if (argc >= 3 && std::string(argv[1]) == "--load") {
-			if (argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark --load <document.q4ui> [repeats=3]");
+			if (argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark --load <document.rui> [repeats=3]");
 			const int repeats = argc > 3 ? std::stoi(argv[3]) : 3;
 			if (repeats < 1 || repeats > 100) throw std::runtime_error("Invalid repeat count");
 			Load(argv[2],repeats);
 			return 0;
 		}
 		if (argc >= 3 && (std::string(argv[1]) == "--screen" || std::string(argv[1]) == "--scope")) {
-			if (argc > 7) throw std::runtime_error("usage: openq4-retained-ui-benchmark --screen|--scope <document.q4ui> [frames=120] [width=1280] [height=720] [event]");
+			if (argc > 7) throw std::runtime_error("usage: openq4-retained-ui-benchmark --screen|--scope <document.rui> [frames=120] [width=1280] [height=720] [event]");
 			const int frames = argc > 3 ? std::stoi(argv[3]) : 120, width = argc > 4 ? std::stoi(argv[4]) : 1280, height = argc > 5 ? std::stoi(argv[5]) : 720;
 			if (frames < 2 || frames > 3600 || width < 64 || width > 8192 || height < 64 || height > 8192) throw std::runtime_error("Invalid screen frame count or size");
 			Screen(argv[2],frames,width,height,argc > 6 ? argv[6] : "",std::string(argv[1]) == "--scope");
 			return 0;
 		}
-		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.q4ui> [density=1.25] [frames=60] | --screen|--scope <document.q4ui> [frames] [width] [height] [event] | --load <document.q4ui> [repeats]");
+		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.rui> [density=1.25] [frames=60] | --screen|--scope <document.rui> [frames] [width] [height] [event] | --load <document.rui> [repeats]");
 		Viewport viewport;
 		viewport.displayScale = argc > 2 ? std::stof(argv[2]) : 1.25f;
 		const int frames = argc > 3 ? std::stoi(argv[3]) : 60;

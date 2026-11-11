@@ -53,7 +53,7 @@ def expected_commands(capture: dict) -> list[str]:
         if not probe['passed'] or probe['sources'] != sources:
             raise ValueError('presentation probe provenance changed')
         result += commands(FIXTURES / 'presentation-smoke.cfg')
-    result += [f'{load} "retained-smoke.q4ui"'] + begin + profile + ['wait 2']
+    result += [f'{load} "retained-smoke.rui"'] + begin + profile + ['wait 2']
     result += commands(FIXTURES / 'snapshot-smoke.cfg') + [f'wait {settle}'] + end
     if preview.get('language_reload', False):
         result += ['reloadLanguage', 'wait 2']
@@ -88,7 +88,7 @@ def verify_capture(folder: Path) -> dict:
     # Read the fixed engine target path, never a path selected by metadata.
     # Both native Windows and portable slash spellings describe that artifact.
     image_name_ok = isinstance(image['path'], str) and image['path'].replace('\\', '/') == image_path.relative_to(folder).as_posix()
-    provenance = (preview['sha256'] == digest(FIXTURES / 'interaction-smoke.q4ui') == digest(game / 'retained-smoke.q4ui') and
+    provenance = (preview['sha256'] == digest(FIXTURES / 'interaction-smoke.rui') == digest(game / 'retained-smoke.rui') and
                   preview['interaction_script']['sha256'] == digest(FIXTURES / 'snapshot-smoke.cfg') and
                   preview['resume_script']['sha256'] == digest(FIXTURES / 'snapshot-resume.cfg') and
                   capture['cfg_sha256'] == digest(cfg_path) and capture['log_sha256'] == digest(log_path) and
@@ -130,7 +130,7 @@ def verify_capture(folder: Path) -> dict:
     restarts = [line for line in snapshots if line.startswith('Retained UI instance restored after renderer/language change:')]
     result = {'action_batches': counts, 'actions': actions, 'states': states,
               'checkpoint_bytes': saved, 'restored_bytes': restored, 'resource_restores': len(restarts)}
-    expected_restart = 'Retained UI instance restored after renderer/language change: retained-smoke.q4ui'
+    expected_restart = 'Retained UI instance restored after renderer/language change: retained-smoke.rui'
     expected_restores = [expected_restart] * (1 + int(preview.get('language_reload', False)))
     ordered = [line for line in lines if line in trace or line in snapshots]
     expected_checkpoints = ([f'Retained UI checkpoint: save bytes={saved[0]}',

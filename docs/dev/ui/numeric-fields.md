@@ -273,7 +273,7 @@ Runtime suite uses actual RmlUi layout and drawing with a counted Host, includin
 fractional density, transforms, scrolling, composition and resource restoration.
 These tests do not operate a native device or qualify native IME behavior.
 
-`tools/ui/fixtures/number-edit-smoke.q4ui` supplies first-party vector artwork for
+`tools/ui/fixtures/number-edit-smoke.rui` supplies first-party vector artwork for
 the managed adapter. Its companion configuration uses `openq4_retainedGui number`
 semantic operations and engine `screenshot` commands. It is a test fixture;
 at that checkpoint the shipped SYSTEM page still needed an entry field and

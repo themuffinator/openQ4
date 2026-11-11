@@ -27,7 +27,7 @@ import time
 import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURE = ROOT / "tools/ui/fixtures/display-settings-smoke.q4ui"
+FIXTURE = ROOT / "tools/ui/fixtures/display-settings-smoke.rui"
 MAGIC = b"openQ4 settings recovery 1\n"
 JOURNAL_NAME = "ui-settings-recovery.dat"
 CONFIG_NAME = "openQ4Config.cfg"
@@ -42,7 +42,7 @@ def digest(path: Path) -> str:
 
 def scripts() -> tuple[str, str]:
     before = ('rendererDisplayProbe report\n'
-              'testGUI "settings-recovery.q4ui"\nwait 2\n'
+              'testGUI "settings-recovery.rui"\nwait 2\n'
               'openq4_retainedGui event "edit"\nwait 2\n'
               'openq4_retainedGui event "apply"\nwait 12\n'
               'openq4_retainedGui report\n')
@@ -383,7 +383,7 @@ def capture(args: argparse.Namespace) -> int:
     if not Path(commands["pending"][0]).is_file():
         raise ValueError("staged client is absent")
     game.mkdir(parents=True)
-    shutil.copyfile(FIXTURE, game / "settings-recovery.q4ui")
+    shutil.copyfile(FIXTURE, game / "settings-recovery.rui")
     cfgs = {}
     for phase, script in zip(("pending", "startup"), scripts()):
         path = game / f"settings-recovery-{phase}.cfg"

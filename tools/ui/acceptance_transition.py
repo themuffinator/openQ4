@@ -379,7 +379,7 @@ def check_resource_entry(audit, entry, label):
     """Fields an accepted migration resource must carry."""
     audit.require(entry["translation_status"] == ACCEPTED and entry["family_reviewed"] is True,
                   f"Unqualified resource: {label} is not reviewed and accepted")
-    audit.require(isinstance(entry["replacement"], str) and entry["replacement"].endswith(".q4ui"),
+    audit.require(isinstance(entry["replacement"], str) and entry["replacement"].endswith(".rui"),
                   f"Unqualified resource: {label} has no retained replacement")
     exceptions = entry["bitmap_exceptions"]
     audit.require(isinstance(exceptions, list) and all(isinstance(item, dict) and set(item) == {"path", "reason", "review"} and

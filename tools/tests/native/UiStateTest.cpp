@@ -12,7 +12,7 @@ static void Check(bool good, const char* message) {
 }
 static bool Near(double a, double b) { return std::abs(a-b)<.0001; }
 static void CheckCombinedSources() {
-	const std::string source = R"({"format":"openq4-ui","version":1,"id":"combined-state",
+	const std::string source = R"({"format":"retained-ui","version":1,"id":"combined-state",
  "root":{"id":"root","type":"group","properties":{"left":{"type":"length","value":1,"unit":"dp"}}},
  "state":{"application":{"type":"number","initial":2},"host":{"type":"number","initial":1,"cvar":"host_value"}},
  "presentationVariables":{"pending":{"type":"number","initial":0,"value":{"state":"application"}}},
@@ -50,7 +50,7 @@ static void CheckCombinedSources() {
 }
 int main(int argc, char** argv) {
 	CheckCombinedSources();
-	std::ifstream file(argc>1 ? argv[1] : "tools/ui/fixtures/binding-smoke.q4ui",std::ios::binary);
+	std::ifstream file(argc>1 ? argv[1] : "tools/ui/fixtures/binding-smoke.rui",std::ios::binary);
 	Check(file.good(),"binding fixture exists");
 	const std::string source((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());
 	Document document; std::vector<Diagnostic> diagnostics; std::string error;

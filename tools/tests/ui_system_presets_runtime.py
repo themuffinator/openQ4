@@ -53,7 +53,7 @@ def main():
     # The fixture reads each locale's openQ4 table and its stock code table (the
     # prompt bar's key names).
     strings = ROOT/'content/baseoq4/pak0/strings'
-    bound = sources + headers + libraries + [Path(__file__).resolve(), ROOT/'content/baseoq4/pak0/guis/menu/settings/system.q4ui'] + list(strings.glob('*_openq4.lang')) + list(strings.glob('*_code.lang'))
+    bound = sources + headers + libraries + [Path(__file__).resolve(), ROOT/'content/baseoq4/pak0/guis/menu/settings/system.rui'] + list(strings.glob('*_openq4.lang')) + list(strings.glob('*_code.lang'))
     before = {str(path): sha(path) for path in bound}
     reused = {}
     if args.reuse:
@@ -107,7 +107,7 @@ def main():
     mutations = []
     try:
         exe = build('baseline' if args.baseline else 'positive', [source for source in sources if source not in reused], reused.values())
-        run_result = run(exe, [str(ROOT/'content/baseoq4/pak0/guis/menu/settings/system.q4ui'), str(ROOT/'content/baseoq4/pak0/strings')])
+        run_result = run(exe, [str(ROOT/'content/baseoq4/pak0/guis/menu/settings/system.rui'), str(ROOT/'content/baseoq4/pak0/strings')])
         print(run_result.stdout + run_result.stderr, flush=True)
     except Exception as failure:
         error = str(failure)

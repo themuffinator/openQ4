@@ -10,6 +10,7 @@ from filesystem_case_segments import function_body
 
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = r'''
+#include <cctype>
 #include <cstdarg>
 #include <cstdio>
 #include <stdexcept>
@@ -18,6 +19,8 @@ struct idStr:std::string {
     using std::string::string;using std::string::operator=;
     int Length() const {return static_cast<int>(size());}
     operator const char*() const {return c_str();}
+    static int Icmp(const char* a,const char* b){for(;;++a,++b){const int x=std::tolower(static_cast<unsigned char>(*a)),y=std::tolower(static_cast<unsigned char>(*b));if(x!=y)return x-y;if(!x)return 0;}}
+    void SetFileExtension(const char* ext){const size_t dot=find_last_of('.'),slash=find_last_of("/\\");if(dot!=npos&&(slash==npos||dot>slash))erase(dot);append(ext);}
 };
 struct idDict {};
 struct File {int reads=0;};
@@ -27,8 +30,8 @@ struct idUserInterface {
 } available;
 struct Manager {
     idUserInterface* result=&available;
-    int calls=0;bool unique=false;
-    idUserInterface* FindGui(const char*,bool load,bool value){if(!load)throw std::runtime_error("autoload disabled");++calls;unique=value;return result;}
+    int calls=0;bool unique=false;std::string path;
+    idUserInterface* FindGui(const char* name,bool load,bool value){if(!load)throw std::runtime_error("autoload disabled");++calls;unique=value;path=name;return result;}
 } manager,*uiManager=&manager;
 struct openQ4SaveGameGuiRevision_t {const char* currentWindow="new";} revision;
 static bool historical=false;static int openQ4SaveGameLayoutBuild=0;
@@ -83,7 +86,18 @@ int main(){try {
         idUserInterface* ui=&available;restore.ReadUserInterface(ui,&args);
         require(!ui && !manager.calls && !restore.flags && !restore.storage.reads && !restore.parms,"null GUI record consumed payload or created a GUI");
     }
-    std::puts("GUI restore: missing definition rejected before payload; null, current, unique and historical readers preserved");return 0;
+    for(const char* saved:{"guis/weapons/railgun_scope.q4ui","guis/hud/REMASTERED_MARINE.Q4UI"}) {
+        idRestoreGame restore;restore.name=saved;manager.result=&available;available.valid=true;historical=false;
+        idUserInterface* ui=nullptr;restore.ReadUserInterface(ui,&args);
+        idStr expected=saved;expected.SetFileExtension(".rui");
+        require(ui==&available && manager.path==expected,"a GUI record saved before the .rui rename did not open the renamed document");
+    }
+    {
+        idRestoreGame restore;restore.name="guis/menu/title.rui";manager.result=&available;available.valid=true;historical=false;
+        idUserInterface* ui=nullptr;restore.ReadUserInterface(ui,&args);
+        require(manager.path=="guis/menu/title.rui","a current .rui GUI record was renamed");
+    }
+    std::puts("GUI restore: missing definition rejected before payload; null, current, unique, historical and pre-.rui readers preserved");return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"%s\n",e.what());return 1;}}
 '''
 

@@ -17,7 +17,7 @@ the effects its alpha content left out (docs/user/awakening.md).
 - The turret parts' "snd_move" servo loop plays where a def sets
   "playMoveSound"; it is transient, never saved.
 - The turret's HUD is openQ4's guis/vehicles/turret_hud.gui with the
-  Remastered peer remastered_chaingun_turret.q4ui: the gunner's health and
+  Remastered peer remastered_chaingun_turret.rui: the gunner's health and
   armor and the barrel heat.
 - A vehicle weapon ejects casings at all (Raven's timing test returned on
   every shot) in its joint's frame, and trails "fx_burstSmoke" after a burst
@@ -222,8 +222,8 @@ def check_turret_gun() -> None:
     assert "moveSound" not in turret_save, "the servo loop is transient"
 
     retained = read(ROOT / "src/ui/RetainedHud.cpp")
-    assert '{"guis/vehicles/turret_hud.gui","guis/hud/remastered_chaingun_turret.q4ui"}' in retained
-    assert (PAK0 / "guis/hud/remastered_chaingun_turret.q4ui").is_file()
+    assert '{"guis/vehicles/turret_hud.gui","guis/hud/remastered_chaingun_turret.rui"}' in retained
+    assert (PAK0 / "guis/hud/remastered_chaingun_turret.rui").is_file()
     gui = read(PAK0 / "guis/vehicles/turret_hud.gui")
     for key in ("gui::vehicle_heat", "gui::vehicle_overheat", "gui::player_healthpct", "gui::player_armorpct", "#str_231708",
                 "#str_231709", "#str_231710"):

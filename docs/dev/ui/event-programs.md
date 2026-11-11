@@ -200,7 +200,7 @@ use host/backend doubles; the following captures exercise the built engine.
 Both runs use the mode-specific launch profile, installed stock assets, a hidden
 window, disabled host mouse/controller input and the engine `screenshot` command.
 MP explicitly sets `ui_autoJoin 1`. The
-[event fixture](../../../tools/ui/fixtures/event-program-smoke.q4ui),
+[event fixture](../../../tools/ui/fixtures/event-program-smoke.rui),
 [semantic script](../../../tools/ui/fixtures/event-program-smoke.cfg) and
 [read-only recovery script](../../../tools/ui/fixtures/event-program-smoke-resume.cfg)
 are authored test assets. They are not production GUI replacements.

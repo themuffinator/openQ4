@@ -104,7 +104,7 @@ void idPlayerView::DrawRetainedViewEffects( bool wheelOnly ) {
 		recovery = recovery * recovery * ( 3 - 2 * recovery );
 	}
 	if ( death <= 0 && recovery <= 0 && shock <= 0 && wheel <= 0 && crashFocus <= 0 && crashLids <= 0 ) return;
-	if ( !presentationFx ) presentationFx = uiManager->FindGui( "guis/hud/view_effects.q4ui", true, true );
+	if ( !presentationFx ) presentationFx = uiManager->FindGui( "guis/hud/view_effects.rui", true, true );
 	if ( !presentationFx ) return;
 	presentationFx->SetStateFloat( "death_amount", death );
 	presentationFx->SetStateFloat( "death_shock", shock );

@@ -149,7 +149,7 @@ hashes, warning comparisons and review results. The baseline engine revision is
 48/13. The tested client SHA-256 is
 `3c7bf81479b9a869a4743f559be6dea40a6715b045999b26f8e4da26e00b9793`.
 
-The authored [document](../../../tools/ui/fixtures/presentation-alias-smoke.q4ui),
+The authored [document](../../../tools/ui/fixtures/presentation-alias-smoke.rui),
 [setup](../../../tools/ui/fixtures/presentation-alias-smoke.cfg) and
 [resume](../../../tools/ui/fixtures/presentation-alias-smoke-resume.cfg) use actual
 public presentation calls, framed GUI save/restore and typed shadow operations.

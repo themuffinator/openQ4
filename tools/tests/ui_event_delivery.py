@@ -105,7 +105,7 @@ struct Scenario {
         while(uiManagerLocal.allocations.Num())delete uiManagerLocal.allocations[0];
         assert(!uiManagerLocal.applicationPumpDepth && !recycledAllocation);
     }
-    idUserInterfaceRetained* Make(const char* name="view.q4ui") {
+    idUserInterfaceRetained* Make(const char* name="view.rui") {
         auto* gui=new idUserInterfaceRetained; assert(gui->InitFromFile(name)); return gui;
     }
 };
@@ -115,7 +115,7 @@ MAIN = r'''
 int main() {
     {
         Scenario s;
-        auto* first=s.Make(); auto* second=s.Make("hidden.q4ui");
+        auto* first=s.Make(); auto* second=s.Make("hidden.rui");
         auto* legacy=new idUserInterfaceLocal; legacy->InitFromFile("legacy.gui");
         first->pendingActions={"first"}; second->pendingActions={"hidden"};
         consoleObject.open=true; previewOpen=true;
@@ -132,12 +132,12 @@ int main() {
     }
     {
         Scenario s;
-        auto* first=s.Make("first.q4ui"); auto* victim=s.Make("victim.q4ui");
+        auto* first=s.Make("first.rui"); auto* victim=s.Make("victim.rui");
         idUserInterfaceRetained* replacement=nullptr;
         first->pendingActions={"first"}; victim->pendingActions={"stale"};
         first->onDispatch=[&] {
             first->onDispatch={}; recycleAllocation=true; delete victim;
-            replacement=s.Make("replacement.q4ui"); recycleAllocation=false;
+            replacement=s.Make("replacement.rui"); recycleAllocation=false;
             assert(replacement==victim); replacement->pendingActions={"replacement"};
         };
         s.session.PumpApplicationActions();
@@ -147,7 +147,7 @@ int main() {
     }
     {
         Scenario s;
-        auto* first=s.Make(); auto* peer=s.Make("peer.q4ui");
+        auto* first=s.Make(); auto* peer=s.Make("peer.rui");
         first->pendingActions={"self"}; peer->pendingActions={"peer"};
         first->onDispatch=[&] { delete peer; delete first; };
         const int before=destroyed; s.session.PumpApplicationActions();
@@ -155,11 +155,11 @@ int main() {
     }
     {
         Scenario s;
-        auto* first=s.Make(); auto* idle=s.Make("idle.q4ui");
+        auto* first=s.Make(); auto* idle=s.Make("idle.rui");
         first->pendingActions={"initial"};
         first->onDispatch=[&] {
             first->onDispatch={}; first->pendingActions={"next self"}; idle->pendingActions={"next peer"};
-            auto* added=s.Make("added.q4ui"); added->pendingActions={"next new"};
+            auto* added=s.Make("added.rui"); added->pendingActions={"next new"};
             s.session.PumpApplicationActions(); // Nested global drain does nothing.
         };
         s.session.PumpApplicationActions();
@@ -188,7 +188,7 @@ int main() {
     }
     {
         Scenario s;
-        auto* old=s.Make("old.q4ui"); auto* next=s.Make("next.q4ui");
+        auto* old=s.Make("old.rui"); auto* next=s.Make("next.rui");
         int deactivations=0,activations=0;
         old->active=true; s.session.guiActive=old;
         old->onActivate=[&](bool active) {
@@ -207,8 +207,8 @@ int main() {
     }
     {
         Scenario s;
-        auto* active=s.Make("normal.q4ui"); active->active=true; s.session.guiActive=active;
-        s.session.TestGUI("test.q4ui"); auto* old=static_cast<idUserInterfaceRetained*>(s.session.guiTest);
+        auto* active=s.Make("normal.rui"); active->active=true; s.session.guiActive=active;
+        s.session.TestGUI("test.rui"); auto* old=static_cast<idUserInterfaceRetained*>(s.session.guiTest);
         int deactivations=0;
         old->onActivate=[&](bool value) {
             assert(!value && !s.session.guiTest); ++deactivations;
@@ -221,11 +221,11 @@ int main() {
         assert(!s.session.guiTest && s.session.guiActive==active && active->active);
         assert(deactivations==1 && destroyed==before+1 && applicationActions==std::vector<std::string>{"before delete"});
         s.session.PumpApplicationActions(); assert(applicationActions.size()==1);
-        s.session.TestGUI("replacement-source.q4ui");
+        s.session.TestGUI("replacement-source.rui");
         old=static_cast<idUserInterfaceRetained*>(s.session.guiTest);
         old->onActivate=[&](bool value) { assert(!value); old->pendingActions={"dismiss","replace cleanup"}; };
-        s.session.TestGUI("replacement.q4ui");
-        assert(s.session.guiTest && std::string(s.session.guiTest->Name())=="replacement.q4ui");
+        s.session.TestGUI("replacement.rui");
+        assert(s.session.guiTest && std::string(s.session.guiTest->Name())=="replacement.rui");
         assert(applicationActions.back()=="replace cleanup" && active->active);
     }
     {
@@ -237,7 +237,7 @@ int main() {
     }
     {
         Scenario s;
-        auto* wrapper=uiManagerLocal.Alloc(); assert(wrapper->InitFromFile("deferred.q4ui"));
+        auto* wrapper=uiManagerLocal.Alloc(); assert(wrapper->InitFromFile("deferred.rui"));
         assert(uiManagerLocal.allocations.Num()==1);
         wrapper->SetStateString("queuedAction","wrapped"); wrapper->HandleNamedEvent("queue");
         assert(std::string(static_cast<idUserInterfaceManaged*>(wrapper)->PendingApplicationCommand())=="retained-pending");

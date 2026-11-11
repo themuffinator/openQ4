@@ -415,7 +415,7 @@ again when one is chosen.
 
 At the end of a match the summary card covers the game's match summary
 (`guis/summary.gui`, section 14.14) as the Escape card covers its menu
-(`guis/menu/mp_summary.q4ui`, built by `tools/ui/retained_mp_summary.py`). It
+(`guis/menu/mp_summary.rui`, built by `tools/ui/retained_mp_summary.py`). It
 presents with `ui_retained` alone, since all its pages are built, and the
 stock summary stays for `ui_retained 0`, a mod's own `summary.gui` and an
 Arena Campaign match. It takes the Escape card's size, so the Players page it

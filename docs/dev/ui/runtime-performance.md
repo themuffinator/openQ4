@@ -45,7 +45,7 @@ instead of per frame. The gate rejects the previous documents: the machinegun
 alone compiles and uploads 3,840 paths in 240 frames. Existing geometry budgets,
 centering, ammo and lock-state assertions also pass.
 
-Reproduce with `openq4-retained-ui-benchmark --scope <scope.q4ui> 180 1920 1080`
+Reproduce with `openq4-retained-ui-benchmark --scope <scope.rui> 180 1920 1080`
 and the Meson `openq4-ui-retained-screens-optics` test. The windowed SP harness
 `tools/tests/ui_scope_performance.py` profiles each moving scope over
 `game/airdefense1`, captures through the engine `screenshot` command, and
@@ -195,8 +195,8 @@ It is a diagnostic executable, not a timing threshold in the normal test suite.
 
 ```powershell
 & tools/build/meson_setup.ps1 compile -C builddir openq4-retained-ui-benchmark
-& builddir/openq4-retained-ui-benchmark.exe tools/ui/fixtures/vector-smoke.q4ui 1.25 60
-& builddir/openq4-retained-ui-benchmark.exe tools/ui/fixtures/vector-smoke.q4ui 2 60
+& builddir/openq4-retained-ui-benchmark.exe tools/ui/fixtures/vector-smoke.rui 1.25 60
+& builddir/openq4-retained-ui-benchmark.exe tools/ui/fixtures/vector-smoke.rui 2 60
 ```
 
 The baseline was `d096cc9f` with measurement instrumentation, before cache
@@ -242,7 +242,7 @@ It reports frame, update, render and tessellation times, paths compiled, draw
 calls, submitted vertices, and layers pushed and elided:
 
 ```powershell
-& builddir/openq4-retained-ui-benchmark.exe --screen content/baseoq4/pak0/guis/menu/title.q4ui 240 1280 720
+& builddir/openq4-retained-ui-benchmark.exe --screen content/baseoq4/pak0/guis/menu/title.rui 240 1280 720
 ```
 
 An optional sixth argument names a document event that runs after the settle,
@@ -252,7 +252,7 @@ opens in a 2.8-3.4 ms first frame against 2.5-2.7 ms without the list
 (debugoptimized, two runs each, 30 frames at 1280x720):
 
 ```powershell
-& builddir/openq4-retained-ui-benchmark.exe --screen content/baseoq4/pak0/guis/menu/createserver.q4ui 30 1280 720 advancedModalShow
+& builddir/openq4-retained-ui-benchmark.exe --screen content/baseoq4/pak0/guis/menu/createserver.rui 30 1280 720 advancedModalShow
 ```
 
 ## Gameplay evidence
@@ -295,8 +295,8 @@ or the complete 271-resource GUI corpus.
 
 ```powershell
 $assets = 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4'
-python tools/ui/capture_legacy_baseline.py --assets $assets --mode sp --renderer gl --retained-document tools/ui/fixtures/vector-smoke.q4ui --density 1.25 --timeline enter --video-restart --profile-frames 180 --output .tmp/ui/performance/sp-gl-review
-python tools/ui/capture_legacy_baseline.py --assets $assets --mode mp --renderer vulkan --retained-document tools/ui/fixtures/vector-smoke.q4ui --density 2 --timeline enter --profile-frames 180 --output .tmp/ui/performance/mp-vulkan-review
+python tools/ui/capture_legacy_baseline.py --assets $assets --mode sp --renderer gl --retained-document tools/ui/fixtures/vector-smoke.rui --density 1.25 --timeline enter --video-restart --profile-frames 180 --output .tmp/ui/performance/sp-gl-review
+python tools/ui/capture_legacy_baseline.py --assets $assets --mode mp --renderer vulkan --retained-document tools/ui/fixtures/vector-smoke.rui --density 2 --timeline enter --profile-frames 180 --output .tmp/ui/performance/mp-vulkan-review
 ```
 
 ## Retained title screen CPU
@@ -399,7 +399,7 @@ property. With dependency-tracked evaluation (see
 [bindings](bindings.md#updates-ownership-and-lifetime)) a batch evaluates and
 applies only what it reaches. The native benchmark
 (`openq4-ui-retained-screens-test --hud-bench`, debugoptimized, one variable
-changed per batch) on `remastered_mp.q4ui`:
+changed per batch) on `remastered_mp.rui`:
 
 | Document | State update | Frame after a change |
 | --- | ---: | ---: |
@@ -1238,7 +1238,7 @@ results and implementation. This does not change the accepted parity findings.
 
 ## Large documents
 
-5 October 2026. The multiplayer Escape card (`mp_escape.q4ui`) is the largest
+5 October 2026. The multiplayer Escape card (`mp_escape.rui`) is the largest
 retained document: 7.6 MB, 4,499 nodes, 366 controls, 2,173 bindings, 1,925
 timelines with 5,240 tracks and 34,395 authored properties. The game loads it
 with every multiplayer map, and on a debugoptimized build its load took
@@ -1286,10 +1286,10 @@ frames at 1280x720 after the four-second settle; medians:
 
 | Document | Load before | Load after | Frame p50 before | Frame p50 after | Frame p95 before | Frame p95 after |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `mp_escape.q4ui` | 9,484 ms | 624 ms | 504.0 ms | 13.4 ms | 764.3 ms | 61.0 ms |
-| `mp_welcome.q4ui` | 231 ms | 117 ms | 4.50 ms | 0.73 ms | 5.25 ms | 0.85 ms |
-| `title.q4ui` | 80 ms | 78 ms | 0.96 ms | 0.67 ms | 1.12 ms | 0.88 ms |
-| `pause.q4ui` | 70 ms | 63 ms | 1.12 ms | 0.29 ms | 1.23 ms | 0.36 ms |
+| `mp_escape.rui` | 9,484 ms | 624 ms | 504.0 ms | 13.4 ms | 764.3 ms | 61.0 ms |
+| `mp_welcome.rui` | 231 ms | 117 ms | 4.50 ms | 0.73 ms | 5.25 ms | 0.85 ms |
+| `title.rui` | 80 ms | 78 ms | 0.96 ms | 0.67 ms | 1.12 ms | 0.88 ms |
+| `pause.rui` | 70 ms | 63 ms | 1.12 ms | 0.29 ms | 1.23 ms | 0.36 ms |
 
 The native screens test, which loads the Escape card four times, fell from
 104-187 s to 42 s. The canvas suite (`ui_document_canvas.py`) and its 30
@@ -1326,13 +1326,13 @@ Same machine and build type as above, 60 frames at 1280x720 after the settle:
 
 | Document | Frame p50 before | Frame p50 after | Update p50 before | Update p50 after |
 | --- | ---: | ---: | ---: | ---: |
-| `mp_escape.q4ui` | 14.21 ms | 5.85 ms | 13.44 ms | 5.07 ms |
-| `mp_welcome.q4ui` | 0.82 ms | 0.28 ms | 0.71 ms | 0.18 ms |
-| `joingame.q4ui` | 1.89 ms | 0.50 ms | – | 0.25 ms |
-| `createserver.q4ui` | 1.66 ms | 0.89 ms | – | 0.61 ms |
-| `loadgame.q4ui` | 0.41 ms | 0.17 ms | – | 0.08 ms |
-| `pause.q4ui` | 0.39 ms | 0.16 ms | – | 0.07 ms |
-| `title.q4ui` | 1.09 ms | 1.02 ms | – | 0.37 ms |
+| `mp_escape.rui` | 14.21 ms | 5.85 ms | 13.44 ms | 5.07 ms |
+| `mp_welcome.rui` | 0.82 ms | 0.28 ms | 0.71 ms | 0.18 ms |
+| `joingame.rui` | 1.89 ms | 0.50 ms | – | 0.25 ms |
+| `createserver.rui` | 1.66 ms | 0.89 ms | – | 0.61 ms |
+| `loadgame.rui` | 0.41 ms | 0.17 ms | – | 0.08 ms |
+| `pause.rui` | 0.39 ms | 0.16 ms | – | 0.07 ms |
+| `title.rui` | 1.09 ms | 1.02 ms | – | 0.37 ms |
 
 What remained on the Escape card was `ValueControlView::Paint`, which
 reasserted every choice option's label, availability and display each frame
@@ -1356,11 +1356,11 @@ machine ran lighter than for the table above, where the Escape card measured
 
 | Document | Without | With |
 | --- | ---: | ---: |
-| `mp_escape.q4ui` | 2.13 ms | 0.67 ms |
-| `createserver.q4ui` | 0.91 ms | 0.62 ms |
-| `mp_welcome.q4ui` | 0.26 ms | 0.18 ms |
-| `joingame.q4ui` | 0.52 ms | 0.51 ms |
-| `title.q4ui` | 1.10 ms | 1.00 ms |
+| `mp_escape.rui` | 2.13 ms | 0.67 ms |
+| `createserver.rui` | 0.91 ms | 0.62 ms |
+| `mp_welcome.rui` | 0.26 ms | 0.18 ms |
+| `joingame.rui` | 0.52 ms | 0.51 ms |
+| `title.rui` | 1.10 ms | 1.00 ms |
 
 ## Startup preload
 
@@ -1709,7 +1709,7 @@ parse alone, `Document::Load` (parse, validation and index), the derived
 markup and the runtime's view, with the private memory each phase retains:
 
 ```powershell
-& builddir-perf/openq4-retained-ui-benchmark.exe --load content/baseoq4/pak0/guis/hud/remastered_marine.q4ui 3
+& builddir-perf/openq4-retained-ui-benchmark.exe --load content/baseoq4/pak0/guis/hud/remastered_marine.rui 3
 ```
 
 It found three costs with one cause: the loader kept and walked more than it
@@ -1755,14 +1755,14 @@ five loads each:
 
 | Document | Parse before | Parse after | Load before | Load after |
 | --- | ---: | ---: | ---: | ---: |
-| `title.q4ui` | 31.7 ms | 22.9 ms | 73.9 ms | 59.1 ms |
-| `createserver.q4ui` | 62.6 ms | 42.1 ms | 155.5 ms | 107.9 ms |
-| `joingame.q4ui` | 87.5 ms | 67.2 ms | 216.9 ms | 169.6 ms |
-| `mp_escape.q4ui` | 122.6 ms | 107.7 ms | 449.8 ms | 295.2 ms |
-| `remastered_marine.q4ui` | 155.6 ms | 94.1 ms | 332.7 ms | 223.5 ms |
-| `remastered_mp.q4ui` | 96.7 ms | 71.9 ms | 235.6 ms | 192.7 ms |
-| `weapon_wheel_marine.q4ui` | 47.8 ms | 32.2 ms | 107.5 ms | 79.3 ms |
-| `artwork.q4ui` | 75.4 ms | 55.0 ms | 159.4 ms | 132.0 ms |
+| `title.rui` | 31.7 ms | 22.9 ms | 73.9 ms | 59.1 ms |
+| `createserver.rui` | 62.6 ms | 42.1 ms | 155.5 ms | 107.9 ms |
+| `joingame.rui` | 87.5 ms | 67.2 ms | 216.9 ms | 169.6 ms |
+| `mp_escape.rui` | 122.6 ms | 107.7 ms | 449.8 ms | 295.2 ms |
+| `remastered_marine.rui` | 155.6 ms | 94.1 ms | 332.7 ms | 223.5 ms |
+| `remastered_mp.rui` | 96.7 ms | 71.9 ms | 235.6 ms | 192.7 ms |
+| `weapon_wheel_marine.rui` | 47.8 ms | 32.2 ms | 107.5 ms | 79.3 ms |
+| `artwork.rui` | 75.4 ms | 55.0 ms | 159.4 ms | 132.0 ms |
 
 Every load gains, on the workers that parse the title's pages at startup as
 on the main thread; the view's cost (markup, elements, bindings) is
@@ -1905,15 +1905,15 @@ discarded.
 
 | Document | Load before | Load after | View before | View after | View MB before | View MB after |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `title.q4ui` | 50.0 ms | 43.4 ms | 16.5 ms | 9.6 ms | 10.9 | 6.3 |
-| `createserver.q4ui` | 106.9 ms | 89.1 ms | 45.3 ms | 26.4 ms | 27.1 | 18.4 |
-| `joingame.q4ui` | 161.5 ms | 149.6 ms | 60.2 ms | 32.9 ms | 37.4 | 21.1 |
-| `mp_escape.q4ui` | 302.9 ms | 242.3 ms | 200.9 ms | 111.5 ms | 103.0 | 66.6 |
-| `mp_summary.q4ui` | 149.9 ms | 126.8 ms | 89.9 ms | 49.6 ms | 53.5 | 32.9 |
-| `remastered_marine.q4ui` | 214.6 ms | 183.9 ms | 40.1 ms | 22.5 ms | 26.5 | 18.5 |
-| `remastered_mp.q4ui` | 170.6 ms | 150.9 ms | 76.1 ms | 39.5 ms | 44.9 | 26.2 |
-| `remastered_scoreboard.q4ui` | 123.2 ms | 111.0 ms | 74.4 ms | 40.6 ms | 45.0 | 27.8 |
-| `weapon_wheel_marine.q4ui` | 78.4 ms | 68.6 ms | 12.7 ms | 7.9 ms | 9.2 | 6.0 |
+| `title.rui` | 50.0 ms | 43.4 ms | 16.5 ms | 9.6 ms | 10.9 | 6.3 |
+| `createserver.rui` | 106.9 ms | 89.1 ms | 45.3 ms | 26.4 ms | 27.1 | 18.4 |
+| `joingame.rui` | 161.5 ms | 149.6 ms | 60.2 ms | 32.9 ms | 37.4 | 21.1 |
+| `mp_escape.rui` | 302.9 ms | 242.3 ms | 200.9 ms | 111.5 ms | 103.0 | 66.6 |
+| `mp_summary.rui` | 149.9 ms | 126.8 ms | 89.9 ms | 49.6 ms | 53.5 | 32.9 |
+| `remastered_marine.rui` | 214.6 ms | 183.9 ms | 40.1 ms | 22.5 ms | 26.5 | 18.5 |
+| `remastered_mp.rui` | 170.6 ms | 150.9 ms | 76.1 ms | 39.5 ms | 44.9 | 26.2 |
+| `remastered_scoreboard.rui` | 123.2 ms | 111.0 ms | 74.4 ms | 40.6 ms | 45.0 | 27.8 |
+| `weapon_wheel_marine.rui` | 78.4 ms | 68.6 ms | 12.7 ms | 7.9 ms | 9.2 | 6.0 |
 
 The view builds 38 to 48 percent faster and retains 30 to 44 percent less
 memory (the shared model instead of its copies). `Document::Load` is 7 to 20
@@ -1999,15 +1999,15 @@ percent between the binaries for every document.
 
 | Document | Load before | Load after | View before | View after | View MB before | View MB after |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `title.q4ui` | 51.6 ms | 51.1 ms | 9.3 ms | 7.2 ms | 7.1 | 6.0 |
-| `createserver.q4ui` | 105.5 ms | 106.1 ms | 25.6 ms | 18.6 ms | 18.6 | 16.3 |
-| `joingame.q4ui` | 160.4 ms | 166.4 ms | 31.7 ms | 21.0 ms | 21.5 | 17.2 |
-| `mp_escape.q4ui` | 258.7 ms | 246.7 ms | 108.5 ms | 68.1 ms | 65.4 | 53.8 |
-| `mp_summary.q4ui` | 132.0 ms | 132.4 ms | 46.8 ms | 31.8 ms | 32.0 | 27.0 |
-| `remastered_marine.q4ui` | 224.8 ms | 233.6 ms | 22.4 ms | 14.0 ms | 17.6 | 14.9 |
-| `remastered_mp.q4ui` | 186.1 ms | 186.1 ms | 41.8 ms | 29.3 ms | 27.1 | 23.9 |
-| `remastered_scoreboard.q4ui` | 123.6 ms | 130.4 ms | 43.8 ms | 28.8 ms | 27.9 | 24.1 |
-| `weapon_wheel_marine.q4ui` | 87.1 ms | 91.3 ms | 8.2 ms | 6.1 ms | 6.8 | 6.2 |
+| `title.rui` | 51.6 ms | 51.1 ms | 9.3 ms | 7.2 ms | 7.1 | 6.0 |
+| `createserver.rui` | 105.5 ms | 106.1 ms | 25.6 ms | 18.6 ms | 18.6 | 16.3 |
+| `joingame.rui` | 160.4 ms | 166.4 ms | 31.7 ms | 21.0 ms | 21.5 | 17.2 |
+| `mp_escape.rui` | 258.7 ms | 246.7 ms | 108.5 ms | 68.1 ms | 65.4 | 53.8 |
+| `mp_summary.rui` | 132.0 ms | 132.4 ms | 46.8 ms | 31.8 ms | 32.0 | 27.0 |
+| `remastered_marine.rui` | 224.8 ms | 233.6 ms | 22.4 ms | 14.0 ms | 17.6 | 14.9 |
+| `remastered_mp.rui` | 186.1 ms | 186.1 ms | 41.8 ms | 29.3 ms | 27.1 | 23.9 |
+| `remastered_scoreboard.rui` | 123.6 ms | 130.4 ms | 43.8 ms | 28.8 ms | 27.9 | 24.1 |
+| `weapon_wheel_marine.rui` | 87.1 ms | 91.3 ms | 8.2 ms | 6.1 ms | 6.8 | 6.2 |
 
 The view builds 23 to 38 percent faster (the Escape card's from 108 to 68
 ms, the Match Summary's from 47 to 32, the Join Game page's from 32 to 21,
@@ -2918,7 +2918,7 @@ An opt-in, per-snapshot legacy-GUI cache (`g_saveUserInterfaceCache`, default
 **0**) reuses only complete memory-backed `.gui` payloads. It caps entries at
 256, each record at 1 MiB and all payloads at 8 MiB; closing or abandoning the
 snapshot releases them. Game Save methods must invalidate an instance before
-changing it; both player save-notification paths do so. Retained `.q4ui` state
+changing it; both player save-notification paths do so. Retained `.rui` state
 and file-backed outputs use the original writer. Native tests extract both
 production game writers and verify independent wire bytes, unique flags,
 mutation invalidation, snapshot lifetime, limits, failed fresh/cached writes,

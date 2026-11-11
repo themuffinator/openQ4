@@ -355,7 +355,7 @@ struct Child {
 };
 
 void CreateCases(const fs::path& dir) {
-    const auto path=Utf8Path(dir / NativePath("new-\xc3\xa9-\xe6\xb0\xb4.q4ui"));
+    const auto path=Utf8Path(dir / NativePath("new-\xc3\xa9-\xe6\xb0\xb4.rui"));
     std::string bytes(ChunkBytes*3+17,'x');
     for(std::size_t i=0;i<bytes.size();++i)bytes[i]=static_cast<char>(i%251);
     Reset();faults.writeChunk=7;
@@ -378,7 +378,7 @@ void CreateCases(const fs::path& dir) {
     Reset();
     Check(DurableCreateExact(path,std::string(DurableFileMaxBytes+1,'z'),error)==DurableCreateResult::Failed &&
         !fs::exists(NativePath(path)),"new-file total byte bound precedes effects");
-    Check(DurableCreateExact("relative.q4ui",bytes,error)==DurableCreateResult::Failed,"new-file path must be absolute");
+    Check(DurableCreateExact("relative.rui",bytes,error)==DurableCreateResult::Failed,"new-file path must be absolute");
     Check(DurableCreateExact(Utf8Path(dir / "missing-parent" / "file"),bytes,error)==DurableCreateResult::Failed &&
         !fs::exists(dir / "missing-parent"),"new-file operation never creates parent directories");
     creationRacePath=path;faults.beforeCreatePublication=CreateCompetitor;
@@ -437,7 +437,7 @@ void CreateCases(const fs::path& dir) {
     Check(DurableRemoveExact(path,error),"remove concurrent thread fixture");
     // The standalone narrow-main child harness has no Windows Unicode argv
     // adapter; Unicode paths are covered above through the actual UTF-8 API.
-    const auto processPath=Utf8Path(dir / "process-create.q4ui");
+    const auto processPath=Utf8Path(dir / "process-create.rui");
     Child first,second;first.Start({"--create-exact",processPath,"first-process"});second.Start({"--create-exact",processPath,"second-process"});
     const int a=first.Wait(),b=second.Wait();
     std::cout << "Independent create results: " << a << ',' << b << '\n';

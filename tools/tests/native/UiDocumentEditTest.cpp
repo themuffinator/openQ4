@@ -17,7 +17,7 @@ void operator delete(void* p,std::size_t) noexcept{std::free(p);}
 void operator delete[](void* p,std::size_t) noexcept{std::free(p);}
 #define CHECK(v) do{++checks;if(!(v)){std::fprintf(stderr,"FAIL %d: %s\n",__LINE__,#v);std::exit(1);}}while(false)
 static std::string NodeSource(const char* id){return std::string("{\"id\":\"")+id+"\",\"type\":\"group\",\"properties\":{\"opacity\":{\"type\":\"number\",\"value\":1}},\"extensions\":{\"kept\":\"é😀\"}}";}
-static std::string Source(){return "\xef\xbb\xbf{\r\n// untouched prefix\r\n\"format\":\"openq4-ui\",\"version\":1,\"id\":\"edit\",\"root\":{\"id\":\"root\",\"type\":\"group\",\"children\":[/*leading,*/"+NodeSource("a")+",// between, stays\r\n"+NodeSource("b")+",/*last,*/{\"id\":\"nest\",\"type\":\"group\",\"children\":[]}]},\"aliases\":{\"alpha\":{\"node\":\"a\",\"property\":\"opacity\"}},\"extensions\":{\"tail\":\"untouched\"}\r\n}";}
+static std::string Source(){return "\xef\xbb\xbf{\r\n// untouched prefix\r\n\"format\":\"retained-ui\",\"version\":1,\"id\":\"edit\",\"root\":{\"id\":\"root\",\"type\":\"group\",\"children\":[/*leading,*/"+NodeSource("a")+",// between, stays\r\n"+NodeSource("b")+",/*last,*/{\"id\":\"nest\",\"type\":\"group\",\"children\":[]}]},\"aliases\":{\"alpha\":{\"node\":\"a\",\"property\":\"opacity\"}},\"extensions\":{\"tail\":\"untouched\"}\r\n}";}
 struct Fixture {
     DocumentEdit edit;std::vector<Diagnostic> diagnostics;DocumentEditReceipt receipt;
     explicit Fixture(DocumentEditLimits limits={},const std::string& source=Source()){CHECK(edit.Open(source,limits,diagnostics));}
@@ -83,7 +83,7 @@ static void Budgets(){
     for(int fault=0;fault<6;++fault){DocumentEdit e;limits={};if(fault==0)limits.states=0;if(fault==1)limits.steps=0;if(fault==2)limits.sourceBytes=17*1024*1024;if(fault==3)limits.historyBytes=0;if(fault==4)limits.workingSourceBytes=0;if(fault==5)limits.revision=0;std::vector<Diagnostic> d;CHECK(!e.Open(Source(),limits,d)&&!e.Current()&&e.Identity()==DocumentEditIdentity{});}
 }
 static void ParserCompatibility(){
-    for(const auto& source:{std::string("{}"),Source()+"0",std::string("{\"format\":\"openq4-ui\",\"format\":\"other\"}"),Source()+std::string(1,'\0')}){
+    for(const auto& source:{std::string("{}"),Source()+"0",std::string("{\"format\":\"retained-ui\",\"format\":\"other\"}"),Source()+std::string(1,'\0')}){
         Document d;DocumentEdit e;std::vector<Diagnostic> direct,edited;CHECK(!d.Load(source,direct));CHECK(!e.Open(source,{},edited));CHECK(!direct.empty()&&!edited.empty());CHECK(direct[0].message==edited[0].message&&direct[0].byte==edited[0].byte);
     }
     auto duplicate=Source();const auto position=duplicate.find("\"version\":1");duplicate.insert(position,"\"version\":1,");
@@ -91,11 +91,11 @@ static void ParserCompatibility(){
 }
 static void SeparatorGrammar(){
     for(const auto* separator:{","," /*before,*/ , /*after,*/ "," //before,\n , //after,\n ","/*,]}*/ ,\r\n"}) {
-        const auto source=std::string("{\"format\":\"openq4-ui\",\"version\":1,\"id\":\"edit\",\"root\":{\"id\":\"root\",\"type\":\"group\",\"children\":[/*prefix,*/")+NodeSource("a")+separator+NodeSource("b")+" //suffix,\n]}}";
+        const auto source=std::string("{\"format\":\"retained-ui\",\"version\":1,\"id\":\"edit\",\"root\":{\"id\":\"root\",\"type\":\"group\",\"children\":[/*prefix,*/")+NodeSource("a")+separator+NodeSource("b")+" //suffix,\n]}}";
         for(std::size_t index=0;index<=2;++index){Fixture f({},source);CHECK(f.Apply({InsertDocumentNode{"root",index,NodeSource("c")}}));f.Valid();CHECK(f.edit.Current()->Model().root.children[index].id=="c");CHECK(f.Apply({RemoveDocumentNode{"c"}}));f.Valid();CHECK(f.Text().find("/*prefix,*/")!=std::string::npos&&f.Text().find("//suffix,\n")!=std::string::npos);}
         for(const auto* id:{"a","b"}){Fixture f({},source);CHECK(f.Apply({RemoveDocumentNode{id}}));f.Valid();CHECK(f.Text().find("/*prefix,*/")!=std::string::npos&&f.Text().find("//suffix,\n")!=std::string::npos);}
     }
-    auto source=std::string("{\"format\":\"openq4-ui\",\"version\":1,\"id\":\"edit\",\"root\":{\"id\":\"root\",\"type\":\"group\" //parent-tail\n}} ");
+    auto source=std::string("{\"format\":\"retained-ui\",\"version\":1,\"id\":\"edit\",\"root\":{\"id\":\"root\",\"type\":\"group\" //parent-tail\n}} ");
     Fixture missing({},source);CHECK(missing.Apply({InsertDocumentNode{"root",0,NodeSource("a")}}));missing.Valid();CHECK(missing.Text().find("//parent-tail\n")!=std::string::npos);
     CHECK(missing.Apply({RemoveDocumentNode{"a"}}));missing.Valid();CHECK(missing.Apply({InsertDocumentNode{"root",0,NodeSource("a")}}));missing.Valid();
 }

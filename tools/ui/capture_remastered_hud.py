@@ -281,7 +281,7 @@ def objectives_toggle():
 
 
 def quick_chat_stages(team):
-    """The quick-chat wheel (guis/hud/quick_chat.q4ui): opened and a phrase
+    """The quick-chat wheel (guis/hud/quick_chat.rui): opened and a phrase
     picked through testQuickChat; in Team DM it opens on TEAM and switches to
     ALL. Releasing sends the phrase, which the chat lines then show; reduced
     motion and Minimal keep the wheel."""

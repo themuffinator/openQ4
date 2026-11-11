@@ -32,7 +32,7 @@ POLICY = ["requirement_ids", "scope", "engine_revision", "companion_revision", "
           "host_and_backend_if_rendered", "log_and_image_hashes_if_rendered", "result",
           "reviewer_or_review_outcome", "limitations"]
 PRODUCT, VISUAL = "docs/dev/plans/ui-product.md", "docs/dev/ui-visual-design.md"
-WIDGET, MENU, HUD = "src/ui/Widget.cpp", "content/guis/menu.q4ui", "content/guis/hud.q4ui"
+WIDGET, MENU, HUD = "src/ui/Widget.cpp", "content/guis/menu.rui", "content/guis/hud.rui"
 
 
 def requirement(name, milestone, dependencies=(), status="partial", needs=("Behavior evidence", "Visual evidence"),
@@ -80,8 +80,8 @@ class AcceptanceTransitionTests(unittest.TestCase):
         self.write("docs/dev/ui/value-controls.md", "# Value controls\n")
         self.write("docs/dev/ui/foundation.md", "# Foundation\n\nLimited implementation.\n")
         self.write(WIDGET, "int Widget() { return 1; }\n")
-        self.write(MENU, '{"format": "openq4-ui", "id": "menu"}\n')
-        self.write(HUD, '{"format": "openq4-ui", "id": "hud"}\n')
+        self.write(MENU, '{"format": "retained-ui", "id": "menu"}\n')
+        self.write(HUD, '{"format": "retained-ui", "id": "hud"}\n')
         self.write(".gitignore", ".tmp/\n")
         rows = [
             requirement("DOC-001", "M1"),

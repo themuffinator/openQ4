@@ -55,7 +55,7 @@ the passive chat panel the engine installs over the classic match HUD
 ## HUD presentation contract
 
 The game drives both the stock `mphud.gui` and its Remastered peer
-(`tools/ui/remastered_hud_mp.py` → `guis/hud/remastered_mp.q4ui`) with the same
+(`tools/ui/remastered_hud_mp.py` → `guis/hud/remastered_mp.rui`) with the same
 named events and `arena_present*` state:
 
 | Event | Mode | Copy |
@@ -186,7 +186,7 @@ The stock menu is `guis/arena_pause.gui`, loaded beside `mpmain.gui`;
   the pause menu through `game->StartMenu()`, after `ExitMenu` restores the
   game sound world.
 - **Retained.** With `ui_retained` (or `ui_retainedMultiplayer`) the session
-  covers the menu with `guis/menu/arena_pause.q4ui`
+  covers the menu with `guis/menu/arena_pause.rui`
   (`tools/ui/retained_arena_pause.py`): the single-player pause frame with
   MATCH PAUSED, the four actions on the stock rows, the match block in the
   level block's place and the stock modal for both questions. The cover uses

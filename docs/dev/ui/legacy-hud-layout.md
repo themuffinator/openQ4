@@ -118,7 +118,7 @@ Classic while the retained one looked for the file.
   HUD's `oq4_hudRemastered`), so its stock lines stay empty, and `mphud.gui` draws
   the feed from the game's `oq4_feed<slot>_*` fields. Lines that arrive while
   the layout is Classic use the stock feed.
-- **Air gauge.** `air_marine.q4ui` and `air_strogg.q4ui` (the Classic overlay)
+- **Air gauge.** `air_marine.rui` and `air_strogg.rui` (the Classic overlay)
   follow the centered health gauge through `oq4_hudRemastered`.
 - **`ui_hudTest`.** It now runs the GUI on that GUI's own clock. Stock HUD
   timelines (pickup, save and exit notices) therefore play in captures instead of

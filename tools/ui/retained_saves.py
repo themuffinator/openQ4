@@ -33,8 +33,8 @@ it carried into the title slot is the page's title. Back returns the home with
 the bands, as from a stock page.
 
 The Strogg pause hands off to the same pages in the Strogg family
-(loadgame_strogg.q4ui, savegame_strogg.q4ui and, from retained_difficulty.py,
-restartlevel_strogg.q4ui): the construction stays, the plates end in the
+(loadgame_strogg.rui, savegame_strogg.rui and, from retained_difficulty.py,
+restartlevel_strogg.rui): the construction stays, the plates end in the
 Strogg pause's 30-degree shoulders with slanted markers, and the rails,
 rules, frames and row light take its #F59512 and #FF9000. Labels and headings
 are R_Strogg in #FCFFC8, turning #FFCC00, and the saves' names stay Lowpixel.

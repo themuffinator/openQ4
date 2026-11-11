@@ -220,7 +220,7 @@ static void RenderedTextWidth() {
             auto& label=(*BoxFrameNode(source["root"],(id+"-label").c_str()))["properties"];label["left"]=Typed("length",0,"dp");label["padding-left"]=Typed("length",12,"dp");label["width"]=Typed("length",100,"%");label["box-sizing"]=Typed("keyword","border-box");
             if(mode==3){label["white-space"]=Typed("keyword","pre-line");row["height"]=Typed("length",72,"dp");row["top"]=Typed("length",i*72,"dp");}
         }
-        Runtime runtime(host);std::vector<Diagnostic> ds;const bool loaded=runtime.LoadDocument(Text(source),"proportional.q4ui",ds);for(const auto& d:ds)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"proportional fixture loads");Viewport vp;vp.width=640;vp.height=400;double time=1;
+        Runtime runtime(host);std::vector<Diagnostic> ds;const bool loaded=runtime.LoadDocument(Text(source),"proportional.rui",ds);for(const auto& d:ds)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"proportional fixture loads");Viewport vp;vp.width=640;vp.height=400;double time=1;
         auto frame=[&]{time+=.02;++host.frame;runtime.Frame(vp,time);};auto key=[&](MenuInput input){runtime.MenuAction(input,true,time);runtime.MenuAction(input,false,time);};frame();if(mode==1)Check(Element("clipped-parent")->SetProperty("text-transform","uppercase"),"actual inherited Rml text transform accepted");if(mode==0)for(unsigned i=0;i<6;++i)Check(Element(("option-"+std::to_string(i)+"-label").c_str())->SetProperty("text-transform","uppercase"),"actual Rml label transform accepted");frame();runtime.FocusControl("choice",time);key(MenuInput::Accept);frame();
         auto w=runtime.GetWidgetState("choice");Check(w&&w->popupOpen&&w->scroll&&w->scroll->available,"processed text fits without compressing or falsely refusing row");
         auto* label=Element("option-0-label");auto* clip=Element("viewport");const auto at=clip->GetAbsoluteOffset(Rml::BoxArea::Padding),size=clip->GetBox().GetSize(Rml::BoxArea::Padding);unsigned count=0;
@@ -241,7 +241,7 @@ static void ProductionPopup(const std::string& source,const std::string& locales
     for(const char* locale:{"english","french","russian","italian","spanish","polish","german"})for(float expansion:{1.f,1.4f}) {
         std::fprintf(stderr,"popup locale=%s glyph-width=%g\n",locale,expansion);
         PopupPageHost host;host.Locale(locales+"/"+locale+"_openq4.lang");host.Locale(locales+"/"+locale+"_guis.lang");host.expansion=expansion;Runtime runtime(host);std::vector<Diagnostic> diagnostics;
-        const bool loaded=runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics);
+        const bool loaded=runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics);
         for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"production framed SYSTEM loads");
         std::string error;double time=1;Viewport vp;vp.width=1280;vp.height=720;vp.displayScale=expansion==1?1.25f:2.f;SystemCanvas(vp);
         runtime.SetReducedMotion(true,time);Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true}},error,time),"real SYSTEM editing state");
@@ -340,7 +340,7 @@ struct WrapCase { std::string label; int width,height; float density,text,expans
 static void WrappedOpening(const std::string& source,const std::string& locales,const WrapCase& c) {
     std::fprintf(stderr,"wrapped opening %dx%d density=%g text=%g transform=%s\n",c.width,c.height,c.density,c.text,c.transform?c.transform:"none");
     PopupPageHost host;host.Locale(locales+"/english_openq4.lang");host.Locale(locales+"/english_guis.lang");host.expansion=c.expansion;
-    Runtime runtime(host);std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics),"production SYSTEM loads");
+    Runtime runtime(host);std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics),"production SYSTEM loads");
     std::string error;double time=1;Viewport vp;vp.width=c.width;vp.height=c.height;vp.displayScale=c.density;vp.textScale=c.text;SystemCanvas(vp);
     runtime.SetReducedMotion(true,time);
     Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true},
@@ -381,7 +381,7 @@ static void SequentialOpenings(const std::string& source,const std::string& loca
     const Size sizes[]={{1024,768,2},{640,480,1},{1366,768,2},{800,600,1.25f},{1280,720,2},{640,480,1},{3440,1440,3},{800,600,1},{1920,1080,2},{640,480,1}};
     for(const char* locale:{"english","german"}) {
         PopupPageHost host;host.Locale(locales+"/"+locale+"_openq4.lang");host.Locale(locales+"/"+locale+"_guis.lang");host.expansion=1.4f;
-        Runtime runtime(host);std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics),"production SYSTEM loads");
+        Runtime runtime(host);std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics),"production SYSTEM loads");
         std::string error;double time=1;Viewport vp;vp.textScale=2;SystemCanvas(vp);
         runtime.SetReducedMotion(true,time);
         Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},

@@ -28,7 +28,7 @@ def main():
             'testWeaponScope weapon_machinegun','waitMsec 1500','testWeaponScope',
             'set ui_retained 0','waitMsec 300','testWeaponScope','set ui_retained 1','waitMsec 300','testWeaponScope']
     for kind in ('machinegun','railgun','nailgun'):
-        stages += [f'testGUI guis/weapons/{kind}_scope.q4ui','waitMsec 1200',
+        stages += [f'testGUI guis/weapons/{kind}_scope.rui','waitMsec 1200',
                    'openq4_retainedGui state playerYaw 37',f'screenshot "screenshots/{kind}.tga"']
         if kind=='railgun':
             stages += ['openq4_retainedGui state player_ammo 1','waitMsec 100','screenshot "screenshots/railgun-one.tga"']
@@ -43,8 +43,8 @@ def main():
     assert 'frame geometry ring overflow' not in log, 'Vulkan geometry budget exceeded'
     assert not any('retained UI:' in message for message in result['retained_warnings']),result['retained_warnings']
     for kind in ('machinegun','railgun','nailgun'):
-        assert f'guis/weapons/{kind}_scope.q4ui' in result['retained_loaded'],kind
-    assert 'WEAPON_SCOPE gui=guis/weapons/machinegun_scope.gui' in log and 'WEAPON_SCOPE gui=guis/weapons/machinegun_scope.q4ui' in log
+        assert f'guis/weapons/{kind}_scope.rui' in result['retained_loaded'],kind
+    assert 'WEAPON_SCOPE gui=guis/weapons/machinegun_scope.gui' in log and 'WEAPON_SCOPE gui=guis/weapons/machinegun_scope.rui' in log
     (args.output/'report.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
     print(f"scopes: {args.renderer} {args.size}, five engine captures, live gate fallback, no retained errors")
 

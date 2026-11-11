@@ -35,7 +35,8 @@ int Sys_SDL_GamepadGlyphFamily(int faceLabels[4]);
 namespace {
 using namespace openq4::ui;
 constexpr const char* ActionMarker = "openq4-retained-actions";
-constexpr unsigned SaveTag = 0x49553451; // Q4UI, little endian through idFile.
+constexpr unsigned SaveTag = 0x49553451; // "Q4UI", little endian through idFile. Frozen
+// save framing: it predates the .rui name and stays so earlier saves load.
 constexpr int MaxStateEntries = 4096, MaxStringBytes = 65536;
 constexpr int MaxStateBytes = 16 * 1024 * 1024;
 constexpr int MaxFrameBytes = static_cast<int>(Runtime::MaxSnapshotBytes) + MaxStateBytes + MaxStateEntries*8 + 64;
@@ -2421,15 +2422,15 @@ bool AwakeningGame() {
 // The weapon wheels and quick chat the game names (WeaponWheel.inl,
 // QuickChat.inl), by family and campaign; the HUD documents come from the
 // Remastered routes of the stock HUD sources a spawn creates.
-constexpr const char* WheelDocuments[] = {"guis/hud/weapon_wheel_marine.q4ui","guis/hud/weapon_wheel_strogg.q4ui"};
-constexpr const char* AwakeningWheelDocuments[] = {"guis/hud/weapon_wheel_marine_awakening.q4ui","guis/hud/weapon_wheel_strogg_awakening.q4ui"};
+constexpr const char* WheelDocuments[] = {"guis/hud/weapon_wheel_marine.rui","guis/hud/weapon_wheel_strogg.rui"};
+constexpr const char* AwakeningWheelDocuments[] = {"guis/hud/weapon_wheel_marine_awakening.rui","guis/hud/weapon_wheel_strogg_awakening.rui"};
 // Single player precaches the scoreboard but never draws it, so its document
 // is not expected there; multiplayer draws the Marine HUD under its own.
 constexpr const char* SinglePlayerHudSources[] = {"guis/hud.gui","guis/hud_strogg.gui","guis/wristcomm.gui","guis/wristcomm_strogg.gui","guis/vehicles/hud.gui"};
 constexpr const char* AwakeningHudSources[] = {"guis/q4xhud.gui","guis/q4xhud_strogg.gui","guis/wristcomm.gui","guis/wristcomm_strogg.gui","guis/vehicles/hud.gui"};
 constexpr const char* MultiplayerHudSources[] = {"guis/mphud.gui","guis/hud.gui","guis/scoreboard.gui"};
-constexpr const char* QuickChatDocument = "guis/hud/quick_chat.q4ui";
-constexpr const char* ViewEffectsDocument = "guis/hud/view_effects.q4ui";
+constexpr const char* QuickChatDocument = "guis/hud/quick_chat.rui";
+constexpr const char* ViewEffectsDocument = "guis/hud/view_effects.rui";
 std::vector<const char*> GameplayDocuments(bool multiplayer) {
 	std::vector<const char*> documents;
 	const bool awakening = !multiplayer && AwakeningGame();

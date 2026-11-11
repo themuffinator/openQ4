@@ -32,7 +32,7 @@ struct Fixture {
     NativeTextEditorBarrier barrier;
     std::string error;
     explicit Fixture(bool deferred=false) {
-        if(deferred){auto* value=new idUserInterfaceDeferred;outer=value;CHECK(value->InitFromFile("number.q4ui"));gui=dynamic_cast<idUserInterfaceRetained*>(value->backend);}
+        if(deferred){auto* value=new idUserInterfaceDeferred;outer=value;CHECK(value->InitFromFile("number.rui"));gui=dynamic_cast<idUserInterfaceRetained*>(value->backend);}
         else {gui=new idUserInterfaceRetained;outer=gui;}
         CHECK(gui);runtime=gui->impl->runtime;route={outer,17,true};
         gui->impl->active=true;gui->impl->interactive=true;
@@ -130,7 +130,7 @@ static void Replacement() {
     }
     Fixture f(true);f.Attach();auto* deferred=static_cast<idUserInterfaceDeferred*>(f.outer);
     auto old=f.barrier;auto oldRuntime=f.runtime;
-    f.gui->impl->callback=[&]{CHECK(deferred->InitFromFile("new-number.q4ui"));};
+    f.gui->impl->callback=[&]{CHECK(deferred->InitFromFile("new-number.rui"));};
     NativeTextEditorView out;CHECK(!f.owner.Refresh(old,out,f.error));CHECK(oldRuntime->impl->prepares==1);
     CHECK(!f.owner.Current(old));denyAllocation=true;CHECK(!UI_NativeTextRetireExact(old.native,old.editor));denyAllocation=false;
     f.gui=dynamic_cast<idUserInterfaceRetained*>(deferred->backend);CHECK(f.gui);
@@ -313,7 +313,7 @@ static void PresenceBoundaryAndLifetime() {
         CHECK(!replaced.owner.Current(replaced.barrier));
         CHECK(!UI_NativeTextRetireExact(replaced.nativeId,replaced.editor));
     };
-    CHECK(deferred->InitFromFile("replacement.q4ui"));
+    CHECK(deferred->InitFromFile("replacement.rui"));
     CHECK(changingCallbacks==1 && !deferred->nativeInputChanging);
     Fixture closing;closing.Attach();closing.gui->MarkNativeInputClosing();
     CHECK(Presence(closing)==P::BusyOrUnknown);

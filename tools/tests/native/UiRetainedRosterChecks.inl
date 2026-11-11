@@ -4,7 +4,7 @@ static void CheckRosterCapacity(ScreenHost& host, const char* path, const char* 
     const char* prefix, bool interactive) {
     Runtime runtime(host);
     std::vector<Diagnostic> diagnostics;
-    Check(runtime.Initialize() && runtime.LoadDocument(Read(path),"guis/menu/roster-test.q4ui",diagnostics),"load production roster");
+    Check(runtime.Initialize() && runtime.LoadDocument(Read(path),"guis/menu/roster-test.rui",diagnostics),"load production roster");
     Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
     double now = 1;
     std::string error;

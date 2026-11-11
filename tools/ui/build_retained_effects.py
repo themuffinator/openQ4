@@ -55,7 +55,7 @@ def document():
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--check',action='store_true');args=parser.parse_args()
-    target=ui.PAK0/'guis/hud/view_effects.q4ui';text=ui.render(document()).replace('build_retained_screens.py','build_retained_effects.py')
+    target=ui.PAK0/'guis/hud/view_effects.rui';text=ui.render(document()).replace('build_retained_screens.py','build_retained_effects.py')
     if args.check:
         if not target.exists() or target.read_text(encoding='utf-8')!=text.replace('\r\n','\n'):raise SystemExit('stale view effects document')
     else:

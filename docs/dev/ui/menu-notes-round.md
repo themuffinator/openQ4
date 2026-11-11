@@ -93,7 +93,7 @@ measures, its opaque black frame over the glow, and its motion.
 UPDATES' answer, a failed connection, a password prompt and every other box
 the session raises (`idSessionLocal::MessageBox`) drew the stock
 `guis/msg.gui` over the retained menus. They now present
-`guis/menu/msgbox.q4ui` (`tools/ui/retained_msgbox.py`): the pop-up 560 dp
+`guis/menu/msgbox.rui` (`tools/ui/retained_msgbox.py`): the pop-up 560 dp
 wide and 176 u tall, with six lines of message, a prompt's field, and up to
 two buttons.
 

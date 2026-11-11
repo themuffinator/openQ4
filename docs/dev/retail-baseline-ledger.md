@@ -285,7 +285,7 @@ source review records these separately:
 | `materials/hardwareshaders_openq4.mtr`, `materials/hud_openq4.mtr`, `materials/weaponwheel_openq4.mtr` | Scope/HUD/wheel presentation resources; UI-04/REN-08, not world-lighting workarounds |
 | `materials/postprocess_openq4.mtr` and remaining `glprogs/` | Existing renderer feature resources. Original-content controls omit them; shared/generated engine resources remain the preferred direction for future changes |
 
-Retained Q4UI documents, bot profiles, the new map, light grids and new language
+Retained UI (`.rui`) documents, bot profiles, the new map, light grids and new language
 tables are intentional features, not candidates for automatic deletion merely
 because retail lacks them. No blanket source/bitmap acceptance is granted.
 This audit found no safe compatibility-only override to remove without changing

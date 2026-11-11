@@ -45,7 +45,7 @@ static Json::Value Button(Json::Value& source,const char* id,double y) {
 }
 static Json::Value WriteState(const char* name,bool value) { Json::Value step;step["op"]="setState";step["values"][name]=value;return step; }
 static Json::Value Source() {
-	Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="modal-runtime";
+	Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="modal-runtime";
 	for(const char* id:{"open","nested","other","safeEnabled","alternativeEnabled","hostOpen"}) {
 		source["state"][id]["type"]="boolean";source["state"][id]["initial"]=std::string(id)=="safeEnabled";
 	}
@@ -91,7 +91,7 @@ struct TestHost final:Host {
 struct View {
 	TestHost& host;Runtime runtime;Viewport viewport;double now=1;
 	explicit View(TestHost& h,const Json::Value& source=Source()):host(h),runtime(h) {
-		viewport.width=640;viewport.height=400;std::vector<Diagnostic> errors;const bool loaded=runtime.LoadDocument(Text(source),"modal.q4ui",errors);
+		viewport.width=640;viewport.height=400;std::vector<Diagnostic> errors;const bool loaded=runtime.LoadDocument(Text(source),"modal.rui",errors);
 		for(const auto& error:errors)std::fprintf(stderr,"%s: %s\n",error.pointer.c_str(),error.message.c_str());Check(loaded,"canonical modal fixture loads");Frame();
 	}
 	void Frame(){host.draws=0;host.firstDrawFocus.clear();host.observing=&runtime;++host.frame;now+=.02;runtime.Frame(viewport,now);host.observing=nullptr;}
@@ -183,7 +183,7 @@ static void Snapshots(TestHost& host) {
 	corrupt=Parse(stable);corrupt["interaction"]["modals"][0]["authored"]=false;Check(!view.runtime.RestoreSnapshot(Text(corrupt),error,view.now),"forged manual modal ownership rejected");
 	corrupt=Parse(stable);corrupt["hostSources"]["unknown"]=false;Check(!view.runtime.RestoreSnapshot(Text(corrupt),error,view.now),"unknown historical source rejected");
 	corrupt=Parse(stable);corrupt["version"]=3;Check(!view.runtime.RestoreSnapshot(Text(corrupt),error,view.now),"modal snapshot cannot downgrade to legacy semantics");
-	corrupt=Parse(stable);corrupt["document"]["path"]="other.q4ui";Check(!view.runtime.RestoreSnapshot(Text(corrupt),error,view.now),"modal snapshot exact path identity is required");
+	corrupt=Parse(stable);corrupt["document"]["path"]="other.rui";Check(!view.runtime.RestoreSnapshot(Text(corrupt),error,view.now),"modal snapshot exact path identity is required");
 	corrupt=Parse(stable);corrupt["document"]["source"]="{}";Check(!view.runtime.RestoreSnapshot(Text(corrupt),error,view.now),"modal snapshot exact source identity is required");
 	view.Restore(stable);view.Frame();Check(!view.runtime.CanDispatchControlAction(activation[0],view.now)&&!view.runtime.CanDispatchModalBack(back[0],view.now),"successful restore rejects both taken Activate and Back from prior lifetime");
 	view.Set({{"open",false}});const auto closing=view.Save();view.Restore(closing);view.Frame();Check(view.runtime.FocusedControl()=="opener","snapshot closing before layout preserves return focus");
@@ -193,6 +193,6 @@ static void Snapshots(TestHost& host) {
 	view.Restore(closing);view.Frame();host.hostOpen=true;view.Restore(closing);view.Frame();Check(view.runtime.FocusedControl()=="safe","fresh host can introduce modal during restore");host.hostOpen=false;
 	View peer(host);Check(peer.runtime.FocusedControl().empty(),"independent instance has no borrowed modal focus");
 	peer.Restore(peer.Save());peer.Frame();Check(peer.runtime.FocusedControl().empty(),"snapshot preserves intentionally empty background focus");
-	view.runtime.Shutdown();std::vector<Diagnostic> diagnostics;Check(view.runtime.LoadDocument(Text(Source()),"modal.q4ui",diagnostics),"resources recreated");view.Restore(selected);view.Frame();Check(view.runtime.FocusedControl()=="alternative","shutdown/reload snapshot preserves focus with fresh bounds");
+	view.runtime.Shutdown();std::vector<Diagnostic> diagnostics;Check(view.runtime.LoadDocument(Text(Source()),"modal.rui",diagnostics),"resources recreated");view.Restore(selected);view.Frame();Check(view.runtime.FocusedControl()=="alternative","shutdown/reload snapshot preserves focus with fresh bounds");
 }
 int main(){Schema();TestHost host;FocusAndActions(host);TransactionsAndWheel(host);InitialLayout(host);Snapshots(host);Check(host.errors==0,"valid modal runtime paths log no errors");std::printf("Modal Runtime: %u checks passed\n",checks);return 0;}

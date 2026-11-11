@@ -3496,7 +3496,7 @@ bool Runtime::SaveSnapshot(std::string& snapshot, std::string& error, double sec
 		if (!motion.Restore(playback,now,error,true)) return false;
 		const auto input = interaction.Capture();
 		Json::Value root(Json::objectValue);
-		root["format"] = "openq4-ui-instance"; root["version"] = authoredModals ? 4 : widgets.widgets.empty() ? 2 : 3;
+		root["format"] = "retained-ui-instance"; root["version"] = authoredModals ? 4 : widgets.widgets.empty() ? 2 : 3;
 		root["application"] = Json::Value(Json::objectValue);
 		for (const auto& [id,value] : snapshotState.Variables()) if (!snapshotState.Declarations().at(id).HostSourced())
 			std::visit([&](const auto& primitive) { root["application"][id] = primitive; },value);
@@ -3603,7 +3603,7 @@ bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, d
 		builder["allowSpecialFloats"] = false; builder["stackLimit"] = 32; builder["skipBom"] = false;
 		std::unique_ptr<Json::CharReader> reader(builder.newCharReader()); Json::Value root;
 		if (!reader->parse(snapshot.data(),snapshot.data()+snapshot.size(),&root,nullptr)) return reject("Invalid instance snapshot JSON");
-		if (root["format"] != "openq4-ui-instance" || !root["version"].isUInt() || root["version"].asUInt() < 1 || root["version"].asUInt() > 4)
+		if ((root["format"] != "retained-ui-instance" && root["format"] != "openq4-ui-instance") || !root["version"].isUInt() || root["version"].asUInt() < 1 || root["version"].asUInt() > 4)
 			return reject("Unsupported instance snapshot schema");
 		const bool authoredModals = root["version"].asUInt() == 4;
 		if (authoredModals != impl->interaction.HasAuthoredModals()) return reject("Instance snapshot modal schema does not match the document");

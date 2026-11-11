@@ -130,9 +130,9 @@ int main() {
     assert(!UI_QueryTextContext(a,5,7).editor);a->onTextQuery={};
     delete a;recycleAllocation=false;if(recycledAllocation){::operator delete(recycledAllocation);recycledAllocation=nullptr;}
     delete b;
-    auto* deferred=new idUserInterfaceDeferred;assert(deferred->InitFromFile("one.q4ui",true,true));
+    auto* deferred=new idUserInterfaceDeferred;assert(deferred->InitFromFile("one.rui",true,true));
     auto first=UI_QueryTextContext(deferred,5,7);assert(first.editor);
-    assert(deferred->InitFromFile("two.q4ui",true,true));auto second=UI_QueryTextContext(deferred,5,7);
+    assert(deferred->InitFromFile("two.rui",true,true));auto second=UI_QueryTextContext(deferred,5,7);
     assert(second.editor && second.editor->allocation==first.editor->allocation && second.editor->backend!=first.editor->backend);
     delivery.target=*first.editor;assert(UI_DeliverTextInput(deferred,5,7,first,delivery).outcome==TextDeliveryOutcome::Rejected);
     assert(deferred->InitFromFile("parent.gui",true,true));deferred->Activate(true,0);
@@ -167,7 +167,7 @@ static void Install() {
     std::string error;assert(r.BeginNumberEdit("number",error,1));
 }
 int main() {
-    files.sources["test.q4ui"]="source";files.sources["next.q4ui"]="next";
+    files.sources["test.rui"]="source";files.sources["next.rui"]="next";
     modelTemplate.id="number-test";modelTemplate.root.id="root";
     modelTemplate.root.control=Control{};
     modelTemplate.root.control->action="brightness";
@@ -177,7 +177,7 @@ int main() {
     std::string error;TextInputEvent input;assert(MakeTextInputCommit("1.25",input,error));
     idUserInterfaceRetained gui;
     assert(!gui.QueryTextContext(77,5,7).editor);
-    assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);
+    assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);
     assert(!gui.QueryTextContext(77,5,7).editor);
     Install();auto context=gui.QueryTextContext(77,5,7);assert(context.editor);
     assert(context.editor->allocation==77 && context.editor->window==5 && context.nativeSession==7);
@@ -229,9 +229,9 @@ int main() {
     Live().loaded=false;assert(!gui.QueryTextContext(77,5,7).editor);
     Live().loaded=true;view->callback(view->owner,retainedUIViewEvent_t::Restored);Install();restored=gui.QueryTextContext(77,5,7);
     assert(restored.editor->document!=after.editor->document && restored.editor->backend==after.editor->backend);
-    rejectLoad=true;assert(!gui.InitFromFile("next.q4ui"));rejectLoad=false;
+    rejectLoad=true;assert(!gui.InitFromFile("next.rui"));rejectLoad=false;
     assert(gui.QueryTextContext(77,5,7).editor->document==restored.editor->document);
-    assert(gui.InitFromFile("next.q4ui"));Install();after=gui.QueryTextContext(77,5,7);
+    assert(gui.InitFromFile("next.rui"));Install();after=gui.QueryTextContext(77,5,7);
     assert(after.editor->document!=restored.editor->document && after.editor->backend==restored.editor->backend);
     gui.Activate(false,0);assert(!gui.QueryTextContext(77,5,7).editor);
     std::puts("Retained text owner: active Number freshness, stale dispatch, no auto-begin/settings write, focus/console/eligibility, save/restore/source/resource lifetimes passed");

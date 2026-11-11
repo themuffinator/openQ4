@@ -61,7 +61,7 @@ static void Run(const std::string& source,const std::string& directory,const cha
  }
  std::string snapshot;Check(v.runtime.SaveSnapshot(snapshot,v.error,v.time),"display source snapshot saves");
  v.runtime.CloseDocument();std::vector<Diagnostic> diagnostics;
- Check(v.runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"display controls survive source-bound recreation");v.Sync();v.Frame();
+ Check(v.runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"display controls survive source-bound recreation");v.Sync();v.Frame();
  for(const auto& field:fields)Check(SettingsValueEqual(v.runtime.GetWidgetState(field.id)->accepted,field.target),"restored widget follows current service draft");
  Check(v.runtime.TakeActions().empty(),"resource recreation replays no display operation");
  for(const auto& blocked:StateValues{{"settings.busy",true},{"settings.confirmationVisible",true},{"page.discardVisible",true},{"ui.numberDraftsPending",true},{"settings.open",false},{"settings.phase",2.0}}) {

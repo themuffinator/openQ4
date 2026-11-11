@@ -216,7 +216,7 @@ def document():
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--check',action='store_true');args=p.parse_args()
-    target=ui.PAK0/'guis/loading/initialization.q4ui';text=ui.render(document()).replace('build_retained_screens.py','build_retained_initialization.py')
+    target=ui.PAK0/'guis/loading/initialization.rui';text=ui.render(document()).replace('build_retained_screens.py','build_retained_initialization.py')
     if args.check:
         if not target.exists() or target.read_text(encoding='utf-8')!=text.replace('\r\n','\n'): raise SystemExit('stale initialization document')
     else:

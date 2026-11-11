@@ -17,7 +17,7 @@ bool Near(double a, double b) { return std::abs(a-b) < .0001; }
 
 const char* Source = R"json(
 {
- "format":"openq4-ui", "version":1, "id":"ordered-behavior",
+ "format":"retained-ui", "version":1, "id":"ordered-behavior",
  "state":{
   "a":{"type":"number","initial":1}, "b":{"type":"number","initial":10},
   "level":{"type":"number","initial":0.25}, "extent":{"type":"number","initial":100},

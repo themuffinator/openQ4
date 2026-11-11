@@ -20,7 +20,7 @@ static std::string Encode(const Json::Value& value) {
 }
 static Json::Value Source() {
     Json::Value source,root,model;
-    source["format"]="openq4-ui"; source["version"]=1; source["id"]="model-scene-test";
+    source["format"]="retained-ui"; source["version"]=1; source["id"]="model-scene-test";
     source["state"]["body"]["type"]="string"; source["state"]["body"]["initial"]="";
     source["state"]["yaw"]["type"]="number"; source["state"]["yaw"]["initial"]=200;
     source["state"]["shown"]["type"]="boolean"; source["state"]["shown"]["initial"]=true;
@@ -121,7 +121,7 @@ static void SchemaAndTransactions() {
 static void ActualRuntime() {
     ModelHost host;
     Runtime runtime(host); std::vector<Diagnostic> diagnostics;
-    Check(runtime.Initialize() && runtime.LoadDocument(Encode(Source()),"models.q4ui",diagnostics),"model document loads into actual Rml runtime");
+    Check(runtime.Initialize() && runtime.LoadDocument(Encode(Source()),"models.rui",diagnostics),"model document loads into actual Rml runtime");
     std::string error;
     Check(runtime.SetState({{"body",std::string("player_marine_ui")}},error,.1),"session publishes selected model before first frame");
     Viewport viewport; viewport.width=1280; viewport.height=720;
@@ -146,7 +146,7 @@ static void ActualRuntime() {
     runtime.CloseDocument();
     Check(host.released==std::vector<std::uint64_t>{first.lease},"document close retires the exact model owner once");
     host.refuse=false;
-    Check(runtime.LoadDocument(Encode(Source()),"again.q4ui",diagnostics) && runtime.Frame(viewport,.7) &&
+    Check(runtime.LoadDocument(Encode(Source()),"again.rui",diagnostics) && runtime.Frame(viewport,.7) &&
         host.calls.back().lease!=first.lease,"reopening never reuses a retired model owner");
     runtime.Shutdown();
     Check(host.released.size()==2 && host.released[0]!=host.released[1],"shutdown releases the remaining scene");

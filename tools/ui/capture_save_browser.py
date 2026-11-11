@@ -100,7 +100,7 @@ def main():
     bindings = {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries}
     sources = ['src/framework/Session_menu.cpp', 'src/framework/Session_local.h', 'src/ui/UserInterfaceRetained.cpp',
                'tools/ui/retained_saves.py', 'tools/ui/capture_save_browser.py']
-    documents = [f'guis/menu/{page}{suffix}.q4ui' for page in ('loadgame', 'savegame') for suffix in ('', '_strogg')]
+    documents = [f'guis/menu/{page}{suffix}.rui' for page in ('loadgame', 'savegame') for suffix in ('', '_strogg')]
     sources += ['content/baseoq4/pak0/' + path for path in documents]
     source_bindings = {p: capture.digest(ROOT / p) for p in sources}
     with zipfile.ZipFile(args.runtime / 'baseoq4/pak0.pk4') as pack:

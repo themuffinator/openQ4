@@ -3104,7 +3104,7 @@ Completion substeps must keep three forms of evidence distinct:
   turret keeps 40 through its own damage. The turret gained barrel heat
   (`idVehicleTurretGun`: player gunners only, saved), crosshair convergence, a
   zoom, its parts' servo loop and openQ4's turret HUD (Classic
-  `turret_hud.gui`, Remastered `remastered_chaingun_turret.q4ui`: the gunner's
+  `turret_hud.gui`, Remastered `remastered_chaingun_turret.rui`: the gunner's
   gauges and the heat). Hidden, input-free M01 and M04 runs measured the heat
   cycle (overheat after 5.3 s of fire, 2.0 s vent), the 40/15/20 damage, one
   hot-gun save/reload and both HUD layouts; a sustained wave defence and

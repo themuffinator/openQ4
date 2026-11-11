@@ -301,7 +301,7 @@ public:
 	// The change between Campaign and a fourth-level child: its difficulty
 	// page, or its levels with `chapters`; `back` climbs to Campaign.
 	void BeginRetainedCampaignSkill( idUserInterface *from, const char *campaign, bool back = false, bool chapters = false );
-	// Single Player's retained Arena sub-page (guis/menu/arena.q4ui): the
+	// Single Player's retained Arena sub-page (guis/menu/arena.rui): the
 	// Arena campaign's browser where it can present (NULL: the stock one
 	// presents), and the page while it is loaded, which the campaign
 	// publishes into.
@@ -403,7 +403,7 @@ public:
 	void				PresentRetainedSubpage( bool deeper, retainedSubpage_t subpage );
 	void				UpdateRetainedSubpage();
 	bool				RetainedSubpageEvent( const sysEvent_t *event );
-	// The retained Load Game page (guis/menu/loadgame.q4ui): LOAD GAME on the
+	// The retained Load Game page (guis/menu/loadgame.rui): LOAD GAME on the
 	// title and the Marine pause hands off to it as to a stock page.
 	bool				BeginRetainedPage( const char *request );
 	void				UpdateRetainedPage();
@@ -416,7 +416,7 @@ public:
 	void				PublishRetainedLoadRows( idUserInterface *gui );
 	void				PublishRetainedLoadSave( idUserInterface *gui, const char *error );
 	void				HandleRetainedLoadRequest( idUserInterface *gui, const char *request );
-	// The retained Save Game page (guis/menu/savegame.q4ui): SAVE GAME on the
+	// The retained Save Game page (guis/menu/savegame.rui): SAVE GAME on the
 	// Marine pause hands off to it the same way. RetainedPageActive is true
 	// while either page presents.
 	bool				RetainedPageActive() const;
@@ -424,10 +424,10 @@ public:
 	void				PublishRetainedSaveSelection( idUserInterface *gui, bool name );
 	void				HandleRetainedSaveRequest( idUserInterface *gui, const char *request );
 	bool				RetainedSaveGame( idUserInterface *gui, const char *name );
-	// The retained Restart Level page (guis/menu/restartlevel.q4ui), which
+	// The retained Restart Level page (guis/menu/restartlevel.rui), which
 	// RESTART LEVEL on the Marine pause hands off to the same way.
 	void				HandleRetainedRestartRequest( idUserInterface *gui, const char *request );
-	// The retained Demos page (guis/menu/demos.q4ui), which the title's DEMOS
+	// The retained Demos page (guis/menu/demos.rui), which the title's DEMOS
 	// hands off to the same way: the library, filtered, a page at a time.
 	void				PublishRetainedDemosPage( idUserInterface *gui, const char *selectPath, int selectRow, const char *error );
 	void				PublishRetainedDemoRows( idUserInterface *gui );
@@ -437,7 +437,7 @@ public:
 	void				OpenRetainedDemos();
 	// The Arena page's verbs, which run the Arena campaign's own commands.
 	void				HandleRetainedArenaRequest( idUserInterface *gui, const char *request );
-	// The retained Multiplayer page (guis/menu/multiplayer.q4ui), which the
+	// The retained Multiplayer page (guis/menu/multiplayer.rui), which the
 	// title's MULTIPLAYER hands off to: its sections open the stock pages
 	// after its departure, and their Back presents it again (multiplayerOpen);
 	// back from a sub-page it returns onto that sub-page's section.
@@ -458,7 +458,7 @@ public:
 	void				HandleRetainedSettingsPageRequest( idUserInterface *gui, const char *request );
 	void				UpdateRetainedSettingsPage();
 	bool				RetainedSettingsParent() const;
-	// The retained Create Server sub-page (guis/menu/createserver.q4ui), which
+	// The retained Create Server sub-page (guis/menu/createserver.rui), which
 	// CREATE SERVER on the Multiplayer page goes deeper to: the session owns
 	// its settings and publishes them (create.*), and CREATE SERVER starts the
 	// server as the stock page's does.
@@ -469,7 +469,7 @@ public:
 	void				PublishRetainedCreateBans( idUserInterface *gui );
 	void				HandleRetainedCreateServerRequest( idUserInterface *gui, const char *request );
 	bool				StartMenuServer();
-	// The retained Join Game sub-page (guis/menu/joingame.q4ui), which JOIN
+	// The retained Join Game sub-page (guis/menu/joingame.rui), which JOIN
 	// GAME on the Multiplayer page goes deeper to: the session lists the
 	// server scan's servers (join.*) as the scan finds them, and JOIN SERVER
 	// connects to the chosen one.
@@ -1138,7 +1138,7 @@ public:
 	void				SelectRetainedMod( idUserInterface *gui, int row );
 	// After the player dies: the retained restart screen, else the stock one.
 	void				OpenRestartMenu();
-	// The retained Credits page (guis/menu/credits.q4ui), which the title's
+	// The retained Credits page (guis/menu/credits.rui), which the title's
 	// CREDITS hands off to: its lines read from the legacy credits windows.
 	void				PublishRetainedCredits( idUserInterface *page );
 	int					retainedModSelected;

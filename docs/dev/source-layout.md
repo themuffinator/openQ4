@@ -87,7 +87,7 @@ SDK, Doom 3 and decompiled references.
   (`meson_setup.sh` and `meson_setup.ps1`). Windows-only PowerShell drivers may
   use Verb-Noun names (`Invoke-openQ4MacOSWorkflow.ps1`).
 - Documentation and fixtures are lowercase-kebab (`source-layout.md`,
-  `binding-smoke.q4ui`). Release notes are `docs/dev/releases/vX.Y.Z.md`.
+  `binding-smoke.rui`). Release notes are `docs/dev/releases/vX.Y.Z.md`.
 - The project name is `openQ4` in mixed-case names and prose
   (`openQ4Installer.iss.in`), and `openq4` inside lowercase snake or kebab names
   (`openq4_pak.py`, `openq4.desktop.in`). Never `OpenQ4`.

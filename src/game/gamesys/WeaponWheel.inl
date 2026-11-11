@@ -51,7 +51,7 @@ void idPlayer::InitWeaponWheel() {
 
 idStr idPlayer::RetainedWeaponWheelPath() const {
 	const char *family = isStrogg && !gameLocal.isMultiplayer ? "strogg" : "marine";
-	return va( "guis/hud/weapon_wheel_%s%s.q4ui", family, GetWeaponWheelSlotCount() == 13 ? "_awakening" : "" );
+	return va( "guis/hud/weapon_wheel_%s%s.rui", family, GetWeaponWheelSlotCount() == 13 ? "_awakening" : "" );
 }
 
 // The local player's wheel loads as the player spawns: inside the level load

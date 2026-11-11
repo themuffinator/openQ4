@@ -155,7 +155,7 @@ def run(args, case: str) -> dict:
     retained_warnings = [line for line in log.splitlines() if 'WARNING' in line and 'retained' in line.lower()]
     if case.endswith('retained'):
         expected_gui = 'singleplayer' if case == 'real-singleplayer-retained' else 'campaigns'
-        passed = passed and not retained_warnings and f'RETAINED_GUI_LOADED guis/menu/{expected_gui}.q4ui' in log
+        passed = passed and not retained_warnings and f'RETAINED_GUI_LOADED guis/menu/{expected_gui}.rui' in log
     if case in ('switch-sp','switch-mp','switch-arena'):
         passed = passed and 'AWAKENING_GAMEPLAY_BEFORE_SWITCH' in logs.get('q4xbase','')
     if case in ('switch-mp','direct-mp','dedicated'):

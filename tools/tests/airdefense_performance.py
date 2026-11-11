@@ -102,7 +102,7 @@ def check_rotation(text: str, api: str, preset: str = "quality") -> list[str]:
         complete_profile = profile and json.loads(profile[1])["frames"] == 1000
     except (ValueError, KeyError):
         complete_profile = False
-    if not complete_profile or "Retained UI document work: path=guis/hud/remastered_marine.q4ui" not in warmup:
+    if not complete_profile or "Retained UI document work: path=guis/hud/remastered_marine.rui" not in warmup:
         failures.append("Remastered HUD warm-up profile did not complete before sampling")
     backend = "Vulkan" if api == "vk" else "OpenGL"
     for effect in ("SSAO", "motion blur", "bloom/tone map"):

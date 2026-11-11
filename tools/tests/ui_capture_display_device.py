@@ -309,7 +309,7 @@ class DisplayOracleTests(unittest.TestCase):
 class DisplayCaptureRestrictionsTests(unittest.TestCase):
     def test_script_has_only_fixed_semantic_operations_engine_screenshots_and_bounded_waits(self):
         read_commands = [('openq4_guiGet', field) for field in FIELDS]
-        expected = [('rendererModuleSelfTest',), ('testGUI', 'display-smoke.q4ui'), ('wait', '3'),
+        expected = [('rendererModuleSelfTest',), ('testGUI', 'display-smoke.rui'), ('wait', '3'),
                     ('openq4_retainedGui', 'event', 'edit'), ('wait', '3')] + read_commands
         expected += [('rendererDisplayProbe', 'save'), ('rendererDisplayProbe', 'apply', '960', '540', '0', '0'),
                      ('wait', '6'), ('rendererDisplayProbe', 'report'), ('screenshot', 'screenshots/display-applied.tga')]
@@ -324,7 +324,7 @@ class DisplayCaptureRestrictionsTests(unittest.TestCase):
         self.assertEqual(capture.script_for_renderer('gl'),capture.SCRIPT.replace('apply 960 540 0 0','apply 960 540 0 4'))
         # The engine lexer splits unquoted hyphenated arguments; shlex does not.
         self.assertIn('rendererDisplayProbe "missing-display"\n', capture.SCRIPT)
-        self.assertEqual(capture.FIXTURE, ROOT / 'tools/ui/fixtures/display-device-smoke.q4ui')
+        self.assertEqual(capture.FIXTURE, ROOT / 'tools/ui/fixtures/display-device-smoke.rui')
         self.assertFalse(any(char in capture.SCRIPT for char in (';', '\r', '\x00')))
 
     def test_cli_rejects_arbitrary_script_commands_and_backend_values(self):

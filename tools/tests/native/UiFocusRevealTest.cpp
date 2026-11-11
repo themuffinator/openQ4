@@ -28,7 +28,7 @@ static void AddControl(Json::Value& source,Json::Value& node){const auto id=node
     for(unsigned time:{0u,1u}){Json::Value key;key["atMs"]=time;key["value"]=Typed("number",1);track["keys"].append(key);}timeline["tracks"].append(track);source["timelines"].append(timeline);
 }
 static std::string Source(bool nested=false,bool rotated=false,bool oversized=false,bool atEnd=false){
-    Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="focus-reveal";source["state"]["flag"]["type"]="boolean";source["state"]["flag"]["initial"]=false;
+    Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="focus-reveal";source["state"]["flag"]["type"]="boolean";source["state"]["flag"]["initial"]=false;
     auto root=Box("root",0,0,640,360),outer=Box("outer",40,40,280,150),content=Box("outer-content",0,0,700,700);
     outer["properties"]["overflow"]=Typed("keyword","auto");outer["properties"]["border-width"]=Typed("length",nested?2:0,"dp");outer["properties"]["padding"]=Typed("length",nested?3:0,"dp");
     auto upper=Box("upper",8,8,80,36);AddControl(source,upper);content["children"].append(upper);
@@ -57,7 +57,7 @@ struct TestHost final:Host {
 struct View {
     TestHost host;Runtime runtime{host};Viewport viewport;double time=1;
     explicit View(float density,bool nested=false,bool rotated=false,bool oversized=false,bool atEnd=false){viewport.width=1280;viewport.height=720;viewport.displayScale=density;std::vector<Diagnostic> diagnostics;
-        const bool loaded=runtime.LoadDocument(Source(nested,rotated,oversized,atEnd),"focus-reveal.q4ui",diagnostics);for(auto& d:diagnostics)std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"real authored fixture parses");Frame();}
+        const bool loaded=runtime.LoadDocument(Source(nested,rotated,oversized,atEnd),"focus-reveal.rui",diagnostics);for(auto& d:diagnostics)std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"real authored fixture parses");Frame();}
     void Frame(){host.red.clear();++host.frame;time+=.01;runtime.Frame(viewport,time);}
     Rml::Element* Element(const char* id){auto* context=Rml::GetContext(0);Check(context!=nullptr,"actual Rml context");auto* element=context->GetDocument(0)->GetElementById(id);Check(element!=nullptr,"actual authored element");return element;}
     void Focus(){Check(runtime.FocusControl("lower",time),"lower control focused");Frame();Check(runtime.FocusedControl()=="lower"&&runtime.TakeActions().empty(),"reveal does not activate control");}
@@ -147,7 +147,7 @@ static void AddButton(Json::Value& source,Json::Value& node){const auto id=node[
     for(unsigned time:{0u,1u}){Json::Value key;key["atMs"]=time;key["value"]=Typed("number",1);track["keys"].append(key);}timeline["tracks"].append(track);source["timelines"].append(timeline);
 }
 static std::string ListSource(bool buttons){
-    Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="list-paging";source["state"]["flag"]["type"]="boolean";source["state"]["flag"]["initial"]=false;
+    Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="list-paging";source["state"]["flag"]["type"]="boolean";source["state"]["flag"]["initial"]=false;
     auto root=Box("root",0,0,640,360),list=Box("list",40,40,280,150),content=Box("list-content",0,0,280,600);
     list["properties"]["overflow"]=Typed("keyword","auto");
     for(int i=0;i<20;++i){auto row=Box(("row-"+std::to_string(i)).c_str(),0,30.*i,200,30);if(buttons)AddButton(source,row);else AddControl(source,row);content["children"].append(row);}
@@ -160,7 +160,7 @@ static std::string ListSource(bool buttons){
 static void ListPaging(){
     for(bool buttons:{false,true})for(float density:{1.f,2.f}){
         TestHost host;Runtime runtime{host};Viewport viewport;viewport.width=1280;viewport.height=720;viewport.displayScale=density;double time=1;
-        std::vector<Diagnostic> diagnostics;const bool parsed=runtime.LoadDocument(ListSource(buttons),"list-paging.q4ui",diagnostics);
+        std::vector<Diagnostic> diagnostics;const bool parsed=runtime.LoadDocument(ListSource(buttons),"list-paging.rui",diagnostics);
         for(auto& d:diagnostics)std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());Check(parsed,"list fixture parses");runtime.Frame(viewport,time);
         const auto press=[&](MenuInput input){time+=.05;runtime.MenuAction(input,true,time);runtime.MenuAction(input,false,time+.01);runtime.Frame(viewport,time+.02);return runtime.FocusedControl();};
         Check(runtime.FocusControl("row-0",time),"focus the first row");runtime.Frame(viewport,time+=.01);
@@ -184,7 +184,7 @@ static void ListPaging(){
 // one, one whose content fits and a list of buttons are passed over; focus
 // stays and nothing activates. A document of lists alone has no detail area.
 static std::string DetailSource(){
-    Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="detail-scroll";source["state"]["flag"]["type"]="boolean";source["state"]["flag"]["initial"]=false;
+    Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="detail-scroll";source["state"]["flag"]["type"]="boolean";source["state"]["flag"]["initial"]=false;
     auto root=Box("root",0,0,640,360);
     const auto area=[&](const char* id,double x,double contentHeight,bool hidden){
         auto box=Box(id,x,40,120,150);box["properties"]["overflow"]=Typed("keyword","auto");
@@ -203,7 +203,7 @@ static std::string DetailSource(){
 static void DetailScroll(){
     for(float density:{1.f,2.f}){
         TestHost host;Runtime runtime{host};Viewport viewport;viewport.width=1280;viewport.height=720;viewport.displayScale=density;double time=1;
-        std::vector<Diagnostic> diagnostics;const bool parsed=runtime.LoadDocument(DetailSource(),"detail-scroll.q4ui",diagnostics);
+        std::vector<Diagnostic> diagnostics;const bool parsed=runtime.LoadDocument(DetailSource(),"detail-scroll.rui",diagnostics);
         for(auto& d:diagnostics)std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());Check(parsed,"detail fixture parses");runtime.Frame(viewport,time);
         Check(runtime.FocusControl("row-0",time),"focus a list row");runtime.Frame(viewport,time+=.01);
         auto* document=Rml::GetContext(0)->GetDocument(0);auto* notes=document->GetElementById("notes");auto* list=document->GetElementById("list");
@@ -218,7 +218,7 @@ static void DetailScroll(){
         Check(runtime.ScrollDetail(0,time)==false,"no deflection, no movement");
     }
     TestHost host;Runtime runtime{host};Viewport viewport;viewport.width=1280;viewport.height=720;double time=1;
-    std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(ListSource(true),"list-paging.q4ui",diagnostics),"list fixture parses");runtime.Frame(viewport,time);
+    std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(ListSource(true),"list-paging.rui",diagnostics),"list fixture parses");runtime.Frame(viewport,time);
     Check(!runtime.ScrollDetail(100,time+.01),"lists alone have no detail area");
 }
 int main(int argc,char**){if(argc>1){View v(2);v.Focus();FullInset(v,"outer");return 0;}BasicAndNested();InputAndResize();LimitsAndHelper();HorizontalAndProjection();LayoutReflow();ListPaging();DetailScroll();std::printf("PASS %u checks\n",checks);}

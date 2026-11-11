@@ -702,7 +702,7 @@ still reloads through the per-frame check.
   (`openq4_retainedGui`, `openq4_system report`, `screenshot`), no gate
   setting on the command line.
   - **The default.** `OPENQ4_RETAINED ... system=1`, and SETTINGS > DISPLAY
-    opens `guis/menu/settings/system.q4ui` as the SETTINGS page's child.
+    opens `guis/menu/settings/system.rui` as the SETTINGS page's child.
   - **Presets.** Starting from Enhanced, each run steps the Performance
     Preset row through all nine presets and applies each, then applies
     Performance and Auto-Detect. After every Apply the 55 preset settings are

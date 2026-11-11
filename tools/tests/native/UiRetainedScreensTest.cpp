@@ -142,7 +142,7 @@ static bool Loads(const std::string& source) {
 }
 
 static std::string Wrap(const std::string& root, const std::string& extra = "") {
-	return R"({"format":"openq4-ui","version":1,"id":"screens-schema")"+extra+R"(,"root":)"+root+"}";
+	return R"({"format":"retained-ui","version":1,"id":"screens-schema")"+extra+R"(,"root":)"+root+"}";
 }
 
 static void CheckSchema() {
@@ -219,7 +219,7 @@ static void CheckViewSource(ScreenHost& host) {
 		!Loads(source(R"({"type":"number","initial":1,"view":"aspect","cvar":"ui_scale"})")),"only a number takes the aspect, never with a CVar");
 	Check(!Loads(source(aspect,R"(,"events":{"onActivate":[{"op":"setState","values":{"view.aspect":1}}]})")),"events cannot write a view source");
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error;
-	Check(runtime.Initialize() && runtime.LoadDocument(source(aspect,bound),"view-source.q4ui",diagnostics),"the view source loads");
+	Check(runtime.Initialize() && runtime.LoadDocument(source(aspect,bound),"view-source.rui",diagnostics),"the view source loads");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.canvasMinWidth = 960; viewport.width = 1280; viewport.height = 720;
 	runtime.Frame(viewport,0.1);
 	const auto shown = [&]() { const auto found = runtime.PresentedValue("tall","display"); return found ? found->text : std::string("?"); };
@@ -244,7 +244,7 @@ static void CheckViewSource(ScreenHost& host) {
 		"only a number takes an inset, by its edge's name, never with a CVar");
 	Runtime safe(host);
 	Check(safe.Initialize() && safe.LoadDocument(sourced(insets+R"(,"aspect":{"type":"number","initial":1.3333,"view":"aspect"})"),
-		"safe-source.q4ui",diagnostics),"the safe sources load");
+		"safe-source.rui",diagnostics),"the safe sources load");
 	const auto read = [&](const char* id) { return static_cast<float>(std::get<double>(safe.GetState(true).at(id))); };
 	viewport.width = 540; viewport.height = 1170; viewport.safeTop = 72; viewport.safeBottom = 36;
 	safe.Frame(viewport,0.4);
@@ -377,7 +377,7 @@ static void CheckTransformedClip(ScreenHost& host) {
 	for (const bool rotated : {false,true}) {
 		Runtime runtime(host);
 		std::vector<Diagnostic> diagnostics;
-		Check(runtime.Initialize() && runtime.LoadDocument(document(rotated ? "[10,20,1,1,10]" : "[10,20,1,1,0]"),"clip.q4ui",diagnostics),
+		Check(runtime.Initialize() && runtime.LoadDocument(document(rotated ? "[10,20,1,1,10]" : "[10,20,1,1,0]"),"clip.rui",diagnostics),
 			"transformed clip document loads");
 		host.draws.clear();
 		runtime.Frame(Viewport(),1);
@@ -434,7 +434,7 @@ static void CheckEscape(ScreenHost& host, const char* path) {
 	Check(root.children.size() == 3 && root.children[0].id == "scene-softfocus" && root.children[1].id == "scrim" &&
 		root.children[2].id == "chrome","the softened view, its scrim stand-in, then the card and its modal");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.q4ui",diagnostics),"the card loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.rui",diagnostics),"the card loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720;
 	std::string error;
 	Runtime::EventEffects effects;
@@ -731,7 +731,7 @@ static void CheckVote(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics;
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.q4ui",diagnostics),"the Escape card loads for its Vote page");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.rui",diagnostics),"the Escape card loads for its Vote page");
 	{
 		// The Vote and Admin pages' map choices hold the game's catalog of
 		// 128 maps a game type (RETAINED_VOTE_MAPS).
@@ -895,7 +895,7 @@ static void CheckAdmin(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics;
-	const bool loaded = runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.q4ui",diagnostics);
+	const bool loaded = runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.rui",diagnostics);
 	for (const auto& diagnostic : diagnostics) std::fprintf(stderr,"mp_escape %s: %s\n",diagnostic.pointer.c_str(),diagnostic.message.c_str());
 	Check(loaded,"the Escape card loads for its Admin page");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
@@ -1118,7 +1118,7 @@ static void CheckMenuWrap(ScreenHost& host, const char* titlePath, const char* p
 	};
 	{
 		Runtime runtime(host); std::vector<Diagnostic> diagnostics;
-		Check(runtime.Initialize() && runtime.LoadDocument(Read(titlePath),"guis/menu/title.q4ui",diagnostics),"the title loads for its wrap");
+		Check(runtime.Initialize() && runtime.LoadDocument(Read(titlePath),"guis/menu/title.rui",diagnostics),"the title loads for its wrap");
 		runtime.Frame(viewport,t);
 		Check(runtime.FocusControl("nav_singleplayer",t+=.05),"focus SINGLE PLAYER without a save");
 		runtime.Frame(viewport,t+=.05);
@@ -1141,7 +1141,7 @@ static void CheckMenuWrap(ScreenHost& host, const char* titlePath, const char* p
 	}
 	{
 		Runtime runtime(host); std::vector<Diagnostic> diagnostics;
-		Check(runtime.Initialize() && runtime.LoadDocument(Read(pausePath),"guis/menu/pause.q4ui",diagnostics),"the pause loads for its wrap");
+		Check(runtime.Initialize() && runtime.LoadDocument(Read(pausePath),"guis/menu/pause.rui",diagnostics),"the pause loads for its wrap");
 		runtime.Frame(viewport,t+=.05);
 		Check(runtime.FocusControl("nav_resume",t+=.05),"focus RESUME");
 		runtime.Frame(viewport,t+=.05);
@@ -1169,7 +1169,7 @@ static void CheckMenuWrap(ScreenHost& host, const char* titlePath, const char* p
 	}
 	if (restartPath != nullptr) {
 		Runtime runtime(host); std::vector<Diagnostic> diagnostics;
-		Check(runtime.Initialize() && runtime.LoadDocument(Read(restartPath),"guis/menu/restartlevel.q4ui",diagnostics),
+		Check(runtime.Initialize() && runtime.LoadDocument(Read(restartPath),"guis/menu/restartlevel.rui",diagnostics),
 			"Restart Level loads for its wrap");
 		runtime.Frame(viewport,t+=.05);
 		Check(runtime.FocusControl("skill-0",t+=.05),"focus the first difficulty");
@@ -1190,7 +1190,7 @@ static void CheckMatch(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics;
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.q4ui",diagnostics),"the Escape card loads for its Match page");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.rui",diagnostics),"the Escape card loads for its Match page");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error;
 	Runtime::EventEffects effects;
@@ -1647,7 +1647,7 @@ static void CheckSettings(ScreenHost& host, const char* escapePath, const char* 
 	{
 		Runtime runtime(host);
 		std::vector<Diagnostic> diagnostics;
-		Check(runtime.Initialize() && runtime.LoadDocument(Read(escapePath),"guis/menu/mp_escape.q4ui",diagnostics),"the Escape card loads for its Settings page");
+		Check(runtime.Initialize() && runtime.LoadDocument(Read(escapePath),"guis/menu/mp_escape.rui",diagnostics),"the Escape card loads for its Settings page");
 		const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a settings node is laid out"); return b; };
 		const auto text = [&](const std::string& node, const char* property) {
 			const auto value = runtime.PresentedValue(node,property); Check(value.has_value(),"a presented keyword"); return value->text;
@@ -1753,7 +1753,7 @@ static void CheckSettings(ScreenHost& host, const char* escapePath, const char* 
 	{
 		Runtime runtime(host);
 		std::vector<Diagnostic> diagnostics;
-		Check(runtime.Initialize() && runtime.LoadDocument(Read(welcomePath),"guis/menu/mp_welcome.q4ui",diagnostics),"the Welcome card loads for its Settings page");
+		Check(runtime.Initialize() && runtime.LoadDocument(Read(welcomePath),"guis/menu/mp_welcome.rui",diagnostics),"the Welcome card loads for its Settings page");
 		const auto text = [&](const std::string& node, const char* property) {
 			const auto value = runtime.PresentedValue(node,property); Check(value.has_value(),"a presented keyword"); return value->text;
 		};
@@ -1786,7 +1786,7 @@ static void CheckWelcome(ScreenHost& host, const char* path) {
 	Check(valid && document.Model().id == "openq4.mp_welcome" && document.Model().canvasHeight == 720,"the Welcome card validates");
 	CheckSessionActions(document);
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_welcome.q4ui",diagnostics),"the Welcome card loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_welcome.rui",diagnostics),"the Welcome card loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error;
 	Runtime::EventEffects effects;
@@ -1893,7 +1893,7 @@ static void CheckScopes(ScreenHost& host, char** paths) {
 		for (const auto& diagnostic : diagnostics) std::fprintf(stderr,"scope: %s\n",diagnostic.message.c_str());
 		Check(valid && document.Model().canvasMinWidth == 960,"scope document validates with an isotropic center");
 		Runtime runtime(host);
-		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/weapons/scope.q4ui",diagnostics),"scope loads");
+		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/weapons/scope.rui",diagnostics),"scope loads");
 		Viewport viewport; viewport.canvasHeight = 720; viewport.canvasMinWidth = 960;
 		for (const auto size : {std::pair{640,360},std::pair{1280,360},std::pair{360,640},std::pair{3840,2160}}) {
 			viewport.width = size.first; viewport.height = size.second;
@@ -1982,7 +1982,7 @@ static void CheckScopes(ScreenHost& host, char** paths) {
 static void CheckContinuity(ScreenHost& host, char** paths, const char* campaignPath, bool effectsOnly = false) {
 	for (int kind = effectsOnly ? 2 : 0; kind < 3; ++kind) {
 		Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error; Runtime::EventEffects effects;
-		const bool loaded = runtime.Initialize() && runtime.LoadDocument(Read(paths[kind]),"guis/continuity.q4ui",diagnostics);
+		const bool loaded = runtime.Initialize() && runtime.LoadDocument(Read(paths[kind]),"guis/continuity.rui",diagnostics);
 		for (const auto& d : diagnostics) std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());
 		Check(loaded,"initialization, fourth-level and game effects load in the native runtime");
 		Viewport viewport; viewport.canvasHeight = 720; viewport.canvasMinWidth = 960;
@@ -2067,7 +2067,7 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 	}
 	if (effectsOnly) return;
 	Runtime parent(host); std::vector<Diagnostic> diagnostics; std::string error; Runtime::EventEffects effects; Viewport viewport;
-	Check(parent.Initialize() && parent.LoadDocument(Read(campaignPath),"guis/menu/campaigns.q4ui",diagnostics),"campaign parent loads for detail continuity");
+	Check(parent.Initialize() && parent.LoadDocument(Read(campaignPath),"guis/menu/campaigns.rui",diagnostics),"campaign parent loads for detail continuity");
 	Check(parent.RunEvent("onActivate",0,effects,error),"campaign parent activates"); parent.Frame(viewport,.2);
 	double at = 1;
 	for (const char* event : {"detailEnterQuake4","detailEnterAwakening","detailEnterChapters"}) {
@@ -2084,7 +2084,7 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 static void CheckWeaponWheels(ScreenHost& host, char** paths) {
 	for (int variant = 0; variant < 4; ++variant) {
 		Runtime wheel(host); std::vector<Diagnostic> diagnostics; std::string error; Runtime::EventEffects effects;
-		const bool loaded = wheel.Initialize() && wheel.LoadDocument(Read(paths[variant]),"guis/hud/weapon_wheel.q4ui",diagnostics);
+		const bool loaded = wheel.Initialize() && wheel.LoadDocument(Read(paths[variant]),"guis/hud/weapon_wheel.rui",diagnostics);
 		for (const auto& d:diagnostics) std::fprintf(stderr,"wheel %s: %s\n",d.pointer.c_str(),d.message.c_str());
 		Check(loaded,"native wheel document loads");
 		const int slots = variant % 2 ? 13 : 11;
@@ -2189,7 +2189,7 @@ static void CheckWeaponWheels(ScreenHost& host, char** paths) {
 // zoom control's key that switches it.
 static void CheckQuickChat(ScreenHost& host, const char* path) {
 	Runtime chat(host); std::vector<Diagnostic> diagnostics; std::string error; Runtime::EventEffects effects;
-	const bool loaded = chat.Initialize() && chat.LoadDocument(Read(path),"guis/hud/quick_chat.q4ui",diagnostics);
+	const bool loaded = chat.Initialize() && chat.LoadDocument(Read(path),"guis/hud/quick_chat.rui",diagnostics);
 	for (const auto& d:diagnostics) std::fprintf(stderr,"quick chat %s: %s\n",d.pointer.c_str(),d.message.c_str());
 	Check(loaded,"quick-chat document loads");
 	const auto opacity = [&](const char* id) { const auto value = chat.PresentedValue(id,"opacity"); return value ? float(value->data[0]) : -1.f; };
@@ -2253,10 +2253,10 @@ static void CheckQuickChat(ScreenHost& host, const char* path) {
 	Check(host.errors == 0,"no runtime diagnostics across the quick-chat exercise");
 }
 
-// The Strogg pause's copy of a page (loadgame_strogg.q4ui beside loadgame.q4ui):
+// The Strogg pause's copy of a page (loadgame_strogg.rui beside loadgame.rui):
 // the same construction and verbs in the Strogg family.
 static std::string StroggPage(const char* path) {
-	std::string strogg = path; const auto dot = strogg.rfind(".q4ui");
+	std::string strogg = path; const auto dot = strogg.rfind(".rui");
 	return dot == std::string::npos ? strogg : strogg.insert(dot,"_strogg");
 }
 
@@ -2274,7 +2274,7 @@ static void CheckLoadPage(ScreenHost& host, const char* path, bool strogg = fals
 	Check(!document.Model().FindNode("band-top") && !document.Model().FindNode("scene-softfocus") && !document.Model().FindNode("title"),
 		"the page is its content alone: the home that handed off draws its frame and title behind it");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,strogg ? "guis/menu/loadgame_strogg.q4ui" : "guis/menu/loadgame.q4ui",diagnostics),
+	Check(runtime.Initialize() && runtime.LoadDocument(source,strogg ? "guis/menu/loadgame_strogg.rui" : "guis/menu/loadgame.rui",diagnostics),
 		"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
@@ -2504,7 +2504,7 @@ static void CheckSavePage(ScreenHost& host, const char* path, bool strogg = fals
 		"the name is a text field of up to 32 bytes");
 	Check(!document.Model().FindNode("band-top") && !document.Model().FindNode("title"),"the page is its content alone, as the Load Game page");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,strogg ? "guis/menu/savegame_strogg.q4ui" : "guis/menu/savegame.q4ui",diagnostics),
+	Check(runtime.Initialize() && runtime.LoadDocument(source,strogg ? "guis/menu/savegame_strogg.rui" : "guis/menu/savegame.rui",diagnostics),
 		"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
@@ -2622,7 +2622,7 @@ static void CheckRestartPage(ScreenHost& host, const char* path, bool strogg = f
 		back != document.Model().actions.end() && std::get<std::string>(back->second.arguments.at("command").literal) == "restartBack",
 		"RESTART LEVEL and BACK ask the session");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,strogg ? "guis/menu/restartlevel_strogg.q4ui" : "guis/menu/restartlevel.q4ui",
+	Check(runtime.Initialize() && runtime.LoadDocument(source,strogg ? "guis/menu/restartlevel_strogg.rui" : "guis/menu/restartlevel.rui",
 		diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
@@ -2686,7 +2686,7 @@ static void CheckDemosPage(ScreenHost& host, const char* path) {
 	Check(document.Model().FindNode("band-top") && document.Model().FindNode("crumb") && document.Model().FindNode("title") &&
 		!document.Model().FindNode("demo-title"),"the sub-page draws its own frame: the MULTIPLAYER crumb and its title at the step's foot");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/demos.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/demos.rui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto text = [&](const std::string& node, const char* property) {
@@ -2825,7 +2825,7 @@ static void CheckModsDialog(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	std::vector<Diagnostic> diagnostics;
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/title.q4ui",diagnostics),"the title loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/title.rui",diagnostics),"the title loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto text = [&](const std::string& node, const char* property) {
@@ -2899,7 +2899,7 @@ static void CheckRestartMenu(ScreenHost& host, const char* path) {
 			"each plate asks the session for the stock screen's command");
 	}
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/restartmenu.q4ui",diagnostics),"the screen loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/restartmenu.rui",diagnostics),"the screen loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto text = [&](const std::string& node, const char* property) {
@@ -2959,7 +2959,7 @@ static void CheckCreditsPage(ScreenHost& host, const char* path) {
 	for (const auto& [name, declaration] : document.Model().state) lines += name.rfind("credits.",0) == 0;
 	Check(lines > 300,"every credit line, rune and Latin, shows application text");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/credits.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/credits.rui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto value = [&](const std::string& node, const char* property, size_t index) {
@@ -3025,7 +3025,7 @@ static void CheckArenaPage(ScreenHost& host, const char* pagePath, const char* p
 			"each verb asks the session for the campaign's command");
 	}
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/arena.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/arena.rui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto text = [&](const std::string& node, const char* property) {
@@ -3213,7 +3213,7 @@ static void CheckArenaPage(ScreenHost& host, const char* pagePath, const char* p
 	// Arena returns onto ARENA.
 	const auto pageSource = Read(pagePath);
 	Runtime page(host);
-	Check(page.Initialize() && page.LoadDocument(pageSource,"guis/menu/singleplayer.q4ui",diagnostics),"Single Player loads");
+	Check(page.Initialize() && page.LoadDocument(pageSource,"guis/menu/singleplayer.rui",diagnostics),"Single Player loads");
 	Check(page.RunEvent("onActivate",9,effects,error) && page.RunEvent("subpageEnterArena",9.1,effects,error),"ARENA leads deeper");
 	page.Frame(viewport,9.11);
 	const auto from = page.PresentedValue("arena-carry","transform");
@@ -3266,7 +3266,7 @@ static void CheckMultiplayerPage(ScreenHost& host, const char* path) {
 			"each section asks the session for its page");
 	}
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/multiplayer.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/multiplayer.rui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto text = [&](const std::string& node, const char* property) {
@@ -3434,7 +3434,7 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 			std::get<std::string>(found->second.arguments.at("command").literal) == command,"the page's verbs reach the session");
 	}
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/joingame.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/joingame.rui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto value = [&](const std::string& node, const char* property, size_t index = 0) {
@@ -3895,7 +3895,7 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics;
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/createserver.q4ui",diagnostics),"the page loads for its ban list");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/createserver.rui",diagnostics),"the page loads for its ban list");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto text = [&](const std::string& node, const char* property) {
@@ -4328,7 +4328,7 @@ static void CheckContentColumn(Runtime& runtime, const Viewport& view, float tex
 // title and detail stand on their own lines above the plinth, and the exit
 // question grows.
 static void CheckTitleTextScale(ScreenHost& host, const char* path) {
-	CheckPageTextScale(host,path,"guis/menu/title.q4ui","home-content",{"open"},
+	CheckPageTextScale(host,path,"guis/menu/title.rui","home-content",{"open"},
 		{{"menu_continue",true},{"menu_continue_title",std::string("Save")},{"menu_continue_detail",std::string("Level")}},{"exitModal"},
 		[](Runtime& runtime, const Viewport& view, float text, const Bounds& canvas, float dp, bool tall) {
 			const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a title node is laid out"); return b; };
@@ -4429,7 +4429,7 @@ static void CheckSettingsPage(ScreenHost& host, const char* path) {
 	for (const char* event : {"subpageentercontrols","subpageentergame","subpageenterdisplay","subpageenteraudio","subpagereturn","subpagereverse150","subpagereverse300"})
 		Check(document.Model().events.contains(PresentationAliasKey(event)),"the page goes one level deeper to its sub-pages and back");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings.rui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = document.Model().canvasHeight; viewport.canvasMinWidth = document.Model().canvasMinWidth;
 	viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
@@ -4678,7 +4678,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(!document.Model().FindNode("controls_bind_49"),"the stock page's 49 bindings, no more");
 	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other"}) Check(document.Model().FindNode(tab) != nullptr,"the stock tabs");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/controls.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/controls.rui",diagnostics),"the page loads into a runtime");
 	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
 	const auto press = [&](MenuInput input, double at) { runtime.MenuAction(input,true,at); runtime.MenuAction(input,false,at+.01); };
 	const auto text = [&](const std::string& node, const char* property) {
@@ -4823,7 +4823,7 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	for (const auto& [name, declaration] : document.Model().state)
 		if (!declaration.cvar.empty()) host.cvars.emplace(declaration.cvar,declaration.initial);
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/game.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/game.rui",diagnostics),"the page loads into a runtime");
 	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
 	const auto press = [&](MenuInput input, double at) { runtime.MenuAction(input,true,at); runtime.MenuAction(input,false,at+.01); };
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a GAME page node is laid out"); return b; };
@@ -4977,7 +4977,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 		"BACK asks the session to return");
 	Check(!document.Model().FindNode("tab-audio"),"one screen of rows has no tab strip");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/audio.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/audio.rui",diagnostics),"the page loads into a runtime");
 	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
 	const auto press = [&](MenuInput input, double at) { runtime.MenuAction(input,true,at); runtime.MenuAction(input,false,at+.01); };
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"an AUDIO page node is laid out"); return b; };
@@ -5095,7 +5095,7 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 	Check(!nameField.masked && !nameField.allowEmpty && nameField.maxBytes == 25 && !cycleField.masked && cycleField.allowEmpty &&
 		cycleField.maxBytes == 200,"the server name needs text; the map cycle may be empty");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/createserver.q4ui",diagnostics),"the page loads into a runtime");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/createserver.rui",diagnostics),"the page loads into a runtime");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	std::string error; Runtime::EventEffects effects;
 	const auto value = [&](const std::string& node, const char* property, size_t index = 0) {
@@ -5208,7 +5208,7 @@ static void CheckPromptGlyphs(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	std::vector<Diagnostic> diagnostics; std::string error;
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/title.q4ui",diagnostics),"the title loads for its prompts");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/title.rui",diagnostics),"the title loads for its prompts");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	const char* const families[] = {"xbox","playstation","nintendo","steamdeck","generic"};
 	const auto display = [&](const std::string& node) {
@@ -5259,7 +5259,7 @@ static void CheckCardPromptGlyphs(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	std::vector<Diagnostic> diagnostics; std::string error;
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.q4ui",diagnostics),"the card loads for its prompts");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/mp_escape.rui",diagnostics),"the card loads for its prompts");
 	Viewport viewport; viewport.canvasHeight = 720; viewport.width = 1280; viewport.height = 720;
 	const char* const families[] = {"xbox","playstation","nintendo","steamdeck","generic"};
 	const auto display = [&](const std::string& node) {
@@ -5492,50 +5492,50 @@ static void CheckMenusPointerReach(ScreenHost& host, char** argv) {
 		for (const char* id : ids) if (!reached.contains(id)) { std::fprintf(stderr,"pointer probe: %s was not probed\n",id); all = false; }
 		return all;
 	};
-	Check(probed(CheckPointerReach(host,argv[19],"guis/menu/loadgame.q4ui",{{"load.count",1.0},{"load.first",0.0},{"load.selected",0.0}},
+	Check(probed(CheckPointerReach(host,argv[19],"guis/menu/loadgame.rui",{{"load.count",1.0},{"load.first",0.0},{"load.selected",0.0}},
 		"onActivate"),{"row-0","load_go","load_delete","load_back","deleteModal_yes","deleteModal_no"}),
 		"Load Game's plates, save, BACK and confirmation take the pointer");
-	Check(probed(CheckPointerReach(host,argv[19],"guis/menu/loadgame.q4ui",{},"onActivate"),{"load_newgame","load_back"}),
+	Check(probed(CheckPointerReach(host,argv[19],"guis/menu/loadgame.rui",{},"onActivate"),{"load_newgame","load_back"}),
 		"the empty Load Game page's NEW GAME takes the pointer");
-	Check(probed(CheckPointerReach(host,argv[20],"guis/menu/savegame.q4ui",{{"save.count",1.0},{"save.first",0.0},{"save.selected",0.0},
+	Check(probed(CheckPointerReach(host,argv[20],"guis/menu/savegame.rui",{{"save.count",1.0},{"save.first",0.0},{"save.selected",0.0},
 		{"save.name",std::string("Medic")}},"onActivate"),{"row-0","save-name","save_go","save_back","overwriteModal_yes","overwriteModal_no",
 		"noticeModal_close"}),"Save Game's plate, name, save, BACK and dialogs take the pointer");
-	Check(probed(CheckPointerReach(host,argv[21],"guis/menu/restartlevel.q4ui",{},"onActivate"),
+	Check(probed(CheckPointerReach(host,argv[21],"guis/menu/restartlevel.rui",{},"onActivate"),
 		{"skill-0","skill-1","skill-2","skill-3","skill-4","restart_go","restart_back"}),"Restart Level's plates take the pointer");
 	// The Strogg pause's pages: the same targets in the Strogg family.
-	Check(probed(CheckPointerReach(host,StroggPage(argv[19]).c_str(),"guis/menu/loadgame_strogg.q4ui",{{"load.count",1.0},{"load.first",0.0},
+	Check(probed(CheckPointerReach(host,StroggPage(argv[19]).c_str(),"guis/menu/loadgame_strogg.rui",{{"load.count",1.0},{"load.first",0.0},
 		{"load.selected",0.0},{"load.ingame",true}},"onActivate"),{"row-0","load_go","load_delete","load_back","deleteModal_yes","deleteModal_no"}),
 		"the Strogg Load Game's plates, save, BACK and confirmation take the pointer");
-	Check(probed(CheckPointerReach(host,StroggPage(argv[20]).c_str(),"guis/menu/savegame_strogg.q4ui",{{"save.count",1.0},{"save.first",0.0},
+	Check(probed(CheckPointerReach(host,StroggPage(argv[20]).c_str(),"guis/menu/savegame_strogg.rui",{{"save.count",1.0},{"save.first",0.0},
 		{"save.selected",0.0},{"save.name",std::string("Medic")}},"onActivate"),{"row-0","save-name","save_go","save_back","overwriteModal_yes",
 		"overwriteModal_no","noticeModal_close"}),"the Strogg Save Game's plate, name, save, BACK and dialogs take the pointer");
-	Check(probed(CheckPointerReach(host,StroggPage(argv[21]).c_str(),"guis/menu/restartlevel_strogg.q4ui",{},"onActivate"),
+	Check(probed(CheckPointerReach(host,StroggPage(argv[21]).c_str(),"guis/menu/restartlevel_strogg.rui",{},"onActivate"),
 		{"skill-0","skill-1","skill-2","skill-3","skill-4","restart_go","restart_back"}),"the Strogg Restart Level's plates take the pointer");
-	Check(probed(CheckPointerReach(host,argv[22],"guis/menu/demos.q4ui",{{"demos.count",1.0},{"demos.first",0.0},{"demos.selected",0.0},
+	Check(probed(CheckPointerReach(host,argv[22],"guis/menu/demos.rui",{{"demos.count",1.0},{"demos.first",0.0},{"demos.selected",0.0},
 		{"demos.canPlay",true},{"demos.canDelete",true}},"onActivate"),{"row-0","tag-mvd","tag-render","tag-legacy","tag-incomplete","demo_play",
 		"demo_delete","demo_refresh","demo_back","deleteModal_yes","deleteModal_no"}),"Demos' plates, tags, demo, BACK and confirmation take the pointer");
-	Check(probed(CheckPointerReach(host,argv[24],"guis/menu/credits.q4ui",{},"onActivate"),{"credits_back"}),"Credits' BACK takes the pointer");
-	Check(probed(CheckPointerReach(host,argv[27],"guis/menu/createserver.q4ui",{{"create.map_count",3.0},{"create.map_first",0.0},
+	Check(probed(CheckPointerReach(host,argv[24],"guis/menu/credits.rui",{},"onActivate"),{"credits_back"}),"Credits' BACK takes the pointer");
+	Check(probed(CheckPointerReach(host,argv[27],"guis/menu/createserver.rui",{{"create.map_count",3.0},{"create.map_first",0.0},
 		{"create.map_selected",1.0}},"onActivate"),{"create_start","create_back","create-name","map-0","map-2"}),
 		"Create Server's options, maps and dialogs take the pointer");
-	Check(probed(CheckPointerReach(host,argv[28],"guis/menu/joingame.q4ui",{{"join.count",3.0},{"join.first",0.0},{"join.selected",0.0},
+	Check(probed(CheckPointerReach(host,argv[28],"guis/menu/joingame.rui",{{"join.count",3.0},{"join.first",0.0},{"join.selected",0.0},
 		{"join.listed",3.0}},"onActivate"),{"server-0","server-2","join_server","join_newlist","join_refresh","join_back"}),
 		"Join Game's servers, actions and dialogs take the pointer");
 	// The homes, sub-pages and cards: every control they show. The Escape
 	// card's sixteen confirmations are one construction over the same card, and
 	// each costs two of its 90 ms frames: one stands for them.
-	CheckPointerReach(host,argv[1],"guis/menu/title.q4ui",{{"menu_continue",true}},"open");
-	CheckPointerReach(host,argv[2],"guis/menu/pause.q4ui",{},"open");
-	CheckPointerReach(host,argv[4],"guis/menu/pause_strogg.q4ui",{},"open");
-	CheckPointerReach(host,argv[5],"guis/menu/singleplayer.q4ui",{},"onActivate");
-	CheckPointerReach(host,argv[6],"guis/menu/campaigns.q4ui",{},"onActivate");
-	CheckPointerReach(host,argv[7],"guis/menu/mp_escape.q4ui",{{"mp.action0.shown",true},{"mp.action0.available",true},
+	CheckPointerReach(host,argv[1],"guis/menu/title.rui",{{"menu_continue",true}},"open");
+	CheckPointerReach(host,argv[2],"guis/menu/pause.rui",{},"open");
+	CheckPointerReach(host,argv[4],"guis/menu/pause_strogg.rui",{},"open");
+	CheckPointerReach(host,argv[5],"guis/menu/singleplayer.rui",{},"onActivate");
+	CheckPointerReach(host,argv[6],"guis/menu/campaigns.rui",{},"onActivate");
+	CheckPointerReach(host,argv[7],"guis/menu/mp_escape.rui",{{"mp.action0.shown",true},{"mp.action0.available",true},
 		{"mp.action1.shown",true},{"mp.action1.available",true}},"open",1);
-	CheckPointerReach(host,argv[8],"guis/menu/mp_welcome.q4ui",{},"open");
-	CheckPointerReach(host,argv[23],"guis/menu/restartmenu.q4ui",{},"onActivate");
-	CheckPointerReach(host,argv[25],"guis/menu/arena.q4ui",{{"arena_loaded",true},{"arena_canStart",true},{"arena_difficulty",3.0},
+	CheckPointerReach(host,argv[8],"guis/menu/mp_welcome.rui",{},"open");
+	CheckPointerReach(host,argv[23],"guis/menu/restartmenu.rui",{},"onActivate");
+	CheckPointerReach(host,argv[25],"guis/menu/arena.rui",{{"arena_loaded",true},{"arena_canStart",true},{"arena_difficulty",3.0},
 		{"arenaCampaignProgress",5.0},{"arena_canReset",true}},"onActivate");
-	CheckPointerReach(host,argv[26],"guis/menu/multiplayer.q4ui",{},"onActivate");
+	CheckPointerReach(host,argv[26],"guis/menu/multiplayer.rui",{},"onActivate");
 	host.recordDraws = true;
 }
 
@@ -5735,12 +5735,12 @@ static void CheckSafeAreas(ScreenHost& host, char** paths, int count) {
 		const std::string path = paths[i];
 		const auto named = [&](const char* file) { return path.ends_with(file); };
 		StateValues values;
-		if (named("title.q4ui")) values = {{"menu_continue",true}};
-		else if (named("loadgame.q4ui")) values = {{"load.count",1.0},{"load.first",0.0},{"load.selected",0.0}};
-		else if (named("demos.q4ui")) values = {{"demos.count",1.0},{"demos.first",0.0},{"demos.selected",0.0},{"demos.canPlay",true},{"demos.canDelete",true}};
-		else if (named("arena.q4ui")) values = {{"arena_loaded",true},{"arena_canStart",true},{"arena_difficulty",3.0},{"arenaCampaignProgress",5.0},
+		if (named("title.rui")) values = {{"menu_continue",true}};
+		else if (named("loadgame.rui")) values = {{"load.count",1.0},{"load.first",0.0},{"load.selected",0.0}};
+		else if (named("demos.rui")) values = {{"demos.count",1.0},{"demos.first",0.0},{"demos.selected",0.0},{"demos.canPlay",true},{"demos.canDelete",true}};
+		else if (named("arena.rui")) values = {{"arena_loaded",true},{"arena_canStart",true},{"arena_difficulty",3.0},{"arenaCampaignProgress",5.0},
 			{"arena_canReset",true}};
-		else if (named("joingame.q4ui")) values = {{"join.count",3.0},{"join.first",0.0},{"join.selected",0.0},{"join.listed",3.0}};
+		else if (named("joingame.rui")) values = {{"join.count",3.0},{"join.first",0.0},{"join.selected",0.0},{"join.listed",3.0}};
 		CheckSafeArea(host,paths[i],values);
 	}
 	host.recordDraws = true;
@@ -5763,7 +5763,7 @@ static void CheckSubtitles(ScreenHost& host, const char* path) {
 	for (const auto& d : diagnostics) std::fprintf(stderr,"subtitles %s: %s\n",d.pointer.c_str(),d.message.c_str());
 	Check(valid && document.Model().id == "openq4.subtitles", "subtitle document validates");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/hud/subtitles.q4ui",diagnostics), "subtitle runtime loads");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/hud/subtitles.rui",diagnostics), "subtitle runtime loads");
 	std::string error;
 	for (const auto [width,height] : std::vector<std::pair<int,int>>{{1280,720},{1024,768},{3440,1440},{720,1280}}) {
 		Viewport viewport; viewport.width=width; viewport.height=height; viewport.canvasHeight=720;
@@ -5832,14 +5832,14 @@ static std::string Sibling(const char* path, const char* name) {
 // campaign's difficulty, its CHAPTERS page, Credits and the Arena with its
 // ledger, reset question and entrance.
 static void CheckPagesTextScale(ScreenHost& host, char** argv) {
-	CheckTextScaleCase(host,RestartTextScale(argv[21],"guis/menu/restartlevel.q4ui"));
+	CheckTextScaleCase(host,RestartTextScale(argv[21],"guis/menu/restartlevel.rui"));
 	// The difficulty page grows a fixed amount, so it takes its column in
 	// every portrait view that holds it (spec 1.36); CHAPTERS keeps 3:4.
-	CheckTextScaleCase(host,{argv[13],"guis/menu/campaign_skill.q4ui",{{"skill",1.0},{"turbo",true}},{"onActivate"},
+	CheckTextScaleCase(host,{argv[13],"guis/menu/campaign_skill.rui",{{"skill",1.0},{"turbo",true}},{"onActivate"},
 		{{{"back","description"},0,2},{{"description","prompts"},0,1}},{},{"skill0-label","start-label","back-label"},
 		{1.f,1.f,.906f}});
 	const std::vector<float> chaptersTall = {.886f,.7995f,.7653f};
-	static const std::string chaptersPath = Sibling(argv[13],"chapters.q4ui");
+	static const std::string chaptersPath = Sibling(argv[13],"chapters.rui");
 	StateValues chapters{{"chapter.count",3.0},{"chapter.first",0.0},{"chapter.selected",0.0},{"chapter.open",true},
 		{"chapter.name",std::string("AIR DEFENSE BUNKER")},
 		{"chapter.detail",std::string("Starts from this level's autosave, with the arsenal and difficulty you reached it with.")}};
@@ -5848,7 +5848,7 @@ static void CheckPagesTextScale(ScreenHost& host, char** argv) {
 		chapters["chapter.row"+std::to_string(row)+".name"] = std::string("Air Defense Bunker");
 		chapters["chapter.row"+std::to_string(row)+".location"] = std::string("Reached");
 	}
-	CheckTextScaleCase(host,{chaptersPath.c_str(),"guis/menu/chapters.q4ui",chapters,{"onActivate"},
+	CheckTextScaleCase(host,{chaptersPath.c_str(),"guis/menu/chapters.rui",chapters,{"onActivate"},
 		{{{"chapter-shot-back","chapter-name","chapter-detail"}},{{"chapter-list","chapter_start-label"},1,1},
 		 {{"chapter-list","chapter_back-label"},1,1}},
 		{{"row-0-name","row-0"},{"row-0-location","row-0"}},{"chapter_start","chapter_back","row-0"},chaptersTall});
@@ -5866,7 +5866,7 @@ static void CheckPagesTextScale(ScreenHost& host, char** argv) {
 			for (const auto& child : node->children) pending.push_back(&child);
 		}
 		Check(!lines.empty(),"the credits' lines are found");
-		TextScaleCase credits{argv[24],"guis/menu/credits.q4ui",{},{},{},{},{"credits_back"},{.8481f,.8481f,.8481f}};
+		TextScaleCase credits{argv[24],"guis/menu/credits.rui",{},{},{},{},{"credits_back"},{.8481f,.8481f,.8481f}};
 		credits.textsOnScreen = false;
 		CheckTextScaleCase(host,credits,
 			[&](Runtime& runtime, const Viewport& view, float text, bool tall) {
@@ -5896,7 +5896,7 @@ static void CheckPagesTextScale(ScreenHost& host, char** argv) {
 		{"arena_match0_selected",true},{"arena_tier0_status",std::string("AVAILABLE")},{"arena_match0_status",std::string("AVAILABLE")}};
 	const std::vector<std::string> arenaControls{"tier-0","tier-4","match-0","match-3","arena_easier","arena_harder","arena_start",
 		"arena_back-label","arena_reset"};
-	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",arena,{"onActivate"},
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.rui",arena,{"onActivate"},
 		{{{"arena-shot-back","arena-match-title","arena-match-description","arena-map","arena-gametype","arena-roster","arena-limits",
 		   "arena-skill"}},{{"arena-skill","arena-difficulty-label"},0,1},{{"arena-difficulty-label","arena_easier","arena_start"}},
 		 {{"arena_start","arena_back"},0,1},{{"arena-tier-name","arena-tier-description","arena-tier-path","arena-tier-rule"}},
@@ -5908,12 +5908,12 @@ static void CheckPagesTextScale(ScreenHost& host, char** argv) {
 		{"arena_resultHasScore",true},{"arena_resultScore",std::string("10 - 7")},{"arena_resultHasUnlock",true},
 		{"arena_resultUnlock",std::string("Qualifier 2")},{"arena_resultHasAwards",true},{"arena_resultAwardLine",std::string("Excellent, Impressive")},
 		{"arena_resultCanRetry",true}}) ledger[key] = value;
-	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",ledger,{"onActivate","arenaResultReveal"},
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.rui",ledger,{"onActivate","arenaResultReveal"},
 		{{{"result-title","result-match","result-message","result-score","result-unlock","result-awards","resultModal_no"}}},
 		{{"result-awards","resultModal-dialog"},{"result-title","resultModal-dialog"}},{"resultModal_yes","resultModal_no"}});
-	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",arena,{"onActivate","arenaResetReveal"},
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.rui",arena,{"onActivate","arenaResetReveal"},
 		{{{"resetModal-body","resetModal_yes"}}},{{"resetModal-body","resetModal-dialog"}},{"resetModal_yes","resetModal_no"}});
-	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.q4ui",arena,{"onActivate","arenaMatchLaunch"},
+	CheckTextScaleCase(host,{argv[25],"guis/menu/arena.rui",arena,{"onActivate","arenaMatchLaunch"},
 		{{{"launch-kicker","launch-title","launch-gametype","launch-map","launch-ready"}}},
 		{{"launch-title","launch-card"},{"launch-ready","launch-card"}},{"launch-card"}});
 }
@@ -5927,7 +5927,7 @@ static void CheckMenusTextScale(ScreenHost& host, char** argv) {
 		mods["mods.row"+std::to_string(row)+".name"] = std::string("A modification");
 		mods["mods.row"+std::to_string(row)+".version"] = std::string("1.0");
 	}
-	CheckTextScaleCase(host,{argv[1],"guis/menu/title.q4ui",mods,{"open","modsModalShow"},
+	CheckTextScaleCase(host,{argv[1],"guis/menu/title.rui",mods,{"open","modsModalShow"},
 		{{{"mods-list","mods-author","mods-date","mods-engine","mods-directory","modsModal_yes"}}},
 		{{"mods-row-0-name","mods-row-0"},{"mods-directory","modsModal-dialog"},{"mods-author-label","modsModal-dialog"}},
 		{"modsModal_yes","modsModal_no"},{1.f,1.f,1.f}});
@@ -5938,11 +5938,11 @@ static void CheckMenusTextScale(ScreenHost& host, char** argv) {
 			std::string("The bay doors open from the control room above the hangar floor. Strogg forces hold the stairs.");
 		objectives["pause_completed_"+std::to_string(row)] = std::string("Find the medic");
 	}
-	CheckTextScaleCase(host,{argv[2],"guis/menu/pause.q4ui",objectives,{"open","objectivesShow"},
+	CheckTextScaleCase(host,{argv[2],"guis/menu/pause.rui",objectives,{"open","objectivesShow"},
 		{{{"objectives-entry-0","objectives-entry-1","objectives-completed","objectives-serial"}}},
 		{{"objectives-entry-0-title","objectives-entry-0"},{"objectives-entry-0-text","objectives-entry-0"},{"objectives-done-0-title","objectives-done-0"}},
 		{"objectives-list","objectives_back"},{.827f,.827f,.827f}});
-	CheckTextScaleCase(host,{argv[2],"guis/menu/pause.q4ui",{},{"open","objectivesShow"},{},
+	CheckTextScaleCase(host,{argv[2],"guis/menu/pause.rui",{},{"open","objectivesShow"},{},
 		{{"objectives-empty-text","objectives-empty"}},{"objectives-list","objectives_back"},{.827f,.827f,.827f}});
 }
 
@@ -5951,31 +5951,31 @@ static void CheckMenusTextScale(ScreenHost& host, char** argv) {
 // and Player Setup, whose value stands under its label above 100 %.
 static void CheckMultiplayerTextScale(ScreenHost& host, char** argv) {
 	StateValues create{{"create.map_count",3.0},{"create.map_first",0.0},{"create.map_selected",0.0},{"create.gametype",0.0}};
-	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.q4ui",create,{"onActivate"},
+	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.rui",create,{"onActivate"},
 		{{{"create-gametype-head","create-gametype-value"},1},{{"create-name-head","create-name-viewport"},1},
 		 {{"create-dedicated-head","create-dedicated-box"},1},{{"create-fraglimit-head","create-fraglimit-viewport"},1}},
 		{{"create-gametype-value","create-gametype"},{"create-gametype-chevron","create-gametype"},{"create-dedicated-box","create-dedicated"},
 		 {"create-fraglimit-viewport","create-fraglimit"},{"create-name-viewport","create-name"},{"create-name-head","create-name"}},
 		{"create_start","create_advanced","create_back","create-options"}});
-	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.q4ui",create,{"onActivate","advancedModalShow"},
+	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.rui",create,{"onActivate","advancedModalShow"},
 		{{{"advanced-rows","advancedModal_close"}},{{"create-rate-head","create-rate-value"},1}},
 		{{"create-rate-value","create-rate"},{"create-banlist-label","create-banlist"},{"create-banlist-chevron","create-banlist"},
 		 {"advanced-rows","advancedModal-dialog"},{"create-mapcycle-viewport","create-mapcycle"}},{"advancedModal_close"}});
 	StateValues join{{"join.count",0.0},{"join.listed",0.0},{"join.scanning",false},{"join.status",std::string("No servers found")}};
-	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.q4ui",join,{"onActivate"},
+	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.rui",join,{"onActivate"},
 		{{{"servers-list","join-gametype-value","join-status"},0,1},{{"join-empty-heading","join-empty","join_emptynew"}}},
 		{},{"join_refresh","join_newlist","join_server","join_back"}});
-	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.q4ui",join,{"onActivate","joinIpOpen"},
+	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.rui",join,{"onActivate","joinIpOpen"},
 		{{{"join-ip-rows","join-yourip-value","joinIpModal_yes"}}},
 		{{"join-address-viewport","join-address"},{"join-ip-rows","joinIpModal-dialog"},{"join-yourip-value","joinIpModal-dialog"}},
 		{"joinIpModal_yes","joinIpModal_no"}});
-	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.q4ui",join,{"onActivate","findOpen"},
+	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.rui",join,{"onActivate","findOpen"},
 		{{{"join-find-rows","findModal_yes"}},{{"join-find-head","join-find-viewport"},1}},
 		{{"join-find-viewport","join-find"},{"join-find-head","join-find"},{"join-find-rows","findModal-dialog"}},{"findModal_yes","findModal_no"}});
 	StateValues setup{{"setup.model_count",2.0},{"setup.model_row",0.0},{"setup.model.0.name",std::string("Kane")},
 		{"setup.model.1.name",std::string("Voss")},{"setup.model_name",std::string("Kane")},{"setup.name",std::string("Player")},
 		{"setup.notice",std::string("Saved")},{"setup.rail",2.0}};
-	CheckTextScaleCase(host,{argv[26],"guis/menu/multiplayer.q4ui",setup,{"onActivate","setupOpen"},
+	CheckTextScaleCase(host,{argv[26],"guis/menu/multiplayer.rui",setup,{"onActivate","setupOpen"},
 		{{{"setup-name-head","setup-name-viewport"},1},{{"setup-model-head","setup-model-value"},1},
 		 {{"setup-rotation-head","setup-rotation-track"},1},{{"setup-rail-label","setup-rail-0"},1},
 		 {{"setup-heading","setup-fields","setup-notice","setup-current-model","prompts"},0,2}},
@@ -6013,7 +6013,7 @@ int main(int argc, char** argv) {
  }
  if (argc == 3 && std::string(argv[1]) == "--settings") {
      ScreenHost host; CheckSettingsPage(host,argv[2]);
-     CheckColumnPageTextScale(host,argv[2],"guis/menu/settings.q4ui",{},{"defaultsModal"},
+     CheckColumnPageTextScale(host,argv[2],"guis/menu/settings.rui",{},{"defaultsModal"},
 		{"description","summary-controls","summary-game","summary-display","summary-audio"});
      std::printf("retained SETTINGS page: %d checks passed\n",checks); return 0;
  }
@@ -6072,7 +6072,7 @@ int main(int argc, char** argv) {
      Check(host.errors == 0,"no retained status diagnostics");
      std::printf("retained status bar: %d checks passed\n",checks); return 0;
  }
-	Check(argc == 29 || argc == 30,"usage: title.q4ui pause.q4ui loading.q4ui pause_strogg.q4ui singleplayer.q4ui campaigns.q4ui mp_escape.q4ui mp_welcome.q4ui machinegun_scope.q4ui railgun_scope.q4ui nailgun_scope.q4ui initialization.q4ui campaign_skill.q4ui view_effects.q4ui weapon_wheel_marine.q4ui weapon_wheel_marine_awakening.q4ui weapon_wheel_strogg.q4ui weapon_wheel_strogg_awakening.q4ui loadgame.q4ui savegame.q4ui restartlevel.q4ui demos.q4ui restartmenu.q4ui credits.q4ui arena.q4ui multiplayer.q4ui createserver.q4ui joingame.q4ui [group]");
+	Check(argc == 29 || argc == 30,"usage: title.rui pause.rui loading.rui pause_strogg.rui singleplayer.rui campaigns.rui mp_escape.rui mp_welcome.rui machinegun_scope.rui railgun_scope.rui nailgun_scope.rui initialization.rui campaign_skill.rui view_effects.rui weapon_wheel_marine.rui weapon_wheel_marine_awakening.rui weapon_wheel_strogg.rui weapon_wheel_strogg_awakening.rui loadgame.rui savegame.rui restartlevel.rui demos.rui restartmenu.rui credits.rui arena.rui multiplayer.rui createserver.rui joingame.rui [group]");
 	const std::string group = argc == 30 ? argv[29] : "";
 	bool known = group.empty();
 	const auto runs = [&](const char* name) { const bool selected = group.empty() || group == name; known = known || selected; return selected; };
@@ -6082,31 +6082,31 @@ int main(int argc, char** argv) {
 	if (runs("menus")) CheckViewSource(host);
 	if (runs("menus")) CheckPromptGlyphs(host,argv[1]);
 	if (runs("mp-card")) CheckCardPromptGlyphs(host,argv[7]);
-	if (runs("pages")) CheckPagePrompts(host,argv[19],"guis/menu/loadgame.q4ui","load_back","back",nullptr,true);
-	if (runs("pages")) CheckPagePrompts(host,argv[20],"guis/menu/savegame.q4ui","save_back","back",nullptr,true);
-	if (runs("pages")) CheckPagePrompts(host,argv[21],"guis/menu/restartlevel.q4ui","restart_back","back",nullptr,true);
-	if (runs("strogg-pages")) CheckPagePrompts(host,StroggPage(argv[19]).c_str(),"guis/menu/loadgame_strogg.q4ui","load_back","back",nullptr,true);
-	if (runs("strogg-pages")) CheckPagePrompts(host,StroggPage(argv[20]).c_str(),"guis/menu/savegame_strogg.q4ui","save_back","back",nullptr,true);
-	if (runs("strogg-pages")) CheckPagePrompts(host,StroggPage(argv[21]).c_str(),"guis/menu/restartlevel_strogg.q4ui","restart_back","back",nullptr,true);
-	if (runs("pages")) CheckPagePrompts(host,argv[22],"guis/menu/demos.q4ui","demo_back","back",nullptr,true);
-	if (runs("pages")) CheckPagePrompts(host,argv[24],"guis/menu/credits.q4ui","credits_back","back",nullptr,false);
-	if (runs("mp-pages")) CheckPagePrompts(host,argv[27],"guis/menu/createserver.q4ui","create_back","back",nullptr,true);
-	if (runs("mp-pages")) CheckPagePrompts(host,argv[28],"guis/menu/joingame.q4ui","join_back","back",nullptr,true);
-	if (runs("pause")) CheckPagePrompts(host,argv[2],"guis/menu/pause.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow","objectives-prompts");
-	if (runs("strogg-pause")) CheckPagePrompts(host,argv[4],"guis/menu/pause_strogg.q4ui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow",
+	if (runs("pages")) CheckPagePrompts(host,argv[19],"guis/menu/loadgame.rui","load_back","back",nullptr,true);
+	if (runs("pages")) CheckPagePrompts(host,argv[20],"guis/menu/savegame.rui","save_back","back",nullptr,true);
+	if (runs("pages")) CheckPagePrompts(host,argv[21],"guis/menu/restartlevel.rui","restart_back","back",nullptr,true);
+	if (runs("strogg-pages")) CheckPagePrompts(host,StroggPage(argv[19]).c_str(),"guis/menu/loadgame_strogg.rui","load_back","back",nullptr,true);
+	if (runs("strogg-pages")) CheckPagePrompts(host,StroggPage(argv[20]).c_str(),"guis/menu/savegame_strogg.rui","save_back","back",nullptr,true);
+	if (runs("strogg-pages")) CheckPagePrompts(host,StroggPage(argv[21]).c_str(),"guis/menu/restartlevel_strogg.rui","restart_back","back",nullptr,true);
+	if (runs("pages")) CheckPagePrompts(host,argv[22],"guis/menu/demos.rui","demo_back","back",nullptr,true);
+	if (runs("pages")) CheckPagePrompts(host,argv[24],"guis/menu/credits.rui","credits_back","back",nullptr,false);
+	if (runs("mp-pages")) CheckPagePrompts(host,argv[27],"guis/menu/createserver.rui","create_back","back",nullptr,true);
+	if (runs("mp-pages")) CheckPagePrompts(host,argv[28],"guis/menu/joingame.rui","join_back","back",nullptr,true);
+	if (runs("pause")) CheckPagePrompts(host,argv[2],"guis/menu/pause.rui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow","objectives-prompts");
+	if (runs("strogg-pause")) CheckPagePrompts(host,argv[4],"guis/menu/pause_strogg.rui","objectives_back",nullptr,"objectivesHide",false,"objectivesShow",
 		"objectives-prompts");
 	// The legends: Single Player, Campaign, the campaign difficulty page and
 	// Multiplayer, whose own BACK is in the content.
-	for (const auto& [page,name] : {std::pair{5,"guis/menu/singleplayer.q4ui"},std::pair{6,"guis/menu/campaigns.q4ui"},
-		std::pair{13,"guis/menu/campaign_skill.q4ui"},std::pair{26,"guis/menu/multiplayer.q4ui"}})
+	for (const auto& [page,name] : {std::pair{5,"guis/menu/singleplayer.rui"},std::pair{6,"guis/menu/campaigns.rui"},
+		std::pair{13,"guis/menu/campaign_skill.rui"},std::pair{26,"guis/menu/multiplayer.rui"}})
 		if (runs(page == 26 ? "mp-pages" : "pages")) CheckPagePrompts(host,argv[page],name,"",nullptr,nullptr,true);
-	if (runs("pages")) CheckPagePrompts(host,Sibling(argv[13],"chapters.q4ui").c_str(),"guis/menu/chapters.q4ui","",nullptr,nullptr,true);
+	if (runs("pages")) CheckPagePrompts(host,Sibling(argv[13],"chapters.rui").c_str(),"guis/menu/chapters.rui","",nullptr,nullptr,true);
 	if (runs("menus")) CheckMenuWrap(host,argv[1],argv[2],argv[21]);
 	if (runs("menus")) CheckTitleTextScale(host,argv[1]);
-	if (runs("pause")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.q4ui");
-	if (runs("strogg-pause")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.q4ui");
-	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.q4ui",{},{},{"description","summary-campaign","summary-arena"});
-	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.q4ui",{{"awakening_ready",true}},{},
+	if (runs("pause")) CheckPauseTextScale(host,argv[2],"guis/menu/pause.rui");
+	if (runs("strogg-pause")) CheckPauseTextScale(host,argv[4],"guis/menu/pause_strogg.rui");
+	if (runs("menus")) CheckColumnPageTextScale(host,argv[5],"guis/menu/singleplayer.rui",{},{},{"description","summary-campaign","summary-arena"});
+	if (runs("menus")) CheckColumnPageTextScale(host,argv[6],"guis/menu/campaigns.rui",{{"awakening_ready",true}},{},
 		{"available","summary-newgame","summary-chapters"});
 	// Title: canvas scaling, the lit field, the multiplied emblem and CONTINUE.
 	if (runs("menus")) {
@@ -6117,7 +6117,7 @@ int main(int argc, char** argv) {
 		CheckSessionActions(document);
 		Runtime runtime(host);
 		Check(runtime.Initialize(),"retained runtime");
-		Check(runtime.LoadDocument(source,"guis/menu/title.q4ui",diagnostics),"title loads into a runtime");
+		Check(runtime.LoadDocument(source,"guis/menu/title.rui",diagnostics),"title loads into a runtime");
 		Viewport viewport; viewport.canvasHeight = 720;
 		runtime.Frame(viewport,1);
 		Bounds label, focus;
@@ -6377,7 +6377,7 @@ int main(int argc, char** argv) {
 		Check(valid && document.Model().id == "openq4.pause","pause document validates");
 		CheckSessionActions(document);
 		Runtime runtime(host);
-		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/pause.q4ui",diagnostics),"pause loads into a runtime");
+		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/pause.rui",diagnostics),"pause loads into a runtime");
 		std::string error;
 		Check(runtime.SetState({{"pause_level",std::string("Air Defense Trenches")},{"pause_shot",std::string("gfx/guis/loadscreens/airdefense2")}},error,1),
 			"publish the level block");
@@ -6613,7 +6613,7 @@ int main(int argc, char** argv) {
 				std::string saved; std::vector<Diagnostic> restoredDiagnostics;
 				Check(runtime.SaveSnapshot(saved,error,11.2),"save the open Objectives page");
 				Runtime restored(host);
-				Check(restored.Initialize() && restored.LoadDocument(source,"guis/menu/pause.q4ui",restoredDiagnostics) &&
+				Check(restored.Initialize() && restored.LoadDocument(source,"guis/menu/pause.rui",restoredDiagnostics) &&
 					restored.RestoreSnapshot(saved,error,11.2),"restore it into a fresh runtime");
 				restored.Frame(viewport,11.21); restored.Frame(viewport,11.22);
 				const auto kept = restored.GetWidgetState("objectives_scroll");
@@ -6688,7 +6688,7 @@ int main(int argc, char** argv) {
 		Check(valid && document.Model().id == "openq4.pause_strogg","the Strogg pause validates");
 		CheckSessionActions(document);
 		Runtime runtime(host);
-		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/pause_strogg.q4ui",diagnostics),"the Strogg pause loads into a runtime");
+		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/pause_strogg.rui",diagnostics),"the Strogg pause loads into a runtime");
 		std::string error;
 		Check(runtime.SetState({{"pause_level",std::string("Strogg Medical Facilities")},{"pause_shot",std::string("gfx/guis/loadscreens/medlabs")},
 			{"pause_objective_count",1.0},{"pause_objective_0",std::string("Escape the medical facility")},
@@ -6876,7 +6876,7 @@ int main(int argc, char** argv) {
 		Document document; std::vector<Diagnostic> diagnostics;
 		Check(document.Load(source,diagnostics) && document.Model().id == "openq4.loading" && document.Model().actions.empty(),"loading document validates");
 		Runtime runtime(host);
-		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/loading/loading.q4ui",diagnostics),"loading loads into a runtime");
+		Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/loading/loading.rui",diagnostics),"loading loads into a runtime");
 		Viewport viewport; viewport.canvasHeight = 720;
 		viewport.canvasMinWidth = 960;
 		for (const auto size : {std::pair{1280,360},std::pair{360,640}}) {
@@ -7113,8 +7113,8 @@ int main(int argc, char** argv) {
 		Check(pageDocument.Load(pageSource,diagnostics) && subDocument.Load(subSource,diagnostics),"the selector documents validate");
 		for (const auto& diagnostic : diagnostics) std::fprintf(stderr,"selectors %s: %s\n",diagnostic.pointer.c_str(),diagnostic.message.c_str());
 		Runtime page(host), sub(host);
-		Check(page.Initialize() && page.LoadDocument(pageSource,"guis/menu/singleplayer.q4ui",diagnostics) &&
-			sub.Initialize() && sub.LoadDocument(subSource,"guis/menu/campaigns.q4ui",diagnostics),"the selectors load into runtimes");
+		Check(page.Initialize() && page.LoadDocument(pageSource,"guis/menu/singleplayer.rui",diagnostics) &&
+			sub.Initialize() && sub.LoadDocument(subSource,"guis/menu/campaigns.rui",diagnostics),"the selectors load into runtimes");
 		Viewport viewport; viewport.canvasHeight = 720;
 		std::string error;
 		Runtime::EventEffects effects;
@@ -7331,19 +7331,19 @@ int main(int argc, char** argv) {
 			{"load.time",std::string("09:26am")},{"load.skill",std::string("CORPORAL")},{"load.played",std::string("0:03:13 played")},
 			{"load.row0.name",std::string("Medic")},{"load.row0.location",std::string("AIR DEFENSE BUNKER")},
 			{"load.row1.name",std::string("Bunker door")},{"load.row1.location",std::string("AIR DEFENSE BUNKER")}};
-		CheckListTextScale(host,argv[19],"guis/menu/loadgame.q4ui",load,"load-list",{"load-date","load-time","load-skill","load-played"},
+		CheckListTextScale(host,argv[19],"guis/menu/loadgame.rui",load,"load-list",{"load-date","load-time","load-skill","load-played"},
 			"load-shot-back","load_go-plate");
 		StateValues demos{{"demos.count",2.0},{"demos.first",0.0},{"demos.selected",0.0},{"demos.kind",std::string("Render demo v10")},
 			{"demos.status",std::string("Playable")},{"demos.detail",std::string("Fixed recorded camera")},{"demos.playable",true},
 			{"demos.row0.name",std::string("newer")},{"demos.row0.map",std::string("-")},{"demos.row0.date",std::string("11/02/2026")},
 			{"demos.row0.length",std::string("--:--")},{"demos.row1.name",std::string("older")},{"demos.row1.length",std::string("--:--")}};
-		CheckListTextScale(host,argv[22],"guis/menu/demos.q4ui",demos,"demo-list",{"demo-kind","demo-status","demo-detail"},
+		CheckListTextScale(host,argv[22],"guis/menu/demos.rui",demos,"demo-list",{"demo-kind","demo-status","demo-detail"},
 			"demo-shot-back","demo_play-plate");
 	}
 	if (runs("pages")) CheckPagesTextScale(host,argv);
 	if (runs("strogg-pages")) {
 		const std::string path = StroggPage(argv[21]);
-		CheckTextScaleCase(host,RestartTextScale(path.c_str(),"guis/menu/restartlevel_strogg.q4ui"));
+		CheckTextScaleCase(host,RestartTextScale(path.c_str(),"guis/menu/restartlevel_strogg.rui"));
 	}
 	if (runs("menus")) CheckMenusTextScale(host,argv);
 	if (runs("mp-pages")) CheckMultiplayerTextScale(host,argv);
@@ -7352,7 +7352,7 @@ int main(int argc, char** argv) {
 	if (runs("pages")) CheckCreditsPage(host,argv[24]);
 	if (runs("pages")) CheckArenaPage(host,argv[5],argv[25]);
 	if (runs("mp-pages")) CheckMultiplayerPage(host,argv[26]);
-	if (runs("mp-pages")) CheckColumnPageTextScale(host,argv[26],"guis/menu/multiplayer.q4ui",{},{},
+	if (runs("mp-pages")) CheckColumnPageTextScale(host,argv[26],"guis/menu/multiplayer.rui",{},{},
 		{"description","summary-join","summary-create","summary-demos","summary-setup"});
 	if (runs("mp-pages")) CheckCreateServerPage(host,argv[27]);
 	if (runs("mp-pages")) CheckCreateServerBanList(host,argv[27]);

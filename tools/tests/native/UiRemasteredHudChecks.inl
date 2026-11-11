@@ -88,8 +88,8 @@ static void CheckRemasteredHudSafeArea(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	// `runtime` takes the insets; `twin` is driven alike and never has them.
 	Runtime runtime(host), twin(host); std::string error; Runtime::EventEffects effects;
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/hud/safe-area.q4ui",diagnostics) && twin.Initialize() &&
-		twin.LoadDocument(source,"guis/hud/safe-area.q4ui",diagnostics),"the HUD loads into a runtime and its twin for the safe-area probe");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/hud/safe-area.rui",diagnostics) && twin.Initialize() &&
+		twin.LoadDocument(source,"guis/hud/safe-area.rui",diagnostics),"the HUD loads into a runtime and its twin for the safe-area probe");
 	StateValues values;
 	for (const auto& [key,value] : StateValues{{"player_health",100.0},{"player_healthpct",1.0},{"player_armor",57.0},{"player_armorpct",.57},
 		{"player_ammo",36.0},{"player_totalammo",50.0},{"player_clip_size",50.0},{"player_ammopct",.72},{"player_weapon",5.0},
@@ -264,7 +264,7 @@ static void CheckStroggGaugeGrain(ScreenHost& host, const std::string& source) {
 	std::vector<Diagnostic> diagnostics;
 	std::string error;
 	Runtime::EventEffects effects;
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/hud/strogg-grain.q4ui",diagnostics),"Strogg grain document loads");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/hud/strogg-grain.rui",diagnostics),"Strogg grain document loads");
 	StateValues values=RemasteredLayout(1280,720);
 	values.insert({{"player_health",100.0},{"player_healthpct",1.0},{"player_armor",100.0},{"player_armorpct",1.0},
 		{"player_ammo",50.0},{"player_totalammo",100.0},{"player_clip_size",50.0},{"player_ammopct",1.0}});
@@ -322,7 +322,7 @@ static void CheckStroggGaugeGrain(ScreenHost& host, const std::string& source) {
 
 static void CheckHudInstruments(ScreenHost& host, const std::string& source, bool strogg) {
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error; Runtime::EventEffects effects;
-	Check(runtime.LoadDocument(source,"instruments.q4ui",diagnostics),"HUD instruments load");
+	Check(runtime.LoadDocument(source,"instruments.rui",diagnostics),"HUD instruments load");
 	auto state=RemasteredLayout(1280,720);
 	state.insert({{"player_health",100.0},{"player_healthpct",1.0}});
 	Check(runtime.SetState(state,error,0) && runtime.RunEvent("hudJoin",0,effects,error),"instruments start");
@@ -395,7 +395,7 @@ static void CheckRemasteredHud(ScreenHost& host, const char* path, const std::st
 	if (strogg) CheckStroggGaugeGrain(host,source);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered.q4ui",diagnostics),"Remastered HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered.rui",diagnostics),"Remastered HUD loads into a runtime");
 	std::string error;
 	StateValues values = RemasteredLayout(1280,720);
 	values.insert({{"player_health",100.0},{"player_healthpct",1.0},{"player_armor",57.0},{"player_armorpct",.57},
@@ -728,7 +728,7 @@ static void CheckRemasteredMpHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_mp.q4ui",diagnostics),"Remastered MP HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_mp.rui",diagnostics),"Remastered MP HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -1152,7 +1152,7 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,3);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_mp.q4ui",diagnostics),"Remastered MP HUD loads for Competitive");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_mp.rui",diagnostics),"Remastered MP HUD loads for Competitive");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -1404,7 +1404,7 @@ static void CheckRemasteredVehicleHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_vehicle.q4ui",diagnostics),"Remastered vehicle HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_vehicle.rui",diagnostics),"Remastered vehicle HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -1573,7 +1573,7 @@ static void CheckRemasteredAirdefHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_airdef.q4ui",diagnostics),"Remastered air-defence HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_airdef.rui",diagnostics),"Remastered air-defence HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	host.softFocus = true;
@@ -1645,7 +1645,7 @@ static void CheckRemasteredTurretHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_turret.q4ui",diagnostics),"Remastered space cannon HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_turret.rui",diagnostics),"Remastered space cannon HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -1708,7 +1708,7 @@ static void CheckRemasteredMccHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_mcc.q4ui",diagnostics),"Remastered MCC cannon HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_mcc.rui",diagnostics),"Remastered MCC cannon HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -1775,7 +1775,7 @@ static void CheckRemasteredChaingunTurretHud(ScreenHost& host, const char* path)
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_chaingun_turret.q4ui",diagnostics),"Remastered chaingun turret HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_chaingun_turret.rui",diagnostics),"Remastered chaingun turret HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -1838,7 +1838,7 @@ static void CheckRemasteredSpeederHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_speeder.q4ui",diagnostics),"Remastered speeder HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_speeder.rui",diagnostics),"Remastered speeder HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	host.softFocus = true;
@@ -1971,7 +1971,7 @@ static void CheckRemasteredGevHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_gev.q4ui",diagnostics),"Remastered GEV HUD loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_gev.rui",diagnostics),"Remastered GEV HUD loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -2108,7 +2108,7 @@ static void CheckRemasteredMedchangeHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_medchange.q4ui",diagnostics),"Remastered implant overlay loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_medchange.rui",diagnostics),"Remastered implant overlay loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	Check(runtime.SetState(RemasteredLayout(1280,720),error,0),error.c_str());
@@ -2192,7 +2192,7 @@ static void CheckRemasteredObjectivesHud(ScreenHost& host, const char* path, boo
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_objectives.q4ui",diagnostics),"Remastered objectives load into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_objectives.rui",diagnostics),"Remastered objectives load into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	Check(runtime.SetState(RemasteredLayout(1280,720),error,0),error.c_str());
@@ -2293,7 +2293,7 @@ static void CheckRemasteredScoreboardHud(ScreenHost& host, const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	Check(runtime.LoadDocument(source,"guis/hud/remastered_scoreboard.q4ui",diagnostics),"Remastered scoreboard loads into a runtime");
+	Check(runtime.LoadDocument(source,"guis/hud/remastered_scoreboard.rui",diagnostics),"Remastered scoreboard loads into a runtime");
 	std::string error;
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
@@ -2411,7 +2411,7 @@ static void BenchRemasteredHud(const char* path) {
 	RemasteredLayoutPreference(host,1);
 	Runtime runtime(host);
 	Check(runtime.Initialize(),"retained runtime");
-	const bool loaded=runtime.LoadDocument(source,"guis/hud/bench.q4ui",diagnostics);
+	const bool loaded=runtime.LoadDocument(source,"guis/hud/bench.rui",diagnostics);
 	for (const auto& diagnostic:diagnostics) std::fprintf(stderr,"HUD_BENCH %s: %s\n",diagnostic.pointer.c_str(),diagnostic.message.c_str());
 	Check(loaded,"bench document loads");
 	std::string error;
@@ -2464,7 +2464,7 @@ static void BenchRemasteredHud(const char* path) {
 static void BenchHudAudio(const char* path) {
 	ScreenHost host; RemasteredLayoutPreference(host,1);
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error; Runtime::EventEffects effects;
-	Check(runtime.LoadDocument(Read(path),"audio-bench.q4ui",diagnostics),"audio benchmark document loads");
+	Check(runtime.LoadDocument(Read(path),"audio-bench.rui",diagnostics),"audio benchmark document loads");
 	const bool radio=runtime.HasEvent("radioChatterUp");
 	const bool live=runtime.GetState().contains(radio ? "radio.peak.0" : "voice.self.peak.0");
 	Check(runtime.SetState(RemasteredLayout(1280,720),error,0) && runtime.RunEvent("hudJoin",0,effects,error),"audio benchmark starts");

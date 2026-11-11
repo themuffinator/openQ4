@@ -10,7 +10,7 @@ static Rml::Element* Element(const char* id) {
     Check(element!=nullptr,"real canonical element exists");return element;
 }
 static Json::Value TypographySource() {
-    Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="text-scale";
+    Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="text-scale";
     auto root=Box("root",0,0,640,400);
     root["properties"]["font-family"]=Typed("font","test-font");
     root["properties"]["font-size"]=Typed("length",16,"dp");
@@ -59,7 +59,7 @@ static void Scaling(TestHost& host) {
     Check(Near(Element("label")->GetComputedValues().font_size(),view.runtime.PresentedValue("label","font-size")->data[0]*1.5),"changing text size preserves animation progress");
     std::string snapshot,error;Check(view.runtime.SaveSnapshot(snapshot,error,view.time),"scaled instance snapshots authored values");
     view.runtime.CloseDocument();std::vector<Diagnostic> diagnostics;
-    Check(view.runtime.LoadDocument(source,"value-runtime.q4ui",diagnostics)&&view.runtime.RestoreSnapshot(snapshot,error,view.time),"source survives renderer-style recreation");
+    Check(view.runtime.LoadDocument(source,"value-runtime.rui",diagnostics)&&view.runtime.RestoreSnapshot(snapshot,error,view.time),"source survives renderer-style recreation");
     view.Frame();Check(Near(Element("label")->GetComputedValues().font_size(),view.runtime.PresentedValue("label","font-size")->data[0]*1.5),"restored scale is not baked into saved animation");
 }
 int main() {

@@ -4,7 +4,7 @@ FLOW-050).
 
 Built by tools/ui/build_retained_screens.py, which writes and checks it with
 the other retained screens. JOIN GAME on the Multiplayer page goes one level
-deeper to guis/menu/joingame.q4ui as CREATE SERVER goes to Create Server,
+deeper to guis/menu/joingame.rui as CREATE SERVER goes to Create Server,
 on the same sub-page frame (retained_subpage); Back climbs out onto JOIN
 GAME.
 

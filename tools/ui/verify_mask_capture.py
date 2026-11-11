@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify mask-smoke.q4ui against an independent area-integrated mask.
+"""Verify mask-smoke.rui against an independent area-integrated mask.
 
 Reads an engine TGA. Compare the masked panel with its matching reference,
 including nested control masks, group opacity, glyphs, and transparent holes.

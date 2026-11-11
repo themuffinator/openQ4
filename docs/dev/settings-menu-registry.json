@@ -13,7 +13,7 @@
     "common": "src/framework/Common.cpp",
     "default_cfg": "content/baseoq4/pak0/default.cfg",
     "openq4_defaults_cfg": "content/baseoq4/pak0/openq4_defaults.cfg",
-    "system_retained": "content/baseoq4/pak0/guis/menu/settings/system.q4ui",
+    "system_retained": "content/baseoq4/pak0/guis/menu/settings/system.rui",
     "settings_service": "src/ui/SettingsService.cpp"
   },
   "settings": [

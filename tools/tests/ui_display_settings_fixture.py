@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tools/ui'))
 from capture_legacy_baseline import interaction_script
 
-FIXTURE = ROOT/'tools/ui/fixtures/display-settings-smoke.q4ui'
+FIXTURE = ROOT/'tools/ui/fixtures/display-settings-smoke.rui'
 SOURCE = r'''
 #include "src/ui/retained/Document.h"
 #include "src/ui/retained/State.h"

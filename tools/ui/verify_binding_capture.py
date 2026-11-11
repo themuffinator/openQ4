@@ -17,7 +17,7 @@ def verify(folder: Path) -> dict:
         return {'passed':False,'reason':'capture or retained runtime reported errors'}
     def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
     fixture = ROOT/'tools/ui/fixtures'
-    source_ok = preview['sha256'] == sha(fixture/'binding-smoke.q4ui')
+    source_ok = preview['sha256'] == sha(fixture/'binding-smoke.rui')
     source_ok &= preview['interaction_script']['sha256'] == sha(fixture/'binding-smoke.cfg')
     data_hashes = {row['name']:row['sha256'] for row in preview['state_data']}
     source_ok &= data_hashes == {name:sha(fixture/name) for name in ('binding-first.json','binding-final.json')}

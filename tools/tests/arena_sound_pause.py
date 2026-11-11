@@ -68,7 +68,7 @@ struct Common { int GetPresentationTime() const { return 0; } } commonLocal;
 Common* common=&commonLocal;
 namespace openq4 { void NativeInputBeforeSessionChange() {} }
 struct idStr { static int Icmp(const char* a,const char* b) { return std::strcmp(a,b); } };
-bool UI_IsRetainedPath(const char* name) { return std::strstr(name,".q4ui")!=nullptr; }
+bool UI_IsRetainedPath(const char* name) { return std::strstr(name,".rui")!=nullptr; }
 struct idSessionLocal {
     GUI *guiSystem=nullptr,*guiActive=nullptr,*guiMsg=nullptr,*guiMsgRestore=nullptr;
     GUI *guiMainMenu=nullptr,*guiIntro=nullptr,*guiLoading=nullptr;
@@ -124,7 +124,7 @@ int main() {
     soundSystem=nullptr; game.UpdateArenaSoundPause(true); assert(!game.arenaSoundPauseOwned);
     soundSystem=&soundSystemLocal;
     idSessionLocal session; session.sw=&gameWorld; session.menuSoundWorld=&menuWorld;
-    GUI arena{"guis/arena_pause.gui"},mp{"guis/mpmenu.gui"},settings{"guis/menu/settings/system.q4ui"};
+    GUI arena{"guis/arena_pause.gui"},mp{"guis/mpmenu.gui"},settings{"guis/menu/settings/system.rui"};
     session.guiActive=&arena; session.SetPlayingSoundWorld(); assert(session.selected==&menuWorld);
     session.guiActive=&mp; session.SetPlayingSoundWorld(); assert(session.selected==&gameWorld);
     session.guiActive=nullptr; session.SetPlayingSoundWorld(); assert(session.selected==&gameWorld);

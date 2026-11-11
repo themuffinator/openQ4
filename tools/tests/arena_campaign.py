@@ -3457,7 +3457,7 @@ def validate_pause_menu() -> None:
     require(cover, 'card->SetStateBool( "mp.cover_allowed", allowed || arenaPause );', "the cover protocol answers for the pause card")
     publish = function_body(game, "void idMultiplayerGame::PublishRetainedMenu( idUserInterface *card )")
     require(publish, "PublishArenaPauseMenu( card, true );", "the card publishes the match block")
-    require(session_menu, 'static const char *const RETAINED_ARENA_PAUSE_GUI = "guis/menu/arena_pause.q4ui";', "the Arena pause card")
+    require(session_menu, 'static const char *const RETAINED_ARENA_PAUSE_GUI = "guis/menu/arena_pause.rui";', "the Arena pause card")
     require(session_menu, '!idStr::Icmp( gui->Name(), "guis/arena_pause.gui" )', "the session recognises the pause menu")
     request = function_body(session_menu, "void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, const char *request )")
     for verb, command in (("arenaRestart", "restart"), ("arenaLeave", "leave"), ("settings", "settings"), ("resume", "resume")):
@@ -3499,7 +3499,7 @@ def validate_pause_menu() -> None:
             "focus cannot leave an open question for the menu behind it")
 
     # The retained card's verbs and questions.
-    text = (ROOT / "content" / "baseoq4" / "pak0" / "guis" / "menu" / "arena_pause.q4ui").read_text(encoding="utf-8")
+    text = (ROOT / "content" / "baseoq4" / "pak0" / "guis" / "menu" / "arena_pause.rui").read_text(encoding="utf-8")
     document = json.loads(re.sub(r"^\s*//.*$", "", text, flags=re.M))
     # The card's own verbs; the session's notice layer adds its actions to every retained menu.
     actions = {name: action["arguments"]["command"] for name, action in document["actions"].items()

@@ -8,9 +8,9 @@ FIXTURE = Path(__file__).resolve().parent / 'fixtures/system-settings-smoke'
 FIELDS = ['live', 'draft', 'baseline', 'dirty', 'open', 'canApply', 'phase',
           'liveShadows', 'draftShadows', 'liveWidth', 'draftWidth', 'spare']
 EXPECTED_DIAGNOSTICS = [
-    'WARNING: retained GUI retained-smoke.q4ui: r_brightness: outside the registered CVar range',
-    'WARNING: retained GUI retained-smoke.q4ui: System settings batch requires unsupported effects or an owning confirmation view',
-    'WARNING: retained GUI retained-smoke.q4ui: Settings changed outside this session; reopen before applying',
+    'WARNING: retained GUI retained-smoke.rui: r_brightness: outside the registered CVar range',
+    'WARNING: retained GUI retained-smoke.rui: System settings batch requires unsupported effects or an owning confirmation view',
+    'WARNING: retained GUI retained-smoke.rui: Settings changed outside this session; reopen before applying',
 ]
 
 
@@ -18,7 +18,7 @@ def sources(args):
     if args.brightness != 1 or args.width == 960:
         raise ValueError('SYSTEM probe requires initial brightness 1 and a window width other than 960')
     result = {}
-    for attribute, suffix in [('retained_document', '.q4ui'), ('retained_script', '.cfg'),
+    for attribute, suffix in [('retained_document', '.rui'), ('retained_script', '.cfg'),
                               ('retained_resume_script', '-resume.cfg')]:
         expected = Path(str(FIXTURE) + suffix)
         supplied = getattr(args, attribute)

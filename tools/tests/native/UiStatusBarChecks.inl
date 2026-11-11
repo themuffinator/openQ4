@@ -3,7 +3,7 @@ static void CheckStatusBars(ScreenHost& host, char** paths) {
 	host.cvars["ui_retainedOpaqueBacking"] = false;
 	for (int family=0; family<2; ++family) {
 		Runtime hud(host); std::vector<Diagnostic> diagnostics; std::string error;
-		const bool loaded=hud.Initialize() && hud.LoadDocument(Read(paths[family]),"guis/hud/status.q4ui",diagnostics);
+		const bool loaded=hud.Initialize() && hud.LoadDocument(Read(paths[family]),"guis/hud/status.rui",diagnostics);
 		for (const auto& d:diagnostics) std::fprintf(stderr,"status %s: %s\n",d.pointer.c_str(),d.message.c_str());
 		Check(loaded,"status bar document loads through the production schema");
 		Check(hud.SetState({{"health.1",std::string("1")},{"health.2",std::string("0")},{"health.3",std::string("0")},

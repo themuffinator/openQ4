@@ -170,10 +170,10 @@ struct CVarSystem {
 static idStr audioDeviceNames, audioDeviceValues;
 static void BuildMainMenuAudioDeviceChoices(idStr& names, idStr& values) { names = audioDeviceNames; values = audioDeviceValues; }
 typedef void* HandleGuiCommand_t;
-// Retained documents are the .q4ui ones (UI_IsRetainedPath).
+// Retained documents are the .rui ones (UI_IsRetainedPath).
 static bool UI_IsRetainedPath(const char* path) {
     const std::string name = path ? path : "";
-    return name.size() > 5 && name.compare(name.size() - 5, 5, ".q4ui") == 0;
+    return name.size() > 4 && name.compare(name.size() - 4, 4, ".rui") == 0;
 }
 enum { RETAINED_NOTICE_FAVORITE = 1, RETAINED_NOTICE_CONTROLLER = 2 };
 enum { RETAINED_NOTICE_UNDO_NONE, RETAINED_NOTICE_UNDO_FAVORITE };
@@ -761,7 +761,7 @@ public:
         ++systemOpens;
         if (guiSystem != nullptr) return guiActive == guiSystem;
         if (!systemOpensPage || !RetainedSystemAvailable() || !RetainedSettingsParent() || guiMsgRestore != nullptr) return false;
-        idUserInterface* child = FindRetainedGui("guis/menu/settings/system.q4ui", false, false);
+        idUserInterface* child = FindRetainedGui("guis/menu/settings/system.rui", false, false);
         if (child == nullptr) return false;
         guiSystemParent = guiActive; guiSystemParentHandle = guiHandle; guiSystem = child;
         SetGUI(child, nullptr); return guiActive == child;
@@ -842,15 +842,15 @@ static struct {
 '''
 
 MAIN = r'''
-static const char* const DOCUMENTS[] = {"guis/menu/title.q4ui", "guis/menu/pause.q4ui", "guis/menu/pause_strogg.q4ui", "guis/loading/loading.q4ui",
-    "guis/menu/singleplayer.q4ui", "guis/menu/campaigns.q4ui", "guis/menu/settings/system.q4ui", "guis/menu/mp_escape.q4ui",
-    "guis/menu/mp_welcome.q4ui", "guis/menu/campaign_skill.q4ui", "guis/menu/chapters.q4ui", "guis/menu/mp_summary.q4ui",
-    "guis/menu/loadgame.q4ui", "guis/menu/savegame.q4ui", "guis/menu/restartlevel.q4ui",
-    "guis/menu/loadgame_strogg.q4ui", "guis/menu/savegame_strogg.q4ui", "guis/menu/restartlevel_strogg.q4ui",
-    "guis/menu/demos.q4ui", "guis/menu/restartmenu.q4ui", "guis/menu/credits.q4ui",
-    "guis/menu/arena.q4ui", "guis/menu/multiplayer.q4ui", "guis/menu/createserver.q4ui", "guis/menu/joingame.q4ui",
-    "guis/menu/arena_pause.q4ui", "guis/menu/settings/audio.q4ui", "guis/menu/settings/game.q4ui",
-    "guis/menu/settings/controls.q4ui", "guis/menu/settings.q4ui"};
+static const char* const DOCUMENTS[] = {"guis/menu/title.rui", "guis/menu/pause.rui", "guis/menu/pause_strogg.rui", "guis/loading/loading.rui",
+    "guis/menu/singleplayer.rui", "guis/menu/campaigns.rui", "guis/menu/settings/system.rui", "guis/menu/mp_escape.rui",
+    "guis/menu/mp_welcome.rui", "guis/menu/campaign_skill.rui", "guis/menu/chapters.rui", "guis/menu/mp_summary.rui",
+    "guis/menu/loadgame.rui", "guis/menu/savegame.rui", "guis/menu/restartlevel.rui",
+    "guis/menu/loadgame_strogg.rui", "guis/menu/savegame_strogg.rui", "guis/menu/restartlevel_strogg.rui",
+    "guis/menu/demos.rui", "guis/menu/restartmenu.rui", "guis/menu/credits.rui",
+    "guis/menu/arena.rui", "guis/menu/multiplayer.rui", "guis/menu/createserver.rui", "guis/menu/joingame.rui",
+    "guis/menu/arena_pause.rui", "guis/menu/settings/audio.rui", "guis/menu/settings/game.rui",
+    "guis/menu/settings/controls.rui", "guis/menu/settings.rui"};
 // The documents that fell back to their stock screens, in order.
 static std::vector<std::string> Stock(const idSessionLocal& session) {
     return std::vector<std::string>(session.retainedStock.begin(), session.retainedStock.end());
@@ -972,7 +972,7 @@ int main() {
         legacy["desktop::video_check"] = 1; s.UpdateRetainedHome();
         CHECK(s.guiRetainedHome == nullptr && managerObject.loads.empty()); // logo videos stay legacy
         legacy["desktop::video_check"] = 0; s.UpdateRetainedHome();
-        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/title.q4ui");
+        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/title.rui");
         CHECK(managerObject.loads.size() == 1 && managerObject.flags[0].autoLoad && managerObject.flags[0].unique && !managerObject.flags[0].shared);
         CHECK(s.guiRetainedHome->active && s.guiRetainedHome->named.back() == "open");
         // The save's name, then its level and, for a save from an earlier build,
@@ -1039,7 +1039,7 @@ int main() {
         legacy["desktop::active"] = 1; legacy["desktop::dest"] = 0; s.UpdateRetainedHome(); CHECK(s.guiRetainedHome == title && title->named.back() == "open");
         // Session verbs never become console text; quit uses the stock path.
         s.HandleRetainedSessionRequest(title, "continue"); CHECK(s.loadedGames == std::vector<std::string>{"quick"});
-        idUserInterface stranger("guis/other.q4ui"); s.HandleRetainedSessionRequest(&stranger, "quit"); CHECK(commonObject.quits == 0);
+        idUserInterface stranger("guis/other.rui"); s.HandleRetainedSessionRequest(&stranger, "quit"); CHECK(commonObject.quits == 0);
         s.HandleRetainedSessionRequest(title, "resume"); CHECK(s.exits == 0); // the title has no game to resume
         s.HandleRetainedSessionRequest(title, "unknown"); CHECK(commonObject.warnings.back().find("unhandled session request") != std::string::npos);
         legacyActionAvailable = false; legacyEventsMissing = {"openSettingsPage"};
@@ -1055,7 +1055,7 @@ int main() {
         auto s = Session(true); s.saves = {"quick", "autosave", "medic"};
         s.PreloadRetainedScreens(); s.UpdateRetainedHome();
         auto* title = s.guiRetainedHome; auto* page = s.guiRetainedLoad;
-        CHECK(title && page && std::string(page->Name()) == "guis/menu/loadgame.q4ui");
+        CHECK(title && page && std::string(page->Name()) == "guis/menu/loadgame.rui");
         const size_t loads = managerObject.loads.size();
         s.HandleRetainedSessionRequest(title, "loadGame");
         CHECK(legacyActions.empty() && managerObject.loads.size() == loads && s.retainedPagePending == page);
@@ -1117,7 +1117,7 @@ int main() {
         // Opening it again lists the saves afresh; NEW GAME opens the Single Player page.
         s.HandleRetainedSessionRequest(title, "loadGame"); commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
         CHECK(s.guiActive == page && page->state["load.count"] == "0");
-        s.HandleRetainedSessionRequest(page, "loadNewGame"); CHECK(std::string(s.guiActive->Name()) == "guis/menu/singleplayer.q4ui");
+        s.HandleRetainedSessionRequest(page, "loadNewGame"); CHECK(std::string(s.guiActive->Name()) == "guis/menu/singleplayer.rui");
         s.HandleRetainedSessionRequest(page, "unknown"); CHECK(commonObject.warnings.empty());  // not presenting: ignored
     }
     {   // More saves than the page's rows: it pages, selecting the older page's first
@@ -1145,7 +1145,7 @@ int main() {
         // page that is not installed, cannot load or stopped drawing falls back
         // to the stock page, never to the other family's.
         auto s = Session(true, true); s.saves = {"quick"}; s.PreloadRetainedScreens(); s.UpdateRetainedHome();
-        auto* pause = s.guiRetainedHome; CHECK(pause && std::string(pause->Name()) == "guis/menu/pause.q4ui");
+        auto* pause = s.guiRetainedHome; CHECK(pause && std::string(pause->Name()) == "guis/menu/pause.rui");
         s.HandleRetainedSessionRequest(pause, "loadGame"); commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
         auto* page = s.guiActive;
         CHECK(page == s.guiRetainedLoad && page->state["load.ingame"] == "1" && s.retainedPageHome == pause && legacyActions.empty());
@@ -1167,15 +1167,15 @@ int main() {
         CHECK(title.exits == 0 && title.guiActive == titlePage && title.RetainedPageActive());
         auto strogg = Session(true, true); strogg.PreloadRetainedScreens();
         gameObject.publish = [](idUserInterface* gui) { gui->SetStateBool("pause_strogg", true); };
-        strogg.UpdateRetainedHome(); CHECK(std::string(strogg.guiRetainedHome->Name()) == "guis/menu/pause_strogg.q4ui");
+        strogg.UpdateRetainedHome(); CHECK(std::string(strogg.guiRetainedHome->Name()) == "guis/menu/pause_strogg.rui");
         // The first Strogg answer of a level starts parsing the Strogg pages.
-        CHECK((prefetched == std::vector<std::string>{"guis/menu/loadgame_strogg.q4ui", "guis/menu/savegame_strogg.q4ui",
-                                                     "guis/menu/restartlevel_strogg.q4ui"}));
+        CHECK((prefetched == std::vector<std::string>{"guis/menu/loadgame_strogg.rui", "guis/menu/savegame_strogg.rui",
+                                                     "guis/menu/restartlevel_strogg.rui"}));
         auto* stroggPause = strogg.guiRetainedHome; const size_t stroggActions = legacyActions.size();
         strogg.HandleRetainedSessionRequest(stroggPause, "loadGame");
         CHECK(legacyActions.size() == stroggActions && strogg.guiRetainedLoadStrogg != nullptr &&
               strogg.retainedPagePending == strogg.guiRetainedLoadStrogg &&
-              std::string(strogg.guiRetainedLoadStrogg->Name()) == "guis/menu/loadgame_strogg.q4ui");
+              std::string(strogg.guiRetainedLoadStrogg->Name()) == "guis/menu/loadgame_strogg.rui");
         CHECK(stroggPause->named[stroggPause->named.size() - 2] == "carry_loadGame" && stroggPause->named.back() == "depart");
         commonObject.time += 550; strogg.UpdateRetainedHome(); strogg.UpdateRetainedPage();
         auto* stroggPage = strogg.guiActive;
@@ -1183,21 +1183,21 @@ int main() {
               strogg.retainedPageHome == stroggPause && stroggPage->state["load.count"] == "0");
         strogg.HandleRetainedSessionRequest(stroggPage, "loadBack");
         CHECK(strogg.guiRetainedHome == stroggPause && stroggPause->named.back() == "returnHome" && !strogg.RetainedPageActive());
-        auto stroggMissing = Session(true, true); fileSystemObject.files.erase("guis/menu/loadgame_strogg.q4ui");
+        auto stroggMissing = Session(true, true); fileSystemObject.files.erase("guis/menu/loadgame_strogg.rui");
         gameObject.publish = [](idUserInterface* gui) { gui->SetStateBool("pause_strogg", true); };
         stroggMissing.PreloadRetainedScreens(); stroggMissing.UpdateRetainedHome();
         stroggMissing.HandleRetainedSessionRequest(stroggMissing.guiRetainedHome, "loadGame");
         CHECK(legacyActions.back() == "main_b_loadgame" && stroggMissing.retainedPagePending == nullptr &&
-              (Stock(stroggMissing) == std::vector<std::string>{"guis/menu/loadgame_strogg.q4ui"}));
+              (Stock(stroggMissing) == std::vector<std::string>{"guis/menu/loadgame_strogg.rui"}));
         gameObject.publish = nullptr;
-        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/loadgame.q4ui");
+        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/loadgame.rui");
         missing.PreloadRetainedScreens(); missing.UpdateRetainedHome();
         CHECK(missing.guiRetainedLoad == nullptr && commonObject.warnings.empty() && precached.empty());
         missing.HandleRetainedSessionRequest(missing.guiRetainedHome, "loadGame");
-        CHECK(legacyActions.back() == "main_b_loadgame" && (Stock(missing) == std::vector<std::string>{"guis/menu/loadgame.q4ui"}));
+        CHECK(legacyActions.back() == "main_b_loadgame" && (Stock(missing) == std::vector<std::string>{"guis/menu/loadgame.rui"}));
         auto late = Session(true); late.UpdateRetainedHome();  // the gate came on after startup: the page loads at the click
         late.HandleRetainedSessionRequest(late.guiRetainedHome, "loadGame");
-        CHECK(late.guiRetainedLoad && managerObject.loads.back() == "guis/menu/loadgame.q4ui" && legacyActions.empty());
+        CHECK(late.guiRetainedLoad && managerObject.loads.back() == "guis/menu/loadgame.rui" && legacyActions.empty());
         auto failed = Session(true); failed.PreloadRetainedScreens(); failed.UpdateRetainedHome();
         failed.guiRetainedLoad->failed = true;
         failed.HandleRetainedSessionRequest(failed.guiRetainedHome, "loadGame");
@@ -1212,7 +1212,7 @@ int main() {
         auto s = Session(true, true); s.saves = {"quick", "medic"};
         s.PreloadRetainedScreens(); s.PrepareRetainedLevel("game/airdefense1", false); s.UpdateRetainedHome();
         auto* pause = s.guiRetainedHome; auto* page = s.guiRetainedSave;
-        CHECK(pause && page && std::string(page->Name()) == "guis/menu/savegame.q4ui");
+        CHECK(pause && page && std::string(page->Name()) == "guis/menu/savegame.rui");
         s.HandleRetainedSessionRequest(pause, "saveGame");
         CHECK(legacyActions.empty() && s.retainedPagePending == page && s.played.back() == "play main_menu_selection");
         CHECK(pause->named[pause->named.size() - 2] == "carry_saveGame" && pause->named.back() == "depart");
@@ -1272,7 +1272,7 @@ int main() {
         strogg.HandleRetainedSessionRequest(strogg.guiRetainedHome, "saveGame");
         CHECK(legacyActions.size() == stroggActions && strogg.guiRetainedSaveStrogg != nullptr &&
               strogg.retainedPagePending == strogg.guiRetainedSaveStrogg && strogg.guiRetainedSave == nullptr &&
-              std::string(strogg.guiRetainedSaveStrogg->Name()) == "guis/menu/savegame_strogg.q4ui");
+              std::string(strogg.guiRetainedSaveStrogg->Name()) == "guis/menu/savegame_strogg.rui");
         commonObject.time += 550; strogg.UpdateRetainedHome(); strogg.UpdateRetainedPage();
         auto* stroggPage = strogg.guiActive;
         CHECK(stroggPage == strogg.guiRetainedSaveStrogg && strogg.RetainedPageActive());
@@ -1280,11 +1280,11 @@ int main() {
         CHECK(strogg.savedGames.back() == "Strogg door" && stroggPage->state["save.row0.name"] == "Strogg door" &&
               !stroggPage->state.count("load.row0.name"));
         gameObject.publish = nullptr;
-        auto missing = Session(true, true); fileSystemObject.files.erase("guis/menu/savegame.q4ui");
+        auto missing = Session(true, true); fileSystemObject.files.erase("guis/menu/savegame.rui");
         missing.PreloadRetainedScreens(); missing.UpdateRetainedHome();
         missing.HandleRetainedSessionRequest(missing.guiRetainedHome, "saveGame");
         CHECK(missing.guiRetainedSave == nullptr && legacyActions.back() == "main_b_savegame" &&
-              (Stock(missing) == std::vector<std::string>{"guis/menu/savegame.q4ui"}));
+              (Stock(missing) == std::vector<std::string>{"guis/menu/savegame.rui"}));
     }
     {   // The Restart Level page (FLOW-050): the Marine pause's RESTART LEVEL hands off to
         // it as LOAD GAME does, at the level's difficulty. The choice stays on the
@@ -1292,7 +1292,7 @@ int main() {
         auto s = Session(true, true); cvarSystemObject.strings["g_skill"] = "3";
         s.PreloadRetainedScreens(); s.PrepareRetainedLevel("game/airdefense1", false); s.UpdateRetainedHome();
         auto* pause = s.guiRetainedHome; auto* page = s.guiRetainedRestart;
-        CHECK(pause && page && std::string(page->Name()) == "guis/menu/restartlevel.q4ui");
+        CHECK(pause && page && std::string(page->Name()) == "guis/menu/restartlevel.rui");
         s.HandleRetainedSessionRequest(pause, "restartLevel");
         CHECK(legacyActions.empty() && s.retainedPagePending == page && page->state["restart.skill"] == "3");
         CHECK(pause->named[pause->named.size() - 2] == "carry_restartLevel" && pause->named.back() == "depart");
@@ -1315,7 +1315,7 @@ int main() {
         // delete, refresh and filter; Back climbs out onto DEMOS.
         auto s = Session(true); s.PreloadRetainedScreens(); s.UpdateRetainedHome();
         auto* title = s.guiRetainedHome; auto* page = s.guiRetainedDemos; auto* mp = s.guiRetainedMpPage;
-        CHECK(title && mp && page && std::string(page->Name()) == "guis/menu/demos.q4ui" && s.RetainedDemosPage() == page);
+        CHECK(title && mp && page && std::string(page->Name()) == "guis/menu/demos.rui" && s.RetainedDemosPage() == page);
         auto demo = [](const char* name, demoLibraryType_t type, bool playable, const char* map = "") {
             demoLibraryEntry_t e; e.path = std::string("demos/") + name; e.displayName = name; e.type = type; e.playable = playable;
             e.capabilities = (playable ? DEMO_CAP_PLAY : 0) | DEMO_CAP_DELETE; e.mapName = map; e.status = playable ? "Playable" : "Unsupported";
@@ -1411,13 +1411,13 @@ int main() {
         CHECK(playing.retainedSubpageFrom == nullptr && (playing.demoMenus == std::vector<bool>{true}) &&
               playing.played.back() == "play main_menu_selection");
         playing.demoPlaying = false; playing.mapSpawned = true; CHECK(playing.RetainedDemosPage() == nullptr); playing.mapSpawned = false;
-        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/demos.q4ui");
+        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/demos.rui");
         missing.PreloadRetainedScreens(); missing.UpdateRetainedHome();
         missing.HandleRetainedSessionRequest(missing.guiRetainedHome, "multiplayer"); commonObject.time += 550;
         missing.UpdateRetainedHome(); missing.UpdateRetainedPage(); CHECK(missing.guiActive == missing.guiRetainedMpPage);
         missing.HandleRetainedSessionRequest(missing.guiRetainedMpPage, "multiplayerDemos");
         CHECK(missing.guiRetainedDemos == nullptr && missing.retainedSubpageFrom == nullptr && (missing.demoMenus == std::vector<bool>{true}) &&
-              (Stock(missing) == std::vector<std::string>{"guis/menu/demos.q4ui"}));
+              (Stock(missing) == std::vector<std::string>{"guis/menu/demos.rui"}));
         // Where it stops presenting between the choice and the hand-over, the
         // legacy browser opens over the Multiplayer page in its place.
         missing.guiActive = missing.guiRetainedMpPage; missing.OpenRetainedDemos();
@@ -1452,7 +1452,7 @@ int main() {
         // its plates run the stock screen's own commands.
         auto s = Session(true, true); s.PreloadRetainedScreens(); s.PrepareRetainedLevel("game/airdefense1", false);
         auto* page = s.guiRetainedRestartMenu;
-        CHECK(page && std::string(page->Name()) == "guis/menu/restartmenu.q4ui");
+        CHECK(page && std::string(page->Name()) == "guis/menu/restartmenu.rui");
         idUserInterface stock("guis/restart.gui"); s.guiRestartMenu = &stock;
         s.OpenRestartMenu(); CHECK(s.guiActive == page);
         s.HandleRetainedSessionRequest(page, "deathRestart");
@@ -1469,16 +1469,16 @@ int main() {
         s.HandleRetainedSessionRequest(page, "quit"); CHECK(commonObject.quits == 1 && s.restartCommands.size() == 3);
         {   // A Load Game page that cannot present: the stock page, as before.
             auto stockLoad = Session(true, true); stockLoad.PreloadRetainedScreens(); stockLoad.guiRestartMenu = &stock;
-            fileSystemObject.files.erase("guis/menu/loadgame.q4ui"); stockLoad.retainedStock.Append(idStr("guis/menu/loadgame.q4ui"));
+            fileSystemObject.files.erase("guis/menu/loadgame.rui"); stockLoad.retainedStock.Append(idStr("guis/menu/loadgame.rui"));
             stockLoad.guiRetainedLoad = nullptr; stockLoad.OpenRestartMenu();
             stockLoad.HandleRetainedSessionRequest(stockLoad.guiActive, "deathLoad");
             CHECK(stockLoad.retainedPagePending == nullptr && stockLoad.guiMainMenu->named.back() == "fromRestart_toLoad");
-            fileSystemObject.files.insert("guis/menu/loadgame.q4ui");
+            fileSystemObject.files.insert("guis/menu/loadgame.rui");
         }
         // The gate off, the screen not installed, or a view that stopped drawing:
         // the stock screen, the last for good.
         auto off = Session(false, true); off.guiRestartMenu = &stock; off.OpenRestartMenu(); CHECK(off.guiActive == &stock);
-        auto missing = Session(true, true); fileSystemObject.files.erase("guis/menu/restartmenu.q4ui"); missing.guiRestartMenu = &stock;
+        auto missing = Session(true, true); fileSystemObject.files.erase("guis/menu/restartmenu.rui"); missing.guiRestartMenu = &stock;
         missing.PreloadRetainedScreens(); missing.OpenRestartMenu();
         CHECK(missing.guiActive == &stock && missing.guiRetainedRestartMenu == nullptr);
         auto failed = Session(true, true); failed.guiRestartMenu = &stock; failed.PreloadRetainedScreens();
@@ -1493,8 +1493,8 @@ int main() {
         // returns the title.
         auto s = Session(true); s.PreloadRetainedScreens(); s.UpdateRetainedHome();
         auto* title = s.guiRetainedHome; auto* page = s.guiRetainedCredits;
-        CHECK(page && std::string(page->Name()) == "guis/menu/credits.q4ui");
-        declaredStates["guis/menu/credits.q4ui"] = {"credits.screen1_t_1", "credits.screen1_n_1", "credits.screen9_n_56a", "menu.other"};
+        CHECK(page && std::string(page->Name()) == "guis/menu/credits.rui");
+        declaredStates["guis/menu/credits.rui"] = {"credits.screen1_t_1", "credits.screen1_n_1", "credits.screen9_n_56a", "menu.other"};
         s.guiMainMenu->presentation["screen1_t_1::text"] = "Project Lead"; s.guiMainMenu->presentation["screen1_n_1::text"] = "A Name";
         s.HandleRetainedSessionRequest(title, "credits");
         CHECK(legacyActions.empty() && s.retainedPagePending == page && title->named.back() == "depart");
@@ -1507,10 +1507,10 @@ int main() {
         s.HandleRetainedSessionRequest(page, "creditsBack");
         CHECK(s.guiActive == s.guiMainMenu && title->named.back() == "returnHome");
         // A page that cannot present leaves the stock page.
-        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/credits.q4ui");
+        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/credits.rui");
         missing.PreloadRetainedScreens(); missing.UpdateRetainedHome();
         missing.HandleRetainedSessionRequest(missing.guiRetainedHome, "credits");
-        CHECK(legacyActions.back() == "main_b_credits" && (Stock(missing) == std::vector<std::string>{"guis/menu/credits.q4ui"}));
+        CHECK(legacyActions.back() == "main_b_credits" && (Stock(missing) == std::vector<std::string>{"guis/menu/credits.rui"}));
         // In game there is no Credits page.
         auto ingame = Session(true, true); ingame.PreloadRetainedScreens(); ingame.UpdateRetainedHome();
         CHECK(!ingame.BeginRetainedPage("credits"));
@@ -1524,7 +1524,7 @@ int main() {
         // the title, from the page dock after a stock page.
         auto s = Session(true); s.PreloadRetainedScreens(); s.UpdateRetainedHome();
         auto* title = s.guiRetainedHome; auto* page = s.guiRetainedMpPage;
-        CHECK(page && std::string(page->Name()) == "guis/menu/multiplayer.q4ui" && s.RetainedMultiplayerPage() == page);
+        CHECK(page && std::string(page->Name()) == "guis/menu/multiplayer.rui" && s.RetainedMultiplayerPage() == page);
         page->state["from_create"] = page->state["from_join"] = page->state["from_demos"] = page->state["from_setup"] = "1";
         s.HandleRetainedSessionRequest(title, "multiplayer");
         CHECK(legacyActions.empty() && s.retainedPagePending == page && title->named.back() == "depart" &&
@@ -1602,15 +1602,15 @@ int main() {
         auto off = Session(false); CHECK(!off.OpenRetainedMultiplayerPage() && off.RetainedMultiplayerPage() == nullptr && managerObject.loads.empty());
         auto ingame = Session(true, true); CHECK(!ingame.OpenRetainedMultiplayerPage() && managerObject.loads.empty());
         CHECK(!ingame.BeginRetainedPage("multiplayer"));
-        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/multiplayer.q4ui");
+        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/multiplayer.rui");
         CHECK(!missing.OpenRetainedMultiplayerPage() && commonObject.warnings.empty() &&
-              (Stock(missing) == std::vector<std::string>{"guis/menu/multiplayer.q4ui"}));
+              (Stock(missing) == std::vector<std::string>{"guis/menu/multiplayer.rui"}));
         missing.PreloadRetainedScreens(); missing.UpdateRetainedHome();
         missing.HandleRetainedSessionRequest(missing.guiRetainedHome, "multiplayer");
         CHECK(legacyActions.back() == "main_b_multiplayer" && missing.retainedPagePending == nullptr);
         auto failed = Session(true); failed.PreloadRetainedScreens(); failed.guiRetainedMpPage->failed = true;
         CHECK(!failed.OpenRetainedMultiplayerPage() && failed.guiRetainedMpPage == nullptr && commonObject.warnings.size() == 1 &&
-              (Stock(failed) == std::vector<std::string>{"guis/menu/multiplayer.q4ui"}));
+              (Stock(failed) == std::vector<std::string>{"guis/menu/multiplayer.rui"}));
         CHECK(!failed.OpenRetainedMultiplayerPage() && commonObject.warnings.size() == 1);
         // A main menu without each route to its Multiplayer pages (a mod's copy
         // of an older one) keeps its own Multiplayer page, quietly: the title
@@ -1623,8 +1623,8 @@ int main() {
             CHECK(legacyActions.back() == "main_b_multiplayer" && old.retainedPagePending == nullptr && !old.OpenRetainedMultiplayerPage());
             CHECK(commonObject.warnings.empty() && commonObject.developer.size() == 1 &&
                   commonObject.developer[0].find("no routes to its Multiplayer pages") != std::string::npos &&
-                  (Stock(old) == std::vector<std::string>{"guis/menu/multiplayer.q4ui"}));
-            CHECK(std::find(managerObject.loads.begin(), managerObject.loads.end(), "guis/menu/multiplayer.q4ui") == managerObject.loads.end());
+                  (Stock(old) == std::vector<std::string>{"guis/menu/multiplayer.rui"}));
+            CHECK(std::find(managerObject.loads.begin(), managerObject.loads.end(), "guis/menu/multiplayer.rui") == managerObject.loads.end());
         }
     }
     {   // A preview that stops publishing hands the active setup edit to stock.
@@ -1660,7 +1660,7 @@ int main() {
                                     {"bot_skill", "9"}, {"g_password", "hunter2"}};
         s.PreloadRetainedScreens(); s.UpdateRetainedHome();
         auto* create = s.guiRetainedCreate;
-        CHECK(create && std::string(create->Name()) == "guis/menu/createserver.q4ui" && s.RetainedCreateServerPage() == create);
+        CHECK(create && std::string(create->Name()) == "guis/menu/createserver.rui" && s.RetainedCreateServerPage() == create);
         // Each map's levelshot waits for the title's idle frames, or for the page.
         CHECK(s.retainedLevelshots.Num() == 3 && std::count(precached.begin(), precached.end(), std::string("gfx/guis/loadscreens/q4dm5")) == 0);
         const int opening = latePrecaches;
@@ -1770,7 +1770,7 @@ int main() {
         // A Create Server that stopped drawing hands CREATE SERVER back to the stock page.
         create->failed = true; s.HandleRetainedSessionRequest(page, "multiplayerCreate");
         CHECK(s.guiRetainedCreate == nullptr && s.retainedMpPageDest == 17 && commonObject.warnings.back().find("stopped drawing") != std::string::npos &&
-              (Stock(s) == std::vector<std::string>{"guis/menu/createserver.q4ui"}));
+              (Stock(s) == std::vector<std::string>{"guis/menu/createserver.rui"}));
         ui_retainedMultiplayer.value = false;
     }
     {   // The Join Game sub-page (FLOW-050), Multiplayer's server browser,
@@ -1804,7 +1804,7 @@ int main() {
         s.guiMainMenu->state["sortNotice"] = "Showing 3 out of 3 servers"; s.guiMainMenu->state["filterMod"] = "^1All"; scan.menu = s.guiMainMenu;
         s.PreloadRetainedScreens(); s.UpdateRetainedHome();
         auto* join = s.guiRetainedJoin;
-        CHECK(join && std::string(join->Name()) == "guis/menu/joingame.q4ui" && s.RetainedJoinGamePage() == join);
+        CHECK(join && std::string(join->Name()) == "guis/menu/joingame.rui" && s.RetainedJoinGamePage() == join);
         s.HandleRetainedSessionRequest(s.guiRetainedHome, "multiplayer"); commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
         auto* page = s.guiRetainedMpPage; CHECK(s.guiActive == page);
         s.HandleRetainedSessionRequest(page, "multiplayerJoin");
@@ -2154,7 +2154,7 @@ int main() {
         // A Join Game that stopped drawing hands JOIN GAME back to the stock browser.
         join->failed = true; s.HandleRetainedSessionRequest(page, "multiplayerJoin");
         CHECK(s.guiRetainedJoin == nullptr && s.retainedMpPageDest == 14 && commonObject.warnings.back().find("stopped drawing") != std::string::npos &&
-              (Stock(s) == std::vector<std::string>{"guis/menu/joingame.q4ui"}));
+              (Stock(s) == std::vector<std::string>{"guis/menu/joingame.rui"}));
         ui_retainedMultiplayer.value = false;
     }
     {   // The title has no level to restart, and the Strogg pause hands off to
@@ -2170,7 +2170,7 @@ int main() {
         CHECK(legacyActions.size() == stroggActions && strogg.guiRetainedRestartStrogg != nullptr &&
               strogg.retainedPagePending == strogg.guiRetainedRestartStrogg && strogg.restarts.empty() &&
               strogg.guiRetainedRestartStrogg->state["restart.skill"] == "2" &&
-              std::string(strogg.guiRetainedRestartStrogg->Name()) == "guis/menu/restartlevel_strogg.q4ui");
+              std::string(strogg.guiRetainedRestartStrogg->Name()) == "guis/menu/restartlevel_strogg.rui");
         commonObject.time += 550; strogg.UpdateRetainedHome(); strogg.UpdateRetainedPage();
         CHECK(strogg.guiActive == strogg.guiRetainedRestartStrogg && strogg.RetainedPageActive());
         strogg.HandleRetainedSessionRequest(strogg.guiActive, "restartBack");
@@ -2196,7 +2196,7 @@ int main() {
     }
     {   // Single-player pause and its verbs; multiplayer keeps the stock in-game menu.
         auto s = Session(true, true); s.UpdateRetainedHome();
-        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.q4ui" && s.guiRetainedHome->state["pause_level"] == "game/airdefense1");
+        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.rui" && s.guiRetainedHome->state["pause_level"] == "game/airdefense1");
         auto* pause = s.guiRetainedHome;
         s.HandleRetainedSessionRequest(pause, "quitToMenu"); CHECK(commands.buffered == std::vector<std::string>{"disconnect\n"});
         // (SETTINGS over a main menu without the route to its settings screen: its own.)
@@ -2216,10 +2216,10 @@ int main() {
         // load, the pause screens and the pages only they reach, and the pause
         // levelshot.
         auto s = Session(true); s.PreloadRetainedScreens();
-        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/title.q4ui", "guis/menu/loadgame.q4ui",
-                                                            "guis/menu/credits.q4ui", "guis/menu/demos.q4ui", "guis/menu/arena.q4ui",
-                                                            "guis/menu/multiplayer.q4ui", "guis/menu/createserver.q4ui",
-                                                            "guis/menu/joingame.q4ui"}) &&
+        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/title.rui", "guis/menu/loadgame.rui",
+                                                            "guis/menu/credits.rui", "guis/menu/demos.rui", "guis/menu/arena.rui",
+                                                            "guis/menu/multiplayer.rui", "guis/menu/createserver.rui",
+                                                            "guis/menu/joingame.rui"}) &&
               s.guiRetainedHome == nullptr && s.guiRetainedLoad != nullptr && s.guiRetainedPause == nullptr && s.guiRetainedSave == nullptr);
         CHECK(!managerObject.flags[1].unique && managerObject.flags[1].shared);  // the page is one shared document
         CHECK((precached == std::vector<std::string>{"gfx/guis/loadscreens/generic"}));  // a save without a picture shows it
@@ -2231,13 +2231,13 @@ int main() {
         s.PrepareRetainedLevel("game/airdefense1", false);
         CHECK((precached == std::vector<std::string>{"gfx/guis/loadscreens/generic", "gfx/guis/loadscreens/generic"}) &&
               (std::vector<std::string>(managerObject.loads.begin() + 8 + cards, managerObject.loads.end()) ==
-               std::vector<std::string>{"guis/menu/pause.q4ui", "guis/menu/pause_strogg.q4ui",  // either family may pause the level
-                                        "guis/menu/savegame.q4ui", "guis/menu/restartlevel.q4ui", "guis/menu/restartmenu.q4ui"}));
+               std::vector<std::string>{"guis/menu/pause.rui", "guis/menu/pause_strogg.rui",  // either family may pause the level
+                                        "guis/menu/savegame.rui", "guis/menu/restartlevel.rui", "guis/menu/restartmenu.rui"}));
         s.PrepareRetainedLevel("game/airdefense1", false); CHECK(managerObject.loads.size() == 13 + cards);  // once a session
         auto late = Session(true); late.PrepareRetainedLevel("game/airdefense1", false); // the gate switched on after startup
-        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/pause.q4ui", "guis/menu/pause_strogg.q4ui", "guis/menu/loadgame.q4ui",
-                                                            "guis/menu/savegame.q4ui", "guis/menu/restartlevel.q4ui",
-                                                            "guis/menu/restartmenu.q4ui"}) && precached.size() == 2);
+        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/pause.rui", "guis/menu/pause_strogg.rui", "guis/menu/loadgame.rui",
+                                                            "guis/menu/savegame.rui", "guis/menu/restartlevel.rui",
+                                                            "guis/menu/restartmenu.rui"}) && precached.size() == 2);
     }
     {   // The multiplayer levelshots: queued at startup, read on the front end's
         // idle frames once the title has presented for a second, as many as fit
@@ -2284,7 +2284,7 @@ int main() {
         auto s = Session(true); idUserInterface generic("guis/loading/generic.gui"), intro("guis/loading/intro.gui"), custom("guis/map/mylevel.gui");
         CHECK(s.SelectRetainedLoadingGui(&custom, false) == &custom && managerObject.loads.empty());
         auto* retained = s.SelectRetainedLoadingGui(&intro, true);
-        CHECK(retained != &intro && std::string(retained->Name()) == "guis/loading/loading.q4ui");
+        CHECK(retained != &intro && std::string(retained->Name()) == "guis/loading/loading.rui");
         CHECK(!managerObject.flags[0].unique && managerObject.flags[0].shared);
         CHECK(retained->state["loading_mp"] == "1" && retained->state["loading_intro"] == "1" && retained->state["loading_ready"] == "0");
         auto failing = Session(true); managerObject.fail = true;
@@ -2292,7 +2292,7 @@ int main() {
         CHECK(managerObject.loads.size() == 1 && commonObject.warnings.size() == 1);
         auto title = Session(true); managerObject.fail = true; title.UpdateRetainedHome(); title.UpdateRetainedHome();
         CHECK(title.guiRetainedHome == nullptr && managerObject.loads.size() == 1 && commonObject.warnings.size() == 1);
-        CHECK((Stock(title) == std::vector<std::string>{"guis/menu/title.q4ui"}));
+        CHECK((Stock(title) == std::vector<std::string>{"guis/menu/title.rui"}));
     }
     {   // A mod's own copy of a stock loading screen stays; the stock screens of
         // openQ4, the stock game and the Awakening are replaced.
@@ -2314,14 +2314,14 @@ int main() {
         }
     }
     {   // A document that is not installed falls back quietly, screen by screen.
-        auto s = Session(true); fileSystemObject.files.erase("guis/menu/title.q4ui");
+        auto s = Session(true); fileSystemObject.files.erase("guis/menu/title.rui");
         s.UpdateRetainedHome(); s.UpdateRetainedHome();
         CHECK(s.guiRetainedHome == nullptr && managerObject.loads.empty() && commonObject.warnings.empty());
         CHECK(commonObject.developer.size() == 1 && commonObject.developer[0].find("not installed") != std::string::npos);
-        s.ReportRetainedScreens(); CHECK(commonObject.output.find("views=0 stock=guis/menu/title.q4ui\n") != std::string::npos);
+        s.ReportRetainedScreens(); CHECK(commonObject.output.find("views=0 stock=guis/menu/title.rui\n") != std::string::npos);
         s.mapSpawned = true; s.UpdateRetainedHome(); // the pause screen is installed and still presents
-        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.q4ui");
-        idUserInterface generic("guis/loading/generic.gui"); fileSystemObject.files.erase("guis/loading/loading.q4ui");
+        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.rui");
+        idUserInterface generic("guis/loading/generic.gui"); fileSystemObject.files.erase("guis/loading/loading.rui");
         CHECK(s.SelectRetainedLoadingGui(&generic, false) == &generic && commonObject.warnings.empty());
         CHECK(s.retainedStock.Num() == 2 && managerObject.loads.size() == 1);
     }
@@ -2330,7 +2330,7 @@ int main() {
         auto s = Session(true); legacyMissing = {"main_b_credits"};
         s.PreloadRetainedScreens(); s.UpdateRetainedHome(); s.mapSpawned = true; s.UpdateRetainedHome();
         CHECK(s.guiRetainedHome == nullptr && managerObject.loads.empty() && commonObject.warnings.empty());
-        CHECK((Stock(s) == std::vector<std::string>{"guis/menu/title.q4ui", "guis/menu/pause.q4ui"}));
+        CHECK((Stock(s) == std::vector<std::string>{"guis/menu/title.rui", "guis/menu/pause.rui"}));
         CHECK(commonObject.developer.size() == 2 && commonObject.developer[0].find("'main_b_credits'") != std::string::npos);
         idUserInterface generic("guis/loading/generic.gui");
         CHECK(s.SelectRetainedLoadingGui(&generic, false) != &generic);
@@ -2350,7 +2350,7 @@ int main() {
         // (the hand-off's dest 37); its own return puts it back, unseen, and the
         // title takes the screen back at once with the bands coming home.
         auto s = Session(true); s.OpenCampaignSelector(false); auto* page = s.guiActive;
-        CHECK(page && std::string(page->Name()) == "guis/menu/singleplayer.q4ui");
+        CHECK(page && std::string(page->Name()) == "guis/menu/singleplayer.rui");
         legacy["desktop::curr"] = 0; legacy["desktop::active"] = 1; legacy["desktop::dest"] = 37;
         const size_t played = s.played.size();
         s.HandleRetainedSessionRequest(page, "campaignHome");
@@ -2379,9 +2379,9 @@ int main() {
     }
     {   // The campaign selectors: the retained ones while installed, the stock ones otherwise.
         auto s = Session(true); s.OpenCampaignSelector(false);
-        CHECK(s.guiActive && std::string(s.guiActive->Name()) == "guis/menu/singleplayer.q4ui" && arenaCampaign.selectors == 0);
+        CHECK(s.guiActive && std::string(s.guiActive->Name()) == "guis/menu/singleplayer.rui" && arenaCampaign.selectors == 0);
         s.OpenCampaignSelector(true);
-        CHECK(std::string(s.guiActive->Name()) == "guis/menu/campaigns.q4ui" && s.guiActive->state["awakening_ready"] == "1");
+        CHECK(std::string(s.guiActive->Name()) == "guis/menu/campaigns.rui" && s.guiActive->state["awakening_ready"] == "1");
         // NEW GAME and CHAPTERS summarize themselves (section 13.7) over the
         // active campaign's first and furthest reached levels, read as precaches.
         CHECK(s.guiActive->state["summary.newgame.shot"] == "gfx/guis/loadscreens/e3_load" &&
@@ -2389,7 +2389,7 @@ int main() {
               std::count(precached.begin(), precached.end(), std::string("gfx/guis/loadscreens/airdefense")) == 1);
         CHECK(!managerObject.flags[0].unique && managerObject.flags[0].shared);
         auto missing = Session(true);
-        fileSystemObject.files.erase("guis/menu/singleplayer.q4ui"); fileSystemObject.files.erase("guis/menu/campaigns.q4ui");
+        fileSystemObject.files.erase("guis/menu/singleplayer.rui"); fileSystemObject.files.erase("guis/menu/campaigns.rui");
         missing.OpenCampaignSelector(false); CHECK(arenaCampaign.selectors == 1 && managerObject.loads.empty());
         missing.OpenCampaignSelector(true); CHECK(std::string(missing.guiActive->Name()) == "guis/campaign_menu.gui");
         missing.OpenCampaignSelector(false); CHECK(arenaCampaign.selectors == 2 && commonObject.warnings.empty());
@@ -2398,15 +2398,15 @@ int main() {
         // The Single Player page, found each time it opens, whose view stopped
         // drawing: the stock selector, reported once.
         auto stopped = Session(true); stopped.OpenCampaignSelector(false); auto* drawn = stopped.guiActive;
-        CHECK(drawn != nullptr && std::string(drawn->Name()) == "guis/menu/singleplayer.q4ui");
+        CHECK(drawn != nullptr && std::string(drawn->Name()) == "guis/menu/singleplayer.rui");
         drawn->failed = true; stopped.OpenCampaignSelector(false);
-        CHECK(arenaCampaign.selectors == 1 && Stock(stopped) == std::vector<std::string>{"guis/menu/singleplayer.q4ui"} &&
+        CHECK(arenaCampaign.selectors == 1 && Stock(stopped) == std::vector<std::string>{"guis/menu/singleplayer.rui"} &&
               commonObject.warnings.size() == 1 && commonObject.warnings[0].find("stopped drawing") != std::string::npos);
         stopped.OpenCampaignSelector(false); CHECK(arenaCampaign.selectors == 2 && commonObject.warnings.size() == 1);
     }
     {   // Single player loading tips: the first when the screen presents, then the
         // next every 6 s in the other slot; multiplayer runs the arsenal instead.
-        auto s = Session(true); idUserInterface loading("guis/loading/loading.q4ui"); s.guiLoading = &loading;
+        auto s = Session(true); idUserInterface loading("guis/loading/loading.rui"); s.guiLoading = &loading;
         s.PublishRetainedLoadingTip(true); CHECK(loading.named.empty());  // not presenting the load
         s.retainedLoadingActive = true; sysMilliseconds = 5;
         s.PublishRetainedLoadingTip(true);
@@ -2438,7 +2438,7 @@ int main() {
         CHECK(parent->named.back() == "detailEnterAwakening");
         commonObject.time += 349; s.UpdateRetainedSubpage(); CHECK(s.guiActive == parent);
         commonObject.time += 1; s.UpdateRetainedSubpage(); auto* skill = s.guiActive;
-        CHECK(std::string(skill->Name()) == "guis/menu/campaign_skill.q4ui" && s.selected.back() == "awakening");
+        CHECK(std::string(skill->Name()) == "guis/menu/campaign_skill.rui" && s.selected.back() == "awakening");
         s.HandleRetainedSessionRequest(skill,"campaignSkill4"); s.HandleRetainedSessionRequest(skill,"campaignSkillTurbo");
         CHECK(skill->State().GetInt("skill") == 4 && skill->State().GetBool("turbo") && cvarSystemObject.GetCVarInteger("g_skill") == 1);
         s.HandleRetainedSessionRequest(skill,"campaignSkillBack"); CHECK(s.retainedDetailTarget == 2);
@@ -2451,7 +2451,7 @@ int main() {
         s.HandleRetainedSessionRequest(parent,"campaignChapters");
         CHECK(s.retainedDetailTarget == 3 && parent->named.back() == "detailEnterChapters");
         commonObject.time += 350; s.UpdateRetainedSubpage(); auto* chapters = s.guiActive;
-        CHECK(std::string(chapters->Name()) == "guis/menu/chapters.q4ui" && s.selected.back() == "quake4");
+        CHECK(std::string(chapters->Name()) == "guis/menu/chapters.rui" && s.selected.back() == "quake4");
         CHECK(s.chapterPublishes.size() == published + 1 && s.chapterPublishes.back() == -1);
         chapters->state["chapter.pick"] = "6"; s.HandleRetainedSessionRequest(chapters,"campaignChapterSelect");
         CHECK(s.chapterPublishes.back() == 6);
@@ -2468,8 +2468,8 @@ int main() {
         s.HandleRetainedSessionRequest(skill,"campaignSkillStart");
         CHECK(s.starts == 1 && cvarSystemObject.GetCVarInteger("g_skill") == 3 && cvarSystemObject.GetCVarBool("g_turboMode"));
         auto disabled = Session(false); CHECK(!disabled.OpenRetainedCampaignSkill() && !disabled.OpenRetainedCampaignChapters());
-        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/campaign_skill.q4ui");
-        fileSystemObject.files.erase("guis/menu/chapters.q4ui");
+        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/campaign_skill.rui");
+        fileSystemObject.files.erase("guis/menu/chapters.rui");
         CHECK(!missing.OpenRetainedCampaignSkill() && !missing.OpenRetainedCampaignChapters());
     }
     {   // Single Player and its Campaign sub-page (spec 1.10): the leaving document
@@ -2489,7 +2489,7 @@ int main() {
         CHECK(s.RetainedSubpageEvent(&release) && page->events.size() == 1 && page->events[0].evValue2 == 0);
         commonObject.time += 349; s.UpdateRetainedSubpage(); CHECK(s.guiActive == page);
         commonObject.time += 1; s.UpdateRetainedSubpage(); auto* sub = s.guiActive;
-        CHECK(sub && std::string(sub->Name()) == "guis/menu/campaigns.q4ui" && s.retainedSubpageFrom == nullptr);
+        CHECK(sub && std::string(sub->Name()) == "guis/menu/campaigns.rui" && s.retainedSubpageFrom == nullptr);
         CHECK(!s.RetainedSubpageEvent(&press));  // the sub-page takes input again
         s.HandleRetainedSessionRequest(sub, "campaignBack");
         CHECK(s.guiActive == sub && sub->named.back() == "subpageLeave" && !s.retainedSubpageDeeper && s.retainedSubpageUntil == commonObject.time + 300);
@@ -2518,7 +2518,7 @@ int main() {
         // Reduced motion hands over at once: the arrival's 80 ms fade is the change.
         cvarSystemObject.strings["ui_retainedReducedMotion"] = "1";
         s.HandleRetainedSessionRequest(page, "campaigns");
-        CHECK(std::string(s.guiActive->Name()) == "guis/menu/campaigns.q4ui" && s.retainedSubpageFrom == nullptr && page->named.back() != "subpageEnter");
+        CHECK(std::string(s.guiActive->Name()) == "guis/menu/campaigns.rui" && s.retainedSubpageFrom == nullptr && page->named.back() != "subpageEnter");
         s.HandleRetainedSessionRequest(s.guiActive, "campaignBack");
         CHECK(s.guiActive == page && page->named.back() == "subpageReturn" && s.retainedSubpageFrom == nullptr);
         cvarSystemObject.strings["ui_retainedReducedMotion"] = "0";
@@ -2528,7 +2528,7 @@ int main() {
         CHECK(s.retainedSubpageFrom == nullptr && s.guiActive == &other);
         // A sub-page that cannot present: its stock selector opens at once.
         auto stock = Session(true); stock.OpenCampaignSelector(false); auto* alone = stock.guiActive;
-        fileSystemObject.files.erase("guis/menu/campaigns.q4ui");
+        fileSystemObject.files.erase("guis/menu/campaigns.rui");
         stock.HandleRetainedSessionRequest(alone, "campaigns");
         CHECK(std::string(stock.guiActive->Name()) == "guis/campaign_menu.gui" && stock.retainedSubpageFrom == nullptr && alone->named.empty());
     }
@@ -2550,7 +2550,7 @@ int main() {
               commonObject.output.find("CAMPAIGN_SELECTED id=arena gameDir=baseoq4") != std::string::npos);
         // The campaign presents the page (idArenaCampaign::OpenBrowser).
         auto* arena = s.RetainedArenaPage();
-        CHECK(arena && std::string(arena->Name()) == "guis/menu/arena.q4ui" && s.RetainedArenaGui() == arena);
+        CHECK(arena && std::string(arena->Name()) == "guis/menu/arena.rui" && s.RetainedArenaGui() == arena);
         s.guiActive = arena;
         const std::pair<const char*, const char*> verbs[] = {{"arenaTier2", "arenaSelectTier 2"}, {"arenaMatch3", "arenaSelectMatch 3"},
             {"arenaTierNext", "arenaStepTier 1"}, {"arenaTierPrevious", "arenaStepTier -1"}, {"arenaEasier", "arenaDifficulty -1"},
@@ -2599,14 +2599,14 @@ int main() {
         CHECK((reload.selected == std::vector<std::string>{"arena"}) && reload.retainedSubpageFrom == nullptr && first->named.empty());
         // Not installed, cannot load, stopped drawing, or the gate off: the
         // stock browser, selected as before.
-        auto missing = Session(true); home(); fileSystemObject.files.erase("guis/menu/arena.q4ui");
+        auto missing = Session(true); home(); fileSystemObject.files.erase("guis/menu/arena.rui");
         missing.OpenCampaignSelector(false); auto* alone = missing.guiActive;
         missing.HandleRetainedSessionRequest(alone, "campaignArena");
         CHECK((missing.selected == std::vector<std::string>{"arena"}) && missing.RetainedArenaPage() == nullptr && commonObject.warnings.empty());
         auto failed = Session(true); home();
         auto* view = failed.RetainedArenaPage(); CHECK(view != nullptr); view->failed = true;
         CHECK(failed.RetainedArenaPage() == nullptr && failed.RetainedArenaGui() == nullptr && commonObject.warnings.size() == 1 &&
-              Stock(failed) == std::vector<std::string>{"guis/menu/arena.q4ui"});
+              Stock(failed) == std::vector<std::string>{"guis/menu/arena.rui"});
         auto off = Session(false); CHECK(off.RetainedArenaPage() == nullptr && managerObject.loads.empty());
     }
     {   // The gate alone includes the SYSTEM page only once it lacks no stock setting and
@@ -2616,7 +2616,7 @@ int main() {
         s.ReportRetainedScreens(); CHECK(commonObject.output.find(complete ? "OPENQ4_RETAINED enabled=1 system=1 multiplayer=" : "OPENQ4_RETAINED enabled=1 system=0 multiplayer=") != std::string::npos);
         auto off = Session(false); CHECK(!off.RetainedSystemAvailable());
         ui_retainedSystem.value = true; CHECK(s.RetainedSystemAvailable() && off.RetainedSystemAvailable());
-        s.retainedStock.Append("guis/menu/settings/system.q4ui"); CHECK(!s.RetainedSystemAvailable());
+        s.retainedStock.Append("guis/menu/settings/system.rui"); CHECK(!s.RetainedSystemAvailable());
     }
     {   // The AUDIO button opens the retained page over the settings screen,
         // its values read back: the volumes and the subtitle size and
@@ -2635,7 +2635,7 @@ int main() {
         auto* settings = s.guiMainMenu; s.guiHandle = reinterpret_cast<HandleGuiCommand_t>(&audioDeviceNames);
         s.OpenRetainedAudioRoute();
         auto* page = s.guiActive;
-        CHECK(page != settings && page == s.guiRetainedAudio && std::string(page->Name()) == "guis/menu/settings/audio.q4ui" &&
+        CHECK(page != settings && page == s.guiRetainedAudio && std::string(page->Name()) == "guis/menu/settings/audio.rui" &&
               s.retainedAudioParent == settings && s.guiHandle == nullptr && legacyActions.empty());
         CHECK(page->state["audio.volume"] == "70" && page->state["audio.music"] == "40" && page->state["audio.dialogue"] == "100" &&
               page->state["audio.backend"] == "1" && page->state["audio.device.count"] == "3" && page->state["audio.device"] == "2" &&
@@ -2679,8 +2679,8 @@ int main() {
         page->failed = true; s.OpenRetainedAudioRoute();
         CHECK(s.guiActive == settings && s.guiRetainedAudio == nullptr && (legacyActions == std::vector<std::string>{"set_b_audio"}) &&
               s.dispatched.back() == "play main_menu_selection" && !s.RetainedAudioAvailable() &&
-              Stock(s) == std::vector<std::string>{"guis/menu/settings/audio.q4ui"} && settings->state["retainedAudio"] == "0");
-        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/settings/audio.q4ui");
+              Stock(s) == std::vector<std::string>{"guis/menu/settings/audio.rui"} && settings->state["retainedAudio"] == "0");
+        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/settings/audio.rui");
         missing.OpenRetainedAudioRoute();
         CHECK(missing.guiActive == missing.guiMainMenu && missing.guiRetainedAudio == nullptr && !missing.RetainedAudioAvailable() &&
               legacyActions.size() == 1);
@@ -2698,7 +2698,7 @@ int main() {
         auto* settings = s.guiMainMenu; s.guiHandle = reinterpret_cast<HandleGuiCommand_t>(&audioDeviceNames);
         s.OpenRetainedGameRoute();
         auto* page = s.guiActive;
-        CHECK(page != settings && page == s.guiRetainedGame && std::string(page->Name()) == "guis/menu/settings/game.q4ui" &&
+        CHECK(page != settings && page == s.guiRetainedGame && std::string(page->Name()) == "guis/menu/settings/game.rui" &&
               s.retainedGameParent == settings && s.guiHandle == nullptr && legacyActions.empty() &&
               (s.gamePublishes == std::vector<idUserInterface*>{page}));
         s.HandleRetainedSessionRequest(page, "gameLanguage 2");
@@ -2710,9 +2710,9 @@ int main() {
         s.OpenRetainedGameRoute(); CHECK(s.guiActive == page && s.gamePublishes.size() == 2); s.ReturnRetainedGame();
         page->failed = true; s.OpenRetainedGameRoute();
         CHECK(s.guiActive == settings && s.guiRetainedGame == nullptr && (legacyActions == std::vector<std::string>{"set_b_gameoptions"}) &&
-              !s.RetainedGameAvailable() && Stock(s) == std::vector<std::string>{"guis/menu/settings/game.q4ui"} &&
+              !s.RetainedGameAvailable() && Stock(s) == std::vector<std::string>{"guis/menu/settings/game.rui"} &&
               settings->state["retainedGame"] == "0");
-        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/settings/game.q4ui");
+        auto missing = Session(true); fileSystemObject.files.erase("guis/menu/settings/game.rui");
         missing.OpenRetainedGameRoute();
         CHECK(missing.guiActive == missing.guiMainMenu && missing.guiRetainedGame == nullptr && !missing.RetainedGameAvailable() &&
               legacyActions.size() == 1);
@@ -2743,7 +2743,7 @@ int main() {
         auto* title = s.guiRetainedHome;
         s.HandleRetainedSessionRequest(title, "settings");
         auto* page = s.guiRetainedSettingsPage;
-        CHECK(page && std::string(page->Name()) == "guis/menu/settings.q4ui" && legacyActions.empty() && s.retainedPagePending == page &&
+        CHECK(page && std::string(page->Name()) == "guis/menu/settings.rui" && legacyActions.empty() && s.retainedPagePending == page &&
               title->named.back() == "depart" && title->named[title->named.size() - 2] == "carry_settings" &&
               page->state["from_controls"] == "0" && page->state["from_audio"] == "0");
         commonObject.time += 550; s.UpdateRetainedHome(); s.UpdateRetainedPage();
@@ -2778,7 +2778,7 @@ int main() {
         const size_t sounds = s.played.size();
         // DISPLAY where the SYSTEM page fell back to its stock screen: the
         // page leaves for the stock panel (dest 22).
-        s.retainedStock.Append("guis/menu/settings/system.q4ui");
+        s.retainedStock.Append("guis/menu/settings/system.rui");
         s.HandleRetainedSessionRequest(page, "settingsDisplay");
         CHECK(s.systemOpens == 0 && page->named.back() == "depart" && s.retainedSettingsDest == 22 && page->state["from_display"] == "1" &&
               s.played.size() == sounds + 1);
@@ -2818,7 +2818,7 @@ int main() {
         auto* stroggHome = strogg.guiRetainedHome;
         strogg.HandleRetainedSessionRequest(stroggHome, "settings");
         CHECK(strogg.retainedPagePending == strogg.guiRetainedSettingsPage && strogg.guiRetainedSettingsPage != nullptr &&
-              std::string(strogg.retainedPagePending->Name()) == "guis/menu/settings.q4ui" &&
+              std::string(strogg.retainedPagePending->Name()) == "guis/menu/settings.rui" &&
               strogg.guiRetainedSettingsPage != strogg.guiRetainedLoadStrogg &&
               strogg.guiRetainedSettingsPage->state.count("load.count") == 0);
         commonObject.time += 550; strogg.UpdateRetainedHome(); strogg.UpdateRetainedPage();
@@ -2841,7 +2841,7 @@ int main() {
         // Where the page cannot present, SETTINGS runs the stock button: the
         // gate off, or a main menu without the route (quietly).
         auto off = Session(false); CHECK(off.RetainedSettingsPage() == nullptr && !off.OpenRetainedSettingsPage());
-        auto missingSettings = Session(true); fileSystemObject.files.erase("guis/menu/settings.q4ui");
+        auto missingSettings = Session(true); fileSystemObject.files.erase("guis/menu/settings.rui");
         missingSettings.PreloadRetainedScreens(); missingSettings.UpdateRetainedHome();
         missingSettings.HandleRetainedSessionRequest(missingSettings.guiRetainedHome, "settings");
         CHECK(missingSettings.retainedPagePending == nullptr && legacyActions.back() == "main_b_settings" &&
@@ -2849,7 +2849,7 @@ int main() {
         auto old = Session(true); legacyEventsMissing = {"openSettingsPage"}; old.PreloadRetainedScreens(); old.UpdateRetainedHome();
         old.HandleRetainedSessionRequest(old.guiRetainedHome, "settings");
         CHECK(legacyActions.back() == "main_b_settings" && old.retainedPagePending == nullptr && commonObject.warnings.empty() &&
-              (Stock(old) == std::vector<std::string>{"guis/menu/settings.q4ui"}));
+              (Stock(old) == std::vector<std::string>{"guis/menu/settings.rui"}));
         legacyEventsMissing.clear();
     }
     {   // DISPLAY with the SYSTEM page on goes one level deeper to it as the
@@ -2874,7 +2874,7 @@ int main() {
         s.HandleRetainedSessionRequest(page, "settingsGame"); CHECK(s.retainedSubpageKind == RETAINED_SUBPAGE_SETTINGS_SYSTEM);  // nothing else meanwhile
         commonObject.time += 350; s.UpdateRetainedSubpage();
         auto* system = s.guiSystem;
-        CHECK(system != nullptr && s.guiActive == system && std::string(system->Name()) == "guis/menu/settings/system.q4ui" &&
+        CHECK(system != nullptr && s.guiActive == system && std::string(system->Name()) == "guis/menu/settings/system.rui" &&
               s.guiSystemParent == page && s.systemOpens == 1 && s.retainedSubpageFrom == nullptr && s.retainedSettingsDest == 0);
         CHECK(s.ReturnSystemSettings());
         CHECK(s.guiActive == system && s.guiSystem == system && !system->named.empty() && system->named.back() == "subpageLeave" &&
@@ -2919,7 +2919,7 @@ int main() {
         auto stock = Session(true); ui_retainedSystem.value = true; stock.PreloadRetainedScreens(); stock.UpdateRetainedHome();
         stock.HandleRetainedSessionRequest(stock.guiRetainedHome, "settings"); commonObject.time += 550;
         stock.UpdateRetainedHome(); stock.UpdateRetainedPage();
-        stock.retainedStock.Append("guis/menu/settings/system.q4ui"); CHECK(!stock.RetainedSystemAvailable());
+        stock.retainedStock.Append("guis/menu/settings/system.rui"); CHECK(!stock.RetainedSystemAvailable());
         stock.HandleRetainedSessionRequest(stock.guiRetainedSettingsPage, "settingsDisplay");
         CHECK(stock.guiRetainedSettingsPage->named.back() == "depart" && stock.retainedSettingsDest == 22 && stock.retainedSubpageFrom == nullptr &&
               stock.systemOpens == 0);
@@ -2932,7 +2932,7 @@ int main() {
         auto* settings = s.guiMainMenu; s.retainedControlsCapture = 7; s.retainedControlsCaptured = 9;
         s.OpenRetainedControlsRoute();
         auto* page = s.guiActive;
-        CHECK(page == s.guiRetainedControls && std::string(page->Name()) == "guis/menu/settings/controls.q4ui" &&
+        CHECK(page == s.guiRetainedControls && std::string(page->Name()) == "guis/menu/settings/controls.rui" &&
               s.retainedControlsParent == settings && s.retainedControlsCapture == -1 && s.retainedControlsCaptured == -1 &&
               (s.controlsPublishes == std::vector<idUserInterface*>{page}));
         s.HandleRetainedSessionRequest(page, "controlsBind"); s.HandleRetainedSessionRequest(settings, "controlsClear");
@@ -3037,10 +3037,10 @@ int main() {
         auto s = Session(true, true);
         gameObject.publish = [](idUserInterface* gui) { gui->SetStateBool("pause_strogg", true); };
         s.UpdateRetainedHome(); auto* strogg = s.guiRetainedHome;
-        CHECK(strogg && std::string(strogg->Name()) == "guis/menu/pause_strogg.q4ui" && strogg == s.guiRetainedPauseStrogg);
+        CHECK(strogg && std::string(strogg->Name()) == "guis/menu/pause_strogg.rui" && strogg == s.guiRetainedPauseStrogg);
         CHECK(strogg->active && strogg->named.back() == "open" && strogg->state["pause_level"] == "game/airdefense1");
         CHECK((gameObject.commands == std::vector<std::string>{"retainedPauseFamily", "retainedPauseState"}));
-        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/pause_strogg.q4ui"}));
+        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/pause_strogg.rui"}));
         s.HandleRetainedSessionRequest(strogg, "resume"); CHECK(s.exits == 1);
         s.UpdateRetainedHome(); CHECK(s.guiRetainedHome == nullptr && !strogg->active);
         CHECK(strogg->named.back() == "release" && s.guiRetainedReleasing == strogg);  // either family releases the softened view
@@ -3051,21 +3051,21 @@ int main() {
         // Each level asks again: a Marine level pauses in the Marine family.
         s.ExitMenu(); s.UpdateRetainedHome(); s.PrepareRetainedLevel("game/airdefense1", false);
         gameObject.publish = nullptr; s.guiActive = s.guiMainMenu; s.UpdateRetainedHome();
-        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.q4ui");
+        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.rui");
         CHECK(std::count(gameObject.commands.begin(), gameObject.commands.end(), "retainedPauseFamily") == 2);
         // A Strogg view that stopped drawing hands over to the Marine pause.
         s.ExitMenu(); s.UpdateRetainedHome(); s.PrepareRetainedLevel("game/recomp", false);
         gameObject.publish = [](idUserInterface* gui) { gui->SetStateBool("pause_strogg", true); };
         strogg->failed = true; s.guiActive = s.guiMainMenu; s.UpdateRetainedHome();
-        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.q4ui" && s.guiRetainedPauseStrogg == nullptr);
+        CHECK(s.guiRetainedHome && std::string(s.guiRetainedHome->Name()) == "guis/menu/pause.rui" && s.guiRetainedPauseStrogg == nullptr);
         CHECK(commonObject.warnings.size() == 1 && commonObject.warnings[0].find("stopped drawing") != std::string::npos);
-        CHECK((Stock(s) == std::vector<std::string>{"guis/menu/pause_strogg.q4ui"}));
+        CHECK((Stock(s) == std::vector<std::string>{"guis/menu/pause_strogg.rui"}));
         // Not installed, it falls back quietly to the Marine pause.
-        auto missing = Session(true, true); fileSystemObject.files.erase("guis/menu/pause_strogg.q4ui");
+        auto missing = Session(true, true); fileSystemObject.files.erase("guis/menu/pause_strogg.rui");
         gameObject.publish = [](idUserInterface* gui) { gui->SetStateBool("pause_strogg", true); };
         missing.UpdateRetainedHome();
-        CHECK(missing.guiRetainedHome && std::string(missing.guiRetainedHome->Name()) == "guis/menu/pause.q4ui" && commonObject.warnings.empty());
-        CHECK((Stock(missing) == std::vector<std::string>{"guis/menu/pause_strogg.q4ui"}));
+        CHECK(missing.guiRetainedHome && std::string(missing.guiRetainedHome->Name()) == "guis/menu/pause.rui" && commonObject.warnings.empty());
+        CHECK((Stock(missing) == std::vector<std::string>{"guis/menu/pause_strogg.rui"}));
         // The title never asks the game.
         auto title = Session(true); title.UpdateRetainedHome(); CHECK(gameObject.commands.empty());
     }
@@ -3073,7 +3073,7 @@ int main() {
         // drawing over the running game for 250 ms while the softened view
         // releases; anything else taking the screen ends the release.
         auto s = Session(true, true); s.UpdateRetainedHome(); auto* pause = s.guiRetainedHome;
-        CHECK(pause && std::string(pause->Name()) == "guis/menu/pause.q4ui" && s.guiRetainedReleasing == nullptr);
+        CHECK(pause && std::string(pause->Name()) == "guis/menu/pause.rui" && s.guiRetainedReleasing == nullptr);
         s.HandleRetainedSessionRequest(pause, "resume"); s.UpdateRetainedHome();
         CHECK(s.guiRetainedHome == nullptr && !pause->active && pause->deactivations == 1);
         CHECK(pause->named.back() == "release" && s.guiRetainedReleasing == pause && s.retainedReleaseUntil == commonObject.time + 250);
@@ -3090,7 +3090,7 @@ int main() {
         s.UpdateRetainedHome(); CHECK(s.guiRetainedHome == nullptr && s.guiRetainedReleasing == nullptr && pause->named.back() != "release");
         auto title = Session(true); title.UpdateRetainedHome(); auto* home = title.guiRetainedHome;
         title.mapSpawned = true; title.ExitMenu(); title.UpdateRetainedHome();  // CONTINUE: the title closes into a level
-        CHECK(home && std::string(home->Name()) == "guis/menu/title.q4ui" && title.guiRetainedReleasing == nullptr && home->named.back() != "release");
+        CHECK(home && std::string(home->Name()) == "guis/menu/title.rui" && title.guiRetainedReleasing == nullptr && home->named.back() != "release");
     }
     {   // The Objectives page: the game lists every objective screenshot of the level,
         // which resolves inside the load, and a published screenshot shows only when
@@ -3140,8 +3140,8 @@ int main() {
         auto s = Mp(true, true);
         idKeyInput::Bound()["_impulse28"] = "^iK8b"; idKeyInput::Bound()["_impulse29"] = "^ik8c";
         s.PrepareRetainedLevel("mp/q4dm1", true);  // loaded inside the level load
-        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/mp_escape.q4ui", "guis/menu/mp_welcome.q4ui",
-                                                               "guis/menu/mp_summary.q4ui"}) &&
+        CHECK((managerObject.loads == std::vector<std::string>{"guis/menu/mp_escape.rui", "guis/menu/mp_welcome.rui",
+                                                               "guis/menu/mp_summary.rui"}) &&
               s.guiRetainedEscape && s.guiRetainedEscape->state["card.tab"] == "0" && s.guiRetainedWelcome &&
               s.guiRetainedWelcome->state["card.tab"] == "0" && s.guiRetainedSummary && s.guiRetainedSummary->state["card.tab"] == "0");
         CHECK(managerObject.flags[0].unique && !managerObject.flags[0].shared);
@@ -3161,7 +3161,7 @@ int main() {
         gameObject.publish = nullptr; s.UpdateRetainedMultiplayer(); CHECK(card->stateChanges == 2 && card->activations == 1);
         // Home verbs from the card, and card verbs from elsewhere, are refused.
         s.HandleRetainedSessionRequest(card, "quit"); CHECK(commonObject.quits == 0 && commonObject.warnings.back().find("unhandled multiplayer request") != std::string::npos);
-        idUserInterface stranger("guis/other.q4ui"); s.HandleRetainedSessionRequest(&stranger, "mpClose"); CHECK(gameObject.guiCommands.empty());
+        idUserInterface stranger("guis/other.rui"); s.HandleRetainedSessionRequest(&stranger, "mpClose"); CHECK(gameObject.guiCommands.empty());
         // Resume: the game's own close, with its sound; the card releases the
         // softened view over the running game in the same frame.
         gameObject.answer = [](const char*) -> const char* { return nullptr; };
@@ -3491,7 +3491,7 @@ int main() {
         const size_t arenaAsked = gameObject.commands.size();
         s.guiActive = &arenaMenu; s.UpdateRetainedMultiplayer();
         auto* arenaPause = s.guiRetainedMultiplayer;
-        CHECK(arenaPause && arenaPause == s.guiRetainedArenaPause && std::string(arenaPause->Name()) == "guis/menu/arena_pause.q4ui" &&
+        CHECK(arenaPause && arenaPause == s.guiRetainedArenaPause && std::string(arenaPause->Name()) == "guis/menu/arena_pause.rui" &&
               arenaPause->named.back() == "open" && gameObject.commands.size() == arenaAsked + 1 && gameObject.commands.back() == "retainedMultiplayerCover");
         gameObject.answer = [](const char*) -> const char* { return "continue"; };
         for (const auto& [verb, action] : std::vector<std::pair<const char*, const char*>>{{"arenaRestart", "restart"}, {"arenaLeave", "leave"}}) {
@@ -3519,15 +3519,15 @@ int main() {
         // A game module without the protocol keeps the stock menu for the session.
         auto old = Mp(true, true); gameObject.publish = nullptr;
         old.UpdateRetainedMultiplayer(); old.UpdateRetainedMultiplayer();
-        CHECK(old.guiRetainedMultiplayer == nullptr && (Stock(old) == std::vector<std::string>{"guis/menu/mp_escape.q4ui"}) && gameObject.commands.size() == 2);
+        CHECK(old.guiRetainedMultiplayer == nullptr && (Stock(old) == std::vector<std::string>{"guis/menu/mp_escape.rui"}) && gameObject.commands.size() == 2);
         // So does a mod's own multiplayer menu, and a card that stopped drawing.
         auto mod = Mp(true, true); cvarSystemObject.strings["fs_game"] = "mymod"; fileSystemObject.gameDirFiles["mymod"] = {"guis/mpmain.gui"};
         mod.UpdateRetainedMultiplayer();
-        CHECK(mod.guiRetainedMultiplayer == nullptr && managerObject.loads.empty() && (Stock(mod) == std::vector<std::string>{"guis/menu/mp_escape.q4ui"}));
+        CHECK(mod.guiRetainedMultiplayer == nullptr && managerObject.loads.empty() && (Stock(mod) == std::vector<std::string>{"guis/menu/mp_escape.rui"}));
         auto failed = Mp(true, true); failed.UpdateRetainedMultiplayer(); auto* stopped = failed.guiRetainedMultiplayer; CHECK(stopped);
         failed.guiActive = nullptr; failed.UpdateRetainedMultiplayer(); stopped->failed = true; failed.guiActive = &mpMenu; failed.UpdateRetainedMultiplayer();
         CHECK(failed.guiRetainedMultiplayer == nullptr && commonObject.warnings.back().find("stopped drawing") != std::string::npos);
-        auto missing = Mp(true, true); fileSystemObject.files.erase("guis/menu/mp_escape.q4ui"); missing.UpdateRetainedMultiplayer();
+        auto missing = Mp(true, true); fileSystemObject.files.erase("guis/menu/mp_escape.rui"); missing.UpdateRetainedMultiplayer();
         CHECK(missing.guiRetainedMultiplayer == nullptr && commonObject.warnings.empty() &&
               (gameObject.commands == std::vector<std::string>{"retainedMultiplayerVariant"}));
         // Welcome: while the player has not answered the join offer the game
@@ -3627,7 +3627,7 @@ OPERATION_RESETS = {'settings.system.display': {'r_mode', 'r_displayRefresh'},
 
 
 def retained_system_document() -> dict:
-    text = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/system.q4ui').read_text(encoding='utf-8')
+    text = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/system.rui').read_text(encoding='utf-8')
     return json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
 
 
@@ -4310,7 +4310,7 @@ struct idStrList {
         return -1;
     }
 };
-static const char* const RETAINED_MP_WELCOME_GUI = "guis/menu/mp_welcome.q4ui";
+static const char* const RETAINED_MP_WELCOME_GUI = "guis/menu/mp_welcome.rui";
 static bool welcomeEnabled = true, modMenu = false, retainedOpen = false;
 static bool Session_RetainedMultiplayerEnabled(bool welcome) { return welcome && welcomeEnabled; }
 static bool Session_ModSuppliesFile(const char* path) { return modMenu && !std::strcmp(path, "guis/mpmain.gui"); }
@@ -4342,7 +4342,7 @@ public:
 """
 
 HOLD_MAIN = r"""
-static idUserInterface loading{"guis/loading/loading.q4ui"}, menu{"guis/mpmain.gui", true}, card{"guis/menu/mp_welcome.q4ui"},
+static idUserInterface loading{"guis/loading/loading.rui"}, menu{"guis/mpmain.gui", true}, card{"guis/menu/mp_welcome.rui"},
     chat{"guis/mpchat.gui", true};
 // A session at the end of a multiplayer load that the retained screen presented.
 static idSessionLocal Loaded() {
@@ -4639,7 +4639,7 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
                     return first['args'][1], False
         return None
     documents, shoulders, swapping = 0, 0, 0
-    for path in sorted((ROOT / 'content/baseoq4/pak0/guis').rglob('*.q4ui')):
+    for path in sorted((ROOT / 'content/baseoq4/pak0/guis').rglob('*.rui')):
         document = json.loads(re.sub(r'^\s*//.*$', '', path.read_text(encoding='utf-8'), flags=re.M))
         if generator.PROMPT_GLYPHS not in document.get('state', {}):
             continue
@@ -4740,7 +4740,7 @@ def check_loading_hold(compiler: str, directory: Path) -> None:
     assert 'retained->HandleNamedEvent( "present" );' in function_body(menu, 'idUserInterface *idSessionLocal::SelectRetainedLoadingGui(')
     # The loading document's hand-off: the whole screen fades over the
     # session's hand-off time, and present makes it whole again.
-    text = (ROOT / 'content/baseoq4/pak0/guis/loading/loading.q4ui').read_text(encoding='utf-8')
+    text = (ROOT / 'content/baseoq4/pak0/guis/loading/loading.rui').read_text(encoding='utf-8')
     document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
     handoff_ms = int(re.search(r'RETAINED_LOADING_HANDOFF_MSEC = (\d+);', menu).group(1))
     timelines = {timeline['id']: timeline for timeline in document['timelines']}
@@ -5004,7 +5004,7 @@ def check_create_server(menu: str) -> None:
     # Nothing of the stock page is missing, so the page is the default.
     missing = re.search(r'RETAINED_CREATE_SERVER_MISSING\[\] = \{([^}]*)\};', text).group(1)
     assert missing.strip() == 'NULL', missing
-    document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/createserver.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/createserver.rui').read_text(encoding='utf-8'), flags=re.M))
     assert {'createBanList', 'createBanPick', 'createBanRemove'} <= set(document['actions'])
     assert re.search(r'RETAINED_CREATE_BAN_ROWS = (\d+);', text).group(1) == str(create.BAN_ROWS)
     # Retail's session commands for the stock page: the player counts' guards
@@ -5069,7 +5069,7 @@ def check_join_game(menu: str) -> None:
     assert [(verb, order.index(sort)) for verb, sort in sorts] == [(verb, sort) for _c, sort, _k, _l, _w, verb in join.COLUMNS], sorts
     assert order.index('SORT_NONE') == 11  # the page marks no column for it
     adapter = (ROOT / 'src/ui/UserInterfaceRetained.cpp').read_text(encoding='utf-8', errors='replace')
-    document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/joingame.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/joingame.rui').read_text(encoding='utf-8'), flags=re.M))
     commands = {action['arguments']['command'] for action in document['actions'].values() if action['operation'] == 'session.menu'}
     # The page's own verbs, and the session's notice layer's (section 13.13).
     shared = {f'noticeAction{slot}' for slot in range(3)}
@@ -5127,7 +5127,7 @@ def check_join_game(menu: str) -> None:
     # document defines the card on join.detail, and each row names its row.
     assert re.search(r'RETAINED_JOIN_DETAIL_PLAYERS = (\d+);', text).group(1) == str(join.DETAIL_PLAYERS)
     assert re.search(r'RETAINED_JOIN_DETAIL_SETTINGS = (\d+);', text).group(1) == str(join.DETAIL_SETTINGS)
-    page = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/joingame.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    page = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/joingame.rui').read_text(encoding='utf-8'), flags=re.M))
     assert page['detail'] == {'state': 'join.detail', 'card': 'join-detail', 'none': -1}, page['detail']
     rows = {}
     stack = [page['root']]
@@ -5153,7 +5153,7 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
             '\treturn ui_retainedMultiplayer.GetBool() || ( Session_RetainedScreensEnabled() && missing[0] == NULL );') in menu.replace('\r\n', '\n')
     sys.path.insert(0, str(ROOT / 'tools' / 'ui'))
     import retained_mp_menus
-    text = (ROOT / 'content/baseoq4/pak0/guis/menu/mp_escape.q4ui').read_text(encoding='utf-8')
+    text = (ROOT / 'content/baseoq4/pak0/guis/menu/mp_escape.rui').read_text(encoding='utf-8')
     document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
     # A page is missing while it hands off to its stock page.
     handoffs = {name[len('stock_'):] for name in document['events'] if name.startswith('stock_')}
@@ -5172,7 +5172,7 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
             assert event == [{'op': 'setState', 'values': {'card.stock_page': index}}, {'op': 'action', 'action': 'mpStockPage'}], ident
     # The Welcome card: its missing pages are its hand-offs, and each presses
     # the join panel's button for its page.
-    welcome_text = (ROOT / 'content/baseoq4/pak0/guis/menu/mp_welcome.q4ui').read_text(encoding='utf-8')
+    welcome_text = (ROOT / 'content/baseoq4/pak0/guis/menu/mp_welcome.rui').read_text(encoding='utf-8')
     welcome_document = json.loads(re.sub(r'^\s*//.*$', '', welcome_text, flags=re.M))
     welcome_handoffs = {name[len('stock_'):] for name in welcome_document['events'] if name.startswith('stock_')}
     welcome_missing = re.search(r'RETAINED_MP_WELCOME_MISSING_PAGES\[\] = \{([^}]*)\};', menu).group(1)
@@ -5285,7 +5285,7 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     assert 'DispatchCommand( guiActive, "chatmessage" );' in typing and 'RETAINED_SUMMARY_CHAT_LIMIT' in typing
     gui_text = (ROOT / 'content/baseoq4/pak0/guis/summary.gui').read_text(encoding='utf-8', errors='replace').replace('\r\n', '\n')
     assert 'onNamedEvent oq4_chatFocus {\n\t\tsetfocus "chat_enter" ;' in gui_text and 'onNamedEvent oq4_chatBlur {' in gui_text
-    summary_text = (ROOT / 'content/baseoq4/pak0/guis/menu/mp_summary.q4ui').read_text(encoding='utf-8')
+    summary_text = (ROOT / 'content/baseoq4/pak0/guis/menu/mp_summary.rui').read_text(encoding='utf-8')
     summary_document = json.loads(re.sub(r'^\s*//.*$', '', summary_text, flags=re.M))
     assert summary_document['events']['onBack'] == [{'op': 'action', 'action': 'mpClose'}]
     assert summary_document['events']['summary_chat'] == [{'op': 'action', 'action': 'mpSummaryChat'}]
@@ -5485,17 +5485,17 @@ def main() -> int:
     assert 'guiMainMenu->SetStateBool( "retainedSystem", RetainedSystemAvailable() );' in menu
     # Every retained document path in the session is behind the gate.
     for source, name in ((menu, 'Session_menu.cpp'), (session, 'Session.cpp')):
-        for match in re.finditer(r'"([^"]+\.q4ui)"', source):
+        for match in re.finditer(r'"([^"]+\.rui)"', source):
             path = match.group(1)
-            allowed = {'guis/menu/settings/system.q4ui', 'guis/menu/title.q4ui', 'guis/menu/pause.q4ui', 'guis/menu/pause_strogg.q4ui',
-                       'guis/loading/loading.q4ui', 'guis/menu/singleplayer.q4ui', 'guis/menu/campaigns.q4ui', 'guis/menu/campaign_skill.q4ui', 'guis/menu/chapters.q4ui',
-                       'guis/menu/mp_escape.q4ui', 'guis/menu/mp_welcome.q4ui', 'guis/menu/mp_summary.q4ui', 'guis/menu/loadgame.q4ui',
-                       'guis/menu/savegame.q4ui', 'guis/menu/restartlevel.q4ui', 'guis/menu/loadgame_strogg.q4ui',
-                       'guis/menu/savegame_strogg.q4ui', 'guis/menu/restartlevel_strogg.q4ui',
-                       'guis/menu/demos.q4ui', 'guis/menu/restartmenu.q4ui', 'guis/menu/credits.q4ui', 'guis/menu/arena.q4ui',
-                       'guis/menu/multiplayer.q4ui', 'guis/menu/createserver.q4ui', 'guis/menu/joingame.q4ui',
-                       'guis/menu/arena_pause.q4ui', 'guis/menu/settings/audio.q4ui', 'guis/menu/settings/game.q4ui',
-                       'guis/menu/settings/controls.q4ui', 'guis/menu/settings.q4ui', 'guis/menu/msgbox.q4ui'}
+            allowed = {'guis/menu/settings/system.rui', 'guis/menu/title.rui', 'guis/menu/pause.rui', 'guis/menu/pause_strogg.rui',
+                       'guis/loading/loading.rui', 'guis/menu/singleplayer.rui', 'guis/menu/campaigns.rui', 'guis/menu/campaign_skill.rui', 'guis/menu/chapters.rui',
+                       'guis/menu/mp_escape.rui', 'guis/menu/mp_welcome.rui', 'guis/menu/mp_summary.rui', 'guis/menu/loadgame.rui',
+                       'guis/menu/savegame.rui', 'guis/menu/restartlevel.rui', 'guis/menu/loadgame_strogg.rui',
+                       'guis/menu/savegame_strogg.rui', 'guis/menu/restartlevel_strogg.rui',
+                       'guis/menu/demos.rui', 'guis/menu/restartmenu.rui', 'guis/menu/credits.rui', 'guis/menu/arena.rui',
+                       'guis/menu/multiplayer.rui', 'guis/menu/createserver.rui', 'guis/menu/joingame.rui',
+                       'guis/menu/arena_pause.rui', 'guis/menu/settings/audio.rui', 'guis/menu/settings/game.rui',
+                       'guis/menu/settings/controls.rui', 'guis/menu/settings.rui', 'guis/menu/msgbox.rui'}
             assert path in allowed, f'{name} names an ungated retained document {path}'
     # The message box presents the retained pop-up only behind the gate, found
     # through FindRetainedGui; the download progress keeps the stock box.
@@ -5507,7 +5507,7 @@ def main() -> int:
     assert 'SelectMessageBox( false );' in function_body(menu, 'void idSessionLocal::DownloadProgressBox(')
     # Every retained document loads through FindRetainedGui, which falls back to
     # the stock screen; the SYSTEM page and the campaign selectors fall back too.
-    assert not re.search(r'uiManager->FindGui\(\s*(?:RETAINED_|"[^"]+\.q4ui")', menu + session), 'retained documents load only through FindRetainedGui'
+    assert not re.search(r'uiManager->FindGui\(\s*(?:RETAINED_|"[^"]+\.rui")', menu + session), 'retained documents load only through FindRetainedGui'
     find_retained = function_body(menu, 'idUserInterface *idSessionLocal::FindRetainedGui(')
     assert 'uiManager->FindGui( path, true, !shared, shared )' in find_retained and 'retainedStock.Append( path );' in find_retained
     system_open = function_body(menu, 'bool idSessionLocal::OpenSystemSettings(')
@@ -5535,7 +5535,7 @@ def main() -> int:
     adapter_audio = [verb for verb in cpp_allowlist(adapter, 'bool SessionMenuValueCommand(') if verb.startswith('audio')]
     assert set(adapter_audio) == set(audio_verbs) and len(adapter_audio) == len(audio_verbs) == 12
     assert [verb for _section, _heading, rows in retained_audio.SECTIONS for _kind, _ident, _label, verb, _state, _extra in rows] == audio_verbs
-    audio_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/audio.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    audio_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/audio.rui').read_text(encoding='utf-8'), flags=re.M))
     assert audio_document['canvas']['height'] == 720 and audio_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'audioBack'}}
     for verb in audio_verbs:
         assert audio_document['actions'][verb]['operation'] == 'session.menuValue' and \
@@ -5564,7 +5564,7 @@ def main() -> int:
     game_verbs = re.findall(r'"(game[A-Za-z]+)"', re.search(r'RETAINED_GAME_VERBS\[\] = \{([^}]*)\};', menu).group(1))
     adapter_game = [verb for verb in cpp_allowlist(adapter, 'bool SessionMenuValueCommand(') if verb.startswith('game')]
     assert game_verbs == list(retained_game.VERBS) and sorted(adapter_game) == sorted(game_verbs)
-    game_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/game.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    game_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/game.rui').read_text(encoding='utf-8'), flags=re.M))
     assert game_document['canvas']['height'] == 720 and game_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'gameBack'}}
     for verb in game_verbs:
         assert game_document['actions'][verb]['arguments'] == {'command': verb, 'value': {'input': 'value'}}, verb
@@ -5619,7 +5619,7 @@ def main() -> int:
     stock_bindings = [binding.strip('"') for binding in re.findall(r'bindDef\s+\w+\s*\{[^}]*?\bbind\s+("[^"]+"|\S+)', stock_controls)]
     session_bindings = re.findall(r'"([^"]+)"', re.search(r'RETAINED_CONTROLS_BINDINGS\[\] = \{([^}]*)\};', menu).group(1))
     assert list(retained_controls.BINDINGS) == stock_bindings == session_bindings and len(stock_bindings) == 49
-    controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.rui').read_text(encoding='utf-8'), flags=re.M))
     assert [controls_document['state'][f'controls.{row}.keys']['keyBinding'] for row in range(49)] == session_bindings
     controls_publish = function_body(menu, 'void idSessionLocal::PublishRetainedControls(')
     assert controls_publish.index('gui->SetKeyBindingNames();') < controls_publish.index('retainedControlsCapture >= 0') < controls_publish.index('gui->StateChanged(')
@@ -5654,7 +5654,7 @@ def main() -> int:
     page_sections = [(verb, ident) for ident, _key, verb in retained_settings_page.SECTIONS if verb]
     assert [(verb, ident) for verb, ident, _dest in session_sections] == page_sections
     assert {ident: int(dest) for _verb, ident, dest in session_sections} == {'controls': 4, 'game': 21, 'display': 22, 'audio': 36}
-    settings_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings.q4ui').read_text(encoding='utf-8'), flags=re.M))
+    settings_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings.rui').read_text(encoding='utf-8'), flags=re.M))
     assert {name: action['arguments']['command'] for name, action in settings_document['actions'].items()
          if action['operation'] == 'session.menu' and not name.startswith('notice')} == \
         {**{verb: verb for verb, _ident in page_sections}, 'back': 'settingsBack', 'settingsDefaults': 'settingsDefaults'}
@@ -5795,7 +5795,7 @@ def main() -> int:
     assert session.count('guiRetainedReleasing->Redraw(') == 1
     release_ms = int(re.search(r'static const int RETAINED_RELEASE_MSEC = (\d+);', menu).group(1))
     for name in ('pause', 'pause_strogg'):
-        text = (ROOT / f'content/baseoq4/pak0/guis/menu/{name}.q4ui').read_text(encoding='utf-8')
+        text = (ROOT / f'content/baseoq4/pak0/guis/menu/{name}.rui').read_text(encoding='utf-8')
         document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
         release = next(item for item in document['timelines'] if item['id'] == 'release')
         assert release['durationMs'] == release_ms, name
@@ -5814,7 +5814,7 @@ def main() -> int:
     assert arsenal_count == 20 and 'if ( numIcons >= 20 ) {' in icon_body
     publish = function_body(session, 'void idSessionLocal::PublishRetainedLoadingIcon(')
     assert 'guiLoading->HandleNamedEvent( va( "arsenal%d", index ) );' in publish and '!retainedLoadingActive' in publish
-    loading_text = (ROOT / 'content/baseoq4/pak0/guis/loading/loading.q4ui').read_text(encoding='utf-8')
+    loading_text = (ROOT / 'content/baseoq4/pak0/guis/loading/loading.rui').read_text(encoding='utf-8')
     loading_doc = json.loads(re.sub(r'^\s*//.*$', '', loading_text, flags=re.M))
     fades = [item for item in loading_doc['timelines'] if item['id'].startswith('arsenal')]
     assert sorted(item['id'] for item in fades) == sorted(f'arsenal{index}' for index in range(1, arsenal_count + 1))
@@ -5849,7 +5849,7 @@ def main() -> int:
                         ('joingame', 'subpageLeave'), ('demos', 'subpageLeave'),
                         *[('settings', enter) for *_rest, enter in settings_subpages],
                         *[(f'settings/{page}', 'subpageLeave') for page in ('controls', 'game', 'system', 'audio')]):
-        text = (ROOT / f'content/baseoq4/pak0/guis/menu/{name}.q4ui').read_text(encoding='utf-8')
+        text = (ROOT / f'content/baseoq4/pak0/guis/menu/{name}.rui').read_text(encoding='utf-8')
         document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
         timelines = {item['id']: item for item in document['timelines']}
         assert timelines[event]['durationMs'] == waits['DEEPER' if event.startswith('subpageEnter') else 'BACK'], name
@@ -5866,7 +5866,7 @@ def main() -> int:
                   if item['id'] == 'rest' or item['id'].startswith('crumbRest') for track in item['tracks']}
         assert moved <= rested, (name, sorted(moved - rested))
     reversals = sorted(int(item['id'][len('subpageReverse'):]) for item in json.loads(re.sub(r'^\s*//.*$', '',
-        (ROOT / 'content/baseoq4/pak0/guis/menu/singleplayer.q4ui').read_text(encoding='utf-8'), flags=re.M))['timelines']
+        (ROOT / 'content/baseoq4/pak0/guis/menu/singleplayer.rui').read_text(encoding='utf-8'), flags=re.M))['timelines']
         if item['id'].startswith('subpageReverse'))
     assert reversals == [150, 200, 250, 300], reversals
     saving = function_body(session, 'bool idSessionLocal::SaveGame(')
@@ -5897,12 +5897,12 @@ def main() -> int:
     settings_sections = menu[menu.index('RETAINED_SETTINGS_SECTIONS[] = {'):menu.index('RETAINED_SETTINGS_SECTION_COUNT')]
     handled |= set(re.findall(r'\{ "(settings[A-Za-z]*)",', settings_sections))
     assert allowlist == handled, f'allowlist {sorted(allowlist)} differs from session handlers {sorted(handled)}'
-    for relative in ('content/baseoq4/pak0/guis/menu/title.q4ui', 'content/baseoq4/pak0/guis/menu/pause.q4ui',
-                     'content/baseoq4/pak0/guis/menu/pause_strogg.q4ui', 'content/baseoq4/pak0/guis/loading/loading.q4ui',
-                     'content/baseoq4/pak0/guis/menu/singleplayer.q4ui', 'content/baseoq4/pak0/guis/menu/campaigns.q4ui',
-                     'content/baseoq4/pak0/guis/menu/mp_escape.q4ui', 'content/baseoq4/pak0/guis/menu/campaign_skill.q4ui',
-                     'content/baseoq4/pak0/guis/menu/chapters.q4ui',
-                     'content/baseoq4/pak0/guis/menu/mp_summary.q4ui', 'content/baseoq4/pak0/guis/menu/loadgame.q4ui'):
+    for relative in ('content/baseoq4/pak0/guis/menu/title.rui', 'content/baseoq4/pak0/guis/menu/pause.rui',
+                     'content/baseoq4/pak0/guis/menu/pause_strogg.rui', 'content/baseoq4/pak0/guis/loading/loading.rui',
+                     'content/baseoq4/pak0/guis/menu/singleplayer.rui', 'content/baseoq4/pak0/guis/menu/campaigns.rui',
+                     'content/baseoq4/pak0/guis/menu/mp_escape.rui', 'content/baseoq4/pak0/guis/menu/campaign_skill.rui',
+                     'content/baseoq4/pak0/guis/menu/chapters.rui',
+                     'content/baseoq4/pak0/guis/menu/mp_summary.rui', 'content/baseoq4/pak0/guis/menu/loadgame.rui'):
         text = (ROOT / relative).read_text(encoding='utf-8')
         document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
         # The 4:3 canvas shrinks to a narrower view's width: every menu fits
@@ -5925,7 +5925,7 @@ def main() -> int:
             assert find_node(document['root'], 'load-panel')['properties']['height'] == {'type': 'length', 'value': 100, 'unit': '%'}, relative
         if 'pause' in relative or 'mp_escape' in relative or 'mp_summary' in relative:
             # The pause carries the session's notice slots over everything.
-            notices = ['notice-0', 'notice-1', 'notice-2'] if relative.endswith('/pause.q4ui') else []
+            notices = ['notice-0', 'notice-1', 'notice-2'] if relative.endswith('/pause.rui') else []
             assert [child['id'] for child in document['root']['children']] == ['scene-softfocus', 'scrim', 'chrome', *notices], relative
         if 'pause' in relative:
             layers = [child['id'] for child in document['root']['children'][2]['children']]
@@ -5956,7 +5956,7 @@ def main() -> int:
             if path == ROOT / 'src/game/gamesys/RetainedScope.h':
                 continue
             if path.suffix.lower() in {'.gui', '.def', '.cfg', '.script', '.mtr', '.cpp', '.h'} and path.is_file():
-                assert '.q4ui' not in path.read_text(encoding='utf-8', errors='replace'), f'{path} names a retained document'
+                assert '.rui' not in path.read_text(encoding='utf-8', errors='replace'), f'{path} names a retained document'
 
     # Behaviour: the production session code against counted doubles.
     start = menu.index('static const char *const RETAINED_TITLE_GUI')

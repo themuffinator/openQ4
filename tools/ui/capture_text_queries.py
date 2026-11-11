@@ -107,10 +107,10 @@ def main():
     source_paths = ['src/ui/UserInterfaceRetained.cpp', 'src/ui/retained/Runtime.cpp', 'src/ui/retained/Runtime.h',
                     'src/ui/retained/Document.cpp', 'src/ui/retained/Document.h', 'src/framework/Session_menu.cpp',
                     'tools/ui/retained_controls.py', 'tools/ui/capture_text_queries.py',
-                    'content/baseoq4/pak0/guis/menu/settings/controls.q4ui']
+                    'content/baseoq4/pak0/guis/menu/settings/controls.rui']
     sources = {p: capture.digest(ROOT / p) for p in source_paths}
     with zipfile.ZipFile(args.runtime / 'baseoq4/pak0.pk4') as pack:
-        document = 'guis/menu/settings/controls.q4ui'
+        document = 'guis/menu/settings/controls.rui'
         if pack.read(document).replace(b'\r\n', b'\n') != (ROOT / 'content/baseoq4/pak0' / document).read_bytes().replace(b'\r\n', b'\n'):
             raise RuntimeError('staged CONTROLS document differs from source')
     scenario = 'text-queries'

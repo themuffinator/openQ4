@@ -48,7 +48,7 @@ struct CanvasHost final:Host {
     FontMetrics GetFontMetrics(const std::string&,int size) override{Call();if(failFont)return {};return {size*.8f,size*.2f,size*1.2f,size*.5f};}
     Glyph GetGlyph(const std::string&,int size,std::uint32_t) override{Call();return {size*.6f,0,-size*.8f,size*.6f,float(size),0,0,1,1,"font"};}
 };
-static const char* Source=R"json({"format":"openq4-ui","version":1,"id":"canvas","state":{"host":{"type":"number","initial":1,"cvar":"fixture"}},"root":{"id":"root","type":"group","children":[
+static const char* Source=R"json({"format":"retained-ui","version":1,"id":"canvas","state":{"host":{"type":"number","initial":1,"cvar":"fixture"}},"root":{"id":"root","type":"group","children":[
  {"id":"panel","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","unit":"dp","value":10},"top":{"type":"length","unit":"dp","value":20},"width":{"type":"length","unit":"dp","value":100},"height":{"type":"length","unit":"dp","value":40},"background-color":{"type":"color","value":[1,0,0,1]}}}
 ]}})json";
 static Json::Value Typed(const char* type,Json::Value value,const char* unit=nullptr) {
@@ -63,7 +63,7 @@ static Json::Value Box(const char* id,double x,double y,double width,double heig
 }
 static void Colour(Json::Value& node,std::initializer_list<double> colour) { node["properties"]["background-color"]=Typed("color",Array(colour)); }
 static std::string NumberSource(bool transformed=false,bool framed=false,bool hostSource=false) {
-	Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="number-runtime";
+	Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="number-runtime";
 	source["state"]["value"]["type"]="number";source["state"]["value"]["initial"]=1.05;
 	if(hostSource)source["state"]["value"]["cvar"]="r_number_test";
 	source["actions"]["edit"]["input"]="number";source["actions"]["edit"]["operation"]="test.edit";source["actions"]["edit"]["arguments"]["value"]["input"]="value";
@@ -103,11 +103,11 @@ static std::string NumberSource(bool transformed=false,bool framed=false,bool ho
 
 static void Basic(){
     CanvasHost host;Runtime runtime(host);DocumentEdit history;std::vector<Diagnostic> diagnostics;
-    Check(history.Open(Source,{},diagnostics),"open history");Check(runtime.LoadDocument(Source,"canvas.q4ui",diagnostics),"load actual runtime");
+    Check(history.Open(Source,{},diagnostics),"open history");Check(runtime.LoadDocument(Source,"canvas.rui",diagnostics),"load actual runtime");
     Viewport viewport;runtime.Frame(viewport,1);Bounds original;Check(runtime.GetBounds("panel",original),"initial bounds");
     const auto identity=history.Identity();const std::array<DocumentEditOperation,1> edits{ReplaceDocumentValue{"panel","/properties/left/value","70"}};
     auto source=history.PrepareEdit(identity,edits,diagnostics);Check(bool(source),"prepare source");
-    const auto draws=host.draws;RuntimeDocumentOptions options;options.sourcePath="canvas.q4ui";options.viewport=viewport;options.seconds=1;
+    const auto draws=host.draws;RuntimeDocumentOptions options;options.sourcePath="canvas.rui";options.viewport=viewport;options.seconds=1;
     auto candidate=runtime.PrepareDocument(runtime.CanvasIdentity(),*source,options,diagnostics);Check(bool(candidate),"prepare real Rml context");
     Check(host.draws==draws,"preparation submits no canvas draw");Check(history.Identity()==identity,"history not published during layout");
     Bounds bounds;Check(runtime.GetBounds("panel",bounds)&&bounds.x==original.x,"old actual canvas preserved before publication");
@@ -119,7 +119,7 @@ static void Basic(){
     Check(runtime.Statistics().activeContexts==2,"old context retained through publication");
     candidate.reset();source.reset();Check(runtime.Statistics().activeContexts==1,"old context eventually cleaned");
     host.ink.clear();runtime.Frame(viewport,1);const auto first=host.ink;
-    Runtime fresh(host);Check(fresh.LoadDocument(history.Current()->Source(),"canvas.q4ui",diagnostics),"fresh source reference");
+    Runtime fresh(host);Check(fresh.LoadDocument(history.Current()->Source(),"canvas.rui",diagnostics),"fresh source reference");
     host.ink.clear();fresh.Frame(viewport,1);Check(first.size()==host.ink.size(),"same normal renderer geometry count");
     for(size_t i=0;i<first.size();++i)Check(first[i].x==host.ink[i].x&&first[i].y==host.ink[i].y&&first[i].r==host.ink[i].r,"same normal renderer vertices");
     auto undo=history.PrepareUndo(history.Identity(),false,diagnostics);Check(bool(undo),"prepare canvas undo");
@@ -129,9 +129,9 @@ static void Basic(){
 }
 static void StaleAndLifetime(){
     CanvasHost host;std::vector<Diagnostic> diagnostics;auto history=std::make_unique<DocumentEdit>();auto runtime=std::make_unique<Runtime>(host);
-    Check(history->Open(Source,{},diagnostics)&&runtime->LoadDocument(Source,"canvas.q4ui",diagnostics),"lifetime fixture");
+    Check(history->Open(Source,{},diagnostics)&&runtime->LoadDocument(Source,"canvas.rui",diagnostics),"lifetime fixture");
     const std::array<DocumentEditOperation,1> edits{ReplaceDocumentValue{"panel","/properties/left/value","70"}};
-    RuntimeDocumentOptions options;options.sourcePath="canvas.q4ui";
+    RuntimeDocumentOptions options;options.sourcePath="canvas.rui";
     auto source=history->PrepareEdit(history->Identity(),edits,diagnostics);auto candidate=runtime->PrepareDocument(runtime->CanvasIdentity(),*source,options,diagnostics);
     Check(bool(candidate),"candidate before rejected mutation");Check(!runtime->FocusControl("missing",1),"rejected live mutation");
     DocumentEditReceipt out;Check(!runtime->PublishDocument(*history,*source,*candidate,out)&&!out.after.document,"rejected mutation invalidates proposal without output");
@@ -148,7 +148,7 @@ static void StaleAndLifetime(){
 struct CanvasFixture {
     CanvasHost host;Runtime runtime{host};DocumentEdit history;std::vector<Diagnostic> diagnostics;RuntimeDocumentOptions options;
     std::array<DocumentEditOperation,1> edits{ReplaceDocumentValue{"panel","/properties/left/value","70"}};
-    CanvasFixture(){Check(history.Open(Source,{},diagnostics)&&runtime.LoadDocument(Source,"canvas.q4ui",diagnostics),"fixture source and runtime");options.sourcePath="canvas.q4ui";runtime.Frame(options.viewport,1);}
+    CanvasFixture(){Check(history.Open(Source,{},diagnostics)&&runtime.LoadDocument(Source,"canvas.rui",diagnostics),"fixture source and runtime");options.sourcePath="canvas.rui";runtime.Frame(options.viewport,1);}
 };
 static void IndependentMutations(){
     using Change=std::function<void(Runtime&)>;
@@ -197,8 +197,8 @@ static void PreparationFailures(){
     }
     f.host.callback=[] { Rml::GetSystemInterface()->LogMessage(Rml::Log::LT_WARNING,"candidate-owned warning"); };
     Check(!f.runtime.PrepareDocument(f.runtime.CanvasIdentity(),*source,f.options,f.diagnostics),"candidate diagnostic refuses replacement");
-    Check(f.history.Current()->Source()==Source&&f.runtime.SourceMatches(Source,"canvas.q4ui"),"diagnostic failure keeps old source/canvas");
-    Runtime peer(f.host);Check(peer.LoadDocument(Source,"peer.q4ui",f.diagnostics),"peer context for warning ownership");
+    Check(f.history.Current()->Source()==Source&&f.runtime.SourceMatches(Source,"canvas.rui"),"diagnostic failure keeps old source/canvas");
+    Runtime peer(f.host);Check(peer.LoadDocument(Source,"peer.rui",f.diagnostics),"peer context for warning ownership");
     f.host.callback=[&]{Check(peer.LoadMarkup("<rml><body style='unregistered-property: 1'>peer</body></rml>","peer.rml"),"nested peer markup survives legacy warning");};
     auto prepared=f.runtime.PrepareDocument(f.runtime.CanvasIdentity(),*source,f.options,f.diagnostics);Check(bool(prepared),"peer warning cannot impersonate candidate failure");prepared.reset();
     f.host.callback=[] { Rml::GetSystemInterface()->LogMessage(Rml::Log::LT_WARNING,"candidate warning with reentry"); };
@@ -212,8 +212,8 @@ static void PreparationFailures(){
 }
 static void NumberCanvasAndNative(){
     CanvasHost host;Runtime runtime(host);DocumentEdit history;std::vector<Diagnostic> diagnostics;std::string error;
-    const auto text=NumberSource(true,true);Check(history.Open(text,{},diagnostics)&&runtime.LoadDocument(text,"number.q4ui",diagnostics),"number actual source");
-    RuntimeDocumentOptions options;options.sourcePath="number.q4ui";options.viewport.displayScale=1.25f;runtime.Frame(options.viewport,1);
+    const auto text=NumberSource(true,true);Check(history.Open(text,{},diagnostics)&&runtime.LoadDocument(text,"number.rui",diagnostics),"number actual source");
+    RuntimeDocumentOptions options;options.sourcePath="number.rui";options.viewport.displayScale=1.25f;runtime.Frame(options.viewport,1);
     Check(runtime.FocusControl("number",1)&&runtime.BeginNumberEdit("number",error,1),"number editor before native");
     auto editor=runtime.QueryNumberEditor(error,1);Check(bool(editor),"number editor identity");
     TextEditorIdentity owner{1,2,3,editor->modalToken,5,editor->editor.identity.session,editor->editor.identity.revision,"number"};NativeTextIdentity native{11,12};NativeTextEditorBarrier barrier;
@@ -261,14 +261,14 @@ static void CandidateObservationCopies(){
     const std::string role="\"role\":\""+control+"\"";const auto at=text.find(role);Check(at!=std::string::npos,"long-ID fixture preserves exact role grammar");text.replace(at,role.size(),"\"role\":\"number\"");
     // Action input and state type are likewise grammar, independent of stable IDs.
     for(const char* key:{"input","type"}){const std::string from="\""+std::string(key)+"\":\""+control+"\"";for(size_t pos=0;(pos=text.find(from,pos))!=std::string::npos;)text.replace(pos,from.size(),"\""+std::string(key)+"\":\"number\"");}
-    Check(runtime.LoadDocument(text,"candidate.q4ui",diagnostics),"long original control loads");runtime.Frame({},1);
+    Check(runtime.LoadDocument(text,"candidate.rui",diagnostics),"long original control loads");runtime.Frame({},1);
     Check(runtime.FocusControl(control,1)&&runtime.BeginNumberEdit(control,error,1),"long-ID active editor");
     NumberNativeCandidate out;Check(runtime.ObserveNumberNativeCandidate(out),"long candidate owned copy");const auto prior=out;const auto calls=host.calls;
     deny=true;const bool observed=runtime.ObserveNumberNativeCandidate(out);deny=false;
     Check(!observed&&out.control==prior.control&&out.identity==prior.identity&&out.modalToken==prior.modalToken&&host.calls==calls,"candidate allocation failure preserves complete caller output without callbacks");
     bool wrong=true;std::thread thread([&]{wrong=runtime.ObserveNumberNativeCandidate(out);});thread.join();Check(!wrong&&out.control==prior.control,"foreign thread cannot observe runtime authority");
     DocumentEdit history;Check(history.Open(text,{},diagnostics),"candidate copy history");const std::array<DocumentEditOperation,1> edits{ReplaceDocumentValue{control,"/properties/left/value","60"}};
-    auto source=history.PrepareEdit(history.Identity(),edits,diagnostics);RuntimeDocumentOptions options;options.sourcePath="candidate.q4ui";bool called=false;
+    auto source=history.PrepareEdit(history.Identity(),edits,diagnostics);RuntimeDocumentOptions options;options.sourcePath="candidate.rui";bool called=false;
     host.callback=[&]{called=true;Check(!runtime.ObserveNumberNativeCandidate(out)&&out.control==prior.control&&out.identity==prior.identity,"in-flight canvas preparation refuses candidate observation unchanged");};
     auto prepared=runtime.PrepareDocument(runtime.CanvasIdentity(),*source,options,diagnostics);Check(called&&bool(prepared),"read-only refusal does not invalidate independent canvas preparation");
 }

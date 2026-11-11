@@ -3,7 +3,7 @@ and 9, "Menu levels"; FLOW-050).
 
 Built by tools/ui/build_retained_screens.py, which writes and checks it with
 the other retained screens. CREATE SERVER on the Multiplayer page goes one
-level deeper to guis/menu/createserver.q4ui as Single Player's CAMPAIGN goes to
+level deeper to guis/menu/createserver.rui as Single Player's CAMPAIGN goes to
 Campaign: the page sweeps away, MULTIPLAYER becomes the crumb, the top band
 steps one notch and the CREATE SERVER label carries to the step's foot, where
 the sub-page presents at 350 ms (idSessionLocal::BeginRetainedSubpage). Back

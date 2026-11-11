@@ -15,10 +15,10 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURE = ROOT / 'tools/ui/fixtures/display-device-smoke.q4ui'
+FIXTURE = ROOT / 'tools/ui/fixtures/display-device-smoke.rui'
 FIELDS = ('live', 'draft', 'baseline', 'dirty', 'open', 'phase', 'liveWidth', 'draftWidth')
 READS = ''.join(f'openq4_guiGet "{field}"\n' for field in FIELDS)
-SCRIPT = ('rendererModuleSelfTest\ntestGUI "display-smoke.q4ui"\nwait 3\n'
+SCRIPT = ('rendererModuleSelfTest\ntestGUI "display-smoke.rui"\nwait 3\n'
           'openq4_retainedGui event "edit"\nwait 3\n' + READS +
           'rendererDisplayProbe save\nrendererDisplayProbe apply 960 540 0 0\nwait 6\n'
           'rendererDisplayProbe report\nscreenshot "screenshots/display-applied.tga"\n' + READS +
@@ -165,7 +165,7 @@ def capture(args):
     profile = next(row for row in configurations if row['name'].startswith(prefix) and row['name'].endswith('GL'))
     game = output / 'save/baseoq4'
     game.mkdir(parents=True)
-    (game / 'display-smoke.q4ui').write_bytes(FIXTURE.read_bytes())
+    (game / 'display-smoke.rui').write_bytes(FIXTURE.read_bytes())
     cfg = game / 'display-device.cfg'
     cfg.write_text(script_for_renderer(args.renderer), encoding='utf-8')
     overrides = {

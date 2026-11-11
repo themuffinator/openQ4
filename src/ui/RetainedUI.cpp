@@ -1549,7 +1549,7 @@ bool RefreshResources() {
 	return true;
 }
 bool Preview(const idCmdArgs& args) {
-	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPreview <VFS path.q4ui or path.rml>\n"); return false; }
+	if (args.Argc() != 2) { common->Printf("usage: ui_retainedPreview <VFS path.rui or path.rml>\n"); return false; }
 	std::string markup;
 	if (!host.ReadFile(args.Argv(1),markup)) { common->Warning("retained UI: cannot read %s",args.Argv(1)); return false; }
 	if (!RefreshResources()) return false;
@@ -1570,7 +1570,7 @@ bool Preview(const idCmdArgs& args) {
 void Preview_f(const idCmdArgs& args) { Preview(args); }
 void Open_f(const idCmdArgs& args) {
 	if (args.Argc() != 2 || !UI_IsRetainedPath(args.Argv(1))) {
-		common->Printf("usage: ui_retainedOpen <VFS path.q4ui>\n"); return;
+		common->Printf("usage: ui_retainedOpen <VFS path.rui>\n"); return;
 	}
 	if (!Preview(args)) return;
 	if (console) console->Close();
@@ -1865,7 +1865,7 @@ bool RetainedUI_DrawInitialization(const char* message) {
 	if (drawing) return false;
 	struct Guard { bool& flag; Guard(bool& f):flag(f){flag=true;} ~Guard(){flag=false;} } guard(drawing);
 	if (!initializationView) {
-		const char* path = "guis/loading/initialization.q4ui";
+		const char* path = "guis/loading/initialization.rui";
 		void* bytes = nullptr; const int size = fileSystem->ReadFile(path,&bytes);
 		if (size <= 0 || !bytes) return false;
 		initializationView = RetainedUI_CreateView();

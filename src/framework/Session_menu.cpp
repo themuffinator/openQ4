@@ -112,7 +112,7 @@ static bool Session_RetainedScreensEnabled( void ) {
 }
 
 // The retained SYSTEM page, reached from the legacy menu's SYSTEM button.
-static const char *const RETAINED_SYSTEM_GUI = "guis/menu/settings/system.q4ui";
+static const char *const RETAINED_SYSTEM_GUI = "guis/menu/settings/system.rui";
 // Settings the stock SYSTEM page offers that the retained page has no control
 // for yet. While any remain, the gate leaves the stock SYSTEM page in place
 // and only ui_retainedSystem opts into the retained one. ui_retained_gate.py
@@ -138,10 +138,10 @@ static bool Session_RetainedSystemEnabled( void ) {
 // The multiplayer menu card (section 14.18), which covers the game's own menu
 // while it is open over a match: Escape, and Welcome while the player has not
 // answered the join offer.
-static const char *const RETAINED_MP_ESCAPE_GUI = "guis/menu/mp_escape.q4ui";
+static const char *const RETAINED_MP_ESCAPE_GUI = "guis/menu/mp_escape.rui";
 // The session's message box (guis/msg.gui) as the retained pop-up.
-static const char *const RETAINED_MSGBOX_GUI = "guis/menu/msgbox.q4ui";
-static const char *const RETAINED_MP_WELCOME_GUI = "guis/menu/mp_welcome.q4ui";
+static const char *const RETAINED_MSGBOX_GUI = "guis/menu/msgbox.rui";
+static const char *const RETAINED_MP_WELCOME_GUI = "guis/menu/mp_welcome.rui";
 // The version of the game's answer to retainedMultiplayerCover that the card
 // relies on; a game module without it keeps its stock menu.
 static const int RETAINED_MP_PROTOCOL = 4;
@@ -285,10 +285,10 @@ static bool Session_RetainedMultiplayerEnabled( bool welcome ) {
 
 // The match summary card (section 14.14) covers the game's summary at the end
 // of a match as the menu cards cover its menu; all its pages are built.
-static const char *const RETAINED_MP_SUMMARY_GUI = "guis/menu/mp_summary.q4ui";
+static const char *const RETAINED_MP_SUMMARY_GUI = "guis/menu/mp_summary.rui";
 // The single-player Arena's pause card (section 13.7) covers the game's Arena
 // pause menu as the cards cover the multiplayer menu; all its actions are built.
-static const char *const RETAINED_ARENA_PAUSE_GUI = "guis/menu/arena_pause.q4ui";
+static const char *const RETAINED_ARENA_PAUSE_GUI = "guis/menu/arena_pause.rui";
 
 #ifndef ID_DEDICATED
 static bool Session_RetainedSummaryEnabled( void ) {
@@ -343,7 +343,7 @@ static bool Session_RetainedValueRequest( const char *request, const char *const
 // The retained AUDIO page (tools/ui/retained_audio.py): its document, its
 // value verbs in the order HandleRetainedAudioRequest takes them, the device
 // list's rows and the speaker counts its choice names.
-static const char *const RETAINED_AUDIO_GUI = "guis/menu/settings/audio.q4ui";
+static const char *const RETAINED_AUDIO_GUI = "guis/menu/settings/audio.rui";
 static const char *const RETAINED_AUDIO_VERBS[] = {
 	"audioVolume", "audioMusic", "audioDialogue", "audioBackend", "audioDevice", "audioEax", "audioSpeakers", "audioHrtf",
 	"audioSubtitles", "audioSubtitleSize", "audioSubtitleBackground", "audioSubtitleSpeakers"
@@ -355,7 +355,7 @@ static const int RETAINED_AUDIO_SPEAKERS[] = { 0, 2, 6 };
 // the verbs of the rows the stock page computes, in the order
 // HandleRetainedGameRequest takes them, and the languages its list names, in
 // #str_229908's order.
-static const char *const RETAINED_GAME_GUI = "guis/menu/settings/game.q4ui";
+static const char *const RETAINED_GAME_GUI = "guis/menu/settings/game.rui";
 static const char *const RETAINED_GAME_VERBS[] = {
 	"gameGunPosition", "gameForceModel", "gameCrosshair", "gameCorpseTime", "gameLanguage"
 };
@@ -366,7 +366,7 @@ static const char *const RETAINED_GAME_LANGUAGES[] = {
 static const int RETAINED_GAME_LANGUAGE_COUNT = sizeof( RETAINED_GAME_LANGUAGES ) / sizeof( RETAINED_GAME_LANGUAGES[0] );
 // The retained CONTROLS page (tools/ui/retained_controls.py): its document and
 // the bindings of its rows, in its order (the stock page's tabs in turn).
-static const char *const RETAINED_CONTROLS_GUI = "guis/menu/settings/controls.q4ui";
+static const char *const RETAINED_CONTROLS_GUI = "guis/menu/settings/controls.rui";
 static const char *const RETAINED_CONTROLS_BINDINGS[] = {
 	"_forward", "_back", "_moveleft", "_moveright", "_moveUp", "_moveDown", "_left", "_right", "_strafe", "_speed", "_impulse0",
 	"_impulse1", "_impulse2", "_impulse3", "_impulse4", "_impulse5", "_impulse6", "_impulse7", "_impulse8", "_impulse9",
@@ -6136,7 +6136,7 @@ void idSessionLocal::GuiFrameEvents() {
 idSessionLocal::SelectMessageBox
 
 The box the next message presents. `retained` asks for the retained pop-up
-(guis/menu/msgbox.q4ui), which takes the stock box's state under the same
+(guis/menu/msgbox.rui), which takes the stock box's state under the same
 names and answers with its commands (HandleRetainedSessionRequest); it
 presents where the retained screens do and its document loads and draws.
 Otherwise, and for the boxes it has no part for (the download progress), the
@@ -6677,49 +6677,49 @@ void idSessionLocal::HandleNoteCommands( const char *menuCommand ) {
 */
 
 #ifndef ID_DEDICATED
-static const char *const RETAINED_TITLE_GUI = "guis/menu/title.q4ui";
-static const char *const RETAINED_PAUSE_GUI = "guis/menu/pause.q4ui";
-static const char *const RETAINED_PAUSE_STROGG_GUI = "guis/menu/pause_strogg.q4ui";
-static const char *const RETAINED_LOADING_GUI = "guis/loading/loading.q4ui";
-static const char *const RETAINED_SINGLEPLAYER_GUI = "guis/menu/singleplayer.q4ui";
-static const char *const RETAINED_CAMPAIGNS_GUI = "guis/menu/campaigns.q4ui";
-static const char *const RETAINED_SKILL_GUI = "guis/menu/campaign_skill.q4ui";
-static const char *const RETAINED_CHAPTERS_GUI = "guis/menu/chapters.q4ui";
+static const char *const RETAINED_TITLE_GUI = "guis/menu/title.rui";
+static const char *const RETAINED_PAUSE_GUI = "guis/menu/pause.rui";
+static const char *const RETAINED_PAUSE_STROGG_GUI = "guis/menu/pause_strogg.rui";
+static const char *const RETAINED_LOADING_GUI = "guis/loading/loading.rui";
+static const char *const RETAINED_SINGLEPLAYER_GUI = "guis/menu/singleplayer.rui";
+static const char *const RETAINED_CAMPAIGNS_GUI = "guis/menu/campaigns.rui";
+static const char *const RETAINED_SKILL_GUI = "guis/menu/campaign_skill.rui";
+static const char *const RETAINED_CHAPTERS_GUI = "guis/menu/chapters.rui";
 // The Load Game page, which LOAD GAME on the title and the Marine pause hands
 // off to as to a stock page. Its list holds this many saves at a time and
 // pages through more (ROWS in tools/ui/retained_saves.py); a save without a
 // picture shows the stock page's generic one.
-static const char *const RETAINED_LOADGAME_GUI = "guis/menu/loadgame.q4ui";
-static const char *const RETAINED_SAVEGAME_GUI = "guis/menu/savegame.q4ui";
-static const char *const RETAINED_RESTART_GUI = "guis/menu/restartlevel.q4ui";
+static const char *const RETAINED_LOADGAME_GUI = "guis/menu/loadgame.rui";
+static const char *const RETAINED_SAVEGAME_GUI = "guis/menu/savegame.rui";
+static const char *const RETAINED_RESTART_GUI = "guis/menu/restartlevel.rui";
 // The same three pages in the Strogg family, which the Strogg pause hands off
 // to; they load once a level's player is Strogg.
-static const char *const RETAINED_LOADGAME_STROGG_GUI = "guis/menu/loadgame_strogg.q4ui";
-static const char *const RETAINED_SAVEGAME_STROGG_GUI = "guis/menu/savegame_strogg.q4ui";
-static const char *const RETAINED_RESTART_STROGG_GUI = "guis/menu/restartlevel_strogg.q4ui";
+static const char *const RETAINED_LOADGAME_STROGG_GUI = "guis/menu/loadgame_strogg.rui";
+static const char *const RETAINED_SAVEGAME_STROGG_GUI = "guis/menu/savegame_strogg.rui";
+static const char *const RETAINED_RESTART_STROGG_GUI = "guis/menu/restartlevel_strogg.rui";
 // The Demos page, which the title's DEMOS hands off to as LOAD GAME does to
 // its page. Its list holds this many demos at a time (ROWS in
 // tools/ui/retained_demos.py); demos.filter picks one of the legacy
 // browser's filters, 0 showing them all.
-static const char *const RETAINED_DEMOS_GUI = "guis/menu/demos.q4ui";
+static const char *const RETAINED_DEMOS_GUI = "guis/menu/demos.rui";
 // The restart screen single player shows after the player dies (the stock
 // guis/restart.gui).
-static const char *const RETAINED_RESTARTMENU_GUI = "guis/menu/restartmenu.q4ui";
+static const char *const RETAINED_RESTARTMENU_GUI = "guis/menu/restartmenu.rui";
 // The Credits page, which the title's CREDITS hands off to.
-static const char *const RETAINED_CREDITS_GUI = "guis/menu/credits.q4ui";
+static const char *const RETAINED_CREDITS_GUI = "guis/menu/credits.rui";
 // The Multiplayer page, which the title's MULTIPLAYER hands off to. Its
 // sections open the stock Multiplayer pages (desktop::dest) once it has left
 // as the stock Multiplayer page leaves, 500 ms after the choice.
-static const char *const RETAINED_MPPAGE_GUI = "guis/menu/multiplayer.q4ui";
+static const char *const RETAINED_MPPAGE_GUI = "guis/menu/multiplayer.rui";
 static const int RETAINED_MPPAGE_LEAVE_MSEC = 500;
 // The retained SETTINGS page (tools/ui/retained_settings_page.py); its
 // sections are RETAINED_SETTINGS_SECTIONS.
-static const char *const RETAINED_SETTINGSPAGE_GUI = "guis/menu/settings.q4ui";
+static const char *const RETAINED_SETTINGSPAGE_GUI = "guis/menu/settings.rui";
 static const int RETAINED_SETTINGSPAGE_LEAVE_MSEC = 500;
 // Multiplayer's Create Server sub-page. Its map list holds this many maps at a
 // time (MAP_ROWS in tools/ui/retained_create_server.py), and its game types
 // are the stock choice's, in its order (mp_create_val4's values).
-static const char *const RETAINED_CREATE_SERVER_GUI = "guis/menu/createserver.q4ui";
+static const char *const RETAINED_CREATE_SERVER_GUI = "guis/menu/createserver.rui";
 static const int RETAINED_CREATE_MAP_ROWS = 64;
 static const char *const RETAINED_CREATE_GAMETYPES[] = {
 	"DM", "Tourney", "Team DM", "CTF", "Arena CTF", "DeadZone", "Duel", "Clan Arena", "Freeze Tag", "Red Rover", "One Flag CTF",
@@ -6794,7 +6794,7 @@ static const int RETAINED_CREATE_BAN_ROWS = 32;
 // many servers at a time (JOIN_ROWS in tools/ui/retained_join_game.py), and
 // each column heading asks to sort by its column (the sort the page's
 // join.sort names, COLUMNS in the generator).
-static const char *const RETAINED_JOIN_GAME_GUI = "guis/menu/joingame.q4ui";
+static const char *const RETAINED_JOIN_GAME_GUI = "guis/menu/joingame.rui";
 static const int RETAINED_JOIN_ROWS = 64;
 // The details card's lines: the stock tooltip's player list holds 11 of its
 // 12 u items, and the scan describes 7 settings (DETAIL_PLAYERS and
@@ -6819,7 +6819,7 @@ static const retainedJoinSort_t RETAINED_JOIN_SORTS[] = {
 static const int RETAINED_JOIN_SORT_COUNT = static_cast<int>( sizeof( RETAINED_JOIN_SORTS ) / sizeof( RETAINED_JOIN_SORTS[0] ) );
 // Single Player's Arena sub-page, the Arena campaign's browser, and the
 // campaign command each of its verbs runs (idArenaCampaign::HandleGuiCommand).
-static const char *const RETAINED_ARENA_GUI = "guis/menu/arena.q4ui";
+static const char *const RETAINED_ARENA_GUI = "guis/menu/arena.rui";
 static const char *const RETAINED_ARENA_VERBS[][2] = {
 	{ "arenaTier0", "arenaSelectTier 0" },
 	{ "arenaTier1", "arenaSelectTier 1" },

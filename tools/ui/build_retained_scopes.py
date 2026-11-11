@@ -265,7 +265,7 @@ def main():
     parser.add_argument('--check',action='store_true')
     args = parser.parse_args()
     for kind in ('machinegun','railgun','nailgun'):
-        path = ui.PAK0/'guis/weapons'/f'{kind}_scope.q4ui'
+        path = ui.PAK0/'guis/weapons'/f'{kind}_scope.rui'
         contents = ui.render(document(kind)).replace('build_retained_screens.py','build_retained_scopes.py')
         if args.check:
             if not path.exists() or path.read_text(encoding='utf-8') != contents.replace('\r\n','\n'):

@@ -127,7 +127,7 @@ def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: in
     observed_revision = None
     pattern = r'RETAINED_GUI path=(\S+) focus=(\S*) revision=([0-9]+) active=([01]) brightness=(\S+) shadows=([01]) contexts=([0-9]+)'
     for line in lines:
-        if line == 'RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored':
+        if line == 'RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored':
             resource_epoch += 1
             observation_segment += 1
             observed_revision = None
@@ -167,14 +167,14 @@ def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: in
     if not reports or len(reports) != expected_reports:
         errors.append('managed report count differs from the submitted script')
     loaded = [line for line in lines if line.startswith('RETAINED_GUI_LOADED ')]
-    if loaded != ['RETAINED_GUI_LOADED retained-smoke.q4ui']:
+    if loaded != ['RETAINED_GUI_LOADED retained-smoke.rui']:
         errors.append('normal manager did not load exactly one retained fixture')
     resources = [line for line in lines if line.startswith('RETAINED_GUI_RESOURCE ')]
-    if resources != ['RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored'] * resource_resets:
+    if resources != ['RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored'] * resource_resets:
         errors.append('managed resource restoration did not complete once per requested reset')
     for index, report in enumerate(reports):
         expected_contexts = 1 if not peer or index == len(reports)-1 else 2
-        if report['path'] != 'retained-smoke.q4ui' or report['active'] != 1 or report['contexts'] != expected_contexts:
+        if report['path'] != 'retained-smoke.rui' or report['active'] != 1 or report['contexts'] != expected_contexts:
             errors.append('managed owner, activity or peer context count changed unexpectedly')
             break
     if peer and 'Retained UI preview loaded:' not in log:
@@ -248,7 +248,7 @@ def managed_evidence(log: str, commands: str, *, peer: bool, resource_resets: in
 def presentation_alias_sources(args: argparse.Namespace) -> dict:
     """A named probe qualifies only its exact canonical source and scripts."""
     sources = {}
-    for attribute, suffix in (('retained_document', '.q4ui'), ('retained_script', '.cfg'),
+    for attribute, suffix in (('retained_document', '.rui'), ('retained_script', '.cfg'),
                               ('retained_resume_script', '-resume.cfg')):
         canonical = Path(str(ALIAS_FIXTURE) + suffix)
         supplied = getattr(args, attribute)
@@ -263,7 +263,7 @@ def presentation_alias_sources(args: argparse.Namespace) -> dict:
 def event_program_sources(args: argparse.Namespace) -> dict:
     """Event acceptance is scoped to the exact document/setup/resume bytes."""
     sources = {}
-    for attribute, suffix in (('retained_document', '.q4ui'), ('retained_script', '.cfg'),
+    for attribute, suffix in (('retained_document', '.rui'), ('retained_script', '.cfg'),
                               ('retained_resume_script', '-resume.cfg')):
         canonical = Path(str(EVENT_FIXTURE) + suffix)
         supplied = getattr(args, attribute)
@@ -358,7 +358,7 @@ def event_program_evidence(log: str, commands: str, reports: list[dict], reads: 
             path, operation, value, brightness, shadows, close = match.groups()
             try:
                 item = (operation, value if value == '-' else float(value), float(brightness), int(shadows), int(close))
-                if path == 'retained-smoke.q4ui' and math.isfinite(item[2]) and (value == '-' or math.isfinite(item[1])):
+                if path == 'retained-smoke.rui' and math.isfinite(item[2]) and (value == '-' or math.isfinite(item[1])):
                     dispatch.append(item)
                     continue
             except ValueError:
@@ -701,7 +701,7 @@ def capture(args: argparse.Namespace) -> int:
         if args.retained_managed:
             evidence = managed_evidence(plain_log, preview + close, peer=args.retained_peer,
                 resource_resets=int(args.language_reload) + int(args.video_restart) + (3 if display_sources else 0),
-                settings_fixture=args.retained_document.resolve() == ROOT / 'tools/ui/fixtures/managed-settings-smoke.q4ui',
+                settings_fixture=args.retained_document.resolve() == ROOT / 'tools/ui/fixtures/managed-settings-smoke.rui',
                 mode=args.mode, alias_fixture=args.presentation_alias_probe, event_fixture=args.event_program_probe,
                 initial_brightness=args.brightness)
             if args.system_settings_probe:
@@ -760,14 +760,14 @@ def main() -> int:
     parser.add_argument('--height', type=int, default=720)
     parser.add_argument('--shared-gui', action='store_true', help='exercise the shared GUI renderer domain')
     parser.add_argument('--timeout', type=int, default=180)
-    parser.add_argument('--retained-document', type=Path, help='Optional Q4UI or RML integration fixture, copied into the isolated savepath.')
+    parser.add_argument('--retained-document', type=Path, help='Optional .rui or RML integration fixture, copied into the isolated savepath.')
     parser.add_argument('--retained-resume-script', type=Path, help='Checks after video restart; managed mode reads surviving state after each language/video reset without setup replay.')
     parser.add_argument('--retained-script', type=Path, help='Optional semantic control script; does not send device input.')
     parser.add_argument('--retained-trace', action='store_true', help='Record retained application and display transaction diagnostics.')
     parser.add_argument('--retained-data', type=Path, action='append', default=[], help='State JSON copied to retained-data/<name>; repeat for scripted state batches.')
     ownership = parser.add_mutually_exclusive_group()
     ownership.add_argument('--retained-open', action='store_true', help='Acquire preview application ownership with host input still disabled; inspect pause/resume and close.')
-    ownership.add_argument('--retained-managed', action='store_true', help='Load a normal manager-owned .q4ui with testGUI and qualify typed application actions.')
+    ownership.add_argument('--retained-managed', action='store_true', help='Load a normal manager-owned .rui with testGUI and qualify typed application actions.')
     parser.add_argument('--retained-peer', action='store_true', help='Managed mode only: keep an independent preview of the same document alive across resets, then close the peer and report the managed owner.')
     parser.add_argument('--legacy-export-list', type=Path, help='JSON source/hash records to preprocess through the engine without executing GUI scripts.')
     parser.add_argument('--presentation-probe', action='store_true', help='Exercise production presentation reads/writes with an authored legacy fixture after map gameplay; no host input.')
@@ -788,28 +788,28 @@ def main() -> int:
     if args.display_settings_probe:
         if not args.retained_managed or args.retained_peer or args.presentation_probe or args.presentation_alias_probe or args.event_program_probe or args.system_settings_probe:
             parser.error('--display-settings-probe requires one --retained-managed owner and cannot combine with another probe')
-        args.retained_document = args.retained_document or Path(str(display_settings_probe.FIXTURE) + '.q4ui')
+        args.retained_document = args.retained_document or Path(str(display_settings_probe.FIXTURE) + '.rui')
         args.retained_script = args.retained_script or Path(str(display_settings_probe.FIXTURE) + '.cfg')
         if args.language_reload or args.video_restart:
             args.retained_resume_script = args.retained_resume_script or Path(str(display_settings_probe.FIXTURE) + '-resume.cfg')
     if args.system_settings_probe:
         if not args.retained_managed or args.presentation_probe or args.presentation_alias_probe or args.event_program_probe:
             parser.error('--system-settings-probe requires --retained-managed and cannot combine with another presentation probe')
-        args.retained_document = args.retained_document or Path(str(system_settings_probe.FIXTURE) + '.q4ui')
+        args.retained_document = args.retained_document or Path(str(system_settings_probe.FIXTURE) + '.rui')
         args.retained_script = args.retained_script or Path(str(system_settings_probe.FIXTURE) + '.cfg')
         if args.language_reload or args.video_restart:
             args.retained_resume_script = args.retained_resume_script or Path(str(system_settings_probe.FIXTURE) + '-resume.cfg')
     if args.event_program_probe:
         if not args.retained_managed or args.presentation_probe or args.presentation_alias_probe:
             parser.error('--event-program-probe requires --retained-managed and cannot combine with other presentation probes')
-        args.retained_document = args.retained_document or Path(str(EVENT_FIXTURE) + '.q4ui')
+        args.retained_document = args.retained_document or Path(str(EVENT_FIXTURE) + '.rui')
         args.retained_script = args.retained_script or Path(str(EVENT_FIXTURE) + '.cfg')
         if args.language_reload or args.video_restart:
             args.retained_resume_script = args.retained_resume_script or Path(str(EVENT_FIXTURE) + '-resume.cfg')
     if args.presentation_alias_probe:
         if not args.retained_managed or args.presentation_probe:
             parser.error('--presentation-alias-probe requires --retained-managed and cannot combine with --presentation-probe')
-        args.retained_document = args.retained_document or Path(str(ALIAS_FIXTURE) + '.q4ui')
+        args.retained_document = args.retained_document or Path(str(ALIAS_FIXTURE) + '.rui')
         args.retained_script = args.retained_script or Path(str(ALIAS_FIXTURE) + '.cfg')
         if args.language_reload or args.video_restart:
             args.retained_resume_script = args.retained_resume_script or Path(str(ALIAS_FIXTURE) + '-resume.cfg')
@@ -827,28 +827,28 @@ def main() -> int:
         parser.error('--video-restart requires --retained-document')
     if args.language_reload and not args.retained_document:
         parser.error('--language-reload requires --retained-document')
-    if args.retained_script and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
-        parser.error('--retained-script requires a .q4ui document')
+    if args.retained_script and (not args.retained_document or args.retained_document.suffix.lower() != '.rui'):
+        parser.error('--retained-script requires a .rui document')
     if args.retained_resume_script and (not (args.video_restart or (args.retained_managed and args.language_reload))
-                                       or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
-        parser.error('--retained-resume-script requires a .q4ui document and video restart (or managed language reload)')
-    if args.retained_data and (len(args.retained_data) > 16 or not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
-        parser.error('--retained-data requires a .q4ui document and at most 16 files')
-    if args.retained_open and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
-        parser.error('--retained-open requires a .q4ui document')
-    if args.retained_managed and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'):
-        parser.error('--retained-managed requires a .q4ui document')
+                                       or not args.retained_document or args.retained_document.suffix.lower() != '.rui'):
+        parser.error('--retained-resume-script requires a .rui document and video restart (or managed language reload)')
+    if args.retained_data and (len(args.retained_data) > 16 or not args.retained_document or args.retained_document.suffix.lower() != '.rui'):
+        parser.error('--retained-data requires a .rui document and at most 16 files')
+    if args.retained_open and (not args.retained_document or args.retained_document.suffix.lower() != '.rui'):
+        parser.error('--retained-open requires a .rui document')
+    if args.retained_managed and (not args.retained_document or args.retained_document.suffix.lower() != '.rui'):
+        parser.error('--retained-managed requires a .rui document')
     if args.retained_peer and not args.retained_managed:
         parser.error('--retained-peer requires --retained-managed')
     if args.retained_managed and (args.timeline or args.profile_frames or args.retained_data):
         parser.error('managed mode uses its semantic script; preview timeline/profile/state-data commands are unsupported')
     if not 0 <= args.profile_frames <= 3600 or (args.profile_frames and not args.retained_document):
         parser.error('--profile-frames requires a retained document and a count from 1 to 3600')
-    if args.retained_document and args.retained_document.suffix.lower() not in ('.rml', '.q4ui'):
-        parser.error('retained document must be .rml or .q4ui')
-    if args.timeline and (not args.retained_document or args.retained_document.suffix.lower() != '.q4ui'
+    if args.retained_document and args.retained_document.suffix.lower() not in ('.rml', '.rui'):
+        parser.error('retained document must be .rml or .rui')
+    if args.timeline and (not args.retained_document or args.retained_document.suffix.lower() != '.rui'
                           or not re.fullmatch(r'[A-Za-z0-9_.-]{1,128}', args.timeline)):
-        parser.error('--timeline requires a .q4ui document and a valid stable timeline ID')
+        parser.error('--timeline requires a .rui document and a valid stable timeline ID')
     try:
         return capture(args)
     except (OSError, ValueError, StopIteration) as error:

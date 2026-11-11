@@ -1,6 +1,6 @@
 # Retained GUI application integration
 
-This checkpoint connects explicit `.q4ui` documents to normal engine GUI
+This checkpoint connects explicit `.rui` documents to normal engine GUI
 allocation and session dispatch. It is part of M1 in the
 [product completion plan](../archive/2026-10-18/plans/ui-product-completion.md). It does not accept
 any of the 271 shipped GUI resources or complete the production settings page.
@@ -14,7 +14,7 @@ limitation identified by this earlier build.
 ## Loading and ownership
 
 `FindGui` selects the retained implementation only for a complete,
-case-insensitive `.q4ui` suffix. Other paths retain the legacy implementation,
+case-insensitive `.rui` suffix. Other paths retain the legacy implementation,
 including `.gui` and `.guied` editor sources. No implicit source alias or
 fallback can mistake a failed retained load for a successful replacement.
 Dedicated builds reject explicit retained documents without linking the client

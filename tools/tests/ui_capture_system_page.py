@@ -309,7 +309,7 @@ class SystemPageOracleTests(unittest.TestCase):
 
     def test_peer_documents_hold_their_own_context(self):
         # The classic HUD's essential document runs beside the page in gameplay.
-        peer='guis/hud/air_marine.q4ui'
+        peer='guis/hud/air_marine.rui'
         log=trace().replace('OPENQ4_MENU_ACTIVATION ','RETAINED_GUI_LOADED '+peer+'\nOPENQ4_MENU_ACTIVATION ',1)
         self.reject(log)
         mark=capture.STAGE_MARKER+' language\n'

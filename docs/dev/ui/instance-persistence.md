@@ -34,7 +34,7 @@ retains the original checkpoint's evidence and limits.
 
 ## Snapshot contract
 
-`Runtime::SaveSnapshot` writes version 1 of `openq4-ui-instance` to a bounded
+`Runtime::SaveSnapshot` writes version 1 of `retained-ui-instance` to a bounded
 UTF-8 JSON string. `RestoreSnapshot` validates a candidate before changing any
 live state. Failure preserves the existing instance; save failure preserves the
 caller's previous output. The envelope is limited to 128 MiB, rejects duplicate
@@ -168,7 +168,7 @@ not a finished settings screen, game save round trip, world surface or native
 editor. Shared GUI was requested but reported zero owned views: 20 SP and 18 MP
 views used its fallback path. No shipping performance claim is made.
 
-Reproduce with `capture_legacy_baseline.py`, the `interaction-smoke.q4ui`
+Reproduce with `capture_legacy_baseline.py`, the `interaction-smoke.rui`
 document, `snapshot-smoke.cfg` setup and `snapshot-resume.cfg` resume script,
 `--retained-open --language-reload --video-restart --shared-gui`, the table's
 mode/backend/dimensions/density, installed assets, and a fresh output folder.

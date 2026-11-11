@@ -7495,7 +7495,7 @@ void idSessionLocal::PublishCampaignChapters( idUserInterface *gui, int select )
 	if ( gui == NULL ) {
 		return;
 	}
-	const bool retained = idStr::CheckExtension( gui->Name(), ".q4ui" );
+	const bool retained = idStr::CheckExtension( gui->Name(), ".rui" );
 	int count = 0;
 	const sessionChapter_t *chapters = Session_CampaignChapters( count );
 	idStrList saves;

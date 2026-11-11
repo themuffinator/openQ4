@@ -20,7 +20,7 @@ def sources(args):
     if not args.retained_managed or getattr(args, 'retained_peer', False):
         raise ValueError('display settings probe requires one managed confirmation owner')
     result = {}
-    for attribute, suffix in (('retained_document', '.q4ui'), ('retained_script', '.cfg'),
+    for attribute, suffix in (('retained_document', '.rui'), ('retained_script', '.cfg'),
                               ('retained_resume_script', '-resume.cfg')):
         expected = Path(str(FIXTURE) + suffix)
         supplied = getattr(args, attribute)
@@ -173,7 +173,7 @@ def evidence(log, *, game, resets=0):
         if line.startswith('GUI_VALUE '):
             flow.append(('read', line.split('=', 1)[0][10:]))
         if line.startswith('RETAINED_GUI_RESOURCE '):
-            if line != 'RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored':
+            if line != 'RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored':
                 errors.append('retained resource recovery failed or belongs to another document')
             flow.append(('resource', 'restored'))
         if line.startswith('Wrote screenshots/ui-display-'):

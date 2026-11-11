@@ -910,7 +910,7 @@ static void CheckPublicTextQueries() {
     for (const char* count : {"keyCount","padCount"}) modelTemplate.state[std::string("binding.forward.")+count]={0.0,"","",""};
     {
         idUserInterfaceRetained gui;
-        assert(gui.InitFromFile("test.q4ui",true,true));
+        assert(gui.InitFromFile("test.rui",true,true));
         const auto text=[](const char* name) { return std::get<std::string>(Live().state.at(std::string("binding.forward.")+name)); };
         const auto number=[](const char* name) { return std::get<double>(Live().state.at(std::string("binding.forward.")+name)); };
         idKeyInput::bindings={{101,"_forward"},{102,"_forward"},{103,"_forward"},{K_JOY3,"_forward"}};
@@ -955,7 +955,7 @@ static void CheckPromptUpdates() {
     modelTemplate.state["prompt"]={std::string(""),""};
     modelTemplate.state["prompt.glyph"]={0.0,""};
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui"));
         gui.SetStateString("prompt",va("^ik%02X",K_JOY3)); gui.StateChanged(0);
         assert(std::get<double>(Live().state.at("prompt.glyph"))==6);
         const int reads=idKeyInput::nameReads;
@@ -995,7 +995,7 @@ static void CheckPresentationBridge() {
     gui.SetStateString("curr","dictionary page");
     gui.SetStateString("desktop::curr","dictionary qualified page");
     gui.SetStateString("dictionaryOnly","not an exported presentation variable");
-    assert(gui.InitFromFile("test.q4ui"));
+    assert(gui.InitFromFile("test.rui"));
     auto& runtime=Live();
     runtime.aliases={{"CuRR","22"},{"desktop::curr","23"},{"number","24"},{"metadata",""}};
     Value numeric; numeric.type=ValueType::Number; numeric.text="0.35";
@@ -1126,7 +1126,7 @@ static void CheckCompletionWrites() {
     assert(views.empty()); cvars=CVars{}; consoleObject.open=false; windowFocused=true;
     eventPlans={}; eventHistory.clear();
     idUserInterfaceRetained gui;
-    assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+    assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
     gui.SetStateString("unrelated","unmodified");
     Live().completionWrites={{"flag",true},{"text",std::string("finished")}};
     const unsigned takes=Live().completionTakes;
@@ -1152,7 +1152,7 @@ static void CheckCompletionWrites() {
 static void CheckApplicationDeltas() {
     assert(views.empty());
     idUserInterfaceRetained gui;
-    assert(gui.InitFromFile("test.q4ui")); gui.StateChanged(0);
+    assert(gui.InitFromFile("test.rui")); gui.StateChanged(0);
     auto& runtime=Live();
     gui.SetStateFloat("NuMbEr",2); gui.SetStateString("text","changed"); gui.StateChanged(0);
     assert(runtime.state.at("number")==StateValue(2.0) && runtime.state.at("text")==StateValue(std::string("changed")));
@@ -1185,7 +1185,7 @@ static void CheckLevelLoadKeep() {
     modelTemplate.root.children.push_back(picture);
     {
         idUserInterfaceRetained gui;
-        assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        assert(gui.InitFromFile("test.rui")); gui.Activate(true,0); gui.Redraw(0);
         const auto* view=views.front();
         gui.SetStateFloat("number",1.5f); gui.StateChanged(0);
         gui.HandleNamedEvent("queue"); assert(*gui.PendingApplicationCommand());
@@ -1195,10 +1195,10 @@ static void CheckLevelLoadKeep() {
         assert(!*gui.PendingApplicationCommand() && cvars.writes==0);
         assert(std::get<double>(Live().state.at("number"))==1.5);
         assert(precachedImages==std::vector<std::string>{"gfx/guis/kept"});
-        assert(commonObject.prints.back()=="RETAINED_GUI_KEPT test.q4ui\n");
-        files.sources["test.q4ui"]="edited";
+        assert(commonObject.prints.back()=="RETAINED_GUI_KEPT test.rui\n");
+        files.sources["test.rui"]="edited";
         assert(!gui.KeepForLevelLoad() && views.front()==view && precachedImages.size()==1);
-        files.sources["test.q4ui"]="valid";
+        files.sources["test.rui"]="valid";
         Live().loaded=false; assert(!gui.KeepForLevelLoad()); Live().loaded=true;
         assert(gui.KeepForLevelLoad() && precachedImages.size()==2);
     }
@@ -1211,7 +1211,7 @@ static void CheckEventBridge() {
     eventHistory.clear();
     {
         idUserInterfaceRetained gui;
-        assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         gui.SetStateString("number","1.7500"); gui.SetStateString("text","pending ; data");
         gui.SetStateString("unrelated","unmodified"); gui.SetStateString("host","caller cannot own this");
         assert(std::get<double>(Live().state.at("number"))==1);
@@ -1265,8 +1265,8 @@ static void CheckEventBridge() {
         gui.HandleNamedEvent("tail"); idFile_Memory saved; assert(gui.WriteToSaveGame(&saved));
         idFile_Memory restore("programs",saved.GetDataPtr(),saved.Length());
         assert(gui.ReadFromSaveGame(&restore)); Drain(gui,{});
-        gui.HandleNamedEvent("tail"); assert(gui.InitFromFile("test.q4ui")); Drain(gui,{});
-        gui.HandleNamedEvent("tail"); assert(gui.InitFromFile("next.q4ui")); Drain(gui,{});
+        gui.HandleNamedEvent("tail"); assert(gui.InitFromFile("test.rui")); Drain(gui,{});
+        gui.HandleNamedEvent("tail"); assert(gui.InitFromFile("next.rui")); Drain(gui,{});
 
         // Validation is real adapter code; late rejection leaves runtime, public
         // dictionary and FIFO unchanged. No partial CVar write can escape.
@@ -1301,7 +1301,7 @@ static void CheckEventBridge() {
         auto saved=modelTemplate.actions.at("brightness");
         auto& expression=modelTemplate.actions["brightness"].arguments["value"];
         expression.state.clear(); expression.presentation="setting";
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         Live().aliases["setting"]="1.3"; Key(gui,K_ENTER,true); Key(gui,K_ENTER,false);
         assert(Live().resolvedActions==std::vector<std::string>{"brightness"}); Drain(gui,{{"r_brightness",1.3}});
         modelTemplate.actions["brightness"]=std::move(saved);
@@ -1310,20 +1310,20 @@ static void CheckEventBridge() {
         eventPlans={{"oninit",{{{"number",1.125}},{Brightness(1.125)}}},
                     {"onactivate",{{},{Shadows(false)}}}, {"ondeactivate",{{},{Brightness(.9)}}},
                     {"ontrigger",{{},{Brightness(1.7)}}}};
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui") && eventHistory.empty());
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui") && eventHistory.empty());
         assert(*gui.Activate(true,0)); gui.Redraw(0); gui.Redraw(0);
         assert(eventHistory==std::vector<std::string>({"onactivate","oninit"}));
         assert(gui.GetStateFloat("number")==1.125f); Drain(gui,{{"r_shadows",0},{"r_brightness",1.125}});
         gui.Trigger(0); assert(*gui.Activate(false,0)); Drain(gui,{{"r_brightness",1.7},{"r_brightness",.9}});
         const auto beforeReload=eventHistory.size();
-        assert(gui.InitFromFile("test.q4ui")); gui.Redraw(0); assert(eventHistory.size()==beforeReload);
+        assert(gui.InitFromFile("test.rui")); gui.Redraw(0); assert(eventHistory.size()==beforeReload);
         idFile_Memory save; assert(gui.WriteToSaveGame(&save));
         idFile_Memory restored("lifecycle",save.GetDataPtr(),save.Length());
         assert(gui.ReadFromSaveGame(&restored)); gui.Redraw(0); assert(eventHistory.size()==beforeReload);
         views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
         views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored);
         gui.Redraw(0); assert(eventHistory.size()==beforeReload);
-        assert(gui.InitFromFile("next.q4ui")); eventPlans["oninit"].fail=true;
+        assert(gui.InitFromFile("next.rui")); eventPlans["oninit"].fail=true;
         gui.Redraw(0); assert(eventHistory.size()==beforeReload+1 && !*gui.PendingApplicationCommand());
         eventPlans["oninit"].fail=false; gui.Redraw(0); gui.Redraw(0);
         assert(eventHistory.size()==beforeReload+2); Drain(gui,{{"r_brightness",1.125}});
@@ -1331,7 +1331,7 @@ static void CheckEventBridge() {
     eventHistory.clear();
     {
         // Restoring a GUI that has never drawn must still suppress automatic init.
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui"));
         idFile_Memory save; assert(gui.WriteToSaveGame(&save));
         idFile_Memory restored("before-init",save.GetDataPtr(),save.Length());
         assert(gui.ReadFromSaveGame(&restored)); gui.Redraw(0);
@@ -1366,7 +1366,7 @@ static void CheckEventBridge() {
         action.arguments.erase("generation"); assert(!ValidOperation(action));
     }
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         eventPlans["savecatalog"]={{},{save("loadSelect",65.0,7.0),save("loadDelete",12.0,7.0)}};
         gui.HandleNamedEvent("savecatalog");
         gui.SetStateInt("load.pick",3); gui.SetStateInt("browser.generation",8);
@@ -1391,7 +1391,7 @@ static void CheckEventBridge() {
         assert(!ValidInvocation({"player","session.menu",{{"command",std::string(command)}}},error));
     }
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         eventPlans["players"]={{},{player("mpSelectPlayer",4.0,std::string("8196")),
                                   player("mpMute",31.0,std::string("4294967295")),
                                     player("mpFriend",7.0,std::string("16391")),
@@ -1518,7 +1518,7 @@ static void CheckEventBridge() {
     modelTemplate=scrollModel;
     {
         idUserInterfaceRetained gui;
-        assert(gui.InitFromFile("test.q4ui") && gui.IsInteractive());
+        assert(gui.InitFromFile("test.rui") && gui.IsInteractive());
         assert(!*gui.PendingApplicationCommand());
     }
     modelTemplate=applicationModel;
@@ -1534,7 +1534,7 @@ static void CheckEventEligibility() {
     eventPlans["invalidate"].disableControl="later";
     sysEvent_t tick{};
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         gui.HandleNamedEvent("tail"); Live().modals=1;
         Live().actions={{ControlAction::Kind::Activate,"stale-document","button","brightness",""},
                         {ControlAction::Kind::Back,"stale-document","button","",""},
@@ -1551,7 +1551,7 @@ static void CheckEventEligibility() {
         Drain(gui,{{"r_brightness",.9},{"r_shadows",0}});
     }
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         Key(gui,K_ENTER,true); Key(gui,K_ENTER,false); // Pending physical invocation.
         gui.SetStateString("noninteractive","true");
         assert(gui.IsInteractive() && !std::get<bool>(Live().state.at("noninteractive")));
@@ -1566,13 +1566,13 @@ static void CheckEventEligibility() {
     }
     {
         idUserInterfaceRetained gui; gui.SetStateString("noninteractive","true");
-        assert(gui.InitFromFile("test.q4ui") && !gui.IsInteractive());
+        assert(gui.InitFromFile("test.rui") && !gui.IsInteractive());
         gui.SetStateString("noninteractive","false"); gui.StateChanged(0); assert(gui.IsInteractive());
         gui.SetStateString("noninteractive","1"); gui.StateChanged(0); assert(!gui.IsInteractive());
         gui.SetStateString("noninteractive","0"); gui.StateChanged(0); assert(gui.IsInteractive());
     }
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         Key(gui,K_ENTER,true); Key(gui,K_ENTER,false);
         gui.HandleNamedEvent("tail"); Live().modals=1;
         const auto checked=Live().eligibilityQueries.size();
@@ -1588,7 +1588,7 @@ static void CheckEventEligibility() {
         Drain(gui,{{"r_brightness",.9},{"r_brightness",1.25}});
     }
     for(bool interactive:{false,true}) {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         gui.SetInteractive(interactive); gui.SetStateBool("noninteractive",true);
         gui.HandleNamedEvent("disable");
         assert(gui.HasInteractiveOverride() && gui.IsInteractive()==interactive && gui.GetStateBool("noninteractive"));
@@ -1602,7 +1602,7 @@ static void CheckEventEligibility() {
     // Undeclared legacy numeric flags retain the dictionary's nonzero behavior.
     for(const char* value:{"2","-1"}) {
         idUserInterfaceRetained gui; gui.SetStateString("noninteractive",value);
-        assert(gui.InitFromFile("test.q4ui") && !gui.IsInteractive());
+        assert(gui.InitFromFile("test.rui") && !gui.IsInteractive());
         gui.SetStateString("noninteractive","0"); gui.StateChanged(0); assert(gui.IsInteractive());
     }
     assert(views.empty());
@@ -1667,7 +1667,7 @@ static void CheckSettingsBoundary() {
         idUserInterfaceRetained gui;
         gui.SetStateFloat("number",1.25f);
         gui.SetStateString("settings.draft.r_brightness","caller cannot initialize service values");
-        assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        assert(gui.InitFromFile("test.rui")); gui.Activate(true,0); gui.Redraw(0);
         assert(gui.GetStateBool("settings.open")==false);
         SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         oldOwner=service.active;
@@ -1699,34 +1699,34 @@ static void CheckSettingsBoundary() {
         // Same source replacement and renderer callbacks retain the service
         // owner even though the adapter's Runtime resource may be recreated.
         const auto creates=service.created.size(),releases=service.released.size();
-        assert(gui.InitFromFile("test.q4ui")); gui.Redraw(0);
+        assert(gui.InitFromFile("test.rui")); gui.Redraw(0);
         assert(service.created.size()==creates && service.released.size()==releases && service.reads.back()==oldOwner && service.active==oldOwner);
         views.front()->callback(views.front()->owner,retainedUIViewEvent_t::BeforeResourceReset);
         views.front()->callback(views.front()->owner,retainedUIViewEvent_t::Restored); gui.Redraw(0);
         assert(service.reads.back()==oldOwner && service.released.size()==releases);
-        rejectLoad=true; assert(!gui.InitFromFile("next.q4ui")); rejectLoad=false;
+        rejectLoad=true; assert(!gui.InitFromFile("next.rui")); rejectLoad=false;
         assert(service.active==oldOwner && service.released.size()==releases);
         SettingsEvent(gui,{SettingsAction("edit",{{"r_brightness",1.9}})});
         const auto delivered=service.dispatches.size();
-        assert(gui.InitFromFile("next.q4ui")); gui.Redraw(0); Drain(gui,{});
+        assert(gui.InitFromFile("next.rui")); gui.Redraw(0); Drain(gui,{});
         assert(service.dispatches.size()==delivered && service.released.back()==oldOwner && !service.owners.contains(oldOwner));
         assert(service.reads.back()!=oldOwner && service.active==0 && !gui.GetStateBool("settings.open"));
         SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         oldOwner=service.active;
         const auto previous=oldOwner;
-        const auto oldSource=files.sources.at("next.q4ui"); files.sources["next.q4ui"]="edited body at the same path";
-        assert(gui.InitFromFile("next.q4ui")); gui.Redraw(0);
+        const auto oldSource=files.sources.at("next.rui"); files.sources["next.rui"]="edited body at the same path";
+        assert(gui.InitFromFile("next.rui")); gui.Redraw(0);
         assert(service.released.back()==previous && !service.owners.contains(previous) && service.active==0);
         SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         oldOwner=service.active; assert(oldOwner!=previous);
-        files.sources["next.q4ui"]=oldSource;
+        files.sources["next.rui"]=oldSource;
     }
     assert(views.empty() && service.owners.empty() && service.active==0 && service.released.back()==oldOwner);
     // Two adapters forward distinct stable owners; a busy response is scoped
     // to the requester and cannot change the first adapter's draft.
     {
         idUserInterfaceRetained first,second;
-        assert(first.InitFromFile("test.q4ui") && second.InitFromFile("test.q4ui"));
+        assert(first.InitFromFile("test.rui") && second.InitFromFile("test.rui"));
         first.Activate(true,0); second.Activate(true,0);
         SettingsEvent(first,{SettingsAction("begin"),SettingsAction("edit",{{"r_brightness",1.4}})}); Drain(first,{});
         const auto firstOwner=service.active;
@@ -1745,7 +1745,7 @@ static void CheckSettingsBoundary() {
     // A cached outgoing GUI must finish committed lifecycle actions before it
     // closes settings. The token remains available for a later activation.
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         const auto owner=service.active;
         SettingsEvent(gui,{SettingsAction("edit",{{"r_brightness",1.6}})});
@@ -1786,7 +1786,7 @@ static void CheckSettingsBoundary() {
     }
     assert(views.empty() && service.owners.empty());
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui"));
         idFile_Memory inactive; assert(gui.WriteToSaveGame(&inactive));
         gui.Activate(true,0);
         SettingsEvent(gui,{SettingsAction("begin"),SettingsAction("edit",{{"r_brightness",1.4}})}); Drain(gui,{});
@@ -1822,13 +1822,13 @@ static void CheckSettingsBoundary() {
         gui.Activate(true,0); SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         assert(service.active==owner && *gui.Activate(false,0));
         const auto released=service.released.size();
-        rejectLoad=true; assert(!gui.InitFromFile("test.q4ui")); rejectLoad=false;
+        rejectLoad=true; assert(!gui.InitFromFile("test.rui")); rejectLoad=false;
         assert(service.active==owner && *gui.PendingApplicationCommand() && service.released.size()==released);
-        assert(gui.InitFromFile("test.q4ui"));
+        assert(gui.InitFromFile("test.rui"));
         assert(!*gui.PendingApplicationCommand() && service.active==0 && service.owners.contains(owner) && service.released.size()==released);
         gui.Activate(true,0); SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         assert(*gui.Activate(false,0));
-        assert(gui.InitFromFile("next.q4ui") && !*gui.PendingApplicationCommand());
+        assert(gui.InitFromFile("next.rui") && !*gui.PendingApplicationCommand());
         assert(!service.owners.contains(owner) && service.active==0);
         SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         assert(service.active!=0 && service.active!=owner);
@@ -1839,7 +1839,7 @@ static void CheckSettingsBoundary() {
 }
 static void CheckNodeInspection() {
     assert(views.empty());
-    idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+    idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui"));
     auto inspect=[&](const std::string& id) {return UI_RetainedDiagnostic(&gui,idCmdArgs{{"openq4_retainedGui","inspect",id}});};
     auto& runtime=Live();
     runtime.bounds={32,32,864,462}; runtime.stats={1,13,4,4,9,300,450};
@@ -1879,10 +1879,10 @@ static void CheckSettingsDrawBoundary() {
     {
         idUserInterfaceRetained gui;
         const auto registrations=service.registrations.size();
-        assert(!gui.InitFromFile("bad.q4ui") && service.registrations.size()==registrations);
-        rejectLoad=true; assert(!gui.InitFromFile("test.q4ui")); rejectLoad=false;
+        assert(!gui.InitFromFile("bad.rui") && service.registrations.size()==registrations);
+        rejectLoad=true; assert(!gui.InitFromFile("test.rui")); rejectLoad=false;
         assert(service.registrations.size()==registrations);
-        assert(gui.InitFromFile("test.q4ui"));
+        assert(gui.InitFromFile("test.rui"));
         const auto owner=service.created.back();
         assert(service.registrations.size()==registrations+1 && service.registrations.back().first==owner);
         const auto& registered=service.registrations.back().second;
@@ -1925,12 +1925,12 @@ static void CheckSettingsDrawBoundary() {
         gui.Redraw(0);
         assert(service.registrations.size()==count && service.draws.back().owner==owner);
         assert(service.dispatches.size()==dispatched+1);
-        assert(gui.InitFromFile("test.q4ui"));
+        assert(gui.InitFromFile("test.rui"));
         assert(service.registrations.size()==count+1 && service.registrations.back().first==owner);
-        rejectLoad=true; assert(!gui.InitFromFile("next.q4ui")); rejectLoad=false;
+        rejectLoad=true; assert(!gui.InitFromFile("next.rui")); rejectLoad=false;
         assert(service.registrations.size()==count+1 && service.owners.contains(owner));
         modelTemplate.id="replacement-document";
-        assert(gui.InitFromFile("next.q4ui"));
+        assert(gui.InitFromFile("next.rui"));
         const auto replacement=service.created.back();
         assert(replacement!=owner && !service.owners.contains(owner));
         assert(service.registrations.size()==count+2 && service.registrations.back().first==replacement &&
@@ -1944,7 +1944,7 @@ static void CheckSettingsDrawBoundary() {
     modelTemplate=originalModel; eventPlans.clear();
     const auto draws=service.draws.size();
     {
-        idUserInterfaceRetained plain; assert(plain.InitFromFile("test.q4ui")); plain.Activate(true,0); plain.Redraw(0);
+        idUserInterfaceRetained plain; assert(plain.InitFromFile("test.rui")); plain.Activate(true,0); plain.Redraw(0);
         assert(service.draws.size()==draws); // Unrelated retained pages make no settings draw claim.
     }
     assert(views.empty() && service.owners.empty());
@@ -1969,7 +1969,7 @@ static void CheckValueProposalBoundary() {
     for(const auto& [key,type]:UI_SettingsStateSchema())
         modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0); gui.Redraw(0);
         auto& runtime=Live();
         const auto proposal=[&](std::uint64_t token,double value,const char* action="value.brightness",const char* document=nullptr) {
             runtime.latestProposal["root"]=token;
@@ -2055,7 +2055,7 @@ static void CheckStationaryWheelHandoff() {
     consoleObject.open=false; windowFocused=true;
     const auto savedViewport=viewport;
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0); gui.Redraw(0);
         auto& runtime=Live(); runtime.pointerTransport.clear();
         const auto wheel=[&] {Key(gui,K_MWHEELDOWN,true); Key(gui,K_MWHEELDOWN,false);};
         gui.SetCursor(100,100);
@@ -2100,7 +2100,7 @@ static void CheckSettingsExitReceiptBoundary() {
     for(unsigned scenario=0;scenario<5;++scenario) {
         service=SettingsBoundary::Service{}; eventPlans.clear(); eventHistory.clear();
         {
-            idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+            idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
             const auto owner=service.created.back();
             // This boundary supplies a finished service receipt. The separate
             // production service tests prove which Apply/Keep outcomes create it.
@@ -2151,7 +2151,7 @@ static void CheckSettingsExitBatchBoundary() {
         service=SettingsBoundary::Service{}; eventPlans.clear(); eventHistory.clear();
         consoleObject.open=false; windowFocused=true;
         {
-            idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+            idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
             const auto owner=service.created.back();
             SettingsEvent(gui,{SettingsAction("begin"),SettingsAction("edit",{{"r_brightness",1.6}})}); Drain(gui,{});
             assert(service.active==owner && service.exitReceipts.empty());
@@ -2192,7 +2192,7 @@ static void CheckAuthoredModalBackBoundary() {
     eventPlans.clear(); eventHistory.clear();
     for(int scenario=0;scenario<9;++scenario) {
         eventPlans["modalback"]={{{"text",std::string("modal back accepted")}}, {Brightness(1.3)}};
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         const std::string priorText=gui.GetStateString("text");
         auto& runtime=Live(); runtime.modals=1; runtime.authoredModal=true;
         runtime.modalIdentity=71;
@@ -2231,7 +2231,7 @@ static void CheckQueuedControlScopeBoundary() {
     eventPlans["replace"]={{}, {Brightness(1.2)}, false, false, "", true};
     eventPlans["stale"]={{}, {Brightness(1.8)}};
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         auto& runtime=Live(); runtime.modalIdentity=81;
         ControlAction replace{ControlAction::Kind::Activate,modelTemplate.id,"button","","replace"};
         ControlAction staleEvent{ControlAction::Kind::Activate,modelTemplate.id,"same-control","","stale"};
@@ -2258,7 +2258,7 @@ static void CheckPendingControlScopeBoundary() {
     assert(views.empty()); eventPlans.clear(); eventHistory.clear();
     eventPlans["committed"]={{}, {Brightness(1.6)}};
     for(int scenario=0;scenario<3;++scenario) {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0);
         auto& runtime=Live(); runtime.modalIdentity=91; runtime.latestProposal["button"]=902;
         runtime.expectedControlDescriptors["button"]={"brightness",""};
         ControlAction physical{ControlAction::Kind::Activate,modelTemplate.id,"button","brightness","",1.4,902};
@@ -2297,7 +2297,7 @@ static void CheckSettingsReturnBoundary() {
     const auto qualified=modelTemplate;
     assert(!UI_RetainedSettingsDocument(nullptr) && !UI_RetainedSettingsCanReturn(nullptr));
     {
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui")); gui.Activate(true,0); gui.Redraw(0);
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui")); gui.Activate(true,0); gui.Redraw(0);
         assert(UI_RetainedSettingsDocument(&gui) && UI_RetainedSettingsCanReturn(&gui));
         SettingsEvent(gui,{SettingsAction("begin")}); Drain(gui,{});
         assert(UI_RetainedSettingsCanReturn(&gui));
@@ -2339,7 +2339,7 @@ static void CheckSettingsReturnBoundary() {
             case 3: modelTemplate.state.erase("settings.canRetry"); break;
             case 4: modelTemplate.actions.erase("apply"); break;
         }
-        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.q4ui"));
+        idUserInterfaceRetained gui; assert(gui.InitFromFile("test.rui"));
         assert(!UI_RetainedSettingsDocument(&gui));
     }
     assert(views.empty() && service.owners.empty()); modelTemplate=original; eventPlans.clear();
@@ -2365,7 +2365,7 @@ static void CheckNumberDraftBoundary() {
         assert(!ValidateApplication(bad,error));
     }
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         SettingsEvent(gui,{SettingsAction("begin")});Drain(gui,{});
         auto& runtime=Live();runtime.InstallNumber("root","number.settings");runtime.selected="root";
         assert(runtime.BeginNumberEdit("root",error,0));
@@ -2425,7 +2425,7 @@ static void CheckNumberDraftBoundary() {
     {
         // A completed Apply-and-exit callback can introduce a new local draft.
         // Consume the service receipt once, then refuse the stale close result.
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         SettingsEvent(gui,{SettingsAction("begin")});Drain(gui,{});
         auto& runtime=Live();runtime.InstallNumber("root","number.settings");runtime.selected="root";
         service.afterDispatch=[&] {
@@ -2442,7 +2442,7 @@ static void CheckNumberDraftBoundary() {
 }
 static void CheckChoiceDiagnosticBoundary() {
     assert(views.empty());
-    idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+    idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
     auto& runtime=Live();WidgetViewState widget;widget.role=ControlRole::Choice;widget.accepted=2.0;
     widget.popupOpen=true;widget.popupToken=731;widget.popupRevision=734;widget.popupOffsetDp=42;
     ScrollReadback scroll;scroll.geometryToken=901;scroll.available=true;scroll.dpRatio=1.25;
@@ -2481,7 +2481,7 @@ static void CheckNumberDiagnosticBoundary() {
     for(const auto& [key,type]:UI_SettingsStateSchema())
         modelTemplate.state[key]={type==0?StateValue(0.0):type==1?StateValue(false):StateValue(std::string()),""};
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         SettingsEvent(gui,{SettingsAction("begin")});Drain(gui,{});
         auto& runtime=Live();runtime.InstallNumber("root","number.settings");
         assert(UI_RetainedDiagnostic(&gui,idCmdArgs{{"retained","focus","root"}}));
@@ -2590,7 +2590,7 @@ static void CheckNumberDiagnosticBoundary() {
 static void CheckTabKeys() {
     assert(views.empty());cvars=CVars{};consoleObject.open=false;windowFocused=true;
     eventPlans={};eventHistory.clear();
-    idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+    idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
     auto& runtime=Live();
     const auto tabs=[&]{std::vector<std::string> found;for(const auto& name:eventHistory)if(name=="ontabprevious" || name=="ontabnext")found.push_back(name);return found;};
     const auto pulse=[&](int key){Key(gui,key,true);Key(gui,key,false);};
@@ -2688,7 +2688,7 @@ static void CheckTouch() {
     assert(views.empty());cvars=CVars{};consoleObject.open=false;windowFocused=true;
     eventPlans={};eventHistory.clear();
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         auto& runtime=Live();gui.SetCursor(100,100);
         const auto left=[&]{return !runtime.pointerMoves.empty() && std::isnan(runtime.pointerMoves.back().first);};
         sysEvent_t motion{SE_MOUSE,0,0};
@@ -2718,14 +2718,14 @@ static void CheckPromptGlyphs() {
     assert(views.empty());const auto original=modelTemplate;
     consoleObject.open=false;windowFocused=true;promptGlyphsValue=3;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);
         auto& runtime=Live();gui.Redraw(0);gui.Redraw(0);
         assert(!runtime.state.contains("prompt.glyphs"));
         for(const auto& call:runtime.stateCalls)assert(!call.contains("prompt.glyphs"));
     }
     modelTemplate.state["prompt.glyphs"]={0.0,""};promptGlyphsValue=0;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);
         auto& runtime=Live();
         const auto published=[&]{size_t n=0;for(const auto& call:runtime.stateCalls)if(call.size()==1 && call.contains("prompt.glyphs"))++n;return n;};
         const auto glyphs=[&]{return std::get<double>(runtime.state.at("prompt.glyphs"));};
@@ -2746,12 +2746,12 @@ static void CheckPromptSwapped() {
     assert(views.empty());const auto original=modelTemplate;
     consoleObject.open=false;windowFocused=true;promptSwappedValue=true;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         assert(!Live().state.contains("prompt.swapped"));
     }
     modelTemplate.state["prompt.swapped"]={false,""};promptSwappedValue=false;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);
         auto& runtime=Live();
         const auto published=[&]{size_t n=0;for(const auto& call:runtime.stateCalls)if(call.size()==1 && call.contains("prompt.swapped"))++n;return n;};
         gui.Redraw(0);
@@ -2771,12 +2771,12 @@ static void CheckPromptAccept() {
     assert(views.empty());const auto original=modelTemplate;
     consoleObject.open=false;windowFocused=true;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         assert(!Live().state.contains("prompt.accept") && Live().acceptQueries.empty());
     }
     modelTemplate.state["prompt.accept"]={std::string("#str_231042"),""};
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);
         auto& runtime=Live();
         const auto published=[&]{size_t n=0;for(const auto& call:runtime.stateCalls)if(call.size()==1 && call.contains("prompt.accept"))++n;return n;};
         const auto verb=[&]{return std::get<std::string>(runtime.state.at("prompt.accept"));};
@@ -2798,7 +2798,7 @@ static void CheckPromptAccept() {
 // ends what its press began even when the swap changes in between.
 static void CheckConfirmSwap() {
     assert(views.empty());cvars=CVars{};consoleObject.open=false;windowFocused=true;eventPlans={};
-    idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+    idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
     auto& runtime=Live();
     const auto pulse=[&](int key){const auto before=runtime.menu.size();Key(gui,key,true);Key(gui,key,false);
         assert(runtime.menu.size()==before+2 && runtime.menu[before].second && !runtime.menu.back().second &&
@@ -2822,7 +2822,7 @@ static void CheckTypedCharacters() {
     modelTemplate.actions["number.set"]={"settings.brightness.set",{{"value",operand}},std::size_t(0)};
     consoleObject.open=false;windowFocused=true;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         auto& runtime=Live();runtime.InstallNumber("root","number.set");runtime.selected="root";
         const auto type=[&](int character){sysEvent_t event{SE_CHAR,character,0};gui.HandleEvent(&event,0,nullptr);};
         const auto text=[&]{return runtime.numberBuffers.at("root").State().text;};
@@ -2856,7 +2856,7 @@ static void CheckNumberKeys() {
     modelTemplate.actions["number.set"]={"settings.brightness.set",{{"value",operand}},std::size_t(0)};
     consoleObject.open=false;windowFocused=true;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         auto& runtime=Live();runtime.InstallNumber("root","number.set");runtime.InstallNumber("other","number.set");runtime.selected="root";
         std::string error;assert(runtime.BeginNumberEdit("root",error,0));
         const auto identity=[&]{return runtime.widgets.at(runtime.selected).number->identity;};
@@ -2946,7 +2946,7 @@ int main() {
                            {"shadows",{"settings.shadows.set",{{"value",flag}}}}, {"dismiss",{"ui.dismiss",{}}}};
     modelTemplate.root.id="root";
     modelTemplate.root.control=Control{}; modelTemplate.root.control->action="brightness";
-    files.sources={{"test.q4ui","valid"},{"bad.q4ui","invalid"},{"next.q4ui","next"},{"menuXq4ui","valid"}};
+    files.sources={{"test.rui","valid"},{"bad.rui","invalid"},{"next.rui","next"},{"menuXrui","valid"}};
     CheckPresentationBridge();
     CheckPublicTextQueries();
     CheckPromptUpdates();
@@ -2954,15 +2954,15 @@ int main() {
         idUserInterfaceRetained gui;
         gui.SetStateFloat("number",1.25f); gui.SetStateBool("flag",true);
         gui.SetStateString("text","literal ; quit"); gui.SetStateString("host","not a number");
-        assert(gui.InitFromFile("test.q4ui") && std::get<double>(Live().state.at("number"))==1.25);
+        assert(gui.InitFromFile("test.rui") && std::get<double>(Live().state.at("number"))==1.25);
         assert(gui.IsInteractive() && !gui.Active() && !gui.HasInteractiveOverride());
         gui.SetStateBool("noninteractive",true); gui.StateChanged(0); assert(!gui.IsInteractive());
         gui.SetStateBool("noninteractive",false); gui.StateChanged(0); assert(gui.IsInteractive());
         assert(!Live().state.contains("host") && gui.GetTimeStamp()==91);
         const auto* first=views.front();
-        assert(!gui.InitFromFile("bad.q4ui") && views.front()==first);
-        assert(!gui.InitFromFile("menuXq4ui") && views.front()==first);
-        rejectLoad=true; assert(!gui.InitFromFile("next.q4ui") && views.front()==first); rejectLoad=false;
+        assert(!gui.InitFromFile("bad.rui") && views.front()==first);
+        assert(!gui.InitFromFile("menuXrui") && views.front()==first);
+        rejectLoad=true; assert(!gui.InitFromFile("next.rui") && views.front()==first); rejectLoad=false;
         gui.SetStateString("number","nan"); gui.StateChanged(0);
         assert(std::get<double>(Live().state.at("number"))==1.25);
         gui.SetStateFloat("number",1.5f); gui.StateChanged(0);

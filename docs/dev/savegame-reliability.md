@@ -1546,7 +1546,7 @@ dependences that the raw inventory could not see:
   variable in a fixed list (`idWindow::TransitionFieldOffset`).
 - **Retained GUI snapshots.** A retained document's saved state names the
   document by its full source text, which carries the checkout's line endings.
-  A Windows save's `machinegun_scope.q4ui` (870 CRLF) did not match the Linux
+  A Windows save's `machinegun_scope.rui` (870 CRLF) did not match the Linux
   copy, and the restore failed after teardown. The identity now compares
   sources with CRLF and LF treated alike, for every payload version.
 

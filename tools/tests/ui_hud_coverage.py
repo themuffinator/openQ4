@@ -22,7 +22,7 @@ def main():
     args = parser.parse_args()
     subprocess.run([sys.executable, str(ROOT/'tools/ui/build_retained_hud.py'), '--check'], cwd=ROOT, check=True)
     registry = json.loads((CATALOG/'coverage.json').read_text())
-    catalog = json.loads((CATALOG/'artwork.q4ui').read_text())
+    catalog = json.loads((CATALOG/'artwork.rui').read_text())
     nodes = {n['id']: n for n in catalog['root']['children']}
     own = registry.get('openq4Roots', [])
     roots = registry['roots'] + registry['expansionRoots'] + own

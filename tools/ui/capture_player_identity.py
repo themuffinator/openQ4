@@ -115,10 +115,10 @@ def main():
                'tools/ui/retained_mp_admin.py',
                'src/ui/UserInterfaceRetained.cpp', 'src/framework/Session_menu.cpp',
                'src/ui/retained/Interaction.cpp', 'src/ui/retained/State.cpp', 'tools/ui/capture_player_identity.py',
-               'content/baseoq4/pak0/guis/menu/mp_escape.q4ui']
+               'content/baseoq4/pak0/guis/menu/mp_escape.rui']
     source_bindings = {p: capture.digest(ROOT / p) for p in sources}
     with zipfile.ZipFile(args.runtime / 'baseoq4/pak0.pk4') as pack:
-        document = 'guis/menu/mp_escape.q4ui'
+        document = 'guis/menu/mp_escape.rui'
         if pack.read(document).replace(b'\r\n', b'\n') != (ROOT / 'content/baseoq4/pak0' / document).read_bytes().replace(b'\r\n', b'\n'):
             raise RuntimeError('staged Players document differs from source')
     capture.SCENARIOS['player-identity'] = ('mp:mp/q4dm1', steps())

@@ -436,7 +436,7 @@ SCENARIOS = {
         'waitMsec 600', 'ui_retainedStatus',
     ]),
     'loading': (None, [
-        'waitMsec 3000', 'testGUI "guis/loading/loading.q4ui"', 'waitMsec 300',
+        'waitMsec 3000', 'testGUI "guis/loading/loading.rui"', 'waitMsec 300',
         'openq4_retainedGui pending loading_levelshot gfx/guis/loadscreens/airdefense',
         'openq4_retainedGui pending loading_levelname "Air Defense Trenches"',
         'openq4_retainedGui pending loading_objectives "Fight through the trench network to the anti-aircraft battery."',
@@ -1685,16 +1685,16 @@ SCENARIO_CVARS = {'mpcard-prompts': {'ui_retainedMultiplayer': '1'}, 'mpcard-tri
 # The private mod the fallback scenarios run as, and the files it provides.
 FALLBACK_MOD = 'retainedfallback'
 OVERRIDES = {
-    'fallback-document': {'guis/menu/title.q4ui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-document': {'guis/menu/title.rui': lambda runtime: BROKEN_DOCUMENT},
     'fallback-menu': {'guis/mainmenu.gui': stock_menu_without_demos},
-    'fallback-system': {'guis/menu/settings/system.q4ui': lambda runtime: BROKEN_DOCUMENT},
-    'fallback-system-mp': {'guis/menu/settings/system.q4ui': lambda runtime: BROKEN_DOCUMENT},
-    'fallback-audio': {'guis/menu/settings/audio.q4ui': lambda runtime: BROKEN_DOCUMENT},
-    'fallback-game': {'guis/menu/settings/game.q4ui': lambda runtime: BROKEN_DOCUMENT},
-    'fallback-game-mp': {'guis/menu/settings/game.q4ui': lambda runtime: BROKEN_DOCUMENT},
-    'fallback-controls': {'guis/menu/settings/controls.q4ui': lambda runtime: BROKEN_DOCUMENT},
-    'fallback-settings': {'guis/menu/settings.q4ui': lambda runtime: BROKEN_DOCUMENT},
-    'fallback-campaign': {'guis/menu/singleplayer.q4ui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-system': {'guis/menu/settings/system.rui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-system-mp': {'guis/menu/settings/system.rui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-audio': {'guis/menu/settings/audio.rui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-game': {'guis/menu/settings/game.rui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-game-mp': {'guis/menu/settings/game.rui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-controls': {'guis/menu/settings/controls.rui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-settings': {'guis/menu/settings.rui': lambda runtime: BROKEN_DOCUMENT},
+    'fallback-campaign': {'guis/menu/singleplayer.rui': lambda runtime: BROKEN_DOCUMENT},
     'fallback-loading': {'guis/loading/splevel.gui': lambda runtime: MOD_LOADING_GUI,
                          'guis/loading/generic.gui': lambda runtime: MOD_LOADING_GUI},
 }

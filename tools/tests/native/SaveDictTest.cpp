@@ -310,7 +310,7 @@ template<class Writer> static void TestGui() {
     }
     for (bool memory : {false,true}) {
         Writer w; w.output.memory=memory; w.userInterfaceCacheMode=1; w.userInterfaceCache.reset(new SaveUserInterfaceCache);
-        idUserInterface gui; gui.name=memory?"guis/moving.q4ui":"guis/shared.gui";
+        idUserInterface gui; gui.name=memory?"guis/moving.rui":"guis/shared.gui";
         w.WriteUserInterface(&gui,false); w.WriteUserInterface(&gui,false);
         Check(gui.writes==2 && w.userInterfaceCache->hits==0);
     }

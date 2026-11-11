@@ -15,7 +15,7 @@ static bool Near(double a, double b) { return std::abs(a-b) < .0001; }
 static const char* Source = R"json(
 // Retain this authored comment and spacing exactly.
 {
- "format": "openq4-ui", "version": 1, "id": "test-document",
+ "format": "retained-ui", "version": 1, "id": "test-document",
  "tokens": {"size": {"type":"length", "value":100, "unit":"dp"}},
  "root": {"id":"root", "type":"group", "children":[
   {"id":"panel", "type":"group", "properties":{
@@ -53,7 +53,7 @@ static void CheckPresentationSchema() {
 	const std::string source = R"json(
 // Public metadata is typed data, independent of rendered properties.
 {
- "format":"openq4-ui", "version":1, "id":"presentation-schema",
+ "format":"retained-ui", "version":1, "id":"presentation-schema",
  "state":{"source":{"type":"number","initial":3},"allowed":{"type":"boolean","initial":true}},
  "presentationVariables":{
   "page":{"type":"number","initial":22,"value":{"state":"source"}},
@@ -179,7 +179,7 @@ static void CheckPresentationSchema() {
 		"initial presentation evaluation preserves lazy unused expression branches");
 	Check(document.ReplaceValue("/root/properties/pointer-events/value",R"("none")",errors),"pointer-events none is a canonical keyword");
 
-	const std::string prefix = R"({"format":"openq4-ui","version":1,"id":"presentation-limits","root":{"id":"root","type":"group"},"presentationVariables":)";
+	const std::string prefix = R"({"format":"retained-ui","version":1,"id":"presentation-limits","root":{"id":"root","type":"group"},"presentationVariables":)";
 	auto declarations = [](unsigned count,bool aliases) {
 		std::string result="{";
 		for (unsigned i=0;i<count;++i) {
@@ -202,7 +202,7 @@ static void CheckPresentationSchema() {
 static void CheckEventSchema() {
 	const std::string source = R"json(
 // Ordered authored programs, including forward and recursive named calls.
-{"format":"openq4-ui","version":1,"id":"event-schema",
+{"format":"retained-ui","version":1,"id":"event-schema",
  "state":{"count":{"type":"number","initial":2},"gate":{"type":"boolean","initial":true},
           "host":{"type":"number","initial":1,"cvar":"host_value"}},
  "presentationVariables":{"page":{"type":"number","initial":0,"value":{"state":"count"}},
@@ -361,7 +361,7 @@ static void CheckEventSchema() {
 	reject("/root/children/1/control",R"({"role":"button","event":"OnActivate","action":"inspect","label":"#str_test","states":{}})");
 	reject("/root/children/1/control",R"({"role":"button","label":"#str_test","states":{}})");
 	const auto bounded = [](const std::string& events) {
-		return "{\"format\":\"openq4-ui\",\"version\":1,\"id\":\"limits\",\"root\":{\"id\":\"root\",\"type\":\"group\"},\"events\":"+events+"}";
+		return "{\"format\":\"retained-ui\",\"version\":1,\"id\":\"limits\",\"root\":{\"id\":\"root\",\"type\":\"group\"},\"events\":"+events+"}";
 	};
 	for (const unsigned count : {1024u,1025u}) {
 		std::string events="{";
@@ -386,7 +386,7 @@ static void CheckEventSchema() {
 // completions cannot lead back to a timeline already completing.
 static void CheckCompletionSchema() {
 	const auto document = [](const std::string& a, const std::string& b) {
-		return R"json({"format":"openq4-ui","version":1,"id":"completion-schema",
+		return R"json({"format":"retained-ui","version":1,"id":"completion-schema",
 		 "state":{"done":{"type":"boolean","initial":false}},
 		 "root":{"id":"root","type":"group","properties":{"opacity":{"type":"number","value":1},"left":{"type":"length","value":0,"unit":"dp"}}},
 		 "actions":{"leave":{"operation":"test.leave","arguments":{}}},
@@ -424,7 +424,7 @@ static void CheckCompletionSchema() {
 static void CheckDetailSchema() {
 	const auto document = [](const std::string& detail, const std::string& control, const std::string& timelines = "",
 		const std::string& bindings = "") {
-		return R"json({"format":"openq4-ui","version":1,"id":"detail-schema",
+		return R"json({"format":"retained-ui","version":1,"id":"detail-schema",
 		 "state":{"subject":{"type":"number","initial":-1},"flag":{"type":"boolean","initial":false}},
 		 "root":{"id":"root","type":"group","children":[
 		  {"id":"row","type":"group","properties":{"opacity":{"type":"number","value":1}},"control":{"role":"button","event":"pick",

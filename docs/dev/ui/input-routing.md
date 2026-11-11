@@ -1,7 +1,7 @@
 # Retained menu ownership and platform input
 
 8 September 2026. Retained documents can now acquire application input through
-`ui_retainedOpen "path.q4ui"`. This advances the [full replacement plan](../archive/2026-10-18/plans/idtech5-ui.md)
+`ui_retainedOpen "path.rui"`. This advances the [full replacement plan](../archive/2026-10-18/plans/idtech5-ui.md)
 from semantic button fixtures to an engine menu host. The host closes the console,
 receives SDL input, owns the session's GUI state and inhibits gameplay controls.
 `ui_retainedPreview` remains a passive renderer. Neither command accepts a stock
@@ -522,8 +522,8 @@ It captures through the registered engine screenshot command.
 Reproduce from a staged package and use fresh output directories for each run:
 
 ```powershell
-python tools/ui/capture_legacy_baseline.py --assets 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4' --mode sp --renderer gl --retained-document tools/ui/fixtures/interaction-smoke.q4ui --retained-script tools/ui/fixtures/interaction-smoke.cfg --retained-open --density 1.25 --video-restart --profile-frames 60 --output .tmp/ui/input/sp-gl-125-r8
-python tools/ui/capture_legacy_baseline.py --assets 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4' --mode mp --renderer vulkan --retained-document tools/ui/fixtures/interaction-smoke.q4ui --retained-script tools/ui/fixtures/interaction-smoke.cfg --retained-open --density 2 --width 1920 --height 1080 --profile-frames 60 --output .tmp/ui/input/mp-vulkan-200-r8
+python tools/ui/capture_legacy_baseline.py --assets 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4' --mode sp --renderer gl --retained-document tools/ui/fixtures/interaction-smoke.rui --retained-script tools/ui/fixtures/interaction-smoke.cfg --retained-open --density 1.25 --video-restart --profile-frames 60 --output .tmp/ui/input/sp-gl-125-r8
+python tools/ui/capture_legacy_baseline.py --assets 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4' --mode mp --renderer vulkan --retained-document tools/ui/fixtures/interaction-smoke.rui --retained-script tools/ui/fixtures/interaction-smoke.cfg --retained-open --density 2 --width 1920 --height 1080 --profile-frames 60 --output .tmp/ui/input/mp-vulkan-200-r8
 python tools/ui/verify_interaction_capture.py .tmp/ui/input/sp-gl-125-r8
 python tools/ui/verify_interaction_capture.py .tmp/ui/input/mp-vulkan-200-r8
 ```

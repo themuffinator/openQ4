@@ -131,7 +131,7 @@ class RecoveryOracle(unittest.TestCase):
                         log.replace(f"approved={int(approved)}", f"approved={int(not approved)}"),
                         log.replace("presented=106", "presented=105"),
                         log.replace("interval=1", "interval=0"),
-                        log + "RETAINED_GUI_LOADED settings-recovery.q4ui\n",
+                        log + "RETAINED_GUI_LOADED settings-recovery.rui\n",
                         log + row("UI_SETTINGS", operation="settings.system.begin", result=0, owner=19),
                         log + "UI_SETTINGS startup_recovery=complete\n"]
             for altered in failures:

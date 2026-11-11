@@ -253,7 +253,7 @@ public:
         ++ticks; lastTime=time; auto callback=onThink; if(callback) callback();
     }
     bool InitFromFile(const char* path,bool=true,bool=true) override {
-        if(!path || !*path || !idStr::Icmp(path,"missing.gui") || !idStr::Icmp(path,"missing.q4ui")) return false;
+        if(!path || !*path || !idStr::Icmp(path,"missing.gui") || !idStr::Icmp(path,"missing.rui")) return false;
         // A production reload must not pass a pointer owned by this instance.
         assert(path!=source.c_str());
         source=path; state.Set("name",path); state.Set("text","parser default");
@@ -367,27 +367,27 @@ static void RestoredReplacement() {
 
 #ifndef ID_DEDICATED
     auto* explicitView=static_cast<idUserInterfaceManaged*>(manager.Alloc());
-    assert(explicitView->InitFromFile("restore-explicit-a.q4ui"));
+    assert(explicitView->InitFromFile("restore-explicit-a.rui"));
     explicitView->SetInteractive(false); explicitView->Activate(true,10);
     idFile explicitSave; assert(explicitView->WriteToSaveGame(&explicitSave));
     explicitView->SetInteractive(true); explicitView->Activate(false,20);
     assert(explicitView->ReadFromSaveGame(&explicitSave));
     assert(explicitView->Active() && !explicitView->IsInteractive() && explicitView->HasInteractiveOverride());
-    assert(explicitView->InitFromFile("restore-explicit-b.q4ui"));
+    assert(explicitView->InitFromFile("restore-explicit-b.rui"));
     explicitView->StateChanged(30,false);
     assert(explicitView->Active() && !explicitView->IsInteractive() && explicitView->HasInteractiveOverride());
     // The same restored policy continues through another replacement.
-    assert(explicitView->InitFromFile("restore-explicit-c.q4ui"));
+    assert(explicitView->InitFromFile("restore-explicit-c.rui"));
     assert(explicitView->Active() && !explicitView->IsInteractive() && explicitView->HasInteractiveOverride());
     delete explicitView; Empty();
 
     auto* defaultView=static_cast<idUserInterfaceManaged*>(manager.Alloc());
-    assert(defaultView->InitFromFile("restore-default-a.q4ui"));
+    assert(defaultView->InitFromFile("restore-default-a.rui"));
     idFile defaultSave; assert(defaultView->WriteToSaveGame(&defaultSave));
     defaultView->SetInteractive(false); defaultView->Activate(true,20);
     assert(defaultView->ReadFromSaveGame(&defaultSave));
     assert(!defaultView->Active() && defaultView->IsInteractive() && !defaultView->HasInteractiveOverride());
-    assert(defaultView->InitFromFile("restore-default-b.q4ui"));
+    assert(defaultView->InitFromFile("restore-default-b.rui"));
     assert(!defaultView->Active() && defaultView->IsInteractive() && !defaultView->HasInteractiveOverride());
     defaultView->SetStateBool("noninteractive",true); defaultView->StateChanged(30,false);
     assert(!defaultView->IsInteractive());
@@ -398,9 +398,9 @@ static void RestoredReplacement() {
 }
 int main() {
     auto& manager=uiManagerLocal;
-    assert(UI_IsRetainedPath("menu.q4ui") && UI_IsRetainedPath("MENU.Q4UI"));
+    assert(UI_IsRetainedPath("menu.rui") && UI_IsRetainedPath("MENU.RUI"));
     assert(!UI_IsRetainedPath(nullptr) && !UI_IsRetainedPath("") && !UI_IsRetainedPath("ui"));
-    assert(!UI_IsRetainedPath("menuXq4ui") && !UI_IsRetainedPath("menu.x4ui") && !UI_IsRetainedPath("menu.q4ui.guied"));
+    assert(!UI_IsRetainedPath("menuXrui") && !UI_IsRetainedPath("menu.x4ui") && !UI_IsRetainedPath("menu.rui.guied"));
     RestoredReplacement();
     // An owned child never appears in any manager registry, even when it
     // publishes its parsed desktop, demo metadata and changing thinker flag.
@@ -448,24 +448,24 @@ int main() {
 #ifndef ID_DEDICATED
     // A different explicit path switches the unregistered implementation,
     // preserving the wrapper identity, refs, state, cursor and save contract.
-    assert(deferred->InitFromFile("deferred.Q4UI"));
+    assert(deferred->InitFromFile("deferred.RUI"));
     assert(!idStr::Icmp(deferred->Comment(),"retained") && manager.allocations.Num()==1 && manager.guis.Num()==1);
     assert(manager.guis[0]->GetRefs()==2 && deferred->GetStateInt("score")==42);
-    assert(!idStr::Icmp(deferred->GetStateString("name"),"deferred.Q4UI"));
-    assert(!deferred->InitFromFile("missing.q4ui") && !idStr::Icmp(deferred->Name(),"deferred.Q4UI"));
+    assert(!idStr::Icmp(deferred->GetStateString("name"),"deferred.RUI"));
+    assert(!deferred->InitFromFile("missing.rui") && !idStr::Icmp(deferred->Name(),"deferred.RUI"));
     assert(deferred->WriteToSaveGame(&save) && save.kind==2 && save.writes==2);
     assert(UI_DispatchApplicationActions(deferred,"retained-back",close) && close);
     assert(UI_DispatchApplicationActions(deferred,"untrusted text",close) && !close);
     // Only the wrapper is registered; its unregistered child still exposes
     // pending requests through the private managed virtual.
     assert(std::string(static_cast<idUserInterfaceManaged*>(deferred)->PendingApplicationCommand()).empty());
-    auto retained=manager.FindGui("direct.q4ui",true);
+    auto retained=manager.FindGui("direct.rui",true);
     assert(dynamic_cast<idUserInterfaceRetained*>(retained)!=nullptr);
-    assert(manager.FindGui("DIRECT.Q4UI",false,false,true)==retained);
+    assert(manager.FindGui("DIRECT.RUI",false,false,true)==retained);
     delete retained;
 #else
-    assert(manager.FindGui("direct.q4ui",true)==nullptr);
-    assert(!deferred->InitFromFile("deferred.q4ui"));
+    assert(manager.FindGui("direct.rui",true)==nullptr);
+    assert(!deferred->InitFromFile("deferred.rui"));
     assert(!idStr::Icmp(deferred->Name(),"deferred.gui") && deferred->GetStateInt("score")==42);
 #endif
     // The wrapper remains the material owner; its child must not be purged.
@@ -505,7 +505,7 @@ int main() {
     // fatal check when a missing GUI would strand an unframed state payload.
     try {
         assert(manager.FindGui("missing.gui",true)==nullptr);
-        assert(manager.FindGui("missing.q4ui",true)==nullptr);
+        assert(manager.FindGui("missing.rui",true)==nullptr);
     } catch(const std::runtime_error&) { rejected=true; }
     sessionObject.saving=false;
     assert(!rejected);
@@ -608,9 +608,9 @@ int main() {
     // the console asks for re-initializes them all the same.
     first=Load("level-first.gui");
 #ifndef ID_DEDICATED
-    auto* kept=static_cast<idUserInterfaceLocal*>(manager.FindGui("level-kept.q4ui",true));
+    auto* kept=static_cast<idUserInterfaceLocal*>(manager.FindGui("level-kept.rui",true));
     auto* wrapped=manager.Alloc();
-    assert(wrapped->InitFromFile("level-wrapped.q4ui"));
+    assert(wrapped->InitFromFile("level-wrapped.rui"));
     wrapped->SetStateString("text","application text");
     keepRetained=true; UI_ReloadForLevelLoad();
     assert(first->loads==2 && kept->loads==1 && keepQueries==2);

@@ -30,7 +30,7 @@ def main():
     parser.add_argument('--mutations', action='store_true')
     args = parser.parse_args()
     repository = args.repository.resolve()
-    candidate=(args.document or (ROOT/'.tmp/system-candidate.q4ui' if (ROOT/'.tmp/system-candidate.q4ui').is_file() else ROOT/'content/baseoq4/pak0/guis/menu/settings/system.q4ui')).resolve()
+    candidate=(args.document or (ROOT/'.tmp/system-candidate.rui' if (ROOT/'.tmp/system-candidate.rui').is_file() else ROOT/'content/baseoq4/pak0/guis/menu/settings/system.rui')).resolve()
     rml = ROOT / 'rml-projection'
     if not rml.is_dir():
         rml = repository / 'subprojects/RmlUi-6.3'

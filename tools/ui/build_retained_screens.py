@@ -33,37 +33,37 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PAK0 = ROOT / "content" / "baseoq4" / "pak0"
 OUTPUTS = {
-    "title": PAK0 / "guis" / "menu" / "title.q4ui",
-    "pause": PAK0 / "guis" / "menu" / "pause.q4ui",
-    "pause_strogg": PAK0 / "guis" / "menu" / "pause_strogg.q4ui",
-    "loading": PAK0 / "guis" / "loading" / "loading.q4ui",
-    "singleplayer": PAK0 / "guis" / "menu" / "singleplayer.q4ui",
-    "campaigns": PAK0 / "guis" / "menu" / "campaigns.q4ui",
-    "skill": PAK0 / "guis" / "menu" / "campaign_skill.q4ui",
-    "chapters": PAK0 / "guis" / "menu" / "chapters.q4ui",
-    "loadgame": PAK0 / "guis" / "menu" / "loadgame.q4ui",
-    "savegame": PAK0 / "guis" / "menu" / "savegame.q4ui",
-    "restartlevel": PAK0 / "guis" / "menu" / "restartlevel.q4ui",
-    "loadgame_strogg": PAK0 / "guis" / "menu" / "loadgame_strogg.q4ui",
-    "savegame_strogg": PAK0 / "guis" / "menu" / "savegame_strogg.q4ui",
-    "restartlevel_strogg": PAK0 / "guis" / "menu" / "restartlevel_strogg.q4ui",
-    "restartmenu": PAK0 / "guis" / "menu" / "restartmenu.q4ui",
-    "msgbox": PAK0 / "guis" / "menu" / "msgbox.q4ui",
-    "credits": PAK0 / "guis" / "menu" / "credits.q4ui",
-    "demos": PAK0 / "guis" / "menu" / "demos.q4ui",
-    "arena": PAK0 / "guis" / "menu" / "arena.q4ui",
-    "multiplayer": PAK0 / "guis" / "menu" / "multiplayer.q4ui",
-    "createserver": PAK0 / "guis" / "menu" / "createserver.q4ui",
-    "joingame": PAK0 / "guis" / "menu" / "joingame.q4ui",
-    "audio": PAK0 / "guis" / "menu" / "settings" / "audio.q4ui",
-    "game": PAK0 / "guis" / "menu" / "settings" / "game.q4ui",
-    "system": PAK0 / "guis" / "menu" / "settings" / "system.q4ui",
-    "controls": PAK0 / "guis" / "menu" / "settings" / "controls.q4ui",
-    "settings": PAK0 / "guis" / "menu" / "settings.q4ui",
-    "mp_escape": PAK0 / "guis" / "menu" / "mp_escape.q4ui",
-    "mp_welcome": PAK0 / "guis" / "menu" / "mp_welcome.q4ui",
-    "mp_summary": PAK0 / "guis" / "menu" / "mp_summary.q4ui",
-    "arena_pause": PAK0 / "guis" / "menu" / "arena_pause.q4ui",
+    "title": PAK0 / "guis" / "menu" / "title.rui",
+    "pause": PAK0 / "guis" / "menu" / "pause.rui",
+    "pause_strogg": PAK0 / "guis" / "menu" / "pause_strogg.rui",
+    "loading": PAK0 / "guis" / "loading" / "loading.rui",
+    "singleplayer": PAK0 / "guis" / "menu" / "singleplayer.rui",
+    "campaigns": PAK0 / "guis" / "menu" / "campaigns.rui",
+    "skill": PAK0 / "guis" / "menu" / "campaign_skill.rui",
+    "chapters": PAK0 / "guis" / "menu" / "chapters.rui",
+    "loadgame": PAK0 / "guis" / "menu" / "loadgame.rui",
+    "savegame": PAK0 / "guis" / "menu" / "savegame.rui",
+    "restartlevel": PAK0 / "guis" / "menu" / "restartlevel.rui",
+    "loadgame_strogg": PAK0 / "guis" / "menu" / "loadgame_strogg.rui",
+    "savegame_strogg": PAK0 / "guis" / "menu" / "savegame_strogg.rui",
+    "restartlevel_strogg": PAK0 / "guis" / "menu" / "restartlevel_strogg.rui",
+    "restartmenu": PAK0 / "guis" / "menu" / "restartmenu.rui",
+    "msgbox": PAK0 / "guis" / "menu" / "msgbox.rui",
+    "credits": PAK0 / "guis" / "menu" / "credits.rui",
+    "demos": PAK0 / "guis" / "menu" / "demos.rui",
+    "arena": PAK0 / "guis" / "menu" / "arena.rui",
+    "multiplayer": PAK0 / "guis" / "menu" / "multiplayer.rui",
+    "createserver": PAK0 / "guis" / "menu" / "createserver.rui",
+    "joingame": PAK0 / "guis" / "menu" / "joingame.rui",
+    "audio": PAK0 / "guis" / "menu" / "settings" / "audio.rui",
+    "game": PAK0 / "guis" / "menu" / "settings" / "game.rui",
+    "system": PAK0 / "guis" / "menu" / "settings" / "system.rui",
+    "controls": PAK0 / "guis" / "menu" / "settings" / "controls.rui",
+    "settings": PAK0 / "guis" / "menu" / "settings.rui",
+    "mp_escape": PAK0 / "guis" / "menu" / "mp_escape.rui",
+    "mp_welcome": PAK0 / "guis" / "menu" / "mp_welcome.rui",
+    "mp_summary": PAK0 / "guis" / "menu" / "mp_summary.rui",
+    "arena_pause": PAK0 / "guis" / "menu" / "arena_pause.rui",
 }
 
 U = 1.5            # dp per stock source unit at the 720 dp canvas
@@ -881,7 +881,7 @@ class Document:
         return ids
 
     def build(self, root: dict, extras: dict | None = None) -> dict:
-        result = {"format": "openq4-ui", "version": 1, "id": self.ident, "canvas": {"height": 720}}
+        result = {"format": "retained-ui", "version": 1, "id": self.ident, "canvas": {"height": 720}}
         if self.state:
             result["state"] = self.state
         if self.actions:

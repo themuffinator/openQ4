@@ -338,7 +338,7 @@ static void Recreate(View& v,const std::string& source) {
  Publish(v,{true,true,2,Two});Draft(v,{{"r_screen",1.0},{"r_multiScreen",0.0}});
  std::string snapshot;Check(v.runtime.SaveSnapshot(snapshot,v.error,v.time),"the page snapshot saves");
  v.runtime.CloseDocument();std::vector<Diagnostic> diagnostics;
- Check(v.runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"the display rows survive recreation");
+ Check(v.runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"the display rows survive recreation");
  v.Sync();Publish(v,{true,true,2,Two});
  Check(ClosedText(v,Device)==Encoded(Two[1])&&v.runtime.TakeActions().empty(),"the recreated row reads the current list and replays no pick");
 }

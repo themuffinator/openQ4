@@ -23,7 +23,7 @@ def options(**changes):
                   retained_script=FIXTURES / 'managed-settings-smoke.cfg',
                   retained_resume_script=FIXTURES / 'managed-settings-smoke-resume.cfg',
                   language_reload=True, video_restart=True, profile_frames=0, timeline=None,
-                  retained_document=FIXTURES / 'managed-settings-smoke.q4ui',
+                  retained_document=FIXTURES / 'managed-settings-smoke.rui',
                   presentation_alias_probe=False, event_program_probe=False, gamma=1, brightness=1)
     values.update(changes)
     return SimpleNamespace(**values)
@@ -34,20 +34,20 @@ GUI_VALUE shadows-reading::text=#str_200157
 GUI_VALUE brightness-target-reading::text=1.50
 GUI_VALUE shadows-target-reading::text=0
 '''
-FINAL = 'RETAINED_GUI path=retained-smoke.q4ui focus=managed-shadows revision=4 active=1 brightness=1.250000 shadows=1 contexts=1\n'
+FINAL = 'RETAINED_GUI path=retained-smoke.rui focus=managed-shadows revision=4 active=1 brightness=1.250000 shadows=1 contexts=1\n'
 OWNERSHIP = 'Retained UI ownership: open=0 suspended=1 session_gui=1 game_time=1000 requests=0\n'
 BEFORE = OWNERSHIP.replace('session_gui=1 game_time=1000', 'session_gui=0 game_time=900')
 AFTER = OWNERSHIP.replace('session_gui=1 game_time=1000', 'session_gui=0 game_time=1100')
-LOG = '''RETAINED_GUI_LOADED retained-smoke.q4ui
-RETAINED_GUI path=retained-smoke.q4ui focus= revision=1 active=1 brightness=1.000000 shadows=1 contexts=1
+LOG = '''RETAINED_GUI_LOADED retained-smoke.rui
+RETAINED_GUI path=retained-smoke.rui focus= revision=1 active=1 brightness=1.000000 shadows=1 contexts=1
 RETAINED_GUI_OPERATION focus passed
 RETAINED_GUI_OPERATION menu passed
 RETAINED_GUI_OPERATION menu passed
-RETAINED_GUI path=retained-smoke.q4ui focus=managed-brightness revision=2 active=1 brightness=1.500000 shadows=1 contexts=1
+RETAINED_GUI path=retained-smoke.rui focus=managed-brightness revision=2 active=1 brightness=1.500000 shadows=1 contexts=1
 RETAINED_GUI_OPERATION focus passed
 RETAINED_GUI_OPERATION menu passed
 RETAINED_GUI_OPERATION menu passed
-RETAINED_GUI path=retained-smoke.q4ui focus=managed-shadows revision=3 active=1 brightness=1.500000 shadows=0 contexts=1
+RETAINED_GUI path=retained-smoke.rui focus=managed-shadows revision=3 active=1 brightness=1.500000 shadows=0 contexts=1
 RETAINED_GUI_OPERATION save passed
 RETAINED_GUI_OPERATION state passed
 RETAINED_GUI_OPERATION state passed
@@ -57,7 +57,7 @@ RETAINED_GUI_OPERATION menu passed
 RETAINED_GUI_OPERATION focus passed
 RETAINED_GUI_OPERATION menu passed
 RETAINED_GUI_OPERATION menu passed
-RETAINED_GUI path=retained-smoke.q4ui focus=managed-shadows revision=7 active=1 brightness=1.250000 shadows=1 contexts=1
+RETAINED_GUI path=retained-smoke.rui focus=managed-shadows revision=7 active=1 brightness=1.250000 shadows=1 contexts=1
 GUI_VALUE brightness-target-reading::text=1.25
 GUI_VALUE shadows-target-reading::text=1
 RETAINED_GUI_OPERATION restore passed
@@ -65,12 +65,12 @@ RETAINED_GUI_OPERATION restore passed
 
 
 def evidence_log(peer=False, resets=2):
-    result = BEFORE + LOG.replace('RETAINED_GUI_LOADED retained-smoke.q4ui\n',
-                                  'RETAINED_GUI_LOADED retained-smoke.q4ui\n' + OWNERSHIP) + OWNERSHIP
+    result = BEFORE + LOG.replace('RETAINED_GUI_LOADED retained-smoke.rui\n',
+                                  'RETAINED_GUI_LOADED retained-smoke.rui\n' + OWNERSHIP) + OWNERSHIP
     for _ in range(resets):
-        result += 'RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored\n' + FINAL + READBACK + OWNERSHIP
+        result += 'RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored\n' + FINAL + READBACK + OWNERSHIP
     if peer:
-        result = 'Retained UI preview loaded: retained-smoke.q4ui\n' + result.replace('contexts=1', 'contexts=2') + FINAL + OWNERSHIP
+        result = 'Retained UI preview loaded: retained-smoke.rui\n' + result.replace('contexts=1', 'contexts=2') + FINAL + OWNERSHIP
     return result + AFTER
 
 
@@ -90,7 +90,7 @@ def change_report(log, index, old, new):
 
 def alias_options(**changes):
     values = dict(presentation_alias_probe=True,
-                  retained_document=FIXTURES / 'presentation-alias-smoke.q4ui',
+                  retained_document=FIXTURES / 'presentation-alias-smoke.rui',
                   retained_script=FIXTURES / 'presentation-alias-smoke.cfg',
                   retained_resume_script=FIXTURES / 'presentation-alias-smoke-resume.cfg')
     values.update(changes)
@@ -99,7 +99,7 @@ def alias_options(**changes):
 
 def alias_log(args):
     """A counted log stand-in; mutations below test the independent oracle."""
-    commands, close, _ = capture.retained_commands(args, 'retained-smoke.q4ui')
+    commands, close, _ = capture.retained_commands(args, 'retained-smoke.rui')
     values = iter(capture.presentation_alias_expected_values(int(args.language_reload) + int(args.video_restart), args.brightness))
     rows = []
     active = peer = opened = False
@@ -107,10 +107,10 @@ def alias_log(args):
     for command in (commands + close).splitlines():
         if command.startswith('ui_retainedPreview '):
             peer = True
-            rows.append('Retained UI preview loaded: retained-smoke.q4ui')
+            rows.append('Retained UI preview loaded: retained-smoke.rui')
         elif command.startswith('testGUI '):
             active = opened = True
-            rows.append('RETAINED_GUI_LOADED retained-smoke.q4ui')
+            rows.append('RETAINED_GUI_LOADED retained-smoke.rui')
         elif command == 'testGUI':
             active = False
         elif command == 'ui_retainedClose':
@@ -119,11 +119,11 @@ def alias_log(args):
             tick = 1000 if active else 1100 if opened else 900
             rows.append(f'Retained UI ownership: open=0 suspended=1 session_gui={int(active)} game_time={tick} requests=0')
         elif command in ('reloadLanguage', 'vid_restart windowed'):
-            rows.append('RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored')
+            rows.append('RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored')
         elif command == 'openq4_retainedGui report':
             focus = 'managed-shadows' if report >= 2 else ''
             shadows = int(report < 2)
-            rows.append(f'RETAINED_GUI path=retained-smoke.q4ui focus={focus} revision=1 active=1 brightness={args.brightness:.6f} shadows={shadows} contexts={1+int(peer)}')
+            rows.append(f'RETAINED_GUI path=retained-smoke.rui focus={focus} revision=1 active=1 brightness={args.brightness:.6f} shadows={shadows} contexts={1+int(peer)}')
             report += 1
         elif command.startswith('openq4_retainedGui '):
             rows.append(f'RETAINED_GUI_OPERATION {command.split()[1]} passed')
@@ -138,7 +138,7 @@ def alias_log(args):
 
 def event_options(**changes):
     values = dict(event_program_probe=True,
-                  retained_document=FIXTURES / 'event-program-smoke.q4ui',
+                  retained_document=FIXTURES / 'event-program-smoke.rui',
                   retained_script=FIXTURES / 'event-program-smoke.cfg',
                   retained_resume_script=FIXTURES / 'event-program-smoke-resume.cfg')
     values.update(changes)
@@ -147,7 +147,7 @@ def event_options(**changes):
 
 def event_log(args):
     """Model trace timing, including asynchronous application dispatch."""
-    commands, close, _ = capture.retained_commands(args, 'retained-smoke.q4ui')
+    commands, close, _ = capture.retained_commands(args, 'retained-smoke.rui')
     values = iter(capture.event_program_expected_values(int(args.language_reload) + int(args.video_restart)))
     events = iter(capture.EVENT_PROGRAM_TRACE)
     dispatches = iter(capture.EVENT_PROGRAM_DISPATCH)
@@ -169,17 +169,17 @@ def event_log(args):
         nonlocal queued
         for _ in range(queued):
             operation, value, brightness, shadows, close_requested = next(dispatches)
-            rows.append(f'RETAINED_GUI_DISPATCH path=retained-smoke.q4ui operation={operation} value={value} '
+            rows.append(f'RETAINED_GUI_DISPATCH path=retained-smoke.rui operation={operation} value={value} '
                         f'brightness={brightness:.6f} shadows={shadows} close={close_requested}')
         queued = 0
 
     for command in (commands + 'echo UI_BASELINE_CAPTURE_COMPLETE\n' + close).splitlines():
         if command.startswith('ui_retainedPreview '):
             peer = True
-            rows.append('Retained UI preview loaded: retained-smoke.q4ui')
+            rows.append('Retained UI preview loaded: retained-smoke.rui')
         elif command.startswith('testGUI '):
             active = opened = True
-            rows.append('RETAINED_GUI_LOADED retained-smoke.q4ui')
+            rows.append('RETAINED_GUI_LOADED retained-smoke.rui')
             event('onActivate')
             pump()
             event('onInit')
@@ -195,10 +195,10 @@ def event_log(args):
             tick = 1000 if active else 1100 if opened else 900
             rows.append(f'Retained UI ownership: open=0 suspended=1 session_gui={int(active)} game_time={tick} requests=0')
         elif command in ('reloadLanguage', 'vid_restart windowed'):
-            rows.append('RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored')
+            rows.append('RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored')
         elif command == 'openq4_retainedGui report':
             brightness, shadows = hosts[report] if report < len(hosts) else (1.25, 0)
-            rows.append(f'RETAINED_GUI path=retained-smoke.q4ui focus={focus} revision=1 active=1 '
+            rows.append(f'RETAINED_GUI path=retained-smoke.rui focus={focus} revision=1 active=1 '
                         f'brightness={brightness:.6f} shadows={shadows} contexts={1+int(peer)}')
             report += 1
         elif command.startswith('openq4_retainedGui '):
@@ -279,7 +279,7 @@ class ManagedCapture(unittest.TestCase):
         self.assertNotIn(' event ', resume)
 
     def test_event_fixture_declares_event_controls_localized_art_and_typed_programs(self):
-        source = (FIXTURES / 'event-program-smoke.q4ui').read_text(encoding='utf-8')
+        source = (FIXTURES / 'event-program-smoke.rui').read_text(encoding='utf-8')
         document = json.loads(source[source.index('{'):])
         self.assertEqual(document['id'], 'event-program-smoke')
         self.assertEqual(document['aliases']['curr'], document['aliases']['desktop::curr'])
@@ -325,7 +325,7 @@ class ManagedCapture(unittest.TestCase):
         with patch.object(sys, 'argv', base + good), patch.object(capture, 'capture', return_value=0) as launch:
             self.assertEqual(capture.main(), 0)
         parsed = launch.call_args.args[0]
-        self.assertEqual(parsed.retained_document, FIXTURES / 'event-program-smoke.q4ui')
+        self.assertEqual(parsed.retained_document, FIXTURES / 'event-program-smoke.rui')
         self.assertEqual(parsed.retained_script, FIXTURES / 'event-program-smoke.cfg')
         self.assertEqual(parsed.retained_resume_script, FIXTURES / 'event-program-smoke-resume.cfg')
         for arguments in (['--event-program-probe'], good + ['--presentation-probe'], good + ['--presentation-alias-probe']):
@@ -377,8 +377,8 @@ class ManagedCapture(unittest.TestCase):
             'deactivation before capture': log.replace('UI_BASELINE_CAPTURE_COMPLETE\n', '') + 'UI_BASELINE_CAPTURE_COMPLETE\n',
             'nonfinite dispatch': log.replace('operation=settings.brightness.set value=1.5 ',
                                                'operation=settings.brightness.set value=NaN ', 1),
-            'unrelated instance dispatched': log.replace('RETAINED_GUI_DISPATCH path=retained-smoke.q4ui',
-                                                          'RETAINED_GUI_DISPATCH path=peer.q4ui', 1),
+            'unrelated instance dispatched': log.replace('RETAINED_GUI_DISPATCH path=retained-smoke.rui',
+                                                          'RETAINED_GUI_DISPATCH path=peer.rui', 1),
         }
         for name, text in failures.items():
             with self.subTest(name=name):
@@ -434,7 +434,7 @@ class ManagedCapture(unittest.TestCase):
                 self.check_script(command, managed=True)
 
     def test_alias_fixture_has_explicit_targets_localization_and_separate_state(self):
-        source = (FIXTURES / 'presentation-alias-smoke.q4ui').read_text(encoding='utf-8')
+        source = (FIXTURES / 'presentation-alias-smoke.rui').read_text(encoding='utf-8')
         document = json.loads(source[source.index('{'):])
         self.assertEqual(document['id'], 'presentation-alias-smoke')
         self.assertEqual(document['aliases']['curr'], document['aliases']['desktop::curr'])
@@ -524,7 +524,7 @@ class ManagedCapture(unittest.TestCase):
         with patch.object(sys, 'argv', base + good), patch.object(capture, 'capture', return_value=0) as launch:
             self.assertEqual(capture.main(), 0)
         args = launch.call_args.args[0]
-        self.assertEqual(args.retained_document, FIXTURES / 'presentation-alias-smoke.q4ui')
+        self.assertEqual(args.retained_document, FIXTURES / 'presentation-alias-smoke.rui')
         self.assertEqual(args.retained_script, FIXTURES / 'presentation-alias-smoke.cfg')
         self.assertEqual(args.retained_resume_script, FIXTURES / 'presentation-alias-smoke-resume.cfg')
         self.assertEqual((args.brightness, args.gamma), (1.25, 1.3))
@@ -543,7 +543,7 @@ class ManagedCapture(unittest.TestCase):
             launch.assert_not_called()
 
     def test_settings_contract_uses_requested_initial_brightness_only(self):
-        commands, close, _ = capture.retained_commands(options(), 'retained-smoke.q4ui')
+        commands, close, _ = capture.retained_commands(options(), 'retained-smoke.rui')
         log = evidence_log().replace('brightness=1.000000', 'brightness=1.400000', 1)
         result = capture.managed_evidence(log, commands + close, peer=False, resource_resets=2,
                                           settings_fixture=True, initial_brightness=1.4, mode='sp')
@@ -552,7 +552,7 @@ class ManagedCapture(unittest.TestCase):
                                                 settings_fixture=True, mode='sp')['passed'])
 
     def test_settings_fixture_has_localized_controls_and_host_bindings(self):
-        source = (FIXTURES / 'managed-settings-smoke.q4ui').read_text(encoding='utf-8')
+        source = (FIXTURES / 'managed-settings-smoke.rui').read_text(encoding='utf-8')
         document = json.loads(source[source.index('{'):])
         nodes = {}
 
@@ -577,8 +577,8 @@ class ManagedCapture(unittest.TestCase):
         self.assertEqual(document['state']['shadows']['cvar'], 'r_shadows')
 
     def test_managed_script_loads_peer_first_and_never_replays_setup(self):
-        commands, close, settle = capture.retained_commands(options(retained_peer=True), 'retained-smoke.q4ui')
-        self.assertTrue(commands.startswith('ui_retainedOwnership\nui_retainedPreview "retained-smoke.q4ui"\ntestGUI "retained-smoke.q4ui"\n'))
+        commands, close, settle = capture.retained_commands(options(retained_peer=True), 'retained-smoke.rui')
+        self.assertTrue(commands.startswith('ui_retainedOwnership\nui_retainedPreview "retained-smoke.rui"\ntestGUI "retained-smoke.rui"\n'))
         self.assertEqual(commands.count('openq4_retainedGui save\n'), 1)
         self.assertEqual(commands.count('openq4_retainedGui menu accept 1\n'), 4)
         for tail in commands.split('reloadLanguage\n')[1:]:
@@ -593,15 +593,15 @@ class ManagedCapture(unittest.TestCase):
         args = options(retained_managed=False, retained_script=FIXTURES / 'snapshot-smoke.cfg',
                        retained_resume_script=FIXTURES / 'snapshot-resume.cfg', retained_open=True,
                        profile_frames=60, timeline='enter')
-        commands, close, settle = capture.retained_commands(args, 'retained-smoke.q4ui')
-        self.assertTrue(commands.startswith('ui_retainedOpen "retained-smoke.q4ui"\nwait 2\nui_retainedOwnership\n'))
+        commands, close, settle = capture.retained_commands(args, 'retained-smoke.rui')
+        self.assertTrue(commands.startswith('ui_retainedOpen "retained-smoke.rui"\nwait 2\nui_retainedOwnership\n'))
         self.assertEqual(commands.count('ui_retainedProfile 60\n'), 2)
         self.assertEqual(commands.count('ui_retainedPlay "enter"\n'), 1)
         self.assertEqual(close, 'ui_retainedClose\nwait 3\nui_retainedOwnership\n')
         self.assertEqual(settle, 62)
 
     def test_managed_evidence_requires_actions_host_values_and_live_peer_owner(self):
-        commands, close, _ = capture.retained_commands(options(retained_peer=True), 'retained-smoke.q4ui')
+        commands, close, _ = capture.retained_commands(options(retained_peer=True), 'retained-smoke.rui')
         log = evidence_log(peer=True)
 
         def validate(text):
@@ -609,13 +609,13 @@ class ManagedCapture(unittest.TestCase):
 
         self.assertTrue(validate(log)['passed'], validate(log)['errors'])
         failures = {
-            'missing normal load': log.replace('RETAINED_GUI_LOADED retained-smoke.q4ui\n', ''),
+            'missing normal load': log.replace('RETAINED_GUI_LOADED retained-smoke.rui\n', ''),
             'failed action': log.replace('RETAINED_GUI_OPERATION menu passed', 'RETAINED_GUI_OPERATION menu failed', 1),
             'failed sentinel restore': log.replace('RETAINED_GUI_OPERATION restore passed', 'RETAINED_GUI_OPERATION restore failed'),
             'missing restore': log.replace('RETAINED_GUI_OPERATION restore passed\n', ''),
             'replayed action': log + 'RETAINED_GUI_OPERATION menu passed\n',
             'resource failure': log.replace('event=restored', 'event=failed', 1),
-            'skipped resource barrier': log.replace('RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored\n', '', 1),
+            'skipped resource barrier': log.replace('RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored\n', '', 1),
             'peer missing': log.replace('contexts=2', 'contexts=1'),
             'peer not closed': change_last_report(log, 'contexts=1', 'contexts=2'),
             'host action not applied': log.replace('brightness=1.500000', 'brightness=1.000000', 1),
@@ -632,8 +632,8 @@ class ManagedCapture(unittest.TestCase):
                 self.assertFalse(validate(text)['passed'])
 
     def test_revision_is_compared_only_within_resource_epoch_segments(self):
-        commands, close, _ = capture.retained_commands(options(retained_peer=True), 'retained-smoke.q4ui')
-        resource = 'RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored\n'
+        commands, close, _ = capture.retained_commands(options(retained_peer=True), 'retained-smoke.rui')
+        resource = 'RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored\n'
         epochs = evidence_log(peer=True).split(resource)
         epochs[1] = epochs[1].replace('revision=4', 'revision=2')
         epochs[2] = epochs[2].replace('revision=4', 'revision=3')
@@ -652,7 +652,7 @@ class ManagedCapture(unittest.TestCase):
         self.assertFalse(validate(resource.join(changed))['passed'])
 
     def test_normal_session_ownership_pause_resume_and_mp_continuation(self):
-        commands, close, _ = capture.retained_commands(options(retained_peer=True), 'retained-smoke.q4ui')
+        commands, close, _ = capture.retained_commands(options(retained_peer=True), 'retained-smoke.rui')
 
         def validate(log, mode='sp'):
             return capture.managed_evidence(log, commands + close, peer=True, resource_resets=2, settings_fixture=True, mode=mode)
@@ -679,7 +679,7 @@ class ManagedCapture(unittest.TestCase):
 
     def test_capture_cli_rejects_incompatible_ownership_without_launch(self):
         base = ['capture', '--mode', 'sp', '--renderer', 'gl', '--assets', '.', '--output', '.tmp/unlaunched',
-                '--retained-document', str(FIXTURES / 'managed-settings-smoke.q4ui')]
+                '--retained-document', str(FIXTURES / 'managed-settings-smoke.rui')]
         for arguments in (['--retained-managed', '--retained-open'], ['--retained-peer'],
                           ['--retained-managed', '--profile-frames', '1'], ['--retained-managed', '--timeline', 'enter']):
             with self.subTest(arguments=arguments), patch.object(sys, 'argv', base + arguments), \

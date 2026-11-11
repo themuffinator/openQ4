@@ -165,7 +165,7 @@ void idUserInterfaceManaged::RefreshThinking() {
 bool UI_IsRetainedPath( const char *qpath ) {
 	if ( qpath == NULL ) { return false; }
 	const int length = idStr::Length( qpath );
-	return length >= 5 && idStr::Icmp( qpath + length - 5, ".q4ui" ) == 0;
+	return length >= 4 && idStr::Icmp( qpath + length - 4, ".rui" ) == 0;
 }
 
 idUserInterfaceManaged *UI_CreateForPath( const char *qpath, bool managed ) {

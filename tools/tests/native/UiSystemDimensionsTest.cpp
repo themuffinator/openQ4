@@ -85,7 +85,7 @@ static void Run(const std::string& source,const std::string& directory,const cha
  Replace(v,"settings_window_width","-");Pending(v);std::string snapshot;
  Check(v.runtime.SaveSnapshot(snapshot,v.error,v.time),"dimension document snapshot saves pending correction");
  v.runtime.CloseDocument();std::vector<Diagnostic> diagnostics;
- Check(v.runtime.LoadDocument(source,"guis/menu/settings/system.q4ui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"dimension fields recreate from exact source");v.Sync();v.Frame();
+ Check(v.runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"dimension fields recreate from exact source");v.Sync();v.Frame();
  Check(v.runtime.GetWidgetState("settings_window_width")->number->state.text=="-"&&v.runtime.TakeActions().empty(),"recreation preserves invalid text without replaying a proposal");
  NumberDraftSummary draft;Check(v.runtime.QueryNumberDrafts(draft,v.error,v.time)&&v.runtime.DiscardNumberDrafts(draft.barrier,v.error,v.time),"explicit discard clears restored local size");v.pending=false;v.Sync();v.Frame();
  Check(v.Focus("settings_window_width")&&v.runtime.BeginNumberEdit("settings_window_width",v.error,v.time),"begin proposal before dependency loss");Replace(v,"settings_window_width","1920");

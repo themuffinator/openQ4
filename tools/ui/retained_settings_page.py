@@ -3,7 +3,7 @@
 
 Built by tools/ui/build_retained_screens.py, which writes and checks it with
 the other retained screens. SETTINGS on the title or the pause hands off to
-guis/menu/settings.q4ui as MULTIPLAYER does to its page
+guis/menu/settings.rui as MULTIPLAYER does to its page
 (idSessionLocal::BeginRetainedPage): the home docks its bands and carries its
 label into the title slot, and at 550 ms the page presents in the page state,
 that label its title. It is the stock settings screen's level: its buttons

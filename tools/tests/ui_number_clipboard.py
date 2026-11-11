@@ -145,9 +145,9 @@ int main(){
     NativeReset();a=new idUserInterfaceRetained;a->Request(uiClipboardOperation_t::Paste);address=a;
     nativeCallback=[&]{delete a;a=nullptr;};Drain(address);assert(reads==1 && a==nullptr);
     // The same registered Deferred survives replacement of its inner backend.
-    NativeReset();auto* deferred=new idUserInterfaceDeferred;assert(deferred->InitFromFile("one.q4ui",true,true));
+    NativeReset();auto* deferred=new idUserInterfaceDeferred;assert(deferred->InitFromFile("one.rui",true,true));
     auto* inner=static_cast<idUserInterfaceRetained*>(deferred->backend);inner->Request(uiClipboardOperation_t::Cut);
-    nativeCallback=[&]{assert(deferred->InitFromFile("two.q4ui",true,true));};Drain(deferred);
+    nativeCallback=[&]{assert(deferred->InitFromFile("two.rui",true,true));};Drain(deferred);
     inner=static_cast<idUserInterfaceRetained*>(deferred->backend);assert(writes==1 && inner->replacements==0 && inner->notices==0);delete deferred;
     // Nested drains may not run another native service or authorize the first.
     NativeReset();a=new idUserInterfaceRetained;auto* b=new idUserInterfaceRetained;b->Request(uiClipboardOperation_t::Paste);
@@ -176,7 +176,7 @@ static void CheckClipboardKeys() {
     modelTemplate.actions["number.set"]={"settings.brightness.set",{{"value",operand}},std::size_t(0)};
     consoleObject.open=false;windowFocused=true;
     {
-        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.q4ui"));gui.Activate(true,0);gui.Redraw(0);
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
         auto& runtime=Live();runtime.InstallNumber("root","number.set");runtime.InstallNumber("other","number.set");runtime.selected="root";
         std::string error;assert(runtime.BeginNumberEdit("root",error,0));
         const auto captured=[&](int key,bool down,openq4::KeyEventMetadata modifiers){

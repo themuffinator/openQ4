@@ -14,7 +14,7 @@ static void OpenQ4_UpdateScopeGui( idUserInterface *&gui, idStr &requested, cons
 		return;
 	}
 	idStr desired = stock;
-	if ( cvarSystem->GetCVarBool( "ui_retained" ) ) desired.SetFileExtension( ".q4ui" );
+	if ( cvarSystem->GetCVarBool( "ui_retained" ) ) desired.SetFileExtension( ".rui" );
 	if ( !requested.Icmp( desired ) ) return;
 	requested = desired; // missing/invalid documents retry only after a gate change
 	// A mod may replace a stock-named scope without opting into this UI.

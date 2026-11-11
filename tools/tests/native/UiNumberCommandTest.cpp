@@ -29,7 +29,7 @@ static Json::Value Box(const char* id,double x,double y,double width,double heig
 }
 static void Colour(Json::Value& node,std::initializer_list<double> colour) { node["properties"]["background-color"]=Typed("color",Array(colour)); }
 static std::string Source(bool transformed=false,bool framed=false,bool hostSource=false) {
-	Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="number-runtime";
+	Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="number-runtime";
 	source["state"]["value"]["type"]="number";source["state"]["value"]["initial"]=1.05;
 	if(hostSource)source["state"]["value"]["cvar"]="r_number_test";
 	source["actions"]["edit"]["input"]="number";source["actions"]["edit"]["operation"]="test.edit";source["actions"]["edit"]["arguments"]["value"]["input"]="value";
@@ -96,7 +96,7 @@ struct TestHost final:Host {
 struct View {
 	TestHost host;Runtime runtime{host};Viewport viewport;double time=1;std::string error,source;
 	explicit View(bool cvar=false){source=Source(false,false,cvar);std::vector<Diagnostic> diagnostics;
-		const bool loaded=runtime.LoadDocument(source,"number-command.q4ui",diagnostics);
+		const bool loaded=runtime.LoadDocument(source,"number-command.rui",diagnostics);
 		for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());
 		Check(loaded,"actual command fixture loads");runtime.SetReducedMotion(true,time);Frame();Begin();}
 	void Frame(){++host.frame;time+=.01;runtime.Frame(viewport,time);}
@@ -188,12 +188,12 @@ static void OwnershipAndReadback(){
 }
 static void RestoreAndIndependentInstances(){
 	TestHost host;Runtime first(host),second(host);std::string error,snapshot;std::vector<Diagnostic> diagnostics;Viewport viewport;
-	const auto source=Source();Check(first.LoadDocument(source,"same.q4ui",diagnostics)&&second.LoadDocument(source,"same.q4ui",diagnostics),"independent contexts load same source");
+	const auto source=Source();Check(first.LoadDocument(source,"same.rui",diagnostics)&&second.LoadDocument(source,"same.rui",diagnostics),"independent contexts load same source");
 	first.Frame(viewport,1);second.Frame(viewport,1);Check(first.FocusControl("number",1)&&first.BeginNumberEdit("number",error,1),"first instance begins");
 	Check(second.FocusControl("number",1)&&second.BeginNumberEdit("number",error,1),"peer has its own active edit lease");
 	auto id=first.GetWidgetState("number")->number->identity;Check(first.ReplaceNumberSelection("number",id,"1e",error,1),"first instance dirty draft");id=first.GetWidgetState("number")->number->identity;
 	Check(!second.NumberCommand("number",id,TextEditCommand::Home,false,error,1),"sibling cannot use first instance edit lease");
-	Check(first.SaveSnapshot(snapshot,error,1),"save source-bound local edit");first.Shutdown();Check(first.LoadDocument(source,"same.q4ui",diagnostics)&&first.RestoreSnapshot(snapshot,error,2),"recreate resource and restore draft");
+	Check(first.SaveSnapshot(snapshot,error,1),"save source-bound local edit");first.Shutdown();Check(first.LoadDocument(source,"same.rui",diagnostics)&&first.RestoreSnapshot(snapshot,error,2),"recreate resource and restore draft");
 	Check(!first.NumberCommand("number",id,TextEditCommand::Home,false,error,2),"old lease cannot navigate restored draft before layout");
 	++host.frame;first.Frame(viewport,2);Check(first.BeginNumberEdit("number",error,2),"explicit resume restored draft");
 	const auto fresh=first.GetWidgetState("number")->number->identity;Check(fresh!=id&&first.NumberCommand("number",fresh,TextEditCommand::Home,false,error,2),"new restored lease navigates current draft");
@@ -202,7 +202,7 @@ static void RestoreAndIndependentInstances(){
 static void FontServiceRecreation(){
 	View v;v.Frame();v.Text("8e");const auto old=v.Id();std::string snapshot;std::vector<Diagnostic> diagnostics;
 	Check(v.runtime.SaveSnapshot(snapshot,v.error,v.time),"save before final-context font teardown");v.runtime.Shutdown();v.host.fontSize=37;v.host.glyphs.clear();
-	Check(v.runtime.LoadDocument(v.source,"number-command.q4ui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"rebuild document with fresh font service");
+	Check(v.runtime.LoadDocument(v.source,"number-command.rui",diagnostics)&&v.runtime.RestoreSnapshot(snapshot,v.error,v.time),"rebuild document with fresh font service");
 	v.Frame();v.Begin();Check(!v.runtime.NumberCommand("number",old,TextEditCommand::Home,false,v.error,v.time),"font-resource recreation cannot resurrect edit identity");
 	Check(v.Command(TextEditCommand::Home)&&v.host.glyphs.contains({37,'8'}),"recreated command queries new service font");v.Expect("8e",0,0);
 }

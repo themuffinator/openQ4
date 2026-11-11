@@ -2277,6 +2277,11 @@ void idRestoreGame::ReadUserInterface( idUserInterface *&ui, const idDict *args 
 // RAVEN END
 
 	ReadString( name );
+	// openQ4 named retained documents .q4ui until the id Tech 4 ports shared
+	// the format as .rui; saves written before then still name the old file.
+	if ( name.Length() > 5 && !idStr::Icmp( name.c_str() + name.Length() - 5, ".q4ui" ) ) {
+		name.SetFileExtension( ".rui" );
+	}
 	if ( !name.Length() ) {
 		ui = NULL;
 	} else {

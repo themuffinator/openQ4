@@ -48,7 +48,7 @@ def steps():
                 'openq4_retainedGui focus "players-a-1"', *menu('accept'),
                 'screenshot "screenshots/live-players.tga"', 'openq4_retainedGui event onBack', 'waitMsec 500']
     for name, document, tab, prefix in VIEWS:
-        commands += [f'testGUI "guis/menu/{document}.q4ui"', 'waitMsec 500']
+        commands += [f'testGUI "guis/menu/{document}.rui"', 'waitMsec 500']
         values = {'mp.players.a.shown': 1, 'mp.players.a.count': 32, 'mp.players.a.color': 3,
                   'mp.players.a.title': '#str_200038', 'mp.players.b.shown': 0,
                   'mp.players.b.count': 0, 'mp.players.s.count': 0}
@@ -132,7 +132,7 @@ def main():
     binaries = [executable, *sorted(args.runtime.glob('renderer-*')), *sorted((args.runtime / 'baseoq4').glob('game-*'))]
     binaries = [p for p in binaries if p.is_file()]
     bindings = {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries}
-    documents = {f'guis/menu/{doc}.q4ui' for _, doc, _, _ in VIEWS}
+    documents = {f'guis/menu/{doc}.rui' for _, doc, _, _ in VIEWS}
     source_paths = [*(ROOT / 'content/baseoq4/pak0' / doc for doc in sorted(documents)),
                     ROOT / 'src/mpgame/MultiplayerGame.h', ROOT / 'src/mpgame/MultiplayerGame.cpp', Path(__file__).resolve()]
     sources = {str(p.relative_to(ROOT)): capture.digest(p) for p in source_paths}

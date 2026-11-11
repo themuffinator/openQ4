@@ -53,7 +53,7 @@ static void StateDecl(Json::Value& root, const char* id, const char* type, Json:
 	root["state"][id]["type"] = type; root["state"][id]["initial"] = std::move(value);
 }
 static Json::Value Fixture() {
-	Json::Value root; root["format"] = "openq4-ui"; root["version"] = 1; root["id"] = "value-controls";
+	Json::Value root; root["format"] = "retained-ui"; root["version"] = 1; root["id"] = "value-controls";
 	StateDecl(root,"flag","boolean",false); StateDecl(root,"mixed","boolean",true);
 	StateDecl(root,"brightness","number",1.25); StateDecl(root,"divisor","number",1);
 	StateDecl(root,"choice","number",3); StateDecl(root,"available","boolean",true);

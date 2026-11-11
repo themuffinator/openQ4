@@ -110,7 +110,7 @@ staged successfully through the MSVC-aware Meson wrapper.
 
 ### Final gameplay captures
 
-The unchanged `vector-smoke.q4ui` fixture was captured through the registered
+The unchanged `vector-smoke.rui` fixture was captured through the registered
 engine screenshot command after entering gameplay. Both runs were hidden and
 windowed, with mouse/controller input disabled and no host input injection.
 Render-target TGA files were reviewed visually; the rails and curved ring/check
@@ -153,8 +153,8 @@ and new output directories:
 & tools/build/meson_setup.ps1 test -C builddir --no-rebuild openq4-retained-ui openq4-ui-document openq4-ui-vector
 & tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects
 $assets = 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4'
-python tools/ui/capture_legacy_baseline.py --assets $assets --mode sp --renderer gl --retained-document tools/ui/fixtures/vector-smoke.q4ui --density 1.25 --timeline enter --video-restart --output .tmp/ui/coverage/sp-gl-review
-python tools/ui/capture_legacy_baseline.py --assets $assets --mode mp --renderer vulkan --retained-document tools/ui/fixtures/vector-smoke.q4ui --density 2 --timeline enter --reduced-motion --output .tmp/ui/coverage/mp-vulkan-review
+python tools/ui/capture_legacy_baseline.py --assets $assets --mode sp --renderer gl --retained-document tools/ui/fixtures/vector-smoke.rui --density 1.25 --timeline enter --video-restart --output .tmp/ui/coverage/sp-gl-review
+python tools/ui/capture_legacy_baseline.py --assets $assets --mode mp --renderer vulkan --retained-document tools/ui/fixtures/vector-smoke.rui --density 2 --timeline enter --reduced-motion --output .tmp/ui/coverage/mp-vulkan-review
 ```
 
 ## Remaining quality work

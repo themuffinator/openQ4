@@ -40,7 +40,7 @@ def main():
         if scenario=='marine': stages += ['saveGame "status-bar"','waitMsec 500',
             'testStatusBar stats 45 0','loadGame "status-bar"','waitMsec 3000','testStatusBar probe',shot('save-restored')]
         capture.SCENARIOS[scenario]=(level,stages)
-        path='guis/hud/status_bar_marine.q4ui'
+        path='guis/hud/status_bar_marine.rui'
         if scenario=='missing': capture.OVERRIDES[scenario]={path:lambda runtime:''}
         if scenario=='invalid': capture.OVERRIDES[scenario]={path:lambda runtime:'{"format":"invalid"}'}
         if scenario=='custom':
@@ -57,7 +57,7 @@ def main():
         if scenario in ('missing','invalid','custom'):
             assert all(t[0]=='stock' and t[-1]=='0' for t in traces),'unavailable or mod-owned HUD must use stock gauges'
         else:
-            assert any(t[0].endswith('status_bar_'+('strogg' if scenario=='strogg' else 'marine')+'.q4ui') and t[-1]=='1' for t in traces),'native status bar must draw during gameplay'
+            assert any(t[0].endswith('status_bar_'+('strogg' if scenario=='strogg' else 'marine')+'.rui') and t[-1]=='1' for t in traces),'native status bar must draw during gameplay'
             assert any(t[1:3]==('20','0') and t[-1]=='1' for t in traces),'low health and zero armor bind during gameplay'
             assert traces[-1][-1]=='1','renderer restart must restore a drawn status bar'
             assert any(t[3]=='293' for t in traces),'consuming seven rounds must update live ammunition'

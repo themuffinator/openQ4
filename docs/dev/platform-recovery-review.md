@@ -512,7 +512,7 @@ The updated debug APK, SHA-256
 passes exact staged payload, seven-library, manifest, API/ABI, 16 KiB ELF/ZIP
 alignment and v2-signature checks. An in-place update with the same debug
 certificate preserves the original save, metadata and preview byte-for-byte.
-Its restore attempt fails safely because `guis/menu/pause.q4ui` cannot be
+Its restore attempt fails safely because `guis/menu/pause.rui` cannot be
 created; the game displays its load-failed dialog and is then force-stopped.
 The original save and failure logs are retained. Inspection identifies a UI
 thread binding captured during library loading instead of engine initialization;
@@ -539,7 +539,7 @@ Both owners now bind during UI initialization, preserving rejection of calls
 from other threads and allowing serial engine reinitialization.
 
 The S25 restore failure above occurs in optional pause-menu preparation before
-the game reads saved state. The original save contains no `pause.q4ui` reference;
+the game reads saved state. The original save contains no `pause.rui` reference;
 `FindGui`'s broad loading-session guard produced the serialized-GUI diagnostic.
 The subsequent [serialized-GUI boundary repair](savegame-reliability.md#serialized-gui-admission-and-optional-menu-fallback)
 preserves optional fallback while rejecting missing definitions required by the

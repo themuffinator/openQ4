@@ -35,7 +35,7 @@ def options(**changes):
                   presentation_probe=False, presentation_alias_probe=False, event_program_probe=False,
                   system_settings_probe=False, legacy_export_list=None, shared_gui=False,
                   mode='sp', renderer='gl', ui_scale=1, density=0, reduced_motion=False, timeout=1,
-                  retained_document=Path(str(FIXTURE)+'.q4ui'), retained_script=Path(str(FIXTURE)+'.cfg'),
+                  retained_document=Path(str(FIXTURE)+'.rui'), retained_script=Path(str(FIXTURE)+'.cfg'),
                   retained_resume_script=None)
     values.update(changes)
     return SimpleNamespace(**values)
@@ -61,7 +61,7 @@ def synthetic_log(resets=0):
         return f'UI_SETTINGS_DEVICE restore={restore} epoch=7 generation={generation} submitted={count} presented={count} failures=0 width={width} height={height}'
     def witness(kind,request,generation,count):
         return f'UI_SETTINGS_{kind} owner=77 request={request} epoch=7 generation={generation} submitted={count} presented={count} failures=0'
-    resource='RETAINED_GUI_RESOURCE path=retained-smoke.q4ui event=restored'
+    resource='RETAINED_GUI_RESOURCE path=retained-smoke.rui event=restored'
     lines=[action('begin',1,0)]+group(0)+[action('edit',1,1)]+group(1)
     lines += [action('apply',4,1),'UI_SETTINGS_JOURNAL state=pending durable=1',device(0,10,100,960,540),
               stage(2,11,1),resource,witness('VIEW',11,10,101),stage(3,11,1),witness('PRESENT',11,10,102)]+group(2)
@@ -172,7 +172,7 @@ class DisplayCapture(unittest.TestCase):
         for old,new in (('durable=1','durable=0'),('state=confirmed','state=pending'),('result=0','result=1'),
                         ('blocked=1','blocked=0'),('stage=6','stage=0'),('owner=77','owner=0'),('request=14','request=13')):
             with self.subTest(old=old):self.rejects([line.replace(old,new) for line in original])
-        for warning in ('WARNING: retained GUI retained-smoke.q4ui: unexpected',
+        for warning in ('WARNING: retained GUI retained-smoke.rui: unexpected',
                         'WARNING: Loading non pre-cached material decl _retained/_ttfatlasx_fonts_english_marine_48',
                         'ERROR: renderer failed','FATAL: cannot initialize'):
             self.rejects(original+[warning])
@@ -206,9 +206,9 @@ class DisplayCapture(unittest.TestCase):
             lock.write_bytes(b'')
 
     def test_exact_sources_and_owned_screenshot_injection(self):
-        args=options();expected={Path(str(FIXTURE)+suffix).name:hashlib.sha256(Path(str(FIXTURE)+suffix).read_bytes()).hexdigest() for suffix in ('.q4ui','.cfg','-resume.cfg')}
+        args=options();expected={Path(str(FIXTURE)+suffix).name:hashlib.sha256(Path(str(FIXTURE)+suffix).read_bytes()).hexdigest() for suffix in ('.rui','.cfg','-resume.cfg')}
         self.assertEqual(probe.sources(args),expected)
-        commands,close,_=capture.retained_commands(args,'retained-smoke.q4ui')
+        commands,close,_=capture.retained_commands(args,'retained-smoke.rui')
         shots=re.findall(r'^screenshot "([^"]+)"$',commands,re.MULTILINE)
         self.assertEqual(shots,[f'screenshots/ui-display-{name}.tga' for name in ('confirm-a','keep','confirm-b','revert')])
         self.assertEqual(commands.count('openq4_guiGet "liveHeight"'),6)
@@ -222,15 +222,15 @@ class DisplayCapture(unittest.TestCase):
                         {'language_reload':True,'retained_resume_script':None}):
             with self.subTest(changes=changes),self.assertRaises(ValueError):probe.sources(options(**changes))
         with tempfile.TemporaryDirectory(prefix='display-source-',dir=ROOT/'.tmp') as temp:
-            for attribute,suffix in (('retained_document','.q4ui'),('retained_script','.cfg'),('retained_resume_script','-resume.cfg')):
+            for attribute,suffix in (('retained_document','.rui'),('retained_script','.cfg'),('retained_resume_script','-resume.cfg')):
                 source=Path(str(FIXTURE)+suffix);copied=Path(temp)/source.name;copied.write_bytes(source.read_bytes())
                 self.assertEqual(probe.sources(options(**{attribute:copied})),expected)
                 copied.write_bytes(copied.read_bytes()+b'\n// changed source\n')
-                with self.assertRaises(ValueError):capture.retained_commands(options(**{attribute:copied}),'retained-smoke.q4ui')
+                with self.assertRaises(ValueError):capture.retained_commands(options(**{attribute:copied}),'retained-smoke.rui')
 
     def test_resume_never_replays_actions_or_screenshots(self):
         args=options(language_reload=True,video_restart=True,retained_resume_script=Path(str(FIXTURE)+'-resume.cfg'))
-        commands,_,_=capture.retained_commands(args,'retained-smoke.q4ui')
+        commands,_,_=capture.retained_commands(args,'retained-smoke.rui')
         for tail in (commands.split('reloadLanguage\n',1)[1],commands.split('vid_restart windowed\n',1)[1]):
             self.assertNotIn('openq4_retainedGui event ',tail)
             self.assertNotIn('openq4_retainedGui menu ',tail)

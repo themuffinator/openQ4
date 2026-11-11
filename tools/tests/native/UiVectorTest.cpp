@@ -335,7 +335,7 @@ int main(int argc, char** argv) {
 	Check(!TessellatePath(path,options,mesh,error),"reject non-finite transform");
 	options.transform = {0,0,0,0,0,0}; build(path); Check(mesh.indices.empty(),"collapsed scale produces no stale geometry");
 	Document document; std::vector<Diagnostic> diagnostics;
-	const char* source = R"json({"format":"openq4-ui","version":1,"id":"vector-document",
+	const char* source = R"json({"format":"retained-ui","version":1,"id":"vector-document",
 	 "tokens":{"rail":{"type":"color","value":[0.5,0.6,0.3,1]}},
 	 "root":{"id":"panel","type":"vector","paths":[{"id":"plate","fill":{"type":"solid","color":{"type":"token","value":"rail"}},
 	 "commands":[{"id":"start","op":"move","points":[[12,0]]},

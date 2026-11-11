@@ -28,7 +28,7 @@ void idPlayer::InitQuickChat( void ) {
 void idPlayer::PrecacheQuickChatGui( void ) {
 	if ( quickChatGui || quickChatGuiFailed || gameLocal.localClientNum < 0 || entityNumber != gameLocal.localClientNum ) return;
 	if ( !cvarSystem->GetCVarBool( "ui_retained" ) ) return;
-	quickChatGui = uiManager->FindGui( "guis/hud/quick_chat.q4ui", true, true );
+	quickChatGui = uiManager->FindGui( "guis/hud/quick_chat.rui", true, true );
 	if ( !quickChatGui ) quickChatGuiFailed = true;
 }
 
@@ -175,7 +175,7 @@ void idPlayer::DrawQuickChat( void ) {
 	}
 	if ( !quickChatGui ) {
 		if ( quickChatGuiFailed ) return;
-		quickChatGui = uiManager->FindGui( "guis/hud/quick_chat.q4ui", true, true );
+		quickChatGui = uiManager->FindGui( "guis/hud/quick_chat.rui", true, true );
 		if ( !quickChatGui ) {
 			quickChatGuiFailed = true;
 			return;

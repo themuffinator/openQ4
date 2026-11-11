@@ -6,6 +6,19 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Retained interface documents are now `.rui` files, 11 November 2026
+
+- The new interface's menus, HUDs and optics overlays are now `.rui` (Retained
+  UI) documents instead of `.q4ui`, and declare `"format": "retained-ui"`
+  instead of `"openq4-ui"`. openD3, openPREY and openETQW share the format, so
+  its name no longer belongs to one game.
+- **Upgrade note for mod authors:** rename custom `.q4ui` documents to `.rui`.
+  Only `.rui` paths open in the new interface; a document that still declares
+  `"openq4-ui"` is accepted.
+- Saves made while a `.q4ui` HUD, scope or menu was open still load: the game
+  opens the renamed document. The save's binary `Q4UI` frame tag is unchanged.
+- Validation: Built and staged from a clean tree, every UI generator reproduces its committed documents, the Meson suite passes (341 tests), and in Air Defense Bunker the title, pause, loading, Remastered HUD and weapon wheel load as `.rui` documents. A save made by the previous build loads.
+
 ## Credits scan bars sweep in from the screen's edge on wide screens, 11 November 2026
 
 - On the Credits page, the orange scan bars that translate each heading from

@@ -30,7 +30,7 @@ def main():
     parser.add_argument('--mutations', action='store_true')
     args = parser.parse_args()
     repository = args.repository.resolve()
-    candidate=(args.document or ROOT/'content/baseoq4/pak0/guis/menu/settings/system.q4ui').resolve()
+    candidate=(args.document or ROOT/'content/baseoq4/pak0/guis/menu/settings/system.rui').resolve()
     rml = repository / 'subprojects/RmlUi-6.3'
     scratch = ROOT / '.tmp'
     scratch.mkdir(exist_ok=True)

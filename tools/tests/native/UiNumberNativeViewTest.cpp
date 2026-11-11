@@ -40,7 +40,7 @@ static Json::Value Box(const char* id,double x,double y,double width,double heig
 }
 static void Colour(Json::Value& node,std::initializer_list<double> colour) { node["properties"]["background-color"]=Typed("color",Array(colour)); }
 static std::string Source(bool transformed=false,bool framed=false,bool hostSource=false) {
-	Json::Value source;source["format"]="openq4-ui";source["version"]=1;source["id"]="number-runtime";
+	Json::Value source;source["format"]="retained-ui";source["version"]=1;source["id"]="number-runtime";
 	source["state"]["value"]["type"]="number";source["state"]["value"]["initial"]=1.05;
 	if(hostSource)source["state"]["value"]["cvar"]="r_number_test";
 	source["actions"]["edit"]["input"]="number";source["actions"]["edit"]["operation"]="test.edit";source["actions"]["edit"]["arguments"]["value"]["input"]="value";
@@ -150,7 +150,7 @@ struct NativeView {
  std::uint64_t dispatch=10,fence=20;
  NativeView(float density=1,bool transform=false,bool framed=false,bool masked=false):ratio(density) {
   source=masked?MaskedSource():NativeSource(transform,framed);std::vector<Diagnostic> diagnostics;
-  const bool loaded=model.Load(source,diagnostics)&&runtime.LoadDocument(source,"native-number.q4ui",diagnostics);
+  const bool loaded=model.Load(source,diagnostics)&&runtime.LoadDocument(source,"native-number.rui",diagnostics);
   for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"real authored vector Number fixture loads");
   Viewport viewport;viewport.width=1280;viewport.height=720;viewport.displayScale=ratio;runtime.Frame(viewport,time);
   context=Rml::GetContext(0);Check(context!=nullptr,"actual Rml context exists");document=context->GetDocument(0);Check(document!=nullptr,"actual Rml document exists");

@@ -108,7 +108,7 @@ struct Game {int time=101;} gameLocal;
 MAIN = r'''
 int main(){
  for(const char*kind:{"machinegun","railgun","nailgun"}){
-    const std::string stock=std::string("guis/weapons/")+kind+"_scope.gui",retained=stock.substr(0,stock.size()-4)+".q4ui";
+    const std::string stock=std::string("guis/weapons/")+kind+"_scope.gui",retained=stock.substr(0,stock.size()-4)+".rui";
     idDict args;args.Set("gui_zoom",stock.c_str());idStr requested;
     idUserInterface old(stock.c_str());old.SetStateString("lockStatus","1");old.SetStateString("lockRange","12.4");
     idUserInterface*gui=&old;cv.retained=false;

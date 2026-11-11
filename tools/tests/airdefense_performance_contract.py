@@ -6,7 +6,7 @@ VALID = '''Vulkan: first SSAO pass drew
 Vulkan: first motion blur pass drew (camera only)
 Vulkan: first bloom/tone map pass drew
 Retained UI root profile: {"frames":1000,"views":3}
-Retained UI document work: path=guis/hud/remastered_marine.q4ui cpu_ms=0.1
+Retained UI document work: path=guis/hud/remastered_marine.rui cpu_ms=0.1
 benchmarkViewSweep: start, 360.0 degrees over 12000 ms
 benchmarkViewSweep: complete, 360.0 degrees over 12000 ms, yaw -105 -> -105
 benchmarkViewSweep: start, 720.0 degrees over 24000 ms
@@ -36,7 +36,7 @@ def check_profile(preset):
         ("cap=0,", "cap=60,"),
         ("span_ms=27000", "span_ms=5000"),
         ('"frames":1000', '"frames":500'),
-        ("remastered_marine.q4ui", "artwork.q4ui"),
+        ("remastered_marine.rui", "artwork.rui"),
         ("10325.0", "0.0"),
     ):
         assert check(valid.replace(before, after)), (before, after)

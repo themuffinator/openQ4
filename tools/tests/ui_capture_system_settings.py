@@ -34,9 +34,9 @@ OPERATIONS = (
     ('begin', 0, 1, 0), ('edit', 0, 1, 1), ('apply', 0, 1, 0), ('edit', 0, 1, 1),
 )
 DIAGNOSTICS = (
-    'WARNING: retained GUI retained-smoke.q4ui: r_brightness: outside the registered CVar range',
-    'WARNING: retained GUI retained-smoke.q4ui: System settings batch requires unsupported effects or an owning confirmation view',
-    'WARNING: retained GUI retained-smoke.q4ui: Settings changed outside this session; reopen before applying',
+    'WARNING: retained GUI retained-smoke.rui: r_brightness: outside the registered CVar range',
+    'WARNING: retained GUI retained-smoke.rui: System settings batch requires unsupported effects or an owning confirmation view',
+    'WARNING: retained GUI retained-smoke.rui: Settings changed outside this session; reopen before applying',
 )
 
 
@@ -44,7 +44,7 @@ def options(**changes):
     values = dict(brightness=1, width=1280, language_reload=True, video_restart=True,
                   retained_managed=True, retained_open=False, retained_peer=False,
                   profile_frames=0, timeline=None,
-                  retained_document=Path(str(FIXTURE) + '.q4ui'),
+                  retained_document=Path(str(FIXTURE) + '.rui'),
                   retained_script=Path(str(FIXTURE) + '.cfg'),
                   retained_resume_script=Path(str(FIXTURE) + '-resume.cfg'))
     values.update(changes)
@@ -163,7 +163,7 @@ class SystemSettingsCapture(unittest.TestCase):
             with self.subTest(missing=warning):
                 self.rejects([line for line in original if line != warning])
             self.rejects(original + [warning])
-        self.rejects(original + ['WARNING: retained GUI retained-smoke.q4ui: unexpected error'])
+        self.rejects(original + ['WARNING: retained GUI retained-smoke.rui: unexpected error'])
         self.rejects([line.replace('outside the registered CVar range', 'outside the editor range') for line in original])
         changed = original.copy(); changed[-1], changed[-2] = changed[-2], changed[-1]
         self.rejects(changed)
@@ -180,9 +180,9 @@ class SystemSettingsCapture(unittest.TestCase):
         self.assertIn('openq4_retainedGui pending "settings.draft.r_brightness" "1.9"', setup)
         self.assertIn('openq4_retainedGui pending "spare" "9"', setup)
         self.assertLess(setup.index('openq4_retainedGui save'), setup.index('openq4_retainedGui restore'))
-        commands, close, _ = capture.retained_commands(args, 'retained-smoke.q4ui')
+        commands, close, _ = capture.retained_commands(args, 'retained-smoke.rui')
         self.assertEqual(commands.count(setup), 1)
-        self.assertTrue(commands.startswith('ui_retainedOwnership\ntestGUI "retained-smoke.q4ui"'))
+        self.assertTrue(commands.startswith('ui_retainedOwnership\ntestGUI "retained-smoke.rui"'))
         for part in commands.split('reloadLanguage\n')[1:] + commands.split('vid_restart windowed\n')[1:]:
             self.assertIn(resume, part)
             self.assertNotIn('openq4_retainedGui event ', part)
@@ -210,10 +210,10 @@ class SystemSettingsCapture(unittest.TestCase):
 
     def test_source_bytes_are_bound_with_explicit_initial_conditions(self):
         expected = {Path(str(FIXTURE) + suffix).name: hashlib.sha256(Path(str(FIXTURE) + suffix).read_bytes()).hexdigest()
-                    for suffix in ('.q4ui', '.cfg', '-resume.cfg')}
+                    for suffix in ('.rui', '.cfg', '-resume.cfg')}
         self.assertEqual(probe.sources(options()), expected)
         no_reset = probe.sources(options(language_reload=False, video_restart=False, retained_resume_script=None))
-        self.assertEqual(set(no_reset), {FIXTURE.name + '.q4ui', FIXTURE.name + '.cfg'})
+        self.assertEqual(set(no_reset), {FIXTURE.name + '.rui', FIXTURE.name + '.cfg'})
         for changes in ({'brightness': 1.25}, {'brightness': float('nan')}, {'width': 960},
                         {'retained_document': None}, {'retained_script': None}, {'retained_resume_script': None}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):

@@ -38,7 +38,7 @@ def main():
     setattr(args, 'set', ['com_gameMode=SP', 'r_swapInterval=0', 'com_maxfps=0'])
     stages = ['god', 'notarget', 'set ui_testGuiInGame 1']
     for kind in ('machinegun', 'railgun', 'nailgun'):
-        stages += [f'testGUI guis/weapons/{kind}_scope.q4ui', 'waitMsec 1500',
+        stages += [f'testGUI guis/weapons/{kind}_scope.rui', 'waitMsec 1500',
                    f'echo SCOPE_PROFILE {kind}', f'ui_retainedProfile {args.frames}']
         for frame in range(args.frames + 2):
             stages += [f'openq4_retainedGui state playerYaw {frame * .7 % 360:.3f}']
@@ -73,7 +73,7 @@ def main():
     result['document_work'] = re.findall(r'Retained UI document work: [^\n]+', log)
     result['passed'] = (result['complete'] and result['returncode'] == 0 and result['runtime_unchanged'] and
                         not result['errors'] and len(result['profiles']) == 3 and
-                        'WEAPON_SCOPE gui=guis/weapons/railgun_scope.q4ui' in log and
+                        'WEAPON_SCOPE gui=guis/weapons/railgun_scope.rui' in log and
                         'frame geometry ring overflow' not in log and
                         not result['retained_warnings'])
     (args.output / 'report.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')

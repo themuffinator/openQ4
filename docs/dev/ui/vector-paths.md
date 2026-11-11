@@ -1,6 +1,6 @@
 # Native vector path checkpoint
 
-8 September 2026. Canonical `.q4ui` documents now contain editable vector paths
+8 September 2026. Canonical `.rui` documents now contain editable vector paths
 rendered as native geometry through the engine. The runtime and future editor
 share the path model/compiler. This does **not** complete the production vector
 renderer or artwork migration. [Coverage antialiasing](coverage-antialiasing.md)
@@ -214,7 +214,7 @@ to the host, checking inherited rectangular clipping at two densities and paint
 alpha multiplied by parent and child opacity. Existing document/motion regression
 checks remain in place. All three native targets pass on Windows.
 
-The [fixture](../../../tools/ui/fixtures/vector-smoke.q4ui) demonstrates 12/8 dp
+The [fixture](../../../tools/ui/fixtures/vector-smoke.rui) demonstrates 12/8 dp
 panel cuts, two rails, header wash, lower-left button cuts, fading action rails,
 triangle markers, a cubic ring with a hole and a rounded stroke. It uses existing
 localized strings and the normative family colors. It is a geometry fixture,
@@ -237,7 +237,7 @@ The dedicated target also built; its link inputs contain no retained UI,
 RmlUi, JsonCpp or libtess2 libraries. This is Windows evidence; other platforms
 remain unqualified.
 
-Both final captures used the same client and `vector-smoke.q4ui` source SHA-256
+Both final captures used the same client and `vector-smoke.rui` source SHA-256
 `78dc7bc86a65d6983ac23646f5534f205ec670bb85ade94cffecb4c8da921bbe`.
 The harness uses a hidden, windowed game, disabled mouse/controller input, an
 active map and the registered engine `screenshot` command. Images were reviewed
@@ -264,8 +264,8 @@ MSVC-aware Meson wrapper (choose new output directories):
 
 ```powershell
 $assets = 'C:\Program Files (x86)\Steam\steamapps\common\Quake 4'
-python tools/ui/capture_legacy_baseline.py --assets $assets --mode sp --renderer gl --retained-document tools/ui/fixtures/vector-smoke.q4ui --density 1.25 --timeline enter --video-restart --output .tmp/ui/vectors/sp-gl-125-review
-python tools/ui/capture_legacy_baseline.py --assets $assets --mode mp --renderer vulkan --retained-document tools/ui/fixtures/vector-smoke.q4ui --density 2 --timeline enter --reduced-motion --output .tmp/ui/vectors/mp-vulkan-200-review
+python tools/ui/capture_legacy_baseline.py --assets $assets --mode sp --renderer gl --retained-document tools/ui/fixtures/vector-smoke.rui --density 1.25 --timeline enter --video-restart --output .tmp/ui/vectors/sp-gl-125-review
+python tools/ui/capture_legacy_baseline.py --assets $assets --mode mp --renderer vulkan --retained-document tools/ui/fixtures/vector-smoke.rui --density 2 --timeline enter --reduced-motion --output .tmp/ui/vectors/mp-vulkan-200-review
 ```
 
 These are reviewed geometry checkpoints. Their capture reports retain

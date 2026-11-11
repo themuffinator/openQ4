@@ -95,13 +95,13 @@ def gui_fixtures(data):
         size = struct.unpack_from('<i', data, offset)[0]
         name = data[offset+4:offset+4+size]
         if not (11 <= size < 512 and name.startswith(b'guis/')
-                and name.endswith((b'.gui', b'.q4ui'))
+                and name.endswith((b'.gui', b'.rui'))
                 and data[offset+4+size] in (0, 1)):
             continue
         original = name.decode('ascii')
         # A missing retained document fails creation, whereas the legacy GUI
         # reader may create a placeholder for a missing definition.
-        prefix, suffix = 'guis/', '.q4ui'
+        prefix, suffix = 'guis/', '.rui'
         replacement = prefix+'x'*(size-len(prefix)-len(suffix))+suffix
         changed = bytearray(data)
         changed[offset+4:offset+4+size] = replacement.encode('ascii')
@@ -1165,7 +1165,7 @@ def main():
         manifest = json.loads((runtime/'baseoq4/mod.json').read_text())
         manifest['name'] = 'Save GUI fallback probe'
         (game/'mod.json').write_text(json.dumps(manifest, indent=2)+'\n')
-        menu = game/'guis/menu/pause.q4ui'
+        menu = game/'guis/menu/pause.rui'
         menu.parent.mkdir(parents=True)
         menu.write_text('{ invalid document for optional-menu fallback probe\n')
     saves = [game/'savegames/Good.save']
@@ -1225,11 +1225,11 @@ def main():
     report['restore_attempts'] = text.count('Game Map Init SaveGame')
     report['expected_errors'] = {name: details['expected'] in text for name, (_, details) in fixtures.items()}
     report['optional_menu_fallback'] = (
-        "retained UI: 'guis/menu/pause.q4ui' could not be loaded; the stock screen stays in use" in text)
+        "retained UI: 'guis/menu/pause.rui' could not be loaded; the stock screen stays in use" in text)
     report['screenshots'] = {name: sha(game/f'screenshots/{name}.tga')
         for name in ['initial', *fixtures, 'final'] if (game/f'screenshots/{name}.tga').is_file()}
     report['engine_log_sha256'] = sha(log) if log.is_file() else None
-    report['recovery_ui'] = dict(retained_pages=text.count('RETAINED_GUI path=guis/menu/loadgame.q4ui'),
+    report['recovery_ui'] = dict(retained_pages=text.count('RETAINED_GUI path=guis/menu/loadgame.rui'),
                                 classic_dialogs=text.count('MessageBox: LOAD FAILED -'))
     ui_passed = (report['recovery_ui']['retained_pages'] == len(fixtures) and report['recovery_ui']['classic_dialogs'] == 0
                  if args.ui == 'retained' else report['recovery_ui']['classic_dialogs'] == len(fixtures))

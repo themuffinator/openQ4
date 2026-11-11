@@ -53,7 +53,7 @@ struct idMath { static float ClampFloat(float lo, float hi, float v) { return v 
 template <typename T> static T Min(T a, T b) { return a < b ? a : b; }
 static bool invertLook = false;
 struct CVarSystem { bool GetCVarBool(const char* name) const { return std::strcmp(name, "in_joystickInvertLook") == 0 && invertLook; } } cvarObject, *cvarSystem = &cvarObject;
-static bool UI_IsRetainedPath(const char* qpath) { const std::string p = qpath ? qpath : ""; return p.size() >= 5 && p.compare(p.size() - 5, 5, ".q4ui") == 0; }
+static bool UI_IsRetainedPath(const char* qpath) { const std::string p = qpath ? qpath : ""; return p.size() >= 4 && p.compare(p.size() - 4, 4, ".rui") == 0; }
 struct idUserInterface { std::string name; explicit idUserInterface(const char* n) : name(n) {} const char* Name() const { return name.c_str(); } };
 struct Delivered { int key, down; };
 struct Stick { idUserInterface* gui; float x, y, seconds; };
@@ -77,7 +77,7 @@ struct idSessionLocal {
 MAIN = r'''
 static int Downs(const idSessionLocal& s) { int n = 0; for (const auto& e : s.events) n += e.down; return n; }
 int main() {
-    idUserInterface legacy("guis/mainmenu.gui"), page("guis/menu/settings/system.q4ui"), home("guis/menu/title.q4ui");
+    idUserInterface legacy("guis/mainmenu.gui"), page("guis/menu/settings/system.rui"), home("guis/menu/title.rui");
     auto step = [](idSessionLocal& s, int ms) { now += ms; PumpControllerMenuNavigation(&s); };
     {   // The stick on a retained page: every step pairs its press and its release,
         // and centring the stick ends the steps with nothing left held.
@@ -164,7 +164,7 @@ int main() {
         // the game's menu take it, as they take the menu input.
         blocked.homeBlocked = false; CHECK(blocked.RetainedStickTarget() == &home);
         pump(blocked, 300); pump(blocked, 10); CHECK(sticks.size() == 1 && sticks[0].gui == &home);
-        idUserInterface game("guis/mpmain.gui"), card("guis/menu/mp_escape.q4ui");
+        idUserInterface game("guis/mpmain.gui"), card("guis/menu/mp_escape.rui");
         idSessionLocal covered; covered.guiActive = &game; covered.guiMainMenu = &legacy; covered.cardCovers = true; covered.guiRetainedMultiplayer = &card;
         CHECK(covered.RetainedStickTarget() == &card);
         pump(covered, 300); pump(covered, 10); CHECK(sticks.size() == 2 && sticks[1].gui == &card);

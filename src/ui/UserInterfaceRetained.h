@@ -29,7 +29,7 @@ std::string UI_RetainedFocusedControl(idUserInterface* gui);
 // Whether the area moved.
 bool UI_RetainedDetailStick(idUserInterface* gui, float y, float seconds);
 
-// Engine adapter for explicit .q4ui resources. The public game ABI remains
+// Engine adapter for explicit .rui resources. The public game ABI remains
 // idUserInterface; RmlUi, canonical nodes and device ownership stay private.
 class idUserInterfaceRetained final : public idUserInterfaceManaged {
 	friend bool UI_RetainedDiagnostic(idUserInterface*, const idCmdArgs&);

@@ -9,7 +9,7 @@ all 271 GUI migrations and the seven final gates remain required.
 
 ## Settings and authored controls
 
-The packaged `guis/menu/settings/system.q4ui` now presents 16 value controls.
+The packaged `guis/menu/settings/system.rui` now presents 16 value controls.
 Bloom, SSAO, tone mapping, CRT, irradiance, UI aspect behavior and resolution
 scale join the eight initial image controls. VSync uses the existing display
 transaction and confirmation path. Resolution-scale option labels are localized

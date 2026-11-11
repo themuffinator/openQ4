@@ -111,10 +111,10 @@ def main():
                'src/ui/UserInterfaceRetained.cpp', 'src/framework/Session_menu.cpp',
                'src/ui/retained/Interaction.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Document.cpp',
                'src/ui/retained/Document.h', 'tools/ui/capture_vote_targets.py',
-               'content/baseoq4/pak0/guis/menu/mp_escape.q4ui']
+               'content/baseoq4/pak0/guis/menu/mp_escape.rui']
     source_bindings = {p: capture.digest(ROOT / p) for p in sources}
     with zipfile.ZipFile(args.runtime / 'baseoq4/pak0.pk4') as pack:
-        document = 'guis/menu/mp_escape.q4ui'
+        document = 'guis/menu/mp_escape.rui'
         if pack.read(document).replace(b'\r\n', b'\n') != (ROOT / 'content/baseoq4/pak0' / document).read_bytes().replace(b'\r\n', b'\n'):
             raise RuntimeError('staged Vote document differs from source')
     capture.SCENARIOS['vote-targets'] = ('mp:mp/q4dm1', steps())

@@ -3,7 +3,7 @@
 
 Built by tools/ui/build_retained_screens.py, which writes and checks it with
 the other retained screens. MULTIPLAYER on the title hands off to
-guis/menu/multiplayer.q4ui as LOAD GAME does to its page
+guis/menu/multiplayer.rui as LOAD GAME does to its page
 (idSessionLocal::BeginRetainedPage): the title docks its bands and carries
 its label into the title slot, and at 550 ms the page presents in the page
 state Single Player holds, that label its title. It is the stock Multiplayer

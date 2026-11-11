@@ -103,7 +103,7 @@ static void CheckInitializationPacing() {
 }
 static void CheckTypedActionDescriptors() {
 	const std::string source = R"json({
-	 "format":"openq4-ui","version":1,"id":"application-actions",
+	 "format":"retained-ui","version":1,"id":"application-actions",
 	 "state":{
 	  "brightness":{"type":"number","initial":1},
 	  "shadows":{"type":"boolean","initial":true},
@@ -409,7 +409,7 @@ struct TestHost final : Host {
 // node's box extended by the blur's reach. An unsupported host is counted and
 // changes nothing. Zero blur at full saturation draws no backdrop at all.
 static void CheckSoftFocus(TestHost& host) {
-	const std::string source = R"json({"format":"openq4-ui","version":1,"id":"soft-focus",
+	const std::string source = R"json({"format":"retained-ui","version":1,"id":"soft-focus",
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
 	  "children":[{"id":"veil","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},
 	   "left":{"type":"length","value":100,"unit":"dp"},"top":{"type":"length","value":50,"unit":"dp"},
@@ -421,7 +421,7 @@ static void CheckSoftFocus(TestHost& host) {
 	 "events":{"soften":[{"op":"playTimeline","timeline":"focus"}]}})json";
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics;
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"soft-focus.q4ui",diagnostics),"soft-focus document loads");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"soft-focus.rui",diagnostics),"soft-focus document loads");
 	Viewport viewport; viewport.width = 1280; viewport.height = 720; viewport.displayScale = 2;
 	host.softened.clear();
 	runtime.Frame(viewport,1);
@@ -464,12 +464,12 @@ static void CheckSoftFocus(TestHost& host) {
 }
 
 static void CheckDirectBackdrop(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"full-backdrop",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"full-backdrop",
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","unit":"%","value":100},"height":{"type":"length","unit":"%","value":100}},
 	 "children":[{"id":"soften","type":"group","properties":{"width":{"type":"length","unit":"%","value":100},"height":{"type":"length","unit":"%","value":100},
 	 "opacity":{"type":"number","value":1},"backdrop-blur":{"type":"length","unit":"dp","value":4},"backdrop-saturate":{"type":"number","value":0.8}}}]}})json";
 	Runtime runtime(host);std::vector<Diagnostic> diagnostics;
-	Check(runtime.LoadDocument(source,"full-backdrop.q4ui",diagnostics),"load full-view backdrop fixture");
+	Check(runtime.LoadDocument(source,"full-backdrop.rui",diagnostics),"load full-view backdrop fixture");
 	host.sampleUniformBackdrop=true;host.samplePoints={{100,100}};
 	for(int frame=0;frame<3;++frame){host.ClearSamples();Check(runtime.Frame({},frame),"settle full-view backdrop recording");}
 	int frame=3;
@@ -492,7 +492,7 @@ static void CheckDirectBackdrop(TestHost& host) {
 		Document layered;Check(layered.Load(source,diagnostics),"load layered backdrop reference");
 		Check(layered.ReplaceValue(partial ? "/root/children/0/properties/height/value" : "/root/children/0/properties/opacity/value",
 			partial ? "50" : "0.5",diagnostics),"set partial or translucent backdrop");
-		Check(runtime.LoadDocument(layered.Source(),"layered-backdrop.q4ui",diagnostics),"load constrained backdrop runtime");
+		Check(runtime.LoadDocument(layered.Source(),"layered-backdrop.rui",diagnostics),"load constrained backdrop runtime");
 		for(int i=0;i<3;++i){host.ClearSamples();Check(runtime.Frame({},frame++),"settle constrained backdrop");}
 		host.ClearSamples();host.softened.clear();host.layers[0].pixels[0]=Vertex{0,0,0,0,1,0,0,1};
 		Check(runtime.Frame({},frame++) && host.softened.size()==1 && host.softened[0].destination!=0,
@@ -507,7 +507,7 @@ static void CheckDirectBackdrop(TestHost& host) {
 // layer at that strength over the node's box, instead of soft focus. No
 // strength draws nothing.
 static void CheckSpeedStreak(TestHost& host) {
-	const std::string source = R"json({"format":"openq4-ui","version":1,"id":"speed-streak",
+	const std::string source = R"json({"format":"retained-ui","version":1,"id":"speed-streak",
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
 	  "children":[{"id":"streak","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},
 	   "left":{"type":"length","value":0,"unit":"dp"},"top":{"type":"length","value":0,"unit":"dp"},
@@ -523,7 +523,7 @@ static void CheckSpeedStreak(TestHost& host) {
 		// document refuses an unknown symbol, a node with both a symbol and
 		// its own paths, and a symbol on a node that is no vector.
 		const auto symbols = [](const char* node) {
-			return std::string(R"json({"format":"openq4-ui","version":1,"id":"symbols","symbols":{"dash":[{"id":"line","commands":[
+			return std::string(R"json({"format":"retained-ui","version":1,"id":"symbols","symbols":{"dash":[{"id":"line","commands":[
 				{"id":"a","op":"move","points":[[0,0]]},{"id":"b","op":"line","points":[[{"fraction":1},0]]}],
 				"stroke":{"paint":{"type":"solid","color":{"type":"color","value":[1,1,1,1]}},"widthDp":1,"join":"miter","cap":"butt"}}]},
 				"root":{"id":"root","type":"group","children":[)json")+node+R"json(]}})json";
@@ -540,10 +540,10 @@ static void CheckSpeedStreak(TestHost& host) {
 			Check(!refused.Load(symbols(bad),found) && !found.empty(),"an unknown or misplaced symbol refuses the document");
 		}
 	}
-	Check(!document.Load(R"json({"format":"openq4-ui","version":1,"id":"speed-streak-range","root":{"id":"root","type":"group",
+	Check(!document.Load(R"json({"format":"retained-ui","version":1,"id":"speed-streak-range","root":{"id":"root","type":"group",
 		"properties":{"backdrop-streak":{"type":"number","value":1.5}}}})json",diagnostics),"a streak beyond full strength is rejected");
 	Runtime runtime(host);
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"speed-streak.q4ui",diagnostics),"streak document loads");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"speed-streak.rui",diagnostics),"streak document loads");
 	Viewport viewport; viewport.width = 1280; viewport.height = 720;
 	host.softened.clear(); host.streaked.clear();
 	runtime.Frame(viewport,1);
@@ -561,7 +561,7 @@ static void CheckSpeedStreak(TestHost& host) {
 // once. Cancellation suppresses it, replay restarts it, pause delays it, and
 // reduced motion completes a spatial timeline inside the event that plays it.
 static void CheckCompletionPrograms(TestHost& host) {
-	const std::string source = R"json({"format":"openq4-ui","version":1,"id":"completion-programs",
+	const std::string source = R"json({"format":"retained-ui","version":1,"id":"completion-programs",
 	 "state":{"shown":{"type":"boolean","initial":true},"phase":{"type":"number","initial":0}},
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
 	  "children":[{"id":"box","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},
@@ -586,7 +586,7 @@ static void CheckCompletionPrograms(TestHost& host) {
 	  "slid":[{"op":"setState","values":{"phase":{"op":"+","args":[{"state":"phase"},10]}}}]}})json";
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics;
-	Check(runtime.Initialize() && runtime.LoadDocument(source,"completion.q4ui",diagnostics),"completion document loads");
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"completion.rui",diagnostics),"completion document loads");
 	Viewport viewport; viewport.width = 640; viewport.height = 480;
 	const auto state = [&](const char* key) { return runtime.GetState(false).at(key); };
 	const auto run = [&](const char* name, double seconds) {
@@ -632,7 +632,7 @@ static void CheckCompletionPrograms(TestHost& host) {
 	Check(runtime.SaveSnapshot(snapshot,error,7.4),"snapshot after the fade ended, before a frame ran its completion");
 	Check(std::get<bool>(state("shown")) && std::get<double>(state("phase")) == 13,"saving does not run the completion on the live instance");
 	Runtime restored(host);
-	Check(restored.Initialize() && restored.LoadDocument(source,"completion.q4ui",diagnostics) && restored.RestoreSnapshot(snapshot,error,7.4),
+	Check(restored.Initialize() && restored.LoadDocument(source,"completion.rui",diagnostics) && restored.RestoreSnapshot(snapshot,error,7.4),
 		"restore the snapshot");
 	restored.Frame(viewport,7.5); restored.Frame(viewport,7.8);
 	const auto after = restored.GetState(false);
@@ -649,12 +649,12 @@ static void CheckCompletionPrograms(TestHost& host) {
 static void CheckRetainedMeshes(TestHost& host) {
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics;
-	const char* document = R"json({"format":"openq4-ui","version":1,"id":"mesh-test",
+	const char* document = R"json({"format":"retained-ui","version":1,"id":"mesh-test",
 	 "root":{"id":"root","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","value":0,"unit":"dp"},"top":{"type":"length","value":0,"unit":"dp"},"width":{"type":"length","value":400,"unit":"dp"},"height":{"type":"length","value":200,"unit":"dp"}},
 	  "children":[{"id":"faded","type":"vector","properties":{"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","value":10,"unit":"dp"},"top":{"type":"length","value":10,"unit":"dp"},"width":{"type":"length","value":50,"unit":"dp"},"height":{"type":"length","value":50,"unit":"dp"},"opacity":{"type":"number","value":0.5},"transform":{"type":"transform","unit":"px","value":[0,0,1,1,0]}},"paths":[{"id":"rectangle","fill":{"type":"solid","color":{"type":"color","value":[0.8,0.4,0.2,0.8]}},"commands":[{"id":"p0","op":"move","points":[[0,0]]},{"id":"p1","op":"line","points":[[{"fraction":1},0]]},{"id":"p2","op":"line","points":[[{"fraction":1},{"fraction":1}]]},{"id":"p3","op":"line","points":[[0,{"fraction":1}]]},{"id":"close","op":"close"}]}]},
 	   {"id":"hidden","type":"vector","properties":{"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","value":100,"unit":"dp"},"top":{"type":"length","value":10,"unit":"dp"},"width":{"type":"length","value":50,"unit":"dp"},"height":{"type":"length","value":50,"unit":"dp"},"opacity":{"type":"number","value":0},"transform":{"type":"transform","unit":"px","value":[0,0,1,1,0]}},"paths":[{"id":"rectangle","fill":{"type":"solid","color":{"type":"color","value":[0.8,0.4,0.2,0.8]}},"commands":[{"id":"p0","op":"move","points":[[0,0]]},{"id":"p1","op":"line","points":[[{"fraction":1},0]]},{"id":"p2","op":"line","points":[[{"fraction":1},{"fraction":1}]]},{"id":"p3","op":"line","points":[[0,{"fraction":1}]]},{"id":"close","op":"close"}]}]}]},
 	 "timelines":[{"id":"move","durationMs":1000,"tracks":[{"node":"faded","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"px","value":[0,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"px","value":[10,0,1,1,0]}}]}]}]})json";
-	Check(runtime.LoadDocument(document,"meshes.q4ui",diagnostics),"load the retained mesh fixture");
+	Check(runtime.LoadDocument(document,"meshes.rui",diagnostics),"load the retained mesh fixture");
 	Viewport viewport;
 	runtime.Frame(viewport,1);
 	host.meshes.clear(); host.ClearSamples(); runtime.Frame(viewport,2);
@@ -679,7 +679,7 @@ static void CheckRetainedMeshes(TestHost& host) {
 			"every mesh identity is released with its geometry");
 }
 static void CheckFrameReplay(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"frame-replay",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"frame-replay",
 	 "state":{"left":{"type":"number","initial":10}},
 	 "bindings":[{"id":"move","node":"panel","property":"left","value":{"state":"left"}}],
 	 "root":{"id":"root","type":"group","children":[{"id":"panel","type":"group","properties":{
@@ -687,7 +687,7 @@ static void CheckFrameReplay(TestHost& host) {
 	  "top":{"type":"length","unit":"dp","value":10},"width":{"type":"length","unit":"dp","value":50},
 	  "height":{"type":"length","unit":"dp","value":50},"background-color":{"type":"color","value":[1,0,0,1]}}}]}})json";
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error;
-	Check(runtime.LoadDocument(source,"frame-replay.q4ui",diagnostics),"load static presentation replay fixture");
+	Check(runtime.LoadDocument(source,"frame-replay.rui",diagnostics),"load static presentation replay fixture");
 	Viewport viewport;
 	for (int frame=0;frame<3;++frame) { host.ClearSamples(); Check(runtime.Frame(viewport,frame),"render static presentation"); }
 	Check(runtime.Statistics().frameReplays==1 && !host.drawn.empty(),"unchanged presentation replays its submitted draws");
@@ -714,11 +714,11 @@ static void CheckFrameReplay(TestHost& host) {
 	 {"id":"binding","type":"text","legacyText":"window","properties":{
 	  "width":{"type":"length","unit":"dp","value":100},"height":{"type":"length","unit":"dp","value":50},
 	  "text":{"type":"text","value":"#str_live_binding"}}}])json",diagnostics) &&
-	 runtime.LoadDocument(liveText.Source(),"live-binding.q4ui",diagnostics),"replace cached presentation with live binding text");
+	 runtime.LoadDocument(liveText.Source(),"live-binding.rui",diagnostics),"replace cached presentation with live binding text");
 	for (int frame=8;frame<12;++frame) runtime.Frame(viewport,frame);
 	Check(runtime.Statistics().frameReplays==0 && runtime.Statistics().liveTextRuns==1,
 		"live binding text always reaches the host even without a document property change");
-	const char* movingImage=R"json({"format":"openq4-ui","version":1,"id":"sampling-replay",
+	const char* movingImage=R"json({"format":"retained-ui","version":1,"id":"sampling-replay",
 	 "root":{"id":"image","type":"image","properties":{
 	  "width":{"type":"length","unit":"dp","value":100},"height":{"type":"length","unit":"dp","value":50},
 	  "image":{"type":"image","value":"gfx/test/trace.tga"},"image-blend":{"type":"keyword","value":"additive"},
@@ -726,7 +726,7 @@ static void CheckFrameReplay(TestHost& host) {
 	 "timelines":[{"id":"scroll","durationMs":1000,"tracks":[
 	 {"node":"image","property":"image-offset-x","keys":[{"atMs":0,"value":{"type":"number","value":0}},{"atMs":1000,"value":{"type":"number","value":1}}]},
 	 {"node":"image","property":"image-scale-x","keys":[{"atMs":0,"value":{"type":"number","value":0.2}},{"atMs":1000,"value":{"type":"number","value":2}}]}]}]})json";
-	Check(runtime.LoadDocument(movingImage,"sampling-replay.q4ui",diagnostics) && runtime.PlayTimeline("scroll",12),
+	Check(runtime.LoadDocument(movingImage,"sampling-replay.rui",diagnostics) && runtime.PlayTimeline("scroll",12),
 		"load an image whose sampling offset and scale animate");
 	for (const double seconds:{12.0,12.1,12.2}) { host.ClearSamples(); runtime.Frame(viewport,seconds); }
 	Check(runtime.Statistics().frameReplays==1 && !host.imageVertices.empty(),"UV-only animation replays stationary geometry");
@@ -744,7 +744,7 @@ static void CheckFrameReplay(TestHost& host) {
 	std::string fading=movingImage;
 	fading.insert(fading.find("\"root\""),R"json("state":{"alpha":{"type":"number","initial":0.5}},
 	 "bindings":[{"id":"fade","node":"image","property":"opacity","value":{"state":"alpha"}}],)json");
-	Check(runtime.LoadDocument(fading,"paint-opacity.q4ui",diagnostics),"load isolated opacity presentation");
+	Check(runtime.LoadDocument(fading,"paint-opacity.rui",diagnostics),"load isolated opacity presentation");
 	Check(runtime.PlayTimeline("scroll",20),"animate UV sampling while opacity changes");
 	runtime.Frame(viewport,20); runtime.Frame(viewport,20.1);
 	double previousOpacity=.5;
@@ -774,7 +774,7 @@ static void CheckFrameReplay(TestHost& host) {
 		previousOpacity=opacity;
 	}
 	Document textFade;
-	const bool textLoaded=textFade.Load(R"json({"format":"openq4-ui","version":1,"id":"text-fade",
+	const bool textLoaded=textFade.Load(R"json({"format":"retained-ui","version":1,"id":"text-fade",
 	 "state":{"alpha":{"type":"number","initial":0.5}},
 	 "bindings":[{"id":"fade","node":"image","property":"opacity","value":{"state":"alpha"}}],
 	 "root":{"id":"image","type":"text","properties":{
@@ -789,7 +789,7 @@ static void CheckFrameReplay(TestHost& host) {
 		host.cacheLayers=mode==2;
 		host.samplePoints={{9.5f,8.5f,0,0}};
 		if (overlap) Check(textFade.ReplaceValue("/root/properties/letter-spacing/value","-5",diagnostics),"overlap glyphs");
-		Check(runtime.LoadDocument(textFade.Source(),"text-opacity.q4ui",diagnostics),"load leaf text fade fixture");
+		Check(runtime.LoadDocument(textFade.Source(),"text-opacity.rui",diagnostics),"load leaf text fade fixture");
 		if (mode==2) {
 			host.ClearSamples(); runtime.Frame(viewport,22);
 			host.ClearSamples(false); runtime.Frame(viewport,22);
@@ -816,7 +816,7 @@ static void CheckFrameReplay(TestHost& host) {
 
 
 static void CheckHiddenPresentation(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"hidden-layout",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"hidden-layout",
 	 "state":{"shown":{"type":"boolean","initial":false}},
 	 "bindings":[{"id":"show","node":"branch","property":"display","value":{"op":"select","args":[{"state":"shown"},"block","none"]}}],
 	 "root":{"id":"root","type":"group","children":[{"id":"branch","type":"group",
@@ -826,7 +826,7 @@ static void CheckHiddenPresentation(TestHost& host) {
 	  {"atMs":0,"value":{"type":"length","unit":"dp","value":10}},
 	  {"atMs":1000,"value":{"type":"length","unit":"dp","value":110}}]}]}]})json";
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error; Bounds bounds;
-	Check(runtime.LoadDocument(source,"hidden-layout.q4ui",diagnostics),"load hidden presentation fixture");
+	Check(runtime.LoadDocument(source,"hidden-layout.rui",diagnostics),"load hidden presentation fixture");
 	runtime.Frame({},0);
 	Check(runtime.PlayTimeline("grow",0),"start hidden size animation");
 	runtime.Frame({},.25);
@@ -847,14 +847,14 @@ static void CheckHiddenPresentation(TestHost& host) {
 	Check(runtime.SetState({{"shown",true}},error,1.1),"reveal completed hidden animation");
 	runtime.Frame({},1.1);
 	Check(runtime.GetBounds("growing",bounds) && Near(bounds.width,110),"completed hidden animation keeps its final layout");
-	Check(runtime.LoadDocument(source,"replacement.q4ui",diagnostics) && runtime.SetState({{"shown",true}},error,2),
+	Check(runtime.LoadDocument(source,"replacement.rui",diagnostics) && runtime.SetState({{"shown",true}},error,2),
 		"replace a document after caching its layout readbacks");
 	Check(runtime.Frame({},2) && runtime.GetBounds("growing",bounds) && Near(bounds.width,10),
 		"layout readbacks belong to the replacement document, not retired elements");
 	Check(host.errors==0,"hidden presentation updates produce no diagnostics");
 }
 static void CheckIdentityTransformReuse(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"identity-reuse",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"identity-reuse",
 	 "root":{"id":"parent","type":"group","properties":{"width":{"type":"length","unit":"dp","value":100},"height":{"type":"length","unit":"dp","value":100},"transform":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}},
 	 "children":[{"id":"child","type":"vector","properties":{"width":{"type":"length","unit":"dp","value":100},"height":{"type":"length","unit":"dp","value":100},"transform":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}},
 	 "paths":[{"id":"rectangle","commands":[{"id":"a","op":"move","points":[[10,10]]},{"id":"b","op":"line","points":[[90,10]]},{"id":"c","op":"line","points":[[90,90]]},{"id":"d","op":"line","points":[[10,90]]},{"id":"z","op":"close"}],"fill":{"type":"solid","color":{"type":"color","value":[1,0,0,1]}}}]}]},
@@ -862,7 +862,7 @@ static void CheckIdentityTransformReuse(TestHost& host) {
 	 {"node":"parent","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}},{"atMs":9000,"value":{"type":"transform","unit":"dp","value":[0,0,1,1,360]}}]},
 	 {"node":"child","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}},{"atMs":9000,"value":{"type":"transform","unit":"dp","value":[0,0,1,1,-360]}}]}]}]})json";
 	Runtime runtime(host);std::vector<Diagnostic> diagnostics;
-	Check(runtime.LoadDocument(source,"identity-reuse.q4ui",diagnostics) && runtime.PlayTimeline("turn",0),"load counter-rotating transform fixture");
+	Check(runtime.LoadDocument(source,"identity-reuse.rui",diagnostics) && runtime.PlayTimeline("turn",0),"load counter-rotating transform fixture");
 	std::vector<std::pair<std::uint64_t,std::uint64_t>> stationary;
 	for(int frame=0;frame<=240;++frame){
 		host.meshes.clear();host.ClearSamples();Check(runtime.Frame({},frame/60.0),"render counter-rotating transform");
@@ -873,7 +873,7 @@ static void CheckIdentityTransformReuse(TestHost& host) {
 	}
 }
 static void CheckMovingMaskSourceCache(TestHost& host,bool solid=false) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"moving-mask-cache",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"moving-mask-cache",
 	 "state":{"alpha":{"type":"number","initial":0.75}},
 	 "bindings":[{"id":"alpha","node":"parent","property":"opacity","value":{"state":"alpha"}}],
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","unit":"dp","value":100},"height":{"type":"length","unit":"dp","value":100},"background-color":{"type":"color","value":[0,1,0,1]},"transform":{"type":"transform","unit":"dp","value":[100,100,1,1,0]}},
@@ -898,7 +898,7 @@ static void CheckMovingMaskSourceCache(TestHost& host,bool solid=false) {
 		host.cacheLayers=cached;host.maskedSourceLayers=cached;host.replayFrames=mode==4;
 		host.linearMaskDraws=0;
 		Runtime runtime(host);std::vector<Diagnostic> diagnostics;std::string error;
-		Check(runtime.LoadDocument(artwork.Source(),"moving-mask-cache.q4ui",diagnostics) && runtime.PlayTimeline("turn",0),"load moving mask over stable overlapping artwork");
+		Check(runtime.LoadDocument(artwork.Source(),"moving-mask-cache.rui",diagnostics) && runtime.PlayTimeline("turn",0),"load moving mask over stable overlapping artwork");
 		int direct=0,hits=0,replays=0;const int initialErrors=host.errors;
 		for(int frame=0;frame<30;++frame) {
 			host.linearMasks=mode>=2 && frame!=15;
@@ -929,7 +929,7 @@ static void CheckMovingMaskSourceCache(TestHost& host,bool solid=false) {
 	host.cacheLayers=false;host.maskedSourceLayers=false;host.linearMasks=false;host.replayFrames=true;host.samplePoints.clear();
 }
 static void CheckQuietButtonLayout(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"quiet-buttons",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"quiet-buttons",
 	 "state":{"left":{"type":"number","initial":10}},
 	 "bindings":[{"id":"move","node":"button","property":"left","value":{"state":"left"}}],
 	 "root":{"id":"root","type":"group","children":[{"id":"button","type":"group",
@@ -942,7 +942,7 @@ static void CheckQuietButtonLayout(TestHost& host) {
 	 {"id":"rest","durationMs":1,"tracks":[{"node":"button","property":"background-color","keys":[
 	 {"atMs":0,"value":{"type":"color","value":[1,0,0,1]}},{"atMs":1,"value":{"type":"color","value":[1,0,0,1]}}]}]}]})json";
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error;
-	const bool loaded=runtime.LoadDocument(source,"quiet-buttons.q4ui",diagnostics);
+	const bool loaded=runtime.LoadDocument(source,"quiet-buttons.rui",diagnostics);
 	if (!loaded) for (const auto& diagnostic:diagnostics) std::fprintf(stderr,"%s\n",diagnostic.message.c_str());
 	Check(loaded,"load quiet button layout fixture");
 	for (int frame=0;frame<3;++frame) Check(runtime.Frame({},frame),"settle button layout");
@@ -966,7 +966,7 @@ static void CheckQuietButtonLayout(TestHost& host) {
 		"quiet geometry never preserves eligibility after a control is disabled");
 }
 static void CheckMenuFadeReplay(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"menu-fade",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"menu-fade",
 	 "state":{"alpha":{"type":"number","initial":0.5},"buttonAlpha":{"type":"number","initial":1}},
 	 "bindings":[{"id":"fade","node":"picture","property":"opacity","value":{"state":"alpha"}},
 	 {"id":"buttonFade","node":"button","property":"opacity","value":{"state":"buttonAlpha"}}],
@@ -975,7 +975,7 @@ static void CheckMenuFadeReplay(TestHost& host) {
 	 {"id":"picture","type":"image","properties":{"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","unit":"dp","value":100},"top":{"type":"length","unit":"dp","value":10},"width":{"type":"length","unit":"dp","value":50},"height":{"type":"length","unit":"dp","value":50},"image":{"type":"image","value":"gfx/test/fade.tga"},"opacity":{"type":"number","value":0.5}}}]},
 	 "timelines":[{"id":"rest","durationMs":1,"tracks":[{"node":"button","property":"background-color","keys":[{"atMs":0,"value":{"type":"color","value":[1,0,0,1]}},{"atMs":1,"value":{"type":"color","value":[1,0,0,1]}}]}]}]})json";
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error;
-	Check(runtime.LoadDocument(source,"menu-fade.q4ui",diagnostics),"load a decorative image beside an interactive button");
+	Check(runtime.LoadDocument(source,"menu-fade.rui",diagnostics),"load a decorative image beside an interactive button");
 	runtime.PointerMove(20,20,0);
 	for (int frame=0;frame<4;++frame) { host.ClearSamples(); Check(runtime.Frame({},frame*.1),"settle the hovered menu and image"); }
 	double time=.4,previousAlpha=.5;
@@ -1003,7 +1003,7 @@ static void CheckMenuFadeReplay(TestHost& host) {
 	Check(runtime.Frame({},time) && runtime.Statistics().layoutUpdates>0,"interactive opacity keeps full layout and interaction validation");
 }
 static void CheckDecorativeTransforms(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"decorative-transforms",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"decorative-transforms",
 	 "root":{"id":"root","type":"group","children":[
 	 {"id":"button","type":"group","properties":{"background-color":{"type":"color","value":[1,0,0,1]},"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","unit":"dp","value":10},"top":{"type":"length","unit":"dp","value":10},"width":{"type":"length","unit":"dp","value":50},"height":{"type":"length","unit":"dp","value":50},"transform":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}},"control":{"role":"button","action":"fixture.activate","label":"#str_200013","states":{"default":"rest","hover":"rest","focus":"rest","pressed":"rest","disabled":"rest"}}},
 	 {"id":"decoration","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","unit":"dp","value":200},"top":{"type":"length","unit":"dp","value":10},"width":{"type":"length","unit":"dp","value":50},"height":{"type":"length","unit":"dp","value":50},"background-color":{"type":"color","value":[0,0,1,1]},"transform":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}}}]},
@@ -1011,7 +1011,7 @@ static void CheckDecorativeTransforms(TestHost& host) {
 	 {"id":"control","durationMs":1000,"tracks":[{"node":"button","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"dp","value":[0,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"dp","value":[40,0,1,1,0]}}]}]}]})json";
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics;
 	const auto left=[&](bool blue) { float x=1e6f; for(const auto& v:host.drawn) if(blue ? v.b>.99f && v.r<.01f : v.r>.99f && v.b<.01f) x=std::min(x,v.x); return x; };
-	const bool loaded=runtime.LoadDocument(source,"decorative-transforms.q4ui",diagnostics);
+	const bool loaded=runtime.LoadDocument(source,"decorative-transforms.rui",diagnostics);
 	if (!loaded) for (const auto& diagnostic:diagnostics) std::fprintf(stderr,"%s\n",diagnostic.message.c_str());
 	Check(loaded,"load decorative transform beside interactive button");
 	Check(runtime.Frame({},0) && runtime.Frame({},1),"settle decorative transform fixture");
@@ -1038,7 +1038,7 @@ static void CheckDecorativeTransforms(TestHost& host) {
 		Document fixture; Check(fixture.Load(typedSource,diagnostics),"load typed transform fixture with consistent timeline units");
 		Check(fixture.ReplaceValue("/timelines/1/tracks/0/keys/1/value/value","[36.5,-15,-2.5,1.5,74]",diagnostics),"set reflected transform motion");
 		Runtime animated(host),reference(host); Viewport viewport; viewport.displayScale=density;
-		Check(animated.LoadDocument(fixture.Source(),"typed-transform.q4ui",diagnostics),"load typed transform runtime");
+		Check(animated.LoadDocument(fixture.Source(),"typed-transform.rui",diagnostics),"load typed transform runtime");
 		Check(animated.Frame(viewport,0) && animated.Frame(viewport,1) && animated.PlayTimeline("decor",2) &&
 			animated.Frame(viewport,2.1),"settle typed transform runtime");
 		host.ClearSamples(); Check(animated.Frame(viewport,2.5),"advance typed reflected transform");
@@ -1046,7 +1046,7 @@ static void CheckDecorativeTransforms(TestHost& host) {
 		const auto blue=[&] { std::vector<Vertex> result; for(const auto& v:host.drawn) if(v.b>.99f && v.r<.01f) result.push_back(v); return result; };
 		const auto painted=blue(); Check(!painted.empty(),"typed transformed artwork stays visible");
 		Check(fixture.ReplaceValue("/root/children/1/properties/transform/value","[18.25,-7.5,-0.75,1.25,37]",diagnostics),"pose CSS transform reference");
-		Check(reference.LoadDocument(fixture.Source(),"css-transform.q4ui",diagnostics),"load independent CSS transform reference");
+		Check(reference.LoadDocument(fixture.Source(),"css-transform.rui",diagnostics),"load independent CSS transform reference");
 		host.ClearSamples(); Check(reference.Frame(viewport,2.5),"render independent CSS transform reference");
 		const auto compare=[&] {
 			const auto expected=blue(); Check(expected.size()==painted.size(),"typed and CSS transform topology matches");
@@ -1061,7 +1061,7 @@ static void CheckDecorativeTransforms(TestHost& host) {
 	}
 }
 static void CheckCompoundPlateCache(TestHost& host) {
-	const char* source=R"json({"format":"openq4-ui","version":1,"id":"plate-cache",
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"plate-cache",
 	 "state":{"alpha":{"type":"number","initial":0.5}},
 	 "bindings":[{"id":"alpha","node":"plate","property":"opacity","value":{"state":"alpha"}}],
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","unit":"dp","value":200},"height":{"type":"length","unit":"dp","value":100},"background-color":{"type":"color","value":[0,1,0,1]}},
@@ -1072,7 +1072,7 @@ static void CheckCompoundPlateCache(TestHost& host) {
 	 ]}]}})json";
 	Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error;
 	const auto near=[](float actual,float expected){return std::abs(actual-expected)<.002f;};
-	Check(runtime.LoadDocument(source,"plate-cache.q4ui",diagnostics),"load overlapping plate cache fixture");
+	Check(runtime.LoadDocument(source,"plate-cache.rui",diagnostics),"load overlapping plate cache fixture");
 	host.cacheLayers=true; host.replayFrames=false; host.samplePoints={{20.25f,20.25f},{60.25f,20.25f}};
 	for (int frame=0;frame<3;++frame) { host.ClearSamples(); Check(runtime.Frame({},frame),"render compound plate"); }
 	Check(runtime.Statistics().layerCacheHits==1 && runtime.Statistics().layerPushes==0,"stable compound plate reuses its completed target");
@@ -1109,7 +1109,7 @@ static void CheckDetailCard(TestHost& host) {
 		return std::string(R"({"id":")")+id+R"(-lit","durationMs":100,"tracks":[{"node":")"+id+R"(","property":"opacity","keys":[)"
 			R"({"atMs":0,"value":{"type":"number","value":1}},{"atMs":100,"value":{"type":"number","value":0.8}}]}]})";
 	};
-	const std::string source = R"json({"format":"openq4-ui","version":1,"id":"detail-card",
+	const std::string source = R"json({"format":"retained-ui","version":1,"id":"detail-card",
 	 "state":{"subject":{"type":"number","initial":-1},"picked":{"type":"boolean","initial":false}},
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
 	  "children":[)json"+box("upper",40,40,1220,30)+"}"+button("upper",R"(,"detail":0)")+","+
@@ -1122,7 +1122,7 @@ static void CheckDetailCard(TestHost& host) {
 	 "detail":{"state":"subject","card":"card"}})json";
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics;
-	const bool loaded = runtime.Initialize() && runtime.LoadDocument(source,"detail-card.q4ui",diagnostics);
+	const bool loaded = runtime.Initialize() && runtime.LoadDocument(source,"detail-card.rui",diagnostics);
 	for (const auto& d : diagnostics) std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());
 	Check(loaded,"the detail card document loads");
 	Viewport viewport; viewport.width = 1280; viewport.height = 720;
@@ -1173,7 +1173,7 @@ static void CheckAcceptPrompts(TestHost& host) {
 			R"({"atMs":0,"value":{"type":"number","value":1}},{"atMs":1,"value":{"type":"number","value":1}}]}]})";
 	};
 	const auto document = [&](const std::string& extra) {
-		return std::string(R"json({"format":"openq4-ui","version":1,"id":"accept-prompts",
+		return std::string(R"json({"format":"retained-ui","version":1,"id":"accept-prompts",
 		 "state":{"chosen":{"type":"boolean","initial":false},"verb":{"type":"string","initial":"#str_231521"},
 		  "picked":{"type":"boolean","initial":false}},
 		 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
@@ -1186,7 +1186,7 @@ static void CheckAcceptPrompts(TestHost& host) {
 	const auto loads = [](const std::string& source) { Document parsed; std::vector<Diagnostic> found; return parsed.Load(source,found); };
 	Runtime runtime(host);
 	std::vector<Diagnostic> diagnostics; std::string error;
-	const bool loaded = runtime.Initialize() && runtime.LoadDocument(document(""),"accept-prompts.q4ui",diagnostics);
+	const bool loaded = runtime.Initialize() && runtime.LoadDocument(document(""),"accept-prompts.rui",diagnostics);
 	for (const auto& d : diagnostics) std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());
 	Check(loaded,"the accept prompt document loads");
 	Viewport viewport; viewport.width = 1280; viewport.height = 720;
@@ -1214,7 +1214,7 @@ static void CheckAcceptPrompts(TestHost& host) {
 // runtime loaded from the parsed document presents as one loaded from the
 // source.
 static void CheckSharedDocument(TestHost& host) {
-	const std::string source = R"json({"format":"openq4-ui","version":1,"id":"shared",
+	const std::string source = R"json({"format":"retained-ui","version":1,"id":"shared",
 	 "state":{"wide":{"type":"boolean","initial":true}},
 	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
 	  "children":[{"id":"bar","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},
@@ -1230,10 +1230,10 @@ static void CheckSharedDocument(TestHost& host) {
 		&copy.Model() != &parsed.Model() && parsed.Source() == source && parsed.Model().FindNode("bar") != nullptr,
 		"an edit replaces only the edited copy's document");
 	Runtime fromSource(host), fromDocument(host), fromNothing(host);
-	Check(fromSource.Initialize() && fromSource.LoadDocument(source,"shared.q4ui",diagnostics),"load the shared document from its source");
-	Check(fromDocument.Initialize() && fromDocument.LoadDocument(parsed,"shared.q4ui",diagnostics) && diagnostics.empty(),
+	Check(fromSource.Initialize() && fromSource.LoadDocument(source,"shared.rui",diagnostics),"load the shared document from its source");
+	Check(fromDocument.Initialize() && fromDocument.LoadDocument(parsed,"shared.rui",diagnostics) && diagnostics.empty(),
 		"load the shared document as parsed");
-	Check(fromNothing.Initialize() && !fromNothing.LoadDocument(Document(),"empty.q4ui",diagnostics) && !fromNothing.IsLoaded(),
+	Check(fromNothing.Initialize() && !fromNothing.LoadDocument(Document(),"empty.rui",diagnostics) && !fromNothing.IsLoaded(),
 		"a document that never loaded is refused");
 	Viewport viewport; viewport.width = 1280; viewport.height = 720;
 	fromSource.Frame(viewport,1); fromDocument.Frame(viewport,1);
@@ -1245,7 +1245,7 @@ static void CheckSharedDocument(TestHost& host) {
 }
 
 static void CheckPublicTextQueries(TestHost& host) {
-	const std::string source=R"json({"format":"openq4-ui","version":1,"id":"text-fit",
+	const std::string source=R"json({"format":"retained-ui","version":1,"id":"text-fit",
 	 "state":{"key":{"type":"string","initial":"","keyBinding":"savegame quick"}},
 	 "root":{"id":"root","type":"group","children":[
 	  {"id":"label","type":"text","properties":{"width":{"type":"length","value":25,"unit":"dp"},
@@ -1269,7 +1269,7 @@ static void CheckPublicTextQueries(TestHost& host) {
 	Document bad=document;
 	Check(!bad.ReplaceValue("/state/key",R"({"type":"string","initial":"","cvar":"x","keyBinding":"_forward"})",diagnostics),
 		"binding state cannot also be CVar sourced");
-	Runtime runtime(host); Check(runtime.LoadDocument(document,"text-fit.q4ui",diagnostics),"load real query layout");
+	Runtime runtime(host); Check(runtime.LoadDocument(document,"text-fit.rui",diagnostics),"load real query layout");
 	Viewport viewport; Check(runtime.Frame(viewport,1),"lay out text queries");
 	TextFit fit;
 	Check(runtime.QueryTextFit("label","a b",fit) && fit.overflow && fit.maxIndex==2 && fit.lastWhitespace==1,
@@ -1290,7 +1290,7 @@ static void CheckPublicTextQueries(TestHost& host) {
 		"density scales content and typography together");
 	viewport.textScale=2; Check(runtime.Frame(viewport,3) && runtime.QueryTextFit("label","abc",fit) && fit.maxIndex==1,
 		"text scaling changes the actual fitting byte index");
-	Runtime other(host); Check(other.LoadDocument(document,"other-fit.q4ui",diagnostics) && other.Frame({},1),"second independent text context");
+	Runtime other(host); Check(other.LoadDocument(document,"other-fit.rui",diagnostics) && other.Frame({},1),"second independent text context");
 	Check(other.QueryTextFit("label","abc",fit) && fit.maxIndex==2 && runtime.QueryTextFit("label","abc",fit) && fit.maxIndex==1,
 		"queries retain each view's density and text scale");
 	runtime.Shutdown(); fit={true,99,98};
@@ -1391,7 +1391,7 @@ int main(int argc, char** argv) {
 	Check(Near(leftAt(5.4),60),"backward clock does not reverse presentation");
 	Check(Near(leftAt(5.5+1.0/144.0),60+100.f/144.f),"144 Hz sample advances between simulation ticks");
 	const char* canonical = R"json({
-	 "format":"openq4-ui","version":1,"id":"canonical-test",
+	 "format":"retained-ui","version":1,"id":"canonical-test",
 	 "root":{"id":"root","type":"group","children":[
 	  {"id":"canonical-panel","type":"group","properties":{
 	   "position":{"type":"keyword","value":"absolute"},
@@ -1411,7 +1411,7 @@ int main(int argc, char** argv) {
 	 ]}]
 	})json";
 	std::vector<Diagnostic> diagnostics;
-	Check(runtime.LoadDocument(canonical,"test.q4ui",diagnostics),"load canonical document through real layout adapter");
+	Check(runtime.LoadDocument(canonical,"test.rui",diagnostics),"load canonical document through real layout adapter");
 	Check(!runtime.SetProperty("canonical-panel","left","30dp"),"canonical source retains property ownership");
 	Check(runtime.PlayTimeline("slide",6),"play canonical absolute timeline");
 	Check(Near(leftAt(6),10),"canonical initial transform reaches renderer");
@@ -1420,9 +1420,9 @@ int main(int argc, char** argv) {
 	viewport.displayScale=2;
 	Check(Near(leftAt(6.5),120),"canonical transform and layout share dp scale during animation");
 	Check(Near(leftAt(7),220),"canonical transform reaches exact final endpoint");
-	Check(!runtime.LoadDocument("{\"version\":2}","bad.q4ui",diagnostics),"reject invalid replacement document");
+	Check(!runtime.LoadDocument("{\"version\":2}","bad.rui",diagnostics),"reject invalid replacement document");
 	Check(Near(leftAt(7.25),220),"invalid replacement keeps previous rendered document");
-	const char* vectorDocument = R"json({"format":"openq4-ui","version":1,"id":"vector-render-test",
+	const char* vectorDocument = R"json({"format":"retained-ui","version":1,"id":"vector-render-test",
 	 "root":{"id":"clip","type":"group","properties":{
 	  "position":{"type":"keyword","value":"absolute"},"overflow":{"type":"keyword","value":"hidden"},
 	  "left":{"type":"length","value":100,"unit":"dp"},"top":{"type":"length","value":100,"unit":"dp"},
@@ -1440,7 +1440,7 @@ int main(int argc, char** argv) {
 	  {"id":"move","durationMs":1000,"tracks":[{"node":"shape","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"px","value":[0,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"px","value":[10,0,1,1,0]}}]}]},
 	  {"id":"fractional","durationMs":1000,"tracks":[{"node":"shape","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"px","value":[10,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"px","value":[10.5,0,1,1,0]}}]}]}
 	 ]})json";
-	Check(runtime.LoadDocument(vectorDocument,"vector.q4ui",diagnostics),"load native vector element into retained tree");
+	Check(runtime.LoadDocument(vectorDocument,"vector.rui",diagnostics),"load native vector element into retained tree");
 	for (int density : {1,2}) {
 		viewport.displayScale = static_cast<float>(density);
 		host.drawn.clear(); runtime.Frame(viewport,8+density);
@@ -1472,7 +1472,7 @@ int main(int argc, char** argv) {
 	Check(direct.Load(vectorDocument,diagnostics),"load fresh reference for animated cached geometry");
 	Check(direct.ReplaceValue("/root/children/0/properties/opacity/value","0.25",diagnostics),"set final reference opacity");
 	Check(direct.ReplaceValue("/root/children/0/properties/transform/value","[10.25,0,1,1,0]",diagnostics),"set final reference position");
-	Check(runtime.LoadDocument(direct.Source(),"fresh-vector.q4ui",diagnostics),"load fresh renderer reference");
+	Check(runtime.LoadDocument(direct.Source(),"fresh-vector.rui",diagnostics),"load fresh renderer reference");
 	host.drawn.clear(); runtime.Frame(viewport,14);
 	Check(host.drawn.size() == cachedDraw.size(),"fresh and cached vector submission topology agrees");
 	for (size_t i = 0; i < host.drawn.size(); ++i) {
@@ -1486,7 +1486,7 @@ int main(int argc, char** argv) {
 		Check(rigid.Load(rigidSource,diagnostics),"load local triangle cache fixture");
 		Check(rigid.ReplaceValue("/root/children/0/properties/transform/value","[10,0,1,1,0]",diagnostics),"pose the rotation's starting position");
 		Check(rigid.ReplaceValue("/timelines/2/tracks/0/keys/1/value/value","[10.5,0,1,1,70]",diagnostics),"rotate and translate cached artwork");
-		Check(runtime.LoadDocument(rigid.Source(),"rigid.q4ui",diagnostics),"load rigid vector runtime");
+		Check(runtime.LoadDocument(rigid.Source(),"rigid.rui",diagnostics),"load rigid vector runtime");
 		runtime.Frame(viewport,14);
 		Check(runtime.PlayTimeline("fractional",14),"start rigid motion");
 		for (int frame = 1; frame <= 30; ++frame) {
@@ -1497,7 +1497,7 @@ int main(int argc, char** argv) {
 		const auto rotated = host.drawn;
 		Check(!rotated.empty(),"rotated artwork remains visible");
 		Check(rigid.ReplaceValue("/root/children/0/properties/transform/value","[10.25,0,1,1,35]",diagnostics),"pose independent rotation reference");
-		Check(runtime.LoadDocument(rigid.Source(),"rigid-reference.q4ui",diagnostics),"load fresh rotation reference");
+		Check(runtime.LoadDocument(rigid.Source(),"rigid-reference.rui",diagnostics),"load fresh rotation reference");
 		host.drawn.clear(); runtime.Frame(viewport,14.5);
 		Check(host.drawn.size() == rotated.size(),"fresh and cached rotated topology matches");
 		for (size_t i = 0; i < rotated.size(); ++i) {
@@ -1508,7 +1508,7 @@ int main(int argc, char** argv) {
 		Check(runtime.Statistics().vectorPathsCompiled > 0,"density changes recompile local artwork at the new curve precision");
 		viewport.displayScale = 2;
 	}
-	const char* compositionDocument = R"json({"format":"openq4-ui","version":1,"id":"composition",
+	const char* compositionDocument = R"json({"format":"retained-ui","version":1,"id":"composition",
 	 "root":{"id":"root","type":"group","properties":{
 	  "width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"},
 	  "background-color":{"type":"color","value":[0,1,0,1]}},"children":[
@@ -1523,7 +1523,7 @@ int main(int argc, char** argv) {
 	  ]}
 	 ]},"timelines":[{"id":"fade","durationMs":1000,"tracks":[{"node":"fade-group","property":"opacity","keys":[
 	 {"atMs":0,"value":{"type":"number","value":0.5}},{"atMs":1000,"value":{"type":"number","value":0}}]}]}]})json";
-	Check(runtime.LoadDocument(compositionDocument,"composition.q4ui",diagnostics),"load nested isolated opacity fixture");
+	Check(runtime.LoadDocument(compositionDocument,"composition.rui",diagnostics),"load nested isolated opacity fixture");
 	host.samplePoints = {{20.37f,20.63f},{50.37f,20.63f},{200.37f,20.63f}};
 	auto sampleFrame = [&](double time) { host.ClearSamples(); return runtime.Frame(viewport,time); };
 	auto pixel = [&](size_t index, float r, float g, float b) {
@@ -1556,7 +1556,7 @@ int main(int argc, char** argv) {
 	  {"id":"a","op":"move","points":[[0,0]]},{"id":"b","op":"line","points":[[80,0]]},
 	  {"id":"c","op":"line","points":[[80,80]]},{"id":"d","op":"line","points":[[0,80]]},{"id":"e","op":"close"}]
 	 }]},)json");
-	Check(runtime.LoadDocument(maskedDocument,"masked.q4ui",diagnostics),"load nested alpha masks with a chamfer and hole");
+	Check(runtime.LoadDocument(maskedDocument,"masked.rui",diagnostics),"load nested alpha masks with a chamfer and hole");
 	viewport = {}; // These mask coordinates are dp; paint coordinates are px.
 	host.samplePoints = {{20.37f,20.63f},{50.37f,20.63f},{70.37f,50.63f},{12.37f,12.63f},{19.37f,20.63f}};
 	sampleFrame(17);
@@ -1571,7 +1571,7 @@ int main(int argc, char** argv) {
 	Check(runtime.PlayTimeline("fade",17.1),"animate opacity independently of alpha mask");
 	sampleFrame(17.6); pixel(0,.25f*maskAlpha,1-.25f*maskAlpha,0); pixel(2,0,1,0);
 	Check(runtime.Statistics().vectorPathsCompiled == 0,"fades do not rebuild mask coverage");
-	Check(runtime.LoadDocument(maskedDocument,"mask-failure.q4ui",diagnostics),"restore authored mask opacity");
+	Check(runtime.LoadDocument(maskedDocument,"mask-failure.rui",diagnostics),"restore authored mask opacity");
 	for (int allocation = 0; allocation < 6; ++allocation) {
 		host.allocationsUntilFailure = allocation;
 		sampleFrame(17.7+allocation*.02);
@@ -1589,18 +1589,18 @@ int main(int argc, char** argv) {
 	 {"at":0,"color":{"type":"color","value":[1,0,0,0]}},
 	 {"at":1,"color":{"type":"color","value":[0,0,0,1]}}]})json";
 	Check(maskEdit.ReplaceValue("/root/children/0/mask/paths/0/fill",gradient,diagnostics),"edit mask paint to a soft reveal gradient");
-	Check(runtime.LoadDocument(maskEdit.Source(),"gradient-mask.q4ui",diagnostics),"load gradient alpha mask");
+	Check(runtime.LoadDocument(maskEdit.Source(),"gradient-mask.rui",diagnostics),"load gradient alpha mask");
 	sampleFrame(17.9);
 	const float gradientAlpha = (20.37f-10)/120;
 	pixel(0,.5f*gradientAlpha,1-.5f*gradientAlpha,0); pixel(2,0,1,0);
 	Check(maskEdit.ReplaceValue("/root/children/0/mask/paths","[]",diagnostics),"author an empty mask");
-	Check(runtime.LoadDocument(maskEdit.Source(),"empty-mask.q4ui",diagnostics),"load explicitly empty mask");
+	Check(runtime.LoadDocument(maskEdit.Source(),"empty-mask.rui",diagnostics),"load explicitly empty mask");
 	sampleFrame(18); pixel(0,0,1,0); pixel(1,0,1,0);
 	Check(maskEdit.ReplaceValue("/root/children/0/mask",R"json({"paths":[{"id":"invalid","commands":[]}]})json",diagnostics) == false,"invalid mask edit is transactional");
 	Check(diagnostics[0].pointer == "/root/children/0/mask/paths/0/commands","mask diagnostic identifies the source command array");
 	std::string dpMasked = maskedDocument;
 	for (size_t pos = 0; (pos = dpMasked.find("\"px\"",pos)) != std::string::npos; pos += 4) dpMasked.replace(pos,4,"\"dp\"");
-	Check(runtime.LoadDocument(dpMasked,"mask-density.q4ui",diagnostics),"mask and contents share dp coordinates");
+	Check(runtime.LoadDocument(dpMasked,"mask-density.rui",diagnostics),"mask and contents share dp coordinates");
 	for (float density : {1.25f,1.5f,2.f,1.f}) {
 		viewport.displayScale = density;
 		host.samplePoints = {{20.37f*density,20.63f*density},{50.37f*density,20.63f*density},{70.37f*density,50.63f*density},{12.37f*density,12.63f*density}};
@@ -1615,7 +1615,7 @@ int main(int argc, char** argv) {
 	Document cachedMask;
 	Check(cachedMask.Load(maskedDocument,diagnostics) &&
 		cachedMask.ReplaceValue("/root/children/0/children","[]",diagnostics),"build leaf-mask cache fixture");
-	Check(runtime.LoadDocument(cachedMask.Source(),"cached-mask.q4ui",diagnostics),"load leaf-mask cache fixture");
+	Check(runtime.LoadDocument(cachedMask.Source(),"cached-mask.rui",diagnostics),"load leaf-mask cache fixture");
 	viewport={}; host.cacheLayers=true;
 	host.samplePoints={{20.37f,20.63f},{70.37f,50.63f},{12.37f,12.63f},{19.37f,20.63f}};
 	sampleFrame(19); pixel(0,.5f*maskAlpha,1-.5f*maskAlpha,0); pixel(1,0,1,0); pixel(2,0,1,0);
@@ -1631,15 +1631,15 @@ int main(int argc, char** argv) {
 	sampleFrame(19.6); pixel(0,.25f*maskAlpha,1-.25f*maskAlpha,0);
 	Check(runtime.Statistics().layerCacheHits==0,"resize invalidates completed targets");
 	Check(cachedMask.ReplaceValue("/root/children/0/properties/background-color/value","[0,0,1,1]",diagnostics) &&
-		runtime.LoadDocument(cachedMask.Source(),"cached-mask.q4ui",diagnostics),"replace cached paint");
+		runtime.LoadDocument(cachedMask.Source(),"cached-mask.rui",diagnostics),"replace cached paint");
 	sampleFrame(19.7); pixel(0,0,1-.5f*maskAlpha,.5f*maskAlpha);
 	Check(runtime.Statistics().layerCacheHits==0,"changed geometry cannot replay old paint");
 	// Multiple contexts share a bounded host. A resting view's completed
 	// panel must yield its cache lease when another view needs scratch space.
-	Check(runtime.LoadDocument(cachedMask.Source(),"cache-pressure-a.q4ui",diagnostics),"reload cache pressure fixture");
+	Check(runtime.LoadDocument(cachedMask.Source(),"cache-pressure-a.rui",diagnostics),"reload cache pressure fixture");
 	{
 		Runtime other(host);
-		Check(other.LoadDocument(cachedMask.Source(),"cache-pressure-b.q4ui",diagnostics),"load second cache pressure view");
+		Check(other.LoadDocument(cachedMask.Source(),"cache-pressure-b.rui",diagnostics),"load second cache pressure view");
 		host.maxLayerId=4;
 		const int errorsBefore=host.errors;
 		for (int frame=0;frame<4;++frame) { host.ClearSamples(); runtime.Frame(viewport,19.7); }
@@ -1653,11 +1653,11 @@ int main(int argc, char** argv) {
 		Check(host.errors==errorsBefore,"shared cache pressure evicts idle pixels without losing composition");
 		host.maxLayerId=48;
 	}
-	Check(runtime.LoadDocument(cachedMask.Source(),"cache-budget-a.q4ui",diagnostics),"reload shared cache budget fixture");
+	Check(runtime.LoadDocument(cachedMask.Source(),"cache-budget-a.rui",diagnostics),"reload shared cache budget fixture");
 	{
 		Runtime second(host), third(host);
-		Check(second.LoadDocument(cachedMask.Source(),"cache-budget-b.q4ui",diagnostics) &&
-			third.LoadDocument(cachedMask.Source(),"cache-budget-c.q4ui",diagnostics),"load shared 4K cache budget views");
+		Check(second.LoadDocument(cachedMask.Source(),"cache-budget-b.rui",diagnostics) &&
+			third.LoadDocument(cachedMask.Source(),"cache-budget-c.rui",diagnostics),"load shared 4K cache budget views");
 		Viewport large; large.width=3840; large.height=2160;
 		const int errorsBefore=host.errors;
 		for (int frame=0; frame<3; ++frame) {
@@ -1694,7 +1694,7 @@ int main(int argc, char** argv) {
 		 "image-color":{"type":"color","value":[1,0,0,1]},"image-offset-x":{"type":"number","value":0.125},
 		 "image-offset-y":{"type":"number","value":-0.2},"image-scale-x":{"type":"number","value":2},
 		 "image-scale-y":{"type":"number","value":0.5}}}])json",diagnostics),"author repeating masked image");
-	Check(runtime.LoadDocument(imageMask.Source(),"image-mask.q4ui",diagnostics),"load repeating image");
+	Check(runtime.LoadDocument(imageMask.Source(),"image-mask.rui",diagnostics),"load repeating image");
 	host.samplePoints={{20.37f,20.63f},{70.37f,50.63f},{12.37f,12.63f},{19.37f,20.63f}};
 	sampleFrame(19.8);
 	pixel(0,.5f*maskAlpha,1,0); pixel(1,0,1,0); pixel(2,0,1,0); pixel(3,32.f/255,1,0);
@@ -1707,7 +1707,7 @@ int main(int argc, char** argv) {
 		Check(scrolling.Load(imageMask.Source(),diagnostics) && scrolling.ReplaceValue("/timelines",R"json([
 		 {"id":"scroll","durationMs":1000,"tracks":[{"node":"trace","property":"image-offset-x","keys":[
 		 {"atMs":0,"value":{"type":"number","value":0.125}},{"atMs":1000,"value":{"type":"number","value":1.125}}]}]}])json",diagnostics) &&
-		 animated.LoadDocument(scrolling.Source(),"masked-sampling-replay.q4ui",diagnostics) && animated.PlayTimeline("scroll",19.8),
+		 animated.LoadDocument(scrolling.Source(),"masked-sampling-replay.rui",diagnostics) && animated.PlayTimeline("scroll",19.8),
 		 "load animated sampling through a stationary mask");
 		for (const double seconds:{19.8,19.9,20.0}) { host.ClearSamples(); animated.Frame(viewport,seconds); }
 		Check(animated.Statistics().frameReplays==1 && !host.imageVertices.empty(),"masked image sampling advances through replay");
@@ -1725,14 +1725,14 @@ int main(int argc, char** argv) {
 	sampleFrame(19.9); pixel(0,.45f*maskAlpha,1,0);
 	Check(!imageMask.ReplaceValue("/root/children/0/children/0/properties/image-scale-y/value","0",diagnostics),"zero image scale is rejected transactionally");
 	Check(imageMask.ReplaceValue("/root/children/0/children/0/properties/width/value","50",diagnostics) &&
-		runtime.LoadDocument(imageMask.Source(),"image-intersection.q4ui",diagnostics),"image covers only part of its mask");
+		runtime.LoadDocument(imageMask.Source(),"image-intersection.rui",diagnostics),"image covers only part of its mask");
 	sampleFrame(19.9); pixel(0,.5f*maskAlpha,1,0); pixel(1,0,1,0);
 	Check(runtime.Statistics().directMaskDraws==0 && runtime.Statistics().layerPushes>0,"partial intersection uses general masking without drawing outside the image");
 	host.samplePoints.clear(); viewport={};
-	std::ifstream interactionFile(argc > 1 ? argv[1] : "tools/ui/fixtures/interaction-smoke.q4ui",std::ios::binary);
+	std::ifstream interactionFile(argc > 1 ? argv[1] : "tools/ui/fixtures/interaction-smoke.rui",std::ios::binary);
 	Check(interactionFile.good(),"open canonical interaction qualification fixture");
 	const std::string interactionSource((std::istreambuf_iterator<char>(interactionFile)),std::istreambuf_iterator<char>());
-	Check(runtime.LoadDocument(interactionSource,"interaction.q4ui",diagnostics),"load semantic buttons and visual-state timelines");
+	Check(runtime.LoadDocument(interactionSource,"interaction.rui",diagnostics),"load semantic buttons and visual-state timelines");
 	viewport = {}; runtime.Frame(viewport,20);
 	auto menu = [&](MenuInput action, bool down = true) { runtime.MenuAction(action,down,20); };
 	menu(MenuInput::Next); Check(runtime.FocusedControl() == "reference-controls","source-order navigation chooses the first eligible button");
@@ -1780,7 +1780,7 @@ int main(int argc, char** argv) {
 	Check(runtime.TakeActions().empty(),"dragging off a pressed button cancels activation");
 	runtime.MenuAction(MenuInput::Accept,true,22); runtime.MenuAction(MenuInput::Accept,false,22);
 	runtime.MenuAction(MenuInput::Accept,true,22);
-	Check(runtime.LoadDocument(interactionSource,"replacement.q4ui",diagnostics),"replace the document while accept is held");
+	Check(runtime.LoadDocument(interactionSource,"replacement.rui",diagnostics),"replace the document while accept is held");
 	runtime.Frame(viewport,23); runtime.FocusControl("reference-controls",23);
 	runtime.MenuAction(MenuInput::Accept,true,23); runtime.MenuAction(MenuInput::Accept,false,23);
 	Check(runtime.TakeActions().empty(),"held input and repeats cannot activate a replacement document");
@@ -1821,7 +1821,7 @@ int main(int argc, char** argv) {
 	 {"atMs":0,"value":{"type":"number","value":0}},{"atMs":60,"value":{"type":"number","value":1}}]}])json",diagnostics),"incomplete feedback cannot leave pressed properties stuck on another state");
 	Check(interactionEdit.Source() == interactionSource,"failed control edits preserve exact canonical source");
 	Check(interactionEdit.ReplaceValue("/root/children/0/properties/transform/value","[30,0,1,1,25]",diagnostics),"edit the control ancestor's transform");
-	Check(runtime.LoadDocument(interactionEdit.Source(),"rotated-controls.q4ui",diagnostics),"load rotated control hierarchy");
+	Check(runtime.LoadDocument(interactionEdit.Source(),"rotated-controls.rui",diagnostics),"load rotated control hierarchy");
 	viewport = {}; runtime.Frame(viewport,25);
 	Bounds parentBounds; runtime.GetBounds("reference-panel",parentBounds); runtime.GetBounds("reference-controls",controlBounds);
 	const double radians = 25*3.141592653589793/180;
@@ -1834,7 +1834,7 @@ int main(int argc, char** argv) {
 	runtime.MenuAction(MenuInput::Accept,true,25);
 	viewport.width = 0; runtime.Frame(viewport,26); runtime.MenuAction(MenuInput::Accept,false,26);
 	Check(runtime.TakeActions().empty() && runtime.FocusedControl().empty(),"invalid/minimized output disables stale hit targets and disarms input");
-	Check(runtime.LoadDocument(interactionSource,"input-aggregation.q4ui",diagnostics),"load button document for platform-source aggregation");
+	Check(runtime.LoadDocument(interactionSource,"input-aggregation.rui",diagnostics),"load button document for platform-source aggregation");
 	viewport = {}; runtime.Frame(viewport,30); runtime.FocusControl("reference-controls",30);
 	Input routedInput;
 	double inputTime = 30;
@@ -1872,7 +1872,7 @@ int main(int argc, char** argv) {
 	button(10,MenuInput::Accept,true);
 	routedInput.Cancel(); route();
 	Check(runtime.TakeActions().empty(),"source cancellation disarms before releasing logical inputs");
-	Check(runtime.LoadDocument(interactionSource,"input-replacement.q4ui",diagnostics),"replace a document with physical input held");
+	Check(runtime.LoadDocument(interactionSource,"input-replacement.rui",diagnostics),"replace a document with physical input held");
 	runtime.Frame(viewport,102); runtime.FocusControl("reference-controls",102); inputTime = 102;
 	button(10,MenuInput::Accept,true); button(10,MenuInput::Accept,false);
 	Check(runtime.TakeActions().empty(),"a held physical source cannot reactivate after document replacement");
@@ -1900,11 +1900,11 @@ int main(int argc, char** argv) {
 	routedInput.Cancel(true); route();
 	button(10,MenuInput::Accept,true); button(10,MenuInput::Accept,false);
 	Check(runtime.TakeActions().size() == 1,"cancellation also releases logical arms created by a previous input adapter");
-	std::ifstream bindingFile(argc > 2 ? argv[2] : "tools/ui/fixtures/binding-smoke.q4ui",std::ios::binary);
+	std::ifstream bindingFile(argc > 2 ? argv[2] : "tools/ui/fixtures/binding-smoke.rui",std::ios::binary);
 	Check(bindingFile.good(),"live binding fixture exists");
 	const std::string bindingSource((std::istreambuf_iterator<char>(bindingFile)),std::istreambuf_iterator<char>());
 	host.cvars["ui_retainedScale"] = 1.25;
-	Check(runtime.LoadDocument(bindingSource,"bindings.q4ui",diagnostics),"load live state bindings");
+	Check(runtime.LoadDocument(bindingSource,"bindings.rui",diagnostics),"load live state bindings");
 	viewport = {1280,720,1,1}; runtime.Frame(viewport,110);
 	Bounds track, fill; runtime.GetBounds("progress-track",track); runtime.GetBounds("progress-fill",fill);
 	Check(Near(fill.width,track.width*.25f),"binding sets actual layout width");
@@ -1938,7 +1938,7 @@ int main(int argc, char** argv) {
 	Check(runtime.SetState({{"shown",true},{"available",true}},stateError,114),"restore bound panel"); runtime.Frame(viewport,114);
 	const auto savedState=runtime.GetState(false);
 	Check(!savedState.contains("scale"),"application snapshot excludes host sources");
-	runtime.Shutdown(); Check(runtime.LoadDocument(bindingSource,"bindings-restart.q4ui",diagnostics),"restart live document");
+	runtime.Shutdown(); Check(runtime.LoadDocument(bindingSource,"bindings-restart.rui",diagnostics),"restart live document");
 	Check(runtime.SetState(savedState,stateError,115),"restore application state through validated batch");
 	runtime.Frame(viewport,115);
 	Check(runtime.PresentedValue("reading","text")->text == "75" && runtime.PresentedValue("scale-reading","text")->text == "2.00","restart preserves application state and rereads current host state");
@@ -1962,8 +1962,8 @@ int main(int argc, char** argv) {
 		 }}})json");
 		Document snapshotActions;
 		Check(snapshotActions.Load(actionBindingSource,diagnostics),"compile action descriptor for existing opaque semantic control");
-		Check(first.LoadDocument(actionBindingSource,"snapshot-bindings.q4ui",diagnostics),"load durable state fixture");
-		Check(second.LoadDocument(actionBindingSource,"snapshot-bindings.q4ui",diagnostics),"load independent snapshot recipient");
+		Check(first.LoadDocument(actionBindingSource,"snapshot-bindings.rui",diagnostics),"load durable state fixture");
+		Check(second.LoadDocument(actionBindingSource,"snapshot-bindings.rui",diagnostics),"load independent snapshot recipient");
 		Check(first.SetState({{"progress",37.0},{"heading",std::string("#str_test")}},error,1),"set snapshot application values");
 		first.Frame({},1); Check(first.FocusControl("reference-controls",1),"focus snapshot fixture");
 		first.MenuAction(MenuInput::Accept,true,1); first.MenuAction(MenuInput::Accept,false,1);
@@ -1999,9 +1999,9 @@ int main(int argc, char** argv) {
 			Check(second.SaveSnapshot(after,error,10.2) && after==stable && second.StateRevision()==revision,"failed restore preserves state, focus, playback and presentation clock atomically");
 		};
 		reject("{}"); reject(snapshot.substr(0,snapshot.size()-1)); reject(snapshot+" {}");
-		reject(replace(snapshot,"\"format\":\"openq4-ui-instance\"","\"format\":\"openq4-ui-instance-next\""));
+		reject(replace(snapshot,"\"format\":\"retained-ui-instance\"","\"format\":\"openq4-ui-instance-next\""));
 		reject(replace(snapshot,"\"version\":2","\"version\":3"));
-		reject(replace(snapshot,"\"path\":\"snapshot-bindings.q4ui\"","\"path\":\"different.q4ui\""));
+		reject(replace(snapshot,"\"path\":\"snapshot-bindings.rui\"","\"path\":\"different.rui\""));
 		reject(replace(snapshot,"\"progress\":37.0","\"progress\":true"));
 		reject(replace(snapshot,"\"limit\":100.0","\"limit\":0.0"));
 		reject(replace(snapshot,"\"progress\":37.0","\"progress\":1e999"));
@@ -2025,11 +2025,11 @@ int main(int argc, char** argv) {
 				otherEndings += c;
 			}
 			Runtime third(host);
-			Check(otherEndings != actionBindingSource && third.LoadDocument(otherEndings,"snapshot-bindings.q4ui",diagnostics),
+			Check(otherEndings != actionBindingSource && third.LoadDocument(otherEndings,"snapshot-bindings.rui",diagnostics),
 				"load the snapshot document with the other line endings");
 			Check(third.RestoreSnapshot(snapshot,error,30),"another checkout's line endings keep the snapshot's document identity");
 		}
-		Check(second.LoadDocument(bindingSource+"\n","snapshot-bindings.q4ui",diagnostics),"load source revision with unchanged IDs");
+		Check(second.LoadDocument(bindingSource+"\n","snapshot-bindings.rui",diagnostics),"load source revision with unchanged IDs");
 		Check(!second.RestoreSnapshot(snapshot,error,30),"exact source changes require an explicit snapshot migration");
 		std::string replacementSnapshot;
 		Check(second.SaveSnapshot(replacementSnapshot,error,30) && second.RestoreSnapshot(replacementSnapshot,error,31),
@@ -2041,7 +2041,7 @@ int main(int argc, char** argv) {
 	{
 		Runtime first(host), second(host);
 		std::string snapshot, error;
-		Check(first.LoadDocument(canonical,"snapshot-motion.q4ui",diagnostics) && second.LoadDocument(canonical,"snapshot-motion.q4ui",diagnostics),"load timeline snapshot pair");
+		Check(first.LoadDocument(canonical,"snapshot-motion.rui",diagnostics) && second.LoadDocument(canonical,"snapshot-motion.rui",diagnostics),"load timeline snapshot pair");
 		Check(first.PlayTimeline("slide",1),"start durable timeline");
 		Check(first.SaveSnapshot(snapshot,error,1.25) && second.RestoreSnapshot(snapshot,error,100),"reanchor active playback to independent time domain");
 		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),25),"restore preserves quarter progress immediately");
@@ -2075,7 +2075,7 @@ int main(int argc, char** argv) {
 		Check(at!=std::string::npos,"repeat test timeline exists");
 		repeatSource.insert(at,"\"iterations\":0,");
 		Runtime first(host),second(host); std::string snapshot,error;
-		Check(first.LoadDocument(repeatSource,"snapshot-repeat.q4ui",diagnostics) && second.LoadDocument(repeatSource,"snapshot-repeat.q4ui",diagnostics),"load indefinitely repeating snapshot pair");
+		Check(first.LoadDocument(repeatSource,"snapshot-repeat.rui",diagnostics) && second.LoadDocument(repeatSource,"snapshot-repeat.rui",diagnostics),"load indefinitely repeating snapshot pair");
 		first.PlayTimeline("slide",1);
 		Check(first.SaveSnapshot(snapshot,error,1000000.25) && second.RestoreSnapshot(snapshot,error,2),"unbounded repeat stores bounded phase across unrelated clocks");
 		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),25),"repeat phase survives large original uptime");
@@ -2083,7 +2083,7 @@ int main(int argc, char** argv) {
 		Check(Near(float(second.PresentedValue("canonical-panel","transform")->data[0]),50),"restored repeat advances from authored cycle start");
 		std::string unchanged="unchanged";
 		Check(!first.SaveSnapshot(unchanged,error,1e308) && unchanged=="unchanged","overflowing repeated playback cannot produce an unrestorable snapshot");
-		Check(first.LoadDocument(vectorDocument,"snapshot-reduced.q4ui",diagnostics) && second.LoadDocument(vectorDocument,"snapshot-reduced.q4ui",diagnostics),"load reduced motion snapshot pair");
+		Check(first.LoadDocument(vectorDocument,"snapshot-reduced.rui",diagnostics) && second.LoadDocument(vectorDocument,"snapshot-reduced.rui",diagnostics),"load reduced motion snapshot pair");
 		first.SetReducedMotion(true,10); first.PlayTimeline("fade",10);
 		Check(first.SaveSnapshot(snapshot,error,10.04) && second.RestoreSnapshot(snapshot,error,20),"restore bounded reduced-motion fade");
 		Check(Near(float(second.PresentedValue("shape","opacity")->data[0]),.375f),"reduced fade resumes at its shortened midpoint");
@@ -2091,20 +2091,20 @@ int main(int argc, char** argv) {
 		Check(Near(float(second.PresentedValue("shape","opacity")->data[0]),.25f),"reduced fade completes within its original 80 ms limit");
 	}
 	{
-		const char* combined=R"json({"format":"openq4-ui","version":1,"id":"atomic-snapshot",
+		const char* combined=R"json({"format":"retained-ui","version":1,"id":"atomic-snapshot",
 		 "root":{"id":"root","type":"group","properties":{"opacity":{"type":"number","value":1}}},
 		 "state":{"amount":{"type":"number","initial":1},"host":{"type":"number","initial":1,"cvar":"snapshot_denominator"}},
 		 "bindings":[{"id":"ratio","node":"root","property":"opacity","value":{"op":"/","args":[{"state":"amount"},{"state":"host"}]}}]})json";
 		Runtime first(host),second(host); std::string snapshot,error;
 		host.cvars["snapshot_denominator"]=1.0;
-		Check(first.LoadDocument(combined,"snapshot-atomic.q4ui",diagnostics) && second.LoadDocument(combined,"snapshot-atomic.q4ui",diagnostics),"load atomic host/application fixture");
+		Check(first.LoadDocument(combined,"snapshot-atomic.rui",diagnostics) && second.LoadDocument(combined,"snapshot-atomic.rui",diagnostics),"load atomic host/application fixture");
 		Check(first.SetState({{"amount",.5}},error,1) && first.SaveSnapshot(snapshot,error,1),"save application amount independently from host denominator");
 		host.cvars["snapshot_denominator"]=.5;
 		Check(second.RestoreSnapshot(snapshot,error,2) && Near(float(second.PresentedValue("root","opacity")->data[0]),1),"restore evaluates valid combined snapshot without invalid host-first intermediate");
 		Document availability;
 		Check(availability.Load(bindingSource,diagnostics) && availability.ReplaceValue("/state/available",R"({"type":"boolean","initial":true,"cvar":"snapshot_available"})",diagnostics),"compile host-owned availability fixture");
 		host.cvars["snapshot_available"]=true;
-		Check(first.LoadDocument(availability.Source(),"snapshot-availability.q4ui",diagnostics) && second.LoadDocument(availability.Source(),"snapshot-availability.q4ui",diagnostics),"load availability snapshot pair");
+		Check(first.LoadDocument(availability.Source(),"snapshot-availability.rui",diagnostics) && second.LoadDocument(availability.Source(),"snapshot-availability.rui",diagnostics),"load availability snapshot pair");
 		first.Frame({},3); first.FocusControl("reference-controls",3); first.Frame({},3.2);
 		Check(first.SaveSnapshot(snapshot,error,3.2),"save focused control while host permits interaction");
 		host.cvars["snapshot_available"]=false;
@@ -2116,7 +2116,7 @@ int main(int argc, char** argv) {
 	{
 		Runtime first(host), second(host);
 		std::string snapshot,error;
-		Check(first.LoadDocument(interactionSource,"snapshot-modal.q4ui",diagnostics) && second.LoadDocument(interactionSource,"snapshot-modal.q4ui",diagnostics),"load modal snapshot pair");
+		Check(first.LoadDocument(interactionSource,"snapshot-modal.rui",diagnostics) && second.LoadDocument(interactionSource,"snapshot-modal.rui",diagnostics),"load modal snapshot pair");
 		first.Frame({},1); Check(first.FocusControl("reference-controls",1),"choose modal return focus");
 		Check(first.SetControlEnabled("reference-system",false,1),"set persistent unbound availability override");
 		Check(first.PushModal("modal-panel",1) && first.PushModal("modal-controls",1),"open nested modal scopes");
@@ -2132,7 +2132,7 @@ int main(int argc, char** argv) {
 	for (int device = 0; device < 3; ++device) {
 		Runtime restored(host); Input adapter;
 		std::string snapshot,error,before,after;
-		Check(restored.LoadDocument(interactionSource,"snapshot-routed-input.q4ui",diagnostics),"load composed restore/source-quarantine fixture");
+		Check(restored.LoadDocument(interactionSource,"snapshot-routed-input.rui",diagnostics),"load composed restore/source-quarantine fixture");
 		restored.Frame({},1); Check(restored.FocusControl("reference-controls",1),"focus composed restore target");
 		Bounds target; Check(restored.GetBounds("reference-controls",target),"get internal fixture pointer coordinates");
 		const float x=target.x+target.width*.5f,y=target.y+target.height*.5f;
@@ -2196,8 +2196,8 @@ int main(int argc, char** argv) {
 		// data and input must survive interleaved frames and arbitrary close order.
 		auto first = std::make_unique<Runtime>(host);
 		Runtime second(host);
-		Check(first->LoadDocument(bindingSource,"first.q4ui",diagnostics),"first independent live document");
-		Check(second.LoadDocument(bindingSource,"second.q4ui",diagnostics),"second independent live document");
+		Check(first->LoadDocument(bindingSource,"first.rui",diagnostics),"first independent live document");
+		Check(second.LoadDocument(bindingSource,"second.rui",diagnostics),"second independent live document");
 		Check(first->SetState({{"progress",20.0}},stateError,1),"first instance state");
 		Check(second.SetState({{"progress",80.0}},stateError,100),"second instance state");
 		const Viewport firstViewport{900,650,1,1}, secondViewport{1200,900,2,1};
@@ -2214,7 +2214,7 @@ int main(int argc, char** argv) {
 		first->MenuAction(MenuInput::Accept,false,1);
 		Check(first->TakeActions().size()==1 && second.TakeActions().empty(),"activation and availability are independent");
 		const auto secondRevision = second.StateRevision();
-		Check(!first->LoadDocument("{}","bad.q4ui",diagnostics),"failed replacement is local");
+		Check(!first->LoadDocument("{}","bad.rui",diagnostics),"failed replacement is local");
 		Check(second.StateRevision()==secondRevision && first->PresentedValue("reading","text")->text=="20","failed load preserves both documents");
 		const auto secondGeometry = second.Statistics().residentGeometryCount;
 		first.reset(); // The initial RmlUi service creator may leave first.
@@ -2222,7 +2222,7 @@ int main(int argc, char** argv) {
 		Check(second.Statistics().residentGeometryCount==secondGeometry,"closing a neighbor does not flush the survivor's text geometry");
 		for (int iteration=0; iteration<24; ++iteration) {
 			Runtime temporary(host);
-			Check(temporary.LoadDocument(bindingSource,"temporary.q4ui",diagnostics),"reacquire an idle render backend");
+			Check(temporary.LoadDocument(bindingSource,"temporary.rui",diagnostics),"reacquire an idle render backend");
 			temporary.Frame(firstViewport,iteration);
 			Check(temporary.Statistics().residentBackends==2 && second.Statistics().activeContexts==2,"backend residency is bounded by peak concurrent views");
 		}
@@ -2233,8 +2233,8 @@ int main(int argc, char** argv) {
 	}
 	{
 		Runtime first(host),second(host);
-		Check(first.LoadDocument(maskedDocument,"mask-first.q4ui",diagnostics),"first masked view");
-		Check(second.LoadDocument(maskedDocument,"mask-second.q4ui",diagnostics),"second masked view");
+		Check(first.LoadDocument(maskedDocument,"mask-first.rui",diagnostics),"first masked view");
+		Check(second.LoadDocument(maskedDocument,"mask-second.rui",diagnostics),"second masked view");
 		Check(first.PlayTimeline("fade",1) && second.PlayTimeline("fade",100),"separate playback epochs");
 		host.samplePoints={{20.37f,20.63f},{70.37f,50.63f}};
 		const Viewport small{240,160,1,1},large{800,600,1,1};
@@ -2252,7 +2252,7 @@ int main(int argc, char** argv) {
 	}
 	{
 		Runtime limited(host);
-		Check(limited.LoadDocument(maskedDocument,"bounded-frames.q4ui",diagnostics),"load frame-fence exhaustion fixture");
+		Check(limited.LoadDocument(maskedDocument,"bounded-frames.rui",diagnostics),"load frame-fence exhaustion fixture");
 		host.samplePoints={{20.37f,20.63f}}; ++host.renderFrame;
 		int exhausted = 0;
 		for (int i=0; i<60; ++i) {
