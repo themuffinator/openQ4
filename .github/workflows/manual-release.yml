@@ -2051,6 +2051,9 @@ jobs:
           # Launch the executable from inside the bundle while deliberately
           # using an unrelated CWD, matching Finder/LaunchServices path
           # semantics without relying on an interactive desktop session.
+          # Both macOS variants qualify the OpenGL path (the Metal bridge wraps
+          # it), and the safety self-test checks the OpenGL bootstrap. Pin it:
+          # Automatic has chosen Vulkan through MoltenVK since 28 October.
           (
             cd "${smoke_cwd}"
             "${app_exec}" \
@@ -2062,6 +2065,7 @@ jobs:
               +set g_allowAssetlessStartup 1 \
               +set r_fullscreen 0 \
               +set r_ignoreGLErrors 0 \
+              +set r_renderApi gl \
               +rendererDefaultSafetySelfTest \
               +gfxInfo \
               +quit > "${smoke_console}" 2>&1 &

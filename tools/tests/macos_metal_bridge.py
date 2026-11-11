@@ -3379,6 +3379,8 @@ def validate_packaging_and_release_contract() -> None:
     require(release, "Smoke test macOS app-bundle path resolution", "manual release macOS app runtime smoke")
     require(release, "finder-style-cwd", "manual release Finder-style working-directory smoke")
     require(release, "+rendererDefaultSafetySelfTest", "manual release app renderer self-test")
+    # The self-test and the shutdown line below are OpenGL's; Automatic picks Vulkan.
+    require(release, "+set r_renderApi gl \\\n              +rendererDefaultSafetySelfTest", "manual release app smoke pins OpenGL")
     require(release, "smoke_exit_status", "manual release app exit-status capture")
     require(release, "smoke_console", "manual release app console-output capture")
     require(release, "require_smoke_output", "manual release app console-output validation")
