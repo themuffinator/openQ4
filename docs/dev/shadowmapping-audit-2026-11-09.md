@@ -80,6 +80,7 @@ cache (sixteen at most) against forty cubes in view.
 |---|---|
 | **Quality and Ultra give the projected atlas four cells** (2048 cells in 4096, 4096 in 8192) while Enhanced has sixteen. A light with local casters takes two. OpenGL re-renders the overflow every view; Vulkan marks the light for stencil permanently and can draw it unshadowed for a frame. convoy2's start view does this: up to four projected lights, five lights sent to stencil for good and one drawn unshadowed. | **Fixed, both backends.** A tile size per light, assigned per view. See "Atlas tile sizes" below. No preset changed. |
 | Vulkan: cascades in an 8192 atlas always fail (one CSM block is the whole atlas). | **Open**; no preset uses it. |
+| On Vulkan a crowded view's spotlights are cut down as if every map needed an atlas block, though maps read where they live need none. | **By design.** The fit cuts lights in one stock view of fifteen, to half size and never less, and at sixteen poses there the picture is the same as with every light at full size: the cut lamps cast no shadow in view. Following the cache instead would make the size, which is part of the cache key, depend on what is cached. See "The tile-size fit and maps read in place" below. |
 | OpenGL's projected cache is its atlas, four full maps at Quality and Ultra, where Vulkan keeps eight resident beside its atlas. A view crowded with spotlights evicts on OpenGL what Vulkan keeps: turning in convoy2's start view renders 45 maps fresh against 19. | **By design.** The atlas fills in one stock view of ten, and there the difference is a hundredth of a millisecond a view; eight maps would take a second atlas, 64 MiB at Quality and 256 MiB at Ultra. See "OpenGL's projected cache and its atlas" below. |
 | The stencil-fallback flag on a light was never cleared: one failed map pass cost the light its volume elision for the rest of the level. | **Fixed, both backends.** A light leaves the fallback after 240 views without another failure. See "Leaving the stencil fallback" below. |
 | **A light with nothing to cast was sent to the stencil fallback.** A receiver pass that found no caster for its map was treated as a map that had failed. OpenGL marked the light, released it after 240 clean views and marked it again, for as long as it was in view; Vulkan marked it in every view and never released it. Such a light has nothing for stencil to draw either. Found by the openD3 session on Doom 3's hell1; no stock Quake 4 view tried shows it. | **Fixed, both backends.** A pass with nothing to cast holds its light only where stencil has a volume for it. See "A pass with nothing to cast" below. |
@@ -1364,6 +1365,64 @@ keep more lights at full size.
 Checked: the counts above, one launch a level on each renderer. No code
 changed.
 
+### The tile-size fit and maps read in place
+
+Added on 11 November, for the open item "on Vulkan a projected light's tile
+size is fitted as if every map of the view needed an atlas block". The front
+end sizes a crowded view's atlas lights so that one block for each of their
+passes fits the atlas (`R_ShadowMapAssignAtlasTiles`). Vulkan reads a cached
+map with nothing live in it where it lives and takes no block for it, so in
+a settled view most of the atlas the fit made room in stays empty, and the
+lights could have kept their size.
+
+Where the fit cuts anything, Vulkan, Quality, fifteen start views with the
+view turning for twelve seconds:
+
+| Level | Most atlas passes in a view | Atlas lights cut below 2048 |
+|---|---:|---|
+| convoy2 | 10 | in 29 of 75 reports: 163 light-reports at 1024, 38 at 2048, none smaller |
+| hub2, medlabs, storage2 | 4 | never |
+| convoy1, building_b, network1 | 2 | never |
+| hub1 | 1 | never |
+| airdefense1 (two views), airdefense2, waste, putra, storage1, mcc_landing | 0 | never |
+
+One view of fifteen, the one the tile sizes were made for. Its passes are
+served as the item says: of 273 passes in those reports 242 were read in
+place, 27 composed over a copy and 4 rendered.
+
+What the cut costs there was looked for in pictures: time frozen, point
+lights left on stencil so that only atlas lights are mapped, the fit's
+picture against the same view with `r_shadowMapAtlasSize 8192`, which keeps
+every light at 2048.
+
+| convoy2, from the start position | Pixels that differ at all |
+|---|---:|
+| Eight directions at eye level, fit against every light at 2048 | 0 in all eight |
+| Four directions looking 25 and 50 degrees down, the same | 0 in seven, 1 pixel by one level in one |
+| The same sixteen poses, fit against every light at 256 | 0 in fifteen, 1 pixel in one |
+| OpenGL, one pose, fit against 256 | 0 |
+| hub2's start view for comparison, 2048 against 1024 | 56,381, of them 5,196 by more than 24 levels |
+
+The lamps the fit cuts cast nothing that can be seen from there. Isolated
+one at a time on OpenGL, five of six shadow no pixel at all and the sixth 34
+pixels by less than 8 levels: they are small spotlights in wire caps whose
+light volumes reach the view and whose shadows do not. hub2 shows what a
+halved map costs a light whose shadows are in view, and it is the order of
+the fit, smallest lights first, that keeps such a light at full size.
+
+Letting Vulkan's lights keep their size would also need more than a
+different count. A map that is not cached yet is rendered into an atlas
+block and copied to its resident image, so the first view of a crowded place
+needs a block for every pass whatever the cache holds, and the size is part
+of the cache key: a fit that followed the cache would render at one size,
+find the maps cached, choose another size and miss. The resident images
+would have to become render targets (they are created as copy targets), or
+first renders be spread over several views with lights unshadowed
+meanwhile. Not worth doing for a difference no stock view shows. Left as it
+is.
+
+Checked: the counts and pictures above. No code changed.
+
 ## Presets
 
 Unchanged. Enhanced keeps point lights on stencil: mapping them still costs
@@ -1377,25 +1436,23 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. On Vulkan a projected light's tile size is fitted as if every map of the
-   view needed an atlas block. Maps read where they live need none, so a
-   crowded view could keep more of its lights at full size. The fit decides
-   the cache key, so it must not follow what happens to be cached.
-3. One static cube for both ownerships of a composed Vulkan light, as on
+2. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
    cubes. It needs a resident entry two passes of a view can share.
-4. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
+3. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
    most, than the same light unshadowed, in up to a tenth of the view. Not
    the filter and not the translucent setting; Vulkan is exact. Invisible,
    and unexplained.
-5. A static model that moves under still lights (a lift, a door) builds its
+4. A static model that moves under still lights (a lift, a door) builds its
    volumes again each frame it moves, 40 to 45 microseconds a view in hub2.
    Leaving them out needs a mark on the entity for having moved.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters"); the stencil volumes of static models under lights that have
 never moved (see "Static volumes under mapped lights"); a projected cache for
-OpenGL beyond its atlas (see "OpenGL's projected cache and its atlas").
+OpenGL beyond its atlas (see "OpenGL's projected cache and its atlas"); a
+tile-size fit on Vulkan that leaves out maps read in place (see "The
+tile-size fit and maps read in place").
 
 Outside the shadow system, found in passing: `idMaterial::ConstantRegisters()`
 is NULL for every material, so every surface evaluates its registers every
