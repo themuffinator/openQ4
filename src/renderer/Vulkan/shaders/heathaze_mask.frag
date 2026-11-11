@@ -1,6 +1,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "framebuffer_coords.glsl"
+#include "heathaze_depth_reject.glsl"
 
 // Native Vulkan port of heatHazeWithMask.vfp. This is also the compatibility
 // implementation for Quake 4's dangling heatHazeGrayWithMask.vfp material
@@ -10,6 +11,8 @@
 layout(set = 0, binding = 0) uniform sampler2D currentRenderMap;
 layout(set = 1, binding = 0) uniform sampler2D normalMap;
 layout(set = 2, binding = 0) uniform sampler2D maskMap;
+
+layout(set = 5, binding = 0) uniform sampler2D sceneDepthMap;
 
 layout(set = 6, binding = 0, std140) uniform StageParms {
     vec4 parms[8];
@@ -45,10 +48,14 @@ void main() {
         gl_FragCoord.x - sp.parms[7].x,
         CanonicalWindowY(sp.parms[6].z) - sp.parms[7].y);
     vec4 screenTexCoord = vec4(windowGL * sp.parms[6].xy, 0.0, 1.0);
+    vec4 undistortedTexCoord = screenTexCoord;
     screenTexCoord = clamp(
         localNormal * vDeformScale + screenTexCoord,
         0.0,
         1.0);
+    // parms[7].zw: 0..1 window space to the _currentDepth capture
+    screenTexCoord.xy = HeatHazeRejectNearer(sceneDepthMap, sp.parms[7].zw,
+        screenTexCoord.xy, undistortedTexCoord.xy);
     screenTexCoord *= sp.parms[5];
 
     vec4 color = vec4(texture(currentRenderMap, screenTexCoord.xy).rgb, 1.0);

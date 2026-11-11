@@ -1156,6 +1156,18 @@ if get_option('build_native_tests')
     openq4_arb_color_zero_floor_test,
     timeout: 30,
   )
+
+  openq4_arb_heat_haze_depth_reject_test = executable(
+    'openq4-arb-heat-haze-depth-reject-test',
+    files('tools/tests/native/ARBHeatHazeDepthRejectTest.cpp'),
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test(
+    'openq4-arb-heat-haze-depth-reject',
+    openq4_arb_heat_haze_depth_reject_test,
+    timeout: 30,
+  )
 endif
 
 # The retained runtime is isolated from engine PCH/platform/render headers.

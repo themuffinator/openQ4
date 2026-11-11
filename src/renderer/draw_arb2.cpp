@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "tr_local.h"
 #include "draw_pbr.h"
 #include "ARBColorZeroFloor.h"
+#include "ARBHeatHazeDepthReject.h"
 #include "CelShading.h"
 #include "Model_local.h"
 #include "ShadowMapClassification.h"
@@ -17309,6 +17310,7 @@ typedef struct {
 	int				errorPosition;
 	char			failureReason[256];
 	char			normalizedPath[96];
+	bool			sceneDepthReject;	// heat haze rewritten to read texture[oq4arbhaze::TEXTURE_UNIT]
 } progDef_t;
 
 static	const int	MAX_GLPROGS = 200;
@@ -17418,6 +17420,7 @@ static void RB_ResetARBProgramStatus( progDef_t &prog ) {
 	prog.requiredForLighting = RB_IsRequiredLightingARBProgram( prog );
 	prog.errorPosition = -1;
 	prog.failureReason[0] = '\0';
+	prog.sceneDepthReject = false;
 	RB_SetARBProgramPath( prog );
 }
 
@@ -17503,6 +17506,47 @@ static bool RB_ARBProgramNeedsColorZeroFloor( const progDef_t &prog ) {
 		( prog.ident == FPROG_INTERACTION ||
 		  prog.ident == FPROG_SIMPLE_INTERACTION ||
 		  prog.ident == FPROG_TEST );
+}
+
+/*
+==================
+RB_ARBProgramNeedsHeatHazeDepthReject
+
+The stock heat-haze fragment programs, which refract _currentRender. Their
+refracted read must not pick up the first-person weapon or other geometry in
+front of the haze; ARBHeatHazeDepthReject.h has the whole story.
+==================
+*/
+static bool RB_ARBProgramNeedsHeatHazeDepthReject( const progDef_t &prog ) {
+	return prog.target == GL_FRAGMENT_PROGRAM_ARB && idStr::Icmpn( prog.name, "heatHaze", 8 ) == 0;
+}
+
+static const char *RB_ARBHeatHazeDepthRejectResultName( oq4arbhaze::rewriteResult_t result ) {
+	switch ( result ) {
+	case oq4arbhaze::REWRITE_DONE:
+		return "done";
+	case oq4arbhaze::REWRITE_NO_SCREEN_READ:
+		return "no _currentRender read";
+	case oq4arbhaze::REWRITE_UNSUPPORTED:
+		return "unsupported program";
+	case oq4arbhaze::REWRITE_NO_ROOM:
+		return "rewrite buffer too small";
+	default:
+		return "unknown";
+	}
+}
+
+/*
+==================
+R_ARBProgramUsesSceneDepthReject
+
+True when the loaded fragment program ident reads the scene depth on
+texture[oq4arbhaze::TEXTURE_UNIT] and program.local[oq4arbhaze::LOCAL_INDEX].
+==================
+*/
+bool R_ARBProgramUsesSceneDepthReject( int ident ) {
+	const progDef_t *prog = RB_FindARBProgramRecord( GL_FRAGMENT_PROGRAM_ARB, static_cast<GLuint>( ident ) );
+	return prog != NULL && prog->valid && prog->sceneDepthReject;
 }
 
 static const char *RB_ARBColorZeroFloorResultName( oq4arbfloor::rewriteResult_t result ) {
@@ -17814,6 +17858,23 @@ void R_LoadARBProgram( int progIndex ) {
 		}
 	}
 
+	// The heat-haze programs get a scene depth test on their refracted read.
+	// Like the zero floor it is our rewrite, so a driver that refuses it gets
+	// the program as shipped.
+	idList<char> hazeDepthRejectProgram;
+	bool hazeDepthReject = false;
+	if ( RB_ARBProgramNeedsHeatHazeDepthReject( prog ) ) {
+		hazeDepthRejectProgram.SetNum( idLib::SizeToInt( oq4arbhaze::RewriteBufferSize( start ), "R_LoadARBProgram" ) );
+		const oq4arbhaze::rewriteResult_t hazeResult = oq4arbhaze::RewriteWithDepthReject( start,
+			hazeDepthRejectProgram.Ptr(), static_cast<size_t>( hazeDepthRejectProgram.Num() ) );
+		if ( hazeResult == oq4arbhaze::REWRITE_DONE ) {
+			programText = hazeDepthRejectProgram.Ptr();
+			hazeDepthReject = true;
+		} else {
+			common->Printf( ": heat-haze depth test not applied (%s)", RB_ARBHeatHazeDepthRejectResultName( hazeResult ) );
+		}
+	}
+
 	glBindProgramARB( prog.target, prog.ident );
 	glGetError();
 
@@ -17825,11 +17886,18 @@ void R_LoadARBProgram( int progIndex ) {
 	if ( programText != start && ( err == GL_INVALID_OPERATION || ofs != -1 ) ) {
 		const GLubyte *str = glGetString( GL_PROGRAM_ERROR_STRING_ARB );
 		common->Printf( "\n" );
-		common->Warning( "R_LoadARBProgram: the driver rejected the colour zero floor for %s (%s); loading it unchanged, "
-			"so a light behind a surface can darken it on a float scene target",
-			fullPath.c_str(), ( str != NULL ) ? (const char *)str : "unknown" );
+		if ( hazeDepthReject ) {
+			common->Warning( "R_LoadARBProgram: the driver rejected the heat-haze depth test for %s (%s); loading it unchanged, "
+				"so the haze can refract the view weapon",
+				fullPath.c_str(), ( str != NULL ) ? (const char *)str : "unknown" );
+		} else {
+			common->Warning( "R_LoadARBProgram: the driver rejected the colour zero floor for %s (%s); loading it unchanged, "
+				"so a light behind a surface can darken it on a float scene target",
+				fullPath.c_str(), ( str != NULL ) ? (const char *)str : "unknown" );
+		}
 		common->Printf( "%s", fullPath.c_str() );
 		programText = start;
+		hazeDepthReject = false;
 		glProgramStringARB( prog.target, GL_PROGRAM_FORMAT_ASCII_ARB,
 			idLib::SizeToInt( strlen( programText ), "R_LoadARBProgram" ), (unsigned char *)programText );
 		err = glGetError();
@@ -17857,7 +17925,12 @@ void R_LoadARBProgram( int progIndex ) {
 	}
 
 	prog.valid = true;
-	common->Printf( programText != start ? ": colour floored at zero\n" : "\n" );
+	prog.sceneDepthReject = hazeDepthReject;
+	if ( programText == start ) {
+		common->Printf( "\n" );
+	} else {
+		common->Printf( hazeDepthReject ? ": heat-haze depth test added\n" : ": colour floored at zero\n" );
+	}
 }
 
 /*

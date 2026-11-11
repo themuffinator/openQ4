@@ -6676,6 +6676,30 @@ static bool VK_Exec_MaterialUsesCurrentDepth( const idMaterial *material ) {
 	return false;
 }
 
+static bool VK_Exec_IsHeatHazeFamily( vkMaterialProgramFamily_t family ) {
+	return family == VK_MATERIAL_PROGRAM_FAMILY_HEAT_HAZE
+			|| family == VK_MATERIAL_PROGRAM_FAMILY_HEAT_HAZE_WITH_MASK
+			|| family == VK_MATERIAL_PROGRAM_FAMILY_HEAT_HAZE_GRAY_WITH_MASK
+			|| family == VK_MATERIAL_PROGRAM_FAMILY_HEAT_HAZE_WITH_MASK_AND_VERTEX;
+}
+
+// The native heat-haze shaders test their refracted _currentRender read
+// against the scene depth, so the haze does not refract the first-person
+// weapon or anything else in front of it (ARBHeatHazeDepthReject.h has the
+// OpenGL side). The depth is optional: without it the haze draws as retail.
+static bool VK_Exec_StageWantsHeatHazeSceneDepth( const shaderStage_t *stage ) {
+	if ( !r_heatHazeDepthReject.GetBool() || stage == NULL || stage->newStage == NULL
+			|| stage->newStage->glslProgram || stage->newStage->customLighting ) {
+		return false;
+	}
+	vkMaterialProgramFamily_t family = R_GetARBProgramFamily( GL_FRAGMENT_PROGRAM_ARB,
+			stage->newStage->fragmentProgram );
+	if ( family == VK_MATERIAL_PROGRAM_FAMILY_UNKNOWN ) {
+		family = R_GetARBProgramFamily( GL_VERTEX_PROGRAM_ARB, stage->newStage->vertexProgram );
+	}
+	return VK_Exec_IsHeatHazeFamily( family );
+}
+
 static bool VK_Exec_CaptureCurrentRender( const viewDef_t *viewDef ) {
 	if ( globalImages == NULL || globalImages->currentRenderImage == NULL
 			|| viewDef == NULL ) {
@@ -12411,6 +12435,21 @@ static void VK_Exec_DrawProgramStage( const viewDef_t *viewDef,
 			return;
 		}
 	}
+	// set 5: the scene depth for the refracted-read test, or white (a depth
+	// of 1.0 is never nearer than the haze) when the test is off
+	idImage *hazeDepthImage = globalImages->currentDepthImage;
+	const bool hazeDepthReject = VK_Exec_StageWantsHeatHazeSceneDepth( stage )
+			&& backEnd.currentDepthCopied && hazeDepthImage != NULL
+			&& hazeDepthImage->GetOpts().width > 0 && hazeDepthImage->GetOpts().height > 0;
+	VkDescriptorSet hazeDepthSet = hazeDepthReject
+			? VK_Exec_ImageDescriptor( hazeDepthImage->GetDeviceHandle(), true )
+			: VK_NULL_HANDLE;
+	if ( hazeDepthSet == VK_NULL_HANDLE && globalImages->whiteImage != NULL ) {
+		hazeDepthSet = VK_GuiExecutor_GetResidentImageDescriptor( globalImages->whiteImage );
+	}
+	if ( hazeDepthSet == VK_NULL_HANDLE ) {
+		return;
+	}
 
 	float parms[ 8 ][ 4 ];
 	memset( parms, 0, sizeof( parms ) );
@@ -12462,6 +12501,13 @@ static void VK_Exec_DrawProgramStage( const viewDef_t *viewDef,
 	parms[ 6 ][ 2 ] = (float)VK_Exec_ActiveFramebufferHeight();
 	parms[ 7 ][ 0 ] = (float)viewDef->viewport.x1;
 	parms[ 7 ][ 1 ] = (float)viewDef->viewport.y1;
+	// 0..1 screen space to the depth capture's texture space
+	parms[ 7 ][ 2 ] = 1.0f;
+	parms[ 7 ][ 3 ] = 1.0f;
+	if ( hazeDepthSet != VK_NULL_HANDLE && hazeDepthReject ) {
+		parms[ 7 ][ 2 ] = (float)viewportWidth / (float)hazeDepthImage->GetOpts().width;
+		parms[ 7 ][ 3 ] = (float)viewportHeight / (float)hazeDepthImage->GetOpts().height;
+	}
 
 	const int uniformOffset =
 			VK_Exec_InteractionUniformAlloc( parms, sizeof( parms ) );
@@ -12518,6 +12564,8 @@ static void VK_Exec_DrawProgramStage( const viewDef_t *viewDef,
 	vkCmdBindDescriptorSets( vkExec.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			vkExec.interactionPipelineLayout, 0, (uint32_t)numTextures,
 			textureSets, 0, NULL );
+	vkCmdBindDescriptorSets( vkExec.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			vkExec.interactionPipelineLayout, 5, 1, &hazeDepthSet, 0, NULL );
 	const VkDescriptorSet uniformSet = VK_Exec_InteractionUniformSet();
 	const uint32_t dynamicOffset = (uint32_t)uniformOffset;
 	vkCmdBindDescriptorSets( vkExec.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -12597,6 +12645,12 @@ static void VK_Exec_DrawAmbientStages( const viewDef_t *viewDef, const drawSurf_
 			} else {
 				backEnd.currentDepthCopied = true;
 			}
+		}
+		// Like soft particles, a failed capture only leaves the haze without
+		// its depth test.
+		if ( !backEnd.currentDepthCopied && VK_Exec_StageWantsHeatHazeSceneDepth( pStage )
+				&& VK_Exec_CaptureCurrentDepth( viewDef ) ) {
+			captureInterruptedScope = true;
 		}
 		if ( captureInterruptedScope ) {
 			VK_Exec_RestoreSurfaceState( cmd, viewDef, shader, worldDepthState );

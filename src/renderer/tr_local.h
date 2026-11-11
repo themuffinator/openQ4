@@ -1583,6 +1583,7 @@ extern idCVar r_shadowMapTranslucentMinVariance;	// minimum variance for translu
 extern idCVar r_shadowMapTranslucentBleedReduction;	// moment light-bleed reduction
 extern idCVar r_shadowMapGpuSyncTimings;	// 1 = glFinish-bracket shadow-map passes for GPU-synchronized diagnostics
 extern idCVar r_shadowMapGpuTimerQueries;	// 1 = use GL timer queries for shadow-map GPU diagnostics when available
+extern idCVar r_heatHazeDepthReject;	// 1 = heat haze does not refract the view weapon or other geometry in front of it
 extern idCVar r_softParticles;			// 1 = depth-fade eligible BSE particle surfaces against the opaque scene depth
 extern idCVar r_softParticleFadeDistance;	// world-unit fade distance for r_softParticles
 extern idCVar r_enhancedMaterials;		// 1 = use enhanced GLSL interaction shading for stock materials when supported
@@ -2334,6 +2335,8 @@ int		R_FindARBProgram( unsigned int target, const char *program );
 bool	R_IsARBProgramValid( unsigned int target, unsigned int ident );
 vkMaterialProgramFamily_t R_GetARBProgramFamily( unsigned int target, unsigned int ident );
 bool	R_BindARBProgram( unsigned int target, unsigned int ident, const char *usage, bool required );
+// a stock heat-haze fragment program rewritten to test its refracted read against the scene depth
+bool	R_ARBProgramUsesSceneDepthReject( int ident );
 
 // Stable identities for every GLSL family named by the shipped Quake 4
 // materials. Native replacements require an approved source-pair identity,

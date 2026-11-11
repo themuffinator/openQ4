@@ -6,6 +6,25 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Heat haze no longer smears your weapon into the scene, 11 November 2026
+
+- **The view weapon stays out of heat haze.** Heat haze from fires, jets and
+  explosions bends the image behind it. When the haze sat behind your gun,
+  it also bent the gun itself, so a dark ghost of the weapon smeared into
+  the fire around its edges. The haze now ignores anything in front of it,
+  so the weapon keeps a clean outline and the fire shows around it. The same
+  goes for a pillar or crate standing between you and a fire.
+- **The haze itself is unchanged.** Everything behind the haze still
+  refracts exactly as in the original game, on OpenGL and Vulkan.
+- **Nothing to do.** `r_heatHazeDepthReject 0` restores the original
+  behaviour for comparison. The Android OpenGL ES renderers are unchanged.
+- Evidence: Air Defense 1, the fire beside the start, with the pistol over
+  its haze, on OpenGL and Vulkan, captured in one frame with the test on and
+  off: every changed pixel lies along the weapon's outline, where the ghost
+  of the grip disappears, and nothing else in the frame changed; no new
+  warnings. `openq4-arb-heat-haze-depth-reject` covers the OpenGL program
+  rewrite, and `vk_shader_header_pin.py` the regenerated Vulkan shaders.
+
 ## Display settings that apply without restarting the renderer, 11 November 2026
 
 - **V-Sync switches at once.** In the new interface, changing V-Sync on

@@ -45,6 +45,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "RendererMetrics.h"
 #include "ScenePackets.h"
 #include "MotionBlurCore.h"
+#include "ARBHeatHazeDepthReject.h"
 
 #ifndef GL_FRAMEBUFFER_SRGB
 #define GL_FRAMEBUFFER_SRGB 0x8DB9
@@ -7734,6 +7735,54 @@ static void RB_EnsureCurrentDepthSampledPlain( idImage *depthImage ) {
 	lastGeneration = generation;
 }
 
+/*
+==================
+RB_PrepareHeatHazeSceneDepth
+
+The rewritten heat-haze programs (ARBHeatHazeDepthReject.h) read the scene
+depth on texture[oq4arbhaze::TEXTURE_UNIT]. Capture it if this view has not
+yet, while no stage state is bound; RB_BindHeatHazeSceneDepth binds it.
+==================
+*/
+static void RB_PrepareHeatHazeSceneDepth( void ) {
+	if ( !r_heatHazeDepthReject.GetBool() || backEnd.currentDepthCopied
+		|| globalImages == NULL || globalImages->currentDepthImage == NULL || backEnd.viewDef == NULL ) {
+		return;
+	}
+	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	RB_CaptureCurrentDepthImage( viewportWidth, viewportHeight );
+}
+
+/*
+==================
+RB_BindHeatHazeSceneDepth
+
+A white texture in place of the depth turns the test off: a depth of 1.0 is
+never nearer than the haze, so every refracted read keeps its offset.
+==================
+*/
+static void RB_BindHeatHazeSceneDepth( void ) {
+	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	idImage *depthImage = globalImages->currentDepthImage;
+	const bool useDepth = r_heatHazeDepthReject.GetBool() && backEnd.currentDepthCopied
+		&& depthImage != NULL && depthImage->GetOpts().width > 0 && depthImage->GetOpts().height > 0
+		&& viewportWidth > 0 && viewportHeight > 0;
+
+	float parm[4] = { 1.0f, 1.0f, 0.0f, 0.0f };
+	GL_SelectTexture( oq4arbhaze::TEXTURE_UNIT );
+	if ( useDepth ) {
+		depthImage->Bind();
+		RB_EnsureCurrentDepthSampledPlain( depthImage );
+		parm[0] = static_cast<float>( viewportWidth ) / static_cast<float>( depthImage->GetOpts().width );
+		parm[1] = static_cast<float>( viewportHeight ) / static_cast<float>( depthImage->GetOpts().height );
+	} else {
+		globalImages->whiteImage->Bind();
+	}
+	glProgramLocalParameter4fvARB( GL_FRAGMENT_PROGRAM_ARB, oq4arbhaze::LOCAL_INDEX, parm );
+}
+
 static bool RB_TryDrawSoftParticleStage( const drawSurf_t *surf, const shaderStage_t *pStage, const float *regs, const srfTriangles_t *tri, idDrawVert *ac, int stage, const float color[4] ) {
 	if ( !RB_SoftParticleStageEligible( surf, pStage ) ) {
 		return false;
@@ -11650,6 +11699,12 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 				}
 			}
 
+			const bool hazeDepthReject = fragmentProgramEnabled
+				&& R_ARBProgramUsesSceneDepthReject( newStage->fragmentProgram );
+			if ( hazeDepthReject ) {
+				RB_PrepareHeatHazeSceneDepth();
+			}
+
 			if ( fragmentProgramEnabled ) {
 				for ( int i = 0 ; i < newStage->numFragmentProgramImages ; i++ ) {
 					if ( newStage->fragmentProgramImages[i] ) {
@@ -11658,9 +11713,17 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					}
 				}
 			}
+			if ( hazeDepthReject ) {
+				RB_BindHeatHazeSceneDepth();
+			}
 
 			// draw it
 			RB_DrawElementsWithCounters( tri );
+
+			if ( hazeDepthReject ) {
+				GL_SelectTexture( oq4arbhaze::TEXTURE_UNIT );
+				globalImages->BindNull();
+			}
 
 			if ( fragmentProgramEnabled ) {
 				for ( int i = 1 ; i < newStage->numFragmentProgramImages ; i++ ) {
