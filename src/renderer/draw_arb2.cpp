@@ -12461,11 +12461,12 @@ static void RB_ShadowMapDrawReceiverFallbacks( const viewLight_t *vLight, const 
 	}
 
 	// Fallback receivers are shadowed by the light's stencil volumes even on
-	// mapped frames. If the front end elided those volumes, restore them from
-	// the next frame on so these receivers do not stay unshadowed.
-	if ( primaryShadowSurfs == NULL && secondaryShadowSurfs == NULL ) {
-		RB_ShadowMapMarkStencilFallbackSticky( vLight );
-	}
+	// mapped frames, so the light needs those volumes for as long as it draws
+	// one. Every such view renews the hold. Marked only when the volumes were
+	// missing, the light counted each view that had them as clean, left the
+	// fallback after r_shadowMapStencilFallbackViews, drew these receivers
+	// unshadowed for a frame and was marked again, over and over.
+	RB_ShadowMapMarkStencilFallbackSticky( vLight );
 
 	if ( passKind == SHADOWMAP_PASS_LOCAL ) {
 		g_shadowMapStats.receiverFallbackLocalPasses++;

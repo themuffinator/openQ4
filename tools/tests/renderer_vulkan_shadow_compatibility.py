@@ -9233,6 +9233,29 @@ def validate_stencil_fallback_release_contract() -> None:
             f"{path}: every failed pass restarts the count, marked or not",
         )
 
+    # A receiver that can only be shadowed by stencil volumes needs them in
+    # every view it is drawn. The hold is renewed whether or not the volumes
+    # are there: renewed only when they were missing, the light counted the
+    # views that had them as clean and left the fallback again and again,
+    # drawing those receivers unshadowed for a frame each time.
+    receiver_fallbacks = braced_body(
+        read("src/renderer/draw_arb2.cpp"),
+        "static void RB_ShadowMapDrawReceiverFallbacks(",
+        "OpenGL receiver fallback draw",
+    )
+    require_order(
+        receiver_fallbacks,
+        (
+            "if ( receiverFallbackSurfaces <= 0 ) {",
+            "return;",
+            "RB_ShadowMapMarkStencilFallbackSticky( vLight );",
+            "if ( passKind == SHADOWMAP_PASS_LOCAL ) {",
+        ),
+        "every view that draws a fallback receiver renews the light's hold on its volumes",
+    )
+    if "primaryShadowSurfs == NULL && secondaryShadowSurfs == NULL" in receiver_fallbacks:
+        raise AssertionError("The receiver fallback hold must not depend on the volumes being absent")
+
     # A render-thread snapshot carries the flag it was taken with. Copied back
     # as it stands it would undo a release decided meanwhile; only a failure
     # stamped on the snapshot afterwards is news.

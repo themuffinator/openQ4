@@ -772,6 +772,18 @@ the second excursion marks no light anew and draws no light unshadowed. The
 validation layers are silent. A released light that fails again behaves as
 any light does at its first failure.
 
+Corrected on 11 November. On OpenGL a receiver that can only be shadowed by
+stencil volumes (custom GLSL lighting, generated geometry) marked its light
+only in a view where the volumes were missing. Once marked, the light had
+them, so each such view counted as clean; after 240 it left the fallback,
+drew those receivers unshadowed for one frame, and was marked again, for as
+long as the receiver was in view. Every view that draws such a receiver now
+renews the hold (`RB_ShadowMapDrawReceiverFallbacks`). The openPREY session
+found it in Prey, where four lights cycled five times each in 900 frames; no
+stock Quake 4 view tried here has such a receiver, so the correction is
+checked by the code path and its contract, not by a reproduction. Vulkan
+keeps the volumes through its receiver scan and was not affected.
+
 Checked for this change, on the final build: that run; the fourteen scenarios
 on both back ends; the in-engine self-tests; and the static tests that read
 the touched files.
