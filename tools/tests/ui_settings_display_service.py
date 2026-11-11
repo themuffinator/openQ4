@@ -888,6 +888,84 @@ static void CombinedCases(){
     {ResetFixture();SystemSettingsHost settings;CombinedForStartup(settings,false,false);
      localCVarSystem.variables.at("image_picmip").value="5";EngineSettingsDisplayHost host(settings);
      Check(!host.Startup(error) && writes==0 && files.contains(journalFile),"a divergent owned key blocks combined replay");host.Shutdown();}
+    // A texture batch needs no new device: the running one reloads its images.
+    // The record and both leases stay as its domains require; nothing restarts
+    // and the leased placement never moves.
+    for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN})for(bool restore:{false,true}){ResetFixture();moduleStatus.activeApi=api;
+     SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     SettingsAttempt a{53,149,Live(settings),{},{}};a.completion=SettingsCompletion::Automatic;a.target=a.baseline;
+     a.target["image_downSize"]=true;a.target["image_picmip"]=1.0;
+     a.target["r_rendererBenchmarkPreset"]=std::string(std::get<std::string>(a.baseline.at("r_rendererBenchmarkPreset"))=="low"?"modern":"low");
+     for(const auto& [key,value]:a.target)if(value!=a.baseline.at(key))a.patch[key]=value;
+     Check(host.Prepare(a,error) && geometryToken,"a texture batch keeps the record and leases of its domains");
+     const auto j=EffectJournal();
+     Check(j.plan.domainMask==(SystemSettingImageReload|SystemSettingRendererResources) && j.plan.rendererStrategy==SettingsRendererStrategy::CoalescedDevice &&
+           j.displayRestore==j.displayTarget && j.placement.size()==18,"its record still holds the captured display and its placement");
+     const auto generation=actual.presentation.generation;const auto leased=geometry;
+     traceEnabled=true;Check(settings.Write(a.patch,error),"write the texture patch");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==0 && soundRestarts==0 && seen.ready && actual.presentation.generation==generation,
+           "the running device takes a texture batch in place");
+     const auto inPlace=[](const char* line){return std::any_of(trace.begin(),trace.end(),[&](const std::string& entry){return entry.rfind(std::string("print:")+line,0)==0;});};
+     Check(inPlace("UI_SETTINGS_INPLACE restore=0 ") && !inPlace("UI_SETTINGS_DEVICE") && !inPlace("UI_SETTINGS_DEFERRED"),"the trace names the in-place route");
+     Present();Check(host.Observe(false,seen,error) && seen.effectsReady,"a later presented frame completes it");
+     if(restore){StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
+      Check(settings.Write(back,error) && host.Restart(true,seen,error) && restarts==0 && inPlace("UI_SETTINGS_INPLACE restore=1 "),"its restore is taken in place too");
+      Present();Check(host.Observe(true,seen,error) && seen.effectsReady && host.Finish(true,error) && configWrites==0,"a restored texture batch never archives its candidate");}
+     else Check(host.PersistConfirmation(a,error) && EffectJournal().state==SettingsJournalState::Confirmed && host.Finish(false,error) && configWrites==1,
+                "the texture batch commits");
+     Check(!files.contains(journalFile) && !geometryToken && leases.empty() && Same(geometry,leased) && !host.RecoveryActive(),
+           "both leases retire and the placement never moved");}
+    // OpenGL allocates its upload stream when its device starts (the case
+    // above restarts it); Vulkan reads neither setting, so a preset needs no
+    // new device there. The sound device still reopens.
+    {ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_VULKAN;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     auto a=CombinedAttempt(settings,false);Check(a.patch.contains("r_rendererUploadMegs"),"the preset fixture changes the upload stream");
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a preset batch on Vulkan");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==0 && soundRestarts==1,"Vulkan takes a preset without a new device");
+     Present();Check(host.Observe(false,seen,error) && !seen.effectsReady,"it still waits for the sound device");
+     soundState=SOUND_OUTPUT_READY;
+     Check(host.Observe(false,seen,error) && seen.effectsReady && host.PersistConfirmation(a,error) && host.Finish(false,error) &&
+           configWrites==1 && !geometryToken && leases.empty(),"the preset commits");}
+    // A swap interval is immediate and adds no domain. The running device
+    // applies it, so a batch taken in place does not hold the device to the
+    // interval it captured.
+    {ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     SettingsAttempt a{59,151,Live(settings),{},{}};a.completion=SettingsCompletion::Automatic;a.target=a.baseline;
+     a.target["image_downSize"]=true;a.target["r_swapInterval"]=0.0;
+     for(const auto& [key,value]:a.target)if(value!=a.baseline.at(key))a.patch[key]=value;
+     Check(SystemSettingsHost::ApplyClassOf(a.baseline,a.target)==SystemApplyClass::Combined && host.Prepare(a,error) && settings.Write(a.patch,error),
+           "prepare a texture batch that also turns V-Sync off");
+     Check(EffectJournal().plan.domainMask==SystemSettingImageReload,"V-Sync adds no display domain");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==0,"nothing restarts");
+     actual.presentation.swapInterval=0;Present();
+     Check(host.Observe(false,seen,error) && seen.effectsReady && host.PersistConfirmation(a,error) && host.Finish(false,error) && configWrites==1,
+           "the interval the running device applied does not contradict the attempt");}
+    // A restart names an interval in its request and then owns it, so one that
+    // keeps the display carries the batch's own, in both directions.
+    for(bool renderer:{false,true}){ResetFixture();SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     auto a=renderer?RendererAttempt(settings):CombinedAttempt(settings,false);a.target["r_swapInterval"]=0.0;a.patch["r_swapInterval"]=0.0;
+     Check(SystemSettingsHost::ApplyClassOf(a.baseline,a.target)==(renderer?SystemApplyClass::Renderer:SystemApplyClass::Combined) && host.Prepare(a,error),
+           "prepare a restart that keeps the display and turns V-Sync off");
+     const auto j=EffectJournal();
+     Check(!(j.plan.domainMask & SystemSettingDisplayRestart) && j.plan.completion==SettingsEffectCompletion::Automatic,"V-Sync asks for no confirmation");
+     auto same=j.displayTarget;same["interval"]=1.0;
+     Check(j.displayRestore.at("interval")==StateValue(1.0) && j.displayTarget.at("interval")==StateValue(0.0) && same==j.displayRestore,
+           "the target record carries the new interval and nothing else differs");
+     Check(settings.Write(a.patch,error),"write the batch");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && restarts==1 && lastRequest.swapInterval==0 && actual.presentation.swapInterval==0,"the restart asks for the new interval");
+     soundState=SOUND_OUTPUT_READY;Present();Check(host.Observe(false,seen,error),"the restarted device matches it");
+     StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
+     Check(settings.Write(back,error) && host.Restart(true,seen,error) && restarts==2 && lastRequest.swapInterval==1,"the restore asks for the captured interval");
+     soundState=SOUND_OUTPUT_READY;Present();Check(host.Observe(true,seen,error) && host.Finish(true,error) && configWrites==0,"the restore completes");}
+    // Cold start: such a record is accepted, and a target interval the catalog
+    // did not change is refused.
+    {ResetFixture();SystemSettingsHost settings;
+     {EngineSettingsDisplayHost preparing(settings);auto a=CombinedAttempt(settings,false);a.target["r_swapInterval"]=0.0;a.patch["r_swapInterval"]=0.0;
+      Check(preparing.Prepare(a,error),"prepare a carried-interval startup fixture");preparing.Shutdown();}
+     {EngineSettingsDisplayHost host(settings);Check(host.Startup(error) && host.RecoveryActive(),"startup accepts a record whose target carries the interval");host.Shutdown();}}
+    {ResetFixture();SystemSettingsHost settings;CombinedForStartup(settings,false,false);auto j=EffectJournal();
+     j.displayTarget["interval"]=0.0;StoreEffect(j);EngineSettingsDisplayHost host(settings);
+     Check(!host.Startup(error) && writes==0 && files.contains(journalFile),"a target interval the catalog did not change is refused");host.Shutdown();}
 }
 
 // The display lists' inputs: the stamp, the topology, the window's display

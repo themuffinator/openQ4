@@ -78,10 +78,19 @@ private:
 	bool StartupCombined(const std::string& bytes, const openq4::ui::SettingsEffectRecoveryJournal& record, std::string& error);
 	// The display half of a cold start, for the record now held in journal.
 	bool StartupDisplay(const std::string& bytes, bool combined, std::string& error);
-	// The attempt restarts the renderer device; changes the display itself
-	// (Keep/Revert, and the window may take the target's size); or changes
-	// r_renderer, which the restarted renderer must report it resolved.
+	// The attempt records the renderer's display and leases its placement
+	// (the display, image and renderer resource domains); changes the display
+	// itself (Keep/Revert, and the window may take the target's size); or
+	// changes r_renderer, which the restarted renderer must report it resolved.
 	bool DeviceWork() const;
+	// The attempt needs a new renderer device: a display change, a renderer
+	// fallback change, or OpenGL's upload stream, which is allocated when its
+	// device starts. Any other DeviceWork attempt is taken by the running
+	// device: it reloads its file-backed images when it ends the frame after a
+	// texture setting changes, and nothing else in those domains waits for a
+	// device start. Such an attempt keeps its record and leases and completes
+	// as one without device work does.
+	bool DeviceRestart() const;
 	bool DisplayOwned() const;
 	bool RendererOwned() const;
 	// A combined attempt that changed the speaker layout or EFX reopens the
@@ -104,9 +113,10 @@ private:
 	// renderer attempt (the renderer fallback) journals a schema-2 record with
 	// the renderer domain and restarts the device on the same display. A
 	// combined attempt journals a schema-2 record with every domain its batch
-	// changes: one device restart covers its display, image and renderer
-	// resource changes, the sound device reopens for a layout or EFX change,
-	// and load-policy changes wait for the loads that read them.
+	// changes: one device restart covers a display, renderer fallback or
+	// OpenGL upload stream change, the running device reloads its images for
+	// a texture change alone, the sound device reopens for a layout or EFX
+	// change, and load-policy changes wait for the loads that read them.
 	enum class Kind { Display, Deferred, Renderer, Combined };
 	Kind kind = Kind::Display;
 	std::uint64_t selectionSerial = 0; // the selection report the last restart produced

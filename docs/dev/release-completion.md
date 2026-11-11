@@ -6,6 +6,34 @@ Later implementation and validation entries below are unreleased development
 work. Historical CI/publication success does not restore the withdrawn release.
 See [player release status](../user/release-status.md).
 
+## Display settings that apply without restarting the renderer, 11 November 2026
+
+- **V-Sync switches at once.** In the new interface, changing V-Sync on
+  Settings > Display and pressing Apply Changes no longer restarts the
+  renderer and no longer asks you to keep or revert.
+- **Texture quality reloads in place.** A texture quality change reloads the
+  textures while the game keeps running. It used to restart the whole
+  renderer first. The reload still takes a moment.
+- **Presets apply faster.** A Performance Preset now restarts the renderer
+  only when it changes anti-aliasing (MSAA) or, under OpenGL, the renderer's
+  upload buffers. Otherwise its effects switch at once and its textures
+  reload in place.
+- **The precompressed textures setting applies from the console.** Changing
+  `image_usePrecompressedTextures` reloads the textures by itself, without a
+  `vid_restart`.
+- **Still a restart.** Resolution, fullscreen, borderless, display, refresh
+  rate and MSAA changes restart the renderer and ask you to keep or revert,
+  as before. High-quality texture flags still finish at the next start.
+- **Nothing to do.** The classic interface (`ui_retained 0`) is unchanged.
+- Evidence: [applying without a device restart](ui/settings-live-apply.md),
+  with engine checks on OpenGL and Vulkan: V-Sync toggled twice with no
+  restart and no question; a texture ceiling changed 335 of 477 world
+  textures in Air Defense 1 on the same device; all nine presets and
+  Auto-Detect, where Vulkan restarted only for the six MSAA changes.
+  `tools/tests/ui_settings_display_service.py`,
+  `tools/tests/ui_settings_effect_journal.py`,
+  `tools/tests/ui_system_settings_host.py`.
+
 ## The flashlight casts shadows on every preset that draws them, 10 November 2026
 
 - **Low, Performance, Balanced and Enhanced now give the flashlight its

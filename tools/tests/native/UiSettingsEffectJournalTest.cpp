@@ -32,7 +32,7 @@ TEST_NOINLINE void operator delete(void* p) noexcept {std::free(p);}TEST_NOINLIN
 TEST_NOINLINE void operator delete(void* p,std::size_t) noexcept {std::free(p);}TEST_NOINLINE void operator delete[](void* p,std::size_t) noexcept {std::free(p);}
 using FloatMode=openq4::test::FloatFlushMode;
 static StateValues Values() {
- StateValues v;for(const auto& [k,f]:SettingsEffectCatalogV4())v[k]=f.type==0?StateValue(0.0):f.type==1?StateValue(false):StateValue(std::string("original"));
+ StateValues v;for(const auto& [k,f]:SettingsEffectCatalogV5())v[k]=f.type==0?StateValue(0.0):f.type==1?StateValue(false):StateValue(std::string("original"));
  v["r_windowWidth"]=1280.0;v["r_windowHeight"]=720.0;v["r_customWidth"]=1280.0;v["r_customHeight"]=720.0;v["r_screen"]=-1.0;
  return v;
 }
@@ -47,7 +47,7 @@ static StateValues Placement(const StateValues& a,const StateValues& b) {
 }
 static SettingsEffectRecoveryJournal Sample(unsigned mask) {
  SettingsEffectRecoveryJournal j;j.attempt="123456789abcdef0123456789abcdef0";j.baseline=Values();j.target=j.baseline;
- for(const auto& [k,f]:SettingsEffectCatalogV4())if((f.effects&mask)!=0) {
+ for(const auto& [k,f]:SettingsEffectCatalogV5())if((f.effects&mask)!=0) {
   j.target[k]=f.type==0?StateValue(std::get<double>(j.target.at(k))+1):f.type==1?StateValue(true):StateValue(std::string("target"));
  }
  if(!mask)j.target["r_brightness"]=1.25;
@@ -75,8 +75,11 @@ static void Reject(const std::string& bad) {
  CHECK(!DecodeSettingsJournalRecord(bad,SystemSettingsHost::Schema(),out,e));CHECK(!e.empty()&&out.Value()==prior&&out.Schema()==2);
 }
 static void CatalogAndPlans() {
- CHECK(SettingsEffectCatalogV1().size()==53);CHECK(SettingsEffectCatalogV2().size()==55);CHECK(SettingsEffectCatalogV3().size()==74);CHECK(SettingsEffectCatalogV4().size()==76);CHECK(SystemSettingsHost::Catalog().size()==76);
- for(const auto& field:SystemSettingsHost::Catalog()){const auto& p=SettingsEffectCatalogV4().at(field.key);CHECK(p.type==field.type&&p.effects==field.effects);}
+ CHECK(SettingsEffectCatalogV1().size()==53);CHECK(SettingsEffectCatalogV2().size()==55);CHECK(SettingsEffectCatalogV3().size()==74);CHECK(SettingsEffectCatalogV4().size()==76);CHECK(SettingsEffectCatalogV5().size()==76);CHECK(SystemSettingsHost::Catalog().size()==76);
+ for(const auto& field:SystemSettingsHost::Catalog()){const auto& p=SettingsEffectCatalogV5().at(field.key);CHECK(p.type==field.type&&p.effects==field.effects);}
+ // V5 moves one key: the swap interval is immediate. Every other field keeps V4's meaning.
+ for(const auto& [key,field]:SettingsEffectCatalogV4()){const auto& next=SettingsEffectCatalogV5().at(key);
+  if(key=="r_swapInterval")CHECK(field==(SettingsEffectField{0,1})&&next==(SettingsEffectField{0,0}));else CHECK(next==field);}
  for(const auto& [key,field]:SettingsEffectCatalogV1())CHECK(SettingsEffectCatalogV4().at(key)==field);
  for(const auto* key:{"ui_retainedScale","ui_retainedTextScale"}) {
   CHECK(!SettingsEffectCatalogV1().contains(key));const auto& field=SettingsEffectCatalogV4().at(key);
@@ -89,6 +92,14 @@ static void CatalogAndPlans() {
   std::string e;CHECK(ValidateSettingsEffectPlan(j.plan,j.baseline,j.target,SystemSettingsHost::Schema(),e));
   for(unsigned bad=0;bad<6;++bad){auto p=j.plan;if(bad==0)p.version=1;if(bad==1)p.changeMask^=1;if(bad==2)p.domainMask^=4;if(bad==3)p.completion=static_cast<SettingsEffectCompletion>(12);if(bad==4)p.rendererStrategy=static_cast<SettingsRendererStrategy>(12);if(bad==5)p.domainMask|=32;CHECK(!ValidateSettingsEffectPlan(p,j.baseline,j.target,SystemSettingsHost::Schema(),e));}
  }
+ {// A plan that names V4 keeps V4's meaning of the keys V5 shares; no other version fits them.
+  auto v=Sample(2);v.target["r_swapInterval"]=1.0;std::string e;SettingsEffectPlan now,then,none;none.version=77;
+  CHECK(BuildSettingsEffectPlan(v.baseline,v.target,SystemSettingsHost::Schema(),now,e)&&now.version==5&&now.domainMask==2&&now.completion==SettingsEffectCompletion::Automatic);
+  CHECK(BuildSettingsEffectPlan(v.baseline,v.target,SystemSettingsHost::Schema(),then,e,4)&&then.version==4&&then.domainMask==3&&then.completion==SettingsEffectCompletion::DisplayConfirmed);
+  CHECK(ValidateSettingsEffectPlan(now,v.baseline,v.target,SystemSettingsHost::Schema(),e)&&ValidateSettingsEffectPlan(then,v.baseline,v.target,SystemSettingsHost::Schema(),e));
+  auto relabelled=now;relabelled.version=4;CHECK(!ValidateSettingsEffectPlan(relabelled,v.baseline,v.target,SystemSettingsHost::Schema(),e));
+  relabelled=then;relabelled.version=5;CHECK(!ValidateSettingsEffectPlan(relabelled,v.baseline,v.target,SystemSettingsHost::Schema(),e));
+  for(unsigned wrong:{1u,2u,3u,6u})CHECK(!BuildSettingsEffectPlan(v.baseline,v.target,SystemSettingsHost::Schema(),none,e,wrong)&&none.version==77);}
  auto j=Sample(0);std::string e;SettingsEffectPlan p;p.version=77;const auto old=p;
  auto schema=SystemSettingsHost::Schema();schema["future"]=0;CHECK(!BuildSettingsEffectPlan(j.baseline,j.target,schema,p,e)&&p==old);
  schema=SystemSettingsHost::Schema();schema["r_bloom"]=0;CHECK(!BuildSettingsEffectPlan(j.baseline,j.target,schema,p,e)&&p==old);
@@ -178,12 +189,12 @@ static void RoundTrips() {
 static void Forgery() {
  const auto b=Encode(Sample(63));
  for(const auto& pair:std::initializer_list<std::pair<std::string,std::string>>{
-  {"\"schema\":2","\"schema\":1"},{"\"schema\":2","\"schema\":2.0"},{"\"plan.version\":4","\"plan.version\":5"},
+  {"\"schema\":2","\"schema\":1"},{"\"schema\":2","\"schema\":2.0"},{"\"plan.version\":5","\"plan.version\":6"},
   {"\"plan.changeMask\":63","\"plan.changeMask\":31"},{"\"plan.domainMask\":31","\"plan.domainMask\":63"},
   {"\"plan.domainMask\":31","\"plan.domainMask\":30"},{"\"plan.changeMask\":63","\"plan.changeMask\":63.1"},
-  {"display-confirmed","automatic"},{"coalesced-device","none"},{"\"plan.version\":4","\"plan.version\":true"},
-  {"\"plan.version\":4","\"plan.version\":4,\n\"plan.unknown\":0"},
-  {"\"plan.version\":4","\"plan.version\":4,\n\"plan.version\":4"},
+  {"display-confirmed","automatic"},{"coalesced-device","none"},{"\"plan.version\":5","\"plan.version\":true"},
+  {"\"plan.version\":5","\"plan.version\":5,\n\"plan.unknown\":0"},
+  {"\"plan.version\":5","\"plan.version\":5,\n\"plan.version\":5"},
   {"\"imageTarget.sample\":\"opaque\",\n",""},{"\"patch.r_borderless\":true,\n",""},
   {"\"patch.r_borderless\":true","\"patch.r_borderless\":false"},{"\"placement.target.width\":1281","\"placement.target.width\":1280"},
   {"\"placement.target.normalValid\":true","\"placement.target.normalValid\":0"},
@@ -206,7 +217,7 @@ static void Forgery() {
  }
  Reject(Replace(b,"recovery 2","recovery 1"));Reject(Replace(b,"recovery 2","recovery 3"));Reject(b+"\n");
  for(std::size_t i=0;i<b.size();i+=37)Reject(b.substr(0,i));
- auto absent=b;absent.erase(absent.find("\"plan.version\""),std::string("\"plan.version\":4,\n").size());Reject(Checksum(absent));
+ auto absent=b;absent.erase(absent.find("\"plan.version\""),std::string("\"plan.version\":5,\n").size());Reject(Checksum(absent));
 }
 static void Bounds() {
  auto j=Sample(4);std::string bytes="untouched",e;
@@ -239,7 +250,7 @@ static void ExactNumbers() {
  CHECK(BuildSettingsEffectPlan(b,next,SystemSettingsHost::Schema(),plan,error)&&plan.changeMask==0);
  auto tiny=Sample(4);tiny.baseline["r_brightness"]=1.0;tiny.target["r_brightness"]=tiny.patch["r_brightness"]=std::bit_cast<double>(std::uint64_t(2));
  Reject(Replace(Encode(tiny),"\"patch.r_brightness\":9.8813129168249309e-324","\"patch.r_brightness\":0"));
- Reject(Replace(Encode(Sample(4)),"\"plan.version\":4","\"plan.version\":5.9406564584124654e-324"));
+ Reject(Replace(Encode(Sample(4)),"\"plan.version\":5","\"plan.version\":5.9406564584124654e-324"));
 }
 static void SchemaOne() {
  const std::map<std::string,std::size_t> schema{{"brightness",0},{"fullscreen",1},{"mode",2}};
@@ -283,6 +294,11 @@ static void PreserveDisplay() {
  CHECK(ValidateDisplayPreserveActualPair(saved,saved,baseline,target,e));CHECK(!ValidateDisplayRecoveryPair(saved,saved,target,e));
  auto different=actual;different.window.windowX++;SystemDisplayPlan other;StateValues changed;CHECK(BuildDisplayRestore(different,topo,other,e)&&CaptureDisplayRecovery(other,topo,changed,e));CHECK(!ValidateDisplayPreserveActualPair(saved,changed,baseline,target,e));
  target["r_multiSamples"]=4.0;CHECK(!ValidateDisplayPreserveActualPair(saved,saved,baseline,target,e));target=baseline;target["r_rendererUploadMegs"]=32.0;
+ // An immediate swap interval change is carried by the target record, and only that field may differ.
+ {auto carried=saved;carried["interval"]=0.0;auto from=baseline,to=target;from["r_swapInterval"]=1.0;to["r_swapInterval"]=0.0;
+  CHECK(ValidateDisplayPreserveActualPair(saved,carried,from,to,e));CHECK(!ValidateDisplayPreserveActualPair(saved,saved,from,to,e));
+  CHECK(!ValidateDisplayPreserveActualPair(saved,carried,baseline,target,e));CHECK(!ValidateDisplayPreserveActualPair(saved,changed,from,to,e));
+  to["r_swapInterval"]=1.0;from["r_swapInterval"]=0.0;CHECK(ValidateDisplayPreserveActualPair(saved,saved,from,to,e));}
  auto bad=saved;bad["extra"]=true;CHECK(!ValidateDisplayPreserveActualPair(bad,bad,baseline,target,e));
  target.erase("r_bloom");CHECK(!ValidateDisplayPreserveActualPair(saved,saved,baseline,target,e));
  // Historical descriptors alone do not authorize a missing current monitor.

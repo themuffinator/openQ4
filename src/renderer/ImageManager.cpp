@@ -302,15 +302,21 @@ void R_ResolveImageDownsizePolicy( const imageDownsizeInputs_t& inputs, const ch
 R_ImageReductionCvarsChanged
 
 One list, consumed by both the startup priming and the per-frame check so the
-two can never drift apart.
+two can never drift apart. image_usePrecompressedTextures belongs to it: it
+chooses the file a texture is read from (a precompressed DDS or its source
+image), so a change reaches the GPU the same way, through a reload. Until it
+joined the list only a full renderer restart applied it.
 ===============
 */
+extern idCVar image_usePrecompressedTextures;
+
 static bool R_ImageReductionCvarsChanged( bool clear ) {
 	idCVar *const reductionCvars[] = {
 		&image_picmip, &image_picmipFilter, &image_picmipMinSize,
 		&image_downSize, &image_downSizeLimit,
 		&image_downSizeSpecular, &image_downSizeSpecularLimit,
-		&image_downSizeBump, &image_downSizeBumpLimit
+		&image_downSizeBump, &image_downSizeBumpLimit,
+		&image_usePrecompressedTextures
 	};
 
 	bool changed = false;
@@ -345,7 +351,7 @@ static bool R_ImageSamplerCvarsChanged( bool clear ) {
 idImageManager::PrimeCvars
 
 Every cvar is born CVAR_MODIFIED, so without this the first rendered frame of
-every launch would see nine "changed" reduction cvars and reload every image for
+every launch would see ten "changed" reduction cvars and reload every image for
 nothing. Sampling cvars need the same startup priming so they do not pointlessly
 reapply every default sampler. Called once the intrinsic images exist and the
 real values are in.

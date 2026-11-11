@@ -82,7 +82,9 @@ To adopt the revised settings on an existing configuration, select the preset ag
 
 Performance presets write video, texture-allocation, texture-sampling, and audio backend cvars. Anisotropy is capped to the maximum supported by the active GPU. Run `vid_restart` after applying one from the console so renderer, texture allocation, and sampler changes take effect; run `s_restart` as well if you want speaker/EAX/emitter-budget changes to rebuild the active sound backend immediately.
 
-In the modern interface, choose the preset on **Settings > Display** and press **Apply Changes**. That restarts the renderer once and, when the speaker layout or reverb setting changed, the sound device. A preset that changes anti-aliasing asks you to keep or revert. High-quality texture flags and the per-sound sample limit fully change when the game next starts; the page tells you when your changes include one of them.
+In the modern interface, choose the preset on **Settings > Display** and press **Apply Changes**. Most of a preset applies to the running game: its effects switch at once and its textures reload in place, which takes a moment. The renderer itself restarts only when the preset changes anti-aliasing (MSAA), which also asks you to keep or revert, or, under OpenGL, when it changes the renderer's upload buffers. The sound device restarts when the speaker layout or reverb setting changed. High-quality texture flags and the per-sound sample limit fully change when the game next starts; the page tells you when your changes include one of them.
+
+**V-Sync** on that page applies as soon as you press **Apply Changes**, with no renderer restart and no keep-or-revert question. Texture quality changes made there reload the textures in place the same way.
 
 `autoDetectPerformancePreset` takes no arguments. It recommends and applies a starting point using the **active renderer and GPU**, system RAM, CPU concurrency, platform power hints and current drawable resolution. It does not run a benchmark or promise a particular frame rate. Every preset but Maximum can be recommended; Maximum has no frame-rate target and remains a manual choice.
 

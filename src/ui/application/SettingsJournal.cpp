@@ -256,7 +256,7 @@ bool DecodeEffect(const std::string& bytes,const std::map<std::string,std::size_
  if (!ParseStateValues(payload,flat,diagnostics)) return Fail(error,"Invalid typed settings effect journal payload");
  unsigned schema=0; std::string state(0,'\0'),completion(0,'\0'),strategy(0,'\0');
  if (!ReadUnsigned(flat,"schema",2,schema) || schema!=2 || !ReadText(flat,"attempt",j.attempt) || !ReadText(flat,"state",state) ||
-  !ReadUnsigned(flat,"plan.version",4,j.plan.version) || j.plan.version<1 ||
+  !ReadUnsigned(flat,"plan.version",5,j.plan.version) || j.plan.version<1 ||
   !ReadUnsigned(flat,"plan.changeMask",127,j.plan.changeMask) || !ReadUnsigned(flat,"plan.domainMask",31,j.plan.domainMask) ||
   !ReadText(flat,"plan.completion",completion) || !ReadText(flat,"plan.rendererStrategy",strategy))
   return Fail(error,"Invalid settings effect journal schema or plan");

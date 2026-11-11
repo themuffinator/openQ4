@@ -2535,6 +2535,16 @@ Completion must advance through the existing dependencies:
   ([the gate](ui/system-resolution-rows.md#the-gate)). The checked image and
   audio results, a visible exclusive-fullscreen Apply, the editor round trip
   and platform acceptance remain open.
+  Progress, 11 November: the DISPLAY page starts
+  [applying to the running renderer](ui/settings-live-apply.md). V-Sync is an
+  immediate setting, a texture batch reloads images in place, and a
+  Performance Preset restarts no device on Vulkan unless it changes MSAA.
+  Remaining, in order: window, size and display changes as in-place window
+  transitions that keep Keep/Revert; MSAA as a scene-target rebuild (Vulkan
+  first; OpenGL's window is itself multisampled) and OpenGL's upload stream
+  in place; a material re-parse so `image_ignoreHighQuality` applies in the
+  session; the rendering API and GPU switch from inside a game; and an image
+  reload spread across frames.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

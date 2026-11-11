@@ -55,6 +55,17 @@ bool EngineSettingsDisplayHost::SupportsCombined(const StateValues& baseline, co
 bool EngineSettingsDisplayHost::DeviceWork() const {
 	return kind == Kind::Display || kind == Kind::Renderer || (kind == Kind::Combined && (effects.plan.domainMask & 19u) != 0);
 }
+bool EngineSettingsDisplayHost::DeviceRestart() const {
+	if (kind != Kind::Combined) return DeviceWork();
+	if (!DeviceWork()) return false;
+	// The display itself, and the renderer fallback a new device must resolve.
+	if ((effects.plan.domainMask & SystemSettingDisplayRestart) != 0 || effects.patch.contains("r_renderer")) return true;
+	// OpenGL allocates its upload stream when its device starts. Vulkan stages
+	// through its own allocator and reads neither setting. Texture settings
+	// reload in place on either, and the benchmark budget is read on each use.
+	return WindowMultisampling() &&
+		(effects.patch.contains("r_rendererUploadMegs") || effects.patch.contains("r_rendererUploadFrameBuffers"));
+}
 bool EngineSettingsDisplayHost::DisplayOwned() const {
 	return kind == Kind::Display || (kind == Kind::Combined && (effects.plan.domainMask & SystemSettingDisplayRestart) != 0);
 }
@@ -147,6 +158,13 @@ const StateValues& EngineSettingsDisplayHost::SavedDisplay(bool restoring) const
 }
 namespace {
 bool Fail(std::string& error, const char* message) { error = message; return false; }
+// The swap interval is an immediate setting, but a device restart names one in
+// its request and then owns it. A restart that keeps the display therefore
+// carries the interval the batch asks for.
+void CarrySwapInterval(const SettingsAttempt& attempt, SystemDisplayPlan& plan) {
+	const auto& before = attempt.baseline.at("r_swapInterval"); const auto& after = attempt.target.at("r_swapInterval");
+	if (!SettingsValueEqual(before,after)) plan.request.swapInterval = int(std::get<double>(after));
+}
 bool ObserveDevice(rendererDisplayState_t& state, SettingsDisplayObservation& output, std::string& error) {
 	if (!R_RendererModule_QueryDisplay(&state)) return Fail(error,"Actual renderer display observation is unavailable");
 	const auto& p = state.presentation;
@@ -333,7 +351,7 @@ bool EngineSettingsDisplayHost::PrepareRenderer(const SettingsAttempt& attempt, 
 	// The renderer restarts on the display it has now, in both directions.
 	SystemDisplayTopology topology;
 	if (!CaptureDisplayTopology(topology,error) || !BuildDisplayRestore(baselineDevice,topology,restorePlan,error)) return false;
-	targetPlan=restorePlan;
+	targetPlan=restorePlan; CarrySwapInterval(attempt,targetPlan);
 	SettingsEffectRecoveryJournal candidate;
 	candidate.baseline=attempt.baseline; candidate.target=attempt.target; candidate.patch=attempt.patch;
 	if (!BuildSettingsEffectPlan(attempt.baseline,attempt.target,SystemSettingsHost::Schema(),candidate.plan,error)) return false;
@@ -365,14 +383,16 @@ bool EngineSettingsDisplayHost::PrepareCombined(const SettingsAttempt& attempt, 
 	candidate.baseline=attempt.baseline; candidate.target=attempt.target; candidate.patch=attempt.patch;
 	if (!BuildSettingsEffectPlan(attempt.baseline,attempt.target,SystemSettingsHost::Schema(),candidate.plan,error)) return false;
 	CombinedPolicy(candidate);
-	// One device restart covers the display, image and renderer resource
-	// domains. Without a display change it runs on the display the renderer
-	// has now, in both directions.
+	// The display, image and renderer resource domains record the display the
+	// renderer has and lease its placement, whether the batch then needs a new
+	// device or the running one takes it in place (DeviceRestart). Without a
+	// display change a restart runs on the display the renderer has now, in
+	// both directions.
 	const bool device=(candidate.plan.domainMask & 19u)!=0, display=(candidate.plan.domainMask & SystemSettingDisplayRestart)!=0;
 	if (device) {
 		SystemDisplayTopology topology;
 		if (!CaptureDisplayTopology(topology,error) || !BuildDisplayRestore(baselineDevice,topology,restorePlan,error)) return false;
-		if (!display) targetPlan=restorePlan;
+		if (!display) { targetPlan=restorePlan; CarrySwapInterval(attempt,targetPlan); }
 		else if (!BuildDisplayRequest(attempt.target,baselineDevice,topology,targetPlan,error,WindowMultisampling())) return false;
 		if (!CaptureDisplayRecovery(restorePlan,topology,candidate.displayRestore,error) ||
 			!CaptureDisplayRecovery(targetPlan,topology,candidate.displayTarget,error)) return false;
@@ -436,16 +456,20 @@ bool EngineSettingsDisplayHost::CancelPreparation(std::string& error) {
 }
 bool EngineSettingsDisplayHost::Restart(bool restoring, SettingsDisplayObservation& output, std::string& error) {
 	if (!VerifyJournal(false,error)) return false;
-	if (!DeviceWork()) {
-		// The next level load reads the committed policy; nothing restarts. The
-		// controller still waits for a later presented frame on this device. A
-		// combined attempt without renderer work may still reopen the sound device.
+	if (!DeviceRestart()) {
+		// Nothing restarts. The next level load reads a committed load policy.
+		// The running renderer takes a texture setting in place: it reloads its
+		// file-backed images when it ends the frame that follows the write, so
+		// the later presented frame the controller waits for already shows them.
+		// A combined attempt without a renderer restart may still reopen the
+		// sound device.
 		rendererDisplayState_t observed{}; SettingsDisplayObservation candidate;
 		if (!ObserveDevice(observed,candidate,error) || !candidate.ready || candidate.epoch!=baselineDevice.moduleEpoch)
 			return Fail(error,error.empty()?"The renderer stopped presenting during the settings change":error.c_str());
 		RestartSound(restoring);
 		currentDevice=observed; output=candidate;
-		if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("UI_SETTINGS_DEFERRED restore=%d epoch=%llu generation=%llu submitted=%llu presented=%llu\n",
+		if (cvarSystem->GetCVarBool("ui_retainedTrace")) common->Printf("%s restore=%d epoch=%llu generation=%llu submitted=%llu presented=%llu\n",
+			DeviceWork()?"UI_SETTINGS_INPLACE":"UI_SETTINGS_DEFERRED",
 			restoring?1:0,static_cast<unsigned long long>(candidate.epoch),static_cast<unsigned long long>(candidate.generation),
 			static_cast<unsigned long long>(candidate.submitted),static_cast<unsigned long long>(candidate.presented));
 		return true;
@@ -493,7 +517,7 @@ bool EngineSettingsDisplayHost::Restart(bool restoring, SettingsDisplayObservati
 }
 bool EngineSettingsDisplayHost::Observe(bool restoring, SettingsDisplayObservation& output, std::string& error) {
 	rendererDisplayState_t observed{}; SettingsDisplayObservation candidate;
-	if (!DeviceWork()) {
+	if (!DeviceRestart()) {
 		if (!ObserveDevice(observed,candidate,error) || !SoundReady(candidate.effectsReady,error)) return false;
 		output=candidate; return true;
 	}
@@ -512,7 +536,7 @@ bool EngineSettingsDisplayHost::Observe(bool restoring, SettingsDisplayObservati
 }
 bool EngineSettingsDisplayHost::PersistConfirmation(const SettingsAttempt& attempt, std::string& error) {
 	if (!ValidateLive(attempt.target,error) || !VerifyJournal(false,error)) return false;
-	if (!DeviceWork()) {
+	if (!DeviceRestart()) {
 		effects.state=SettingsJournalState::Confirmed;
 		if (!WriteJournal(error) || !ValidateLive(attempt.target,error)) return false;
 		return CommitConfiguration(error);
@@ -540,7 +564,8 @@ bool EngineSettingsDisplayHost::PersistConfirmation(const SettingsAttempt& attem
 	return CommitConfiguration(error);
 }
 bool EngineSettingsDisplayHost::Finish(bool restoring, std::string& error) {
-	if (!DeviceWork()) return FinishJournal(error);
+	// An attempt the device took in place never moved its leased placement.
+	if (!DeviceRestart()) return FinishJournal(error);
 	auto finalState=restoring?placement:committedPlacement;
 	if (restoring) {
 		// The catalog transaction already restored its owned keys and rebased

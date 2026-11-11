@@ -87,7 +87,9 @@ def main():
    'journal-daz-zero':('journal','SettingsValueEqual(value,StateValue(0.0))?0.0:*number','*number==0.0?0.0:*number'),
    'journal-early-publication':('journal','std::unique_ptr<SettingsJournalValue> candidate;','journal.value.reset(); std::unique_ptr<SettingsJournalValue> candidate;'),
    'journal-early-output':('journal','if (!Valid2(journal,catalog,error))','bytes.clear(); if (!Valid2(journal,catalog,error))'),
-   'display-preservation':('display','if (!SettingsValuesEqual(savedRestore,savedTarget))','if (false && !SettingsValuesEqual(savedRestore,savedTarget))'),
+   'plan-v4-meaning':('plan','plan.version==4?4u:0u','0u'),
+   'display-preservation':('display','if (!SettingsValuesEqual(expected,savedTarget))','if (false && !SettingsValuesEqual(expected,savedTarget))'),
+   'display-carried-interval':('display','if (!SettingsValueEqual(catalogBaseline.at("r_swapInterval"),catalogTarget.at("r_swapInterval")))','if (true)'),
    'display-catalog-change':('display','if ((item.effects & SystemSettingDisplayRestart) &&','if (false && (item.effects & SystemSettingDisplayRestart) &&'),
   }
   if not a.no_mutations:

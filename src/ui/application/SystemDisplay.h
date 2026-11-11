@@ -69,6 +69,8 @@ bool ValidateDisplayRecoveryPair(const StateValues& savedRestore, const StateVal
 // differ from that actual baseline (for example a prior legacy fallback).
 // Placement metadata/catalog dimensions are checked by the journal envelope;
 // selected-direction topology resolution and fresh readiness are still required.
+// A changed r_swapInterval is immediate, not a display edit: the target plan
+// then carries the catalog's new interval and nothing else may differ.
 bool ValidateDisplayPreserveActualPair(const StateValues& savedRestore, const StateValues& savedTarget,
 	const StateValues& catalogBaseline, const StateValues& catalogTarget, std::string& error);
 bool ResolveDisplayRecovery(const StateValues& saved, const SystemDisplayTopology& freshTopology,

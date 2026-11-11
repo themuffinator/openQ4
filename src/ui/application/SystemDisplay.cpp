@@ -426,7 +426,13 @@ bool ValidateDisplayPreserveActualPair(const StateValues& savedRestore,const Sta
  SystemDisplayPlan restore,target; SystemDisplayTopology oldTopology,newTopology;
  if (!InspectDisplayRecovery(savedRestore,restore,oldTopology,error) ||
   !InspectDisplayRecovery(savedTarget,target,newTopology,error)) return false;
- if (!SettingsValuesEqual(savedRestore,savedTarget)) return Fail(error,"Preserve-actual recovery changes the captured display");
+ // The swap interval is an immediate setting, but a restart names it in its
+ // request. The target may differ from the captured display in that one field,
+ // and only as the catalog's own change says.
+ StateValues expected=savedRestore;
+ if (!SettingsValueEqual(catalogBaseline.at("r_swapInterval"),catalogTarget.at("r_swapInterval")))
+  expected["interval"]=catalogTarget.at("r_swapInterval");
+ if (!SettingsValuesEqual(expected,savedTarget)) return Fail(error,"Preserve-actual recovery changes the captured display");
  error.clear(); return true;
 }
 
