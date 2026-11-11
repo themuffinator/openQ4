@@ -157,7 +157,12 @@ float EffectiveShadowFilterRadius() {
 
 vec3 DecodeLocalNormal( vec4 bumpSample ) {
 	if ( uMaterialEnhanced < 0.5 ) {
-		return SafeNormalize( vec3( bumpSample.a, bumpSample.g, bumpSample.b ) * 2.0 - 1.0 );
+		// The stock interaction uses the sample as it is stored, and so do
+		// material_interaction.fs and the Vulkan receivers. A filtered sample
+		// is shorter than a unit vector wherever the bump detail turns, and
+		// that shortfall is part of the stock look: normalized here, every
+		// such edge was lit harder under a shadow map than without one.
+		return vec3( bumpSample.a, bumpSample.g, bumpSample.b ) * 2.0 - 1.0;
 	}
 
 	vec2 localNormalXY = vec2( bumpSample.a, bumpSample.g ) * 2.0 - 1.0;
@@ -183,16 +188,18 @@ float EnhancedSpecularTerm( vec3 halfAngle, vec3 viewDir, vec3 localNormal, vec3
 	return pow( ndoth, specularPower ) * max( uMaterialSpecularBoost, 0.0 ) * fresnel;
 }
 
+// The stock term with its doubling inside, as material_interaction.fs has
+// it: cel banding then clamps and steps the same value on both paths.
 float LegacySpecularTerm( vec3 halfAngle, vec3 localNormal ) {
 	float specular = clamp( dot( halfAngle, localNormal ) * 4.0 - 3.0, 0.0, 1.0 );
-	return specular * specular;
+	return specular * specular * 2.0;
 }
 
 vec3 InteractionSpecular( vec3 halfAngle, vec3 viewDir, vec3 localNormal, vec3 specularSample ) {
 	if ( uMaterialEnhanced >= 0.5 ) {
 		return specularSample * uSpecularColor.rgb * CelSpecularTerm( EnhancedSpecularTerm( halfAngle, viewDir, localNormal, specularSample ) );
 	}
-	return specularSample * ( uSpecularColor.rgb * 2.0 ) * CelSpecularTerm( LegacySpecularTerm( halfAngle, localNormal ) );
+	return specularSample * uSpecularColor.rgb * CelSpecularTerm( LegacySpecularTerm( halfAngle, localNormal ) );
 }
 
 float ApproxErf( float x ) {

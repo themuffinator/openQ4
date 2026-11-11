@@ -66,6 +66,7 @@ cache (sixteen at most) against forty cubes in view.
 | **A soft shadow's grain followed its tile around.** The projected filter turns its kernel by a hash of the texel, and the texel was counted within the sampled image. The grain therefore changed whenever the light's tile took another place in the atlas, and a cached map differed from the same map drawn fresh: in hub2's start view one light alone changed 19,000 pixels between the two, by up to 147 levels, on both renderers. Reading cached maps where they live on Vulkan added a third place. | **Fixed, both backends.** The hash takes the texel within the tile. See "Walking" below. |
 | **Light-facing one-sided geometry cast in maps and never in stencil.** A stencil volume is built from the triangles that face away from the light and from nothing else, and the levels are lit on that understanding: a lamp shines through the one-sided floor it hangs over. The automatic caster mode drew every open surface two-sided, so the same floor blocked its light. storage2's fourteen alarm lights lit almost nothing with shadow maps on: at eight beam angles the mapped picture differed from the stencil one in up to 32,000 pixels on Vulkan and 73,000 on OpenGL. Recorded in September as a contact-detail decision; it is a missing light. | **Fixed, both backends.** Open geometry stores the triangles that face away from the light; a sealed hull keeps its near shell. See "Which triangles cast" below. |
 | **The near shell of a sealed hull was its far shell under every parallel and distant point light**, and under any projector whose right and up vectors are left-handed against its direction. Those projections show the light's view mirrored, which swaps the face the rasterizer reports for every triangle, and the culling took no account of it. A sealed hull has the same silhouette either way, so it showed only as the detached contact shadow the near shell was chosen to avoid. | **Fixed, both backends.** The face to discard follows the projection's handedness. See "Which triangles cast" below. |
+| **OpenGL lit a surface harder under a shadow map than without one.** Its two shadow receivers normalized the stock normal-map sample, which the classic interaction and Vulkan use as stored. A filtered sample is shorter than a unit vector wherever the relief turns, so every raised edge was drawn brighter with shadow maps on than with stencil shadows or none: in one test view 44,000 pixels were brighter than the picture with no shadows at all. | **Fixed (OpenGL).** See "Receiver lighting on OpenGL" below. |
 | CSM lights are unshadowed past `r_shadowMapCascadeDistance`. Maximum only. | **Open.** |
 
 ### Resources
@@ -961,6 +962,60 @@ views above on both renderers; the fourteen scenarios on both back ends; the
 continuous-motion qualification; the in-engine self-tests; and the static
 tests that read the touched files.
 
+### Receiver lighting on OpenGL
+
+Added on 11 November, from a figure in the section above: on OpenGL the test
+point light's mapped picture differed from the stencil one in 83,000 pixels,
+where Vulkan's differed in 16,000, in every caster mode.
+
+It was not shadow. OpenGL's stencil and unshadowed pictures match Vulkan's
+(4,300 and 5,200 pixels apart in the left half of the view); OpenGL's mapped
+picture differed from Vulkan's mapped one in 50,400, in thin lines along the
+relief of every panel. And where stencil casts no shadow, the mapped picture
+was brighter than the picture with no shadows at all, in 44,000 pixels. A
+shadow map can only take light away. No receiver setting moved it, and it was
+the same with multisampling off.
+
+- **The two OpenGL shadow receivers normalized the stock normal-map sample**
+  (`shadow_interaction.fs`, `shadow_point_interaction.fs`). The stock
+  interaction uses the sample as stored, and so do `material_interaction.fs`,
+  which draws a light without a shadow map, and the three Vulkan interaction
+  shaders. A filtered sample is shorter than a unit vector wherever the bump
+  detail turns, and that shortfall dims the edge; normalized, the edge is lit
+  at full strength. The classic shader was given the stock decode in July
+  and the receivers were not.
+- **They now use the sample as stored**, and carry the stock specular term's
+  doubling inside the term as the classic shader does, so that cel banding
+  clamps and steps the same value on both paths. Without cel banding that
+  part changes nothing.
+
+OpenGL, Quality, pixels that differ from the stencil picture by more than 24
+levels, before and after, with Vulkan's figure for the same view:
+
+| View | OpenGL before | OpenGL after | Vulkan |
+|---|---:|---:|---:|
+| Test point light, left half of the view | 57,819 | 11,952 | 11,939 |
+| of which brighter than no shadows at all | 44,091 | 37 | 0 |
+| storage2 alarm light, worst of eight angles | 819 | 35 | 67 |
+| hub2 | 8,590 | 3,442 | 4,504 |
+| convoy2 | 2,320 | 61 | 61 |
+| airdefense1, outdoor pose | 11,433 | 11,403 | 11,161 |
+| airdefense1, start | 24,235 | 19,967 | 19,919 |
+| airdefense1, arena | 5,477 | 3,609 | 3,403 |
+
+So the figures for OpenGL in "Which triangles cast" carried this fault; the
+two renderers now agree with stencil equally.
+
+A loose copy of the two shaders under the save path had no effect on the
+picture; the change showed only once a build had packed them.
+
+Checked for this change, on the final build: the figures above; the fourteen
+scenarios on both back ends; the continuous-motion qualification; the
+in-engine self-tests on both renderers; and the 74 static tests that read the
+touched files. The enhanced-material branch of the receivers reads the same
+as the classic shader's; the PBR branch was not compared with its unshadowed
+counterpart.
+
 ## Presets
 
 Unchanged. Enhanced keeps point lights on stencil: mapping them still costs
@@ -990,10 +1045,6 @@ whether Enhanced can now map point lights on Vulkan.
 6. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
    cubes. It needs a resident entry two passes of a view can share.
-7. On OpenGL a test point light of radius 600 at storage2's alarm lamp
-   differs from the stencil picture in 83,000 pixels, in every caster mode,
-   where Vulkan differs in 16,000. Seen while measuring cube faces; not
-   looked into.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters").

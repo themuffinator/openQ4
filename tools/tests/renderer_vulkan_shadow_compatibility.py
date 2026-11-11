@@ -9074,6 +9074,58 @@ def validate_static_signature_view_independence_contract() -> None:
             "a new snapshot still changes the signature")
 
 
+def validate_receiver_stock_lighting_parity_contract() -> None:
+    """A shadow receiver lights a stock surface exactly as the unshadowed
+    interaction does: a shadow map may only take light away.
+
+    OpenGL's two receivers normalized the stock normal-map sample, which the
+    classic interaction and the three Vulkan interactions use as stored. A
+    filtered sample is shorter than a unit vector wherever the bump detail
+    turns, so every such edge was lit harder with shadow maps on than with
+    stencil shadows or with none.
+    """
+    classic = read("content/baseoq4/pak0/glprogs/material_interaction.fs")
+    require_order(
+        braced_body(classic, "vec3 DecodeStockLocalNormal(", "classic stock normal"),
+        ("return vec3( bumpSample.a, bumpSample.g, bumpSample.b ) * 2.0 - 1.0;",),
+        "the classic interaction uses the stock normal as stored",
+    )
+    require(
+        braced_body(classic, "float StockSpecularTerm(", "classic stock specular"),
+        "return specular * specular * 2.0;",
+        "the classic stock specular term carries its doubling",
+    )
+    for name in ("shadow_interaction.fs", "shadow_point_interaction.fs"):
+        shader = read(f"content/baseoq4/pak0/glprogs/{name}")
+        require_order(
+            braced_body(shader, "vec3 DecodeLocalNormal(", f"{name} normal decode"),
+            (
+                "if ( uMaterialEnhanced < 0.5 ) {",
+                "return vec3( bumpSample.a, bumpSample.g, bumpSample.b ) * 2.0 - 1.0;",
+                "localNormalXY *= max( uMaterialNormalScale, 0.0 );",
+            ),
+            f"{name}: the stock normal as stored, the enhanced one rebuilt",
+        )
+        if "SafeNormalize( vec3( bumpSample.a, bumpSample.g, bumpSample.b )" in shader:
+            raise AssertionError(f"{name} must not normalize the stock normal-map sample")
+        require(
+            braced_body(shader, "float LegacySpecularTerm(", f"{name} stock specular"),
+            "return specular * specular * 2.0;",
+            f"{name}: the stock specular term as the classic interaction has it",
+        )
+        require(
+            shader,
+            "return specularSample * uSpecularColor.rgb * CelSpecularTerm( LegacySpecularTerm( halfAngle, localNormal ) );",
+            f"{name}: cel banding steps the same specular value as the classic interaction",
+        )
+    for name in ("interaction.frag", "interaction_shadow.frag", "interaction_shadow_point.frag"):
+        require(
+            read(f"src/renderer/Vulkan/shaders/{name}"),
+            ": vec3(bumpSample.a, bumpSample.g, bumpSample.b) * 2.0 - 1.0;",
+            f"{name}: the stock normal as stored",
+        )
+
+
 def validate_moving_light_cache_bypass_contract() -> None:
     """A moving light draws its shadow maps directly, on both renderers.
 
@@ -9616,6 +9668,7 @@ def main() -> None:
     validate_static_signature_view_independence_contract()
     validate_moving_light_cache_bypass_contract()
     validate_stencil_fallback_release_contract()
+    validate_receiver_stock_lighting_parity_contract()
     validate_scratch_cube_pool_contract()
     validate_resident_projected_sampling_contract()
     validate_ci_registration()
