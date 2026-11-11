@@ -897,6 +897,17 @@ static idImage *rbSceneColorImage = NULL;
 static idImage *rbSceneDepthStencilImage = NULL;
 static idRenderTexture *rbSceneRenderTexture = NULL;
 static int rbSceneRenderTextureSamples = -1;
+// window-view multisampling (see RB_WindowView_Begin)
+static idImage *rbWindowViewColorImage = NULL;
+static idImage *rbWindowViewDepthImage = NULL;
+static idRenderTexture *rbWindowViewRenderTexture = NULL;
+static idImage *rbWindowViewResolveImage = NULL;
+static idRenderTexture *rbWindowViewResolveRenderTexture = NULL;
+static int rbWindowViewWidth = 0;
+static int rbWindowViewHeight = 0;
+static int rbWindowViewSamples = 0;
+static bool rbWindowViewWarned = false;
+static unsigned int rbWindowViewMirroredFramebuffer = 0;
 static int rbSceneRenderTargetPreserveFarDepthFrame = -1;
 static const viewDef_t *rbSceneRenderTargetPreserveFarDepthView = NULL;
 static int rbSceneRenderTargetPortalSkyFrame = -1;
@@ -1925,10 +1936,11 @@ static bool RB_EnsureSceneRenderTexture( const viewDef_t *sceneTargetView ) {
 		scaledWidth, scaledHeight );
 	const int targetWidth = scaledScene ? scaledWidth : Max( glConfig.vidWidth, sceneTargetView->viewport.x2 + 1 );
 	const int targetHeight = scaledScene ? scaledHeight : Max( glConfig.vidHeight, sceneTargetView->viewport.y2 + 1 );
-	// Follow the created context, which can differ from the archived preference
-	// after a strict device request or driver fallback. Unknown samples do not
-	// authorize allocating a multisampled target.
-	const int requestedSamples = Max( 0, R_DefaultFramebufferSamples() );
+	// Follow the created context where the window carries MSAA: it can differ
+	// from the archived preference after a strict device request or driver
+	// fallback, and unknown samples do not authorize allocating a multisampled
+	// target. A single-sample window leaves the count to the setting.
+	const int requestedSamples = Max( 0, R_ViewFramebufferSamples() );
 	// Any non-native scene target already requires a resolve. Keep it
 	// single-sample instead of stacking an MSAA FP16 FBO on top of the scale
 	// transition; temporal AA owns antialiasing when enabled.
@@ -8221,6 +8233,14 @@ void RB_ShutdownScenePostProcess( void ) {
 
 	RB_DestroyPostProcessRenderTexture( rbSceneRenderTexture );
 	rbSceneRenderTextureSamples = -1;
+	RB_DestroyPostProcessRenderTexture( rbWindowViewRenderTexture );
+	RB_DestroyPostProcessRenderTexture( rbWindowViewResolveRenderTexture );
+	rbWindowViewResolveImage = NULL;
+	rbWindowViewColorImage = NULL;
+	rbWindowViewDepthImage = NULL;
+	rbWindowViewWidth = rbWindowViewHeight = rbWindowViewSamples = 0;
+	rbWindowViewWarned = false;
+	rbWindowViewMirroredFramebuffer = 0;
 	rbSceneColorImage = NULL;
 	rbSceneDepthStencilImage = NULL;
 	rbSceneRenderTargetPreserveDepthImage = NULL;
@@ -16461,6 +16481,312 @@ static void RB_DrawPortalSkyBackdrop( idImage *backdrop ) {
 }
 
 /*
+====================
+Window-view multisampling
+
+Where the window carries MSAA (r_glWindowMultisample 1, OpenGL ES), every 3D
+view drawn straight to it is antialiased: GUI renderDef windows, and remote
+cameras, mirrors and other capture-backed subviews before they are copied into
+their textures. A single-sample window gives those views nothing, and an
+r_multiSamples change would otherwise need a new window.
+
+Such a view therefore draws into a window-sized multisampled target that
+stands in for the window (R_SetDefaultRenderTarget, as a VR eye does), so the
+back end keeps drawing "to the window" and none of its target logic changes.
+The view's rectangle is first seeded with the window's pixels, because a 3D
+view clears only depth and draws over what the GUI put there. Afterwards the
+rectangle is resolved back into the window. Any refusal leaves the view
+single-sample.
+
+Views that already draw into a render texture (the game's scene target, the
+renderer's own, a capture's) are not touched: they carry their own samples.
+====================
+*/
+static idCVar r_glWindowViewMultisample( "r_glWindowViewMultisample", "1", CVAR_RENDERER | CVAR_INTEGER,
+	"multisample 3D views drawn straight to a single-sample OpenGL window (GUI renderDef windows, remote cameras, mirrors) at r_multiSamples, as a multisampled window does; 2 = also print each such view",
+	0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+
+struct rbWindowViewState_t {
+	bool	active;
+	bool	captured;	// a subview: copied into a texture after it is drawn
+	int		x, y, width, height;
+	GLint	windowBuffer;
+};
+
+static bool RB_WindowView_Refuse( const char *reason ) {
+	if ( !rbWindowViewWarned ) {
+		rbWindowViewWarned = true;
+		common->Warning( "OpenGL: window view multisampling unavailable (%s); drawing the view single-sample", reason );
+	}
+	return false;
+}
+
+static bool RB_WindowView_EnsureTarget( int width, int height, int samples ) {
+	if ( rbWindowViewRenderTexture != NULL && rbWindowViewWidth == width
+			&& rbWindowViewHeight == height && rbWindowViewSamples == samples ) {
+		return true;
+	}
+	rbWindowViewWidth = 0;
+	rbWindowViewHeight = 0;
+	rbWindowViewSamples = 0;
+
+	idImageOpts colorOpts;
+	colorOpts.textureType = TT_2D;
+	colorOpts.format = FMT_RGBA8;
+	colorOpts.width = width;
+	colorOpts.height = height;
+	colorOpts.numLevels = 1;
+	colorOpts.numMSAASamples = samples;
+	colorOpts.isPersistant = true;
+	rbWindowViewColorImage = globalImages->ScratchImage( "_glWindowViewColor", &colorOpts, TF_LINEAR, TR_CLAMP, TD_DEFAULT );
+
+	idImageOpts depthOpts;
+	depthOpts.textureType = TT_2D;
+	depthOpts.format = FMT_DEPTH_STENCIL;
+	depthOpts.width = width;
+	depthOpts.height = height;
+	depthOpts.numLevels = 1;
+	depthOpts.numMSAASamples = samples;
+	depthOpts.isPersistant = true;
+	rbWindowViewDepthImage = globalImages->ScratchImage( "_glWindowViewDepth", &depthOpts, TF_NEAREST, TR_CLAMP, TD_DEPTH );
+
+	if ( rbWindowViewColorImage == NULL || rbWindowViewDepthImage == NULL ) {
+		return RB_WindowView_Refuse( "allocation failed" );
+	}
+	if ( rbWindowViewColorImage->GetOpts().numMSAASamples <= 1 ) {
+		return RB_WindowView_Refuse( "no multisampled colour target" );
+	}
+	if ( rbWindowViewRenderTexture != NULL ) {
+		tr.DestroyRenderTexture( rbWindowViewRenderTexture );
+		rbWindowViewRenderTexture = NULL;
+	}
+	rbWindowViewRenderTexture = tr.CreateRenderTexture( rbWindowViewColorImage, rbWindowViewDepthImage );
+	rbWindowViewMirroredFramebuffer = 0;
+	if ( rbWindowViewRenderTexture == NULL || !rbWindowViewRenderTexture->EnsureDeviceHandle()
+			|| rbWindowViewRenderTexture->IsKnownIncomplete() ) {
+		return RB_WindowView_Refuse( "incomplete framebuffer" );
+	}
+	rbWindowViewRenderTexture->SetDebugLabel( "OpenGL window view (multisampled)" );
+
+	// A subview is resolved through a single-sample target of the same format
+	// (see RB_WindowView_End).
+	idImageOpts resolveOpts;
+	resolveOpts.textureType = TT_2D;
+	resolveOpts.format = FMT_RGBA8;
+	resolveOpts.width = width;
+	resolveOpts.height = height;
+	resolveOpts.numLevels = 1;
+	resolveOpts.numMSAASamples = 0;
+	resolveOpts.isPersistant = true;
+	rbWindowViewResolveImage = globalImages->ScratchImage( "_glWindowViewResolve", &resolveOpts, TF_LINEAR, TR_CLAMP, TD_DEFAULT );
+	if ( rbWindowViewResolveRenderTexture != NULL ) {
+		tr.DestroyRenderTexture( rbWindowViewResolveRenderTexture );
+		rbWindowViewResolveRenderTexture = NULL;
+	}
+	if ( rbWindowViewResolveImage != NULL ) {
+		rbWindowViewResolveRenderTexture = tr.CreateRenderTexture( rbWindowViewResolveImage, NULL );
+	}
+	if ( rbWindowViewResolveRenderTexture == NULL || !rbWindowViewResolveRenderTexture->EnsureDeviceHandle()
+			|| rbWindowViewResolveRenderTexture->IsKnownIncomplete() ) {
+		return RB_WindowView_Refuse( "incomplete resolve framebuffer" );
+	}
+	rbWindowViewResolveRenderTexture->SetDebugLabel( "OpenGL window view resolve" );
+	rbWindowViewWidth = width;
+	rbWindowViewHeight = height;
+	rbWindowViewSamples = samples;
+	return true;
+}
+
+static void RB_WindowView_PrintSamplePositions( const char *label, int samples, bool programmable );
+
+/*
+====================
+RB_WindowView_MirrorSamplePositions
+
+A window's rows are stored top-down, so its multisample pattern sits mirrored
+relative to a framebuffer object's, and edge coverage differs by a few levels
+on edge pixels. Where sample positions are programmable the stand-in takes the
+window's pattern: its own, mirrored. The bound draw framebuffer must be the
+stand-in. Without the extension the view keeps the object's pattern.
+====================
+*/
+static void RB_WindowView_MirrorSamplePositions( unsigned int framebuffer, int samples ) {
+	if ( rbWindowViewMirroredFramebuffer == framebuffer ) {
+		return;
+	}
+	rbWindowViewMirroredFramebuffer = framebuffer;
+	if ( !GLEW_ARB_sample_locations || glFramebufferSampleLocationsfvARB == NULL
+			|| glGetMultisamplefv == NULL || glFramebufferParameteri == NULL
+			|| samples <= 1 || samples > 16 ) {
+		return;
+	}
+	if ( r_glWindowViewMultisample.GetInteger() == 2 ) {
+		RB_WindowView_PrintSamplePositions( "the target's own", samples, false );
+	}
+	GLfloat positions[32];
+	for ( int i = 0; i < samples; i++ ) {
+		glGetMultisamplefv( GL_SAMPLE_POSITION, i, &positions[i * 2] );
+		positions[i * 2 + 1] = 1.0f - positions[i * 2 + 1];
+	}
+	glFramebufferParameteri( GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_PROGRAMMABLE_SAMPLE_LOCATIONS_ARB, GL_TRUE );
+	glFramebufferSampleLocationsfvARB( GL_DRAW_FRAMEBUFFER, 0, samples, positions );
+	if ( glGetError() != GL_NO_ERROR ) {
+		// leave the object's own pattern rather than a half-set one
+		glFramebufferParameteri( GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_PROGRAMMABLE_SAMPLE_LOCATIONS_ARB, GL_FALSE );
+		while ( glGetError() != GL_NO_ERROR ) {
+		}
+	}
+}
+
+// r_glWindowViewMultisample 2: the sample positions of the bound draw framebuffer, once per label.
+static void RB_WindowView_PrintSamplePositions( const char *label, int samples, bool programmable ) {
+	if ( glGetMultisamplefv == NULL || samples <= 1 || samples > 16 ) {
+		return;
+	}
+	idStr text;
+	for ( int i = 0; i < samples; i++ ) {
+		GLfloat position[2] = { 0.0f, 0.0f };
+		glGetMultisamplefv( programmable ? GL_PROGRAMMABLE_SAMPLE_LOCATION_ARB : GL_SAMPLE_POSITION, i, position );
+		text += va( " (%.4f %.4f)", position[0], position[1] );
+	}
+	common->Printf( "GL window view: %s sample positions:%s\n", label, text.c_str() );
+}
+
+static void RB_WindowView_Blit( const rbWindowViewState_t &state ) {
+	// glBlitFramebuffer obeys the scissor, which a prior light may have left set
+	const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
+	if ( scissorWasEnabled ) {
+		glDisable( GL_SCISSOR_TEST );
+	}
+	glBlitFramebuffer( state.x, state.y, state.x + state.width, state.y + state.height,
+		state.x, state.y, state.x + state.width, state.y + state.height, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+	if ( scissorWasEnabled ) {
+		glEnable( GL_SCISSOR_TEST );
+	}
+}
+
+static void RB_WindowView_Begin( const viewDef_t *viewDef, rbWindowViewState_t &state ) {
+	state.active = false;
+	const int samples = r_multiSamples.GetInteger();
+	// A window that carries MSAA needs nothing, a VR eye or virtual screen
+	// standing in for the window keeps one sample, and a render texture
+	// carries its own.
+	if ( !r_glWindowViewMultisample.GetBool() || samples <= 1 || viewDef == NULL || viewDef->viewEntitys == NULL
+			|| backEnd.renderTexture != NULL || R_DefaultFramebufferHandle() != 0
+			|| R_WindowCarriesMultisampling() || R_DefaultFramebufferSamples() != 0
+			|| glBlitFramebuffer == NULL || glBindFramebuffer == NULL ) {
+		static int printedWindowSamples = 0;
+		if ( r_glWindowViewMultisample.GetInteger() == 2 && backEnd.renderTexture == NULL
+				&& R_DefaultFramebufferHandle() == 0 && R_DefaultFramebufferSamples() > 1
+				&& printedWindowSamples != R_DefaultFramebufferSamples() ) {
+			printedWindowSamples = R_DefaultFramebufferSamples();
+			glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+			RB_WindowView_PrintSamplePositions( "the window's", printedWindowSamples, false );
+		}
+		if ( r_glWindowViewMultisample.GetInteger() == 2 && viewDef != NULL && viewDef->viewEntitys != NULL ) {
+			common->Printf( "GL window view: skipped %dx%d (samples %d, render texture %d, stand-in %d, window carries %d, window samples %d)\n",
+				viewDef->viewport.x2 - viewDef->viewport.x1 + 1, viewDef->viewport.y2 - viewDef->viewport.y1 + 1, samples,
+				backEnd.renderTexture != NULL ? 1 : 0, R_DefaultFramebufferHandle() != 0 ? 1 : 0,
+				R_WindowCarriesMultisampling() ? 1 : 0, R_DefaultFramebufferSamples() );
+		}
+		return;
+	}
+
+	// the part of the view that lands in the window (a capture tile can hang over its edge)
+	const int x0 = Max( 0, tr.viewportOffset[0] + viewDef->viewport.x1 );
+	const int y0 = Max( 0, tr.viewportOffset[1] + viewDef->viewport.y1 );
+	const int x1 = Min( glConfig.vidWidth, tr.viewportOffset[0] + viewDef->viewport.x2 + 1 );
+	const int y1 = Min( glConfig.vidHeight, tr.viewportOffset[1] + viewDef->viewport.y2 + 1 );
+	if ( x1 <= x0 || y1 <= y0 ) {
+		return;
+	}
+	if ( !RB_WindowView_EnsureTarget( glConfig.vidWidth, glConfig.vidHeight, samples ) ) {
+		return;
+	}
+
+	state.x = x0;
+	state.y = y0;
+	state.width = x1 - x0;
+	state.height = y1 - y0;
+	GL_CheckErrors();
+	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	state.windowBuffer = GL_BACK;
+	glGetIntegerv( GL_DRAW_BUFFER, &state.windowBuffer );
+	glReadBuffer( state.windowBuffer );
+	glBindFramebuffer( GL_DRAW_FRAMEBUFFER, rbWindowViewRenderTexture->GetDeviceHandle() );
+	glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+	RB_WindowView_MirrorSamplePositions( rbWindowViewRenderTexture->GetDeviceHandle(), samples );
+	RB_WindowView_Blit( state );
+	const bool seeded = glGetError() == GL_NO_ERROR;
+	if ( seeded ) {
+		R_SetDefaultRenderTarget( rbWindowViewRenderTexture );
+	}
+	const bool standing = seeded && R_GetDefaultRenderTarget() == rbWindowViewRenderTexture;
+	if ( !standing ) {
+		R_SetDefaultRenderTarget( NULL );
+	}
+	idRenderTexture::BindNull();
+	if ( standing ) {
+		R_SetDefaultDrawAndReadBuffers();
+	} else {
+		glDrawBuffer( state.windowBuffer );
+		glReadBuffer( state.windowBuffer );
+		RB_WindowView_Refuse( "the window could not be copied into the target" );
+		return;
+	}
+	state.active = true;
+	state.captured = viewDef->isSubview;
+	if ( r_glWindowViewMultisample.GetInteger() == 2 ) {
+		common->Printf( "GL window view: %dx%d at %d,%d with %d samples (subview %d)\n",
+			state.width, state.height, state.x, state.y, samples, viewDef->isSubview ? 1 : 0 );
+	}
+}
+
+/*
+====================
+RB_WindowView_End
+
+Resolves the view's rectangle back into the window, the way a multisampled
+window's samples reached their reader:
+
+- A subview is copied into a texture next (a remote camera, a mirror). That
+  copy read a multisampled window with glCopyTexSubImage2D, a plain average of
+  the samples. So the samples are averaged into a single-sample target of the
+  same format first, as every other multisampled target here is resolved, and
+  that is copied to the window.
+- Any other view stays in the window (a GUI renderDef window) and was
+  downsampled by the window system when the frame was read or presented. A
+  blit straight from the multisampled target into the window is that same
+  downsample, with whatever weighting the driver gives it (NVIDIA's
+  gamma-correct antialiasing).
+====================
+*/
+static void RB_WindowView_End( rbWindowViewState_t &state ) {
+	if ( !state.active ) {
+		return;
+	}
+	state.active = false;
+	R_SetDefaultRenderTarget( NULL );
+	if ( rbWindowViewRenderTexture != NULL && rbWindowViewResolveRenderTexture != NULL ) {
+		glBindFramebuffer( GL_READ_FRAMEBUFFER, rbWindowViewRenderTexture->GetDeviceHandle() );
+		glReadBuffer( GL_COLOR_ATTACHMENT0 );
+		if ( state.captured ) {
+			glBindFramebuffer( GL_DRAW_FRAMEBUFFER, rbWindowViewResolveRenderTexture->GetDeviceHandle() );
+			glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+			RB_WindowView_Blit( state );
+			glBindFramebuffer( GL_READ_FRAMEBUFFER, rbWindowViewResolveRenderTexture->GetDeviceHandle() );
+			glReadBuffer( GL_COLOR_ATTACHMENT0 );
+		}
+		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
+		glDrawBuffer( state.windowBuffer );
+		RB_WindowView_Blit( state );
+	}
+	idRenderTexture::BindNull();
+	glDrawBuffer( state.windowBuffer );
+	glReadBuffer( state.windowBuffer );
+}
+
+/*
 =============
 RB_STD_DrawView
 
@@ -16533,6 +16859,18 @@ void	RB_STD_DrawView( void ) {
 		// image. If target allocation failed, draw the direct compatibility path
 		// with the projection centered before any world work reaches the backbuffer.
 		RB_RecenterDirectTemporalProjection( sceneScaleState, backEnd.viewDef );
+	}
+
+	// A 3D view left to draw straight to a single-sample window gets a
+	// multisampled stand-in for it.
+	rbWindowViewState_t windowView;
+	windowView.active = false;
+	if ( !sceneRenderTargetReady ) {
+		RB_WindowView_Begin( backEnd.viewDef, windowView );
+	} else if ( r_glWindowViewMultisample.GetInteger() == 2 && backEnd.viewDef->viewEntitys != NULL ) {
+		common->Printf( "GL window view: %dx%d drawn in the renderer's scene target (%d samples, inline subview %d)\n",
+			backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1, backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1,
+			rbSceneRenderTextureSamples, inlineSubviewSceneRenderTargetRequested ? 1 : 0 );
 	}
 
 	// If we have a backend rendertexture, assign it here.
@@ -16781,6 +17119,9 @@ void	RB_STD_DrawView( void ) {
 		backEnd.renderTexture = NULL;
 		idRenderTexture::BindNull();
 	}
+
+	// resolve a window view's rectangle back into the window
+	RB_WindowView_End( windowView );
 
 	RB_CapturePortalSkyBackdrop( backEnd.viewDef );
 

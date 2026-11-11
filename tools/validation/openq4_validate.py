@@ -734,6 +734,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_pbr_materials.py",
         root / "tools" / "tests" / "material_constant_registers_contract.py",
         root / "tools" / "tests" / "material_quality_reparse_contract.py",
+        root / "tools" / "tests" / "renderer_gl_window_view_contract.py",
         root / "tools" / "tests" / "renderer_classic_gui_domain.py",
         root / "tools" / "tests" / "renderer_classic_cinematic_post_domain.py",
         root / "tools" / "tests" / "renderer_classic_special_frame_domain.py",

@@ -665,6 +665,13 @@ unsigned int R_DefaultFramebufferHandle( void ) {
 	return r_defaultFramebuffer;
 }
 
+int R_DefaultRenderTargetSamples( void ) {
+	const idImage *color = r_defaultRenderTarget != NULL && r_defaultRenderTarget->GetNumColorImages() > 0
+		? r_defaultRenderTarget->GetColorImage( 0 ) : NULL;
+	const int samples = color != NULL ? color->GetOpts().numMSAASamples : 0;
+	return samples > 1 ? samples : 0;
+}
+
 unsigned int R_DefaultColorBuffer( void ) {
 	return r_defaultFramebuffer != 0 ? GL_COLOR_ATTACHMENT0 : GL_BACK;
 }

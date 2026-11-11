@@ -1540,6 +1540,11 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 	}
 
 	const bool readingFromRenderTexture = ( backEnd.renderTexture != NULL ) && ( backEnd.renderTexture->GetNumColorImages() > 0 );
+	// A window view's multisampled stand-in (draw_common.cpp) is read like a
+	// multisampled render texture: glCopyTexSubImage2D cannot read it, a blit
+	// resolves it.
+	const bool readingFromMultisampledStandIn = !readingFromRenderTexture
+		&& R_DefaultFramebufferHandle() != 0 && R_DefaultFramebufferSamples() > 1;
 	const GLenum readAttachment = GL_COLOR_ATTACHMENT0;
 	bool needsStorageResize = ( opts.width != imageWidth ) || ( opts.height != imageHeight );
 
@@ -1574,7 +1579,8 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 	opts.width = imageWidth;
 	opts.height = imageHeight;
 
-	if ( readingFromRenderTexture && ( GLEW_EXT_framebuffer_blit || GLEW_ARB_framebuffer_object || GLEW_VERSION_3_0 ) ) {
+	if ( ( readingFromRenderTexture || readingFromMultisampledStandIn )
+			&& ( GLEW_EXT_framebuffer_blit || GLEW_ARB_framebuffer_object || GLEW_VERSION_3_0 ) ) {
 		GLint previousReadFbo = 0;
 		GLint previousDrawFbo = 0;
 		GLint previousReadBuffer = GL_BACK;
@@ -1601,7 +1607,8 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 			glTexParameterf( textureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 		}
 
-		glBindFramebuffer( GL_READ_FRAMEBUFFER, backEnd.renderTexture->GetDeviceHandle() );
+		glBindFramebuffer( GL_READ_FRAMEBUFFER, readingFromRenderTexture
+			? backEnd.renderTexture->GetDeviceHandle() : R_DefaultFramebufferHandle() );
 		glReadBuffer( readAttachment );
 
 		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, copyFbo );

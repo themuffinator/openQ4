@@ -2570,10 +2570,14 @@ Completion must advance through the existing dependencies:
   both back ends, and Vulkan applies an MSAA change as a transition, so no
   Performance Preset restarts Vulkan's device.
   Remaining, in order: a focused Keep under borderless and exclusive
-  fullscreen, and any Keep on OpenGL (the test window had no focus);
-  OpenGL's MSAA Apply (a single-sample window with the direct 3D views
-  through a multisampled target, as Vulkan has; the record lists what it
-  touches); and an image reload spread across frames.
+  fullscreen, and any Keep on OpenGL (the test window had no focus); and an
+  image reload spread across frames.
+  OpenGL's window is single-sample by default now (`r_glWindowMultisample`,
+  1 on Apple): 3D views drawn straight to it go through a multisampled
+  stand-in, so an MSAA change is a transition there too and no preset
+  restarts OpenGL. At 4x the view-capture sequence matches the multisampled
+  window (eleven of twelve images exactly); Intel, AMD, a visible window and
+  the classic `renderDef` pages were not run.
   OpenGL now resizes its upload stream on the running device, so a preset
   restarts OpenGL only when it changes MSAA.
   Stage 4, the same day: a changed `image_ignoreHighQuality` re-parses the

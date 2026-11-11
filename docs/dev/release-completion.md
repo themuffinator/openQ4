@@ -133,8 +133,16 @@ See [player release status](../user/release-status.md).
   only. During multiplayer, a cinematic or after dying it still asks you to
   return to the main menu first. The save stays in the Load list as Restart
   Renderer.
-- **Still a restart.** Under OpenGL an MSAA change on the Display page
-  restarts the renderer.
+- **MSAA applies in place under OpenGL too.** On Windows and Linux an
+  anti-aliasing change no longer restarts the OpenGL renderer, so no
+  Performance Preset restarts it either. It still asks you to keep or
+  revert. macOS keeps the previous behaviour.
+- **Compatibility note for OpenGL.** With MSAA on, the edges of the 2D
+  interface are no longer multisampled, as they never were under Vulkan; 3D
+  views, in-game screens and mirrors are antialiased as before. If your
+  graphics driver cannot do this, the log says so at start-up; set
+  `r_glWindowMultisample 1` and restart the renderer to get the previous
+  behaviour back.
 - **Nothing to do.** The classic interface (`ui_retained 0`) is unchanged.
 - Evidence: [applying without a device restart](ui/settings-live-apply.md),
   with engine checks on OpenGL and Vulkan: V-Sync toggled twice with no
@@ -161,7 +169,13 @@ See [player release status](../user/release-status.md).
   interface were not run. On OpenGL the upload buffers changed size three
   times in a running Air Defense 1 with no device start, and the preset
   walk restarted the renderer six times, once per MSAA change, where it
-  was seven.
+  was seven. With the single-sample OpenGL window the preset walk restarted
+  it not at all, an MSAA step on the Display page applied and was kept with
+  no device start, and the view-capture sequence at 4x MSAA matched the
+  multisampled window: eleven of twelve images exactly, the twelfth within
+  two levels on 17 pixels. At 8x two images differ from the old window by
+  up to 55 levels and agree with Vulkan within two. Run on one NVIDIA driver
+  with a hidden window; Intel, AMD and a visible window were not run.
   `tools/tests/ui_settings_display_service.py`,
   `tools/tests/ui_settings_effect_journal.py`,
   `tools/tests/ui_system_settings_host.py`.

@@ -104,6 +104,9 @@ struct RendererCvar {
     void SetInteger(int next) { value=next;Record("cvar-write"); }
     void SetModified() { Record("renderer-selection"); }
 } r_renderer,r_multiSamples,r_displayRefresh,r_hiddenWindow,r_borderless,r_windowWidth{1280},r_windowHeight{720},r_customWidth{1920},r_customHeight{1080},r_mode;
+// The window policy (RenderSystem_init.cpp): this fixture's window carries the samples, as the cases below expect.
+static bool r_windowCarriesMultisampling=true;
+static int R_WindowMultiSamplesForNewDevice() { return r_multiSamples.GetInteger(); }
 struct FullscreenCvar {
     bool GetBool() const { return configuredFullscreen; }
     void SetInteger(int next) { configuredFullscreen=next!=0;Record("cvar-write"); }

@@ -269,6 +269,19 @@ validation messages:
 
 Reports and engine images: `.tmp/vk-roadmap/nov6/windowview/`.
 
+### OpenGL's own window views (11 November 2026)
+
+OpenGL's window is single-sample by default since
+[stage 6 of the live settings work](ui/settings-live-apply.md#stage-6-msaa-on-opengl-without-a-new-window),
+and its window views go through a multisampled stand-in too. The reference
+of this section is the multisampled window, which `r_glWindowMultisample 1`
+still gives. At 4x the new OpenGL reproduces that reference (eleven of the
+sequence's twelve images exactly) and the comparison against Vulkan passes
+with either. At 8x Vulkan agrees with the new OpenGL within two levels and
+differs from the multisampled window in the cube face that shows the remote
+camera (96 pixels, up to 55 levels) and in `offset-gui` (12 pixels, up to 3):
+the window's 8-sample downsample was the driver's, not a plain average.
+
 ## Stencil debug views and the weapon depth hack (6 November 2026)
 
 `renderer_stencil_debug_capture.py` lights the original laboratory with its

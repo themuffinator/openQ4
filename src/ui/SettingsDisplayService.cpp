@@ -15,13 +15,23 @@ bool EngineSettingsDisplayHost::SupportsMultisampling() const {
 	rendererDisplayState_t state{};
 	if (!R_RendererModule_QueryDisplay(&state) || !state.rendererReady || !state.windowValid || !state.presentation.available)
 		return false;
-	// Vulkan multisamples its scene targets, which follow r_multiSamples on the
-	// running device.
-	return WindowMultisampling() || R_RendererModule_GetStatus().activeApi == RENDER_MODULE_API_VULKAN;
+	// Every known back end multisamples: in its window where the window
+	// carries the samples, otherwise in render targets that follow
+	// r_multiSamples on the running device.
+	const auto api = R_RendererModule_GetStatus().activeApi;
+	return api == RENDER_MODULE_API_GL || api == RENDER_MODULE_API_GL_MODULE || api == RENDER_MODULE_API_GLES || api == RENDER_MODULE_API_VULKAN;
 }
 bool EngineSettingsDisplayHost::WindowMultisampling() const {
+	// Vulkan's swapchain is single-sample. An OpenGL ES window always carries
+	// the samples; a desktop OpenGL window does only where r_glWindowMultisample
+	// asks (Apple's default). The renderer reads that when its device starts,
+	// and a request that names another count than the window has is refused
+	// and falls back to a device restart, so a stale answer here costs a
+	// restart, never a wrong window.
 	const auto api = R_RendererModule_GetStatus().activeApi;
-	return api == RENDER_MODULE_API_GL || api == RENDER_MODULE_API_GL_MODULE || api == RENDER_MODULE_API_GLES;
+	if (api == RENDER_MODULE_API_GLES) return true;
+	return (api == RENDER_MODULE_API_GL || api == RENDER_MODULE_API_GL_MODULE) &&
+		(cvarSystem->GetCVarBool("r_glWindowMultisample") || cvarSystem->GetCVarBool("r_glesContext"));
 }
 bool EngineSettingsDisplayHost::LightGridLoad(renderLightGridLoadReceipt_t& receipt, std::uint64_t& serial) const {
 	std::uint64_t epoch = 0;

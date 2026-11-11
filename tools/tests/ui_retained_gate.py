@@ -3764,7 +3764,7 @@ def combined_effects() -> set[str]:
 # statement's behaviour). Any other form is a reason the control is incomplete.
 RENDERER_LIMITED_STATES = {'settings.msaaAvailable': ('src/ui/SettingsDisplayService.cpp',
                                                       'bool EngineSettingsDisplayHost::SupportsMultisampling() const {',
-                                                      'return WindowMultisampling() || R_RendererModule_GetStatus().activeApi == RENDER_MODULE_API_VULKAN;',
+                                                      'return api == RENDER_MODULE_API_GL || api == RENDER_MODULE_API_GL_MODULE || api == RENDER_MODULE_API_GLES || api == RENDER_MODULE_API_VULKAN;',
                                                       'Vulkan')}
 # The engine reaches a Number field's text through the native text owner;
 # while no engine code constructs one, typed characters never arrive.

@@ -275,6 +275,22 @@ const char *r_multiSamplesArgs[] = { "0", "2", "4", "8", "16", NULL };
 idCVar r_inhibitFragmentProgram( "r_inhibitFragmentProgram", "0", CVAR_RENDERER | CVAR_BOOL, "ignore the fragment program extension" );
 idCVar r_glDriver( "r_glDriver", "", CVAR_RENDERER, "\"opengl32\", etc." );
 idCVar r_useLightPortalFlow( "r_useLightPortalFlow", "1", CVAR_RENDERER | CVAR_BOOL, "use a more precise area reference determination" );
+// Where multisample textures are missing (Apple's OpenGL 2.1 context) the
+// window is the only MSAA there is, so that platform keeps it by default.
+#if defined( __APPLE__ )
+#define R_GL_WINDOW_MULTISAMPLE_DEFAULT "1"
+#else
+#define R_GL_WINDOW_MULTISAMPLE_DEFAULT "0"
+#endif
+idCVar r_glWindowMultisample( "r_glWindowMultisample", R_GL_WINDOW_MULTISAMPLE_DEFAULT, CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"OpenGL: 0 = the window is single-sample and 3D views are multisampled in render targets, so r_multiSamples applies to the running renderer; 1 = the window itself is created with r_multiSamples samples, and an MSAA change needs a renderer restart. Read when the renderer starts; OpenGL ES always uses 1" );
+// Latched when the device creates its window.
+static bool r_windowCarriesMultisampling = false;
+bool R_WindowCarriesMultisampling( void ) {
+	return r_windowCarriesMultisampling;
+}
+int R_WindowMultiSamplesForNewDevice( void );
+
 idCVar r_multiSamples( "r_multiSamples", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "MSAA sample count: 0 = off, 2/4/8/16 = supported quality steps", 0, 16, idCmdSystem::ArgCompletion_String<r_multiSamplesArgs> );
 idCVar r_postAA( "r_postAA", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "post AA mode: 0 = off, 1 = SMAA 1x medium, 2 = SMAA 1x high, 3 = SMAA 1x ultra, 4 = SMAA 1x colour-edge prototype", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
 idCVar r_postAAStatePoisonTest( "r_postAAStatePoisonTest", "0", CVAR_RENDERER | CVAR_BOOL, "intentionally dirty GL texture/client state before SMAA post-AA draws for validation" );
@@ -584,6 +600,25 @@ idCVar r_renderer( "r_renderer", "best", CVAR_RENDERER | CVAR_ARCHIVE, "hardware
 idCVar r_actualRenderer( "r_actualRenderer", "UNINITIALIZED", CVAR_RENDERER | CVAR_ROM, "actual active renderer backend after request/fallback selection" );
 idCVar r_glTier( "r_glTier", "auto", CVAR_RENDERER | CVAR_ARCHIVE, "OpenGL renderer tier: auto, legacy, gl33, gl41, gl43, gl45, gl46", r_glTierArgs, idCmdSystem::ArgCompletion_String<r_glTierArgs> );
 idCVar r_glesContext( "r_glesContext", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "request an OpenGL ES 3.0 context instead of desktop GL; bring-up aid for the Android GLES backend, on desktop this needs an EGL/GLES translation layer (ANGLE)" );
+
+/*
+==================
+R_WindowMultiSamplesForNewDevice
+
+The samples a new window is asked for, and the latch for the device that owns
+it. An OpenGL ES window always carries them: its targets may not be
+multisampled textures. Desktop OpenGL carries them only where
+r_glWindowMultisample says so.
+==================
+*/
+int R_WindowMultiSamplesForNewDevice( void ) {
+#if defined( __ANDROID__ )
+	r_windowCarriesMultisampling = true;
+#else
+	r_windowCarriesMultisampling = r_glesContext.GetBool() || r_glWindowMultisample.GetBool();
+#endif
+	return r_windowCarriesMultisampling ? r_multiSamples.GetInteger() : 0;
+}
 idCVar r_glCoreProfileFirst( "r_glCoreProfileFirst", "0", CVAR_RENDERER | CVAR_BOOL, "with a forced r_glTier, try core-profile contexts before the compatibility fallback; needed to reach the modern path on drivers that cap compatibility below 3.3 (macOS caps it at 2.1), diagnostic only" );
 idCVar r_vkValidation( "r_vkValidation", "0", CVAR_RENDERER | CVAR_BOOL, "enable Vulkan validation layers for the Vulkan renderer module and rendererVkProbe" );
 idCVar r_vkSampleLocations( "r_vkSampleLocations", "1", CVAR_RENDERER | CVAR_BOOL, "use lower-left standard MSAA locations when supported; read at Vulkan initialization" );
@@ -2101,7 +2136,7 @@ static bool R_CreateOpenGLContext( bool legacyPolicy, bool forceWindow, char *er
 		glConfig.vidHeight = parms.height;
 		parms.borderless = !parms.hiddenWindow && !parms.fullScreen && r_borderless.GetBool();
 		parms.displayHz = r_displayRefresh.GetInteger();
-		parms.multiSamples = r_multiSamples.GetInteger();
+		parms.multiSamples = R_WindowMultiSamplesForNewDevice();
 		parms.stereo = false;
 		if ( !legacyPolicy && r_recoverableWindowRequest != NULL ) {
 			const renderWindowParms_t &requested = r_recoverableWindowRequest->parms;
@@ -2284,6 +2319,14 @@ static bool R_InitOpenGLInternal( bool legacyPolicy, bool forceWindow, char *err
 	R_GLDebugOutput_FlushMessages();
 
 	R_RendererUpload_Init( glConfig.backendCaps );
+
+	// A single-sample window leaves MSAA to multisample textures. A context
+	// without them (an old driver, a 2.1 context) then draws without MSAA, and
+	// the player needs to know which setting brings it back.
+	if ( !r_windowCarriesMultisampling && r_multiSamples.GetInteger() > 1 && glTexImage2DMultisample == NULL ) {
+		common->Printf( "^3r_multiSamples %d has no effect: this OpenGL context has no multisample textures and its window is single-sample. Set r_glWindowMultisample 1 and restart the renderer to multisample the window instead^0\n",
+			r_multiSamples.GetInteger() );
+	}
 	R_GpuSkinning_ContractInit( glConfig.backendCaps );
 
 	// allocate the vertex array range or vertex objects
@@ -6014,7 +6057,8 @@ void R_VidRestart_f( const idCmdArgs &args ) {
 		}
 		parms.borderless = !parms.hiddenWindow && !parms.fullScreen && r_borderless.GetBool();
 		parms.displayHz = r_displayRefresh.GetInteger();
-		parms.multiSamples = r_multiSamples.GetInteger();
+		// the window keeps the samples its device gave it
+		parms.multiSamples = r_windowCarriesMultisampling ? r_multiSamples.GetInteger() : 0;
 		parms.stereo = false;
 		if ( !GLimp_SetScreenParms( parms ) ) {
 			common->Printf( "^3vid_restart partial failed, retrying full restart\n" );

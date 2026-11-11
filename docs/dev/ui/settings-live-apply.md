@@ -1,6 +1,6 @@
 # Applying display settings without a device restart
 
-This note records the five stages of making Settings > Display apply its
+This note records the six stages of making Settings > Display apply its
 changes to the running renderer. It is the record for the changes of
 11 November 2026 and supersedes, for the settings named here, what
 [effect execution](settings-effect-execution.md#combined-executor),
@@ -24,7 +24,8 @@ did every texture setting and every Performance Preset.
 | Precompressed textures (`image_usePrecompressedTextures`) | Device restart; a console change needed `vid_restart` | Reloads in place, from the page and from the console. |
 | Benchmark budget (`r_rendererBenchmarkPreset`) | Device restart | Nothing to do: it is read on each use. |
 | Upload stream (`r_rendererUploadMegs`, `r_rendererUploadFrameBuffers`) | Device restart | Vulkan: nothing to do, it reads neither. OpenGL: a device restart until stage 5, which resizes the stream at the next frame. |
-| A Performance Preset | Device restart, always | Stage 1: no device restart on Vulkan unless the preset changes MSAA. Stage 3: none on Vulkan at all. Stage 5: OpenGL restarts only when the preset changes MSAA. |
+| A Performance Preset | Device restart, always | Stage 1: no device restart on Vulkan unless the preset changes MSAA. Stage 3: none on Vulkan at all. Stage 5: OpenGL restarts only when the preset changes MSAA. Stage 6: nor then, where its window is single-sample (the default except on Apple). |
+| MSAA on OpenGL (`r_multiSamples`) | Device restart: the window carried the samples | Stage 6: a transition. The window is single-sample and 3D views are multisampled in render targets. `r_glWindowMultisample 1`, Apple and OpenGL ES keep the old window and the restart. |
 | High-quality texture hints (`image_ignoreHighQuality`) | Written, finished at the next start | Stage 4: the materials that read the hint are re-parsed in the session. |
 | Rendering API and GPU (`r_renderApi`, `r_renderDevice`) | Restart Renderer at the main menu only | Stage 4: also inside a single-player game, which is saved, reloaded around and resumed. |
 
@@ -454,30 +455,118 @@ Hidden window, console verbs only, working tree on `39e4ce8a1`.
   changes only the upload stream among the device settings, resized it in
   place.
 
-### What is left on OpenGL: the MSAA Apply
+## Stage 6: MSAA on OpenGL without a new window
 
-An MSAA change on the Display page still restarts OpenGL's device, because
-OpenGL's window carries the sample count. The main scene already follows
-`r_multiSamples` on the next frame (stage 3). Removing the restart means a
-single-sample window, and that is a larger change than the others here:
+OpenGL created its window with `r_multiSamples` samples, so an MSAA change
+was a change of window: a device restart. The window's samples did three
+things, and each now has another home.
 
-- The window's samples antialias every 3D view drawn straight to it: remote
-  cameras, mirrors and other capture-backed subviews before they are copied
-  into their textures, and GUI `renderDef` windows. Vulkan needed its own
-  window-view target to match
-  ([Vulkan captures](../vulkan-captures.md)). OpenGL would need the same.
-- The back end's own scene target and the capture copy take their sample
-  count from the window (`R_DefaultFramebufferSamples`), not from the
-  setting.
-- Where multisample textures are missing (Apple's OpenGL 2.1 context) the
-  window is the only MSAA there is, so that context has to keep it, and the
-  choice has to be made before the context exists.
-- OpenGL's pictures are the reference the Vulkan renderer was qualified
-  against, so the change needs the view-capture comparison
-  (`tools/tests/renderer_view_capture.py`) run against the stored OpenGL
-  images.
+**The policy.** `r_glWindowMultisample` (archived, read when the renderer
+starts) says whether the window carries the samples. It defaults to 0, a
+single-sample window, and to 1 on Apple platforms, whose OpenGL 2.1 context
+has no multisample textures, so the window is the only MSAA there. An OpenGL
+ES window always carries them. `R_WindowMultiSamplesForNewDevice` latches the
+answer for the device (`R_WindowCarriesMultisampling`). A context without
+multisample textures and with a single-sample window draws without MSAA and
+says which setting brings it back.
 
-It is not started.
+**The main scene** already took its samples from the game's forward target,
+which follows the setting on the next frame (stage 3). The renderer's own
+scene target took its count from the window; it now takes it from
+`R_ViewFramebufferSamples`, which is the window's count where the window
+carries samples and the setting otherwise.
+
+**Views drawn straight to the window** were antialiased by it: GUI
+`renderDef` windows, and remote cameras, mirrors and other capture-backed
+subviews before they are copied into their textures. On a single-sample
+window such a view draws into a window-sized multisampled target that stands
+in for the window (`RB_WindowView_Begin`, `RB_WindowView_End` in
+`draw_common.cpp`, through `R_SetDefaultRenderTarget`, the mechanism a VR eye
+uses). The back end keeps drawing "to the window" and none of its target
+logic changes. The same idea as
+[Vulkan's window views](../vulkan-captures.md#window-view-multisampling-6-november-2026):
+
+- The view's rectangle is first seeded with the window's pixels, because a 3D
+  view clears only depth and draws over what the GUI put there.
+- Afterwards the rectangle is resolved back into the window. A subview, which
+  is copied into a texture next, is averaged into a single-sample target
+  first, because that copy read a multisampled window with
+  `glCopyTexSubImage2D`, a plain average. Any other view is blitted straight
+  into the window, the window system's own downsample.
+- A window stores its rows top-down, so its sample pattern is the mirror of a
+  framebuffer object's. Where sample positions are programmable
+  (`ARB_sample_locations`) the stand-in takes the mirrored pattern.
+- A colour copy out of the multisampled stand-in resolves with a blit
+  (`idImage::CopyFramebuffer`); the depth copy already handled a multisampled
+  default framebuffer.
+- It does not engage where the window carries the samples, under VR, or for a
+  view that already draws into a render texture. `r_glWindowViewMultisample 0`
+  turns it off, and 2 prints each view it takes.
+
+**The Display page.** `EngineSettingsDisplayHost::WindowMultisampling` is
+true for OpenGL ES, and for desktop OpenGL only with `r_glWindowMultisample
+1`. Otherwise an MSAA change is a display transition that asks for the window
+the device has, as on Vulkan, with Keep or Revert unchanged. If the setting
+was changed without restarting the renderer, the request names another
+sample count than the window has, the transition is refused and the Apply
+falls back to the device restart.
+
+### What changes for the picture
+
+- With MSAA on, 2D drawn straight to the window (interface edges that are
+  geometry, not texture) is no longer multisampled under OpenGL. It never was
+  under Vulkan.
+- Without `ARB_sample_locations` a window view keeps the framebuffer
+  object's own sample pattern: in the laboratory's GUI view that was 52 edge
+  pixels different by up to 5 levels.
+- At 8 samples the old window's own downsample was not a plain average on the
+  test driver. See the comparison below.
+
+### Qualification, stage 6
+
+`tools/tests/renderer_view_capture.py` (six cases at 4x MSAA: a remote camera
+on a screen, its control, the same inside the legacy 50% crop, a cropped
+`envshot` cube, a GUI `renderDef` window away from the origin, and
+`vid_restart`), one build, captured with `r_glWindowMultisample 1` (the
+multisampled window, the reference) and 0. NVIDIA, hidden window, in a
+worktree build of `f08a72d24` plus this change:
+
+- **4 samples.** Eleven of the twelve images (six screenshots, six cube
+  faces) are identical pixel for pixel. The GUI view differs in 17 pixels by
+  at most 2 levels. The harness's own OpenGL against Vulkan comparison passes
+  with the new OpenGL, as it does with the old.
+- **8 samples.** Ten images are identical. The cube face that shows the
+  remote camera differs in 96 pixels by up to 55 levels, and the GUI view in
+  12 pixels by up to 3. Vulkan, which averages its samples plainly, agrees
+  with the new OpenGL within 2 levels on every image and fails against the
+  old window on exactly those two. The window's 8-sample positions are the
+  mirror of the target's, so the pattern is the same; the old window's
+  downsample was the driver's.
+- The in-game remote camera views of the sequence draw into the game's
+  render target, not the window, in both modes.
+
+How the differences were found: a blit straight from the multisampled target
+into the window made a captured subview's edges up to 59 levels brighter than
+the reference at 4 samples, and the two-step resolve removed that exactly.
+
+### Engine checks, stage 6
+
+Hidden window, console verbs only, the same build:
+
+- **MSAA on the Display page** (OpenGL): one step up applied as a transition
+  and kept, with no device start. With `r_glWindowMultisample 1` the same
+  step restarted the device, as before.
+- **MSAA from the console in a map** (`game/airdefense1`): 0 to 4 to 0 to 2,
+  the forward target and `gfxInfo` reporting each count as effective, no
+  device start.
+- **Every preset on the page** (OpenGL): no device restart at all, where
+  there were six.
+
+Not run: a visible window, an Intel or AMD driver, a driver without
+`ARB_sample_locations`, the classic interface's `renderDef` pages in a real
+menu, a tiled screenshot larger than the window with a window view in it, VR
+on OpenGL, macOS and OpenGL ES (both keep the multisampled window), and a
+context without multisample textures.
 
 ## What these stages do not do
 
@@ -487,8 +576,8 @@ It is not started.
 - The in-place route has no readback of image dimensions. Its evidence is the
   exact settings readback, the same device generation and a later presented
   frame, as for the combined executor's restart.
-- OpenGL's MSAA Apply is later work
-  ([roadmap](../roadmap.md), UI-01).
+- Apple platforms and OpenGL ES keep the multisampled window, so an MSAA
+  change still restarts the device there.
 
 ## Engine checks, 11 November 2026
 
@@ -518,6 +607,16 @@ device reopened.
 
 ## Tests
 
+- `tools/tests/renderer_gl_window_view_contract.py` (stage 6): the policy and
+  its latch, the sample counts, the window view's conditions, seed, resolve
+  and placement in the view, the copy out of a multisampled stand-in, and the
+  Display page's gate.
+- `tools/tests/renderer_gl_display_policy.py` (stage 6): a window that carries
+  no samples leaves the count to the setting, a stand-in reports its own, and
+  unknown window samples still authorize nothing.
+- `tools/tests/ui_settings_display_service.py` (stage 6): an MSAA change and a
+  preset that changes MSAA are transitions on a single-sample OpenGL window,
+  kept and restored, and a device restart where the window carries the samples.
 - `tools/tests/renderer_upload_storage.py`
   (`tools/tests/native/RendererUploadStorageTest.cpp`, stage 5): a changed
   size or depth replaces the frame buffers alone at `BeginFrame`, on each

@@ -663,6 +663,10 @@ unsigned int R_DefaultFramebufferHandle( void ) {
 	return 0;
 }
 
+int R_DefaultRenderTargetSamples( void ) {
+	return 0;
+}
+
 unsigned int R_DefaultColorBuffer( void ) {
 	return GL_BACK;
 }

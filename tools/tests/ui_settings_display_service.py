@@ -188,7 +188,7 @@ CASES = r'''
 static std::string error;
 static StateValues Live(SystemSettingsHost& host){StateValues values;Check(host.Read(values,error),"read live catalog");return values;}
 static void ResetFixture(){
-    files.clear();leases.clear();geometryToken=0;readFailure=replaceFailure=replacePublishes=removeFailure=configFailure=changedSaveRoot=traceEnabled=false;
+    files.clear();leases.clear();geometryToken=0;readFailure=replaceFailure=replacePublishes=removeFailure=configFailure=changedSaveRoot=traceEnabled=false;windowMultisample=true;
     geometryFailure=geometryPartial=false;queryOkay=restartOkay=true;displayOrder={1,2};displayCount=2;primaryDisplay=1;currentDisplay=2;configWrites=restarts=initializations=0;archived.clear();
     Seed();localCVarSystem.variables.at("r_swapInterval").value="1";actual=Actual();actual.window.hidden=false;actual.window.focused=true;
     geometry={actual.window.windowX,actual.window.windowY,1280,720,actual.window.windowX,actual.window.windowY,1280,720,true};
@@ -203,6 +203,11 @@ static void MultisamplingCapability(){
         const bool window=api==RENDER_MODULE_API_GL || api==RENDER_MODULE_API_GL_MODULE || api==RENDER_MODULE_API_GLES;
         Check(host.SupportsMultisampling()==(window || api==RENDER_MODULE_API_VULKAN),"every known ready renderer applies MSAA");
         Check(host.WindowMultisampling()==window,"only the OpenGL family multisamples its window");
+        // A desktop OpenGL window is single-sample by default; an OpenGL ES window always carries the samples.
+        windowMultisample=false;
+        Check(host.SupportsMultisampling()==(window || api==RENDER_MODULE_API_VULKAN),"MSAA does not depend on where the samples live");
+        Check(host.WindowMultisampling()==(api==RENDER_MODULE_API_GLES),"a single-sample desktop OpenGL window carries no samples");
+        windowMultisample=true;
     }
     moduleStatus.activeApi=RENDER_MODULE_API_GL;
     queryOkay=false;Check(!host.SupportsMultisampling(),"missing observation disables MSAA");queryOkay=true;
@@ -1028,20 +1033,41 @@ static void TransitionCases(){
      Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare a window change whose transition and restart fail");
      transitionOkay=false;restartOkay=false;SettingsDisplayObservation seen;
      Check(!host.Restart(false,seen,error) && transitions==1 && restarts==1 && host.RecoveryActive(),"a failed fallback fails the attempt");host.Shutdown();}
-    // A window's sample count is fixed when its device is created. Under
-    // OpenGL an MSAA change is a change to that count and never tries a
-    // transition. Vulkan's window is single-sample and its scene targets
-    // follow r_multiSamples on the running device, so there the change is a
-    // transition that asks for the window it already has. A window whose
-    // actual count differs from the request restarts on either back end.
+    // A window's sample count is fixed when its device is created. Where an
+    // OpenGL window carries the samples (r_glWindowMultisample 1) an MSAA
+    // change is a change to that count and never tries a transition. Vulkan's
+    // window is single-sample and its scene targets follow r_multiSamples on
+    // the running device, so there the change is a transition that asks for
+    // the window it already has. A window whose actual count differs from the
+    // request restarts on either back end.
     for(const auto api:{RENDER_MODULE_API_GL,RENDER_MODULE_API_VULKAN}){ResetFixture();moduleStatus.activeApi=api;
      SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=Attempt(settings);
      Check(a.patch.contains("r_multiSamples") && host.Prepare(a,error) && settings.Write(a.patch,error),"prepare an MSAA change");SettingsDisplayObservation seen;
      const bool gl=api==RENDER_MODULE_API_GL;
-     Check(host.Restart(false,seen,error) && transitions==(gl?0:1) && restarts==(gl?1:0),"an MSAA change restarts OpenGL's device and transitions on Vulkan");
+     Check(host.Restart(false,seen,error) && transitions==(gl?0:1) && restarts==(gl?1:0),"an MSAA change restarts an OpenGL device whose window carries the samples and transitions on Vulkan");
      Check(gl || (lastRequest.parms.multiSamples==0 && actual.presentation.samples==0),"the Vulkan transition keeps the single-sample window");
      Present();Check(host.Observe(false,seen,error) && host.PersistConfirmation(a,error) && host.Finish(false,error) && configWrites==1 &&
                      Live(settings).at("r_multiSamples")==StateValue(4.0),"the MSAA change keeps");}
+    // Desktop OpenGL's default window is single-sample too (r_glWindowMultisample 0):
+    // its 3D views take their samples from render targets, so the change is a
+    // transition there as well, kept and restored, and the request names no samples.
+    for(bool restore:{false,true}){ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_GL;windowMultisample=false;
+     SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);auto a=Attempt(settings);
+     Check(a.patch.contains("r_multiSamples") && host.Prepare(a,error) && settings.Write(a.patch,error),"prepare an MSAA change on a single-sample OpenGL window");
+     SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==1 && restarts==0 && lastRequest.parms.multiSamples==0 && actual.presentation.samples==0,
+           "an MSAA change is a transition on a single-sample OpenGL window");
+     Present();Check(host.Observe(false,seen,error),"the transition is observed");
+     if(restore){StateValues back;for(const auto& [key,value]:a.patch)back[key]=a.baseline.at(key);
+      Check(settings.Write(back,error) && host.Restart(true,seen,error) && transitions==2 && restarts==0,"its restore is a transition too");
+      Present();Check(host.Observe(true,seen,error) && host.Finish(true,error) && configWrites==0,"the restored MSAA change never archives");}
+     else Check(host.PersistConfirmation(a,error) && host.Finish(false,error) && configWrites==1 &&
+                Live(settings).at("r_multiSamples")==StateValue(4.0),"the MSAA change keeps");}
+    // An OpenGL preset that changes MSAA restarts nothing on such a window.
+    {ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_GL;windowMultisample=false;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
+     auto a=CombinedAttempt(settings,true);Check(a.patch.contains("r_multiSamples") && a.patch.contains("r_rendererUploadMegs"),"the fixture changes MSAA and the upload stream");
+     Check(host.Prepare(a,error) && settings.Write(a.patch,error),"prepare an OpenGL preset that changes MSAA");SettingsDisplayObservation seen;
+     Check(host.Restart(false,seen,error) && transitions==1 && restarts==0 && soundRestarts==1,"it transitions and reopens the sound device");host.Shutdown();}
     // A Vulkan preset that changes MSAA and the upload stream needs no new device either.
     {ResetFixture();moduleStatus.activeApi=RENDER_MODULE_API_VULKAN;SystemSettingsHost settings;EngineSettingsDisplayHost host(settings);
      auto a=CombinedAttempt(settings,true);Check(a.patch.contains("r_multiSamples") && a.patch.contains("r_rendererUploadMegs"),"the fixture changes MSAA and the upload stream");
@@ -1149,13 +1175,15 @@ def main(production_mutations=(), emit_directory=None):
     names = ("bool Identifier(", "std::string PointerPart(", "void Diagnose(", "bool Utf8(",
              "bool LexicalForms(", "bool Parse(", "bool ValidStateValue(", "bool ParseStateValues(")
     validation = '\n'.join(document[document.index(name):document.index('bool Parse(', document.index(name))] if name == 'bool LexicalForms(' else function_body(document, name) for name in names)
-    support = host_test.SUPPORT.replace("static int writes=0;", "static std::vector<std::string> trace;\nstatic bool traceEnabled=false;\nstatic int writes=0;")
+    support = host_test.SUPPORT.replace("static int writes=0;", "static std::vector<std::string> trace;\nstatic bool traceEnabled=false;\n"
+                                      "// r_glWindowMultisample: the OpenGL window carries the samples (the legacy policy most cases assume).\n"
+                                      "static bool windowMultisample=true;\nstatic int writes=0;")
     support = support.replace("struct idStr : std::string { using std::string::string; using std::string::operator=; };",
                               "#include <cstring>\n"
                               "struct idStr : std::string { using std::string::string; using std::string::operator=; "
                               "static int Cmp(const char* a,const char* b){return std::strcmp(a,b);} };")
     support = support.replace("++writes; if(key!=refuse)", '++writes;trace.push_back("cvar-write"); if(key!=refuse)')
-    support = support.replace('idCVar* Find(const char* name)', 'bool GetCVarBool(const char* name){return traceEnabled && std::string(name)=="ui_retainedTrace";}\n    int GetCVarInteger(const char* name){return std::atoi(FindInternal(name)->value.c_str());}\n    idCVar* Find(const char* name)')
+    support = support.replace('idCVar* Find(const char* name)', 'bool GetCVarBool(const char* name){const std::string key(name);return (traceEnabled && key=="ui_retainedTrace") || (windowMultisample && key=="r_glWindowMultisample");}\n    int GetCVarInteger(const char* name){return std::atoi(FindInternal(name)->value.c_str());}\n    idCVar* Find(const char* name)')
     support = support.replace("static int displayCount=2;", "static int displayCount=2;static std::vector<unsigned> displayOrder{1,2};")
     support = support.replace("result[i]=i+1;", "result[i]=displayOrder.at(i);")
     support = support.replace("services.RefreshNativeWindowHandles=", 'services.PrepareWindowSystem=+[]{return true;};\n    services.RefreshNativeWindowHandles=')
