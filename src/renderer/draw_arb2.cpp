@@ -3114,39 +3114,37 @@ bool RB_ShadowMapResourcesKnownGood( bool pointLight ) {
 // Shadow casters render in light space, where the mirrored-view logic in
 // GL_Cull does not apply. idTech4 winding makes the engine-front (visible)
 // side of a front-sided material the GL_BACK face, so culling GL_FRONT stores
-// the light-facing, near shell. The automatic mode only does that for sealed
-// hulls. Open, non-manifold, or otherwise uncertain geometry is rendered
-// two-sided: either authored winding can then contribute and props cannot
-// silently disappear from the depth map. Storing the far shell is deliberately
-// avoided because mesh thickness turns into contact-shadow detachment.
-//   r_shadowMapCasterCulling 0: always two-sided
-//   r_shadowMapCasterCulling 1: always store the light-facing near shell
-//   r_shadowMapCasterCulling 2: automatic (near shell for perfect hulls whose
-//     bounds do not contain the light and whose transform preserves winding,
-//     two-sided otherwise)
-// The authored material orientation is honored whenever one-sided culling is
-// active. Mode 0 and AUTO's conservative fallbacks intentionally override it.
+// the light-facing near shell and culling GL_BACK the triangles that face
+// away from the light. Which of the two a caster stores is the shared policy
+// of R_ShadowMapCasterFaces (r_shadowMapCasterCulling); this only turns its
+// answer into GL state.
 static int g_shadowMapCasterCullApplied = -1; // 0 = culling disabled, else the GLenum face
+// whether the light whose casters are being drawn has a mirrored projection
+static bool g_shadowMapCasterWindingMirrored = false;
+
+static int RB_ShadowMapCasterFacesCullFace( const shadowMapCasterFaces_t faces ) {
+	switch ( faces ) {
+	case SHADOWMAP_CASTER_FACES_NEAR:
+		return static_cast<int>( GL_FRONT );
+	case SHADOWMAP_CASTER_FACES_FAR:
+		return static_cast<int>( GL_BACK );
+	default:
+		return 0;
+	}
+}
 
 static void RB_ShadowMapApplyCasterCull( const idMaterial *shader,
 		const srfTriangles_t *casterGeo = NULL,
 		const float *modelMatrix = NULL ) {
-	const int mode = idMath::ClampInt( 0, 2, r_shadowMapCasterCulling.GetInteger() );
 	const int materialCull = ( shader != NULL ) ? shader->GetCullType() : CT_FRONT_SIDED;
-	const bool automaticTwoSided = mode == 2
-		&& ( casterGeo == NULL || !casterGeo->perfectHull
-			|| R_ShadowMapCasterTransformNeedsTwoSided( modelMatrix )
-			|| R_ShadowMapLightOriginInsideCasterBounds( backEnd.vLight,
-				modelMatrix, casterGeo->bounds[0].ToFloatPtr(),
-				casterGeo->bounds[1].ToFloatPtr() ) );
-	int desired = 0;
-	if ( mode != 0 && !automaticTwoSided && materialCull != CT_TWO_SIDED ) {
-		GLenum cullFace = GL_FRONT;
-		if ( materialCull == CT_BACK_SIDED ) {
-			cullFace = ( cullFace == GL_FRONT ) ? GL_BACK : GL_FRONT;
-		}
-		desired = static_cast<int>( cullFace );
-	}
+	const int desired = RB_ShadowMapCasterFacesCullFace(
+		R_ShadowMapCasterFaces( R_ShadowMapCasterCullingMode(),
+			backEnd.vLight, g_shadowMapCasterWindingMirrored,
+			casterGeo != NULL,
+			casterGeo != NULL && casterGeo->perfectHull, modelMatrix,
+			casterGeo != NULL ? casterGeo->bounds[0].ToFloatPtr() : NULL,
+			casterGeo != NULL ? casterGeo->bounds[1].ToFloatPtr() : NULL,
+			materialCull ) );
 	if ( desired == g_shadowMapCasterCullApplied ) {
 		return;
 	}
@@ -3159,7 +3157,10 @@ static void RB_ShadowMapApplyCasterCull( const idMaterial *shader,
 	glCullFace( static_cast<GLenum>( desired ) );
 }
 
+// Called once at the start of every caster pass, with the pass's light current.
 static void RB_ShadowMapResetCasterCull( void ) {
+	g_shadowMapCasterWindingMirrored =
+		R_ShadowMapLightMirrorsCasterWinding( backEnd.vLight );
 	g_shadowMapCasterCullApplied = -1;
 	RB_ShadowMapApplyCasterCull( NULL );
 }
@@ -3584,7 +3585,7 @@ static int RB_ShadowMapBuildPassSignatureForView( const viewLight_t *vLight, con
 	hash = RB_ShadowMapHashInt( hash, r_shadowMapStableAlphaHash.GetBool() ? 1 : 0 );
 	hash = RB_ShadowMapHashFloat( hash, RB_ShadowMapPolygonFactor() );
 	hash = RB_ShadowMapHashFloat( hash, RB_ShadowMapPolygonOffset() );
-	hash = RB_ShadowMapHashFloat( hash, static_cast<float>( idMath::ClampInt( 0, 2, r_shadowMapCasterCulling.GetInteger() ) ) );
+	hash = RB_ShadowMapHashFloat( hash, static_cast<float>( R_ShadowMapCasterCullingMode() ) );
 	if ( pointLight ) {
 		hash = RB_ShadowMapHashInt( hash, RB_ShadowMapPointSizeValue() );
 		hash = RB_ShadowMapHashInt( hash, RB_PointShadowMapHighPrecisionEnabled() ? 1 : 0 );
@@ -13849,9 +13850,7 @@ static bool RB_SharedWorldInteractionGLMapPassValuesValid(
 			|| ( !pass.allowCacheReuse && !pass.allowCacheUpdate )
 			|| pass.casterSignature
 				!= light.legacyViewLight->shadowMapCasterSignature
-			|| pass.casterCullMode
-				!= idMath::ClampInt( 0, 2,
-					r_shadowMapCasterCulling.GetInteger() )
+			|| pass.casterCullMode != R_ShadowMapCasterCullingMode()
 			|| idMath::Fabs( pass.polygonFactor
 				- RB_ShadowMapPolygonFactor() ) > 0.00001f
 			|| idMath::Fabs( pass.polygonOffset
@@ -14460,19 +14459,13 @@ static bool RB_SharedWorldInteractionGLPointEntryMatches(
 static void RB_SharedWorldInteractionGLApplyMapCasterCull(
 		const classicInteractionDomainShadowMapPass_t &pass,
 		const classicInteractionDomainShadowCaster_t &caster ) {
-	int desired = 0;
-	const bool automaticTwoSided = pass.casterCullMode == 2
-		&& ( !caster.perfectHull
-			|| R_ShadowMapLightOriginInsideCasterBounds(
-				pass.legacyViewLight, caster.modelMatrix,
-				caster.boundsMin, caster.boundsMax ) );
-	if ( pass.casterCullMode != 0 && !automaticTwoSided && caster.cull != RENDERER_CULL_NONE ) {
-		GLenum face = GL_FRONT;
-		if ( caster.cull == RENDERER_CULL_BACK ) {
-			face = face == GL_FRONT ? GL_BACK : GL_FRONT;
-		}
-		desired = static_cast<int>( face );
-	}
+	const int materialCull = caster.cull == RENDERER_CULL_NONE ? CT_TWO_SIDED
+		: ( caster.cull == RENDERER_CULL_BACK ? CT_BACK_SIDED : CT_FRONT_SIDED );
+	const int desired = RB_ShadowMapCasterFacesCullFace(
+		R_ShadowMapCasterFaces( pass.casterCullMode, pass.legacyViewLight,
+			pass.casterWindingMirrored, true, caster.perfectHull,
+			caster.modelMatrix, caster.boundsMin, caster.boundsMax,
+			materialCull ) );
 	if ( desired == 0 ) {
 		glDisable( GL_CULL_FACE );
 	} else {

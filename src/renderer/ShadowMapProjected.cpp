@@ -424,6 +424,32 @@ void R_ShadowMapBuildBaseClipPlanesForLight( const viewLight_t *vLight, idPlane 
 	}
 }
 
+bool R_ShadowMapClipPlanesMirrorWinding( const idPlane clipPlanes[4] ) {
+	const idVec3 s = clipPlanes[0].Normal();
+	const idVec3 t = clipPlanes[1].Normal();
+	// the direction the light travels: the divide row of a perspective map, or
+	// the depth row of an orthographic one, whose divide row is the constant 1
+	idVec3 away = clipPlanes[3].Normal();
+	if ( away.LengthSqr() <= 0.0f ) {
+		away = clipPlanes[2].Normal();
+	}
+	const double determinant =
+		static_cast<double>( s.x ) * ( static_cast<double>( t.y ) * away.z - static_cast<double>( t.z ) * away.y )
+		- static_cast<double>( s.y ) * ( static_cast<double>( t.x ) * away.z - static_cast<double>( t.z ) * away.x )
+		+ static_cast<double>( s.z ) * ( static_cast<double>( t.x ) * away.y - static_cast<double>( t.y ) * away.x );
+	// a degenerate projection has no picture to mirror
+	return determinant < 0.0;
+}
+
+bool R_ShadowMapLightMirrorsCasterWinding( const viewLight_t *vLight ) {
+	if ( vLight == NULL || R_ClassifyShadowMapLight( vLight ).pointLight ) {
+		return false;
+	}
+	idPlane clipPlanes[4];
+	R_ShadowMapBuildBaseClipPlanesForLight( vLight, clipPlanes );
+	return R_ShadowMapClipPlanesMirrorWinding( clipPlanes );
+}
+
 // World distance over which the stored falloff depth spans 0..1. The depth
 // row is the authored falloff plane (clipPlanes[2] = lightProject[3]), whose
 // normal length is the reciprocal of that distance. This is the one true
@@ -851,6 +877,136 @@ bool R_ShadowMapDistantPointProjectionSelfTest( void ) {
 		return false;
 	}
 	common->Printf( "Distant point projection self-test passed: 32 receiver/blocker rays, rotation and translation\n" );
+	return true;
+}
+
+// Which triangles a caster keeps, and the handedness test that picks the
+// face to discard. The projector is storage2's alarm light, the one the rule
+// was measured on: discarding the rasterizer's back face keeps the triangles
+// that face away from it.
+bool R_ShadowMapCasterFacesSelfTest( void ) {
+	// lightProject as R_SetLightProject leaves it for light_right (-184 0 0),
+	// light_up (0 -144 -120), light_target (0 272 -312)
+	idPlane lightProject[4];
+	lightProject[0].SetNormal( idVec3( -1.1245f, 0.0f, 0.0f ) );
+	lightProject[1].SetNormal( idVec3( 0.0f, 0.8479f, 0.7066f ) );
+	lightProject[2].SetNormal( idVec3( 0.0f, 0.6402f, -0.7682f ) );
+	lightProject[3].SetNormal( idVec3( 0.0f, 0.00159f, -0.00182f ) );
+	for ( int plane = 0; plane < 4; ++plane ) {
+		lightProject[plane][3] = 0.0f;
+	}
+	idPlane clipPlanes[4];
+	R_ShadowMapBuildClipPlanes( lightProject, clipPlanes );
+	if ( R_ShadowMapClipPlanesMirrorWinding( clipPlanes ) ) {
+		return false;	// the reference projector
+	}
+	// the same projector authored with its right vector the other way round
+	lightProject[0].SetNormal( idVec3( 1.1245f, 0.0f, 0.0f ) );
+	R_ShadowMapBuildClipPlanes( lightProject, clipPlanes );
+	if ( !R_ShadowMapClipPlanesMirrorWinding( clipPlanes ) ) {
+		return false;
+	}
+
+	// distant point and parallel lights take their axes from NormalVectors,
+	// which hands back a left-handed pair
+	idRenderLightLocal lightDef;
+	memset( &lightDef.parms, 0, sizeof( lightDef.parms ) );
+	renderLight_t &parms = lightDef.parms;
+	parms.pointLight = true;
+	parms.lightRadius.Set( 512.0f, 320.0f, 192.0f );
+	viewLight_t light;
+	memset( &light, 0, sizeof( light ) );
+	light.lightDef = &lightDef;
+	light.pointLight = true;
+	int projections = 2;
+	for ( int transform = 0; transform < 4; ++transform ) {
+		parms.origin.Set( 3000.0f * transform, -1700.0f * transform, 64.0f );
+		parms.axis = idAngles( 11.0f * transform, 41.0f * transform, 5.0f ).ToMat3();
+		parms.parallel = false;
+		parms.lightCenter.Set( 2000.0f, -1200.0f, 1800.0f );
+		light.parallel = false;
+		light.globalLightOrigin = parms.origin + parms.lightCenter * parms.axis;
+		if ( !R_ShadowMapBuildDistantPointClipPlanes( &light, clipPlanes, NULL )
+				|| !R_ShadowMapClipPlanesMirrorWinding( clipPlanes ) ) {
+			return false;
+		}
+		parms.parallel = true;
+		light.parallel = true;
+		if ( !R_ShadowMapBuildParallelClipPlanes( &light, clipPlanes )
+				|| !R_ShadowMapClipPlanesMirrorWinding( clipPlanes ) ) {
+			return false;
+		}
+		projections += 2;
+	}
+
+	// the face table, for a light well outside the caster
+	parms.parallel = false;
+	light.parallel = false;
+	light.globalLightOrigin.Set( 0.0f, 0.0f, 4096.0f );
+	float identity[16];
+	memset( identity, 0, sizeof( identity ) );
+	identity[0] = identity[5] = identity[10] = identity[15] = 1.0f;
+	float mirror[16];
+	memcpy( mirror, identity, sizeof( mirror ) );
+	mirror[0] = -1.0f;
+	float collapsed[16];
+	memcpy( collapsed, identity, sizeof( collapsed ) );
+	collapsed[10] = 0.0f;
+	const float mins[3] = { -16.0f, -16.0f, -16.0f };
+	const float maxs[3] = { 16.0f, 16.0f, 16.0f };
+	const float around[3] = { -8192.0f, -8192.0f, -8192.0f };
+	const float aroundMax[3] = { 8192.0f, 8192.0f, 8192.0f };
+	struct faceCase_t {
+		int mode; bool mirrored; bool sealed; const float *matrix; bool enclosing; int cull;
+		shadowMapCasterFaces_t expected;
+	};
+	const faceCase_t cases[] = {
+		{ 0, false, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_BOTH },
+		{ 1, false, false, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
+		{ 1, false, false, identity, false, CT_BACK_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 1, true, false, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		// a sealed hull keeps its near shell, on either kind of projection
+		{ 2, false, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
+		{ 2, true, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 2, false, true, identity, true, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_BOTH },
+		{ 2, false, true, mirror, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_BOTH },
+		{ 2, false, true, identity, false, CT_TWO_SIDED, SHADOWMAP_CASTER_FACES_BOTH },
+		// open geometry: the stencil rule, whatever the material shows
+		{ 2, false, false, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 2, false, false, identity, false, CT_BACK_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 2, false, false, identity, false, CT_TWO_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 2, true, false, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
+		{ 2, false, false, mirror, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
+		{ 2, true, false, mirror, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 2, false, false, collapsed, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_BOTH },
+		{ 3, false, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 3, true, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
+		// the earlier automatic mode
+		{ 4, false, false, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_BOTH },
+		{ 4, false, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
+	};
+	const int caseCount = sizeof( cases ) / sizeof( cases[0] );
+	for ( int i = 0; i < caseCount; ++i ) {
+		const faceCase_t &c = cases[i];
+		const shadowMapCasterFaces_t faces = R_ShadowMapCasterFaces( c.mode,
+			&light, c.mirrored, true, c.sealed, c.matrix,
+			c.enclosing ? around : mins, c.enclosing ? aroundMax : maxs, c.cull );
+		if ( faces != c.expected ) {
+			common->Printf( "Caster face self-test FAILED: case %d\n", i );
+			return false;
+		}
+	}
+	// no geometry to judge: both sides, except under the forced near shell
+	if ( R_ShadowMapCasterFaces( 2, &light, false, false, false, NULL, NULL, NULL, CT_FRONT_SIDED )
+				!= SHADOWMAP_CASTER_FACES_BOTH
+			|| R_ShadowMapCasterTransformWinding( identity ) != 1
+			|| R_ShadowMapCasterTransformWinding( mirror ) != -1
+			|| R_ShadowMapCasterTransformWinding( collapsed ) != 0
+			|| R_ShadowMapCasterTransformWinding( NULL ) != 0 ) {
+		return false;
+	}
+	common->Printf( "Caster face self-test passed: %d projections, %d face cases\n",
+		projections, caseCount );
 	return true;
 }
 

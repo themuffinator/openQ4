@@ -1060,6 +1060,7 @@ static std::uint64_t HashShadowMapPass(
 	HashBool( hash, pass.hashedAlpha );
 	HashBool( hash, pass.stableAlphaHash );
 	HashInt( hash, pass.casterCullMode );
+	HashBool( hash, pass.casterWindingMirrored );
 	HashFloat( hash, pass.polygonFactor );
 	HashFloat( hash, pass.polygonOffset );
 	if ( pass.lightClass == SHADOWMAP_LIGHT_POINT ) {
@@ -2312,8 +2313,9 @@ static bool BuildShadowMapPasses(
 		pass.allowScratch = true;
 		pass.hashedAlpha = r_shadowMapHashedAlpha.GetBool();
 		pass.stableAlphaHash = r_shadowMapStableAlphaHash.GetBool();
-		pass.casterCullMode = idMath::ClampInt( 0, 2,
-			r_shadowMapCasterCulling.GetInteger() );
+		pass.casterCullMode = R_ShadowMapCasterCullingMode();
+		pass.casterWindingMirrored =
+			R_ShadowMapLightMirrorsCasterWinding( viewLight );
 		pass.polygonFactor = r_shadowMapPolygonFactor.GetFloat();
 		pass.polygonOffset = r_shadowMapPolygonOffset.GetFloat();
 		pass.projected = projected;

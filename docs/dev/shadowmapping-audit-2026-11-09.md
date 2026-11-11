@@ -64,7 +64,8 @@ cache (sixteen at most) against forty cubes in view.
 | **Shadow passes restored the viewport without the tiled-capture offset.** | **Fixed** (OpenGL). |
 | Casters are not clipped to the light volume. For a point light whose origin lies outside its box (388 authored), geometry between origin and box can shadow the box in a map and never in stencil. | **Open, unconfirmed.** convoy2's `light_9020` captured mapped and stencilled shows no such difference. mcc_landing's `light_9081` view does differ, but those captures were not controlled for the player's own shadow or the scene's animation. A fragment clip in the cube caster is the fix if a case is confirmed; Vulkan's caster push block has no room for the box. |
 | **A soft shadow's grain followed its tile around.** The projected filter turns its kernel by a hash of the texel, and the texel was counted within the sampled image. The grain therefore changed whenever the light's tile took another place in the atlas, and a cached map differed from the same map drawn fresh: in hub2's start view one light alone changed 19,000 pixels between the two, by up to 147 levels, on both renderers. Reading cached maps where they live on Vulkan added a third place. | **Fixed, both backends.** The hash takes the texel within the tile. See "Walking" below. |
-| Light-facing one-sided geometry casts in maps and never in stencil. | **By design** (the September contact-detail decision). Recorded, not changed. |
+| **Light-facing one-sided geometry cast in maps and never in stencil.** A stencil volume is built from the triangles that face away from the light and from nothing else, and the levels are lit on that understanding: a lamp shines through the one-sided floor it hangs over. The automatic caster mode drew every open surface two-sided, so the same floor blocked its light. storage2's fourteen alarm lights lit almost nothing with shadow maps on: at eight beam angles the mapped picture differed from the stencil one in up to 32,000 pixels on Vulkan and 73,000 on OpenGL. Recorded in September as a contact-detail decision; it is a missing light. | **Fixed, both backends.** Open geometry stores the triangles that face away from the light; a sealed hull keeps its near shell. See "Which triangles cast" below. |
+| **The near shell of a sealed hull was its far shell under every parallel and distant point light**, and under any projector whose right and up vectors are left-handed against its direction. Those projections show the light's view mirrored, which swaps the face the rasterizer reports for every triangle, and the culling took no account of it. A sealed hull has the same silhouette either way, so it showed only as the detached contact shadow the near shell was chosen to avoid. | **Fixed, both backends.** The face to discard follows the projection's handedness. See "Which triangles cast" below. |
 | CSM lights are unshadowed past `r_shadowMapCascadeDistance`. Maximum only. | **Open.** |
 
 ### Resources
@@ -846,6 +847,108 @@ again after the Vulkan port, where the point lights now report
 policies) and `performancePresetSelfTest`, and
 `renderer_vulkan_shadow_compatibility.py`, which pins every contract above.
 
+### Which triangles cast
+
+Added on 11 November, from the last item on the open list: storage2 rendered
+two or three maps fresh in every view.
+
+**What that was.** storage2 has fourteen alarm lights (`spinnyLight_1` to
+`_14`): projectors bound to a spinning mover, with shadows on. One to three
+are in view, and a light that turns has a new map every frame. Since "Moving
+lights" each is drawn directly, one pass, or two while the beam crosses a
+`noSelfShadow` receiver, at 0.3 to 0.5 ms of GPU on Vulkan for the one in the
+start view. That part needed nothing.
+
+**What it uncovered.** With shadow maps on, the same light lit almost
+nothing. The light was isolated and frozen at eight beam angles, and the
+mapped picture set against the stencil one and against the picture with no
+shadows:
+
+| Pixels that differ from the stencil picture, worst of eight angles | Before | After |
+|---|---:|---:|
+| Vulkan | 32,070 | 67 |
+| OpenGL | 72,831 | 819 |
+
+What is left on OpenGL is the soft edge of shadows both pictures have.
+
+At the worst angles stencil shadowed a few hundred pixels and the map tens of
+thousands: the whole room the beam falls into. No receiver setting changed it
+(filter, biases, depth comparison, padding, atlas size). Removing one world
+surface from the light's casters did: a floor 184 units under the lamp, lit
+from above, with the room in question beneath it and visible through glass.
+
+- **A stencil volume is built from the triangles that face away from the
+  light**, and from nothing else (`R_CreateShadowVolume` and the turbo path
+  both skip a facing triangle). A one-sided surface lit from its front casts
+  no stencil shadow, and the levels are lit on that understanding. The
+  automatic caster mode drew every open surface two-sided, so in a map the
+  floor blocked the lamp.
+- **Open geometry now stores the triangles that face away from the light.**
+  A sealed hull keeps its near shell: its silhouette is the same from either
+  side, and the near shell holds a contact shadow against the bias. The rule
+  is one function for the four places casters are drawn
+  (`R_ShadowMapCasterFaces`); each renderer only turns its answer into a
+  cull face.
+- **The face to discard follows the projection.** The first version of the
+  rule made the airdefense1 arena worse: its main light, a point light whose
+  centre lies far outside its box, lost the shadow of a lamp hood and of a
+  column. Such a light, and every parallel light, takes the two axes of its
+  projection from `idVec3::NormalVectors`, and they are left-handed against
+  the direction the light travels. The map then shows the light's view
+  mirrored, and the rasterizer's front and back faces change places. An
+  authored projector does the same if its right and up vectors are the other
+  way round. The handedness is read from the planes the map is drawn with
+  (`R_ShadowMapLightMirrorsCasterWinding`); a cube face is a camera at the
+  light and is never mirrored. The same fault had been storing the far shell
+  of sealed hulls under those lights since the near shell was introduced.
+
+The arena's main light alone, Vulkan, pixels that differ from stencil: 3,153
+two-sided as before, 5,576 with the rule and no handedness, 3,155 with both.
+
+Cube maps were measured apart, with a test point light placed at the alarm
+lamp, over the same floor: discarding the rasterizer's back face differs from
+stencil in 15,429 pixels, two-sided and front-discarding both in 16,495, on
+Vulkan; on OpenGL 83,339 against 83,598.
+
+Whole views, every light, time frozen, the earlier automatic mode against the
+new one (`r_shadowMapCasterCulling 4` and `2`), pixels that differ from the
+stencil picture by more than 24 levels, the animated HUD strip left out:
+
+| View | Vulkan, earlier | Vulkan, new | OpenGL, earlier | OpenGL, new | The two modes apart, Vulkan / OpenGL |
+|---|---:|---:|---:|---:|---:|
+| hub2 | 4,504 | 4,504 | 8,589 | 8,590 | 0 / 0 |
+| convoy2 | 76 | 61 | 2,327 | 2,320 | 2 / 12 |
+| airdefense1, outdoor pose | 11,161 | 11,161 | 11,429 | 11,433 | 0 / 0 |
+| airdefense1, start | 19,919 | 19,919 | 24,235 | 24,235 | 0 / 0 |
+| airdefense1, arena | 3,272 | 3,403 | 5,248 | 5,477 | 56 / 132 |
+
+storage2's start view and medlabs show no shadow at the frozen moment and
+are the same in every mode. The differences from stencil that remain are
+filtered edges, the same in both modes.
+
+So outside the lights the old rule blocked, the two modes draw the same
+picture, to within 132 pixels of 2.6 million.
+
+A map drawn under the new rule rasterizes about half of each open caster.
+hub2, Vulkan, Quality, the static cache off so that every map is drawn in
+every view, the two modes alternated in one process, six pairs: the shadow
+GPU phases fall from 1.41 to 0.87 ms (projected 0.99 to 0.66, point 0.41 to
+0.21). The GPU frame was 0.57 ms shorter in four of the six pairs, with a
+spread of 2.8 ms: other sessions were running clients. With the cache on, a
+view draws few maps and the difference is that much smaller.
+
+`r_shadowMapCasterCulling` has two more values: `3` applies the stencil rule to sealed hulls as well, and
+`4` is the earlier automatic mode, kept for comparison.
+
+Not verified: no stock projector with left-handed vectors was found in a
+test view, so that class rests on the same determinant as the two that were
+measured; and nothing was run on another GPU.
+
+Checked for this change, on the final build: the eight angles and the whole
+views above on both renderers; the fourteen scenarios on both back ends; the
+continuous-motion qualification; the in-engine self-tests; and the static
+tests that read the touched files.
+
 ## Presets
 
 Unchanged. Enhanced keeps point lights on stencil: mapping them still costs
@@ -875,7 +978,10 @@ whether Enhanced can now map point lights on Vulkan.
 6. One static cube for both ownerships of a composed Vulkan light, as on
    OpenGL. Measured on a walk: 4 of 24 fresh maps and up to ten resident
    cubes. It needs a resident entry two passes of a view can share.
-7. storage2 renders two or three maps fresh in every view. Not looked into.
+7. On OpenGL a test point light of radius 600 at storage2's alarm lamp
+   differs from the stencil picture in 83,000 pixels, in every caster mode,
+   where Vulkan differs in 16,000. Seen while measuring cube faces; not
+   looked into.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters").

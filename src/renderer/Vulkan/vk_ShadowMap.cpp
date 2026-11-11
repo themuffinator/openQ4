@@ -1523,9 +1523,7 @@ static int VK_ShadowMap_BuildPassSignatureForView(
 			r_shadowMapPolygonFactor.GetFloat() );
 	hash = VK_ShadowMap_HashFloat( hash,
 			r_shadowMapPolygonOffset.GetFloat() );
-	hash = VK_ShadowMap_HashInt( hash,
-			idMath::ClampInt( 0, 2,
-					r_shadowMapCasterCulling.GetInteger() ) );
+	hash = VK_ShadowMap_HashInt( hash, R_ShadowMapCasterCullingMode() );
 
 	if ( pointLight ) {
 		hash = VK_ShadowMap_HashInt( hash, resourceSize );
@@ -3905,36 +3903,37 @@ Caster drawing
 ====================
 */
 
-// r_shadowMapCasterCulling in the executor's GL-parity winding convention
-// (negative-height viewport, CCW front): mode 0 is always two-sided, mode 1
-// stores light-facing near-shell faces (cull FRONT), and mode 2 (default) is
-// topology-aware: open/unknown hulls and hulls enclosing the light are
-// two-sided, as are mirrored/invalid model transforms, while other perfect
-// hulls use mode 1. The authored material orientation is honored whenever
-// one-sided culling is active.
-static VkCullModeFlags VK_ShadowMap_CasterCullMode(
-		const viewLight_t *vLight, const drawSurf_t *surf,
-		const srfTriangles_t *casterGeo ) {
-	const int mode = idMath::ClampInt( 0, 2, r_shadowMapCasterCulling.GetInteger() );
-	const idMaterial *shader = surf != NULL ? surf->material : NULL;
-	const int materialCull = ( shader != NULL ) ? shader->GetCullType() : CT_FRONT_SIDED;
-	if ( mode == 0 || materialCull == CT_TWO_SIDED
-			|| ( mode == 2
-				&& ( casterGeo == NULL || !casterGeo->perfectHull
-					|| surf == NULL || surf->space == NULL
-					|| R_ShadowMapCasterTransformNeedsTwoSided(
-						surf->space->modelMatrix )
-					|| R_ShadowMapLightOriginInsideCasterBounds( vLight,
-						surf->space->modelMatrix,
-						casterGeo->bounds[0].ToFloatPtr(),
-						casterGeo->bounds[1].ToFloatPtr() ) ) ) ) {
+// The shared caster face policy (R_ShadowMapCasterFaces,
+// r_shadowMapCasterCulling) in the executor's GL-parity winding convention
+// (negative-height viewport, CCW front): the near shell culls FRONT, the
+// triangles that face away from the light cull BACK.
+static VkCullModeFlags VK_ShadowMap_CasterFacesCullMode(
+		const shadowMapCasterFaces_t faces ) {
+	switch ( faces ) {
+	case SHADOWMAP_CASTER_FACES_NEAR:
+		return VK_CULL_MODE_FRONT_BIT;
+	case SHADOWMAP_CASTER_FACES_FAR:
+		return VK_CULL_MODE_BACK_BIT;
+	default:
 		return VK_CULL_MODE_NONE;
 	}
-	bool cullFront = true;
-	if ( materialCull == CT_BACK_SIDED ) {
-		cullFront = !cullFront;
-	}
-	return cullFront ? VK_CULL_MODE_FRONT_BIT : VK_CULL_MODE_BACK_BIT;
+}
+
+static VkCullModeFlags VK_ShadowMap_CasterCullMode(
+		const viewLight_t *vLight, const bool windingMirrored,
+		const drawSurf_t *surf, const srfTriangles_t *casterGeo ) {
+	const idMaterial *shader = surf != NULL ? surf->material : NULL;
+	const int materialCull = ( shader != NULL ) ? shader->GetCullType() : CT_FRONT_SIDED;
+	const bool haveGeometry = casterGeo != NULL && surf != NULL
+		&& surf->space != NULL;
+	return VK_ShadowMap_CasterFacesCullMode(
+		R_ShadowMapCasterFaces( R_ShadowMapCasterCullingMode(), vLight,
+			windingMirrored,
+			haveGeometry, haveGeometry && casterGeo->perfectHull,
+			haveGeometry ? surf->space->modelMatrix : NULL,
+			haveGeometry ? casterGeo->bounds[0].ToFloatPtr() : NULL,
+			haveGeometry ? casterGeo->bounds[1].ToFloatPtr() : NULL,
+			materialCull ) );
 }
 
 // Vulkan can currently represent the ordinary explicit-ST static-image
@@ -4073,6 +4072,9 @@ typedef struct vkCasterPassCtx_s {
 	float				slopeFactor;
 	float				constOffset;
 	bool				unsupportedCaster;
+	// the light the mirror answer below was worked out for
+	const viewLight_t	*windingLight;
+	bool				windingMirrored;
 } vkCasterPassCtx_t;
 
 static void VK_ShadowMap_CasterDraw( vkCasterPassCtx_t &ctx, const vkCasterPush_t &push,
@@ -4142,8 +4144,14 @@ static bool VK_ShadowMap_DrawResolvedCaster( vkCasterPassCtx_t &ctx,
 		vkCasterPush_t &push,
 		const viewLight_t *vLight, const drawSurf_t *surf,
 		const srfTriangles_t *casterGeo ) {
+	if ( ctx.windingLight != vLight ) {
+		// one light's casters arrive together: work its projection out once
+		ctx.windingLight = vLight;
+		ctx.windingMirrored = R_ShadowMapLightMirrorsCasterWinding( vLight );
+	}
 	const VkCullModeFlags cullMode =
-		VK_ShadowMap_CasterCullMode( vLight, surf, casterGeo );
+		VK_ShadowMap_CasterCullMode( vLight, ctx.windingMirrored, surf,
+			casterGeo );
 	if ( cullMode != ctx.boundCullMode ) {
 		ctx.boundCullMode = cullMode;
 		vkCmdSetCullMode( ctx.cmd, cullMode );
@@ -4722,8 +4730,7 @@ static bool VK_ClassicShadow_ValidatePhysicalPass(
 			|| sealed.hashedAlpha != r_shadowMapHashedAlpha.GetBool()
 			|| sealed.stableAlphaHash
 				!= r_shadowMapStableAlphaHash.GetBool()
-			|| sealed.casterCullMode != idMath::ClampInt( 0, 2,
-			r_shadowMapCasterCulling.GetInteger() )
+			|| sealed.casterCullMode != R_ShadowMapCasterCullingMode()
 			|| idMath::Fabs( sealed.polygonFactor
 				- r_shadowMapPolygonFactor.GetFloat() ) > 0.00001f
 			|| idMath::Fabs( sealed.polygonOffset
@@ -5035,24 +5042,18 @@ static const vkClassicShadowPassPlan_t *VK_ClassicShadow_FindPassPlan(
 static VkCullModeFlags VK_ClassicShadow_EffectiveCull(
 		const vkClassicShadowCasterPlan_t &casterPlan,
 		const classicInteractionDomainShadowMapPass_t &pass ) {
-	if ( pass.casterCullMode == 0
-			|| casterPlan.cullMode == VK_CULL_MODE_NONE
-			|| ( pass.casterCullMode == 2
-				&& ( !casterPlan.caster->perfectHull
-					|| R_ShadowMapLightOriginInsideCasterBounds(
-						pass.legacyViewLight,
-						casterPlan.caster->modelMatrix,
-						casterPlan.caster->boundsMin,
-						casterPlan.caster->boundsMax ) ) ) ) {
-		return VK_CULL_MODE_NONE;
-	}
-	// Both explicit mode 1 and AUTO mode 2 on a sealed perfect hull store the
-	// light-facing near shell. The material cull orientation may reverse it.
-	bool cullFront = true;
-	if ( casterPlan.cullMode == VK_CULL_MODE_BACK_BIT ) {
-		cullFront = !cullFront;
-	}
-	return cullFront ? VK_CULL_MODE_FRONT_BIT : VK_CULL_MODE_BACK_BIT;
+	// casterPlan.cullMode is the material's own orientation, already checked
+	// when the plan was built
+	const int materialCull = casterPlan.cullMode == VK_CULL_MODE_NONE
+		? CT_TWO_SIDED
+		: ( casterPlan.cullMode == VK_CULL_MODE_BACK_BIT
+			? CT_BACK_SIDED : CT_FRONT_SIDED );
+	return VK_ShadowMap_CasterFacesCullMode(
+		R_ShadowMapCasterFaces( pass.casterCullMode, pass.legacyViewLight,
+			pass.casterWindingMirrored, true,
+			casterPlan.caster->perfectHull,
+			casterPlan.caster->modelMatrix, casterPlan.caster->boundsMin,
+			casterPlan.caster->boundsMax, materialCull ) );
 }
 
 static void VK_ClassicShadow_DrawCaster(

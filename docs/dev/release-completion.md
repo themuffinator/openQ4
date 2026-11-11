@@ -668,6 +668,14 @@ there is no double-click word selection.
   redrew its light's shadows. Lights that do not move now cast them at any
   distance, drawn once and kept. Moving objects and moving lights behave as
   before.
+- **Alarm lights and lamps mounted behind one-sided surfaces light the room
+  again.** With shadow maps on, a lamp that shines through a floor panel or
+  trim that only has a front, as the original shadows always allowed, was
+  blocked by it. The spinning alarm lights in Data Storage Security lit
+  almost nothing. Shadow maps now follow the original rule for which surfaces
+  cast a shadow, on both renderers. Nothing needs changing;
+  `r_shadowMapCasterCulling 4` brings the earlier behaviour back for
+  comparison.
 - **Vulkan gives shadow memory back.** The working copies Vulkan keeps for
   point-light shadows were never released, so one view of a great many lights
   (2.0 GB in our test) stayed allocated for the rest of the session. They now

@@ -317,6 +317,7 @@ typedef struct classicInteractionDomainShadowMapPass_s {
 	bool			hashedAlpha;
 	bool			stableAlphaHash;
 	int			casterCullMode;
+	bool			casterWindingMirrored;
 	float			polygonFactor;
 	float			polygonOffset;
 	classicInteractionDomainShadowProjectedState_t projected;

@@ -601,8 +601,12 @@ bool R_ShadowMapCachePolicySelfTest( void ) {
 }
 
 bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] ) {
+	return R_ShadowMapCasterTransformWinding( modelMatrix ) <= 0;
+}
+
+int R_ShadowMapCasterTransformWinding( const float modelMatrix[ 16 ] ) {
 	if ( modelMatrix == NULL ) {
-		return true;
+		return 0;
 	}
 
 	// Evaluate the affine linear transform in double precision so large, but
@@ -620,7 +624,74 @@ bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] ) {
 	// A singular transform has no reliable winding either. It can arise from
 	// malformed or transient entity state; AUTO must fail conservatively rather
 	// than culling one side of the collapsed caster.
-	return !std::isfinite( determinant ) || determinant <= 0.0;
+	if ( !std::isfinite( determinant ) || determinant == 0.0 ) {
+		return 0;
+	}
+	return determinant > 0.0 ? 1 : -1;
+}
+
+int R_ShadowMapCasterCullingMode( void ) {
+	return idMath::ClampInt( 0, SHADOWMAP_CASTER_CULLING_MAX,
+		r_shadowMapCasterCulling.GetInteger() );
+}
+
+static shadowMapCasterFaces_t R_ShadowMapSwapCasterFaces(
+		const shadowMapCasterFaces_t faces ) {
+	switch ( faces ) {
+	case SHADOWMAP_CASTER_FACES_NEAR:
+		return SHADOWMAP_CASTER_FACES_FAR;
+	case SHADOWMAP_CASTER_FACES_FAR:
+		return SHADOWMAP_CASTER_FACES_NEAR;
+	default:
+		return faces;
+	}
+}
+
+shadowMapCasterFaces_t R_ShadowMapCasterFaces( const int cullingMode,
+		const viewLight_t *vLight, const bool windingMirrored,
+		const bool haveGeometry, const bool perfectHull,
+		const float modelMatrix[ 16 ], const float boundsMin[ 3 ],
+		const float boundsMax[ 3 ], const int materialCull ) {
+	const int mode = idMath::ClampInt( 0, SHADOWMAP_CASTER_CULLING_MAX,
+		cullingMode );
+	if ( mode == 0 ) {
+		return SHADOWMAP_CASTER_FACES_BOTH;
+	}
+	// A near-shell store honours the side the material was authored to show.
+	shadowMapCasterFaces_t nearShell =
+		materialCull == CT_TWO_SIDED ? SHADOWMAP_CASTER_FACES_BOTH
+		: ( materialCull == CT_BACK_SIDED ? SHADOWMAP_CASTER_FACES_FAR
+			: SHADOWMAP_CASTER_FACES_NEAR );
+	if ( windingMirrored ) {
+		nearShell = R_ShadowMapSwapCasterFaces( nearShell );
+	}
+	if ( mode == 1 ) {
+		return nearShell;
+	}
+	if ( !haveGeometry ) {
+		return SHADOWMAP_CASTER_FACES_BOTH;
+	}
+	const int winding = R_ShadowMapCasterTransformWinding( modelMatrix );
+	if ( winding == 0 ) {
+		return SHADOWMAP_CASTER_FACES_BOTH;
+	}
+	if ( ( mode == 2 || mode == 4 ) && perfectHull ) {
+		if ( winding < 0 || R_ShadowMapLightOriginInsideCasterBounds( vLight,
+				modelMatrix, boundsMin, boundsMax ) ) {
+			return SHADOWMAP_CASTER_FACES_BOTH;
+		}
+		return nearShell;
+	}
+	if ( mode == 4 ) {
+		// the earlier automatic mode drew open geometry two-sided
+		return SHADOWMAP_CASTER_FACES_BOTH;
+	}
+	// The stencil rule looks at the triangle, never at the material: the side
+	// of its plane the light is on. A mirrored transform or projection leaves
+	// that answer alone and swaps the face the rasterizer reports.
+	const bool swapped = ( winding < 0 ) != windingMirrored;
+	return swapped ? SHADOWMAP_CASTER_FACES_NEAR
+		: SHADOWMAP_CASTER_FACES_FAR;
 }
 
 bool R_ShadowMapLightOriginInsideCasterBounds( const viewLight_t *vLight,

@@ -1770,7 +1770,11 @@ optimization has landed.
   each one to the cache, copying it and composing over the copy: 560 passes on one
   hub2 route, `r_shadowMapCacheMovingLights`.) (A light whose map failed once now stops building its stencil volumes
   again after 240 views without another failure, `r_shadowMapStencilFallbackViews`;
-  before, it built them for the rest of the level.)
+  before, it built them for the rest of the level.) (Shadow maps now follow the
+  stencil rule for which triangles cast: open geometry stores the ones that face
+  away from the light, sealed hulls keep their near shell, and the face to discard
+  follows the handedness of each light's projection, `r_shadowMapCasterCulling`.
+  storage2's alarm lights had been blocked by a one-sided floor.)
 - [ ] **FPS-04 — P1, implementation: post-processing chain cost.** Price and reduce the
   screen-space passes the current Ultra adds: SSAO (full resolution on OpenGL; the
   half-resolution path exists only on Vulkan and only below 32 samples), motion blur

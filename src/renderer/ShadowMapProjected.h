@@ -71,6 +71,18 @@ void R_ShadowMapBuildClipPlanes( const idPlane lightProject[4], idPlane clipPlan
 bool R_ShadowMapBuildParallelClipPlanes( const viewLight_t *vLight, idPlane clipPlanes[4] );
 bool R_ShadowMapBuildDistantPointClipPlanes( const viewLight_t *vLight, idPlane clipPlanes[4], float *farWidth = NULL );
 void R_ShadowMapBuildBaseClipPlanesForLight( const viewLight_t *vLight, idPlane clipPlanes[4] );
+// Whether a projection shows the light's view mirrored, which swaps the face
+// the rasterizer reports for every triangle. A cube face is a camera at the
+// light and never does. A projected map takes its S and T rows from the
+// light's authored right and up vectors, or from the pair
+// idVec3::NormalVectors hands a parallel or distant point light, and either
+// set can be left-handed against the direction the light travels: the stock
+// projector with its right vector the other way round, and every parallel and
+// distant point light. The reference is the right-handed authored projector,
+// for which discarding the rasterizer's back face keeps the triangles that
+// face away from the light.
+bool R_ShadowMapClipPlanesMirrorWinding( const idPlane clipPlanes[4] );
+bool R_ShadowMapLightMirrorsCasterWinding( const viewLight_t *vLight );
 void R_ShadowMapClipPlanesToGLMatrix( const idPlane clipPlanes[4], float matrix[16] );
 idVec4 R_ShadowMapBuildAtlasRect( int cascadeIndex, int atlasDiv );
 float R_ShadowMapTexelDepthBias( float worldTexelSize, float depthRange );
@@ -87,6 +99,7 @@ int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_
 // pins the stabilization guarantees (shadow plan invariant I5)
 bool R_ShadowMapCascadeStabilitySelfTest( void );
 bool R_ShadowMapDistantPointProjectionSelfTest( void );
+bool R_ShadowMapCasterFacesSelfTest( void );
 void R_BuildShadowMapProjectedLightState( const viewLight_t *vLight, const viewDef_t *viewDef, int tileSize, shadowMapProjectedLightState_t &state );
 
 #endif /* !__SHADOWMAP_PROJECTED_H__ */
