@@ -1479,16 +1479,20 @@ static int VK_ShadowMap_MapNameHash( const viewDef_t *viewDef ) {
 
 static bool VK_ShadowMap_PointComposeAvailable( void );
 
-// A point light whose local casters are all live keeps one resident cube for
-// both ownerships: the cube holds static depth, which is the global casters'
-// for LOCAL and GLOBAL alike, and the live local casters reach the GLOBAL map
-// only through its composed copy. A projected light in the same state still
-// keeps a tile for each ownership here; OpenGL shares those too.
+// A light whose local casters are all live keeps one resident entry for both
+// ownerships: the entry holds static depth, which is the global casters' for
+// LOCAL and GLOBAL alike, and the live local casters reach the GLOBAL map
+// only through its composed copy. That needs the light to compose. A point
+// cube does while r_shadowMapPointCompose is on, a projected tile always,
+// and neither under the sealed shared stream, which draws every pass's whole
+// caster plan (VK_ShadowMap_StaticCacheable).
 static bool VK_ShadowMap_ComposesLocalCasters( const viewLight_t *vLight ) {
-	return vLight != NULL
-		&& vLight->localShadowMapDynamicCasters != NULL
-		&& VK_ShadowMap_PointComposeAvailable()
-		&& R_ClassifyShadowMapLight( vLight ).pointLight;
+	if ( vLight == NULL || vLight->localShadowMapDynamicCasters == NULL
+			|| r_rendererSharedWorldInteraction.GetBool() ) {
+		return false;
+	}
+	return !R_ClassifyShadowMapLight( vLight ).pointLight
+		|| VK_ShadowMap_PointComposeAvailable();
 }
 
 static vkShadowReceiverPass_t VK_ShadowMap_CachePassKind(
@@ -2728,6 +2732,37 @@ static VkDescriptorSet VK_ShadowMap_ProjectedEntryResidentSet(
 	return entry.sets[ slot ];
 }
 
+// Every cascade tile uses a negative-height viewport (GL winding parity), so
+// tile-local v=0 lands on the tile's bottom image row. The rects address the
+// image the receivers sample: the atlas, or a resident block itself, whose
+// origin is its own corner.
+static void VK_ShadowMap_SetProjectedPassRects( const vkShadowLightState_t &light,
+		vkShadowPassState_t &pass, const int tileX, const int tileY,
+		const float invMapSize ) {
+	pass.tileX = tileX;
+	pass.tileY = tileY;
+	pass.invMapSize = invMapSize;
+	const int atlasDiv = idMath::ClampInt( 1, 2,
+			light.projectedState.atlasDiv );
+	const int cascadeCount = idMath::ClampInt( 1,
+			SHADOWMAP_PROJECTED_MAX_CASCADES,
+			light.projectedState.cascadeCount );
+	for ( int cascadeIndex = 0 ; cascadeIndex < cascadeCount ; cascadeIndex++ ) {
+		const int cascadeX = cascadeIndex % atlasDiv;
+		const int cascadeY = cascadeIndex / atlasDiv;
+		const int cascadeTileX = tileX + cascadeX * light.tileSize;
+		const int cascadeTileY = tileY + cascadeY * light.tileSize;
+		pass.atlasRects[ cascadeIndex ][ 0 ] =
+				(float)cascadeTileX * invMapSize;
+		pass.atlasRects[ cascadeIndex ][ 1 ] =
+				(float)( cascadeTileY + light.tileSize ) * invMapSize;
+		pass.atlasRects[ cascadeIndex ][ 2 ] =
+				(float)( cascadeTileX + light.tileSize ) * invMapSize;
+		pass.atlasRects[ cascadeIndex ][ 3 ] =
+				(float)cascadeTileY * invMapSize;
+	}
+}
+
 static bool VK_ShadowMap_AllocateProjectedPass( vkShadowLightState_t &light,
 		const vkShadowReceiverPass_t receiverPass,
 		const vkShadowSchedule_t &schedule ) {
@@ -2796,36 +2831,57 @@ static bool VK_ShadowMap_AllocateProjectedPass( vkShadowLightState_t &light,
 			&& VK_ShadowMap_PassHasDynamicCasters( light.vLight,
 					receiverPass );
 	pass.cubeIndex = -1;
-	pass.tileX = tileX;
-	pass.tileY = tileY;
 	pass.residentSet = residentSet;
 	if ( residentSet != VK_NULL_HANDLE ) {
 		vkShadow.residentPasses++;
 	}
+	VK_ShadowMap_SetProjectedPassRects( light, pass, tileX, tileY,
+			residentSet != VK_NULL_HANDLE
+				? 1.0f / (float)blockSize : light.invAtlasSize[ 0 ] );
+	return true;
+}
 
-	// Every cascade tile uses a negative-height viewport (GL winding
-	// parity), so tile-local v=0 lands on the tile's bottom image row. The
-	// rects address the image the receivers sample: the atlas, or the
-	// resident block itself, whose origin is its own corner.
-	const float invAtlas = residentSet != VK_NULL_HANDLE
-			? 1.0f / (float)blockSize : light.invAtlasSize[ 0 ];
-	pass.invMapSize = invAtlas;
-	const int cascadeCount = idMath::ClampInt( 1,
-			SHADOWMAP_PROJECTED_MAX_CASCADES,
-			light.projectedState.cascadeCount );
-	for ( int cascadeIndex = 0 ; cascadeIndex < cascadeCount ; cascadeIndex++ ) {
-		const int cascadeX = cascadeIndex % atlasDiv;
-		const int cascadeY = cascadeIndex / atlasDiv;
-		const int cascadeTileX = tileX + cascadeX * light.tileSize;
-		const int cascadeTileY = tileY + cascadeY * light.tileSize;
-		pass.atlasRects[ cascadeIndex ][ 0 ] =
-				(float)cascadeTileX * invAtlas;
-		pass.atlasRects[ cascadeIndex ][ 1 ] =
-				(float)( cascadeTileY + light.tileSize ) * invAtlas;
-		pass.atlasRects[ cascadeIndex ][ 2 ] =
-				(float)( cascadeTileX + light.tileSize ) * invAtlas;
-		pass.atlasRects[ cascadeIndex ][ 3 ] =
-				(float)cascadeTileY * invAtlas;
+// The GLOBAL pass of a projected light whose local casters are all live takes
+// its static depth from the resident tile the LOCAL pass restores, reads in
+// place or publishes in this view, and composes its own live casters over a
+// copy of it in an atlas block. Before, it kept a second resident tile with
+// the same static depth in it. Returns false when the light is not in that
+// state or the atlas has no block left; the caller then schedules the pass on
+// its own.
+static bool VK_ShadowMap_ShareProjectedStaticTile( vkShadowLightState_t &light ) {
+	const vkShadowPassState_t &owner =
+			light.passes[ VK_SHADOW_RECEIVER_LOCAL ];
+	if ( !VK_ShadowMap_ComposesLocalCasters( light.vLight )
+			|| VK_ShadowMap_CachePassKind( light.vLight,
+					VK_SHADOW_RECEIVER_LOCAL ) != VK_SHADOW_RECEIVER_GLOBAL
+			|| !owner.valid
+			|| owner.resourcePass != VK_SHADOW_RECEIVER_LOCAL
+			|| !( owner.cacheHit || owner.cacheUpdate )
+			|| owner.cacheEntry < 0
+			|| owner.cacheEntry >= VK_SHADOW_MAX_CACHE_SLOTS ) {
+		return false;
+	}
+	int tileX = 0;
+	int tileY = 0;
+	if ( !VK_ShadowMap_AllocTileBlock(
+			VK_ShadowMap_ProjectedBlockSize( light ), tileX, tileY ) ) {
+		return false;
+	}
+	vkShadowPassState_t &pass = light.passes[ VK_SHADOW_RECEIVER_GLOBAL ];
+	memset( &pass, 0, sizeof( pass ) );
+	pass.valid = true;
+	pass.resourcePass = VK_SHADOW_RECEIVER_GLOBAL;
+	pass.sharesStatic = true;
+	pass.cacheHit = owner.cacheHit;
+	pass.cacheEntry = owner.cacheEntry;
+	pass.cacheSignature = owner.cacheSignature;
+	pass.composeDynamic = true;
+	pass.cubeIndex = -1;
+	VK_ShadowMap_SetProjectedPassRects( light, pass, tileX, tileY,
+			light.invAtlasSize[ 0 ] );
+	if ( pass.cacheHit ) {
+		// served from the cache, as it was when it had a tile of its own
+		vkShadow.projectedCacheHits++;
 	}
 	return true;
 }
@@ -3947,6 +4003,12 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 					&& !VK_ShadowMap_HasLocalCasters( vLight )
 					&& entry.passes[ VK_SHADOW_RECEIVER_LOCAL ].valid ) {
 				VK_ShadowMap_AliasPass( entry, receiverPass, VK_SHADOW_RECEIVER_LOCAL );
+				continue;
+			}
+			// With local casters that are all live their static depth is
+			// identical: GLOBAL composes over the LOCAL pass's resident tile.
+			if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL
+					&& VK_ShadowMap_ShareProjectedStaticTile( entry ) ) {
 				continue;
 			}
 
@@ -6340,6 +6402,29 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					VK_ShadowMap_InvalidatePassResource( light, receiverPass );
 					continue;
 				}
+				if ( pass.sharesStatic ) {
+					// The LOCAL pass publishes, in this view, the entry this
+					// pass is restored from. It renders nothing of its own.
+					const vkShadowPassState_t &owner =
+							light.passes[ VK_SHADOW_RECEIVER_LOCAL ];
+					if ( !owner.valid || !owner.cacheUpdate
+							|| owner.cacheEntry != pass.cacheEntry
+							|| pass.cacheEntry < 0
+							|| pass.cacheEntry
+								>= VK_SHADOW_MAX_CACHE_SLOTS
+							|| !vkShadow.projectedCache[
+									pass.cacheEntry ].reserved
+							|| vkShadow.projectedCache[
+									pass.cacheEntry ].image
+								== VK_NULL_HANDLE ) {
+						VK_ShadowMap_InvalidatePassResource(
+								light, receiverPass );
+						continue;
+					}
+					projectedCount++;
+					projectedComposeCount++;
+					continue;
+				}
 				if ( pass.cacheUpdate
 						&& ( pass.cacheEntry < 0
 							|| pass.cacheEntry
@@ -6496,7 +6581,7 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					const int blockSize = VK_ShadowMap_ProjectedBlockSize( light );
 					for ( int p = 0; p < VK_SHADOW_RECEIVER_PASS_COUNT; ++p ) {
 						const vkShadowPassState_t &pass = light.passes[p];
-						if ( !pass.valid || pass.cacheHit || pass.resourcePass != p ) continue;
+						if ( !pass.valid || pass.cacheHit || pass.sharesStatic || pass.resourcePass != p ) continue;
 						right = Max( right, pass.tileX + blockSize );
 						bottom = Max( bottom, pass.tileY + blockSize );
 					}
@@ -6540,7 +6625,9 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							(vkShadowReceiverPass_t)passIndex;
 					vkShadowPassState_t &pass =
 							light.passes[ passIndex ];
-					if ( !pass.valid || pass.cacheHit
+					// a hit is restored after this scope, and so is a pass
+					// that shares the LOCAL pass's entry
+					if ( !pass.valid || pass.cacheHit || pass.sharesStatic
 							|| pass.resourcePass
 								!= receiverPass ) {
 						continue;
@@ -6719,7 +6806,8 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					passIndex++ ) {
 				const vkShadowPassState_t &pass =
 						light.passes[ passIndex ];
-				if ( !pass.valid || !pass.cacheHit
+				if ( !pass.valid
+						|| !( pass.cacheHit || pass.sharesStatic )
 						|| pass.resourcePass
 							!= (vkShadowReceiverPass_t)passIndex
 						|| pass.cacheEntry < 0
@@ -6841,7 +6929,12 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							(vkShadowReceiverPass_t)passIndex;
 					vkShadowPassState_t &pass =
 							light.passes[ passIndex ];
-					if ( !pass.valid || !pass.cacheHit
+					// A pass that shares the LOCAL pass's entry is restored
+					// from it like a hit, also when that entry was published
+					// just above.
+					if ( !pass.valid
+							|| !( pass.cacheHit || pass.sharesStatic )
+							|| pass.residentSet != VK_NULL_HANDLE
 							|| pass.resourcePass
 								!= receiverPass
 							|| pass.cacheEntry < 0
@@ -6852,12 +6945,6 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					vkProjectedShadowCacheEntry_t &cache =
 							vkShadow.projectedCache[
 									pass.cacheEntry ];
-					if ( pass.residentSet != VK_NULL_HANDLE ) {
-						// read where it lives: nothing moves
-						VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
-								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-						continue;
-					}
 					VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
 							VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
 					VK_ShadowMap_CopyDepthTile( cmd,
@@ -6866,6 +6953,35 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							pass.tileX, pass.tileY,
 							VK_ShadowMap_ProjectedBlockSize(
 									light ) );
+				}
+			}
+			// The entries read where they live come after every copy: one
+			// may have just served as the source of its light's other pass,
+			// and the receivers sample it in the layout set here.
+			for ( int i = 0 ; i < vkShadow.numLights ; i++ ) {
+				vkShadowLightState_t &light =
+						vkShadow.lights[ i ];
+				if ( !light.valid || light.pointLight ) {
+					continue;
+				}
+				for ( int passIndex = 0 ;
+						passIndex < VK_SHADOW_RECEIVER_PASS_COUNT ;
+						passIndex++ ) {
+					const vkShadowPassState_t &pass =
+							light.passes[ passIndex ];
+					if ( !pass.valid || !pass.cacheHit
+							|| pass.residentSet == VK_NULL_HANDLE
+							|| pass.resourcePass
+								!= (vkShadowReceiverPass_t)passIndex
+							|| pass.cacheEntry < 0
+							|| pass.cacheEntry
+								>= VK_SHADOW_MAX_CACHE_SLOTS ) {
+						continue;
+					}
+					// read where it lives: nothing moves
+					VK_ShadowMap_TransitionProjectedEntry( cmd,
+							vkShadow.projectedCache[ pass.cacheEntry ],
+							VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 				}
 			}
 		}

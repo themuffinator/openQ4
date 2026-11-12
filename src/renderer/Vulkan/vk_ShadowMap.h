@@ -70,12 +70,13 @@ typedef struct vkShadowPassState_s {
 									// SHADOWMAP_RENDER_COMPOSE_DYNAMIC contract): over
 									// the atlas tile for a projected light, over a
 									// scratch copy of the resident cube for a point one
-	bool				sharesStatic;	// point GLOBAL pass with live local casters only:
-									// its static depth is the LOCAL pass's resident cube
-									// (cacheEntry names it), restored or published by
-									// that pass earlier in the view. This pass owns no
-									// entry, renders no static face and composes its
-									// live casters over a copy of that cube
+	bool				sharesStatic;	// GLOBAL pass of a light whose local casters are all
+									// live: its static depth is the LOCAL pass's resident
+									// entry (cacheEntry names it), restored or published
+									// by that pass in the same view. This pass owns no
+									// entry and renders no static depth: it composes its
+									// live casters over a copy, in a scratch cube for a
+									// point light and in its atlas block for a projected one
 	int					cacheEntry;	// class-specific resident slot, -1 when uncached
 	int					cacheSignature;
 	int					tileX;			// atlas block origin, image (top-left) coordinates

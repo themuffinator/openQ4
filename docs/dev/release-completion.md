@@ -1040,9 +1040,10 @@ there is no double-click word selection.
   machinery harder than it does otherwise, so raised edges were outlined
   brighter than under the original shadows or on Vulkan. The two now match.
 - **Vulkan stores one shadow, not two, for a light with a character in it.**
-  A point light near a character kept two stored copies of the same shadow
-  and redrew one of them each time the character stepped into the light or
-  out of it. It keeps one now, as OpenGL does. The picture is unchanged.
+  A light near a character kept two stored copies of the same shadow and
+  redrew one of them each time the character stepped into the light or out
+  of it. It keeps one now, as OpenGL does: up to 48 MiB less video memory in
+  the Nexus Hub at Quality. The picture is unchanged.
 - **Vulkan gives shadow memory back.** The working copies Vulkan keeps for
   point-light shadows were never released, so one view of a great many lights
   (2.0 GB in our test) stayed allocated for the rest of the session. They now

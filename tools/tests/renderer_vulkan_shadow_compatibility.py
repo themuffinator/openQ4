@@ -1522,16 +1522,30 @@ def validate_csm_atlas_and_receiver_contract() -> None:
             "const int atlasDiv = idMath::ClampInt( 1, 2, light.projectedState.atlasDiv );",
             "const int blockSize = light.tileSize * atlasDiv;",
             "VK_ShadowMap_AllocTileBlock( blockSize, tileX, tileY )",
+            "VK_ShadowMap_SetProjectedPassRects( light, pass, tileX, tileY,",
+            "? 1.0f / (float)blockSize : light.invAtlasSize[ 0 ] );",
+        ),
+        "projected cascade block allocation",
+    )
+    # one placement for a pass's own block and for the block of a pass that
+    # shares the LOCAL pass's resident tile
+    require_order(
+        braced_body(shadow_map, "static void VK_ShadowMap_SetProjectedPassRects(", "projected cascade rects"),
+        (
+            "pass.tileX = tileX;",
+            "pass.tileY = tileY;",
+            "pass.invMapSize = invMapSize;",
+            "const int atlasDiv = idMath::ClampInt( 1, 2, light.projectedState.atlasDiv );",
             "const int cascadeCount = idMath::ClampInt( 1, SHADOWMAP_PROJECTED_MAX_CASCADES, light.projectedState.cascadeCount );",
             "for ( int cascadeIndex = 0 ; cascadeIndex < cascadeCount ; cascadeIndex++ )",
             "const int cascadeX = cascadeIndex % atlasDiv;",
             "const int cascadeY = cascadeIndex / atlasDiv;",
             "const int cascadeTileX = tileX + cascadeX * light.tileSize;",
             "const int cascadeTileY = tileY + cascadeY * light.tileSize;",
-            "pass.atlasRects[ cascadeIndex ][ 0 ] = (float)cascadeTileX * invAtlas;",
-            "pass.atlasRects[ cascadeIndex ][ 1 ] = (float)( cascadeTileY + light.tileSize ) * invAtlas;",
-            "pass.atlasRects[ cascadeIndex ][ 2 ] = (float)( cascadeTileX + light.tileSize ) * invAtlas;",
-            "pass.atlasRects[ cascadeIndex ][ 3 ] = (float)cascadeTileY * invAtlas;",
+            "pass.atlasRects[ cascadeIndex ][ 0 ] = (float)cascadeTileX * invMapSize;",
+            "pass.atlasRects[ cascadeIndex ][ 1 ] = (float)( cascadeTileY + light.tileSize ) * invMapSize;",
+            "pass.atlasRects[ cascadeIndex ][ 2 ] = (float)( cascadeTileX + light.tileSize ) * invMapSize;",
+            "pass.atlasRects[ cascadeIndex ][ 3 ] = (float)cascadeTileY * invMapSize;",
         ),
         "projected 1x1/2x2 cascade tile placement",
     )
@@ -5312,10 +5326,8 @@ def validate_exact_static_cache_and_admission_contract() -> None:
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );""",
             "if ( haveCacheHits )",
             "haveCacheCopies && atlasLayout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL",
-            # a hit read where it lives moves nothing; the others are restored
-            "if ( pass.residentSet != VK_NULL_HANDLE ) {",
-            """VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );""",
+            # the hits that are not read where they live are restored first
+            "|| pass.residentSet != VK_NULL_HANDLE",
             "continue;",
             """VK_ShadowMap_TransitionProjectedEntry( cmd, cache,
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );""",
@@ -5324,6 +5336,12 @@ def validate_exact_static_cache_and_admission_contract() -> None:
                 vkShadow.atlasImage,
                 pass.tileX, pass.tileY,
                 VK_ShadowMap_ProjectedBlockSize( light ) );""",
+            # a hit read where it lives moves nothing, and is settled after the copies
+            "|| pass.residentSet == VK_NULL_HANDLE",
+            "continue;",
+            """VK_ShadowMap_TransitionProjectedEntry( cmd,
+                vkShadow.projectedCache[ pass.cacheEntry ],
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );""",
             "VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL",
             "vkShadow.atlasLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;",
         ),
@@ -9339,20 +9357,22 @@ def validate_receiver_stock_lighting_parity_contract() -> None:
 
 
 def validate_shared_static_cube_contract() -> None:
-    """One resident cube holds the static depth of both ownerships of a light.
+    """One resident entry holds the static depth of both ownerships of a light.
 
     The LOCAL map of a light takes its global casters, the GLOBAL map its local
     (noSelfShadow) ones as well. A resident cache entry holds static depth only:
     live casters are drawn over a copy of it in each view. So the two entries
     are the same whenever no local caster is static, which is the ordinary case
     of a character standing in a light. OpenGL has always kept one entry then.
-    Vulkan kept one for each ownership of a point light, rendered both when the
-    static depth changed, and gave the LOCAL entry another name each time a
-    character walked into the light or out of it.
+    Vulkan kept one for each ownership, rendered both when the static depth
+    changed, and gave the LOCAL entry another name each time a character walked
+    into the light or out of it.
 
     The rule is one function for both back ends. On Vulkan the GLOBAL pass of
-    such a point light owns no entry: it names the LOCAL pass's cube, which that
-    pass restores or publishes just before it, and composes over a copy.
+    such a light owns no entry: it names the LOCAL pass's, which that pass
+    restores, reads in place or publishes in the same view, and composes over a
+    copy: in a scratch cube for a point light, in an atlas block for a projected
+    one.
     """
     classification = read("src/renderer/ShadowMapClassification.cpp")
     rule = braced_body(classification, "bool R_ShadowMapOwnershipsShareResidentDepth(", "shared resident depth rule")
@@ -9380,11 +9400,14 @@ def validate_shared_static_cube_contract() -> None:
     require_order(
         composes,
         (
-            "vLight->localShadowMapDynamicCasters != NULL",
-            "VK_ShadowMap_PointComposeAvailable()",
-            "R_ClassifyShadowMapLight( vLight ).pointLight",
+            "vLight->localShadowMapDynamicCasters == NULL",
+            # the sealed shared stream draws every pass's whole caster plan
+            "|| r_rendererSharedWorldInteraction.GetBool() ) {",
+            "return false;",
+            "return !R_ClassifyShadowMapLight( vLight ).pointLight",
+            "|| VK_ShadowMap_PointComposeAvailable();",
         ),
-        "a point light that composes its live local casters",
+        "a light that composes its live local casters: a projected one always, a point one while it may",
     )
     share = braced_body(vk, "static bool VK_ShadowMap_SharePointStaticCube(", "sharing the LOCAL cube")
     require_order(
@@ -9427,6 +9450,85 @@ def validate_shared_static_cube_contract() -> None:
                             true, pointSize, 1, 1 );""",
         ),
         "a point light's GLOBAL pass shares before it is scheduled on its own",
+    )
+    # A projected light does the same with its atlas block for the copy.
+    share_tile = braced_body(vk, "static bool VK_ShadowMap_ShareProjectedStaticTile(", "sharing the LOCAL tile")
+    require_order(
+        share_tile,
+        (
+            "light.passes[ VK_SHADOW_RECEIVER_LOCAL ];",
+            "!VK_ShadowMap_ComposesLocalCasters( light.vLight )",
+            "VK_SHADOW_RECEIVER_LOCAL ) != VK_SHADOW_RECEIVER_GLOBAL",
+            "!owner.valid",
+            "!( owner.cacheHit || owner.cacheUpdate )",
+            "return false;",
+            "if ( !VK_ShadowMap_AllocTileBlock(",
+            "return false;",
+            "pass.resourcePass = VK_SHADOW_RECEIVER_GLOBAL;",
+            "pass.sharesStatic = true;",
+            "pass.cacheHit = owner.cacheHit;",
+            "pass.cacheEntry = owner.cacheEntry;",
+            "pass.composeDynamic = true;",
+            "VK_ShadowMap_SetProjectedPassRects( light, pass, tileX, tileY,",
+            "light.invAtlasSize[ 0 ] );",
+            "return true;",
+        ),
+        "the GLOBAL pass names the LOCAL pass's tile and takes an atlas block for its copy",
+    )
+    if "cacheUpdate = true" in share_tile or "residentSet =" in share_tile:
+        raise AssertionError("A pass that shares a tile neither publishes one nor reads one in place")
+    require_order(
+        vk,
+        (
+            """if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL
+                    && VK_ShadowMap_ShareProjectedStaticTile( entry ) ) {
+                continue;
+            }""",
+            """VK_ShadowMap_SchedulePass(
+                            vLight, viewDef, receiverPass,
+                            stencilFallbackAvailable, false,""",
+        ),
+        "a projected light's GLOBAL pass shares before it is scheduled on its own",
+    )
+    render_atlas = braced_body(vk, "bool VK_ShadowMap_RenderAtlas(", "Vulkan shadow map recording")
+    require_order(
+        render_atlas,
+        (
+            # counted as a composed pass, not a fresh one, in a view where the LOCAL pass publishes
+            "if ( pass.sharesStatic ) {",
+            "if ( !owner.valid || !owner.cacheUpdate",
+            "|| owner.cacheEntry != pass.cacheEntry",
+            "projectedComposeCount++;",
+            "projectedFreshCount++;",
+            # the fresh scope neither clears nor renders its block
+            "if ( !pass.valid || pass.cacheHit || pass.sharesStatic || pass.resourcePass != p ) continue;",
+            """if ( !pass.valid || pass.cacheHit || pass.sharesStatic
+                    || pass.resourcePass
+                        != receiverPass ) {
+                continue;
+            }""",
+            # it is restored by a copy, from an entry that was resident or was published above
+            """if ( !pass.valid
+                    || !( pass.cacheHit || pass.sharesStatic )
+                    || pass.resourcePass
+                        != (vkShadowReceiverPass_t)passIndex""",
+            "haveCacheCopies = true;",
+            "VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );",
+            "VK_ShadowMap_CopyDepthTile( cmd,",
+            "vkShadow.atlasImage,",
+            "pass.tileX, pass.tileY,",
+            """if ( !pass.valid
+                    || !( pass.cacheHit || pass.sharesStatic )
+                    || pass.residentSet != VK_NULL_HANDLE""",
+            "VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );",
+            "cache.image, 0, 0,",
+            # and only then are the entries read in place given the layout their receivers sample
+            """if ( !pass.valid || !pass.cacheHit
+                    || pass.residentSet == VK_NULL_HANDLE""",
+            "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );",
+            "GL SHADOWMAP_RENDER_COMPOSE_DYNAMIC (draw_arb2.cpp): every cached",
+        ),
+        "a sharing projected pass is restored before its light's in-place entry is settled",
     )
     # It renders no static face: the LOCAL pass left the cube rendered or resident.
     require(vk, "const bool renderCube = !pass.cacheHit && !pass.sharesStatic;",
@@ -9857,14 +9959,12 @@ def validate_resident_projected_sampling_contract() -> None:
             "if ( residentSet == VK_NULL_HANDLE",
             "&& !VK_ShadowMap_AllocTileBlock( blockSize, tileX, tileY ) ) {",
             "pass.composeDynamic = ( pass.cacheHit || pass.cacheUpdate )",
-            "pass.tileX = tileX;",
-            "pass.tileY = tileY;",
             "pass.residentSet = residentSet;",
             "vkShadow.residentPasses++;",
             # the rects address the image that is sampled
-            "const float invAtlas = residentSet != VK_NULL_HANDLE",
-            "? 1.0f / (float)blockSize : light.invAtlasSize[ 0 ];",
-            "pass.invMapSize = invAtlas;",
+            "VK_ShadowMap_SetProjectedPassRects( light, pass, tileX, tileY,",
+            "residentSet != VK_NULL_HANDLE",
+            "? 1.0f / (float)blockSize : light.invAtlasSize[ 0 ] );",
         ),
         "an in-place pass holds no atlas block and addresses its own image",
     )
