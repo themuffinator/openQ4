@@ -2391,6 +2391,8 @@ enum rbSSAOUniformIndex_t {
 	RB_SSAO_UNIFORM_DEBUG_VIEW,
 	RB_SSAO_UNIFORM_MODE,
 	RB_SSAO_UNIFORM_FIELD_INV_SIZE,
+	RB_SSAO_UNIFORM_MULTIPLY,
+	RB_SSAO_UNIFORM_HALF_INFO,
 	RB_SSAO_UNIFORM_COUNT
 };
 
@@ -2420,6 +2422,17 @@ static const viewDef_t *rbSSAOFieldView = NULL;
 static int rbSSAOFieldFrame = -1;
 static int rbSSAOFieldWidth = 0;
 static int rbSSAOFieldHeight = 0;
+
+/*
+The half-resolution classic pass (R_SSAOHalfResolution, FPS-04): the AO of
+the even pixel of each 2x2 block of the view and that pixel's view depth, as
+Vulkan's VK_Post_DrawSSAOHalf draws it.
+*/
+static idImage *rbSSAOHalfImage = NULL;
+static idRenderTexture *rbSSAOHalfRenderTexture = NULL;
+
+static idCVar r_glSSAOReferenceComposition( "r_glSSAOReferenceComposition", "0", CVAR_RENDERER | CVAR_BOOL,
+	"OpenGL SSAO validation reference: draw the full-resolution pass over a resolved copy of the scene instead of multiplying the occlusion into the scene target" );
 
 static bool RB_SSAOFieldValid( void ) {
 	return rbSSAOFieldFrame == backEnd.frameCount && rbSSAOFieldView == backEnd.viewDef
@@ -2496,7 +2509,9 @@ static void RB_InitSSAOStage( void ) {
 		{ "ssaoSampleCount", 1 },
 		{ "ssaoDebugView", 1 },
 		{ "ssaoMode", 1 },
-		{ "fieldInvSize", 2 }
+		{ "fieldInvSize", 2 },
+		{ "ssaoMultiply", 1 },
+		{ "halfInfo", 4 }
 	};
 
 	rbSSAOStage.numShaderParms = RB_SSAO_UNIFORM_COUNT;
@@ -2528,27 +2543,40 @@ RB_DrawSSAOPass
 
 One SSAO draw over the view's scissor into the bound target: mode 0 darkens
 the lit scene, 1 writes the occlusion field before lighting, 2 applies the
-field's classic factor to the lit scene. Unused inputs bind the white image.
+field's classic factor to the lit scene, 3 writes the half-resolution AO
+into the bound half-size target (halfTarget set) and 4 darkens the lit scene
+with it. Unused inputs bind the white image. A multiply blend has the pass
+write the factor alone into every sample of the scene target instead of
+reading a resolved copy of the scene.
 ==================
 */
 static void RB_DrawSSAOPass( float mode, idImage *sceneImage, idImage *depthImage, idImage *finalDepthImage,
 		idImage *classicDepthImage, idImage *fieldImage, int viewportWidth, int viewportHeight,
-		int textureWidth, int textureHeight ) {
+		int textureWidth, int textureHeight, bool multiply = false, const GLfloat *halfInfo = NULL,
+		bool halfTarget = false ) {
 	const GLfloat projX = backEnd.viewDef->projectionMatrix[0];
 	const GLfloat projY = backEnd.viewDef->projectionMatrix[5];
 	const int depthTextureWidth = depthImage->GetOpts().width;
 	const int depthTextureHeight = depthImage->GetOpts().height;
 
-	backEnd.currentScissor = backEnd.viewDef->scissor;
+	if ( halfTarget ) {
+		RB_BeginFullscreenPostProcessPass( 0, 0, viewportWidth, viewportHeight );
+	} else {
+		backEnd.currentScissor = backEnd.viewDef->scissor;
 
-	RB_BeginFullscreenPostProcessPass(
-		backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
-		backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
-		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
-		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+		RB_BeginFullscreenPostProcessPass(
+			backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+			backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+			backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+			backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+	}
+	if ( multiply ) {
+		GL_State( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS );
+	}
 
 	GL_SelectTexture( 0 );
-	( sceneImage != NULL ? sceneImage : globalImages->whiteImage )->Bind();
+	// A multiplied pass never reads the scene; keep the target's image unbound.
+	( sceneImage != NULL && !multiply ? sceneImage : globalImages->whiteImage )->Bind();
 	RB_BindSSAODepthImage( 1, depthImage );
 	RB_BindSSAODepthImage( 2, finalDepthImage );
 	RB_BindSSAODepthImage( 3, classicDepthImage != NULL ? classicDepthImage : finalDepthImage );
@@ -2629,6 +2657,13 @@ static void RB_DrawSSAOPass( float mode, idImage *sceneImage, idImage *depthImag
 	}
 	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_FIELD_INV_SIZE] >= 0 ) {
 		glUniform2fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_FIELD_INV_SIZE], 1, fieldInvSize );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_MULTIPLY] >= 0 ) {
+		glUniform1fARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_MULTIPLY], multiply ? 1.0f : 0.0f );
+	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_HALF_INFO] >= 0 ) {
+		static const GLfloat noHalfInfo[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		glUniform4fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_HALF_INFO], 1, halfInfo != NULL ? halfInfo : noHalfInfo );
 	}
 
 	RB_DrawFullscreenPostProcessQuad( viewportWidth, viewportHeight, textureWidth, textureHeight );
@@ -2749,6 +2784,87 @@ static void RB_PrepareSSAOIndirectField( void ) {
 	rbSSAOFieldView = backEnd.viewDef;
 }
 
+static bool RB_EnsureSSAOHalfTarget( int width, int height ) {
+	if ( globalImages == NULL || width <= 0 || height <= 0 ) {
+		return false;
+	}
+	idImageOpts opts;
+	opts.textureType = TT_2D;
+	// r: AO, g: view depth (negative where no AO applies), as on Vulkan.
+	opts.format = FMT_RGBA16F;
+	opts.width = width;
+	opts.height = height;
+	opts.numLevels = 1;
+	opts.numMSAASamples = 0;
+	opts.isPersistant = true;
+	rbSSAOHalfImage = globalImages->ScratchImage( "_ssaoHalf", &opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
+	if ( rbSSAOHalfImage == NULL ) {
+		return false;
+	}
+	if ( rbSSAOHalfRenderTexture == NULL ) {
+		rbSSAOHalfRenderTexture = tr.CreateRenderTexture( rbSSAOHalfImage, NULL );
+	} else if ( rbSSAOHalfRenderTexture->GetWidth() != width || rbSSAOHalfRenderTexture->GetHeight() != height ) {
+		tr.ResizeRenderTexture( rbSSAOHalfRenderTexture, width, height );
+	}
+	return rbSSAOHalfRenderTexture != NULL;
+}
+
+/*
+==================
+RB_DrawSSAOHalf
+
+The classic pass at half resolution (R_SSAOHalfResolution): the AO of the even
+pixel of each 2x2 block goes into a half-size target, computed as the
+full-resolution pass computes it there; a full-resolution pass then
+multiplies the scene by a depth-aware upsample of it, or with the debug view
+writes the AO itself, white where no AO applies. Sky and foreground pixels
+stay untouched as before. The same two draws as Vulkan's VK_Post_DrawSSAOHalf.
+==================
+*/
+static bool RB_DrawSSAOHalf( idImage *depthImage, idImage *finalDepthImage, int viewportWidth, int viewportHeight, bool debug ) {
+	const int halfWidth = ( viewportWidth + 1 ) / 2;
+	const int halfHeight = ( viewportHeight + 1 ) / 2;
+	if ( !RB_EnsureSSAOHalfTarget( halfWidth, halfHeight ) ) {
+		return false;
+	}
+	const GLfloat halfInfo[4] = {
+		static_cast<GLfloat>( halfWidth ), static_cast<GLfloat>( halfHeight ),
+		static_cast<GLfloat>( viewportWidth ), static_cast<GLfloat>( viewportHeight )
+	};
+
+	GLint viewport[4], scissor[4];
+	glGetIntegerv( GL_VIEWPORT, viewport );
+	glGetIntegerv( GL_SCISSOR_BOX, scissor );
+	const GLboolean scissorTest = glIsEnabled( GL_SCISSOR_TEST );
+	idRenderTexture *sceneTarget = backEnd.renderTexture;
+
+	backEnd.renderTexture = rbSSAOHalfRenderTexture;
+	rbSSAOHalfRenderTexture->MakeCurrent();
+	glViewport( 0, 0, halfWidth, halfHeight );
+	RB_DrawSSAOPass( 3.0f, NULL, depthImage, finalDepthImage, NULL, NULL,
+		halfWidth, halfHeight, halfWidth, halfHeight, false, halfInfo, true );
+
+	backEnd.renderTexture = sceneTarget;
+	if ( sceneTarget != NULL ) {
+		sceneTarget->MakeCurrent();
+	} else {
+		idRenderTexture::BindNull();
+		R_SetDefaultDrawAndReadBuffers();
+	}
+	glViewport( viewport[0], viewport[1], viewport[2], viewport[3] );
+	glScissor( scissor[0], scissor[1], scissor[2], scissor[3] );
+	if ( scissorTest ) {
+		glEnable( GL_SCISSOR_TEST );
+	} else {
+		glDisable( GL_SCISSOR_TEST );
+	}
+
+	RB_DrawSSAOPass( 4.0f, NULL, depthImage, finalDepthImage, NULL, rbSSAOHalfImage,
+		viewportWidth, viewportHeight, depthImage->GetOpts().width, depthImage->GetOpts().height,
+		!debug, halfInfo );
+	return true;
+}
+
 static void RB_STD_SSAO( void ) {
 	if ( !RB_SSAORequestedForCurrentView() ) {
 		return;
@@ -2779,13 +2895,24 @@ static void RB_STD_SSAO( void ) {
 
 	RB_LogComment( "---------- RB_STD_SSAO ----------\n" );
 
-	sceneImage->CopyFramebuffer(
-		backEnd.viewDef->viewport.x1,
-		backEnd.viewDef->viewport.y1,
-		viewportWidth,
-		viewportHeight );
-
+	// AO is a scalar factor. Blend it into every sample of the scene target
+	// instead of resolving the whole scene into _currentRender only for the
+	// shader to multiply that copy, as Vulkan's composition does (FPS-04). A
+	// view with native PBR's occlusion field, the full-resolution debug view
+	// and the validation reference keep the copy.
 	const bool field = RB_SSAOFieldValid();
+	const bool debug = r_ssaoDebug.GetBool();
+	const bool composable = !field && !r_glSSAOReferenceComposition.GetBool();
+	const bool half = composable && R_SSAOHalfResolution();
+	const bool multiply = composable && !debug;
+	if ( !half && !multiply ) {
+		sceneImage->CopyFramebuffer(
+			backEnd.viewDef->viewport.x1,
+			backEnd.viewDef->viewport.y1,
+			viewportWidth,
+			viewportHeight );
+	}
+
 	idImage *depthImage = NULL;
 	if ( rbSSAOWorldDepthFrame == backEnd.frameCount
 		&& rbSSAOWorldDepthWidth == viewportWidth
@@ -2816,14 +2943,36 @@ static void RB_STD_SSAO( void ) {
 		finalDepthImage = depthImage;
 	}
 
-	const int textureWidth = sceneImage->GetOpts().width;
-	const int textureHeight = sceneImage->GetOpts().height;
-	if ( textureWidth <= 0 || textureHeight <= 0 || depthImage->GetOpts().width <= 0 || depthImage->GetOpts().height <= 0 ) {
+	if ( depthImage->GetOpts().width <= 0 || depthImage->GetOpts().height <= 0 ) {
+		return;
+	}
+	if ( half && RB_DrawSSAOHalf( depthImage, finalDepthImage, viewportWidth, viewportHeight, debug ) ) {
+		static bool loggedHalf = false;
+		if ( !loggedHalf ) {
+			loggedHalf = true;
+			common->Printf( "OpenGL: first SSAO pass drew (half resolution)\n" );
+		}
+		return;
+	}
+	if ( half && !multiply ) {
+		// The half-size target failed and the debug view needs the scene copy
+		// the half-resolution path skipped.
+		sceneImage->CopyFramebuffer(
+			backEnd.viewDef->viewport.x1,
+			backEnd.viewDef->viewport.y1,
+			viewportWidth,
+			viewportHeight );
+	}
+
+	// A multiplied pass samples only the view-sized depth images.
+	const int textureWidth = multiply ? depthImage->GetOpts().width : sceneImage->GetOpts().width;
+	const int textureHeight = multiply ? depthImage->GetOpts().height : sceneImage->GetOpts().height;
+	if ( textureWidth <= 0 || textureHeight <= 0 ) {
 		return;
 	}
 
 	RB_DrawSSAOPass( field ? 2.0f : 0.0f, sceneImage, depthImage, finalDepthImage, NULL,
-		field ? rbSSAOFieldImage : NULL, viewportWidth, viewportHeight, textureWidth, textureHeight );
+		field ? rbSSAOFieldImage : NULL, viewportWidth, viewportHeight, textureWidth, textureHeight, multiply );
 	static bool logged = false;
 	if ( !logged ) {
 		logged = true;
@@ -4857,9 +5006,14 @@ static void RB_STD_Bloom( void ) {
 	GL_SelectTexture( 0 );
 	RB_EndFullscreenPostProcessPass();
 
-	if ( originalRenderTexture != NULL ) {
-		RB_CaptureCurrentRenderImage( viewportWidth, viewportHeight );
-	}
+	// _currentRender now holds the scene from before the composite. It used to
+	// be resolved again here, a second full-screen resolve of the multisampled
+	// scene every frame (FPS-04), but every later reader in this view takes its
+	// own copy: authored post-process surfaces at the start of their list, the
+	// cel ink and the underwater pass when they draw, a material that needs the
+	// current render when this flag says it is stale, and presentation. Mark it
+	// stale so they resolve the finished scene once, when it is needed.
+	backEnd.currentRenderCopied = false;
 	static bool logged = false;
 	if ( !logged ) {
 		logged = true;
@@ -8263,6 +8417,8 @@ void RB_ShutdownScenePostProcess( void ) {
 	RB_DestroyPostProcessRenderTexture( rbMotionVectorRenderTexture );
 	RB_DestroyPostProcessRenderTexture( rbSSAOFieldRenderTexture );
 	rbSSAOFieldFrame = -1;
+	RB_DestroyPostProcessRenderTexture( rbSSAOHalfRenderTexture );
+	rbSSAOHalfImage = NULL;
 	rbMotionVectorImage = NULL;
 	rbMotionVectorPreviousState = NULL;
 	rbMotionVectorDrewSurface = false;

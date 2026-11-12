@@ -122,9 +122,10 @@ if os.environ.get('OPENQ4_LAB_VK_DEVICE', '').strip():
 # so OpenGL draws all of them through its scene target; the unoccluded ones
 # fade it out at the nearest distance instead.
 # Full resolution: a view with native PBR's occlusion field always takes the
-# full-resolution pass (vk_PostProcess.cpp VK_Post_DrawSSAO), so its classic
-# pixels compare with a classic-only frame only when that frame does too.
-# Automatic Vulkan SSAO halves resolution below 32 samples (R_SSAOHalfResolution).
+# full-resolution pass (vk_PostProcess.cpp VK_Post_DrawSSAO, draw_common.cpp
+# RB_STD_SSAO), so its classic pixels compare with a classic-only frame only
+# when that frame does too. Automatic SSAO halves resolution below 32 samples
+# on both renderers (R_SSAOHalfResolution; OpenGL since FPS-04).
 SSAO_SETTINGS = {'r_ssao': '1', 'r_ssaoRadius': '64', 'r_ssaoIntensity': '2', 'r_ssaoMaxDistance': '2048',
                  'r_ssaoResolution': '1'}
 SSAO_FADED = {**SSAO_SETTINGS, 'r_ssaoMaxDistance': '16'}
@@ -144,8 +145,8 @@ CUTOUT_EDGE_FLIP_PIXELS = 24
 # REN-05 matched half-resolution control. A view with native PBR always takes
 # the full-resolution pass, so half resolution reaches classic-only frames:
 # compare them, and their occlusion debug view, with the full-resolution ones.
-# OpenGL has one SSAO resolution and must match exactly; on Vulkan the
-# half-resolution field must stay a close, unbiased approximation.
+# On both renderers the half-resolution field must stay a close, unbiased
+# approximation (OpenGL draws it with Vulkan's two passes since FPS-04).
 SSAO_HALF = {**SSAO_SETTINGS, 'r_ssaoResolution': '2'}
 # Measured 6 November 2026: RTX 4060 2.07, Iris Xe 2.95 levels; bias +0.02/+0.03.
 SSAO_HALF_DEBUG_MEAN_LEVELS = 4.0	# mean absolute debug-view difference, 8-bit levels
@@ -1228,12 +1229,8 @@ def compare_ssao_half_resolution(by_case: dict, unoccluded: bytes) -> None:
     row['ssaoHalfResolution'] = {'debugMeanAbs': round(mean, 4), 'debugMeanSigned': round(bias, 4),
                                  'classicDarkenedFull': darkened_full, 'classicDarkenedHalf': darkened_half,
                                  'darkenedRatio': round(ratio, 4), 'identical': full == half}
-    if row.get('backend') == 'gl':
-        if full != half or images['ssao-classic'] != images['ssao-classic-half']:
-            row['failures'].append('OpenGL SSAO changed with r_ssaoResolution, which only Vulkan reads')
-        return
     if full == half:
-        row['failures'].append('r_ssaoResolution 2 did not change the Vulkan occlusion field')
+        row['failures'].append('r_ssaoResolution 2 did not change the occlusion field')
     if mean > SSAO_HALF_DEBUG_MEAN_LEVELS:
         row['failures'].append(f'half-resolution SSAO differs from full by {mean:.2f} levels on average')
     if abs(bias) > SSAO_HALF_DEBUG_BIAS_LEVELS:

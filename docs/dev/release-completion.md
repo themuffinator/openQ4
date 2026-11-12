@@ -32,6 +32,29 @@ does not restore the withdrawn release. See
   at play distance, and swimming as a remote client
   ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)).
 
+## Faster post-processing on OpenGL (FPS-04), 12 November 2026
+
+- **Ultra, Quality and Enhanced cost less GPU time on OpenGL.** Ambient
+  occlusion no longer copies the whole multisampled picture before darkening
+  it, and the tone map no longer copies the finished picture a second time. At
+  Ultra the OpenGL frame is 0.4-0.7 ms of GPU work shorter in every scene we
+  measured, and the post-processing chain 0.7-1.1 ms cheaper (hub2: 3.7 to
+  2.6 ms).
+- **Quality and Enhanced draw ambient occlusion at half resolution on OpenGL
+  too**, as they already did on Vulkan, with the same edge-aware upsample:
+  another 0.4-0.55 ms off where the effect has work to do. Ultra and Maximum
+  keep full resolution. Nothing to re-select; `r_ssaoResolution` (automatic by
+  default) now applies to both renderers.
+- Pictures are unchanged: frozen captures at five reference poses differ by
+  at most one level of 255, on at most 439 of 1.93 million pixels, and the
+  half-resolution occlusion matches Vulkan's in the PBR laboratory (2.07 levels
+  mean difference from full resolution, no bias). The SSAO laboratory controls
+  pass 10/10 on OpenGL with and without the modern path, and on Vulkan.
+- Developers: `r_glSSAOReferenceComposition 1` draws the old copy-based SSAO
+  pass for comparisons. The post chain at Ultra now has declared per-scene GPU
+  budgets on both backends and per-pass shares of the frame
+  ([performance report, section 12](performance-report.md#12-post-processing-chain-fps-04)).
+
 ## The mouse keeps working when you switch to or from The Awakening, 12 November 2026
 
 - **Switching campaigns no longer leaves the menus deaf to the mouse.**

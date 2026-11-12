@@ -1363,6 +1363,172 @@ Against FPS-01, hub2 at Ultra on OpenGL went from 19 to 91 fps.
 - **Maximum is not budgeted.** It carries no frame-rate claim; section 10.1 records what
   it cost at 94e0b14ec, and the FPS-03 to FPS-05 work lowers that cost.
 
+## 12. Post-processing chain (FPS-04)
+
+FPS-04 priced the screen-space passes of the re-tiered presets on both backends, cut the
+OpenGL chain down to what the Vulkan chain already did, and declared a per-scene budget for
+the chain at Ultra. The passes are SSAO, bloom, the HDR tone map and SMAA; motion blur is
+Maximum only since FPS-02.
+
+### 12.1 What changed (OpenGL)
+
+Vulkan already blended SSAO into the multisampled scene target, drew it at half
+resolution below 32 samples, and read the scene once for bloom and the tone map. OpenGL
+did none of the three:
+
+- **Half-resolution SSAO.** `r_ssaoResolution` (automatic by default) now applies to both
+  renderers. Below the maximum sample count (Quality's 20, Enhanced's 12) the occlusion is
+  drawn for the even pixel of each 2x2 block into a half-size target and upsampled with
+  depth-aware weights, the same two passes as Vulkan (`RB_DrawSSAOHalf` in
+  `draw_common.cpp`, modes 3 and 4 of `glprogs/ssao.fs`). Ultra's 32 samples stay at full
+  resolution, the user's decision of 5 November.
+- **SSAO without a scene copy.** The occlusion is a scalar factor. The classic pass now
+  writes it alone and the blend unit multiplies it into every sample of the scene target,
+  instead of resolving the whole 2x or 4x multisampled RGBA16F scene into `_currentRender`
+  first. The occlusion-field path of native PBR views, the full-resolution debug view and
+  the new validation switch `r_glSSAOReferenceComposition 1` keep the copy.
+- **One scene read for bloom and the tone map.** The composite resolved the scene into
+  `_currentRender` a second time after writing it. Every later reader in the view already
+  takes its own copy (authored post-process surfaces, the cel ink, the underwater pass,
+  materials that need the current render, presentation), so the copy was dropped and the
+  flag marked stale.
+- The SSAO normal is reconstructed only once the distance fade keeps a pixel, which leaves
+  the result unchanged.
+
+At Ultra the OpenGL chain therefore resolves the multisampled scene twice a frame (bloom
+input and presentation) instead of four times, the same as Vulkan.
+
+### 12.2 Method
+
+Feature costs come from in-launch toggle ladders in hidden 2560x1440 windows: windows of
+4 s with a 360 degree view sweep at the scene's reference pose, each toggle read against
+the mean of its two neighbouring base windows, and the per-frame GPU time of
+`rendererBenchmarkCapture` (timestamp queries, microseconds) as the measure. This is the
+shadow audit's configuration method; it is immune to the window focus that fullscreen
+launches depend on (section 12.6). The chain toggle turns SSAO, bloom, the tone map and
+SMAA off together, which also releases the scene target, so it exceeds the sum of the
+four single toggles. The arena row is the Air Defense 1 battlefield pose shared by the
+combat and effects scenarios, without their spawned waves.
+
+Builds: `fps04-base` (`main` 4f67e7fa3) and `fps04-head` (the same with the FPS-04
+change), debugoptimized with `b_ndebug=true`, measured one after the other on the
+reference laptop with every peer session idle.
+
+### 12.3 Ultra
+
+GPU milliseconds per frame. Base is the mean of the six base windows; the passes are
+savings when turned off.
+
+| Build | Scene | GPU frame | SSAO | Bloom | Tone map | SMAA | Whole chain |
+|---|---|---:|---:|---:|---:|---:|---:|
+| OpenGL before | hub2 | 7.34 | 2.11 | 0.42 | 0.91 | 0.28 | 3.71 |
+| OpenGL after | hub2 | 6.61 | 1.80 | 0.57 | 0.62 | 0.44 | 2.63 |
+| Vulkan | hub2 | 6.81 | 0.93 | 0.43 | 0.46 | 0.38 | 1.61 |
+| OpenGL before | storage2 | 7.80 | 2.59 | 0.77 | 1.17 | 0.47 | 4.66 |
+| OpenGL after | storage2 | 7.37 | 2.75 | 0.53 | 0.67 | 0.24 | 4.00 |
+| Vulkan | storage2 | 7.96 | 2.57 | 0.43 | 0.76 | 0.37 | 3.61 |
+| OpenGL before | arena | 7.38 | 1.25 | 0.41 | 0.77 | 0.18 | 2.55 |
+| OpenGL after | arena | 6.95 | 0.85 | 0.60 | 0.73 | 0.48 | 1.65 |
+| Vulkan | arena | 7.24 | 1.17 | 0.49 | 0.53 | 0.40 | 1.86 |
+| OpenGL before | airdefense1 | 6.48 | 0.96 | 0.47 | 0.54 | 0.42 | 2.09 |
+| OpenGL after | airdefense1 | 5.86 | 0.19 | 0.10 | 0.23 | 0.23 | 1.35 |
+| Vulkan | airdefense1 | 6.24 | 0.23 | 0.30 | 0.26 | 0.25 | 1.06 |
+| OpenGL before | convoy1 | 7.30 | 1.35 | 0.83 | 0.48 | 0.39 | 1.76 |
+| OpenGL after | convoy1 | 6.73 | 0.41 | 0.41 | 0.45 | 0.29 | 0.77 |
+| Vulkan | convoy1 | 6.59 | 0.76 | 0.40 | 0.32 | 0.17 | 1.18 |
+
+- **The OpenGL Ultra frame is 0.4-0.7 ms of GPU shorter in every scene** and its chain
+  0.7-1.1 ms cheaper. The base windows varied by 0.2-0.7 ms within a launch, except in
+  storage2 (1.8 ms), whose scripted lights change the scene mid-launch on both builds.
+- **SSAO is the largest pass everywhere.** Storage2's near walls give it the widest pixel
+  radius, 2.6-2.75 ms on both backends at full resolution. Where the camera looks across
+  open ground it costs 0.2-1.2 ms.
+- **OpenGL's full-resolution SSAO still costs up to twice Vulkan's in hub2** (1.80 against
+  0.93 ms). The shader is the same. The difference lies outside it, most likely in
+  OpenGL's depth copies for SSAO (the world-only snapshot and the final depth), which half
+  resolution does not shrink (section 12.4); it was not measured separately.
+
+### 12.4 Quality and the half-resolution pass
+
+The same ladder with only SSAO and the whole chain toggled:
+
+| Scene | OpenGL SSAO before / after | OpenGL chain before / after | OpenGL GPU frame before / after | Vulkan SSAO / chain |
+|---|---:|---:|---:|---:|
+| hub2 | 1.42 / 1.01 | 2.20 / 2.10 | 6.17 / 6.00 | 0.11 / 0.76 |
+| storage2 | 1.33 / 0.80 | 2.55 / 2.19 | 5.74 / 5.34 | 0.38 / 1.30 |
+| arena | 0.53 / 0.00 | 1.57 / 1.20 | 6.46 / 6.25 | 0.13 / 0.64 |
+| airdefense1 | 0.25 / 0.03 | 1.35 / 0.90 | 5.92 / 5.72 | 0.14 / 0.74 |
+| convoy1 | 0.62 / 0.13 | 1.34 / 0.96 | 6.90 / 6.71 | 0.12 / 0.56 |
+
+Half resolution takes 0.4-0.55 ms off SSAO where it has work to do and the OpenGL Quality
+frame is 0.2-0.4 ms shorter. Its remaining 0.8-1.0 ms in hub2 and storage2 against
+Vulkan's 0.1-0.4 ms sits outside the occlusion shader, most likely in the depth copies
+named above: the next lever, recorded under section 12.7. Enhanced (12 samples) takes the same half-resolution path; it was not priced.
+
+### 12.5 Declared budgets and shares
+
+Declared for the Ultra preset on the reference machine at 2560x1440, on both backends,
+in the GPU time of section 12.2: the worse backend's whole-chain cost plus 25 %, rounded
+up to 0.1 ms.
+
+| Scene | Whole-chain budget | OpenGL after | Vulkan | OpenGL before |
+|---|---:|---:|---:|---:|
+| hub2 | 3.3 | 2.63 | 1.61 | 3.71 (over) |
+| storage2 | 5.0 | 4.00 | 3.61 | 4.66 |
+| arena (combat, effects) | 2.4 | 1.65 | 1.86 | 2.55 (over) |
+| airdefense1 | 1.7 | 1.35 | 1.06 | 2.09 (over) |
+| convoy1 | 1.5 | 0.77 | 1.18 | 1.76 (over) |
+
+Each pass has a share of the Ultra refresh-class frame (13.3 ms, section 11.1) that it
+may not exceed in any of these scenes, on either backend:
+
+| Pass | Share of 13.3 ms | Ceiling | Highest after FPS-04 | Highest before (OpenGL) |
+|---|---:|---:|---|---|
+| SSAO | 22.5 % | 3.0 ms | 2.75 storage2, OpenGL | 2.59 storage2 |
+| Tone map | 7.5 % | 1.0 ms | 0.76 storage2, Vulkan | 1.17 storage2 (over) |
+| Bloom | 6 % | 0.8 ms | 0.60 arena, OpenGL | 0.83 convoy1 (over) |
+| SMAA ultra | 4.5 % | 0.6 ms | 0.48 arena, OpenGL | 0.47 storage2 |
+
+The whole chain may take at most 37.5 % of the class frame (storage2) and 25 % elsewhere.
+Every scene and pass is inside its budget on both backends after FPS-04; before it, four
+of the five OpenGL chains, its tone map and its bloom were over. The vehicle level
+(walker) was not priced: its whole Ultra frame is 5.3-5.8 ms (section 11.6.1).
+
+### 12.6 Fullscreen ladders
+
+The same toggles ran fullscreen through `performance_suite.py run --toggle` (`fps04-*` in
+the appendix): Ultra on OpenGL for both builds and on Vulkan, and Quality on OpenGL.
+Six of the 30 launches lost the foreground part-way, which pins a window at exactly
+60 Hz without idling the GPU, so the suite's idle check did not catch it; shell calls of
+other sessions on the shared machine are the likely cause. Where the launches held, the
+Vulkan Ultra ladders were steady (hub2 base windows 7.69-7.76 ms): the chain was 3.66 ms
+of the hub2 frame (SSAO 1.84, bloom 0.63, tone map 0.69, SMAA 0.50) and 2.89 ms in the
+effects wave. Fullscreen frame-interval deltas run 1.4-2 times the hidden GPU deltas of
+section 12.3, in the same order of passes; they also carry CPU and presentation effects
+that a GPU timer does not see, and the two regimes run the GPU at different loads. The
+budgets are stated in the hidden GPU measure only, and the fullscreen frame-rate budgets
+of section 11 remain the frame-rate gate. The OpenGL Quality ladders
+held; their base windows put the after build 0.4-0.5 ms faster outdoors (Air Defense 1,
+convoy1) and within 0.1 ms in hub2, storage2 and the combat wave (the before build's effects
+launch drifted too far to read).
+
+### 12.7 Pictures, and what is left
+
+- **Composition.** Frozen captures at the reference poses of hub2, storage2, the arena,
+  Air Defense 1 and convoy1, multiply composition against `r_glSSAOReferenceComposition 1`
+  in the same launch: at most one level of difference, on 0-439 pixels of 1.93 million.
+- **Half resolution.** The PBR laboratory's matched control (`ssao-classic-half`) now
+  holds OpenGL to Vulkan's limits: the occlusion debug view differs from full resolution by
+  2.07 levels on average with a +0.02 bias and darkens 1.1 % more classic pixels, against
+  Vulkan's 2.07, +0.02 and 1.2 %. The SSAO laboratory controls pass 10/10 on OpenGL with
+  and without the modern visible path and on Vulkan. Final frames at the five poses differ
+  from full resolution by at most one level at the 99th percentile on both renderers.
+- **Not changed:** bloom draws its first level at full resolution on both backends
+  (three full-size passes); starting the pyramid at half size would change the glow and is
+  left to a decision. Ultra's full-resolution SSAO is the user's choice; half resolution
+  would save about 1 ms there. OpenGL's SSAO depth copies are the largest OpenGL-only
+  cost left in the chain.
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;
@@ -1383,6 +1549,8 @@ and paks; SHA-256 of `openQ4-client_x64.exe`):
 | `perf-bisect-834564945` | `main` at 834564945 (2 October), pass 1 | `93b50504578f6b2172897b0164b3355799b819c725e2460406b0c5e9b26e14af` |
 | `perf-bisect-156ced3fd` | `main` at 156ced3fd (15 October), pass 2, client-only staging | `32dc13aafe9d1776034e5afdf244cff31cd35040037dce49fafa6426805235fd` |
 | `perf-ref` | `main` 94e0b14ec, debugoptimized, b_ndebug, staged from `.install` (the FPS-01 reference runtime, section 10) | `44064cda370395a79c14a2e899647027ad113283d7c03e155e24f476ed2efd4b` |
+| `fps04-base` | `main` 4f67e7fa3, debugoptimized, b_ndebug (worktree `.tmp/wt-fps03`, build `.tmp/fps03-build`), section 12 before | `dae2d0d55c0babff9064667b285829213f67534567772c700ea3096eac7497e7` (renderer-gl `a088d314...`) |
+| `fps04-head` | the same with the FPS-04 change, section 12 after | `986ba61998357430ca29b3385dd668857b43eda196f9d6027d682bfde3ced8c4` (renderer-gl `fb407391...`) |
 
 `perf-bisect-56a74bd48` (22 October) was built but not measured before the chain was paused.
 The renderer and game modules of `perf-head` carry PDB paths into `.tmp/perf-build-head`,
@@ -1432,6 +1600,9 @@ launches follow it in the order of its `summary.jsonl`):
 | `.tmp/perf-suite/screen3-gl`, `screen3-vk` | three candidates (`perf-ref`) | gl, vk | the same five | 15 each | 2026-11-09 01:29, 01:51 | section 11.2 |
 | `.tmp/perf-suite/fps02-gl` | ultra/quality/enhanced (`perf-head`, FPS-02 build) | gl | the seven timed scenarios | 63 | 2026-11-09 02:38 | section 11.6, FPS-02 reference run |
 | `.tmp/perf-suite/fps02-vk` | ultra/quality/enhanced (`perf-head`, FPS-02 build) | vk | the seven timed scenarios | 63 | 2026-11-09 04:02 | section 11.6 |
+| `.tmp/perf-suite/fps04-ultra-gl`, `fps04-ultra-vk`, `fps04-quality-gl` | head/base (`fps04-head`, `fps04-base`) | gl, vk, gl | the six multi-pass timed scenarios, toggle ladders | 12, 6, 12 | 2026-11-12 19:49, 20:29, 20:50 | section 12.6; six launches lost the foreground |
+| `.tmp/fps03-close/price/` | before/after (`fps04-base`, `fps04-head`) | gl, vk | hub2, storage2, arena, airdefense1, convoy1, hidden GPU ladders | 30 | 2026-11-12 21:11 | sections 12.3-12.5 (`pricesummary.py`) |
+| `.tmp/fps03-close/img/` | before/after | gl, vk | the same five poses, frozen captures | 20 | 2026-11-12 18:58 | section 12.7 (`imgsummary.py`) |
 
 **Chain scripts and kits** (`.tmp/perf/`): `phase2.sh` and `phase3.sh` with their step
 scripts (`run_matrix.sh`, `run_toggles.sh`, `run_msaa.sh`, `run_default.sh`,

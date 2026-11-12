@@ -332,7 +332,7 @@ idCVar r_ssaoMaxDistance( "r_ssaoMaxDistance", "220.0", CVAR_RENDERER | CVAR_ARC
 idCVar r_ssaoSamples( "r_ssaoSamples", "20", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of SSAO spiral samples", 4, 32, idCmdSystem::ArgCompletion_Integer<4,32> );
 idCVar r_ssaoDebug( "r_ssaoDebug", "0", CVAR_RENDERER | CVAR_BOOL, "visualize SSAO only" );
 idCVar r_ssaoResolution( "r_ssaoResolution", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
-	"Vulkan SSAO resolution: 0 automatic (full at the maximum r_ssaoSamples, half below), 1 full, 2 half", 0, 2,
+	"SSAO resolution: 0 automatic (full at the maximum r_ssaoSamples, half below), 1 full, 2 half", 0, 2,
 	idCmdSystem::ArgCompletion_Integer<0,2> );
 
 /*
@@ -343,6 +343,7 @@ Automatic keeps the maximum sample count (Ultra's 32) at full resolution and
 draws lower counts, such as Quality's 20, at half resolution: at native
 1440p the full-resolution pass was the largest single GPU cost of the Quality
 frame. The performance presets own r_ssaoSamples, so they select this too.
+Both renderers read it (OpenGL since FPS-04).
 ====================
 */
 bool R_SSAOHalfResolution() {

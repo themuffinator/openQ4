@@ -353,6 +353,15 @@ pixels:
 Half resolution is a close, unbiased approximation on both devices: it
 softens contact edges but neither darkens nor lightens the scene.
 
+Since FPS-04 (12 November 2026) OpenGL draws the same two half-resolution
+passes, so the control holds it to the Vulkan limits instead of exact
+equality. On the RTX 4060 Laptop GPU OpenGL measures 2.07 levels mean, +0.02
+bias and 252,258 / 255,138 darkened pixels (+1.1%), with and without the
+modern visible path; Vulkan on the same run measures 2.07, +0.02 and +1.2%.
+The SSAO controls pass 10/10 on both renderers, and the classic-pixel and
+debug-view parity with native PBR stays exact on OpenGL with the multiplied
+composition.
+
 ### Skin substitutions on packed MD5R, 6 November 2026 (REN-05)
 
 The laboratory fixture ships two skins for its skinned specimen: its PBR metal
