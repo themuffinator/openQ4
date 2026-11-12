@@ -4764,7 +4764,22 @@ void Com_ReloadEngine_f( const idCmdArgs &args ) {
 		// close: the reload leaves it as it is.
 	}
 	com_preserveStartupRecoveryLog = com_logFile.GetInteger() != 0;
-	commonLocal.ShutdownGame( true );
+	// A reload the menus ask for (entering or leaving the Awakening campaign,
+	// loading a mod) keeps the game window, as a game-module swap does. A
+	// replacement window is not always given the focus: Windows refuses it once
+	// the pointer has passed over another program while the old window was gone,
+	// and the menus of an unfocused window ignore the mouse. A change of
+	// rendering API or device still builds its window afresh.
+	struct preserveWindowScope_t {
+		explicit preserveWindowScope_t( bool preserve ) { GLimp_PreserveWindowOnShutdown( preserve ); }
+		~preserveWindowScope_t() { GLimp_PreserveWindowOnShutdown( false ); }
+	};
+	{
+		const bool preserveWindow = menu && idAsyncNetwork::serverDedicated.GetInteger() != 1 &&
+			renderSystem != NULL && renderSystem->IsOpenGLRunning() && !R_RendererModule_SelectionReloadPending();
+		preserveWindowScope_t preserveWindowScope( preserveWindow );
+		commonLocal.ShutdownGame( true );
+	}
 	if ( !R_RendererModule_FinishSelectionReload() ) {
 		common->FatalError( "renderer selection reload could not retire the previous module" );
 		return;

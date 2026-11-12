@@ -946,6 +946,24 @@ def validate_dedicated_conversion() -> None:
         ],
         "dedicated console across an engine reload",
     )
+    # A reload the menus ask for (the Awakening campaign, a mod) keeps the game
+    # window, as a game-module swap does: a replacement window may come up
+    # without the focus, and an unfocused window's menus ignore the mouse. A
+    # rendering API or device change still gets a new window.
+    require_order(
+        reload,
+        [
+            "const bool preserveWindow = menu && idAsyncNetwork::serverDedicated.GetInteger() != 1 &&",
+            "!R_RendererModule_SelectionReloadPending();",
+            "preserveWindowScope_t preserveWindowScope( preserveWindow );",
+            "commonLocal.ShutdownGame( true );",
+            "R_RendererModule_FinishSelectionReload()",
+            "commonLocal.InitGame();",
+        ],
+        "menu engine reload keeps the game window",
+    )
+    require(reload, "~preserveWindowScope_t() { GLimp_PreserveWindowOnShutdown( false ); }",
+            "menu engine reload window preservation scope")
     # A launch with net_serverDedicated 1 shows its console quitting on close, and
     # hidden with the game window. r_hiddenWindow is NOCHEAT, so a spawn's reset of
     # cheat CVars cannot show the window or the console afterwards.

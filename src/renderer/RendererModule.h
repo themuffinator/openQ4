@@ -167,6 +167,8 @@ bool R_RendererModule_RenderSelectionPending(const char* api, const char* device
 // After checked menu persistence, supersede the original launch preferences
 // for this process's explicit renderer reload. Other launch options survive.
 void R_RendererModule_UseSavedSelectionOnReload();
+// Whether the next engine reload changes the rendering API or device.
+bool R_RendererModule_SelectionReloadPending();
 // Engine command boundary only, after ShutdownGame has retired every owner.
 bool R_RendererModule_FinishSelectionReload();
 bool	R_RendererModule_QueryLightGridLoad( renderLightGridLoadReceipt_t &receipt, uint64_t &serial, uint64_t &epoch );

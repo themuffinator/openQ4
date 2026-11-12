@@ -7,6 +7,29 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The mouse keeps working when you switch to or from The Awakening, 12 November 2026
+
+- **Switching campaigns no longer leaves the menus deaf to the mouse.**
+  Choosing The Awakening, or Quake 4 again from it, closed the game window
+  and opened a new one. Windows does not always give that new window the
+  focus, notably if the pointer has crossed another program during the load,
+  and the menus of an unfocused window ignore the mouse, so the pointer showed
+  as the desktop arrow and the menu would not respond. The game now keeps its
+  window across the switch, as it already does between single player and
+  multiplayer. Loading a mod from the menus gets the same fix.
+- `reloadEngine menu` now preserves the window (`GLimp_PreserveWindowOnShutdown`)
+  unless a dedicated server is reloading or a rendering API or device change
+  is pending (`R_RendererModule_SelectionReloadPending`). The SDL3 backend
+  still recreates a preserved window if the surface kind differs.
+  `settings_menu_coverage.py` pins the guard.
+- Verified on Windows (OpenGL) with instrumented engine runs that went from
+  Quake 4 to The Awakening and back with `campaignSelect`: both reloads log
+  `SDL3: reusing preserved OpenGL window` and keep the same SDL window. The
+  unpatched build created a new window at each reload, which came up without
+  input focus. With the window focused, menu cursor tracking after the
+  switch matched the pointer exactly. A run whose focus was never lost was not
+  automated: no synthetic input is used.
+
 ## 0.14.1 release, 11 November 2026
 
 - Curated player notes: [v0.14.1.md](releases/v0.14.1.md). They recap what the
