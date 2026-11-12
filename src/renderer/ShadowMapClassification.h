@@ -197,6 +197,15 @@ bool R_ShadowMapEmptyPassHasStencilVolumes( const viewLight_t *vLight, int recei
 // local ones the global receivers only.
 bool R_ShadowMapEmptyPassNeedsStencil( bool globalVolumesLinked, bool localVolumesLinked,
 	int elidedStencilMask, int receiverMask );
+// Whether the LOCAL and GLOBAL ownerships of a light hold the same resident
+// depth, so that one cache entry can serve both. The LOCAL map takes the
+// global casters and the GLOBAL map the local ones as well. A resident entry
+// holds static depth, so the two are the same whenever no local caster is
+// drawn into it: none exists, or the ones that do are all live and are drawn
+// over a copy of the entry in each view (dynamicsComposed). A local caster
+// that is static or translucent makes them different maps.
+bool R_ShadowMapOwnershipsShareResidentDepth( bool localStaticCasters, bool localTranslucentCasters,
+	bool localDynamicCasters, bool dynamicsComposed );
 // The pure form, for the self-test: the window in frames for a smoothed frame
 // interval in milliseconds.
 int R_ShadowMapDynamicCasterFramesFor( float frameMsec );

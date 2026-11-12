@@ -491,7 +491,9 @@ static void VK_ShadowMap_RefreshLightValidity( vkShadowLightState_t &light ) {
 static void VK_ShadowMap_InvalidatePassResource( vkShadowLightState_t &light,
 		const vkShadowReceiverPass_t resourcePass ) {
 	const vkShadowPassState_t &owner = light.passes[ resourcePass ];
-	if ( owner.cacheEntry >= 0
+	// A pass that shares the LOCAL pass's resident cube does not own it: its
+	// own failure leaves that cube, and the LOCAL pass, as they are.
+	if ( !owner.sharesStatic && owner.cacheEntry >= 0
 			&& owner.cacheEntry < VK_SHADOW_MAX_CACHE_SLOTS ) {
 		if ( light.pointLight ) {
 			VK_ShadowMap_ClearPointEntryMetadata(
@@ -505,6 +507,11 @@ static void VK_ShadowMap_InvalidatePassResource( vkShadowLightState_t &light,
 	for ( int passIndex = 0 ; passIndex < VK_SHADOW_RECEIVER_PASS_COUNT ; passIndex++ ) {
 		vkShadowPassState_t &pass = light.passes[ passIndex ];
 		if ( pass.valid && pass.resourcePass == resourcePass ) {
+			pass.valid = false;
+		}
+		// the static depth a sharing pass copies went with its owner
+		if ( pass.valid && pass.sharesStatic
+				&& resourcePass == VK_SHADOW_RECEIVER_LOCAL ) {
 			pass.valid = false;
 		}
 	}
@@ -1470,17 +1477,35 @@ static int VK_ShadowMap_MapNameHash( const viewDef_t *viewDef ) {
 			viewDef->renderWorld->mapName.c_str() );
 }
 
+static bool VK_ShadowMap_PointComposeAvailable( void );
+
+// A point light whose local casters are all live keeps one resident cube for
+// both ownerships: the cube holds static depth, which is the global casters'
+// for LOCAL and GLOBAL alike, and the live local casters reach the GLOBAL map
+// only through its composed copy. A projected light in the same state still
+// keeps a tile for each ownership here; OpenGL shares those too.
+static bool VK_ShadowMap_ComposesLocalCasters( const viewLight_t *vLight ) {
+	return vLight != NULL
+		&& vLight->localShadowMapDynamicCasters != NULL
+		&& VK_ShadowMap_PointComposeAvailable()
+		&& R_ClassifyShadowMapLight( vLight ).pointLight;
+}
+
 static vkShadowReceiverPass_t VK_ShadowMap_CachePassKind(
 		const viewLight_t *vLight,
 		const vkShadowReceiverPass_t requestedPass ) {
-	// With no local caster of any coverage class, LOCAL (global casters) and
-	// GLOBAL (global + local casters) own identical content. Canonicalize both
-	// identities to GLOBAL so a LOCAL-filled entry also hits a later
-	// GLOBAL-only view.
+	// LOCAL (global casters) and GLOBAL (global + local casters) own the same
+	// resident content while no local caster is drawn into it
+	// (R_ShadowMapOwnershipsShareResidentDepth). Canonicalize both identities
+	// to GLOBAL then, so that one entry serves both, a LOCAL-filled entry also
+	// hits a later GLOBAL-only view, and a character walking into the light
+	// does not give the LOCAL map another name.
 	if ( vLight != NULL
-			&& vLight->localShadowMapCasters == NULL
-			&& vLight->localShadowMapDynamicCasters == NULL
-			&& vLight->localTranslucentShadowMapCasters == NULL ) {
+			&& R_ShadowMapOwnershipsShareResidentDepth(
+				vLight->localShadowMapCasters != NULL,
+				vLight->localTranslucentShadowMapCasters != NULL,
+				vLight->localShadowMapDynamicCasters != NULL,
+				VK_ShadowMap_ComposesLocalCasters( vLight ) ) ) {
 		return VK_SHADOW_RECEIVER_GLOBAL;
 	}
 	return requestedPass;
@@ -2951,6 +2976,54 @@ static bool VK_ShadowMap_AllocatePointPass( vkShadowLightState_t &light,
 	return true;
 }
 
+// The GLOBAL pass of a point light whose local casters are all live takes
+// its static depth from the resident cube the LOCAL pass has just restored or
+// is about to publish, and composes its own live casters over a copy. Before,
+// it kept a second resident cube with the same static depth in it and rendered
+// that again whenever the first was rendered. Returns false when the light is
+// not in that state or no scratch cube is left; the caller then schedules the
+// pass on its own.
+static bool VK_ShadowMap_SharePointStaticCube( vkShadowLightState_t &light ) {
+	const vkShadowPassState_t &owner =
+			light.passes[ VK_SHADOW_RECEIVER_LOCAL ];
+	if ( !VK_ShadowMap_ComposesLocalCasters( light.vLight )
+			|| VK_ShadowMap_CachePassKind( light.vLight,
+					VK_SHADOW_RECEIVER_LOCAL ) != VK_SHADOW_RECEIVER_GLOBAL
+			|| !owner.valid
+			|| owner.resourcePass != VK_SHADOW_RECEIVER_LOCAL
+			|| !( owner.cacheHit || owner.cacheUpdate )
+			|| owner.cacheEntry < 0
+			|| owner.cacheEntry >= VK_SHADOW_MAX_CACHE_SLOTS
+			// the copy is face for face
+			|| light.tileSize != vkShadow.pointCubeFaceSize ) {
+		return false;
+	}
+	const int frameSlot = VK_Exec_ActiveFrameSlot();
+	if ( frameSlot < 0 || frameSlot >= VK_FRAMES_IN_FLIGHT ) {
+		return false;
+	}
+	vkShadowPassState_t &pass = light.passes[ VK_SHADOW_RECEIVER_GLOBAL ];
+	memset( &pass, 0, sizeof( pass ) );
+	pass.valid = true;
+	pass.resourcePass = VK_SHADOW_RECEIVER_GLOBAL;
+	pass.sharesStatic = true;
+	pass.cacheHit = owner.cacheHit;
+	pass.cacheEntry = owner.cacheEntry;
+	pass.cacheSignature = owner.cacheSignature;
+	pass.cubeIndex = -1;
+	if ( !VK_ShadowMap_ClaimPointComposeTarget( pass, frameSlot ) ) {
+		memset( &pass, 0, sizeof( pass ) );
+		pass.cacheEntry = -1;
+		pass.cubeIndex = -1;
+		return false;
+	}
+	if ( pass.cacheHit ) {
+		// served from the cache, as it was when it had a cube of its own
+		vkShadow.pointCacheHits++;
+	}
+	return true;
+}
+
 static void VK_ShadowMap_AliasPass( vkShadowLightState_t &light,
 		const vkShadowReceiverPass_t receiverPass,
 		const vkShadowReceiverPass_t resourcePass ) {
@@ -3158,6 +3231,10 @@ static void VK_ShadowMap_ReportViewLights( void ) {
 			} else if ( pass.resourcePass
 					!= (vkShadowReceiverPass_t)passIndex ) {
 				outcome[ passIndex ] = "alias";
+			} else if ( pass.sharesStatic ) {
+				// the LOCAL pass's cube, resident or just published
+				outcome[ passIndex ] = pass.cacheHit
+						? "reuse+compose+shared" : "shared+compose";
 			} else if ( pass.cacheHit ) {
 				outcome[ passIndex ] = pass.composeDynamic
 						? "reuse+compose" : "reuse";
@@ -3402,6 +3479,18 @@ static bool VK_ShadowMap_EstimateUpdateCost( const viewLight_t *vLight,
 		// nothing extra, exactly as the scheduling walk decides.
 		if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL
 				&& !VK_ShadowMap_HasLocalCasters( vLight )
+				&& passNeeded[ VK_SHADOW_RECEIVER_LOCAL ]
+				&& VK_ShadowMap_PassHasCasters( vLight,
+						VK_SHADOW_RECEIVER_LOCAL ) ) {
+			continue;
+		}
+		// Nor does one that shares the LOCAL pass's resident cube
+		// (VK_ShadowMap_SharePointStaticCube): the static render is that
+		// pass's, and it was counted above.
+		if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL && cacheable
+				&& VK_ShadowMap_ComposesLocalCasters( vLight )
+				&& VK_ShadowMap_CachePassKind( vLight,
+						VK_SHADOW_RECEIVER_LOCAL ) == VK_SHADOW_RECEIVER_GLOBAL
 				&& passNeeded[ VK_SHADOW_RECEIVER_LOCAL ]
 				&& VK_ShadowMap_PassHasCasters( vLight,
 						VK_SHADOW_RECEIVER_LOCAL ) ) {
@@ -3735,6 +3824,12 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 						&& !VK_ShadowMap_HasLocalCasters( vLight )
 						&& entry.passes[ VK_SHADOW_RECEIVER_LOCAL ].valid ) {
 					VK_ShadowMap_AliasPass( entry, receiverPass, VK_SHADOW_RECEIVER_LOCAL );
+					continue;
+				}
+				// With local casters that are all live their static depth is
+				// identical: GLOBAL composes over the LOCAL pass's resident cube.
+				if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL
+						&& VK_ShadowMap_SharePointStaticCube( entry ) ) {
 					continue;
 				}
 
@@ -7137,11 +7232,14 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					}
 				};
 
-				// A composed hit renders nothing into its resident cube; every
-				// other pass here starts one from a clear. An uncached map
-				// takes all four chains, a published one that composes only
-				// the static two.
-				const bool renderCube = !pass.cacheHit;
+				// A composed hit renders nothing into its resident cube, and
+				// neither does a pass that shares the LOCAL pass's: that pass
+				// ran just before this one and left the cube rendered or
+				// resident, in the layout a hit finds it in. Every other pass
+				// here starts a cube from a clear. An uncached map takes all
+				// four chains, a published one that composes only the static
+				// two.
+				const bool renderCube = !pass.cacheHit && !pass.sharesStatic;
 				if ( renderCube ) {
 					const VkImageLayout oldCubeLayout = cube->layout;
 					VK_ShadowMap_ImageBarrier( cmd, cube->image, 6,

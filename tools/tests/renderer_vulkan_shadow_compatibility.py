@@ -4939,15 +4939,17 @@ def validate_exact_static_cache_and_admission_contract() -> None:
     )
     require_compact(
         cache_pass_kind,
-        """vLight->localShadowMapCasters == NULL
-            && vLight->localShadowMapDynamicCasters == NULL
-            && vLight->localTranslucentShadowMapCasters == NULL""",
+        """R_ShadowMapOwnershipsShareResidentDepth(
+                vLight->localShadowMapCasters != NULL,
+                vLight->localTranslucentShadowMapCasters != NULL,
+                vLight->localShadowMapDynamicCasters != NULL,
+                VK_ShadowMap_ComposesLocalCasters( vLight ) )""",
         "canonicalization across every local caster class",
     )
     require_order(
         cache_pass_kind,
         (
-            "vLight->localTranslucentShadowMapCasters == NULL",
+            "R_ShadowMapOwnershipsShareResidentDepth(",
             "return VK_SHADOW_RECEIVER_GLOBAL;",
             "return requestedPass;",
         ),
@@ -6396,7 +6398,7 @@ def validate_dynamic_caster_composition_contract() -> None:
             """if ( pass.cacheHit && !composePass ) {
                 continue;
             }""",
-            "const bool renderCube = !pass.cacheHit;",
+            "const bool renderCube = !pass.cacheHit && !pass.sharesStatic;",
             # the static chains alone are published ...
             """drawCubeFaces( *cube, VK_ATTACHMENT_LOAD_OP_CLEAR,
                 composePass ? VK_SHADOW_CHAINS_STATIC_ONLY
@@ -8098,11 +8100,15 @@ def validate_point_cache_parity_and_receiver_cost_contract() -> None:
     require_order(
         gl_pass_kind,
         (
-            "vLight->localShadowMapCasters != NULL",
-            "return passKind;",
-            "vLight->localShadowMapDynamicCasters == NULL",
-            "return SHADOWMAP_PASS_GLOBAL;",
-            "!RB_ShadowMapPointComposeAvailable()",
+            "const bool bakesDynamics = vLight->localShadowMapDynamicCasters != NULL",
+            "&& R_ClassifyShadowMapLight( vLight ).pointLight",
+            "&& !RB_ShadowMapPointComposeAvailable();",
+            "return R_ShadowMapOwnershipsShareResidentDepth(",
+            "vLight->localShadowMapCasters != NULL,",
+            "vLight->localTranslucentShadowMapCasters != NULL,",
+            "vLight->localShadowMapDynamicCasters != NULL,",
+            "!bakesDynamics )",
+            "? SHADOWMAP_PASS_GLOBAL : passKind;",
         ),
         "composed ownerships share one static entry",
     )
@@ -9332,6 +9338,134 @@ def validate_receiver_stock_lighting_parity_contract() -> None:
         )
 
 
+def validate_shared_static_cube_contract() -> None:
+    """One resident cube holds the static depth of both ownerships of a light.
+
+    The LOCAL map of a light takes its global casters, the GLOBAL map its local
+    (noSelfShadow) ones as well. A resident cache entry holds static depth only:
+    live casters are drawn over a copy of it in each view. So the two entries
+    are the same whenever no local caster is static, which is the ordinary case
+    of a character standing in a light. OpenGL has always kept one entry then.
+    Vulkan kept one for each ownership of a point light, rendered both when the
+    static depth changed, and gave the LOCAL entry another name each time a
+    character walked into the light or out of it.
+
+    The rule is one function for both back ends. On Vulkan the GLOBAL pass of
+    such a point light owns no entry: it names the LOCAL pass's cube, which that
+    pass restores or publishes just before it, and composes over a copy.
+    """
+    classification = read("src/renderer/ShadowMapClassification.cpp")
+    rule = braced_body(classification, "bool R_ShadowMapOwnershipsShareResidentDepth(", "shared resident depth rule")
+    require_order(
+        rule,
+        (
+            "if ( localStaticCasters || localTranslucentCasters ) {",
+            "return false;",
+            "return !localDynamicCasters || dynamicsComposed;",
+        ),
+        "the ownerships share an entry while no local caster is drawn into it",
+    )
+    selftest = braced_body(classification, "bool R_ShadowMapCachePolicySelfTest(", "shared policy self-test")
+    for case in ("R_ShadowMapOwnershipsShareResidentDepth( false, false, false, false )",
+                 "R_ShadowMapOwnershipsShareResidentDepth( false, false, true, true )",
+                 "!R_ShadowMapOwnershipsShareResidentDepth( false, false, true, false )",
+                 "!R_ShadowMapOwnershipsShareResidentDepth( true, false, false, true )",
+                 "!R_ShadowMapOwnershipsShareResidentDepth( false, true, false, true )"):
+        require(selftest, case, "the self-test covers the shared resident depth rule")
+
+    header = read("src/renderer/Vulkan/vk_ShadowMap.h")
+    require(header, "bool\t\t\t\tsharesStatic;", "a pass can name another pass's resident cube")
+    vk = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    composes = braced_body(vk, "static bool VK_ShadowMap_ComposesLocalCasters(", "which lights share a cube")
+    require_order(
+        composes,
+        (
+            "vLight->localShadowMapDynamicCasters != NULL",
+            "VK_ShadowMap_PointComposeAvailable()",
+            "R_ClassifyShadowMapLight( vLight ).pointLight",
+        ),
+        "a point light that composes its live local casters",
+    )
+    share = braced_body(vk, "static bool VK_ShadowMap_SharePointStaticCube(", "sharing the LOCAL cube")
+    require_order(
+        share,
+        (
+            "light.passes[ VK_SHADOW_RECEIVER_LOCAL ];",
+            "!VK_ShadowMap_ComposesLocalCasters( light.vLight )",
+            # no static or translucent local caster: both ownerships have the one identity
+            "VK_SHADOW_RECEIVER_LOCAL ) != VK_SHADOW_RECEIVER_GLOBAL",
+            "!owner.valid",
+            "owner.resourcePass != VK_SHADOW_RECEIVER_LOCAL",
+            "!( owner.cacheHit || owner.cacheUpdate )",
+            "light.tileSize != vkShadow.pointCubeFaceSize",
+            "return false;",
+            "pass.resourcePass = VK_SHADOW_RECEIVER_GLOBAL;",
+            "pass.sharesStatic = true;",
+            "pass.cacheHit = owner.cacheHit;",
+            "pass.cacheEntry = owner.cacheEntry;",
+            "pass.cacheSignature = owner.cacheSignature;",
+            "if ( !VK_ShadowMap_ClaimPointComposeTarget( pass, frameSlot ) ) {",
+            "return false;",
+            "return true;",
+        ),
+        "the GLOBAL pass names the LOCAL pass's cube and takes a scratch cube for its copy",
+    )
+    if "cacheUpdate = true" in share or "VK_ShadowMap_AllocPointCacheEntry" in share:
+        raise AssertionError("A pass that shares a cube must not publish or allocate one")
+    # the LOCAL pass is prepared first, then aliased, then shared, and only then scheduled alone
+    require_order(
+        vk,
+        (
+            "VK_ShadowMap_AliasPass( entry, receiverPass, VK_SHADOW_RECEIVER_LOCAL );",
+            """if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL
+                    && VK_ShadowMap_SharePointStaticCube( entry ) ) {
+                continue;
+            }""",
+            """VK_ShadowMap_SchedulePass(
+                            vLight, viewDef, receiverPass,
+                            stencilFallbackAvailable,
+                            true, pointSize, 1, 1 );""",
+        ),
+        "a point light's GLOBAL pass shares before it is scheduled on its own",
+    )
+    # It renders no static face: the LOCAL pass left the cube rendered or resident.
+    require(vk, "const bool renderCube = !pass.cacheHit && !pass.sharesStatic;",
+            "a sharing pass does not render the resident cube again")
+    invalidate = braced_body(vk, "static void VK_ShadowMap_InvalidatePassResource(", "pass invalidation")
+    require_order(
+        invalidate,
+        (
+            # its own failure leaves the owner's cube alone
+            "if ( !owner.sharesStatic && owner.cacheEntry >= 0",
+            "VK_ShadowMap_ClearPointEntryMetadata(",
+            "if ( pass.valid && pass.resourcePass == resourcePass ) {",
+            # and the owner's failure takes it along
+            """if ( pass.valid && pass.sharesStatic
+                    && resourcePass == VK_SHADOW_RECEIVER_LOCAL ) {
+                pass.valid = false;
+            }""",
+        ),
+        "a sharing pass neither clears the owner's entry nor outlives it",
+    )
+    estimate = braced_body(vk, "static bool VK_ShadowMap_EstimateUpdateCost(", "update cost estimate")
+    require_order(
+        estimate,
+        (
+            "&& !VK_ShadowMap_HasLocalCasters( vLight )",
+            """if ( receiverPass == VK_SHADOW_RECEIVER_GLOBAL && cacheable
+                    && VK_ShadowMap_ComposesLocalCasters( vLight )""",
+            "continue;",
+            "cost++;",
+        ),
+        "a shared GLOBAL map is not counted as a second render",
+    )
+    for label in ('"reuse+compose+shared"', '"shared+compose"'):
+        require(vk, label, "the report names a pass that shares the LOCAL cube")
+    movers = read("tools/tests/renderer_shadow_mapping_movers.py")
+    require(movers, '("reuse", "publish", "scratch", "alias", "shared")',
+            "the mover scenarios accept a shared GLOBAL pass as mapped")
+
+
 def validate_moving_light_cache_bypass_contract() -> None:
     """A moving light draws its shadow maps directly, on both renderers.
 
@@ -9872,6 +10006,7 @@ def main() -> None:
     validate_depth_only_point_cube_contract()
     validate_static_cutout_caster_contract()
     validate_static_signature_view_independence_contract()
+    validate_shared_static_cube_contract()
     validate_moving_light_cache_bypass_contract()
     validate_stencil_fallback_release_contract()
     validate_receiver_stock_lighting_parity_contract()

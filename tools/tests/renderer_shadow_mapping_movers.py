@@ -138,7 +138,8 @@ def validate_mover_reports(scenario: str, text: str) -> list[str]:
                 mapped_pass = "result=mapped" in line or "result=cache-reuse" in line
                 cache_hit = "result=cache-reuse" in line
             elif line.startswith("SM pass light["):
-                mapped_pass = any("GLOBAL=" + mode in line for mode in ("reuse", "publish", "scratch", "alias"))
+                mapped_pass = any("GLOBAL=" + mode in line
+                                  for mode in ("reuse", "publish", "scratch", "alias", "shared"))
                 cache_hit = "GLOBAL=reuse" in line
         status = re.fullmatch(r"testDoor: name=(\S+) time=(\d+) state=(\d+) origin=\(([^)]+)\) "
                               r"velocity=\(([^)]+)\) portal=(\d+) blocking=(-?\d+)\s*", line)

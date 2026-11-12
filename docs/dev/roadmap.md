@@ -1774,6 +1774,10 @@ optimization has landed.
   released it. Found by the openD3 session on Doom 3's hell1; no stock Quake 4 view
   tried shows it, so it was reproduced with a temporary switch and is pinned by
   the shared rule's self-test.)
+  (On Vulkan a point light whose only `noSelfShadow` casters are live, a character
+  standing in it, now keeps one resident cube for both receiver ownerships, as
+  OpenGL does: two or three cubes fewer in medlabs and network1, and the LOCAL
+  cube is no longer rendered again each time a character walks in or out.)
   (A light that moves now draws its maps directly instead of publishing
   each one to the cache, copying it and composing over the copy: 560 passes on one
   hub2 route, `r_shadowMapCacheMovingLights`.) (A light whose map failed once now stops building its stencil volumes

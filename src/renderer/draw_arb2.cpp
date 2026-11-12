@@ -4330,15 +4330,19 @@ static void RB_ShadowMapCountCacheSlots( void ) {
 // ownerships with the same resident content, and they share one entry too.
 // Only a cube that bakes its dynamics in must keep the two apart.
 static shadowMapPassKind_t RB_ShadowMapCachePassKind( const viewLight_t *vLight, const shadowMapPassKind_t passKind ) {
-	if ( vLight == NULL || vLight->localShadowMapCasters != NULL || vLight->localTranslucentShadowMapCasters != NULL ) {
+	if ( vLight == NULL ) {
 		return passKind;
 	}
-	if ( vLight->localShadowMapDynamicCasters == NULL ) {
-		return SHADOWMAP_PASS_GLOBAL;
-	}
-	const bool bakesDynamics = R_ClassifyShadowMapLight( vLight ).pointLight
+	// a point cube that cannot compose bakes its live casters into the map
+	const bool bakesDynamics = vLight->localShadowMapDynamicCasters != NULL
+		&& R_ClassifyShadowMapLight( vLight ).pointLight
 		&& !RB_ShadowMapPointComposeAvailable();
-	return bakesDynamics ? passKind : SHADOWMAP_PASS_GLOBAL;
+	return R_ShadowMapOwnershipsShareResidentDepth(
+			vLight->localShadowMapCasters != NULL,
+			vLight->localTranslucentShadowMapCasters != NULL,
+			vLight->localShadowMapDynamicCasters != NULL,
+			!bakesDynamics )
+		? SHADOWMAP_PASS_GLOBAL : passKind;
 }
 
 static bool RB_ShadowMapUpdateAdmitted( const int lightIndex ) {

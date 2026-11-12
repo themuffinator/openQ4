@@ -365,6 +365,15 @@ bool R_ShadowMapEmptyPassNeedsStencil( const bool globalVolumesLinked, const boo
 	return ( elidedStencilMask & receiverMask ) != 0;
 }
 
+bool R_ShadowMapOwnershipsShareResidentDepth( const bool localStaticCasters,
+		const bool localTranslucentCasters, const bool localDynamicCasters,
+		const bool dynamicsComposed ) {
+	if ( localStaticCasters || localTranslucentCasters ) {
+		return false;
+	}
+	return !localDynamicCasters || dynamicsComposed;
+}
+
 bool R_ShadowMapEmptyPassHasStencilVolumes( const viewLight_t *vLight, const int receiverMask ) {
 	return vLight != NULL && R_ShadowMapEmptyPassNeedsStencil(
 		vLight->globalShadows != NULL, vLight->localShadows != NULL,
@@ -685,10 +694,23 @@ bool R_ShadowMapCachePolicySelfTest( void ) {
 		return false;
 	}
 	// any other caster's volume shadows both
-	return R_ShadowMapEmptyPassNeedsStencil( false, false, local | global, local )
-		&& R_ShadowMapEmptyPassNeedsStencil( false, false, local | global, global )
-		&& R_ShadowMapEmptyPassNeedsStencil( true, false, 0, local )
-		&& R_ShadowMapEmptyPassNeedsStencil( true, false, 0, global );
+	if ( !R_ShadowMapEmptyPassNeedsStencil( false, false, local | global, local )
+			|| !R_ShadowMapEmptyPassNeedsStencil( false, false, local | global, global )
+			|| !R_ShadowMapEmptyPassNeedsStencil( true, false, 0, local )
+			|| !R_ShadowMapEmptyPassNeedsStencil( true, false, 0, global ) ) {
+		return false;
+	}
+	// One resident entry serves both ownerships while no local caster is drawn
+	// into it: none at all, or live ones that are composed over a copy.
+	return R_ShadowMapOwnershipsShareResidentDepth( false, false, false, false )
+		&& R_ShadowMapOwnershipsShareResidentDepth( false, false, false, true )
+		&& R_ShadowMapOwnershipsShareResidentDepth( false, false, true, true )
+		// live local casters baked into the map make the GLOBAL one differ
+		&& !R_ShadowMapOwnershipsShareResidentDepth( false, false, true, false )
+		// and so does a static or a translucent local caster, composed or not
+		&& !R_ShadowMapOwnershipsShareResidentDepth( true, false, false, true )
+		&& !R_ShadowMapOwnershipsShareResidentDepth( false, true, false, true )
+		&& !R_ShadowMapOwnershipsShareResidentDepth( true, false, true, true );
 }
 
 bool R_ShadowMapCasterTransformNeedsTwoSided( const float modelMatrix[ 16 ] ) {
