@@ -170,8 +170,11 @@ void main() {
 	vec3 transmittance = pow( max( underwaterTint, vec3( 0.004 ) ), vec3( travel ) );
 	transmittance = mix( vec3( 1.0 ), transmittance, amount );
 
+	// In-scattering puts back the liquid's own colour by the light lost across all three channels,
+	// as underwater.fs does; per-channel loss put back the absorbed colours (teal in lava).
 	vec3 scatterColor = underwaterTint * ( 0.50 + 0.30 * ( 1.0 - radius * 0.5 ) );
-	vec3 lit = scene * transmittance + scatterColor * ( 1.0 - transmittance ) * amount;
+	float extinction = 1.0 - dot( transmittance, vec3( 1.0 / 3.0 ) );
+	vec3 lit = scene * transmittance + scatterColor * extinction * amount;
 
 	float bloomAmount = effectParams1.x * amount * ( 0.45 + travel * 0.85 );
 	if ( bloomAmount > 0.0 ) {

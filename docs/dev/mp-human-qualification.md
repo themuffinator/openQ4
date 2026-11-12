@@ -62,14 +62,22 @@ Start Arena from the main menu (any card).
 Host `+set si_gameType DM +spawnServer mp/liquid_lab` (the liquid lab is in
 the staged package). Optionally add `+set bot_minPlayers 4` for traffic.
 
+`mp_liquid_swim_probe.py` already drives the movement through every pool
+without input (see [the liquid record](liquid-qualification.md#swimming-wading-and-drowning-under-player-movement-12-november-2026)):
+the swim directions, reaching and resting on the floor, climbing out, drowning,
+air recovery and the wading sound. What is left here is the feel with real
+keys and a controller, what you hear and what you see at play distance. If you
+can, run 6.1 and 6.2 once more from a second client joined to the host, which
+the harness cannot: it covers client prediction while swimming.
+
 | # | Do this | Pass when |
 | --- | --- | --- |
-| 6.1 | Walk into each pool (water, slime, lava) and swim around, down to the floor and back up. | Swimming controls work in all directions; you can reach the floor and climb out at the edge. |
+| 6.1 | Walk into each pool (water, slime, lava) and swim around, down to the floor and back up, with keys and then a controller. Rest on the floor holding crouch. | Swimming controls work in all directions; you can reach the floor, you stay put while resting on it, and you can climb out at the edge. |
 | 6.2 | Stay under water until the AIR gauge empties. | The gauge drains, you take drowning damage at zero, and it refills on surfacing. |
 | 6.3 | Watch the surface as you, then a bot, enter and leave the water at speed. | A splash plays at the surface each time, with its sound. |
-| 6.4 | Stand waist-deep and walk; then stay submerged. | Wading ripples and sound play while walking; bubbles rise while submerged. |
+| 6.4 | Run through the shallow wading pool (east of the north row); then stay submerged in the deep pool. | Each running step makes a splashing wade sound (there is no ripple effect); bubbles rise while submerged. |
 | 6.5 | Fire rockets and hyperblaster into and out of the water. | Each shot that crosses the surface splashes there and continues. |
-| 6.6 | Duck your head under and lift it out. | The underwater view tint and muffled sound switch on and off with the eye position. |
+| 6.6 | Duck your head under and lift it out, in water, slime and lava. | The underwater view tint and muffled sound switch on and off with the eye position; the haze takes the liquid's colour (blue-grey, green, orange). |
 
 ## MP-07: weapon visuals under prediction
 

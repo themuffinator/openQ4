@@ -7,6 +7,31 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Swimming stays put on the bottom, and lava looks like lava from inside, 12 November 2026
+
+- **Resting on the bottom of a pool no longer slides you along it.** Holding
+  crouch on a pool floor used to carry you off at a slow walk in whatever
+  direction you last moved, until you hit a wall. You now stay where you
+  settle. Swimming along the floor and up underwater slopes is unchanged.
+- **Ducking under lava or slime shows the liquid's colour.** The haze below the
+  surface was teal in lava and grey-purple in slime. It is now orange-brown in
+  lava and green in slime, on OpenGL and Vulkan. Water looks almost the same,
+  slightly bluer in the distance.
+- MP-06: `mp_liquid_swim_probe.py` qualifies swimming in every liquid-lab pool,
+  climbing out, drowning, air recovery and the wade sound without input, on
+  OpenGL and Vulkan. It drives the host through the new cheat-gated
+  `in_movementProbe` development cvar, which holds movement buttons inside the
+  usercmd generator. `g_debugLiquid` now logs each wading footstep.
+  [Evidence](liquid-qualification.md#swimming-wading-and-drowning-under-player-movement-12-november-2026).
+- Fixes: `idPhysics_Player::WaterMove` in both game trees restores the speed
+  projected out by the underwater slope rule only in proportion to how much of
+  the wish runs along the floor; `underwater.fs` and `post_underwater.frag`
+  weight in-scattering by the mean extinction instead of per channel. The
+  Vulkan post SPIR-V header is regenerated.
+- Not covered: physical keys and controllers, hearing the sounds, a by-eye pass
+  at play distance, and swimming as a remote client
+  ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)).
+
 ## The mouse keeps working when you switch to or from The Awakening, 12 November 2026
 
 - **Switching campaigns no longer leaves the menus deaf to the mouse.**

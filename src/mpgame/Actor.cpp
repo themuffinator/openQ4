@@ -3090,6 +3090,9 @@ void idActor::FootStep( void ) {
 		if ( wadeSound && *wadeSound ) {
 			const idSoundShader *wadeShader = declManager->FindSound( wadeSound, false );
 			if ( wadeShader ) {
+				if ( g_debugLiquid.GetBool() ) {
+					gameLocal.Printf( "liquid: wade footstep %s, sound %s\n", name.c_str(), wadeShader->GetName() );
+				}
 				StartSoundShader( wadeShader, SND_CHANNEL_BODY, 0, false, NULL );
 				return;
 			}

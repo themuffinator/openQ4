@@ -200,9 +200,12 @@ void main() {
 	transmittance = mix( vec3( 1.0 ), transmittance, amount );
 
 	// 2. In-scattering. What the water takes out it puts back as its own colour, which is what
-	//    stops distance reading as simple darkness.
+	//    stops distance reading as simple darkness. How much it puts back is the light lost across
+	//    all three channels: weighting each channel by its own loss put back the colours the liquid
+	//    absorbs instead, so lava, which never absorbs red, filled with a teal haze.
 	vec3 scatterColor = underwaterTint * ( 0.50 + 0.30 * ( 1.0 - radius * 0.5 ) );
-	vec3 lit = scene * transmittance + scatterColor * ( 1.0 - transmittance ) * amount;
+	float extinction = 1.0 - dot( transmittance, vec3( 1.0 / 3.0 ) );
+	vec3 lit = scene * transmittance + scatterColor * extinction * amount;
 
 	// 3. Bloom. The halo grows with the water the light had to cross to reach the eye.
 	float bloomAmount = effectParams1.x * amount * ( 0.45 + travel * 0.85 );

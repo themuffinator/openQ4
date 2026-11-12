@@ -194,7 +194,7 @@ spawn func_liquid_openq4_lava size "512 512 256"
 | `r_underwaterCaustics` | 0.06 | strength of the moving light pattern |
 | `pm_swimSpeed` | 160 | swim speed, Quake 3's figure |
 | `pm_swimSpeedFast` | 200 | swim speed in multiplayer and after stroggification |
-| `g_debugLiquid` | 0 | log water level changes, the air reservoir, speed and every damage tick |
+| `g_debugLiquid` | 0 | log water level changes, the air reservoir, speed, every damage tick and each wading footstep |
 | `g_liquidTestVolume` | "" | dev aid: drop a `water`/`slime`/`lava` volume around the player on spawn |
 | `g_liquidTestVolumeSize` | 640 | cube size of that test volume |
 

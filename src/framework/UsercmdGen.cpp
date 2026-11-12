@@ -437,6 +437,7 @@ private:
 
 	void			Mouse( void );
 	void			MouseProbe( void );
+	int				MovementProbe( void );
 	bool			PresentationLookRate( float &yawRate, float &pitchRate );
     void MouseEvent(int action,int value);
 	void			Keyboard( void );
@@ -528,6 +529,7 @@ private:
 	static idCVar	in_presentationViewProbe;
 	static idCVar	in_presentationViewProbeZoom;
 	static idCVar	in_presentationViewProbeAttack;
+	static idCVar	in_movementProbe;
 };
 
 idCVar idUsercmdGenLocal::in_yawSpeed( "in_yawspeed", "140", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "yaw change speed when holding down _left or _right button" );
@@ -558,6 +560,7 @@ idCVar idUsercmdGenLocal::in_presentationView( "in_presentationView", "0", CVAR_
 idCVar idUsercmdGenLocal::in_presentationViewProbe( "in_presentationViewProbe", "0", CVAR_SYSTEM | CVAR_CHEAT | CVAR_FLOAT, "development probe: synthetic horizontal mouse counts per second, delivered through the ordinary mouse path for no-input latency measurements; requires cheats" );
 idCVar idUsercmdGenLocal::in_presentationViewProbeZoom( "in_presentationViewProbeZoom", "0", CVAR_SYSTEM | CVAR_CHEAT | CVAR_BOOL, "development probe: hold the zoom button, for no-input zoomed late-look measurements; requires cheats" );
 idCVar idUsercmdGenLocal::in_presentationViewProbeAttack( "in_presentationViewProbeAttack", "0", CVAR_SYSTEM | CVAR_CHEAT | CVAR_BOOL, "development probe: hold the attack button, so muzzle flashes, view lights and tracers can be reviewed under late look without input; requires cheats" );
+idCVar idUsercmdGenLocal::in_movementProbe( "in_movementProbe", "", CVAR_SYSTEM | CVAR_CHEAT, "development probe: hold the named movement buttons (_forward, _back, _moveLeft, _moveRight, _moveUp, _moveDown, separated by spaces) the way held keys would, so swimming and wading can be qualified without input; requires cheats" );
 
 static idUsercmdGenLocal localUsercmdGen;
 idUsercmdGen	*usercmdGen = &localUsercmdGen;
@@ -769,6 +772,17 @@ void idUsercmdGenLocal::KeyMove( void ) {
 
 	forward += KEY_MOVESPEED * ButtonState( UB_FORWARD );
 	forward -= KEY_MOVESPEED * ButtonState( UB_BACK );
+
+	// in_movementProbe holds movement buttons the way held keys would
+	const int probe = MovementProbe();
+	if ( probe ) {
+		side += KEY_MOVESPEED * ( ( probe >> UB_MOVERIGHT ) & 1 );
+		side -= KEY_MOVESPEED * ( ( probe >> UB_MOVELEFT ) & 1 );
+		up -= KEY_MOVESPEED * ( ( probe >> UB_DOWN ) & 1 );
+		up += KEY_MOVESPEED * ( ( probe >> UB_UP ) & 1 );
+		forward += KEY_MOVESPEED * ( ( probe >> UB_FORWARD ) & 1 );
+		forward -= KEY_MOVESPEED * ( ( probe >> UB_BACK ) & 1 );
+	}
 
 	cmd.forwardmove = idMath::ClampChar( forward );
 	cmd.rightmove = idMath::ClampChar( side );
@@ -1741,6 +1755,56 @@ void idUsercmdGenLocal::MouseProbe( void ) {
 		mouseDx += counts;
 	}
 	mouseProbeLastMsec = now;
+}
+
+/*
+===================
+idUsercmdGenLocal::MovementProbe
+
+in_movementProbe: a development stand-in for held movement keys, so swimming,
+wading and climbing out of liquids can be qualified without synthesising
+device input. The value names buttons by their binding names; each one counts
+in KeyMove exactly as a held key does, so the command reaches prediction and
+the server through the ordinary path. Returns a mask of usercmdButton_t bits.
+===================
+*/
+int idUsercmdGenLocal::MovementProbe( void ) {
+	static const usercmdButton_t movementButtons[] = { UB_FORWARD, UB_BACK, UB_MOVELEFT, UB_MOVERIGHT, UB_UP, UB_DOWN };
+	const char *probe = in_movementProbe.GetString();
+	if ( probe == NULL || probe[0] == '\0' ) {
+		return 0;
+	}
+	const bool report = in_movementProbe.IsModified();
+	in_movementProbe.ClearModified();
+
+	int held = 0;
+	idStr token;
+	for ( const char *c = probe; ; c++ ) {
+		if ( *c != '\0' && *c != ' ' && *c != '\t' && *c != ',' ) {
+			token += *c;
+			continue;
+		}
+		if ( token.Length() ) {
+			bool known = false;
+			for ( int i = 0; i < (int)( sizeof( movementButtons ) / sizeof( movementButtons[0] ) ) && !known; i++ ) {
+				for ( const userCmdString_t *ucs = userCmdStrings; ucs->string; ucs++ ) {
+					if ( ucs->button == movementButtons[i] && !idStr::Icmp( token, ucs->string ) ) {
+						held |= 1 << movementButtons[i];
+						known = true;
+						break;
+					}
+				}
+			}
+			if ( !known && report ) {
+				common->Warning( "in_movementProbe: '%s' is not one of _forward, _back, _moveLeft, _moveRight, _moveUp, _moveDown", token.c_str() );
+			}
+			token.Clear();
+		}
+		if ( *c == '\0' ) {
+			break;
+		}
+	}
+	return held;
 }
 
 void idUsercmdGenLocal::Mouse( void ) {

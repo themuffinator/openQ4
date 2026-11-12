@@ -604,8 +604,19 @@ void idPhysics_Player::WaterMove( void ) {
 		// slide along the ground plane
 		current.velocity.ProjectOntoPlane( groundTrace.c.normal, OVERCLIP );
 
-		current.velocity.Normalize();
-		current.velocity *= vel;
+// openQ4 BEGIN
+		// Quake 3 then hands back all the speed the projection removed, so a swimmer heading into
+		// an underwater slope keeps their pace up it. Pushing straight into the floor - crouch held
+		// on the bottom, or sinking with no input - has no heading along it, and that speed went to
+		// whatever drift was left: a swimmer resting on the bottom slid at about 40 units a second
+		// for as long as they stayed down. Hand it back in proportion to how much of the wish runs
+		// along the floor, all of it once that is half or more.
+		idVec3 wishAlong = wishdir;
+		wishAlong.ProjectOntoPlane( groundTrace.c.normal );
+		const float giveBack = idMath::ClampFloat( 0.0f, 1.0f, 2.0f * wishAlong.Length() );
+		const float projected = current.velocity.Normalize();
+		current.velocity *= projected + ( vel - projected ) * giveBack;
+// openQ4 END
 	}
 
 	idPhysics_Player::SlideMove( false, true, false, false );

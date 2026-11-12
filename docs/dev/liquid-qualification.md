@@ -13,7 +13,9 @@ runtime hashes stay unchanged. The tested client SHA-256 starts
 
 This is regression evidence for implemented replication/replay and the
 underwater HUD. It does not qualify player-controlled swimming, audible muffle,
-or the outstanding splash/wade presentation; those gates remain open.
+or the outstanding splash/wade presentation; those gates remain open. (Swimming
+under player movement and the wading sound were qualified on 12 November;
+see the last section.)
 
 MP-06 in the [roadmap](roadmap.md) owns delivery scope. This records what the
 compiler and gameplay checks establish; the archived liquid plan preserves
@@ -191,3 +193,81 @@ neck-deep, not submerged, and has no bubble trail there. Wading has no visual
 effect. It is the `snd_wade` sound while moving, which needs real movement and
 stays with the [human checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye),
 as do swimming under player control and a by-eye pass at normal play distances.
+
+## Swimming, wading and drowning under player movement, 12 November 2026
+
+Player-controlled swimming no longer needs a person to exercise it. The
+cheat-gated development cvar `in_movementProbe` holds named movement buttons
+(`_forward`, `_back`, `_moveLeft`, `_moveRight`, `_moveUp`, `_moveDown`)
+inside the usercmd generator, where they count exactly as held keys do, so
+each command reaches the player physics through the ordinary path. No
+operating-system input is synthesised. It follows the existing
+`in_presentationViewProbe*` probes. `g_debugLiquid` now also logs each wading
+footstep and the sound it played.
+
+`mp_liquid_swim_probe.py` drives a first-person listen host through every
+liquid-lab pool. From the central aisle it walks in, dives to the floor, rests
+there with crouch held, moves right, left, back and forward, swims up and
+swims forward against the far edge until it climbs out. In the deep pool it
+stays down until its air runs out, then surfaces, breathes and dives again. It
+runs across the 24-unit wading pool and jumps out. `getviewpos` samples the
+eye after each move and `g_debugLiquid` logs the water-level changes, drowning
+ticks and wading footsteps.
+
+The first run found a swimming defect. A swimmer resting on a pool floor with
+crouch held slid along it at about 40 units a second for as long as they stayed
+down: 60 units in 1.5 seconds in every pool, and 77 units into the deep pool's
+wall during the drowning wait, which then threw the swimmer out with a water
+jump. The underwater slope rule inherited from Quake 3 projects the velocity
+onto the floor and then restores its full length, so each frame's downward push
+was handed to whatever drift was left, and water friction balanced it at
+about 40 units a second. It now restores the speed in proportion to how much of
+the wish runs along the floor, all of it once that is half or more, so swimming
+into a slope keeps its pace and pushing straight down stops. The same rule is in
+both game trees. The harness keeps the run on the old physics as a control
+(`.tmp/mp06-swim/control-old-physics/`): its rest checks fail.
+
+The by-eye review of the run's captures found a presentation defect. With the
+head under lava the distant haze was teal, and under slime grey-purple. The
+underwater pass weighted its in-scattered colour by each channel's own loss, so
+it put back the colours the liquid absorbs: lava, which never absorbs red,
+scattered only green and blue. Both the OpenGL program and the Vulkan shader
+now put back the liquid's own colour by the light lost across all three
+channels. The lower half of the under-lava capture averages (93, 39, 17), an
+orange-brown haze, where it was (19, 46, 28). Slime turns green and deep water
+is slightly bluer in the distance. The Vulkan SPIR-V header was regenerated and
+`vk_shader_header_pin.py` passes.
+
+The fixed build passes on OpenGL and Vulkan
+(`.tmp/mp06-swim/final-gl/report.json`, SHA-256
+`bbb94592a88fe35d6dfbaf5bc241f805b6efaa52643f5e205c70784eea674dc1`;
+`.tmp/mp06-swim/final-vulkan/report.json`, SHA-256
+`3001b010493120cad2ae55bb3a3e7c6f0071b02255b14cb837500b2f4d028a17`; client
+`999a54f1…`, `game-mp_x64.dll` `ddd013c4…`, `renderer-vk_x64.dll` `6bb6a4a5…`,
+`pak0.pk4` `890c60fc…`). The build came from a working tree that also held a
+peer's unrelated, uncommitted shadow-map change.
+
+| Check | Result |
+| --- | --- |
+| Walk in from the aisle | Every pool entered; the logged type is water, slime or lava |
+| Dive | The head goes under in all four swimming pools; the floor is reached and held |
+| Rest on the floor with crouch held | 0 to 2.4 units of drift over 1.5 s (old physics: 60); 0 over the 7.5 s drowning rest (old: 77) |
+| Right, left, back, forward on the floor | 65 to 110 units along the expected axis each, facing north and south |
+| Swim up | The head comes out (water level back to waist) in every pool and bobs at the surface |
+| Climb out at the far edge | Standing on the far walkway in all five pools |
+| Drowning | Air reaches 0, then damage of 2, 4, 6 … 14 a second takes health from 109 to 65 |
+| Air after surfacing | 592 of 1,800 (OpenGL) and 596 (Vulkan) after three seconds at the surface |
+| Wading | Feet-deep only; five wading footsteps, each playing `player_sounds_water_wade` |
+
+A 90-second six-bot audit of the liquid lab on the same build
+(`.tmp/mp06-swim/bot-audit/`) has 54 kills, no world deaths, no stuck reports
+and 22 completed traversals, against 53, none, one and 19 before the physics
+change.
+
+This covers the swimming physics, controls in every direction, climbing out,
+drowning, air recovery, the wading sound and the underwater colour of each
+liquid. It does not cover client prediction while swimming: the swimmer is the
+listen host, whose commands run on the server directly, and a remote client
+cannot be placed at a pool without input. Physical keys and controllers, hearing
+the sounds and a by-eye pass at play distance stay with the
+[human checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye).

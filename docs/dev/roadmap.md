@@ -3790,7 +3790,7 @@ prediction/rewind defaults.
 | MP-03 — Closed | Trench jumps and debug-pool defects fixed; route-cost, collision, graph/cache and ladder/lift subjects have recorded dispositions. | Custom lifts remain unsupported; final safety evidence and the accepted timing-contention caveat are recorded under completed MP-02. |
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
-| MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked. | Real player swimming, wade sound and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
+| MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
 | MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; defaults remain off. | Firing player's same-fire-frame visuals and remaining peer transitions ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
@@ -4331,6 +4331,24 @@ Completion substeps:
   in the rebuilt package. Wading has no visual effect, only its moving sound.
   Remaining: swimming under player control, wade sound and a by-eye pass at
   play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)).
+  Progress, 12 November: [swimming under player movement and the wade sound](liquid-qualification.md#swimming-wading-and-drowning-under-player-movement-12-november-2026)
+  are qualified on OpenGL and Vulkan without input. The cheat-gated
+  `in_movementProbe` holds movement buttons inside the usercmd generator, and
+  `mp_liquid_swim_probe.py` takes a listen host into all five liquid-lab pools:
+  it dives, moves in all four directions on the floor, surfaces, climbs out at
+  the far edge, drowns and recovers its air in the deep pool, and wades with
+  five logged `player_sounds_water_wade` footsteps. The run found two defects,
+  both fixed. A swimmer resting on a pool floor with crouch held slid at about
+  40 units a second, because the inherited underwater slope rule gave the
+  downward push to any leftover drift; it now keeps speed only for wishes that
+  run along the floor (60 units of drift in 1.5 s becomes 0 to 2.4). Under lava
+  the underwater haze was teal and under slime grey-purple, because in-scattering
+  put back the absorbed colours; both renderers now put back the liquid's own
+  colour. A six-bot liquid-lab audit has no world deaths and no stuck reports.
+  Remaining: the [human checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)
+  (real keys and controller, hearing the sounds, a by-eye pass at play distance)
+  and swimming as a remote client: the harness cannot place one at a pool without
+  input, so client prediction while swimming is unexercised.
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
   rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind
