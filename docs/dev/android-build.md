@@ -183,25 +183,71 @@ given `.tmp` directory. With `--check-budgets` it compares the run against the
 per-model limits in
 [`android-device-budgets.json`](android-device-budgets.json).
 
-## Meta Quest flavor verification
+## Meta Quest flavor
 
 The standalone headset build is the phone build declared as an immersive
-OpenXR app. Its integration, distribution and device qualification are AND-05;
-AND-01 provides the checks it must pass. `-Dandroid_headset=true` on an
-arm64-v8a configuration stages package variant `quest` and installs the
-`openq4-headset` marker that starts the game in VR. The phone Gradle host
-refuses that stage until the flavor's Gradle side lands.
+OpenXR app (AND-05). Configure an arm64-v8a build with `-Dandroid_headset=true`
+(the build refuses x86_64): it stages package variant `quest`, installs the
+`openq4-headset` marker and links the Khronos OpenXR loader into
+`libquake4.so`. Package that stage with `-Popenq4Quest=true`:
+
+```sh
+gradle -p mobile/android --project-cache-dir=<checkout>/.tmp/android-gradle-project \
+  -Psdl3SourceRoot=<SDL3-3.4.18> -Popenq4Stage=<quest stage> -Popenq4Quest=true assembleRelease
+```
+
+Gradle refuses a Quest stage without the property and the property without a
+Quest stage, and builds under `builddir/android-apk-quest/`. The manifest is
+generated from the phone manifest, so the two cannot drift: it adds the
+head-tracking requirement, the OpenXR permissions and runtime-broker queries,
+the supported headsets (Quest 2, Pro, 3 and 3S), focus awareness, the 2D
+category that opens setup as a panel, and the Quest VR and Khronos immersive
+categories on the game activity. When the marker asset is present,
+`OpenQ4Activity` starts the game with `vr_enable 1`, the touch controls off,
+the never-seen window mirror off, and the window kept landscape.
+
+On Android the loader is upstream's JNI build: it finds the runtime through
+the Khronos runtime broker, so the engine initializes it with the app's Java
+VM and activity (`xrInitializeLoaderKHR`) and names them again at instance
+creation (`XR_KHR_android_create_instance`). The session binds the GLES
+renderer's EGL context through `XR_KHR_opengl_es_enable`. The GLES module
+presents with the OpenGL presentation code: eyes and the virtual screen are
+render textures behind the redirected default target, a blit copies them into
+the swapchain images, and an sRGB image is written with
+`GL_EXT_sRGB_write_control` off (Quest's Adreno has it) or, without it,
+through a draw that decodes the engine's gamma-encoded pixels, since OpenGL
+ES encodes every write into an sRGB image. Where the runtime offers them, the
+engine chooses the refresh rate (`XR_FB_display_refresh_rate`,
+`vr_refreshRate`), holds the CPU and GPU level (`XR_EXT_performance_settings`,
+`vr_performanceLevel`, sustained high by default), logs thermal warnings, and
+names the frame thread (`XR_KHR_android_thread_settings`).
 
 `verify_android_apk.py --variant quest` then requires its own application ID,
 `com.darkmatter.openq4.quest` (never the phone's, so neither APK replaces the
-other), a nondebuggable release signature, the same seven ARM64 libraries (the
-OpenXR loader links into the client), the marker asset, and a manifest that
-requires head tracking, requests the OpenXR runtime permission, opens the game
-with the immersive OpenXR and Quest categories and names its supported
-headsets. Phone and emulator APKs must carry none of these and no marker, and
-no stage or APK of any variant may carry the headset-free OpenXR test runtime
-(`libopenq4-xr-test-runtime.so`). The application ID and API floor are the
-flavor's until AND-05's distribution decision.
+other), a nondebuggable release signature, the same seven ARM64 libraries,
+the marker asset, and a manifest that requires head tracking, requests the
+OpenXR runtime permission, opens the game with the immersive OpenXR and Quest
+categories and names its supported headsets. Phone and emulator APKs must
+carry none of these and no marker. No stage and no distributable APK may carry
+the headset-free OpenXR test runtime (`libopenq4-xr-test-runtime.so`). The
+application ID and API floor are the flavor's until AND-05's distribution
+decision.
+
+Phones carry no OpenXR: only the Quest flavor and the diagnostic x86_64
+emulator build it. The emulator checks the headset path without a headset:
+package its debug APK with `-Popenq4XrTestRuntime=<build>/libopenq4-xr-test-runtime.so`
+(Gradle refuses the property for any other variant), then run
+`android_emulator_smoke.py --mode vr --xr-runtime <that library>`. The harness
+admits exactly that library through `verify_payload`, writes the runtime's
+manifest, settings and script into the app's external files (the Android
+loader reads no environment, so `vr_runtimeJson` reaches it as a loader
+property, and the runtime reads `openq4_xr_test.env`), plays Air Defense 1 in
+stereo with a scripted head turn, and requires the ES binding, the refresh
+rate requests, the performance levels, the thermal report and lit, differing
+eyes in the runtime's captures. It qualifies SwiftShader's GLES only:
+Adreno's sRGB write control, Horizon OS's panel-to-immersive launch, the
+controllers, comfort, session recovery across the system menu and sleep, and
+thermal and refresh budgets need a headset.
 
 Create AVDs using the [Android emulator tools](https://developer.android.com/studio/run/emulator-commandline).
 Set `ANDROID_USER_HOME` and the AVD data path inside the checkout's `.tmp/`

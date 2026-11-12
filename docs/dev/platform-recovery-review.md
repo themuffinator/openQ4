@@ -1777,3 +1777,96 @@ Evidence (reports, logs, captures, traces and APK hashes) is under
 - an audible check and controller, mouse and keyboard input, which need the
   player;
 - a Mali GPU and an API 24-floor device, which are unavailable for now.
+
+## Meta Quest flavor integration, 12 November 2026
+
+The archived Quest change (`65aa9bd88`) is integrated for AND-05 on the current
+renderer and OpenXR path, with the headset services it lacked, and checked on
+the diagnostic emulator against the test runtime. No headset was available, so
+nothing here qualifies a Quest.
+
+**Loader and session.** Meson builds the Khronos loader (1.1.65) with
+`XR_OS_ANDROID`, jnipp, the Android JNI wrappers and `android_utilities.cpp`
+for the Quest flavor (`-Dandroid_headset=true`) and the diagnostic x86_64
+emulator only; phones never link it. `Sys_AndroidJavaHandles` hands OpenXR the
+Java VM and a global reference to the activity for `xrInitializeLoaderKHR` and
+`XR_KHR_android_create_instance`. The Android loader reads no environment, so
+`vr_runtimeJson` reaches it as an `XR_EXT_loader_init_properties` property;
+only the emulator check sets it. The session binds the GLES module's EGL
+context through `XR_KHR_opengl_es_enable`, and swapchains carry the ES image
+type.
+
+**Presentation.** The GLES module presents with the OpenGL presentation code,
+and GLES_D3's scene present and render check now honour the redirected default
+target. An sRGB swapchain image is written with `GL_EXT_sRGB_write_control`
+off or, without it, through a draw that decodes the engine's gamma-encoded
+pixels. Review of the archived draw found it left the GLES program cache and
+texture unit 0 believing their earlier state, so the next frame could skip
+binding its program or texture; the draw now invalidates both and the GL state
+cache.
+
+**Headset services (new).** Where the runtime lists them, the engine chooses
+the refresh rate (`XR_FB_display_refresh_rate`, `vr_refreshRate`: the fastest
+offered rate at or below the request), holds the CPU and GPU level
+(`XR_EXT_performance_settings`, `vr_performanceLevel`, sustained high by
+default), logs thermal reports and shows them in `vr_status`, and names the
+frame thread (`XR_KHR_android_thread_settings`). `VR_ChooseRefreshRate` and
+`VR_PerformanceSettingsLevel` are covered by the native VR maths test, and the
+lifecycle harness checks that a lost session or instance drops their state.
+
+**Package.** Gradle `-Popenq4Quest=true` packages the Quest stage as
+`com.darkmatter.openq4.quest` under `builddir/android-apk-quest/`. Its manifest
+is generated from the phone manifest: head tracking, the OpenXR permissions
+and runtime-broker queries, the supported headsets, focus awareness, the 2D
+category on setup, and the Quest VR and Khronos immersive categories on the
+game. A build carrying the `openq4-headset` marker starts with `vr_enable 1`,
+the touch controls and window mirror off and the window landscape; setup hides
+the touch Controls page. The test runtime now builds for Android (GLES
+swapchains), offers the refresh-rate and performance extensions on request and
+scripts thermal reports. Only the emulator's debug APK may carry it
+(`-Popenq4XrTestRuntime`), and `verify_payload` admits it by its exact bytes.
+
+**Builds.** NDK r30 builds in WSL of build 2398 (HEAD `6cf523a01` plus this
+change, with other sessions' uncommitted edits held at their base):
+
+- the x86_64 emulator stage with OpenXR, packaged as a debug APK with the test
+  runtime;
+- the arm64-v8a Quest stage (variant `quest`, the marker, the seven libraries,
+  no test runtime), packaged as a release APK (versionCode 14001, API 24 to
+  35) and signed with a one-day throwaway rehearsal key.
+  `verify_android_apk.py --variant quest` passes its certificate, manifest,
+  16 KiB ELF/ZIP alignment and exact payload checks.
+
+**Emulator VR check.** `android_emulator_smoke.py --mode vr` on the API 35
+x86_64 AVD (SwiftShader, OpenGL ES 3.0). The test runtime offered 72, 90 and
+120 Hz, starting at 72, and performance levels.
+
+- The engine found the ES runtime with both services, held the CPU and GPU at
+  sustained high and asked for 90 Hz; the headset reported 90 Hz (was 72).
+  The session ran 640x704 eyes and a 1920x1080 virtual screen on the STAGE
+  space with the Touch controller profile.
+- SwiftShader has no `GL_EXT_sRGB_write_control`, so the decoding draw ran.
+- In Air Defense 1 both eyes are lit and differ by the eye offset, a scripted
+  30-degree head turn moves the view, and the HUD is on the virtual screen.
+- The scripted GPU thermal warning reached the log and `vr_status`; setting
+  `vr_refreshRate 72` in play asked again and the headset changed to 72 Hz.
+- Quitting closed the session and destroyed the instance.
+
+Also passing: `android_build.py` (20 tests, three new), `openxr_vr_contract.py`,
+`openxr_lifecycle.py`, the native VR maths test, and the Android host storage,
+interface, save path, setup and touch checks, on HEAD plus this change.
+
+**Found, not changed.** At quit, after BSE shutdown, Android's HWUI worker
+threads abort on a destroyed mutex (`FORTIFY: pthread_mutex_lock called on a
+destroyed mutex`, SIGABRT in `hwuiTask1`), although the activity manager
+records a clean exit. The 8 and 9 November emulator runs, without VR, show the
+same abort, so it predates this change.
+
+Evidence (the run's logs, report and captures, the Quest manifest dump and
+verifier output, the rehearsal certificate and APK hashes) is under
+`.tmp/android-evidence/2026-11-12-and05/` in the main checkout. Not qualified,
+and needing a headset: the Adreno sRGB write path, Horizon OS's launch from
+the setup panel into VR, controller and menu interaction, comfort, recovery
+across the system menu, boundary and sleep, sustained refresh and thermal
+budgets, installation and asset import on the headset, and the distribution
+decision.

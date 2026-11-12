@@ -3,7 +3,10 @@
 # samples, tests and conformance suite are not engine content. The loader keeps
 # the runtime-negotiation and manifest-discovery behaviour of the upstream CMake
 # build: XR_RUNTIME_JSON, the Windows ActiveRuntime registry value and the XDG
-# active_runtime.json search all work unchanged.
+# active_runtime.json search all work unchanged. On Android (Meta Quest and
+# other standalone headsets) it asks the Khronos runtime broker through JNI,
+# as upstream's Android loader does; there the application initializes it with
+# xrInitializeLoaderKHR, and loader properties replace environment variables.
 project('openxr', ['c', 'cpp'], version: '1.1.65', license: 'Apache-2.0',
   meson_version: '>=1.6', default_options: ['cpp_std=c++17', 'warning_level=0'])
 
@@ -40,11 +43,28 @@ elif host_system == 'linux'
   loader_deps += cpp.find_library('dl', required: false)
 elif host_system == 'darwin'
   loader_args += ['-DXR_OS_APPLE', '-DXR_USE_PLATFORM_MACOS']
+elif host_system == 'android'
+  # upstream's Android loader: XR_OS_ANDROID alone (not Linux), the runtime
+  # broker queried through jnipp and the android.* JNI wrappers
+  loader_args += ['-DXR_OS_ANDROID', '-DXR_USE_PLATFORM_ANDROID']
+  loader_deps += [cpp.find_library('log'), cpp.find_library('android')]
 else
-  error('The openQ4 OpenXR loader build supports Windows, Linux and macOS hosts only.')
+  error('The openQ4 OpenXR loader build supports Windows, Linux, macOS and Android hosts only.')
 endif
 
-openxr_loader_library = static_library('openxr_loader', files(
+loader_platform_sources = []
+loader_platform_includes = []
+if host_system == 'android'
+  loader_platform_sources = files(
+    'src/loader/android_utilities.cpp',
+    'src/external/android-jni-wrappers/wrap/android.content.cpp',
+    'src/external/android-jni-wrappers/wrap/android.database.cpp',
+    'src/external/android-jni-wrappers/wrap/android.net.cpp',
+    'src/external/jnipp/jnipp.cpp')
+  loader_platform_includes = include_directories('src/external/jnipp', 'src/external/android-jni-wrappers')
+endif
+
+openxr_loader_library = static_library('openxr_loader', loader_platform_sources + files(
   'src/common/filesystem_utils.cpp',
   'src/common/object_info.cpp',
   'src/loader/api_layer_interface.cpp',
@@ -60,7 +80,8 @@ openxr_loader_library = static_library('openxr_loader', files(
   'src/xr_generated_dispatch_table_core.c'),
   c_args: loader_args, cpp_args: loader_args,
   # '.' reaches the configured common_config.h in the build directory
-  include_directories: [openxr_includes, include_directories('.', 'src', 'src/common', 'src/loader')],
+  include_directories: [openxr_includes, include_directories('.', 'src', 'src/common', 'src/loader')]
+    + loader_platform_includes,
   dependencies: loader_deps, pic: true, install: false)
 
 openxr_loader_dep = declare_dependency(link_with: openxr_loader_library,

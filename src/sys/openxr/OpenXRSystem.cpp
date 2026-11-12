@@ -8,8 +8,8 @@
 
 	One OpenXR session drives presentation, tracking and controller input:
 
-	- The session binds to the renderer's OpenGL context
-	  (idRenderSystem::GetVRGraphicsBinding). It opens after the renderer
+	- The session binds to the renderer's OpenGL, OpenGL ES (Android) or
+	  Vulkan device (idRenderSystem::GetVRGraphicsBinding). It opens after the renderer
 	  reports a live device and closes before the device is destroyed, so a
 	  vid_restart or renderer shutdown never pulls a context out from under
 	  the runtime.
@@ -44,6 +44,9 @@
 #define XR_USE_GRAPHICS_API_OPENGL
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
+#if defined( __ANDROID__ )
+#include "../android/android_public.h"
+#endif
 
 // The Xlib OpenGL binding, declared without X11 or GLX headers. The layout is
 // XrGraphicsBindingOpenGLXlibKHR's: Display *, VisualID (uint32_t),
@@ -144,6 +147,66 @@ typedef struct vrEGLGraphicsBinding_s {
 	void *					config;
 	void *					context;
 } vrEGLGraphicsBinding_t;
+
+// Android (Meta Quest and other standalone headsets), declared without JNI or
+// EGL headers. The Android loader finds runtimes through the application's
+// Java context, so it is initialized first with the Java VM and the activity
+// (XR_KHR_loader_init_android: XrLoaderInitInfoAndroidKHR's layout), and the
+// instance names them again (XR_KHR_android_create_instance:
+// XrInstanceCreateInfoAndroidKHR's layout, which is the same). The GLES
+// renderer binds its EGL display, config and context through
+// XR_KHR_opengl_es_enable (XrGraphicsBindingOpenGLESAndroidKHR's layout); its
+// requirements and swapchain images have the OpenGL structures' layouts, so
+// the OpenGL path serves both with the ES structure types.
+#define VR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME	"XR_KHR_android_create_instance"
+#define VR_OPENGL_ES_ENABLE_EXTENSION_NAME		"XR_KHR_opengl_es_enable"
+
+typedef struct vrAndroidJavaHandles_s {
+	XrStructureType			type;
+	const void *			next;
+	void *					applicationVM;
+	void *					applicationActivity;
+} vrAndroidJavaHandles_t;
+
+typedef struct vrGLESAndroidGraphicsBinding_s {
+	XrStructureType			type;
+	const void *			next;
+	void *					display;
+	void *					config;
+	void *					context;
+} vrGLESAndroidGraphicsBinding_t;
+
+#if defined( __ANDROID__ )
+static const bool VR_GL_IS_ES = true;
+#else
+static const bool VR_GL_IS_ES = false;
+#endif
+
+// Optional runtime services, used when the runtime offers them (Meta Quest
+// does, standalone and over Link): XR_FB_display_refresh_rate lets the
+// player choose the headset's refresh rate (vr_refreshRate);
+// XR_EXT_performance_settings sets the CPU and GPU levels the headset holds
+// (vr_performanceLevel) and reports thermal limits. On a standalone headset
+// XR_KHR_android_thread_settings tells the runtime which thread carries the
+// frame, declared without JNI headers: XrAndroidThreadTypeKHR is a 32-bit enum.
+#define VR_REFRESH_RATE_EXTENSION_NAME			"XR_FB_display_refresh_rate"
+#define VR_PERFORMANCE_SETTINGS_EXTENSION_NAME	"XR_EXT_performance_settings"
+#define VR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME	"XR_KHR_android_thread_settings"
+static const int32_t VR_ANDROID_THREAD_TYPE_APPLICATION_MAIN = 1;
+static const int32_t VR_ANDROID_THREAD_TYPE_RENDERER_MAIN = 3;
+typedef XrResult ( XRAPI_PTR *vrSetAndroidApplicationThread_t )( XrSession session, int32_t threadType, uint32_t threadId );
+static const int VR_MAX_REFRESH_RATES = 32;
+
+#if defined( __ANDROID__ )
+#include <unistd.h>		// gettid
+#endif
+
+idCVar vr_refreshRate( "vr_refreshRate", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
+	"headset refresh rate in Hz, on headsets that let a game choose it (Meta Quest): the fastest offered rate up to this; "
+	"0 keeps the headset's own" );
+idCVar vr_performanceLevel( "vr_performanceLevel", "3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
+	"CPU and GPU clocks the headset holds, on headsets that let a game choose them (Meta Quest): 0 the headset decides, "
+	"1 power savings, 2 sustained low, 3 sustained high (0 applies from the next vr_restart)", 0, 3 );
 
 #ifndef GL_SRGB8_ALPHA8
 #define GL_SRGB8_ALPHA8		0x8C43
@@ -376,6 +439,9 @@ private:
 	bool					CreateBaseSpace( void );
 	void					UpdateStageBounds( void );
 	void					ReleaseRendererImages( void );
+	void					ApplyRefreshRate( void );
+	void					ApplyPerformanceLevel( void );
+	void					RegisterFrameThread( void );
 
 	// per frame
 	void					LocateFrame( XrTime time );
@@ -417,6 +483,15 @@ private:
 	vrCreateVulkanInstance_t createVulkanInstance;
 	vrGetVulkanDevice_t		getVulkanDevice;
 	vrCreateVulkanDevice_t	createVulkanDevice;
+	// optional runtime services; NULL when the runtime does not offer them
+	PFN_xrEnumerateDisplayRefreshRatesFB enumerateRefreshRates;	// XR_FB_display_refresh_rate
+	PFN_xrGetDisplayRefreshRateFB getRefreshRate;
+	PFN_xrRequestDisplayRefreshRateFB requestRefreshRate;
+	PFN_xrPerfSettingsSetPerformanceLevelEXT setPerformanceLevel;	// XR_EXT_performance_settings
+	vrSetAndroidApplicationThread_t setAndroidThread;	// XR_KHR_android_thread_settings
+	float					refreshRate;		// the headset's refresh rate as last reported, Hz; 0 unknown
+	bool					refreshRateRequested;	// this session asked for a rate (vr_refreshRate)
+	int						thermalLevel[2];	// last XrPerfSettingsNotificationLevelEXT, CPU then GPU
 	int						graphicsApi;		// vrGraphicsApi_t of the session
 	// the Vulkan objects this instance's runtime created for the renderer; a
 	// session binds only to a device the runtime made
@@ -590,6 +665,14 @@ idVRSystemOpenXR::idVRSystemOpenXR( void ) {
 	createVulkanInstance = NULL;
 	getVulkanDevice = NULL;
 	createVulkanDevice = NULL;
+	enumerateRefreshRates = NULL;
+	getRefreshRate = NULL;
+	requestRefreshRate = NULL;
+	setPerformanceLevel = NULL;
+	setAndroidThread = NULL;
+	refreshRate = 0.0f;
+	refreshRateRequested = false;
+	thermalLevel[0] = thermalLevel[1] = XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT;
 	graphicsApi = VR_GRAPHICS_NONE;
 	vulkanInstance = NULL;
 	vulkanPhysicalDevice = NULL;
@@ -766,6 +849,16 @@ void idVRSystemOpenXR::PrintStatus( void ) const {
 		} else {
 			common->Printf( "  refresh: not reported yet\n" );
 		}
+		if ( requestRefreshRate != NULL ) {
+			common->Printf( "  refresh rate choice: vr_refreshRate %g, headset reports %.0f Hz%s\n", vr_refreshRate.GetFloat(),
+				refreshRate, refreshRateRequested ? "" : " (its own choice)" );
+		}
+		if ( setPerformanceLevel != NULL ) {
+			const char *const levels[3] = { "normal", "warning", "impaired" };
+			const int cpu = thermalLevel[0] >= XR_PERF_SETTINGS_NOTIF_LEVEL_IMPAIRED_EXT ? 2 : thermalLevel[0] >= XR_PERF_SETTINGS_NOTIF_LEVEL_WARNING_EXT ? 1 : 0;
+			const int gpu = thermalLevel[1] >= XR_PERF_SETTINGS_NOTIF_LEVEL_IMPAIRED_EXT ? 2 : thermalLevel[1] >= XR_PERF_SETTINGS_NOTIF_LEVEL_WARNING_EXT ? 1 : 0;
+			common->Printf( "  performance: vr_performanceLevel %d, CPU %s, GPU %s\n", vr_performanceLevel.GetInteger(), levels[cpu], levels[gpu] );
+		}
 		common->Printf( "  interaction profile: %s\n", interactionProfile.Length() ? interactionProfile.c_str() : "<none>" );
 		const char *const baseName = baseSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE ? "STAGE"
 			: baseSpaceType == VR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR ? "LOCAL_FLOOR" : "LOCAL";
@@ -859,17 +952,89 @@ XrPath idVRSystemOpenXR::Path( const char *text ) {
 	return path;
 }
 
+#if defined( __ANDROID__ )
+idCVar vr_runtimeJson( "vr_runtimeJson", "", CVAR_SYSTEM,
+	"development: an OpenXR runtime manifest the Android loader uses instead of the system's runtime (set before VR first starts)" );
+
+/*
+====================
+VR_InitializeAndroidLoader
+
+The Android loader finds the runtime through the application's Java context,
+so it is initialized before any other OpenXR call. vr_runtimeJson hands it a
+runtime manifest instead (the headset-free test runtime): Android has no
+environment for XR_RUNTIME_JSON, so it travels as a loader property.
+====================
+*/
+static bool VR_InitializeAndroidLoader( void ) {
+	// initialized again when vr_runtimeJson changes: a config can set it after
+	// the command line's vr_enable already started VR once without a runtime
+	static bool initialized = false;
+	static idStr initializedWith;
+	static bool warned = false;
+	if ( initialized && initializedWith == vr_runtimeJson.GetString() ) {
+		return true;
+	}
+	vrAndroidJavaHandles_t loaderInfo;
+	memset( &loaderInfo, 0, sizeof( loaderInfo ) );
+	loaderInfo.type = XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR;
+	PFN_xrVoidFunction function = NULL;
+	if ( !Sys_AndroidJavaHandles( &loaderInfo.applicationVM, &loaderInfo.applicationActivity )
+			|| XR_FAILED( xrGetInstanceProcAddr( XR_NULL_HANDLE, "xrInitializeLoaderKHR", &function ) ) || function == NULL ) {
+		if ( !warned ) {
+			common->Warning( "OpenXR: the Android loader cannot be initialized; VR stays off" );
+			warned = true;
+		}
+		return false;
+	}
+	const idStr runtimeJson = vr_runtimeJson.GetString();
+	XrLoaderInitPropertyValueEXT property;
+	property.name = "XR_RUNTIME_JSON";
+	property.value = runtimeJson.c_str();
+	XrLoaderInitInfoPropertiesEXT properties;
+	memset( &properties, 0, sizeof( properties ) );
+	properties.type = XR_TYPE_LOADER_INIT_INFO_PROPERTIES_EXT;
+	properties.propertyValueCount = 1;
+	properties.propertyValues = &property;
+	if ( runtimeJson.Length() > 0 ) {
+		loaderInfo.next = &properties;
+		common->Printf( "OpenXR: the loader uses the runtime manifest %s\n", runtimeJson.c_str() );
+	}
+	const XrResult result = reinterpret_cast<PFN_xrInitializeLoaderKHR>( function )(
+		reinterpret_cast<const XrLoaderInitInfoBaseHeaderKHR *>( &loaderInfo ) );
+	if ( XR_FAILED( result ) ) {
+		if ( !warned ) {
+			common->Warning( "OpenXR: xrInitializeLoaderKHR failed (%d); VR stays off", static_cast<int>( result ) );
+			warned = true;
+		}
+		return false;
+	}
+	initialized = true;
+	initializedWith = runtimeJson;
+	return true;
+}
+#endif
+
 /*
 ====================
 idVRSystemOpenXR::CreateInstance
 ====================
 */
 bool idVRSystemOpenXR::CreateInstance( void ) {
+#if defined( __ANDROID__ )
+	if ( !VR_InitializeAndroidLoader() ) {
+		return false;
+	}
+#endif
 	uint32_t extensionCount = 0;
 	XrResult result = xrEnumerateInstanceExtensionProperties( NULL, 0, &extensionCount, NULL );
 	if ( XR_FAILED( result ) || extensionCount == 0 || extensionCount > 4096 ) {
 		if ( !startFailureLogged ) {
+#if defined( __ANDROID__ )
+			common->Warning( "OpenXR: this device has no OpenXR runtime (%d); VR needs a standalone headset such as Meta Quest", static_cast<int>( result ) );
+#else
 			common->Warning( "OpenXR: no runtime is available (%d); install and activate one (SteamVR, Meta Quest Link, Monado...)", static_cast<int>( result ) );
+#endif
 			startFailureLogged = true;
 		}
 		return false;
@@ -890,30 +1055,57 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	bool haveVulkan = false;
 	bool haveEGLBinding = false;
 	bool haveLocalFloorExtension = false;
+	bool haveAndroidInstance = false;
+	bool haveRefreshRate = false;
+	bool havePerformanceSettings = false;
+	bool haveAndroidThreads = false;
+	// on Android the OpenGL path is OpenGL ES, the GLES renderer's, and the
+	// only renderer: Android builds have neither a Vulkan renderer nor a
+	// desktop OpenGL context on EGL
+	const char *const openGLExtension = VR_GL_IS_ES ? VR_OPENGL_ES_ENABLE_EXTENSION_NAME : XR_KHR_OPENGL_ENABLE_EXTENSION_NAME;
 	for ( int i = 0; XR_SUCCEEDED( result ) && i < extensions.Num(); i++ ) {
-		if ( idStr::Cmp( extensions[i].extensionName, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME ) == 0 ) {
+		const char *const name = extensions[i].extensionName;
+		if ( idStr::Cmp( name, VR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME ) == 0 ) {
+			haveAndroidInstance = true;
+		} else if ( idStr::Cmp( name, openGLExtension ) == 0 ) {
 			haveOpenGL = true;
-		} else if ( idStr::Cmp( extensions[i].extensionName, VR_VULKAN_ENABLE2_EXTENSION_NAME ) == 0 ) {
-			haveVulkan = true;
-		} else if ( idStr::Cmp( extensions[i].extensionName, VR_EGL_ENABLE_EXTENSION_NAME ) == 0 ) {
-			haveEGLBinding = true;
-		} else if ( idStr::Cmp( extensions[i].extensionName, VR_LOCAL_FLOOR_EXTENSION_NAME ) == 0 ) {
+		} else if ( idStr::Cmp( name, VR_VULKAN_ENABLE2_EXTENSION_NAME ) == 0 ) {
+			haveVulkan = !VR_GL_IS_ES;
+		} else if ( idStr::Cmp( name, VR_EGL_ENABLE_EXTENSION_NAME ) == 0 ) {
+			haveEGLBinding = !VR_GL_IS_ES;
+		} else if ( idStr::Cmp( name, VR_LOCAL_FLOOR_EXTENSION_NAME ) == 0 ) {
 			haveLocalFloorExtension = true;
+		} else if ( idStr::Cmp( name, VR_REFRESH_RATE_EXTENSION_NAME ) == 0 ) {
+			haveRefreshRate = true;
+		} else if ( idStr::Cmp( name, VR_PERFORMANCE_SETTINGS_EXTENSION_NAME ) == 0 ) {
+			havePerformanceSettings = true;
+		} else if ( idStr::Cmp( name, VR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME ) == 0 ) {
+			haveAndroidThreads = VR_GL_IS_ES;
 		}
 	}
 	if ( !haveOpenGL && !haveVulkan ) {
 		if ( !startFailureLogged ) {
 			common->Warning( "OpenXR: the active runtime supports neither OpenGL (%s) nor Vulkan (%s); VR stays off",
-				XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, VR_VULKAN_ENABLE2_EXTENSION_NAME );
+				openGLExtension, VR_VULKAN_ENABLE2_EXTENSION_NAME );
+			startFailureLogged = true;
+		}
+		return false;
+	}
+	if ( VR_GL_IS_ES && !haveAndroidInstance ) {
+		if ( !startFailureLogged ) {
+			common->Warning( "OpenXR: the active runtime lacks %s; VR stays off", VR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME );
 			startFailureLogged = true;
 		}
 		return false;
 	}
 
-	const char *enabledExtensions[4];
+	const char *enabledExtensions[10];
 	uint32_t enabledCount = 0;
+	if ( VR_GL_IS_ES ) {
+		enabledExtensions[enabledCount++] = VR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME;
+	}
 	if ( haveOpenGL ) {
-		enabledExtensions[enabledCount++] = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME;
+		enabledExtensions[enabledCount++] = openGLExtension;
 		// an OpenGL context on EGL (native Wayland) binds through it
 		if ( haveEGLBinding ) {
 			enabledExtensions[enabledCount++] = VR_EGL_ENABLE_EXTENSION_NAME;
@@ -926,6 +1118,15 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	if ( haveLocalFloorExtension ) {
 		enabledExtensions[enabledCount++] = VR_LOCAL_FLOOR_EXTENSION_NAME;
 	}
+	if ( haveRefreshRate ) {
+		enabledExtensions[enabledCount++] = VR_REFRESH_RATE_EXTENSION_NAME;
+	}
+	if ( havePerformanceSettings ) {
+		enabledExtensions[enabledCount++] = VR_PERFORMANCE_SETTINGS_EXTENSION_NAME;
+	}
+	if ( haveAndroidThreads ) {
+		enabledExtensions[enabledCount++] = VR_ANDROID_THREAD_SETTINGS_EXTENSION_NAME;
+	}
 	XrInstanceCreateInfo createInfo;
 	memset( &createInfo, 0, sizeof( createInfo ) );
 	createInfo.type = XR_TYPE_INSTANCE_CREATE_INFO;
@@ -936,6 +1137,15 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 	createInfo.applicationInfo.apiVersion = XR_API_VERSION_1_0;
 	createInfo.enabledExtensionCount = enabledCount;
 	createInfo.enabledExtensionNames = enabledExtensions;
+#if defined( __ANDROID__ )
+	vrAndroidJavaHandles_t androidInfo;
+	memset( &androidInfo, 0, sizeof( androidInfo ) );
+	androidInfo.type = XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR;
+	if ( !Sys_AndroidJavaHandles( &androidInfo.applicationVM, &androidInfo.applicationActivity ) ) {
+		return false;
+	}
+	createInfo.next = &androidInfo;
+#endif
 	if ( !Check( xrCreateInstance( &createInfo, &instance ), "xrCreateInstance" ) ) {
 		instance = XR_NULL_HANDLE;
 		return false;
@@ -959,7 +1169,9 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 
 	PFN_xrVoidFunction function = NULL;
 	if ( haveOpenGL ) {
-		if ( !Check( xrGetInstanceProcAddr( instance, "xrGetOpenGLGraphicsRequirementsKHR", &function ), "xrGetInstanceProcAddr( xrGetOpenGLGraphicsRequirementsKHR )" ) ) {
+		// xrGetOpenGLESGraphicsRequirementsKHR fills a structure of the same layout
+		const char *const requirementsName = VR_GL_IS_ES ? "xrGetOpenGLESGraphicsRequirementsKHR" : "xrGetOpenGLGraphicsRequirementsKHR";
+		if ( !Check( xrGetInstanceProcAddr( instance, requirementsName, &function ), requirementsName ) ) {
 			DestroyInstance();
 			return false;
 		}
@@ -984,9 +1196,41 @@ bool idVRSystemOpenXR::CreateInstance( void ) {
 			return false;
 		}
 	}
-	common->Printf( "OpenXR: runtime %s (%s%s%s%s)\n", runtimeName.c_str(), getGLRequirements != NULL ? "OpenGL" : "",
+	// optional services: a runtime that lists one and cannot resolve its
+	// functions simply goes without it
+	if ( instance != XR_NULL_HANDLE && recovery == RECOVERY_NONE ) {
+		if ( haveRefreshRate ) {
+			PFN_xrVoidFunction enumerate = NULL, get = NULL, request = NULL;
+			if ( Check( xrGetInstanceProcAddr( instance, "xrEnumerateDisplayRefreshRatesFB", &enumerate ), "xrEnumerateDisplayRefreshRatesFB" )
+					&& Check( xrGetInstanceProcAddr( instance, "xrGetDisplayRefreshRateFB", &get ), "xrGetDisplayRefreshRateFB" )
+					&& Check( xrGetInstanceProcAddr( instance, "xrRequestDisplayRefreshRateFB", &request ), "xrRequestDisplayRefreshRateFB" )
+					&& enumerate != NULL && get != NULL && request != NULL ) {
+				enumerateRefreshRates = reinterpret_cast<PFN_xrEnumerateDisplayRefreshRatesFB>( enumerate );
+				getRefreshRate = reinterpret_cast<PFN_xrGetDisplayRefreshRateFB>( get );
+				requestRefreshRate = reinterpret_cast<PFN_xrRequestDisplayRefreshRateFB>( request );
+			}
+		}
+		if ( havePerformanceSettings ) {
+			function = NULL;
+			if ( Check( xrGetInstanceProcAddr( instance, "xrPerfSettingsSetPerformanceLevelEXT", &function ), "xrPerfSettingsSetPerformanceLevelEXT" ) ) {
+				setPerformanceLevel = reinterpret_cast<PFN_xrPerfSettingsSetPerformanceLevelEXT>( function );
+			}
+		}
+		if ( haveAndroidThreads ) {
+			function = NULL;
+			if ( Check( xrGetInstanceProcAddr( instance, "xrSetAndroidApplicationThreadKHR", &function ), "xrSetAndroidApplicationThreadKHR" ) ) {
+				setAndroidThread = reinterpret_cast<vrSetAndroidApplicationThread_t>( function );
+			}
+		}
+		if ( recovery != RECOVERY_NONE ) {
+			return false;
+		}
+	}
+	common->Printf( "OpenXR: runtime %s (%s%s%s%s)%s%s%s\n", runtimeName.c_str(), getGLRequirements != NULL ? ( VR_GL_IS_ES ? "OpenGL ES" : "OpenGL" ) : "",
 		haveEGL ? " on GLX or EGL" : "",
-		getGLRequirements != NULL && getVulkanRequirements != NULL ? ", " : "", getVulkanRequirements != NULL ? "Vulkan" : "" );
+		getGLRequirements != NULL && getVulkanRequirements != NULL ? ", " : "", getVulkanRequirements != NULL ? "Vulkan" : "",
+		requestRefreshRate != NULL ? ", refresh rate choice" : "", setPerformanceLevel != NULL ? ", performance levels" : "",
+		setAndroidThread != NULL ? ", thread hints" : "" );
 	systemUnavailableLogged = false;
 	nextSystemRetryTime = 0;
 	return true;
@@ -1007,6 +1251,11 @@ void idVRSystemOpenXR::DestroyInstance( void ) {
 	createVulkanInstance = NULL;
 	getVulkanDevice = NULL;
 	createVulkanDevice = NULL;
+	enumerateRefreshRates = NULL;
+	getRefreshRate = NULL;
+	requestRefreshRate = NULL;
+	setPerformanceLevel = NULL;
+	setAndroidThread = NULL;
 	// the renderer keeps its Vulkan objects; they belong to no runtime now
 	vulkanCreator = XR_NULL_HANDLE;
 	vulkanRestartFor = XR_NULL_HANDLE;
@@ -1256,7 +1505,11 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 	if ( !renderSystem->GetVRGraphicsBinding( binding ) ) {
 		static bool warned = false;
 		if ( !warned ) {
+#if defined( __ANDROID__ )
+			common->Warning( "OpenXR: the OpenGL ES renderer has no EGL context to share with the runtime; VR stays off" );
+#else
 			common->Warning( "OpenXR: VR needs the OpenGL or the Vulkan renderer (r_renderApi gl or vulkan); VR stays off" );
+#endif
 			warned = true;
 		}
 		return false;
@@ -1268,6 +1521,8 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 	createInfo.systemId = systemId;
 #if defined( _WIN32 )
 	XrGraphicsBindingOpenGLWin32KHR win32Binding;
+#elif defined( __ANDROID__ )
+	vrGLESAndroidGraphicsBinding_t glesBinding;
 #else
 	vrXlibGraphicsBinding_t xlibBinding;
 	vrEGLGraphicsBinding_t eglBinding;
@@ -1309,7 +1564,7 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 	} else {
 		XrGraphicsRequirementsOpenGLKHR requirements;
 		memset( &requirements, 0, sizeof( requirements ) );
-		requirements.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR;
+		requirements.type = VR_GL_IS_ES ? XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR : XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR;
 		if ( getGLRequirements == NULL ) {
 			static bool warned = false;
 			if ( !warned ) {
@@ -1319,7 +1574,7 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 			}
 			return false;
 		}
-		if ( binding.kind == RENDER_VR_BINDING_EGL && !haveEGL ) {
+		if ( binding.kind == RENDER_VR_BINDING_EGL && !haveEGL && !VR_GL_IS_ES ) {
 			static bool warned = false;
 			if ( !warned ) {
 				common->Warning( "OpenXR: the OpenGL renderer runs on EGL (native Wayland) and the active runtime cannot bind it (%s); "
@@ -1333,7 +1588,7 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 		}
 		const XrVersion contextVersion = XR_MAKE_VERSION( binding.glMajor, binding.glMinor, 0 );
 		if ( contextVersion < requirements.minApiVersionSupported ) {
-			common->Warning( "OpenXR: the runtime needs OpenGL %u.%u, the renderer's context is %d.%d; VR stays off",
+			common->Warning( "OpenXR: the runtime needs OpenGL%s %u.%u, the renderer's context is %d.%d; VR stays off", VR_GL_IS_ES ? " ES" : "",
 				static_cast<unsigned>( XR_VERSION_MAJOR( requirements.minApiVersionSupported ) ),
 				static_cast<unsigned>( XR_VERSION_MINOR( requirements.minApiVersionSupported ) ),
 				binding.glMajor, binding.glMinor );
@@ -1345,6 +1600,16 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 		win32Binding.hDC = static_cast<HDC>( binding.wglDC );
 		win32Binding.hGLRC = static_cast<HGLRC>( binding.wglContext );
 		createInfo.next = &win32Binding;
+#elif defined( __ANDROID__ )
+		if ( binding.kind != RENDER_VR_BINDING_EGL ) {
+			return false;
+		}
+		memset( &glesBinding, 0, sizeof( glesBinding ) );
+		glesBinding.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR;
+		glesBinding.display = binding.eglDisplay;
+		glesBinding.config = binding.eglConfig;
+		glesBinding.context = binding.eglContext;
+		createInfo.next = &glesBinding;
 #else
 		if ( binding.kind == RENDER_VR_BINDING_EGL ) {
 			memset( &eglBinding, 0, sizeof( eglBinding ) );
@@ -1473,6 +1738,18 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 		}
 	}
 
+	// the headset's refresh rate, clocks and frame thread, where the runtime
+	// lets a game choose them
+	refreshRate = 0.0f;
+	refreshRateRequested = false;
+	thermalLevel[0] = thermalLevel[1] = XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT;
+	RegisterFrameThread();
+	ApplyPerformanceLevel();
+	ApplyRefreshRate();
+	if ( recovery != RECOVERY_NONE ) {
+		return false;
+	}
+
 	recenterRequested = true;
 	screenAnchored = false;
 	bodyYawValid = false;
@@ -1530,6 +1807,9 @@ void idVRSystemOpenXR::DestroySession( void ) {
 	frameDisplayPeriod = 0;
 	spaceChangePending = false;
 	interactionProfile.Clear();
+	refreshRate = 0.0f;
+	refreshRateRequested = false;
+	thermalLevel[0] = thermalLevel[1] = XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT;
 
 	for ( int i = 0; i < 16; i++ ) {
 		UpdateKey( i, heldKeys[i], false );
@@ -1628,6 +1908,101 @@ void idVRSystemOpenXR::UpdateStageBounds( void ) {
 
 /*
 ====================
+idVRSystemOpenXR::ApplyRefreshRate
+
+XR_FB_display_refresh_rate: the fastest rate the headset offers up to
+vr_refreshRate (VR_ChooseRefreshRate). Setting 0 again after a request
+returns the headset to its own rate. The runtime confirms a change with an
+event, which updates refreshRate.
+====================
+*/
+void idVRSystemOpenXR::ApplyRefreshRate( void ) {
+	vr_refreshRate.ClearModified();
+	if ( session == XR_NULL_HANDLE || enumerateRefreshRates == NULL || requestRefreshRate == NULL ) {
+		return;
+	}
+	if ( refreshRate <= 0.0f && getRefreshRate != NULL ) {
+		float current = 0.0f;
+		if ( Check( getRefreshRate( session, &current ), "xrGetDisplayRefreshRateFB" ) && current > 0.0f ) {
+			refreshRate = current;
+		}
+	}
+	uint32_t count = 0;
+	float rates[VR_MAX_REFRESH_RATES];
+	if ( !Check( enumerateRefreshRates( session, 0, &count, NULL ), "xrEnumerateDisplayRefreshRatesFB" )
+			|| count == 0 || count > static_cast<uint32_t>( VR_MAX_REFRESH_RATES )
+			|| !Check( enumerateRefreshRates( session, count, &count, rates ), "xrEnumerateDisplayRefreshRatesFB" )
+			|| count == 0 || count > static_cast<uint32_t>( VR_MAX_REFRESH_RATES ) ) {
+		return;
+	}
+	const float chosen = VR_ChooseRefreshRate( vr_refreshRate.GetFloat(), rates, static_cast<int>( count ) );
+	if ( chosen <= 0.0f && !refreshRateRequested ) {
+		return;		// the headset keeps its own rate
+	}
+	// 0 asks the runtime to choose again
+	if ( Check( requestRefreshRate( session, chosen ), "xrRequestDisplayRefreshRateFB" ) ) {
+		refreshRateRequested = chosen > 0.0f;
+		if ( chosen > 0.0f ) {
+			common->Printf( "OpenXR: asked the headset for %.0f Hz\n", chosen );
+		} else {
+			common->Printf( "OpenXR: the headset chooses its refresh rate again\n" );
+		}
+	}
+}
+
+/*
+====================
+idVRSystemOpenXR::ApplyPerformanceLevel
+
+XR_EXT_performance_settings: the clocks vr_performanceLevel asks for, for
+the CPU and the GPU. 0 asks for nothing, which leaves a level set earlier in
+the session until the next one.
+====================
+*/
+void idVRSystemOpenXR::ApplyPerformanceLevel( void ) {
+	vr_performanceLevel.ClearModified();
+	const int level = VR_PerformanceSettingsLevel( vr_performanceLevel.GetInteger() );
+	if ( session == XR_NULL_HANDLE || setPerformanceLevel == NULL || level < 0 ) {
+		return;
+	}
+	const XrPerfSettingsDomainEXT domains[2] = { XR_PERF_SETTINGS_DOMAIN_CPU_EXT, XR_PERF_SETTINGS_DOMAIN_GPU_EXT };
+	bool applied = true;
+	for ( int i = 0; i < 2; i++ ) {
+		applied = Check( setPerformanceLevel( session, domains[i], static_cast<XrPerfSettingsLevelEXT>( level ) ),
+			"xrPerfSettingsSetPerformanceLevelEXT" ) && applied;
+	}
+	if ( applied ) {
+		common->Printf( "OpenXR: headset CPU and GPU held at %s\n",
+			level == XR_PERF_SETTINGS_LEVEL_SUSTAINED_HIGH_EXT ? "sustained high"
+			: level == XR_PERF_SETTINGS_LEVEL_SUSTAINED_LOW_EXT ? "sustained low" : "power savings" );
+	}
+}
+
+/*
+====================
+idVRSystemOpenXR::RegisterFrameThread
+
+XR_KHR_android_thread_settings: on a standalone headset the thread that
+creates the session runs the game and submits every GLES frame, so the
+runtime schedules it as both the application's and the renderer's main
+thread.
+====================
+*/
+void idVRSystemOpenXR::RegisterFrameThread( void ) {
+#if defined( __ANDROID__ )
+	if ( session == XR_NULL_HANDLE || setAndroidThread == NULL ) {
+		return;
+	}
+	const uint32_t thread = static_cast<uint32_t>( gettid() );
+	if ( Check( setAndroidThread( session, VR_ANDROID_THREAD_TYPE_APPLICATION_MAIN, thread ), "xrSetAndroidApplicationThreadKHR" )
+			&& Check( setAndroidThread( session, VR_ANDROID_THREAD_TYPE_RENDERER_MAIN, thread ), "xrSetAndroidApplicationThreadKHR" ) ) {
+		common->Printf( "OpenXR: thread %u carries the frame\n", thread );
+	}
+#endif
+}
+
+/*
+====================
 idVRSystemOpenXR::ReleaseRendererImages
 
 Before swapchains are destroyed: OpenXR requires every submitted graphics
@@ -1698,7 +2073,8 @@ bool idVRSystemOpenXR::CreateSwapchain( swapchain_t &swapchain, int width, int h
 		idList<XrSwapchainImageOpenGLKHR> images;
 		images.SetNum( static_cast<int>( imageCount ) );
 		for ( int i = 0; i < images.Num(); i++ ) {
-			images[i].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+			// XrSwapchainImageOpenGLESKHR has the same layout
+			images[i].type = VR_GL_IS_ES ? XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR : XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 			images[i].next = NULL;
 			images[i].image = 0;
 		}
@@ -2017,6 +2393,25 @@ void idVRSystemOpenXR::PollEvents( void ) {
 							frameDisplayTime > 0 ? static_cast<double>( pending->changeTime - frameDisplayTime ) * 1.0e-6 : 0.0 );
 					}
 				}
+				break;
+			}
+			case XR_TYPE_EVENT_DATA_DISPLAY_REFRESH_RATE_CHANGED_FB: {
+				const XrEventDataDisplayRefreshRateChangedFB *changed = reinterpret_cast<const XrEventDataDisplayRefreshRateChangedFB *>( &event );
+				refreshRate = changed->toDisplayRefreshRate;
+				common->Printf( "OpenXR: the headset refreshes at %.0f Hz (was %.0f)\n", changed->toDisplayRefreshRate, changed->fromDisplayRefreshRate );
+				break;
+			}
+			case XR_TYPE_EVENT_DATA_PERF_SETTINGS_EXT: {
+				// the headset's thermal limits: a warning means the runtime may soon
+				// lower the clocks, impaired that it already has
+				const XrEventDataPerfSettingsEXT *perf = reinterpret_cast<const XrEventDataPerfSettingsEXT *>( &event );
+				const int domain = perf->domain == XR_PERF_SETTINGS_DOMAIN_GPU_EXT ? 1 : 0;
+				thermalLevel[domain] = static_cast<int>( perf->toLevel );
+				const char *const levelName = perf->toLevel >= XR_PERF_SETTINGS_NOTIF_LEVEL_IMPAIRED_EXT ? "impaired"
+					: perf->toLevel >= XR_PERF_SETTINGS_NOTIF_LEVEL_WARNING_EXT ? "warning" : "normal";
+				const char *const subName = perf->subDomain == XR_PERF_SETTINGS_SUB_DOMAIN_THERMAL_EXT ? "thermal"
+					: perf->subDomain == XR_PERF_SETTINGS_SUB_DOMAIN_RENDERING_EXT ? "rendering" : "compositing";
+				common->Printf( "OpenXR: headset %s %s level %s\n", domain == 1 ? "GPU" : "CPU", subName, levelName );
 				break;
 			}
 			default:
@@ -2924,6 +3319,16 @@ void idVRSystemOpenXR::BeginFrame( void ) {
 	if ( vr_standingHeight.IsModified() ) {
 		vr_standingHeight.ClearModified();
 		recenterRequested = true;
+	}
+	// the headset's refresh rate and clocks follow the settings between frames
+	if ( vr_refreshRate.IsModified() ) {
+		ApplyRefreshRate();
+	}
+	if ( vr_performanceLevel.IsModified() ) {
+		ApplyPerformanceLevel();
+	}
+	if ( RecoverIfNeeded() ) {
+		return;
 	}
 
 	XrFrameWaitInfo waitInfo;

@@ -31,6 +31,7 @@ constexpr int VR_NUM_EYES=2, VR_NUM_HANDS=2, VR_INPUT_CRITICAL_SECTION=2;
 constexpr int VR_SYSTEM_RETRY_MSEC=3000;
 constexpr uint32_t VR_MAX_SWAPCHAIN_IMAGES=64;
 constexpr XrDuration VR_IMAGE_WAIT_NSEC=100000000;
+constexpr bool VR_GL_IS_ES=false;  // Android swapchains carry the OpenGL ES image type
 template<class T> struct idList : std::vector<T> {
     int Num() const { return static_cast<int>(this->size()); }
     void Clear() { this->clear(); }
@@ -156,6 +157,12 @@ public:
     PFN_xrGetOpenGLGraphicsRequirementsKHR getGLRequirements=nullptr;
     void *getVulkanRequirements=nullptr,*createVulkanInstance=nullptr,*getVulkanDevice=nullptr,*createVulkanDevice=nullptr;
     XrInstance vulkanCreator=XR_NULL_HANDLE,vulkanRestartFor=XR_NULL_HANDLE;
+    // optional runtime services (refresh rate, performance levels, Android thread hints)
+    void *enumerateRefreshRates=handle<void*>(4),*getRefreshRate=handle<void*>(5),*requestRefreshRate=handle<void*>(6);
+    void *setPerformanceLevel=handle<void*>(7),*setAndroidThread=handle<void*>(8);
+    float refreshRate=90.0f;
+    bool refreshRateRequested=true;
+    int thermalLevel[2]={XR_PERF_SETTINGS_NOTIF_LEVEL_WARNING_EXT,XR_PERF_SETTINGS_NOTIF_LEVEL_IMPAIRED_EXT};
     int graphicsApi=VR_GRAPHICS_OPENGL;
     bool haveLocalFloor=false,haveEGL=false;
     bool frameOpen=true,frameShouldRender=true,rendererReady=true;
@@ -281,11 +288,17 @@ void run(const std::string& test) {
         // the session had the controllers: single player pauses on their loss,
         // and a space move the lost session announced is forgotten with it
         assert(app.focusLost && !app.spaceChangePending && app.frameDisplayPeriod==0);
+        // the lost session's refresh rate and thermal reports belong to it
+        assert(app.refreshRate==0.0f && !app.refreshRateRequested
+            && app.thermalLevel[0]==XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT && app.thermalLevel[1]==XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT);
         assert(!app.RecoverIfNeeded());
     } else throw std::runtime_error("unknown case");
     app.DestroyInstance(); app.DestroyInstance();
     assert(rt.chains.empty() && rt.destroySessions==1 && rt.destroyInstances==1);
     assert(!app.frameOpen && !app.inputValid && !app.sessionRunning);
+    // an instance's optional services leave with it
+    assert(app.enumerateRefreshRates==nullptr && app.requestRefreshRate==nullptr
+        && app.setPerformanceLevel==nullptr && app.setAndroidThread==nullptr);
 }
 int main(int argc,char** argv) {
     try {

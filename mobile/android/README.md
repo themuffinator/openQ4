@@ -49,6 +49,16 @@ uses `-Popenq4Abi=x86_64` and its matching stage. It produces a debug APK under
 `com.darkmatter.openq4.emulator` and keeps separate saves/data. Release packaging
 is disabled for that ABI; it is not a published phone upgrade.
 
+The experimental [Meta Quest flavor](../../docs/dev/android-build.md#meta-quest-flavor)
+packages an arm64-v8a stage configured with `-Dandroid_headset=true`; add
+`-Popenq4Quest=true`. It uses application ID `com.darkmatter.openq4.quest`,
+builds under `builddir/android-apk-quest/` and declares itself an immersive
+OpenXR headset app: setup opens as a 2D panel and the game in VR. Gradle
+refuses a Quest stage without the property and the property without a Quest
+stage. The emulator alone accepts `-Popenq4XrTestRuntime=<built
+libopenq4-xr-test-runtime.so>`, a headset-free OpenXR runtime for its VR check;
+no stage or release carries it.
+
 Gradle uses a 4 GiB heap and at most two workers. PK4 assets are already
 compressed archives and are stored directly in the APK to avoid redundant
 compression and intermittent heap exhaustion during release packaging.

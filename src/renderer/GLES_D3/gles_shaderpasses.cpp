@@ -383,7 +383,7 @@ static void GLESD3_VerifyCurrentRenderContents( idImage *sceneImage, int width, 
 	const int sampleY = backEnd.viewDef->viewport.y1 + height / 2;
 
 	byte fromFramebuffer[4] = { 0, 0, 0, 0 };
-	glBindFramebuffer( GL_READ_FRAMEBUFFER, 0 );
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, (GLuint)R_DefaultFramebufferHandle() );
 	glReadPixels( sampleX, sampleY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, fromFramebuffer );
 
 	byte fromImage[4] = { 0, 0, 0, 0 };

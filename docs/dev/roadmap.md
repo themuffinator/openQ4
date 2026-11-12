@@ -54,8 +54,8 @@ exact; the estimate column is deliberately approximate.
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
-| [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; Quest waits on AND-05. |
-| [Android and mobile rendering](#android-and-mobile-rendering) — AND | **66%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest. |
+| [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05). |
+| [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
@@ -204,8 +204,8 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | Vulkan | Stable supported on Windows x64 following the October NVIDIA/Intel qualification; experimental on Linux and macOS. The user-requested 28 October GPU policy makes fresh desktop `best` prefer compatible high-performance Vulkan hardware with OpenGL fallback; saved explicit choices persist. Android keeps GLES. This does not expand hardware qualification. Historical failed runs remain evidence for their specific builds and conditions. |
 | Modern rendering | Native GL/Vulkan PBR is default-on for authored PBR materials; stock materials stay classic. Shared classic rendering domains exist but remain default-off. Aggregate modern-visible lighting still has `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; these are different promotion decisions. |
 | Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes are excluded, and VR takes only explicit per-eye TAA (`r_temporalAA 1`), without dynamic resolution. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
-| VR | The active source implements PC OpenXR on OpenGL (GLX/WGL, and EGL on Wayland) and Vulkan, headset submission without desktop presentation, stereo, tracked input, room scale, standing/seated play spaces, crouch, two-handed aiming, world-GUI pointing, per-eye TAA, haptics, comfort controls and vehicle views, all qualified on the simulated runtime. Quest standalone waits on AND-05; real-headset qualification remains open ([checklist](vr-headset-qualification.md)). |
-| Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Onboarding/import/export, touch, the per-orientation touch layout editor, the background suspension save and multiplayer resume are integrated with scoped S25/emulator evidence. Physical device/lifecycle breadth stays open under AND-01 through AND-05. |
+| VR | The active source implements PC OpenXR on OpenGL (GLX/WGL, and EGL on Wayland) and Vulkan, headset submission without desktop presentation, stereo, tracked input, room scale, standing/seated play spaces, crouch, two-handed aiming, world-GUI pointing, per-eye TAA, haptics, comfort controls and vehicle views, all qualified on the simulated runtime. A standalone Meta Quest flavor (AND-05) is integrated and checked on the emulator's simulated headset; real-headset qualification remains open ([checklist](vr-headset-qualification.md)). |
+| Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Onboarding/import/export, touch, the per-orientation touch layout editor, the background suspension save and multiplayer resume are integrated with scoped S25/emulator evidence. A Meta Quest flavor (OpenXR on the GLES renderer) is integrated with emulator evidence only. Physical device/lifecycle breadth stays open under AND-01 through AND-05. |
 | UI | Many retained screens and HUDs now run by default. The register preserves 352 rows, 312 active requirements and 40 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
 | Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl/BSE audits, stock transition chains and selected Awakening-state probes have scoped evidence; full playthroughs remain open. Saves now write portable v5 with Windows/Linux cross-load evidence while retaining legacy readers; other target qualification remains Q4-06/Q4-07. |
 | Multiplayer | Dual-stack networking, pure asset checks and bounded rcon2 exist. Actual MP defaults are `net_mpLagCompensation 0` and `net_mpPredictMode 0`. Clients advertise bounded remote extrapolation, and server rewind subtracts it from the displayed pose age; the coupled implementation and remaining peer qualification are recorded under MP-07. Retail 2.85 interoperability is outside the current openQ4 2.41 protocol contract. |
@@ -235,7 +235,7 @@ to a final project-wide phase. Important dependencies are:
 | --- | --- |
 | Full UI migration/cutover | UI-10 refreshed inventory and resolved scope; a real SYSTEM editor round trip and RmlUi decision at `GATE-003`; shared toolkit/editor qualification at `GATE-004`; UI-11 evidence-controlled acceptance. Working screens may continue to improve before full-product acceptance. |
 | Remote-player smoothing or lag-compensation promotion | HF-01 and MP-07 must define the displayed remote pose, extrapolation and server rewind together. Do not enable both corrections independently. |
-| Quest VR integration | VR-01's PC Vulkan/EGL integration and VR-06 lifecycle are in place; AND-01's flavor-aware package checks are in place; the standalone flavor's Gradle side, installation and distribution decision are AND-05. PC headset qualification (VR-02) can proceed independently. |
+| Quest VR integration | VR-01's PC Vulkan/EGL integration and VR-06 lifecycle are in place; AND-01's flavor-aware package checks are in place; the standalone flavor is integrated (AND-05, 12 November), and its headset qualification and distribution decision remain AND-05. PC headset qualification (VR-02) can proceed independently. |
 | Android sustained operation | AND-02 includes AUD-03/CORE-03 aggregate memory and cancellation behavior, not only renderer FPS. |
 | Modern-renderer promotion | Each REN-01 shared-domain gate is separate from REN-02 aggregate visible-lighting ownership. Keep their defaults and rollback decisions independent. |
 | Preset re-tiering (FPS-02) | FPS-01's recorded budgets first; the FPS-03, FPS-04 and FPS-05 cost reductions decide what each tier can afford. HF-07's Quality floor and FPS-02's Ultra budget are measured by the same suite on the same reference machine; neither is qualified from a hidden or windowed capture. |
@@ -1959,8 +1959,8 @@ and AND-05.
   per-eye TAA smokes, the Vulkan fault matrix (windowless included) and Linux
   native-Wayland Vulkan/EGL and X11 Vulkan/GLX runs pass on the simulated
   runtime; see the [integration evidence](platform-recovery-review.md#vulkan-egl-and-world-gui-xr-integration-6-november-2026).
-  Quest (`65aa9bd88`) is not integrated: by decision it waits on AND-05's
-  distribution decision. Physical headsets remain VR-02.
+  Quest (`65aa9bd88`) was left to AND-05 by decision and is integrated there
+  (12 November). Physical headsets remain VR-02.
   9 November: the review missed two fixes on that branch. The off-axis culling
   planes fix (`ea85bdd7b`) is restored in `3a40f705c`; without it the eyes lost
   near terrain and wreckage on both renderers
@@ -2080,9 +2080,10 @@ Sources: [Android build and packaging](android-build.md),
 
 ### AND completion checkpoints
 
-**Estimate: 66%; 1/5 tasks closed.** Onboarding, touch and several lifecycle
+**Estimate: 70%; 1/5 tasks closed.** Onboarding, touch and several lifecycle
 repairs are already integrated; they are not all still archived. S25 and emulator
 checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
+The Quest flavor is integrated, with emulator and test-runtime evidence only.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
@@ -2090,7 +2091,7 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
 | AND-02 — Partial | The device harness and S25 (Adreno 830, API 36) campaign pass cold and warm: real level transitions, save/load, audio residency, storage, thermal and per-model budgets. | S25 sustain and multiplayer phases; audible and gamepad/mouse/keyboard checks; Mali and API-floor devices. |
 | AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
 | AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas, HUD safe-area and thumb-deck positioning and the per-orientation layout editor exist. | Device-based presets and GLES limits; keyboard/touch targets, human-finger portrait play, the weapon control over the portrait readouts, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
-| AND-05 — Not integrated | Quest recovery sources are identified under VR-01/AND-01; the archived Quest change (`65aa9bd88`) moved here from VR-01 on 6 November, on top of the integrated PC Vulkan/EGL XR path. | Dedicated verified flavor, installation/assets, stereo/controller UI, comfort/session recovery and sustained thermal/refresh budgets; distribution decision. |
+| AND-05 — Partial | The archived Quest change (`65aa9bd88`) is integrated with refresh-rate, performance-level, thermal and frame-thread services; the `-Popenq4Quest` release APK with its generated headset manifest passes `verify_android_apk.py --variant quest`, and the emulator plays Air Defense 1 in stereo on the test runtime (12 November). | On a headset: installation/assets, stereo gameplay, controller/UI interaction, comfort, session recovery and sustained thermal/refresh budgets; distribution decision. |
 
 ### AND task evidence and acceptance
 
@@ -2305,6 +2306,20 @@ checks are bounded evidence, not the complete Adreno/Mali/API/lifecycle matrix.
   Decide sideload/store packaging policy. Keep emulator/test-runtime results
   separate from headset support and x86_64 emulator builds separate from publication.
   Require AND-01's flavor-aware package verification and VR-06 lifecycle tests.
+  Integrated 12 November ([evidence](platform-recovery-review.md#meta-quest-flavor-integration-12-november-2026)):
+  the archived change's Android loader, ES session binding and GLES
+  presentation sit on the current renderer, and its sRGB decode draw now
+  invalidates the GLES program and texture caches. Where the runtime offers
+  them, the engine also chooses the refresh rate (`vr_refreshRate`), holds the
+  CPU/GPU level (`vr_performanceLevel`), reports thermal limits and names the
+  frame thread. Gradle `-Popenq4Quest=true` packages `com.darkmatter.openq4.quest`
+  with a manifest generated from the phone's, and its release APK passes
+  `verify_android_apk.py --variant quest`. On the x86_64 AVD the test runtime,
+  which only the emulator's debug APK may carry, runs Air Defense 1 in stereo
+  with a head turn, the 90 Hz request, sustained-high levels and a thermal
+  report (`android_emulator_smoke.py --mode vr`). This is emulator evidence
+  only: every qualification point above still needs a headset, and the
+  packaging policy a decision.
 
 ## iOS, iPadOS and visionOS
 

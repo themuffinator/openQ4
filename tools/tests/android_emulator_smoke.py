@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run silent SP/save, MP/touch, SP rotation, lifecycle or MP resume diagnostics on an isolated Android emulator.
+"""Run silent SP/save, MP/touch, SP rotation, lifecycle, MP resume or VR diagnostics on an isolated Android emulator.
 
 Requires a booted AOSP/userdebug AVD and the separately verified emulator APK.
 No OS pointer/keyboard input or OS screen capture is used. Retail files are
@@ -13,6 +13,16 @@ relaunches it and loads that save. --mode resume joins the dedicated server
 at --server, stays in the background for --away seconds and returns, then
 requires the connection to survive (a stay shorter than the time-out) or the
 client to reconnect (a longer one).
+
+--mode vr checks the Meta Quest flavor's engine path (AND-05) with no headset:
+an emulator APK packed with the OpenXR test runtime (Gradle
+-Popenq4XrTestRuntime=<the --xr-runtime library>) starts VR through the
+Android loader, binds the GLES renderer through XR_KHR_opengl_es_enable,
+plays Air Defense 1 in stereo, follows a scripted head turn, chooses a
+refresh rate (XR_FB_display_refresh_rate), holds the CPU/GPU level
+(XR_EXT_performance_settings) and reports a scripted thermal warning. The
+runtime's event log and layer captures are the evidence; this qualifies the
+emulator's SwiftShader GLES only, never a headset.
 """
 from __future__ import annotations
 
@@ -188,6 +198,58 @@ quit
 }
 
 
+# VR mode: the runtime lives in the app's external files (adb-readable) and
+# acts on markers the engine writes into its private save directory.
+XR_EXTERNAL = f"/sdcard/Android/data/{PACKAGE}/files"
+XR_DIR = XR_EXTERNAL + "/xrtest"
+XR_ENV = XR_EXTERNAL + "/openq4_xr_test.env"
+XR_PRIVATE_SAVE = f"/data/user/0/{PACKAGE}/{SAVE_ROOT}"
+XR_EYE_SIZE = "640x704"
+VR_GAMEPLAY = """god
+notarget
+waitMsec 3000
+echo EMULATOR_VR_READY
+vr_status
+condump vr_marker_ingame.txt
+waitMsec 8000
+condump vr_marker_turn.txt
+waitMsec 8000
+set vr_refreshRate 72
+waitMsec 4000
+echo EMULATOR_VR_STATUS
+vr_status
+echo EMULATOR_SMOKE_COMPLETE
+quit
+"""
+
+
+def vr_runtime_files() -> dict[str, str]:
+    """The test runtime's manifest, settings and script, keyed by their device paths."""
+    def marker(name: str) -> str:
+        return f"{XR_PRIVATE_SAVE}/vr_marker_{name}.txt"
+    return {
+        # a bare library name: the loader dlopens it from the APK's native library directory
+        XR_DIR + "/openq4_xr_test_runtime.json": json.dumps({
+            "file_format_version": "1.0.0",
+            "runtime": {"name": "openQ4 test runtime", "library_path": "libopenq4-xr-test-runtime.so"}}, indent=4) + "\n",
+        XR_ENV: "\n".join((
+            f"OPENQ4_XR_TEST_LOG={XR_DIR}/xr_events.jsonl",
+            f"OPENQ4_XR_TEST_SCRIPT={XR_DIR}/xr_script.txt",
+            f"OPENQ4_XR_TEST_EYE_SIZE={XR_EYE_SIZE}",
+            # Quest's own default, so asking for 90 is a change the runtime announces
+            "OPENQ4_XR_TEST_RATE=72",
+            "OPENQ4_XR_TEST_REFRESH_RATES=72,90,120",
+            "OPENQ4_XR_TEST_PERF_SETTINGS=1",
+            "")),
+        XR_DIR + "/xr_script.txt": "\n".join((
+            f"when {marker('ingame')} capture {XR_DIR}/xr_gameplay",
+            f"when {marker('ingame')} thermal gpu warning",
+            f"when {marker('turn')} head 30 0 0",
+            f"when {marker('turn')} capture {XR_DIR}/xr_turned",
+            "")),
+    }
+
+
 def sha(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
@@ -230,6 +292,21 @@ quit
         )
     elif mode == "rotate":
         scripts["emulator_smoke.cfg"] = ROTATE_GAMEPLAY
+    elif mode == "vr":
+        # The Quest flavor's start (OpenQ4Activity's headset arguments), with the
+        # emulator's runtime manifest; the desktop window mirrors the left eye.
+        scripts.pop("emulator_restored.cfg")
+        scripts["autoexec.cfg"] = scripts["autoexec.cfg"].replace(
+            "set in_touchControls 1\n", "set in_touchControls 0\n").replace(
+            "wait 10\ndevmap game/hangar1", f"""set vr_runtimeJson {XR_DIR}/openq4_xr_test_runtime.json
+set vr_refreshRate 90
+set vr_performanceLevel 3
+set vr_mirror 1
+set vr_debug 1
+set vr_enable 1
+wait 10
+devmap game/airdefense1""")
+        scripts["emulator_smoke.cfg"] = VR_GAMEPLAY
     elif mode != "sp":
         raise ValueError("Unknown emulator game mode")
     scripts["emulator_smoke.cfg"] = "com_activeGameModule\n" + scripts["emulator_smoke.cfg"]
@@ -293,7 +370,9 @@ class Probe:
         self.mode = args.mode
         self.scripts = scripts_for_mode(self.mode, getattr(args, "server", None))
         self.captures = {"sp": CAPTURES, "rotate": ROTATE_CAPTURES, "lifecycle": LIFECYCLE_CAPTURES,
-                         "resume": ()}.get(self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
+                         "resume": (), "vr": ()}.get(self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
+        self.xr_files = vr_runtime_files() if self.mode == "vr" else {}
+        self.xr_markers = ("vr_marker_ingame.txt", "vr_marker_turn.txt") if self.mode == "vr" else ()
         slot = SUSPEND_SLOT if self.mode == "lifecycle" else SLOT
         self.save_names = (tuple(f"savegames/{slot}.{ext}" for ext in ("save", "txt", "tga"))
                            if self.mode in ("sp", "rotate", "lifecycle") else ())
@@ -538,6 +617,7 @@ class Probe:
             arguments = ("logcat", "-d") if name == "logcat" else ("shell", "dumpsys", "activity", "exit-info", PACKAGE)
             result = self.adb(*arguments, check=False)
             (self.out / (name + ".txt")).write_bytes(result.stdout + result.stderr)
+        self.pull_xr_evidence()
 
     def run(self):
         if self.adb("shell", "getprop", "ro.kernel.qemu").stdout.strip() != b"1":
@@ -565,8 +645,12 @@ class Probe:
         if int(self.report["ro.opengles.version"] or "0") < 0x30000:
             raise ValueError("The emulator image/renderer does not advertise required OpenGL ES 3.0")
         verify_tools(self.args.apk, self.args.build_tools, self.args.certificate, self.args.version, "emulator")
-        verify_payload(self.args.apk, self.args.stage, self.args.version, "emulator")
+        # only VR mode admits the test runtime, and only the library it names
+        verify_payload(self.args.apk, self.args.stage, self.args.version, "emulator",
+                       self.args.xr_runtime if self.mode == "vr" else None)
         self.report["apk_sha256"] = sha(self.args.apk)
+        if self.mode == "vr":
+            self.report["xr_test_runtime_sha256"] = sha(self.args.xr_runtime)
         self.report["native_sha256"] = {p.name: sha(p) for p in sorted((self.args.stage / "lib").glob("*.so"))}
         self.report["source_head"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         names = subprocess.check_output(["git", "ls-files", "-m", "-o", "--exclude-standard"], cwd=ROOT, text=True).splitlines()
@@ -632,9 +716,11 @@ class Probe:
             self.report["page_size_source"] = "/proc/self/smaps KernelPageSize"
         self.adb("shell", "run-as", PACKAGE, "mkdir", "-p", SAVE_ROOT)
         for name in (*self.scripts, *self.save_names, *(("emulator_resumed.cfg",) if self.mode == "lifecycle" else ()),
-                     *("screenshots/" + name for name in self.captures)):
+                     *("screenshots/" + name for name in self.captures), *self.xr_markers):
             if self.read(name) is not None:
                 raise ValueError(f"Existing test file must be reviewed before reuse: {name}")
+        if self.xr_files:
+            self.prepare_xr_runtime(uid)
         self.before_config = self.read("openQ4Config.cfg")
         if self.before_config is not None:
             (self.out / "before-openQ4Config.cfg").write_bytes(self.before_config)
@@ -663,6 +749,7 @@ class Probe:
         result = self.adb("shell", "am", "start", "-W", "-n",
                           PACKAGE + "/com.darkmatter.openq4.OpenQ4Activity",
                           "--ez", "multiplayer", "true" if self.mode in ("mp", "resume") else "false", timeout=60)
+        self.report["launch_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         requests = {"EMULATOR_ROTATE_PORTRAIT": 1, "EMULATOR_ROTATE_LANDSCAPE": 0}
         (self.out / "launch.log").write_bytes(result.stdout + result.stderr)
         deadline = time.monotonic() + self.args.timeout
@@ -680,7 +767,8 @@ class Probe:
                 self.collect()
                 raise ValueError("Engine reported a fatal error; inspect openq4.log")
             markers = re.findall(rb"EMULATOR_(?:GAMEPLAY_READY|ROTATE_PORTRAIT|ROTATE_LANDSCAPE|TOUCH_RELEASED"
-                                 rb"|SAVE_RESTORED|SUSPEND_RESTORED|BACKGROUND_REQUEST|RECONNECTED|SMOKE_COMPLETE)", data)
+                                 rb"|SAVE_RESTORED|SUSPEND_RESTORED|BACKGROUND_REQUEST|RECONNECTED|VR_READY|VR_STATUS"
+                                 rb"|SMOKE_COMPLETE)", data)
             if markers and markers[-1].decode() != last_marker:
                 last_marker = markers[-1].decode()
                 print(last_marker, flush=True)
@@ -721,11 +809,121 @@ class Probe:
         self.collect()
         self.assess()
 
+    def prepare_xr_runtime(self, uid: str):
+        """Put the test runtime's manifest, settings and script where the app (and adb) can read them."""
+        for path in self.xr_files:
+            if self.adb("shell", "test", "-e", path, check=False).returncode == 0:
+                raise ValueError(f"Existing VR test file must be reviewed before reuse: {path}")
+        if self.adb("shell", "test", "-e", XR_DIR, check=False).returncode == 0:
+            raise ValueError(f"Existing VR test directory must be reviewed before reuse: {XR_DIR}")
+        self.adb("shell", "mkdir", "-p", XR_DIR)
+        self.xr_created = True
+        for path, text in self.xr_files.items():
+            local = self.out / ("input-" + Path(path).name)
+            local.write_bytes(text.encode())
+            self.adb("push", str(local), path)
+        # root adbd's copies otherwise stay unreadable to the app on FUSE
+        self.adb("shell", "chown", "-R", uid, XR_DIR)
+        self.adb("shell", "chown", uid, XR_ENV)
+        self.report["xr_runtime_files"] = {path: hashlib.sha256(text.encode()).hexdigest() for path, text in self.xr_files.items()}
+
+    def pull_xr_evidence(self):
+        """Copy the runtime's log and captures from the device."""
+        if not getattr(self, "xr_created", False):
+            return
+        listing = self.adb("shell", "ls", XR_DIR, check=False).stdout.decode(errors="replace").split()
+        evidence = self.out / "xr"
+        evidence.mkdir(exist_ok=True)
+        for name in listing:
+            if re.fullmatch(r"[A-Za-z0-9_.\-]+", name):
+                self.adb("pull", f"{XR_DIR}/{name}", str(evidence / name), timeout=120)
+
+    def collect_xr_runtime(self):
+        """Keep the runtime's evidence, then remove everything VR mode put on the device."""
+        if not getattr(self, "xr_created", False):
+            return
+        self.pull_xr_evidence()
+        self.adb("shell", "rm", "-r", XR_DIR)
+        self.adb("shell", "rm", "-f", XR_ENV)
+        for name in self.xr_markers:
+            data = self.read(name)
+            if data is not None:
+                (self.out / name).write_bytes(data)
+                self.adb("shell", "run-as", PACKAGE, "rm", self.path(name))
+        self.xr_created = False
+
+    def assess_vr(self):
+        log = (self.out / "openq4.log").read_text(errors="replace")
+        for marker in ("EMULATOR_VR_READY", "EMULATOR_VR_STATUS", "EMULATOR_SMOKE_COMPLETE"):
+            if marker not in log:
+                raise ValueError(f"Missing engine marker: {marker}")
+        if re.search(r"(?:^|\n)(?:ERROR:|FATAL|Fatal)", log):
+            raise ValueError("Engine reports a fatal error")
+        for line in ("OpenXR: the loader uses the runtime manifest", "OpenXR: runtime openQ4 test runtime",
+                     "(OpenGL ES)", "OpenXR: presenting to the headset", "OpenXR: asked the headset for 90 Hz",
+                     "OpenXR: the headset refreshes at 90 Hz", "OpenXR: asked the headset for 72 Hz",
+                     "OpenXR: the headset refreshes at 72 Hz", "OpenXR: headset CPU and GPU held at sustained high",
+                     "OpenXR: headset GPU thermal level warning"):
+            if line not in log:
+                raise ValueError(f"The engine log lacks {line!r}")
+        events_path = self.out / "xr" / "xr_events.jsonl"
+        if not events_path.is_file():
+            raise ValueError("The test runtime wrote no event log")
+        events = [json.loads(line) for line in events_path.read_text(errors="replace").splitlines() if line.startswith("{")]
+        kinds = [event.get("event") for event in events]
+        created = next((e for e in events if e.get("event") == "create_instance"), None)
+        if created is None:
+            raise ValueError("The engine created no OpenXR instance")
+        required = {"XR_KHR_android_create_instance", "XR_KHR_opengl_es_enable", "XR_FB_display_refresh_rate",
+                    "XR_EXT_performance_settings"}
+        if not required <= set(created.get("extensions", [])):
+            raise ValueError(f"The instance lacks {sorted(required - set(created.get('extensions', [])))}")
+        if not any(e.get("event") == "create_session" and e.get("binding") == "opengl_es_android" for e in events):
+            raise ValueError("The session did not bind the GLES renderer's EGL context")
+        levels = {(e.get("domain"), e.get("level")) for e in events if e.get("event") == "perf_level"}
+        if levels != {("cpu", 50), ("gpu", 50)}:
+            raise ValueError(f"Unexpected performance levels: {levels}")
+        rates = [(e.get("requested"), e.get("to")) for e in events if e.get("event") == "refresh_rate"]
+        if rates[:2] != [(90.0, 90.0), (72.0, 72.0)]:
+            raise ValueError(f"Unexpected refresh rate requests: {rates}")
+        captures = {}
+        for prefix in ("xr_gameplay", "xr_turned"):
+            for layer in ("left", "right"):
+                capture = next((e for e in events if e.get("event") == "capture"
+                                and e.get("path", "").endswith(f"/{prefix}_{layer}.tga")), None)
+                if capture is None or not capture.get("written"):
+                    raise ValueError(f"Missing runtime capture {prefix}_{layer}")
+                captures[f"{prefix}_{layer}"] = {key: capture[key] for key in ("width", "height", "mean_luma", "lit_fraction")}
+        eye_width, eye_height = (int(n) for n in XR_EYE_SIZE.split("x"))
+        for name, capture in captures.items():
+            if (capture["width"], capture["height"]) != (eye_width, eye_height):
+                raise ValueError(f"{name} is not the recommended {XR_EYE_SIZE} eye")
+            if capture["lit_fraction"] < 0.2:
+                raise ValueError(f"{name} is mostly dark: {capture}")
+        # two eyes see two views, and a head turn changes what both see
+        if abs(captures["xr_gameplay_left"]["mean_luma"] - captures["xr_gameplay_right"]["mean_luma"]) < 0.01:
+            raise ValueError("The eyes rendered the same image")
+        for layer in ("left", "right"):
+            if abs(captures[f"xr_turned_{layer}"]["mean_luma"] - captures[f"xr_gameplay_{layer}"]["mean_luma"]) < 0.5:
+                raise ValueError(f"The head turn did not change the {layer} eye")
+        frames = max((e.get("frame", 0) for e in events if e.get("event") == "end_frame"), default=0)
+        if int(self.report["ro.build.version.sdk"]) >= 30:
+            exit_info = (self.out / "exit-info.txt").read_text(errors="replace")
+            if not re.search(r"pid=" + re.escape(self.pid) + r"\b[^\n]*\n[^\n]*reason=1 \(EXIT_SELF\)[^\n]*status=0\b", exit_info):
+                raise ValueError("No successful native self-exit record for the tested process")
+        self.report.update(status="pass", engine_pid=self.pid, xr_captures=captures, xr_frames_logged=frames,
+                           xr_event_counts={kind: kinds.count(kind) for kind in sorted(set(filter(None, kinds)))},
+                           scope="Native SP in stereo on the OpenXR test runtime through the Android loader and "
+                                 "XR_KHR_opengl_es_enable (SwiftShader GLES): head turn, refresh rate choice, "
+                                 "performance level, thermal report; no headset, visual review separate")
+
     def assess(self):
         if self.mode == "lifecycle":
             return self.assess_lifecycle()
         if self.mode == "resume":
             return self.assess_resume()
+        if self.mode == "vr":
+            return self.assess_vr()
         log = (self.out / "openq4.log").read_text(errors="replace")
         for marker in ("EMULATOR_GAMEPLAY_READY", "EMULATOR_TOUCH_RELEASED", "EMULATOR_SMOKE_COMPLETE",
                        *(("EMULATOR_SAVE_RESTORED",) if self.mode != "mp" else ()),
@@ -909,6 +1107,7 @@ class Probe:
             self.collect()
         else:
             self.report["forced_stop"] = False
+        self.collect_xr_runtime()
         retired = {}
         for name, expected in self.created.items():
             actual = self.read(name)
@@ -944,7 +1143,9 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--mode", choices=("sp", "mp", "rotate", "lifecycle", "resume"), default="sp")
+    parser.add_argument("--mode", choices=("sp", "mp", "rotate", "lifecycle", "resume", "vr"), default="sp")
+    parser.add_argument("--xr-runtime", type=Path,
+                        help="vr mode: the libopenq4-xr-test-runtime.so the APK was packed with (Gradle -Popenq4XrTestRuntime)")
     parser.add_argument("--timeout", type=int, default=420)
     parser.add_argument("--server", help="resume mode: the dedicated server, <IPv4>:<port>, as the emulator reaches it")
     parser.add_argument("--away", type=int, default=50, help="resume mode: seconds in the background (40 or more is beyond the time-out)")
@@ -955,6 +1156,10 @@ def main():
         parser.error("Timeout must be between 30 and 1500 seconds")
     if args.mode == "resume" and (not args.server or not 5 <= args.away <= 300):
         parser.error("Resume mode needs --server and --away between 5 and 300 seconds")
+    if (args.mode == "vr") != (args.xr_runtime is not None):
+        parser.error("--xr-runtime belongs to VR mode, which needs it")
+    if args.xr_runtime is not None:
+        args.xr_runtime = args.xr_runtime.resolve()
     for name in ("adb", "apk", "stage", "build_tools", "certificate", "assets"):
         setattr(args, name, getattr(args, name).resolve())
     probe = Probe(args)
@@ -972,7 +1177,8 @@ def main():
         finally:
             probe.write_report()
     scope = {"sp": "SP gameplay/save", "mp": "MP gameplay", "rotate": "SP rotation/portrait deck/save",
-             "lifecycle": "SP touch layout/suspension save/process death/restore", "resume": "MP background/resume"}[args.mode]
+             "lifecycle": "SP touch layout/suspension save/process death/restore", "resume": "MP background/resume",
+             "vr": "OpenXR stereo on the test runtime"}[args.mode]
     print(f"PASS: silent emulator {scope} probe; inspect the retained engine captures.", flush=True)
 
 

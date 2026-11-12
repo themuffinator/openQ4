@@ -127,9 +127,15 @@ def digest(stream) -> str:
     return result.hexdigest()
 
 
-def verify_payload(apk: Path, stage: Path, version: str, variant: str = 'phone') -> None:
-    abi, _, _ = variant_settings(variant)
+def verify_payload(apk: Path, stage: Path, version: str, variant: str = 'phone',
+                   xr_test_runtime: Path | None = None) -> None:
+    """xr_test_runtime admits exactly that test runtime library into a debuggable
+    emulator APK for the emulator VR check (android_emulator_smoke.py --mode
+    vr). No other variant may name one, and no stage may carry it."""
+    abi, _, debuggable = variant_settings(variant)
     headset = variant_info(variant).headset
+    if xr_test_runtime is not None and (not debuggable or variant != 'emulator' or xr_test_runtime.name != XR_TEST_RUNTIME):
+        raise ValueError('Only the diagnostic emulator APK may carry the OpenXR test runtime')
     metadata = json.loads((stage / 'android-build.json').read_text(encoding='utf-8'))
     mod = json.loads((stage / 'baseoq4/mod.json').read_text(encoding='utf-8'))
     # Format 1 originally described only phones. Missing variant is accepted
@@ -179,6 +185,15 @@ def verify_payload(apk: Path, stage: Path, version: str, variant: str = 'phone')
         if len(names) != len(set(names)):
             raise ValueError('APK contains duplicate entries')
         native = {name for name in names if name.startswith('lib/') and not name.endswith('/')}
+        runtime_entry = f'lib/{abi}/{XR_TEST_RUNTIME}'
+        if xr_test_runtime is not None:
+            if runtime_entry not in native:
+                raise ValueError('The emulator VR APK must carry the named OpenXR test runtime')
+            validate_library(xr_test_runtime, 24, abi)
+            with archive.open(runtime_entry) as packaged, xr_test_runtime.open('rb') as built:
+                if digest(packaged) != digest(built):
+                    raise ValueError('The packaged OpenXR test runtime differs from the named library')
+            native.discard(runtime_entry)
         if any(name.rsplit('/', 1)[-1] == XR_TEST_RUNTIME for name in native):
             raise ValueError('APK must never carry the OpenXR test runtime')
         if native != {name for name in expected if name.startswith('lib/')}:

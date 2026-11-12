@@ -685,4 +685,49 @@ inline vrQuadHit_t VR_RayQuadIntersect( const vrVec3_t &rayOrigin, const vrVec3_
 	return result;
 }
 
+/*
+====================
+Headset services
+
+vr_refreshRate asks for the fastest refresh rate the headset offers up to the
+player's choice; a choice below every offered rate takes the slowest, and 0
+(or a non-finite value) asks for nothing, keeping the headset's own rate.
+Offered rates come from the runtime in any order. Returns 0 when nothing is
+asked for.
+====================
+*/
+inline float VR_ChooseRefreshRate( float requested, const float *offered, int count ) {
+	if ( !std::isfinite( requested ) || requested <= 0.0f || offered == 0 || count <= 0 ) {
+		return 0.0f;
+	}
+	float best = 0.0f;
+	float slowest = 0.0f;
+	for ( int i = 0; i < count; i++ ) {
+		const float rate = offered[i];
+		if ( !std::isfinite( rate ) || rate <= 0.0f ) {
+			continue;
+		}
+		if ( slowest <= 0.0f || rate < slowest ) {
+			slowest = rate;
+		}
+		// a rate within half a hertz of the choice counts as it (90 asks for 90.0003)
+		if ( rate <= requested + 0.5f && rate > best ) {
+			best = rate;
+		}
+	}
+	return best > 0.0f ? best : slowest;
+}
+
+// vr_performanceLevel as an XrPerfSettingsLevelEXT (0 power savings, 25
+// sustained low, 50 sustained high), or -1 for 0: the runtime decides.
+// Boost is for short bursts and is never held.
+inline int VR_PerformanceSettingsLevel( int choice ) {
+	switch ( choice ) {
+		case 1: return 0;
+		case 2: return 25;
+		case 3: return 50;
+		default: return -1;
+	}
+}
+
 #endif /* !__VR_MATH_CORE_H__ */

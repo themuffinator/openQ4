@@ -381,6 +381,96 @@ class AndroidBuildTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'belongs to Quest stages only'):
                 verify_android_apk.verify_payload(apk, stage, '0.14.000')
 
+    def test_only_the_emulator_vr_check_packs_the_named_test_runtime(self) -> None:
+        name = verify_android_apk.XR_TEST_RUNTIME
+        with tempfile.TemporaryDirectory(prefix='android-xr-runtime-', dir=ROOT / '.tmp') as temporary:
+            stage = Path(temporary) / 'stage'
+            _, entries = staged_package(stage, 'emulator')
+            runtime = Path(temporary) / 'built' / name
+            runtime.parent.mkdir()
+            runtime.write_bytes(android_library(machine=62))
+            apk = Path(temporary) / 'vr.apk'
+            write_apk(apk, dict(entries, **{'lib/x86_64/' + name: runtime.read_bytes()}))
+            # The emulator VR check names the library it built; nothing else passes.
+            verify_android_apk.verify_payload(apk, stage, '0.14.000', 'emulator', runtime)
+            with self.assertRaisesRegex(ValueError, 'never carry the OpenXR test runtime'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'emulator')
+            other = Path(temporary) / 'other' / name
+            other.parent.mkdir()
+            other.write_bytes(android_library(api=23, machine=62))
+            with self.assertRaisesRegex(ValueError, 'differs from the named library'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'emulator', other)
+            write_apk(apk, entries)
+            with self.assertRaisesRegex(ValueError, 'must carry the named OpenXR test runtime'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'emulator', runtime)
+            (stage / 'lib' / name).write_bytes(runtime.read_bytes())
+            with self.assertRaisesRegex(ValueError, 'never be staged'):
+                verify_android_apk.verify_payload(apk, stage, '0.14.000', 'emulator', runtime)
+        for variant in ('phone', 'quest'):
+            with tempfile.TemporaryDirectory(prefix=f'android-xr-runtime-{variant}-', dir=ROOT / '.tmp') as temporary:
+                stage = Path(temporary) / 'stage'
+                _, entries = staged_package(stage, variant)
+                runtime = Path(temporary) / name
+                runtime.write_bytes(android_library())
+                apk = Path(temporary) / 'release.apk'
+                write_apk(apk, dict(entries, **{'lib/arm64-v8a/' + name: runtime.read_bytes()}))
+                with self.subTest(variant=variant), self.assertRaisesRegex(ValueError, 'Only the diagnostic emulator APK'):
+                    verify_android_apk.verify_payload(apk, stage, '0.14.000', variant, runtime)
+
+    def test_emulator_vr_mode_engine_and_runtime_scripts_agree(self) -> None:
+        smoke = android_emulator_smoke
+        scripts = smoke.scripts_for_mode('vr')
+        files = smoke.vr_runtime_files()
+        autoexec, gameplay = scripts['autoexec.cfg'], scripts['emulator_smoke.cfg']
+        # the Quest flavor's start, against the emulator's runtime manifest
+        for line in ('set vr_enable 1', 'set in_touchControls 0', 'set vr_refreshRate 90', 'set vr_performanceLevel 3',
+                     f'set vr_runtimeJson {smoke.XR_DIR}/openq4_xr_test_runtime.json', 'devmap game/airdefense1'):
+            self.assertIn(line + '\n', autoexec)
+        self.assertNotIn('in_touchControls 1', autoexec)
+        self.assertLess(autoexec.index('set vr_runtimeJson'), autoexec.index('set vr_enable 1'))
+        manifest = json.loads(files[smoke.XR_DIR + '/openq4_xr_test_runtime.json'])
+        self.assertEqual(manifest['runtime']['library_path'], verify_android_apk.XR_TEST_RUNTIME)
+        environment = dict(line.split('=', 1) for line in files[smoke.XR_ENV].splitlines() if line)
+        self.assertEqual(environment['OPENQ4_XR_TEST_PERF_SETTINGS'], '1')
+        self.assertNotEqual(environment['OPENQ4_XR_TEST_RATE'], '90')	# asking for 90 must be a change
+        self.assertIn('90', environment['OPENQ4_XR_TEST_REFRESH_RATES'].split(','))
+        self.assertIn('72', environment['OPENQ4_XR_TEST_REFRESH_RATES'].split(','))
+        # every marker the runtime waits for is one the engine writes, in order
+        runtime = files[smoke.XR_DIR + '/xr_script.txt']
+        waited = [line.split()[1] for line in runtime.splitlines() if line.startswith('when ')]
+        written = [f'{smoke.XR_PRIVATE_SAVE}/{line.split()[1]}' for line in gameplay.splitlines() if line.startswith('condump ')]
+        self.assertEqual(sorted(set(waited)), sorted(written))
+        self.assertLess(gameplay.index('condump vr_marker_turn.txt'), gameplay.index('set vr_refreshRate 72'))
+
+    def test_quest_gradle_flavor_declares_what_the_verifier_requires(self) -> None:
+        gradle = (ROOT / 'mobile/android/app/build.gradle').read_text(encoding='utf-8')
+        # The generated headset manifest carries every declaration the Quest check requires.
+        for token in (verify_android_apk.HEADSET_FEATURE, verify_android_apk.HEADSET_PERMISSION,
+                      *verify_android_apk.HEADSET_CATEGORIES, verify_android_apk.HEADSET_DEVICES):
+            self.assertIn(token, gradle)
+        self.assertIn("applicationId emulator ? 'com.darkmatter.openq4.emulator' :\n"
+                      "            (questBuild ? '" + verify_android_apk.VARIANT_TABLE['quest'].package
+                      + "' : '" + verify_android_apk.VARIANT_TABLE['phone'].package + "')", gradle.replace('\r\n', '\n'))
+        self.assertIn(f"def headsetMarker = '{verify_android_apk.HEADSET_MARKER}'", gradle)
+        self.assertIn("from(nativeStage) { include headsetMarker }", gradle)
+        # a stage and a Gradle flavor must agree, both ways
+        self.assertIn("if (stagedVariant != packageVariant && (stagedVariant == 'quest' || questBuild)) {", gradle)
+        self.assertIn("throw new GradleException('The Meta Quest headset flavor is arm64-v8a only.')", gradle)
+        self.assertIn("throw new GradleException('Only the diagnostic x86_64 emulator APK may carry the OpenXR test runtime.')",
+                      gradle)
+        # the marker starts a headset build in VR with the touch controls off
+        activity = (ROOT / 'mobile/android/app/src/main/java/com/darkmatter/openq4/OpenQ4Activity.java').read_text(encoding='utf-8')
+        self.assertIn(f'assets.open("{verify_android_apk.HEADSET_MARKER}")', activity)
+        self.assertIn('if (headsetBuild == null) headsetBuild = headsetBuild(getAssets());', activity)
+        # setup offers no touch controls page on a headset
+        launcher = (ROOT / 'mobile/android/app/src/main/java/com/darkmatter/openq4/LauncherActivity.java').read_text(encoding='utf-8')
+        self.assertIn('if (!OpenQ4Activity.headsetBuild(getAssets()))', launcher)
+        for token in ('"+set", "vr_enable", "1",', '"+set", "in_touchControls", "0",', '"+set", "vr_mirror", "0"'):
+            self.assertIn(token, activity)
+        meson = (ROOT / 'meson.build').read_text(encoding='utf-8')
+        self.assertIn("openxr_android = host_system == 'android' and (get_option('android_headset') or host_cpu_family == 'x86_64')",
+                      meson)
+
     def test_quest_manifest_declares_an_immersive_headset_app(self) -> None:
         certificate = ROOT / 'mobile/android/release-signing-cert.pem'
         cert_digest = hashlib.sha256(ssl.PEM_cert_to_DER_cert(certificate.read_text())).hexdigest()

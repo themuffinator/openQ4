@@ -316,6 +316,27 @@ static void TestQuad( void ) {
 	Check( hit.hit && Near( hit.u, 0.5f ) && Near( hit.v, 0.5f ) && Near( hit.distance, 3.0f ), "rotated quad centre hit" );
 }
 
+static void TestHeadsetServices( void ) {
+	const float quest3[] = { 120.0f, 72.0f, 80.0f, 90.0f };	// a runtime may list them in any order
+	Check( VR_ChooseRefreshRate( 0.0f, quest3, 4 ) == 0.0f, "0 keeps the headset's own rate" );
+	Check( VR_ChooseRefreshRate( 90.0f, quest3, 4 ) == 90.0f, "an offered rate is taken exactly" );
+	Check( VR_ChooseRefreshRate( 100.0f, quest3, 4 ) == 90.0f, "between rates, the fastest one below the choice" );
+	Check( VR_ChooseRefreshRate( 144.0f, quest3, 4 ) == 120.0f, "above every rate, the fastest" );
+	Check( VR_ChooseRefreshRate( 60.0f, quest3, 4 ) == 72.0f, "below every rate, the slowest" );
+	const float drift[] = { 72.0f, 90.0004f };
+	Check( VR_ChooseRefreshRate( 90.0f, drift, 2 ) == 90.0004f, "a runtime's 90.0004 is the 90 the player asked for" );
+	const float broken[] = { -1.0f, std::nanf( "" ), 0.0f };
+	Check( VR_ChooseRefreshRate( 90.0f, broken, 3 ) == 0.0f, "no usable rate asks for nothing" );
+	Check( VR_ChooseRefreshRate( std::nanf( "" ), quest3, 4 ) == 0.0f, "a broken choice asks for nothing" );
+	Check( VR_ChooseRefreshRate( 90.0f, quest3, 0 ) == 0.0f, "no offered rates ask for nothing" );
+
+	Check( VR_PerformanceSettingsLevel( 0 ) == -1, "0 leaves the clocks to the runtime" );
+	Check( VR_PerformanceSettingsLevel( 1 ) == 0, "1 is power savings" );
+	Check( VR_PerformanceSettingsLevel( 2 ) == 25, "2 is sustained low" );
+	Check( VR_PerformanceSettingsLevel( 3 ) == 50, "3 is sustained high" );
+	Check( VR_PerformanceSettingsLevel( 4 ) == -1 && VR_PerformanceSettingsLevel( -2 ) == -1, "boost or nonsense is never held" );
+}
+
 int main() {
 	TestBasis();
 	TestOrientation();
@@ -331,6 +352,7 @@ int main() {
 	TestTurning();
 	TestOffsets();
 	TestQuad();
+	TestHeadsetServices();
 	std::printf( "VR math core: all checks passed\n" );
 	return 0;
 }

@@ -28,6 +28,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 #include <SDL3/SDL.h>
 #include <atomic>
+#include <jni.h>
 
 // The OpenTouch touch layer (Clibs_OpenTouch/touch_interface_base.cpp) reaches
 // SDL_StartTextInput through this global, which every SDL3 engine in the app is
@@ -47,6 +48,41 @@ idCVar sys_videoRam(
 	0,
 	65536
 );
+
+/*
+====================
+Sys_AndroidJavaHandles
+
+The OpenXR loader and instance name the Java VM and the activity. The
+activity becomes a global reference once and stays one: the loader keeps the
+context it was initialized with for the life of the process.
+====================
+*/
+bool Sys_AndroidJavaHandles( void **javaVM, void **activity ) {
+	static JavaVM *vm = NULL;
+	static jobject activityRef = NULL;
+	if ( vm == NULL || activityRef == NULL ) {
+		JNIEnv *env = static_cast<JNIEnv *>( SDL_GetAndroidJNIEnv() );
+		jobject local = static_cast<jobject>( SDL_GetAndroidActivity() );
+		if ( env == NULL || local == NULL ) {
+			return false;
+		}
+		JavaVM *found = NULL;
+		if ( env->GetJavaVM( &found ) != JNI_OK || found == NULL ) {
+			env->DeleteLocalRef( local );
+			return false;
+		}
+		activityRef = env->NewGlobalRef( local );
+		env->DeleteLocalRef( local );
+		if ( activityRef == NULL ) {
+			return false;
+		}
+		vm = found;
+	}
+	*javaVM = vm;
+	*activity = activityRef;
+	return true;
+}
 
 // The GLES renderer module resolves its entry points from the Khronos headers
 // against the system driver; there is no GLEW-style loader to bring up.

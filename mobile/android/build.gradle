@@ -3,9 +3,12 @@ plugins {
     id 'com.android.application' version '8.7.3' apply false
 }
 
-// Keep compiler/package intermediates under the repository's standard build root.
+// Keep compiler/package intermediates under the repository's standard build root,
+// one directory per package variant so their manifests and payloads never mix.
 def emulator = providers.gradleProperty('openq4Abi').getOrElse('arm64-v8a') == 'x86_64'
-layout.buildDirectory.set(file(emulator ? '../../builddir/android-apk-emulator' : '../../builddir/android-apk'))
+def quest = providers.gradleProperty('openq4Quest').getOrElse('false') == 'true'
+layout.buildDirectory.set(file(emulator ? '../../builddir/android-apk-emulator' :
+    (quest ? '../../builddir/android-apk-quest' : '../../builddir/android-apk')))
 subprojects {
     layout.buildDirectory.set(new File(rootProject.layout.buildDirectory.get().asFile, name))
 }

@@ -66,7 +66,7 @@ option(
   'android_headset',
   type: 'boolean',
   value: false,
-  description: 'Android arm64-v8a only: stage the experimental Meta Quest headset flavor (package variant "quest", with the openq4-headset marker that starts the game in VR). The Gradle flavor and its distribution are AND-05; see docs/dev/android-build.md.',
+  description: 'Android arm64-v8a only: stage the experimental Meta Quest headset flavor (package variant "quest", with the openq4-headset marker that starts the game in VR). Gradle packages it with -Popenq4Quest=true; its distribution is AND-05. See docs/dev/android-build.md.',
 )
 
 option(
@@ -101,7 +101,7 @@ option(
   'openxr',
   type: 'feature',
   value: 'auto',
-  description: 'OpenXR virtual reality in the client (vr_enable). Links the Khronos OpenXR loader statically into the SDL3 client on Windows and Linux; macOS, Android and dedicated servers never build it. See docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md.',
+  description: 'OpenXR virtual reality in the client (vr_enable). Links the Khronos OpenXR loader statically into the SDL3 client on Windows and Linux, and on Android into the Meta Quest flavor (android_headset) and the diagnostic x86_64 emulator; macOS, Android phones and dedicated servers never build it. See docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md.',
 )
 
 option(

@@ -13,11 +13,15 @@
 #include "../tr_local.h"
 #include "../TemporalPresentation.h"
 #include "../SavePreviewCapture.h"
+#if defined( OPENQ4_RENDERER_GLES_MODULE ) && defined( __ANDROID__ )
+#include "../GLStateCache.h"
+#include "../GLES_D3/gles_program.h"
+#endif
 
 #if defined( OPENQ4_RENDERER_GL_MODULE ) && defined( _WIN32 )
 #include <windows.h>
 #endif
-#if defined( OPENQ4_RENDERER_GL_MODULE ) && defined( __linux__ )
+#if ( defined( OPENQ4_RENDERER_GL_MODULE ) || defined( OPENQ4_RENDERER_GLES_MODULE ) ) && defined( __linux__ )
 #include <dlfcn.h>
 #endif
 
@@ -25,12 +29,17 @@
 #define GL_FRAMEBUFFER_SRGB 0x8DB9
 #endif
 
-// Presentation needs desktop GL: the module that owns a WGL or GLX context.
-// The GLES module and the static renderer of dedicated and macOS builds never
-// present to OpenXR; the Vulkan module has its own backend
+// Presentation needs the module that owns the context: desktop GL (WGL, GLX
+// or EGL), or on Android the GLES module, whose EGL context a standalone
+// headset (Meta Quest) binds through XR_KHR_opengl_es_enable. The desktop GLES
+// module and the static renderer of dedicated and macOS builds never present
+// to OpenXR; the Vulkan module has its own backend
 // (Vulkan/vk_VRPresentation.cpp).
 #if defined( OPENQ4_RENDERER_GL_MODULE ) && !defined( OPENQ4_RENDERER_GLES_MODULE )
 #define OPENQ4_VR_GL_PRESENTATION 1
+#elif defined( OPENQ4_RENDERER_GLES_MODULE ) && defined( __ANDROID__ )
+#define OPENQ4_VR_GL_PRESENTATION 1
+#define OPENQ4_VR_GLES_PRESENTATION 1
 #endif
 
 // GL presents through the front end's render textures (tr.vrTargets), and its
@@ -61,10 +70,15 @@ R_VR_BackendCanPresent
 ====================
 */
 bool R_VR_BackendCanPresent( void ) {
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+	// OpenGL ES 3 links its framebuffer entry points directly
+	return glConfig.isInitialized;
+#else
 	return glConfig.isInitialized
 		&& glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES
 		&& glBindFramebuffer != NULL && glGenFramebuffers != NULL
 		&& glFramebufferTexture2D != NULL && glBlitFramebuffer != NULL;
+#endif
 }
 
 /*
@@ -88,7 +102,7 @@ static void R_VR_ContextVersion( renderVRGraphicsBinding_t &binding ) {
 	binding.glMinor = minor;
 }
 
-#if defined( __linux__ )
+#if defined( __linux__ ) && !defined( __ANDROID__ )
 void *GLimp_ExtensionPointer( const char *name );
 
 // GLX is resolved at run time so the module needs no X11 or GLX headers; the
@@ -103,9 +117,14 @@ static void *R_VR_GLXSymbol( const char *name ) {
 #endif
 
 #if defined( __linux__ )
-// EGL as well, which SDL loads for native Wayland, possibly as a local library.
+// EGL as well, which SDL loads for native Wayland, possibly as a local library
+// (Android's is libEGL.so, which the GLES module links).
 static void *R_VR_EGLSymbol( const char *name ) {
+#if defined( __ANDROID__ )
+	static void *library = dlopen( "libEGL.so", RTLD_NOW | RTLD_NOLOAD );
+#else
 	static void *library = dlopen( "libEGL.so.1", RTLD_NOW | RTLD_NOLOAD );
+#endif
 	void *symbol = dlsym( RTLD_DEFAULT, name );
 	if ( symbol == NULL && library != NULL ) {
 		symbol = dlsym( library, name );
@@ -172,6 +191,9 @@ bool R_VR_QueryGraphicsBinding( renderVRGraphicsBinding_t &binding ) {
 	binding.wglDC = wglGetCurrentDC();
 	binding.wglContext = wglGetCurrentContext();
 	return binding.wglDC != NULL && binding.wglContext != NULL;
+#elif defined( __ANDROID__ )
+	// the GLES module's EGL context, for XR_KHR_opengl_es_enable
+	return R_VR_QueryEGLBinding( binding );
 #elif defined( __linux__ )
 	typedef void *( *getCurrentContext_t )( void );
 	typedef void *( *getCurrentDisplay_t )( void );
@@ -349,9 +371,175 @@ static bool RB_VR_EnsureBlitFramebuffer( void ) {
 	return rb_vrBlitFramebuffer != 0;
 }
 
+// The engine's pixels are already gamma-encoded and must reach an sRGB
+// swapchain image unchanged. Desktop GL encodes only while GL_FRAMEBUFFER_SRGB
+// is on. OpenGL ES always encodes into an sRGB destination unless
+// GL_EXT_sRGB_write_control turns that off (Meta Quest's Adreno has it).
+// False when writes into an sRGB image stay encoded.
+static bool RB_VR_DisableSRGBWrites( void ) {
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+	static int writeControl = -1;
+	static int generation = -1;
+	if ( writeControl < 0 || generation != tr.glContextGeneration ) {
+		writeControl = 0;
+		generation = tr.glContextGeneration;
+		GLint count = 0;
+		glGetIntegerv( GL_NUM_EXTENSIONS, &count );
+		for ( GLint i = 0; i < count && writeControl == 0; i++ ) {
+			const char *name = reinterpret_cast<const char *>( glGetStringi( GL_EXTENSIONS, static_cast<GLuint>( i ) ) );
+			if ( name != NULL && idStr::Cmp( name, "GL_EXT_sRGB_write_control" ) == 0 ) {
+				writeControl = 1;
+			}
+		}
+		if ( writeControl == 0 ) {
+			common->Printf( "VR: OpenGL ES has no GL_EXT_sRGB_write_control; sRGB swapchain images are written "
+				"through a decoding draw instead of a blit\n" );
+		}
+	}
+	if ( writeControl != 0 ) {
+		glDisable( GL_FRAMEBUFFER_SRGB );
+	}
+	return writeControl != 0;
+#else
+	if ( glConfig.framebufferSRGBAvailable ) {
+		glDisable( GL_FRAMEBUFFER_SRGB );
+	}
+	return true;
+#endif
+}
+
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+/*
+====================
+RB_VR_DecodeCopy
+
+OpenGL ES without GL_EXT_sRGB_write_control encodes every write into an sRGB
+image, blits included. Drawing the target through a shader that decodes the
+engine's gamma-encoded pixels first lets that encoding give them back
+unchanged. Draws into the bound draw framebuffer; the backend's state caches
+are told the GL state changed behind them.
+====================
+*/
+static GLuint	rb_vrDecodeProgram = 0;
+static GLuint	rb_vrDecodeVertexArray = 0;
+static GLuint	rb_vrDecodeSampler = 0;
+static int		rb_vrDecodeGeneration = -1;
+
+static GLuint RB_VR_CompileDecodeShader( GLenum type, const char *source ) {
+	GLuint shader = glCreateShader( type );
+	glShaderSource( shader, 1, &source, NULL );
+	glCompileShader( shader );
+	GLint compiled = GL_FALSE;
+	glGetShaderiv( shader, GL_COMPILE_STATUS, &compiled );
+	if ( compiled != GL_TRUE ) {
+		char log[512] = "";
+		glGetShaderInfoLog( shader, sizeof( log ), NULL, log );
+		common->Warning( "VR: the sRGB decode shader does not compile: %s", log );
+		glDeleteShader( shader );
+		return 0;
+	}
+	return shader;
+}
+
+static bool RB_VR_EnsureDecodeProgram( void ) {
+	if ( rb_vrDecodeGeneration == tr.glContextGeneration ) {
+		return rb_vrDecodeProgram != 0;
+	}
+	rb_vrDecodeGeneration = tr.glContextGeneration;
+	rb_vrDecodeProgram = rb_vrDecodeVertexArray = rb_vrDecodeSampler = 0;
+	// one triangle over the target, from gl_VertexID alone
+	static const char *const vertexSource =
+		"#version 300 es\n"
+		"out vec2 uv;\n"
+		"void main() {\n"
+		"	vec2 corner = vec2( float( ( gl_VertexID & 1 ) << 2 ), float( ( gl_VertexID & 2 ) << 1 ) ) - 1.0;\n"
+		"	uv = corner * 0.5 + 0.5;\n"
+		"	gl_Position = vec4( corner, 0.0, 1.0 );\n"
+		"}\n";
+	static const char *const fragmentSource =
+		"#version 300 es\n"
+		"precision highp float;\n"
+		"uniform sampler2D image;\n"
+		"in vec2 uv;\n"
+		"out vec4 color;\n"
+		"void main() {\n"
+		"	vec4 encoded = texture( image, uv );\n"
+		"	vec3 low = encoded.rgb / 12.92;\n"
+		"	vec3 high = pow( ( encoded.rgb + 0.055 ) / 1.055, vec3( 2.4 ) );\n"
+		"	color = vec4( mix( high, low, vec3( lessThanEqual( encoded.rgb, vec3( 0.04045 ) ) ) ), encoded.a );\n"
+		"}\n";
+	const GLuint vertex = RB_VR_CompileDecodeShader( GL_VERTEX_SHADER, vertexSource );
+	const GLuint fragment = RB_VR_CompileDecodeShader( GL_FRAGMENT_SHADER, fragmentSource );
+	if ( vertex == 0 || fragment == 0 ) {
+		if ( vertex != 0 ) {
+			glDeleteShader( vertex );
+		}
+		if ( fragment != 0 ) {
+			glDeleteShader( fragment );
+		}
+		return false;
+	}
+	const GLuint program = glCreateProgram();
+	glAttachShader( program, vertex );
+	glAttachShader( program, fragment );
+	glLinkProgram( program );
+	glDeleteShader( vertex );
+	glDeleteShader( fragment );
+	GLint linked = GL_FALSE;
+	glGetProgramiv( program, GL_LINK_STATUS, &linked );
+	if ( linked != GL_TRUE ) {
+		common->Warning( "VR: the sRGB decode program does not link" );
+		glDeleteProgram( program );
+		return false;
+	}
+	glUseProgram( program );
+	glUniform1i( glGetUniformLocation( program, "image" ), 0 );
+	glUseProgram( 0 );
+	glGenVertexArrays( 1, &rb_vrDecodeVertexArray );
+	glGenSamplers( 1, &rb_vrDecodeSampler );
+	glSamplerParameteri( rb_vrDecodeSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+	glSamplerParameteri( rb_vrDecodeSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+	glSamplerParameteri( rb_vrDecodeSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glSamplerParameteri( rb_vrDecodeSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	rb_vrDecodeProgram = program;
+	return true;
+}
+
+static bool RB_VR_DecodeCopy( idRenderTexture *source, int width, int height ) {
+	idImage *color = source->GetNumColorImages() > 0 ? source->GetColorImage( 0 ) : NULL;
+	if ( color == NULL || !RB_VR_EnsureDecodeProgram() ) {
+		return false;
+	}
+	glViewport( 0, 0, width, height );
+	glDisable( GL_BLEND );
+	glDisable( GL_DEPTH_TEST );
+	glDisable( GL_STENCIL_TEST );
+	glDisable( GL_CULL_FACE );
+	glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	glUseProgram( rb_vrDecodeProgram );
+	glBindVertexArray( rb_vrDecodeVertexArray );
+	glActiveTexture( GL_TEXTURE0 );
+	glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( color->GetDeviceHandle() ) );
+	glBindSampler( 0, rb_vrDecodeSampler );
+	glDrawArrays( GL_TRIANGLES, 0, 3 );
+	glBindSampler( 0, 0 );
+	glBindTexture( GL_TEXTURE_2D, 0 );
+	glBindVertexArray( 0 );
+	glUseProgram( 0 );
+	// the program, unit 0 and the GL state changed behind the caches that
+	// delta-code against them; a frame that skips the swap (a screenshot)
+	// never reaches the swap's own reset (RB_GLES_RestoreStateAfterOverlay)
+	R_GLESD3_InvalidateProgramState();
+	backEnd.glState.tmu[0].current2DMap = -1;
+	R_GLStateCache_InvalidateAll( "VR sRGB decode" );
+	GL_ClearStateDelta();
+	return true;
+}
+#endif
+
 // Copies a finished target into a swapchain image. The image belongs to the
-// runtime: it is attached only for the copy, and framebuffer sRGB stays off so
-// the gamma-encoded pixels arrive unchanged in an sRGB swapchain format.
+// runtime: it is attached only for the copy, and sRGB writes stay off so the
+// gamma-encoded pixels arrive unchanged in an sRGB swapchain format.
 static bool RB_VR_BlitToImage( idRenderTexture *source, GLuint image, int width, int height ) {
 	if ( source == NULL || image == 0 || width <= 0 || height <= 0 || !RB_VR_EnsureBlitFramebuffer() ) {
 		return false;
@@ -360,9 +548,7 @@ static bool RB_VR_BlitToImage( idRenderTexture *source, GLuint image, int width,
 	if ( sourceFramebuffer == 0 ) {
 		return false;
 	}
-	if ( glConfig.framebufferSRGBAvailable ) {
-		glDisable( GL_FRAMEBUFFER_SRGB );
-	}
+	const bool writesUnencoded = RB_VR_DisableSRGBWrites();
 	const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
 	if ( scissorWasEnabled ) {
 		glDisable( GL_SCISSOR_TEST );
@@ -376,7 +562,20 @@ static bool RB_VR_BlitToImage( idRenderTexture *source, GLuint image, int width,
 	const GLenum status = glCheckFramebufferStatus( GL_DRAW_FRAMEBUFFER );
 	const bool complete = status == GL_FRAMEBUFFER_COMPLETE;
 	if ( complete ) {
-		glBlitFramebuffer( 0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+		bool copied = false;
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+		if ( !writesUnencoded ) {
+			GLint encoding = GL_LINEAR;
+			glGetFramebufferAttachmentParameteriv( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, &encoding );
+			copied = encoding == GL_SRGB && RB_VR_DecodeCopy( source, width, height );
+		}
+#else
+		(void)writesUnencoded;
+#endif
+		if ( !copied ) {
+			glBlitFramebuffer( 0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+		}
 	} else {
 		static int reports = 0;
 		if ( reports++ < 4 ) {
@@ -438,7 +637,32 @@ static void RB_VR_DrawMirror( void ) {
 		t0 = 0.5f - 0.5f * keep;
 		t1 = 0.5f + 0.5f * keep;
 	}
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+	// the GLES module has no 2D image pass; a filtered blit crops the same way
+	// (the Android window is single-sampled, so it can receive one)
+	const GLuint sourceFramebuffer = source->GetDeviceHandle();
+	if ( sourceFramebuffer == 0 ) {
+		return;
+	}
+	const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
+	if ( scissorWasEnabled ) {
+		glDisable( GL_SCISSOR_TEST );
+	}
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, sourceFramebuffer );
+	glReadBuffer( GL_COLOR_ATTACHMENT0 );
+	glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
+	glBlitFramebuffer( static_cast<GLint>( s0 * sourceWidth ), static_cast<GLint>( t0 * sourceHeight ),
+		static_cast<GLint>( s1 * sourceWidth ), static_cast<GLint>( t1 * sourceHeight ),
+		0, 0, windowWidth, windowHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR );
+	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	glReadBuffer( GL_BACK );
+	if ( scissorWasEnabled ) {
+		glEnable( GL_SCISSOR_TEST );
+	}
+	(void)image;
+#else
 	RB_VR_DrawImageRect( image, 0, 0, windowWidth, windowHeight, s0, t0, s1, t1 );
+#endif
 }
 
 /*
@@ -503,9 +727,23 @@ bool RB_VR_PresentFrame( void ) {
 }
 
 void R_VR_ShutdownTargets( void ) {
-	if ( rb_vrBlitFramebuffer != 0 && rb_vrBlitFramebufferGeneration == tr.glContextGeneration && glDeleteFramebuffers != NULL ) {
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+	const bool canDeleteFramebuffers = true;	// linked directly
+#else
+	const bool canDeleteFramebuffers = glDeleteFramebuffers != NULL;
+#endif
+	if ( rb_vrBlitFramebuffer != 0 && rb_vrBlitFramebufferGeneration == tr.glContextGeneration && canDeleteFramebuffers ) {
 		glDeleteFramebuffers( 1, &rb_vrBlitFramebuffer );
 	}
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+	if ( rb_vrDecodeGeneration == tr.glContextGeneration && rb_vrDecodeProgram != 0 ) {
+		glDeleteProgram( rb_vrDecodeProgram );
+		glDeleteVertexArrays( 1, &rb_vrDecodeVertexArray );
+		glDeleteSamplers( 1, &rb_vrDecodeSampler );
+	}
+	rb_vrDecodeProgram = rb_vrDecodeVertexArray = rb_vrDecodeSampler = 0;
+	rb_vrDecodeGeneration = -1;
+#endif
 	rb_vrBlitFramebuffer = 0;
 	rb_vrBlitFramebufferGeneration = -1;
 	R_SetDefaultRenderTarget( NULL );

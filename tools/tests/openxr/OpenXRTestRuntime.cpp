@@ -33,6 +33,17 @@
 //   OPENQ4_XR_TEST_VK_FORMATS comma-separated VkFormat values the swapchains
 //                           offer, in order (default 43,50,37,44: RGBA and
 //                           BGRA, sRGB first)
+//   OPENQ4_XR_TEST_GL_FORMATS the same for OpenGL (ES) swapchains, as GL enums
+//   OPENQ4_XR_TEST_REFRESH_RATES comma-separated refresh rates (Hz) the display
+//                           offers through XR_FB_display_refresh_rate, which is
+//                           offered only then (Meta Quest style); a request
+//                           repaces the frames at the chosen rate
+//   OPENQ4_XR_TEST_PERF_SETTINGS 1 offers XR_EXT_performance_settings: levels the
+//                           application sets are logged, and the thermal script
+//                           command reports limits
+//
+// On Android an app process has no environment a harness can set, so these
+// come from openq4_xr_test.env in the app's external files directory instead.
 //
 // Script lines are "<frame> <command> [arguments]", where frame counts
 // completed xrEndFrame calls and a command takes effect when that many frames
@@ -54,6 +65,7 @@
 //                                                   change is announced at once, as a runtime does
 //   focus <0|1>                                     toggle between FOCUSED and VISIBLE
 //   exit                                            ask the application to quit (STOPPING)
+//   thermal <cpu|gpu> <normal|warning|impaired>     a thermal limit report (XR_EXT_performance_settings)
 
 #if defined( _WIN32 )
 #define WIN32_LEAN_AND_MEAN
@@ -65,6 +77,17 @@
 
 #if defined( __APPLE__ )
 #include <OpenGL/gl.h>
+#elif defined( __ANDROID__ )
+// OpenGL ES swapchains for the GLES renderer of a standalone headset (Meta
+// Quest), checked on the Android emulator
+#include <GLES3/gl3.h>
+#include <EGL/egl.h>
+#include <jni.h>
+#define XR_USE_PLATFORM_ANDROID
+#define XR_USE_GRAPHICS_API_OPENGL_ES
+#ifndef APIENTRY
+#define APIENTRY GL_APIENTRY
+#endif
 #else
 #include <GL/gl.h>
 #endif
@@ -529,6 +552,13 @@ struct RuntimeGlobals {
 	// floor-level reference spaces offered (OPENQ4_XR_TEST_SPACES)
 	bool					offerStage = true;
 	bool					offerLocalFloor = false;
+	// XR_FB_display_refresh_rate (OPENQ4_XR_TEST_REFRESH_RATES): the offered
+	// rates, and the rate frames are paced at before any request
+	std::vector<float>		refreshRates;
+	double					defaultRefreshRate = 90.0;
+	// XR_EXT_performance_settings (OPENQ4_XR_TEST_PERF_SETTINGS)
+	bool					offerPerfSettings = false;
+	int						thermalLevel[2] = { XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT, XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT };
 	// LOCAL's origin in the stage space: a seated origin at the default head
 	// height until the "recenter" script command moves it. The move applies to
 	// locates at or after localChangeTime, as the specification requires of
@@ -653,12 +683,47 @@ void ParseScript( const char *path ) {
 	Log( "{\"event\":\"script\",\"path\":\"%s\",\"commands\":%u}", JsonEscape( path ).c_str(), static_cast<unsigned>( g.script.size() ) );
 }
 
+#if defined( __ANDROID__ )
+// An Android app process has no environment a test harness can set, so the
+// OPENQ4_XR_TEST_* settings come from openq4_xr_test.env in the app's
+// external files directory, one NAME=value per line ('#' comments).
+void LoadAndroidEnvironmentFile() {
+	char process[256] = {};
+	if ( FILE *cmdline = std::fopen( "/proc/self/cmdline", "rb" ) ) {
+		const size_t length = std::fread( process, 1, sizeof( process ) - 1, cmdline );
+		std::fclose( cmdline );
+		process[length] = '\0';
+	}
+	if ( char *colon = std::strchr( process, ':' ) ) {
+		*colon = '\0';	// a sub-process of the package
+	}
+	if ( process[0] == '\0' ) {
+		return;
+	}
+	std::ifstream file( std::string( "/sdcard/Android/data/" ) + process + "/files/openq4_xr_test.env" );
+	std::string line;
+	while ( std::getline( file, line ) ) {
+		while ( !line.empty() && ( line.back() == '\r' || line.back() == ' ' ) ) {
+			line.pop_back();
+		}
+		const size_t equals = line.find( '=' );
+		if ( line.empty() || line[0] == '#' || equals == std::string::npos || equals == 0 ) {
+			continue;
+		}
+		setenv( line.substr( 0, equals ).c_str(), line.substr( equals + 1 ).c_str(), 1 );
+	}
+}
+#endif
+
 void InitGlobals() {
 	RuntimeGlobals &g = G();
 	if ( g.initialized ) {
 		return;
 	}
 	g.initialized = true;
+#if defined( __ANDROID__ )
+	LoadAndroidEnvironmentFile();
+#endif
 	ResetHands();
 	if ( const char *logPath = std::getenv( "OPENQ4_XR_TEST_LOG" ) ) {
 		g.log = std::fopen( logPath, "a" );
@@ -692,6 +757,20 @@ void InitGlobals() {
 		const std::string list = std::string( "," ) + spaces + ",";
 		g.offerStage = list.find( ",stage," ) != std::string::npos;
 		g.offerLocalFloor = list.find( ",local_floor," ) != std::string::npos;
+	}
+	g.defaultRefreshRate = g.refreshRate;
+	if ( const char *rates = std::getenv( "OPENQ4_XR_TEST_REFRESH_RATES" ) ) {
+		std::stringstream stream( rates );
+		std::string item;
+		while ( std::getline( stream, item, ',' ) ) {
+			const float rate = static_cast<float>( std::atof( item.c_str() ) );
+			if ( rate > 0.0f ) {
+				g.refreshRates.push_back( rate );
+			}
+		}
+	}
+	if ( const char *perf = std::getenv( "OPENQ4_XR_TEST_PERF_SETTINGS" ) ) {
+		g.offerPerfSettings = std::atoi( perf ) != 0;
 	}
 	if ( const char *path = std::getenv( "OPENQ4_XR_TEST_FAULT_AFTER" ) ) g.faultAfter = path;
 	if ( const char *path = std::getenv( "OPENQ4_XR_TEST_FAULT_ONCE" ) ) g.faultOnce = path;
@@ -969,6 +1048,8 @@ PFNTRGLBINDBUFFER GetBindBuffer() {
 #if defined( _WIN32 )
 	static PFNTRGLBINDBUFFER fn = reinterpret_cast<PFNTRGLBINDBUFFER>( wglGetProcAddress( "glBindBuffer" ) );
 	return fn;
+#elif defined( __ANDROID__ )
+	return glBindBuffer;	// core in OpenGL ES 3.0
 #else
 	return nullptr;
 #endif
@@ -1232,9 +1313,27 @@ bool ReadSwapchainImage( const TRSwapchain *swapchain, int index, const XrRect2D
 		bindBuffer( GL_PIXEL_PACK_BUFFER, 0 );
 	}
 	glPixelStorei( GL_PACK_ALIGNMENT, 1 );
+#if defined( __ANDROID__ )
+	// ES has no glGetTexImage: the image is read through a framebuffer. An sRGB
+	// image reads back as its stored bytes on the Android emulator's GLES
+	// (SwiftShader), checked against the window mirror, so nothing is converted.
+	GLint previousReadFramebuffer = 0;
+	glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer );
+	GLuint readFramebuffer = 0;
+	glGenFramebuffers( 1, &readFramebuffer );
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, readFramebuffer );
+	glFramebufferTexture2D( GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+		swapchain->textures[static_cast<size_t>( index )], 0 );
+	glReadBuffer( GL_COLOR_ATTACHMENT0 );
+	glReadPixels( 0, 0, fullWidth, fullHeight, GL_RGBA, GL_UNSIGNED_BYTE, full.data() );
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, static_cast<GLuint>( previousReadFramebuffer ) );
+	glDeleteFramebuffers( 1, &readFramebuffer );
+	(void)previousTexture;
+#else
 	glBindTexture( GL_TEXTURE_2D, swapchain->textures[static_cast<size_t>( index )] );
 	glGetTexImage( GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, full.data() );
 	glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( previousTexture ) );
+#endif
 	glPixelStorei( GL_PACK_ALIGNMENT, previousPack );
 	if ( bindBuffer != nullptr ) {
 		bindBuffer( GL_PIXEL_PACK_BUFFER, static_cast<GLuint>( previousPackBuffer ) );
@@ -1334,6 +1433,8 @@ bool FileExists( const std::string &path ) {
 	return true;
 }
 
+bool InstanceHasExtension( TRInstance *instance, const char *name );
+
 void RunScriptCommand( TRSession *session, const std::vector<std::string> &a ) {
 	RuntimeGlobals &g = G();
 	{
@@ -1422,6 +1523,21 @@ void RunScriptCommand( TRSession *session, const std::vector<std::string> &a ) {
 				session->exitRequested = true;
 				QueueStateChange( session, XR_SESSION_STATE_STOPPING );
 			}
+		} else if ( command == "thermal" && a.size() >= 3 && g.offerPerfSettings
+				&& InstanceHasExtension( session->instance, XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME ) ) {
+			const int domain = a[1] == "gpu" ? 1 : 0;
+			const int level = a[2] == "impaired" ? XR_PERF_SETTINGS_NOTIF_LEVEL_IMPAIRED_EXT
+				: a[2] == "warning" ? XR_PERF_SETTINGS_NOTIF_LEVEL_WARNING_EXT : XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT;
+			XrEventDataBuffer buffer = {};
+			XrEventDataPerfSettingsEXT *perf = reinterpret_cast<XrEventDataPerfSettingsEXT *>( &buffer );
+			perf->type = XR_TYPE_EVENT_DATA_PERF_SETTINGS_EXT;
+			perf->next = nullptr;
+			perf->domain = domain == 1 ? XR_PERF_SETTINGS_DOMAIN_GPU_EXT : XR_PERF_SETTINGS_DOMAIN_CPU_EXT;
+			perf->subDomain = XR_PERF_SETTINGS_SUB_DOMAIN_THERMAL_EXT;
+			perf->fromLevel = static_cast<XrPerfSettingsNotificationLevelEXT>( g.thermalLevel[domain] );
+			perf->toLevel = static_cast<XrPerfSettingsNotificationLevelEXT>( level );
+			g.thermalLevel[domain] = level;
+			QueueEvent( session->instance, buffer );
 		}
 		Log( "{\"event\":\"script_command\",\"frame\":%llu,\"command\":\"%s\"}",
 			static_cast<unsigned long long>( session->framesSubmitted ), JsonEscape( command ).c_str() );
@@ -1458,7 +1574,9 @@ void AdvanceScript( TRSession *session ) {
 // carries the getProcAddress function, then EGLDisplay, EGLConfig and
 // EGLContext pointers.
 #define TR_MNDX_EGL_ENABLE_EXTENSION_NAME "XR_MNDX_egl_enable"
+#if defined( __linux__ ) && !defined( __ANDROID__ )
 const uint32_t TR_MNDX_EGL_ENABLE_SPEC_VERSION = 2;
+#endif
 
 struct TREGLBinding {
 	XrStructureType	type;
@@ -1470,26 +1588,48 @@ struct TREGLBinding {
 };
 
 const char *const SUPPORTED_EXTENSIONS[] = {
+#if defined( __ANDROID__ )
+	XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME,
+	XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME,
+#else
 	XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
+#endif
 	XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME,
 	XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,
 	XR_EXT_LOCAL_FLOOR_EXTENSION_NAME,	// only while OPENQ4_XR_TEST_SPACES offers local_floor
-#if defined( __linux__ )
+	XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME,	// only with OPENQ4_XR_TEST_REFRESH_RATES
+	XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME,	// only with OPENQ4_XR_TEST_PERF_SETTINGS
+#if defined( __linux__ ) && !defined( __ANDROID__ )
 	TR_MNDX_EGL_ENABLE_EXTENSION_NAME,
 #endif
 };
 
 uint32_t ExtensionVersion( const char *name ) {
+#if defined( __ANDROID__ )
+	if ( std::strcmp( name, XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME ) == 0 ) {
+		return XR_KHR_opengl_es_enable_SPEC_VERSION;
+	}
+	if ( std::strcmp( name, XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME ) == 0 ) {
+		return XR_KHR_android_create_instance_SPEC_VERSION;
+	}
+#else
 	if ( std::strcmp( name, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME ) == 0 ) {
 		return XR_KHR_opengl_enable_SPEC_VERSION;
 	}
+#endif
 	if ( std::strcmp( name, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ) == 0 ) {
 		return XR_KHR_vulkan_enable2_SPEC_VERSION;
 	}
 	if ( std::strcmp( name, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME ) == 0 ) {
 		return XR_EXT_local_floor_SPEC_VERSION;
 	}
-#if defined( __linux__ )
+	if ( std::strcmp( name, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME ) == 0 && !G().refreshRates.empty() ) {
+		return XR_FB_display_refresh_rate_SPEC_VERSION;
+	}
+	if ( std::strcmp( name, XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME ) == 0 && G().offerPerfSettings ) {
+		return XR_EXT_performance_settings_SPEC_VERSION;
+	}
+#if defined( __linux__ ) && !defined( __ANDROID__ )
 	if ( std::strcmp( name, TR_MNDX_EGL_ENABLE_EXTENSION_NAME ) == 0 ) {
 		return TR_MNDX_EGL_ENABLE_SPEC_VERSION;
 	}
@@ -1508,7 +1648,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateInstanceExtensionProperties( const 
 	}
 	std::vector<XrExtensionProperties> values;
 	for ( const char *name : SUPPORTED_EXTENSIONS ) {
-		if ( std::strcmp( name, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME ) == 0 && !G().offerLocalFloor ) {
+		if ( ( std::strcmp( name, XR_EXT_LOCAL_FLOOR_EXTENSION_NAME ) == 0 && !G().offerLocalFloor ) || ExtensionVersion( name ) == 0 ) {
 			continue;
 		}
 		XrExtensionProperties p = {};
@@ -1814,6 +1954,29 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateViewConfigurationViews( XrInstance 
 	return XR_SUCCESS;
 }
 
+#if defined( __ANDROID__ )
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetOpenGLESGraphicsRequirementsKHR( XrInstance handle, XrSystemId systemId, XrGraphicsRequirementsOpenGLESKHR *requirements ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	TRInstance *instance = GetInstance( handle );
+	if ( instance == nullptr ) {
+		return XR_ERROR_HANDLE_INVALID;
+	}
+	if ( !InstanceHasExtension( instance, XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME ) ) {
+		return XR_ERROR_FUNCTION_UNSUPPORTED;
+	}
+	if ( systemId != TR_SYSTEM_ID ) {
+		return XR_ERROR_SYSTEM_INVALID;
+	}
+	if ( requirements == nullptr || requirements->type != XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	requirements->minApiVersionSupported = XR_MAKE_VERSION( 3, 0, 0 );
+	requirements->maxApiVersionSupported = XR_MAKE_VERSION( 3, 2, 0 );
+	instance->graphicsRequirementsQueried = true;
+	return XR_SUCCESS;
+}
+#endif
+
 XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetOpenGLGraphicsRequirementsKHR( XrInstance handle, XrSystemId systemId, XrGraphicsRequirementsOpenGLKHR *requirements ) {
 	std::lock_guard<std::recursive_mutex> guard( G().lock );
 	TRInstance *instance = GetInstance( handle );
@@ -2060,6 +2223,10 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateSession( XrInstance handle, const XrSe
 			bindingName = "opengl_egl";
 			break;
 		}
+		if ( binding->type == XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR ) {
+			bindingName = "opengl_es_android";
+			break;
+		}
 		binding = binding->next;
 	}
 	if ( binding == nullptr ) {
@@ -2086,6 +2253,17 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrCreateSession( XrInstance handle, const XrSe
 			return XR_ERROR_GRAPHICS_DEVICE_INVALID;
 		}
 	}
+#if defined( __ANDROID__ )
+	if ( binding->type == XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR ) {
+		// the binding names the EGL context current on this thread
+		const XrGraphicsBindingOpenGLESAndroidKHR *gles = reinterpret_cast<const XrGraphicsBindingOpenGLESAndroidKHR *>( binding );
+		if ( !InstanceHasExtension( instance, XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME ) || gles->display == EGL_NO_DISPLAY
+				|| gles->context == EGL_NO_CONTEXT || eglGetCurrentContext() != gles->context ) {
+			Log( "{\"event\":\"create_session_rejected\",\"reason\":\"binding is not the current EGL context\"}" );
+			return XR_ERROR_GRAPHICS_DEVICE_INVALID;
+		}
+	}
+#endif
 	const XrGraphicsBindingVulkanKHR *vulkanBinding = nullptr;
 	if ( binding->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR ) {
 		vulkanBinding = reinterpret_cast<const XrGraphicsBindingVulkanKHR *>( binding );
@@ -2569,8 +2747,26 @@ bool CreateVulkanSwapchainImages( TRSwapchain *swapchain ) {
 	} );
 }
 
+// OPENQ4_XR_TEST_GL_FORMATS narrows the OpenGL (ES) formats, as
+// OPENQ4_XR_TEST_VK_FORMATS does the Vulkan ones: a comma list of GL enums
 const std::vector<int64_t> &SwapchainFormats( const TRSession *session ) {
-	static const std::vector<int64_t> formats = { GL_SRGB8_ALPHA8, GL_RGBA8, GL_RGBA16F };
+	static std::vector<int64_t> formats;
+	if ( formats.empty() ) {
+		const char *list = std::getenv( "OPENQ4_XR_TEST_GL_FORMATS" );
+		if ( list != nullptr && list[0] != '\0' ) {
+			std::stringstream stream( list );
+			std::string item;
+			while ( std::getline( stream, item, ',' ) ) {
+				const long long value = std::atoll( item.c_str() );
+				if ( value > 0 ) {
+					formats.push_back( value );
+				}
+			}
+		}
+		if ( formats.empty() ) {
+			formats = { GL_SRGB8_ALPHA8, GL_RGBA8, GL_RGBA16F };
+		}
+	}
 	return session->vulkan ? VulkanSwapchainFormats() : formats;
 }
 
@@ -2720,9 +2916,15 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateSwapchainImages( XrSwapchain handle
 		}
 		return XR_SUCCESS;
 	}
+	// XrSwapchainImageOpenGLESKHR has the same layout
+#if defined( __ANDROID__ )
+	const XrStructureType imageType = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR;
+#else
+	const XrStructureType imageType = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
+#endif
 	XrSwapchainImageOpenGLKHR *gl = reinterpret_cast<XrSwapchainImageOpenGLKHR *>( images );
 	for ( size_t i = 0; i < swapchain->textures.size(); ++i ) {
-		if ( gl[i].type != XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR ) {
+		if ( gl[i].type != imageType ) {
 			return XR_ERROR_VALIDATION_FAILURE;
 		}
 		gl[i].image = unbound ? 0x7fff0000u + static_cast<uint32_t>( i ) : swapchain->textures[i];
@@ -3582,6 +3784,102 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrStopHapticFeedback( XrSession handle, const 
 ===============================================================================
 */
 
+// XR_FB_display_refresh_rate: the offered rates, the current one, and a
+// request that repaces the session's frames and is announced with an event.
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrEnumerateDisplayRefreshRatesFB( XrSession handle, uint32_t capacity, uint32_t *countOutput, float *rates ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	TRSession *session = GetSession( handle );
+	if ( session == nullptr ) {
+		return XR_ERROR_HANDLE_INVALID;
+	}
+	if ( !InstanceHasExtension( session->instance, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME ) ) {
+		return XR_ERROR_FUNCTION_UNSUPPORTED;
+	}
+	if ( countOutput == nullptr ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	const std::vector<float> &offered = G().refreshRates;
+	*countOutput = static_cast<uint32_t>( offered.size() );
+	if ( capacity == 0 ) {
+		return XR_SUCCESS;
+	}
+	if ( rates == nullptr || capacity < offered.size() ) {
+		return XR_ERROR_SIZE_INSUFFICIENT;
+	}
+	std::copy( offered.begin(), offered.end(), rates );
+	return XR_SUCCESS;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetDisplayRefreshRateFB( XrSession handle, float *rate ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	TRSession *session = GetSession( handle );
+	if ( session == nullptr ) {
+		return XR_ERROR_HANDLE_INVALID;
+	}
+	if ( !InstanceHasExtension( session->instance, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME ) ) {
+		return XR_ERROR_FUNCTION_UNSUPPORTED;
+	}
+	if ( rate == nullptr ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	*rate = static_cast<float>( G().refreshRate );
+	return XR_SUCCESS;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrRequestDisplayRefreshRateFB( XrSession handle, float requested ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	RuntimeGlobals &g = G();
+	TRSession *session = GetSession( handle );
+	if ( session == nullptr ) {
+		return XR_ERROR_HANDLE_INVALID;
+	}
+	if ( !InstanceHasExtension( session->instance, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME ) ) {
+		return XR_ERROR_FUNCTION_UNSUPPORTED;
+	}
+	// 0 asks for the runtime's own rate
+	if ( requested != 0.0f && std::find( g.refreshRates.begin(), g.refreshRates.end(), requested ) == g.refreshRates.end() ) {
+		Log( "{\"event\":\"refresh_rate_rejected\",\"requested\":%.3f}", requested );
+		return XR_ERROR_DISPLAY_REFRESH_RATE_UNSUPPORTED_FB;
+	}
+	const double from = g.refreshRate;
+	const double to = requested != 0.0f ? requested : g.defaultRefreshRate;
+	Log( "{\"event\":\"refresh_rate\",\"requested\":%.3f,\"from\":%.3f,\"to\":%.3f}", requested, from, to );
+	if ( to != from ) {
+		g.refreshRate = to;
+		if ( to > 0.0 ) {
+			session->period = static_cast<int64_t>( 1e9 / to );
+		}
+		XrEventDataBuffer buffer = {};
+		XrEventDataDisplayRefreshRateChangedFB *changed = reinterpret_cast<XrEventDataDisplayRefreshRateChangedFB *>( &buffer );
+		changed->type = XR_TYPE_EVENT_DATA_DISPLAY_REFRESH_RATE_CHANGED_FB;
+		changed->next = nullptr;
+		changed->fromDisplayRefreshRate = static_cast<float>( from );
+		changed->toDisplayRefreshRate = static_cast<float>( to );
+		QueueEvent( session->instance, buffer );
+	}
+	return XR_SUCCESS;
+}
+
+// XR_EXT_performance_settings: levels are recorded in the log for a harness.
+XRAPI_ATTR XrResult XRAPI_CALL TR_xrPerfSettingsSetPerformanceLevelEXT( XrSession handle, XrPerfSettingsDomainEXT domain, XrPerfSettingsLevelEXT level ) {
+	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	TRSession *session = GetSession( handle );
+	if ( session == nullptr ) {
+		return XR_ERROR_HANDLE_INVALID;
+	}
+	if ( !InstanceHasExtension( session->instance, XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME ) ) {
+		return XR_ERROR_FUNCTION_UNSUPPORTED;
+	}
+	if ( ( domain != XR_PERF_SETTINGS_DOMAIN_CPU_EXT && domain != XR_PERF_SETTINGS_DOMAIN_GPU_EXT )
+			|| ( level != XR_PERF_SETTINGS_LEVEL_POWER_SAVINGS_EXT && level != XR_PERF_SETTINGS_LEVEL_SUSTAINED_LOW_EXT
+				&& level != XR_PERF_SETTINGS_LEVEL_SUSTAINED_HIGH_EXT && level != XR_PERF_SETTINGS_LEVEL_BOOST_EXT ) ) {
+		return XR_ERROR_VALIDATION_FAILURE;
+	}
+	Log( "{\"event\":\"perf_level\",\"domain\":\"%s\",\"level\":%d}", domain == XR_PERF_SETTINGS_DOMAIN_GPU_EXT ? "gpu" : "cpu",
+		static_cast<int>( level ) );
+	return XR_SUCCESS;
+}
+
 struct FunctionEntry {
 	const char *		name;
 	PFN_xrVoidFunction	function;
@@ -3646,6 +3944,13 @@ const FunctionEntry FUNCTIONS[] = {
 	TR_ENTRY( xrApplyHapticFeedback ),
 	TR_ENTRY( xrStopHapticFeedback ),
 	TR_EXT_ENTRY( xrGetOpenGLGraphicsRequirementsKHR, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME ),
+#if defined( __ANDROID__ )
+	TR_EXT_ENTRY( xrGetOpenGLESGraphicsRequirementsKHR, XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME ),
+#endif
+	TR_EXT_ENTRY( xrEnumerateDisplayRefreshRatesFB, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME ),
+	TR_EXT_ENTRY( xrGetDisplayRefreshRateFB, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME ),
+	TR_EXT_ENTRY( xrRequestDisplayRefreshRateFB, XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME ),
+	TR_EXT_ENTRY( xrPerfSettingsSetPerformanceLevelEXT, XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME ),
 	TR_EXT_ENTRY( xrGetVulkanGraphicsRequirements2KHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),
 	TR_EXT_ENTRY( xrCreateVulkanInstanceKHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),
 	TR_EXT_ENTRY( xrGetVulkanGraphicsDevice2KHR, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME ),

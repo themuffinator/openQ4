@@ -21,6 +21,9 @@ multiplayer, and needs no extra content beyond your Quake 4 install.
 
   Windows Mixed Reality's own runtime does not support OpenGL. On a WMR
   headset, run the game through SteamVR instead.
+
+  A standalone build for Meta Quest is being prepared; see
+  [Meta Quest without a PC](#meta-quest-without-a-pc).
 - Either renderer: **OpenGL** (the default) or **Vulkan** (`r_renderApi
   vulkan`). On Vulkan the runtime picks the GPU your headset is attached to,
   so turning VR on for the first time restarts the renderer once.
@@ -235,6 +238,14 @@ height and the size of your play area.
 | `vr_screenDistance` | 2.5 | menu and cinematic screen distance in metres |
 | `vr_screenWidth` | 3.0 | menu and cinematic screen width in metres |
 | `vr_mirror` | 1 | desktop window: 0 black, 1 left eye, 2 the floating screen |
+| `vr_refreshRate` | 0 | headset refresh rate in Hz, where the headset lets a game choose (Meta Quest, also over Link): the fastest rate it offers up to this; 0 keeps the headset's own |
+| `vr_performanceLevel` | 3 | CPU and GPU clocks the headset holds, where it lets a game choose (Meta Quest): 1 power savings, 2 sustained low, 3 sustained high, 0 leaves it to the headset from the next `vr_restart` |
+
+A faster refresh rate is smoother but leaves less time for each frame; if
+the game can't keep up, the headset fills in frames and motion looks less
+steady. `vr_status` lists the rate in use and any heat warning the headset
+reports. Most PC runtimes don't offer either setting, and then both do
+nothing.
 
 The floating screen and the HUD take the shape of the game window, so menus
 look the same as on your monitor.
@@ -308,6 +319,19 @@ A server built before the current development build can leave your shots a
 fixed angle above or below the laser after you respawn or teleport, because
 it adds the offset a mouse would need. Servers on the current build keep
 shots on the laser.
+
+## Meta Quest without a PC
+
+openQ4's Android version can also be built as a **standalone Meta Quest
+app** (Quest 2, Quest Pro, Quest 3 and 3S). Setup, where you add your Quake 4
+files, opens as a flat window in the headset; the game then starts in VR with
+the touch controls off, and you play with the Touch controllers as described
+above.
+
+This build is **not published yet** and **no headset has run it**: it has
+only been checked in Android's emulator against openQ4's simulated headset.
+Expect rough edges once it reaches real headsets, especially in frame rate,
+since the Quest renders both eyes on a phone-class GPU.
 
 ## Troubleshooting
 

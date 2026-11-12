@@ -301,7 +301,9 @@ public final class LauncherActivity extends Activity implements SetupTask.Observ
         }); addButton(column, cancel);
         sp = theme.button(R.string.setup_play_sp, () -> launch(false)); addButton(column, sp);
         mp = theme.button(R.string.setup_play_mp, () -> launch(true)); addButton(column, mp);
-        addButton(column, theme.button(R.string.setup_controls, () -> { controlsPage = true; build(); }));
+        // A headset plays with its controllers: the touch controls page has nothing to set.
+        if (!OpenQ4Activity.headsetBuild(getAssets()))
+            addButton(column, theme.button(R.string.setup_controls, () -> { controlsPage = true; build(); }));
         addButton(column, theme.button(R.string.setup_interface, () -> { interfacePage = true; build(); }));
         column.addView(theme.text(R.string.setup_exports, true));
         column.addView(theme.text(R.string.setup_export_help, false));

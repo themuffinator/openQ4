@@ -6,6 +6,7 @@ import android.annotation.TargetApi;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Insets;
@@ -21,6 +22,7 @@ import android.widget.Toast;
 import org.libsdl.app.SDLActivity;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -60,8 +62,10 @@ public final class OpenQ4Activity extends SDLActivity {
     }
 
     private void applyScreenOrientation() {
-        int requested = screenOrientation(InterfaceSettings.decodeOrNull(
-                getSharedPreferences("setup", MODE_PRIVATE).getString(InterfaceSettings.SAVED, null)));
+        // A headset presents through OpenXR; its window keeps the manifest's landscape.
+        int requested = isHeadsetBuild() ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                : screenOrientation(InterfaceSettings.decodeOrNull(
+                        getSharedPreferences("setup", MODE_PRIVATE).getString(InterfaceSettings.SAVED, null)));
         if (getRequestedOrientation() != requested) setRequestedOrientation(requested);
     }
 
@@ -167,6 +171,22 @@ public final class OpenQ4Activity extends SDLActivity {
         SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_BACK);
     }
 
+    /** The Meta Quest flavor (Gradle -Popenq4Quest=true) carries the openq4-headset asset. */
+    static boolean headsetBuild(AssetManager assets) {
+        try (InputStream marker = assets.open("openq4-headset")) {
+            return true;
+        } catch (IOException absent) {
+            return false;
+        }
+    }
+
+    private volatile Boolean headsetBuild;
+
+    boolean isHeadsetBuild() {
+        if (headsetBuild == null) headsetBuild = headsetBuild(getAssets());
+        return headsetBuild;
+    }
+
     @Override
     protected String[] getLibraries() {
         return new String[] { "SDL3", "quake4" };
@@ -204,6 +224,14 @@ public final class OpenQ4Activity extends SDLActivity {
                 "+set", "logFile", "2",
                 "+set", "logFileName", "logs/openq4.log"
             ));
+            if (isHeadsetBuild()) {
+                // An immersive headset app: without VR nothing reaches the display,
+                // the controllers replace touch input, and no one sees the window.
+                arguments.addAll(Arrays.asList(
+                    "+set", "vr_enable", "1",
+                    "+set", "in_touchControls", "0",
+                    "+set", "vr_mirror", "0"));
+            }
             String language = SetupLanguage.engine(getIntent().getStringExtra("setup_language"));
             if (language != null) {
                 arguments.addAll(Arrays.asList("+set", "sys_lang", language));

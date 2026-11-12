@@ -7,6 +7,38 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A Meta Quest build of openQ4, not yet tried on a headset, 12 November 2026
+
+- **openQ4 can now be built as a standalone Meta Quest app.** Building the
+  Android app with the Quest option makes a separate app that installs beside
+  the phone version. Setup, where you add your Quake 4 files, opens as a flat
+  window in the headset; the game then starts in VR, with the Touch
+  controllers in place of the touch controls. No headset has run it yet, so it
+  is not published and no release includes it: it is for testers who build
+  from source.
+- **Two new VR settings for headsets that allow them.** `vr_refreshRate` asks
+  the headset for a refresh rate (on a Quest, 72, 90 or 120 Hz; 0 keeps the
+  headset's own), and `vr_performanceLevel` sets how hard a standalone headset
+  runs its processor and graphics chip (sustained high by default). Headsets
+  and PC runtimes that don't offer these ignore them. `vr_status` shows the
+  rate in use and any heat warning the headset reports.
+- AND-05: the archived Quest change is integrated on the current renderer. The
+  Khronos loader builds for Android (Quest flavor and diagnostic emulator only),
+  the session binds the GLES renderer's EGL context, and the GLES module
+  presents through the OpenGL presentation code. Its sRGB decode draw now
+  resets the GLES program and texture caches. `XR_FB_display_refresh_rate`,
+  `XR_EXT_performance_settings` and `XR_KHR_android_thread_settings` are used
+  where offered. Gradle `-Popenq4Quest=true` packages
+  `com.darkmatter.openq4.quest` with a manifest generated from the phone's.
+- Verified: the release Quest APK passes `verify_android_apk.py --variant
+  quest`, and on the x86_64 emulator `android_emulator_smoke.py --mode vr`
+  plays Air Defense 1 in stereo against the simulated headset, with the
+  refresh-rate request, the performance level and a thermal report.
+  [Evidence](platform-recovery-review.md#meta-quest-flavor-integration-12-november-2026).
+- Not covered: everything that needs a headset, including Horizon OS's launch
+  into VR, the controllers, comfort, the system menu and sleep, frame rate and
+  heat over a session, and whether and how to distribute it.
+
 ## Swimming stays put on the bottom, and lava looks like lava from inside, 12 November 2026
 
 - **Resting on the bottom of a pool no longer slides you along it.** Holding

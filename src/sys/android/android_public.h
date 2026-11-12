@@ -54,4 +54,10 @@ float AndroidTouchControls_HudTop();
 // bottom readouts stay above; zero when inactive or in landscape.
 float AndroidTouchControls_HudBottomEdge();
 
+// sys/android/android_sdl3.cpp, for OpenXR (sys/openxr): the Java VM and the
+// activity, which the Android OpenXR loader and instance need. The activity is
+// a global reference kept for the life of the process, as the loader keeps
+// the context it is given. False until SDL has its activity.
+bool Sys_AndroidJavaHandles( void **javaVM, void **activity );
+
 #endif

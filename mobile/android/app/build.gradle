@@ -18,7 +18,27 @@ if (!(abi in ['arm64-v8a', 'x86_64'])) {
     throw new GradleException('openQ4 supports arm64-v8a phones and diagnostic x86_64 emulators only.')
 }
 def emulator = abi == 'x86_64'
-def packageVariant = emulator ? 'emulator' : 'phone'
+// -Popenq4Quest=true packages the Meta Quest headset flavor from a stage made
+// with -Dandroid_headset=true: the phone build declared as an immersive
+// OpenXR app, with its own application ID, data and saves.
+def questBuild = providers.gradleProperty('openq4Quest').getOrElse('false') == 'true'
+if (questBuild && emulator) {
+    throw new GradleException('The Meta Quest headset flavor is arm64-v8a only.')
+}
+def packageVariant = emulator ? 'emulator' : (questBuild ? 'quest' : 'phone')
+// -Popenq4XrTestRuntime=<builddir>/libopenq4-xr-test-runtime.so packs the
+// headset-free OpenXR test runtime for the emulator VR check. Only the
+// debuggable emulator APK may carry it; a stage never does.
+def xrTestRuntimePath = providers.gradleProperty('openq4XrTestRuntime').orNull
+def xrTestRuntime = xrTestRuntimePath == null ? null : file(xrTestRuntimePath)
+if (xrTestRuntime != null) {
+    if (!emulator) {
+        throw new GradleException('Only the diagnostic x86_64 emulator APK may carry the OpenXR test runtime.')
+    }
+    if (xrTestRuntime.name != 'libopenq4-xr-test-runtime.so' || !xrTestRuntime.isFile()) {
+        throw new GradleException("openq4XrTestRuntime must name a built libopenq4-xr-test-runtime.so, not ${xrTestRuntime}")
+    }
+}
 def moduleArch = emulator ? 'x64' : 'arm64'
 def nativeLibraries = ['libquake4.so', 'libSDL3.so', "librenderer-gles_${moduleArch}.so",
                        "libgame-sp_${moduleArch}.so", "libgame-mp_${moduleArch}.so",
@@ -31,6 +51,10 @@ if (!nativeMetadataFile.isFile() || !modMetadataFile.isFile()) {
 }
 def nativeMetadata = new JsonSlurper().parse(nativeMetadataFile)
 def stagedVariant = nativeMetadata.containsKey('variant') ? nativeMetadata.variant : 'phone'
+if (stagedVariant != packageVariant && (stagedVariant == 'quest' || questBuild)) {
+    throw new GradleException("The staged ${stagedVariant} build cannot make a ${packageVariant} APK: a Quest stage " +
+        '(-Dandroid_headset=true) needs -Popenq4Quest=true, and a Quest APK needs a Quest stage.')
+}
 if (nativeMetadata.format != 1 || nativeMetadata.abi != abi ||
         stagedVariant != packageVariant ||
         !(nativeMetadata.androidApi instanceof Number) || nativeMetadata.androidApi < 24 ||
@@ -69,6 +93,58 @@ if (!(versionCodeText ==~ /[1-9][0-9]*/) || versionCodeText.toBigInteger() > 210
 def generatedJni = layout.buildDirectory.dir('generated/openq4/jniLibs')
 def generatedAssets = layout.buildDirectory.dir('generated/openq4/assets')
 def generatedResources = layout.buildDirectory.dir('generated/openq4/res')
+def headsetMarker = 'openq4-headset'
+
+// The Quest manifest is the phone manifest with the headset declarations
+// added, so the two cannot drift: the head-tracking requirement, the OpenXR
+// loader's permissions and runtime-broker queries, the supported headsets,
+// and the categories that open setup as a 2D panel and the game immersive.
+// verify_android_apk.py --variant quest checks the result.
+def questManifest = layout.buildDirectory.file('generated/openq4/quest/AndroidManifest.xml')
+if (questBuild) {
+    def text = file('src/main/AndroidManifest.xml').getText('UTF-8').replace('\r\n', '\n')
+    def insertAt = { String anchor, boolean before, String addition ->
+        int at = text.indexOf(anchor)
+        if (at < 0 || text.indexOf(anchor, at + 1) >= 0) {
+            throw new GradleException("Quest manifest: the phone manifest no longer has exactly one ${anchor.trim()}")
+        }
+        int point = before ? at : at + anchor.length()
+        text = text.substring(0, point) + addition + text.substring(point)
+    }
+    insertAt('    <application', true, '''    <!-- Meta Quest flavor (openq4Quest): an immersive OpenXR headset app. -->
+    <uses-feature android:name="android.hardware.vr.headtracking" android:required="true" android:version="1" />
+    <uses-permission android:name="org.khronos.openxr.permission.OPENXR" />
+    <uses-permission android:name="org.khronos.openxr.permission.OPENXR_SYSTEM" />
+    <queries>
+        <provider android:authorities="org.khronos.openxr.runtime_broker;org.khronos.openxr.system_runtime_broker" />
+        <intent><action android:name="org.khronos.openxr.OpenXRRuntimeService" /></intent>
+        <intent><action android:name="org.khronos.openxr.OpenXRApiLayerService" /></intent>
+    </queries>
+''')
+    insertAt('        <activity\n            android:name=".LauncherActivity"', true,
+        '''        <meta-data android:name="com.oculus.supportedDevices" android:value="quest2|questpro|quest3|quest3s" />
+''')
+    insertAt('<category android:name="android.intent.category.LAUNCHER" />', false, '''
+                <!-- setup checks the Quake 4 files on a 2D panel -->
+                <category android:name="com.oculus.intent.category.2D" />''')
+    int game = text.indexOf('android:name=".OpenQ4Activity"')
+    int close = game < 0 ? -1 : text.indexOf('/>', game)
+    if (close < 0 || text.indexOf('<', game) < close) {
+        throw new GradleException('Quest manifest: the phone manifest no longer declares OpenQ4Activity as one empty element')
+    }
+    text = text.substring(0, close) + '''>
+            <!-- immersive: the game presents to the headset through OpenXR -->
+            <meta-data android:name="com.oculus.vr.focusaware" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="com.oculus.intent.category.VR" />
+                <category android:name="org.khronos.openxr.intent.category.IMMERSIVE_HMD" />
+            </intent-filter>
+        </activity>''' + text.substring(close + 2)
+    def generated = questManifest.get().asFile
+    generated.parentFile.mkdirs()
+    generated.setText(text, 'UTF-8')
+}
 def launcherIcon = file('../../../assets/icons/quake4_512.png')
 
 tasks.register('stageOpenQ4Icon', Sync) {
@@ -86,6 +162,9 @@ tasks.register('stageOpenQ4Icon', Sync) {
 
 tasks.register('stageOpenQ4Native', Sync) {
     from(new File(nativeStage, 'lib')) { include '*.so' }
+    if (xrTestRuntime != null) {
+        from(xrTestRuntime)
+    }
     into(generatedJni.map { it.dir(abi) })
     doFirst {
         def actual = fileTree(new File(nativeStage, 'lib')).matching { include '**/*' }
@@ -100,6 +179,10 @@ tasks.register('stageOpenQ4Assets', Sync) {
     from(new File(nativeStage, 'baseoq4')) { into 'baseoq4' }
     from(new File(nativeStage, 'licenses')) { into 'licenses' }
     from(nativeStage) { include 'LICENSE', 'LICENSING.md', 'CONTRIBUTORS.md', 'android-build.json' }
+    // OpenQ4Activity starts a headset build in VR when this marker exists
+    if (questBuild) {
+        from(nativeStage) { include headsetMarker }
+    }
     // Setup is visible before the engine unpacks pak0. Reuse its exact faces,
     // rather than checking in duplicate fonts or depending on extracted data.
     from({ zipTree(new File(nativeStage, 'baseoq4/pak0.pk4')) }) {
@@ -116,6 +199,10 @@ tasks.register('stageOpenQ4Assets', Sync) {
         }
         if (!new File(nativeStage, 'licenses').isDirectory()) {
             throw new GradleException('Missing staged dependency license notices.')
+        }
+        if (questBuild != new File(nativeStage, headsetMarker).isFile()) {
+            throw new GradleException(questBuild ? "The Quest stage lacks its ${headsetMarker} marker." :
+                "Only a Quest stage may carry the ${headsetMarker} marker.")
         }
     }
     doLast {
@@ -140,7 +227,10 @@ android {
     defaultConfig {
         // An emulator installation has its own data/saves and cannot update a
         // phone installation. Keep the established phone identity unchanged.
-        applicationId emulator ? 'com.darkmatter.openq4.emulator' : 'com.darkmatter.openq4'
+        // The Quest flavor has its own identity too, so a headset build never
+        // replaces or reads a phone installation's data.
+        applicationId emulator ? 'com.darkmatter.openq4.emulator' :
+            (questBuild ? 'com.darkmatter.openq4.quest' : 'com.darkmatter.openq4')
         manifestPlaceholders = [openq4AppLabel: emulator ? '@string/app_name_emulator' : '@string/app_name']
         minSdk nativeMetadata.androidApi.intValue()
         targetSdk 35
@@ -153,6 +243,9 @@ android {
         jniLibs.srcDir generatedJni
         assets.srcDir generatedAssets
         res.srcDir generatedResources
+        if (questBuild) {
+            manifest.srcFile questManifest.get().asFile
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

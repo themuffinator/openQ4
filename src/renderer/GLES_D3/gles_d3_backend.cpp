@@ -174,8 +174,9 @@ static void RB_GLESD3_PresentSceneTarget( void ) {
 	const int width = glConfig.vidWidth;
 	const int height = glConfig.vidHeight;
 
+	// the default target: the window, or a VR eye or virtual screen (OpenXR on Android)
 	glBindFramebuffer( GL_READ_FRAMEBUFFER, sourceFbo );
-	glBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
+	glBindFramebuffer( GL_DRAW_FRAMEBUFFER, (GLuint)R_DefaultFramebufferHandle() );
 	glReadBuffer( GL_COLOR_ATTACHMENT0 );
 
 	const bool scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST ) == GL_TRUE;
@@ -190,7 +191,7 @@ static void RB_GLESD3_PresentSceneTarget( void ) {
 
 	// leave the target framebuffer bound the way the frame loop expects, and
 	// re-bind the render texture so later commands still address it
-	glBindFramebuffer( GL_READ_FRAMEBUFFER, 0 );
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, (GLuint)R_DefaultFramebufferHandle() );
 	glBindFramebuffer( GL_FRAMEBUFFER, sourceFbo );
 }
 

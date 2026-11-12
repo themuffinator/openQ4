@@ -2620,12 +2620,15 @@ endif
 # OpenXR virtual reality (docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md). The Khronos
 # loader links statically into the SDL3 client on Windows and Linux, built from
 # the pinned SDK against the jsoncpp subproject above; nothing ships beside the
-# executable and dedicated servers never see it.
+# executable and dedicated servers never see it. On Android only the Meta Quest
+# headset flavor (android_headset) and the diagnostic x86_64 emulator, which
+# checks it against the test runtime, carry it: phones have no OpenXR runtime.
 openxr_option = get_option('openxr')
+openxr_android = host_system == 'android' and (get_option('android_headset') or host_cpu_family == 'x86_64')
 build_openxr = build_engine and use_sdl3_backend and not openxr_option.disabled() \
-  and (host_system == 'windows' or host_system == 'linux')
+  and (host_system == 'windows' or host_system == 'linux' or openxr_android)
 if openxr_option.enabled() and not build_openxr
-  error('openxr requires the SDL3 client on Windows or Linux.')
+  error('openxr requires the SDL3 client on Windows or Linux, or the Android Quest flavor or emulator.')
 endif
 openxr_loader_dep = disabler()
 openxr_headers_dep = disabler()
@@ -3961,20 +3964,32 @@ endif
 # through XR_RUNTIME_JSON, so no system runtime registration is touched. It is a
 # test fixture, never installed or packaged.
 if build_openxr
-  openxr_test_runtime_gl_deps = host_system == 'windows' \
-    ? [cc.find_library('opengl32', required: true)] : [dependency('gl', required: true)]
+  if host_system == 'windows'
+    openxr_test_runtime_gl_deps = [cc.find_library('opengl32', required: true)]
+  elif host_system == 'android'
+    # OpenGL ES swapchains for the GLES renderer (XR_KHR_opengl_es_enable)
+    openxr_test_runtime_gl_deps = [cc.find_library('GLESv3', required: true), cc.find_library('EGL', required: true),
+      cc.find_library('log', required: true)]
+  else
+    openxr_test_runtime_gl_deps = [dependency('gl', required: true)]
+  endif
+  # Android loads lib*.so files only. The emulator VR check packs it into a
+  # diagnostic APK (Gradle -Popenq4XrTestRuntime=<this library>); a stage or a
+  # distributable APK never carries it (verify_android_apk.py).
+  openxr_test_runtime_prefix = host_system == 'android' ? 'lib' : ''
   openxr_test_runtime = shared_module(
     'openq4-xr-test-runtime',
     files('tools/tests/openxr/OpenXRTestRuntime.cpp'),
     # XR_KHR_vulkan_enable2 through the application's loader: headers only
     include_directories: include_directories('src/external/vulkan/include'),
     dependencies: [openxr_headers_dep] + openxr_test_runtime_gl_deps,
-    name_prefix: '',
+    name_prefix: openxr_test_runtime_prefix,
     gnu_symbol_visibility: 'hidden',
     install: false,
   )
   openxr_test_runtime_manifest = configuration_data()
-  openxr_test_runtime_manifest.set('LIBRARY', 'openq4-xr-test-runtime.' + (host_system == 'windows' ? 'dll' : 'so'))
+  openxr_test_runtime_manifest.set('LIBRARY', openxr_test_runtime_prefix + 'openq4-xr-test-runtime.'
+    + (host_system == 'windows' ? 'dll' : 'so'))
   configure_file(
     input: 'tools/tests/openxr/openq4_xr_test_runtime.json.in',
     output: 'openq4_xr_test_runtime.json',
