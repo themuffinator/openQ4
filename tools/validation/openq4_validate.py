@@ -767,6 +767,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_vulkan_probe_safety.py",
         root / "tools" / "tests" / "renderer_vulkan_shadow_compatibility.py",
         root / "tools" / "tests" / "renderer_vulkan_world_interaction_compatibility.py",
+        root / "tools" / "tests" / "renderer_shared_domain_targets.py",
         root / "tools" / "tests" / "rigid_body_recovery_diagnostics.py",
         root / "tools" / "tests" / "ai_medic_approach_watchdog.py",
         root / "tools" / "tests" / "savegame_corruption_contract.py",

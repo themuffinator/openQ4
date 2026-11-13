@@ -569,6 +569,11 @@ bool R_ClassicCinematicPostDomain_ReadyForBackend( const viewDef_t *viewDef,
 	if ( !stats.prepared || !stats.frameValid || stats.overflow ) {
 		return false;
 	}
+	if ( ( r_rendererSharedFaultInject.GetInteger()
+			& SHARED_FAULT_INJECT_CINEMATIC_POST ) != 0 ) {
+		// Qualification rollback: every backend takes its classic path.
+		return false;
+	}
 	const classicCinematicPostDomainView_t *view =
 		R_ClassicCinematicPostDomain_Find( viewDef, scope );
 	if ( view == NULL || !view->ready ) {

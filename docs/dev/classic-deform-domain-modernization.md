@@ -2,9 +2,11 @@
 
 ## Status
 
-The Milestone D material-deform dependency is **Implemented (default-off;
-controlled local OpenGL/Vulkan qualification recorded below; freshly staged
-final package and platform release promotion pending)**.
+The Milestone D material-deform dependency is **Implemented and qualified for
+individual promotion (default-off; REN-01 runtime qualification on Windows
+OpenGL/Vulkan recorded 13 November 2026; non-Windows platforms and human
+appearance review belong to platform qualification)**; see
+[REN-01 qualification](#ren-01-qualification-13-november-2026).
 `r_rendererSharedDeform 1` allows an existing shared classic domain to consume
 the final geometry produced by the established CPU material-deform path when
 that result has a complete sealed provenance record. The classic front-end
@@ -221,6 +223,18 @@ They bind the staged runtime and dirty source revision used for this local
 qualification. Clean committed-source recapture, a freshly staged final
 package, human image review, and target-platform/driver coverage remain
 separate release-promotion gates.
+
+## REN-01 qualification, 13 November 2026
+
+The [shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)
+draws the stock `maps/tools/mv2` floor with the stock `shaderDemos/move`
+deforming material on OpenGL and Vulkan, under the default preset and with the
+post chain off, frozen on one game tic. With deform ownership on, the world
+ambient domain owns the view and consumes every completed deform record; the
+frame is byte-identical to the classic one and `r_skipDeforms 1` is the
+visible control. Turning deform ownership off while ambient ownership stays on
+is the natural zero-commit rollback: the ambient view falls back on its
+unsealed deform and draws byte-identical to the classic frame.
 
 ## Milestone D completion and release-promotion boundary
 

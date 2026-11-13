@@ -2,11 +2,11 @@
 
 ## Status
 
-The second Milestone D classic-frame domain is **Implemented (default-off;
-local Windows stock-runtime OpenGL/Vulkan qualification recorded; freshly
-staged final package and platform release promotion pending)** for complete
-eligible 3D
-world ambient/material views. OpenGL and Vulkan consume the same ordered,
+The second Milestone D classic-frame domain is **Implemented and qualified for
+individual promotion (default-off; REN-01 runtime qualification on Windows
+OpenGL/Vulkan recorded 13 November 2026; non-Windows platforms and human
+appearance review belong to platform qualification)** for complete eligible 3D
+world ambient/material views; see [REN-01 qualification](#ren-01-qualification-13-november-2026). OpenGL and Vulkan consume the same ordered,
 per-draw evaluated material records. The established classic view remains the
 supported default and the whole-view rollback.
 
@@ -60,17 +60,20 @@ surface work, unsupported fixed-function state, and every bounded-pool or stale
 resource failure. One rejection keeps the complete view classic.
 
 Unpacketized or backend-local view mutations are also explicit blockers:
-visible light lists, portal-distance fades, a positive forced-ambient floor,
-cel/world-outline work, overdraw or single-triangle diagnostics, ambient/render
-skip modes, same-view blur/AL special-effect commands, prepared
-offscreen render targets, and a non-swapchain Vulkan render scope. A benign
-zero-mask special-effect command is a no-op rather than a false blocker.
+portal-distance fades, a positive forced-ambient floor, cel/world-outline work,
+overdraw or single-triangle diagnostics, ambient/render skip modes, same-view
+blur/AL special-effect commands, and any render target other than the window,
+the renderer's own scene target or the game's forward scene target (REN-01). A
+benign zero-mask special-effect command is a no-op rather than a false blocker.
 
-Packet categories with active stencil-shadow, shadow-map, ARB2-interaction,
-light-grid, deferred, forward+, fog/blend, SSAO, motion-blur, bloom, authored
-post, special-effect, GUI, or present work are explicit whole-view blockers.
-Only the depth and ambient packet categories may participate in this first
-domain.
+The domain owns only the two ambient walks, so the classic phases both walkers
+draw before, between or after them keep their owners and are admitted (REN-01):
+stencil shadows, shadow maps and ARB2 interactions before the pre-fog walk,
+the light grid between it and fog, fog/blend lights between the walks, and
+SSAO, motion blur and bloom after the post-fog walk. Packet categories with
+active deferred, forward+, authored-post, special-effect, GUI or present work
+remain whole-view blockers. (The first version admitted only depth and ambient
+packets and required an empty light list.)
 
 ## Depth and phase contract
 
@@ -128,15 +131,16 @@ Vulkan adapter completes geometry offsets, descriptors, exact pipeline keys,
 render-scope, state, scissor, capacity, and coverage preflight before the view's
 depth clear or first framebuffer-affecting command.
 
-Vulkan otherwise draws a native-size root view into its lower-origin scene
-target, which this adapter and the other shared view adapters (interaction,
-in-world GUI, cinematic/post, fog/blend) cannot own. While any of them is
-requested, a root view that needs nothing the target provides (scaling,
-temporal AA, screen-space effects, an HDR scene, MSAA or a PBR preview) stays
-on the swapchain. From the 2026-09-25 checkpoint until 2026-10-04 every such
-view went to the target and the shared adapters never ran: the Vulkan outcome
-read neither owned nor fallback (`VK=0/0`), and the classic-colors suite failed
-its 18 shared cases.
+Vulkan draws a native-size root view into its lower-origin scene target. Since
+REN-01 (13 November 2026) this adapter and the other shared view adapters
+(interaction, in-world GUI, cinematic/post, fog/blend) draw into that target,
+or the game's forward scene target, exactly where the classic walker draws;
+a scaled scene, whose rectangles the temporal presenter rewrites, keeps the
+classic walker. Before that, a requested shared domain kept its view on the
+swapchain instead, which changed the orientation and interpolation rounding of
+the classic work beside it, so a shared frame could never match the classic
+one byte for byte, and under the default presets (HDR, temporal AA) the
+adapters never ran at all.
 
 The actual shared consumers do not reread `shaderStage_t`, `GetStage`, or raw
 `shaderRegisters`; those inputs are sealed by the front-end transaction. The
@@ -260,6 +264,26 @@ lifecycle screenshots have the eligible OpenGL reference SHA-256
 This completes the local implementation/runtime gate. The evidence comes from a
 development worktree and does not replace a clean committed-package recapture
 or target-platform/driver qualification before promotion.
+
+## REN-01 qualification, 13 November 2026
+
+The [shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)
+owns the stock `maps/tools/mv2` floor on OpenGL and Vulkan, under the default
+preset (HDR scene target, SSAO, bloom) and with the post chain off, both with
+every light suppressed and under the map's own lights. Each frame is
+byte-identical to the classic one; `r_skipAmbient 1` is the visible control
+and the first-person weapon's depth hack the named zero-commit rollback.
+
+Three restrictions went: the adapters refused any render target (so nothing
+owned under the default presets), both refused a non-empty light list, and
+the domain refused any classic light, light-grid, fog or screen-space pass
+beside its walks. None of those changes what the two ambient walks draw.
+
+The per-surface boundary is unchanged: decals, BSE effects, authored
+post-process surfaces, in-world GUI and subview surfaces, depth hacks and the
+other rejections above still keep the complete view classic. Typical lit stock
+gameplay views (`game/airdefense1`, for example) contain at least one of them,
+so this domain owns plain world views but not yet most gameplay frames.
 
 ## Milestone D completion and release-promotion boundary
 

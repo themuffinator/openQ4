@@ -354,8 +354,6 @@ def validate_shared_interaction_consumer() -> None:
     )
     for token in (
         "R_ClassicInteractionDomain_FindView(",
-        "backEnd.renderTexture != NULL",
-        "backEnd.feedbackRenderTexture != NULL",
         "VK_Exec_SharedInteractionTargetReady()",
         "VK_Exec_InteractionPipeline(",
         "VK_Exec_InteractionPipelineLayout(",
@@ -475,19 +473,37 @@ def validate_shared_interaction_consumer() -> None:
         "bool VK_Exec_SharedInteractionTargetReady(",
         "Vulkan shared interaction main-target query",
     )
+    # REN-01: the shared domains draw where the classic walker draws - the
+    # swapchain, the backend-owned scene target or the game's forward scene
+    # target (bound as its own feedback source) - and nowhere else.
     for token in (
         "vkExec.frameOpen",
         "vkExec.mainScopeOpen",
+        "vkExec.pendingSpecialEffectsView != NULL",
+        "vkExec.pendingSpecialEffectsSource != NULL",
+        "vkExec.pendingSpecialEffectsNeedsResolve",
         "vkExec.activeRenderTexture == NULL",
         "vkExec.activeColorEntries[ 0 ] == NULL",
         "vkExec.activeDepthEntry == NULL",
-        "vkExec.pendingSpecialEffectsView == NULL",
-        "vkExec.pendingSpecialEffectsSource == NULL",
-        "!vkExec.pendingSpecialEffectsNeedsResolve",
         "VK_Exec_PipelineTargetsMatch(",
         "VK_Exec_SwapchainPipelineTarget()",
+        "vkExec.activeRenderTexture == vkExec.temporalSceneRenderTexture",
+        "vkExec.temporalScenePendingComposite",
+        "backEnd.renderTexture == backEnd.feedbackRenderTexture",
+        "vkExec.activeRenderTexture == backEnd.renderTexture",
     ):
         require(target_ready, token, "Vulkan shared interaction main-target query")
+    walk = braced_body(
+        executor,
+        "void VK_GuiExecutor_Draw3DView(",
+        "Vulkan 3D walk",
+    )
+    if "!sceneScaleState.active && r_rendererShared" in walk:
+        raise AssertionError(
+            "Shared domains must be gated by VK_SharedDomainSceneAllowed, not by any scene target"
+        )
+    require(walk, "VK_SharedDomainSceneAllowed( sceneScaleState )",
+            "Vulkan 3D walk shared-domain scene gate")
 
     owned = braced_body(
         source,

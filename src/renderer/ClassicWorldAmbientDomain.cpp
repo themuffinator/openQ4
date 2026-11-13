@@ -585,24 +585,32 @@ static bool ValidateDepthPrerequisite( const idScenePacketFrame &packetFrame,
 
 static bool ForbiddenPassCategory( renderPassCategory_t category ) {
 	switch ( category ) {
+	// Both classic walkers draw these as their own phases before, between or
+	// after the two ambient walks this domain replaces, whoever owns ambient:
+	// lights and shadows before the pre-fog walk, the light grid between it
+	// and fog, fog/blend between the walks, and the screen-space passes after
+	// the post-fog walk (REN-01).
 	case RENDER_PASS_STENCIL_SHADOW:
 	case RENDER_PASS_SHADOW_MAP:
 	case RENDER_PASS_ARB2_INTERACTION:
 	case RENDER_PASS_LIGHT_GRID:
-	case RENDER_PASS_DEFERRED_RESOLVE:
-	case RENDER_PASS_FORWARD_PLUS:
 	case RENDER_PASS_FOG_BLEND:
 	case RENDER_PASS_SSAO:
 	case RENDER_PASS_MOTION_BLUR:
 	case RENDER_PASS_BLOOM:
+	case RENDER_PASS_DEPTH:
+	case RENDER_PASS_AMBIENT:
+		return false;
+	// The modern executors replace the walks themselves; Raven effects and
+	// in-world GUI interleave with them; an authored post tail is refused per
+	// surface (FALLBACK_POST_PROCESS).
+	case RENDER_PASS_DEFERRED_RESOLVE:
+	case RENDER_PASS_FORWARD_PLUS:
 	case RENDER_PASS_AUTHORED_POST:
 	case RENDER_PASS_SPECIAL_EFFECTS:
 	case RENDER_PASS_GUI:
 	case RENDER_PASS_PRESENT:
 		return true;
-	case RENDER_PASS_DEPTH:
-	case RENDER_PASS_AMBIENT:
-		return false;
 	default:
 		return true;
 	}

@@ -13817,7 +13817,10 @@ static bool RB_SharedWorldInteractionGLMapPassValuesValid(
 		const classicInteractionDomainLight_t &light,
 		const classicInteractionDomainShadowMapPass_t &pass,
 		classicInteractionDomainReceiver_t receiver, int domainLightIndex ) {
-	const bool pointLight = light.pointLight;
+	// Classic draws a cube only for an enclosing point light; a distant point
+	// light renders into a projected frustum (R_ClassifyShadowMapLight).
+	const bool pointLight = light.legacyViewLight != NULL
+		&& R_ClassifyShadowMapLight( light.legacyViewLight ).pointLight;
 	const bool hybrid = pass.disposition
 		== CLASSIC_INTERACTION_SHADOW_MAP_PASS_HYBRID;
 	if ( pass.legacyViewLight != light.legacyViewLight
@@ -14893,7 +14896,8 @@ static bool RB_SharedWorldInteractionGLPrepareMappedPass(
 	const classicInteractionDomainLight_t &light = *preparedLight.light;
 	const classicInteractionDomainShadowMapPass_t &pass = *preparedPass.pass;
 	viewLight_t *viewLight = const_cast<viewLight_t *>( light.legacyViewLight );
-	const bool pointLight = light.pointLight;
+	const bool pointLight = viewLight != NULL
+		&& R_ClassifyShadowMapLight( viewLight ).pointLight;
 	const shadowMapPassKind_t requestedPassKind = receiver
 		== CLASSIC_INTERACTION_RECEIVER_LOCAL
 			? SHADOWMAP_PASS_LOCAL : SHADOWMAP_PASS_GLOBAL;
@@ -15161,8 +15165,7 @@ static bool RB_ARB2_SharedInteractionPreflight( const viewDef_t *viewDef,
 			|| ( viewDef->renderFlags & ~allowedRenderFlags ) != 0
 			|| viewDef->numOutlineDrawSurfs != 0
 			|| viewDef->renderView.globalMaterial != NULL
-			|| backEnd.renderTexture != NULL
-			|| backEnd.feedbackRenderTexture != NULL
+			|| !RB_SharedDomainTargetAllowed()
 			|| r_skipRender.GetBool() || r_skipRenderContext.GetBool()
 			|| r_skipInteractions.GetBool() || r_skipBump.GetBool()
 			|| r_skipDiffuse.GetBool() || r_skipSpecular.GetBool()

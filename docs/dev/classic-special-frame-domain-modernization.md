@@ -2,9 +2,11 @@
 
 ## Status
 
-This Milestone D corridor is **Implemented (default-off; native/static
-implementation evidence recorded; runtime, final-package, and platform release
-qualification pending)**.
+This Milestone D corridor is **Implemented and qualified for individual
+promotion (default-off; REN-01 runtime qualification on Windows OpenGL/Vulkan
+recorded 13 November 2026; non-Windows platforms and human appearance review
+belong to platform qualification)**; see
+[REN-01 qualification](#ren-01-qualification-13-november-2026).
 `r_rendererSharedSpecialFrame 1` gives OpenGL and Vulkan the same sealed
 ownership boundary for two otherwise exceptional classic-frame paths:
 
@@ -98,6 +100,36 @@ completion and rollback decision.
 
 Together with the other independently guarded shared corridors, this completes
 Milestone D's scoped implementation. It does not make every classic-frame
-category or the aggregate modern-visible renderer shared-owned. Runtime,
-clean-package, human-review, and target-platform/driver evidence remain
-release-promotion gates; temporal presentation is the next roadmap milestone.
+category or the aggregate modern-visible renderer shared-owned.
+
+## REN-01 qualification, 13 November 2026
+
+The [shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)
+owns both forms on OpenGL and Vulkan, under the default preset and with the
+post chain off:
+
+- **Raven blur.** Stock content drives Raven's renderer controller only from
+  the multiplayer game (its join screen and Arena depth of field);
+  single-player scripts route `setSpecialEffect` to the game's own blur post
+  material instead. The harness therefore drives the same controller with
+  `r_forceSpecialEffects 1` over a frozen `game/airdefense1` view, which needs
+  no listen server. The controller command is owned with complete blur
+  coverage and the frame is byte-identical to the classic one; turning the
+  effect off is the visible control.
+- **Render-demo playback.** A demo recorded from the frozen, lit
+  `maps/tools/mv2` floor plays back with every frame owned and byte-identical
+  to classic playback on Vulkan (both configurations) and on OpenGL with the
+  post chain off. Under the default preset, OpenGL plays back successive
+  frames of a frozen demo differently even on the classic path (the
+  `game/airdefense1` portal sky, the mv2 horizon), so no comparison can be
+  pinned there; that classic playback defect is outside this domain and is
+  tracked separately.
+
+The rollback is the qualification diagnostic `r_rendererSharedFaultInject 2`:
+both backends run the complete classic executor and record a named fallback.
+Raven ownership is reported after the classic controller finishes, and a
+command that already took its fallback used to be counted a coverage mismatch
+on OpenGL when the later blur report arrived, while Vulkan recorded no
+fallback at all; both backends now record one named fallback and never report
+that command owned. Human appearance review and non-Windows platforms belong
+to platform qualification.

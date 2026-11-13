@@ -34,7 +34,10 @@ constexpr int MAX_GAME_MESSAGE_SIZE=16384,GAME_RELIABLE_MESSAGE_CALLVOTE=20,GAME
 using vote_flags_t=int;
 constexpr int VOTEFLAG_RESTART=1,VOTEFLAG_BUYING=2,VOTEFLAG_TEAMBALANCE=4,VOTEFLAG_SHUFFLE=8,VOTEFLAG_MAP=32,
  VOTEFLAG_GAMETYPE=64,VOTEFLAG_TIMELIMIT=128,VOTEFLAG_TOURNEYLIMIT=256,VOTEFLAG_CAPTURELIMIT=512,VOTEFLAG_FRAGLIMIT=1024,VOTEFLAG_CONTROLTIME=2048;
-struct idMath {static int ClampChar(int n){return n;}static int ClampShort(int n){return n;}};
+struct idMath {static int ClampChar(int n){return n;}static int ClampShort(int n){return n;}
+    static int ClampInt(int lo,int hi,int n){return n<lo?lo:n>hi?hi:n;}};
+// The buying vote carries the mode: off, Quake 4's rules or The Awakening's (mp/Buying.h).
+enum {BUYING_MODE_OFF,BUYING_MODE_QUAKE4,BUYING_MODE_AWAKENING,BUYING_MODE_COUNT};
 template<class T>struct idList:std::vector<T>{int Num()const{return int(this->size());}void Clear(){this->clear();}void Append(T v){this->push_back(v);}int FindIndex(T v)const{auto i=std::find(this->begin(),this->end(),v);return i==this->end()?-1:int(i-this->begin());}};
 constexpr int VOTE_ABORTED=1,VOTE_RESET=2,VOTE_PASSED=3,VOTE_FAILED=4;
 struct idStr:std::string {

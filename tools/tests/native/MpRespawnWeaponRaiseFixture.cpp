@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 
 template<class T> static T Min( T a, T b ) { return a < b ? a : b; }
 static int FRAME2MS( int framenum ) { return ( framenum * 1000 ) / 60; }
@@ -109,8 +110,12 @@ struct Usercmd {
 	int buttons = 0;
 };
 
+// The respawn branch latches the weapon mods the snapshot carried across Init().
+static const int MAX_WEAPONS = 16;
+
 struct Inventory {
 	int powerups = 0;
+	int weaponMods[ MAX_WEAPONS ] = {};
 };
 
 struct Snapshot {

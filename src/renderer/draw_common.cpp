@@ -1849,6 +1849,23 @@ static bool RB_IsFeedbackSceneRenderTexture( const idRenderTexture *renderTextur
 	return renderTexture != NULL && renderTexture == backEnd.feedbackRenderTexture;
 }
 
+bool RB_SharedDomainTargetAllowed( void ) {
+	// The classic walker draws a 3D view with the very commands it would send
+	// to the window into either the renderer's own scene target (HDR/post
+	// chain, temporal presentation) or the game's forward scene target, which
+	// the game binds as its own _currentRender feedback source. A scaled scene
+	// rewrites the view's viewport and scissor in place, which each adapter's
+	// sealed-record comparison already rejects. Any other pairing (a post pass
+	// target, a capture, a VR eye) keeps the classic path.
+	if ( backEnd.renderTexture == NULL ) {
+		return backEnd.feedbackRenderTexture == NULL;
+	}
+	if ( RB_IsSceneRenderTexture( backEnd.renderTexture ) ) {
+		return backEnd.feedbackRenderTexture == NULL;
+	}
+	return backEnd.renderTexture == backEnd.feedbackRenderTexture;
+}
+
 static bool RB_AutomaticCurrentRenderCaptureAllowed( void ) {
 	return backEnd.renderTexture == NULL
 		|| RB_IsSceneRenderTexture( backEnd.renderTexture )
@@ -9116,9 +9133,15 @@ static void RB_DisplaySpecialEffects( const viewEntity_t *viewEnts, bool prePass
 			bool restoredView = false;
 			if ( RB_PrepareRVSpecialBlurImage() ) {
 				restoredView |= RB_CompositeRVSpecialBlur();
+				// A command that already took its classic fallback is never
+				// reported owned afterwards (REN-01).
 				if ( restoredView && r_rendererSharedSpecialFrame.GetBool()
 						&& R_ClassicSpecialFrameDomain_FindRavenEffectsView(
-							rbRVSpecialCommandView ) != NULL ) {
+							rbRVSpecialCommandView ) != NULL
+						&& R_ClassicSpecialFrameDomain_ReadyForBackend(
+							rbRVSpecialCommandView,
+							CLASSIC_SPECIAL_FRAME_SCOPE_RAVEN_EFFECTS,
+							CLASSIC_SPECIAL_FRAME_BACKEND_GL ) ) {
 					(void)R_ClassicSpecialFrameDomain_RecordOwned(
 						rbRVSpecialCommandView,
 						CLASSIC_SPECIAL_FRAME_SCOPE_RAVEN_EFFECTS,
@@ -9184,7 +9207,11 @@ static void RB_DisplaySpecialEffects( const viewEntity_t *viewEnts, bool prePass
 	}
 	if ( drawnALLights > 0 && r_rendererSharedSpecialFrame.GetBool()
 			&& R_ClassicSpecialFrameDomain_FindRavenEffectsView(
-				rbRVSpecialCommandView ) != NULL ) {
+				rbRVSpecialCommandView ) != NULL
+			&& R_ClassicSpecialFrameDomain_ReadyForBackend(
+				rbRVSpecialCommandView,
+				CLASSIC_SPECIAL_FRAME_SCOPE_RAVEN_EFFECTS,
+				CLASSIC_SPECIAL_FRAME_BACKEND_GL ) ) {
 		(void)R_ClassicSpecialFrameDomain_RecordOwned(
 			rbRVSpecialCommandView,
 			CLASSIC_SPECIAL_FRAME_SCOPE_RAVEN_EFFECTS,
@@ -10417,8 +10444,7 @@ static bool RB_SharedGuiGLPreflight( const viewDef_t *viewDef,
 			|| viewDef->subviewSurface != NULL || viewDef->numClipPlanes != 0
 			|| ( !inWorld && ( viewDef->renderWorld != NULL
 				|| viewDef->viewLights != NULL ) )
-			|| viewDef->numOutlineDrawSurfs != 0 || backEnd.renderTexture != NULL
-			|| backEnd.feedbackRenderTexture != NULL
+			|| viewDef->numOutlineDrawSurfs != 0 || !RB_SharedDomainTargetAllowed()
 			|| r_showOverDraw.GetInteger() != 0 || r_singleTriangle.GetBool() ) {
 		failureDetail = RB_SharedGuiGLFailureDetail(
 			RB_SHARED_GUI_GL_REJECT_MUTATED_VIEW );
@@ -11220,7 +11246,7 @@ static bool RB_SharedWorldAmbientGLPreflight( const viewDef_t *viewDef,
 	if ( viewDef->isSubview || viewDef->isMirror || viewDef->isXraySubview
 			|| viewDef->isEditor || viewDef->superView != NULL
 			|| viewDef->subviewSurface != NULL || viewDef->numClipPlanes != 0
-			|| viewDef->renderWorld == NULL || viewDef->viewLights != NULL
+			|| viewDef->renderWorld == NULL
 			|| viewDef->renderView.viewID < 0
 			|| ( viewDef->renderFlags & ~allowedRenderFlags ) != 0
 			|| viewDef->numOutlineDrawSurfs != 0
@@ -11245,7 +11271,7 @@ static bool RB_SharedWorldAmbientGLPreflight( const viewDef_t *viewDef,
 			RB_SHARED_WORLD_AMBIENT_GL_REJECT_SPECIAL_EFFECTS );
 		return false;
 	}
-	if ( backEnd.renderTexture != NULL || backEnd.feedbackRenderTexture != NULL ) {
+	if ( !RB_SharedDomainTargetAllowed() ) {
 		failureDetail = RB_SharedWorldAmbientGLFailureDetail(
 			RB_SHARED_WORLD_AMBIENT_GL_REJECT_TARGET );
 		return false;
@@ -12498,7 +12524,7 @@ static bool RB_SharedCinematicPostGLReady( const viewDef_t *viewDef,
 	}
 	if ( viewDef == NULL || viewDef != domainView->viewDef
 			|| domainView->sourceSurfaceCount <= 0 || viewDef->drawSurfs == NULL
-			|| backEnd.renderTexture != NULL || backEnd.feedbackRenderTexture != NULL
+			|| !RB_SharedDomainTargetAllowed()
 			|| r_skipRender.GetBool() || r_skipRenderContext.GetBool()
 			|| r_showOverDraw.GetInteger() != 0 || r_singleTriangle.GetBool() ) {
 		R_ClassicCinematicPostDomain_RecordBackendFallback( viewDef, scope,
@@ -13541,8 +13567,7 @@ static bool RB_ClassicFogBlend_GLPreflight(
 			|| viewDef->renderView.viewID < 0
 			|| ( viewDef->renderFlags & ~allowedRenderFlags ) != 0
 			|| viewDef->renderView.globalMaterial != NULL
-			|| ( !linearScene && backEnd.renderTexture != NULL )
-			|| ( !linearScene && backEnd.feedbackRenderTexture != NULL )
+			|| ( !linearScene && !RB_SharedDomainTargetAllowed() )
 			|| r_skipFogLights.GetBool() || r_showOverDraw.GetInteger() != 0
 			|| r_singleTriangle.GetBool() || r_skipRender.GetBool()
 			|| r_skipRenderContext.GetBool()

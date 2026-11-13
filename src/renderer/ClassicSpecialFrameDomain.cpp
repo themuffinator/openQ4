@@ -333,6 +333,11 @@ bool R_ClassicSpecialFrameDomain_ReadyForBackend( const viewDef_t *viewDef,
 		classicSpecialFrameDomainBackend_t backend ) {
 	const classicSpecialFrameDomainView_t *view =
 		R_ClassicSpecialFrameDomain_Find( viewDef, scope );
+	if ( ( r_rendererSharedFaultInject.GetInteger()
+			& SHARED_FAULT_INJECT_SPECIAL_FRAME ) != 0 ) {
+		// Qualification rollback: every backend takes its classic path.
+		return false;
+	}
 	return view != NULL && view->ready
 		&& backend >= CLASSIC_SPECIAL_FRAME_BACKEND_GL
 		&& backend < CLASSIC_SPECIAL_FRAME_BACKEND_COUNT

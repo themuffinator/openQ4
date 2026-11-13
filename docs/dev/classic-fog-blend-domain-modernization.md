@@ -2,9 +2,11 @@
 
 ## Status
 
-The fourth Milestone D classic-frame domain is **Implemented (default-off;
-native/static and controlled OpenGL/Vulkan runtime qualification recorded;
-authored-stock, final-package, and platform release promotion pending)**.
+The fourth Milestone D classic-frame domain is **Implemented and qualified for
+individual promotion (default-off; REN-01 runtime qualification on authored
+stock fog on Windows OpenGL/Vulkan recorded 13 November 2026; non-Windows
+platforms and human appearance review belong to platform qualification)**; see
+[REN-01 qualification](#ren-01-qualification-13-november-2026).
 `r_rendererSharedWorldFogBlend 1` allows the complete fog/blend phase of one
 eligible ordinary root 3D view to be evaluated once into backend-neutral sealed
 records and consumed by OpenGL or Vulkan. The established backend fog/blend
@@ -238,14 +240,25 @@ The retained local reports are under
 They bind the staged runtime and dirty source revision used for this development
 qualification.
 
-## Remaining release evidence
+## REN-01 qualification, 13 November 2026
 
-A separate authored-stock fog case must retain a fixed camera in a map such as
-`game/storage2` or `mp/q4dm10`, exact same-backend shared/classic parity,
-nonempty fog receiver/cap ownership, a material fog-on/off delta, and clean
-Vulkan validation. Clean committed-source recapture, a freshly staged final
-package, retained human review, and target-platform/driver coverage also remain
-required before the default-off option can be promoted.
+The authored-stock fog case is now part of the
+[shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01):
+a fixed camera inside a stock `lights/fog_generic` volume near the
+`game/airdefense1` bunker. On OpenGL and Vulkan, under the default preset, with
+4x MSAA and with the post chain off, the domain owns the fog phase and the
+frame is byte-identical to the classic one; turning fog and blend lights off
+is the visible control and `r_showOverDraw 1` the named zero-commit rollback.
+
+Under the default presets the adapters had refused the scene target the view
+draws into (OpenGL: the game's forward target; Vulkan: the domain was never
+attempted while a scene target was active). They now draw where the classic
+walker draws. A view the domain never prepared, such as a portal sky, still
+reaches the backend gate and is reported as an untracked fallback; it draws
+classic and is not a coverage fault.
+
+Human appearance review and non-Windows platforms belong to platform
+qualification.
 
 ## Milestone D completion and release-promotion boundary
 

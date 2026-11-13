@@ -194,11 +194,16 @@ static bool R_GeometryResources_RunOverflowSelfTest( void ) {
 	packetFrame.AddScene( &viewDef, true );
 	packetFrame.AddPass( RENDER_PASS_DEPTH, true );
 
-	static srfTriangles_t geometries[SCENE_PACKET_MAX_GEOMETRY_RECORDS + 1];
-	static drawSurf_t drawSurfs[SCENE_PACKET_MAX_GEOMETRY_RECORDS + 1];
+	// The geometry pool matches the draw pool: a full frame of distinct
+	// geometries fits, and the first draw beyond it overflows the draws, not
+	// the geometry records.
+	static_assert( SCENE_PACKET_MAX_GEOMETRY_RECORDS >= SCENE_PACKET_MAX_DRAWS,
+		"every draw packet must be able to carry its own geometry record" );
+	static srfTriangles_t geometries[SCENE_PACKET_MAX_DRAWS + 1];
+	static drawSurf_t drawSurfs[SCENE_PACKET_MAX_DRAWS + 1];
 	memset( geometries, 0, sizeof( geometries ) );
 	memset( drawSurfs, 0, sizeof( drawSurfs ) );
-	for ( int i = 0; i < SCENE_PACKET_MAX_GEOMETRY_RECORDS + 1; ++i ) {
+	for ( int i = 0; i < SCENE_PACKET_MAX_DRAWS + 1; ++i ) {
 		geometries[i].numVerts = 3;
 		geometries[i].numIndexes = 3;
 		drawSurfs[i].geo = &geometries[i];
@@ -208,7 +213,7 @@ static bool R_GeometryResources_RunOverflowSelfTest( void ) {
 	}
 
 	const scenePacketFrameStats_t &stats = packetFrame.Stats();
-	if ( !stats.overflow || stats.overflowCause != SCENE_PACKET_OVERFLOW_GEOMETRY_RECORDS || stats.geometryRecords != SCENE_PACKET_MAX_GEOMETRY_RECORDS || stats.drawPackets != SCENE_PACKET_MAX_GEOMETRY_RECORDS + 1 ) {
+	if ( !stats.overflow || stats.overflowCause != SCENE_PACKET_OVERFLOW_DRAWS || stats.geometryRecords != SCENE_PACKET_MAX_DRAWS || stats.drawPackets != SCENE_PACKET_MAX_DRAWS ) {
 		common->Printf(
 			"RendererGeometryResource self-test failed: overflow mismatch overflow=%d cause=%s geometry=%d draws=%d\n",
 			stats.overflow ? 1 : 0,

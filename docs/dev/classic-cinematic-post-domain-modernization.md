@@ -2,10 +2,11 @@
 
 ## Status
 
-This Milestone D corridor is **Implemented (default-off; native/static and
-controlled Windows OpenGL/Vulkan runtime acceptance recorded; clean
-final-package, retained-review, broader-content, platform, and driver release
-qualification pending)**.
+This Milestone D corridor is **Implemented and qualified for individual
+promotion (default-off; REN-01 runtime qualification on Windows OpenGL/Vulkan
+recorded 13 November 2026; non-Windows platforms and human appearance review
+belong to platform qualification)**; see
+[REN-01 qualification](#ren-01-qualification-13-november-2026).
 `r_rendererSharedCinematicPost 1` lets OpenGL and Vulkan use the same sealed
 transaction boundary for two dynamic classic-frame islands:
 
@@ -62,8 +63,10 @@ post path accepts either an ordinary root 3D view or a child view with an exact
 `superView` and source surface while `r_rendererSharedSubview 1` has already
 prepared a ready member/root record. In either form, the post tail must be
 complete and packet-matching. Both paths reject invalid scene/pass ranges,
-changed source identity, overflow, non-finite cinematic time, render targets,
-debug/skip modes, feedback-capture failure, and backend rejection.
+changed source identity, overflow, non-finite cinematic time, render targets
+other than the window, the renderer's own scene target or the game's forward
+scene target, debug/skip modes, feedback-capture failure, and backend
+rejection.
 
 A rejection uses the complete classic fallback path. Once an adapter starts, it
 retains the whole sealed range and reports
@@ -221,7 +224,31 @@ authored-post completion and rollback for eligible nested tails.
 
 Together with the other independently guarded shared corridors, this completes
 Milestone D's scoped implementation. It does not make every classic-frame
-category or the aggregate modern-visible renderer shared-owned. The narrow
-controlled nested runtime gate above is recorded; clean-package, broader
-content, human-review, and target-platform/driver evidence remain
-release-promotion gates. Temporal presentation is the next roadmap milestone.
+category or the aggregate modern-visible renderer shared-owned.
+
+## REN-01 qualification, 13 November 2026
+
+The [shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)
+covers the open forms on OpenGL and Vulkan under the default preset and with
+the post chain off:
+
+- **Ordinary-root authored post.** The stock `game/airdefense1` gameplay view's
+  post tail is owned and byte-identical to the classic frame;
+  `r_skipPostProcess 1` is the visible control.
+- **`_currentDepth`, `_currentRender` and a cinematic stage.** In the
+  harness's validation room, one post panel reads `_currentDepth` and another
+  plays the stock `video/idlogo` cinematic blended with `_currentRender`. The
+  world clock is frozen, so the cinematic clock is deterministic; the frame is
+  byte-identical to the classic one, and an empty post range
+  (`r_skipPostProcess 1`) is the natural zero-commit rollback.
+- **Root cinematic view.** A root 2D view playing stock `video/idlogo` is owned
+  on both backends, `r_skipDynamicTextures 1` is the visible control and the
+  qualification diagnostic `r_rendererSharedFaultInject 4` the named rollback.
+  GUI videos run on the wall clock (`com_frameRealTime`), which no capture can
+  pin, so this case records parity rather than requiring it; the exact parity
+  of cinematic stages is the frozen post case above.
+
+Under the default presets the root post tail draws into the game's forward
+scene target (OpenGL) or a scene target (Vulkan), which the adapters used to
+refuse; they now draw where the classic walker draws. Human appearance review
+and non-Windows platforms belong to platform qualification.

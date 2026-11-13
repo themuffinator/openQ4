@@ -711,6 +711,7 @@ idCVar r_rendererSharedWorldInteraction( "r_rendererSharedWorldInteraction", "0"
 idCVar r_rendererSharedWorldFogBlend( "r_rendererSharedWorldFogBlend", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "execute the complete classic fog/blend light phase in an eligible 3D view from a backend-neutral sealed stream; any unsupported view uses the complete classic path" );
 idCVar r_rendererSharedSubview( "r_rendererSharedSubview", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "execute eligible direct mirror and capture-backed remote-camera, mirror, reflection, refraction, and x-ray subview transactions from backend-neutral sealed records; nested child trees commit atomically at their outermost special view, while 2D/cubemap color and depth captures retain exact type, aspect, and face; unsupported subviews use the complete classic path" );
 idCVar r_rendererSharedDeform( "r_rendererSharedDeform", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable optional, default-off backend-neutral material-deform ownership; incomplete or unsupported work retains the complete classic path" );
+idCVar r_rendererSharedFaultInject( "r_rendererSharedFaultInject", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_CHEAT, "qualification diagnostic: make the selected shared classic domains decline at their backend boundary with a named fallback, so the complete classic path runs (1 = subview, 2 = render-demo/Raven special frame, 4 = cinematic/authored post)", 0, 7, idCmdSystem::ArgCompletion_Integer<0,7> );
 idCVar r_rendererModernLightingParity( "r_rendererModernLightingParity", "0", CVAR_RENDERER | CVAR_INTEGER, "diagnostic override forcing modern lighting-ownership parity contracts proven for bring-up capture: 1 = interaction, 2 = fog/blend, 4 = light grid, 8 = shadow receivers; 0 keeps every unproven domain on the ARB2 bridge", 0, 15, idCmdSystem::ArgCompletion_Integer<0,15> );
 idCVar r_rendererModernAutoPromote( "r_rendererModernAutoPromote", "0", CVAR_RENDERER | CVAR_BOOL, "allow r_glTier auto and r_renderer best to request the guarded modern visible path after promotion evidence and sign-off; off keeps ARB2 default" );
 idCVar r_rendererPromotionEvidence( "r_rendererPromotionEvidence", "", CVAR_RENDERER, "Phase 8 validation evidence token required with r_rendererModernAutoPromote before automatic modern visible promotion" );
@@ -5159,6 +5160,42 @@ void GfxInfo_f( const idCmdArgs &args ) {
 			guiDomain.backend[CLASSIC_GUI_DOMAIN_BACKEND_GL].fallbackViews,
 			guiDomain.backend[CLASSIC_GUI_DOMAIN_BACKEND_VULKAN].ownedViews,
 			guiDomain.backend[CLASSIC_GUI_DOMAIN_BACKEND_VULKAN].fallbackViews );
+		// Name each view's outcome, as the world domains do, so a fallback
+		// is attributable without a debugger.
+		for ( int viewIndex = 0; viewIndex < R_ClassicGuiDomain_NumViews();
+				++viewIndex ) {
+			const classicGuiDomainView_t *view =
+				R_ClassicGuiDomain_ViewByIndex( viewIndex );
+			if ( view == NULL ) {
+				continue;
+			}
+			common->Printf(
+				"Renderer shared classic GUI view[%d]: scene=%d scope=%s ready=%d failure=%s detail=%d guiPass=%s surface=%d stage=%d surfaces=%d/%d passes=%d GL=%d/%s/%d/%d+%d VK=%d/%s/%d/%d+%d\n",
+				viewIndex,
+				view->scenePacketIndex,
+				view->scope == CLASSIC_GUI_DOMAIN_SCOPE_IN_WORLD ? "world" : "root",
+				view->ready ? 1 : 0,
+				ClassicGuiDomainFailure_Name( view->failure ),
+				view->failureDetail,
+				MaterialResourceGuiPassFailure_Name( view->guiPassFailure ),
+				view->failureSourceSurfaceIndex,
+				view->failureSourceStageIndex,
+				view->drawableSurfaceCount,
+				view->sourceSurfaceCount,
+				view->drawablePassCount,
+				view->backendOutcome[CLASSIC_GUI_DOMAIN_BACKEND_GL],
+				ClassicGuiDomainFailure_Name(
+					view->backendFailure[CLASSIC_GUI_DOMAIN_BACKEND_GL] ),
+				view->backendFailureDetail[CLASSIC_GUI_DOMAIN_BACKEND_GL],
+				view->backendDrawnPasses[CLASSIC_GUI_DOMAIN_BACKEND_GL],
+				view->backendNoopPasses[CLASSIC_GUI_DOMAIN_BACKEND_GL],
+				view->backendOutcome[CLASSIC_GUI_DOMAIN_BACKEND_VULKAN],
+				ClassicGuiDomainFailure_Name(
+					view->backendFailure[CLASSIC_GUI_DOMAIN_BACKEND_VULKAN] ),
+				view->backendFailureDetail[CLASSIC_GUI_DOMAIN_BACKEND_VULKAN],
+				view->backendDrawnPasses[CLASSIC_GUI_DOMAIN_BACKEND_VULKAN],
+				view->backendNoopPasses[CLASSIC_GUI_DOMAIN_BACKEND_VULKAN] );
+		}
 	}
 	{
 		const classicCinematicPostDomainStats_t &cinematicPost =

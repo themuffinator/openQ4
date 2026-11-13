@@ -45,8 +45,12 @@ const int SCENE_PACKET_MAX_SCENES = 64;
 const int SCENE_PACKET_MAX_PASSES = 256;
 const int SCENE_PACKET_MAX_DRAWS = 4096;
 const int SCENE_PACKET_MAX_MATERIAL_RECORDS = 1024;
-const int SCENE_PACKET_MAX_GEOMETRY_RECORDS = 1024;
-const int SCENE_PACKET_MAX_INSTANCE_RECORDS = 1024;
+// A draw packet references at most one geometry and one instance record, so a
+// frame whose draws fit can never run out of either. At 1024, dense stock views
+// (game/airdefense1 near its fog volumes) overflowed the geometry records and
+// every shared domain declined the frame (REN-01).
+const int SCENE_PACKET_MAX_GEOMETRY_RECORDS = SCENE_PACKET_MAX_DRAWS;
+const int SCENE_PACKET_MAX_INSTANCE_RECORDS = SCENE_PACKET_MAX_DRAWS;
 // Captures are command-stream edges rather than drawable passes. A subview
 // publishes at most one color capture, so bound this table with scenes.
 const int SCENE_PACKET_MAX_SUBVIEW_CAPTURES = SCENE_PACKET_MAX_SCENES;

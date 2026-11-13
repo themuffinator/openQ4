@@ -120,7 +120,10 @@ only a stencil-shadow pass), `modern-visible-shadow-fallback` and
 
 These are transactional per view: a view rejected by a domain draws entirely
 through the classic path. All default to 0 and are guarded in the
-default-safety report.
+default-safety report. REN-01 qualified each of them individually on Windows
+OpenGL/Vulkan on 13 November 2026, including under the default presets, where
+they now draw into the same scene target as the classic walker
+([evidence](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)).
 
 | Cvar | Covers | Implementation |
 | --- | --- | --- |

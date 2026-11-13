@@ -39,18 +39,16 @@ struct idRectangle { float x,y,w,h; };
 '''
 CHECKS = r'''
 int main() {
-#if defined(OPENQ4_RENDERER_VK_MODULE)
-    constexpr int captureFlush = 0;
-#else
+    // Both backends end the batch at the final scene composite: GL for its
+    // eager capture, and both so the HUD that follows is a pure GUI view the
+    // shared GUI domain can own (REN-01). The VK build must agree with GL.
     constexpr int captureFlush = 1;
-#endif
     idRenderSystemLocal r;
     idMaterial ui, composite{SS_POST_PROCESS,0}, feedback{SS_GUI,MF_NEED_CURRENT_RENDER};
     // Ordinary retained/legacy quads with an identical viewport still batch.
     r.model.surfaces={{6,&ui}}; r.SetUseUIViewportFor2D(true);
     assert(r.flushes==0 && r.model.surfaces.size()==1);
-    // GL's eager capture needs a boundary even if ordinary UI is last in the
-    // batch. Vulkan's just-in-time capture keeps its existing batch intact.
+    // The composite needs a boundary even if ordinary UI is last in the batch.
     r.model.surfaces={{6,&composite},{6,&ui}}; r.SetUseUIViewportFor2D(false);
     assert(r.flushes==captureFlush && (r.model.surfaces.empty() == bool(captureFlush)));
     r.model.surfaces={{6,&feedback}}; r.SetUseUIViewportFor2D(true);

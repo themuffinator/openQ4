@@ -2,10 +2,11 @@
 
 ## Status
 
-The special-subview Milestone D corridor is **Implemented (default-off;
-native/static and controlled Windows OpenGL/Vulkan nested-runtime acceptance
-recorded; clean final-package, retained-review, broader-content, platform, and
-driver release qualification pending)**. `r_rendererSharedSubview 1` lets an
+The special-subview Milestone D corridor is **Implemented and qualified for
+individual promotion (default-off; REN-01 runtime qualification of every
+subview kind and a nested chain on Windows OpenGL/Vulkan recorded 13 November
+2026; non-Windows platforms and human appearance review belong to platform
+qualification)**; see [REN-01 qualification](#ren-01-qualification-13-november-2026). `r_rendererSharedSubview 1` lets an
 eligible direct `SS_SUBVIEW` mirror publish its complete camera, clip-plane,
 viewport, and scissor record and lets eligible remote-camera, mirror,
 reflection, refraction, and x-ray
@@ -212,7 +213,45 @@ Domain](classic-inworld-gui-domain-modernization.md).
 
 Together with the other independently guarded shared corridors, this completes
 Milestone D's scoped implementation. It does not make every child material,
-lighting category, or the aggregate modern-visible renderer shared-owned. The
-narrow controlled nested runtime gate above is recorded; clean-package,
-broader-form, human-review, and target-platform/driver evidence remain
-release-promotion gates. Temporal presentation is the next roadmap milestone.
+lighting category, or the aggregate modern-visible renderer shared-owned.
+
+## REN-01 qualification, 13 November 2026
+
+The [shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)
+now covers the forms R6 left open, on OpenGL and Vulkan under the default
+preset and with the post chain off. Stock materials author only direct mirrors
+and remote cameras, so the harness compiles validation rooms (stock textures,
+models and the stock `camera1.gui` screen, plus test materials) into the run's
+isolated save path:
+
+- **Room A:** a reflection, a dynamic (capture-backed) mirror, a remote camera
+  aimed by a `func_cameraview`, and a direct mirror side by side, all owned
+  (four root transactions).
+- **Rooms C and D:** an x-ray capture and a refraction capture, each alone in
+  view because both draw from the viewer's own camera.
+- **Room B:** a direct mirror facing a capture-backed mirror, a nested
+  direct/capture chain owned as one two-view tree.
+- **Room E:** a direct mirror that sees an x-ray panel. The x-ray child copies
+  its parent mirror view, clip plane included, as classic `R_XrayViewBySurface`
+  (like `R_RemoteRender` and `R_RefractionRender`) always has; the domain
+  refuses that inherited semantics and the whole tree declines, nothing owned
+  and the frame classic.
+
+A reflection or refraction render-map stage only refreshes its image and draws
+nothing itself, so each test material adds a stage that samples
+`_reflectionRender` or `_refractionRender` in screen space. The refraction one
+draws at half brightness so that it stands apart from the room behind it.
+
+Every owned frame is byte-identical to the classic one. The control hides the
+subview surfaces (each is a `func_static`, so `r_skipEntities 1`): skipping
+subviews alone shows nothing on a frozen scene, which re-captures identical
+images, and Vulkan keeps a skipped direct mirror's previous pixels. The rollback is the
+qualification diagnostic `r_rendererSharedFaultInject 1`, which declines every
+subview at the backend boundary with a named `backendRejected` fallback.
+
+Cubemap and depth subview targets have no producer: material dynamic images
+are always 2D colour captures. They remain covered only by
+`rendererClassicSubviewDomainSelfTest`. The stock `game/tram1` remote screen
+was owned during exploration, but that scene keeps moving under `g_stopTime`,
+so it cannot give an exact comparison. Human appearance review and non-Windows
+platforms belong to platform qualification.
