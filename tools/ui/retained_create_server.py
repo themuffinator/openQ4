@@ -97,7 +97,8 @@ ADVANCED = (
     ("spectators", "createSpectators", "#str_200064", "toggle", 0, 1, None),
     ("warmup", "createWarmup", "#str_200062", "toggle", 0, 1, None),
     ("voice", "createVoice", "#str_201021", "toggle", 0, 1, None),
-    ("buying", "createBuying", "#str_222000", "toggle", 0, 1, None),
+    # Off, Quake 4's buy menu or The Awakening's (si_isBuyingEnabled and si_buyingRules).
+    ("buying", "createBuying", "#str_231901", "choice", 0, 2, None),
     ("bots", "createBots", "#str_42210", "choice", 0, 16, None),
     ("botskill", "createBotSkill", "#str_42212", "choice", 1, 5, None),
     # openQ4's match rules a host sets most (si_shuffle, si_overtime,
@@ -106,6 +107,9 @@ ADVANCED = (
     ("overtime", "createOvertime", "#str_41310", "number", 0, 999, "#str_231123"),   # seconds; the long label outgrows the column in Russian
     ("mercy", "createMercy", "#str_41638", "number", 0, 999, "#str_231123"),
     ("roundlimit", "createRoundLimit", "#str_41404", "number", 0, 60, "#str_231125"),
+    # openQ4's Classic multiplayer ruleset (si_ruleset) and its grappling hook.
+    ("ruleset", "createRuleset", "#str_42220", "choice", 0, 1, None),
+    ("grapple", "createGrapple", "#str_42222", "choice", 0, 2, None),
     # Instagib (si_instagib): any game type with an unlimited railgun and one-hit kills.
     ("instagib", "createInstagib", "#str_231960", "toggle", 0, 1, None),
 )
@@ -118,7 +122,8 @@ ADVANCED_TABS = (
                      "create-mapcycle", "create-banlist")),
     ("#str_231004", ("create-ready", "create-warmup", "create-spectators", "create-voice", "create-shuffle", "create-bots",
                      "create-botskill")),
-    ("#str_41704", ("create-instagib", "create-weaponstay", "create-buying", "create-overtime", "create-mercy", "create-roundlimit")),
+    ("#str_41704", ("create-ruleset", "create-grapple", "create-instagib", "create-weaponstay", "create-buying", "create-overtime",
+                    "create-mercy", "create-roundlimit")),
 )
 ADVANCED_TAB_H = 32.0   # u: the tab strip and the gap under it
 # Each choice's stock list and its values.
@@ -128,6 +133,9 @@ CHOICES = {
     "rate": ("#str_200179", (0, 1, 2, 3, 4, 5)),
     "bots": ("#str_42211", (0, *range(2, 17))),
     "botskill": ("#str_42213", (1, 2, 3, 4, 5)),
+    "buying": (("#str_41200", "#str_41584", "#str_231900"), (0, 1, 2)),
+    "ruleset": ("#str_42221", (0, 1)),
+    "grapple": ("#str_42223", (0, 1, 2)),
 }
 # The game types each row serves, by index: the limit row's three, Tourney's
 # round limit, and the team modes in which Auto Balance and Team Damage apply
@@ -248,7 +256,8 @@ def setting_rows(doc: Document, settings: tuple, width: float, value_x: float, r
             entries = None
             if kind == "choice":
                 names, values = CHOICES[state]
-                entries = [((names, index), value) for index, value in enumerate(values)]
+                # A stock list by index, or each option's own key.
+                entries = [(names[index] if isinstance(names, tuple) else (names, index), value) for index, value in enumerate(values)]
             row = value_row(doc, ident, label_key, kind, width, value_x, value={"state": key}, action=action, entries=entries,
                             row_h=row_h, placement=placement)
         rows.append(row)

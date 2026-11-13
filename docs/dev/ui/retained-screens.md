@@ -2099,17 +2099,17 @@ The settings screen's AUDIO button opens a retained AUDIO page while the
 retained screens are on. `tools/ui/retained_audio.py` builds
 `guis/menu/settings/audio.rui` in the settings sub-page (see
 [the settings sub-pages](#the-settings-sub-pages-31-october-2026)), so the
-page adds no art and no strings. It carries every row of the stock page, in
+page adds no art and no strings of its own. It carries every row of the stock page, in
 the stock order and with the stock text:
 
 | Section | Rows |
 | --- | --- |
 | LEVELS | Volume, Music Volume and Dialogue Volume, 0 to 100% |
 | DEVICES | Sound System (Default, OpenAL) and Sound Device, the sound system's devices (up to 16) |
-| EFFECTS | EAX ADVANCED HD; Surround Speakers and Headphone HRTF (Auto, Off, On); Dialogue Subtitles; Subtitle Size, 100 to 200%; Subtitle Background, 0 to 100%; Speaker Names |
+| EFFECTS | EAX ADVANCED HD; Surround Speakers and Headphone HRTF (Auto, Off, On); Dialogue Subtitles; Subtitle Size, 100 to 200%; Subtitle Background, 0 to 100%; Speaker Names; Untranscribed Speech (AUD-07, 13 November 2026) |
 
 Each row asks the session with its own value verb (`audioVolume` through
-`audioSubtitleSpeakers`, allowed by the adapter's `SessionMenuValueCommand`),
+`audioSubtitleUntranscribed`, allowed by the adapter's `SessionMenuValueCommand`),
 and the session applies the value at once, as the stock controls do. The
 levels and subtitle rows set their CVars. Sound System, Sound Device and
 Headphone HRTF run the stock page's `sound drivar`, EAX `sound eax` and

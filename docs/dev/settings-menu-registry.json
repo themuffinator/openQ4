@@ -837,6 +837,26 @@
       "accessibility": "Focusable bindDef row that captures the next key or button for this command."
     },
     {
+      "id": "controls.attack_look.attk-hook",
+      "pane": "Controls",
+      "section": "Attack/Look",
+      "path": "Settings > Controls > Attack/Look > Grappling Hook",
+      "source": "controls",
+      "container": "p_set_ctrls_attk",
+      "widgets": [
+        "set_ctrls_attk_hook_key",
+        "set_ctrls_attk_hook"
+      ],
+      "widget_type": "bind",
+      "label_key": "#str_42222",
+      "target_type": "bind",
+      "target": "_hook",
+      "default": "unbound",
+      "default_keys": [],
+      "restart_required": false,
+      "accessibility": "Focusable bindDef row that captures the next key or button for this command."
+    },
+    {
       "id": "controls.other.other-quicksave",
       "pane": "Controls",
       "section": "Other",
@@ -4460,6 +4480,25 @@
       "choices_key": "#str_200059",
       "target_type": "cvar",
       "target": "ui_subtitleSpeakers",
+      "default": "1",
+      "restart_required": false,
+      "accessibility": "Standard focusable choiceDef row."
+    },
+    {
+      "id": "audio.subtitle_untranscribed",
+      "pane": "Audio",
+      "section": "Subtitles",
+      "path": "Settings > Audio > Untranscribed Speech",
+      "source": "audio",
+      "container": "set_audio_subtitle_untranscribed",
+      "widgets": [
+        "set_audio_subtitle_untranscribed_val"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231313",
+      "choices_key": "#str_200059",
+      "target_type": "cvar",
+      "target": "ui_subtitleUntranscribed",
       "default": "1",
       "restart_required": false,
       "accessibility": "Standard focusable choiceDef row."

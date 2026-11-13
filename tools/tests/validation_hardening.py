@@ -729,6 +729,9 @@ def validate_validation_wiring() -> None:
         "audio_dialogue_coverage.py",
         "audio_memory_runtime.py",
         "audio_output_recovery_runtime.py",
+        # Plays on, and records the loopback of, real output devices the operator names.
+        "audio_surround_endpoint.py",
+        "endpoint_loopback.py",
         "audio_mod_reverb.py",
         "audio_scene_audit.py",
         "audio_streaming.py",
@@ -858,6 +861,9 @@ def validate_validation_wiring() -> None:
         "mp_bot_rim_replay.py",
         # Stock sound distance measurements launch a staged client on retail assets.
         "sound_distance_runtime.py",
+        # The retail comparison also launches retail Quake4.exe on Windows;
+        # sound_distance_retail.py exercises its analysis without assets.
+        "sound_distance_retail_compare.py",
         # Drives a rooted x86_64 Android emulator; the workflows py_compile it.
         "android_emulator_smoke.py",
         # Drives a USB-connected debug phone; the workflows py_compile it.

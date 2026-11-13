@@ -211,6 +211,71 @@ static void ReadbackAndToggle(TestHost& host) {
 	ActionInvocation invocation;std::string error;Check(view.runtime.ResolveAction(proposal.action,invocation,error,&*proposal.proposal)&&std::get<double>(invocation.arguments.at("value"))==1.1,"runtime resolves exact typed input operand");
 	view.State({{"level",1.1}});view.Ack(proposal,true);view.Frame();Check(Near(view.BoxOf("slider-fill").width,110),"accepted slider readback changes fill");
 }
+// The stock menu sounds (visual section 8, MOT-006): Focus once each time a
+// device event moves the lit control or option, never for frames, programs, a
+// finger, a held button or a pointer finding what the keys already lit;
+// Activate once per completed press, value cycle, or list opened or closed.
+static void SoundCues(TestHost& host) {
+	View view(host);
+	constexpr auto Focus=ControlCue::Kind::Focus, Activate=ControlCue::Kind::Activate;
+	auto take=[&]{ return view.runtime.TakeCues(); };
+	auto expect=[&](bool passed,const std::vector<ControlCue>& cues,const char* message){
+		if(!passed)for(const auto& cue:cues)std::fprintf(stderr,"  cue %s %s\n",cue.kind==Focus?"focus":"activate",cue.node.c_str());
+		Check(passed,message);
+	};
+	auto one=[&](ControlCue::Kind kind,const char* node,const char* message){
+		const auto cues=take(); expect(cues.size()==1&&cues[0].kind==kind&&cues[0].node==node,cues,message);
+	};
+	auto none=[&](const char* message){ const auto cues=take(); expect(cues.empty(),cues,message); };
+	none("loading and presenting a menu sound nothing");
+	view.Point(30,30); one(Focus,"toggle","a mouse entering a control sounds one hover");
+	view.Point(60,40); view.Frame(); view.Frame(); none("moving within the lit control, and frames under it, are silent");
+	view.Point(600,10); none("leaving for empty space is silent");
+	view.Point(30,30); one(Focus,"toggle","each entry sounds again, as a stock onMouseEnter did");
+	view.Point(100,100); one(Focus,"slider","entering another control sounds once");
+	view.runtime.PointerButton(true,view.time); view.Point(30,30); view.runtime.PointerButton(false,view.time);
+	view.runtime.TakeActions(); none("a held button crossing controls is dragging, not browsing, and a slider commits silently");
+	// The captured drag kept the slider as the pointer's part; freed, the
+	// pointer finds the toggle with its first move, and only then.
+	view.Point(31,31); one(Focus,"toggle","a released drag's first move lights the control under it once");
+	view.Point(32,31); none("moving on over that control is silent");
+	view.runtime.FocusControl("slider",view.time); none("programmatic focus is silent");
+	view.runtime.FocusControl("toggle",view.time); view.Point(32,32); none("a pointer finding the control the focus lit is silent");
+	view.runtime.FocusControl("toggle",view.time); view.Key(MenuInput::Up); none("a navigation press with nowhere to go is silent");
+	view.Key(MenuInput::Next); one(Focus,"slider","a navigation step sounds one hover");
+	view.Key(MenuInput::Right); Check(view.runtime.TakeActions().size()==1,"the slider steps"); none("a value slider's step is silent, as a stock sliderDef was");
+	view.runtime.FocusControl("toggle",view.time);
+	view.runtime.MenuAction(MenuInput::Accept,true,view.time); view.runtime.MenuAction(MenuInput::Accept,true,view.time);
+	view.runtime.MenuAction(MenuInput::Accept,false,view.time);
+	one(Activate,"toggle","an activation and its key repeats sound once"); Check(view.runtime.TakeActions().size()==1,"one toggle proposal");
+	// A mouse's move and its button are separate events, each sounding its own;
+	// the adapter keeps only the press of events that arrive together.
+	view.Point(600,10); take(); view.Point(40,40); one(Focus,"toggle","the mouse finding the toggle sounds its hover");
+	view.runtime.PointerButton(true,view.time); none("a press alone is silent");
+	view.runtime.PointerButton(false,view.time); one(Activate,"toggle","its release completes the press and sounds once");
+	Check(view.runtime.TakeActions().size()==1,"the click proposes once");
+	view.runtime.SetTouchPointer(true); view.Point(600,10); view.Point(30,30); none("a finger landing on a control is silent");
+	view.runtime.PointerButton(true,view.time); view.runtime.PointerButton(false,view.time);
+	one(Activate,"toggle","a tap sounds its activation"); Check(view.runtime.TakeActions().size()==1,"the tap proposes once");
+	view.runtime.SetTouchPointer(false);
+	view.runtime.FocusControl("choice",view.time); view.Key(MenuInput::Accept); view.Frame();
+	one(Activate,"choice","opening a list sounds as an activation");
+	view.Key(MenuInput::Down); one(Focus,"choice","moving through an open list sounds one hover");
+	view.runtime.PointerWheel(1,view.time); one(Focus,"choice","a wheel step through an open list sounds one hover");
+	Check(view.Widget("choice").highlight=="option-3","the wheel stepped past the unavailable option");
+	view.Key(MenuInput::Back); one(Activate,"choice","Back closing the list sounds once");
+	Check(!view.Widget("choice").popupOpen&&view.runtime.TakeActions().empty(),"the list closed without a proposal");
+	view.Key(MenuInput::Right); one(Activate,"choice","cycling a closed choice sounds as an activation");
+	auto cycled=view.runtime.TakeActions(); Check(cycled.size()==1,"the choice cycles once"); view.Ack(cycled[0],false);
+	view.Key(MenuInput::Back); one(Activate,"","Back sounds once with its request");
+	const auto back=view.runtime.TakeActions(); Check(back.size()==1&&back[0].kind==ControlAction::Kind::Back,"Back reaches the application");
+	view.Point(300,150); take();
+	Check(view.runtime.PlayTimeline("move-choice-parent",view.time),"slide the choice toward a resting pointer");
+	view.time+=.2; view.Frame(); view.Frame();
+	Check(view.runtime.HoveredControl()=="choice","the slid choice lies under the resting pointer");
+	none("content sliding under a resting pointer is silent");
+	Check(view.runtime.PlayTimeline("reset-choice-parent",view.time),"restore the choice"); view.Frame();
+}
 static void ProjectedDragAndHandoff(TestHost& host) {
 	View view(host);Check(view.runtime.PlayTimeline("rotate-slider",view.time),"set rotated/translated slider presentation");view.Frame();
 	// Owner center (150,105), translated to (180,125). Track center y=100,
@@ -465,7 +530,7 @@ static void CountedStateLabels(TestHost& host) {
 
 int main() {
 	TestHost host;PaddedValueParts(host);ReadbackAndToggle(host);ProjectedDragAndHandoff(host);PopupAndPersistence(host);ScrollBodyAndFocusReveal(host);PositionedOverflowBoundaries(host);
-	CountedStateLabels(host);
+	CountedStateLabels(host); SoundCues(host);
 	Check(host.errors==0,"real Runtime/RmlUi reports no errors");
 	std::printf("Value Runtime: %u checks passed\n",checks);
     return 0;

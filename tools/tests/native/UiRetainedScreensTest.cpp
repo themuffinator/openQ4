@@ -279,7 +279,7 @@ static const std::set<std::string> SessionCommands = {"continue","singlePlayer",
 	"mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction","mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction",
 	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpMatch","mpMatchSelect",
 	"mpSummaryChat","mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
-	"mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan"};
+	"mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan","mpBuy"};
 // The value controls' verbs, which carry the control's new value.
 static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGameType","mpVoteTimeLimit","mpVoteFragLimit",
 	"mpVoteCaptureLimit","mpVoteTourneyLimit","mpVoteControlTime","mpVoteBalance","mpVoteShuffle","mpVoteRestart","mpVoteBuying","mpVoteKick",
@@ -291,7 +291,7 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
 	"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
-	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers",
+	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 // The player settings the multiplayer card's Settings and Voice pages and the
 // GAME OPTIONS page change.
@@ -361,8 +361,10 @@ static void CheckSessionActions(const Document& document) {
 		const bool player = verb == "mpSelectPlayer" || verb == "mpMute" || verb == "mpFriend" ||
 			verb == "mpAdminSelect" || verb == "mpAdminKick" || verb == "mpAdminBan" || verb == "mpAdminSwitch";
 		const bool save = verb == "loadSelect" || verb == "saveSelect" || verb == "loadSave" || verb == "loadDelete";
+		const bool buy = verb == "mpBuy";
 		Check(!save || (action.arguments.at("index").type == 0 && action.arguments.at("generation").type == 0),"save command carries catalog operands");
-		Check(action.arguments.size() == (player || save || verb == "mpVoteKick" ? 3u : value ? 2u : 1u),"command carries exactly its typed operands");
+		Check(!buy || action.arguments.at("item").type == 0,"a purchase carries its catalog item");
+		Check(action.arguments.size() == (player || save || verb == "mpVoteKick" ? 3u : value || buy ? 2u : 1u),"command carries exactly its typed operands");
 		Check(!player || (action.arguments.at("client").type == 0 && action.arguments.at("identity").type == 2),"player command carries client and connection identity");
 		Check((value ? SessionValueCommands : SessionCommands).contains(std::get<std::string>(command->second.literal)),
 			"every command is in the session allowlist");
@@ -782,7 +784,7 @@ static void CheckVote(ScreenHost& host, const char* path) {
 		{"mp.vote.map_count",3.0},{"mp.vote.map0",std::string("The Fragging Yard")},{"mp.vote.map1",std::string("Lost Fleet")},
 		{"mp.vote.map2",std::string("Bloodwork")},{"mp.vote.map",1.0},{"mp.vote.gametype_count",12.0},
 		{"mp.vote.gametype2",std::string("Team DM")},{"mp.vote.gametype",2.0},{"mp.vote.timelimit",10.0},{"mp.vote.fraglimit",20.0},
-		{"mp.vote.balance",true},{"mp.vote.shuffle",false},{"mp.vote.restart",false},{"mp.vote.buying",false},
+		{"mp.vote.balance",true},{"mp.vote.shuffle",false},{"mp.vote.restart",false},{"mp.vote.buying",0.0},
 		{"mp.vote.kick_catalog",std::string("0,1:4097,2:4098")},{"mp.vote.kick_count",3.0},{"mp.vote.kick0",std::string("Anderson")},{"mp.vote.kick1",std::string("Rhodes")},{"mp.vote.kick",-1.0},
 		{"mp.vote.locked",true}};
 	const char* const keys[] = {"map","gametype","timelimit","fraglimit","capturelimit","tourneylimit","controltime","balance","shuffle",
@@ -4676,12 +4678,12 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(diagnostics.empty() && document.Model().id == "openq4.controls" && document.Model().canvasHeight == 720,
 		"the CONTROLS page validates on the 4:3 canvas");
 	CheckSessionActions(document);
-	for (int row = 0; row < 49; ++row) {
+	for (int row = 0; row < 50; ++row) {
 		const auto* node = document.Model().FindNode("controls_bind_"+std::to_string(row));
 		Check(node && node->control && node->control->role == ControlRole::Button && node->control->action == "controlsBind",
 			"each binding row asks the session to wait for a key");
 	}
-	Check(!document.Model().FindNode("controls_bind_49"),"the stock page's 49 bindings, no more");
+	Check(!document.Model().FindNode("controls_bind_50"),"the stock page's 49 bindings and the Classic ruleset's hook, no more");
 	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other"}) Check(document.Model().FindNode(tab) != nullptr,"the stock tabs");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/controls.rui",diagnostics),"the page loads into a runtime");
@@ -4970,7 +4972,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 		{"audio_dialogue","audioDialogue"},{"audio_backend","audioBackend"},{"audio_device","audioDevice"},{"audio_eax","audioEax"},
 		{"audio_speakers","audioSpeakers"},{"audio_hrtf","audioHrtf"},{"audio_subtitles","audioSubtitles"},
 		{"audio_subtitle_size","audioSubtitleSize"},{"audio_subtitle_background","audioSubtitleBackground"},
-		{"audio_subtitle_speakers","audioSubtitleSpeakers"}};
+		{"audio_subtitle_speakers","audioSubtitleSpeakers"},{"audio_subtitle_untranscribed","audioSubtitleUntranscribed"}};
 	for (const auto& [control, verb] : rows) {
 		const auto* node = document.Model().FindNode(control);
 		const auto found = document.Model().actions.find(verb);
@@ -5007,7 +5009,8 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(runtime.SetState({{"audio.volume",70.0},{"audio.music",40.0},{"audio.dialogue",100.0},{"audio.backend",1.0},
 		{"audio.device.count",3.0},{"audio.device.0.label",std::string("Default device")},{"audio.device.1.label",std::string("Speakers")},
 		{"audio.device.2.label",std::string("Headset")},{"audio.device",1.0},{"audio.eax",true},{"audio.speakers",2.0},{"audio.hrtf",0.0},
-		{"audio.subtitles",true},{"audio.subtitleSize",150.0},{"audio.subtitleBackground",30.0},{"audio.subtitleSpeakers",false}},error,0.1),
+		{"audio.subtitles",true},{"audio.subtitleSize",150.0},{"audio.subtitleBackground",30.0},{"audio.subtitleSpeakers",false},
+		{"audio.subtitleUntranscribed",true}},error,0.1),
 		"the session publishes the values");
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
@@ -5039,20 +5042,23 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(runtime.FocusControl("audio_subtitle_speakers",0.73),"focus Speaker Names");
 	press(MenuInput::Accept,0.74);
 	Check(std::get<bool>(taken("audioSubtitleSpeakers").arguments.at("value")),"Accept asks the session to name the speakers");
+	Check(runtime.FocusControl("audio_subtitle_untranscribed",0.75),"focus Untranscribed Speech");
+	press(MenuInput::Accept,0.76);
+	Check(!std::get<bool>(taken("audioSubtitleUntranscribed").arguments.at("value")),"Accept asks the session to stop marking untranscribed speech");
 	// The back input asks the session to return.
 	Check(runtime.RunEvent("onBack",0.8,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "audioBack","Back asks the session to return");
 	// A portrait view: the panel and its rows stay inside the view.
 	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,1.0);
-	const auto panel = bounds("audio-panel"), last = bounds("audio_subtitle_speakers");
+	const auto panel = bounds("audio-panel"), last = bounds("audio_subtitle_untranscribed");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && last.x+last.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"audio_device","audio_eax","audio_subtitle_speakers","audio-audio-rows",1.1);
+	CheckSettingsPortrait(runtime,document,"audio_device","audio_eax","audio_subtitle_untranscribed","audio-audio-rows",1.1);
 	runtime.Frame(portrait,1.2);
 	const auto band = runtime.PresentedValue("audio-header","display");
 	Check(band && band->text == "none","the tall column's headings stand in its rows, not the header band");
-	CheckSettingsTextScale(host,runtime,document,"audio-audio","audio_device","audio_eax","audio_subtitle_speakers",1.3);
+	CheckSettingsTextScale(host,runtime,document,"audio-audio","audio_device","audio_eax","audio_subtitle_untranscribed",1.3);
 	// The single column at a larger text size takes its headings into its rows too.
 	auto larger = SettingsViewport(document); larger.textScale = 1.5f;
 	runtime.Frame(larger,1.6);
@@ -5757,6 +5763,7 @@ static void CheckSafeAreas(ScreenHost& host, char** paths, int count) {
 #include "UiHudChecks.inl"
 #include "UiRemasteredHudChecks.inl"
 #include "UiRetainedSummaryChecks.inl"
+#include "UiRetainedBuyChecks.inl"
 // Each group of documents is its own meson test, so the suite runs the
 // groups side by side: together the checks take about 35 s of CPU, most of
 // it parsing and loading the documents (the 8 MB Escape card above all), and
@@ -6016,6 +6023,10 @@ int main(int argc, char** argv) {
  if (argc == 3 && std::string(argv[1]) == "--summary") {
      ScreenHost host; CheckSummary(host,argv[2]);
      std::printf("retained summary: %d checks passed\n",checks); return 0;
+ }
+ if (argc == 3 && std::string(argv[1]) == "--buy") {
+     ScreenHost host; CheckBuy(host,argv[2]);
+     std::printf("retained buy card: %d checks passed\n",checks); return 0;
  }
  if (argc == 3 && std::string(argv[1]) == "--settings") {
      ScreenHost host; CheckSettingsPage(host,argv[2]);

@@ -307,6 +307,8 @@ idItem::idItem() {
 	simpleItem = false;
 	pickedUp = false;
 	pickedUpByClientNum = -1;
+	classicMegaHolder = NULL;
+	classicMegaRespawn = 0.0f;
 }
 
 /*
@@ -558,6 +560,24 @@ void idItem::Think( void ) {
 	if ( thinkFlags & TH_PHYSICS ) {
 		RunPhysics();		
 		UpdateTrigger();
+	}
+
+	// openQ4: Classic mega health comes back a while after its holder is done with it
+	if ( pickedUp && classicMegaRespawn > 0.0f && !gameLocal.isClient ) {
+		idPlayer *holder = classicMegaHolder.GetEntity();
+		if ( holder == NULL || holder->spectating || holder->health <= 0 || !holder->ClassicMegaHealthActive() ) {
+			const float respawn = classicMegaRespawn;
+			classicMegaHolder = NULL;
+			classicMegaRespawn = 0.0f;
+			BecomeInactive( TH_THINK );
+			const char *sfx = spawnArgs.GetString( "fx_Respawn" );
+			if ( sfx && *sfx ) {
+				PostEventSec( &EV_RespawnFx, Max( 0.0f, respawn - 0.5f ) );
+			}
+			PostEventSec( &EV_RespawnItem, respawn );
+			gameLocal.mpGame.ObserveCompetitiveItemPickup( this, respawn );
+		}
+		return;
 	}
 
 	if ( gameLocal.IsMultiplayer() && g_skipItemShadowsMP.GetBool() ) {
@@ -995,7 +1015,14 @@ bool idItem::Pickup( idPlayer *player ) {
 		botManager.OnItemPickup( this, player, ( respawn && !dropped && !no_respawn ) ? respawn : 0.0f );
 	}
 
-	if ( respawn && !dropped && !no_respawn ) {
+	// openQ4: Classic mega health starts draining now and holds its respawn until the
+	// holder is back at the normal limit; Think starts the clock from there.
+	if ( respawn && !dropped && !no_respawn && gameLocal.IsClassicRuleset() && spawnArgs.FindKey( "inv_megahealth" ) ) {
+		player->StartClassicMegaHealth();
+		classicMegaHolder = player;
+		classicMegaRespawn = respawn;
+		BecomeActive( TH_THINK );
+	} else if ( respawn && !dropped && !no_respawn ) {
 		const char *sfx = spawnArgs.GetString( "fx_Respawn" );
 		if ( sfx && *sfx ) {
 			PostEventSec( &EV_RespawnFx, respawn - 0.5f );
@@ -2338,7 +2365,10 @@ bool rvItemCTFFlag::GiveToPlayer( idPlayer* player, bool updateHud ) {
 	if ( canPickup ) {
 		// If the flag was dropped, return it		
 		if ( dropped ) {
-			gameLocal.mpGame.AddPlayerTeamScore( player, 2 );
+			// openQ4: the Classic ruleset pays Threewave CTF's recovery bonus
+			if ( !rvClassicRules::AwardFlagReturn( player ) ) {
+				gameLocal.mpGame.AddPlayerTeamScore( player, 2 );
+			}
 			statManager->FlagReturned( player );
 			ResetFlag ( teamPowerup );
 // RITUAL BEGIN
@@ -2409,7 +2439,10 @@ bool rvItemCTFFlag::Pickup( idPlayer *player ) {
 
 	gameLocal.mpGame.SetFlagEntity( NULL, team );
 
-	gameLocal.mpGame.AddPlayerTeamScore( player, 1 );
+	// openQ4: Threewave CTF gives nothing for lifting the flag
+	if ( !rvClassicRules::AwardFlagPickup( player ) ) {
+		gameLocal.mpGame.AddPlayerTeamScore( player, 1 );
+	}
 
 	if( gameLocal.gameType == GAME_CTF || gameLocal.gameType == GAME_ARENA_CTF ) { 
 		((rvCTFGameState*)gameLocal.mpGame.GetGameState())->SetFlagState( team, FS_TAKEN );

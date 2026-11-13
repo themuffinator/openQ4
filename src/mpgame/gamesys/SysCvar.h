@@ -419,6 +419,7 @@ extern idCVar	si_autobalance;
 // squirrel: Mode-agnostic buymenus
 extern idCVar	si_isBuyingEnabled;
 extern idCVar	si_dropWeaponsInBuyingModes;
+extern idCVar	si_buyingRules;
 extern idCVar	si_controlTime;
 // RITUAL END
 
@@ -477,6 +478,8 @@ extern idCVar	si_obeliskRespawn;
 extern idCVar	si_skullTimeout;
 extern idCVar	si_domCaptureTime;
 extern idCVar	si_domScoreRate;
+extern idCVar	si_ruleset;
+extern idCVar	si_classicGrapple;
 extern idCVar	g_hitFeedback;
 // openQ4 END
 

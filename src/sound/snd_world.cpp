@@ -337,6 +337,7 @@ idSoundWorldLocal::idSoundWorldLocal()
 	}
 	renderWorld = NULL;
 	writeDemo = NULL;
+	numSubtitleTails = 0;
 
 	listener.axis.Identity();
 	listener.pos.Zero();
@@ -1015,6 +1016,7 @@ void idSoundWorldLocal::ClearAllSoundEmitters()
 {
 	shakeAmp = 0.0f;
 	rumbleAmp = 0.0f;
+	ForgetSubtitleTails( -1 );
 	for( int i = 0; i < emitters.Num(); i++ )
 	{
 		emitters[i]->Reset();
@@ -1035,6 +1037,7 @@ void idSoundWorldLocal::StopAllSounds()
 {
 	shakeAmp = 0.0f;
 	rumbleAmp = 0.0f;
+	ForgetSubtitleTails( -1 );
 	for( int i = 0; i < emitters.Num(); i++ )
 	{
 		const bool wasReusable = emitters[i]->canFree && emitters[i]->channels.Num() == 0;
@@ -1772,6 +1775,8 @@ return false to the session.
 */
 bool idSoundWorldLocal::ReadSoundState( idFile* savefile, idDemoFile* demoFile )
 {
+	// Held captions belong to the clock being replaced.
+	ForgetSubtitleTails( -1 );
 	if( savefile == NULL )
 	{
 		if( demoFile != NULL )

@@ -11,7 +11,7 @@ The Awakening is built from unfinished alpha content. All 13 maps load, play and
 1. Put the expansion's `q4xbase` folder next to Quake 4's `q4base` folder, or point openQ4 at it with `fs_awakeningpath`. [Campaigns](campaigns.md#install-the-awakening) has the full steps and what to do if the campaign stays unavailable.
 2. Open **Single Player → Campaign**, choose **The Awakening**, then **New Game** or **Chapters**.
 
-The Awakening keeps its saves and settings apart from Quake 4's, in the `q4xbase` folder inside openQ4's save folder. Returning to Quake 4, Arena or multiplayer removes the expansion's files, so its changes never leak into them. Multiplayer is not part of this integration and always runs on stock Quake 4 content.
+The Awakening keeps its saves and settings apart from Quake 4's, in the `q4xbase` folder inside openQ4's save folder. Returning to Quake 4, Arena or multiplayer removes the expansion's files, so its changes never leak into them. Multiplayer is not part of this integration and always runs on stock Quake 4 content; a server can still sell by the expansion's buying rules (see [Buying in multiplayer](buying.md)).
 
 The campaign works with openQ4's other features; in VR, for example, you sit in the expansion's turrets and ride its speeder bike.
 

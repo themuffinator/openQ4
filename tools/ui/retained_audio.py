@@ -43,6 +43,7 @@ SECTIONS = (
         ("slider", "audio_subtitle_size", "#str_231309", "audioSubtitleSize", "audio.subtitleSize", (100, 200, 10)),
         ("slider", "audio_subtitle_background", "#str_231310", "audioSubtitleBackground", "audio.subtitleBackground", (0, 100, 10)),
         ("toggle", "audio_subtitle_speakers", "#str_231311", "audioSubtitleSpeakers", "audio.subtitleSpeakers", None),
+        ("toggle", "audio_subtitle_untranscribed", "#str_231313", "audioSubtitleUntranscribed", "audio.subtitleUntranscribed", None),
     )),
 )
 VERBS = tuple(row[3] for _section, _heading, rows in SECTIONS for row in rows)
@@ -62,6 +63,7 @@ def audio_document() -> dict:
         "audio.hrtf": {"type": "number", "initial": 0}, "audio.subtitles": {"type": "boolean", "initial": False},
         "audio.subtitleSize": {"type": "number", "initial": 100}, "audio.subtitleBackground": {"type": "number", "initial": 0},
         "audio.subtitleSpeakers": {"type": "boolean", "initial": False},
+        "audio.subtitleUntranscribed": {"type": "boolean", "initial": False},
     })
     for row in range(DEVICES):
         doc.state[f"audio.device.{row}.label"] = {"type": "string", "initial": ""}

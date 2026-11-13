@@ -384,6 +384,103 @@ static void CheckHudInstruments(ScreenHost& host, const std::string& source, boo
 	Check(host.errors==0,"HUD instruments have no runtime diagnostics");
 }
 
+// Section 14.5's Remastered motion (version 1.44): the strip opens and
+// closes instead of cutting, one ring travels from the slot it left, a
+// refusal shakes it red and throbs an empty weapon's sign, a tick marks the
+// weapon a quick switch returns to, and reduced motion keeps every cue but
+// none of the travel. The Strogg strip tunes in about its row.
+static void CheckWeaponStripMotion(ScreenHost& host, const std::string& source, bool strogg) {
+	const bool previousReducedMotion = host.reducedMotion;
+	host.reducedMotion = false;
+	Runtime runtime(host);
+	Check(runtime.Initialize(),"retained runtime for the strip's motion");
+	std::vector<Diagnostic> diagnostics; std::string error; Runtime::EventEffects effects;
+	Check(runtime.LoadDocument(source,"guis/hud/remastered.rui",diagnostics),"the strip's HUD loads");
+	const auto view = RemasteredViewport(1280,720);
+	StateValues values = RemasteredLayout(1280,720);
+	values.insert({{"weapon0",true},{"weapon0_index",0.0},{"weapon0_ammo",-1.0},{"weapon2",true},{"weapon2_index",1.0},
+		{"weapon2_ammo",0.0},{"weapon5",true},{"weapon5_index",2.0},{"weapon5_ammo",86.0},{"weaponcount",3.0},
+		{"player_weapon",5.0},{"player_idealweapon",5.0},{"player_lastweapon",0.0},{"weaponname",std::string("NAILGUN")},{"mp",false}});
+	Check(runtime.SetState(values,error,0),error.c_str());
+	Check(runtime.RunEvent("hudJoin",0,effects,error),"the strip's join program runs");
+	runtime.Frame(view,.1);
+	const auto value = [&](const char* id, const char* property, int i) {
+		const auto presented = runtime.PresentedValue(id,property);
+		return presented ? float(presented->data[i]) : -1000.f;
+	};
+
+	// Opening: from the closed values to rest within 140 ms.
+	Check(runtime.RunEvent("weaponChange",1.0,effects,error),"a change opens the strip");
+	runtime.Frame(view,1.03);
+	Check(Shown(runtime,"strip") && value("strip","opacity",0) > 0 && value("strip","opacity",0) < 1,"the strip fades in as it opens");
+	if (strogg) Check(value("strip","transform",3) < 1,"the Strogg strip tunes in about its row");
+	else Check(value("strip","transform",1) > 0,"the Marine strip rises into place");
+	runtime.Frame(view,1.2);
+	Check(Near(value("strip","opacity",0),1,.001f) && Near(value("strip","transform",1),0,.01f) &&
+		Near(value("strip","transform",3),1,.001f),"the open strip rests at full strength");
+	Bounds ring, slot;
+	Check(runtime.GetBounds("strip-cursor",ring) && runtime.GetBounds("slot5",slot) && Near(ring.x,slot.x),
+		"the ring sits on the pending weapon");
+	Check(Shown(runtime,"slot0-last") && !Shown(runtime,"slot5-last") && !Shown(runtime,"slot2-last"),
+		"the tick marks the weapon a quick switch returns to");
+
+	// Changing: the ring's box moves at once and its glide starts on the slot it left.
+	Check(runtime.SetState({{"player_idealweapon",0.0}},error,1.25),error.c_str());
+	Check(runtime.RunEvent("weaponChange",1.25,effects,error),"a second change runs");
+	runtime.Frame(view,1.26);
+	Check(runtime.GetBounds("strip-cursor",ring) && runtime.GetBounds("slot0",slot) && Near(ring.x,slot.x),
+		"the ring's box follows the new choice");
+	const float travel = value("strip-glide","transform",0);
+	Check(travel > 0 && travel <= 60*1.5f+.01f,"the ring travels from the slot it left");
+	Check(Shown(runtime,"slot5-last") && !Shown(runtime,"slot0-last"),"the tick moves to the weapon in hand");
+	runtime.Frame(view,1.5);
+	Check(Near(value("strip-glide","transform",0),0,.01f) && Near(value("strip-glide","transform",2),1,.001f),
+		"the ring settles on the new choice");
+
+	// Refusing an empty weapon: the ring shakes and flashes red, the sign throbs.
+	Check(runtime.SetState({{"weapon_refused",2.0}},error,1.55),error.c_str());
+	Check(runtime.RunEvent("weaponRefused",1.55,effects,error),"a refusal runs");
+	runtime.Frame(view,1.58);
+	Check(Shown(runtime,"strip-refuse") && value("strip-refuse","opacity",0) > .3f,"a refusal flashes the ring red");
+	Check(std::abs(value("strip-shake","transform",0)) > .1f,"a refusal shakes the ring");
+	Check(value("slot2-noammo","transform",2) > 1.01f,"the empty weapon's sign throbs");
+	runtime.Frame(view,1.9);
+	Check(!Shown(runtime,"strip-refuse") && Near(value("strip-shake","transform",0),0,.01f) &&
+		Near(value("slot2-noammo","transform",2),1,.001f),"the refusal settles");
+
+	// Firing closes the strip quickly; its hold no longer closes it later.
+	Check(runtime.RunEvent("weaponFire",2.0,effects,error),"firing runs");
+	runtime.Frame(view,2.03);
+	Check(Shown(runtime,"strip") && value("strip","opacity",0) < 1,"firing fades the strip out");
+	runtime.Frame(view,2.2);
+	Check(!Shown(runtime,"strip"),"the strip is gone 90 ms after firing");
+
+	// A refusal while closed opens it with the ring at rest; the hold then closes it.
+	Check(runtime.SetState({{"weapon_refused",-1.0}},error,2.3),error.c_str());
+	Check(runtime.RunEvent("weaponRefused",2.3,effects,error),"a refusal while closed runs");
+	runtime.Frame(view,2.32);
+	Check(Shown(runtime,"strip") && Near(value("strip-glide","transform",0),0,.01f),"a refusal opens the strip without travel");
+	runtime.Frame(view,3.31);
+	Check(Shown(runtime,"strip"),"the strip closes after its hold rather than cutting");
+	runtime.Frame(view,3.5);
+	Check(!Shown(runtime,"strip"),"the strip is gone 150 ms after its hold");
+
+	// Reduced motion: the strip still opens, the ring lands without travel.
+	host.reducedMotion = true;
+	runtime.SetReducedMotion(true,4.0);
+	Check(runtime.RunEvent("weaponChange",4.0,effects,error),"a change under reduced motion");
+	runtime.Frame(view,4.01);
+	Check(Shown(runtime,"strip") && Near(value("strip","transform",1),0,.01f) && Near(value("strip","transform",3),1,.001f),
+		"reduced motion opens the strip in place");
+	Check(runtime.SetState({{"player_idealweapon",5.0}},error,4.2),error.c_str());
+	Check(runtime.RunEvent("weaponChange",4.2,effects,error),"a second change under reduced motion");
+	runtime.Frame(view,4.21);
+	Check(Near(value("strip-glide","transform",0),0,.01f),"reduced motion moves the ring without travel");
+	Check(host.errors == 0,"no runtime diagnostics across the strip's motion");
+	runtime.Shutdown();
+	host.reducedMotion = previousReducedMotion;
+}
+
 static void CheckRemasteredHud(ScreenHost& host, const char* path, const std::string& id, bool strogg) {
 	const auto source = Read(path);
 	Document document; std::vector<Diagnostic> diagnostics;
@@ -512,8 +609,10 @@ static void CheckRemasteredHud(ScreenHost& host, const char* path, const std::st
 	Check(runtime.GetBounds("slot0",slot0) && runtime.GetBounds("slot5",slot5) && slot0.width > 0,"strip slots appear on a change");
 	Check(Near(slot5.x-slot0.x,30*1.5f),"slots sit on a 30 u pitch");
 	Check(Near((slot0.x+slot5.x+26*1.5f)/2,640,1.5f),"the strip is centred");
-	runtime.Frame(RemasteredViewport(1280,720),2.4);
-	Check(!Shown(runtime,"strip"),"the strip hides 1000 ms after the change");
+	// It closes 1000 ms after the change, over 150 ms (section 14.5).
+	runtime.Frame(RemasteredViewport(1280,720),2.25);
+	runtime.Frame(RemasteredViewport(1280,720),2.45);
+	Check(!Shown(runtime,"strip"),"the strip closes 1000 ms after the change");
 
 	// Pickups: a repeat merges with a count; a different item adds a line.
 	Check(runtime.SetState({{"itemtext",std::string("Armor Shard")},{"itemicon",std::string("item_armorshard")}},error,2.5),error.c_str());
@@ -715,6 +814,7 @@ static void CheckRemasteredHud(ScreenHost& host, const char* path, const std::st
 		"boss, exit, save and missile notices occupy separate rows");
 	Check(host.errors == 0,"no runtime diagnostics across the HUD exercise");
 	runtime.Shutdown();
+	CheckWeaponStripMotion(host,source,strogg);
 }
 
 // The multiplayer peer (ui-visual-design.md 14.9): the stock mphud keys and

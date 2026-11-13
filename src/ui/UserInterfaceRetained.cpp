@@ -265,7 +265,7 @@ bool SessionMenuCommand(const std::string& command) {
         "mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction","mpVoteYes","mpVoteNo","mpCallVote",
         "mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpMatch","mpMatchSelect","mpSummaryChat",
         "mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
-        "mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan",
+        "mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan","mpBuy",
         "arenaRestart","arenaLeave"};
 	return commands.contains(command);
 }
@@ -273,6 +273,22 @@ bool SessionMenuCommand(const std::string& command) {
 bool SessionMenuPlayerCommand(const std::string& command) {
 	return command == "mpSelectPlayer" || command == "mpMute" || command == "mpFriend" ||
 		command == "mpAdminSelect" || command == "mpAdminKick" || command == "mpAdminBan" || command == "mpAdminSwitch";
+}
+
+// The buy card's purchase: the item's place in the game's catalog.
+bool SessionMenuBuyCommand(const std::string& command) {
+	return command == "mpBuy";
+}
+
+// Freeze the item when its plate is chosen, as the player rows freeze theirs.
+std::optional<std::string> SessionMenuBuyRequest(const ActionInvocation& invocation) {
+	const auto command = invocation.arguments.find("command"), item = invocation.arguments.find("item");
+	if (invocation.arguments.size() != 2 || command == invocation.arguments.end() || item == invocation.arguments.end() ||
+		!std::holds_alternative<std::string>(command->second) || !SessionMenuBuyCommand(std::get<std::string>(command->second)) ||
+		!std::holds_alternative<double>(item->second)) return {};
+	const double index = std::get<double>(item->second);
+	if (!std::isfinite(index) || index < 0 || index >= 64 || std::floor(index) != index) return {};
+	return std::get<std::string>(command->second)+" "+std::to_string(static_cast<int>(index));
 }
 
 bool SessionMenuSaveCommand(const std::string& command) {
@@ -331,9 +347,9 @@ bool SessionMenuValueCommand(const std::string& command) {
 		"createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit","createUsePass",
 		"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
 		"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
-		"createInstagib",
+		"createRuleset","createGrapple","createInstagib",
 		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
-		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers",
+		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 		"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 	return commands.contains(command);
 }
@@ -456,6 +472,10 @@ bool ValidOperation(const Action& action) {
 			return action.arguments.size() == 3 && index != action.arguments.end() && index->second.type == 0 &&
 				generation != action.arguments.end() && generation->second.type == 0;
 		}
+		if (literal && SessionMenuBuyCommand(std::get<std::string>(expression.literal))) {
+			const auto item = action.arguments.find("item");
+			return action.arguments.size() == 2 && item != action.arguments.end() && item->second.type == 0;
+		}
 		if (literal && SessionMenuPlayerCommand(std::get<std::string>(expression.literal))) {
 			const auto client = action.arguments.find("client"), identity = action.arguments.find("identity");
 			return action.arguments.size() == 3 && client != action.arguments.end() && client->second.type == 0 &&
@@ -512,6 +532,11 @@ bool ValidInvocation(const ActionInvocation& invocation, std::string& error) {
 			SessionMenuSaveCommand(std::get<std::string>(command->second))) {
 			if (SessionMenuSaveRequest(invocation)) return true;
 			error = "Invalid save catalog identity: "+invocation.action; return false;
+		}
+		if (command != invocation.arguments.end() && std::holds_alternative<std::string>(command->second) &&
+			SessionMenuBuyCommand(std::get<std::string>(command->second))) {
+			if (SessionMenuBuyRequest(invocation)) return true;
+			error = "Invalid buy catalog item: "+invocation.action; return false;
 		}
 		if (command != invocation.arguments.end() && std::holds_alternative<std::string>(command->second) &&
 			SessionMenuPlayerCommand(std::get<std::string>(command->second))) {
@@ -788,6 +813,37 @@ struct idUserInterfaceRetained::Impl {
 			if (current && !readBack && now < it->deadline) { ++it; continue; }
 			if (current) runtime->AcknowledgeControlProposal(it->control,it->token,readBack);
 			it = sessionNumbers.erase(it);
+		}
+	}
+	// A cue from an event this adapter ran itself: a shortcut's onTab* or
+	// onSecondary, or a swipe. The runtime cannot see those.
+	std::optional<ControlCue::Kind> shortcutCue;
+	// The stock menu sounds (visual section 8), at most one per input event:
+	// main_menu_selection when anything was activated, else main_menu_mouseover
+	// when the lit control moved. A tap that both lands and activates, or a
+	// key that lights a control as it cycles it, sounds its activation alone.
+	// They play in the world the session has playing, so the in-game
+	// multiplayer menus sound over the match as the stock ones did, on the
+	// local channel the session's play command uses: a selection cuts short
+	// the tick before it, and the music is untouched.
+	void PlayCues() {
+		auto* runtime = RuntimeView();
+		if (!runtime) return;
+		auto cues = runtime->TakeCues();
+		if (shortcutCue) cues.push_back({*shortcutCue,{}});
+		shortcutCue.reset();
+		if (cues.empty()) return;
+		const auto chosen = std::find_if(cues.begin(),cues.end(),[](const ControlCue& cue) { return cue.kind == ControlCue::Kind::Activate; });
+		const auto& cue = chosen != cues.end() ? *chosen : cues.front();
+		const bool activate = cue.kind == ControlCue::Kind::Activate;
+		const char* shader = activate ? "main_menu_selection" : "main_menu_mouseover";
+		idSoundWorld* world = soundSystem != NULL ? soundSystem->GetPlayingSoundWorld() : NULL;
+		if (world) world->PlayShaderDirectly(shader,1);
+		if (cvarSystem->GetCVarBool("ui_retainedTrace")) {
+			const char* playing = !world ? "none" : world == soundSystem->GetSoundWorldFromId(SOUNDWORLD_MENU) ? "menu" :
+				world == soundSystem->GetSoundWorldFromId(SOUNDWORLD_GAME) ? "game" : "other";
+			common->Printf("RETAINED_GUI_SOUND path=%s cue=%s node=%s shader=%s world=%s cues=%u\n",
+				path.c_str(),activate ? "activate" : "focus",cue.node.c_str(),shader,playing,static_cast<unsigned>(cues.size()));
 		}
 	}
 	bool interactive = true, interactiveSet = false, unique = false, active = false;
@@ -1124,7 +1180,10 @@ struct idUserInterfaceRetained::Impl {
 		if (control || alt) return false;
 		const auto widget = RuntimeView()->GetWidgetState(RuntimeView()->FocusedControl());
 		if (widget && widget->role == ControlRole::Number && widget->number && widget->number->active) return false;
-		RunEvent(name); return true;
+		// A shortcut presses the button it stands for; paging lists only moves
+		// the focus between them.
+		if (RunEvent(name)) shortcutCue = key == K_JOY16 || key == K_JOY15 ? ControlCue::Kind::Focus : ControlCue::Kind::Activate;
+		return true;
 	}
 	bool TextCommandKey(int key, bool down, bool repeated, const openq4::KeyEventMetadata* metadata) {
 		auto* runtime = RuntimeView();
@@ -1594,8 +1653,9 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 	}
 	// A swipe across a tab strip runs onTabPrevious or onTabNext, as Q and E do.
 	for (const auto& name : impl->RuntimeView()->TakeGestureEvents())
-		if (impl->RuntimeView()->HasEvent(name)) impl->RunEvent(name);
+		if (impl->RuntimeView()->HasEvent(name) && impl->RunEvent(name)) impl->shortcutCue = ControlCue::Kind::Activate;
 	impl->CollectActions();
+	impl->PlayCues();
 	if (updateVisuals) *updateVisuals = true;
 	return impl->close || !impl->actions.empty() ? ActionMarker : "";
 }
@@ -1740,7 +1800,8 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 			// Validated again at resolution; the session maps the verb itself.
 			const auto& command = std::get<std::string>(invocation.arguments.at("command"));
 			const auto request = SessionMenuPlayerCommand(command) ? SessionMenuPlayerRequest(invocation) :
-				SessionMenuSaveCommand(command) ? SessionMenuSaveRequest(invocation) : std::optional<std::string>(command);
+				SessionMenuSaveCommand(command) ? SessionMenuSaveRequest(invocation) :
+				SessionMenuBuyCommand(command) ? SessionMenuBuyRequest(invocation) : std::optional<std::string>(command);
 			const bool accepted = request && impl->sessionRequests.size() < 64;
 			if (accepted) impl->sessionRequests.push_back(*request);
 			else impl->Error(request ? "Session menu request queue exceeded 64 requests" : "Invalid session target identity");
@@ -2297,6 +2358,8 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		unsigned sentinel = 0;
 		okay = owner.ReadFromSaveGame(&save) && save.ReadUnsignedInt(sentinel) == 4 && sentinel == 0x53454e54 && save.Tell() == save.Length();
 	}
+	// A device-free verb sounds as the input it stands for would.
+	impl.PlayCues();
 	common->Printf("RETAINED_GUI_OPERATION %s %s\n",verb.c_str(),okay ? "passed" : "failed");
 	return okay;
 }

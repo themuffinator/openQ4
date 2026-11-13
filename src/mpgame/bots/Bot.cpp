@@ -6537,6 +6537,21 @@ void rvBot::UpdateBuying( idPlayer *self ) {
 		return;
 	}
 
+	// Then the mod for the gun in hand, where the server's rules sell mods
+	// (The Awakening's), with the same reserve.
+	for ( int i = 0; i < buyCatalogCount; i++ ) {
+		const buyCatalogItem_t &entry = buyCatalog[ i ];
+		if ( entry.category != BUY_CATEGORY_MODS || self->ItemBuyStatus( entry.item ) != IBS_CAN_BUY ||
+			 cash - (float)self->GetItemCost( entry.item ) < 900.0f ) {
+			continue;
+		}
+		const idDict *modDict = gameLocal.FindEntityDefDict( entry.item, false );
+		if ( modDict != NULL && self->SlotForWeapon( modDict->GetString( "weapon" ) ) == self->GetCurrentWeapon() ) {
+			self->AttemptToBuyItem( entry.item );
+			return;
+		}
+	}
+
 	// In a team game a rich bot buys for everyone, as a good team mate does.
 	if ( gameLocal.IsTeamGame() && cash >= 5000.0f ) {
 		static const struct {

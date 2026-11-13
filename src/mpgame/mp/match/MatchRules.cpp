@@ -46,9 +46,13 @@ static const uint32_t MP_RULE_MODES_TEAM =
 	MP_RULE_GAME_BIT( GAME_DEADZONE ) |
 	MP_RULE_MODES_ROUND;
 
+// The modes whose game type allows buying (GTF_BUYING): retail's, the flag
+// modes included. A casual CTF server with buying on imported a rule this
+// mask refused, and its match never left warmup.
 static const uint32_t MP_RULE_MODES_BUYING =
 	MP_RULE_GAME_BIT( GAME_DM ) |
 	MP_RULE_GAME_BIT( GAME_TDM ) |
+	MP_RULE_MODES_CAPTURE |
 	MP_RULE_GAME_BIT( GAME_DEADZONE );
 
 static const uint32_t MP_RULE_MODES_TIMEOUT =

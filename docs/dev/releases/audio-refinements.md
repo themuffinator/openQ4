@@ -7,6 +7,10 @@
 - Read dialogue subtitles in both Classic and modern UI. Settings > Audio lets
   you enable them, enlarge the text, adjust the backing and show speaker names.
   Captions remain visible with dialogue muted and follow pause and save/load.
+- Know when someone is talking even without a transcript: dialogue the game
+  has no text for shows [untranscribed speech] (Settings > Audio >
+  Untranscribed Speech), and captions stay up long enough to read after a
+  line ends. Mods can now add or translate missing captions with caption packs.
 - Balance spoken dialogue independently of weapons and music with the new
   Dialogue Volume control in Settings > Audio. The setting is saved and also
   applies to The Awakening.
@@ -54,6 +58,9 @@
   picture. A speaker name too wide for the line is left out rather
   than overlapping the words. This feature does not transcribe player voice chat
   or caption effects.
+- Untranscribed Speech starts on. Turn it off in Settings > Audio to leave
+  lines without a transcript blank, as before. Caption packs are mods: openQ4
+  ships none, and a pack's text replaces the installed caption for its lines.
 - Replace the engine and matching game modules together. Dialogue Volume starts
   at full authored volume; existing saves do not need conversion for this setting.
 - Voice requires matching support on the server and clients. It uses narrowband

@@ -434,6 +434,7 @@ void idGameLocal::Clear( void ) {
 
 	localClientNum = 0;
 	isMultiplayer = false;
+	classicRuleset = false;
 	isServer = false;
 	isClient = false;
 	isTVClient = false;
@@ -753,6 +754,10 @@ void idGameLocal::Shutdown( void ) {
 	if ( !common ) {
 		return;
 	}
+
+	// openQ4: the declarations outlive this module; game-sp reads some of the same ones
+	// (weapon_blaster), so the Classic overlay must never survive the unload.
+	rvClassicRules::RevertDefinitions();
 
 	// Fatal startup failures can arrive before the runtime is complete.  Release
 	// only subsystems whose initialization began; the late phase still removes
@@ -1580,6 +1585,15 @@ void idGameLocal::SetServerInfo( const idDict &_serverInfo ) {
 
 	UpdateRepeaterInfo( true );
 
+	// openQ4: the ruleset is latched for the life of a map, and clients read the snapshot
+	// layout from it, so a mid-map change restarts the map rather than drifting apart.
+	// MapRestart treats si_ruleset as a full-restart key.
+	if ( isServer && isMultiplayer && gamestate == GAMESTATE_ACTIVE &&
+		( rvClassicRules::RulesetFromServerInfo( serverInfo ) == MP_RULESET_CLASSIC ) != classicRuleset ) {
+		Printf( "si_ruleset changed to %s; restarting the map\n", rvClassicRules::RulesetName( rvClassicRules::RulesetFromServerInfo( serverInfo ) ) );
+		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "serverMapRestart\n" );
+	}
+
 	if ( isServer ) {
 		// Let our clients know the server info changed
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
@@ -2036,7 +2050,8 @@ void idGameLocal::MapRestart( int instance ) {
 			}
 //RAVEN BEGIN
 			//asalmon: need to restart if the game type has changed but the map has not cause someone could be connecting
-			if(  keyval->GetValue().Icmp( keyval2->GetValue() ) && (!keyval->GetKey().Icmp("si_gametype")))
+			// openQ4: si_ruleset swaps the entity definition overlay, which only a full load applies
+			if(  keyval->GetValue().Icmp( keyval2->GetValue() ) && (!keyval->GetKey().Icmp("si_gametype") || !keyval->GetKey().Icmp("si_ruleset")))
 			{
 				break;
 			}
@@ -2457,6 +2472,15 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 #endif
 	
 	SetGameType();
+
+	// openQ4: the Classic ruleset is latched here, on server and client alike, from the
+	// server info that describes this map, and its definition overlay goes on before
+	// anything is precached or spawned.  MapShutdown takes it back off.
+	classicRuleset = ( rvClassicRules::RulesetFromServerInfo( serverInfo ) == MP_RULESET_CLASSIC );
+	rvClassicRules::ResetMatchState();
+	if ( classicRuleset ) {
+		rvClassicRules::ApplyDefinitions();
+	}
 
 	startupMsec = Sys_Milliseconds() - phaseStartMsec;
 	phaseStartMsec = Sys_Milliseconds();
@@ -3100,6 +3124,10 @@ void idGameLocal::MapShutdown( void ) {
 	clip.Clear();
 // RAVEN END
 	idClipModel::ClearTraceModelCache();
+
+	// openQ4: every entity built from the Classic overlay is gone; restore the shipped definitions.
+	rvClassicRules::RevertDefinitions();
+	classicRuleset = false;
 
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation

@@ -197,37 +197,8 @@ typedef enum {
 	IBS_CANNOT_AFFORD = 3,
 } itemBuyStatus_t;
 
-/*
-===============================================================================
-
-	idBuyItemPrice
-
-	Buy-menu prices a game-library layer sets in code, as the Awakening expansion
-	did; they come before the content's ItemCostConstants. An item is for sale
-	only when something prices it.
-
-		BUY_ITEM_PRICE( weapon_spikegun, 1300 )
-
-===============================================================================
-*/
-
-class idBuyItemPrice {
-public:
-								idBuyItemPrice( const char *item, int price );
-
-	// the price a layer set for item, if it set one
-	static bool					Find( const char *item, int &price );
-
-private:
-	const char *				item;
-	int							price;
-	idBuyItemPrice *			next;
-
-	static idBuyItemPrice *		list;
-};
-
-#define BUY_ITEM_PRICE( item, price ) \
-	static idBuyItemPrice item##_buyItemPrice( #item, price );
+// the weapon mod bits the player snapshot carries (MAX_WEAPONMODS of them)
+const int	WEAPON_MODS_SNAPSHOT_MASK = ( 1 << MAX_WEAPONMODS ) - 1;
 
 const int	ASYNC_PLAYER_TOURNEY_STATUS_BITS = idMath::BitsForInteger( PTS_NUM_STATES );
 
@@ -241,6 +212,7 @@ public:
 // RITUAL END
 	int						powerups;
 	int						armor;
+	int						armorTier;			// openQ4: Classic ruleset armour tier (classicArmorTier_t), meaningful while armor > 0
 	int						maxarmor;
 	int						ammo[ MAX_AMMO ];
 	int						clip[ MAX_WEAPONS ];
@@ -414,6 +386,17 @@ public:
 	int						nextAmmoRegenPulse[ MAX_AMMO ];	// time when ammo will regenerate
 	int						nextArmorPulse;		// time when armor will tick down
 	int						adrenalineHealthDrain;	// health Adrenaline takes back each pulse (MP only, not saved)
+	// openQ4: Classic ruleset (mp/ClassicRules.h). MP only, not saved.
+	int						classicMegaDecayTime;	// next mega health drain; 0 when no mega health is draining
+	int						classicHookState;		// classicHookState_t, server authoritative, in the snapshot
+	idVec3					classicHookOrigin;
+	idVec3					classicHookDir;
+	int						classicHookFireTime;
+	int						classicHookReleaseTime;
+	renderEntity_t			classicHookCable;
+	int						classicHookCableHandle;
+	renderEntity_t			classicHookHead;
+	int						classicHookHeadHandle;
 	bool					hiddenWeapon;		// if the weapon is hidden ( in noWeapons maps )
 
 	// mp stuff
@@ -776,9 +759,16 @@ public:
 	bool					CanBuy( void );
 	int						CanSelectWeapon				( const char* weaponName );
 	int						GetItemCost(const char* itemName);
-	bool					HasItemPrice( const char* itemName );
 	void					PerformImpulse( int impulse );
 	void					Spectate( bool spectate, bool force = false );
+	// openQ4: Classic ruleset
+	void					StartClassicMegaHealth( void );
+	void					UpdateClassicMegaHealth( void );
+	bool					ClassicMegaHealthActive( void ) const { return classicMegaDecayTime != 0; }
+	void					UpdateClassicHook( void );
+	void					ResetClassicHook( bool playSound );
+	void					PresentClassicHook( void );
+	void					FreeClassicHookPresentation( void );
 	void					SpectateFreeFly( bool force );	// force is also used by offline demo controls
 	void					RequestSpectatorFollow( spectatorFollow_t operation, int targetSlot = -1 );
  	void					ToggleObjectives ( void );
@@ -795,6 +785,9 @@ public:
 	idCamera *				GetPrivateCameraView( void ) const { return privateCameraView; }
 	void					StartFxFov( float duration  );
  	void					UpdateHudWeapon( int displayWeapon = -1 );
+	// openQ4: a weapon key that changed nothing (the Remastered strip's refusal).
+	bool					WeaponKeyRefused( int num );
+	void					RefuseWeaponSelection( int num );
 #ifdef _XENON
 	void					ResetHUDWeaponSwitch( void );
 #endif
@@ -954,6 +947,8 @@ public:
 // RITUAL BEGIN
 // squirrel: added DeadZone multiplayer
 	itemBuyStatus_t			ItemBuyStatus( const char* itemName );
+	void					WriteWeaponModsToSnapshot( idBitMsgDelta &msg ) const;
+	void					ReadWeaponModsFromSnapshot( const idBitMsgDelta &msg, int weaponMods[ MAX_WEAPONS ] );
 	bool					CanBuyItem( const char* itemName );
 	void					GiveCash( float cashDeltaAmount );
 	void					ClampCash( float minCash, float maxCash );
@@ -1217,7 +1212,6 @@ private:
 
 	int						oldInventoryWeapons;
 
-	const idDeclEntityDef*	itemCosts;
 
 	idVec3					leanVelocity;
 

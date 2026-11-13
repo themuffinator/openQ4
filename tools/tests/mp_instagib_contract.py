@@ -124,7 +124,9 @@ def validate_menu() -> None:
     require(menu, '{ "createInstagib",\t\t"instagib",\t\t"si_instagib",', "RETAINED_CREATE_SETTINGS")
     generator = read(ROOT / "tools/ui/retained_create_server.py")
     require(generator, '("instagib", "createInstagib", "#str_231960", "toggle", 0, 1, None)', "create-server ADVANCED rows")
-    require(generator, '("#str_41704", ("create-instagib",', "create-server RULES tab")
+    rules = re.search(r'\("#str_41704", \((.*?)\)\),', generator, re.S)
+    if rules is None or '"create-instagib"' not in rules.group(1):
+        raise AssertionError("create-server RULES tab must carry create-instagib")
     document = read(ROOT / "content/baseoq4/pak0/guis/menu/createserver.rui")
     require(document, '"createInstagib"', "createserver.rui (regenerate with build_retained_screens.py)")
 

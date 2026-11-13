@@ -509,6 +509,7 @@ void idInventory::Clear( void ) {
 	carryOverWeapons	= 0;
 	powerups			= 0;
 	armor				= 0;
+	armorTier			= 0;
 	maxarmor			= 0;
 	secretAreasDiscovered = 0;
 
@@ -663,6 +664,7 @@ void idInventory::RestoreInventory( idPlayer *owner, const idDict &dict ) {
 	// health/armor
 	maxHealth		= dict.GetInt( "maxhealth", "100" );
 	armor			= dict.GetInt( "armor", "50" );
+	armorTier		= 0;
 	maxarmor		= dict.GetInt( "maxarmor", "100" );
 
 	// ammo
@@ -1476,6 +1478,16 @@ idPlayer::idPlayer() {
 	corpseSinkStartTime		= 0;
 	nextHealthPulse			= 0;
 	adrenalineHealthDrain	= 0;
+	classicMegaDecayTime	= 0;
+	classicHookState		= CLASSIC_HOOK_NONE;
+	classicHookOrigin.Zero();
+	classicHookDir.Zero();
+	classicHookFireTime		= 0;
+	classicHookReleaseTime	= 0;
+	memset( &classicHookCable, 0, sizeof( classicHookCable ) );
+	classicHookCableHandle	= -1;
+	memset( &classicHookHead, 0, sizeof( classicHookHead ) );
+	classicHookHeadHandle	= -1;
 
 	scoreBoardOpen			= false;
 	forceScoreBoard			= false;
@@ -1715,8 +1727,6 @@ idPlayer::idPlayer() {
 		voiceDest[i] = -1;
 		voiceDestTimes[i] = 0;
 	}
-
-	itemCosts = NULL;
 
 	teamHealthRegen		= NULL;
 	teamHealthRegenPending	= false;
@@ -2022,6 +2032,10 @@ void idPlayer::Init( void ) {
 
 	// restore persistent data
 	RestorePersistantInfo();
+
+	// openQ4: a new life starts with no mega health draining and the hook in.
+	classicMegaDecayTime = 0;
+	ResetClassicHook( false );
 
 	bobCycle	= 0;
 
@@ -2567,8 +2581,6 @@ void idPlayer::Spawn( void ) {
 	inventory.carryOverWeapons = 0;
 //RITUAL END
 
-	itemCosts = static_cast< const idDeclEntityDef * >( declManager->FindType( DECL_ENTITYDEF, "ItemCostConstants", false ) );
-
 	// The local player's retained gameplay documents load now, inside the
 	// level load, so their first use builds nothing.
 	PrecacheWeaponWheelGui();
@@ -2583,6 +2595,7 @@ Release any resources used by the player.
 ==============
 */
 idPlayer::~idPlayer() {
+	FreeClassicHookPresentation();
 	FreeWeaponWheelGui();
 	FreeQuickChatGui();
 	FreeStatusBar();
@@ -3428,6 +3441,10 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 
 // RITUAL BEGIN
 // squirrel: Mode-agnostic buymenus
+	// openQ4: Init() clears the weapon mods; the ones bought for a weapon the
+	// buying mode carries over come back with it below.
+	int carriedWeaponMods[ MAX_WEAPONS ];
+	memcpy( carriedWeaponMods, inventory.weaponMods, sizeof( carriedWeaponMods ) );
 	if ( gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) {
 		// Record previous weapons for later restoration
 		inventory.carryOverWeapons &= ~CARRYOVER_WEAPONS_MASK;
@@ -3575,6 +3592,11 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 			{
 				int ammoIndex	= inventory.AmmoIndexForWeaponIndex( weaponIndex );
 				inventory.ammo[ ammoIndex ] = inventory.StartingAmmoForWeaponIndex( weaponIndex );
+			}
+			// openQ4: and the mods bought for a carried weapon
+			if ( inventory.carryOverWeapons & ( 1 << weaponIndex ) )
+			{
+				inventory.weaponMods[ weaponIndex ] |= carriedWeaponMods[ weaponIndex ];
 			}
 		}
 
@@ -4534,6 +4556,58 @@ void idPlayer::UpdateHudPowerUps( idUserInterface *_hud ) {
 
 /*
 ===============
+idPlayer::WeaponKeyRefused
+
+openQ4: whether a weapon key would leave the choice unchanged because the
+weapon is missing or out of ammunition (SelectWeapon's own refusals).
+===============
+*/
+bool idPlayer::WeaponKeyRefused( int num ) {
+	if ( num < 0 || num >= MAX_WEAPONS ) {
+		return false;
+	}
+	const char *weap = spawnArgs.GetString( va( "def_weapon%d", num ) );
+	if ( !weap[ 0 ] || !( inventory.weapons & ( 1 << num ) ) ) {
+		return true;
+	}
+	return !inventory.HasAmmo( weap ) && !spawnArgs.GetBool( va( "weapon%d_allowempty", num ) );
+}
+
+/*
+===============
+idPlayer::RefuseWeaponSelection
+
+openQ4: tells the HUD that a weapon key changed nothing, so the Remastered
+weapon strip can show the refusal. `num` is the weapon asked for, or -1 when
+there was nothing else to cycle to. The stock HUD has no such event.
+===============
+*/
+void idPlayer::RefuseWeaponSelection( int num ) {
+	if ( !hud || entityNumber != gameLocal.localClientNum ) {
+		return;
+	}
+	if ( !weaponEnabled || spectating || hiddenWeapon || gameLocal.inCinematic || health <= 0 || !inventory.weapons ) {
+		return;
+	}
+	if ( gameLocal.world && gameLocal.world->spawnArgs.GetBool( "no_Weapons" ) ) {
+		return;
+	}
+	// An empty weapon's slot shows why: publish its ammunition as it is now.
+	if ( num >= 0 && num < MAX_WEAPONS && ( inventory.weapons & ( 1 << num ) ) ) {
+		const char *weap = spawnArgs.GetString( va( "def_weapon%d", num ) );
+		if ( weap[ 0 ] ) {
+			hud->SetStateInt( va( "weapon%d_ammo", num ), inventory.ammo[ inventory.AmmoIndexForWeaponClass( weap ) ] );
+		}
+	}
+	hud->SetStateInt( "weapon_refused", num );
+	hud->HandleNamedEvent( "weaponRefused" );
+	hud->StateChanged( gameLocal.time );
+	// Firing closes the strip, as after a change.
+	weaponChangeIconsUp = true;
+}
+
+/*
+===============
 idPlayer::StartRadioChatter
 ===============
 */
@@ -5382,6 +5456,23 @@ bool idPlayer::Give( const char *statname, const char *value, bool dropped, bool
  			if ( health > boundaryHealth ) {
  				health = boundaryHealth;
  			}
+		}
+	} else if ( !idStr::Icmp( statname, "bonushealth" ) && gameLocal.IsClassicRuleset() ) {
+		// openQ4: Classic stimpacks stack past the limit and never drain
+		if ( health >= CLASSIC_HEALTH_CAP ) {
+			return false;
+		}
+		health = Min( health + atoi( value ), CLASSIC_HEALTH_CAP );
+	} else if ( !idStr::Icmp( statname, "megahealth" ) ) {
+		// openQ4: Classic mega health; idItem::Pickup starts the drain and holds the respawn
+		if ( health >= CLASSIC_HEALTH_CAP ) {
+			return false;
+		}
+		health = Min( health + atoi( value ), CLASSIC_HEALTH_CAP );
+	} else if ( !idStr::Icmp( statname, "armor_tier" ) ) {
+		// openQ4: Classic tiered armour
+		if ( !rvClassicRules::GiveArmor( this, value ) ) {
+			return false;
 		}
 	} else if ( !idStr::Icmp( statname, "bonushealth" ) ) {
 		// allow health over max health
@@ -6232,7 +6323,8 @@ void idPlayer::UpdatePowerUps( void ) {
 					nextHealthPulse = gameLocal.time + HEALTH_PULSE;
 				}	
 			// Health above max technically isnt a powerup but functions as one so handle it here
-			} else if ( health > inventory.maxHealth && gameLocal.isServer ) { 
+			// openQ4: under the Classic ruleset only mega health drains (UpdateClassicMegaHealth)
+			} else if ( health > inventory.maxHealth && gameLocal.isServer && !gameLocal.IsClassicRuleset() ) { 
 				nextHealthPulse = gameLocal.time + HEALTH_PULSE;
 				health--;
 			}
@@ -6274,10 +6366,16 @@ void idPlayer::UpdatePowerUps( void ) {
 				inventory.armor = Min( inventory.armor + FC_ARMOR_REGEN_STEP, armorCap );
 				nextArmorPulse = gameLocal.time + FC_ARMOR_REGEN_PULSE;
 			}
-		} else if ( inventory.armor > inventory.maxarmor ) {
+		} else if ( inventory.armor > inventory.maxarmor && !gameLocal.IsClassicRuleset() ) {
+			// openQ4: Classic armour keeps its points; each tier has its own limit
 			nextArmorPulse += ARMOR_PULSE;
 			inventory.armor--;
 		}
+	}
+
+	// openQ4: Classic mega health drain
+	if ( gameLocal.isServer && gameLocal.IsClassicRuleset() ) {
+		UpdateClassicMegaHealth();
 	}
 		
 	// Assign the powerup skin as long as we are alive
@@ -9902,113 +10000,25 @@ bool idPlayer::ExitVehicle ( bool force ) {
 /*
 ==============
 GetItemCost
+
+The item's price under the server's buying rules (mp/Buying.cpp).
 ==============
 */
 int idPlayer::GetItemCost( const char* itemName ) {
-	int price;
-	if ( idBuyItemPrice::Find( itemName, price ) ) {
-		return price;
-	}
-	if ( !itemCosts ) {
-		assert( false );
-		return 99999;
-	}
-	return itemCosts->dict.GetInt( itemName, "99999" );
+	return gameLocal.mpGame.mpBuyingManager.GetItemPrice( itemName );
 }
-
-/*
-==============
-idPlayer::HasItemPrice
-
-True when a layer or the content prices the item. Weapon mods and FC Armor
-Regen, which retail never sold, are for sale only where something does.
-==============
-*/
-bool idPlayer::HasItemPrice( const char* itemName ) {
-	int price;
-	return idBuyItemPrice::Find( itemName, price ) || ( itemCosts != NULL && itemCosts->dict.FindKey( itemName ) != NULL );
-}
-
-/*
-==============
-idBuyItemPrice
-==============
-*/
-idBuyItemPrice *idBuyItemPrice::list = NULL;
-
-idBuyItemPrice::idBuyItemPrice( const char *item, int price ) :
-	item( item ),
-	price( price ),
-	next( list ) {
-	list = this;
-}
-
-bool idBuyItemPrice::Find( const char *item, int &price ) {
-	for ( const idBuyItemPrice *entry = list; entry != NULL; entry = entry->next ) {
-		if ( !idStr::Icmp( entry->item, item ) ) {
-			price = entry->price;
-			return true;
-		}
-	}
-	return false;
-}
-
-/*
-==============
-Buy impulses
-
-A buy travels from client to server as impulse IMPULSE_100 + its index here
-(an 8-bit event, so the list may run past IMPULSE_127). Retail's items keep
-their numbers; the Awakening's fill the numbers retail left unused.
-==============
-*/
-static const char * const buyItemsByImpulse[] = {
-	"weapon_shotgun",					// IMPULSE_100
-	"weapon_machinegun",					// IMPULSE_101
-	"weapon_hyperblaster",				// IMPULSE_102
-	"weapon_grenadelauncher",			// IMPULSE_103
-	"weapon_nailgun",					// IMPULSE_104
-	"weapon_rocketlauncher",				// IMPULSE_105
-	"weapon_railgun",					// IMPULSE_106
-	"weapon_lightninggun",				// IMPULSE_107
-	"weapon_spikegun",					// IMPULSE_108
-	"weapon_napalmgun",					// IMPULSE_109
-	"weapon_dmg",						// IMPULSE_110
-	"wpmod_shotgun_ammo",				// IMPULSE_111
-	"wpmod_hyperblaster_bounce1",		// IMPULSE_112
-	"wpmod_nailgun_rof",					// IMPULSE_113
-	"wpmod_lightninggun_chain",			// IMPULSE_114
-	"wpmod_railgun_penetrate",			// IMPULSE_115
-	"wpmod_grenade_concussion_blast",	// IMPULSE_116
-	"wpmod_rocketlauncher_burst",		// IMPULSE_117
-	"item_armor_small",					// IMPULSE_118
-	"item_armor_large",					// IMPULSE_119
-	"ammorefill",						// IMPULSE_120
-	"wpmod_spikegun_scope",				// IMPULSE_121
-	"wpmod_goobgun_flamethrower",		// IMPULSE_122
-	"ammo_regen",						// IMPULSE_123
-	"health_regen",						// IMPULSE_124
-	"damage_boost",						// IMPULSE_125
-	"fc_armor_regen",					// IMPULSE_126
-	"weapon_freezegun",					// IMPULSE_127
-	"weapon_goobgun",					// IMPULSE_127 + 1
-};
-static const int numBuyItemsByImpulse = sizeof( buyItemsByImpulse ) / sizeof( buyItemsByImpulse[0] );
-static_assert( IMPULSE_100 + (int)( sizeof( buyItemsByImpulse ) / sizeof( buyItemsByImpulse[0] ) ) <= ( 1 << IMPULSE_NUMBER_OF_BITS ), "buy impulses must fit the impulse event" );
 
 /*
 ==============
 GetItemBuyImpulse
+
+A buy travels from client to server as the item's impulse (buyCatalog).
 ==============
 */
 int GetItemBuyImpulse( const char* itemName )
 {
-	for ( int i = 0; i < numBuyItemsByImpulse; i++ ) {
-		if ( !idStr::Icmp( buyItemsByImpulse[ i ], itemName ) ) {
-			return IMPULSE_100 + i;
-		}
-	}
-	return 0;
+	const buyCatalogItem_t *entry = MP_FindBuyCatalogItem( itemName );
+	return entry != NULL ? entry->impulse : 0;
 }
 
 /*
@@ -10018,10 +10028,8 @@ GetBuyItemForImpulse
 */
 static const char* GetBuyItemForImpulse( int impulse )
 {
-	if ( impulse < IMPULSE_100 || impulse >= IMPULSE_100 + numBuyItemsByImpulse ) {
-		return NULL;
-	}
-	return buyItemsByImpulse[ impulse - IMPULSE_100 ];
+	const buyCatalogItem_t *entry = MP_FindBuyCatalogItemForImpulse( impulse );
+	return entry != NULL ? entry->item : NULL;
 }
 
 
@@ -10035,17 +10043,16 @@ bool idPlayer::CanBuyItem( const char* itemName )
 itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 {
 	idStr itemNameStr = itemName;
-	if ( itemNameStr == "notimplemented" )
+
+	// only what the server's buying rules sell and the content defines
+	if ( !gameLocal.mpGame.mpBuyingManager.IsItemSold( itemName ) )
 	{
 		return IBS_NOT_ALLOWED;
 	}
-	else if( !idStr::Cmpn( itemName, "wpmod_", 6 ) )
-	{
-		// a weapon mod is for sale only where something prices it (the Awakening),
-		// and only for a weapon the player carries
-		if ( !HasItemPrice( itemName ) )
-			return IBS_NOT_ALLOWED;
 
+	if( !idStr::Cmpn( itemName, "wpmod_", 6 ) )
+	{
+		// a weapon mod only for a weapon the player carries, and only once
 		const idDict* modDict = gameLocal.FindEntityDefDict( itemName, false );
 		const char* weaponClass = modDict ? modDict->GetString( "weapon" ) : "";
 		const idDict* weaponDict = gameLocal.FindEntityDefDict( weaponClass, false );
@@ -10096,12 +10103,6 @@ itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 				fullAmmo = false;
 		}
 		if ( fullAmmo )
-			return IBS_NOT_ALLOWED;
-	}
-	else if ( itemNameStr == "fc_armor_regen" )
-	{
-		// the Awakening's fourth team special; retail never sold it
-		if ( !HasItemPrice( itemName ) )
 			return IBS_NOT_ALLOWED;
 	}
 
@@ -10301,7 +10302,11 @@ void idPlayer::PerformImpulse( int impulse ) {
 	}
 
 	if ( impulse >= IMPULSE_0 && impulse <= IMPULSE_12 ) {
+		const bool refused = WeaponKeyRefused( impulse );
 		SelectWeapon( impulse, false );
+		if ( refused ) {
+			RefuseWeaponSelection( impulse );
+		}
 		return;
 	}
 
@@ -10311,7 +10316,13 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 		case IMPULSE_14: {
-			NextWeapon();
+			{
+				const int asked = idealWeapon;
+				NextWeapon();
+				if ( idealWeapon == asked && ( !gameLocal.isClient || net_clientPredictWeaponSwitch.GetBool() ) ) {
+					RefuseWeaponSelection( -1 );
+				}
+			}
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCycleNext( this );
 			} else if ( gameLocal.isServer && spectating && spectator != entityNumber ) {
@@ -10322,7 +10333,13 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 		case IMPULSE_15: {
-			PrevWeapon();
+			{
+				const int asked = idealWeapon;
+				PrevWeapon();
+				if ( idealWeapon == asked && ( !gameLocal.isClient || net_clientPredictWeaponSwitch.GetBool() ) ) {
+					RefuseWeaponSelection( -1 );
+				}
+			}
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCyclePrev( this );
 			} else if ( gameLocal.isServer && spectating && spectator != entityNumber ) {
@@ -10405,7 +10422,7 @@ void idPlayer::PerformImpulse( int impulse ) {
 		}
 
 		default: {
-			// the buy menu's impulses (see buyItemsByImpulse)
+			// the buy menu's impulses (buyCatalog in mp/Buying.cpp)
 			const char *buyItem = GetBuyItemForImpulse( impulse );
 			if ( buyItem != NULL ) {
 				AttemptToBuyItem( buyItem );
@@ -11507,6 +11524,9 @@ void idPlayer::Think( void ) {
 	}
 // RAVEN END
 
+	// openQ4: Classic ruleset grappling hook; fixing it before Move lets this frame pull
+	UpdateClassicHook();
+
 	Move();
 	ReportVRRoomScaleWalk();
 
@@ -11574,6 +11594,8 @@ void idPlayer::Think( void ) {
 	UpdateHud();
 
 	UpdatePowerUps();
+
+	PresentClassicHook();
 
 	UpdateDeathSkin( false );
 
@@ -11829,6 +11851,10 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 		pfl.pain = true;
 		return;
 	}
+
+	// openQ4: Classic ruleset: the hook lets go and any mega health stops draining
+	ResetClassicHook( false );
+	classicMegaDecayTime = 0;
 
 // squirrel: Mode-agnostic buymenus
 	if ( gameLocal.isMultiplayer ) {
@@ -12104,7 +12130,11 @@ void idPlayer::CalcDamagePoints( idEntity *inflictor, idEntity *attacker, const 
 	}
 
 	// save some from armor
-	if ( !damageDef->GetBool( "noArmor" ) ) {
+	if ( !damageDef->GetBool( "noArmor" ) && gameLocal.IsClassicRuleset() ) {
+		// openQ4: Classic armour stops a share set by its tier, and may stop a hit outright
+		armorSave = rvClassicRules::AbsorbDamage( inventory.armorTier, inventory.armor, damage, damageDef->GetBool( "classic_energy" ) );
+		damage -= armorSave;
+	} else if ( !damageDef->GetBool( "noArmor" ) ) {
 		float armor_protection;
 
  		armor_protection = ( gameLocal.isMultiplayer ) ? g_armorProtectionMP.GetFloat() : g_armorProtection.GetFloat();
@@ -12351,6 +12381,11 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 		if ( !gameLocal.isClient && gameLocal.mpGame.GetGameState() != NULL &&
 			 attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
 			gameLocal.mpGame.GetGameState()->PlayerDamage( static_cast< idPlayer * >( attacker ), this, damage, armorSave );
+		}
+
+		// openQ4: Classic CTF remembers who has been hurting a flag carrier
+		if ( attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
+			rvClassicRules::NoteDamage( this, static_cast< idPlayer * >( attacker ) );
 		}
 
 		// openQ4: floating damage numbers, ported from Quake Live's damage
@@ -14996,6 +15031,8 @@ void idPlayer::LocalClientPredictionThink( void ) {
  		UpdatePowerUps();
  	}
 
+	PresentClassicHook();
+
  	UpdateDeathSkin( false );
 
 	UpdateDeathShader( deathStateHitch );
@@ -15234,6 +15271,7 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 
 		UpdateHud();
  		UpdatePowerUps();
+		PresentClassicHook();
  	}
 
 //#if !LIMITED_PREDICTION
@@ -15503,6 +15541,17 @@ void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
 	msg.WriteDeltaFloat( 0.0f, deltaViewAngles[2] );
 	msg.WriteShort( health );
 	msg.WriteByte( inventory.armor );
+	// openQ4: Classic ruleset state.  Both ends latch the ruleset from the same server
+	// info at map load, so only Classic maps (and Classic demos) carry these bits.
+	if ( gameLocal.IsClassicRuleset() ) {
+		msg.WriteBits( inventory.armorTier, CLASSIC_ARMOR_TIER_BITS );
+		msg.WriteBits( classicHookState, CLASSIC_HOOK_STATE_BITS );
+		if ( classicHookState != CLASSIC_HOOK_NONE ) {
+			msg.WriteFloat( classicHookOrigin[0] );
+			msg.WriteFloat( classicHookOrigin[1] );
+			msg.WriteFloat( classicHookOrigin[2] );
+		}
+	}
  	msg.WriteBits( lastDamageDef, gameLocal.entityDefBits );
 	msg.WriteDir( lastDamageDir, 9 );
 	msg.WriteShort( lastDamageLocation );
@@ -15525,6 +15574,43 @@ void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
  	}
 	msg.WriteBits( inBuyZone, 1 );
 	msg.WriteLong( (int)buyMenuCash );
+	WriteWeaponModsToSnapshot( msg );
+}
+
+/*
+================
+idPlayer::WriteWeaponModsToSnapshot
+
+openQ4: the weapon mods a buying mode sells (mp/Buying.cpp) change how the
+weapon fires, and every client builds the weapon from them: which weapons
+carry mods, then each one's mod bits.
+================
+*/
+void idPlayer::WriteWeaponModsToSnapshot( idBitMsgDelta &msg ) const {
+	int moddedWeapons = 0;
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( inventory.weaponMods[ i ] & WEAPON_MODS_SNAPSHOT_MASK ) {
+			moddedWeapons |= ( 1 << i );
+		}
+	}
+	msg.WriteBits( moddedWeapons, MAX_WEAPONS );
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( moddedWeapons & ( 1 << i ) ) {
+			msg.WriteBits( inventory.weaponMods[ i ] & WEAPON_MODS_SNAPSHOT_MASK, MAX_WEAPONMODS );
+		}
+	}
+}
+
+/*
+================
+idPlayer::ReadWeaponModsFromSnapshot
+================
+*/
+void idPlayer::ReadWeaponModsFromSnapshot( const idBitMsgDelta &msg, int weaponMods[ MAX_WEAPONS ] ) {
+	const int moddedWeapons = msg.ReadBits( MAX_WEAPONS );
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		weaponMods[ i ] = ( moddedWeapons & ( 1 << i ) ) ? msg.ReadBits( MAX_WEAPONMODS ) : 0;
+	}
 }
 
 /*
@@ -15542,6 +15628,9 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	idAngles decodedDeltaViewAngles;
 	int decodedHealth;
 	int decodedArmor;
+	int decodedArmorTier = CLASSIC_ARMOR_NONE;
+	int decodedHookState = CLASSIC_HOOK_NONE;
+	idVec3 decodedHookOrigin = vec3_origin;
 	int decodedLastDamageDef;
 	idVec3 decodedLastDamageDir;
 	int decodedLastDamageLocation;
@@ -15555,6 +15644,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	int decodedWeaponAmmo = 0;
 	bool decodedInBuyZone;
 	int decodedCash;
+	int decodedWeaponMods[ MAX_WEAPONS ];
 
 	if ( static_cast<unsigned int>( snapshotSequence ) - static_cast<unsigned int>( lastSnapshotSequence ) > 1u ) {
  		stateHitch = true;
@@ -15572,6 +15662,15 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	decodedDeltaViewAngles[2] = msg.ReadDeltaFloat( 0.0f );
 	decodedHealth = msg.ReadShort();
 	decodedArmor = msg.ReadByte();
+	if ( gameLocal.IsClassicRuleset() ) {
+		decodedArmorTier = msg.ReadBits( CLASSIC_ARMOR_TIER_BITS );
+		decodedHookState = msg.ReadBits( CLASSIC_HOOK_STATE_BITS );
+		if ( decodedHookState != CLASSIC_HOOK_NONE ) {
+			decodedHookOrigin[0] = msg.ReadFloat();
+			decodedHookOrigin[1] = msg.ReadFloat();
+			decodedHookOrigin[2] = msg.ReadFloat();
+		}
+	}
 	decodedLastDamageDef = msg.ReadBits( gameLocal.entityDefBits );
 	decodedLastDamageDir = msg.ReadDir( 9 );
 	decodedLastDamageLocation = msg.ReadShort();
@@ -15601,6 +15700,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 	decodedInBuyZone = msg.ReadBits( 1 ) != 0;
 	decodedCash = msg.ReadLong();
+	ReadWeaponModsFromSnapshot( msg, decodedWeaponMods );
 	if ( msg.IsReadOverflowed() ) {
 		return;
 	}
@@ -15628,6 +15728,9 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	deltaViewAngles = decodedDeltaViewAngles;
 	health = decodedHealth;
 	inventory.armor = decodedArmor;
+	inventory.armorTier = decodedArmorTier;
+	classicHookState = decodedHookState;
+	classicHookOrigin = decodedHookOrigin;
 	lastDamageDef = decodedLastDamageDef;
 	lastDamageDir = decodedLastDamageDir;
 	lastDamageLocation = decodedLastDamageLocation;
@@ -15764,6 +15867,21 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		buyMenuCash = (float)decodedCash;
 		gameLocal.mpGame.RedrawLocalBuyMenu();
 	}
+	// A weapon whose mods changed is rebuilt from them, as the server rebuilt
+	// it when they were bought (GiveWeaponMod).
+	bool weaponModsChanged = false;
+	for ( i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( inventory.weaponMods[ i ] != decodedWeaponMods[ i ] ) {
+			if ( i == currentWeapon && weapon != NULL ) {
+				currentWeapon = -1;
+			}
+			inventory.weaponMods[ i ] = decodedWeaponMods[ i ];
+			weaponModsChanged = true;
+		}
+	}
+	if ( weaponModsChanged ) {
+		gameLocal.mpGame.RedrawLocalBuyMenu();
+	}
  	// no msg reading below this
 	
 	// if not a local client assume the client has all ammo types
@@ -15829,8 +15947,13 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		// some powerups since he actually spawned in, so restore those
 		int latchPowerup = inventory.powerups;
 		const unsigned int latchSnapshotSequence = lastSnapshotSequence;
+		// the weapon mods this snapshot carried, which Init() clears: the new
+		// weapon is built with them rather than rebuilt when the next one says so
+		int latchWeaponMods[ MAX_WEAPONS ];
+		memcpy( latchWeaponMods, inventory.weaponMods, sizeof( latchWeaponMods ) );
 		Init();
 		inventory.powerups = latchPowerup;
+		memcpy( inventory.weaponMods, latchWeaponMods, sizeof( latchWeaponMods ) );
 		// openQ4: Init() starts the snapshot sequence over, so the next snapshot read as a
 		// state hitch, and its change of weapon (Init() also clears idealWeapon) caught the new
 		// weapon straight up to ready while the server's raised: the client fired shots the
@@ -17867,5 +17990,234 @@ void idPlayer::SetFriend( int clientNum, bool isFriend ) {
 	} else {
 		friendPlayers &= ~mask;
 		friendPlayerIdentities[ clientNum ] = 0;
+	}
+}
+
+/*
+===============================================================================
+
+	openQ4: Classic ruleset (mp/ClassicRules.h) - mega health and the grappling hook.
+
+===============================================================================
+*/
+
+/*
+================
+idPlayer::StartClassicMegaHealth
+
+Quake 2's mega health: the extra points hold for five seconds, then drain a
+point a second until the player is back at the normal limit.  The item that
+gave it waits for that before it starts its own respawn (idItem::Think).
+================
+*/
+void idPlayer::StartClassicMegaHealth( void ) {
+	classicMegaDecayTime = gameLocal.time + CLASSIC_MEGA_DECAY_DELAY;
+}
+
+/*
+================
+idPlayer::UpdateClassicMegaHealth
+================
+*/
+void idPlayer::UpdateClassicMegaHealth( void ) {
+	if ( !classicMegaDecayTime ) {
+		return;
+	}
+	if ( health <= 0 || health <= inventory.maxHealth ) {
+		classicMegaDecayTime = 0;
+		return;
+	}
+	if ( gameLocal.time < classicMegaDecayTime ) {
+		return;
+	}
+	health--;
+	classicMegaDecayTime = ( health > inventory.maxHealth ) ? gameLocal.time + CLASSIC_MEGA_DECAY_PULSE : 0;
+}
+
+/*
+================
+idPlayer::ResetClassicHook
+================
+*/
+void idPlayer::ResetClassicHook( bool playSound ) {
+	if ( classicHookState != CLASSIC_HOOK_NONE ) {
+		classicHookReleaseTime = gameLocal.time;
+		if ( playSound && !gameLocal.isClient ) {
+			StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+		}
+	}
+	classicHookState = CLASSIC_HOOK_NONE;
+	physicsObj.ClearClassicGrapple();
+}
+
+/*
+================
+idPlayer::UpdateClassicHook
+
+Server side.  Pressing _hook throws the hook from the eye; it flies until it
+bites into the world, then the player physics reels the player in for as long
+as the button stays down (idPhysics_Player::ClassicGrappleMove).  Letting go,
+dying, or the hook striking a player, the sky or nothing within its reach
+brings it back.  It does not hurt anyone, and it holds on to the point it hit
+rather than riding a mover.
+================
+*/
+void idPlayer::UpdateClassicHook( void ) {
+	if ( gameLocal.isClient ) {
+		return;
+	}
+
+	const bool allowed = rvClassicRules::GrappleAllowed() && !spectating && health > 0 && !pfl.dead && !IsInVehicle() && !noclip;
+	const bool held = ( usercmd.buttons & BUTTON_HOOK ) != 0;
+	if ( !allowed || !held ) {
+		if ( classicHookState != CLASSIC_HOOK_NONE ) {
+			ResetClassicHook( allowed );
+		}
+		return;
+	}
+
+	if ( classicHookState == CLASSIC_HOOK_NONE ) {
+		// a fresh press, and not straight after the last hook came back
+		if ( ( oldButtons & BUTTON_HOOK ) != 0 || gameLocal.time < classicHookReleaseTime + CLASSIC_HOOK_REFIRE_DELAY ) {
+			return;
+		}
+		classicHookOrigin = GetEyePosition();
+		classicHookDir = viewAngles.ToForward();
+		classicHookFireTime = gameLocal.time;
+		classicHookState = CLASSIC_HOOK_FLYING;
+		StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+	}
+
+	if ( classicHookState != CLASSIC_HOOK_FLYING ) {
+		return;
+	}
+
+	if ( gameLocal.time - classicHookFireTime > CLASSIC_HOOK_MAX_FLY_TIME ) {
+		ResetClassicHook( true );
+		return;
+	}
+
+	const idVec3 end = classicHookOrigin + classicHookDir * ( CLASSIC_HOOK_FLY_SPEED * MS2SEC( gameLocal.msec ) );
+	trace_t tr;
+	gameLocal.TracePoint( this, tr, classicHookOrigin, end, MASK_SHOT_RENDERMODEL, this );
+	if ( tr.fraction >= 1.0f ) {
+		classicHookOrigin = end;
+		return;
+	}
+
+	const idMaterial *material = tr.c.material;
+	idEntity *hit = ( tr.c.entityNum >= 0 && tr.c.entityNum < MAX_GENTITIES ) ? gameLocal.entities[ tr.c.entityNum ] : NULL;
+	if ( ( material != NULL && ( material->GetSurfaceFlags() & SURF_NOIMPACT ) ) ||
+		( hit != NULL && hit->IsType( idActor::GetClassType() ) ) ) {
+		// the sky, or a player: the hook has nothing to hold
+		ResetClassicHook( true );
+		return;
+	}
+
+	classicHookOrigin = tr.endpos - classicHookDir * 2.0f;
+	classicHookState = CLASSIC_HOOK_ATTACHED;
+	physicsObj.SetClassicGrapple( classicHookOrigin );
+	StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+}
+
+/*
+================
+idPlayer::FreeClassicHookPresentation
+================
+*/
+void idPlayer::FreeClassicHookPresentation( void ) {
+	if ( gameRenderWorld != NULL ) {
+		if ( classicHookCableHandle != -1 ) {
+			gameRenderWorld->FreeEntityDef( classicHookCableHandle );
+		}
+		if ( classicHookHeadHandle != -1 ) {
+			gameRenderWorld->FreeEntityDef( classicHookHeadHandle );
+		}
+	}
+	classicHookCableHandle = -1;
+	classicHookHeadHandle = -1;
+}
+
+/*
+================
+idPlayer::PresentClassicHook
+
+The cable is a beam in Quake 4's multiplayer pulse-line material, tinted by
+team, from the player's hand to the hook; the hook head is the nailgun's nail.
+Both are client side render entities, so nothing new rides the snapshot beyond
+the hook's state and position.
+================
+*/
+void idPlayer::PresentClassicHook( void ) {
+	// a dedicated server draws nothing
+	if ( gameRenderWorld == NULL || ( gameLocal.isServer && !gameLocal.isListenServer ) ) {
+		return;
+	}
+	if ( classicHookState == CLASSIC_HOOK_NONE || !gameLocal.IsClassicRuleset() || spectating || health <= 0 || IsHidden() ) {
+		FreeClassicHookPresentation();
+		return;
+	}
+
+	idVec3 start;
+	const idPlayer *local = gameLocal.GetLocalPlayer();
+	if ( local == this && !pm_thirdPerson.GetBool() ) {
+		start = firstPersonViewOrigin + firstPersonViewAxis[ 0 ] * 20.0f - firstPersonViewAxis[ 1 ] * 8.0f - firstPersonViewAxis[ 2 ] * 10.0f;
+	} else {
+		start = GetPhysics()->GetOrigin() + idVec3( 0.0f, 0.0f, 48.0f );
+	}
+	const idVec3 end = classicHookOrigin;
+	idVec3 dir = end - start;
+	if ( dir.Normalize() < 1.0f ) {
+		dir = viewAngles.ToForward();
+	}
+
+	idVec4 color( 1.0f, 0.85f, 0.4f, 1.0f );
+	if ( gameLocal.IsTeamGame() ) {
+		color = ( team == TEAM_MARINE ) ? idVec4( 0.35f, 0.65f, 1.0f, 1.0f ) : idVec4( 1.0f, 0.4f, 0.2f, 1.0f );
+	}
+
+	idRenderModel *beamModel = renderModelManager->FindModel( "_BEAM" );
+	if ( beamModel != NULL ) {
+		memset( &classicHookCable, 0, sizeof( classicHookCable ) );
+		classicHookCable.hModel = beamModel;
+		classicHookCable.customShader = declManager->FindMaterial( "textures/mptextures/mp_linepulse", false );
+		classicHookCable.origin = start;
+		classicHookCable.axis = mat3_identity;
+		classicHookCable.shaderParms[ SHADERPARM_RED ] = color[ 0 ];
+		classicHookCable.shaderParms[ SHADERPARM_GREEN ] = color[ 1 ];
+		classicHookCable.shaderParms[ SHADERPARM_BLUE ] = color[ 2 ];
+		classicHookCable.shaderParms[ SHADERPARM_ALPHA ] = color[ 3 ];
+		classicHookCable.shaderParms[ SHADERPARM_TIMEOFFSET ] = 2.0f;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_X ] = end.x;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_Y ] = end.y;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_Z ] = end.z;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_WIDTH ] = 3.0f;
+		classicHookCable.noShadow = true;
+		classicHookCable.bounds = beamModel->Bounds( &classicHookCable );
+		if ( classicHookCableHandle == -1 ) {
+			classicHookCableHandle = gameRenderWorld->AddEntityDef( &classicHookCable );
+		} else {
+			gameRenderWorld->UpdateEntityDef( classicHookCableHandle, &classicHookCable );
+		}
+	}
+
+	const idDict *nail = gameLocal.FindEntityDefDict( "projectile_nail", false );
+	idRenderModel *headModel = nail ? renderModelManager->FindModel( nail->GetString( "model" ) ) : NULL;
+	if ( headModel == NULL ) {
+		return;
+	}
+	memset( &classicHookHead, 0, sizeof( classicHookHead ) );
+	classicHookHead.hModel = headModel;
+	classicHookHead.origin = end;
+	classicHookHead.axis = dir.ToMat3();
+	classicHookHead.bounds = headModel->Bounds( &classicHookHead );
+	classicHookHead.shaderParms[ SHADERPARM_RED ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_GREEN ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_BLUE ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_ALPHA ] = 1.0f;
+	if ( classicHookHeadHandle == -1 ) {
+		classicHookHeadHandle = gameRenderWorld->AddEntityDef( &classicHookHead );
+	} else {
+		gameRenderWorld->UpdateEntityDef( classicHookHeadHandle, &classicHookHead );
 	}
 }

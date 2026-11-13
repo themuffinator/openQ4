@@ -41,6 +41,158 @@ does not restore the withdrawn release. See
 - Open: Instagib is not yet a match-rules field, so a managed match's rules
   digest and evidence do not record it, and it has no vote.
 
+## A Classic multiplayer ruleset inspired by Quake 2, 13 November 2026
+
+- **Play Quake 4 multiplayer the Quake 2 way.** Hosts can set **Ruleset** to
+  **Classic** under **Create Server → Advanced Options → Rules** (or
+  `si_ruleset 1`). Every game type works under it, on the stock maps and
+  weapons; the default Quake 4 rules are unchanged.
+- **What Classic changes.** You spawn with only the blaster and 100 health.
+  Each weapon plays its Quake 2 counterpart (the shotgun is the super shotgun,
+  the nailgun the chaingun, the Dark Matter Gun the BFG), with Quake 2 damage,
+  fire rates, ammo boxes and limits, and shared bullets and cells. Armour comes
+  in jacket, combat and body tiers that convert into each other as Quake 2's
+  did. Health shards stack past 100, mega health drains after five seconds and
+  only respawns once its holder is back to 100, and items respawn on Quake 2
+  times. A quick second jump off stairs or ledges launches you higher.
+- **Threewave CTF.** Captures pay 15 to the carrier and 10 to the team, with
+  Threewave's carrier, defence and assist bonuses, and a **grappling hook** in
+  flag modes (or every mode, or none: **Grappling Hook**,
+  `si_classicGrapple`). Bind it under **Settings → Controls → Attack/Look**.
+  The hook reels you in while held, predicted on your own screen.
+- Inspired by Quake 2, not a replica: Quake 4's models, effects and maps stay,
+  and the guide lists where the numbers differ. See
+  [Classic Multiplayer Ruleset](../user/classic-ruleset.md).
+- Checked on Windows/Vulkan with a listen server, bots and a second connected
+  client: the definition overlay applies on both ends and is removed when the
+  map unloads; blaster-only spawns, tier conversion (2 → 51 → 138 → 175 → 177),
+  mega health drain, and the hook on the host and on a predicted remote client
+  in CTF all behave; the stock ruleset still spawns with the machinegun. The
+  Create Server Rules tab sets both settings. Bots do not use the hook.
+
+## The weapon strip moves, and the Strogg one has its own feel, 13 November 2026
+
+- **The new interface's weapon strip opens and closes smoothly.** It rises
+  into place as you change weapons and sinks away a second later, or fades
+  out quickly as soon as you fire, instead of popping in and out.
+- **The ring follows your choice.** One ring glides from the weapon you had
+  to the one you picked, the gun settles into it and its name slides in from
+  the same side, so scrolling through weapons reads at a glance.
+- **A refused choice now tells you so.** Pressing the key for a weapon you
+  don't carry or that is out of ammunition, or scrolling when there is
+  nothing else to switch to, shakes the ring and flashes it red; an empty
+  gun's crossed-out sign pulses to show why.
+- **A small tick marks your quick-switch weapon,** the one you return to
+  after a change.
+- **After Kane's transformation the Strogg strip has its own character.** It
+  tunes in like a neural link with a scan line, its ring stretches as it
+  travels and sends out a pulse when it lands, and a refusal glitches in hard
+  steps. The Awakening's strips and the multiplayer strip move too.
+- Reduced Motion keeps the strip still apart from short fades, while the red
+  refusal, the empty sign and the tick stay. The classic HUD (`ui_retained 0`)
+  is unchanged. Replace both game modules: they send the new refusal to the
+  HUD.
+
+## Retail distance comparison (AUD-01), 13 November 2026
+
+- [ ] AUD-01: `sound_distance_retail_compare.py` compares the levels that retail
+  Quake 4 1.4.2 and openQ4 render, at nine distances for three original shaders,
+  through OpenAL Soft's wave writer. Nothing plays aloud. The openQ4 half follows
+  the authored curve within 0.6 dB and is silent at and beyond the maximum. The
+  retail half needs its window focused by a person, because retail mutes itself
+  while unfocused, and it has not passed yet. No player-facing behaviour changed;
+  the [evidence](audio-modernization.md#rendered-retail-comparison-13-november-2026)
+  also corrects the October distance profile, which had left reverb on.
+
+## Subtitles mark speech they cannot transcribe, accept caption packs and stay up long enough to read (AUD-07), 13 November 2026
+
+- **Dialogue without a transcript no longer passes silently.** About three in
+  ten lines heard in the campaigns have no transcript in the installed game.
+  With subtitles on, such a line now shows **[untranscribed speech]** (or
+  **[speech]** where that does not fit), after the speaker's name when it is
+  known, so a player who cannot hear it still
+  knows someone is talking. **Settings > Audio > Untranscribed Speech** (on by
+  default, `ui_subtitleUntranscribed`) turns the marker off in both
+  interfaces; a transcribed line always takes a caption slot before a marker.
+  The marker is localized in all twelve menu languages.
+- **Caption packs can fill the gaps.** The installed game has no more text to
+  give: every stock transcript is already in use, and The Awakening's spare
+  ones belong to race lines nothing plays. A mod can now add a line's text, or
+  replace it, with a `subtitle/` declaration named after the sound shader or
+  the voice file. The text can be literal or a `#str_` key from the pack's own
+  language files, so a pack can carry translations too. Pack entries are
+  captions only and leave lip sync alone. openQ4 ships no pack and copies no
+  transcripts; `audio_asset_inventory.py --pack-template` lists the 1,419 stock
+  and 72 Awakening gaps as empty entries for authors.
+- **Captions stay up long enough to read.** A line that finishes keeps its
+  last words up for half a second more, and a short line stays up for a second
+  and a half in all. This also covers the end of a line still playing after
+  the game's clock has reached it, which the November fight sweep found. A
+  line that is cut off or replaced still clears at once.
+- `listSubtitles` now reports each caption's source (`installed`, `authored`
+  or `none`), and the speech audit counts authored text as transcribed.
+- Ordered human play and physical stereo-HUD placement remain open under
+  AUD-07.
+
+## Buying by Quake 4's or The Awakening's rules, with a new buy menu, 13 November 2026
+
+- **Buying is one server option with two sets of rules.** Create Server's
+  **Buying** (on the Rules tab of the advanced options), the vote and the
+  admin page offer **Off**, **Quake 4** or **The Awakening**. Quake 4's rules
+  are the retail buy menu at the game's own prices. The Awakening's complete
+  the expansion's unfinished buy menu on the stock game: its prices and cash
+  awards, the Dark Matter Gun, FC Armor Regen and four weapon mods (Bounce
+  Shot, Firepower, Burst Fire and Chain Lightning) for the weapon you carry.
+- **A buy menu that matches the new multiplayer menus.** The buy key opens a
+  card over the match with Weapons, Mods, Armor & Ammo and Team tabs. Each item
+  shows its icon and price; a lock and the reason beside the list say why you
+  cannot buy it yet, a check marks what you own, and the price turns red when
+  you are short of credits. The menu stays open while you shop.
+- **Bought mods stay with you.** A weapon's mod comes back with the weapon
+  after you die, and every player on the server sees the modded weapon fire as
+  it should.
+- **Buying in Capture the Flag works again.** A CTF server with buying on
+  never left its warmup.
+- [x] `mp_buying_rules_contract.py`, the native `openq4-ui-retained-buy`
+  check, the retained gate's buy-card case and `capture_buy_menu.py` on OpenGL
+  and Vulkan pass; a remote client builds the modded hyperblaster from the
+  server's snapshots. Hands-on keyboard and controller play remains under
+  MP-10. See [multiplayer buying](mp-buying.md).
+
+## Surround placement on real output devices, 13 November 2026
+
+- [x] AUD-04: `audio_surround_endpoint.py` plays stock gameplay through the real
+  system audio backend onto named output devices and measures each device's own
+  loopback (`endpoint_loopback.py`: WASAPI on Windows, the sink monitor on
+  Linux). It checks centre or balanced dialogue, lateral positional sound, a
+  forced layout and a mid-line device switch with scene-clock continuity.
+- All 19 checks pass on two real stereo endpoints on Windows. No centre-capable
+  device was available, so the 5.1/7.1 branch ran only on synthetic data. A run
+  on a real 5.1/7.1 endpoint, listening on speakers and the Linux capture path
+  remain open. No player-facing behaviour changed.
+  [Evidence and limits](audio-voice-evidence.md#real-playback-endpoints-13-november-2026).
+
+## The new menus tick and click like Quake 4's, 13 November 2026
+
+- **Moving through the new interface's menus now sounds.** Each move to
+  another button, row, setting or list option plays Quake 4's menu tick,
+  whether you use the mouse, the keyboard or a controller.
+- **Every press answers.** Buttons, checkboxes, opening and closing a
+  dropdown, choosing an option, stepping a setting left or right, starting or
+  finishing a text field, Back, and the controller's shoulder and face-button
+  shortcuts all play Quake 4's select sound. Several of these were silent
+  before, such as Exit on the title, the mods list and Load Defaults.
+- **One sound per action.** A click does not also tick, a held key does not
+  repeat the press sound, sliders stay quiet as they move, as in Quake 4, and
+  nothing sounds while a menu animates or a list refreshes. The in-game
+  multiplayer menus sound over the match, as the original's did.
+- **Fixed: the menus no longer go quiet on the Game, Controls and Audio
+  settings pages during a game.** Their sounds and the menu music now keep
+  playing there, as they do on the pause menu.
+- **Fixed: the loading screen sounds again.** When a single-player level
+  finishes loading, Quake 4's ready chime plays as the continue prompt appears,
+  and continuing plays its click, in both the new and the classic interface.
+  Neither sound was playing before.
 ## The main menu's background comes through as a living signal, 13 November 2026
 
 - **The new interface's main menu has a sci-fi display look.** The level

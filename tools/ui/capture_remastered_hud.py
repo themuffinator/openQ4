@@ -62,6 +62,25 @@ def on_foot(gui):
     ]
 
 
+def strip_motion(tag):
+    """The weapon strip's Remastered motion (14.5) through real weapon keys:
+    openq4_testInput sends each impulse through the player's own usercmd, so
+    PerformImpulse refuses an unowned weapon exactly as a key press would.
+    Shots land inside the 90-240 ms transitions at a 60 Hz cap."""
+    def key(n):
+        return f'openq4_testInput 30 impulse {n}'
+    return [
+        'set g_autoExecAfterMapLoad ""', 'notarget', 'god', 'give weapon_shotgun', 'give weapon_hyperblaster',
+        'give weapon_nailgun', 'waitMsec 2500', key(1), 'waitMsec 1600',
+        key(2), 'waitMsec 40', shot(f'{tag}-opening'), 'waitMsec 400', shot(f'{tag}-open'),
+        key(5), 'waitMsec 40', shot(f'{tag}-travel'), 'waitMsec 400', shot(f'{tag}-landed'),
+        key(8), 'waitMsec 40', shot(f'{tag}-refused'), 'waitMsec 400', shot(f'{tag}-refused-after'),
+        'waitMsec 640', shot(f'{tag}-closing'), 'waitMsec 400', shot(f'{tag}-closed'),
+        key(1), 'waitMsec 900', 'openq4_testInput 150 attack', 'waitMsec 40', shot(f'{tag}-firing'),
+        'waitMsec 400', shot(f'{tag}-fired'),
+    ]
+
+
 def in_vehicle(vehicle):
     """A vehicle HUD (guis/vehicles/hud.gui): the player boards through the
     actor's enterVehicle script event, then the stock events drive the rest."""
@@ -383,6 +402,8 @@ SCENARIOS = {
     'medchange': ('game/medlabs', medchange()),
     'medchange-script': ('game/medlabs', medchange_script()),
     'strogg': ('game/recomp', on_foot('guis/hud_strogg.gui')),
+    'strip-marine': ('game/airdefense1', strip_motion('strip-marine')),
+    'strip-strogg': ('game/recomp', strip_motion('strip-strogg')),
     'mp': ('mp:mp/q4dm1', [
         'set g_autoExecAfterMapLoad ""', 'waitMsec 2500', shot('mp-base'),
         'addbot', 'addbot', 'waitMsec 2500', shot('mp-bots'),

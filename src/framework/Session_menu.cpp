@@ -83,7 +83,7 @@ extern glconfig_t glConfig;
 
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
 idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 );
-idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 6 );
+idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 7 );
 idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 78 );
 // The opt-ins are unarchived, so each lasts until the player quits, and
 // CVAR_NOCHEAT, because the engine counts any other unarchived CVar as a
@@ -289,6 +289,10 @@ static const char *const RETAINED_MP_SUMMARY_GUI = "guis/menu/mp_summary.rui";
 // The single-player Arena's pause card (section 13.7) covers the game's Arena
 // pause menu as the cards cover the multiplayer menu; all its actions are built.
 static const char *const RETAINED_ARENA_PAUSE_GUI = "guis/menu/arena_pause.rui";
+// The buy card (section 14.18) covers the game's buy menu, and buys through
+// the game ("retained buy <index>", the item's place in the game's catalog).
+static const char *const RETAINED_MP_BUY_GUI = "guis/menu/mp_buy.rui";
+static const int RETAINED_MP_BUY_ITEMS = 20;
 
 #ifndef ID_DEDICATED
 static bool Session_RetainedSummaryEnabled( void ) {
@@ -346,7 +350,7 @@ static bool Session_RetainedValueRequest( const char *request, const char *const
 static const char *const RETAINED_AUDIO_GUI = "guis/menu/settings/audio.rui";
 static const char *const RETAINED_AUDIO_VERBS[] = {
 	"audioVolume", "audioMusic", "audioDialogue", "audioBackend", "audioDevice", "audioEax", "audioSpeakers", "audioHrtf",
-	"audioSubtitles", "audioSubtitleSize", "audioSubtitleBackground", "audioSubtitleSpeakers"
+	"audioSubtitles", "audioSubtitleSize", "audioSubtitleBackground", "audioSubtitleSpeakers", "audioSubtitleUntranscribed"
 };
 static const int RETAINED_AUDIO_VERB_COUNT = sizeof( RETAINED_AUDIO_VERBS ) / sizeof( RETAINED_AUDIO_VERBS[0] );
 static const int RETAINED_AUDIO_DEVICES = 16;
@@ -371,7 +375,7 @@ static const char *const RETAINED_CONTROLS_BINDINGS[] = {
 	"_forward", "_back", "_moveleft", "_moveright", "_moveUp", "_moveDown", "_left", "_right", "_strafe", "_speed", "_impulse0",
 	"_impulse1", "_impulse2", "_impulse3", "_impulse4", "_impulse5", "_impulse6", "_impulse7", "_impulse8", "_impulse9",
 	"_impulse10", "buymenu", "_quickChat", "_attack", "_impulse15", "_impulse14", "_impulse13", "_lookUp", "_lookDown", "_mlook",
-	"centerview", "_zoom", "_impulse19", "_impulse50", "screenshot", "_weaponWheel", "savegame quick", "loadgame quick",
+	"centerview", "_zoom", "_impulse19", "_impulse50", "screenshot", "_weaponWheel", "_hook", "savegame quick", "loadgame quick",
 	"clientMessageMode", "clientMessageMode 1", "_impulse28", "_impulse29", "_ingamestats", "_impulse17", "emote salute",
 	"emote cheer", "emote taunt", "emote grab_a", "_voicechat"
 };
@@ -2605,7 +2609,6 @@ void idSessionLocal::ReturnRetainedAudio() {
 		BeginRetainedSubpage( guiRetainedAudio, false, RETAINED_SUBPAGE_SETTINGS_AUDIO );
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	idUserInterface *parent = retainedAudioParent;
 	const HandleGuiCommand_t handler = retainedAudioParentHandle;
 	retainedAudioParent = NULL;
@@ -2621,7 +2624,7 @@ The AUDIO page's values as the session reads them back: the three volumes
 and the subtitle size and background as whole percents, the sound system,
 the device (the row of s_deviceName in the device list, which it publishes
 too, read as a device's text), EAX, the speakers' choice (Auto, 2 or 6),
-HRTF and the three subtitle switches.
+HRTF and the three subtitle switches (on, speaker names, untranscribed speech).
 ===============
 */
 void idSessionLocal::PublishRetainedAudio( idUserInterface *gui ) {
@@ -2667,6 +2670,7 @@ void idSessionLocal::PublishRetainedAudio( idUserInterface *gui ) {
 	gui->SetStateInt( "audio.subtitleSize", percent( "ui_subtitleScale", 100.0f ) );
 	gui->SetStateInt( "audio.subtitleBackground", percent( "ui_subtitleBackground", 100.0f ) );
 	gui->SetStateBool( "audio.subtitleSpeakers", cvarSystem->GetCVarBool( "ui_subtitleSpeakers" ) );
+	gui->SetStateBool( "audio.subtitleUntranscribed", cvarSystem->GetCVarBool( "ui_subtitleUntranscribed" ) );
 	gui->StateChanged( common->GetPresentationTime() );
 #endif
 }
@@ -2692,7 +2696,6 @@ void idSessionLocal::HandleRetainedAudioRequest( idUserInterface *gui, const cha
 	if ( !Session_RetainedValueRequest( request, RETAINED_AUDIO_VERBS, RETAINED_AUDIO_VERB_COUNT, field, value ) ) {
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	switch ( field ) {
 		case 0: cvarSystem->SetCVarFloat( "s_volume", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
 		case 1: cvarSystem->SetCVarFloat( "s_musicVolume", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
@@ -2729,6 +2732,7 @@ void idSessionLocal::HandleRetainedAudioRequest( idUserInterface *gui, const cha
 		case 9: cvarSystem->SetCVarFloat( "ui_subtitleScale", idMath::ClampInt( 100, 200, value ) / 100.0f ); break;
 		case 10: cvarSystem->SetCVarFloat( "ui_subtitleBackground", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
 		case 11: cvarSystem->SetCVarBool( "ui_subtitleSpeakers", value != 0 ); break;
+		case 12: cvarSystem->SetCVarBool( "ui_subtitleUntranscribed", value != 0 ); break;
 		default: return;
 	}
 	PublishRetainedAudio( gui );
@@ -2843,7 +2847,6 @@ void idSessionLocal::ReturnRetainedGame() {
 		BeginRetainedSubpage( guiRetainedGame, false, RETAINED_SUBPAGE_SETTINGS_GAME );
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	idUserInterface *parent = retainedGameParent;
 	const HandleGuiCommand_t handler = retainedGameParentHandle;
 	retainedGameParent = NULL;
@@ -2934,7 +2937,6 @@ void idSessionLocal::HandleRetainedGameRequest( idUserInterface *gui, const char
 	if ( guiMainMenu == NULL || !Session_RetainedValueRequest( request, RETAINED_GAME_VERBS, RETAINED_GAME_VERB_COUNT, field, value ) ) {
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	switch ( field ) {
 		case 0:
 			if ( value < 0 || value >= static_cast<int>( sizeof( MAINMENU_GUN_POSITION_PRESETS ) / sizeof( MAINMENU_GUN_POSITION_PRESETS[0] ) ) ) {
@@ -3097,7 +3099,6 @@ void idSessionLocal::ReturnRetainedControls() {
 		BeginRetainedSubpage( guiRetainedControls, false, RETAINED_SUBPAGE_SETTINGS_CONTROLS );
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	idUserInterface *parent = retainedControlsParent;
 	const HandleGuiCommand_t handler = retainedControlsParentHandle;
 	retainedControlsParent = NULL;
@@ -3142,6 +3143,19 @@ the Android setup's touch layout editor; the game waits behind it as for any
 return from setup.
 ===============
 */
+#ifndef ID_DEDICATED
+// The CONTROLS page's focused binding row, or -1 when another control has focus.
+static int Session_RetainedControlsRow( idUserInterface *gui ) {
+	const std::string focus = UI_RetainedFocusedControl( gui );
+	static const char prefix[] = "controls_bind_";
+	if ( focus.compare( 0, sizeof( prefix ) - 1, prefix ) != 0 ) {
+		return -1;
+	}
+	const int row = atoi( focus.c_str() + sizeof( prefix ) - 1 );
+	return row >= 0 && row < RETAINED_CONTROLS_ROWS && focus == va( "%s%d", prefix, row ) ? row : -1;
+}
+#endif
+
 void idSessionLocal::HandleRetainedControlsRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
 	if ( !idStr::Icmp( request, "controlsBack" ) ) {
@@ -3150,7 +3164,6 @@ void idSessionLocal::HandleRetainedControlsRequest( idUserInterface *gui, const 
 	}
 	if ( !idStr::Icmp( request, "controlsTouchLayout" ) ) {
 		if ( Session_AndroidSetupAvailable() ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			Session_OpenAndroidSetup( ANDROID_SETUP_TOUCH_LAYOUT );
 		}
 		return;
@@ -3160,16 +3173,10 @@ void idSessionLocal::HandleRetainedControlsRequest( idUserInterface *gui, const 
 	if ( !bind && !clear ) {
 		return;
 	}
-	const std::string focus = UI_RetainedFocusedControl( gui );
-	static const char prefix[] = "controls_bind_";
-	if ( focus.compare( 0, sizeof( prefix ) - 1, prefix ) != 0 ) {
+	const int row = Session_RetainedControlsRow( gui );
+	if ( row < 0 ) {
 		return;
 	}
-	const int row = atoi( focus.c_str() + sizeof( prefix ) - 1 );
-	if ( row < 0 || row >= RETAINED_CONTROLS_ROWS || focus != va( "%s%d", prefix, row ) ) {
-		return;
-	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	if ( bind ) {
 		retainedControlsCapture = row;
 		retainedControlsCaptured = -1;
@@ -3207,6 +3214,11 @@ bool idSessionLocal::RetainedControlsKey( const sysEvent_t *event ) {
 	}
 	if ( retainedControlsCapture < 0 ) {
 		if ( event->evType == SE_KEY && event->evValue2 && ( event->evValue == K_DEL || event->evValue == K_BACKSPACE ) ) {
+			// The page never sees this key, so the clear sounds here; the
+			// page sounds its own presses, the controller's clear included.
+			if ( Session_RetainedControlsRow( guiRetainedControls ) >= 0 ) {
+				HandleMainMenuCommands( "play main_menu_selection" );
+			}
 			HandleRetainedControlsRequest( guiRetainedControls, "controlsClear" );
 			return true;
 		}
@@ -5666,10 +5678,10 @@ static const mainMenuSettingsScrollPage_t MAINMENU_SETTINGS_SCROLL_PAGES[] = {
 		NULL,
 		36,
 		0,
-		6,
+		7,
 		-24,
 		-84,
-		474,
+		498,
 		24.0f
 	},
 	{
@@ -6793,7 +6805,7 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createSpectators",	"spectators",	"si_spectators",			0, 1,	true },
 	{ "createWarmup",		"warmup",		"si_warmup",				0, 1,	true },
 	{ "createVoice",		"voice",		"si_voiceChat",				0, 1,	true },
-	{ "createBuying",		"buying",		"si_isBuyingEnabled",		0, 1,	true },
+	{ "createBuying",		"buying",		"si_isBuyingEnabled",		0, 2,	false },	// Session_RetainedCreateValue
 	{ "createBots",			"bots",			"bot_minPlayers",			0, 16,	false },
 	{ "createBotSkill",		"botskill",		"bot_skill",				1, 5,	false },
 	// openQ4's match rules, on the advanced dialog's MATCH and RULES tabs.
@@ -6801,6 +6813,9 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createOvertime",		"overtime",		"si_overtime",				0, 999,	false },
 	{ "createMercy",		"mercy",		"si_mercyLimit",			0, 999,	false },
 	{ "createRoundLimit",	"roundlimit",	"si_roundLimit",			0, 60,	false },
+	// openQ4's Classic multiplayer ruleset (the game's mp/ClassicRules.h) and its hook.
+	{ "createRuleset",		"ruleset",		"si_ruleset",				0, 1,	false },
+	{ "createGrapple",		"grapple",		"si_classicGrapple",		0, 2,	false },
 	{ "createInstagib",		"instagib",		"si_instagib",				0, 1,	true },
 };
 static const int RETAINED_CREATE_SETTING_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_SETTINGS ) / sizeof( RETAINED_CREATE_SETTINGS[0] ) );
@@ -7589,7 +7604,6 @@ void idSessionLocal::DrawRetainedHome( int presentationTime ) {
 void idSessionLocal::BeginRetainedSubpage( idUserInterface *gui, bool deeper, retainedSubpage_t subpage ) {
 #ifndef ID_DEDICATED
 	retainedDetailTarget = 0;
-	HandleMainMenuCommands( "play main_menu_selection" );
 	const bool create = subpage == RETAINED_SUBPAGE_CREATE_SERVER, join = subpage == RETAINED_SUBPAGE_JOIN_GAME;
 	const bool demos = subpage == RETAINED_SUBPAGE_DEMOS;
 	const bool arena = subpage == RETAINED_SUBPAGE_ARENA;
@@ -7948,7 +7962,6 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 	}
     if ( gui && request && gui == guiActive && gui == guiRetainedRestartMenu ) {
         // The restart screen's plates run the stock screen's own commands.
-        HandleMainMenuCommands( "play main_menu_selection" );
         if ( !idStr::Icmp( request, "deathRestart" ) ) HandleRestartMenuCommands( "restart" );
         else if ( !idStr::Icmp( request, "deathLoad" ) ) {
             // LOAD GAME leaves for the title and opens the retained Load Game
@@ -8001,7 +8014,6 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 		return;
 	}
 	if ( !idStr::Icmp( request, "quit" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		ExitMenu();
 		common->Quit();
 		return;
@@ -8017,7 +8029,6 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 		idList<fileTIME_T> fileTimes;
 		GetSaveGameList( fileList, fileTimes );
 		if ( fileTimes.Num() > 0 ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			const idStr slot = fileList[ fileTimes[0].index ];
 			// Preflight refusals keep the title; deeper failures rebuild it.
 			// Both routes open the Load Game page with the reason.
@@ -8032,7 +8043,6 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 	// no MODS. A row selects its mod, and LOAD MOD restarts the engine into it
 	// as the stock LOAD MOD does.
 	if ( !idStr::Icmp( request, "mods" ) && guiRetainedHome == guiRetainedTitle ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		PublishRetainedMods( guiRetainedHome );
 		guiRetainedHome->HandleNamedEvent( "modsModalShow" );
 		return;
@@ -8043,7 +8053,6 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 	}
 	if ( !idStr::Icmp( request, "modsLoad" ) ) {
 		if ( retainedModSelected >= 0 && retainedModSelected < modsList.Num() ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			Session_SelectModForCampaign( modsList[ retainedModSelected ].directory.c_str() );
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadEngine menu\n" );
 		}
@@ -8179,7 +8188,6 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 	retainedPageAt = retainedHandoffUntil;
 	guiRetainedHome->HandleNamedEvent( va( "carry_%s", request ) );
 	guiRetainedHome->HandleNamedEvent( "depart" );
-	HandleMainMenuCommands( "play main_menu_selection" );
 	return true;
 #else
 	return false;
@@ -8190,6 +8198,11 @@ bool idSessionLocal::RetainedPageActive() const {
 	return guiActive != NULL && ( IsRetainedLoadPage( guiActive ) || IsRetainedSavePage( guiActive ) || IsRetainedRestartPage( guiActive ) ||
 		guiActive == guiRetainedCredits || guiActive == guiRetainedMpPage ||
 		( guiRetainedSettingsPage != NULL && guiActive == guiRetainedSettingsPage ) );
+}
+
+bool idSessionLocal::RetainedChildPageActive() const {
+	return guiActive != NULL && ( guiActive == guiRetainedGame || guiActive == guiRetainedControls || guiActive == guiRetainedAudio ||
+		guiActive == guiRetainedArena || guiActive == guiRetainedCreate || guiActive == guiRetainedJoin || guiActive == guiRetainedDemos );
 }
 
 // The hand-off's end: the page presents over the home that handed off, which
@@ -8229,7 +8242,6 @@ void idSessionLocal::ReturnRetainedPage() {
 	if ( !RetainedPageActive() || guiMainMenu == NULL ) {
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	SetGUI( guiMainMenu, NULL );
 	retainedPageReturn = true;
 	UpdateRetainedHome();
@@ -8258,7 +8270,6 @@ void idSessionLocal::ReturnRetainedSinglePlayerHome() {
 		StartMenu();
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	// The legacy menu's timelines stood still while the page presented; they
 	// catch up first, so none of their remaining steps lands on its home.
 	UI_RunTimeEvents( guiMainMenu, common->GetPresentationTime() );
@@ -8537,7 +8548,6 @@ void idSessionLocal::HandleRetainedLoadRequest( idUserInterface *gui, const char
 		if ( !Session_RetainedSaveOperand( request, "loadSave", retainedSaveGeneration, count, target ) ) return;
 		retainedLoadSelected = target;
 		const idStr slot = retainedLoadSlots[ retainedLoadSelected ];
-		HandleMainMenuCommands( "play main_menu_selection" );
 		// A preflight refusal preserves this page. A deeper restore failure
 		// builds a fresh menu and publishes its notice there instead.
 		if ( !LoadGame( slot.c_str() ) && guiActive == gui ) {
@@ -8564,7 +8574,6 @@ void idSessionLocal::HandleRetainedLoadRequest( idUserInterface *gui, const char
 	if ( !idStr::Icmp( request, "loadNewGame" ) ) {
 		// No saves at the title: the Single Player page starts a game.
 		if ( !mapSpawned ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			OpenCampaignSelector( false );
 		}
 		return;
@@ -8628,7 +8637,6 @@ bool idSessionLocal::RetainedSaveGame( idUserInterface *gui, const char *name ) 
 	} else if ( objectiveFailed ) {
 		refusal = "#str_231113";
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	if ( refusal == NULL && !SaveGame( name, ST_REGULAR ) ) {
 		refusal = "#str_231110";
 	}
@@ -8701,14 +8709,12 @@ void idSessionLocal::HandleRetainedSaveRequest( idUserInterface *gui, const char
 		}
 		const sessionMenuSaveSlot_t slot = Session_MenuSaveSlotState( name.c_str() );
 		if ( slot == SESSION_SAVE_SLOT_AUTOSAVE ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			gui->SetStateString( "save.notice", "#str_200982" );
 			gui->StateChanged( common->GetPresentationTime() );
 			gui->HandleNamedEvent( "noticeModalShow" );
 			return;
 		}
 		if ( slot == SESSION_SAVE_SLOT_TAKEN ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			retainedSaveTarget = name;
 			gui->SetStateString( "save.target", name.c_str() );
 			gui->StateChanged( common->GetPresentationTime() );
@@ -8748,7 +8754,6 @@ void idSessionLocal::HandleRetainedRestartRequest( idUserInterface *gui, const c
 		return;
 	}
 	if ( !idStr::Icmp( request, "restartGo" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		RestartLevelAtSkill( idMath::ClampInt( 0, 4, gui->State().GetInt( "restart.skill", "1" ) ) );
 		return;
 	}
@@ -8930,7 +8935,6 @@ void idSessionLocal::HandleRetainedMultiplayerPageRequest( idUserInterface *gui,
 		return;
 	}
 	if ( !idStr::Icmp(request,"multiplayerSetup") && OpenRetainedPlayerSetup(gui) ) {
-		HandleMainMenuCommands("play main_menu_selection");
 		return;
 	}
 	if ( !idStr::Icmp( request, "multiplayerCreate" ) && RetainedCreateServerPage() != NULL ) {
@@ -8949,7 +8953,6 @@ void idSessionLocal::HandleRetainedMultiplayerPageRequest( idUserInterface *gui,
 			PublishRetainedDemosPage( demos, NULL, 0, NULL );
 			BeginRetainedSubpage( gui, true, RETAINED_SUBPAGE_DEMOS );
 		} else {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			OpenDemoMenu( true );
 		}
 		return;
@@ -8964,7 +8967,6 @@ void idSessionLocal::HandleRetainedMultiplayerPageRequest( idUserInterface *gui,
 		}
 		// After a stock Multiplayer page the legacy menu goes home as its own
 		// Multiplayer page does, and the retained home follows it.
-		HandleMainMenuCommands( "play main_menu_selection" );
 		UI_RunTimeEvents( guiMainMenu, common->GetPresentationTime() );
 		guiMainMenu->SetPresentationValue( "desktop::curr", "3" );
 		guiMainMenu->SetPresentationValue( "desktop::active", "1" );
@@ -8984,7 +8986,6 @@ void idSessionLocal::HandleRetainedMultiplayerPageRequest( idUserInterface *gui,
 	} else {
 		return;
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	gui->HandleNamedEvent( "depart" );
 	PumpApplicationActions( gui );
 	retainedMpPageDest = dest;
@@ -9102,7 +9103,6 @@ void idSessionLocal::HandleRetainedSettingsPageRequest( idUserInterface *gui, co
 		}
 		// After the stock settings screen the legacy menu goes home as that
 		// screen's own Back does, and the retained home follows it.
-		HandleMainMenuCommands( "play main_menu_selection" );
 		UI_RunTimeEvents( guiMainMenu, common->GetPresentationTime() );
 		guiMainMenu->SetPresentationValue( "desktop::curr", "9" );
 		guiMainMenu->SetPresentationValue( "desktop::active", "1" );
@@ -9116,7 +9116,7 @@ void idSessionLocal::HandleRetainedSettingsPageRequest( idUserInterface *gui, co
 	if ( !idStr::Icmp( request, "settingsDefaults" ) ) {
 		// The stock dialog's YES: every setting and binding to its default,
 		// and the sound system restarted.
-		HandleMainMenuCommands( "exec cvar_restart ; play main_menu_selection ; resetdefaults ; exec s_restart" );
+		HandleMainMenuCommands( "exec cvar_restart ; resetdefaults ; exec s_restart" );
 		return;
 	}
 	const retainedSettingsSection_t *chosen = NULL;
@@ -9143,7 +9143,6 @@ void idSessionLocal::HandleRetainedSettingsPageRequest( idUserInterface *gui, co
 			return;
 		}
 	}
-	HandleMainMenuCommands( "play main_menu_selection" );
 	const bool opened = chosen->dest == 4 ? OpenRetainedControls() : chosen->dest == 21 ? OpenRetainedGame() :
 		chosen->dest == 36 ? OpenRetainedAudio() : RetainedSystemAvailable() && OpenSystemSettings();
 	if ( opened ) {
@@ -9267,6 +9266,28 @@ static int Session_RetainedCreateGameType( void ) {
 	return 0;
 }
 
+// A setting's value as the page offers it. Buying is one choice over two
+// CVars: off, or on with Quake 4's rules or The Awakening's (si_buyingRules,
+// the game's mp/Buying.h).
+static int Session_RetainedCreateValue( const retainedCreateSetting_t &setting ) {
+	if ( !idStr::Icmp( setting.verb, "createBuying" ) ) {
+		return !cvarSystem->GetCVarBool( "si_isBuyingEnabled" ) ? 0 : cvarSystem->GetCVarInteger( "si_buyingRules" ) == 1 ? 2 : 1;
+	}
+	return idMath::ClampInt( setting.minimum, setting.maximum, cvarSystem->GetCVarInteger( setting.cvar ) );
+}
+
+static void Session_SetRetainedCreateValue( const retainedCreateSetting_t &setting, int value ) {
+	if ( !idStr::Icmp( setting.verb, "createBuying" ) ) {
+		// Off keeps the rules for the next time buying is on.
+		cvarSystem->SetCVarBool( "si_isBuyingEnabled", value != 0 );
+		if ( value != 0 ) {
+			cvarSystem->SetCVarInteger( "si_buyingRules", value == 2 ? 1 : 0 );
+		}
+		return;
+	}
+	cvarSystem->SetCVarInteger( setting.cvar, value );
+}
+
 // A setting's request, "<verb> <value>": its index in RETAINED_CREATE_SETTINGS
 // and the value, a whole number from -1 to 999.
 static bool Session_RetainedCreateSettingRequest( const char *request, int &setting, int &value ) {
@@ -9362,7 +9383,7 @@ void idSessionLocal::PublishRetainedCreateServer( idUserInterface *gui ) {
 #ifndef ID_DEDICATED
 	for ( int i = 0; i < RETAINED_CREATE_SETTING_COUNT; ++i ) {
 		const retainedCreateSetting_t &setting = RETAINED_CREATE_SETTINGS[i];
-		const int value = idMath::ClampInt( setting.minimum, setting.maximum, cvarSystem->GetCVarInteger( setting.cvar ) );
+		const int value = Session_RetainedCreateValue( setting );
 		if ( setting.boolean ) {
 			gui->SetStateBool( va( "create.%s", setting.state ), value != 0 );
 		} else {
@@ -9502,7 +9523,6 @@ void idSessionLocal::HandleRetainedCreateServerRequest( idUserInterface *gui, co
 		return;
 	}
 	if ( !idStr::Icmp( request, "createStart" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		StartMenuServer();
 		return;
 	}
@@ -9510,7 +9530,6 @@ void idSessionLocal::HandleRetainedCreateServerRequest( idUserInterface *gui, co
 		const int row = gui->State().GetInt( "create.pick", "-1" );
 		const int index = retainedCreateMapFirst + row;
 		if ( row >= 0 && row < RETAINED_CREATE_MAP_ROWS && index < retainedCreateMaps.Num() ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			retainedCreateMapSelected = index;
 			PublishRetainedCreateMaps( gui, false );
 		}
@@ -9535,7 +9554,6 @@ void idSessionLocal::HandleRetainedCreateServerRequest( idUserInterface *gui, co
 	if ( !idStr::Icmp( request, "createBanPick" ) ) {
 		const int row = gui->State().GetInt( "create.ban_pick", "-1" );
 		if ( row >= 0 && row < retainedCreateBanGuids.Num() ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			retainedCreateBanSelected = row;
 			gui->SetStateInt( "create.ban_selected", row );
 			gui->StateChanged( common->GetPresentationTime() );
@@ -9545,7 +9563,6 @@ void idSessionLocal::HandleRetainedCreateServerRequest( idUserInterface *gui, co
 	if ( !idStr::Icmp( request, "createBanRemove" ) ) {
 		// The chosen row's GUID as the session published it, never the page's.
 		if ( retainedCreateBanSelected >= 0 && retainedCreateBanSelected < retainedCreateBanGuids.Num() && game != NULL ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			game->RemoveGuidFromBanList( retainedCreateBanGuids[ retainedCreateBanSelected ].c_str() );
 			PublishRetainedCreateBans( gui );
 		}
@@ -9578,7 +9595,7 @@ void idSessionLocal::HandleRetainedCreateServerRequest( idUserInterface *gui, co
 			common->Warning( "retained UI: Create Server asked for %s %d", setting.cvar, value );
 			return;
 		}
-		cvarSystem->SetCVarInteger( setting.cvar, value );
+		Session_SetRetainedCreateValue( setting, value );
 		if ( !idStr::Icmp( setting.cvar, "si_maxPlayers" ) && cvarSystem->GetCVarInteger( "si_minPlayers" ) > value ) {
 			cvarSystem->SetCVarInteger( "si_minPlayers", value );
 		} else if ( !idStr::Icmp( setting.cvar, "si_minPlayers" ) && cvarSystem->GetCVarInteger( "si_maxPlayers" ) < value ) {
@@ -10041,7 +10058,6 @@ void idSessionLocal::HandleRetainedNoticeAction( idUserInterface *gui, int slot 
 		return;
 	}
 	retainedNotice_t &notice = retainedNotices[ index ];
-	HandleMainMenuCommands( "play main_menu_selection" );
 	if ( notice.undo == RETAINED_NOTICE_UNDO_FAVORITE ) {
 		idServerScan &servers = idAsyncNetwork::client.serverList;
 		for ( int i = 0; i < servers.Num(); ++i ) {
@@ -10136,7 +10152,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		if ( gui->State().GetInt( "join.selected", "-1" ) < 0 || retainedJoinAddress.Length() == 0 ) {
 			return;
 		}
-		HandleMainMenuCommands( "play main_menu_selection" );
 		// SPECTATE joins the chosen server watching (the prompt bar's list
 		// pattern), and JOIN plays, whichever the last join chose.
 		cvarSystem->SetCVarString( "ui_spectate", spectate ? "Spectate" : "Play" );
@@ -10152,7 +10167,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		const int row = gui->State().GetInt( "join.pick", "-1" );
 		const int index = retainedJoinFirst + row;
 		if ( row >= 0 && row < RETAINED_JOIN_ROWS && index < retainedJoinServers.Num() && retainedJoinServers[ index ] < servers.Num() ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			retainedJoinAddress = Sys_NetAdrToString( servers[ retainedJoinServers[ index ] ].adr );
 			PublishRetainedJoinGame( gui );
 		}
@@ -10163,7 +10177,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		if ( address.Length() == 0 ) {
 			return;
 		}
-		HandleMainMenuCommands( "play main_menu_selection" );
 		idStr error;
 		retainedJoinReturn = true;
 		if ( !Session_ConnectToTypedAddress( address.c_str(), error ) ) {
@@ -10177,7 +10190,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		return;
 	}
 	if ( !idStr::Icmp( request, "joinSearch" ) || !idStr::Icmp( request, "joinSearchClear" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		servers.SetPlayerSearch( !idStr::Icmp( request, "joinSearch" ) ? Session_RetainedCreateText( gui, "join.find", 99 ).c_str() : "" );
 		PublishRetainedJoinGame( gui );
 		return;
@@ -10185,7 +10197,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 	if ( !idStr::Icmp( request, "joinFavorite" ) ) {
 		for ( int i = 0; i < retainedJoinServers.Num() && retainedJoinAddress.Length() > 0; ++i ) {
 			if ( !retainedJoinAddress.Icmp( Sys_NetAdrToString( servers[ retainedJoinServers[ i ] ].adr ) ) ) {
-				HandleMainMenuCommands( "play main_menu_selection" );
 				if ( servers.ToggleFavoriteServer( retainedJoinServers[ i ] ) ) {
 					// A notice says so (section 13.13); a removal offers Undo.
 					const bool favorite = servers.IsFavoriteServer( retainedJoinServers[ i ] );
@@ -10200,14 +10211,12 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		return;
 	}
 	if ( !idStr::Icmp( request, "joinModPrevious" ) || !idStr::Icmp( request, "joinModNext" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		servers.UpdateFilterByMod( !idStr::Icmp( request, "joinModNext" ) ? 1 : -1 );
 		PublishRetainedJoinGame( gui );
 		return;
 	}
 	if ( !idStr::Icmp( request, "joinFilterFull" ) || !idStr::Icmp( request, "joinFilterEmpty" ) ||
 		!idStr::Icmp( request, "joinFilterPassword" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		servers.ToggleFilter( !idStr::Icmp( request, "joinFilterFull" ) ? idServerScan::BROWSER_FILTER_FULL :
 			!idStr::Icmp( request, "joinFilterEmpty" ) ? idServerScan::BROWSER_FILTER_EMPTY : idServerScan::BROWSER_FILTER_PASSWORD );
 		PublishRetainedJoinGame( gui );
@@ -10216,13 +10225,11 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 	// The empty list's CLEAR FILTERS (section 13.13): every filter the row,
 	// the mod and the search set, at once.
 	if ( !idStr::Icmp( request, "joinClearFilters" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		servers.ClearFilters();
 		PublishRetainedJoinGame( gui );
 		return;
 	}
 	if ( !idStr::Icmp( request, "joinGameTypePrevious" ) || !idStr::Icmp( request, "joinGameTypeNext" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		servers.StepGameTypeFilter( !idStr::Icmp( request, "joinGameTypeNext" ) ? 1 : -1 );
 		PublishRetainedJoinGame( gui );
 		return;
@@ -10230,7 +10237,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 	if ( !idStr::Icmp( request, "joinNewer" ) || !idStr::Icmp( request, "joinOlder" ) ) {
 		const int first = retainedJoinFirst + ( !idStr::Icmp( request, "joinOlder" ) ? RETAINED_JOIN_ROWS : -RETAINED_JOIN_ROWS );
 		if ( first >= 0 && first < retainedJoinServers.Num() ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			retainedJoinFirst = first;
 			PublishRetainedJoinGame( gui );
 		}
@@ -10240,7 +10246,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		return;
 	}
 	if ( !idStr::Icmp( request, "joinSourceInternet" ) || !idStr::Icmp( request, "joinSourceLan" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		guiMainMenu->SetStateBool( "lanSet", !idStr::Icmp( request, "joinSourceLan" ) );
 		guiMainMenu->StateChanged( common->GetPresentationTime() );
 		Session_ScanServers( guiMainMenu->State().GetBool( "lanSet" ), true );
@@ -10248,20 +10253,17 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 		return;
 	}
 	if ( !idStr::Icmp( request, "joinNewList" ) || !idStr::Icmp( request, "joinRefresh" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		Session_ScanServers( guiMainMenu->State().GetBool( "lanSet" ), !idStr::Icmp( request, "joinNewList" ) );
 		PublishRetainedJoinGame( gui );
 		return;
 	}
 	if ( !idStr::Icmp( request, "joinClearSort" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		servers.ResetSorting();
 		PublishRetainedJoinGame( gui );
 		return;
 	}
 	for ( int i = 0; i < RETAINED_JOIN_SORT_COUNT; ++i ) {
 		if ( !idStr::Icmp( request, RETAINED_JOIN_SORTS[i].verb ) ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			servers.SetSorting( RETAINED_JOIN_SORTS[i].sort );
 			PublishRetainedJoinGame( gui );
 			return;
@@ -10281,7 +10283,6 @@ void idSessionLocal::HandleRetainedJoinGameRequest( idUserInterface *gui, const 
 				next = ( i + 1 ) % count;
 			}
 		}
-		HandleMainMenuCommands( "play main_menu_selection" );
 		servers.SetSorting( order[ next ] );
 		PublishRetainedJoinGame( gui );
 		return;
@@ -10311,7 +10312,6 @@ void idSessionLocal::HandleRetainedArenaRequest( idUserInterface *gui, const cha
 	}
 	for ( int i = 0; i < RETAINED_ARENA_VERB_COUNT; ++i ) {
 		if ( !idStr::Icmp( request, RETAINED_ARENA_VERBS[i][0] ) ) {
-			HandleMainMenuCommands( "play main_menu_selection" );
 			arenaCampaign.HandleGuiCommand( RETAINED_ARENA_VERBS[i][1] );
 			return;
 		}
@@ -10554,7 +10554,6 @@ void idSessionLocal::HandleRetainedDemosRequest( idUserInterface *gui, const cha
 		return;
 	}
 	if ( !idStr::Icmp( request, "demosRefresh" ) ) {
-		HandleMainMenuCommands( "play main_menu_selection" );
 		PublishRetainedDemosPage( gui, chosen ? selectedPath.c_str() : NULL, retainedDemoSelected > 0 ? retainedDemoSelected : 0, NULL );
 		return;
 	}
@@ -10571,7 +10570,6 @@ void idSessionLocal::HandleRetainedDemosRequest( idUserInterface *gui, const cha
 		if ( ( demoLibrary[ index ].capabilities & DEMO_CAP_PLAY ) == 0 ) {
 			return;
 		}
-		HandleMainMenuCommands( "play main_menu_selection" );
 		// Playback takes the screen; a demo that could not start leaves the
 		// page here to say so.
 		if ( !PlayDemoLibraryEntry( index ) ) {
@@ -10816,6 +10814,10 @@ void idSessionLocal::PrepareRetainedLevel( const char *mapPath, bool multiplayer
 		if ( Session_RetainedSummaryEnabled() && guiRetainedSummary == NULL ) {
 			guiRetainedSummary = FindRetainedGui( RETAINED_MP_SUMMARY_GUI, false, false );
 		}
+		// The buy card where the server sells; elsewhere on its first opening.
+		if ( Session_RetainedSummaryEnabled() && guiRetainedBuy == NULL && mapSpawnData.serverInfo.GetBool( "si_isBuyingEnabled" ) ) {
+			guiRetainedBuy = FindRetainedGui( RETAINED_MP_BUY_GUI, false, false );
+		}
 		if ( Session_RetainedArenaPauseEnabled() && guiRetainedArenaPause == NULL &&
 				cvarSystem->GetCVarBool( "ui_arenaCampaignActive" ) ) {
 			guiRetainedArenaPause = FindRetainedGui( RETAINED_ARENA_PAUSE_GUI, false, false );
@@ -10897,6 +10899,9 @@ void idSessionLocal::PrefetchRetainedLevel() {
 		}
 		if ( Session_RetainedSummaryEnabled() && guiRetainedSummary == NULL ) {
 			documents.Append( RETAINED_MP_SUMMARY_GUI );
+		}
+		if ( Session_RetainedSummaryEnabled() && guiRetainedBuy == NULL && mapSpawnData.serverInfo.GetBool( "si_isBuyingEnabled" ) ) {
+			documents.Append( RETAINED_MP_BUY_GUI );
 		}
 		if ( Session_RetainedArenaPauseEnabled() && guiRetainedArenaPause == NULL &&
 				cvarSystem->GetCVarBool( "ui_arenaCampaignActive" ) ) {
@@ -11007,7 +11012,8 @@ void idSessionLocal::QueueRetainedLevelshot( const char *picture, bool material 
 }
 
 // The game's in-match menu: its multiplayer menu, drawn over the game. The
-// chat and buy screens are other GUIs and are never covered.
+// chat screen is another GUI and is never covered; the buy menu takes its own
+// card (Session_IsBuyMenu).
 static bool Session_IsGameMenu( idUserInterface *gui ) {
 	return gui != NULL && gui->State().GetBool( "gameDraw" ) && !idStr::Icmp( gui->Name(), "guis/mpmain.gui" );
 }
@@ -11023,9 +11029,14 @@ static bool Session_IsArenaPause( idUserInterface *gui ) {
 	return gui != NULL && gui->State().GetBool( "gameDraw" ) && !idStr::Icmp( gui->Name(), "guis/arena_pause.gui" );
 }
 
+// The game's buy menu, which the buy card covers.
+static bool Session_IsBuyMenu( idUserInterface *gui ) {
+	return gui != NULL && gui->State().GetBool( "gameDraw" ) && !idStr::Icmp( gui->Name(), "guis/buymenu.gui" );
+}
+
 // A game GUI a multiplayer card covers.
 static bool Session_IsCoveredGameGui( idUserInterface *gui ) {
-	return Session_IsGameMenu( gui ) || Session_IsGameSummary( gui ) || Session_IsArenaPause( gui );
+	return Session_IsGameMenu( gui ) || Session_IsGameSummary( gui ) || Session_IsArenaPause( gui ) || Session_IsBuyMenu( gui );
 }
 
 bool idSessionLocal::RetainedMultiplayerCovers() const {
@@ -11222,28 +11233,29 @@ void idSessionLocal::UpdateRetainedMultiplayer() {
 		// card; a game module that does not answer gets Escape, which its join
 		// offer refuses.
 		const bool summary = Session_IsGameSummary( guiActive );
-		// The Arena's pause menu takes its own card.
+		// The Arena's pause menu takes its own card, and so does the buy menu.
 		const bool arena = Session_IsArenaPause( guiActive );
+		const bool buy = Session_IsBuyMenu( guiActive );
 		bool welcome = false;
-		if ( !summary && !arena ) {
+		if ( !summary && !arena && !buy ) {
 			guiActive->SetStateBool( "mp.welcome", false );
 			game->HandleMainMenuCommands( "retainedMultiplayerVariant", guiActive );
 			welcome = guiActive->State().GetBool( "mp.welcome" );
 		}
-		const char *path = arena ? RETAINED_ARENA_PAUSE_GUI : summary ? RETAINED_MP_SUMMARY_GUI :
+		const char *path = arena ? RETAINED_ARENA_PAUSE_GUI : summary ? RETAINED_MP_SUMMARY_GUI : buy ? RETAINED_MP_BUY_GUI :
 			welcome ? RETAINED_MP_WELCOME_GUI : RETAINED_MP_ESCAPE_GUI;
-		idUserInterface *&document = arena ? guiRetainedArenaPause : summary ? guiRetainedSummary :
+		idUserInterface *&document = arena ? guiRetainedArenaPause : summary ? guiRetainedSummary : buy ? guiRetainedBuy :
 			welcome ? guiRetainedWelcome : guiRetainedEscape;
 		// Whatever keeps the stock menu below keeps it for this opening (a
 		// card still waiting for its pages, a fallback, an Arena Campaign
 		// match); the next opening asks again.
 		retainedMultiplayerUncovered = true;
 		const bool enabled = arena ? Session_RetainedArenaPauseEnabled() :
-			summary ? Session_RetainedSummaryEnabled() : Session_RetainedMultiplayerEnabled( welcome );
+			( summary || buy ) ? Session_RetainedSummaryEnabled() : Session_RetainedMultiplayerEnabled( welcome );
 		if ( !enabled || retainedStock.FindIndex( path ) >= 0 ) {
 			return;
 		}
-		const char *stockGui = arena ? "guis/arena_pause.gui" : summary ? "guis/summary.gui" : "guis/mpmain.gui";
+		const char *stockGui = arena ? "guis/arena_pause.gui" : summary ? "guis/summary.gui" : buy ? "guis/buymenu.gui" : "guis/mpmain.gui";
 		if ( Session_ModSuppliesFile( stockGui ) ) {
 			common->DPrintf( "retained UI: the mod supplies its own '%s', so it presents instead of '%s'\n", stockGui, path );
 			retainedStock.Append( path );
@@ -11276,7 +11288,12 @@ void idSessionLocal::UpdateRetainedMultiplayer() {
 		guiRetainedMultiplayer = card;
 		retainedMultiplayerWelcome = welcome;
 		retainedMultiplayerSummary = summary;
+		retainedMultiplayerBuy = buy;
 		retainedMultiplayerRevision = card->State().GetInt( "mp.revision" );
+		if ( buy ) {
+			// Each buy menu opens on its WEAPONS page.
+			card->SetStateInt( "card.tab", 0 );
+		}
 		if ( summary ) {
 			// Each summary opens on its SUMMARY page with the chat field at rest.
 			card->SetStateInt( "card.tab", 0 );
@@ -11335,6 +11352,7 @@ void idSessionLocal::RetireRetainedMultiplayer( bool release ) {
 	// The summary's chat field stops typing with its card.
 	retainedSummaryTyping = false;
 	retainedMultiplayerSummary = false;
+	retainedMultiplayerBuy = false;
 	if ( game != NULL ) {
 		game->HandleMainMenuCommands( "retainedMultiplayerUncover", card );
 	}
@@ -11422,13 +11440,13 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		// card's own confirmations, go to the campaign.
 		const char *arenaCommand = NULL;
 		if ( !idStr::Icmp( request, "resume" ) || !idStr::Icmp( request, "mpClose" ) ) {
-			arenaCommand = "play main_menu_selection ; arenaPause resume";
+			arenaCommand = "arenaPause resume";
 		} else if ( !idStr::Icmp( request, "settings" ) ) {
-			arenaCommand = "play main_menu_selection ; arenaPause settings";
+			arenaCommand = "arenaPause settings";
 		} else if ( !idStr::Icmp( request, "arenaRestart" ) ) {
-			arenaCommand = "play main_menu_selection ; arenaPause restart";
+			arenaCommand = "arenaPause restart";
 		} else if ( !idStr::Icmp( request, "arenaLeave" ) ) {
-			arenaCommand = "play main_menu_selection ; arenaPause leave";
+			arenaCommand = "arenaPause leave";
 		} else {
 			common->Warning( "retained UI: unhandled Arena pause request '%s'", request );
 			return;
@@ -11466,7 +11484,7 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			return;
 		}
 		// None of them closes the menu.
-		gameCommand = va( "play main_menu_selection ; retained %s %d %s", select ? "select" : mute ? "mute" : befriend ? "friend" :
+		gameCommand = va( "retained %s %d %s", select ? "select" : mute ? "mute" : befriend ? "friend" :
 			adminSelect ? "adminSelect" : adminKick ? "adminKick" : adminBan ? "adminBan" : "adminSwitch", client, identity.c_str() );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpWelcomeAction" ) ) {
@@ -11476,7 +11494,7 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			return;
 		}
 		// An action that is unavailable now keeps the menu open.
-		gameCommand = va( "play main_menu_selection ; retained welcome %d", slot );
+		gameCommand = va( "retained welcome %d", slot );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpMatch" ) ) {
 		const int action = gui->State().GetInt( "card.match_op", "-1" );
@@ -11485,9 +11503,9 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			return;
 		}
 		// Match Control's own fixed token; the game checks the action again
-		// against its accepted view and keeps the menu open. A refresh, which
-		// the page asks as it opens, makes no sound.
-		gameCommand = va( "%smatchControl %s", action == 0 ? "" : "play main_menu_selection ; ", RETAINED_MP_MATCH_TOKENS[ action ] );
+		// against its accepted view and keeps the menu open. The card sounds
+		// the press itself, so the refresh it asks for as it opens is silent.
+		gameCommand = va( "matchControl %s", RETAINED_MP_MATCH_TOKENS[ action ] );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpMatchSelect" ) ) {
 		const int list = gui->State().GetInt( "card.match_list", "-1" ), row = gui->State().GetInt( "card.match_row", "-1" );
@@ -11498,7 +11516,7 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		// The stock list's own selection on the game's menu, then its token;
 		// the menu stays open.
 		guiActive->SetStateInt( va( "%s_sel_0", RETAINED_MP_MATCH_LISTS[ list ][ 0 ] ), row );
-		gameCommand = va( "play main_menu_selection ; matchControl %s", RETAINED_MP_MATCH_LISTS[ list ][ 1 ] );
+		gameCommand = va( "matchControl %s", RETAINED_MP_MATCH_LISTS[ list ][ 1 ] );
 		command = gameCommand.c_str();
 	} else if ( Session_RetainedValueRequest( request, RETAINED_MP_MATCH_CHOICES,
 		static_cast<int>( sizeof( RETAINED_MP_MATCH_CHOICES ) / sizeof( RETAINED_MP_MATCH_CHOICES[0] ) ), voteField, voteValue ) ) {
@@ -11513,7 +11531,7 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			common->Warning( "retained UI: the multiplayer card chose %s %d", choices[ voteField ], voteValue );
 			return;
 		}
-		// The stock choice's own value on the game's menu, quietly; the game
+		// The stock choice's own value on the game's menu; the game
 		// reads it as it acts.
 		if ( voteField == 0 ) {
 			guiActive->SetStateInt( "match_role_choice", voteValue );
@@ -11524,10 +11542,22 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		}
 		return;
 	} else if ( Session_RetainedRuleValueRequest( request, voteValue ) ) {
-		// The stock field's own value on the game's menu, quietly; the game
+		// The stock field's own value on the game's menu; the game
 		// checks it against the rule chosen as it stages it.
 		guiActive->SetStateInt( "match_rule_value", voteValue );
 		return;
+	} else if ( !idStr::Icmpn( request, "mpBuy ", 6 ) ) {
+		// The item's place in the game's catalog, frozen when its plate was
+		// chosen; the game checks the purchase again, and the menu stays open.
+		const idStr indexText = request + 6;
+		bool valid = indexText.Length() >= 1 && indexText.Length() <= 2;
+		for ( int i = 0; valid && i < indexText.Length(); ++i ) valid = indexText[i] >= '0' && indexText[i] <= '9';
+		if ( !valid || atoi( indexText.c_str() ) >= RETAINED_MP_BUY_ITEMS ) {
+			common->Warning( "retained UI: the buy card asked for item '%s'", indexText.c_str() );
+			return;
+		}
+		gameCommand = va( "retained buy %d", atoi( indexText.c_str() ) );
+		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpTeamAction" ) ) {
 		const int slot = gui->State().GetInt( "card.team_action", "-1" );
 		if ( slot < 0 || slot >= RETAINED_MP_TEAM_SLOTS ) {
@@ -11535,13 +11565,13 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			return;
 		}
 		// An action that is unavailable now keeps the menu open.
-		gameCommand = va( "play main_menu_selection ; retained team %d", slot );
+		gameCommand = va( "retained team %d", slot );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpVoteYes" ) || !idStr::Icmp( request, "mpVoteNo" ) ) {
 		// A ballot closes the menu, as the stock buttons do; one the player
 		// cannot cast keeps it open.
-		command = !idStr::Icmp( request, "mpVoteYes" ) ? "play main_menu_selection ; retained vote yes" :
-			"play main_menu_selection ; retained vote no";
+		command = !idStr::Icmp( request, "mpVoteYes" ) ? "retained vote yes" :
+			"retained vote no";
 	} else if ( !idStr::Icmpn( request, "mpVoteKick ", 11 ) ) {
 		const idStr operands = request + 11;
 		const int separator = operands.Find( ' ' );
@@ -11556,16 +11586,16 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		gameCommand = va( "retained voteKick %s \"%s\"", row.c_str(), catalog.c_str() );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpCallVote" ) ) {
-		command = "play main_menu_selection ; retained callVote";
+		command = "retained callVote";
 	} else if ( Session_RetainedValueRequest( request, RETAINED_MP_VOTE_FIELDS,
 		static_cast<int>( sizeof( RETAINED_MP_VOTE_FIELDS ) / sizeof( RETAINED_MP_VOTE_FIELDS[0] ) ), voteField, voteValue ) ) {
-		// A drafted field changes quietly, and the menu stays open.
+		// A drafted field changes, and the menu stays open.
 		gameCommand = va( "retained voteSet %d %d", voteField, voteValue );
 		command = gameCommand.c_str();
 	} else if ( Session_RetainedValueRequest( request, RETAINED_MP_APPEARANCE_VALUES,
 		static_cast<int>( sizeof( RETAINED_MP_APPEARANCE_VALUES ) / sizeof( RETAINED_MP_APPEARANCE_VALUES[0] ) ), voteField, voteValue ) &&
 		voteValue >= 0 ) {
-		// A model or the crosshair changes quietly, and the menu stays open.
+		// A model or the crosshair changes, and the menu stays open.
 		gameCommand = voteField < 3 ? va( "retained appearance %d %d", voteField, voteValue ) : va( "retained crosshair %d", voteValue );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpRail" ) ) {
@@ -11574,7 +11604,7 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			common->Warning( "retained UI: the multiplayer card asked for rail color %d", rail );
 			return;
 		}
-		gameCommand = va( "play main_menu_selection ; retained rail %d", rail );
+		gameCommand = va( "retained rail %d", rail );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpAdminPass" ) || !idStr::Icmp( request, "mpRefereeLogin" ) ) {
 		// A credential the card's masked field entered: it moves straight to
@@ -11591,10 +11621,10 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		}
 		if ( admin ) {
 			cvarSystem->SetCVarString( "net_clientRemoteConsolePassword", credential.c_str() );
-			command = "play main_menu_selection ; retained adminPass";
+			command = "retained adminPass";
 		} else {
 			guiActive->SetStateString( "match_referee_credential", credential.c_str() );
-			command = "play main_menu_selection ; matchControl referee_login";
+			command = "matchControl referee_login";
 		}
 	} else if ( !idStr::Icmp( request, "mpSettingsName" ) || !idStr::Icmp( request, "mpSettingsClan" ) ) {
 		// The player's name or clan from the Settings pages' fields, as the
@@ -11623,33 +11653,33 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 			common->Warning( "retained UI: the multiplayer card asked for ban row %d", row );
 			return;
 		}
-		gameCommand = va( "play main_menu_selection ; retained adminBanSelect %d", row );
+		gameCommand = va( "retained adminBanSelect %d", row );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpAdminBans" ) ) {
-		command = "play main_menu_selection ; retained adminBans";
+		command = "retained adminBans";
 	} else if ( !idStr::Icmp( request, "mpAdminUnban" ) ) {
-		command = "play main_menu_selection ; retained adminUnban";
+		command = "retained adminUnban";
 	} else if ( !idStr::Icmp( request, "mpAdminApply" ) ) {
 		// Apply closes the menu where it changes the server, as the stock
 		// page's did.
-		command = "play main_menu_selection ; retained adminApply";
+		command = "retained adminApply";
 	} else if ( Session_RetainedValueRequest( request, RETAINED_MP_ADMIN_FIELDS,
 		static_cast<int>( sizeof( RETAINED_MP_ADMIN_FIELDS ) / sizeof( RETAINED_MP_ADMIN_FIELDS[0] ) ), voteField, voteValue ) ) {
-		// A drafted server setting changes quietly, and the menu stays open.
+		// A drafted server setting changes, and the menu stays open.
 		gameCommand = va( "retained adminSet %d %d", voteField, voteValue );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpSettingsControls" ) ) {
-		command = "play main_menu_selection ; mainMenu fromMp_toControls";
+		command = "mainMenu fromMp_toControls";
 	} else if ( !idStr::Icmp( request, "mpSettingsGame" ) ) {
-		command = "play main_menu_selection ; mainMenu fromMp_toGameoptions";
+		command = "mainMenu fromMp_toGameoptions";
 	} else if ( !idStr::Icmp( request, "mpSettingsSystem" ) ) {
-		command = "play main_menu_selection ; mainMenu fromMp_toSystem";
+		command = "mainMenu fromMp_toSystem";
 	} else if ( !idStr::Icmp( request, "mpClose" ) ) {
-		command = "play main_menu_selection ; close";
+		command = "close";
 	} else if ( !idStr::Icmp( request, "mpMainMenu" ) ) {
-		command = "play main_menu_selection ; mainMenu";
+		command = "mainMenu";
 	} else if ( !idStr::Icmp( request, "mpDisconnect" ) ) {
-		command = "play main_menu_selection ; disconnect";
+		command = "disconnect";
 	} else if ( !idStr::Icmp( request, "mpStockPage" ) ) {
 		const int page = gui->State().GetInt( "card.stock_page", "-1" );
 		if ( Session_RetainedMultiplayerStockPage( retainedMultiplayerWelcome, page, guiActive->State().GetBool( "initial_join" ) ) == NULL ) {
@@ -11917,7 +11947,7 @@ void idSessionLocal::ReportRetainedScreens() {
 		guiRetainedHome != NULL ? guiRetainedHome->Name() : "-",
 		guiRetainedTitle != NULL ? 1 : 0, guiRetainedPause != NULL ? 1 : 0, guiRetainedPauseStrogg != NULL ? 1 : 0,
 		RetainedHomeInputBlocked() ? 1 : 0, guiRetainedReleasing != NULL ? 1 : 0,
-		RetainedMultiplayerCovers() ? ( retainedMultiplayerSummary ? "summary" : retainedMultiplayerWelcome ? "welcome" : "escape" ) : "-",
+		RetainedMultiplayerCovers() ? ( retainedMultiplayerSummary ? "summary" : retainedMultiplayerBuy ? "buy" : retainedMultiplayerWelcome ? "welcome" : "escape" ) : "-",
 		RetainedUI_ViewCount(),
 		stock.Length() > 0 ? stock.c_str() : "-" );
 }

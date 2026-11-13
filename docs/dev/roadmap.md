@@ -60,7 +60,7 @@ exact; the estimate column is deliberately approximate.
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
-| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 9 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
+| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 11 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
@@ -3001,6 +3001,21 @@ Completion must advance through the existing dependencies:
   including ABA changes and restoration. The production kick choice freezes that
   catalog through dispatch. Native and GL/Vulkan gameplay checks pass; full
   toolkit and device/platform acceptance remain open.
+  Progress, 13 November: [menu sounds](ui/menu-sounds.md) now come from one
+  semantic cue stream and one router instead of 78 per-request session plays.
+  A device event that moves the lit control or option ticks
+  (`main_menu_mouseover`), and every completed press, value cycle, list or edit
+  opened or closed, and Back selects (`main_menu_selection`). There is at most
+  one sound per input event, played in the session's playing world. Value
+  sliders stay silent, as retail's did. In a level the settings sub-pages
+  now keep the menu world playing instead of the paused game's. Native
+  interaction, runtime and adapter tests pass, and device-free OpenGL engine
+  checks on the title, the `airdefense1` pause and settings pages and a DM
+  Welcome card log one sound per step in the right world. The single-player
+  loading screen's `load_screen_ready` and `load_screen_click`, silent under
+  both interfaces, now play once each from the session's continue gate.
+  `MOT-006` acceptance still needs physical-device sound counters and a
+  listening review.
 - [x] **UI-10 — P0, investigation and implementation: refresh effective scope and
   source inventory.** Completed [retail/base/Awakening inventory](ui/inventory-report.md):
   264/276/324 effective paths, 358 distinct source/include-bound variants, 18
@@ -3864,7 +3879,7 @@ result is recorded.
 
 ### MP completion checkpoints
 
-**Estimate: 80%; 3/9 tasks closed.** Most systems work and have substantial local
+**Estimate: 80%; 3/11 tasks closed.** Most systems work and have substantial local
 evidence. MP-02's final long-match/catalog safety checks pass, with its timing
 contention caveat accepted for closeout; controlled timing remains unqualified.
 Simulated networking does not close physical peers. The 28 October
@@ -3882,6 +3897,8 @@ prediction/rewind defaults.
 | MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path on IPv4 and IPv6, and over IPv6 even when the path drops IP fragments (connection replies fit one packet). | IPv4 over a fragment-dropping path (1,300-byte channel fragments); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
+| MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
+| MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), bot hook use, Classic pickup names and an armour-tier HUD tint. |
 
 Completion substeps:
 
@@ -4727,6 +4744,40 @@ Completion substeps:
   now sits 60% of the way from skill 1's, giving 83 ± 11, 72 ± 14, 57 ± 9 and
   60 ± 10, consistent with even spacing ([evidence](mp-bots.md#skill-levels-1-november-2026)).
   Remaining: play against people, and retuning the curve from what that shows.
+- [ ] **MP-10 — P2, implementation and qualification: buying rules and the
+  buy card.** A buying server sells by Quake 4's rules or The Awakening's as
+  one option (Create Server, vote, admin), and the buy menu presents in the new
+  interface's in-match card construction ([reference](mp-buying.md)). Gates:
+  `mp_buying_rules_contract.py`, `openq4-ui-retained-buy`, the retained gate's
+  buy-card case and `capture_buy_menu.py` on OpenGL and Vulkan, with a remote
+  client building the modded weapon from the snapshot; then real keyboard and
+  controller purchases and the mods judged in play.
+  Progress, 13 November: the expansion's buy menu was a prototype (prices in
+  its labels, two mods with no def, items that need its content). Its catalog
+  now lives in `buyCatalog` with retail's items priced by the content, its
+  prices and cash awards in code, four mods the base content defines, the Dark
+  Matter Gun and FC Armor Regen. Mods travel in the player snapshot, survive a
+  buying mode's death and never give a clipless weapon a reload. The match
+  rules' buying mask now covers the four CTF modes, which had kept a buying
+  CTF match in warmup. Remaining: hands-on play and the UI register's FLOW-010
+  acceptance with a visual-spec record of the card's detail-column reasons.
+- [ ] **MP-11 — P2, implementation and qualification: Classic multiplayer ruleset.**
+  A Quake 2 inspired ruleset over the stock maps and weapons
+  ([player guide](../user/classic-ruleset.md)), selected by `si_ruleset` and
+  latched at map load on server and clients. Weapon, ammo and item numbers are
+  an overlay on the shipped entity definitions (`src/mpgame/mp/ClassicRules.cpp`),
+  applied before anything spawns and reverted when the map unloads, so no
+  replacement content ships and the stock ruleset is untouched. The armour
+  tier, hook state and double-jump window ride the snapshot only on Classic
+  maps; the hook's pull runs in the player physics so the owner predicts it.
+  Gates: a person plays Classic DM and CTF with real input, judges the hook,
+  the stair double jump and the weapon balance on the stock maps, and the
+  findings are folded back into the overlay.
+  Progress, 13 November: implemented and checked on Windows/Vulkan with a
+  listen server, bots and a connected client: overlay applied on both ends,
+  blaster spawns, Quake 2 armour conversion, mega health drain, hook pull on
+  the host and a predicted remote client, Create Server Rules tab. Remaining:
+  real-input play, bot hook use, Classic pickup names and an armour-tier HUD tint.
 
 ## Audio and voice
 
@@ -4737,18 +4788,20 @@ Sources: [audio implementation and remaining limits](audio-modernization.md),
 
 **Estimate: 80%; 0/7 tasks closed.** Open checkboxes here predominantly reflect
 qualification debt rather than missing core implementations. However, mobile
-memory bounds and full subtitle coverage are substantive outstanding scope, not
-automatically satisfied by a listening pass.
+memory bounds are substantive outstanding scope, not automatically satisfied by
+a listening pass. Subtitle coverage beyond the installed transcripts depends on
+caption packs, which openQ4 supports but does not ship; untranscribed speech is
+marked for players rather than counted as covered.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| AUD-01 — Partial | 54 emitter/OpenAL distance measurements validate current map-unit curves; no speculative unit conversion needed. | Human retail comparison on real speakers/headphones. |
+| AUD-01 — Partial | 54 emitter/OpenAL distance measurements validate current map-unit curves; no speculative unit conversion needed. A rendered retail/openQ4 comparison harness is implemented; openQ4's rendered half follows the authored curve within 0.6 dB and is silent at and beyond the maximum. | One focused run of the retail half (retail mutes itself while unfocused) passing the comparison. |
 | AUD-02 — Partial | Simulated endpoint recovery, scene-clock save/load repair, Linux checks and repeated-map audio residency evidence exist. | Physical endpoint loss/hotplug, audible pause/cinematics, long sessions and target-OS breadth including macOS. |
 | AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. | Real mobile OS low-memory callbacks, device/provider process-memory budgets, thermal/loading/cancellation behavior and device breadth. |
-| AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio. | Physical surround outputs and real endpoint/layout transitions; preserve positional mix and stock zero-rolloff behavior. |
+| AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio; real-device harness passes on real stereo endpoints, including a forced layout and a mid-line device switch. | Run `audio_surround_endpoint.py` on a real 5.1/7.1 endpoint and listen on speakers; preserve positional mix and stock zero-rolloff behavior. |
 | AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
 | AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit, extensive scripted-scene mute/save checks and a 42-map progression sweep with fights (1,052 kills, no mute leak) exist. | Ordered human play, including `walker` past the step where the probe player dies, and physical listening/device checks; retain effects/music separation. |
-| AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue) implemented. | Missing transcripts remain explicit; ordered human play and physical stereo-HUD readability. Installed transcripts are English only. Available mappings do not mean every line is captioned. |
+| AUD-07 — Partial | Implementation complete: playback-driven captions, fallback/mapping policy, authored caption-pack declarations, an optional marker for untranscribed speech, a reading hold after a line ends, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue). | Qualification only: ordered human play and physical stereo-HUD readability. Installed transcripts are English only and cover about seven lines in ten; the rest show the marker unless a caption pack supplies text. |
 
 ### AUD task evidence and acceptance
 
@@ -4771,6 +4824,20 @@ automatically satisfied by a listening pass.
   October 22 audit: the remaining gate is human listening on real speakers or
   headphones against retail. The measured distance-curve audit is complete;
   keep this item open until that listening pass is recorded.
+  November 13: the listening pass becomes a measured comparison of what each
+  game renders. `sound_distance_retail_compare.py` runs retail 1.4.2 and openQ4
+  on the same three shaders, nine distances and two passes, and writes each mix
+  to a WAV through OpenAL Soft. Nothing plays aloud. openQ4 must follow retail and
+  the authored curve within 1 dB beyond the minimum distance (2 dB inside it, where
+  retail's OpenAL path keeps a point source), and both must be silent at and beyond
+  the maximum. Retail's OpenAL output is a fair reference: 1.4.2 sets rolloff 0 and
+  sends its shared channel volume as the gain. The listener sits in Hangar 1's
+  portal-sky room, with the four map sounds that reach it removed. The openQ4 half
+  passes (within 0.6 dB, silent at and beyond the maximum). Retail selects no sound
+  world while it is not the active application, and faking focus would be
+  synthetic input. The retail half therefore waits for a person to focus its window,
+  and it has not run focused yet. Close this item when it passes.
+  [Rendered comparison](audio-modernization.md#rendered-retail-comparison-13-november-2026).
 - [ ] **AUD-02 — P1, qualification: physical device and timing lifecycle.** Test
   default/selected endpoint loss and return, hotplug, pause/resume/slow motion,
   cinematics, map/restart and long sessions on target OSes. Verify audible output,
@@ -4929,6 +4996,19 @@ automatically satisfied by a listening pass.
   now fall off exactly as a mono source's do (half at twice the minimum
   distance, a quarter at four times) with standard and EAX reverb, and stock
   presets are unchanged. Physical surround devices remain open.
+  November 13: `audio_surround_endpoint.py` qualifies placement and transitions
+  on real output devices: stock gameplay through WASAPI (or PulseAudio/PipeWire),
+  measured from each device's own loopback in its own layout, with no wave
+  writer. On two real stereo endpoints all 19 checks pass. The automatic layout
+  matches the device, dialogue stays balanced and positional sound follows its
+  side. A forced 5.1 that the stereo device refused leaves the line un-routed
+  and audible. A switch between devices mid-line reopens in place, silences the
+  old device and plays on the new one within 40 ms of the scene clock. The
+  centre branch checks exclusive centre dialogue and a silent LFE, but no
+  centre-capable device was available, so it ran only on synthetic data. The
+  remaining gate is one run of that harness on a 5.1/7.1 endpoint, plus
+  listening on speakers; real endpoint loss and hotplug stay with AUD-02.
+  [Real-endpoint evidence](audio-voice-evidence.md#real-playback-endpoints-13-november-2026).
 - [ ] **AUD-05 — P1, implementation: functional multiplayer voice.** Capture,
   codec, transport and playback are implemented with explicit microphone consent,
   push-to-talk, local-only testing, connection-scoped mute, server moderation and
@@ -5122,6 +5202,24 @@ automatically satisfied by a listening pass.
   installed game has English transcripts only, which the player guide states;
   ordered human play and physical stereo-HUD placement remain open.
   [Fight evidence](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
+  November 13: implementation complete. The inventory confirms the installed
+  assets have no more text to map: every stock lipSync transcript is in use, and
+  Awakening's 45 unused ones belong to race samples no shader plays. The
+  licensed authored mapping is therefore a caption-pack declaration, a lipSync
+  named `subtitle/<sample path>` or, for a single-sample shader,
+  `subtitle/<shader>`, checked before installed text and falling back to it.
+  Packs carry their own localized text and leave lip sync alone; the repository
+  ships none, and `audio_asset_inventory.py --pack-template` lists the 1,419
+  stock and 72 Awakening gaps as empty entries. Missing coverage is explicit to
+  players: `ui_subtitleUntranscribed` (default on, Settings > Audio in both UI
+  modes, twelve languages) marks speech without a transcript in any slot the
+  transcribed lines leave. A line that ends naturally holds its last words
+  0.5 s, and a short line 1.5 s in all, closing the logical-clock tail the fight
+  sweep found; stops and replacements still clear at once. Native selection
+  tests and the stock, Awakening portrait Turkish and Classic runtime harnesses
+  pass. Ordered human play and physical stereo-HUD placement remain the only
+  open AUD-07 work.
+  [Caption-pack evidence](audio-voice-evidence.md#caption-packs-untranscribed-speech-and-held-captions-13-november-2026).
 
 ## Desktop platforms and packaging
 

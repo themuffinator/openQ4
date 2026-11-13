@@ -742,7 +742,15 @@ void rvWeapon::Init( idPlayer* _owner, const idDeclEntityDef* def, int _weaponIn
 		
 		spawnArgs.Copy ( *modDict );
    	}
-   	
+
+	// openQ4: multiplayer weapons that fire straight from the ammo pool stay
+	// that way. The weapon mods a buying mode sells were made for single
+	// player's clips (the nailgun's rate-of-fire mod brings a 100-nail one);
+	// their clip would only add a reload to a weapon that has none.
+	if ( mods && gameLocal.isMultiplayer && weaponDef->dict.GetInt( "clipSize" ) == 0 ) {
+		spawnArgs.SetInt( "clipSize", 0 );
+	}
+
    	// Associate the weapon with the view model
 	viewModel->weapon = this;
 }

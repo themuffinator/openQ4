@@ -9,6 +9,16 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **Buy your gear by Quake 4's or The Awakening's rules.** A server's
+  **Buying** option (Create Server, the vote and the admin page) now chooses
+  between the retail buy menu and the expansion's, completed on the stock
+  game: its prices and rewards, the Dark Matter Gun, FC Armor Regen and weapon
+  mods such as bouncing hyperblaster bolts and burst-fire homing rockets. The
+  new interface's buy menu is a card like the other multiplayer menus, with
+  tabs, icons, prices and a reason for anything you cannot buy yet. Mods stay
+  on your weapon after you die, and Capture the Flag servers with buying on
+  start their matches again. See [Buying in multiplayer](../../user/buying.md).
+
 - **Build levels in the experimental editor.** `editorExperimental` now edits
   brushes and patches as well as entities: move, turn and scale them in new
   top, front and side views or in 3D, on a grid and with texture lock, draw new
@@ -214,6 +224,7 @@ the [development roadmap](../roadmap.md) for current scope.
 
 - **Modern weapon wheels in campaign and multiplayer.** The new UI uses vector Marine/Strogg wheels with live ammo, fixed weapon positions and smooth scene soft focus that keeps the wheel and HUD crisp. The wheel keeps its familiar right-side placement; change **Wheel offset** beside wheel sensitivity in Game settings, or use `ui_weaponWheelOffset 0` to center it. Multiplayer keeps running at normal speed.
 - Classic HUD gauges regain their beveled fills, armor cells and clipped Marine/Strogg traces, and stay on the centered 4:3 canvas. Its directional damage glow and missile chevron have their own shapes. Boss and timed notices use separate rows. Ammo gains highlight only the value that increased.
+- **A weapon strip that moves with you.** In the new interface the weapon strip opens and closes with quick, subtle motion, its ring glides to the weapon you pick, and a tick marks your quick-switch weapon. Choosing a weapon you don't carry or that is empty shakes the ring red. After Kane's transformation the Strogg strip tunes in like a neural link, its ring stretches and pulses, and refusals glitch. Reduced Motion keeps it to short fades. Replace both game modules.
 - Weapon wheels now use distinct Marine transmission and Strogg translation effects, reserve bands and accurate Awakening symbols. Controller selection follows the stick directly; Escape or the controller's B/Circle button cancels without also opening a menu or firing a bound action.
 - Tourney keeps its arena instructions visible, names the current round, shows infinity during arena sudden death, and uses translucent banners that respect Reduced Motion. Clan Arena shows its timer throughout the round. Respawn prompts show the remaining delay, vote prompts use your controller's buttons, and live match details fold into a compact card. Warm-up shows a compact ready count, and wrapped chat stays within eight lines even when you are not typing.
 - Strogg gauges keep their moving grain across the full fill, with a steady texture under Reduced Motion.
@@ -384,9 +395,13 @@ the [development roadmap](../roadmap.md) for current scope.
 - **Effects closer to the original.** Particle effects now spawn, move, fade and draw as they do in the original Quake 4. Electrical arcs regain their bright, forked look. Steam and smoke placed in maps are already flowing when you first see them. Long-running effects no longer slow down or fade early.
 - **Rooms sound the way Quake 4's level designers set them up.** Every map's rooms, corridors and outdoor areas get their own reverb again, as the original game did with EAX sound hardware: a tiled washroom rings, a hangar booms, and a firefight in the hall next door sounds like that hall, coming from its doorway. Closed doors muffle the sounds behind them, radio chatter stays dry, and voice-over sits back in the mix. Until now openQ4 played no reverb at all. It is on by default (`s_useEAXReverb`) wherever OpenAL Soft is in use; see [Room Reverb](../../user/gameplay-settings.md#room-reverb).
 - **Play your mods over The Awakening.** A mod now stays loaded when you choose The Awakening, and its files apply on top of the expansion's: load it from **Mods** and pick the campaign, or launch with `+set fs_game mymod +set fs_game_base q4xbase`. Mod authors can add `"campaign": "awakening"` (or `"quake4"`) to `mod.json` so their mod always plays over the right campaign. A mod used with both campaigns keeps one folder; Load Game lists only the campaign you are playing. Until now choosing either campaign unloaded your mod, and The Awakening ignored `fs_game_base q4xbase`. See [Mods and The Awakening](../../user/campaigns.md#mods-and-the-awakening).
+- **Subtitles say when someone speaks without a transcript.** With subtitles on, dialogue the installed game has no text for, about three lines in ten, now shows **[untranscribed speech]** after the speaker's name instead of nothing; turn it off with **Settings > Audio > Untranscribed Speech**. Captions also stay up long enough to read after a line ends, and mods can add or translate missing captions with caption packs. See [Dialogue subtitles](../../user/gameplay-settings.md#dialogue-subtitles).
 
 ## Upgrade Notes
 
+- Servers and players must run the same build for buying: the player state now
+  carries weapon mods, and the buying vote names Off, Quake 4 or The Awakening.
+  Replace the engine and both game modules together.
 - If you compiled a map with an earlier openQ4 `dmap` and it uses vehicle, fly,
   shot or item clip brushes, compile it again so its collision file records
   them correctly.

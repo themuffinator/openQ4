@@ -639,6 +639,7 @@ public:
 
 	gameType_t				gameType;
 	bool					isMultiplayer;			// set if the game is run in multiplayer mode
+	bool					classicRuleset;			// openQ4: si_ruleset 1, latched at map load (mp/ClassicRules.h)
 	bool					isServer;				// set if the game is run for a dedicated or listen server
 	bool					isClient;				// set if the game is run for a client
 													// discriminates between the RunFrame path and the ClientPrediction path
@@ -1156,6 +1157,7 @@ public:
 	// openQ4: these were three overlapping hard-coded lists that disagreed with
 	// each other (One Flag CTF counted as a team game in one and not the other).
 	// They now read the single gametype descriptor table.
+	bool					IsClassicRuleset( void ) const { return isMultiplayer && classicRuleset; }
 	bool					IsFlagGameType( void ) { return MPGameTypeHasAny( gameType, GTF_FLAG ); }
 	bool					IsTeamGameType( void ) { return MPGameTypeHasAny( gameType, GTF_TEAM ); }
 	bool					IsRoundGameType( void ) { return MPGameTypeHasAny( gameType, GTF_ROUND ); }
@@ -1685,6 +1687,7 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
 // RAVEN BEGIN
 // nmckenzie: Reduce dependencies.
 #include "mp/CTF.h"
+#include "mp/ClassicRules.h"
 #include "mp/stats/StatManager.h"
 #include "mp/Tourney.h"
 #include "bots/NavMesh.h"

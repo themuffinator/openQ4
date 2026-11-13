@@ -1353,7 +1353,7 @@ VOTE_ROWS = (
     ("balance", "mpVoteBalance", "#str_200212", ("toggle",)),
     ("shuffle", "mpVoteShuffle", "#str_201044", ("toggle",)),
     ("restart", "mpVoteRestart", "#str_200208", ("toggle",)),
-    ("buying", "mpVoteBuying", "#str_222000", ("toggle",)),
+    ("buying", "mpVoteBuying", "#str_231901", ("choice", 3)),
     ("kick", "mpVoteKick", "#str_200207", ("choice", PLAYER_ROWS)),
 )
 VOTE_RUNNING, VOTE_CALL, VOTE_NONE_RUNNING = "#str_231043", "#str_231044", "#str_231047"

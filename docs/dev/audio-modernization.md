@@ -142,6 +142,80 @@ and reverb disabled in the isolated profile. They do not replace the existing
 reverb/HRTF evidence or qualify different endpoints. No attenuation, source-radius,
 HRTF, EFX or reverb defaults changed. The physical distance check is still pending.
 
+Correction, 13 November: the isolated profile did not keep reverb off. A fresh
+profile runs the one-time audio defaults migration, which turns
+`s_useEAXReverb` back on for the minimum, lowpower and performance presets, and
+these runs printed `s_useEAXReverb 0 -> 1`. The readings above are the dry
+channel and OpenAL gains, which reverb does not change, so they stand. The
+harness now sets `s_audioDefaultsMigrated 2` so the profile stays dry.
+
+### Rendered retail comparison, 13 November 2026
+
+The audit above checks openQ4's numbers against the curve it is meant to apply.
+`tools/tests/sound_distance_retail_compare.py` checks what each game actually
+renders instead: retail Quake 4 1.4.2 and openQ4 play the same three original
+looping shaders at the same nine distances, and each writes its mix to a WAV file
+through OpenAL Soft's wave writer, so nothing plays aloud. The harness measures
+the power of every placement and requires openQ4's level at each distance to
+follow retail's, and both to follow the authored linear curve.
+
+What makes the retail side comparable:
+
+- **Retail's OpenAL path carries the same curve as its default mixer.** At
+  `0x1016e6a9` retail 1.4.2 sets `AL_ROLLOFF_FACTOR` to 0, and it passes the
+  channel volume from its shared distance calculation as `AL_GAIN`. Its default
+  software mixer multiplies the same volume into its speaker gains. Retail only
+  takes the OpenAL path when EAX is present, so the 32-bit OpenAL Soft library
+  supplied with `--retail-openal` keeps its EAX extensions exposed; with EAX
+  hidden, retail opens DirectSound on the real device, and the harness stops it
+  as soon as the log says so.
+- **A quiet listener.** Hangar 1 has no playable spot beyond every speaker's
+  range, and retail mixes nothing while the listener is outside the map. The
+  listener sits in the map's portal-sky room, a real area thousands of units from
+  every positional speaker. Four map sounds still reach it: a speaker authored with
+  a 30,984-unit range and the script's global cannon. Both games remove them by
+  name, and each placement then plays over digital silence.
+- **Clean placements.** A speaker is stopped with `trigger` before it is
+  removed; removing it alone lets the sound fade over several seconds. Each
+  window covers one whole loop of the shader's sample, because
+  `ambient_light_hum01`'s level swings by several dB within its 4.09 s loop.
+  Every placement runs twice and the quieter pass is kept, since an unrelated
+  sound can only add power. Levels are the median of 50 ms block powers.
+- **Tolerances.** Beyond the authored minimum distance, openQ4 must follow
+  retail and the authored curve within 1 dB, relative to the level at the minimum
+  distance, and match retail's absolute level within 1.5 dB. Inside the minimum,
+  retail's OpenAL path renders a point source while openQ4 (`AL_SOURCE_RADIUS`)
+  and retail's default mixer spread the sound around the listener, so those
+  placements are allowed 2 dB. At the maximum and beyond, both must be silent.
+
+`sound_distance_retail.py` exercises the analysis without assets. It covers
+synthetic matching curves, a level offset, metre conversion in either direction,
+OpenAL distance attenuation added on top, the quadratic curve, sound beyond the
+maximum, a loud floor, a disturbed pass, and missing or misplaced markers.
+
+**openQ4 half, measured.** The unattended openQ4 run (`--skip-retail`) passes
+against client SHA-256 `6fc420765be3dc1569f4b916964af530876d1b0cf3c8f8d22c15fb6dc8f88d81`
+The recorded sound sources match commit `3321fe89c`. The binary was staged from
+the shared checkout and also carried other sessions' uncommitted, non-audio work.
+Relative to each shader's minimum distance, the rendered levels at a quarter, half
+and three quarters of the way to the maximum are within 0.6 dB of the authored
+−2.5, −6.0 and −12.0 dB. All six placements at and beyond the maximum are
+digitally silent. Inside the minimum, the level rises by 0.3–1.0 dB toward the
+listener as the source spreads. Evidence is in `.tmp/aud01/openq4-only-r6/`.
+
+**Retail half, pending.** Retail mutes itself and sleeps while it is not the
+active application: its session selects no sound world, and its view and
+listener stop updating. Faking focus would be synthetic input. The harness
+therefore waits, for up to ten minutes, until a person focuses the retail
+window. It checks focus throughout the run and refuses the result if focus is
+lost. Unattended runs before this was understood rendered pure silence, and are
+kept as failed records in `.tmp/aud01/compare-r1/` and `compare-r3/`. The
+retail comparison has not passed yet.
+
+On a shared machine, peers' `meson_setup.ps1 install` closes clients running
+from `.install`. Qualify a fixed copy instead, such as `.tmp/runtime/audio/` with
+its large packs hard-linked, and pass it with `--runtime-dir`.
+
 ### Mixing and timing
 
 - **Recycled channels.** `idBlockAlloc` hands back channels without constructing them, and

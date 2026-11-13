@@ -1598,6 +1598,179 @@ These are still routing probes, not a playthrough: nothing is aimed, dodged or
 driven, teleports can telefrag actors and script null-entity warnings remain.
 Ordered human play, physical listening and devices stay open.
 
+## Real playback endpoints, 13 November 2026
+
+Every earlier AUD-04 measurement came from OpenAL Soft's wave writer or an
+OpenAL loopback context, so the real system backend, its device reopen and the
+operating system's mixer were never in the measured path.
+`tools/tests/audio_surround_endpoint.py` now plays stock gameplay through the
+real backend (WASAPI shared mode on Windows, PulseAudio/PipeWire on Linux) onto
+output devices the operator names. `tools/tests/endpoint_loopback.py` records
+each device's own loopback in its own channel layout (WASAPI loopback through
+ctypes, or the sink's monitor through `parec`). No wave writer, microphone or
+host input is used. Each phase is cut from the recordings at the moment its
+probe appeared in the engine log, and the tones are measured per channel.
+
+In `game/airdefense1` the run plays a 440 Hz radio dialogue fixture (the mono
+global path that is centre-routed on a centre-capable output) and an 880 Hz
+`speaker` entity 64 units to the player's right, then to the left. It then
+forces the other layout (`s_numberOfSpeakers` 6 on a device without a centre
+speaker, 2 on one with), returns to the device's own, and moves the output to a
+second device with `s_deviceName` during the line and back. On a centre-capable
+device it also checks exclusive centre dialogue, a silent LFE and that the
+positional sound is not centred. `--self-test` checks the placement analysis on
+synthetic stereo and 5.1 recordings; the 5.1 case reproduces the 2.27 centre
+ratio of `s_centerFractionVO` 0.75.
+
+Windows x64, debugoptimized client SHA-256
+`4bdb60c18fd88e987ab7f1b7c3d185edde73dd96a53c11ddfb2db44775a67e85`, run from a
+fixed copy in `.tmp/runtime/audio-endpoint` because peers re-staged `.install`
+during the session (a stage closes running clients). The sound code in that
+client is unchanged since `b211275ce`. The endpoints were the two active
+virtual devices, Speakers (Steam Streaming Speakers) and Speakers (Steam
+Streaming Microphone): real WASAPI endpoints, 48 kHz stereo, not routed to a
+speaker. All 19 checks pass:
+
+- OpenAL opened the named device and settled on its own layout (basic stereo,
+  centre not routed).
+- The dialogue was balanced, right/left 0.98–1.07 in every playing phase. The
+  speaker read 1.98 to the right and 0.53 (1/1.88) to the left.
+- Forcing 5.1 reset the device in place, but this real stereo device refused
+  5.1 and OpenAL Soft kept rendering basic stereo. The engine followed the
+  observed layout, left the line un-routed and balanced (1.00), and played it at
+  the same level. Returning to the device layout reset in place again. The line
+  moved 28 ms off its scene clock across both resets.
+- The switch reopened the device in place onto the second endpoint. The line
+  played there at the same level (0.089) and balance (0.98), and the first
+  endpoint fell to silence (0.0000). The return reversed both, 40 ms off the
+  scene clock across the two reopens. No sound restart or sample reload
+  occurred after the map loaded.
+
+An earlier run on the same endpoints failed only its lateral check, with
+2.0 as the threshold. OpenAL's stereo pan of a source at 90 degrees measured
+1.9–2.1, so the threshold is now 1.5 (3.5 dB), well clear of the dialogue's own
+balance.
+
+Limits: no centre-capable endpoint was active on this machine, so the 5.1/7.1
+branch ran only on synthetic data. This measures each device's operating-system
+mix, not speakers or ears. Endpoint loss, hotplug and system-default changes were
+not triggered. The Linux capture path is untested (WSL has no PulseAudio tools).
+The report, both recordings and the engine log are in
+`.tmp/aud04/endpoint-stereo/`.
+
+## Caption packs, untranscribed speech and held captions, 13 November 2026
+
+This round finishes AUD-07's implementation. What remains is qualification:
+ordered human play and physical stereo-HUD placement.
+
+### No installed text left to map
+
+The inventory was rerun on the Steam install's `q4base` and on Awakening's
+`q4xbase` (`tools/tests/audio_asset_inventory.py`, identifiers and counts only).
+Every one of the 2,268 stock lipSync declarations is already the same-name
+transcript of a speech shader; none is unused, and no declaration matches an
+unmapped shader's sample by path or file name. Awakening declares 2,622: 1,514
+are same-name transcripts of its own speech shaders (37 of those names have no
+text in `q4base`), 1,063 restate stock declarations, and the 45 left over
+(`vo_8_*`) belong to `sound/vo_english/m08_race` samples that no shader plays.
+Awakening's 72 untranscribed speech shaders are multiplayer announcers, five
+`vo_7_6_*` lines and one scream. A mapping table built from installed
+identifiers alone would therefore caption nothing new; the gaps need text the
+installed game does not contain.
+
+### Authored caption declarations
+
+The licensed authored mapping is a caption-pack declaration: a lipSync named
+`subtitle/<sample path without extension>` or, for a single-sample shader's
+leadin, `subtitle/<shader>`. `SoundTranscriptText` checks these first, by
+sample path and then by shader name, and falls back to the installed policy
+when a pack entry has no text, an unresolved `#str_` key or is the game's
+implicit default. A pack's text therefore also replaces an installed line's,
+for corrections or translations. Its `#str_` keys come from the pack's own
+language tables, with the normal English fallback. The `subtitle/` names are
+never looked up for lip sync, so a pack cannot change mouth animation. The
+repository ships no pack and no transcript. `--pack-template` writes an empty
+declaration for each line without text, by shader for single-sample shaders
+and by sample path for each file of a random-variant shader: 1,419 stock
+entries (1,404 shaders) and 72 Awakening entries. `listSubtitles` reports each
+cue's source as `installed`, `authored` or `none`, and the `s_logSpeech`/
+`s_dialogueVoices` transcript status gains `authored`.
+
+### Untranscribed speech
+
+Missing coverage is now explicit to players, not only in reports. With
+`ui_subtitleUntranscribed` 1 (the default; Settings > Audio > Untranscribed
+Speech in both UI modes, labelled in all twelve menu languages) a dialogue line
+with no transcript gives a cue with no text, which the overlay draws as the
+localized marker `[untranscribed speech]` after any speaker label. A marker
+never pages with the line's duration: one that does not fit its rows takes the
+short localized form (`[speech]`) and keeps the speaker label, then gives the
+label up. The first Awakening portrait run in Turkish showed why: at Subtitle
+Size 1.6 in a 720-wide window the long form wrapped and paged across a 60 s
+line, showing only its first half. Markers use
+the same audibility, privacy, fade and distance rules as captions, and only
+fill slots the two newest transcribed lines leave, so a marker never displaces
+a transcript. `audio_scene_audit.py` runs with markers off and counts authored
+text as transcribed, keeping its corpus comparable with earlier reports.
+
+### Held captions
+
+The 6 November sweep found transcribed lines heard in their last moments with
+no cue: cues followed the channel's logical clock, which reaches the end while
+the voice's last buffers still play. A non-looping line past its end now shows
+its last page until the mixer frees the channel, and a line that ends on its
+own (`idSoundEmitterLocal::CheckForCompletion`) leaves a held caption for
+0.5 s, or until it has been up 1.5 s in all for a short line. Stops,
+replacements on the same channel and freeing an emitter immediately go through
+other paths and still clear at once; a held caption also yields to the same
+speaker's next line, is dropped by `StopSound` on its channel and by world
+clears, `StopAllSounds` and restores, and at most four are kept.
+
+### Results
+
+`audio_subtitles.py` (native selection and pagination, clang++) passes with new
+cases for authored text and its fallback, shader versus sample-path keys, the
+implicit default, marker slotting, held tails and their expiry, replacement,
+channel and world stops, privacy and the four-tail bound. The native AUDIO page
+test (3,777,456 checks) and subtitle overlay test (5,959 checks) pass with the
+new row. `settings_menu_coverage.py`, `choice_gui_value_contract.py`,
+`gui_clipping_contract.py`, `menu_controller_navigation.py` and
+`lang_table_encoding.py` pass.
+
+`audio_subtitles_runtime.py` gained phases for the marker on an untranscribed
+line that keeps playing after the fixtures stop (and its removal when turned
+off), a pack line by sample path, a pack entry on an installed line with
+no transcript (`vo_1_1_1_140_1` in stock, `vo_7_6_2` in Awakening) and a 0.4 s
+line held after it ends and gone 2 s after it started; the Classic Audio page
+now scrolls to step 7 to show the new last row. Fixture text is the harness's
+own words, not a transcript. The marker check also accepts the marker yielding
+when two transcribed lines hold both slots, because the first Awakening run
+showed the map's own dialogue (`vo_darn_welandmss`) doing exactly that; each
+report records whether the marker was shown. All 24 checks pass in each run:
+
+- `.tmp/aud07/subtitles-wide/result.json`: stock `game/airdefense1`, English, 1280×720.
+- `.tmp/aud07/subtitles-portrait/result.json`: Awakening `game/m01_stranarus_trench1`,
+  Turkish, 720×1280; the marker took its short form (`[konuşma]`) beside the map's
+  own line.
+- `.tmp/aud07/subtitles-classic/result.json`: stock, Classic UI, 1024×768.
+
+All three show the marker and use harness SHA-256
+`6832b524b2d93512593c2aeae168942ff9b03f0bad550acdfb81ebe71394c6a1`.
+
+The runs used a separate stage, `.tmp/runtime/subtitles`, because another
+session was running from `.install`. Its client SHA-256 is
+`33008add4be3bd44eff5798d07936226eed5dc774a352309e94e9c728defadd1` (Windows
+x64, debugoptimized, built in the shared tree with other sessions' uncommitted
+work). Engine captures were inspected: the stock marker reads
+`[untranscribed speech]` on its own line (an earlier run showed it with the
+radio label beside a transcribed line), the portrait marker's short form fits
+above the map's paged line, and the Classic page shows Untranscribed Speech as
+its last row.
+
+Not covered: a published third-party caption pack, ordered human play and
+physical stereo-HUD placement. Untranscribed lines in the campaigns still have
+no text unless a pack supplies it.
+
 ## Other verification and limitations
 
 ### PR #212 merge qualification, 4 November 2026

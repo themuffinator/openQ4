@@ -59,6 +59,8 @@ idCVar si_motd(						"si_motd",					"",					CVAR_GAME | CVAR_SERVERINFO | PC_CVA
 // squirrel: Mode-agnostic buymenus
 idCVar si_isBuyingEnabled(			"si_isBuyingEnabled",			"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "enable buying in current mode" );
 idCVar si_dropWeaponsInBuyingModes(	"si_dropWeaponsInBuyingModes",	"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "dead players drop weapons, even in Buying game modes" );
+// openQ4: the rules a buying server sells by: 0 Quake 4 (retail), 1 The Awakening (mp/Buying.h)
+idCVar si_buyingRules(				"si_buyingRules",				"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "buying rules when si_isBuyingEnabled is set: 0 Quake 4, 1 The Awakening", 0, 1 );
 // RITUAL END
 // openQ4: game_mp's Instagib switch. Declared here too, with game_mp's default and
 // help, so the create-server menu can set it while game_sp is the loaded module.
@@ -108,6 +110,9 @@ idCVar si_entityFilter(				"si_entityFilter",			"",				CVAR_GAME | CVAR_SERVERIN
 idCVar si_countDown(				"si_countDown",				"10",			CVAR_GAME | CVAR_SERVERINFO | CVAR_INTEGER, "pregame countdown in seconds", 4, 3600 );
 // MCG: added "weapon stay" option
 idCVar si_weaponStay(				"si_weaponStay",			"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "cannot pick up weapons you already have (get no ammo from them)" );
+// openQ4: registered here too so the front end keeps the multiplayer ruleset while game-sp is loaded
+idCVar si_ruleset(					"si_ruleset",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "multiplayer ruleset: 0 Quake 4, 1 Classic (Quake 2 inspired: tiered armour, blaster start, double jump, Threewave CTF scoring and grappling hook)", 0, 1 );
+idCVar si_classicGrapple(			"si_classicGrapple",		"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "grappling hook under the Classic ruleset: 0 off, 1 flag modes only, 2 every mode", 0, 2 );
 // RAVEN END
 
 // RITUAL BEGIN

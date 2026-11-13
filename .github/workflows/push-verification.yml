@@ -277,6 +277,7 @@ jobs:
             tools/tests/awakening_ci_contract.py \
             tools/tests/awakening_speeder_physics_contract.py \
             tools/tests/awakening_gameplay_contract.py \
+            tools/tests/mp_buying_rules_contract.py \
             tools/tests/awakening_turret_skin_contract.py \
             tools/tests/awakening_status_behavior.py \
             tools/tests/clip_owner_behavior.py \
@@ -530,6 +531,8 @@ jobs:
             tools/tests/sound_recovery.py \
             tools/tests/sound_distance.py \
             tools/tests/sound_distance_runtime.py \
+            tools/tests/sound_distance_retail.py \
+            tools/tests/sound_distance_retail_compare.py \
             tools/tests/sound_retail_reverb_contract.py \
             tools/tests/sound_screen_shake.py \
             tools/tests/audio_asset_inventory.py \
@@ -541,6 +544,8 @@ jobs:
             tools/tests/audio_memory_runtime.py \
             tools/tests/audio_mod_reverb.py \
             tools/tests/audio_output_recovery_runtime.py \
+            tools/tests/audio_surround_endpoint.py \
+            tools/tests/endpoint_loopback.py \
             tools/tests/audio_scene_audit.py \
             tools/tests/audio_stream_budget.py \
             tools/tests/audio_streaming.py \
@@ -590,6 +595,7 @@ jobs:
             tools/ui/capture_player_identity.py \
             tools/ui/capture_text_queries.py \
             tools/ui/capture_vote_targets.py \
+            tools/ui/capture_buy_menu.py \
             tools/ui/capture_save_browser.py \
             tools/tests/ui_stock_level_load.py \
             tools/ui/build_retained_screens.py \
@@ -829,6 +835,7 @@ jobs:
           python tools/tests/awakening_ci_contract.py
           python tools/tests/awakening_speeder_physics_contract.py
           python tools/tests/awakening_gameplay_contract.py
+          python tools/tests/mp_buying_rules_contract.py
           python tools/tests/awakening_turret_skin_contract.py
           python tools/tests/awakening_status_behavior.py
           python tools/tests/clip_owner_behavior.py
@@ -1056,6 +1063,7 @@ jobs:
           python tools/tests/sound_settings.py
           python tools/tests/sound_recovery.py
           python tools/tests/sound_distance.py
+          python tools/tests/sound_distance_retail.py
           python tools/tests/sound_retail_reverb_contract.py
           python tools/tests/sound_screen_shake.py
           python tools/tests/audio_decode_budget.py

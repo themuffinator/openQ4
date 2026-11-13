@@ -1158,6 +1158,7 @@ def main() -> None:
         "ui_subtitleScale",
         "ui_subtitleBackground",
         "ui_subtitleSpeakers",
+        "ui_subtitleUntranscribed",
     ]
     for cvar in audio_cvars:
         require(audio_gui, cvar, "Audio settings include")
@@ -1171,7 +1172,7 @@ def main() -> None:
         "#str_229962",
         "#str_229963",
         "rect\t0,104,640,250",
-        "rect\t-24,-84,640,474",
+        "rect\t-24,-84,640,498",
         "rect\t245,142,361,20",
         "rect\t245,318,361,20",
     ):

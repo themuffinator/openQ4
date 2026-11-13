@@ -10414,7 +10414,10 @@ bool idMultiplayerGame::CanCapture( int team ) {
 void idMultiplayerGame::FlagCaptured( idPlayer *player ) {
 	if( !gameLocal.isClient ) {
 		AddTeamScore( player->team, 1 );
-		AddPlayerTeamScore( player, 5 );
+		// openQ4: the Classic ruleset pays Threewave CTF's capture, team and assist bonuses
+		if ( !rvClassicRules::AwardCapture( player ) ) {
+			AddPlayerTeamScore( player, 5 );
+		}
 		
 // RITUAL BEGIN
 // squirrel: Mode-agnostic buymenus
@@ -12400,8 +12403,8 @@ void idMultiplayerGame::PlayerDeath( idPlayer *dead, idPlayer *killer, int metho
 				AddPlayerScore( killer, 1 );
 			}
 			
-			// additional CTF points
-			if( gameLocal.IsFlagGameType() ) {
+			// additional CTF points (openQ4: the Classic ruleset pays Threewave CTF's frag bonuses instead)
+			if( gameLocal.IsFlagGameType() && !rvClassicRules::AwardFragBonuses( dead, killer ) ) {
 				if( dead->PowerUpActive( killer->team ? POWERUP_CTF_STROGGFLAG : POWERUP_CTF_MARINEFLAG ) ) {
 					AddPlayerTeamScore( killer, 2 );
 				}
@@ -12560,7 +12563,7 @@ void idMultiplayerGame::ExecuteVote( void ) {
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "serverMapRestart\n");
 			break;
 		case VOTE_BUYING:
-			cvarSystem->SetCVarString( "si_isBuyingEnabled", voteValue );
+			MP_SetBuyingModeCVars( atoi( voteValue ) );
 			//cmdSystem->BufferCommandText( CMD_EXEC_NOW, "rescanSI" " " __FILE__ " " __LINESTR__ );
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "serverMapRestart\n");
 			break;
@@ -12758,7 +12761,7 @@ void idMultiplayerGame::ClientCallPackedVote( const voteStruct_t &voteData, int 
 		outMsg.WriteShort( idMath::ClampShort( voteData.m_fragLimit ) );
 	}
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_BUYING ) ) {
-		outMsg.WriteByte( voteData.m_buying ? 1 : 0 );
+		outMsg.WriteByte( idMath::ClampInt( BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, voteData.m_buying ) );
 	}
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_TEAMBALANCE ) ) {
 		outMsg.WriteByte( idMath::ClampChar( voteData.m_teamBalance ) );
@@ -12982,12 +12985,12 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 	// buying
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_BUYING ) ) {
 		voteData.m_buying = msg.ReadByte();
-		if ( voteData.m_buying != 0 && voteData.m_buying != 1 ) {
+		if ( voteData.m_buying < BUYING_MODE_OFF || voteData.m_buying >= BUYING_MODE_COUNT ) {
 			common->DPrintf( "client %d: invalid buying vote value %d\n", clientNum, voteData.m_buying );
 			validVote = false;
 			voteData.m_fieldFlags &= ( ~VOTEFLAG_BUYING );
 		}
-		if ( voteData.m_buying == si_isBuyingEnabled.GetInteger() ) {
+		if ( voteData.m_buying == MP_BuyingModeFromCVars() ) {
 			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_122013" );
 			validVote = false;
 			voteData.m_fieldFlags &= ( ~VOTEFLAG_BUYING );
@@ -13153,11 +13156,10 @@ void idMultiplayerGame::ClientStartPackedVote( int clientNum, const voteStruct_t
 			}
 		}
 		if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_BUYING ) ) {
-			mpHud->SetStateString( va( "voteInfo_%d", voteLineCount ), 
-				va( common->GetLocalizedString( "#str_122011" ), currentVoteData.m_buying ? common->GetLocalizedString( "#str_104341" ) : common->GetLocalizedString( "#str_104342" ) ) );
+			const idStr buyingLine = MP_BuyingVoteLine( currentVoteData.m_buying );
+			mpHud->SetStateString( va( "voteInfo_%d", voteLineCount ), buyingLine.c_str() );
 
-			mainGui->SetStateString( va( "voteData_item_%d", menuVoteLineCount ), 
-				va( common->GetLocalizedString( "#str_122011" ), currentVoteData.m_buying  ? common->GetLocalizedString( "#str_104341" ) : common->GetLocalizedString( "#str_104342" ) ) );
+			mainGui->SetStateString( va( "voteData_item_%d", menuVoteLineCount ), buyingLine.c_str() );
 
 			voteLineCount++;
 			menuVoteLineCount++;
@@ -13383,7 +13385,7 @@ void idMultiplayerGame::ServerStartPackedVote( int clientNum, const voteStruct_t
 		outMsg.WriteShort( idMath::ClampShort( voteData.m_captureLimit ) );
 	}
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_BUYING ) ) {
-		outMsg.WriteByte( voteData.m_buying ? 1 : 0 );
+		outMsg.WriteByte( idMath::ClampInt( BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, voteData.m_buying ) );
 	}
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_TEAMBALANCE ) ) {
 		outMsg.WriteByte( idMath::ClampChar( voteData.m_teamBalance ) );
@@ -13417,7 +13419,7 @@ void idMultiplayerGame::ExecutePackedVote( void ) {
 		needRestart = true;
 	}
 	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_BUYING ) ) {
-		si_isBuyingEnabled.SetInteger( currentVoteData.m_buying );
+		MP_SetBuyingModeCVars( currentVoteData.m_buying );
 		needRescanSI = true;
 		needRestart = true;
 	}
@@ -16841,9 +16843,10 @@ void idMultiplayerGame::SetRetainedMenuCover( bool covered, idUserInterface *car
 		}
 		return;
 	}
-	// The menu, or the summary at the end of a match (section 14.14).
-	const bool allowed = ( ( currentMenu == 1 && mainGui != NULL ) || ( currentMenu == 3 && statSummary != NULL ) ) &&
-		!IsArenaCampaignMatch();
+	// The menu, the summary at the end of a match (section 14.14) or the buy
+	// menu.
+	const bool allowed = ( ( currentMenu == 1 && mainGui != NULL ) || ( currentMenu == 3 && statSummary != NULL ) ||
+		( currentMenu == 4 && buyMenu != NULL ) ) && !IsArenaCampaignMatch();
 	// An Arena match keeps neither: its own pause menu takes its own card.
 	const bool arenaPause = IsArenaPauseMenuOpen() && arenaPauseGui != NULL && IsArenaCampaignMatch();
 	card->SetStateInt( "mp.protocol", RETAINED_MENU_PROTOCOL );
@@ -17755,7 +17758,7 @@ void idMultiplayerGame::ResetRetainedVoteDraft( void ) {
 	retainedVoteDraft[ RVF_BALANCE ] = si.GetBool( "si_autobalance" ) ? 1 : 0;
 	retainedVoteDraft[ RVF_SHUFFLE ] = 0;
 	retainedVoteDraft[ RVF_RESTART ] = 0;
-	retainedVoteDraft[ RVF_BUYING ] = si.GetBool( "si_isBuyingEnabled" ) ? 1 : 0;
+	retainedVoteDraft[ RVF_BUYING ] = MP_BuyingModeFromServerInfo( si );
 	retainedVoteDraft[ RVF_KICK ] = -1;
 	retainedVoteKickIdentity = 0;
 	retainedVoteKickStale = false;
@@ -17900,13 +17903,16 @@ int idMultiplayerGame::RetainedVoteChanges( voteStruct_t &data ) {
 		{ RVF_TOURNEYLIMIT, "si_tourneyLimit", VOTEFLAG_TOURNEYLIMIT, &voteStruct_t::m_tourneyLimit },
 		{ RVF_CONTROLTIME, "si_controlTime", VOTEFLAG_CONTROLTIME, &voteStruct_t::m_controlTime },
 		{ RVF_BALANCE, "si_autobalance", VOTEFLAG_TEAMBALANCE, &voteStruct_t::m_teamBalance },
-		{ RVF_BUYING, "si_isBuyingEnabled", VOTEFLAG_BUYING, &voteStruct_t::m_buying },
 	};
 	for ( const limit_t &limit : limits ) {
 		if ( changes( limit.field ) && retainedVoteDraft[ limit.field ] != si.GetInt( limit.key ) ) {
 			data.*limit.member = retainedVoteDraft[ limit.field ];
 			data.m_fieldFlags |= limit.flag;
 		}
+	}
+	if ( changes( RVF_BUYING ) && retainedVoteDraft[ RVF_BUYING ] != MP_BuyingModeFromServerInfo( si ) ) {
+		data.m_buying = retainedVoteDraft[ RVF_BUYING ];
+		data.m_fieldFlags |= VOTEFLAG_BUYING;
 	}
 	if ( changes( RVF_SHUFFLE ) && retainedVoteDraft[ RVF_SHUFFLE ] ) {
 		data.m_fieldFlags |= VOTEFLAG_SHUFFLE;
@@ -18010,10 +18016,15 @@ bool idMultiplayerGame::SetRetainedVoteField( int field, int value ) {
 			}
 			retainedVoteDraft[ field ] = value;
 			return true;
+		case RVF_BUYING:
+			if ( value < BUYING_MODE_OFF || value >= BUYING_MODE_COUNT ) {
+				return false;
+			}
+			retainedVoteDraft[ field ] = value;
+			return true;
 		case RVF_BALANCE:
 		case RVF_SHUFFLE:
 		case RVF_RESTART:
-		case RVF_BUYING:
 			if ( value != 0 && value != 1 ) {
 				return false;
 			}
@@ -18045,7 +18056,7 @@ void idMultiplayerGame::RetainedVoteLines( const voteStruct_t &data, idStrList &
 		lines.Append( common->GetLocalizedString( "#str_104423" ) );
 	}
 	if ( data.m_fieldFlags & VOTEFLAG_BUYING ) {
-		lines.Append( va( common->GetLocalizedString( "#str_122011" ), data.m_buying ? yes : no ) );
+		lines.Append( MP_BuyingVoteLine( data.m_buying ) );
 	}
 	if ( data.m_fieldFlags & VOTEFLAG_TEAMBALANCE ) {
 		lines.Append( va( common->GetLocalizedString( "#str_104427" ), data.m_teamBalance ? yes : no ) );
@@ -18171,6 +18182,11 @@ void idMultiplayerGame::PublishRetainedVote( idUserInterface *card, bool &change
 	}
 	publish( "mp.vote.gametype_count", va( "%d", Min( MPVoteGameTypeCount(), 16 ) ) );
 	publish( "mp.vote.gametype", va( "%d", retainedVoteDraft[ RVF_GAMETYPE ] ) );
+	// The buying choice: off, Quake 4's rules or The Awakening's (mp/Buying.h).
+	for ( int i = 0; i < BUYING_MODE_COUNT; i++ ) {
+		publish( va( "mp.vote.buying%d", i ), common->GetLocalizedString( MP_BuyingModeName( i ) ) );
+	}
+	publish( "mp.vote.buying_count", va( "%d", BUYING_MODE_COUNT ) );
 	// The kick choice: no one, then the other players by client number.
 	for ( int i = 0; i < RETAINED_PLAYER_ROWS; i++ ) {
 		const idStr name = i < retainedVoteKick.Num() ?
@@ -18217,7 +18233,7 @@ void idMultiplayerGame::ResetRetainedAdminDraft( void ) {
 	retainedAdminDraft[ RVF_BALANCE ] = si.GetBool( "si_autobalance" ) ? 1 : 0;
 	retainedAdminDraft[ RVF_SHUFFLE ] = 0;
 	retainedAdminDraft[ RVF_RESTART ] = 0;
-	retainedAdminDraft[ RVF_BUYING ] = si.GetBool( "si_isBuyingEnabled" ) ? 1 : 0;
+	retainedAdminDraft[ RVF_BUYING ] = MP_BuyingModeFromServerInfo( si );
 	retainedAdminDraft[ RVF_KICK ] = -1;
 	retainedAdminClient = -1;
 	retainedAdminIdentity.Clear();
@@ -18303,10 +18319,15 @@ bool idMultiplayerGame::SetRetainedAdminField( int field, int value ) {
 			}
 			retainedAdminDraft[ field ] = value;
 			return true;
+		case RVF_BUYING:
+			if ( value < BUYING_MODE_OFF || value >= BUYING_MODE_COUNT ) {
+				return false;
+			}
+			retainedAdminDraft[ field ] = value;
+			return true;
 		case RVF_BALANCE:
 		case RVF_SHUFFLE:
 		case RVF_RESTART:
-		case RVF_BUYING:
 			if ( value != 0 && value != 1 ) {
 				return false;
 			}
@@ -18342,7 +18363,7 @@ bool idMultiplayerGame::RetainedAdminChanges( serverAdminData_t &data ) {
 	data.tourneyLimit = drafted( RVF_TOURNEYLIMIT, "si_tourneyLimit" );
 	data.controlTime = drafted( RVF_CONTROLTIME, "si_controlTime" );
 	data.autoBalance = drafted( RVF_BALANCE, "si_autobalance" ) != 0;
-	data.buying = drafted( RVF_BUYING, "si_isBuyingEnabled" ) != 0;
+	data.buying = RetainedAdminFieldShown( RVF_BUYING ) ? retainedAdminDraft[ RVF_BUYING ] : MP_BuyingModeFromServerInfo( si );
 	data.shuffleTeams = RetainedAdminFieldShown( RVF_SHUFFLE ) && retainedAdminDraft[ RVF_SHUFFLE ] != 0;
 	idStr current;
 	NormalizeMapDeclPath( si.GetString( "si_map" ), current );
@@ -18351,7 +18372,7 @@ bool idMultiplayerGame::RetainedAdminChanges( serverAdminData_t &data ) {
 		data.timeLimit != si.GetInt( "si_timeLimit" ) || data.fragLimit != si.GetInt( "si_fragLimit" ) ||
 		data.captureLimit != si.GetInt( "si_captureLimit" ) || data.tourneyLimit != si.GetInt( "si_tourneyLimit" ) ||
 		data.controlTime != si.GetInt( "si_controlTime" ) || data.autoBalance != si.GetBool( "si_autobalance" ) ||
-		data.buying != si.GetBool( "si_isBuyingEnabled" );
+		data.buying != MP_BuyingModeFromServerInfo( si );
 }
 
 /*
@@ -18509,6 +18530,10 @@ void idMultiplayerGame::PublishRetainedAdmin( idUserInterface *card, bool &chang
 	}
 	publish( "mp.admin.gametype_count", va( "%d", Min( MPVoteGameTypeCount(), 16 ) ) );
 	publish( "mp.admin.gametype", va( "%d", retainedAdminDraft[ RVF_GAMETYPE ] ) );
+	for ( int i = 0; i < BUYING_MODE_COUNT; i++ ) {
+		publish( va( "mp.admin.buying%d", i ), common->GetLocalizedString( MP_BuyingModeName( i ) ) );
+	}
+	publish( "mp.admin.buying_count", va( "%d", BUYING_MODE_COUNT ) );
 	// The console's newest lines, oldest first.
 	idStrList lines;
 	for ( int start = 0; start < rconHistory.Length(); ) {
@@ -19265,6 +19290,13 @@ void idMultiplayerGame::PublishRetainedMenu( idUserInterface *card ) {
 	}
 	bool changed = false;
 	const auto publish = [&]( const char *key, const char *value ) { changed |= PublishRetainedValue( card, key, value ); };
+	if ( currentMenu == 4 ) {
+		// The buy card holds the catalog and nothing else.
+		if ( PublishRetainedBuy( card ) ) {
+			card->SetStateInt( "mp.revision", ++retainedMenuRevision );
+		}
+		return;
+	}
 	idStr mapName;
 	publish( "mp.title", ResolveScoreboardMapName( gameLocal.serverInfo.GetString( "si_map" ), mapName ) );
 	publish( "mp.mode", LocalizeGametype() );
@@ -19405,6 +19437,86 @@ void idMultiplayerGame::PublishRetainedMenu( idUserInterface *card ) {
 
 /*
 ================
+idMultiplayerGame::RetainedBuyReason
+
+Why the player cannot buy a catalog item now, for the buy card's plate: the
+reason the stock buy menu only showed as a greyed price.
+================
+*/
+static const char *RetainedBuyReason( const buyCatalogItem_t &entry, idPlayer *player, itemBuyStatus_t status ) {
+	if ( player == NULL || !player->CanBuy() ) {
+		return "#str_231919";
+	}
+	switch ( status ) {
+		case IBS_CANNOT_AFFORD:
+			return "#str_231915";
+		case IBS_ALREADY_HAVE:
+			// Armour at its ceiling is full; what was bought while dead waits.
+			return entry.category == BUY_CATEGORY_GEAR && player->health > 0 ? "#str_231918" : "#str_231914";
+		case IBS_NOT_ALLOWED:
+			if ( entry.category == BUY_CATEGORY_MODS ) {
+				return "#str_231917";
+			}
+			if ( entry.category == BUY_CATEGORY_TEAM ) {
+				return "#str_231916";
+			}
+			if ( !idStr::Icmp( entry.item, "ammorefill" ) ) {
+				return "#str_231918";
+			}
+			return "#str_231919";
+		default:
+			return "";
+	}
+}
+
+/*
+================
+idMultiplayerGame::PublishRetainedBuy
+
+The buy card (section 14.18): its title, the rules the server sells by, the
+player's credits and, for each catalog item in buyCatalog's order
+(mp.buy<i>.*), whether the rules sell it here, its name, price and what it
+does, whether the player can buy it now and, where not, why. How many items
+each page holds lets an empty page say why. True when anything changed.
+================
+*/
+bool idMultiplayerGame::PublishRetainedBuy( idUserInterface *card ) {
+	bool changed = false;
+	const auto publish = [&]( const char *key, const char *value ) { changed |= PublishRetainedValue( card, key, value ); };
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	const int rules = mpBuyingManager.GetRules();
+	publish( "mp.buy.title", common->GetLocalizedString( "#str_222006" ) );
+	publish( "mp.buy.rules", common->GetLocalizedString( rules == BUYING_RULES_AWAKENING ? "#str_230040" : "#str_230039" ) );
+	publish( "mp.buy.credits", va( "%s %d", common->GetLocalizedString( "#str_222002" ), player != NULL ? (int)player->buyMenuCash : 0 ) );
+	int sold[ BUY_CATEGORY_COUNT ] = { 0 };
+	for ( int i = 0; i < buyCatalogCount; i++ ) {
+		const buyCatalogItem_t &entry = buyCatalog[ i ];
+		const bool forSale = mpBuyingManager.IsItemSold( entry.item );
+		const itemBuyStatus_t status = ( player != NULL && forSale ) ? player->ItemBuyStatus( entry.item ) : IBS_NOT_ALLOWED;
+		const bool available = forSale && player != NULL && player->CanBuy() && status == IBS_CAN_BUY;
+		if ( forSale ) {
+			sold[ entry.category ]++;
+		}
+		publish( va( "mp.buy%d.shown", i ), forSale ? "1" : "0" );
+		publish( va( "mp.buy%d.available", i ), available ? "1" : "0" );
+		publish( va( "mp.buy%d.owned", i ), forSale && status == IBS_ALREADY_HAVE ? "1" : "0" );
+		publish( va( "mp.buy%d.dear", i ), forSale && status == IBS_CANNOT_AFFORD ? "1" : "0" );
+		publish( va( "mp.buy%d.label", i ), common->GetLocalizedString( entry.name ) );
+		publish( va( "mp.buy%d.price", i ), va( "%d", mpBuyingManager.GetItemPrice( entry.item ) ) );
+		publish( va( "mp.buy%d.detail", i ), entry.detail != NULL ? common->GetLocalizedString( entry.detail ) : "" );
+		publish( va( "mp.buy%d.reason", i ), ( forSale && !available ) ?
+			common->GetLocalizedString( RetainedBuyReason( entry, player, status ) ) : "" );
+	}
+	static const char *const pageCounts[ BUY_CATEGORY_COUNT ] = {
+		"mp.buy.weapons_count", "mp.buy.mods_count", "mp.buy.gear_count", "mp.buy.team_count" };
+	for ( int category = 0; category < BUY_CATEGORY_COUNT; category++ ) {
+		publish( pageCounts[ category ], va( "%d", sold[ category ] ) );
+	}
+	return changed;
+}
+
+/*
+================
 idMultiplayerGame::HandleRetainedMenuCommand
 
 The card's commands. "retained team <slot>" chooses one of the Team page's
@@ -19501,6 +19613,24 @@ bool idMultiplayerGame::HandleRetainedMenuCommand( const idCmdArgs &args, int &i
 				}
 				cvarSystem->SetCVarString( "g_crosshairCustomFile", crosshairs[ index - 1 ].c_str() );
 			}
+		}
+		return false;
+	}
+	if ( !sub.Icmp( "buy" ) && args.Argc() - icmd >= 1 ) {
+		// "retained buy <index>" buys buyCatalog's item through the buy
+		// impulse, as the stock menu's buttons do, and keeps the menu open.
+		const idStr indexText = args.Argv( icmd++ );
+		if ( indexText.Length() < 1 || indexText.Length() > 2 || !indexText.IsNumeric() || indexText[ 0 ] == '-' ) {
+			return false;
+		}
+		const int index = atoi( indexText.c_str() );
+		idPlayer *player = gameLocal.GetLocalPlayer();
+		if ( currentMenu != 4 || index < 0 || index >= buyCatalogCount || player == NULL ) {
+			return false;
+		}
+		const char *item = buyCatalog[ index ].item;
+		if ( mpBuyingManager.IsItemSold( item ) && player->CanBuy() && player->ItemBuyStatus( item ) == IBS_CAN_BUY ) {
+			player->GenerateImpulseForBuyAttempt( item );
 		}
 		return false;
 	}
@@ -20263,8 +20393,9 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 				voteData.m_fieldFlags |= VOTEFLAG_SPECTATORS;
 			} */
 			// minimum players 
-			int uiBuying = mainGui->GetStateInt( "buying" );
-			if ( uiBuying != gameLocal.serverInfo.GetInt( "si_isBuyingEnabled" ) ) {
+			const int currentBuying = MP_BuyingModeFromServerInfo( gameLocal.serverInfo );
+			const int uiBuying = MP_BuyingModeFromOnOff( mainGui->GetStateInt( "buying" ), currentBuying );
+			if ( uiBuying != currentBuying ) {
 				voteData.m_buying = uiBuying;
 				voteData.m_fieldFlags |= VOTEFLAG_BUYING;
 			} 
@@ -20547,9 +20678,8 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 			data.fragLimit = mainGui->GetStateInt( "sa_fragLimit" );
 			data.tourneyLimit = mainGui->GetStateInt( "sa_tourneylimit" );
 			data.timeLimit = mainGui->GetStateInt( "sa_timeLimit" );
-			data.buying = mainGui->GetStateInt( "sa_buying" );
 			data.autoBalance = 0 != mainGui->GetStateInt( "sa_autobalance" );
-			data.buying = 0 != mainGui->GetStateInt( "sa_buying" );
+			data.buying = MP_BuyingModeFromOnOff( mainGui->GetStateInt( "sa_buying" ), MP_BuyingModeFromServerInfo( gameLocal.serverInfo ) );
 			data.controlTime = mainGui->GetStateInt( "sa_controlTime" );
 			data.shuffleTeams = 0 != mainGui->GetStateInt( "sa_shuffleteams" );
 
@@ -21000,7 +21130,10 @@ bool idMultiplayerGame::Draw( int clientNum ) {
 			buyMenu->HandleNamedEvent( "redraw" );
 			idPlayer* player = gameLocal.GetLocalPlayer();
 			buyMenu->SetStateString( "field_credits", va("%i", (int)player->buyMenuCash) );
-			buyMenu->Redraw(gameLocal.time);
+			// openQ4: the buy card draws in its place while it covers it
+			if ( !retainedMenuCovered ) {
+				buyMenu->Redraw(gameLocal.time);
+			}
 // RITUAL END
 		}
 	} else {
@@ -23506,8 +23639,8 @@ void idMultiplayerGame::CallVote_f( const idCmdArgs &args ) {
 		voteData.m_fieldFlags |= VOTEFLAG_MAP;
 		voteData.m_map = szArg2;
 	} else if ( 0 == idStr::Icmp( szArg1, "buying" ) ) {
-		if ( !ParseVoteIntegerRange( szArg2, 0, 1, parsedValue ) ) {
-			common->Printf( "%s", common->GetLocalizedString( "#str_122012" ) );
+		if ( !ParseVoteIntegerRange( szArg2, BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, parsedValue ) ) {
+			common->Printf( "%s", common->GetLocalizedString( "#str_231921" ) );
 			return;
 		}
 		voteData.m_fieldFlags |= VOTEFLAG_BUYING;
@@ -23860,7 +23993,7 @@ void idMultiplayerGame::ClientUpdateVote( vote_result_t status, int yesCount, in
 			outMsg.WriteShort( idMath::ClampShort( voteData.m_fragLimit ) );
 			outMsg.WriteShort( idMath::ClampShort( voteData.m_tourneyLimit ) );
 			outMsg.WriteShort( idMath::ClampShort( voteData.m_captureLimit ) );
-			outMsg.WriteByte( voteData.m_buying ? 1 : 0 );
+			outMsg.WriteByte( idMath::ClampInt( BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, voteData.m_buying ) );
 			outMsg.WriteByte( idMath::ClampChar( voteData.m_teamBalance ) );
 			outMsg.WriteShort( idMath::ClampShort( voteData.m_controlTime ) );
 		}
@@ -24213,12 +24346,12 @@ void idMultiplayerGame::ServerCallVote( int clientNum, const idBitMsg &msg ) {
 			break;
 		}
 		case VOTE_BUYING: {
-			if ( !ParseVoteIntegerRange( value, 0, 1, vote_buying ) ) {
-				gameLocal.ServerSendChatMessage( clientNum, "server", "#str_122012" );
+			if ( !ParseVoteIntegerRange( value, BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, vote_buying ) ) {
+				gameLocal.ServerSendChatMessage( clientNum, "server", "#str_231921" );
 				common->DPrintf( "client %d: invalid buying vote value: '%s'\n", clientNum, value );
 				return;
 			}
-			if ( vote_buying == gameLocal.serverInfo.GetInt( "si_isBuyingEnabled" ) ) {
+			if ( vote_buying == MP_BuyingModeFromServerInfo( gameLocal.serverInfo ) ) {
 				gameLocal.ServerSendChatMessage( clientNum, "server", "#str_122013" );
 				common->DPrintf( "client %d: already at the voted buying mode\n", clientNum );
 				return;					
@@ -25553,7 +25686,7 @@ bool idMultiplayerGame::HandleServerAdminCommands( serverAdminData_t &data ) {
 		anyChanges = true;
 	} 
 
-	if ( gameLocal.serverInfo.GetBool( "si_isBuyingEnabled" ) != data.buying )
+	if ( MP_BuyingModeFromServerInfo( gameLocal.serverInfo ) != data.buying )
 		restartNeeded = true;
 
 	// The exact registry row and map declaration were validated before this
@@ -25561,7 +25694,10 @@ bool idMultiplayerGame::HandleServerAdminCommands( serverAdminData_t &data ) {
 	// One Flag/Arena alias or a mismatched map-mode pair.
 	if ( !gameLocal.isServer ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon si_autoBalance %d",	data.autoBalance ) );
-		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon si_isBuyingEnabled %d", data.buying ) );
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon si_isBuyingEnabled %d", data.buying != BUYING_MODE_OFF ? 1 : 0 ) );
+		if ( data.buying != BUYING_MODE_OFF ) {
+			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon si_buyingRules %d", data.buying == BUYING_MODE_AWAKENING ? BUYING_RULES_AWAKENING : BUYING_RULES_QUAKE4 ) );
+		}
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon si_captureLimit %d",	data.captureLimit ) );
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon si_controlTime %d",	data.controlTime ) );
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon si_fragLimit %d",		data.fragLimit ) );
@@ -25630,8 +25766,8 @@ bool idMultiplayerGame::HandleServerAdminCommands( serverAdminData_t &data ) {
 		si_timeLimit.SetInteger( data.timeLimit );
 		anyChanges = true;
 	}
-	if ( data.buying != gameLocal.serverInfo.GetBool( "si_isBuyingEnabled" ) ) {
-		si_isBuyingEnabled.SetInteger( data.buying );
+	if ( data.buying != MP_BuyingModeFromServerInfo( gameLocal.serverInfo ) ) {
+		MP_SetBuyingModeCVars( data.buying );
 		anyChanges = true;
 		restartNeeded = true;
 	}

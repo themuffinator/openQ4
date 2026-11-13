@@ -67,6 +67,10 @@ const int BUTTON_QUICKCHAT = BIT(11);
 // the head's). Its pitch is absolute, so the game keeps no pitch offset on it:
 // on both ends of the wire the shot then leaves along the controller's ray.
 const int BUTTON_VRAIM = BIT(12);
+// openQ4: the Classic multiplayer ruleset's grappling hook is held out (_hook).
+// The game fires it on the press and the player physics pulls only while it is
+// held, so a release is predicted on the client the frame it happens.
+const int BUTTON_HOOK = BIT(13);
 // RAVEN END
 
 // usercmd_t->impulse commands

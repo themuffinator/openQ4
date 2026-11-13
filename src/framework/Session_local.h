@@ -426,6 +426,9 @@ public:
 	// Marine pause hands off to it the same way. RetainedPageActive is true
 	// while either page presents.
 	bool				RetainedPageActive() const;
+	// A retained page one of those pages leads to: a settings sub-page, or the
+	// Arena, Create Server, Join Game or Demos page.
+	bool				RetainedChildPageActive() const;
 	void				PublishRetainedSavePage( idUserInterface *gui, int select );
 	void				PublishRetainedSaveSelection( idUserInterface *gui, bool name );
 	void				HandleRetainedSaveRequest( idUserInterface *gui, const char *request );
@@ -807,11 +810,13 @@ public:
 	idUserInterface *	guiRetainedEscape;
 	idUserInterface *	guiRetainedWelcome;
 	idUserInterface *	guiRetainedSummary;
+	idUserInterface *	guiRetainedBuy;
 	// The single-player Arena's pause card.
 	idUserInterface *	guiRetainedArenaPause;
 	idUserInterface *	guiRetainedMultiplayer;
 	idUserInterface *	retainedMultiplayerTarget;		// the game GUI the cover was last decided for
 	bool				retainedMultiplayerSummary;		// the card covers the summary
+	bool				retainedMultiplayerBuy;			// the card covers the buy menu
 	bool				retainedSummaryTyping;
 	int					retainedSummaryCaret;			// a byte offset into the stock summary's chattext
 	bool				retainedMultiplayerWelcome;

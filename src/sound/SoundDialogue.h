@@ -29,9 +29,11 @@ inline bool SoundIsDialogue( bool music, bool authoredSpeech, std::string_view s
 }
 
 // Why a playing sample shows a subtitle or not under the mapping policy: it has
-// text; no lipSync declares it; the declaration has no transcript; its text key
-// does not resolve; or only its random-variant shader declares one.
-enum class SoundTranscript { Text, Undeclared, NoText, Unresolved, Variant };
+// installed text; no lipSync declares it; the declaration has no transcript; its
+// text key does not resolve; only its random-variant shader declares one; or an
+// authored subtitle/ declaration (a caption pack, not installed lip-sync data)
+// supplies its text.
+enum class SoundTranscript { Text, Undeclared, NoText, Unresolved, Variant, Authored };
 
 inline const char* SoundTranscriptName( SoundTranscript transcript ) {
 	switch ( transcript ) {
@@ -40,6 +42,7 @@ inline const char* SoundTranscriptName( SoundTranscript transcript ) {
 		case SoundTranscript::NoText: return "notext";
 		case SoundTranscript::Unresolved: return "unresolved";
 		case SoundTranscript::Variant: return "variant";
+		case SoundTranscript::Authored: return "authored";
 	}
 	return "unknown";
 }

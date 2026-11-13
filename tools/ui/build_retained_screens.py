@@ -63,6 +63,7 @@ OUTPUTS = {
     "mp_escape": PAK0 / "guis" / "menu" / "mp_escape.rui",
     "mp_welcome": PAK0 / "guis" / "menu" / "mp_welcome.rui",
     "mp_summary": PAK0 / "guis" / "menu" / "mp_summary.rui",
+    "mp_buy": PAK0 / "guis" / "menu" / "mp_buy.rui",
     "arena_pause": PAK0 / "guis" / "menu" / "arena_pause.rui",
 }
 
@@ -5268,6 +5269,7 @@ def main() -> int:
     # modules, which build on this one.
     from retained_mp_menus import escape_document, welcome_document
     from retained_mp_summary import summary_document
+    from retained_mp_buy import buy_document
     from retained_saves import STROGG, load_game_document, save_game_document
     from retained_difficulty import restart_level_document
     from retained_demos import demos_document
@@ -5302,6 +5304,7 @@ def main() -> int:
                  "createserver": create_server_document(),
                  "joingame": join_game_document(),
                  "mp_escape": escape_document(), "mp_welcome": welcome_document(), "mp_summary": summary_document(),
+                 "mp_buy": buy_document(),
                  "arena_pause": arena_pause_document(), "audio": audio_document(),
                  "game": game_document(), "controls": controls_document(), "system": system_document(),
                  "settings": settings_page_document()}

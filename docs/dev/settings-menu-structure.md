@@ -132,6 +132,7 @@ The numbered `set_b_controls_move_1..13` windows are row hover/action surfaces f
 | Flashlight | `set_ctrls_attk_flashlight_key` | `_impulse50` |
 | Screenshot | `set_ctrls_attk_screenshot_key` | `screenshot` |
 | Weapon Wheel | `set_ctrls_attk_weaponwheel_key` | `_weaponWheel` |
+| Grappling Hook | `set_ctrls_attk_hook_key` | `_hook` (Classic multiplayer ruleset) |
 
 ### Other
 

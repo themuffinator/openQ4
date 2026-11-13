@@ -444,6 +444,7 @@ extern idCVar	si_autobalance;
 // squirrel: Mode-agnostic buymenus
 extern idCVar	si_isBuyingEnabled;
 extern idCVar	si_dropWeaponsInBuyingModes;
+extern idCVar	si_buyingRules;
 extern idCVar	si_instagib;
 extern idCVar	si_controlTime;
 // RITUAL END

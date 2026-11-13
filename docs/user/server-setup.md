@@ -30,13 +30,20 @@ while it serves the other players.
   interface its **Match** tab has **Fill With Bots**, **Bot Skill** and
   **Shuffle Teams**, and its **Rules** tab has **Instagib**, **Overtime**,
   **Mercy Lead** and **Round Limit**. See [Bots](#bots) and [Instagib](#instagib).
+- **Buying** (**Not in 0.14.1**), on the **Rules** tab, replaces the weapon,
+  armour and ammunition pickups with a buy menu: **Off**, **Quake 4**'s rules or
+  **The Awakening**'s, with its prices, weapon mods and FC Armor Regen. See
+  [Buying in multiplayer](buying.md).
 
 ## Instagib
 
-Instagib works with any game type: Deathmatch, Team Deathmatch, Capture the
-Flag, Duel, Clan Arena, Freeze Tag and the rest.
+**Not in 0.14.1.** Instagib works with any game type: Deathmatch, Team Deathmatch, Capture the
+Flag, Duel, Clan Arena, Freeze Tag and the rest, and with the
+[Classic ruleset](classic-ruleset.md).
 
-- Everyone spawns with a railgun that never runs out, and the gauntlet.
+- Everyone spawns with a railgun that never runs out, and the gauntlet. Under
+  the Classic ruleset, which swaps the gauntlet for the blaster, you get the
+  railgun alone; the grappling hook still works if the server allows it.
 - Any hit from another player kills at once and gibs the body. Armour saves
   nothing. In Freeze Tag a hit freezes instead.
 - Falls do no damage. Lava, pits and other map hazards still kill.
@@ -201,8 +208,11 @@ address to force IPv6.
 | `si_roundLimit` | Rounds a team must win in a round-based match (**Round Limit**) |
 | `si_mercyLimit` | End a team match early once one team leads by this many points; `0` turns it off (**Mercy Lead**) |
 | `si_overtime` | Length of each overtime period in seconds; `0` uses Quake 4's sudden death (**Overtime**) |
+| `si_ruleset` | `1` plays the [Classic ruleset](classic-ruleset.md), inspired by Quake 2; `0` is Quake 4's (**Ruleset**). Changing it mid-map restarts the map. **Not in 0.14.1** |
+| `si_classicGrapple` | Under the Classic ruleset, where the grappling hook works: `0` nowhere, `1` flag modes (default), `2` every mode (**Grappling Hook**). **Not in 0.14.1** |
 | `si_warmup` | Whether matches start with a warmup |
-| `si_instagib` | `1` plays any game type as [Instagib](#instagib): railguns only, and one hit kills |
+| `si_isBuyingEnabled`, `si_buyingRules` | Buying on (`1`) and its rules: `0` Quake 4, `1` The Awakening (**Not in 0.14.1**; see [Buying](buying.md)) |
+| `si_instagib` | `1` plays any game type as [Instagib](#instagib): railguns only, and one hit kills (**Not in 0.14.1**) |
 | `si_usePass`, `g_password` | `si_usePass 1` admits only players who give the password set in `g_password` |
 | `g_mapCycle` | Map cycle script |
 

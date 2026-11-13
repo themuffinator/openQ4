@@ -126,6 +126,7 @@ typedef enum {
 	UB_MLOOK,
 	UB_WEAPONWHEEL,
 	UB_QUICKCHAT,
+	UB_HOOK,
 
 	UB_IMPULSE0,
 	UB_IMPULSE1,
@@ -221,6 +222,7 @@ userCmdString_t	userCmdStrings[] = {
 	{ "_mlook",			UB_MLOOK },
 	{ "_weaponWheel",	UB_WEAPONWHEEL },
 	{ "_quickChat",		UB_QUICKCHAT },
+	{ "_hook",			UB_HOOK },		// openQ4: Classic ruleset grappling hook
 	{ "_altattack",		UB_ZOOM },		// the Awakening's name for zoom / alternate fire
 	{ "_ingameStats",	UB_BUTTON5 },
 	{ "_voiceChat",		UB_BUTTON6 },
@@ -560,7 +562,7 @@ idCVar idUsercmdGenLocal::in_presentationView( "in_presentationView", "0", CVAR_
 idCVar idUsercmdGenLocal::in_presentationViewProbe( "in_presentationViewProbe", "0", CVAR_SYSTEM | CVAR_CHEAT | CVAR_FLOAT, "development probe: synthetic horizontal mouse counts per second, delivered through the ordinary mouse path for no-input latency measurements; requires cheats" );
 idCVar idUsercmdGenLocal::in_presentationViewProbeZoom( "in_presentationViewProbeZoom", "0", CVAR_SYSTEM | CVAR_CHEAT | CVAR_BOOL, "development probe: hold the zoom button, for no-input zoomed late-look measurements; requires cheats" );
 idCVar idUsercmdGenLocal::in_presentationViewProbeAttack( "in_presentationViewProbeAttack", "0", CVAR_SYSTEM | CVAR_CHEAT | CVAR_BOOL, "development probe: hold the attack button, so muzzle flashes, view lights and tracers can be reviewed under late look without input; requires cheats" );
-idCVar idUsercmdGenLocal::in_movementProbe( "in_movementProbe", "", CVAR_SYSTEM | CVAR_CHEAT, "development probe: hold the named movement buttons (_forward, _back, _moveLeft, _moveRight, _moveUp, _moveDown, separated by spaces) the way held keys would, so swimming and wading can be qualified without input; requires cheats" );
+idCVar idUsercmdGenLocal::in_movementProbe( "in_movementProbe", "", CVAR_SYSTEM | CVAR_CHEAT, "development probe: hold the named movement buttons (_forward, _back, _moveLeft, _moveRight, _moveUp, _moveDown, and the Classic ruleset's _hook, separated by spaces) the way held keys would, so swimming, wading and the grappling hook can be qualified without input; requires cheats" );
 
 static idUsercmdGenLocal localUsercmdGen;
 idUsercmdGen	*usercmdGen = &localUsercmdGen;
@@ -1291,6 +1293,11 @@ void idUsercmdGenLocal::CmdButtons( void ) {
 	if ( ButtonState( UB_QUICKCHAT ) ) {
 		cmd.buttons |= BUTTON_QUICKCHAT;
 	}
+
+	// in_movementProbe can hold the hook as well, so the grapple qualifies without input
+	if ( ButtonState( UB_HOOK ) || ( MovementProbe() & ( 1 << UB_HOOK ) ) ) {
+		cmd.buttons |= BUTTON_HOOK;
+	}
 }
 
 static bool IsWeaponSelectionImpulse( int action ) {
@@ -1769,7 +1776,7 @@ the server through the ordinary path. Returns a mask of usercmdButton_t bits.
 ===================
 */
 int idUsercmdGenLocal::MovementProbe( void ) {
-	static const usercmdButton_t movementButtons[] = { UB_FORWARD, UB_BACK, UB_MOVELEFT, UB_MOVERIGHT, UB_UP, UB_DOWN };
+	static const usercmdButton_t movementButtons[] = { UB_FORWARD, UB_BACK, UB_MOVELEFT, UB_MOVERIGHT, UB_UP, UB_DOWN, UB_HOOK };
 	const char *probe = in_movementProbe.GetString();
 	if ( probe == NULL || probe[0] == '\0' ) {
 		return 0;
@@ -1796,7 +1803,7 @@ int idUsercmdGenLocal::MovementProbe( void ) {
 				}
 			}
 			if ( !known && report ) {
-				common->Warning( "in_movementProbe: '%s' is not one of _forward, _back, _moveLeft, _moveRight, _moveUp, _moveDown", token.c_str() );
+				common->Warning( "in_movementProbe: '%s' is not one of _forward, _back, _moveLeft, _moveRight, _moveUp, _moveDown, _hook", token.c_str() );
 			}
 			token.Clear();
 		}

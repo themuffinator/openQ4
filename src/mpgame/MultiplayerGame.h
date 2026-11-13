@@ -651,7 +651,7 @@ public:
 		int			tourneyLimit;
 		int			timeLimit;
 		int			controlTime;
-		bool		buying;
+		int			buying;			// buyingMode_t
 		bool		autoBalance;
 		bool		shuffleTeams;
 	} serverAdminData_t;
@@ -1305,6 +1305,7 @@ private:
 	static const int RETAINED_SUMMARY_CHAT = 10;
 	static const int RETAINED_SUMMARY_AWARDS = 3;
 	void			PublishRetainedSummary( idUserInterface *card, bool &changed );
+	bool			PublishRetainedBuy( idUserInterface *card );
 	// Marks or unmarks a friend: the platform's friends service where there is
 	// one, and the player's own mark, which the lists and scoreboard show.
 	void			ToggleFriend( int client );

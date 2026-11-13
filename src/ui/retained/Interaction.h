@@ -29,6 +29,15 @@ struct ControlAction {
 	std::uint64_t contextToken = 0; // Button/choice subject lifetime; transient, never restored.
 };
 struct ControlFeedback { std::string node, timeline; ControlState state = ControlState::Default; };
+// A menu's sound vocabulary (visual section 8), one cue per semantic event and
+// never one per device source, animation frame or refresh. Focus: the lit
+// control or option changed (main_menu_mouseover). Activate: an activation
+// completed, a value cycled, or a list, edit or dialog opened or closed
+// (main_menu_selection). The host decides what each sounds like.
+struct ControlCue {
+	enum class Kind { Focus, Activate } kind = Kind::Activate;
+	std::string node;
+};
 struct InteractionSnapshot {
 	struct Modal { std::string root, restore; bool authored = false; };
 	std::string focus;
@@ -230,6 +239,15 @@ public:
 	std::optional<ControlState> State(const std::string& id) const;
 	std::vector<ControlFeedback> TakeFeedback();
 	std::vector<ControlAction> TakeActions();
+	// The cues of the input routed since the last call, in order. Activate
+	// cues come from here; a value slider's step is silent, as a stock
+	// sliderDef ran no action while its value moved, and programmatic focus,
+	// popups and edits are silent too. Only the runtime knows which pointer
+	// moves are a device's, so it records the Focus cues (Runtime::TakeCues).
+	// A host that never takes them (a developer preview) keeps the first 64.
+	std::vector<ControlCue> TakeCues();
+	void CueFocus(const std::string& node) { if (cues.size() < 64) cues.push_back({ControlCue::Kind::Focus,node}); }
+	bool PointerHeld() const { return pointerHeld; }
 	bool CanActivate(const std::string& id) const { return !focusPending && Eligible(id); }
 	bool Overflowed() const { return overflowed; }
 	// Capture persistent semantics only. Restore cancels queued actions/arms and
@@ -425,6 +443,7 @@ private:
 	double SliderValue(const SliderSpec& spec, double fraction) const;
 	void Refresh();
 	void Queue(ControlAction action);
+	void Cue(const std::string& node) { if (cues.size() < 64) cues.push_back({ControlCue::Kind::Activate,node}); }
 	std::string document, focused, hovered, armed;
 	bool pointerHeld = false, acceptHeld = false, backHeld = false, pointerArm = false, overflowed = false;
 	std::map<std::string,Item> items;
@@ -447,6 +466,7 @@ private:
 	std::set<MenuInput> heldNavigation, blockedNavigation;
 	std::vector<ControlFeedback> feedback;
 	std::vector<ControlAction> actions;
+	std::vector<ControlCue> cues;
 	std::string dragging, popup, highlight, pointerOption, armedOption;
 	std::optional<double> pointerFraction, dragPreview;
 	bool popupAcceptArm = false;

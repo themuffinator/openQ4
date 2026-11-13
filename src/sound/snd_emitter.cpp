@@ -612,20 +612,40 @@ static const rvDeclLipSync* SoundDeclaredLipSync( const char* name ) {
 	return lip != NULL && !lip->IsImplicit() ? lip : NULL;
 }
 
-// The transcript a playing sample may show. One shader can choose different
+// Text a subtitle may show: a resolved string, never a missing localization key.
+static bool SoundSubtitleTextUsable( const char* text ) {
+	return text != NULL && text[0] && idStr::Icmpn( text, "#str_", 5 ) && idStr::Icmp( text, "<DEFAULTED>" );
+}
+
+// The transcript a playing sample may show. Authored caption declarations come
+// first: a lipSync named "subtitle/<sample path without extension>" or, for a
+// single-sample shader's leadin, "subtitle/<shader>". A caption pack uses them to
+// fill lines the installed game has no text for, or to correct one, without
+// redefining a declaration actor lip sync reads. One whose text does not resolve
+// falls back to the installed data. There, one shader can choose different
 // utterances: only a single-sample shader has an unambiguous same-name
 // transcript, for its leadin; variants need an explicit full sample-path
 // lipSync declaration. Descriptions, filenames and missing localization keys
 // are never transcripts. status, when asked for, says why there is no text.
 static const char* SoundTranscriptText( const idSoundShader* shader, const idSoundSample* sample, bool leadin, SoundTranscript* status ) {
 	const bool single = shader->GetNumEntries() == 1 && leadin;
+	idStr key = sample->GetName(); key.StripFileExtension();
+	idStr authoredSample( "subtitle/" ); authoredSample += key;
+	idStr authoredShader( "subtitle/" ); authoredShader += shader->GetName();
+	const char* authoredNames[2] = { authoredSample.c_str(), single ? authoredShader.c_str() : NULL };
+	for( const char* name : authoredNames ) {
+		const rvDeclLipSync* authored = name != NULL ? SoundDeclaredLipSync( name ) : NULL;
+		const char* text = authored != NULL && authored->GetRawTranscribeText()[0] ? authored->GetSubtitleText() : NULL;
+		if( SoundSubtitleTextUsable( text ) ) {
+			if( status != NULL ) *status = SoundTranscript::Authored;
+			return text;
+		}
+	}
 	const rvDeclLipSync* lip = NULL;
 	if( single )
 		lip = SoundDeclaredLipSync( shader->GetName() );
-	if( lip == NULL ) {
-		idStr key = sample->GetName(); key.StripFileExtension();
+	if( lip == NULL )
 		lip = SoundDeclaredLipSync( key.c_str() );
-	}
 	if( lip == NULL ) {
 		if( status != NULL )
 			*status = !single && SoundDeclaredLipSync( shader->GetName() ) != NULL ? SoundTranscript::Variant : SoundTranscript::Undeclared;
@@ -636,7 +656,7 @@ static const char* SoundTranscriptText( const idSoundShader* shader, const idSou
 		return NULL;
 	}
 	const char* text = lip->GetSubtitleText();
-	if( text == NULL || !text[0] || !idStr::Icmpn( text, "#str_", 5 ) || !idStr::Icmp( text, "<DEFAULTED>" ) ) {
+	if( !SoundSubtitleTextUsable( text ) ) {
 		if( status != NULL ) *status = SoundTranscript::Unresolved;
 		return NULL;
 	}
@@ -644,57 +664,137 @@ static const char* SoundTranscriptText( const idSoundShader* shader, const idSou
 	return text;
 }
 
-// Captions follow authored playback, not the user's volume or hardware-voice
-// allocation. This remains useful with dialogue muted or a lost audio device.
+// The caption a channel shows now, if any. Captions follow authored playback,
+// not the user's volume or hardware-voice allocation, so they remain useful with
+// dialogue muted or a lost audio device. A line that has reached its end shows
+// its last words until the mixer frees the channel. Speech without a transcript
+// gives a cue with no text; the caller decides whether to show it.
+static bool SoundChannelSubtitle( idSoundWorldLocal* world, idSoundEmitterLocal* emitter, idSoundChannel* channel, const int now, soundSubtitle_t& cue ) {
+	if( channel == NULL || channel->soundShader == NULL || channel->leadinSample == NULL || now < channel->startTime ) return false;
+	const int flags = channel->parms.soundShaderFlags;
+	const bool self = emitter->emitterId == world->listener.id;
+	if( ( ( flags & SSF_PRIVATE_SOUND ) && !self ) || ( ( flags & SSF_ANTI_PRIVATE_SOUND ) && self ) ) return false;
+	int cursor = idMath::FtoiFast( SoundChannelPlaybackTimeMsec( channel, now ) );
+	const idSoundSample* sample = channel->leadinSample;
+	if( cursor >= sample->LengthInMsec() ) {
+		// Looping shaders always carry their loop sample; anything else has ended.
+		if( channel->loopingSample != NULL && channel->loopingSample->LengthInMsec() > 0 ) {
+			cursor -= sample->LengthInMsec();
+			sample = channel->loopingSample;
+			cursor %= sample->LengthInMsec();
+		} else {
+			cursor = sample->LengthInMsec() - 1;
+		}
+	}
+	if( sample->IsDefault() || sample->LengthInMsec() <= 0 ||
+		!SoundIsDialogue( SoundUsesMusicVolume( channel->parms ),
+			( flags & ( SSF_IS_VO | SSF_VO_FOR_PLAYER ) ) != 0, sample->GetName() ) ) return false;
+	float audible = channel->parms.volume * channel->volumeFade.GetVolume( now );
+	if( channel->parms.soundClass >= 0 && channel->parms.soundClass < SOUND_MAX_CLASSES )
+		audible *= world->soundClassFade[channel->parms.soundClass].GetVolume( now );
+	if( !( flags & SSF_GLOBAL ) && !self ) {
+		const bool direct = ( flags & SSF_NO_OCCLUSION ) || !s_useOcclusion.GetBool();
+		SoundWorldApplyDistanceFalloff( audible, direct ? ( emitter->origin - world->listener.pos ).Length() : emitter->spatializedDistance,
+			channel->parms.minDistance, channel->parms.maxDistance );
+	}
+	if( !std::isfinite( audible ) || audible <= SOUND_WORLD_VOLUME_EPSILON ) return false;
+	SoundTranscript transcript = SoundTranscript::Undeclared;
+	const char* text = SoundTranscriptText( channel->soundShader, sample, sample == channel->leadinSample, &transcript );
+	cue = { text, channel->soundShader->GetName(), emitter->Index(), emitter->emitterId,
+		channel->startTime, cursor, sample->LengthInMsec(), IsRadioChatterChannel( channel ),
+		text != NULL, transcript == SoundTranscript::Authored };
+	return true;
+}
+
+// Keep the newest cues, newest first. Stable source order breaks simultaneous ties.
+static void SoundKeepNewestSubtitle( soundSubtitle_t* cues, int& count, const int capacity, const soundSubtitle_t& cue ) {
+	int at = 0;
+	while( at < count && cues[at].startTime >= cue.startTime ) ++at;
+	if( at >= capacity ) return;
+	for( int j = Min( count, capacity - 1 ); j > at; --j ) cues[j] = cues[j - 1];
+	cues[at] = cue;
+	count = Min( capacity, count + 1 );
+}
+
+// A line ended on its own: hold its last words (or its untranscribed marker) for
+// SOUND_SUBTITLE_TAIL_MSEC, and a short line until it has been up
+// SOUND_SUBTITLE_MIN_DISPLAY_MSEC. Stops and replacements free channels without
+// passing here, so an interrupted line still clears at once.
+void idSoundWorldLocal::RememberSubtitleTail( idSoundEmitterLocal* emitter, idSoundChannel* channel, const int now ) {
+	soundSubtitle_t cue;
+	if( emitter == NULL || !SoundChannelSubtitle( this, emitter, channel, now, cue ) ) return;
+	const int shown = Max( 0, now - cue.startTime );
+	const int until = now + Min( SOUND_SUBTITLE_MIN_DISPLAY_MSEC, Max( SOUND_SUBTITLE_TAIL_MSEC, SOUND_SUBTITLE_MIN_DISPLAY_MSEC - shown ) );
+	// Replace this emitter's older tail, else the one that ends first.
+	int slot = numSubtitleTails < SOUND_SUBTITLE_TAILS ? numSubtitleTails : 0;
+	for( int i = 0; i < numSubtitleTails; ++i ) {
+		if( subtitleTails[i].emitterIndex == cue.emitterIndex ) { slot = i; break; }
+		if( numSubtitleTails == SOUND_SUBTITLE_TAILS && subtitleTails[i].until < subtitleTails[slot].until ) slot = i;
+	}
+	soundSubtitleTail_t& tail = subtitleTails[slot];
+	tail.text = cue.text != NULL ? cue.text : "";
+	tail.shader = channel->soundShader;
+	tail.emitterIndex = cue.emitterIndex;
+	tail.logicalChannel = channel->logicalChannel;
+	tail.speakerId = cue.speakerId;
+	tail.startTime = cue.startTime;
+	tail.durationMsec = cue.durationMsec;
+	tail.until = until;
+	tail.radio = cue.radio;
+	tail.transcribed = cue.transcribed;
+	tail.authored = cue.authored;
+	if( slot == numSubtitleTails ) ++numSubtitleTails;
+}
+
+void idSoundWorldLocal::ForgetSubtitleTails( const int emitterIndex, const int logicalChannel ) {
+	for( int i = numSubtitleTails - 1; i >= 0; --i ) {
+		if( emitterIndex >= 0 && subtitleTails[i].emitterIndex != emitterIndex ) continue;
+		if( logicalChannel != SCHANNEL_ANY && subtitleTails[i].logicalChannel != logicalChannel ) continue;
+		subtitleTails[i] = subtitleTails[numSubtitleTails - 1];
+		--numSubtitleTails;
+	}
+}
+
+// The two newest transcribed lines, with untranscribed speech marked in any slot
+// they leave while ui_subtitleUntranscribed is set. No stale event queue survives
+// stops or restore; held tails yield to a new line from the same emitter.
 int idSoundWorldLocal::GetSubtitles( soundSubtitle_t* cues, int capacity ) {
 	if( cues == NULL || capacity <= 0 ) return 0;
 	capacity = Min( capacity, 2 );
 	const int now = GetSoundTime();
-	int count = 0;
+	const bool untranscribed = ui_subtitleUntranscribed.GetBool();
+	soundSubtitle_t spoken[2], marked[2];
+	int numSpoken = 0, numMarked = 0;
+	int liveEmitters[64], liveStarts[64], numLive = 0;
 	for( int e = 0; e < emitters.Num(); ++e ) {
 		idSoundEmitterLocal* emitter = emitters[e];
 		if( emitter == NULL ) continue;
 		for( int c = 0; c < emitter->channels.Num(); ++c ) {
-			idSoundChannel* channel = emitter->channels[c];
-			if( channel == NULL || channel->soundShader == NULL || channel->leadinSample == NULL ||
-				now < channel->startTime || SoundChannelHasCompleted( channel, now ) ) continue;
-			const int flags = channel->parms.soundShaderFlags;
-			const bool self = emitter->emitterId == listener.id;
-			if( ( ( flags & SSF_PRIVATE_SOUND ) && !self ) || ( ( flags & SSF_ANTI_PRIVATE_SOUND ) && self ) ) continue;
-			int cursor = idMath::FtoiFast( SoundChannelPlaybackTimeMsec( channel, now ) );
-			const idSoundSample* sample = channel->leadinSample;
-			if( cursor >= sample->LengthInMsec() ) {
-				cursor -= sample->LengthInMsec();
-				sample = channel->loopingSample;
-				if( sample == NULL || sample->LengthInMsec() <= 0 ) continue;
-				cursor %= sample->LengthInMsec();
-			}
-			if( sample->IsDefault() || sample->LengthInMsec() <= 0 ||
-				!SoundIsDialogue( SoundUsesMusicVolume( channel->parms ),
-					( flags & ( SSF_IS_VO | SSF_VO_FOR_PLAYER ) ) != 0, sample->GetName() ) ) continue;
-			float audible = channel->parms.volume * channel->volumeFade.GetVolume( now );
-			if( channel->parms.soundClass >= 0 && channel->parms.soundClass < SOUND_MAX_CLASSES )
-				audible *= soundClassFade[channel->parms.soundClass].GetVolume( now );
-			if( !( flags & SSF_GLOBAL ) && !self ) {
-				const bool direct = ( flags & SSF_NO_OCCLUSION ) || !s_useOcclusion.GetBool();
-				SoundWorldApplyDistanceFalloff( audible, direct ? ( emitter->origin - listener.pos ).Length() : emitter->spatializedDistance,
-					channel->parms.minDistance, channel->parms.maxDistance );
-			}
-			if( !std::isfinite( audible ) || audible <= SOUND_WORLD_VOLUME_EPSILON ) continue;
-			const char* text = SoundTranscriptText( channel->soundShader, sample, sample == channel->leadinSample, NULL );
-			if( text == NULL ) continue;
-			soundSubtitle_t cue = { text, channel->soundShader->GetName(), emitter->Index(), emitter->emitterId,
-				channel->startTime, cursor, sample->LengthInMsec(), IsRadioChatterChannel( channel ) };
-			// Keep the two most recent utterances. Stable source order breaks
-			// simultaneous ties; no stale event queue survives stops or restore.
-			int at = 0;
-			while( at < count && cues[at].startTime >= cue.startTime ) ++at;
-			if( at >= capacity ) continue;
-			for( int j = Min( count, capacity - 1 ); j > at; --j ) cues[j] = cues[j - 1];
-			cues[at] = cue;
-			count = Min( capacity, count + 1 );
+			soundSubtitle_t cue;
+			if( !SoundChannelSubtitle( this, emitter, emitter->channels[c], now, cue ) ) continue;
+			if( numLive < 64 ) { liveEmitters[numLive] = cue.emitterIndex; liveStarts[numLive] = cue.startTime; ++numLive; }
+			if( cue.transcribed ) SoundKeepNewestSubtitle( spoken, numSpoken, capacity, cue );
+			else if( untranscribed ) SoundKeepNewestSubtitle( marked, numMarked, capacity, cue );
 		}
 	}
+	for( int i = numSubtitleTails - 1; i >= 0; --i ) {
+		const soundSubtitleTail_t& tail = subtitleTails[i];
+		bool replaced = now >= tail.until || now < tail.startTime;
+		for( int j = 0; j < numLive && !replaced; ++j )
+			replaced = liveEmitters[j] == tail.emitterIndex && liveStarts[j] >= tail.startTime;
+		if( replaced ) {
+			subtitleTails[i] = subtitleTails[numSubtitleTails - 1];
+			--numSubtitleTails;
+			continue;
+		}
+		const soundSubtitle_t cue = { tail.transcribed ? tail.text.c_str() : NULL, tail.shader->GetName(), tail.emitterIndex, tail.speakerId,
+			tail.startTime, tail.durationMsec - 1, tail.durationMsec, tail.radio, tail.transcribed, tail.authored };
+		if( cue.transcribed ) SoundKeepNewestSubtitle( spoken, numSpoken, capacity, cue );
+		else if( untranscribed ) SoundKeepNewestSubtitle( marked, numMarked, capacity, cue );
+	}
+	int count = 0;
+	for( int i = 0; i < numSpoken; ++i ) SoundKeepNewestSubtitle( cues, count, capacity, spoken[i] );
+	for( int i = 0; i < numMarked && count < capacity; ++i ) SoundKeepNewestSubtitle( cues, count, capacity, marked[i] );
 	return count;
 }
 
@@ -1229,6 +1329,7 @@ bool idSoundEmitterLocal::CheckForCompletion( int currentTime )
 
 		if( chan->CheckForCompletion( currentTime ) )
 		{
+			soundWorld->RememberSubtitleTail( this, chan, currentTime );
 			channels.RemoveIndex( i );
 			soundWorld->FreeSoundChannel( chan );
 		}
@@ -1412,6 +1513,7 @@ void idSoundEmitterLocal::Free( bool immediate )
 
 	if( immediate )
 	{
+		soundWorld->ForgetSubtitleTails( index );
 		Reset();
 	}
 
@@ -1808,6 +1910,8 @@ void idSoundEmitterLocal::StopSound( const s_channelType channel )
 		channels.RemoveIndex( i );
 		soundWorld->FreeSoundChannel( chan );
 	}
+	// A stopped speaker's finished line goes with it.
+	soundWorld->ForgetSubtitleTails( index, channel );
 }
 
 /*

@@ -20,6 +20,7 @@
   "audio.subtitleSize": {"type": "number", "initial": 100},
   "audio.subtitleBackground": {"type": "number", "initial": 0},
   "audio.subtitleSpeakers": {"type": "boolean", "initial": false},
+  "audio.subtitleUntranscribed": {"type": "boolean", "initial": false},
   "audio.device.0.label": {"type": "string", "initial": ""},
   "audio.device.1.label": {"type": "string", "initial": ""},
   "audio.device.2.label": {"type": "string", "initial": ""},
@@ -109,6 +110,11 @@
    "operation": "session.menuValue",
    "input": "boolean",
    "arguments": {"command": "audioSubtitleSpeakers", "value": {"input": "value"}}
+  },
+  "audioSubtitleUntranscribed": {
+   "operation": "session.menuValue",
+   "input": "boolean",
+   "arguments": {"command": "audioSubtitleUntranscribed", "value": {"input": "value"}}
   },
   "back": {"operation": "session.menu", "arguments": {"command": "audioBack"}}
  },
@@ -5202,6 +5208,227 @@
    }
   },
   {
+   "id": "tall.audio_subtitle_untranscribed.width",
+   "node": "audio_subtitle_untranscribed",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed.height",
+   "node": "audio_subtitle_untranscribed",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-focus.width",
+   "node": "audio_subtitle_untranscribed-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-focus.height",
+   "node": "audio_subtitle_untranscribed-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-head.left",
+   "node": "audio_subtitle_untranscribed-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-head.width",
+   "node": "audio_subtitle_untranscribed-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {"op": "*", "args": [159.599, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-head.height",
+   "node": "audio_subtitle_untranscribed-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-label.font-size",
+   "node": "audio_subtitle_untranscribed-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-label.line-height",
+   "node": "audio_subtitle_untranscribed-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-box.left",
+   "node": "audio_subtitle_untranscribed-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-box.top",
+   "node": "audio_subtitle_untranscribed-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-box.width",
+   "node": "audio_subtitle_untranscribed-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-box.height",
+   "node": "audio_subtitle_untranscribed-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-checked.left",
+   "node": "audio_subtitle_untranscribed-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {"op": "*", "args": [188.599, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-checked.top",
+   "node": "audio_subtitle_untranscribed-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-checked.width",
+   "node": "audio_subtitle_untranscribed-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_subtitle_untranscribed-checked.height",
+   "node": "audio_subtitle_untranscribed-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
    "id": "prompt-231042-cap.display",
    "node": "prompt-231042-cap",
    "property": "display",
@@ -7433,6 +7660,150 @@
     },
     {
      "node": "audio_subtitle_speakers-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_subtitle_untranscribed.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "audio_subtitle_untranscribed-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_subtitle_untranscribed.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "audio_subtitle_untranscribed-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_subtitle_untranscribed.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "audio_subtitle_untranscribed-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_subtitle_untranscribed.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "audio_subtitle_untranscribed-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_subtitle_untranscribed.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "audio_subtitle_untranscribed-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_subtitle_untranscribed-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -11972,7 +12343,7 @@
                   "thumb": "audio_volume-thumb",
                   "value": "audio_volume-value"
                  },
-                 "navigation": {"down": "audio_music", "up": "audio_subtitle_speakers", "right": "audio_eax", "left": "audio_volume"}
+                 "navigation": {"down": "audio_music", "up": "audio_subtitle_untranscribed", "right": "audio_eax", "left": "audio_volume"}
                 }
                },
                {
@@ -18382,10 +18753,236 @@
                  },
                  "parts": {"checked": "audio_subtitle_speakers-checked"},
                  "navigation": {
-                  "down": "audio_volume",
+                  "down": "audio_subtitle_untranscribed",
                   "up": "audio_subtitle_background",
                   "left": "audio_device",
                   "right": "audio_subtitle_speakers"
+                 }
+                }
+               },
+               {
+                "id": "audio_subtitle_untranscribed",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "audio_subtitle_untranscribed-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_subtitle_untranscribed-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_subtitle_untranscribed-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_subtitle_untranscribed-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 159.599, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "audio_subtitle_untranscribed-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_231313"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_subtitle_untranscribed-box",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 188.599, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "box",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_subtitle_untranscribed-checked",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 188.599, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "audio_subtitle_untranscribed-mark",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "mark",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "toggle",
+                 "label": "#str_231313",
+                 "action": "audioSubtitleUntranscribed",
+                 "value": {"state": "audio.subtitleUntranscribed"},
+                 "states": {
+                  "default": "audio_subtitle_untranscribed.default",
+                  "hover": "audio_subtitle_untranscribed.hover",
+                  "focus": "audio_subtitle_untranscribed.focus",
+                  "pressed": "audio_subtitle_untranscribed.pressed",
+                  "disabled": "audio_subtitle_untranscribed.disabled"
+                 },
+                 "parts": {"checked": "audio_subtitle_untranscribed-checked"},
+                 "navigation": {
+                  "down": "audio_volume",
+                  "up": "audio_subtitle_speakers",
+                  "left": "audio_device",
+                  "right": "audio_subtitle_untranscribed"
                  }
                 }
                }
