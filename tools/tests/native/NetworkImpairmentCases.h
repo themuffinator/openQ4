@@ -315,6 +315,73 @@ static int ExerciseNetworkImpairment() {
 		ExpectImpairment( inOrder, "delivery survives the clock wrapping" );
 	}
 
+	// A path MTU: settings, then packets counted with each family's headers.
+	ExpectImpairment( Active( Sanitize( 0, 0, 0, 0, 0, 250, 0, 1280 ) ), "a path MTU alone is active" );
+	ExpectImpairment( Sanitize( 0, 0, 0, 0, 0, 250, 0, 100 ).mtuBytes == MIN_MTU_BYTES &&
+		Sanitize( 0, 0, 0, 0, 0, 250, 0, 0, 1 ).mtuDrop == false, "the path MTU is clamped and needs a size to drop" );
+	ExpectImpairment( IpPackets( 1280, 1252, false ) == 1 && IpPackets( 1280, 1253, false ) == 2 &&
+		IpPackets( 1280, 1232, true ) == 1 && IpPackets( 1280, 1233, true ) == 2 && IpPackets( 0, 60000, false ) == 1,
+		"a datagram fits a 1280-byte path up to 1252 bytes over IPv4 and 1232 over IPv6" );
+	ExpectImpairment( IpPackets( 1280, 1310, false ) == 2 && IpPackets( 1280, 2504, false ) == 2 &&
+		IpPackets( 1280, 2505, false ) == 3 && IpPackets( 1280, 2456, true ) == 2 && IpPackets( 1280, 2457, true ) == 3,
+		"IP fragments carry multiples of 8 bytes behind their own headers" );
+	ExpectImpairment( WireBytes( 1, 100, false ) == 100 + LINK_OVERHEAD_BYTES && WireBytes( 1, 100, true ) == 148 &&
+		WireBytes( 2, 1310, false ) == 1358 && WireBytes( 2, 1310, true ) == 1414, "every IP packet's headers cross the link" );
+
+	// A dropping path refuses only what it cannot carry whole.
+	{
+		impairmentQueue_t queue;
+		const settings_t settings = Sanitize( 0, 0, 0, 0, 0, 250, 0, 1280, 1 );
+		std::vector<unsigned char> payload( 1400, 5 );
+		ExpectImpairment( queue.Offer( settings, 0, 1, payload.data(), 1252 ) == 1 &&
+			queue.Offer( settings, 0, 2, payload.data(), 1253 ) == 0 &&
+			queue.Offer( settings, 0, 3, payload.data(), 1232, true ) == 1 &&
+			queue.Offer( settings, 0, 4, payload.data(), 1233, true ) == 0, "a dropping path loses each datagram larger than it" );
+		ExpectImpairment( queue.stats.oversized == 2 && queue.stats.ipFragments == 0 && queue.stats.dropped == 0 &&
+			queue.stats.maxSize == 1253 && queue.Depth() == 2, "dropped oversized datagrams are counted as such" );
+	}
+
+	// A fragmenting path carries an oversized datagram intact, but it is lost when any
+	// of its fragments is: at 20% loss per packet a two-fragment datagram arrives 64%.
+	{
+		impairmentQueue_t whole, split;
+		whole.random.Seed( 31 );
+		split.random.Seed( 31 );
+		std::vector<unsigned char> payload( 1310 );
+		for ( size_t i = 0; i < payload.size(); i++ ) {
+			payload[i] = static_cast<unsigned char>( i * 13 );
+		}
+		const settings_t mtu = Sanitize( 0, 0, 20, 0, 0, 250, 0, 1280 );
+		for ( int i = 0; i < 4000; i++ ) {
+			whole.Offer( mtu, 0, i, payload.data(), 1200 );
+			split.Offer( mtu, 0, i, payload.data(), 1310 );
+		}
+		const double wholeRate = static_cast<double>( whole.Depth() ) / 4000.0;
+		const double splitRate = static_cast<double>( split.Depth() ) / 4000.0;
+		ExpectImpairment( wholeRate > 0.77 && wholeRate < 0.83 && splitRate > 0.61 && splitRate < 0.67,
+			"a fragmented datagram is lost when any fragment is" );
+		ExpectImpairment( split.stats.oversized == 4000 && split.stats.ipFragments == 8000 && whole.stats.oversized == 0,
+			"fragmented datagrams count their IP fragments" );
+		std::vector<unsigned char> out( 2000 );
+		int address = 0;
+		int size = 0;
+		ExpectImpairment( split.Pop( 0, address, out.data(), static_cast<int>( out.size() ), size ) && size == 1310 &&
+			std::vector<unsigned char>( out.begin(), out.begin() + size ) == payload, "a fragmented datagram arrives intact" );
+	}
+
+	// The bottleneck pays for every fragment's header: two IPv4 fragments of a
+	// 1310-byte datagram are 1358 bytes on a 10 KB/s link, so 136 ms.
+	{
+		impairmentQueue_t queue;
+		std::vector<unsigned char> payload( 1310, 1 );
+		queue.Offer( Sanitize( 0, 0, 0, 0, 10000, 1000, 0, 1280 ), 0, 1, payload.data(), 1310 );
+		std::vector<unsigned char> out( 2000 );
+		int address = 0;
+		int size = 0;
+		ExpectImpairment( !queue.Pop( 135, address, out.data(), static_cast<int>( out.size() ), size ) &&
+			queue.Pop( 136, address, out.data(), static_cast<int>( out.size() ), size ), "fragment headers cross the bottleneck" );
+	}
+
 	// A full queue refuses further copies instead of growing without bound.
 	{
 		impairmentQueue_t queue;

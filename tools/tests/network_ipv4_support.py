@@ -933,7 +933,7 @@ def validate_posix_networking() -> None:
         "const char emptyPacket = '\\0';",
         "const void *packetData = data != NULL ? data : &emptyPacket;",
         direct_send,
-        "impairment->send.Offer( settings, now, to, packetData, size );",
+        "impairment->send.Offer( settings, now, to, packetData, size, Net_ImpairmentIPv6( to ) );",
     ):
         require(send_packet, token, "POSIX zero-length UDP send")
     if not (

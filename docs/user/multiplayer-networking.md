@@ -135,6 +135,8 @@ Run `netIPv6SelfTest` from the console to check IPv6 parsing, canonical formatti
 
 IPv6 guarantees only a 1280-byte path MTU and forbids routers from splitting a datagram in transit, so openQ4 fragments its own messages more aggressively on an IPv6 connection than on IPv4. This is automatic and needs no configuration; it prevents the failure where a client connects and then stalls forever waiting for a snapshot that no router will deliver.
 
+One exception remains: the server's replies to a join or a server-list query carry its full settings and are larger than that limit, so your operating system splits them. If an IPv6 server never answers a join or never shows up in the list, and your network (some VPNs and firewalls) blocks split packets, join over IPv4 instead.
+
 ## CVar Reference
 
 | Setting | Default | Range | Scope | What it does |
@@ -243,6 +245,8 @@ directions of each connection:
 | `net_forceDropBurst` | Loses packets in runs of about this many instead of one at a time, keeping the `net_forceDrop` rate. |
 | `net_forceRate` | Limits the connection to this many bytes a second each way, like a slow line. Packets queue behind each other and are dropped when the queue is full. `0` for no limit. |
 | `net_forceQueue` | How many milliseconds of packets that slow line holds before it drops them (default `250`). |
+| `net_forceMTU` | The largest packet, in bytes, the connection carries whole, like a small-MTU VPN (`1280` is the IPv6 minimum). Larger packets are split as your operating system would split them, and are lost if any piece is. `0` for no limit. |
+| `net_forceMTUDrop` | `1` loses every packet larger than `net_forceMTU` instead, like a network that blocks split packets. |
 | `net_forceSeed` | Makes the random choices repeat exactly when a connection opens; `0` picks new ones each time. |
 
 For example, on the client:

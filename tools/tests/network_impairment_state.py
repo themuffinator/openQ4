@@ -4,8 +4,8 @@
 tools/tests/native/NetworkImpairmentCases.h holds the cases (fixed delay and
 order, jitter bounds and reordering, loss and duplication rates, seed
 repeatability, oversize discards, a 9000-byte datagram, clock wrap,
-capacity, bottleneck pacing and drop-tail, burst loss, and the new settings
-changing nothing while off). CoreSafetyTest.cpp runs them in the native suite; this driver also
+capacity, bottleneck pacing and drop-tail, burst loss, the path MTU's dropping
+and IP-fragmenting modes, and the new settings changing nothing while off). CoreSafetyTest.cpp runs them in the native suite; this driver also
 compiles them against single-reversal copies of the header and requires each
 copy to fail, so the cases cannot quietly stop checking what they claim.
 """
@@ -38,7 +38,7 @@ CONTROLS = (
      "return static_cast<int32_t>( static_cast<uint32_t>( a ) - static_cast<uint32_t>( b ) ) <= 0;", "return a <= b;"),
     ("an oversize datagram stops the drain", "stats.discarded++;\n\t\t\t\tcontinue;", "stats.discarded++;\n\t\t\t\treturn false;"),
     ("no capacity limit", "if ( static_cast<int>( entries.size() ) >= MAX_QUEUED_DATAGRAMS ||", "if ( false &&"),
-    ("a rate leaves the line inactive", "settings.duplicatePercent > 0 || settings.rateBytes > 0;", "settings.duplicatePercent > 0;"),
+    ("a rate leaves the line inactive", "|| settings.rateBytes > 0 || settings.mtuBytes", "|| settings.mtuBytes"),
     ("the bottleneck never queues",
      "waitUsec = static_cast<int64_t>( aheadMsec ) * 1000 + linkFreeUsec;", "waitUsec = 0;"),
     ("a full bottleneck never drops",
@@ -47,7 +47,17 @@ CONTROLS = (
      "if ( waitUsec > 0 && finishUsec > static_cast<int64_t>( settings.queueMsec ) * 1000 ) {",
      "if ( finishUsec > static_cast<int64_t>( settings.queueMsec ) * 1000 ) {"),
     ("headers cross the bottleneck free",
-     "( static_cast<int64_t>( size ) + LINK_OVERHEAD_BYTES ) * 1000000", "static_cast<int64_t>( size ) * 1000000"),
+     "return payloadBytes + UDP_HEADER_BYTES + packets * perPacket;", "return payloadBytes;"),
+    ("a path MTU leaves the line inactive", "settings.rateBytes > 0 || settings.mtuBytes > 0;", "settings.rateBytes > 0;"),
+    ("a dropping path carries oversized datagrams", "if ( settings.mtuDrop ) {", "if ( false ) {"),
+    ("only the first fragment can be lost",
+     "lost = Lost( settings ) || lost;", "lost = packet == 0 ? Lost( settings ) : lost;"),
+    ("the IPv6 header is counted as IPv4's",
+     "const int ipHeader = ipv6 ? IPV6_HEADER_BYTES : IPV4_HEADER_BYTES;\n\tconst int datagram",
+     "const int ipHeader = IPV4_HEADER_BYTES;\n\tconst int datagram"),
+    ("IP fragments are not 8-byte aligned",
+     "( ( mtuBytes - ipHeader - ( ipv6 ? IPV6_FRAGMENT_HEADER_BYTES : 0 ) ) / 8 ) * 8;",
+     "mtuBytes - ipHeader - ( ipv6 ? IPV6_FRAGMENT_HEADER_BYTES : 0 );"),
     ("a loss burst never ends", "lossBurst = !random.ChancePpm( leave );", "lossBurst = true;"),
     ("offered bytes are not counted", "stats.offeredBytes += static_cast<uint64_t>( size );", ""),
     ("burst length ignored",

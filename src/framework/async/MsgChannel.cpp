@@ -411,7 +411,21 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 	unsentMsg.WriteLong( outgoingSequence );
 
 	// write out the message data
-	WriteMessageData( unsentMsg, msg );
+	// openQ4: the length test above is taken before packing, and packing can grow
+	// a message (WriteMessageData). One that no longer fits a fragment would leave
+	// as a datagram larger than the family allows, over IPv6's 1232 bytes a size a
+	// 1280-byte path drops. Fragment it instead; receivers assemble either form.
+	if ( !WriteMessageData( unsentMsg, msg ) || unsentMsg.GetSize() - 6 >= Net_FragmentSize( remoteAddress ) ) {
+		unsentMsg.BeginWriting();
+		if ( !WriteMessageData( unsentMsg, msg ) ) {
+			common->Printf( "idMsgChannel::SendMessage: message too large once packed, length = %i\n", totalLength );
+			return -1;
+		}
+		unsentFragments = true;
+		unsentFragmentStart = 0;
+		SendNextFragment( port, time );
+		return outgoingSequence;
+	}
 
 	// send the packet
 	port.SendPacket( remoteAddress, unsentMsg.GetData(), unsentMsg.GetSize() );

@@ -7,8 +7,9 @@ posix_net.cpp define the same net_force* CVars, open one pair of delay lines per
 bound port and release it on close, queue every received datagram and every
 unicast send while conditions are set or a line is still draining, flush due
 sends while polling for packets, and report through netImpairment, including
-the bottleneck (net_forceRate, net_forceQueue) and burst loss
-(net_forceDropBurst).
+the bottleneck (net_forceRate, net_forceQueue), burst loss
+(net_forceDropBurst) and the path MTU (net_forceMTU, net_forceMTUDrop), which
+counts each datagram's own address family.
 
 Single-reversal controls then mutate the platform sources and require each
 check to fail.
@@ -22,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 CVARS = ("net_forceLatency", "net_forceDrop", "net_forceJitter", "net_forceDuplicate", "net_forceSeed",
-         "net_forceRate", "net_forceQueue", "net_forceDropBurst")
+         "net_forceRate", "net_forceQueue", "net_forceDropBurst", "net_forceMTU", "net_forceMTUDrop")
 
 
 def read(rel: str) -> str:
@@ -71,6 +72,10 @@ def validate_platform(source: str, platform: str) -> None:
     for name in ("net_forceLatency", "net_forceJitter", "net_forceDrop", "net_forceDuplicate", "net_forceRate",
                  "net_forceQueue", "net_forceDropBurst"):
         require(settings, f"{name}.GetInteger()", f"{platform} settings")
+    require(settings, "net_forceMTU.GetInteger(),", f"{platform} settings")
+    require(settings, "net_forceMTUDrop.GetBool() ? 1 : 0", f"{platform} settings")
+    family = body(source, "static bool Net_ImpairmentIPv6(", f"{platform} datagram family")
+    require(family, "adr.type == NA_IP6 || adr.type == NA_MULTICAST6", f"{platform} datagram family")
     require(settings, "idNetworkImpairment::Sanitize(", f"{platform} settings clamp")
     opening = body(source, "static netImpairmentPort_t *Net_OpenImpairment(", f"{platform} delay-line open")
     require(opening, "net_forceSeed.GetInteger()", f"{platform} seed")
@@ -88,19 +93,23 @@ def validate_platform(source: str, platform: str) -> None:
     require(receive, "impairment->FlushSends( now,", f"{platform} flushes due sends while polling")
     require(receive, "impairment->ReceivesQueued( settings )", f"{platform} receive queueing decision")
     require(receive, "impairment->receive.Offer( settings, now,", f"{platform} received datagrams wait in line")
+    require(receive, "data, size, Net_ImpairmentIPv6(", f"{platform} received datagrams carry their family")
     require(receive, "impairment->receive.Pop( now,", f"{platform} received datagrams leave when due")
 
     send = body(source, "void idPort::SendPacket", f"{platform} send")
     require(send, "impairment->SendsQueued( settings )", f"{platform} send queueing decision")
     require_before(send, "impairment->send.Offer( settings, now, to,", "impairment->FlushSends( now,",
                    f"{platform} sends wait in line")
+    require(send, "size, Net_ImpairmentIPv6( to ) );", f"{platform} sends carry their family")
 
     report = body(source, "void Sys_NetImpairmentReport(", f"{platform} report")
     require(report, "NET_IMPAIR_SETTINGS", f"{platform} report")
-    for field in ("settings.rateBytes", "settings.queueMsec", "settings.burstLength"):
+    for field in ("settings.rateBytes", "settings.queueMsec", "settings.burstLength", "settings.mtuBytes",
+                  "settings.mtuDrop"):
         require(report, field, f"{platform} reports the bottleneck and burst settings")
     line = body(source, "static void Net_PrintImpairmentLine(", f"{platform} report line")
-    for field in ("stats.offeredBytes", "stats.bursts", "stats.congested", "stats.maxWaitMsec"):
+    for field in ("stats.offeredBytes", "stats.bursts", "stats.congested", "stats.maxWaitMsec", "stats.oversized",
+                  "stats.ipFragments", "stats.maxSize"):
         require(line, field, f"{platform} reports bursts, congestion and the longest wait")
     # Harnesses parse the line by its leading fields, so the new ones come last.
     require(line, '"NET_IMPAIR port=%d dir=%s offered=%llu dropped=%llu duplicated=%llu released=%llu reordered=%llu "',
@@ -150,9 +159,16 @@ def main() -> int:
         validate_wiring()
         controls = (
             ("POSIX reads straight past the receive line", "posix",
-             "impairment->receive.Offer( settings, now, net_from, data, size )", "false"),
+             "impairment->receive.Offer( settings, now, net_from, data, size, Net_ImpairmentIPv6( net_from ) )", "false"),
             ("Windows sends skip the send line", "windows",
-             "impairment->send.Offer( settings, now, to, data, size );", ""),
+             "impairment->send.Offer( settings, now, to, data, size, Net_ImpairmentIPv6( to ) );", ""),
+            ("Windows sends count every datagram as IPv4", "windows",
+             "impairment->send.Offer( settings, now, to, data, size, Net_ImpairmentIPv6( to ) );",
+             "impairment->send.Offer( settings, now, to, data, size );"),
+            ("POSIX ignores the path MTU", "posix",
+             "net_forceDropBurst.GetInteger(), net_forceMTU.GetInteger(),", "net_forceDropBurst.GetInteger(), 0,"),
+            ("Windows drops the oversized count from its report", "windows",
+             "static_cast<unsigned long long>( stats.oversized ),", "0ull,"),
             ("Windows no longer flushes due sends while polling", "windows",
              "impairment->FlushSends( now, [ipv4Socket, ipv6Socket]( const netadr_t &to,", "impairment->Unused( now, [ipv4Socket, ipv6Socket]( const netadr_t &to,"),
             ("POSIX close leaks the delay lines", "posix",
@@ -162,8 +178,8 @@ def main() -> int:
             ("Windows ignores the bottleneck rate", "windows",
              "net_forceDuplicate.GetInteger(), net_forceRate.GetInteger(),", "net_forceDuplicate.GetInteger(), 0,"),
             ("POSIX drops the congestion count from its report", "posix",
-             "static_cast<unsigned long long>( stats.bursts ), static_cast<unsigned long long>( stats.congested ), stats.maxWaitMsec );",
-             "static_cast<unsigned long long>( stats.bursts ), 0ull, stats.maxWaitMsec );"),
+             "static_cast<unsigned long long>( stats.bursts ), static_cast<unsigned long long>( stats.congested ), stats.maxWaitMsec,",
+             "static_cast<unsigned long long>( stats.bursts ), 0ull, stats.maxWaitMsec,"),
             ("Windows reorders the report's leading fields", "windows",
              '"NET_IMPAIR port=%d dir=%s offered=%llu dropped=%llu duplicated=%llu released=%llu reordered=%llu "',
              '"NET_IMPAIR port=%d dir=%s offered=%llu dropped=%llu bursts=%llu duplicated=%llu released=%llu "'),

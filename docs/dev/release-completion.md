@@ -42,6 +42,26 @@ does not restore the withdrawn release. See
   checks the manifest key and startup order; `ui_retained_gate.py` checks the
   Mods page keeps the campaign.
 
+## Online play over small-MTU connections (MP-08), 13 November 2026
+
+- **Large game messages over IPv6 always fit the smallest network size.** A
+  message that grew when it was compressed could leave as one packet about
+  twice the limit IPv6 guarantees, which some VPNs and firewalls silently
+  drop. It is now sent in pieces like any other large message. Nothing to
+  change.
+- **Joining over IPv6 still needs a network that passes split packets.** The
+  server's answers to a join or a server-list query are about 1.8 KB. If an
+  IPv6 server never answers or never appears in the list on such a network,
+  join it over IPv4.
+- Testers: `net_forceMTU` and `net_forceMTUDrop` simulate a small path MTU on
+  one machine, carrying larger packets in IP fragments or dropping them; the
+  [networking guide](../user/multiplayer-networking.md#testing-under-simulated-network-conditions)
+  lists them.
+- Developer: `mp_path_mtu_soak.py` plays a 12-player q4ctf1 match over that
+  path; `netImpairment` reports oversized datagrams, IP fragments and the
+  largest datagram each way.
+  [Evidence](mp-network-qualification.md#a-1280-byte-path-mtu-13-november-2026).
+
 ## The Android app quits without crashing (AND-02), 13 November 2026
 
 - **Quitting the Android app no longer ends in a crash.** Every quit used to

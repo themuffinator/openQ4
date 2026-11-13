@@ -3856,7 +3856,7 @@ prediction/rewind defaults.
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
 | MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); the post-respawn weapon catch-up phase; remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
-| MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
+| MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path that fragments. | The 1.8 KB info/connect replies that a fragment-dropping path loses (protocol decision); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
 Completion substeps:
@@ -4642,6 +4642,19 @@ Completion substeps:
   longer restarts on its pure connect; files older builds saved are still
   purged at the lock
   ([evidence](mp-network-qualification.md#expanded-loading-backgrounds-on-pure-servers-9-november-2026)).
+  Progress, 13 November: checklist row 8.1's match runs on one machine over a
+  simulated 1280-byte path (`net_forceMTU`, `mp_path_mtu_soak.py`). With the
+  path carrying IP fragments, a 12-player q4ctf1 CTF match on a pure dedicated
+  server holds for five minutes on IPv4 and IPv6 with no overflow, drop or
+  disconnect. Inside the match IPv6 stays within 1,232 bytes, but over a path
+  that drops IP fragments neither family can join: the `infoResponse` asked
+  for before the challenge and the `connectResponse` carry the whole
+  server-info dictionary, about 1.8 KB, outside the fragmenting channel.
+  Shrinking them below 1,232 bytes is a protocol decision. A message that
+  packing grew past a fragment now leaves in fragments instead of one
+  oversized datagram
+  ([evidence](mp-network-qualification.md#a-1280-byte-path-mtu-13-november-2026)).
+  The physical-MTU row stays open.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,
