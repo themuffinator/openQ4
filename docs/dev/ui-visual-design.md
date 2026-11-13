@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.39, 9 November 2026 (1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.40, 13 November 2026 (1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -32,6 +32,11 @@ artwork, so two overlapping captions also stay clear of the picture.
 Version 1.28 adds objective points of interest to the multiplayer HUD: flag
 bases, assault points and Dead Zone zones marked in the world, with distance as
 their only text, on the desktop and on the stereo VR HUD plane.
+
+Version 1.40 adds The Awakening's in-game menu family. While the expansion's
+campaign runs, the single-player pause menu and the screens it opens keep the
+Marine frame and take a glacial palette, frost on the framing bands and snow
+behind the instruments, after the 0.14.1 Awakening Edition release artwork.
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -206,6 +211,7 @@ screens. Do not introduce them or carry them into the replacement:
 | Family | Identity | Required fidelity |
 | --- | --- | --- |
 | Marine menus | Olive/black plates, orange focus, yellow values, Marine title face | Stepped/notched bands, open cut plates, triangular markers, additive light, original scene imagery |
+| Awakening menus | The Marine frame in glacial light: ice rails and values, frost on the bands, snow behind the instruments, orange focus | Marine geometry, type, opacity and motion unchanged; the Awakening tokens; frost on the framing bands only; the Marine family everywhere outside the running expansion campaign |
 | Marine HUD | Tactical overlays, bright critical values, compact instruments | Weapon/ammo/health/armor hierarchy, sheared gauges, feedback and original spatial relationships |
 | Strogg HUD and terminals | Original alien glyphs, mechanical paths and family colors | Each source's geometry and animation; never generic Marine panels |
 | World terminals | Local device panel and in-world illumination | Surface mapping, interaction targets, stateful scripts and intended viewing distance |
@@ -230,6 +236,7 @@ family tokens; individual terminals and vehicles still need per-source entries.
 | Family (sources) | Measured palette | Type (stock `textscale`) | Geometry and motion |
 | --- | --- | --- | --- |
 | Marine menus (`mainmenu`, `mpmain`, `buymenu`, `restart`, `msg`, `netmenu`) | Section 4 Marine tokens | Marine, Lowpixel; Profont for tabular detail | Section 6 vocabulary; section 8 choreography |
+| Awakening menus (an openQ4 design after the 0.14.1 Awakening Edition release artwork; no expansion source) | Section 4 Awakening tokens | As Marine menus | As Marine menus, with frost, snow and haze (section 6) and `frost.grow` (section 8) |
 | Marine HUD (`hud`) | Readouts `#DDEBC3`; gauge track `#B3D06E` at 20% and fill at 35% (50% in multiplayer) over black 50%; icons `#A8A360` at 60%; weapon render `#C7BD78` at 40%; weapon name `#B0C891`; selected weapon `#FF8000` in a `#B2CC80` ring; low health `#FF4C00` | Chain 0.50 numerals and 0.32 reserve, trailing-aligned; Marine 0.25 weapon name, 0.20 pickup and radio labels | Rounded gauge plates with a stepped foot, trailing-anchored notched fills, ten-cell armor fill, 0.22 shear about each element's center; EKG; 2 Hz low-health rim (section 14) |
 | Strogg HUD (`hud_strogg`) | Readouts `#FCFFC8`; gauge fill `#FF9000` at 20–35%; icons `#FFCC00` at 60%; selected weapon `#FFCC00`, others `#F59512` at 60%, ring `#F2AD0B` | R_Strogg for all HUD text, 0.12–0.50; numerals 0.50 and unsheared | 30–33° shoulders and small notches; 0.22 backward shear; masked grain over each gauge; low health below 25% |
 | Multiplayer (`mphud`, `scoreboard`, `summary`, `mpmsgmode`, the multiplayer parts of `hud`) | Marine team `#6AA42B`; Strogg team `#FF7B04`; spectators `#999999`; notices `#FFFF8D`; team names and team chat `#AAE355` and `#FF8E00`; deathmatch and Tourney headers `#8B964B`; your Tourney arena `#5EB987` at 40%, finished arenas `#3E57B7`; health icon `#F7C004` and armor icon `#FA2B05`, both at 80% (the stock define names are swapped); ammo fill in the weapon's color | Lowpixel 0.16–0.50; Chain 0.50 gauge numerals; Marine for the chat line's SEND and the summary tabs | Score slabs fading to a sheared cut, team-tinted header bands, faction emblems, award medals; drop-shadowed text over the match (section 14.9) |
@@ -361,6 +368,56 @@ is white at reduced alpha.
 
 Olive-tinted light plates are white art multiplied by `marine.olive`; dark
 plates are black art with `marine.rail.dark` rails. Both rest at 40%.
+
+### Awakening tokens
+
+The Awakening's in-game menus (section 13.7) are an openQ4 design, not a
+measurement of expansion art. Their palette comes from the 0.14.1 Awakening
+Edition release artwork. The glacial cyan of its plate rim and version figure,
+the white of its lettering, the deep ice of its plate body and its frost, snow
+and haze colors are that artwork's own values. The others are sampled from it
+and set to the luminance of the Marine token they stand in for, so every
+opacity in this section applies to them unchanged.
+
+| Token | sRGB hex | Stands in for | Use |
+| --- | --- | --- | --- |
+| `awakening.rail` | `#78DEFF` | `marine.rail.dark` | Rails of dark plates |
+| `awakening.value` | `#78DEFF`, alpha 0.80 | `marine.value` | Setting values, slider ticks and thumb, key names, editable values; the campaign's name in the pause title; objective headings in the level block |
+| `awakening.glacier` | `#289EB7` | `marine.olive`, `marine.marker` | The tint of light plates, markers, header bands and separators |
+| `awakening.rail.card` | `#3AAAC4` | `marine.rail.card` | Card and tooltip frame rail |
+| `awakening.rim` | `#2098BB`, alpha 0.37 falling linearly to 0 across 19 u | `marine.rim` | Rim light outside framing band edges |
+| `awakening.rime` | `#EBFAFF`, alpha 0.45 | New | The crisp 0.5 u line on the bands' inner edges, over the rim light |
+| `awakening.glow` | `#1E6B85` peak | `marine.glow` | Additive backdrop light band; focus light |
+| `awakening.glow.modal` | `#154C5E` peak | `marine.glow.modal` | Additive glow field behind modals |
+| `awakening.deep` | `#040E1A` | Black | Dark plate bodies, card bodies at 0.94, the modal silhouette at 0.70, field and list troughs at 0.90 |
+| `awakening.surface.panel` | `#061420`, alpha 0.88 | `surface.panel` | Solid readable backing |
+| `awakening.plinth` | `#1B4656`, alpha 0.30 | `marine.plinth` | Plinth under the secondary links |
+| `awakening.picture` | `#17414F` | `#414624` | The 1 u picture frame |
+| `awakening.check` | `#0F6F8C` | `marine.check` | Filled square of a set check or radio box |
+| `awakening.sort` | `#45B2CC` | `marine.sort` | Sortable column hover highlight |
+| `awakening.text` | `#EEF8FF` | White | Labels at 0.80, titles at 0.50, headings and disabled labels at 0.40 |
+| `awakening.text.secondary` | `#A9C9D6` | `text.secondary` | Supporting information |
+| `awakening.text.tertiary` | `#7E99A5` | `text.tertiary` | Nonessential metadata |
+| `awakening.frost` | `#D1EDFF` | New | Frost crystals and rime; the reticle grid at 4% |
+| `awakening.snow` | `#EBF6FF` | New | Snow flakes |
+| `awakening.haze` | `#AAD7F0` | New | The low haze |
+
+The family keeps `marine.orange` for hover, focus and selection, with
+`marine.list` and `marine.progress`, and keeps the status colors,
+`marine.scrim` and `modal.softfocus`. Orange is its one warm color. It marks
+only the control the player is on, and no frost, snow or haze is drawn over
+it. That is why the level block's objective headings take `awakening.value`
+where the objectives family uses `#FF8000`. Blue and orange also stay apart
+under the common color-vision deficiencies. Team colors, faction marks and the
+weapon and item color code are unchanged.
+
+Light plates are white art multiplied by `awakening.glacier`; dark plates are
+`awakening.deep` art with `awakening.rail` rails. Both rest at 40%. The
+framing bands stay opaque black. Composited over the level block's card,
+labels at 0.80 reach about 11:1, values 8:1, focused orange 7:1, tertiary
+text 6:1, titles at 0.50 5:1 and headings at 0.40 3.6:1; the title at 0.50
+over the lit field reaches about 4:1. The 40% and 50% roles are large text and
+remain the first to measure, as in the Marine family.
 
 ### Opacity
 
@@ -928,6 +985,77 @@ Stock details that openQ4 reuses:
 | Swatch | A small square with a chipped corner | Color choices, spinner tiles |
 | Picture frame | A 1 u `#414624` border over black 0.60 | Save, server and map previews |
 
+### Frost, snow and haze
+
+The Awakening family (section 13.7) grows frost on its framing bands, lets
+snow fall behind its instruments and lays a low haze over the softened view.
+All three are editable vector geometry generated from a seed, never bitmaps.
+The frost is the one place where the interface draws an angle other than
+45 degrees on purpose: ice branches at 60 degrees, and the furniture around it
+keeps its 45-degree cuts. The release artwork's 13-degree slant, frosted-glass
+lift, rime grain, lens flare and icicles are not part of the family.
+
+- **Where frost grows.** Only on the framing bands, which are opaque black and
+  hold no content. Frost is fixed to the view: it grows from seeds on the
+  view's top and bottom edges and at its four corners, and each band's
+  silhouette masks it, at full strength up to 6 u inside the band's inner edge
+  and falling to nothing at the edge. A moving band covers or uncovers it; it
+  never travels with the band. Frost never lies on a plate, a card, a dialog,
+  text or the view.
+- **Carved slots.** Each screen carves the text and controls standing in its
+  bands out of the frost: the prompt bar, titles and crumbs, and Back. A slot
+  is the item's box with 6 u clear around it, feathered over a further 6 u. A
+  transient item in a band, such as a notice, brings an opaque black backing
+  with the same margin.
+- **Seeds.** Along each of the two edges the seeds stand 12 u apart at a
+  corner, widening to 48 u from 200 u away: the spacing is `48 - 36w` u with
+  `w = (1 - d / 200)²`, `d` the distance to the nearer corner and `w` zero
+  beyond 200 u, each spacing varied by up to 30% either way. Three more seeds
+  stand on each corner, heading 20, 45 and 70 degrees from the edge, give or
+  take 8 degrees.
+- **A crystal.** A trunk leaves its seed in 3 u steps. Its heading starts on
+  the inward normal, give or take 28.6 degrees, and wanders 6.9 degrees a step
+  (both normal deviations). An edge trunk is 20–75 u long, scaled by
+  `0.55 + 0.45w`, so 11–41 u in mid-span, and 0.75–1.6 u wide at its seed; a
+  corner trunk is 45–75 u long and 1.1–1.6 u wide. A crystal thins by 3% a
+  step to a floor of 0.5 u and ends in a point. At each step it has a 28%
+  chance of one branch to either side at 60 degrees, give or take 8.6 degrees,
+  25–50% as long as its parent and 70% as wide as the parent is there.
+  Branches branch in turn to four levels below the trunk, and none is shorter
+  than 2 u. Each branch takes one opacity between 0.59 and 0.98.
+- **Paint.** Branches are filled, tapered ribbons in `awakening.frost` at
+  0.80, over an additive halo of the same shapes blurred by 1.5 u at 0.50.
+  A rime wash in `awakening.frost` lies under them: 0.10 at the view's top and
+  bottom edges falling to nothing 14 u in, and 0.16 at each corner falling to
+  nothing 90 u away. The rime line, 0.5 u of `awakening.rime` and never
+  thinner than one physical pixel, traces each band's inner edge over its rim
+  light.
+- **Determinism and cost.** The seed is 1414, the artwork's. A view of a given
+  size always grows the same frost, so captures compare. The atlas sheet's
+  generator is the reference. Frost is generated when a document is built or
+  the view's size changes, never per frame, and then stands as stationary
+  artwork: about 740 branches at 4:3, 860 at 16:9 and 1,160 at 21:9 and
+  wider.
+- **Snow.** Round flakes in `awakening.snow` in two depths: far flakes of
+  0.3–0.8 u radius at 0.24–0.59, 0.6 to every 1,000 square u of the view, and
+  near flakes of 0.9–1.8 u radius at 0.31–0.78, blurred by 0.7 u, 0.1 to
+  every 1,000 square u. That is about 215 flakes at 4:3 and 290 at 16:9. Snow
+  falls above the backdrop layers and behind every plate, card and band, so
+  no flake crosses text. Section 8 gives its motion.
+- **Haze.** A straight-alpha wash of `awakening.haze` under the light band:
+  nothing above 55% of the view's height, rising linearly to 0.14 at the
+  bottom edge.
+- **Accessibility and power.** Reduced motion shows the frost complete and
+  the snow still. High contrast removes the frost, rime wash, snow and haze
+  and keeps the rime line at 1.00 as a rail. The Phone profile's power saving
+  removes the snow.
+
+The editable [Awakening menu atlas sheet](ui/atlas/awakening-menu.html) draws
+the pause menu and its confirmation at 4:3, 16:9, 21:9 and 32:9 beside the
+Marine family, with the layers switchable, the carved slots outlined and the
+opening replayed. `tools/ui/update_design_atlas.py` merges it into the full
+atlas.
+
 ## 7. Components and interaction states
 
 Controls declare default, hover, keyboard/gamepad focus, pressed, selected/
@@ -1045,6 +1173,7 @@ presented frame.
 | `title.carry` | 500 ms, or 300 ms going deeper | With `frame.dock`, or `frame.step` going deeper: the activated label travels into the title slot and scales to the title size (openQ4) |
 | `frame.step` | 300 ms | `accel(150, 150)`; only the top band moves one notch pitch (97 u) toward the trailing edge as a page opens a sub-page, from 50 ms, and back at once on Back; the bottom band stays docked (openQ4) |
 | `title.crumb` | 150 ms | Linear; going deeper, the page title rises 7 u into the top band's thin span, steps down to 80% of its size and dims to 0.40 as the parent in the path; on Back it returns over the last 150 ms of `frame.step`, once the step has passed back under it (openQ4) |
+| `frost.grow` | 900 ms | Cubic ease-out, `1 - (1 - t)³`; as an Awakening menu opens, the crystal front leaves every seed at one speed and the longest root-to-tip path finishes at 900 ms; it starts with `menu.fade`, and nothing plays on close (openQ4) |
 
 These are authored defaults. Story-driven timing, terminal sequences, weapon
 reticles and scripted effects remain faithful to sources. Marine menu screen
@@ -1229,6 +1358,7 @@ drops slides, flashes, bursts and jolts.
 | Loading status | 100% to 50% over 500 ms, back over 200 ms | Decorative |
 | Weapon display states | Hyperblaster random flicker 68–100%, low pulse at 3 Hz and RELOAD at 2 Hz; nailgun empty 100–40% at 2 Hz; rocket cells 80–100% at 3 Hz; railgun flicker 92–100% | Decorative; alarms where they mark low or empty |
 | Vehicle warnings | Hull and shield 60% × 100–50% at 2 Hz; electric damage a 1 Hz sawtooth 70–30%; hits an additive edge flash over 500 ms | Alarm |
+| Snow in The Awakening's menus (openQ4) | Far flakes fall at 6 u/s and near flakes at 14 u/s, each varied by up to 20%, along the release artwork's 13-degree line toward the leading edge (0.23 u sideways for each u fallen), swaying 2–4 u over 5–9 s and wrapping at the view's edges | Decorative |
 
 Alarms keep their stock cadence, all at or below 3 Hz, and always pair with a
 static cue. Reduced motion stops decorative loops and replaces alarm pulses
@@ -1812,6 +1942,26 @@ and parallax off.
     them. The focused plate runs the scan bar under its label, and the level
     block takes a chamfered frame with the masked grain. Input works from the
     first frame, and reduced motion shows the translated labels at once.
+  - **The Awakening.** While the expansion's campaign is the running game,
+    with its content active and whether or not a mod is loaded over it, the
+    single-player pause menu and every screen it opens over the paused game
+    take the Awakening family: Save, Load, Restart Level, Objectives, the
+    settings pages and their confirmations. Nothing moves. The frame, bands,
+    plates, cuts, markers, type, opacities, choreography and sounds are the
+    Marine pause's, and the section 4 Awakening tokens replace its colors.
+    The bands' inner edges gain the rime line, frost grows on the bands with
+    `frost.grow`, and snow falls behind the instruments over the low haze
+    (sections 6 and 8). The backdrop light band is `awakening.glow` at the
+    pause's strength and the reticle grid `awakening.frost` at 4%. The title
+    reads GAME PAUSED at 0.50 and then, 8 u on, the campaign's name
+    (`#str_230040`) in `awakening.value` at 0.80, as the artwork sets its
+    version figure in ice beside its white label. Hover, focus and selection
+    stay `marine.orange`. A confirmation is the stock modal with
+    `awakening.glow.modal` behind an `awakening.deep` silhouette inside the
+    black frame. Input works from the first frame. The title screen, the
+    multiplayer menus, the HUD and the Classic layout keep their own
+    families, and a Strogg player's pause under The Awakening is the Strogg
+    pause, unchanged.
   - **Arena.** A single-player Arena Campaign match pauses like a story level,
     so Escape opens the single-player pause frame in place of the multiplayer
     Escape menu. MATCH PAUSED replaces GAME PAUSED; Resume, Restart Match,
@@ -4137,6 +4287,29 @@ catalogue obligations, including `ART-035`, remain authoring/artwork requirement
 they do not authorize or require a new gameplay mode. This scope correction
 accepts no GUI, artwork, platform or behavior. Hit-feedback defaults and the other
 UI-05 qualification remain open.
+
+### Version 1.40: The Awakening's in-game menus
+
+The product owner asked for an in-game menu theme for The Awakening after the
+icy release artwork made for the 0.14.1 Awakening Edition. Section 2 adds the
+Awakening menus family, section 4 its tokens, section 6 its frost, snow and
+haze, section 8 `frost.grow` and the snow loop, and section 13.7 the pause
+pattern that uses them.
+
+| Subject | From the artwork | In the menus |
+| --- | --- | --- |
+| Color | Glacial cyan `#78DEFF` on the plate's rim and the version figure, white `#EEF8FF` lettering, a deep ice `#040E1A` plate body | Rails and values, labels, and the bodies of dark plates, cards and the modal silhouette; the remaining tokens are sampled from the artwork at the luminance of the Marine token each replaces |
+| Edge | A crisp rim over a soft glow around the plate | The rime line over the bands' rim light |
+| Frost | Branching crystals creeping in from the edges and corners | The same construction, in units, on the framing bands only, carved around their text |
+| Snow and haze | Two depths of flakes and a haze in the lower part of the frame | The same, behind the instruments, falling along the artwork's slant |
+| Slant | A 13-degree shear on the plate and tagline | Not taken: furniture keeps 45-degree cuts and no shear |
+| Frosted glass, grain, flare | A lifted, desaturated frame edge with rime grain; a flare on the wordmark's slab | Not taken: they would grey the view behind the menu |
+| Interaction | None in a still image | `marine.orange`, the family's one warm color |
+
+The editable atlas sheet `ui/atlas/awakening-menu.html` carries the reference
+generator. This version curates the family; no screen is built from it yet.
+The register does not hold this scope: a revision must append the family's
+requirements before any of it can be accepted, and nothing is accepted.
 
 ### Version 1.39: the Awakening chaingun turret
 

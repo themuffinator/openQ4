@@ -1331,8 +1331,9 @@ def generate_release_docs_site(
         "docs/dev/android-device-budgets.json",
         "docs/dev/retail-overlay-audit.csv",
         "docs/dev/archive/2026-10-18/manifest.json",
-        # The editable atlas sheet the visual specification links (14.19).
+        # The editable atlas sheets the visual specification links (6, 14.19).
         "docs/dev/ui/atlas/medlabs-implant.html",
+        "docs/dev/ui/atlas/awakening-menu.html",
         "subprojects/rmlui.wrap", "subprojects/packagefiles/libtess2/double-precision.patch",
         "subprojects/packagefiles/rmlui/masked-hit-test.patch",
         "subprojects/packagefiles/jsoncpp/subnormal-numbers.patch",

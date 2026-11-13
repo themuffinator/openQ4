@@ -1,0 +1,462 @@
+<section class="sheet" id="awakening-menu">
+  <h2 class="sheet-h">The Awakening · in-game menus</h2>
+  <p class="sheet-p">Visual specification 1.40, sections 2, 4, 6, 8 and 13.7. While The Awakening is the running campaign, the single-player pause menu and everything it opens trade the Marine family's olive light for glacial ice, after the frozen 0.14.1 Awakening Edition release artwork. The frame, the 45° cuts, the open plates and the ◥ marker are the Marine family's, unchanged; the color of the light, the frost on the bands and the snow behind the instruments are the theme. Orange stays the one warm color: it still means the control you are on.</p>
+  <style>
+    #awakening-menu{box-sizing:border-box;max-width:1240px;margin-inline:auto;padding-inline:clamp(16px,3vw,32px)}
+    #awakening-menu .awk-ctl{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+    #awakening-menu .awk-seg{font:500 12px/1 var(--f-mono,monospace);color:var(--ter,#8C947A);background:rgba(120,222,255,.10);border:0;padding:7px 10px 7px 12px;cursor:pointer;clip-path:polygon(0 0,100% 0,100% 100%,6px 100%,0 calc(100% - 6px))}
+    #awakening-menu .awk-seg:hover,#awakening-menu .awk-seg:focus-visible{color:#fff;background:rgba(120,222,255,.24);outline:none}
+    #awakening-menu .awk-seg[aria-pressed="true"]{background:rgba(120,222,255,.42);color:#fff}
+    #awakening-menu .awk-lbl{font:600 11px/1 var(--f-low,sans-serif);letter-spacing:.08em;text-transform:uppercase;color:var(--t40,rgba(255,255,255,.4));margin-right:2px}
+    #awakening-menu .awk-group{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+    #awakening-menu .awk-stage{background:#000;overflow:hidden}
+    #awakening-menu svg.awk-view{display:block;width:100%;height:auto;margin:0 auto}
+    #awakening-menu .awk-np,#awakening-menu .awk-sl,#awakening-menu .awk-btn{cursor:pointer;outline:none}
+    #awakening-menu .awk-np .awk-pf{opacity:.4;transition:opacity .3s linear}
+    #awakening-menu .awk-np.f .awk-pf{opacity:.8;transition:none}
+    #awakening-menu .awk-nl{font:400 11.2px Michroma,Eurostile,sans-serif;fill:var(--awk-text);fill-opacity:.8;transition:fill .3s linear}
+    #awakening-menu .awk-mk{fill:var(--awk-marker);opacity:.4;transition:fill .3s linear,opacity .3s linear}
+    #awakening-menu .awk-np.f .awk-nl,#awakening-menu .awk-sl:hover text,#awakening-menu .awk-sl:focus-visible text,#awakening-menu .awk-btn.f text{fill:#E38900;fill-opacity:1;transition:none}
+    #awakening-menu .awk-np.f .awk-mk,#awakening-menu .awk-sl:hover .awk-mk,#awakening-menu .awk-sl:focus-visible .awk-mk,#awakening-menu .awk-btn.f .awk-mk{fill:#E38900;opacity:1;transition:none}
+    #awakening-menu .awk-np .awk-fx{opacity:0}
+    #awakening-menu .awk-np.f .awk-fx{opacity:1}
+    #awakening-menu .awk-btn .awk-pf{opacity:.4;transition:opacity .3s linear}
+    #awakening-menu .awk-btn.f .awk-pf{opacity:.8;transition:none}
+    #awakening-menu .awk-sl text{font:400 7.4px Michroma,Eurostile,sans-serif;fill:var(--awk-text);fill-opacity:.5;transition:fill .3s linear}
+    #awakening-menu .awk-sws{display:grid;gap:10px 20px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}
+    #awakening-menu .awk-sw{display:grid;grid-template-columns:40px 1fr;gap:10px;align-items:center}
+    #awakening-menu .awk-sw i{height:40px;display:block;position:relative;background:#000;clip-path:polygon(0 0,100% 0,100% 100%,9px 100%,0 calc(100% - 9px))}
+    #awakening-menu .awk-sw i::after{content:"";position:absolute;inset:0;background:var(--c);opacity:var(--a,1)}
+    #awakening-menu .awk-sw span{display:grid;font:12px/1.35 var(--f-mono,monospace);color:var(--ter,#8C947A);min-width:0}
+    #awakening-menu .awk-sw span b{font-weight:500;color:var(--sec,#B8C29E);overflow-wrap:anywhere}
+    #awakening-menu .awk-two{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));align-items:start}
+    #awakening-menu .awk-two>*{min-width:0}
+    #awakening-menu .awk-h{margin:8px 0 0;font:600 12px/1.3 var(--f-low,sans-serif);letter-spacing:.08em;text-transform:uppercase;color:var(--t40,rgba(255,255,255,.4))}
+    #awakening-menu .awk-cap{margin:0;font:12px/1.55 var(--f-mono,monospace);color:var(--ter,#8C947A)}
+    #awakening-menu .awk-cap b{font-weight:500;color:var(--sec,#B8C29E)}
+  </style>
+  <div class="awk-ctl">
+    <span class="awk-group" role="group" aria-label="Screen" id="awk-screen"><span class="awk-lbl">Screen</span><button class="awk-seg" type="button" data-v="pause" aria-pressed="true">Pause</button><button class="awk-seg" type="button" data-v="confirm" aria-pressed="false">Confirmation</button></span>
+    <span class="awk-group" role="group" aria-label="Family" id="awk-family"><span class="awk-lbl">Family</span><button class="awk-seg" type="button" data-v="awakening" aria-pressed="true">The Awakening</button><button class="awk-seg" type="button" data-v="marine" aria-pressed="false">Marine, for comparison</button></span>
+    <span class="awk-group" role="group" aria-label="View" id="awk-aspect"><span class="awk-lbl">View</span><button class="awk-seg" type="button" data-v="1.333333" aria-pressed="false">4:3</button><button class="awk-seg" type="button" data-v="1.777778" aria-pressed="true">16:9</button><button class="awk-seg" type="button" data-v="2.37037" aria-pressed="false">21:9</button><button class="awk-seg" type="button" data-v="3.555556" aria-pressed="false">32:9</button></span>
+    <span class="awk-group" role="group" aria-label="Layers" id="awk-layers"><span class="awk-lbl">Layers</span><button class="awk-seg" type="button" data-v="frost" aria-pressed="true">Frost</button><button class="awk-seg" type="button" data-v="snow" aria-pressed="true">Snow</button><button class="awk-seg" type="button" data-v="haze" aria-pressed="true">Haze</button><button class="awk-seg" type="button" data-v="slots" aria-pressed="false">Show carved slots</button></span>
+    <button class="awk-seg" type="button" id="awk-replay">Replay the opening</button>
+  </div>
+  <div class="awk-stage"><svg class="awk-view" id="awk-view" role="img" aria-label="The Awakening's single-player pause menu" viewBox="-107 0 854 480"></svg></div>
+  <p class="awk-cap" id="awk-status" aria-live="polite"></p>
+
+  <h3 class="awk-h">Tokens</h3>
+  <div class="awk-sws">
+    <div class="awk-sw"><i style="--c:#78DEFF"></i><span><b>awakening.rail</b>#78DEFF · dark plate rails · for marine.rail.dark</span></div>
+    <div class="awk-sw"><i style="--c:#78DEFF;--a:.8"></i><span><b>awakening.value</b>#78DEFF at 80% · values, the campaign's name · for marine.value</span></div>
+    <div class="awk-sw"><i style="--c:#289EB7"></i><span><b>awakening.glacier</b>#289EB7 · light plates, markers, header bands, rules · for marine.olive and marine.marker</span></div>
+    <div class="awk-sw"><i style="--c:#3AAAC4"></i><span><b>awakening.rail.card</b>#3AAAC4 · card rail · for marine.rail.card</span></div>
+    <div class="awk-sw"><i style="--c:#2098BB;--a:.37"></i><span><b>awakening.rim</b>#2098BB at 37% · band rim light · for marine.rim</span></div>
+    <div class="awk-sw"><i style="--c:#EBFAFF;--a:.45"></i><span><b>awakening.rime</b>#EBFAFF at 45% · the crisp line on the bands' inner edges · new</span></div>
+    <div class="awk-sw"><i style="--c:#1E6B85;--a:.7"></i><span><b>awakening.glow</b>#1E6B85 · additive band, focus light · for marine.glow</span></div>
+    <div class="awk-sw"><i style="--c:#154C5E"></i><span><b>awakening.glow.modal</b>#154C5E · modal glow · for marine.glow.modal</span></div>
+    <div class="awk-sw"><i style="--c:#040E1A"></i><span><b>awakening.deep</b>#040E1A · dark plates, card bodies, the modal silhouette, troughs · for black</span></div>
+    <div class="awk-sw"><i style="--c:#061420;--a:.88"></i><span><b>awakening.surface.panel</b>#061420 at 88% · solid backing · for surface.panel</span></div>
+    <div class="awk-sw"><i style="--c:#1B4656;--a:.3"></i><span><b>awakening.plinth</b>#1B4656 at 30% · link plinth · for marine.plinth</span></div>
+    <div class="awk-sw"><i style="--c:#17414F"></i><span><b>awakening.picture</b>#17414F · the 1 u picture frame · for #414624</span></div>
+    <div class="awk-sw"><i style="--c:#0F6F8C"></i><span><b>awakening.check</b>#0F6F8C · set box · for marine.check</span></div>
+    <div class="awk-sw"><i style="--c:#45B2CC"></i><span><b>awakening.sort</b>#45B2CC · sortable column · for marine.sort</span></div>
+    <div class="awk-sw"><i style="--c:#EEF8FF;--a:.8"></i><span><b>awakening.text</b>#EEF8FF · 80% labels, 50% titles, 40% headings · for white</span></div>
+    <div class="awk-sw"><i style="--c:#A9C9D6"></i><span><b>awakening.text.secondary</b>#A9C9D6 · for text.secondary</span></div>
+    <div class="awk-sw"><i style="--c:#7E99A5"></i><span><b>awakening.text.tertiary</b>#7E99A5 · for text.tertiary</span></div>
+    <div class="awk-sw"><i style="--c:#D1EDFF"></i><span><b>awakening.frost</b>#D1EDFF · crystals, rime, the reticle grid · new</span></div>
+    <div class="awk-sw"><i style="--c:#EBF6FF"></i><span><b>awakening.snow</b>#EBF6FF · flakes · new</span></div>
+    <div class="awk-sw"><i style="--c:#AAD7F0;--a:.5"></i><span><b>awakening.haze</b>#AAD7F0 · the low haze · new</span></div>
+    <div class="awk-sw"><i style="--c:#E38900"></i><span><b>marine.orange</b>#E38900 · kept: focus, hover and selection, with marine.list and marine.progress</span></div>
+  </div>
+
+  <div class="awk-two">
+    <div>
+      <h3 class="awk-h">Frost construction</h3>
+      <svg id="awk-crystal" role="img" aria-label="One frost crystal, enlarged, with its construction values" viewBox="0 0 340 250" style="display:block;width:100%;height:auto;background:#000"></svg>
+      <p class="awk-cap"><b>One crystal</b>, enlarged. It leaves a seed on the view's top or bottom edge in 3 u steps, wandering 6.9° a step and thinning 3% a step from 0.75–1.6 u to a 0.5 u floor. At each step it has a 28% chance of a branch at 60° ± 8.6° to either side, 25–50% as long and 70% as wide, to four levels. Sixty degrees is how ice grows; the furniture's own cuts stay at 45°.</p>
+    </div>
+    <div>
+      <h3 class="awk-h">From the artwork to the menu</h3>
+      <p class="awk-cap"><b>Taken</b> the glacial cyan of the plate's rim and the version figure (#78DEFF) for rails and values, the white of its lettering (#EEF8FF), the deep ice of the plate's body (#040E1A), the rim-and-glow edge as the bands' rime line over their rim light, the branching frost from the edges and corners, the two depths of snow and the haze in the lower part of the picture.</p>
+      <p class="awk-cap"><b>Left</b> the 13° slant of the plate and tagline, which belongs to the wordmark: furniture keeps its 45° cuts and no shear, and the slant survives only as the snow's fall line. The frosted-glass lift and rime grain, which would grey the scene behind the menu. The lens flare on the wordmark's slab. Icicles, removed from the artwork itself.</p>
+      <p class="awk-cap"><b>Where frost may grow</b> only on the framing bands, which are opaque black and hold no content: it fades out across the last 6 u inside a band's inner edge and never crosses it. Each screen carves its own band text out of it, with 6 u clear and a 6 u feather: here the prompt bar. A notice brings a black backing of the same margin. Frost never lies on a plate, a card, a dialog or text.</p>
+      <p class="awk-cap"><b>Motion</b> the menu fades in over 250 ms as the stock does; from that first frame the crystal front leaves every seed at one speed and the longest crystal finishes at 900 ms, easing out. Snow falls behind the instruments along the artwork's 13° line, far flakes at 6 u/s and near ones at 14 u/s. Reduced motion shows the frost complete and the snow still; high contrast and the Phone profile's power saving drop the snow, and high contrast drops the haze and frost too.</p>
+    </div>
+  </div>
+</section>
+<script>
+(() => {
+  const root = document.getElementById('awakening-menu');
+  if (!root) return;
+  const svg = root.querySelector('#awk-view'), status = root.querySelector('#awk-status');
+  const ns = 'http://www.w3.org/2000/svg';
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const F_M = 'Michroma, Eurostile, sans-serif', F_L = 'Archivo, "Arial Narrow", Arial, sans-serif';
+  const ADD = 'mix-blend-mode:screen;mix-blend-mode:plus-lighter';
+  const add = (tag, attrs = {}, parent = svg) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); parent.append(n); return n; };
+  const text = (parent, x, y, value, attrs) => { const n = add('text', { x, y, ...attrs }, parent); n.textContent = value; return n; };
+  const r2 = v => Math.round(v * 100) / 100;
+
+  /* Family values (visual specification 1.40, section 4). Marine is drawn only for comparison. */
+  const FAM = {
+    awakening: { rail: '#78DEFF', railCard: '#3AAAC4', plate: '#289EB7', marker: '#289EB7', value: '#78DEFF', rim: '#2098BB', rime: '#EBFAFF', glow: '#1E6B85', glowModal: '#154C5E',
+      deep: '#040E1A', plinth: '#1B4656', picture: '#17414F', text: '#EEF8FF', sec: '#A9C9D6', ter: '#7E99A5', grid: '#D1EDFF', heading: '#78DEFF', open: '#78DEFF' },
+    marine: { rail: '#CCCC51', railCard: '#A0A040', plate: '#8B964B', marker: '#909A49', value: '#FFBE23', rim: '#626934', rime: null, glow: '#616F26', glowModal: '#46501B',
+      deep: '#000000', plinth: '#3E4A21', picture: '#414624', text: '#FFFFFF', sec: '#B8C29E', ter: '#8C947A', grid: '#FFFFFF', heading: '#FF8000', open: '#B0CD6B' },
+  };
+  const FROST = '#D1EDFF', SNOW = '#EBF6FF', HAZE = '#AAD7F0', ORANGE = '#E38900';
+  const ui = { screen: 'pause', family: 'awakening', aspect: 1.777778, frost: true, snow: true, haze: true, slots: false };
+  let uid = 0; const id = p => `awk${p}${++uid}`;
+
+  /* The measured band silhouettes in their home positions (Appendix B.2), as the home sheet draws them. */
+  const TOP = [[-400, 89.7], [-297.9, 89.7], [-283.7, 103.8], [30.7, 103.8], [40.9, 94.7], [76.6, 94.7], [85.8, 103.8], [127.6, 103.8], [137.8, 94.7],
+    [172.5, 94.7], [181.7, 103.8], [223.5, 103.8], [233.7, 94.7], [268.4, 94.7], [277.6, 103.8], [315.4, 103.8], [352.1, 68.5], [900, 68.5]];
+  const BTM = [[-399, 421.5], [-232.7, 421.5], [-222.5, 430.6], [-28.6, 430.6], [2.1, 400.4], [344.9, 400.4], [389.8, 443.7], [582.7, 443.7], [591.9, 434.6], [900, 434.6]];
+  const span = (pts, x0, x1) => pts.map(([x, y], i) => [i === 0 ? Math.min(x, x0 - 20) : i === pts.length - 1 ? Math.max(x, x1 + 20) : x, y]);
+  const poly = pts => 'M' + pts.map(p => p.join(' ')).join('L');
+  const edgeY = (pts, x) => { for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0 || 1); } return pts[pts.length - 1][1]; };
+
+  /* A seeded generator, so a rebuild grows the same frost: mulberry32 from the artwork's seed, 1414. */
+  const rng = seed => { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+  const SEED = 1414, RAD = Math.PI / 180;
+
+  /* Frost: crystals from seeds on the view's top and bottom edges and at its four corners.
+     Every length is in u (640x480 canvas). Returns the branches and the longest root-to-tip path. */
+  function growFrost(x0, W, rand) {
+    const normal = (s) => { const u = Math.max(1e-9, rand()), v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * s; };
+    const uni = (a, b) => a + (b - a) * rand();
+    const out = []; let longest = 0;
+    const grow = (x, y, ang, length, width, depth, base) => {
+      if (depth > 4 || length < 2) return;
+      const pts = [[x, y]], wid = [width]; let travelled = 0;
+      const kids = [];
+      for (let n = Math.floor(length / 3) + 1; n > 0; n--) {
+        ang += normal(6.9 * RAD);
+        x += Math.cos(ang) * 3; y += Math.sin(ang) * 3; travelled += 3;
+        width = Math.max(.5, width * .97);
+        pts.push([x, y]); wid.push(width);
+        if (rand() < .28) kids.push([x, y, ang + (rand() < .5 ? -1 : 1) * (60 * RAD + normal(8.6 * RAD)), length * uni(.25, .5), width * .7, depth + 1, base + travelled]);
+      }
+      out.push({ pts, wid, base, len: travelled, alpha: uni(.59, .98) });
+      longest = Math.max(longest, base + travelled);
+      kids.forEach(k => grow(...k));
+    };
+    const corner = x => { const d = Math.min(x - x0, x0 + W - x); const w = Math.max(0, 1 - d / 200); return w * w; };
+    for (const [y, inward] of [[0, 90], [480, -90]]) {
+      let x = x0 + uni(2, 8);
+      while (x < x0 + W) {
+        const w = corner(x);
+        grow(x, y, (inward + normal(28.6)) * RAD, uni(20, 75) * (.55 + .45 * w), uni(.75, 1.6), 0, 0);
+        x += (48 - 36 * w) * uni(.7, 1.3);
+      }
+    }
+    for (const [cx, cy, a0] of [[x0, 0, 0], [x0 + W, 0, 90], [x0 + W, 480, 180], [x0, 480, 270]])
+      for (const a of [20, 45, 70]) grow(cx, cy, (a0 + a + normal(8)) * RAD, uni(45, 75), uni(1.1, 1.6), 0, 0);
+    return { branches: out, longest };
+  }
+  /* A branch as a tapered ribbon, revealed up to `shown` u from its seed. */
+  function ribbon(b, shown) {
+    const visible = Math.min(b.len, shown - b.base);
+    if (visible <= .2) return '';
+    const full = Math.floor(visible / 3), frac = visible / 3 - full;
+    const pts = b.pts.slice(0, full + 1), wid = b.wid.slice(0, full + 1);
+    if (full < b.pts.length - 1 && frac > 0) { const [ax, ay] = b.pts[full], [bx, by] = b.pts[full + 1]; pts.push([ax + (bx - ax) * frac, ay + (by - ay) * frac]); wid.push(0); }
+    else wid[wid.length - 1] = 0;
+    if (pts.length < 2) return '';
+    const left = [], right = [];
+    pts.forEach(([px, py], i) => {
+      const [ax, ay] = pts[Math.max(0, i - 1)], [bx, by] = pts[Math.min(pts.length - 1, i + 1)];
+      const l = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / l * wid[i] / 2, ny = (bx - ax) / l * wid[i] / 2;
+      left.push(`${r2(px + nx)} ${r2(py + ny)}`); right.push(`${r2(px - nx)} ${r2(py - ny)}`);
+    });
+    return 'M' + left.join('L') + 'L' + right.reverse().join('L') + 'Z';
+  }
+
+  /* An abstract paused view: dusk over a trench line with two fire vents, so the warm scene shows under the cold light. */
+  function scene(g, defs, x0, W) {
+    const sky = id('sky'), lg = add('linearGradient', { id: sky, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    [[0, '#0d1822'], [.42, '#22323c'], [.58, '#4a443a'], [.6, '#191b19'], [1, '#0b0c0b']].forEach(([o, c]) => add('stop', { offset: o, 'stop-color': c }, lg));
+    add('rect', { x: x0 - 20, y: -20, width: W + 40, height: 520, fill: `url(#${sky})` }, g);
+    add('path', { d: `M${x0 - 20} 286L${x0 + W * .12} 250L${x0 + W * .2} 262L${x0 + W * .31} 226L${x0 + W * .4} 258L${x0 + W * .52} 240L${x0 + W * .63} 268L${x0 + W * .78} 232L${x0 + W * .9} 262L${x0 + W + 20} 246V300H${x0 - 20}Z`, fill: '#141a1e' }, g);
+    for (const [fx, h, w] of [[.18, 150, 26], [.47, 96, 18], [.7, 190, 34], [.86, 120, 22]]) {
+      const x = x0 + W * fx;
+      add('path', { d: `M${x - w / 2} 300V${300 - h + 14}L${x - w / 2 + 8} ${300 - h}H${x + w / 2}V300Z`, fill: '#0e1316' }, g);
+      add('rect', { x: x - 3, y: 300 - h + 26, width: 6, height: 3, fill: '#9fd6e8', opacity: .7 }, g);
+    }
+    add('path', { d: `M${x0 - 20} 500V330L${x0 + W * .34} 300H${x0 + W * .66}L${x0 + W + 20} 330V500Z`, fill: '#15171a' }, g);
+    add('path', { d: `M${x0 - 20} 500V352L${x0 + W * .28} 306V500Z`, fill: '#0c0e10' }, g);
+    add('path', { d: `M${x0 + W + 20} 500V352L${x0 + W * .72} 306V500Z`, fill: '#0f1113' }, g);
+    for (const [fx, fy, r] of [[.38, 372, 60], [.83, 344, 44]]) {
+      const gid = id('fire'), rg = add('radialGradient', { id: gid }, defs);
+      [[0, '#FFC46A', .95], [.25, '#FF7A1A', .7], [1, '#FF4A00', 0]].forEach(([o, c, a]) => add('stop', { offset: o, 'stop-color': c, 'stop-opacity': a }, rg));
+      add('ellipse', { cx: x0 + W * fx, cy: fy, rx: r, ry: r * .8, fill: `url(#${gid})`, style: ADD }, g);
+    }
+  }
+
+  let snow = null, jobs = [], frame = 0, visible = true, last = 0, focusLight = 'none';
+  const run = (delay, dur, fn) => { jobs.push([performance.now() + delay, dur, fn]); wake(); };
+  const wake = () => { if (!frame) frame = requestAnimationFrame(tick); };
+  function tick(now) {
+    frame = 0;
+    const dt = Math.min(.1, (now - (last || now)) / 1000); last = now;
+    jobs = jobs.filter(([t0, dur, fn]) => { if (now < t0) return true; fn(dur ? Math.min(1, (now - t0) / dur) : 1); return now < t0 + dur; });
+    const drifting = snow && visible && !reduced && ui.screen === 'pause';
+    if (drifting) snow.step(dt);
+    if (jobs.length || drifting) frame = requestAnimationFrame(tick); else last = 0;
+  }
+
+  function build(opening) {
+    jobs = []; snow = null; uid = 0;
+    svg.replaceChildren();
+    const F = FAM[ui.family], awk = ui.family === 'awakening', confirm = ui.screen === 'confirm';
+    const W = Math.max(640, 480 * ui.aspect), x0 = (640 - W) / 2, x1 = x0 + W;
+    svg.setAttribute('viewBox', `${r2(x0)} 0 ${r2(W)} 480`);
+    svg.style.setProperty('--awk-text', F.text); svg.style.setProperty('--awk-marker', F.marker);
+    svg.setAttribute('aria-label', (awk ? "The Awakening's" : 'The Marine') + (confirm ? ' confirmation over the pause menu' : ' single-player pause menu'));
+    const defs = add('defs');
+    const grad = (stops, vertical = true, extra = {}) => { const gid = id('g'), g = add('linearGradient', { id: gid, x1: 0, y1: 0, x2: vertical ? 0 : 1, y2: vertical ? 1 : 0, ...extra }, defs);
+      stops.forEach(([o, c, a = 1]) => add('stop', { offset: o, 'stop-color': c, 'stop-opacity': a }, g)); return `url(#${gid})`; };
+    const blur = (sd, pad = 40) => { const fid = id('f'); add('feGaussianBlur', { stdDeviation: sd }, add('filter', { id: fid, x: `-${pad}%`, y: `-${pad}%`, width: `${100 + 2 * pad}%`, height: `${100 + 2 * pad}%` }, defs)); return `url(#${fid})`; };
+    const full = { x: r2(x0), y: 0, width: r2(W), height: 480 };
+    const top = span(TOP, x0, x1), btm = span(BTM, x0, x1);
+
+    /* Everything under a confirmation takes modal.softfocus: a 5 u blur at 0.80 saturation, never dimmed. */
+    // nothing shows past the view's own edges
+    const vid = id('view'); add('rect', full, add('clipPath', { id: vid }, defs));
+    const view = add('g', { 'clip-path': `url(#${vid})` });
+    svg.style.maxWidth = Math.round(720 * W / 480) + 'px';
+    let menu = view;
+    if (confirm) {
+      const fid = id('soft'), f = add('filter', { id: fid, x: '-2%', y: '-2%', width: '104%', height: '104%', 'color-interpolation-filters': 'sRGB' }, defs);
+      add('feGaussianBlur', { stdDeviation: 5 }, f); add('feColorMatrix', { type: 'saturate', values: .8 }, f);
+      menu = add('g', { filter: `url(#${fid})` }, view);
+    }
+
+    // the paused view, softened behind the menu
+    const sid = id('soft'), sf = add('filter', { id: sid, x: '-2%', y: '-2%', width: '104%', height: '104%', 'color-interpolation-filters': 'sRGB' }, defs);
+    add('feGaussianBlur', { stdDeviation: 5 }, sf); add('feColorMatrix', { type: 'saturate', values: .7 }, sf);
+    scene(add('g', { filter: `url(#${sid})` }, menu), defs, x0, W);
+    add('rect', { ...full, fill: '#000', 'fill-opacity': .45 }, menu);
+    add('rect', { x: r2(x0), y: 0, width: 520 - x0 - 107, height: 480, fill: grad([[0, '#000', .7], [.55, '#000', .35], [1, '#000', 0]], false) }, menu);
+    // the low haze: nothing above 55% of the height, 0.14 at the foot
+    if (awk && ui.haze) add('rect', { ...full, fill: grad([[.55, HAZE, 0], [1, HAZE, .14]]) }, menu);
+    // the additive light band, the vignettes and the reticle grid
+    add('rect', { ...full, fill: grad([[.1, F.glow, 0], [.5, F.glow, .45], [.9, F.glow, 0]]), style: ADD }, menu);
+    add('rect', { ...full, fill: grad([[0, '#000', .97], [.3, '#000', 0], [.7, '#000', 0], [1, '#000', .97]]) }, menu);
+    const pid = id('p'), pat = add('pattern', { id: pid, width: 30, height: 30, patternUnits: 'userSpaceOnUse' }, defs);
+    add('path', { d: 'M15 8.5v13M8.5 15h13', stroke: F.grid, 'stroke-width': .6 }, pat);
+    add('rect', { ...full, fill: `url(#${pid})`, opacity: .04 }, menu);
+
+    // snow, behind every plate and card: 0.6 far and 0.1 near flakes per 1000 square u
+    if (awk && ui.snow) {
+      const rand = rng(SEED + 1), g = add('g', {}, menu), near = add('g', { filter: blur(.7) }, g);
+      const flakes = [];
+      const make = (count, rmin, rmax, alpha, speed, parent) => { for (let i = 0; i < count; i++) {
+        const f = { x: x0 + rand() * W, y: rand() * 480, r: rmin + rand() * (rmax - rmin), v: speed * (.8 + .4 * rand()), sway: 2 + rand() * 2, period: 5 + rand() * 4, phase: rand() * 6.283 };
+        f.node = add('circle', { r: r2(f.r), fill: SNOW, 'fill-opacity': r2(alpha * (.4 + .6 * rand())) }, parent); flakes.push(f); } };
+      make(Math.round(W * 480 * .0006), .3, .8, .59, 6, g);
+      make(Math.round(W * 480 * .0001), .9, 1.8, .78, 14, near);
+      let clock = 0;
+      const place = () => flakes.forEach(f => { f.node.setAttribute('cx', r2(f.x + Math.sin(clock * 6.283 / f.period + f.phase) * f.sway)); f.node.setAttribute('cy', r2(f.y)); });
+      snow = { step(dt) { clock += dt; flakes.forEach(f => { f.y += f.v * dt; f.x -= .23 * f.v * dt; if (f.y > 484) { f.y -= 488; } if (f.x < x0 - 4) f.x += W + 8; }); place(); } };
+      place();
+    }
+
+    // the focus light: a soft additive glow about 24 dp across beside the focused plate's marker (section 13.8)
+    const fl = id('fl'), flg = add('radialGradient', { id: fl }, defs);
+    add('stop', { offset: 0, 'stop-color': F.glow, 'stop-opacity': .9 }, flg); add('stop', { offset: 1, 'stop-color': F.glow, 'stop-opacity': 0 }, flg);
+    focusLight = `url(#${fl})`;
+
+    levelBlock(menu, defs, grad, F, awk);
+
+    // framing bands: the rim light, the opaque bands, then (The Awakening) the rime line on their inner edges
+    [top, btm].forEach(pts => add('path', { d: poly(pts), fill: 'none', stroke: F.rim, 'stroke-width': 7, opacity: .7, filter: blur(4) }, menu));
+    add('path', { d: poly(top) + `L${x1 + 20} -20L${x0 - 20} -20Z`, fill: '#000' }, menu);
+    add('path', { d: poly(btm) + `L${x1 + 20} 500L${x0 - 20} 500Z`, fill: '#000' }, menu);
+    if (F.rime) [top, btm].forEach(pts => add('path', { d: poly(pts), fill: 'none', stroke: F.rime, 'stroke-width': .5, 'stroke-opacity': .45 }, menu));
+
+    // the title: GAME PAUSED, then the campaign's name as a value
+    const title = text(menu, 44, 152, 'GAME PAUSED', { 'font-family': F_M, 'font-size': 12, fill: F.text, 'fill-opacity': .5 });
+    if (awk) add('tspan', { dx: 8, fill: F.value, 'fill-opacity': .8 }, title).textContent = 'THE AWAKENING';
+
+    nav(menu, grad, F, x0, awk);
+
+    // the plinth, where only EXIT stays in a game
+    add('path', { d: 'M36 405H318L334 421V426H44L36 418Z', fill: F.plinth, 'fill-opacity': .3 }, menu);
+    const exit = add('g', { class: 'awk-sl', tabindex: 0, role: 'button', 'aria-label': 'Exit' }, menu);
+    add('path', { d: 'M50 410.5h4.5v4.5z', class: 'awk-mk' }, exit); text(exit, 58, 416.5, 'EXIT', {});
+
+    // the prompt bar in the bottom band's raised trailing section
+    const pr = add('g', { 'font-family': F_M, 'font-size': 7.4, fill: F.text, 'fill-opacity': .8 }, menu);
+    [['A', 'SELECT', x1 - 130], ['B', 'RESUME', x1 - 66]].forEach(([k, t, x]) => {
+      add('circle', { cx: r2(x), cy: 455, r: 6, fill: F.text, 'fill-opacity': .85 }, pr);
+      text(pr, r2(x - 2.6), 458, k, { 'font-family': F_L, 'font-weight': 700, 'font-size': 8, fill: '#0b0d09', 'fill-opacity': 1 });
+      text(pr, r2(x + 10), 458, t, {});
+    });
+    const slot = [x1 - 142, 446, 140, 18];                    // the prompt bar's box, carved out of the frost
+
+    // frost, on the bands only
+    let frost = null;
+    if (awk && ui.frost) {
+      const mid = id('m'), mask = add('mask', { id: mid, maskUnits: 'userSpaceOnUse', x: r2(x0 - 30), y: -30, width: r2(W + 60), height: 540 }, defs);
+      const inner = add('g', { filter: blur(2, 10) }, mask);    // a 6 u fade inside each inner edge, and round each carved slot
+      add('path', { d: poly(top.map(([x, y]) => [x, y - 3])) + `L${x1 + 40} -40L${x0 - 40} -40Z`, fill: '#fff' }, inner);
+      add('path', { d: poly(btm.map(([x, y]) => [x, y + 3])) + `L${x1 + 40} 520L${x0 - 40} 520Z`, fill: '#fff' }, inner);
+      add('rect', { x: r2(slot[0] - 6), y: slot[1] - 6, width: slot[2] + 12, height: slot[3] + 12, fill: '#000' }, inner);
+      const clip = id('bands'), cp = add('clipPath', { id: clip }, defs);
+      add('path', { d: poly(top) + `L${x1 + 20} -20L${x0 - 20} -20Z` + poly(btm) + `L${x1 + 20} 500L${x0 - 20} 500Z` }, cp);
+      const layer = add('g', { mask: `url(#${mid})` }, add('g', { 'clip-path': `url(#${clip})` }, menu));
+      // rime: a wash along the view's top and bottom edges, deeper at the corners
+      add('rect', { x: r2(x0), y: 0, width: r2(W), height: 14, fill: grad([[0, FROST, .1], [1, FROST, 0]]) }, layer);
+      add('rect', { x: r2(x0), y: 466, width: r2(W), height: 14, fill: grad([[0, FROST, 0], [1, FROST, .1]]) }, layer);
+      for (const [cx, cy] of [[x0, 0], [x1, 0], [x1, 480], [x0, 480]]) {
+        const gid = id('c'), rg = add('radialGradient', { id: gid, gradientUnits: 'userSpaceOnUse', cx: r2(cx), cy, r: 90 }, defs);
+        add('stop', { offset: 0, 'stop-color': FROST, 'stop-opacity': .16 }, rg); add('stop', { offset: 1, 'stop-color': FROST, 'stop-opacity': 0 }, rg);
+        add('circle', { cx: r2(cx), cy, r: 90, fill: `url(#${gid})` }, layer);
+      }
+      const grown = growFrost(x0, W, rng(SEED));
+      const halo = add('g', { fill: FROST, opacity: .5, filter: blur(1.5), style: ADD }, layer), core = add('g', { fill: FROST, opacity: .8 }, layer);
+      const nodes = grown.branches.map(b => [b, add('path', { 'fill-opacity': r2(b.alpha) }, core), add('path', { 'fill-opacity': r2(b.alpha) }, halo)]);
+      const show = p => { const reach = grown.longest * p; nodes.forEach(([b, a, h]) => { const d = ribbon(b, reach); a.setAttribute('d', d); h.setAttribute('d', d); }); };
+      frost = { show, count: grown.branches.length };
+      if (ui.slots) add('rect', { x: r2(slot[0] - 6), y: slot[1] - 6, width: slot[2] + 12, height: slot[3] + 12, fill: 'none', stroke: ORANGE, 'stroke-width': .6, 'stroke-dasharray': '3 2' }, menu);
+      if (opening && !reduced) { show(0); run(0, 900, p => show(1 - Math.pow(1 - p, 3))); } else show(1);
+    }
+    // menu.fade: 250 ms from black as the menu opens
+    if (opening && !reduced) { const cover = add('rect', { ...full, fill: '#000' }, view); run(0, 250, p => { cover.setAttribute('fill-opacity', 1 - p); if (p >= 1) cover.remove(); }); }
+
+    if (confirm) modal(view, defs, grad, blur, F, awk);
+
+    if (status) status.textContent = !awk ? 'Marine, for comparison: the same screen in the stock olive light, with no frost, snow or haze.'
+      : confirm ? 'Confirmation: the stock modal over the softened pause, its glow in awakening.glow.modal and its silhouette in awakening.deep inside the black frame.'
+      : `Pause at ${ui.aspect > 3 ? '32:9' : ui.aspect > 2 ? '21:9' : ui.aspect > 1.5 ? '16:9' : '4:3'}: ${frost ? frost.count + ' frost branches on the bands' : 'no frost'}${ui.snow ? ', ' + (Math.round(W * 480 * .0006) + Math.round(W * 480 * .0001)) + ' flakes behind the instruments' : ''}. Move over the actions: focus stays orange.`;
+    wake();
+  }
+
+  /* The navigation: dark plates bleeding off the leading edge on the stock 30 u pitch from 172 u, rails on the bottom edge only. */
+  function nav(parent, grad, F, x0, awk) {
+    const body = grad([[0, F.deep], [.44, F.deep], [.62, F.deep, .5], [.88, F.deep, 0]], false);
+    const rail = grad([[0, F.rail], [.44, F.rail], [.88, F.rail, 0]], false);
+    const plates = [];
+    ['RESUME', 'SAVE GAME', 'LOAD GAME', 'RESTART LEVEL', 'OBJECTIVES', 'SETTINGS', 'QUIT TO MENU'].forEach((label, i) => {
+      const y = 172 + i * 30, g = add('g', { class: 'awk-np' + (i === 0 ? ' f' : ''), tabindex: 0, role: 'button', 'aria-label': label }, parent);
+      add('rect', { x: r2(x0 - 10), y: y + 2.8, width: r2(256 - x0 + 10), height: 24.4, fill: body, class: 'awk-pf' }, g);
+      add('path', { d: `M${r2(x0 - 10)} ${y + 27.2}H256`, stroke: rail, 'stroke-width': 1, class: 'awk-pf' }, g);
+      add('path', { d: `M${r2(x0 - 10)} ${y + 25.1}H232`, stroke: ORANGE, 'stroke-width': .8, class: 'awk-fx' }, g);
+      add('ellipse', { cx: 34, cy: y + 15, rx: 22, ry: 13, fill: focusLight, class: 'awk-fx', style: ADD }, g);
+      add('path', { d: `M32 ${y + 11}h6v6z`, class: 'awk-mk' }, g);
+      text(g, 44, y + 19.1, label, { class: 'awk-nl' });
+      const focus = () => { plates.forEach(p => p.classList.remove('f')); g.classList.add('f'); };
+      g.addEventListener('pointerenter', focus); g.addEventListener('focus', focus);
+      if (label === 'QUIT TO MENU') g.addEventListener('click', () => choose('awk-screen', 'confirm'));
+      plates.push(g);
+    });
+  }
+
+  /* The current level block, a card in the emblem's place: sample text for The Awakening's first mission. */
+  function levelBlock(parent, defs, grad, F, awk) {
+    const x = 374, y = 118, w = 262, h = 270, g = add('g', { transform: `translate(${x} ${y})` }, parent);
+    const shape = `M2 0H${w - 8}L${w} 8V${h - 2}L${w - 2} ${h}H8L0 ${h - 8}V2Z`;
+    add('path', { d: shape, fill: F.deep, 'fill-opacity': .94 }, g);
+    add('path', { d: shape, fill: 'none', stroke: F.railCard, 'stroke-width': 1 }, g);
+    add('path', { d: `M2.5 .5H${w - 8.2}L${w - .5} 7.8V26.7H.5V2.5Z`, fill: grad([[0, F.text, .08], [.5, F.text, .08], [1, F.text, 0]], false) }, g);
+    add('path', { d: `M0 26.7H${w}`, stroke: F.railCard, 'stroke-opacity': .5, 'stroke-width': .67 }, g);
+    add('path', { d: 'M10 9.8l5.3 3.5-5.3 3.5z', fill: F.marker }, g);
+    text(g, 20, 17.2, 'CURRENT MISSION', { 'font-family': F_M, 'font-size': 7.4, fill: F.text, 'fill-opacity': .9 });
+    const px = 10, py = 34, pw = w - 20, ph = 118, cid = id('pic');
+    add('rect', { x: px, y: py, width: pw, height: ph }, add('clipPath', { id: cid }, defs));
+    const pic = add('g', { 'clip-path': `url(#${cid})` }, g);
+    scene(add('g', { transform: `translate(${px} ${py}) scale(${r2(pw / 854 * 1.12)}) translate(${107 - 854 * .05} -60)` }, pic), defs, -107, 854);
+    add('rect', { x: px, y: py, width: pw, height: ph, fill: 'none', stroke: F.picture }, g);
+    text(g, 10, 168, awk ? 'STRANARUS TRENCHES' : 'AIR DEFENSE TRENCHES', { 'font-family': F_M, 'font-size': 9.4, 'letter-spacing': -.2, fill: F.text, 'fill-opacity': .9 });
+    text(g, 10, 181, awk ? 'The Awakening · Mission 1 · Corporal' : 'Mission 2 · Corporal', { 'font-family': F_L, 'font-weight': 500, 'font-size': 8.4, fill: F.text, 'fill-opacity': .6 });
+    text(g, 10, 199, '>>MISSION OBJECTIVES', { 'font-family': F_M, 'font-size': 6.6, 'letter-spacing': -.2, fill: F.heading, 'fill-opacity': awk ? .8 : 1 });
+    (awk ? [['Fight through the trench line', 1], ['Put out the fire vents with the freeze gun', 0], ['Regroup with Falcon squad at the walker', 0]]
+      : [['Fight through the trench network', 1], ['Destroy the anti-aircraft battery', 0], ['Regroup with Rhino squad at the bunker', 0]]).forEach(([t, done], i) => {
+      const oy = 212 + i * 12.5;
+      if (done) add('path', { d: `M10 ${oy - 4}l2.4 2.6 4.6-5.4`, fill: 'none', stroke: '#B5C784', 'stroke-width': 1.4 }, g);
+      else add('path', { d: `M10 ${oy - 7}h6l-6 6z`, fill: F.open, 'fill-opacity': .4 }, g);
+      text(g, 22, oy, t, { 'font-family': F_L, 'font-weight': 500, 'font-size': 8.4, fill: F.text, 'fill-opacity': done ? .5 : .9 });
+    });
+    add('path', { d: `M10 ${h - 22}H${w - 10}`, stroke: F.text, 'stroke-opacity': .1 }, g);
+    text(g, 10, h - 9, '0:42:10 in mission · 3:12:05 total · autosave 4 min ago', { 'font-family': F_L, 'font-weight': 500, 'font-size': 7.4, fill: F.ter });
+  }
+
+  /* The stock confirmation (section 6): a 320 x 136 u rectangle 17 u above center, the silhouette inset in it, the
+     glow behind it, the black frame of version 1.38 on top with the title's tab. */
+  function modal(parent, defs, grad, blur, F, awk) {
+    const X = 160, Y = 155, w = 320, h = 136, g = add('g', { transform: `translate(${X} ${Y})` }, parent);
+    const sx = 4.4, ex = w - 4.4, ty = 2.4, by = h - 3.6, slot = 11.3, tooth = 4, floor = 211, cham = 25.3;
+    const f0 = sx + tooth, f1 = f0 + slot, f2 = f1 + floor, f3 = f2 + slot;
+    const sil = `M${sx} ${ty}H${f0}L${f1} ${ty + slot}H${f2}L${f3} ${ty}H${ex}V${by}H${sx + cham}L${sx} ${by - cham}Z`;
+    // the glow: graded vertically, half strength at the rectangle's top and bottom, gone 26.7 u beyond; 10.7 u fades at the sides
+    const mid = id('gm'), mask = add('mask', { id: mid, maskUnits: 'userSpaceOnUse', x: -12, y: -28, width: w + 24, height: h + 56 }, defs);
+    add('rect', { x: -10.7, y: -27, width: w + 21.4, height: h + 54, fill: grad([[0, '#fff', 0], [10.7 / (w + 21.4), '#fff', 1], [1 - 10.7 / (w + 21.4), '#fff', 1], [1, '#fff', 0]], false) }, mask);
+    const span = h + 53.4, e = 26.7 / span;
+    add('rect', { x: -10.7, y: -26.7, width: w + 21.4, height: span, mask: `url(#${mid})`, style: ADD,
+      fill: grad([[0, F.glowModal, 0], [e, F.glowModal, .5], [.5, F.glowModal, 1], [1 - e, F.glowModal, .5], [1, F.glowModal, 0]]) }, g);
+    add('path', { d: sil, fill: F.deep, 'fill-opacity': .7 }, g);
+    add('path', { d: sil, fill: 'none', stroke: '#000', 'stroke-width': 2, 'stroke-linejoin': 'miter' }, g);
+    // the title's tab: black from the raised top line, stepping down to the floor at 45 degrees 6.7 u past the title
+    const tab = add('path', { fill: '#000', stroke: '#000', 'stroke-width': 2, 'stroke-linejoin': 'miter' }, g);
+    const label = text(g, f1, 9, 'QUIT TO MENU?', { 'font-family': F_M, 'font-size': 13.3, 'letter-spacing': -1, fill: F.text, 'fill-opacity': .9, stroke: '#000', 'stroke-opacity': .85, 'stroke-width': 1.3, 'paint-order': 'stroke' });
+    const end = Math.min(f2 - slot, f1 + label.getComputedTextLength() + 6.7);
+    tab.setAttribute('d', `M${f0} ${ty}H${r2(end)}L${r2(end + slot)} ${ty + slot}H${f1}Z`);
+    text(g, 22, 58.3, 'Leave this mission and return to the main menu?', { 'font-family': F_L, 'font-weight': 500, 'font-size': 10.4, fill: F.text, 'fill-opacity': .8 });
+    text(g, 22, 73, 'Progress since your last save will be lost.', { 'font-family': F_L, 'font-weight': 500, 'font-size': 10.4, fill: F.text, 'fill-opacity': .8 });
+    // YES leads, NO trails: light plates, the fill and the bottom rail dissolving toward the trailing end
+    const buttons = [];
+    [['YES', 20], ['NO', w - 22 - 96]].forEach(([label, bx], i) => {
+      const yb = h - 10.7 - 26.7, b = add('g', { class: 'awk-btn' + (i === 1 ? ' f' : ''), tabindex: 0, role: 'button', 'aria-label': label, transform: `translate(${bx} ${yb})` }, g);
+      add('path', { d: 'M0 3.3H96V26.7H11.7L0 15Z', fill: grad([[0, F.plate, .55], [.5, F.plate, .45], [1, F.plate, 0]], false), class: 'awk-pf' }, b);
+      add('path', { d: 'M.5 3.3V15L11.7 26.2H96', fill: 'none', stroke: grad([[0, F.rail], [.5, F.rail], [1, F.rail, 0]], false, { gradientUnits: 'userSpaceOnUse', x1: 0, x2: 96 }), 'stroke-width': 1, class: 'awk-pf' }, b);
+      add('path', { d: 'M16 10.5h6v6z', class: 'awk-mk' }, b);
+      text(b, 28, 18.6, label, { 'font-family': F_M, 'font-size': 10, fill: F.text, 'fill-opacity': .8 });
+      const focus = () => { buttons.forEach(n => n.classList.remove('f')); b.classList.add('f'); };
+      b.addEventListener('pointerenter', focus); b.addEventListener('focus', focus);
+      b.addEventListener('click', () => choose('awk-screen', 'pause'));
+      buttons.push(b);
+    });
+  }
+
+  /* One crystal, enlarged to fill the figure, with its construction values. */
+  let scaleNote = '';
+  function crystal() {
+    const fig = root.querySelector('#awk-crystal'); if (!fig) return;
+    fig.replaceChildren();
+    const rand = rng(SEED + 28);
+    // every crystal of a long edge, grouped by trunk (a trunk starts at its seed); show the fullest
+    const groups = [];
+    for (const b of growFrost(0, 4000, rand).branches) { if (b.base === 0) groups.push([]); groups[groups.length - 1].push(b); }
+    const own = groups.reduce((best, g) => g.length > best.length ? g : best, groups[0]);
+    let x0 = 1e9, x1 = -1e9, y1 = 0;
+    own.forEach(b => b.pts.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }));
+    const k = Math.min(8, 300 / (x1 - x0 + 2), 190 / (y1 + 1));
+    const g = add('g', { transform: `translate(${r2(170 - (x0 + x1) / 2 * k)} 14) scale(${r2(k)})`, fill: FROST }, fig);
+    own.forEach(b => add('path', { d: ribbon(b, 1e6), 'fill-opacity': r2(b.alpha) }, g));
+    scaleNote = `drawn at ${k.toFixed(1)} times its size`;
+    add('path', { d: 'M0 14H340', stroke: '#EBFAFF', 'stroke-opacity': .45, 'stroke-width': .8 }, fig);
+    const note = (x, y, t, anchor = 'start') => text(fig, x, y, t, { 'font-family': 'IBM Plex Mono, Consolas, monospace', 'font-size': 9.5, fill: '#A9C9D6', 'text-anchor': anchor });
+    note(8, 10, "the view's edge");
+    note(332, 10, scaleNote, 'end');
+    note(8, 232, 'trunk 20–75 u at a corner, 11–41 u mid-span · 3 u steps');
+    note(8, 244, 'branch 60° ± 8.6° · 25–50% long · 70% wide · four levels');
+  }
+
+  function choose(group, value) {
+    const box = root.querySelector('#' + group);
+    box.querySelectorAll('.awk-seg').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === value)));
+    if (group === 'awk-screen') ui.screen = value; else if (group === 'awk-family') ui.family = value; else ui.aspect = Number(value);
+    build(group !== 'awk-aspect');
+  }
+  for (const group of ['awk-screen', 'awk-family', 'awk-aspect'])
+    root.querySelector('#' + group).addEventListener('click', e => { const b = e.target.closest('.awk-seg'); if (b) choose(group, b.dataset.v); });
+  root.querySelector('#awk-layers').addEventListener('click', e => { const b = e.target.closest('.awk-seg'); if (!b) return;
+    ui[b.dataset.v] = !ui[b.dataset.v]; b.setAttribute('aria-pressed', String(ui[b.dataset.v])); build(false); });
+  root.querySelector('#awk-replay').addEventListener('click', () => build(true));
+  if ('IntersectionObserver' in window) new IntersectionObserver(entries => { visible = entries.some(e => e.isIntersecting); if (visible) wake(); }).observe(svg);
+  build(false);
+  crystal();
+})();
+</script>
