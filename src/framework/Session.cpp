@@ -3075,6 +3075,38 @@ static bool Session_IsLoadingContinueChar( int ch ) {
 	return ch >= K_SPACE;
 }
 
+/*
+The stock single-player loading screens sound the end of the load and the
+press that closes them: FinishedLoading plays load_screen_ready, and the
+continue button's onAction plays load_screen_click, each as a "play" menu
+command. The continue gate holds inside the map change and hands its events
+to no GUI, so neither command ever runs, and the retained screen that stands
+in for the stock ones has no scripts. The session plays both, for the two
+stock screens that author them and for the retained screen. A map's own
+loading GUI is left alone: what it authored is its own.
+*/
+static bool Session_LoadingScreenPlaysStockSounds( const idUserInterface *gui, bool retained ) {
+	if ( gui == NULL ) {
+		return false;
+	}
+	return retained || idStr::Icmp( gui->Name(), "guis/loading/generic.gui" ) == 0 ||
+		idStr::Icmp( gui->Name(), "guis/loading/intro.gui" ) == 0;
+}
+
+// Plays in the world the session has playing, on the channel its play command
+// and the retained menus use. Nothing plays while no world is (s_muteUnfocused).
+static void Session_PlayLoadingScreenSound( const char *shader, bool log ) {
+	idSoundWorld *world = soundSystem->GetPlayingSoundWorld();
+	if ( world != NULL ) {
+		world->PlayShaderDirectly( shader, 1 );
+	}
+	if ( log ) {
+		const char *playing = world == NULL ? "none" : world == soundSystem->GetSoundWorldFromId( SOUNDWORLD_MENU ) ? "menu" :
+			world == soundSystem->GetSoundWorldFromId( SOUNDWORLD_GAME ) ? "game" : "other";
+		common->Printf( "Loading screen sound %s world=%s muted=%d\n", shader, playing, soundSystem->IsMuted() ? 1 : 0 );
+	}
+}
+
 static bool Session_ShouldSilenceAudioWhenUnfocused() {
 	// in a headset the desktop window is rarely focused
 	if ( vrSystem != NULL && vrSystem->IsActive() ) {
@@ -8118,10 +8150,24 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 			loadingSaveGame ? 1 : 0,
 			com_skipLoadingContinue.GetBool() ? 1 : 0 );
 	}
+	bool loadingScreenContinued = false;
 	if ( waitForSPContinue ) {
 		Session_BeginBlockingLoadPresentationFrame();
 		guiLoading->HandleNamedEvent( "FinishedLoading" );
 		guiLoading->StateChanged( common->GetPresentationTime() );
+		// The completion sound plays in the menu world, the world the session
+		// plays under a loading screen (SetPlayingSoundWorld). The load emptied
+		// it, and the level's own sounds stay out of the mix until the press.
+		// The load muted sound and stopped the sound clock, and the gate holds
+		// inside the map change, where Frame never mixes, so the gate mixes for
+		// itself. A sound started at the stale clock would count as played out.
+		const bool loadingScreenSounds = Session_LoadingScreenPlaysStockSounds( guiLoading, retainedLoadingActive );
+		if ( loadingScreenSounds ) {
+			SetPlayingSoundWorld( menuSoundWorld );
+			soundSystem->SetMute( false );
+			soundSystem->Render();
+			Session_PlayLoadingScreenSound( "load_screen_ready", logLoadingContinueGate );
+		}
 		UpdateScreen();
 
 		if ( logLoadingContinueGate ) {
@@ -8180,6 +8226,10 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 				// Touching a controller, or the mouse, switches the prompt: the
 				// retained screen's adapter publishes prompt.glyphs as it redraws.
 				UpdateScreen();
+				if ( loadingScreenSounds ) {
+					UpdateSoundWorldFocus();
+					soundSystem->Render();
+				}
 				if ( Session_FindPresentationCap() <= 0 ) {
 					Sys_Sleep( static_cast<int>( idMath::Ceil( common->GetUserCmdMsecFloat() ) ) );
 					com_frameRealTime = Sys_Milliseconds();
@@ -8188,6 +8238,8 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 			}
 		}
 		openQ4_SetLoadingContinueInputActive( false );
+		// The auto-accept stands in for the player's press, and sounds as one.
+		loadingScreenContinued = loadingScreenSounds;
 
 		if ( logLoadingContinueGate ) {
 			const int loadingContinueElapsedMsec = Max( 0, common->GetPresentationTime() - loadingContinueStartTime );
@@ -8239,6 +8291,12 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 
 	// restart entity sound playback
 	soundSystem->SetMute( false );
+
+	// The press sounds in the game world that takes over from the loading
+	// screen, as the stock screen's "close ; play load_screen_click" did.
+	if ( loadingScreenContinued ) {
+		Session_PlayLoadingScreenSound( "load_screen_click", logLoadingContinueGate );
+	}
 
 	// we are valid for game draws now
 	mapSpawned = true;

@@ -37,6 +37,10 @@ does not restore the withdrawn release. See
 - **Fixed: the menus no longer go quiet on the Game, Controls and Audio
   settings pages during a game.** Their sounds and the menu music now keep
   playing there, as they do on the pause menu.
+- **Fixed: the loading screen sounds again.** When a single-player level
+  finishes loading, Quake 4's ready chime plays as the continue prompt appears,
+  and continuing plays its click, in both the new and the classic interface.
+  Neither sound was playing before.
 
 ## The main menu's background comes through as a living signal, 13 November 2026
 

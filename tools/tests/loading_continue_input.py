@@ -164,6 +164,49 @@ def validate_platform_sources() -> None:
     require(darwin_block, "sys/macos/macos_sdl3.cpp", "macOS SDL3 platform sources")
 
 
+def validate_loading_screen_sounds() -> None:
+    """The stock screens' load_screen_ready and load_screen_click are "play"
+    menu commands that the gate never dispatches, and the retained screen has no
+    scripts, so the session plays each one once per gate (menu-sounds.md)."""
+    for gui in ("generic", "intro"):
+        text = read(f"content/baseoq4/pak0/guis/loading/{gui}.gui")
+        require_order(text, "onNamedEvent FinishedLoading", 'set "cmd" "play load_screen_ready"', f"stock {gui}.gui completion sound")
+        require_order(text, "onAction", 'set "cmd" "play load_screen_click"', f"stock {gui}.gui press sound")
+
+    source = read("src/framework/Session.cpp")
+    for shader in ("load_screen_ready", "load_screen_click"):
+        count = source.count(f'"{shader}"')
+        if count != 1:
+            raise AssertionError(f"Expected one session play of {shader}, found {count}")
+
+    chooser = function_body(source, "static bool Session_LoadingScreenPlaysStockSounds(")
+    require(chooser, "retained ||", "retained loading screen sounds")
+    require(chooser, '"guis/loading/generic.gui"', "stock generic loading screen sounds")
+    require(chooser, '"guis/loading/intro.gui"', "stock intro loading screen sounds")
+    player = function_body(source, "static void Session_PlayLoadingScreenSound(")
+    require(player, "soundSystem->GetPlayingSoundWorld()", "loading screen sounds play in the playing world")
+    require(player, "PlayShaderDirectly( shader, 1 )", "loading screen sounds use the menu channel")
+
+    change = function_body(source, "void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {")
+    gate = change[change.find("if ( waitForSPContinue ) {") :]
+    # The stinger plays in the unmuted menu world on a fresh sound clock, after
+    # the prompt's event, and the held gate keeps mixing it.
+    for first, second in (
+        ('HandleNamedEvent( "FinishedLoading" )', "SetPlayingSoundWorld( menuSoundWorld );"),
+        ("SetPlayingSoundWorld( menuSoundWorld );", "soundSystem->SetMute( false );"),
+        ("soundSystem->SetMute( false );", "soundSystem->Render();"),
+        ("soundSystem->Render();", 'Session_PlayLoadingScreenSound( "load_screen_ready"'),
+        ('Session_PlayLoadingScreenSound( "load_screen_ready"', "bool waitingForContinue = true;"),
+    ):
+        require_order(gate, first, second, "loading screen completion sound")
+    loop = gate[gate.find("bool waitingForContinue = true;") : gate.find("openQ4_SetLoadingContinueInputActive( false );")]
+    require(loop, "soundSystem->Render();", "held loading gate mixes its sound")
+    # The press plays once the game world has taken over and sound is back on.
+    tail = change[change.find("SetPlayingSoundWorld( sw );") :]
+    require_order(tail, "soundSystem->SetMute( false );", 'Session_PlayLoadingScreenSound( "load_screen_click"', "loading screen press sound")
+    require_order(change, "loadingScreenContinued = loadingScreenSounds;", "SetPlayingSoundWorld( sw );", "loading screen press recorded at the gate")
+
+
 def validate_ci_smoke() -> None:
     push = read(".github/workflows/push-verification.yml")
     commit = read(".github/workflows/commit-validation.yml")
@@ -181,6 +224,7 @@ def main() -> None:
     validate_common_flag()
     validate_input_flush_hook()
     validate_platform_sources()
+    validate_loading_screen_sounds()
     validate_ci_smoke()
     print("loading_continue_input: ok")
 

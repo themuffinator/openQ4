@@ -128,10 +128,49 @@ sounds there.
     Back selects in the game world, once, with no second play from the
     `mpClose` command.
 
+## Loading screen
+
+The single-player loading screen sounds again, under both interfaces. Stock
+`generic.gui` and `intro.gui` play `load_screen_ready` from their
+`FinishedLoading` event and `load_screen_click` from the continue button's
+`onAction`, as `play` commands. The continue gate holds inside the map change
+and gives its events to no GUI, so neither command ran. The retained
+`loading.rui` that replaces those screens has no scripts. Before this fix, an
+`airdefense1` load logged neither sound under `ui_retained 1` or `0`.
+
+The session now plays each sound once per gate (`ExecuteMapChange`) for those
+two stock screens and the retained screen. A map's own loading GUI is left
+alone.
+
+- When the continue prompt appears, `load_screen_ready` plays in the menu
+  world, the world the session plays under a loading screen. The load had muted
+  sound, and `Frame` never runs inside the map change. So the gate makes the
+  menu world current, unmutes and mixes sound itself. Its first mix brings the
+  stopped sound clock up to date, because a sound started at the stale clock
+  would count as already played out. The level's own sounds stay out of the
+  mix until the press.
+- The press plays `load_screen_click` in the game world after that world takes
+  over and sound is back on, as the stock `close ; play load_screen_click` did.
+  `com_loadingContinueAutoAdvance` stands in for the press and sounds as one. A
+  skipped gate (`com_skipLoadingContinue`, multiplayer, loading a save) plays
+  neither.
+- `loading_continue_input.py` (`validate_loading_screen_sounds`) pins the stock
+  scripts and one session play of each shader. It also pins the order of world,
+  unmute, clock and stinger, the held gate's mixing, and the click after the
+  hand-over.
+- Engine checks ran on Windows x64 with OpenGL, `com_loadingContinueAutoAdvance
+  3000`, `s_showStartSound 1` and no device input. `airdefense1` under
+  `ui_retained 1` and `0`, and `hangar1` under `ui_retained 0`, each started
+  `load_screen_ready` once (`world=menu muted=0`) and `load_screen_click` once
+  (`world=game muted=0`). With `s_showVoices 1`, the stinger was the gate's only
+  voice, at -6 dB, for 45 mixes from the first mix after it started, and the
+  click was in the game world's first mix. With `com_skipLoadingContinue 1`,
+  neither started.
+
 ## Limits
 
 - Documents cannot name their own sounds. World terminals (`guisound_beep2`)
   wait for retained world-surface output, which does not exist yet.
-- The retained loading screen's continue prompt, the weapon wheel (silent by
-  design) and the HUD documents have no controls and make no cues.
+- The weapon wheel (silent by design) and the HUD documents have no controls
+  and make no cues.
 - Stock pages that still run under `ui_retained 1` keep their own scripts.

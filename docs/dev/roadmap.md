@@ -3011,9 +3011,11 @@ Completion must advance through the existing dependencies:
   now keep the menu world playing instead of the paused game's. Native
   interaction, runtime and adapter tests pass, and device-free OpenGL engine
   checks on the title, the `airdefense1` pause and settings pages and a DM
-  Welcome card log one sound per step in the right world. `MOT-006`
-  acceptance still needs physical-device sound counters and a listening
-  review.
+  Welcome card log one sound per step in the right world. The single-player
+  loading screen's `load_screen_ready` and `load_screen_click`, silent under
+  both interfaces, now play once each from the session's continue gate.
+  `MOT-006` acceptance still needs physical-device sound counters and a
+  listening review.
 - [x] **UI-10 — P0, investigation and implementation: refresh effective scope and
   source inventory.** Completed [retail/base/Awakening inventory](ui/inventory-report.md):
   264/276/324 effective paths, 358 distinct source/include-bound variants, 18
