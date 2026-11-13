@@ -283,6 +283,20 @@ public:
 // This is probably excessive...
 const int MAX_CHANNELS_PER_EMITTER = 16;
 
+// A caption held after its line ended naturally (idSoundWorldLocal::subtitleTails).
+// The text is copied: the channel and its sample may be gone by the next frame.
+const int SOUND_SUBTITLE_TAILS = 4;
+const int SOUND_SUBTITLE_TAIL_MSEC = 500;			// after the line, always
+const int SOUND_SUBTITLE_MIN_DISPLAY_MSEC = 1500;	// a short line stays up this long in all
+struct soundSubtitleTail_t {
+	idStr				text;
+	const idSoundShader* shader;
+	int					emitterIndex, logicalChannel, speakerId, startTime, durationMsec, until;
+	bool				radio, transcribed, authored;
+};
+
+extern idCVar ui_subtitleUntranscribed;
+
 /*
 ===================================================================================
 
@@ -397,6 +411,14 @@ public:
 
 	listener_t			listener;
 	idList<idSoundEmitterLocal*>	emitters;
+
+	// Lines that finished on their own keep their last words up for a moment:
+	// the channel's logical clock reaches the end before the voice's last
+	// buffers play, and a short line needs time to be read. Stops never add one.
+	soundSubtitleTail_t	subtitleTails[SOUND_SUBTITLE_TAILS];
+	int					numSubtitleTails;
+	void				RememberSubtitleTail( idSoundEmitterLocal* emitter, idSoundChannel* channel, int now );
+	void				ForgetSubtitleTails( int emitterIndex, int logicalChannel = SCHANNEL_ANY );	// emitter -1: every one
 
 	idSoundEmitter* 	localSound;			// for PlayShaderDirectly()
 

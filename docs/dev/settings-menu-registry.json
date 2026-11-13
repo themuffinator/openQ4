@@ -4463,6 +4463,25 @@
       "default": "1",
       "restart_required": false,
       "accessibility": "Standard focusable choiceDef row."
+    },
+    {
+      "id": "audio.subtitle_untranscribed",
+      "pane": "Audio",
+      "section": "Subtitles",
+      "path": "Settings > Audio > Untranscribed Speech",
+      "source": "audio",
+      "container": "set_audio_subtitle_untranscribed",
+      "widgets": [
+        "set_audio_subtitle_untranscribed_val"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231313",
+      "choices_key": "#str_200059",
+      "target_type": "cvar",
+      "target": "ui_subtitleUntranscribed",
+      "default": "1",
+      "restart_required": false,
+      "accessibility": "Standard focusable choiceDef row."
     }
   ],
   "default_bind_sources": [

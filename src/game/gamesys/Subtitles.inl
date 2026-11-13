@@ -49,6 +49,10 @@ void idPlayerView::DrawSubtitles() {
 	int visibleLines = 1;
 	for (int i = 0; i < count; ++i) {
 		const soundSubtitle_t& cue = cues[i];
+		// Speech the installed game (and any caption pack) has no transcript for is
+		// marked rather than left blank, so missing coverage stays visible.
+		const bool marker = cue.text == NULL;
+		const char* text = marker ? common->GetLocalizedString("#str_231314") : cue.text;
 		idStr speaker;
 		if (cvarSystem->GetCVarBool("ui_subtitleSpeakers")) {
 			const int entity = cue.speakerId - 1;
@@ -74,15 +78,32 @@ void idPlayerView::DrawSubtitles() {
 			speakerWidth = OpenQ4Subtitles::SpeakerIndent(speakerWidth + 4, width);
 			if (speakerWidth <= 0) speaker.Clear();
 		}
-		const float available = Max(16.0f, width - 24 - speakerWidth);
+		float available = Max(16.0f, width - 24 - speakerWidth);
 		const int rows = count == 1 ? singleRows : 1;
-		idStr cacheKey(cue.text); cacheKey += fontName;
+		// A marker only says that someone speaks, so it never pages with the line. One
+		// that does not fit its rows takes its short form, keeping the speaker, then
+		// gives up the speaker label.
+		if (marker) {
+			const auto fits = [&](const char* candidate, float room) {
+				return OpenQ4Subtitles::Paginate(candidate, room, rows, measure).size() <= 1;
+			};
+			const char* shortForm = common->GetLocalizedString("#str_231315");
+			const float whole = Max(16.0f, width - 24);
+			if (!fits(text, available)) {
+				if (fits(shortForm, available)) text = shortForm;
+				else {
+					speaker.Clear(); speakerWidth = 0; available = whole;
+					if (!fits(text, available)) text = shortForm;
+				}
+			}
+		}
+		idStr cacheKey(text); cacheKey += fontName;
 		if (subtitleCacheText[i] != cacheKey || subtitleCacheWidth[i] != available || subtitleCacheSize[i] != size * textScale || subtitleCacheRows[i] != rows) {
 			subtitleCacheText[i] = cacheKey;
-			subtitlePages[i] = OpenQ4Subtitles::Paginate(cue.text, available, rows, measure);
+			subtitlePages[i] = OpenQ4Subtitles::Paginate(text, available, rows, measure);
 			subtitleCacheWidth[i] = available; subtitleCacheSize[i] = size * textScale; subtitleCacheRows[i] = rows;
 		}
-		const int page = OpenQ4Subtitles::PageAt(subtitlePages[i], cue.timeMsec, cue.durationMsec);
+		const int page = marker ? (subtitlePages[i].empty() ? -1 : 0) : OpenQ4Subtitles::PageAt(subtitlePages[i], cue.timeMsec, cue.durationMsec);
 		if (page < 0) continue;
 		const auto& shown = subtitlePages[i][page];
 		if (split && i == 0) {

@@ -7,6 +7,36 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Subtitles mark speech they cannot transcribe, accept caption packs and stay up long enough to read (AUD-07), 13 November 2026
+
+- **Dialogue without a transcript no longer passes silently.** About three in
+  ten lines heard in the campaigns have no transcript in the installed game.
+  With subtitles on, such a line now shows **[untranscribed speech]** (or
+  **[speech]** where that does not fit), after the speaker's name when it is
+  known, so a player who cannot hear it still
+  knows someone is talking. **Settings > Audio > Untranscribed Speech** (on by
+  default, `ui_subtitleUntranscribed`) turns the marker off in both
+  interfaces; a transcribed line always takes a caption slot before a marker.
+  The marker is localized in all twelve menu languages.
+- **Caption packs can fill the gaps.** The installed game has no more text to
+  give: every stock transcript is already in use, and The Awakening's spare
+  ones belong to race lines nothing plays. A mod can now add a line's text, or
+  replace it, with a `subtitle/` declaration named after the sound shader or
+  the voice file. The text can be literal or a `#str_` key from the pack's own
+  language files, so a pack can carry translations too. Pack entries are
+  captions only and leave lip sync alone. openQ4 ships no pack and copies no
+  transcripts; `audio_asset_inventory.py --pack-template` lists the 1,419 stock
+  and 72 Awakening gaps as empty entries for authors.
+- **Captions stay up long enough to read.** A line that finishes keeps its
+  last words up for half a second more, and a short line stays up for a second
+  and a half in all. This also covers the end of a line still playing after
+  the game's clock has reached it, which the November fight sweep found. A
+  line that is cut off or replaced still clears at once.
+- `listSubtitles` now reports each caption's source (`installed`, `authored`
+  or `none`), and the speech audit counts authored text as transcribed.
+- Ordered human play and physical stereo-HUD placement remain open under
+  AUD-07.
+
 ## Surround placement on real output devices, 13 November 2026
 
 - [x] AUD-04: `audio_surround_endpoint.py` plays stock gameplay through the real

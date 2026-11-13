@@ -18,7 +18,7 @@
 					noclip	0
 					windowDef set_audio_content
 					{
-						rect	-24,-84,640,474
+						rect	-24,-84,640,498
 						visible	1
 				windowDef set_audio_cat_levels
 				{
@@ -542,6 +542,34 @@
 					font	"fonts/lowpixel"
 					onAction	{ set "cmd" "play main_menu_selection" ; }
                 }
+				windowDef	set_audio_subtitle_untranscribed_bg
+                {
+					rect	228,470,377,25
+					visible	1
+					background	"gfx/guis/mainmenu/b3_light"
+					matcolor	0.545,0.588,0.294,0.4
+                }
+				windowDef	set_audio_subtitle_untranscribed
+                {
+					rect	259,472,205,18
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"#str_231313"
+					textscale	0.24
+					font	"fonts/lowpixel"
+                }
+				choiceDef	set_audio_subtitle_untranscribed_val
+                {
+					rect	468,472,160,18
+					visible	1
+					forecolor	1,0.745,0.137,0.8
+					choiceType	0
+					choices	"#str_200059"
+					cvar	ui_subtitleUntranscribed
+					textscale	0.24
+					font	"fonts/lowpixel"
+					onAction	{ set "cmd" "play main_menu_selection" ; }
+                }
 					}
 				}
 				sliderDef set_audio_scroll_thumb
@@ -552,7 +580,7 @@
 					forecolor	1,1,1,0.8
 					matcolor	1,1,1,0.4
 					low	0
-					high	6
+					high	7
 					step	1
 					vertical	1
 					scrollbar	1

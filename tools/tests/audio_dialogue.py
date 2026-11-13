@@ -63,9 +63,9 @@ def rendered_tones(path, windows=None):
     return result
 
 
-def tone(path, frequency):
+def tone(path, frequency, seconds=60):
     path.parent.mkdir(parents=True, exist_ok=True)
-    pcm = array.array('h', (round(4096 * math.sin(i * 2 * math.pi * frequency / 24000)) for i in range(24000 * 60)))
+    pcm = array.array('h', (round(4096 * math.sin(i * 2 * math.pi * frequency / 24000)) for i in range(round(24000 * seconds))))
     if sys.byteorder != 'little':
         pcm.byteswap()
     with wave.open(str(path), 'wb') as output:

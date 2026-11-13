@@ -66,6 +66,8 @@ CHANNEL_END = re.compile(r'^SOUND_DIALOGUE_END channels=(\d+)\s*$', re.M)
 # The harness's own markers are matched anywhere on a line: a map script that prints
 # without a newline (process2's "colour swap left") leaves the next echo mid-line.
 SCENE_MARK = re.compile(r'SCENE_(?:PROBE|STEP|MEMORY|END|BEGIN)\b', re.M)
+# Installed lip-sync text, or an authored subtitle/ declaration from a caption pack.
+TRANSCRIBED = ('text', 'authored')
 CUE = re.compile(r'^Subtitle shader=(\S+) emitter=\d+ speaker=\d+ time=\d+ duration=\d+ radio=\d textBytes=\d+', re.M)
 PROBE = re.compile(r'SCENE_PROBE (\S+) (\d+) (full|mute)\s*$', re.M)
 ADMISSION = re.compile(r'^Audio admission: reserved=(\d+) KiB peak=(\d+) KiB budget=(\d+) MiB refused=(\d+)', re.M)
@@ -338,6 +340,9 @@ def launch(args, root, entries, walk=None, blocked_exits=None):
         'r_swapInterval': '1', 'in_mouse': '0', 'in_joystick': '0', 'in_joystickRumble': '0',
         's_noSound': '1' if getattr(args, 'silent', False) else '0', 's_muteUnfocused': '0', 'com_skipLogoVideos': '1', 'g_autoSkipCinematics': '0',
         's_numberOfSpeakers': '2', 's_openALHRTF': '0', 's_dialogueVolume': '1', 's_logSpeech': '1', 'ui_subtitles': '1',
+        # Markers for untranscribed speech would take free overlay slots; the audit
+        # measures transcript cues, as every earlier corpus report did.
+        'ui_subtitleUntranscribed': '0',
         's_asyncSampleDecode': '1' if args.decode_mode == 'worker' else '0',
         's_asyncStreamDecode': '1' if getattr(args, 'stream_decode', 'worker') == 'worker' else '0',
         's_decodeMemoryMB': str(args.decode_memory_mb), 's_audioMemoryMB': str(args.audio_memory_mb),
@@ -390,7 +395,7 @@ def probe_state(body):
             unattributed.append(f'{source}:{sample}')
         elif channel['dialogue']:
             dialogue.append(sample)
-            if channel['transcript'] == 'text':
+            if channel['transcript'] in TRANSCRIBED:
                 mapped.append((sample, channel['shader']))
         else:
             effects.append(sample)
@@ -461,7 +466,7 @@ def audit(log, labels):
         shutdown = SHUTDOWN.search(segment, begin_at.end()) if begin_at else None
         if shutdown:
             level_changes.append(f'shutdown after step {sum(m.start() < shutdown.start() for m in step_marks) - 1}')
-        text_shaders = {s['shader'].lower() for s in speech if s['transcript'] == 'text'}
+        text_shaders = {s['shader'].lower() for s in speech if s['transcript'] in TRANSCRIBED}
         probes = {}
         marks = list(PROBE.finditer(segment))
         for i, m in enumerate(marks):
@@ -517,7 +522,7 @@ def audit(log, labels):
             'radio_not_dialogue': sorted({s['shader'] for s in speech if s['radio'] == '1' and s['dialogue'] == '0'}),
             'vo_flag_only': sorted({s['shader'] for s in speech if s['vo'] == '1' and s['dialogue'] == '0' and s['declared'] == '0'}),
             'transcripts': dict(statuses),
-            'untranscribed_shaders': sorted({s['shader'] for s in speech if s['dialogue'] == '1' and s['transcript'] != 'text'}),
+            'untranscribed_shaders': sorted({s['shader'] for s in speech if s['dialogue'] == '1' and s['transcript'] not in TRANSCRIBED}),
             'misrouted_speech': misrouted,
             'probes': len(probes) // 2,
             'voice_routing_recorded': bool(probes) and all(p['routing_complete'] for p in probes.values()),

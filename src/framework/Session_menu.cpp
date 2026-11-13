@@ -83,7 +83,7 @@ extern glconfig_t glConfig;
 
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
 idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 );
-idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 6 );
+idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 7 );
 idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 78 );
 // The opt-ins are unarchived, so each lasts until the player quits, and
 // CVAR_NOCHEAT, because the engine counts any other unarchived CVar as a
@@ -346,7 +346,7 @@ static bool Session_RetainedValueRequest( const char *request, const char *const
 static const char *const RETAINED_AUDIO_GUI = "guis/menu/settings/audio.rui";
 static const char *const RETAINED_AUDIO_VERBS[] = {
 	"audioVolume", "audioMusic", "audioDialogue", "audioBackend", "audioDevice", "audioEax", "audioSpeakers", "audioHrtf",
-	"audioSubtitles", "audioSubtitleSize", "audioSubtitleBackground", "audioSubtitleSpeakers"
+	"audioSubtitles", "audioSubtitleSize", "audioSubtitleBackground", "audioSubtitleSpeakers", "audioSubtitleUntranscribed"
 };
 static const int RETAINED_AUDIO_VERB_COUNT = sizeof( RETAINED_AUDIO_VERBS ) / sizeof( RETAINED_AUDIO_VERBS[0] );
 static const int RETAINED_AUDIO_DEVICES = 16;
@@ -2620,7 +2620,7 @@ The AUDIO page's values as the session reads them back: the three volumes
 and the subtitle size and background as whole percents, the sound system,
 the device (the row of s_deviceName in the device list, which it publishes
 too, read as a device's text), EAX, the speakers' choice (Auto, 2 or 6),
-HRTF and the three subtitle switches.
+HRTF and the three subtitle switches (on, speaker names, untranscribed speech).
 ===============
 */
 void idSessionLocal::PublishRetainedAudio( idUserInterface *gui ) {
@@ -2666,6 +2666,7 @@ void idSessionLocal::PublishRetainedAudio( idUserInterface *gui ) {
 	gui->SetStateInt( "audio.subtitleSize", percent( "ui_subtitleScale", 100.0f ) );
 	gui->SetStateInt( "audio.subtitleBackground", percent( "ui_subtitleBackground", 100.0f ) );
 	gui->SetStateBool( "audio.subtitleSpeakers", cvarSystem->GetCVarBool( "ui_subtitleSpeakers" ) );
+	gui->SetStateBool( "audio.subtitleUntranscribed", cvarSystem->GetCVarBool( "ui_subtitleUntranscribed" ) );
 	gui->StateChanged( common->GetPresentationTime() );
 #endif
 }
@@ -2727,6 +2728,7 @@ void idSessionLocal::HandleRetainedAudioRequest( idUserInterface *gui, const cha
 		case 9: cvarSystem->SetCVarFloat( "ui_subtitleScale", idMath::ClampInt( 100, 200, value ) / 100.0f ); break;
 		case 10: cvarSystem->SetCVarFloat( "ui_subtitleBackground", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
 		case 11: cvarSystem->SetCVarBool( "ui_subtitleSpeakers", value != 0 ); break;
+		case 12: cvarSystem->SetCVarBool( "ui_subtitleUntranscribed", value != 0 ); break;
 		default: return;
 	}
 	PublishRetainedAudio( gui );
@@ -5672,10 +5674,10 @@ static const mainMenuSettingsScrollPage_t MAINMENU_SETTINGS_SCROLL_PAGES[] = {
 		NULL,
 		36,
 		0,
-		6,
+		7,
 		-24,
 		-84,
-		474,
+		498,
 		24.0f
 	},
 	{

@@ -283,13 +283,18 @@ option existing simultaniously with a live game.
 ===============================================================================
 */
 
-// A borrowed presentation snapshot, valid until the next decl/language reload.
-// Timing follows the sample clock, including pause and frequency/time shifts.
+// A borrowed presentation snapshot, valid until the next decl/language reload
+// or the next GetSubtitles call. Timing follows the sample clock, including pause
+// and frequency/time shifts. text is NULL for speech without a transcript, which
+// is reported only while ui_subtitleUntranscribed asks for it; authored marks text
+// from a subtitle/ declaration rather than the installed lip-sync data.
 struct soundSubtitle_t {
 	const char* text;
 	const char* shader;
 	int emitterIndex, speakerId, startTime, timeMsec, durationMsec;
 	bool radio;
+	bool transcribed;
+	bool authored;
 };
 
 class idSoundWorld

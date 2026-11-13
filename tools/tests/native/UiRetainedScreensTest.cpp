@@ -291,7 +291,7 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
 	"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
-	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers",
+	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 // The player settings the multiplayer card's Settings and Voice pages and the
 // GAME OPTIONS page change.
@@ -4970,7 +4970,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 		{"audio_dialogue","audioDialogue"},{"audio_backend","audioBackend"},{"audio_device","audioDevice"},{"audio_eax","audioEax"},
 		{"audio_speakers","audioSpeakers"},{"audio_hrtf","audioHrtf"},{"audio_subtitles","audioSubtitles"},
 		{"audio_subtitle_size","audioSubtitleSize"},{"audio_subtitle_background","audioSubtitleBackground"},
-		{"audio_subtitle_speakers","audioSubtitleSpeakers"}};
+		{"audio_subtitle_speakers","audioSubtitleSpeakers"},{"audio_subtitle_untranscribed","audioSubtitleUntranscribed"}};
 	for (const auto& [control, verb] : rows) {
 		const auto* node = document.Model().FindNode(control);
 		const auto found = document.Model().actions.find(verb);
@@ -5007,7 +5007,8 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(runtime.SetState({{"audio.volume",70.0},{"audio.music",40.0},{"audio.dialogue",100.0},{"audio.backend",1.0},
 		{"audio.device.count",3.0},{"audio.device.0.label",std::string("Default device")},{"audio.device.1.label",std::string("Speakers")},
 		{"audio.device.2.label",std::string("Headset")},{"audio.device",1.0},{"audio.eax",true},{"audio.speakers",2.0},{"audio.hrtf",0.0},
-		{"audio.subtitles",true},{"audio.subtitleSize",150.0},{"audio.subtitleBackground",30.0},{"audio.subtitleSpeakers",false}},error,0.1),
+		{"audio.subtitles",true},{"audio.subtitleSize",150.0},{"audio.subtitleBackground",30.0},{"audio.subtitleSpeakers",false},
+		{"audio.subtitleUntranscribed",true}},error,0.1),
 		"the session publishes the values");
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
@@ -5039,20 +5040,23 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(runtime.FocusControl("audio_subtitle_speakers",0.73),"focus Speaker Names");
 	press(MenuInput::Accept,0.74);
 	Check(std::get<bool>(taken("audioSubtitleSpeakers").arguments.at("value")),"Accept asks the session to name the speakers");
+	Check(runtime.FocusControl("audio_subtitle_untranscribed",0.75),"focus Untranscribed Speech");
+	press(MenuInput::Accept,0.76);
+	Check(!std::get<bool>(taken("audioSubtitleUntranscribed").arguments.at("value")),"Accept asks the session to stop marking untranscribed speech");
 	// The back input asks the session to return.
 	Check(runtime.RunEvent("onBack",0.8,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "audioBack","Back asks the session to return");
 	// A portrait view: the panel and its rows stay inside the view.
 	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,1.0);
-	const auto panel = bounds("audio-panel"), last = bounds("audio_subtitle_speakers");
+	const auto panel = bounds("audio-panel"), last = bounds("audio_subtitle_untranscribed");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && last.x+last.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"audio_device","audio_eax","audio_subtitle_speakers","audio-audio-rows",1.1);
+	CheckSettingsPortrait(runtime,document,"audio_device","audio_eax","audio_subtitle_untranscribed","audio-audio-rows",1.1);
 	runtime.Frame(portrait,1.2);
 	const auto band = runtime.PresentedValue("audio-header","display");
 	Check(band && band->text == "none","the tall column's headings stand in its rows, not the header band");
-	CheckSettingsTextScale(host,runtime,document,"audio-audio","audio_device","audio_eax","audio_subtitle_speakers",1.3);
+	CheckSettingsTextScale(host,runtime,document,"audio-audio","audio_device","audio_eax","audio_subtitle_untranscribed",1.3);
 	// The single column at a larger text size takes its headings into its rows too.
 	auto larger = SettingsViewport(document); larger.textScale = 1.5f;
 	runtime.Frame(larger,1.6);

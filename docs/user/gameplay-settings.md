@@ -173,9 +173,24 @@ The weapon on screen has its own controls on **Settings → Game Options → Gen
 
 ## Dialogue subtitles
 
-Turn on **Settings → Audio → Dialogue Subtitles** (scroll down). Subtitles work in both interfaces, including The Awakening, and stay visible when dialogue or master volume is muted. Up to two speakers appear at once, and long lines advance in pages as the audio plays. Pausing, saving and loading keep the caption at the current point in the line. **Subtitle Size**, **Subtitle Background** and **Speaker Names** sit beside it.
+Turn on **Settings → Audio → Dialogue Subtitles** (scroll down). Subtitles work in both interfaces, including The Awakening, and stay visible when dialogue or master volume is muted. Up to two speakers appear at once, and long lines advance in pages as the audio plays. When a line finishes, its last words stay up for half a second more, and a short line stays up for at least a second and a half, so you have time to read it; a line that is cut off clears at once. Pausing, saving and loading keep the caption at the current point in the line. **Subtitle Size**, **Subtitle Background**, **Speaker Names** and **Untranscribed Speech** sit beside it.
 
-The text comes from your installed game's lip-sync transcripts. The Steam release installs these in English only, and The Awakening's are written in English, so other menu languages show English captions. Coverage is incomplete: a line without a transcript stays blank, and scene descriptions are never added. Voice chat and sound effects are not transcribed. In portrait windows, cinematic captions sit below the picture, clear of title cards; at the largest text sizes they show one line at a time there, with a second speaker above the picture. A speaker name too wide for half the line is left out.
+The text comes from your installed game's lip-sync transcripts. The Steam release installs these in English only, and The Awakening's are written in English, so other menu languages show English captions. Coverage is incomplete: about three in ten lines heard in the campaigns have no transcript in the installed game. With **Untranscribed Speech** on (the default) such a line shows **[untranscribed speech]**, after the speaker's name when it is known, so you can tell someone is talking; where that does not fit on one line, as in a narrow window at large text sizes, it shortens to **[speech]**. Turn it off to leave those lines blank. Scene descriptions are never used as captions. Voice chat and sound effects are not transcribed. In portrait windows, cinematic captions sit below the picture, clear of title cards; at the largest text sizes they show one line at a time there, with a second speaker above the picture. A speaker name too wide for half the line is left out.
+
+### Caption packs
+
+A caption pack is a mod that adds text for lines the installed game has no transcript for, or replaces a line's text, for example with a translation. openQ4 does not ship one: the missing text does not exist in the game's files, and openQ4 does not copy transcripts. Install a pack like any other mod, as a PK4 in your game folder or a mod folder. A pack's text takes priority over the installed transcript for the same line; an entry with no text, or a missing `#str_` key, leaves the installed text in place.
+
+For pack authors: a pack is `lipsync/<name>.lipsync` with one entry per line, named `subtitle/` plus either the sound shader's name or the voice file's path without its extension:
+
+```
+lipSync subtitle/vo_1_1_1_140_1 { text "#str_9100001" }
+lipSync subtitle/sound/vo/airdefense/1_1_1_150_2 { text "Your own words for this line." }
+```
+
+Use the shader name for a sound that has one voice file. A shader that picks one of several files at random needs one entry per file path, because each file is a different line. The text can be literal or a `#str_` key; keys come from the pack's own `strings/<language>_<name>.lang` files, so one pack can carry every language and falls back to English where a language has no entry. These entries are only captions: they do not change lip sync. Publish only text you have the right to publish.
+
+To list the lines without a transcript, run `python tools/tests/audio_asset_inventory.py --assets <game folder> --output report.json --pack-template mypack.lipsync` from an openQ4 source checkout. It writes an empty entry for every such line, about 1,400 for Quake 4 and 70 for The Awakening, with no transcript text. In the console, `listSubtitles` shows each caption's source as `installed`, `authored` (from a pack) or `none`.
 
 ## Sound
 
@@ -316,6 +331,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `ui_subtitleScale` | `1` | Subtitle text size, `1` to `2`; also follows the interface text size. |
 | `ui_subtitleBackground` | `0.6` | Opacity of the black backing, `0` to `1`. |
 | `ui_subtitleSpeakers` | `1` | Shows the speaker's name, or the radio label, when known. |
+| `ui_subtitleUntranscribed` | `1` | Shows **[untranscribed speech]** for dialogue that has no transcript; `0` leaves it blank. |
 
 ## Troubleshooting
 

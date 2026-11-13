@@ -4752,8 +4752,10 @@ Sources: [audio implementation and remaining limits](audio-modernization.md),
 
 **Estimate: 80%; 0/7 tasks closed.** Open checkboxes here predominantly reflect
 qualification debt rather than missing core implementations. However, mobile
-memory bounds and full subtitle coverage are substantive outstanding scope, not
-automatically satisfied by a listening pass.
+memory bounds are substantive outstanding scope, not automatically satisfied by
+a listening pass. Subtitle coverage beyond the installed transcripts depends on
+caption packs, which openQ4 supports but does not ship; untranscribed speech is
+marked for players rather than counted as covered.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
@@ -4763,7 +4765,7 @@ automatically satisfied by a listening pass.
 | AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio; real-device harness passes on real stereo endpoints, including a forced layout and a mid-line device switch. | Run `audio_surround_endpoint.py` on a real 5.1/7.1 endpoint and listen on speakers; preserve positional mix and stock zero-rolloff behavior. |
 | AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
 | AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit, extensive scripted-scene mute/save checks and a 42-map progression sweep with fights (1,052 kills, no mute leak) exist. | Ordered human play, including `walker` past the step where the probe player dies, and physical listening/device checks; retain effects/music separation. |
-| AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue) implemented. | Missing transcripts remain explicit; ordered human play and physical stereo-HUD readability. Installed transcripts are English only. Available mappings do not mean every line is captioned. |
+| AUD-07 — Partial | Implementation complete: playback-driven captions, fallback/mapping policy, authored caption-pack declarations, an optional marker for untranscribed speech, a reading hold after a line ends, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue). | Qualification only: ordered human play and physical stereo-HUD readability. Installed transcripts are English only and cover about seven lines in ten; the rest show the marker unless a caption pack supplies text. |
 
 ### AUD task evidence and acceptance
 
@@ -5150,6 +5152,24 @@ automatically satisfied by a listening pass.
   installed game has English transcripts only, which the player guide states;
   ordered human play and physical stereo-HUD placement remain open.
   [Fight evidence](audio-voice-evidence.md#fights-in-the-progression-audit-6-november-2026).
+  November 13: implementation complete. The inventory confirms the installed
+  assets have no more text to map: every stock lipSync transcript is in use, and
+  Awakening's 45 unused ones belong to race samples no shader plays. The
+  licensed authored mapping is therefore a caption-pack declaration, a lipSync
+  named `subtitle/<sample path>` or, for a single-sample shader,
+  `subtitle/<shader>`, checked before installed text and falling back to it.
+  Packs carry their own localized text and leave lip sync alone; the repository
+  ships none, and `audio_asset_inventory.py --pack-template` lists the 1,419
+  stock and 72 Awakening gaps as empty entries. Missing coverage is explicit to
+  players: `ui_subtitleUntranscribed` (default on, Settings > Audio in both UI
+  modes, twelve languages) marks speech without a transcript in any slot the
+  transcribed lines leave. A line that ends naturally holds its last words
+  0.5 s, and a short line 1.5 s in all, closing the logical-clock tail the fight
+  sweep found; stops and replacements still clear at once. Native selection
+  tests and the stock, Awakening portrait Turkish and Classic runtime harnesses
+  pass. Ordered human play and physical stereo-HUD placement remain the only
+  open AUD-07 work.
+  [Caption-pack evidence](audio-voice-evidence.md#caption-packs-untranscribed-speech-and-held-captions-13-november-2026).
 
 ## Desktop platforms and packaging
 
