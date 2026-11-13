@@ -1306,6 +1306,65 @@ void idPhysics_Player::CheckLadder( void ) {
 
 /*
 =============
+idPhysics_Player::SetClassicGrapple / ClearClassicGrapple
+
+openQ4: the server fixes the Classic grappling hook here once it bites, and the
+snapshot carries it to the owner's client, so the pull below runs - and is
+replayed - on both ends.
+=============
+*/
+void idPhysics_Player::SetClassicGrapple( const idVec3 &point ) {
+	current.classicGrapple = 1;
+	current.classicGrapplePoint = point;
+}
+
+void idPhysics_Player::ClearClassicGrapple( void ) {
+	current.classicGrapple = 0;
+	current.classicGrapplePoint.Zero();
+}
+
+/*
+=============
+idPhysics_Player::ClassicGrapplePulling
+
+The hook pulls only while the hook button is still held, so letting go is
+predicted the frame it happens instead of waiting for the server to notice.
+=============
+*/
+bool idPhysics_Player::ClassicGrapplePulling( void ) const {
+	return current.classicGrapple && ( command.buttons & BUTTON_HOOK ) != 0 &&
+		current.movementType == PM_NORMAL && gameLocal.IsClassicRuleset();
+}
+
+/*
+=============
+idPhysics_Player::ClassicGrappleMove
+
+Quake 2 CTF set the player's velocity straight at the hook every frame.  So does
+this, from about chest height, and once the player arrives the pull eases off
+to hold them there - hanging - instead of shaking around the point.
+=============
+*/
+void idPhysics_Player::ClassicGrappleMove( void ) {
+	const idVec3 chest = current.origin - gravityNormal * 48.0f;
+	idVec3 dir = current.classicGrapplePoint - chest;
+	const float dist = dir.Normalize();
+
+	float speed = CLASSIC_HOOK_PULL_SPEED;
+	if ( dist < CLASSIC_HOOK_HANG_DISTANCE && frametime > 0.0f ) {
+		speed = Min( speed, dist / frametime );
+	}
+	current.velocity = dir * speed;
+
+	walking = false;
+	groundPlane = false;
+	groundEntityPtr = NULL;
+
+	idPhysics_Player::SlideMove( false, true, false, false );
+}
+
+/*
+=============
 idPhysics_Player::CheckJump
 =============
 */
@@ -1340,6 +1399,17 @@ bool idPhysics_Player::CheckJump( void ) {
 	
 	addVelocity = 2.0f * maxJumpHeight * -gravityVector;
 	addVelocity *= idMath::Sqrt( addVelocity.Normalize() );
+
+	// openQ4: Classic ruleset stair double jump.  A jump taken soon after the last one -
+	// which on flat ground cannot happen, the first is still in the air - gets a boost,
+	// the way Quake 2 stairs and ledges launched a player.  The jump itself already adds
+	// to any upward speed, as Quake 2's did, so ramps keep their lift.
+	if ( gameLocal.IsClassicRuleset() ) {
+		if ( current.classicJumpTime > 0 ) {
+			addVelocity += CLASSIC_DOUBLE_JUMP_BOOST * -gravityNormal;
+		}
+		current.classicJumpTime = CLASSIC_DOUBLE_JUMP_WINDOW;
+	}
 	current.velocity += addVelocity;
 
 	groundPlane = false;		// jumping away
@@ -1481,6 +1551,11 @@ void idPhysics_Player::DropTimers( void ) {
 			current.crouchSlideTime -= framemsec;
 		}
 	}
+
+	// openQ4: Classic double jump window
+	if ( current.classicJumpTime ) {
+		current.classicJumpTime = ( framemsec >= current.classicJumpTime ) ? 0 : current.classicJumpTime - framemsec;
+	}
 }
 
 /*
@@ -1593,6 +1668,10 @@ void idPhysics_Player::MovePlayer( int msec ) {
 	if ( current.movementType == PM_DEAD ) {
 		// dead
 		idPhysics_Player::DeadMove();
+	}
+	else if ( ClassicGrapplePulling() ) {
+		// openQ4: reeled in by the Classic grappling hook
+		idPhysics_Player::ClassicGrappleMove();
 	}
 	else if ( ladder ) {
 		// going up or down a ladder
@@ -2299,6 +2378,16 @@ void idPhysics_Player::WriteToSnapshot( idBitMsgDelta &msg ) const {
 	msg.WriteBits( current.movementFlags, PLAYER_MOVEMENT_FLAGS_BITS );
 	msg.WriteDeltaLong( 0, current.movementTime );
 	msg.WriteDeltaLong( 0, current.crouchSlideTime );
+	// openQ4: Classic ruleset state; both ends latch the ruleset from the map's server info
+	if ( gameLocal.IsClassicRuleset() ) {
+		msg.WriteDeltaLong( 0, current.classicJumpTime );
+		msg.WriteBits( current.classicGrapple ? 1 : 0, 1 );
+		if ( current.classicGrapple ) {
+			msg.WriteFloat( current.classicGrapplePoint[0] );
+			msg.WriteFloat( current.classicGrapplePoint[1] );
+			msg.WriteFloat( current.classicGrapplePoint[2] );
+		}
+	}
 }
 
 /*
@@ -2333,6 +2422,18 @@ bool idPhysics_Player::DecodeSnapshotState( const idBitMsgDelta &msg, playerPSta
 	decoded.movementFlags = msg.ReadBits( PLAYER_MOVEMENT_FLAGS_BITS );
 	decoded.movementTime = msg.ReadDeltaLong( 0 );
 	decoded.crouchSlideTime = msg.ReadDeltaLong( 0 );
+	decoded.classicJumpTime = 0;
+	decoded.classicGrapple = 0;
+	decoded.classicGrapplePoint.Zero();
+	if ( gameLocal.IsClassicRuleset() ) {
+		decoded.classicJumpTime = msg.ReadDeltaLong( 0 );
+		decoded.classicGrapple = msg.ReadBits( 1 );
+		if ( decoded.classicGrapple ) {
+			decoded.classicGrapplePoint[0] = msg.ReadFloat();
+			decoded.classicGrapplePoint[1] = msg.ReadFloat();
+			decoded.classicGrapplePoint[2] = msg.ReadFloat();
+		}
+	}
 	return !msg.IsReadOverflowed();
 }
 

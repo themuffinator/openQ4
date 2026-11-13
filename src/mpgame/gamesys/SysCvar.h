@@ -477,6 +477,8 @@ extern idCVar	si_obeliskRespawn;
 extern idCVar	si_skullTimeout;
 extern idCVar	si_domCaptureTime;
 extern idCVar	si_domScoreRate;
+extern idCVar	si_ruleset;
+extern idCVar	si_classicGrapple;
 extern idCVar	g_hitFeedback;
 // openQ4 END
 

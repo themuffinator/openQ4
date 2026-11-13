@@ -60,7 +60,7 @@ exact; the estimate column is deliberately approximate.
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
-| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 10 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
+| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 11 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
@@ -3879,7 +3879,7 @@ result is recorded.
 
 ### MP completion checkpoints
 
-**Estimate: 80%; 3/10 tasks closed.** Most systems work and have substantial local
+**Estimate: 80%; 3/11 tasks closed.** Most systems work and have substantial local
 evidence. MP-02's final long-match/catalog safety checks pass, with its timing
 contention caveat accepted for closeout; controlled timing remains unqualified.
 Simulated networking does not close physical peers. The 28 October
@@ -3898,6 +3898,7 @@ prediction/rewind defaults.
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path on IPv4 and IPv6, and over IPv6 even when the path drops IP fragments (connection replies fit one packet). | IPv4 over a fragment-dropping path (1,300-byte channel fragments); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
+| MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), bot hook use, Classic pickup names and an armour-tier HUD tint. |
 
 Completion substeps:
 
@@ -4760,6 +4761,23 @@ Completion substeps:
   rules' buying mask now covers the four CTF modes, which had kept a buying
   CTF match in warmup. Remaining: hands-on play and the UI register's FLOW-010
   acceptance with a visual-spec record of the card's detail-column reasons.
+- [ ] **MP-11 — P2, implementation and qualification: Classic multiplayer ruleset.**
+  A Quake 2 inspired ruleset over the stock maps and weapons
+  ([player guide](../user/classic-ruleset.md)), selected by `si_ruleset` and
+  latched at map load on server and clients. Weapon, ammo and item numbers are
+  an overlay on the shipped entity definitions (`src/mpgame/mp/ClassicRules.cpp`),
+  applied before anything spawns and reverted when the map unloads, so no
+  replacement content ships and the stock ruleset is untouched. The armour
+  tier, hook state and double-jump window ride the snapshot only on Classic
+  maps; the hook's pull runs in the player physics so the owner predicts it.
+  Gates: a person plays Classic DM and CTF with real input, judges the hook,
+  the stair double jump and the weapon balance on the stock maps, and the
+  findings are folded back into the overlay.
+  Progress, 13 November: implemented and checked on Windows/Vulkan with a
+  listen server, bots and a connected client: overlay applied on both ends,
+  blaster spawns, Quake 2 armour conversion, mega health drain, hook pull on
+  the host and a predicted remote client, Create Server Rules tab. Remaining:
+  real-input play, bot hook use, Classic pickup names and an armour-tier HUD tint.
 
 ## Audio and voice
 

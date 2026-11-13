@@ -4678,12 +4678,12 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(diagnostics.empty() && document.Model().id == "openq4.controls" && document.Model().canvasHeight == 720,
 		"the CONTROLS page validates on the 4:3 canvas");
 	CheckSessionActions(document);
-	for (int row = 0; row < 49; ++row) {
+	for (int row = 0; row < 50; ++row) {
 		const auto* node = document.Model().FindNode("controls_bind_"+std::to_string(row));
 		Check(node && node->control && node->control->role == ControlRole::Button && node->control->action == "controlsBind",
 			"each binding row asks the session to wait for a key");
 	}
-	Check(!document.Model().FindNode("controls_bind_49"),"the stock page's 49 bindings, no more");
+	Check(!document.Model().FindNode("controls_bind_50"),"the stock page's 49 bindings and the Classic ruleset's hook, no more");
 	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other"}) Check(document.Model().FindNode(tab) != nullptr,"the stock tabs");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/controls.rui",diagnostics),"the page loads into a runtime");

@@ -212,6 +212,7 @@ public:
 // RITUAL END
 	int						powerups;
 	int						armor;
+	int						armorTier;			// openQ4: Classic ruleset armour tier (classicArmorTier_t), meaningful while armor > 0
 	int						maxarmor;
 	int						ammo[ MAX_AMMO ];
 	int						clip[ MAX_WEAPONS ];
@@ -385,6 +386,17 @@ public:
 	int						nextAmmoRegenPulse[ MAX_AMMO ];	// time when ammo will regenerate
 	int						nextArmorPulse;		// time when armor will tick down
 	int						adrenalineHealthDrain;	// health Adrenaline takes back each pulse (MP only, not saved)
+	// openQ4: Classic ruleset (mp/ClassicRules.h). MP only, not saved.
+	int						classicMegaDecayTime;	// next mega health drain; 0 when no mega health is draining
+	int						classicHookState;		// classicHookState_t, server authoritative, in the snapshot
+	idVec3					classicHookOrigin;
+	idVec3					classicHookDir;
+	int						classicHookFireTime;
+	int						classicHookReleaseTime;
+	renderEntity_t			classicHookCable;
+	int						classicHookCableHandle;
+	renderEntity_t			classicHookHead;
+	int						classicHookHeadHandle;
 	bool					hiddenWeapon;		// if the weapon is hidden ( in noWeapons maps )
 
 	// mp stuff
@@ -748,6 +760,14 @@ public:
 	int						GetItemCost(const char* itemName);
 	void					PerformImpulse( int impulse );
 	void					Spectate( bool spectate, bool force = false );
+	// openQ4: Classic ruleset
+	void					StartClassicMegaHealth( void );
+	void					UpdateClassicMegaHealth( void );
+	bool					ClassicMegaHealthActive( void ) const { return classicMegaDecayTime != 0; }
+	void					UpdateClassicHook( void );
+	void					ResetClassicHook( bool playSound );
+	void					PresentClassicHook( void );
+	void					FreeClassicHookPresentation( void );
 	void					SpectateFreeFly( bool force );	// force is also used by offline demo controls
 	void					RequestSpectatorFollow( spectatorFollow_t operation, int targetSlot = -1 );
  	void					ToggleObjectives ( void );

@@ -743,6 +743,10 @@
 	"#str_42211"	"Off;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16"
 	"#str_42212"	"Abilità dei bot"
 	"#str_42213"	"Allenamento;Recluta;Veterano;Incubo;Impossibile"
+	"#str_42220"	"Regolamento"
+	"#str_42221"	"Quake 4;Classico"
+	"#str_42222"	"Rampino"
+	"#str_42223"	"Off;Modalità bandiera;Tutte le modalità"
 
 	// Ponte di localizzazione chiuso di Match Control. Mantenere questo
 	// intervallo sincronizzato in tutte le lingue openQ4 incluse.

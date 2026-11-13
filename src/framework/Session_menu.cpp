@@ -375,7 +375,7 @@ static const char *const RETAINED_CONTROLS_BINDINGS[] = {
 	"_forward", "_back", "_moveleft", "_moveright", "_moveUp", "_moveDown", "_left", "_right", "_strafe", "_speed", "_impulse0",
 	"_impulse1", "_impulse2", "_impulse3", "_impulse4", "_impulse5", "_impulse6", "_impulse7", "_impulse8", "_impulse9",
 	"_impulse10", "buymenu", "_quickChat", "_attack", "_impulse15", "_impulse14", "_impulse13", "_lookUp", "_lookDown", "_mlook",
-	"centerview", "_zoom", "_impulse19", "_impulse50", "screenshot", "_weaponWheel", "savegame quick", "loadgame quick",
+	"centerview", "_zoom", "_impulse19", "_impulse50", "screenshot", "_weaponWheel", "_hook", "savegame quick", "loadgame quick",
 	"clientMessageMode", "clientMessageMode 1", "_impulse28", "_impulse29", "_ingamestats", "_impulse17", "emote salute",
 	"emote cheer", "emote taunt", "emote grab_a", "_voicechat"
 };
@@ -6813,6 +6813,9 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createOvertime",		"overtime",		"si_overtime",				0, 999,	false },
 	{ "createMercy",		"mercy",		"si_mercyLimit",			0, 999,	false },
 	{ "createRoundLimit",	"roundlimit",	"si_roundLimit",			0, 60,	false },
+	// openQ4's Classic multiplayer ruleset (the game's mp/ClassicRules.h) and its hook.
+	{ "createRuleset",		"ruleset",		"si_ruleset",				0, 1,	false },
+	{ "createGrapple",		"grapple",		"si_classicGrapple",		0, 2,	false },
 };
 static const int RETAINED_CREATE_SETTING_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_SETTINGS ) / sizeof( RETAINED_CREATE_SETTINGS[0] ) );
 // The page's text fields: the verb a field asks with once its text is in its

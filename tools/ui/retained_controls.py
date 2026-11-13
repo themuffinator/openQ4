@@ -54,7 +54,7 @@ SECTIONS = (
         ("#str_200114", "_attack"), ("#str_200115", "_impulse15"), ("#str_200116", "_impulse14"), ("#str_200117", "_impulse13"),
         ("#str_200118", "_lookUp"), ("#str_200119", "_lookDown"), ("#str_200120", "_mlook"), ("#str_200121", "centerview"),
         ("#str_200122", "_zoom"), ("#str_200131", "_impulse19"), ("#str_200315", "_impulse50"), ("#str_200125", "screenshot"),
-        ("#str_229920", "_weaponWheel"),
+        ("#str_229920", "_weaponWheel"), ("#str_42222", "_hook"),
     )),
     ("other", "#str_200093", (
         ("#str_200123", "savegame quick"), ("#str_200124", "loadgame quick"), ("#str_200126", "clientMessageMode"),

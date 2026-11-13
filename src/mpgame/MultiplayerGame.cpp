@@ -10412,7 +10412,10 @@ bool idMultiplayerGame::CanCapture( int team ) {
 void idMultiplayerGame::FlagCaptured( idPlayer *player ) {
 	if( !gameLocal.isClient ) {
 		AddTeamScore( player->team, 1 );
-		AddPlayerTeamScore( player, 5 );
+		// openQ4: the Classic ruleset pays Threewave CTF's capture, team and assist bonuses
+		if ( !rvClassicRules::AwardCapture( player ) ) {
+			AddPlayerTeamScore( player, 5 );
+		}
 		
 // RITUAL BEGIN
 // squirrel: Mode-agnostic buymenus
@@ -12398,8 +12401,8 @@ void idMultiplayerGame::PlayerDeath( idPlayer *dead, idPlayer *killer, int metho
 				AddPlayerScore( killer, 1 );
 			}
 			
-			// additional CTF points
-			if( gameLocal.IsFlagGameType() ) {
+			// additional CTF points (openQ4: the Classic ruleset pays Threewave CTF's frag bonuses instead)
+			if( gameLocal.IsFlagGameType() && !rvClassicRules::AwardFragBonuses( dead, killer ) ) {
 				if( dead->PowerUpActive( killer->team ? POWERUP_CTF_STROGGFLAG : POWERUP_CTF_MARINEFLAG ) ) {
 					AddPlayerTeamScore( killer, 2 );
 				}

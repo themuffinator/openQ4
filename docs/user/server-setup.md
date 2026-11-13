@@ -185,6 +185,8 @@ address to force IPv6.
 | `si_roundLimit` | Rounds a team must win in a round-based match (**Round Limit**) |
 | `si_mercyLimit` | End a team match early once one team leads by this many points; `0` turns it off (**Mercy Lead**) |
 | `si_overtime` | Length of each overtime period in seconds; `0` uses Quake 4's sudden death (**Overtime**) |
+| `si_ruleset` | `1` plays the [Classic ruleset](classic-ruleset.md), inspired by Quake 2; `0` is Quake 4's (**Ruleset**). Changing it mid-map restarts the map. **Not in 0.14.1** |
+| `si_classicGrapple` | Under the Classic ruleset, where the grappling hook works: `0` nowhere, `1` flag modes (default), `2` every mode (**Grappling Hook**). **Not in 0.14.1** |
 | `si_warmup` | Whether matches start with a warmup |
 | `si_isBuyingEnabled`, `si_buyingRules` | Buying on (`1`) and its rules: `0` Quake 4, `1` The Awakening (**Not in 0.14.1**; see [Buying](buying.md)) |
 | `si_usePass`, `g_password` | `si_usePass 1` admits only players who give the password set in `g_password` |

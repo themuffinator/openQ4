@@ -743,6 +743,10 @@
 	"#str_42211"	"Off;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16"
 	"#str_42212"	"Bot Skill"
 	"#str_42213"	"Training;Rookie;Veteran;Nightmare;Impossible"
+	"#str_42220"	"Ruleset"
+	"#str_42221"	"Quake 4;Classic"
+	"#str_42222"	"Grappling Hook"
+	"#str_42223"	"Off;Flag Modes;All Modes"
 
 	// Closed Match Control localization bridge. Keep this range synchronized
 	// across all shipped openQ4 language tables.

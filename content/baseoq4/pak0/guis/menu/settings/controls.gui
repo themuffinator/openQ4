@@ -892,6 +892,20 @@
 						}
 
 					}
+					bindDef set_ctrls_attk_hook_key
+					{
+						rect	452,431,149,18
+						visible	1
+						forecolor	1,0.745,0.137,0.8
+						bind	_hook
+						textscale	0.24
+						font	"fonts/lowpixel"
+
+						onAction {
+							set "cmd" "play main_menu_selection" ;
+						}
+
+					}
 					windowDef set_ctrls_attk_attack
 					{
 						rect	260,119,189,18
@@ -1006,6 +1020,15 @@
 						visible	1
 						forecolor	1,1,1,0.8
 						text	"#str_229920"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					windowDef set_ctrls_attk_hook
+					{
+						rect	260,431,189,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_42222"
 						textscale	0.24
 						font	"fonts/lowpixel"
 					}

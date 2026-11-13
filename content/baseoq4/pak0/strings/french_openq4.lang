@@ -743,6 +743,10 @@
 	"#str_42211"	"Non;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16"
 	"#str_42212"	"Niveau des bots"
 	"#str_42213"	"Entraînement;Recrue;Vétéran;Cauchemar;Impossible"
+	"#str_42220"	"Jeu de règles"
+	"#str_42221"	"Quake 4;Classique"
+	"#str_42222"	"Grappin"
+	"#str_42223"	"Non;Modes à drapeau;Tous les modes"
 
 	// Pont de localisation fermé de Match Control. Garder cette plage
 	// synchronisée dans toutes les langues openQ4 fournies.

@@ -110,6 +110,8 @@
   "create.overtime": {"type": "number", "initial": 0},
   "create.mercy": {"type": "number", "initial": 0},
   "create.roundlimit": {"type": "number", "initial": 0},
+  "create.ruleset": {"type": "number", "initial": 0},
+  "create.grapple": {"type": "number", "initial": 0},
   "create.password": {"type": "string", "initial": ""},
   "create.rconpassword": {"type": "string", "initial": ""},
   "create.mapcycle": {"type": "string", "initial": ""},
@@ -362,6 +364,16 @@
    "operation": "session.menuValue",
    "input": "number",
    "arguments": {"command": "createRoundLimit", "value": {"input": "value"}}
+  },
+  "createRuleset": {
+   "operation": "session.menuValue",
+   "input": "number",
+   "arguments": {"command": "createRuleset", "value": {"input": "value"}}
+  },
+  "createGrapple": {
+   "operation": "session.menuValue",
+   "input": "number",
+   "arguments": {"command": "createGrapple", "value": {"input": "value"}}
   },
   "createPassword": {"operation": "session.menu", "arguments": {"command": "createPassword"}},
   "enter.create-password": {
@@ -19155,6 +19167,18 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.advanced_tab"}, 1]}, "block", "none"]}
   },
   {
+   "id": "create-ruleset.tab",
+   "node": "create-ruleset",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.advanced_tab"}, 2]}, "block", "none"]}
+  },
+  {
+   "id": "create-grapple.tab",
+   "node": "create-grapple",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.advanced_tab"}, 2]}, "block", "none"]}
+  },
+  {
    "id": "create-weaponstay.tab",
    "node": "create-weaponstay",
    "property": "display",
@@ -21975,6 +21999,264 @@
   {
    "id": "text.create-botskill-option-4.height",
    "node": "create-botskill-option-4",
+   "property": "height",
+   "value": {"op": "*", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create-ruleset-head.width",
+   "node": "create-ruleset-head",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 532.5, 301.0]}
+  },
+  {
+   "id": "text.create-ruleset-head.height",
+   "node": "create-ruleset-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+   }
+  },
+  {
+   "id": "text.create-ruleset-label.line-height",
+   "node": "create-ruleset-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 18.0, 36.0]}
+  },
+  {
+   "id": "text.create-ruleset.height",
+   "node": "create-ruleset",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+     },
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-ruleset-focus.height",
+   "node": "create-ruleset-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+     },
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-ruleset-value.left",
+   "node": "create-ruleset-value",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 330.0]}
+  },
+  {
+   "id": "text.create-ruleset-value.top",
+   "node": "create-ruleset-value",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 0]
+   }
+  },
+  {
+   "id": "text.create-ruleset-value.height",
+   "node": "create-ruleset-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+   }
+  },
+  {
+   "id": "text.create-ruleset-value.line-height",
+   "node": "create-ruleset-value",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 18.0, 36.0]}
+  },
+  {
+   "id": "text.create-ruleset-value.width",
+   "node": "create-ruleset-value",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 518.5, 209.5]}
+  },
+  {
+   "id": "text.create-ruleset-value.text-overflow",
+   "node": "create-ruleset-value",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.create-ruleset-chevron.top",
+   "node": "create-ruleset-chevron",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {"op": "+", "args": [-3.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+       {"op": "*", "args": [9.0, {"state": "view.text"}]}
+      ]
+     },
+     15.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-ruleset-option-0.height",
+   "node": "create-ruleset-option-0",
+   "property": "height",
+   "value": {"op": "*", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create-ruleset-option-1.height",
+   "node": "create-ruleset-option-1",
+   "property": "height",
+   "value": {"op": "*", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create-grapple-head.width",
+   "node": "create-grapple-head",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 532.5, 301.0]}
+  },
+  {
+   "id": "text.create-grapple-head.height",
+   "node": "create-grapple-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+   }
+  },
+  {
+   "id": "text.create-grapple-label.line-height",
+   "node": "create-grapple-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 18.0, 36.0]}
+  },
+  {
+   "id": "text.create-grapple.height",
+   "node": "create-grapple",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+     },
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-grapple-focus.height",
+   "node": "create-grapple-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+     },
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-grapple-value.left",
+   "node": "create-grapple-value",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 330.0]}
+  },
+  {
+   "id": "text.create-grapple-value.top",
+   "node": "create-grapple-value",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 0]
+   }
+  },
+  {
+   "id": "text.create-grapple-value.height",
+   "node": "create-grapple-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+   }
+  },
+  {
+   "id": "text.create-grapple-value.line-height",
+   "node": "create-grapple-value",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 18.0, 36.0]}
+  },
+  {
+   "id": "text.create-grapple-value.width",
+   "node": "create-grapple-value",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 518.5, 209.5]}
+  },
+  {
+   "id": "text.create-grapple-value.text-overflow",
+   "node": "create-grapple-value",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.create-grapple-chevron.top",
+   "node": "create-grapple-chevron",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {"op": "+", "args": [-3.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+       {"op": "*", "args": [9.0, {"state": "view.text"}]}
+      ]
+     },
+     15.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-grapple-option-0.height",
+   "node": "create-grapple-option-0",
+   "property": "height",
+   "value": {"op": "*", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create-grapple-option-1.height",
+   "node": "create-grapple-option-1",
+   "property": "height",
+   "value": {"op": "*", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create-grapple-option-2.height",
+   "node": "create-grapple-option-2",
    "property": "height",
    "value": {"op": "*", "args": [22.0, {"state": "view.text"}]}
   },
@@ -46400,6 +46682,294 @@
     },
     {
      "node": "create-roundlimit-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-ruleset.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "create-ruleset-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-ruleset-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-ruleset-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-ruleset.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "create-ruleset-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-ruleset-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "create-ruleset-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-ruleset.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "create-ruleset-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-ruleset-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-ruleset-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-ruleset.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "create-ruleset-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-ruleset-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-ruleset-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-ruleset.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "create-ruleset-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-ruleset-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-ruleset-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-grapple.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "create-grapple-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-grapple-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-grapple-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-grapple.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "create-grapple-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-grapple-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "create-grapple-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-grapple.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "create-grapple-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-grapple-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-grapple-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-grapple.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "create-grapple-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-grapple-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-grapple-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-grapple.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "create-grapple-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-grapple-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-grapple-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -88952,6 +89522,1208 @@
                "scrollbar": {
                 "track": "create-botskill-scroll-track",
                 "thumb": "create-botskill-scroll-thumb",
+                "lineStep": 22.0,
+                "minimumThumb": 24
+               }
+              }
+             },
+             {
+              "id": "create-ruleset",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 565.5, "unit": "dp"},
+               "height": {"type": "length", "value": 36.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 1},
+               "flex-shrink": {"type": "number", "value": 0}
+              },
+              "children": [
+               {
+                "id": "create-ruleset-plate",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"}
+                },
+                "paths": [
+                 {
+                  "id": "plate",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-ruleset-wash",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "wash",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {
+                   "type": "linear",
+                   "from": [0, 0],
+                   "to": [{"fraction": 1}, 0],
+                   "stops": [
+                    {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                    {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                   ]
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-ruleset-focus",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 4, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "rail",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.19444444444444445}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027777777777777776}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.9722222222222222}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.9722222222222222}]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                 }
+                ]
+               },
+               {
+                "id": "create-ruleset-head",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 21, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 301.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "flex"},
+                 "flex-direction": {"type": "keyword", "value": "row"},
+                 "align-items": {"type": "keyword", "value": "center"}
+                },
+                "children": [
+                 {
+                  "id": "create-ruleset-label",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_42220"},
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "flex-shrink": {"type": "number", "value": 1},
+                   "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                   "white-space": {"type": "keyword", "value": "nowrap"},
+                   "overflow": {"type": "keyword", "value": "hidden"}
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-ruleset-value",
+                "type": "text",
+                "properties": {
+                 "text": {"type": "text", "value": "#str_230030"},
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 330.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 209.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "font-family": {"type": "font", "value": "lowpixel"},
+                 "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                 "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+                 "white-space": {"type": "keyword", "value": "nowrap"},
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "clip"}
+                }
+               },
+               {
+                "id": "create-ruleset-chevron",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 541.5, "unit": "dp"},
+                 "top": {"type": "length", "value": 15.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 12, "unit": "dp"},
+                 "height": {"type": "length", "value": 6, "unit": "dp"}
+                },
+                "paths": [
+                 {
+                  "id": "chevron",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[0, 0]]},
+                   {"id": "p1", "op": "line", "points": [[6, 6]]},
+                   {"id": "p2", "op": "line", "points": [[12, 0]]}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                   "widthDp": 1.5,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-ruleset-popup",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 322.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 231.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 48.0, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "none"}
+                },
+                "children": [
+                 {
+                  "id": "create-ruleset-popup-frame",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "rim",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 0]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                     {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                     "widthDp": 4,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   },
+                   {
+                    "id": "body",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 0]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                     {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.698, 0.8039, 0.2627, 0.2]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "create-ruleset-viewport",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 213.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 44.0, "unit": "dp"},
+                   "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+                   "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-ruleset-content",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "children": [
+                     {
+                      "id": "create-ruleset-option-0",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "create-ruleset-option-0-selected",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-ruleset-option-0-highlight",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-ruleset-option-0-label",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_42221"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                         "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                         "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "overflow": {"type": "keyword", "value": "hidden"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "create-ruleset-option-1",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "create-ruleset-option-1-selected",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-ruleset-option-1-highlight",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-ruleset-option-1-label",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_42221"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                         "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                         "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "overflow": {"type": "keyword", "value": "hidden"}
+                        }
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "create-ruleset-scroll-track",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 219.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 2, "unit": "dp"},
+                   "width": {"type": "length", "value": 8, "unit": "dp"},
+                   "height": {"type": "length", "value": 44.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-ruleset-scroll-trough",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "trough",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[3, 0]]},
+                       {"id": "p1", "op": "line", "points": [[5, 0]]},
+                       {"id": "p2", "op": "line", "points": [[5, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[3, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.12]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-ruleset-scroll-thumb",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 8, "unit": "dp"},
+                     "height": {"type": "length", "value": 24, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "create-ruleset-scroll-ink",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "thumb",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[1, 0]]},
+                         {"id": "p1", "op": "line", "points": [[7, 0]]},
+                         {"id": "p2", "op": "line", "points": [[7, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[1, {"fraction": 1}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.9]}}
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ],
+              "control": {
+               "role": "choice",
+               "label": "#str_42220",
+               "action": "createRuleset",
+               "value": {"state": "create.ruleset"},
+               "states": {
+                "default": "create-ruleset.default",
+                "hover": "create-ruleset.hover",
+                "focus": "create-ruleset.focus",
+                "pressed": "create-ruleset.pressed",
+                "disabled": "create-ruleset.disabled"
+               },
+               "parts": {
+                "popup": "create-ruleset-popup",
+                "viewport": "create-ruleset-viewport",
+                "content": "create-ruleset-content",
+                "value": "create-ruleset-value"
+               },
+               "visibleRows": 2,
+               "options": [
+                {
+                 "id": "create-ruleset-option-0",
+                 "node": "create-ruleset-option-0",
+                 "label": "#str_42221",
+                 "value": 0,
+                 "parts": {
+                  "label": "create-ruleset-option-0-label",
+                  "selected": "create-ruleset-option-0-selected",
+                  "highlight": "create-ruleset-option-0-highlight"
+                 },
+                 "labelIndex": 0
+                },
+                {
+                 "id": "create-ruleset-option-1",
+                 "node": "create-ruleset-option-1",
+                 "label": "#str_42221",
+                 "value": 1,
+                 "parts": {
+                  "label": "create-ruleset-option-1-label",
+                  "selected": "create-ruleset-option-1-selected",
+                  "highlight": "create-ruleset-option-1-highlight"
+                 },
+                 "labelIndex": 1
+                }
+               ],
+               "placementBounds": "advancedModal-dialog",
+               "scrollbar": {
+                "track": "create-ruleset-scroll-track",
+                "thumb": "create-ruleset-scroll-thumb",
+                "lineStep": 22.0,
+                "minimumThumb": 24
+               }
+              }
+             },
+             {
+              "id": "create-grapple",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 565.5, "unit": "dp"},
+               "height": {"type": "length", "value": 36.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 1},
+               "flex-shrink": {"type": "number", "value": 0}
+              },
+              "children": [
+               {
+                "id": "create-grapple-plate",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"}
+                },
+                "paths": [
+                 {
+                  "id": "plate",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-grapple-wash",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "wash",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {
+                   "type": "linear",
+                   "from": [0, 0],
+                   "to": [{"fraction": 1}, 0],
+                   "stops": [
+                    {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                    {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                   ]
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-grapple-focus",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 4, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "rail",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.19444444444444445}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027777777777777776}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.9722222222222222}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.9722222222222222}]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                 }
+                ]
+               },
+               {
+                "id": "create-grapple-head",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 21, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 301.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "flex"},
+                 "flex-direction": {"type": "keyword", "value": "row"},
+                 "align-items": {"type": "keyword", "value": "center"}
+                },
+                "children": [
+                 {
+                  "id": "create-grapple-label",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_42222"},
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "flex-shrink": {"type": "number", "value": 1},
+                   "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                   "white-space": {"type": "keyword", "value": "nowrap"},
+                   "overflow": {"type": "keyword", "value": "hidden"}
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-grapple-value",
+                "type": "text",
+                "properties": {
+                 "text": {"type": "text", "value": "#str_230030"},
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 330.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 209.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "font-family": {"type": "font", "value": "lowpixel"},
+                 "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                 "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+                 "white-space": {"type": "keyword", "value": "nowrap"},
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "clip"}
+                }
+               },
+               {
+                "id": "create-grapple-chevron",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 541.5, "unit": "dp"},
+                 "top": {"type": "length", "value": 15.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 12, "unit": "dp"},
+                 "height": {"type": "length", "value": 6, "unit": "dp"}
+                },
+                "paths": [
+                 {
+                  "id": "chevron",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[0, 0]]},
+                   {"id": "p1", "op": "line", "points": [[6, 6]]},
+                   {"id": "p2", "op": "line", "points": [[12, 0]]}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                   "widthDp": 1.5,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-grapple-popup",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 322.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 231.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 70.0, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "none"}
+                },
+                "children": [
+                 {
+                  "id": "create-grapple-popup-frame",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "rim",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 0]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                     {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                     "widthDp": 4,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   },
+                   {
+                    "id": "body",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 0]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                     {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.698, 0.8039, 0.2627, 0.2]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "create-grapple-viewport",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 213.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 66.0, "unit": "dp"},
+                   "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+                   "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-grapple-content",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "children": [
+                     {
+                      "id": "create-grapple-option-0",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "create-grapple-option-0-selected",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-grapple-option-0-highlight",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-grapple-option-0-label",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_42223"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                         "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                         "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "overflow": {"type": "keyword", "value": "hidden"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "create-grapple-option-1",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "create-grapple-option-1-selected",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-grapple-option-1-highlight",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-grapple-option-1-label",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_42223"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                         "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                         "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "overflow": {"type": "keyword", "value": "hidden"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "create-grapple-option-2",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "create-grapple-option-2-selected",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-grapple-option-2-highlight",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "create-grapple-option-2-label",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_42223"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                         "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                         "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "overflow": {"type": "keyword", "value": "hidden"}
+                        }
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "create-grapple-scroll-track",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 219.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 2, "unit": "dp"},
+                   "width": {"type": "length", "value": 8, "unit": "dp"},
+                   "height": {"type": "length", "value": 66.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-grapple-scroll-trough",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "trough",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[3, 0]]},
+                       {"id": "p1", "op": "line", "points": [[5, 0]]},
+                       {"id": "p2", "op": "line", "points": [[5, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[3, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.12]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-grapple-scroll-thumb",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 8, "unit": "dp"},
+                     "height": {"type": "length", "value": 24, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "create-grapple-scroll-ink",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "thumb",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[1, 0]]},
+                         {"id": "p1", "op": "line", "points": [[7, 0]]},
+                         {"id": "p2", "op": "line", "points": [[7, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[1, {"fraction": 1}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.9]}}
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ],
+              "control": {
+               "role": "choice",
+               "label": "#str_42222",
+               "action": "createGrapple",
+               "value": {"state": "create.grapple"},
+               "states": {
+                "default": "create-grapple.default",
+                "hover": "create-grapple.hover",
+                "focus": "create-grapple.focus",
+                "pressed": "create-grapple.pressed",
+                "disabled": "create-grapple.disabled"
+               },
+               "parts": {
+                "popup": "create-grapple-popup",
+                "viewport": "create-grapple-viewport",
+                "content": "create-grapple-content",
+                "value": "create-grapple-value"
+               },
+               "visibleRows": 3,
+               "options": [
+                {
+                 "id": "create-grapple-option-0",
+                 "node": "create-grapple-option-0",
+                 "label": "#str_42223",
+                 "value": 0,
+                 "parts": {
+                  "label": "create-grapple-option-0-label",
+                  "selected": "create-grapple-option-0-selected",
+                  "highlight": "create-grapple-option-0-highlight"
+                 },
+                 "labelIndex": 0
+                },
+                {
+                 "id": "create-grapple-option-1",
+                 "node": "create-grapple-option-1",
+                 "label": "#str_42223",
+                 "value": 1,
+                 "parts": {
+                  "label": "create-grapple-option-1-label",
+                  "selected": "create-grapple-option-1-selected",
+                  "highlight": "create-grapple-option-1-highlight"
+                 },
+                 "labelIndex": 1
+                },
+                {
+                 "id": "create-grapple-option-2",
+                 "node": "create-grapple-option-2",
+                 "label": "#str_42223",
+                 "value": 2,
+                 "parts": {
+                  "label": "create-grapple-option-2-label",
+                  "selected": "create-grapple-option-2-selected",
+                  "highlight": "create-grapple-option-2-highlight"
+                 },
+                 "labelIndex": 2
+                }
+               ],
+               "placementBounds": "advancedModal-dialog",
+               "scrollbar": {
+                "track": "create-grapple-scroll-track",
+                "thumb": "create-grapple-scroll-thumb",
                 "lineStep": 22.0,
                 "minimumThumb": 24
                }

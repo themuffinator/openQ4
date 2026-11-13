@@ -44,19 +44,20 @@
   "controls.33.keys": {"type": "string", "initial": "", "keyBinding": "_impulse50"},
   "controls.34.keys": {"type": "string", "initial": "", "keyBinding": "screenshot"},
   "controls.35.keys": {"type": "string", "initial": "", "keyBinding": "_weaponWheel"},
-  "controls.36.keys": {"type": "string", "initial": "", "keyBinding": "savegame quick"},
-  "controls.37.keys": {"type": "string", "initial": "", "keyBinding": "loadgame quick"},
-  "controls.38.keys": {"type": "string", "initial": "", "keyBinding": "clientMessageMode"},
-  "controls.39.keys": {"type": "string", "initial": "", "keyBinding": "clientMessageMode 1"},
-  "controls.40.keys": {"type": "string", "initial": "", "keyBinding": "_impulse28"},
-  "controls.41.keys": {"type": "string", "initial": "", "keyBinding": "_impulse29"},
-  "controls.42.keys": {"type": "string", "initial": "", "keyBinding": "_ingamestats"},
-  "controls.43.keys": {"type": "string", "initial": "", "keyBinding": "_impulse17"},
-  "controls.44.keys": {"type": "string", "initial": "", "keyBinding": "emote salute"},
-  "controls.45.keys": {"type": "string", "initial": "", "keyBinding": "emote cheer"},
-  "controls.46.keys": {"type": "string", "initial": "", "keyBinding": "emote taunt"},
-  "controls.47.keys": {"type": "string", "initial": "", "keyBinding": "emote grab_a"},
-  "controls.48.keys": {"type": "string", "initial": "", "keyBinding": "_voicechat"},
+  "controls.36.keys": {"type": "string", "initial": "", "keyBinding": "_hook"},
+  "controls.37.keys": {"type": "string", "initial": "", "keyBinding": "savegame quick"},
+  "controls.38.keys": {"type": "string", "initial": "", "keyBinding": "loadgame quick"},
+  "controls.39.keys": {"type": "string", "initial": "", "keyBinding": "clientMessageMode"},
+  "controls.40.keys": {"type": "string", "initial": "", "keyBinding": "clientMessageMode 1"},
+  "controls.41.keys": {"type": "string", "initial": "", "keyBinding": "_impulse28"},
+  "controls.42.keys": {"type": "string", "initial": "", "keyBinding": "_impulse29"},
+  "controls.43.keys": {"type": "string", "initial": "", "keyBinding": "_ingamestats"},
+  "controls.44.keys": {"type": "string", "initial": "", "keyBinding": "_impulse17"},
+  "controls.45.keys": {"type": "string", "initial": "", "keyBinding": "emote salute"},
+  "controls.46.keys": {"type": "string", "initial": "", "keyBinding": "emote cheer"},
+  "controls.47.keys": {"type": "string", "initial": "", "keyBinding": "emote taunt"},
+  "controls.48.keys": {"type": "string", "initial": "", "keyBinding": "emote grab_a"},
+  "controls.49.keys": {"type": "string", "initial": "", "keyBinding": "_voicechat"},
   "controls.touchLayout": {"type": "boolean", "initial": false},
   "controls.0.keys.keyCount": {"type": "number", "initial": 0},
   "controls.0.keys.padCount": {"type": "number", "initial": 0},
@@ -695,6 +696,19 @@
   "controls.48.keys.pad1": {"type": "string", "initial": ""},
   "controls.48.keys.pad1.glyph": {"type": "number", "initial": 0},
   "controls.48.keys.more": {"type": "string", "initial": ""},
+  "controls.49.keys.keyCount": {"type": "number", "initial": 0},
+  "controls.49.keys.padCount": {"type": "number", "initial": 0},
+  "controls.49.keys.key0": {"type": "string", "initial": ""},
+  "controls.49.keys.key0.glyph": {"type": "number", "initial": 0},
+  "controls.49.keys.key0.arrow": {"type": "number", "initial": 0},
+  "controls.49.keys.key1": {"type": "string", "initial": ""},
+  "controls.49.keys.key1.glyph": {"type": "number", "initial": 0},
+  "controls.49.keys.key1.arrow": {"type": "number", "initial": 0},
+  "controls.49.keys.pad0": {"type": "string", "initial": ""},
+  "controls.49.keys.pad0.glyph": {"type": "number", "initial": 0},
+  "controls.49.keys.pad1": {"type": "string", "initial": ""},
+  "controls.49.keys.pad1.glyph": {"type": "number", "initial": 0},
+  "controls.49.keys.more": {"type": "string", "initial": ""},
   "page.tab": {"type": "number", "initial": 0},
   "page.leaving": {"type": "number", "initial": -1},
   "prompt.glyphs": {"type": "number", "initial": 0},
@@ -756,7 +770,7 @@
     "then": [
      {"op": "setState", "values": {"page.leaving": {"state": "page.tab"}, "page.tab": 3}},
      {"op": "playTimeline", "timeline": "show-other"},
-     {"op": "focus", "control": "controls_bind_36"}
+     {"op": "focus", "control": "controls_bind_37"}
     ]
    }
   ],
@@ -917,7 +931,7 @@
         "op": "if",
         "condition": {"op": "==", "args": [{"state": "page.tab"}, 2]},
         "then": [{"op": "focus", "control": "controls_bind_23"}],
-        "else": [{"op": "focus", "control": "controls_bind_36"}]
+        "else": [{"op": "focus", "control": "controls_bind_37"}]
        }
       ]
      }
@@ -44072,6 +44086,883 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "controls.capture"}, 48]}, "block", "none"]}
   },
   {
+   "id": "controls_bind_49-key0-cap-name.text",
+   "node": "controls_bind_49-key0-cap-name",
+   "property": "text",
+   "value": {"state": "controls.49.keys.key0"}
+  },
+  {
+   "id": "controls_bind_49-key0-cap.display",
+   "node": "controls_bind_49-key0-cap",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.arrow"}, 0]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-arrow-1.display",
+   "node": "controls_bind_49-key0-arrow-1",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.arrow"}, 1]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-arrow-2.display",
+   "node": "controls_bind_49-key0-arrow-2",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.arrow"}, 2]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-arrow-3.display",
+   "node": "controls_bind_49-key0-arrow-3",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.arrow"}, 3]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-arrow-4.display",
+   "node": "controls_bind_49-key0-arrow-4",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key0.arrow"}, 4]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-mouse-23.display",
+   "node": "controls_bind_49-key0-mouse-23",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 23]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-mouse-24.display",
+   "node": "controls_bind_49-key0-mouse-24",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 24]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-mouse-25.display",
+   "node": "controls_bind_49-key0-mouse-25",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 25]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-mouse-26.display",
+   "node": "controls_bind_49-key0-mouse-26",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 26]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-mouse-27.display",
+   "node": "controls_bind_49-key0-mouse-27",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 27]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-mouse-28.display",
+   "node": "controls_bind_49-key0-mouse-28",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key0.glyph"}, 28]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key0-side.text",
+   "node": "controls_bind_49-key0-side",
+   "property": "text",
+   "value": {"state": "controls.49.keys.key0"}
+  },
+  {
+   "id": "controls_bind_49-key0.display",
+   "node": "controls_bind_49-key0",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "controls.49.keys.keyCount"}, 0]}, "flex", "none"]}
+  },
+  {
+   "id": "controls_bind_49-key1-cap-name.text",
+   "node": "controls_bind_49-key1-cap-name",
+   "property": "text",
+   "value": {"state": "controls.49.keys.key1"}
+  },
+  {
+   "id": "controls_bind_49-key1-cap.display",
+   "node": "controls_bind_49-key1-cap",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.arrow"}, 0]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-arrow-1.display",
+   "node": "controls_bind_49-key1-arrow-1",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.arrow"}, 1]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-arrow-2.display",
+   "node": "controls_bind_49-key1-arrow-2",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.arrow"}, 2]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-arrow-3.display",
+   "node": "controls_bind_49-key1-arrow-3",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.arrow"}, 3]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-arrow-4.display",
+   "node": "controls_bind_49-key1-arrow-4",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.key1.arrow"}, 4]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-mouse-23.display",
+   "node": "controls_bind_49-key1-mouse-23",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 23]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-mouse-24.display",
+   "node": "controls_bind_49-key1-mouse-24",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 24]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-mouse-25.display",
+   "node": "controls_bind_49-key1-mouse-25",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 25]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-mouse-26.display",
+   "node": "controls_bind_49-key1-mouse-26",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 26]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-mouse-27.display",
+   "node": "controls_bind_49-key1-mouse-27",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 27]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-mouse-28.display",
+   "node": "controls_bind_49-key1-mouse-28",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.key1.glyph"}, 28]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-key1-side.text",
+   "node": "controls_bind_49-key1-side",
+   "property": "text",
+   "value": {"state": "controls.49.keys.key1"}
+  },
+  {
+   "id": "controls_bind_49-key1.display",
+   "node": "controls_bind_49-key1",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "controls.49.keys.keyCount"}, 1]}, "flex", "none"]}
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-1.display",
+   "node": "controls_bind_49-pad0-kind-1",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 1]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-2.display",
+   "node": "controls_bind_49-pad0-kind-2",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 2]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-3.display",
+   "node": "controls_bind_49-pad0-kind-3",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 3]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-4.display",
+   "node": "controls_bind_49-pad0-kind-4",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 4]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-5.display",
+   "node": "controls_bind_49-pad0-kind-5",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 5]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-6.display",
+   "node": "controls_bind_49-pad0-kind-6",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 6]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-7.display",
+   "node": "controls_bind_49-pad0-kind-7",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 7]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-8.display",
+   "node": "controls_bind_49-pad0-kind-8",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 8]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-9.display",
+   "node": "controls_bind_49-pad0-kind-9",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 9]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-10.display",
+   "node": "controls_bind_49-pad0-kind-10",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 10]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-11.display",
+   "node": "controls_bind_49-pad0-kind-11",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 11]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-12.display",
+   "node": "controls_bind_49-pad0-kind-12",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 12]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-13.display",
+   "node": "controls_bind_49-pad0-kind-13",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 13]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-14.display",
+   "node": "controls_bind_49-pad0-kind-14",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 14]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-15.display",
+   "node": "controls_bind_49-pad0-kind-15",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 15]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-16.display",
+   "node": "controls_bind_49-pad0-kind-16",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 16]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-17.display",
+   "node": "controls_bind_49-pad0-kind-17",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 17]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-18.display",
+   "node": "controls_bind_49-pad0-kind-18",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 18]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-19.display",
+   "node": "controls_bind_49-pad0-kind-19",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 19]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-20.display",
+   "node": "controls_bind_49-pad0-kind-20",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 20]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-kind-21.display",
+   "node": "controls_bind_49-pad0-kind-21",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 21]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-cap-name.text",
+   "node": "controls_bind_49-pad0-cap-name",
+   "property": "text",
+   "value": {"state": "controls.49.keys.pad0"}
+  },
+  {
+   "id": "controls_bind_49-pad0-cap.display",
+   "node": "controls_bind_49-pad0-cap",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 22]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0-name.text",
+   "node": "controls_bind_49-pad0-name",
+   "property": "text",
+   "value": {"state": "controls.49.keys.pad0"}
+  },
+  {
+   "id": "controls_bind_49-pad0-name.display",
+   "node": "controls_bind_49-pad0-name",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [
+       {
+        "op": "||",
+        "args": [
+         {
+          "op": "||",
+          "args": [
+           {
+            "op": "||",
+            "args": [
+             {"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 1]},
+             {"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 10]}
+            ]
+           },
+           {"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 11]}
+          ]
+         },
+         {"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 16]}
+        ]
+       },
+       {"op": "==", "args": [{"state": "controls.49.keys.pad0.glyph"}, 21]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad0.display",
+   "node": "controls_bind_49-pad0",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "controls.49.keys.padCount"}, 0]}, "flex", "none"]}
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-1.display",
+   "node": "controls_bind_49-pad1-kind-1",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 1]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-2.display",
+   "node": "controls_bind_49-pad1-kind-2",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 2]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-3.display",
+   "node": "controls_bind_49-pad1-kind-3",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 3]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-4.display",
+   "node": "controls_bind_49-pad1-kind-4",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 4]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-5.display",
+   "node": "controls_bind_49-pad1-kind-5",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 5]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-6.display",
+   "node": "controls_bind_49-pad1-kind-6",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 6]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-7.display",
+   "node": "controls_bind_49-pad1-kind-7",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 7]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-8.display",
+   "node": "controls_bind_49-pad1-kind-8",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 8]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-9.display",
+   "node": "controls_bind_49-pad1-kind-9",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 9]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-10.display",
+   "node": "controls_bind_49-pad1-kind-10",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 10]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-11.display",
+   "node": "controls_bind_49-pad1-kind-11",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 11]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-12.display",
+   "node": "controls_bind_49-pad1-kind-12",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 12]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-13.display",
+   "node": "controls_bind_49-pad1-kind-13",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 13]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-14.display",
+   "node": "controls_bind_49-pad1-kind-14",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 14]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-15.display",
+   "node": "controls_bind_49-pad1-kind-15",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 15]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-16.display",
+   "node": "controls_bind_49-pad1-kind-16",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 16]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-17.display",
+   "node": "controls_bind_49-pad1-kind-17",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 17]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-18.display",
+   "node": "controls_bind_49-pad1-kind-18",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 18]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-19.display",
+   "node": "controls_bind_49-pad1-kind-19",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 19]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-20.display",
+   "node": "controls_bind_49-pad1-kind-20",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 20]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-kind-21.display",
+   "node": "controls_bind_49-pad1-kind-21",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 21]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-cap-name.text",
+   "node": "controls_bind_49-pad1-cap-name",
+   "property": "text",
+   "value": {"state": "controls.49.keys.pad1"}
+  },
+  {
+   "id": "controls_bind_49-pad1-cap.display",
+   "node": "controls_bind_49-pad1-cap",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [{"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 22]}, "block", "none"]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1-name.text",
+   "node": "controls_bind_49-pad1-name",
+   "property": "text",
+   "value": {"state": "controls.49.keys.pad1"}
+  },
+  {
+   "id": "controls_bind_49-pad1-name.display",
+   "node": "controls_bind_49-pad1-name",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "||",
+      "args": [
+       {
+        "op": "||",
+        "args": [
+         {
+          "op": "||",
+          "args": [
+           {
+            "op": "||",
+            "args": [
+             {"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 1]},
+             {"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 10]}
+            ]
+           },
+           {"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 11]}
+          ]
+         },
+         {"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 16]}
+        ]
+       },
+       {"op": "==", "args": [{"state": "controls.49.keys.pad1.glyph"}, 21]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-pad1.display",
+   "node": "controls_bind_49-pad1",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "controls.49.keys.padCount"}, 1]}, "flex", "none"]}
+  },
+  {
+   "id": "controls_bind_49-more.text",
+   "node": "controls_bind_49-more",
+   "property": "text",
+   "value": {"state": "controls.49.keys.more"}
+  },
+  {
+   "id": "controls_bind_49-none.display",
+   "node": "controls_bind_49-none",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "==", "args": [{"state": "controls.49.keys.keyCount"}, 0]},
+       {"op": "==", "args": [{"state": "controls.49.keys.padCount"}, 0]}
+      ]
+     },
+     "block",
+     "none"
+    ]
+   }
+  },
+  {
+   "id": "controls_bind_49-keys.display",
+   "node": "controls_bind_49-keys",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "controls.capture"}, 49]}, "none", "flex"]}
+  },
+  {
+   "id": "controls_bind_49-waiting.display",
+   "node": "controls_bind_49-waiting",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "controls.capture"}, 49]}, "block", "none"]}
+  },
+  {
    "id": "controls_touch_layout.display",
    "node": "controls_touch_layout",
    "property": "display",
@@ -53706,6 +54597,253 @@
    }
   },
   {
+   "id": "tall.controls_bind_36.width",
+   "node": "controls_bind_36",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36.height",
+   "node": "controls_bind_36",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-focus.width",
+   "node": "controls_bind_36-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-focus.height",
+   "node": "controls_bind_36-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-head.left",
+   "node": "controls_bind_36-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-head.width",
+   "node": "controls_bind_36-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     362.5287,
+     {"op": "*", "args": [177.25, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-head.height",
+   "node": "controls_bind_36-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-label.font-size",
+   "node": "controls_bind_36-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-label.line-height",
+   "node": "controls_bind_36-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-keys.left",
+   "node": "controls_bind_36-keys",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     421.8423,
+     {"op": "*", "args": [206.25, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-keys.top",
+   "node": "controls_bind_36-keys",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-keys.width",
+   "node": "controls_bind_36-keys",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     434.1141,
+     {"op": "*", "args": [212.25, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-keys.height",
+   "node": "controls_bind_36-keys",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     40.9059,
+     {"op": "*", "args": [20.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-keys.font-size",
+   "node": "controls_bind_36-keys",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [40.9059, {"state": "view.text"}]},
+     20.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-waiting.left",
+   "node": "controls_bind_36-waiting",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     421.8423,
+     {"op": "*", "args": [206.25, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-waiting.width",
+   "node": "controls_bind_36-waiting",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     434.1141,
+     {"op": "*", "args": [212.25, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-waiting.height",
+   "node": "controls_bind_36-waiting",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-waiting.font-size",
+   "node": "controls_bind_36-waiting",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_36-waiting.line-height",
+   "node": "controls_bind_36-waiting",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
+  },
+  {
    "id": "tall.controls-attack-note.padding-left",
    "node": "controls-attack-note",
    "property": "padding-left",
@@ -53836,6 +54974,12 @@
    "value": {"op": "==", "args": [{"state": "page.tab"}, 2]}
   },
   {
+   "id": "controls_bind_36.enabled",
+   "node": "controls_bind_36",
+   "property": "enabled",
+   "value": {"op": "==", "args": [{"state": "page.tab"}, 2]}
+  },
+  {
    "id": "controls-page-attack.display",
    "node": "controls-page-attack",
    "property": "display",
@@ -53893,253 +55037,6 @@
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      880.5,
      {"op": "*", "args": [430.5, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36.width",
-   "node": "controls_bind_36",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     880.5,
-     {"op": "*", "args": [430.5, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36.height",
-   "node": "controls_bind_36",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-focus.width",
-   "node": "controls_bind_36-focus",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     8.1812,
-     {"op": "*", "args": [4, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-focus.height",
-   "node": "controls_bind_36-focus",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-head.left",
-   "node": "controls_bind_36-head",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     42.9512,
-     {"op": "*", "args": [21, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-head.width",
-   "node": "controls_bind_36-head",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     312.9303,
-     {"op": "*", "args": [153, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-head.height",
-   "node": "controls_bind_36-head",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-label.font-size",
-   "node": "controls_bind_36-label",
-   "property": "font-size",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
-     14
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-label.line-height",
-   "node": "controls_bind_36-label",
-   "property": "line-height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
-     13.0
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-keys.left",
-   "node": "controls_bind_36-keys",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     372.2439,
-     {"op": "*", "args": [182, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-keys.top",
-   "node": "controls_bind_36-keys",
-   "property": "top",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     16.3624,
-     {"op": "*", "args": [8.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-keys.width",
-   "node": "controls_bind_36-keys",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     483.7125,
-     {"op": "*", "args": [236.5, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-keys.height",
-   "node": "controls_bind_36-keys",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     40.9059,
-     {"op": "*", "args": [20.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-keys.font-size",
-   "node": "controls_bind_36-keys",
-   "property": "font-size",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [40.9059, {"state": "view.text"}]},
-     20.0
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-waiting.left",
-   "node": "controls_bind_36-waiting",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     372.2439,
-     {"op": "*", "args": [182, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-waiting.width",
-   "node": "controls_bind_36-waiting",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     483.7125,
-     {"op": "*", "args": [236.5, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-waiting.height",
-   "node": "controls_bind_36-waiting",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-waiting.font-size",
-   "node": "controls_bind_36-waiting",
-   "property": "font-size",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
-     14
-    ]
-   }
-  },
-  {
-   "id": "tall.controls_bind_36-waiting.line-height",
-   "node": "controls_bind_36-waiting",
-   "property": "line-height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
-     36.0
     ]
    }
   },
@@ -55626,19 +56523,6 @@
    }
   },
   {
-   "id": "tall.controls-other-column-1.width",
-   "node": "controls-other-column-1",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     880.5,
-     {"op": "*", "args": [430.5, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
    "id": "tall.controls_bind_43.width",
    "node": "controls_bind_43",
    "property": "width",
@@ -55882,6 +56766,19 @@
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      {"op": "/", "args": [73.6307, {"state": "view.text"}]},
      36.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls-other-column-1.width",
+   "node": "controls-other-column-1",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
     ]
    }
   },
@@ -57121,6 +58018,253 @@
    }
   },
   {
+   "id": "tall.controls_bind_49.width",
+   "node": "controls_bind_49",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49.height",
+   "node": "controls_bind_49",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-focus.width",
+   "node": "controls_bind_49-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-focus.height",
+   "node": "controls_bind_49-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-head.left",
+   "node": "controls_bind_49-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-head.width",
+   "node": "controls_bind_49-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     312.9303,
+     {"op": "*", "args": [153, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-head.height",
+   "node": "controls_bind_49-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-label.font-size",
+   "node": "controls_bind_49-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-label.line-height",
+   "node": "controls_bind_49-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-keys.left",
+   "node": "controls_bind_49-keys",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     372.2439,
+     {"op": "*", "args": [182, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-keys.top",
+   "node": "controls_bind_49-keys",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-keys.width",
+   "node": "controls_bind_49-keys",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     483.7125,
+     {"op": "*", "args": [236.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-keys.height",
+   "node": "controls_bind_49-keys",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     40.9059,
+     {"op": "*", "args": [20.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-keys.font-size",
+   "node": "controls_bind_49-keys",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [40.9059, {"state": "view.text"}]},
+     20.0
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-waiting.left",
+   "node": "controls_bind_49-waiting",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     372.2439,
+     {"op": "*", "args": [182, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-waiting.width",
+   "node": "controls_bind_49-waiting",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     483.7125,
+     {"op": "*", "args": [236.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-waiting.height",
+   "node": "controls_bind_49-waiting",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-waiting.font-size",
+   "node": "controls_bind_49-waiting",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.controls_bind_49-waiting.line-height",
+   "node": "controls_bind_49-waiting",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
+  },
+  {
    "id": "tall.controls_touch_layout.width",
    "node": "controls_touch_layout",
    "property": "width",
@@ -57290,12 +58434,6 @@
    }
   },
   {
-   "id": "controls_bind_36.enabled",
-   "node": "controls_bind_36",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 3]}
-  },
-  {
    "id": "controls_bind_37.enabled",
    "node": "controls_bind_37",
    "property": "enabled",
@@ -57364,6 +58502,12 @@
   {
    "id": "controls_bind_48.enabled",
    "node": "controls_bind_48",
+   "property": "enabled",
+   "value": {"op": "==", "args": [{"state": "page.tab"}, 3]}
+  },
+  {
+   "id": "controls_bind_49.enabled",
+   "node": "controls_bind_49",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 3]}
   },
@@ -67609,6 +68753,150 @@
     },
     {
      "node": "controls_bind_48-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_bind_49.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "controls_bind_49-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "controls_bind_49-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "controls_bind_49-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_bind_49.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "controls_bind_49-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_bind_49.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "controls_bind_49-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_bind_49.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "controls_bind_49-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "controls_bind_49.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "controls_bind_49-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "controls_bind_49-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -109168,7 +110456,7 @@
                  "navigation": {
                   "down": "controls_bind_30",
                   "up": "controls_bind_28",
-                  "right": "controls_bind_35",
+                  "right": "controls_bind_36",
                   "left": "controls_bind_29"
                  }
                 }
@@ -116487,87 +117775,13 @@
                   "disabled": "controls_bind_35.disabled"
                  },
                  "navigation": {
-                  "down": "controls_bind_23",
+                  "down": "controls_bind_36",
                   "up": "controls_bind_34",
                   "left": "controls_bind_28",
                   "right": "controls_bind_35"
                  }
                 }
-               }
-              ]
-             }
-            ]
-           }
-          ]
-         }
-        ]
-       },
-       {
-        "id": "controls-page-other",
-        "type": "group",
-        "properties": {
-         "position": {"type": "keyword", "value": "absolute"},
-         "left": {"type": "length", "value": 0, "unit": "dp"},
-         "top": {"type": "length", "value": 0, "unit": "dp"},
-         "width": {"type": "length", "value": 100, "unit": "%"},
-         "height": {"type": "length", "value": 100, "unit": "%"},
-         "display": {"type": "keyword", "value": "none"},
-         "opacity": {"type": "number", "value": 1}
-        },
-        "children": [
-         {
-          "id": "controls-other-rows",
-          "type": "group",
-          "properties": {
-           "position": {"type": "keyword", "value": "absolute"},
-           "left": {"type": "length", "value": 62.0, "unit": "dp"},
-           "top": {"type": "length", "value": 105.0, "unit": "dp"},
-           "width": {"type": "length", "value": 884.5, "unit": "dp"},
-           "padding-left": {"type": "length", "value": 4.0, "unit": "dp"},
-           "overflow": {"type": "keyword", "value": "auto"},
-           "bottom": {"type": "length", "value": 85.5, "unit": "dp"}
-          },
-          "children": [
-           {
-            "id": "controls-other-note",
-            "type": "text",
-            "properties": {
-             "text": {"type": "text", "value": "#str_231545"},
-             "position": {"type": "keyword", "value": "relative"},
-             "display": {"type": "keyword", "value": "block"},
-             "width": {"type": "length", "value": 837.549, "unit": "dp"},
-             "padding-left": {"type": "length", "value": 21.0, "unit": "dp"},
-             "margin-bottom": {"type": "length", "value": 1.5, "unit": "dp"},
-             "font-family": {"type": "font", "value": "lowpixel"},
-             "font-size": {"type": "length", "value": 14, "unit": "dp"},
-             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
-             "color": {"type": "color", "value": [1, 1, 1, 0.4]},
-             "white-space": {"type": "keyword", "value": "normal"},
-             "pointer-events": {"type": "keyword", "value": "none"}
-            }
-           },
-           {
-            "id": "controls-other-columns",
-            "type": "group",
-            "properties": {
-             "position": {"type": "keyword", "value": "relative"},
-             "display": {"type": "keyword", "value": "flex"},
-             "flex-direction": {"type": "keyword", "value": "row"},
-             "align-items": {"type": "keyword", "value": "flex-start"}
-            },
-            "children": [
-             {
-              "id": "controls-other-column-0",
-              "type": "group",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "flex"},
-               "flex-direction": {"type": "keyword", "value": "column"},
-               "width": {"type": "length", "value": 430.5, "unit": "dp"},
-               "flex-shrink": {"type": "number", "value": 0},
-               "margin-right": {"type": "length", "value": 19.5, "unit": "dp"}
-              },
-              "children": [
+               },
                {
                 "id": "controls_bind_36",
                 "type": "group",
@@ -116678,7 +117892,7 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 21, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 153, "unit": "dp"},
+                   "width": {"type": "length", "value": 177.25, "unit": "dp"},
                    "height": {"type": "length", "value": 36.0, "unit": "dp"},
                    "display": {"type": "keyword", "value": "flex"},
                    "flex-direction": {"type": "keyword", "value": "row"},
@@ -116689,7 +117903,7 @@
                     "id": "controls_bind_36-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200123"},
+                     "text": {"type": "text", "value": "#str_42222"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -116709,9 +117923,9 @@
                   "type": "group",
                   "properties": {
                    "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 182, "unit": "dp"},
+                   "left": {"type": "length", "value": 206.25, "unit": "dp"},
                    "top": {"type": "length", "value": 8.0, "unit": "dp"},
-                   "width": {"type": "length", "value": 236.5, "unit": "dp"},
+                   "width": {"type": "length", "value": 212.25, "unit": "dp"},
                    "height": {"type": "length", "value": 20.0, "unit": "dp"},
                    "display": {"type": "keyword", "value": "flex"},
                    "flex-direction": {"type": "keyword", "value": "row"},
@@ -117751,9 +118965,9 @@
                   "properties": {
                    "text": {"type": "text", "value": "#str_107000"},
                    "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 182, "unit": "dp"},
+                   "left": {"type": "length", "value": 206.25, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 236.5, "unit": "dp"},
+                   "width": {"type": "length", "value": 212.25, "unit": "dp"},
                    "height": {"type": "length", "value": 36.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -117768,7 +118982,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200123",
+                 "label": "#str_42222",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -117778,9 +118992,88 @@
                   "pressed": "controls_bind_36.pressed",
                   "disabled": "controls_bind_36.disabled"
                  },
-                 "navigation": {"down": "controls_bind_37", "up": "tab-other", "right": "controls_bind_43", "left": "controls_bind_36"}
+                 "navigation": {
+                  "down": "controls_bind_23",
+                  "up": "controls_bind_35",
+                  "left": "controls_bind_29",
+                  "right": "controls_bind_36"
+                 }
                 }
-               },
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "id": "controls-page-other",
+        "type": "group",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 100, "unit": "%"},
+         "height": {"type": "length", "value": 100, "unit": "%"},
+         "display": {"type": "keyword", "value": "none"},
+         "opacity": {"type": "number", "value": 1}
+        },
+        "children": [
+         {
+          "id": "controls-other-rows",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 62.0, "unit": "dp"},
+           "top": {"type": "length", "value": 105.0, "unit": "dp"},
+           "width": {"type": "length", "value": 884.5, "unit": "dp"},
+           "padding-left": {"type": "length", "value": 4.0, "unit": "dp"},
+           "overflow": {"type": "keyword", "value": "auto"},
+           "bottom": {"type": "length", "value": 85.5, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "controls-other-note",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_231545"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "width": {"type": "length", "value": 837.549, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 21.0, "unit": "dp"},
+             "margin-bottom": {"type": "length", "value": 1.5, "unit": "dp"},
+             "font-family": {"type": "font", "value": "lowpixel"},
+             "font-size": {"type": "length", "value": 14, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.4]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            }
+           },
+           {
+            "id": "controls-other-columns",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "flex"},
+             "flex-direction": {"type": "keyword", "value": "row"},
+             "align-items": {"type": "keyword", "value": "flex-start"}
+            },
+            "children": [
+             {
+              "id": "controls-other-column-0",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "flex"},
+               "flex-direction": {"type": "keyword", "value": "column"},
+               "width": {"type": "length", "value": 430.5, "unit": "dp"},
+               "flex-shrink": {"type": "number", "value": 0},
+               "margin-right": {"type": "length", "value": 19.5, "unit": "dp"}
+              },
+              "children": [
                {
                 "id": "controls_bind_37",
                 "type": "group",
@@ -117902,7 +119195,7 @@
                     "id": "controls_bind_37-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200124"},
+                     "text": {"type": "text", "value": "#str_200123"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -118981,7 +120274,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200124",
+                 "label": "#str_200123",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -118991,12 +120284,7 @@
                   "pressed": "controls_bind_37.pressed",
                   "disabled": "controls_bind_37.disabled"
                  },
-                 "navigation": {
-                  "down": "controls_bind_38",
-                  "up": "controls_bind_36",
-                  "right": "controls_bind_44",
-                  "left": "controls_bind_37"
-                 }
+                 "navigation": {"down": "controls_bind_38", "up": "tab-other", "right": "controls_bind_44", "left": "controls_bind_37"}
                 }
                },
                {
@@ -119120,7 +120408,7 @@
                     "id": "controls_bind_38-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200126"},
+                     "text": {"type": "text", "value": "#str_200124"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -120199,7 +121487,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200126",
+                 "label": "#str_200124",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -120338,7 +121626,7 @@
                     "id": "controls_bind_39-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200127"},
+                     "text": {"type": "text", "value": "#str_200126"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -121417,7 +122705,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200127",
+                 "label": "#str_200126",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -121556,7 +122844,7 @@
                     "id": "controls_bind_40-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200129"},
+                     "text": {"type": "text", "value": "#str_200127"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -122635,7 +123923,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200129",
+                 "label": "#str_200127",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -122774,7 +124062,7 @@
                     "id": "controls_bind_41-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200130"},
+                     "text": {"type": "text", "value": "#str_200129"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -123853,7 +125141,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200130",
+                 "label": "#str_200129",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -123992,7 +125280,7 @@
                     "id": "controls_bind_42-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200132"},
+                     "text": {"type": "text", "value": "#str_200130"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -125071,7 +126359,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200132",
+                 "label": "#str_200130",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -125084,24 +126372,11 @@
                  "navigation": {
                   "down": "controls_bind_43",
                   "up": "controls_bind_41",
-                  "right": "controls_touch_layout",
+                  "right": "controls_bind_49",
                   "left": "controls_bind_42"
                  }
                 }
-               }
-              ]
-             },
-             {
-              "id": "controls-other-column-1",
-              "type": "group",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "flex"},
-               "flex-direction": {"type": "keyword", "value": "column"},
-               "width": {"type": "length", "value": 430.5, "unit": "dp"},
-               "flex-shrink": {"type": "number", "value": 0}
-              },
-              "children": [
+               },
                {
                 "id": "controls_bind_43",
                 "type": "group",
@@ -125223,7 +126498,7 @@
                     "id": "controls_bind_43-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_201009"},
+                     "text": {"type": "text", "value": "#str_200132"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -126302,7 +127577,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_201009",
+                 "label": "#str_200132",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -126315,11 +127590,24 @@
                  "navigation": {
                   "down": "controls_bind_44",
                   "up": "controls_bind_42",
-                  "left": "controls_bind_36",
-                  "right": "controls_bind_43"
+                  "right": "controls_touch_layout",
+                  "left": "controls_bind_43"
                  }
                 }
-               },
+               }
+              ]
+             },
+             {
+              "id": "controls-other-column-1",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "flex"},
+               "flex-direction": {"type": "keyword", "value": "column"},
+               "width": {"type": "length", "value": 430.5, "unit": "dp"},
+               "flex-shrink": {"type": "number", "value": 0}
+              },
+              "children": [
                {
                 "id": "controls_bind_44",
                 "type": "group",
@@ -126441,7 +127729,7 @@
                     "id": "controls_bind_44-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200311"},
+                     "text": {"type": "text", "value": "#str_201009"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -127520,7 +128808,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200311",
+                 "label": "#str_201009",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -127659,7 +128947,7 @@
                     "id": "controls_bind_45-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200312"},
+                     "text": {"type": "text", "value": "#str_200311"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -128738,7 +130026,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200312",
+                 "label": "#str_200311",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -128877,7 +130165,7 @@
                     "id": "controls_bind_46-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200313"},
+                     "text": {"type": "text", "value": "#str_200312"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -129956,7 +131244,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200313",
+                 "label": "#str_200312",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -130095,7 +131383,7 @@
                     "id": "controls_bind_47-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200314"},
+                     "text": {"type": "text", "value": "#str_200313"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -131174,7 +132462,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200314",
+                 "label": "#str_200313",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -131313,7 +132601,7 @@
                     "id": "controls_bind_48-label",
                     "type": "text",
                     "properties": {
-                     "text": {"type": "text", "value": "#str_200959"},
+                     "text": {"type": "text", "value": "#str_200314"},
                      "position": {"type": "keyword", "value": "relative"},
                      "display": {"type": "keyword", "value": "block"},
                      "flex-shrink": {"type": "number", "value": 1},
@@ -132392,7 +133680,7 @@
                 ],
                 "control": {
                  "role": "button",
-                 "label": "#str_200959",
+                 "label": "#str_200314",
                  "action": "controlsBind",
                  "prompt": "#str_231766",
                  "states": {
@@ -132403,10 +133691,1228 @@
                   "disabled": "controls_bind_48.disabled"
                  },
                  "navigation": {
-                  "down": "controls_touch_layout",
+                  "down": "controls_bind_49",
                   "up": "controls_bind_47",
                   "left": "controls_bind_41",
                   "right": "controls_bind_48"
+                 }
+                }
+               },
+               {
+                "id": "controls_bind_49",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "controls_bind_49-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_bind_49-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_bind_49-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_bind_49-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 153, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "controls_bind_49-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_200959"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_bind_49-keys",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 182, "unit": "dp"},
+                   "top": {"type": "length", "value": 8.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 236.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 20.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"},
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "font-size": {"type": "length", "value": 20.0, "unit": "dp"},
+                   "pointer-events": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "controls_bind_49-key0",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "none"},
+                     "flex-direction": {"type": "keyword", "value": "row"},
+                     "align-items": {"type": "keyword", "value": "center"},
+                     "height": {"type": "length", "value": 1, "unit": "em"},
+                     "margin-right": {"type": "length", "value": 0.3, "unit": "em"},
+                     "flex-shrink": {"type": "number", "value": 0}
+                    },
+                    "children": [
+                     {
+                      "id": "controls_bind_49-key0-cap",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "none"},
+                       "height": {"type": "length", "value": 1, "unit": "em"},
+                       "min-width": {"type": "length", "value": 0.3, "unit": "em"},
+                       "padding-left": {"type": "length", "value": 0.35, "unit": "em"},
+                       "padding-right": {"type": "length", "value": 0.35, "unit": "em"},
+                       "flex-shrink": {"type": "number", "value": 0}
+                      },
+                      "children": [
+                       {
+                        "id": "controls_bind_49-key0-cap-plate",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "cap",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[6, {"fraction": 1}]]},
+                           {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -6}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "controls_bind_49-key0-cap-name",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_230030"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 0.545, "unit": "em"},
+                         "line-height": {"type": "length", "value": 1.833, "unit": "em"},
+                         "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "text-align": {"type": "keyword", "value": "center"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "controls_bind_49-key0-arrow-1",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-1"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-arrow-2",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-2"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-arrow-3",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-3"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-arrow-4",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-4"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-mouse-23",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-23"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-mouse-24",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-24"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-mouse-25",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-25"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-mouse-26",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-26"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-mouse-27",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-27"
+                     },
+                     {
+                      "id": "controls_bind_49-key0-mouse-28",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"},
+                       "position": {"type": "keyword", "value": "relative"}
+                      },
+                      "symbol": "key-mouse-28",
+                      "children": [
+                       {
+                        "id": "controls_bind_49-key0-side",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_230030"},
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 0.409, "unit": "em"},
+                         "line-height": {"type": "length", "value": 1.25, "unit": "em"},
+                         "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "text-align": {"type": "keyword", "value": "center"},
+                         "left": {"type": "length", "value": 12.5, "unit": "%"},
+                         "top": {"type": "length", "value": 46, "unit": "%"},
+                         "width": {"type": "length", "value": 75, "unit": "%"}
+                        }
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "id": "controls_bind_49-key1",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "none"},
+                     "flex-direction": {"type": "keyword", "value": "row"},
+                     "align-items": {"type": "keyword", "value": "center"},
+                     "height": {"type": "length", "value": 1, "unit": "em"},
+                     "margin-right": {"type": "length", "value": 0.65, "unit": "em"},
+                     "flex-shrink": {"type": "number", "value": 0}
+                    },
+                    "children": [
+                     {
+                      "id": "controls_bind_49-key1-cap",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "none"},
+                       "height": {"type": "length", "value": 1, "unit": "em"},
+                       "min-width": {"type": "length", "value": 0.3, "unit": "em"},
+                       "padding-left": {"type": "length", "value": 0.35, "unit": "em"},
+                       "padding-right": {"type": "length", "value": 0.35, "unit": "em"},
+                       "flex-shrink": {"type": "number", "value": 0}
+                      },
+                      "children": [
+                       {
+                        "id": "controls_bind_49-key1-cap-plate",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "cap",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[6, {"fraction": 1}]]},
+                           {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -6}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "controls_bind_49-key1-cap-name",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_230030"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 0.545, "unit": "em"},
+                         "line-height": {"type": "length", "value": 1.833, "unit": "em"},
+                         "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "text-align": {"type": "keyword", "value": "center"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "controls_bind_49-key1-arrow-1",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-1"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-arrow-2",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-2"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-arrow-3",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-3"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-arrow-4",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-arrow-4"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-mouse-23",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-23"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-mouse-24",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-24"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-mouse-25",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-25"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-mouse-26",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-26"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-mouse-27",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-mouse-27"
+                     },
+                     {
+                      "id": "controls_bind_49-key1-mouse-28",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 0.727, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"},
+                       "position": {"type": "keyword", "value": "relative"}
+                      },
+                      "symbol": "key-mouse-28",
+                      "children": [
+                       {
+                        "id": "controls_bind_49-key1-side",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_230030"},
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 0.409, "unit": "em"},
+                         "line-height": {"type": "length", "value": 1.25, "unit": "em"},
+                         "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "text-align": {"type": "keyword", "value": "center"},
+                         "left": {"type": "length", "value": 12.5, "unit": "%"},
+                         "top": {"type": "length", "value": 46, "unit": "%"},
+                         "width": {"type": "length", "value": 75, "unit": "%"}
+                        }
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "id": "controls_bind_49-pad0",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "none"},
+                     "flex-direction": {"type": "keyword", "value": "row"},
+                     "align-items": {"type": "keyword", "value": "center"},
+                     "height": {"type": "length", "value": 1, "unit": "em"},
+                     "margin-right": {"type": "length", "value": 0.3, "unit": "em"},
+                     "flex-shrink": {"type": "number", "value": 0}
+                    },
+                    "children": [
+                     {
+                      "id": "controls_bind_49-pad0-kind-1",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-1"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-2",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-2"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-3",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-3"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-4",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-4"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-5",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-5"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-6",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-6"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-7",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-7"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-8",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-8"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-9",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-9"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-10",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.454, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-10"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-11",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.091, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-11"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-12",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-12"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-13",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-13"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-14",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-14"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-15",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-15"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-16",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-16"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-17",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-17"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-18",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-18"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-19",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-19"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-20",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.454, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-20"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-kind-21",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.182, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-21"
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-cap",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "none"},
+                       "height": {"type": "length", "value": 1, "unit": "em"},
+                       "min-width": {"type": "length", "value": 0.3, "unit": "em"},
+                       "padding-left": {"type": "length", "value": 0.35, "unit": "em"},
+                       "padding-right": {"type": "length", "value": 0.35, "unit": "em"},
+                       "flex-shrink": {"type": "number", "value": 0}
+                      },
+                      "children": [
+                       {
+                        "id": "controls_bind_49-pad0-cap-plate",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "cap",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[6, {"fraction": 0.14}]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -6}, {"fraction": 0.14}]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.5}]]},
+                           {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -6}, {"fraction": 0.86}]]},
+                           {"id": "p4", "op": "line", "points": [[6, {"fraction": 0.86}]]},
+                           {"id": "p5", "op": "line", "points": [[0, {"fraction": 0.5}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "controls_bind_49-pad0-cap-name",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_230030"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 0.545, "unit": "em"},
+                         "line-height": {"type": "length", "value": 1.833, "unit": "em"},
+                         "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "text-align": {"type": "keyword", "value": "center"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "controls_bind_49-pad0-name",
+                      "type": "text",
+                      "properties": {
+                       "text": {"type": "text", "value": "#str_230030"},
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "display": {"type": "keyword", "value": "none"},
+                       "font-family": {"type": "font", "value": "lowpixel"},
+                       "font-size": {"type": "length", "value": 0.477, "unit": "em"},
+                       "line-height": {"type": "length", "value": 2.095, "unit": "em"},
+                       "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                       "white-space": {"type": "keyword", "value": "nowrap"},
+                       "text-align": {"type": "keyword", "value": "center"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"}
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "controls_bind_49-pad1",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "none"},
+                     "flex-direction": {"type": "keyword", "value": "row"},
+                     "align-items": {"type": "keyword", "value": "center"},
+                     "height": {"type": "length", "value": 1, "unit": "em"},
+                     "margin-right": {"type": "length", "value": 0.3, "unit": "em"},
+                     "flex-shrink": {"type": "number", "value": 0}
+                    },
+                    "children": [
+                     {
+                      "id": "controls_bind_49-pad1-kind-1",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-1"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-2",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-2"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-3",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-3"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-4",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-4"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-5",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-5"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-6",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-6"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-7",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-7"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-8",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-8"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-9",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-9"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-10",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.454, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-10"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-11",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.091, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-11"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-12",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-12"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-13",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-13"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-14",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-14"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-15",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-15"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-16",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-16"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-17",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-17"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-18",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-18"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-19",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.0, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-19"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-20",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.454, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-20"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-kind-21",
+                      "type": "vector",
+                      "properties": {
+                       "display": {"type": "keyword", "value": "none"},
+                       "width": {"type": "length", "value": 1.182, "unit": "em"},
+                       "height": {"type": "length", "value": 1, "unit": "em"}
+                      },
+                      "symbol": "key-pad-21"
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-cap",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "none"},
+                       "height": {"type": "length", "value": 1, "unit": "em"},
+                       "min-width": {"type": "length", "value": 0.3, "unit": "em"},
+                       "padding-left": {"type": "length", "value": 0.35, "unit": "em"},
+                       "padding-right": {"type": "length", "value": 0.35, "unit": "em"},
+                       "flex-shrink": {"type": "number", "value": 0}
+                      },
+                      "children": [
+                       {
+                        "id": "controls_bind_49-pad1-cap-plate",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "cap",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[6, {"fraction": 0.14}]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -6}, {"fraction": 0.14}]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.5}]]},
+                           {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -6}, {"fraction": 0.86}]]},
+                           {"id": "p4", "op": "line", "points": [[6, {"fraction": 0.86}]]},
+                           {"id": "p5", "op": "line", "points": [[0, {"fraction": 0.5}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "controls_bind_49-pad1-cap-name",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_230030"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 0.545, "unit": "em"},
+                         "line-height": {"type": "length", "value": 1.833, "unit": "em"},
+                         "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "text-align": {"type": "keyword", "value": "center"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "controls_bind_49-pad1-name",
+                      "type": "text",
+                      "properties": {
+                       "text": {"type": "text", "value": "#str_230030"},
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "display": {"type": "keyword", "value": "none"},
+                       "font-family": {"type": "font", "value": "lowpixel"},
+                       "font-size": {"type": "length", "value": 0.477, "unit": "em"},
+                       "line-height": {"type": "length", "value": 2.095, "unit": "em"},
+                       "color": {"type": "color", "value": [0.04, 0.05, 0.035, 1]},
+                       "white-space": {"type": "keyword", "value": "nowrap"},
+                       "text-align": {"type": "keyword", "value": "center"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"}
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "controls_bind_49-more",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_230030"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 0.65, "unit": "em"},
+                     "line-height": {"type": "length", "value": 1.538, "unit": "em"},
+                     "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+                     "white-space": {"type": "keyword", "value": "nowrap"},
+                     "flex-shrink": {"type": "number", "value": 0}
+                    }
+                   },
+                   {
+                    "id": "controls_bind_49-none",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "none"},
+                     "width": {"type": "length", "value": 0.7, "unit": "em"},
+                     "height": {"type": "length", "value": 1, "unit": "em"},
+                     "flex-shrink": {"type": "number", "value": 0}
+                    },
+                    "paths": [
+                     {
+                      "id": "dash",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[0, {"fraction": 0.5}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.5}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.3]}},
+                       "widthDp": 1.5,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "controls_bind_49-waiting",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_107000"},
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 182, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 236.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]},
+                   "white-space": {"type": "keyword", "value": "nowrap"},
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "display": {"type": "keyword", "value": "none"},
+                   "pointer-events": {"type": "keyword", "value": "none"}
+                  }
+                 }
+                ],
+                "control": {
+                 "role": "button",
+                 "label": "#str_200959",
+                 "action": "controlsBind",
+                 "prompt": "#str_231766",
+                 "states": {
+                  "default": "controls_bind_49.default",
+                  "hover": "controls_bind_49.hover",
+                  "focus": "controls_bind_49.focus",
+                  "pressed": "controls_bind_49.pressed",
+                  "disabled": "controls_bind_49.disabled"
+                 },
+                 "navigation": {
+                  "down": "controls_touch_layout",
+                  "up": "controls_bind_48",
+                  "left": "controls_bind_42",
+                  "right": "controls_bind_49"
                  }
                 }
                },
@@ -132559,9 +135065,9 @@
                   "disabled": "controls_touch_layout.disabled"
                  },
                  "navigation": {
-                  "down": "controls_bind_36",
-                  "up": "controls_bind_48",
-                  "left": "controls_bind_42",
+                  "down": "controls_bind_37",
+                  "up": "controls_bind_49",
+                  "left": "controls_bind_43",
                   "right": "controls_touch_layout"
                  }
                 }

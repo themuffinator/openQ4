@@ -743,6 +743,10 @@
 	"#str_42211"	"Desact.;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16"
 	"#str_42212"	"Habilidad de bots"
 	"#str_42213"	"Entrenamiento;Novato;Veterano;Pesadilla;Imposible"
+	"#str_42220"	"Reglamento"
+	"#str_42221"	"Quake 4;Clásico"
+	"#str_42222"	"Gancho"
+	"#str_42223"	"Desact.;Modos de bandera;Todos los modos"
 
 	// Puente de localización cerrado de Match Control. Mantener este intervalo
 	// sincronizado en todos los idiomas de openQ4 incluidos.

@@ -32,6 +32,7 @@ private:
 	idVec2				chargeGlow;
 	bool				fireForced;
 	int					fireHeldTime;
+	bool				fireOnPress;		// openQ4: "fire_on_press" - shoot on the press and repeat while held, no charge
 	virtual void		GetCrosshairDetail	( crosshairSignals_t &signals ) const;
 
 	stateResult_t		State_Raise				( const stateParms_t& parms );
@@ -121,6 +122,18 @@ bool rvWeaponBlaster::UpdateAttack ( void ) {
 		}
 	}
 
+	// openQ4: a fire-on-press blaster (the Classic ruleset's) shoots the moment the
+	// button goes down and keeps shooting at its fire rate while it is held.
+	if ( fireOnPress ) {
+		if ( wsfl.attack && gameLocal.time >= nextAttackTime ) {
+			nextAttackTime = gameLocal.time + (fireRate * owner->PowerUpModifier ( PMOD_FIRERATE ));
+			fireHeldTime   = gameLocal.time;
+			SetState ( "Fire", 0 );
+			return true;
+		}
+		return false;
+	}
+
 	// If the player is pressing the fire button and they have enough ammo for a shot
 	// then start the shooting process.
 	if ( wsfl.attack && gameLocal.time >= nextAttackTime ) {
@@ -172,6 +185,7 @@ void rvWeaponBlaster::Spawn ( void ) {
 	chargeGlow   = spawnArgs.GetVec2 ( "chargeGlow" );
 	chargeTime   = SEC2MS ( spawnArgs.GetFloat ( "chargeTime" ) );
 	chargeDelay  = SEC2MS ( spawnArgs.GetFloat ( "chargeDelay" ) );
+	fireOnPress  = spawnArgs.GetBool ( "fire_on_press" );
 
 	fireHeldTime		= 0;
 	fireForced			= false;
@@ -198,6 +212,7 @@ rvWeaponBlaster::Restore
 ================
 */
 void rvWeaponBlaster::Restore ( idRestoreGame *savefile ) {
+	fireOnPress = spawnArgs.GetBool ( "fire_on_press" );
 	savefile->ReadInt ( chargeTime );
 	savefile->ReadInt ( chargeDelay );
 	savefile->ReadVec2 ( chargeGlow );
@@ -446,7 +461,7 @@ stateResult_t rvWeaponBlaster::State_Fire ( const stateParms_t& parms ) {
 
 
 	
-			if ( gameLocal.time - fireHeldTime > chargeTime ) {	
+			if ( !fireOnPress && gameLocal.time - fireHeldTime > chargeTime ) {	
 				Attack ( true, 1, spread, 0, 1.0f );
 				DisableViewEffectWeaponDepthHack( PlayEffect ( "fx_chargedflash", barrelJointView, false ) );
 				PlayAnim( ANIMCHANNEL_ALL, "chargedfire", parms.blendFrames );

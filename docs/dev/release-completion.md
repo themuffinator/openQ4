@@ -7,6 +7,35 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A Classic multiplayer ruleset inspired by Quake 2, 13 November 2026
+
+- **Play Quake 4 multiplayer the Quake 2 way.** Hosts can set **Ruleset** to
+  **Classic** under **Create Server → Advanced Options → Rules** (or
+  `si_ruleset 1`). Every game type works under it, on the stock maps and
+  weapons; the default Quake 4 rules are unchanged.
+- **What Classic changes.** You spawn with only the blaster and 100 health.
+  Each weapon plays its Quake 2 counterpart (the shotgun is the super shotgun,
+  the nailgun the chaingun, the Dark Matter Gun the BFG), with Quake 2 damage,
+  fire rates, ammo boxes and limits, and shared bullets and cells. Armour comes
+  in jacket, combat and body tiers that convert into each other as Quake 2's
+  did. Health shards stack past 100, mega health drains after five seconds and
+  only respawns once its holder is back to 100, and items respawn on Quake 2
+  times. A quick second jump off stairs or ledges launches you higher.
+- **Threewave CTF.** Captures pay 15 to the carrier and 10 to the team, with
+  Threewave's carrier, defence and assist bonuses, and a **grappling hook** in
+  flag modes (or every mode, or none: **Grappling Hook**,
+  `si_classicGrapple`). Bind it under **Settings → Controls → Attack/Look**.
+  The hook reels you in while held, predicted on your own screen.
+- Inspired by Quake 2, not a replica: Quake 4's models, effects and maps stay,
+  and the guide lists where the numbers differ. See
+  [Classic Multiplayer Ruleset](../user/classic-ruleset.md).
+- Checked on Windows/Vulkan with a listen server, bots and a second connected
+  client: the definition overlay applies on both ends and is removed when the
+  map unloads; blaster-only spawns, tier conversion (2 → 51 → 138 → 175 → 177),
+  mega health drain, and the hook on the host and on a predicted remote client
+  in CTF all behave; the stock ruleset still spawns with the machinegun. The
+  Create Server Rules tab sets both settings. Bots do not use the hook.
+
 ## The weapon strip moves, and the Strogg one has its own feel, 13 November 2026
 
 - **The new interface's weapon strip opens and closes smoothly.** It rises
@@ -130,7 +159,6 @@ does not restore the withdrawn release. See
   finishes loading, Quake 4's ready chime plays as the continue prompt appears,
   and continuing plays its click, in both the new and the classic interface.
   Neither sound was playing before.
-
 ## The main menu's background comes through as a living signal, 13 November 2026
 
 - **The new interface's main menu has a sci-fi display look.** The level

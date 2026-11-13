@@ -79,6 +79,11 @@ public:
 	// Server side only: the client never needs it and never gets told.
 	int						pickedUpByClientNum;
 
+	// openQ4: Classic ruleset mega health.  The item holds its respawn until the
+	// player it went to has drained back to the normal limit (or died or left).
+	idEntityPtr<idPlayer>	classicMegaHolder;
+	float					classicMegaRespawn;
+
 	const idDeclSkin*		pickupSkin;
 	void					Event_DropToFloor	( void );
 protected:

@@ -755,6 +755,10 @@
 	"#str_42211"	"Wył.;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16"
 	"#str_42212"	"Poziom botów"
 	"#str_42213"	"Szkolenie;Żółtodziób;Weteran;Koszmar;Niemożliwe"
+	"#str_42220"	"Zestaw zasad"
+	"#str_42221"	"Quake 4;Klasyczne"
+	"#str_42222"	"Hak z liną"
+	"#str_42223"	"Wył.;Tryby z flagą;Wszystkie tryby"
 
 	// Closed Match Control localization bridge. Keep this range synchronized
 	// across all shipped openQ4 language tables.

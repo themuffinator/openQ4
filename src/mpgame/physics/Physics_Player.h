@@ -42,6 +42,10 @@ typedef struct playerPState_s {
 	int						movementFlags;
 	int						movementTime;
 	int						crouchSlideTime;
+	// openQ4: Classic ruleset (mp/ClassicRules.h); only on the wire on Classic maps
+	int						classicJumpTime;		// ms left in which another jump is a double jump
+	int						classicGrapple;			// the hook is fixed at classicGrapplePoint
+	idVec3					classicGrapplePoint;
 } playerPState_t;
 
 class idPhysics_Player : public idPhysics_Actor {
@@ -65,6 +69,10 @@ public:
 	void					SetMaxStepHeight( const float newMaxStepHeight );
 	float					GetMaxStepHeight( void ) const;
 	void					SetMaxJumpHeight( const float newMaxJumpHeight );
+	// openQ4: Classic ruleset grappling hook; the server fixes and frees it
+	void					SetClassicGrapple( const idVec3 &point );
+	void					ClearClassicGrapple( void );
+	bool					HasClassicGrapple( void ) const { return current.classicGrapple != 0; }
 	void					SetMovementType( const pmtype_t type );
 	void					SetPlayerInput( const usercmd_t &cmd, const idAngles &newViewAngles );
 	void					SetKnockBack( const int knockBackTime );
@@ -179,6 +187,8 @@ private:
 	void					NoclipMove( void );
 	void					SpectatorMove( void );
 	void					LadderMove( void );
+	bool					ClassicGrapplePulling( void ) const;
+	void					ClassicGrappleMove( void );
 	void					CorrectAllSolid( trace_t &trace, int contents );
 	void					CheckGround( bool checkStuck );
 	void					CheckDuck( void );

@@ -506,6 +506,7 @@ void idInventory::Clear( void ) {
 	carryOverWeapons	= 0;
 	powerups			= 0;
 	armor				= 0;
+	armorTier			= 0;
 	maxarmor			= 0;
 	secretAreasDiscovered = 0;
 
@@ -660,6 +661,7 @@ void idInventory::RestoreInventory( idPlayer *owner, const idDict &dict ) {
 	// health/armor
 	maxHealth		= dict.GetInt( "maxhealth", "100" );
 	armor			= dict.GetInt( "armor", "50" );
+	armorTier		= 0;
 	maxarmor		= dict.GetInt( "maxarmor", "100" );
 
 	// ammo
@@ -1473,6 +1475,16 @@ idPlayer::idPlayer() {
 	corpseSinkStartTime		= 0;
 	nextHealthPulse			= 0;
 	adrenalineHealthDrain	= 0;
+	classicMegaDecayTime	= 0;
+	classicHookState		= CLASSIC_HOOK_NONE;
+	classicHookOrigin.Zero();
+	classicHookDir.Zero();
+	classicHookFireTime		= 0;
+	classicHookReleaseTime	= 0;
+	memset( &classicHookCable, 0, sizeof( classicHookCable ) );
+	classicHookCableHandle	= -1;
+	memset( &classicHookHead, 0, sizeof( classicHookHead ) );
+	classicHookHeadHandle	= -1;
 
 	scoreBoardOpen			= false;
 	forceScoreBoard			= false;
@@ -2017,6 +2029,10 @@ void idPlayer::Init( void ) {
 
 	// restore persistent data
 	RestorePersistantInfo();
+
+	// openQ4: a new life starts with no mega health draining and the hook in.
+	classicMegaDecayTime = 0;
+	ResetClassicHook( false );
 
 	bobCycle	= 0;
 
@@ -2576,6 +2592,7 @@ Release any resources used by the player.
 ==============
 */
 idPlayer::~idPlayer() {
+	FreeClassicHookPresentation();
 	FreeWeaponWheelGui();
 	FreeQuickChatGui();
 	FreeStatusBar();
@@ -5404,6 +5421,23 @@ bool idPlayer::Give( const char *statname, const char *value, bool dropped, bool
  				health = boundaryHealth;
  			}
 		}
+	} else if ( !idStr::Icmp( statname, "bonushealth" ) && gameLocal.IsClassicRuleset() ) {
+		// openQ4: Classic stimpacks stack past the limit and never drain
+		if ( health >= CLASSIC_HEALTH_CAP ) {
+			return false;
+		}
+		health = Min( health + atoi( value ), CLASSIC_HEALTH_CAP );
+	} else if ( !idStr::Icmp( statname, "megahealth" ) ) {
+		// openQ4: Classic mega health; idItem::Pickup starts the drain and holds the respawn
+		if ( health >= CLASSIC_HEALTH_CAP ) {
+			return false;
+		}
+		health = Min( health + atoi( value ), CLASSIC_HEALTH_CAP );
+	} else if ( !idStr::Icmp( statname, "armor_tier" ) ) {
+		// openQ4: Classic tiered armour
+		if ( !rvClassicRules::GiveArmor( this, value ) ) {
+			return false;
+		}
 	} else if ( !idStr::Icmp( statname, "bonushealth" ) ) {
 		// allow health over max health
 		if ( health >= boundaryHealth * 2 ) {
@@ -6253,7 +6287,8 @@ void idPlayer::UpdatePowerUps( void ) {
 					nextHealthPulse = gameLocal.time + HEALTH_PULSE;
 				}	
 			// Health above max technically isnt a powerup but functions as one so handle it here
-			} else if ( health > inventory.maxHealth && gameLocal.isServer ) { 
+			// openQ4: under the Classic ruleset only mega health drains (UpdateClassicMegaHealth)
+			} else if ( health > inventory.maxHealth && gameLocal.isServer && !gameLocal.IsClassicRuleset() ) { 
 				nextHealthPulse = gameLocal.time + HEALTH_PULSE;
 				health--;
 			}
@@ -6295,10 +6330,16 @@ void idPlayer::UpdatePowerUps( void ) {
 				inventory.armor = Min( inventory.armor + FC_ARMOR_REGEN_STEP, armorCap );
 				nextArmorPulse = gameLocal.time + FC_ARMOR_REGEN_PULSE;
 			}
-		} else if ( inventory.armor > inventory.maxarmor ) {
+		} else if ( inventory.armor > inventory.maxarmor && !gameLocal.IsClassicRuleset() ) {
+			// openQ4: Classic armour keeps its points; each tier has its own limit
 			nextArmorPulse += ARMOR_PULSE;
 			inventory.armor--;
 		}
+	}
+
+	// openQ4: Classic mega health drain
+	if ( gameLocal.isServer && gameLocal.IsClassicRuleset() ) {
+		UpdateClassicMegaHealth();
 	}
 		
 	// Assign the powerup skin as long as we are alive
@@ -11440,6 +11481,9 @@ void idPlayer::Think( void ) {
 	}
 // RAVEN END
 
+	// openQ4: Classic ruleset grappling hook; fixing it before Move lets this frame pull
+	UpdateClassicHook();
+
 	Move();
 	ReportVRRoomScaleWalk();
 
@@ -11507,6 +11551,8 @@ void idPlayer::Think( void ) {
 	UpdateHud();
 
 	UpdatePowerUps();
+
+	PresentClassicHook();
 
 	UpdateDeathSkin( false );
 
@@ -11762,6 +11808,10 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 		pfl.pain = true;
 		return;
 	}
+
+	// openQ4: Classic ruleset: the hook lets go and any mega health stops draining
+	ResetClassicHook( false );
+	classicMegaDecayTime = 0;
 
 // squirrel: Mode-agnostic buymenus
 	if ( gameLocal.isMultiplayer ) {
@@ -12037,7 +12087,11 @@ void idPlayer::CalcDamagePoints( idEntity *inflictor, idEntity *attacker, const 
 	}
 
 	// save some from armor
-	if ( !damageDef->GetBool( "noArmor" ) ) {
+	if ( !damageDef->GetBool( "noArmor" ) && gameLocal.IsClassicRuleset() ) {
+		// openQ4: Classic armour stops a share set by its tier, and may stop a hit outright
+		armorSave = rvClassicRules::AbsorbDamage( inventory.armorTier, inventory.armor, damage, damageDef->GetBool( "classic_energy" ) );
+		damage -= armorSave;
+	} else if ( !damageDef->GetBool( "noArmor" ) ) {
 		float armor_protection;
 
  		armor_protection = ( gameLocal.isMultiplayer ) ? g_armorProtectionMP.GetFloat() : g_armorProtection.GetFloat();
@@ -12273,6 +12327,11 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 		if ( !gameLocal.isClient && gameLocal.mpGame.GetGameState() != NULL &&
 			 attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
 			gameLocal.mpGame.GetGameState()->PlayerDamage( static_cast< idPlayer * >( attacker ), this, damage, armorSave );
+		}
+
+		// openQ4: Classic CTF remembers who has been hurting a flag carrier
+		if ( attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
+			rvClassicRules::NoteDamage( this, static_cast< idPlayer * >( attacker ) );
 		}
 
 		// openQ4: floating damage numbers, ported from Quake Live's damage
@@ -14909,6 +14968,8 @@ void idPlayer::LocalClientPredictionThink( void ) {
  		UpdatePowerUps();
  	}
 
+	PresentClassicHook();
+
  	UpdateDeathSkin( false );
 
 	UpdateDeathShader( deathStateHitch );
@@ -15147,6 +15208,7 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 
 		UpdateHud();
  		UpdatePowerUps();
+		PresentClassicHook();
  	}
 
 //#if !LIMITED_PREDICTION
@@ -15416,6 +15478,17 @@ void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
 	msg.WriteDeltaFloat( 0.0f, deltaViewAngles[2] );
 	msg.WriteShort( health );
 	msg.WriteByte( inventory.armor );
+	// openQ4: Classic ruleset state.  Both ends latch the ruleset from the same server
+	// info at map load, so only Classic maps (and Classic demos) carry these bits.
+	if ( gameLocal.IsClassicRuleset() ) {
+		msg.WriteBits( inventory.armorTier, CLASSIC_ARMOR_TIER_BITS );
+		msg.WriteBits( classicHookState, CLASSIC_HOOK_STATE_BITS );
+		if ( classicHookState != CLASSIC_HOOK_NONE ) {
+			msg.WriteFloat( classicHookOrigin[0] );
+			msg.WriteFloat( classicHookOrigin[1] );
+			msg.WriteFloat( classicHookOrigin[2] );
+		}
+	}
  	msg.WriteBits( lastDamageDef, gameLocal.entityDefBits );
 	msg.WriteDir( lastDamageDir, 9 );
 	msg.WriteShort( lastDamageLocation );
@@ -15492,6 +15565,9 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	idAngles decodedDeltaViewAngles;
 	int decodedHealth;
 	int decodedArmor;
+	int decodedArmorTier = CLASSIC_ARMOR_NONE;
+	int decodedHookState = CLASSIC_HOOK_NONE;
+	idVec3 decodedHookOrigin = vec3_origin;
 	int decodedLastDamageDef;
 	idVec3 decodedLastDamageDir;
 	int decodedLastDamageLocation;
@@ -15523,6 +15599,15 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	decodedDeltaViewAngles[2] = msg.ReadDeltaFloat( 0.0f );
 	decodedHealth = msg.ReadShort();
 	decodedArmor = msg.ReadByte();
+	if ( gameLocal.IsClassicRuleset() ) {
+		decodedArmorTier = msg.ReadBits( CLASSIC_ARMOR_TIER_BITS );
+		decodedHookState = msg.ReadBits( CLASSIC_HOOK_STATE_BITS );
+		if ( decodedHookState != CLASSIC_HOOK_NONE ) {
+			decodedHookOrigin[0] = msg.ReadFloat();
+			decodedHookOrigin[1] = msg.ReadFloat();
+			decodedHookOrigin[2] = msg.ReadFloat();
+		}
+	}
 	decodedLastDamageDef = msg.ReadBits( gameLocal.entityDefBits );
 	decodedLastDamageDir = msg.ReadDir( 9 );
 	decodedLastDamageLocation = msg.ReadShort();
@@ -15580,6 +15665,9 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	deltaViewAngles = decodedDeltaViewAngles;
 	health = decodedHealth;
 	inventory.armor = decodedArmor;
+	inventory.armorTier = decodedArmorTier;
+	classicHookState = decodedHookState;
+	classicHookOrigin = decodedHookOrigin;
 	lastDamageDef = decodedLastDamageDef;
 	lastDamageDir = decodedLastDamageDir;
 	lastDamageLocation = decodedLastDamageLocation;
@@ -17839,5 +17927,234 @@ void idPlayer::SetFriend( int clientNum, bool isFriend ) {
 	} else {
 		friendPlayers &= ~mask;
 		friendPlayerIdentities[ clientNum ] = 0;
+	}
+}
+
+/*
+===============================================================================
+
+	openQ4: Classic ruleset (mp/ClassicRules.h) - mega health and the grappling hook.
+
+===============================================================================
+*/
+
+/*
+================
+idPlayer::StartClassicMegaHealth
+
+Quake 2's mega health: the extra points hold for five seconds, then drain a
+point a second until the player is back at the normal limit.  The item that
+gave it waits for that before it starts its own respawn (idItem::Think).
+================
+*/
+void idPlayer::StartClassicMegaHealth( void ) {
+	classicMegaDecayTime = gameLocal.time + CLASSIC_MEGA_DECAY_DELAY;
+}
+
+/*
+================
+idPlayer::UpdateClassicMegaHealth
+================
+*/
+void idPlayer::UpdateClassicMegaHealth( void ) {
+	if ( !classicMegaDecayTime ) {
+		return;
+	}
+	if ( health <= 0 || health <= inventory.maxHealth ) {
+		classicMegaDecayTime = 0;
+		return;
+	}
+	if ( gameLocal.time < classicMegaDecayTime ) {
+		return;
+	}
+	health--;
+	classicMegaDecayTime = ( health > inventory.maxHealth ) ? gameLocal.time + CLASSIC_MEGA_DECAY_PULSE : 0;
+}
+
+/*
+================
+idPlayer::ResetClassicHook
+================
+*/
+void idPlayer::ResetClassicHook( bool playSound ) {
+	if ( classicHookState != CLASSIC_HOOK_NONE ) {
+		classicHookReleaseTime = gameLocal.time;
+		if ( playSound && !gameLocal.isClient ) {
+			StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+		}
+	}
+	classicHookState = CLASSIC_HOOK_NONE;
+	physicsObj.ClearClassicGrapple();
+}
+
+/*
+================
+idPlayer::UpdateClassicHook
+
+Server side.  Pressing _hook throws the hook from the eye; it flies until it
+bites into the world, then the player physics reels the player in for as long
+as the button stays down (idPhysics_Player::ClassicGrappleMove).  Letting go,
+dying, or the hook striking a player, the sky or nothing within its reach
+brings it back.  It does not hurt anyone, and it holds on to the point it hit
+rather than riding a mover.
+================
+*/
+void idPlayer::UpdateClassicHook( void ) {
+	if ( gameLocal.isClient ) {
+		return;
+	}
+
+	const bool allowed = rvClassicRules::GrappleAllowed() && !spectating && health > 0 && !pfl.dead && !IsInVehicle() && !noclip;
+	const bool held = ( usercmd.buttons & BUTTON_HOOK ) != 0;
+	if ( !allowed || !held ) {
+		if ( classicHookState != CLASSIC_HOOK_NONE ) {
+			ResetClassicHook( allowed );
+		}
+		return;
+	}
+
+	if ( classicHookState == CLASSIC_HOOK_NONE ) {
+		// a fresh press, and not straight after the last hook came back
+		if ( ( oldButtons & BUTTON_HOOK ) != 0 || gameLocal.time < classicHookReleaseTime + CLASSIC_HOOK_REFIRE_DELAY ) {
+			return;
+		}
+		classicHookOrigin = GetEyePosition();
+		classicHookDir = viewAngles.ToForward();
+		classicHookFireTime = gameLocal.time;
+		classicHookState = CLASSIC_HOOK_FLYING;
+		StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+	}
+
+	if ( classicHookState != CLASSIC_HOOK_FLYING ) {
+		return;
+	}
+
+	if ( gameLocal.time - classicHookFireTime > CLASSIC_HOOK_MAX_FLY_TIME ) {
+		ResetClassicHook( true );
+		return;
+	}
+
+	const idVec3 end = classicHookOrigin + classicHookDir * ( CLASSIC_HOOK_FLY_SPEED * MS2SEC( gameLocal.msec ) );
+	trace_t tr;
+	gameLocal.TracePoint( this, tr, classicHookOrigin, end, MASK_SHOT_RENDERMODEL, this );
+	if ( tr.fraction >= 1.0f ) {
+		classicHookOrigin = end;
+		return;
+	}
+
+	const idMaterial *material = tr.c.material;
+	idEntity *hit = ( tr.c.entityNum >= 0 && tr.c.entityNum < MAX_GENTITIES ) ? gameLocal.entities[ tr.c.entityNum ] : NULL;
+	if ( ( material != NULL && ( material->GetSurfaceFlags() & SURF_NOIMPACT ) ) ||
+		( hit != NULL && hit->IsType( idActor::GetClassType() ) ) ) {
+		// the sky, or a player: the hook has nothing to hold
+		ResetClassicHook( true );
+		return;
+	}
+
+	classicHookOrigin = tr.endpos - classicHookDir * 2.0f;
+	classicHookState = CLASSIC_HOOK_ATTACHED;
+	physicsObj.SetClassicGrapple( classicHookOrigin );
+	StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+}
+
+/*
+================
+idPlayer::FreeClassicHookPresentation
+================
+*/
+void idPlayer::FreeClassicHookPresentation( void ) {
+	if ( gameRenderWorld != NULL ) {
+		if ( classicHookCableHandle != -1 ) {
+			gameRenderWorld->FreeEntityDef( classicHookCableHandle );
+		}
+		if ( classicHookHeadHandle != -1 ) {
+			gameRenderWorld->FreeEntityDef( classicHookHeadHandle );
+		}
+	}
+	classicHookCableHandle = -1;
+	classicHookHeadHandle = -1;
+}
+
+/*
+================
+idPlayer::PresentClassicHook
+
+The cable is a beam in Quake 4's multiplayer pulse-line material, tinted by
+team, from the player's hand to the hook; the hook head is the nailgun's nail.
+Both are client side render entities, so nothing new rides the snapshot beyond
+the hook's state and position.
+================
+*/
+void idPlayer::PresentClassicHook( void ) {
+	// a dedicated server draws nothing
+	if ( gameRenderWorld == NULL || ( gameLocal.isServer && !gameLocal.isListenServer ) ) {
+		return;
+	}
+	if ( classicHookState == CLASSIC_HOOK_NONE || !gameLocal.IsClassicRuleset() || spectating || health <= 0 || IsHidden() ) {
+		FreeClassicHookPresentation();
+		return;
+	}
+
+	idVec3 start;
+	const idPlayer *local = gameLocal.GetLocalPlayer();
+	if ( local == this && !pm_thirdPerson.GetBool() ) {
+		start = firstPersonViewOrigin + firstPersonViewAxis[ 0 ] * 20.0f - firstPersonViewAxis[ 1 ] * 8.0f - firstPersonViewAxis[ 2 ] * 10.0f;
+	} else {
+		start = GetPhysics()->GetOrigin() + idVec3( 0.0f, 0.0f, 48.0f );
+	}
+	const idVec3 end = classicHookOrigin;
+	idVec3 dir = end - start;
+	if ( dir.Normalize() < 1.0f ) {
+		dir = viewAngles.ToForward();
+	}
+
+	idVec4 color( 1.0f, 0.85f, 0.4f, 1.0f );
+	if ( gameLocal.IsTeamGame() ) {
+		color = ( team == TEAM_MARINE ) ? idVec4( 0.35f, 0.65f, 1.0f, 1.0f ) : idVec4( 1.0f, 0.4f, 0.2f, 1.0f );
+	}
+
+	idRenderModel *beamModel = renderModelManager->FindModel( "_BEAM" );
+	if ( beamModel != NULL ) {
+		memset( &classicHookCable, 0, sizeof( classicHookCable ) );
+		classicHookCable.hModel = beamModel;
+		classicHookCable.customShader = declManager->FindMaterial( "textures/mptextures/mp_linepulse", false );
+		classicHookCable.origin = start;
+		classicHookCable.axis = mat3_identity;
+		classicHookCable.shaderParms[ SHADERPARM_RED ] = color[ 0 ];
+		classicHookCable.shaderParms[ SHADERPARM_GREEN ] = color[ 1 ];
+		classicHookCable.shaderParms[ SHADERPARM_BLUE ] = color[ 2 ];
+		classicHookCable.shaderParms[ SHADERPARM_ALPHA ] = color[ 3 ];
+		classicHookCable.shaderParms[ SHADERPARM_TIMEOFFSET ] = 2.0f;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_X ] = end.x;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_Y ] = end.y;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_Z ] = end.z;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_WIDTH ] = 3.0f;
+		classicHookCable.noShadow = true;
+		classicHookCable.bounds = beamModel->Bounds( &classicHookCable );
+		if ( classicHookCableHandle == -1 ) {
+			classicHookCableHandle = gameRenderWorld->AddEntityDef( &classicHookCable );
+		} else {
+			gameRenderWorld->UpdateEntityDef( classicHookCableHandle, &classicHookCable );
+		}
+	}
+
+	const idDict *nail = gameLocal.FindEntityDefDict( "projectile_nail", false );
+	idRenderModel *headModel = nail ? renderModelManager->FindModel( nail->GetString( "model" ) ) : NULL;
+	if ( headModel == NULL ) {
+		return;
+	}
+	memset( &classicHookHead, 0, sizeof( classicHookHead ) );
+	classicHookHead.hModel = headModel;
+	classicHookHead.origin = end;
+	classicHookHead.axis = dir.ToMat3();
+	classicHookHead.bounds = headModel->Bounds( &classicHookHead );
+	classicHookHead.shaderParms[ SHADERPARM_RED ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_GREEN ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_BLUE ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_ALPHA ] = 1.0f;
+	if ( classicHookHeadHandle == -1 ) {
+		classicHookHeadHandle = gameRenderWorld->AddEntityDef( &classicHookHead );
+	} else {
+		gameRenderWorld->UpdateEntityDef( classicHookHeadHandle, &classicHookHead );
 	}
 }

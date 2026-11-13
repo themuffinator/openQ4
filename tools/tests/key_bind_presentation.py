@@ -561,9 +561,9 @@ def validate_bind_widget_fit_and_capture() -> None:
         ROOT / "content" / "baseoq4" / "pak0" / "guis" / "menu" / "settings" / "controls.gui"
     )
     bind_defs = list(re.finditer(r"\bbindDef\s+([A-Za-z0-9_]+)", controls))
-    # The stock rows plus openQ4's quick-chat row.
-    if len(bind_defs) != 49:
-        raise AssertionError(f"Expected 49 controls bindDef rows, found {len(bind_defs)}")
+    # The stock rows plus openQ4's quick-chat row and the Classic ruleset's hook.
+    if len(bind_defs) != 50:
+        raise AssertionError(f"Expected 50 controls bindDef rows, found {len(bind_defs)}")
 
     number = r"(?:\d+(?:\.\d*)?|\.\d+)"
     rect_pattern = re.compile(
