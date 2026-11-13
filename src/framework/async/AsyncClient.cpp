@@ -75,6 +75,35 @@ static void AsyncClient_StopAfterMalformedSnapshot() {
 	session->Stop();
 }
 
+static idCVar net_clientSnapshotDropProbe( "net_clientSnapshotDropProbe", "0", CVAR_SYSTEM | CVAR_INTEGER | CVAR_CHEAT,
+	"development probe: discard every Nth snapshot, as the channel discards one that arrives after a later one, so a client "
+	"can be tested across single missed snapshots; 0 for none; requires cheats", 0, 64 );
+
+/*
+==================
+AsyncClient_DiscardSnapshotForProbe
+
+openQ4: under jitter the channel drops a snapshot that arrives after a later one, so a
+client routinely reads a snapshot across one it missed. This discards every Nth snapshot
+before any of it is read, as that loss does; the next snapshot's delta comes from the last
+one the client acknowledged, as after a real loss.
+==================
+*/
+static bool AsyncClient_DiscardSnapshotForProbe() {
+	static int snapshotsSinceDiscard = 0;
+	const int every = net_clientSnapshotDropProbe.GetInteger();
+	if ( every < 2 ) {
+		snapshotsSinceDiscard = 0;
+		return false;
+	}
+	if ( ++snapshotsSinceDiscard < every ) {
+		return false;
+	}
+	snapshotsSinceDiscard = 0;
+	common->Printf( "SNAPSHOT_DROP_PROBE discarded a snapshot\n" );
+	return true;
+}
+
 static ID_INLINE int AsyncClient_MaxPredictionMsec() {
 	return idMath::ClampInt( 0, ASYNC_CLIENT_MAX_PREDICTION_MSEC,
 		idAsyncNetwork::clientMaxPrediction.GetInteger() );
@@ -1449,6 +1478,9 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 				if ( idAsyncNetwork::verbose.GetInteger() ) {
 					common->Printf( "ignoring snapshot with != gameInitId\n" );
 				}
+				break;
+			}
+			if ( AsyncClient_DiscardSnapshotForProbe() ) {
 				break;
 			}
 

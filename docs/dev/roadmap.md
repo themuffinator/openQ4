@@ -3879,7 +3879,7 @@ prediction/rewind defaults.
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
-| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames; the server's aim stays with the client's after a client stall (one HUD artwork parse a level, HUD views built at spawn, a controller that recovers from hitches); defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); a respawn after a dropped snapshot and long client frames under jitter still fail the impaired capture now and then; remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames, also when jitter drops the snapshot before or after the respawn; the server's aim stays with the client's after a client stall (one HUD artwork parse a level, HUD views built at spawn, a controller that recovers from hitches); defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); long client frames under jitter still make the odd command late, so the impaired capture fails now and then; remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path that fragments. | The 1.8 KB info/connect replies that a fragment-dropping path loses (protocol decision); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
@@ -4584,8 +4584,28 @@ Completion substeps:
   with 20 failing controls. Every rejoin burst in four impaired runs and on
   loopback fell on the server's frames with its directions. Open: a respawn
   snapshot that follows a snapshot jitter dropped still catches the new
-  weapon up, and a long client frame can still make a command late, so the
-  impaired harness does not pass dependably yet.
+  weapon up (fixed later the same day, below), and a long client frame can
+  still make a command late, so the impaired harness does not pass
+  dependably yet.
+  Later on 13 November: [a respawn read across a dropped snapshot](mp-network-qualification.md#a-respawn-read-across-a-dropped-snapshot-13-november-2026)
+  raises with the server's. Under 80 ms ±20 the shooter's channel loses a
+  snapshot whenever one client frame reads two at once and the jitter swaps
+  them: 6-16 single losses a minute on a quiet machine (0.3-0.9% of
+  snapshots), nearly one in ten on a busy one. Across such a loss the
+  spawn's knockback now places the server's raise, when the last snapshot
+  read is at most 96 ms old and so the knockback must be the spawn's; a
+  longer loss still catches up. The snapshot after a respawn names the
+  weapon `Init()` cleared, and read across a loss that no longer counts as a
+  missed weapon swap. `net_clientSnapshotDropProbe` (development) discards
+  every Nth snapshot, and `mp_firing_view_capture.py --drop-respawn-snapshot`
+  uses it to put every respawn behind one; every run now counts the
+  channel's losses. In four probe runs and two natural runs at 80 ms ±20,
+  five on a quiet machine kept every respawn and rejoin shot on the server's
+  frames with its directions, each raise exact; the control with the old rule
+  caught the weapon up (9 of 34 respawn shots on the frame). The sixth run,
+  on a busy machine, raised exactly but lost shots to stale commands, the long
+  client frame problem, which remains open. `mp_predicted_hitscan_state.py`
+  fails 42 single-reversal controls (nine new).
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/
   MTU/rate limits, congestion, high player counts, discovery and reconnect. Preserve

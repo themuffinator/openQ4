@@ -7,6 +7,43 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Your weapon comes up on time after a respawn on a jittery connection, 13 November 2026
+
+- **A respawn on a jittery connection no longer draws shots that never
+  happened.** When your connection delivers updates slightly out of order now
+  and then, one can go missing right at your respawn. Your client then treated
+  your new weapon as ready at once while the server was still raising it, so
+  holding fire drew tracers the server never fired and ran the rest of the
+  burst out of step. Your weapon now comes up exactly when the server's does
+  across a single lost update, which is what jitter causes; only a longer
+  loss still brings it straight up. Nothing to change in your settings.
+- MP-07: across a hitch, the spawn's knockback now places the server's raise
+  frame when the last snapshot read is at most 96 ms old, so the knockback
+  must be the spawn's (`spawnClockSpan`, `idPlayer::lastSnapshotTime`). The
+  snapshot after a respawn names the weapon `Init()` cleared; read across a
+  missed snapshot, that change no longer asks for a catch-up while the new
+  life's raise time waits. The client's `MP_WEAPON respawn` and `entities`
+  lines give `missed=` and `age=`. `net_clientSnapshotDropProbe N`, a
+  development probe that requires cheats, discards every Nth snapshot as the
+  channel discards a late one. `mp_firing_view_capture.py
+  --drop-respawn-snapshot` uses it to put the respawn behind one dropped
+  snapshot, and every run now counts the shooter's channel losses
+  (`net_channelShowDrop`, `netImpairment`).
+- How often: at 80 ms ±20 on a quiet machine the shooter lost 6-16 snapshots
+  a minute of play, always one at a time (0.3-0.9% of snapshots), because one
+  client frame read two at once and the jitter swapped them. A busy machine
+  raised that to nearly one in ten.
+- Evidence: in three probe runs and two natural runs at 80 ms ±20 on a quiet
+  machine, every shot of the respawn and rejoin bursts was predicted on the
+  server's frame with its direction, and each new life's raise matched the
+  server's. The control, built with the old rule, caught the weapon up and
+  drew 26 shots the server never fired. `mp_predicted_hitscan_state.py` fails
+  42 single-reversal controls
+  ([record](mp-network-qualification.md#a-respawn-read-across-a-dropped-snapshot-13-november-2026)).
+- Still open (MP-07): a long client frame can still make one command late. A
+  probe run on a busy machine raised its weapon exactly but lost shots in both
+  bursts that way.
+
 ## Your first hit no longer hitches, and a hitch no longer leaves the server behind your aim, 13 November 2026
 
 - **The first hit of a match no longer freezes the game for a moment.** In the
@@ -40,8 +77,8 @@ does not restore the withdrawn release. See
   `ui_hud_catalog_state.py` fails all 20 single-reversal controls
   ([record](mp-network-qualification.md#the-servers-aim-after-a-client-stall-13-november-2026)).
 - Open (MP-07): under simulated jitter, a respawn snapshot that follows a
-  dropped snapshot still catches the new weapon up, and a long client frame
-  can still make one command late. Three of the four impaired runs failed on
+  dropped snapshot still catches the new weapon up (fixed later the same day,
+  above), and a long client frame can still make one command late. Three of the four impaired runs failed on
   one of these outside the join.
 
 ## Your weapon comes up with the server's after a respawn, 13 November 2026

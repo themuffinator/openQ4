@@ -21,8 +21,12 @@ bookkeeping across its owner's respawn, spliced from src/mpgame/Player.cpp and
 src/mpgame/Weapon.cpp: the snapshot reader's hitch test, weapon-change block and respawn
 branch, the weapon UpdateWeapon makes, and the raise rvWeapon::PlayAnim plays. The server
 raises the new life's weapon on its own frame; the client raises its weapon from that game
-time, so its shots fall on the server's frames. Only a respawn across a genuine hitch, or a
-weapon swap the client missed, catches the weapon straight up to ready.
+time, so its shots fall on the server's frames. Under jitter the channel drops a snapshot that
+arrives after a later one, so a respawn read across one dropped snapshot is routine: the spawn's
+knockback, still running, places the server's raise across it, and a snapshot dropped right
+after the respawn's does not turn the weapon it names into a missed swap. Only a longer loss
+than the knockback spans, a respawn with no clock to read, or a weapon swap the client missed,
+catches the weapon straight up to ready.
 
 Single-reversal controls re-run every part against mutated production source and require
 each one to fail.
@@ -66,16 +70,40 @@ STATE_MUTATIONS = (
 # Each reverses one rule of the respawn raise; every one must fail its fixture.
 RESPAWN_MUTATIONS = (
     ("Init() restarts the snapshot sequence on a respawn", "player",
-     "lastSnapshotSequence = latchSnapshotSequence;\n\t\tweaponCatchup = stateHitch;",
-     "(void)latchSnapshotSequence;\n\t\tweaponCatchup = stateHitch;"),
+     "lastSnapshotSequence = latchSnapshotSequence;\n\t\tweaponCatchup = !serverRaisePlaced;",
+     "(void)latchSnapshotSequence;\n\t\tweaponCatchup = !serverRaisePlaced;"),
     ("Init() restarts the snapshot sequence on spectating", "player",
      "lastSnapshotSequence = latchSnapshotSequence;\n\t\tweaponCatchup = false;",
      "(void)latchSnapshotSequence;\n\t\tweaponCatchup = false;"),
     ("a catch-up outlives the life spectating ends", "player",
      "lastSnapshotSequence = latchSnapshotSequence;\n\t\tweaponCatchup = false;",
      "lastSnapshotSequence = latchSnapshotSequence;"),
-    ("a respawn always catches up", "player", "weaponCatchup = stateHitch;", "weaponCatchup = true;"),
-    ("a respawn across a hitch raises", "player", "weaponCatchup = stateHitch;", "weaponCatchup = false;"),
+    ("a respawn always catches up", "player", "weaponCatchup = !serverRaisePlaced;", "weaponCatchup = true;"),
+    ("a respawn across a hitch raises", "player", "weaponCatchup = !serverRaisePlaced;", "weaponCatchup = false;"),
+    # The respawn after a jitter-dropped snapshot (13 Nov 2026, run fix-imp3): the old rule.
+    ("one dropped snapshot catches the respawn up", "player",
+     "const bool serverRaisePlaced = !stateHitch || ( hasWeaponState && spawnClock );",
+     "const bool serverRaisePlaced = !stateHitch;"),
+    ("a hitch without the server's weapon reads the clock", "player",
+     "const bool serverRaisePlaced = !stateHitch || ( hasWeaponState && spawnClock );",
+     "const bool serverRaisePlaced = !stateHitch || spawnClock;"),
+    ("the spawn clock spans any loss", "player",
+     "snapshotAge > 0 && snapshotAge <= spawnClockSpan;", "snapshotAge > 0;"),
+    ("an older snapshot reads the spawn clock", "player",
+     "snapshotAge > 0 && snapshotAge <= spawnClockSpan;", "snapshotAge <= spawnClockSpan;"),
+    ("the clock's span ends a frame early", "player",
+     "const int spawnClockSpan = ( ( SPAWN_KNOCKBACK_MSEC - 1 ) / frameMsec ) * frameMsec;",
+     "const int spawnClockSpan = ( SPAWN_KNOCKBACK_MSEC / frameMsec - 1 ) * frameMsec;"),
+    ("the clock's span runs a frame long", "player",
+     "const int spawnClockSpan = ( ( SPAWN_KNOCKBACK_MSEC - 1 ) / frameMsec ) * frameMsec;",
+     "const int spawnClockSpan = ( SPAWN_KNOCKBACK_MSEC / frameMsec + 1 ) * frameMsec;"),
+    ("the snapshot's age is never recorded", "player",
+     "lastSnapshotSequence = snapshotSequence;\n\tlastSnapshotTime = gameLocal.time;",
+     "lastSnapshotSequence = snapshotSequence;"),
+    ("new weapon entities across a dropped snapshot keep a swap's catch-up", "player",
+     "if ( stateHitch ) {\n\t\t\t\t\t// A weapon change read across the same hitch asked for a catch-up\n"
+     "\t\t\t\t\t// above; the weapon for the new entities raises with the server's.\n\t\t\t\t\tweaponCatchup = false;\n\t\t\t\t}",
+     ""),
     ("the raise ignores whether the server's weapon exists", "player",
      "int serverWeaponRaiseTime = gameLocal.time + frameMsec;", "int serverWeaponRaiseTime = gameLocal.time;"),
     ("the spawn clock is ignored", "player",
@@ -84,18 +112,20 @@ RESPAWN_MUTATIONS = (
     ("the spawn clock leaves out the spawn's own frame", "player",
      "serverWeaponRaiseTime = spawnClock ? gameLocal.time + frameMsec - spawnElapsed : gameLocal.time;",
      "serverWeaponRaiseTime = spawnClock ? gameLocal.time - spawnElapsed : gameLocal.time;"),
-    ("any knockback reads as the spawn clock", "player", "spawnElapsed % frameMsec == 0;", "true;"),
+    ("any knockback reads as the spawn clock", "player", "spawnElapsed % frameMsec == 0 &&", "true &&"),
     ("the spawn starts some other knockback", "player",
      "physicsObj.SetKnockBack( SPAWN_KNOCKBACK_MSEC );", "physicsObj.SetKnockBack( 100 );"),
     ("new weapon entities always catch up", "player",
-     "if ( stateHitch ) {\n\t\t\t\tweaponCatchup = true;\n\t\t\t} else {\n\t\t\t\tnetWeaponRaiseTime = serverWeaponRaiseTime;\n\t\t\t}",
-     "weaponCatchup = true;"),
+     "if ( !serverRaisePlaced ) {\n\t\t\t\tweaponCatchup = true;\n\t\t\t} else {",
+     "weaponCatchup = true;\n\t\t\tif ( false ) {"),
     ("the new weapon drops the raise time", "player",
      "weapon->SetNetRaiseStartTime( netWeaponRaiseTime );", "(void)0;"),
     ("the raise time outlives the weapon it was for", "player",
      "netWeaponRaiseTime = -1;\n\t\t\tweaponCatchup = false;", "weaponCatchup = false;"),
     ("a hitch is never seen", "player", "stateHitch = true;", "stateHitch = false;"),
-    ("a missed weapon swap raises", "player", "if ( stateHitch ) {\n\t\t\tweaponCatchup = true;\n\t\t}", ""),
+    ("a missed weapon swap raises", "player", "if ( stateHitch && netWeaponRaiseTime < 0 ) {\n\t\t\tweaponCatchup = true;\n\t\t}", ""),
+    ("a drop right after the respawn catches its weapon up", "player",
+     "if ( stateHitch && netWeaponRaiseTime < 0 ) {", "if ( stateHitch ) {"),
     ("the raise plays from now", "weapon",
      "startTime = Min( netRaiseStartTime, gameLocal.time );", "startTime = gameLocal.time;"),
     ("the world model raises from now", "weapon",
@@ -210,6 +240,9 @@ def build_respawn_fixture(player: str, weapon: str) -> str:
     require_before(snapshot, "oldHealth = health;", "lastSnapshotSequence = snapshotSequence;", "the snapshot sequence")
     require_before(snapshot, "lastSnapshotSequence = snapshotSequence;", "bool weaponChange = ( idealWeapon != newIdealWeapon );",
                    "the snapshot sequence")
+    # and the time it was read, which the spawn clock's span is measured from.
+    require(snapshot, "lastSnapshotSequence = snapshotSequence;\n\tlastSnapshotTime = gameLocal.time;",
+            "the snapshot time is recorded with its sequence")
     change = snapshot[snapshot.index("bool weaponChange = ( idealWeapon != newIdealWeapon );"):
                       snapshot.index("// rjohnson: instance persistance information")]
     respawn = block(snapshot, "else if ( oldHealth <= 0 && health > 0 ) {")

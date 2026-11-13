@@ -36,6 +36,18 @@ point):
   join from spectating) and fires the machinegun while turning; its weapon
   for the new life must raise with the server's too.
 
+Under simulated jitter the shooter's channel drops a server packet that arrives
+after a later one (`net_channelShowDrop` on the shooter logs each loss), so a
+new life can be read across a dropped snapshot. The report counts the losses,
+their lengths and the delay line's reorders (`netImpairment`), and gives, for
+each new life, whether the client read it across a hitch, how many snapshots
+it missed and how long after the last one. The spawn's knockback places the
+server's raise across one dropped snapshot, so such a life is judged like any
+other. Jitter does this to perhaps one life in ten, so `--drop-respawn-snapshot`
+makes it certain: the shooter discards every other snapshot around the respawn
+(`net_clientSnapshotDropProbe 2`), and the run fails unless the respawn was read
+across exactly one dropped snapshot.
+
 The harness feeds the host a control file it executes every 100 ms, which is
 how the bots are paused and the host is placed and moved on cue. Both
 processes log every hit-scan shot (`net_mpHitscanDebug`): the server's shots,
@@ -97,6 +109,13 @@ LINE = re.compile(r"MP_HITSCAN kind=(\w+) client=(\d) owner=(-?\d+) local=(\d) d
                   r"newFrame=(\d) seed=(-?\d+) fx=(\S+) dir=(\S+) gunGap=(\S+) aimGap=(\S+) hit=(-?\d+) actor=(\d)")
 WEAPON = re.compile(r"MP_WEAPON (\w+) client=(\d) owner=(-?\d+) local=(\d) time=(-?\d+)(?:.* start=(-?\d+) done=(-?\d+))?")
 VIEWPOS = re.compile(r"\((-?[\d.]+) (-?[\d.]+) (-?[\d.]+)\) (-?[\d.]+)")
+FIELD = re.compile(r"(\w+)=(-?\d+)")
+# net_channelShowDrop on the shooter: a packet that arrives after a later one is dropped, and
+# the later one, processed first, logs the loss.
+CHANNEL_LOSS = re.compile(r"dropped (\d+) packets at (\d+)")
+CHANNEL_LATE = re.compile(r"out of order packet (\d+) at (\d+)")
+IMPAIR = re.compile(r"NET_IMPAIR port=(\d+) dir=(\w+) offered=(\d+) dropped=(\d+) duplicated=(\d+) released=(\d+) "
+                    r"reordered=(\d+)")
 
 
 def parse(log: str) -> list[dict]:
@@ -121,12 +140,34 @@ def parse(log: str) -> list[dict]:
 def weapon_events(log: str) -> list[dict]:
     """The MP_WEAPON lines in log order: new lives (respawn, entities) and raises."""
     events = []
-    for match in WEAPON.finditer(log):
+    for line in log.splitlines():
+        match = WEAPON.search(line)
+        if not match:
+            continue
         event, client, owner, local, game_time, start, done = match.groups()
+        # A client's new-life lines also say whether it read the life across a hitch, how many
+        # snapshots it missed, how long after the last one, and the raise it took.
+        fields = dict((key, int(value)) for key, value in FIELD.findall(line[match.end(5):]))
         events.append({"event": event, "client": int(client), "owner": int(owner), "local": int(local),
                        "time": int(game_time), "start": int(start) if start else None,
-                       "done": int(done) if done else None})
+                       "done": int(done) if done else None, "hitch": fields.get("hitch"),
+                       "missed": fields.get("missed"), "age": fields.get("age"), "raise": fields.get("raise")})
     return events
+
+
+def channel_losses(log: str) -> dict:
+    """The server packets the shooter's channel lost, from net_channelShowDrop and netImpairment.
+
+    Without simulated loss a lost packet is one the delay line reordered: it arrived after a
+    later one and the channel dropped it. Each loss is logged once with its length in packets.
+    """
+    runs = [int(match.group(1)) for match in CHANNEL_LOSS.finditer(log)]
+    receive = [match for match in IMPAIR.finditer(log) if match.group(2) == "receive"]
+    line = receive[-1] if receive else None
+    return {"losses": len(runs), "lost_packets": sum(runs), "single_packet_losses": runs.count(1),
+            "longest_loss": max(runs, default=0), "late_packets_dropped": len(CHANNEL_LATE.findall(log)),
+            "delay_line_received": int(line.group(6)) if line else None,
+            "delay_line_reordered": int(line.group(7)) if line else None}
 
 
 def new_life_raises(host_events: list[dict], client_events: list[dict], slot: int, scripted_from: int | None) -> list[dict]:
@@ -149,12 +190,17 @@ def new_life_raises(host_events: list[dict], client_events: list[dict], slot: in
         client = min((e for e in client_events if e["event"] == "raise" and e["local"] and
                       abs(e["start"] - server["start"]) <= 500),
                      key=lambda e: abs(e["start"] - server["start"]), default=None)
+        # The snapshot the client first read the life from (a respawn, or new weapon entities).
+        read = next((e for e in client_events if e["event"] in ("respawn", "entities") and e["local"] and
+                     0 <= e["time"] - event["time"] <= 500), None)
         pairs.append({"respawn_time": event["time"],
                       "judged": scripted_from is not None and event["time"] >= scripted_from,
                       "server_start": server["start"], "server_done": server["done"],
                       "client_start": client["start"] if client else None,
                       "client_done": client["done"] if client else None,
-                      "client_raised_at": client["time"] if client else None})
+                      "client_raised_at": client["time"] if client else None,
+                      "client_read": {key: read[key] for key in ("event", "time", "hitch", "missed", "age", "raise")}
+                      if read else None})
     return pairs
 
 
@@ -227,6 +273,9 @@ def main() -> int:
     parser.add_argument("--latency", type=int, default=0, help="forced one-way latency on the shooter, ms")
     parser.add_argument("--jitter", type=int, default=0, help="forced latency jitter on the shooter, ms")
     parser.add_argument("--turn-rate", type=float, default=220.0, help="degrees per second while firing")
+    parser.add_argument("--drop-respawn-snapshot", action="store_true",
+                        help="discard every other snapshot around the respawn (net_clientSnapshotDropProbe 2), so "
+                             "the client reads it across one dropped snapshot, as jitter makes it now and then")
     args = parser.parse_args()
     runtime, output = args.runtime_dir.resolve(), args.output_dir.resolve()
     verify_runtime_is_current(runtime)
@@ -297,7 +346,15 @@ def main() -> int:
                 f"in_presentationViewProbe {counts:g}", "in_presentationViewProbeAttack 1", "waitMsec 300"]
     burst(shooter, shots, "respawn_before", 4)
     # The held attack respawns the shooter once the death camera's minimum time has passed.
-    shooter += ["echo FIRING_VIEW_RESPAWN", "kill", "waitMsec 3300"]
+    shooter += ["echo FIRING_VIEW_RESPAWN", "kill"]
+    if args.drop_respawn_snapshot:
+        # The respawn comes 3 s after the death, read a round trip on. Discarding every other
+        # snapshot from 1.5 s to 3.8 s after the kill puts one dropped snapshot right before the
+        # first one the client reads the respawn from, wherever it falls.
+        shooter += ["waitMsec 1500", "set net_clientSnapshotDropProbe 2", "waitMsec 2300",
+                    "set net_clientSnapshotDropProbe 0"]
+    else:
+        shooter += ["waitMsec 3300"]
     burst(shooter, shots, "respawn_after", 16)
     shooter += ["in_presentationViewProbeAttack 0", "in_presentationViewProbe 0", "waitMsec 1200",
                 "echo FIRING_VIEW_SEGMENT_END respawn"]
@@ -308,7 +365,7 @@ def main() -> int:
                 "waitMsec 400", f"in_presentationViewProbe {counts:g}", "in_presentationViewProbeAttack 1"]
     burst(shooter, shots, "rejoin", 16)
     shooter += ["in_presentationViewProbeAttack 0", "in_presentationViewProbe 0", "waitMsec 1200",
-                "echo FIRING_VIEW_SEGMENT_END rejoin", "openq4_reportMPState", "echo FIRING_VIEW_COMPLETE",
+                "echo FIRING_VIEW_SEGMENT_END rejoin", "openq4_reportMPState", "netImpairment", "echo FIRING_VIEW_COMPLETE",
                 "waitMsec 1000", "disconnect", "quit"]
     write_script(games["host"] / "firing_view.cfg", host)
     write_script(games["shooter"] / "firing_view.cfg", shooter)
@@ -337,6 +394,9 @@ def main() -> int:
                  "si_fragLimit": "999", "si_timeLimit": "0", "g_matchProfile": "casual", "bot_minPlayers": "0",
                  "bot_chat": "0", "com_skipLoadingContinue": "1", "g_autoExecAfterMapLoad": "firing_view.cfg",
                  "g_autoExecAfterMapLoadDelayMs": "500"}
+        if role == "shooter":
+            # Logs each server packet the channel loses (channel_losses).
+            cvars.update(net_channelShowDrop="1")
         if role == "shooter" and (args.latency or args.jitter):
             cvars.update(net_forceLatency=str(args.latency), net_forceJitter=str(args.jitter), net_forceSeed="40708")
         command = [str(exe), *[part for key, value in cvars.items() for part in ("+set", key, value)]]
@@ -349,6 +409,7 @@ def main() -> int:
 
     failures, placements = [], []
     shooter_log = games["shooter"] / "logs/openq4.log"
+    shooter_seconds = None
     try:
         launch("host")
         until = time.monotonic() + 90
@@ -357,7 +418,8 @@ def main() -> int:
                 raise RuntimeError("host did not start the bot match")
             time.sleep(0.25)
         launch("shooter")
-        until, handled, placed = time.monotonic() + 300, 0, False
+        started = time.monotonic()
+        until, handled, placed = started + 300, 0, False
         while processes["shooter"].poll() is None:
             if time.monotonic() > until:
                 failures.append("shooter timed out")
@@ -383,6 +445,7 @@ def main() -> int:
                 steer()
                 placed = False
             time.sleep(0.1)
+        shooter_seconds = round(time.monotonic() - started, 1)
         if processes["shooter"].poll() not in (None, 0):
             failures.append("shooter exited abnormally")
     except (OSError, RuntimeError) as error:
@@ -502,6 +565,8 @@ def main() -> int:
         "steps": steps,
         "new_life_raises": lives,
         "hitches_observed": hitches(games["shooter"] / "diagnostics/hitches.csv"),
+        "channel_losses": dict(channel_losses(log), shooter_seconds=shooter_seconds),
+        "probe_discarded_snapshots": log.count("SNAPSHOT_DROP_PROBE discarded a snapshot"),
         "hud_loads_in_steps": [f"{step}: {source}" for step, source in hud_loads(log)],
         "host_placements": placements,
         "gauntlet_target_captures": sum(1 for s in shots if s.startswith("target_gauntlet")),
@@ -524,6 +589,11 @@ def main() -> int:
             failures.append(f"the client raised its weapon for the life at {life['respawn_time']} over "
                             f"{life['client_start']}-{life['client_done']}, the server over "
                             f"{life['server_start']}-{life['server_done']}")
+    if args.drop_respawn_snapshot and judged:
+        # The probe must have put the respawn behind exactly one dropped snapshot.
+        read = judged[0]["client_read"]
+        if not read or read["event"] != "respawn" or read["missed"] != 1:
+            failures.append(f"the respawn was not read across one dropped snapshot: {read}")
     if len(placements) != len(TARGETS):
         failures.append("the host was not placed for every target step")
     if metrics["hitches_observed"] < HITCHES - 1:
@@ -563,7 +633,8 @@ def main() -> int:
 
     report = {"status": "fail" if failures else "pass", "renderer": args.renderer,
               "predict_hitscan": args.predict_hitscan, "enhanced": args.enhanced, "latency": args.latency,
-              "jitter": args.jitter, "turn_rate": args.turn_rate, "identity": identity, "metrics": metrics,
+              "jitter": args.jitter, "turn_rate": args.turn_rate, "drop_respawn_snapshot": args.drop_respawn_snapshot,
+              "identity": identity, "metrics": metrics,
               "captures": [str(games["shooter"] / f"screenshots/{s}.tga") for s in shots],
               "failures": failures,
               "logs": {role: str(game / "logs/openq4.log") for role, game in games.items()}}

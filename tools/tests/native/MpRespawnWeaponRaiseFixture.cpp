@@ -8,7 +8,12 @@
 // raises it at once.  The client must raise its own from that game time, not catch it
 // straight up to ready (it then fired shots the server never fired) and not start it when
 // the snapshot arrives (it would then be ready, and fire, late).  Only a respawn seen across
-// a genuine state hitch, or a weapon swap the client missed, still catches up.
+// a state hitch the spawn's clock cannot place, or a weapon swap the client missed, still
+// catches up.  Under jitter the channel drops a snapshot that arrives after a later one, so a
+// respawn read across one dropped snapshot is routine: the spawn's knockback, still running,
+// places the server's raise across it.  Only a longer loss, or no clock to read, catches up.
+// The snapshot after the respawn's names the weapon again (Init() cleared idealWeapon); read
+// across a dropped snapshot, that is not a weapon swap the client missed either.
 
 #include <cassert>
 #include <cstdio>
@@ -133,6 +138,8 @@ public:
 	int				clientIdealWeaponPredictFrame = -1;
 	int				snapshotSequence = 0;
 	unsigned int	lastSnapshotSequence = 0;
+	int				lastSnapshotTime = 0;
+	bool			lastReadHitch = false;	// whether the last snapshot read as a state hitch
 	bool			weaponCatchup = false;
 	int				netWeaponRaiseTime = -1;
 	bool			spectating = false;
@@ -205,8 +212,10 @@ void idPlayer::ReadFromSnapshot( const Snapshot &snapshot ) {
 	physicsObj.knockBack = snapshot.knockBack;
 
 	// PRODUCTION_HITCH
+	lastReadHitch = stateHitch;
 
 	lastSnapshotSequence = snapshotSequence;
+	lastSnapshotTime = gameLocal.time;
 	health = snapshot.health;
 
 	// PRODUCTION_WEAPON_CHANGE
@@ -242,21 +251,25 @@ static void Check( bool condition, const char *what ) {
 	}
 }
 
-// Alive with the machinegun at sequence 10, dead from 11 to 19, then the respawn snapshot.
-static void Live( idPlayer &player, int respawnSequence, bool serverWeapon, int knockBack = 0 ) {
-	player.ReadFromSnapshot( { 10, 1000, 100, 1, true } );
+// Alive with the machinegun at sequence 10, dead from 11 to 19 (a snapshot every 32 ms), then
+// the respawn snapshot at game time 2000.  missed snapshots fall between the last dead one and
+// the respawn's, which arrives age ms after the last dead one; nextMissed fall between the
+// respawn's and the next one read.
+static void Live( idPlayer &player, int missed, int age, bool serverWeapon, int knockBack = 0, int nextMissed = 0 ) {
+	const int lastDead = 2000 - age;
+	player.ReadFromSnapshot( { 10, lastDead - 9 * 32, 100, 1, true } );
 	player.Think();
 	Check( player.weapon != nullptr, "the first weapon is made" );
 	for ( int sequence = 11; sequence < 20; sequence++ ) {
-		player.ReadFromSnapshot( { sequence, 1000 + ( sequence - 10 ) * 33, 0, 1, false } );
+		player.ReadFromSnapshot( { sequence, lastDead - ( 19 - sequence ) * 32, 0, 1, false } );
 		player.Think();
 	}
 	Check( player.weapon == nullptr, "the dead player has no weapon" );
-	Snapshot respawn = { respawnSequence, 2000, 100, 1, serverWeapon };
+	Snapshot respawn = { 20 + missed, 2000, 100, 1, serverWeapon };
 	respawn.knockBack = knockBack;
 	player.ReadFromSnapshot( respawn );
 	player.Think();
-	player.ReadFromSnapshot( { respawnSequence + 1, 2033, 100, 1, true } );
+	player.ReadFromSnapshot( { 21 + missed + nextMissed, 2032 + 32 * nextMissed, 100, 1, true } );
 	player.Think();
 }
 
@@ -265,7 +278,7 @@ int main( void ) {
 	// weapon is made, and starts its raise, on the server's next frame.
 	{
 		idPlayer player;
-		Live( player, 20, false );
+		Live( player, 0, 32, false );
 		Check( player.weapon != nullptr, "the weapon for the new life is made" );
 		Check( player.weapon && player.weapon->catchups == 0, "a respawn without a hitch does not catch the weapon up" );
 		Check( player.weapon && player.weapon->viewAnim.blends[ ANIMCHANNEL_ALL ].start == 2016,
@@ -276,6 +289,7 @@ int main( void ) {
 			"the world model raises with the view model" );
 		Check( player.netWeaponRaiseTime == -1 && !player.weaponCatchup, "the respawn's raise time is spent" );
 		Check( player.lastSnapshotSequence == 21, "the snapshot sequence runs on through the respawn" );
+		Check( !player.lastReadHitch, "the snapshot after the respawn's is not read as a hitch" );
 
 		// A later raise (a weapon swap) plays from its own frame.
 		player.weapon->status = WP_HOLSTERED;
@@ -287,7 +301,7 @@ int main( void ) {
 	// A snapshot without the server's weapon ignores the spawn clock: the weapon is made next.
 	{
 		idPlayer player;
-		Live( player, 20, false, 68 );
+		Live( player, 0, 32, false, 68 );
 		Check( player.weapon && player.weapon->viewAnim.blends[ ANIMCHANNEL_ALL ].start == 2016,
 			"without the server's weapon the raise starts next frame whatever the clock says" );
 	}
@@ -305,7 +319,7 @@ int main( void ) {
 	};
 	for ( const auto &clock : clocks ) {
 		idPlayer player;
-		Live( player, 20, true, clock.knockBack );
+		Live( player, 0, 32, true, clock.knockBack );
 		Check( player.weapon && player.weapon->catchups == 0, "a respawn with the server's weapon does not catch up" );
 		Check( player.weapon && player.weapon->viewAnim.blends[ ANIMCHANNEL_ALL ].start == clock.start, clock.what );
 	}
@@ -358,11 +372,99 @@ int main( void ) {
 			"the weapon for a join after spectating raises with the server's" );
 	}
 
-	// A respawn seen across a genuine hitch still catches up.
+	// A clock read a long interval after the last snapshot may not be the spawn's own: with
+	// no hitch the snapshot's frame is taken instead.
 	{
 		idPlayer player;
-		Live( player, 21, false );
-		Check( player.weapon && player.weapon->catchups == 1, "a respawn across a hitch catches the weapon up" );
+		Live( player, 0, 112, true, 52 );
+		Check( player.weapon && player.weapon->catchups == 0, "a respawn without a hitch does not catch up" );
+		Check( player.weapon && player.weapon->viewAnim.blends[ ANIMCHANNEL_ALL ].start == 2000,
+			"a clock read after a long interval leaves the snapshot's frame" );
+	}
+
+	// A respawn read across lost snapshots.  The spawn fell after the last dead snapshot, and
+	// a knockback is refused while another runs, so a knockback read at most 96 ms (the
+	// clock's span) after that snapshot is the spawn's: it places the server's raise across
+	// the loss.  One dropped snapshot always falls inside the span; a longer loss, a clock
+	// that does not read, or no server weapon catches up, as every hitch used to.
+	const struct { int missed; int age; bool serverWeapon; int knockBack; int start; const char *what; } losses[] = {
+		{ 1, 64, true, 52, 1968, "one dropped snapshot: the spawn clock places the raise two frames back" },
+		{ 1, 96, true, 36, 1952, "one dropped snapshot across long intervals: the clock still places the raise" },
+		{ 2, 96, true, 4, 1920, "a loss that ends on the clock's span: the clock still places the raise" },
+		{ 1, 64, true, 84, 2000, "one dropped snapshot: a clock one frame down places the raise on the snapshot's frame" },
+		{ 2, 112, true, 20, -1, "a loss longer than the clock's span catches up" },
+		{ 4, 160, true, 84, -1, "a long loss catches up even when the knockback reads as a clock" },
+		{ 1, 64, true, 0, -1, "one dropped snapshot with no clock to read catches up" },
+		{ 1, 64, true, 74, -1, "one dropped snapshot with a knockback that is not the spawn's clock catches up" },
+		{ 1, 64, false, 52, -1, "one dropped snapshot without the server's weapon catches up" },
+	};
+	for ( const auto &loss : losses ) {
+		idPlayer player;
+		Live( player, loss.missed, loss.age, loss.serverWeapon, loss.knockBack );
+		if ( loss.start < 0 ) {
+			Check( player.weapon && player.weapon->catchups == 1, loss.what );
+		} else {
+			Check( player.weapon && player.weapon->catchups == 0, loss.what );
+			Check( player.weapon && player.weapon->viewAnim.blends[ ANIMCHANNEL_ALL ].start == loss.start, loss.what );
+			Check( player.weapon && player.weapon->animDoneTime[ ANIMCHANNEL_ALL ] == loss.start + RAISE_MSEC, loss.what );
+		}
+		Check( player.netWeaponRaiseTime == -1 && !player.weaponCatchup, "the respawn's raise or catch-up is spent" );
+	}
+
+	// The snapshot after the respawn's names the weapon again (the respawn's Init() cleared
+	// idealWeapon).  Read across a dropped snapshot too, that change is not a swap the client
+	// missed: the weapon still raises with the server's.  Jitter can drop either snapshot.
+	const struct { int missed; int age; int knockBack; int start; const char *what; } nextDrops[] = {
+		{ 0, 32, 68, 1984, "a snapshot dropped right after the respawn's does not catch the weapon up" },
+		{ 1, 64, 52, 1968, "snapshots dropped on both sides of the respawn's do not catch the weapon up" },
+		{ 2, 112, 20, -1, "a respawn caught up across a long loss stays caught up" },
+	};
+	for ( const auto &drop : nextDrops ) {
+		idPlayer player;
+		Live( player, drop.missed, drop.age, true, drop.knockBack, 1 );
+		if ( drop.start < 0 ) {
+			Check( player.weapon && player.weapon->catchups == 1, drop.what );
+		} else {
+			Check( player.weapon && player.weapon->catchups == 0, drop.what );
+			Check( player.weapon && player.weapon->viewAnim.blends[ ANIMCHANNEL_ALL ].start == drop.start, drop.what );
+		}
+		Check( player.netWeaponRaiseTime == -1 && !player.weaponCatchup, "the respawn's raise or catch-up is spent" );
+	}
+
+	// A snapshot older than the last one read (a demo seeking back) is a hitch the clock
+	// cannot span.
+	{
+		idPlayer player;
+		player.ReadFromSnapshot( { 48, 4936, 100, 1, true } );
+		player.Think();
+		player.ReadFromSnapshot( { 49, 4968, 0, 1, false } );
+		player.Think();
+		player.ReadFromSnapshot( { 50, 5100, 0, 1, false } );
+		player.Think();
+		Snapshot back = { 45, 5000, 100, 1, true };
+		back.knockBack = 52;
+		player.ReadFromSnapshot( back );
+		player.Think();
+		player.ReadFromSnapshot( { 46, 5032, 100, 1, true } );
+		player.Think();
+		Check( player.weapon && player.weapon->catchups == 1, "a respawn read from an older snapshot catches up" );
+	}
+
+	// New weapon entities read across one dropped snapshot, with the weapon change that came
+	// with them: the clock places their raise, and the change's catch-up request gives way.
+	{
+		idPlayer player;
+		player.ReadFromSnapshot( { 40, 4000, 100, 1, true } );
+		player.Think();
+		Snapshot join = { 42, 4064, 100, 2, true };
+		join.viewSpawnId = 17;
+		join.worldSpawnId = 19;
+		join.knockBack = 52;
+		player.ReadFromSnapshot( join );
+		player.Think();
+		Check( player.weapon && player.weapon->catchups == 0, "new weapon entities across one dropped snapshot are not caught up" );
+		Check( player.weapon && player.weapon->viewAnim.blends[ ANIMCHANNEL_ALL ].start == 4032,
+			"new weapon entities across one dropped snapshot raise with the server's" );
 	}
 
 	// A catch-up drops a raise time it was given.

@@ -1646,6 +1646,7 @@ idPlayer::idPlayer() {
 	netWeaponRaiseTime		= -1;
 	startupLoadoutDepth		= 0;
  	lastSnapshotSequence	= 0;
+	lastSnapshotTime		= 0;
  
  	aimClientNum			= -1;
  
@@ -15528,6 +15529,11 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
  	} else {
  		stateHitch = false;
  	}
+	// openQ4: the snapshots for this player the client missed (under jitter the channel drops
+	// one that arrives after a later one, so a single miss is routine) and the game time since
+	// it read the last one; see the spawn clock below.
+	const unsigned int missedSnapshots = stateHitch ? static_cast<unsigned int>( snapshotSequence ) - static_cast<unsigned int>( lastSnapshotSequence ) - 1u : 0u;
+	const int snapshotAge = gameLocal.time - lastSnapshotTime;
 	oldHealth = health;
 
 	if ( !physicsObj.DecodeSnapshotState( msg, decodedPhysics ) ) {
@@ -15573,6 +15579,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 
 	lastSnapshotSequence = snapshotSequence;
+	lastSnapshotTime = gameLocal.time;
 	// A snapshot begins a new replay chain, so the re-simulation budget starts over.  It is
 	// also the only point at which the client's prediction for a frame can be compared with
 	// the server's authoritative state for that same frame.
@@ -15653,7 +15660,12 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 
 	if ( weaponChange ) {
-		if ( stateHitch ) {
+		// openQ4: a change of weapon across a state hitch is a swap the client missed, so the
+		// weapon catches up.  One read while a new life's raise time still waits for its weapon
+		// is not: the respawn's Init() cleared idealWeapon, and this snapshot only names the
+		// weapon that raises from that time.  A snapshot dropped right after the respawn's
+		// used to catch that weapon up as well.
+		if ( stateHitch && netWeaponRaiseTime < 0 ) {
 			weaponCatchup = true;
 		}
 		idealWeapon = newIdealWeapon;
@@ -15673,28 +15685,44 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	// frame or two later (a snapshot goes out every 33 ms): the spawn's knockback, which
 	// the server's physics runs down from that frame, says which, and only when it reads as
 	// that clock is the snapshot's own frame taken instead.
+	//
+	// The knockback reads as that clock only while it must still be running: the spawn fell
+	// after the last snapshot read for this player, and a knockback is refused while another
+	// runs, so if that snapshot is at most spawnClockSpan old nothing but the spawn can have
+	// set it.  Then it places the server's raise across a state hitch too: under jitter the
+	// channel routinely drops one snapshot that arrives after a later one, and catching up
+	// across that drop ran the burst out of step with the server's.  Across a longer loss,
+	// or with no clock to read, the client cannot know the raise frame and still catches up.
 	const int frameMsec = gameLocal.GetMSec();
 	const int spawnElapsed = SPAWN_KNOCKBACK_MSEC - physicsObj.GetKnockBack();
+	const int spawnClockSpan = ( ( SPAWN_KNOCKBACK_MSEC - 1 ) / frameMsec ) * frameMsec;
+	const bool spawnClock = physicsObj.GetKnockBack() > 0 && spawnElapsed >= frameMsec && spawnElapsed % frameMsec == 0 &&
+		snapshotAge > 0 && snapshotAge <= spawnClockSpan;
 	int serverWeaponRaiseTime = gameLocal.time + frameMsec;
 	if ( hasWeaponState ) {
-		const bool spawnClock = physicsObj.GetKnockBack() > 0 && spawnElapsed >= frameMsec && spawnElapsed % frameMsec == 0;
 		serverWeaponRaiseTime = spawnClock ? gameLocal.time + frameMsec - spawnElapsed : gameLocal.time;
 	}
+	const bool serverRaisePlaced = !stateHitch || ( hasWeaponState && spawnClock );
 
 	// Attach the world and view entities  
 	if ( weaponWorldModel.GetSpawnId() != newWeaponWorldSpawnId || weaponViewModel.GetSpawnId() != newWeaponSpawnId ) {
 		SetWeapon( -1 );
 
 		if ( weaponWorldModel.SetSpawnId( newWeaponWorldSpawnId ) && weaponViewModel.SetSpawnId( newWeaponSpawnId ) ) {
-			if ( stateHitch ) {
+			if ( !serverRaisePlaced ) {
 				weaponCatchup = true;
 			} else {
 				netWeaponRaiseTime = serverWeaponRaiseTime;
+				if ( stateHitch ) {
+					// A weapon change read across the same hitch asked for a catch-up
+					// above; the weapon for the new entities raises with the server's.
+					weaponCatchup = false;
+				}
 			}
 			if ( net_mpHitscanDebug.GetBool() ) {
-				gameLocal.Printf( "MP_WEAPON entities client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d\n",
+				gameLocal.Printf( "MP_WEAPON entities client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d missed=%u age=%d\n",
 					gameLocal.isClient ? 1 : 0, entityNumber, entityNumber == gameLocal.localClientNum ? 1 : 0,
-					gameLocal.time, stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime );
+					gameLocal.time, stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime, missedSnapshots, snapshotAge );
 			}
 		}
 	}
@@ -15802,15 +15830,16 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		// state hitch, and its change of weapon (Init() also clears idealWeapon) caught the new
 		// weapon straight up to ready while the server's raised: the client fired shots the
 		// server never fired, then the rest of a held burst out of step with it.  Only a
-		// respawn seen across a genuine hitch catches up now; otherwise the new weapon raises
-		// with the server's (serverWeaponRaiseTime above).
+		// respawn seen across a hitch the spawn's clock does not span catches up now; otherwise
+		// the new weapon raises with the server's (serverWeaponRaiseTime above).
 		lastSnapshotSequence = latchSnapshotSequence;
-		weaponCatchup = stateHitch;
-		netWeaponRaiseTime = stateHitch ? -1 : serverWeaponRaiseTime;
+		weaponCatchup = !serverRaisePlaced;
+		netWeaponRaiseTime = serverRaisePlaced ? serverWeaponRaiseTime : -1;
 		if ( net_mpHitscanDebug.GetBool() ) {
-			gameLocal.Printf( "MP_WEAPON respawn client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d movementTime=%d movementFlags=%d\n",
+			gameLocal.Printf( "MP_WEAPON respawn client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d movementTime=%d movementFlags=%d missed=%u age=%d\n",
 				gameLocal.isClient ? 1 : 0, entityNumber, entityNumber == gameLocal.localClientNum ? 1 : 0, gameLocal.time,
-				stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime, decodedPhysics.movementTime, decodedPhysics.movementFlags );
+				stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime, decodedPhysics.movementTime, decodedPhysics.movementFlags,
+				missedSnapshots, snapshotAge );
 		}
 		StopRagdoll();
 		SetPhysics( &physicsObj );
