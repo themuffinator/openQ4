@@ -4,6 +4,15 @@
 
 ## Highlights
 
+- **Your shots land where you aim, the moment you fire.** On a server, your
+  machinegun, shotgun and railgun tracers and their marks on walls used to wait
+  for the server's copy of each shot. They arrived a round trip after the muzzle
+  flash and started from wherever you had turned by then, so firing while
+  turning drew them well off your crosshair. Your client now draws them as you
+  fire, from your gun and along your crosshair. Hits on players are still the
+  server's call: the impact on a body, the hit marker and damage numbers come
+  with the server's update. Set `net_mpPredictHitscan 0` to restore the old
+  behaviour.
 - **Weapons remain visible after seeking while paused.** Following a living
   player in a multi-view demo now shows their weapon immediately after a seek,
   instead of leaving it below the camera until playback resumes.
@@ -57,6 +66,14 @@
 
 ## Change log
 
+- In multiplayer, machinegun and shotgun spread now comes from a seed made from
+  the shooter and the shot's game time, which the server and the shooting
+  client share, so the pellets your client draws are the ones the server fired.
+  The spread pattern and its size are unchanged, and single player is
+  unaffected.
+- `net_mpHitscanDebug` logs every hit-scan shot on the server and on the
+  shooting client: where it started relative to the gun, how far it was from
+  the aim at that moment, and what it hit.
 - Bots can recover from an unplanned walking fall as well as an enemy knock.
   A sloping platform rim could lose support just as the bot braked, leaving it
   steering toward its walking goal through the void. Deliberate jumps, drops

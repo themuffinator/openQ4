@@ -770,6 +770,117 @@ lower `net_clientMaxRate`. Whether to adapt automatically is a design decision.
 Simulated conditions do not model route changes, cross-traffic sharing a
 bottleneck, or asymmetric links (the rate applies both ways).
 
+## The firing player's own shots under prediction, 12 November 2026
+
+A client used to draw its own machinegun, shotgun and railgun shots only from
+the server's copy (`GAME_UNRELIABLE_MESSAGE_HITSCAN`), so each tracer and wall
+mark arrived a round trip after the muzzle flash and started from where the
+server had the gun. Firing while turning drew them well off the crosshair. The
+client now draws them on the predicted frame it fires them
+(`net_mpPredictHitscan 1`, the default): `rvWeapon::Attack` runs
+`rvWeapon::Hitscan` on the newest predicted frame, which traces and plays the
+path, tracers and world impacts with no damage. The server's copy of a
+predicted shot adds only impacts on actors, which stay its verdict. A note
+ring pairs copies with predictions, oldest first per hit-scan, with a
+one-second expiry; a copy with no waiting note draws in full. Multiplayer
+spread comes from `idGameLocal::HitscanSpreadSeed(shooter, game time)`, so
+both sides draw the same pellets. The lightning gun and the gauntlet already
+traced on the client and are unchanged.
+
+`mp_firing_view_capture.py` measures this without input. A listen host on
+q4dm1 stays in warmup with the warmup arsenal and three paused bots, and a
+second process joins over loopback as the shooter. The shooter selects
+weapons with `testWeaponWheel`, turns at 220 degrees a second with
+`in_presentationViewProbe` and fires with `in_presentationViewProbeAttack`.
+The steps are:
+
+- target: railgun, machinegun and gauntlet at the host, which the harness
+  stands still in front of the shooter;
+- sweep: machinegun, railgun, shotgun and lightning gun, four seconds each,
+  turning;
+- respawn: the machinegun, turning, through a `kill` and the respawn.
+
+Both processes log every shot with `net_mpHitscanDebug` (`MP_HITSCAN`): the
+server's shots, the client's predictions, and the copies it received, each
+with its game time, seed, direction, distance from the gun's flash joint
+(plus the hit-scan's `fxOriginOffset`) and angle from the aim the client held
+at that moment. The report pairs server shots with predictions by game time
+and hit-scan. `mp_predicted_hitscan_state.py` runs the note ring and the seed
+in a native fixture spliced from the production source, and fails 14
+single-reversal controls.
+
+Five runs on one staged build (`game-mp_x64.dll` SHA-256
+`027622b3d9b3bd143cd0f28f1dff4bf2a8e9fe78ea64461337a238058015345c`), under
+`.tmp/mp07-firing/`, all pass:
+
+| Run | Server shots | Same frame, outside the respawn | Copies drawn in full | Drawn shot vs aim (median, sweeps) |
+| --- | --- | --- | --- | --- |
+| `p1-loopback`, OpenGL | 112 | 84 of 84 | 0 | spread only: machinegun 0.9°, railgun 0°, shotgun 4.9° |
+| `p0-loopback`, OpenGL, prediction off | 112 | – | 112 | machinegun 12.1°, railgun 10.6°, shotgun 15.8° |
+| `p1-impaired`, 80 ms ±20, enhanced prediction and lag compensation | 113 | 84 of 84 | 0 | spread only |
+| `p0-impaired`, same, prediction off | 111 | – | 109 | machinegun 53.8°, railgun 51.3°, shotgun 58.7° |
+| `p1-vulkan`, Vulkan | 115 | 85 of 85 | 0 | spread only |
+
+Report SHA-256s: `p1-loopback`
+`8134c2f6b8354d5aa23d16299078d8be483feaedf10da8e63bc21e163a396562`,
+`p0-loopback`
+`ac570b0f0ee414d5f4b4bef833e762a9cdc2ec67d81cbe584c679fa6cb1159b8`,
+`p1-impaired`
+`898038d8aee481a7c9a5eb73856d2b939ed64deefd2fc20884ca7037192405b3`,
+`p0-impaired`
+`0d00eca6d5e913556168e30557df0e443b578f9ad088e801ccc6b339ad86bf29`,
+`p1-vulkan`
+`2e5137208c03e9c31eab956586761cb2427caf82a712fb6c87e84b9f204c75a1`.
+
+- **Same shot on both sides.** Every paired prediction has the server's seed
+  and a direction identical to the log's five decimals. Every prediction
+  starts at the gun drawn on that frame (gun gap 0.00).
+- **Old behaviour.** With prediction off, the copies started a median 2.9
+  units from the gun on loopback and 13.5 units with 80 ms of latency. They
+  were 7.8° off the aim at the median and 17.7° at p95 on loopback, and 51.6°
+  and 59.4° with 80 ms of latency.
+- **Hits on the body.** The machinegun hit the standing host with every server
+  shot (37 of 37 on OpenGL loopback). The copies drew 29 of those impacts on
+  the client's copy of the host (34 on Vulkan); the other replays missed it by
+  the small pose difference a remote body always has. The copy's replay
+  predates this work. With 80 ms of latency, two of 113 copies never arrived;
+  they are unreliable messages.
+- **Respawn (7.4).** No copy was drawn in full around a death. The client's
+  first shots after the respawn started 2124 units (loopback), 2630 units
+  (impaired) and 2207 units (Vulkan) from where it died: nothing is drawn
+  from the old position. The client did fire out of step with the server
+  after the respawn. Its new weapon is caught up straight to ready
+  (`weaponCatchup` → `rvWeapon::NetCatchup`) while the server's raises, so it
+  fired four or five shots the server never fired. For the rest of a burst
+  held through the respawn, it then drew each shot one frame (16 ms,
+  loopback) or three frames (48 ms, impaired) before the server fired it. Its
+  muzzle flash and sound already did this before; now its tracer and wall
+  mark follow them, while the body impacts come from the server's shots.
+- **Captures.** The captures agree. The machinegun and railgun sweeps show
+  each tracer or rail leaving the barrel for the crosshair on the capture it
+  fires in, with impacts at the crosshair. With prediction off, the same
+  captures show the muzzle flash alone, and the beam or impacts a moment
+  later beside the crosshair, where the aim had been. The machinegun target
+  shows tracers from the gun to blood on the body under the crosshair.
+- **Gauntlet target.** In those five runs the gauntlet target strafed, steered
+  through the host's 100 ms control file. The strafe drifted out of the
+  gauntlet's reach, so the captures show the host beside the crosshair. With
+  the host standing 44 units away, a sixth run (`p1-gauntlet`, SHA-256
+  `b29dcbb99f2d2e7fd1cb8c6f27be6277f22acd624ce6bdd6066ca2ac0c126885`)
+  passes with the same hit-scan results: 85 of 85 same-frame, no copy drawn
+  in full, 37 body hits. Its captures show the blade on the host's chest under
+  the crosshair. The contact effect is too small to judge at 960×540, so the
+  gauntlet on a moving bot stays by eye.
+
+A set run earlier the same evening is superseded. A stopped runner had
+outlived its task and started a second host on the same port, so one host
+never started, and one Vulkan pass lost four frames of its fire schedule to a
+screenshot stall under that load. The harness now refuses a busy port.
+Remaining for MP-07: walking through a teleporter while firing, a moving
+gauntlet target and the feel with a real mouse
+([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)),
+real WAN peers, and the post-respawn fire phase above.
+
 ## Remote weapon play and live spectator follows, 5 November 2026
 
 `mp_remote_weapon_capture.py` runs a listen host on q4dm1, playing with god

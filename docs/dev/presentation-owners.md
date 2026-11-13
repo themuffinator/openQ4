@@ -98,6 +98,19 @@ interval of turning. Interpolation alone shows up to a whole tick of it, in the
 other direction. No cosmetic retrace is performed: a draw-frame trace would be
 gameplay work, and moving a tracer would misreport where the shot went.
 
+A multiplayer client's own hit-scan shots follow the same rule on the tick it
+predicts them (MP-07, `net_mpPredictHitscan 1`, the default). `rvWeapon::Attack`
+runs `rvWeapon::Hitscan` on the newest predicted frame, which traces and plays
+the path, tracers and world impacts from the gun drawn on that frame, with no
+damage. That is predicted-tick work, as the lightning gun's beam and the
+gauntlet's sparks already were, not a draw-frame retrace. Before this, the
+client drew those shots only from the server's copy, a round trip later and
+from where the server had the gun by then. The server's copy of a predicted
+shot now adds only impacts on actors, which stay the server's verdict.
+Multiplayer spread is seeded by the shooter and the shot's game time, so the
+pellets the client draws are the pellets the server fired. Projectiles still
+appear when the server spawns them.
+
 **Never altered.** Traces, damage, projectile spawns, network events, RNG,
 `viewAngles`, `deltaViewAngles`, `firstPersonViewOrigin/Axis` and the usercmd.
 [`presentation_hf_contract.py`](https://github.com/themuffinator/openQ4/blob/master/tools/tests/presentation_hf_contract.py)

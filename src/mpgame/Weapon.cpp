@@ -3392,6 +3392,15 @@ void rvWeapon::Attack( bool altAttack, int num_attacks, float spread, float fuse
 		statManager->WeaponFired( owner, weaponIndex, num_attacks );
 		
 	}
+// openQ4 BEGIN
+	// A client used to wait for the server's copy of its own shot, so the tracer and impacts
+	// arrived a round trip after the muzzle flash, from where the server had the gun by then.
+	// Draw the shot now instead, from the gun drawn on this frame; Hitscan only traces and
+	// plays effects on a client.  Damage stays on the server.
+	else if ( ( altAttack ? wfl.attackAltHitscan : wfl.attackHitscan ) && PredictsOwnHitscan() ) {
+		Hitscan( altAttack ? attackAltDict : attackDict, muzzleOrigin, muzzleAxis, num_attacks, spread, power );
+	}
+// openQ4 END
 }
 
 /*
@@ -3570,6 +3579,20 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 
 	GetGlobalJointTransform( true, flashJointView, fxOrigin, fxAxis, dict.GetVector( "fxOriginOffset" ) );
 
+// openQ4 BEGIN
+	// The shooting client draws this shot itself as it predicts it (rvWeapon::Attack), so it
+	// and the server have to agree on every pellet.  Both run the shot on the same game frame,
+	// so in multiplayer the spread comes from a generator seeded by the shooter and that
+	// frame's time rather than from the shared game generator.  Single player is unchanged.
+	const int spreadSeed = idGameLocal::HitscanSpreadSeed( owner ? owner->entityNumber : 0, gameLocal.time );
+	idRandom shotRandom( spreadSeed );
+	idRandom &spreadRandom = gameLocal.isMultiplayer ? shotRandom : gameLocal.random;
+	const bool predicted = gameLocal.isClient;
+	if ( predicted ) {
+		gameLocal.NotePredictedHitscan( hitscanAttackDef );
+	}
+// openQ4 END
+
 	if ( gameLocal.isServer ) {
 
 		assert( hitscanAttackDef >= 0 );
@@ -3593,9 +3616,9 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 	idVec3 end;
 	for( i = 0; i < num_hitscans; i++ ) {
 		if( weaponDef->dict.GetBool( "machinegunSpreadStyle" ) ) {	
-			float r = gameLocal.random.RandomFloat() * idMath::PI * 2.0f;
-			float u = idMath::Sin( r ) * gameLocal.random.CRandomFloat() * spread * 16;
-			r = idMath::Cos( r ) * gameLocal.random.CRandomFloat() * spread * 16;
+			float r = spreadRandom.RandomFloat() * idMath::PI * 2.0f;
+			float u = idMath::Sin( r ) * spreadRandom.CRandomFloat() * spread * 16;
+			r = idMath::Cos( r ) * spreadRandom.CRandomFloat() * spread * 16;
 #ifdef _XBOX
 			end = muzzleOrigin + ( ( 8192 * 16 ) * muzzleAxis[ 0 ] );
 			end += ( r * muzzleAxis[ 1 ] );
@@ -3624,8 +3647,8 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 				angle = (i - circleHitscans) * (idMath::TWO_PI / num_hitscans) * 2;
 			}
 			
-			float r = radius * (idMath::Cos(angle) + (gameLocal.random.CRandomFloat() * 0.2f));
-			float u = radius * (idMath::Sin(angle) + (gameLocal.random.CRandomFloat() * 0.2f));
+			float r = radius * (idMath::Cos(angle) + (spreadRandom.CRandomFloat() * 0.2f));
+			float u = radius * (idMath::Sin(angle) + (spreadRandom.CRandomFloat() * 0.2f));
 			
 #ifdef _XBOX
 			end = muzzleOrigin + ( ( 8192 * 16 ) * muzzleAxis[ 0 ] );
@@ -3638,8 +3661,8 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 #endif
 			dir = end - muzzleOrigin;
 		} else {
-			ang = idMath::Sin( spreadRad * gameLocal.random.RandomFloat() );
-			spin = (float)DEG2RAD( 360.0f ) * gameLocal.random.RandomFloat();
+			ang = idMath::Sin( spreadRad * spreadRandom.RandomFloat() );
+			spin = (float)DEG2RAD( 360.0f ) * spreadRandom.RandomFloat();
 			//RAVEN BEGIN
 			//asalmon: xbox must use the muzzleAxis so the aim can be adjusted for aim assistance
 #ifdef _XBOX
@@ -3651,7 +3674,20 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 		}
 		dir.Normalize();
 
-		gameLocal.HitScan( dict, muzzleOrigin, dir, fxOrigin, owner, false, 1.0f, NULL, areas );
+// openQ4 BEGIN
+		idEntity *hit;
+		if ( predicted ) {
+			hit = gameLocal.HitScan( dict, muzzleOrigin, dir, fxOrigin, owner, false, 1.0f, NULL, NULL, idGameLocal::HITSCAN_EFFECTS_PREDICTED );
+		} else {
+			hit = gameLocal.HitScan( dict, muzzleOrigin, dir, fxOrigin, owner, false, 1.0f, NULL, areas );
+		}
+		if ( i == 0 && net_mpHitscanDebug.GetBool() ) {
+			LogHitscanDebug( predicted ? "predicted" : "server", hitscanAttackDef, fxOrigin, dir, spreadSeed, hit );
+		}
+		if ( predicted ) {
+			continue;
+		}
+// openQ4 END
 
 		if ( gameLocal.isServer ) {
 			for ( int area = 0; area < 2; area++ ) {
@@ -3673,6 +3709,59 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 		}
 	}
 }
+
+// openQ4 BEGIN
+/*
+================
+rvWeapon::PredictsOwnHitscan
+
+Only the newest predicted frame: replays of frames already shown must not draw the shot
+again, and every other entity's shots still arrive from the server.  Demo playback replays
+the recorded server copies instead.
+================
+*/
+bool rvWeapon::PredictsOwnHitscan( void ) const {
+	return gameLocal.isClient && gameLocal.isMultiplayer && gameLocal.isNewFrame &&
+		gameLocal.GetDemoState() != DEMO_PLAYING &&
+		owner != NULL && owner->entityNumber == gameLocal.localClientNum &&
+		hitscanAttackDef >= 0 && net_mpPredictHitscan.GetBool();
+}
+
+/*
+================
+rvWeapon::LogHitscanDebug
+
+gunGap is how far the shot's visual starts from the flash joint of the gun this weapon
+holds now, aimGap the angle between the shot and the view this weapon aims along now.  For
+a shot drawn when it is predicted both are what the frame itself shows (aimGap is then the
+spread); for the server's copy they grow with the round trip times the turn rate.
+================
+*/
+void rvWeapon::LogHitscanDebug( const char *kind, int hitscanDefIndex, const idVec3 &fxOrigin, const idVec3 &dir, int seed, const idEntity *hit ) const {
+	const bool local = owner != NULL && owner->entityNumber == gameLocal.localClientNum;
+	float gunGap = -1.0f;
+	float aimGap = -1.0f;
+	if ( local && viewModel && flashJointView != INVALID_JOINT ) {
+		// The shot's visual starts at the flash joint moved by the hit-scan's own offset.
+		const idDeclEntityDef *def = static_cast<const idDeclEntityDef *>( declManager->DeclByIndex( DECL_ENTITYDEF, hitscanDefIndex, false ) );
+		idVec3 flashOrigin;
+		idMat3 flashAxis;
+		const_cast<rvWeapon *>( this )->GetGlobalJointTransform( true, flashJointView, flashOrigin, flashAxis,
+			def ? def->dict.GetVector( "fxOriginOffset" ) : vec3_origin );
+		gunGap = ( fxOrigin - flashOrigin ).Length();
+		// A received direction is quantized and not quite unit length, and acos of a dot
+		// product near 1 amplifies that; the cross and dot products keep it small.
+		idVec3 aim = dir;
+		aim.Normalize();
+		aimGap = RAD2DEG( idMath::ATan( aim.Cross( playerViewAxis[ 0 ] ).Length(), aim * playerViewAxis[ 0 ] ) );
+	}
+	// hit is the entity the trace stopped on, -1 for none; actor says whether that counts as a body.
+	gameLocal.Printf( "MP_HITSCAN kind=%s client=%d owner=%d local=%d def=%d time=%d newFrame=%d seed=%d fx=%.2f,%.2f,%.2f dir=%.5f,%.5f,%.5f gunGap=%.2f aimGap=%.3f hit=%d actor=%d\n",
+		kind, gameLocal.isClient ? 1 : 0, owner ? owner->entityNumber : -1, local ? 1 : 0, hitscanDefIndex, gameLocal.time,
+		gameLocal.isNewFrame ? 1 : 0, seed, fxOrigin.x, fxOrigin.y, fxOrigin.z, dir.x, dir.y, dir.z, gunGap, aimGap,
+		hit ? hit->entityNumber : -1, hit && hit->IsType( idActor::GetClassType() ) ? 1 : 0 );
+}
+// openQ4 END
 
 /*
 ================

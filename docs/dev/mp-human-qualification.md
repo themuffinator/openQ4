@@ -87,6 +87,18 @@ with `net_mpPredictMode 1` and `net_mpLagCompensation 1` set on both ends.
 Add `+set net_forceLatency 80 +set net_forceJitter 20` on the client for the
 impaired pass.
 
+Your client now draws its own machinegun, shotgun and railgun shots on the
+frame it fires them (`net_mpPredictHitscan`, on by default), so 7.1 should look
+the same with and without the impaired settings. `mp_firing_view_capture.py`
+already measures 7.1, the gauntlet on a standing target and the respawn half
+of 7.4 without input, from both processes' shot logs and engine captures (see
+[the network record](mp-network-qualification.md#the-firing-players-own-shots-under-prediction-12-november-2026)).
+What is left here is judging it by eye at full speed with a real mouse, the
+gauntlet on a moving bot, walking through q4dm1's teleporters while firing
+(the harness can do neither), and real WAN peers. For a comparison, run 7.1 once with
+`net_mpPredictHitscan 0` on the client: the old behaviour draws each shot from
+the server's copy, late and off to the side.
+
 | # | Do this | Pass when |
 | --- | --- | --- |
 | 7.1 | Fire the machinegun, railgun and lightning gun while turning quickly. | The tracer, beam and impact start at your gun and land where the crosshair was; no visible lag or offset. |

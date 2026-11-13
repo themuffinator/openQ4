@@ -155,12 +155,20 @@ IPv6 guarantees only a 1280-byte path MTU and forbids routers from splitting a d
 | `net_mpPredictMode` | `0` | `0..1` | MP client prediction | Selects remote-player prediction mode (`0` legacy limited, `1` enhanced per-frame). |
 | `net_mpPredictMaxFrames` | `16` | `1..64` | MP client prediction | The most game frames (16 ms each) enhanced prediction draws another player ahead. |
 | `net_mpRemoteExtrapolation` | derived | read-only | MP client prediction | What this client tells servers it draws other players ahead by, in frames: `0` in legacy mode, otherwise `net_mpPredictMaxFrames`. |
+| `net_mpPredictHitscan` | `1` | `0..1` | MP client | Draws your own machinegun, shotgun and railgun tracers and wall impacts the moment you fire. `0` waits for the server's copy of each shot, as older builds did. |
+| `net_mpHitscanDebug` | `0` | `0..1` | Client and server | Logs every hit-scan shot: the server's, the ones your client drew itself, and the server's copies it received, with how far each started from your gun and aim. |
 
 ## How prediction and lag compensation fit together
 
-Your own movement is predicted, so you see it at once. Other players are
-shown from the last update the server sent, which is a little old by the time
-it arrives.
+Your own movement is predicted, so you see it at once. So are your own shots:
+machinegun, shotgun and railgun tracers and their marks on walls appear the
+moment you fire, from your gun and along your crosshair, as the lightning gun's
+beam and the gauntlet's sparks always did. The server fires the same pellets,
+because both sides take the spread from the same seed. Hits on players stay
+the server's decision: the impact on a body, the hit marker and damage numbers
+come with the server's update. Rockets, grenades and other projectiles still
+appear when the server launches them. Other players are shown from the last
+update the server sent, which is a little old by the time it arrives.
 
 - **Legacy prediction** (`net_mpPredictMode 0`) shows other players about one
   round trip behind where the server has them.

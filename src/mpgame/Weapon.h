@@ -222,6 +222,13 @@ public:
 	bool				PerformAttack				( idVec3& muzzleOrigin, idMat3& muzzleAxis, float dmgPower );
 	void				LaunchProjectiles			( idDict& dict, const idVec3& muzzleOrigin, const idMat3& muzzleAxis, int num_projectiles, float spread, float fuseOffset, float power );
 	void				Hitscan						( const idDict& dict, const idVec3& muzzleOrigin, const idMat3& muzzleAxis, int num_hitscans, float spread, float power );
+// openQ4 BEGIN
+	// True on the frame a multiplayer client first predicts its own hit-scan shot.
+	bool				PredictsOwnHitscan			( void ) const;
+	// net_mpHitscanDebug: one line per shot, with the gap from the gun and aim this weapon
+	// holds now when it belongs to the local player.
+	void				LogHitscanDebug				( const char *kind, int hitscanDefIndex, const idVec3 &fxOrigin, const idVec3 &dir, int seed, const idEntity *hit ) const;
+// openQ4 END
 	void				AlertMonsters				( void );
 
 	// Mods

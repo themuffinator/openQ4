@@ -57,6 +57,37 @@ does not restore the withdrawn release. See
   into VR, the controllers, comfort, the system menu and sleep, frame rate and
   heat over a session, and whether and how to distribute it.
 
+## Your own shots draw the moment you fire online, 12 November 2026
+
+- **Your tracers and wall marks no longer trail behind your aim on a server.**
+  Your machinegun, shotgun and railgun shots used to appear only when the
+  server's copy came back, a round trip after the muzzle flash and from where
+  your gun had turned to by then: 10 to 16 degrees off your aim at a fast turn
+  on a LAN, and over 50 degrees with 80 ms of latency. Your client now draws
+  them as it fires, from your gun and along your crosshair, and the server
+  fires the same pellets. Hits on players stay the server's call. Set
+  `net_mpPredictHitscan 0` for the old behaviour.
+- MP-07: `rvWeapon::Attack` runs `rvWeapon::Hitscan` on a client's newest
+  predicted frame (`PredictsOwnHitscan`): it traces and draws the path,
+  tracers and world impacts with no damage. `idGameLocal::HitScan` takes a
+  `hitscanEffects_t` mode, so the server's copy of a predicted shot draws only
+  impacts on actors. A 16-note ring with a one-second expiry pairs copies with
+  predictions, oldest first, and a copy with no waiting note draws in full.
+  Multiplayer spread comes from `HitscanSpreadSeed(shooter, game time)`
+  instead of the shared game generator; single player is unchanged.
+  `net_mpHitscanDebug` logs every shot on both sides.
+- Evidence: `mp_firing_view_capture.py` passes on OpenGL loopback, OpenGL
+  with 80 ms ±20 latency and Vulkan. Every server shot outside a respawn was
+  predicted on its own frame with the same seed and direction, and no copy was
+  drawn twice. `mp_predicted_hitscan_state.py` fails all 14 single-reversal
+  controls
+  ([record](mp-network-qualification.md#the-firing-players-own-shots-under-prediction-12-november-2026)).
+- Open: a burst held through a respawn can run a frame or more out of phase
+  with the server, because the client's new weapon is caught up straight to
+  ready while the server's raises. A by-eye pass, teleporters, a moving
+  gauntlet target and real WAN peers stay on the
+  [checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction).
+
 ## Swimming stays put on the bottom, and lava looks like lava from inside, 12 November 2026
 
 - **Resting on the bottom of a pool no longer slides you along it.** Holding

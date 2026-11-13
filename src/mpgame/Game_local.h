@@ -1061,7 +1061,26 @@ public:
 	void					CheckPlayerWhizzBy	( idVec3 start, idVec3 end, idEntity* hitEnt, idEntity *attacker );
 // bdube: added hitscan
 // twhitaker: added additionalIgnore parameter
-	idEntity*				HitScan				( const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity * additionalIgnore = NULL, int *areas = NULL );
+// openQ4: effects - which of the shot's visuals this call draws.  A client draws its own
+// shot as it predicts it, without the impacts on actors (HITSCAN_EFFECTS_PREDICTED); the
+// server's copy of that shot then draws only those (HITSCAN_EFFECTS_CONFIRMED).
+	enum hitscanEffects_t {
+		HITSCAN_EFFECTS_ALL,
+		HITSCAN_EFFECTS_PREDICTED,
+		HITSCAN_EFFECTS_CONFIRMED
+	};
+	idEntity*				HitScan				( const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity * additionalIgnore = NULL, int *areas = NULL, hitscanEffects_t effects = HITSCAN_EFFECTS_ALL );
+// openQ4 BEGIN
+	// A multiplayer client's own predicted hit-scan shots, waiting for the server's copy.
+	// Each predicted shot is noted once; a copy that finds a note drew its path and wall
+	// impacts already.  Notes expire on the wall clock, so a shot the server never fired
+	// cannot swallow a later one, and a map change needs no reset.
+	void					NotePredictedHitscan( int hitscanDefIndex );
+	bool					ConsumePredictedHitscan( int hitscanDefIndex );
+	// Spread for one multiplayer hit-scan shot.  The server and the shooting client run the
+	// shot on the same game frame, so both derive the same pellets from these two values.
+	static int				HitscanSpreadSeed	( int shooterEntityNumber, int shotTime );
+// openQ4 END
 // bdube: added effect calls
 	virtual rvClientEffect*	PlayEffect			( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictedBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
 	rvClientEffect*			PlayEffect			( const idDict& args, const char* effectName, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictedBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
@@ -1412,6 +1431,15 @@ public:
 	// player tree where it was unreachable (only game-mp loads in multiplayer).
 	// Public because the weapons that run their own traces - the lightning gun
 	// and the gauntlet - have to bracket them with Begin/End themselves.
+	enum { MP_PREDICTED_HITSCANS = 16 };
+
+	struct mpPredictedHitscan_t {
+		int					hitscanDefIndex;
+		int					noteMsec;			// Sys_Milliseconds when predicted, 0 = free
+	};
+
+	mpPredictedHitscan_t	mpPredictedHitscans[MP_PREDICTED_HITSCANS];
+
 	enum { MP_LAGCOMP_HISTORY = 64 };
 
 	struct mpLagCompFrame_t {

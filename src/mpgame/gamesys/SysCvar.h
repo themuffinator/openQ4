@@ -526,6 +526,8 @@ extern idCVar net_mpLagCompMaxMS;
 extern idCVar net_mpLagCompBiasMS;
 extern idCVar net_mpLagCompSlackMS;
 extern idCVar net_mpLagCompDebug;
+extern idCVar net_mpPredictHitscan;
+extern idCVar net_mpHitscanDebug;
 
 extern idCVar bot_enable;
 extern idCVar bot_minPlayers;

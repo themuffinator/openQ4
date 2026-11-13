@@ -3850,7 +3850,7 @@ prediction/rewind defaults.
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
-| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; defaults remain off. | Firing player's same-fire-frame visuals and remaining peer transitions ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); the post-respawn weapon catch-up phase; remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
@@ -4499,6 +4499,27 @@ Completion substeps:
   follow contract pins this with a failing reversal. Remaining: the firing
   player's same-fire-frame view, impaired and WAN peers
   ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)).
+  Progress, 12 November: [the firing player's own shots](mp-network-qualification.md#the-firing-players-own-shots-under-prediction-12-november-2026)
+  are drawn on the predicted frame that fires them (`net_mpPredictHitscan`,
+  default on). Before, the client drew its machinegun, shotgun and railgun
+  shots from the server's copy, a round trip late and from where the server had
+  the gun. Over loopback at a 220-degree-a-second turn that was 12 degrees off
+  the aim (median, machinegun sweep), and 54 degrees with 80 ms ±20 latency.
+  `rvWeapon::Attack` now runs `rvWeapon::Hitscan` on the newest predicted frame
+  with no damage. `idGameLocal::HitScan` takes an effects mode, so the server's
+  copy adds only impacts on actors. A one-second note ring pairs copies with
+  predictions, and multiplayer spread is seeded by shooter and game time.
+  `mp_firing_view_capture.py` passes on OpenGL loopback, impaired and Vulkan,
+  with the old behaviour as baseline. Every server shot outside the respawn
+  burst was predicted on its own frame, with the same seed and direction. No
+  copy was drawn twice, and every prediction starts at the drawn gun. After a
+  respawn nothing is drawn from the old position. The respawn burst can run a
+  frame or more out of phase with the server, because the client's new weapon
+  is caught up straight to ready while the server's raises; that predates
+  this work and stays open. `mp_predicted_hitscan_state.py` runs the note ring
+  and seed natively with 14 failing controls. Remaining: teleporters, a moving
+  gauntlet target and the by-eye pass with a real mouse, WAN peers, and the
+  defaults decision for enhanced prediction and lag compensation.
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/
   MTU/rate limits, congestion, high player counts, discovery and reconnect. Preserve

@@ -147,6 +147,7 @@ jobs:
             tools/tests/mp_liquid_effects_capture.py \
             tools/tests/mp_liquid_swim_probe.py \
             tools/tests/mp_remote_weapon_capture.py \
+            tools/tests/mp_firing_view_capture.py \
             tools/tests/mp_round_remote_smoke.py \
             tools/tests/mp_tourney_smoke.py \
             tools/tests/parser_include_paths_contract.py \
@@ -391,6 +392,7 @@ jobs:
             tools/tests/bse_retail_parity.py \
             tools/tests/mp_lag_compensation_contract.py \
             tools/tests/mp_lag_compensation_state.py \
+            tools/tests/mp_predicted_hitscan_state.py \
             tools/tests/mp_client_prediction_state.py \
             tools/tests/mp_runtime_freshness.py \
             tools/tests/mp_weapon_switch_contract.py \
@@ -932,6 +934,7 @@ jobs:
           python tools/tests/bse_retail_parity.py
           python tools/tests/mp_lag_compensation_contract.py
           python tools/tests/mp_lag_compensation_state.py
+          python tools/tests/mp_predicted_hitscan_state.py
           python tools/tests/mp_client_prediction_state.py
           python tools/tests/mp_runtime_freshness.py
           python tools/tests/mp_weapon_switch_contract.py

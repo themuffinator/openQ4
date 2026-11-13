@@ -2781,6 +2781,15 @@ void idGameLocal::ClientHitScan( const idBitMsg &msg ) {
 		return;
 	}
 
+	// openQ4: this client drew its own shot when it predicted it (rvWeapon::Attack), from the
+	// gun it drew then.  This copy is a round trip late and starts where the server had the
+	// gun, so it adds only what the prediction leaves to the server: impacts on actors.  A
+	// copy with no prediction waiting - one this client mispredicted - draws in full.
+	hitscanEffects_t effects = HITSCAN_EFFECTS_ALL;
+	if ( ownerNumber == localClientNum && ConsumePredictedHitscan( hitscanDefIndex ) ) {
+		effects = HITSCAN_EFFECTS_CONFIRMED;
+	}
+
 	// one direction sent per hitscan
 	for( i = 0; i < num_hitscans; i++ ) {
 		dir = msg.ReadDir( 24 );
@@ -2788,7 +2797,12 @@ void idGameLocal::ClientHitScan( const idBitMsg &msg ) {
 			common->Warning( "idGameLocal::ClientHitScan: truncated hit-scan direction" );
 			return;
 		}
-		gameLocal.HitScan( decl->dict, muzzleOrigin, dir, fxOrigin, owner );
+		const idEntity *hit = gameLocal.HitScan( decl->dict, muzzleOrigin, dir, fxOrigin, owner, false, 1.0f, NULL, NULL, effects );
+		if ( i == 0 && net_mpHitscanDebug.GetBool() && owner && owner->IsType( idPlayer::GetClassType() ) &&
+				static_cast<idPlayer *>( owner )->weapon ) {
+			static_cast<idPlayer *>( owner )->weapon->LogHitscanDebug(
+				effects == HITSCAN_EFFECTS_CONFIRMED ? "confirmed" : "echo", hitscanDefIndex, fxOrigin, dir, 0, hit );
+		}
 	}
 }
 

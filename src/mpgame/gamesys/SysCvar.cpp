@@ -853,6 +853,12 @@ idCVar net_mpLagCompBiasMS(					"net_mpLagCompBiasMS",				"0",			CVAR_GAME | CVA
 // misreports, or which delays its ping replies, from choosing its own rewind.
 idCVar net_mpLagCompSlackMS(				"net_mpLagCompSlackMS",				"48",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "how far past the measured round trip a lag-compensation rewind may reach", 0, 200 );
 idCVar net_mpLagCompDebug(					"net_mpLagCompDebug",				"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multiplayer lag compensation debug output (0=off, 1=summary, 2=verbose)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+// A client's own hit-scan shots (machinegun, shotgun, railgun) are drawn on the frame it
+// predicts the shot, from the gun it draws, instead of a round trip later from where the
+// server had the gun.  The server's copy of that shot then adds only the impacts on players,
+// which stay the server's verdict.  Client-side presentation only; 0 restores the echo.
+idCVar net_mpPredictHitscan(				"net_mpPredictHitscan",				"1",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "draw this client's own hit-scan tracers and wall impacts when it predicts the shot instead of when the server's copy arrives" );
+idCVar net_mpHitscanDebug(					"net_mpHitscanDebug",				"0",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "log hit-scan shots: the server's, the ones this client predicts, and the server's copies it receives, with how far each started from the gun and aim drawn at the time" );
 
 // Multiplayer bots.  Navigation is generated at map load from the collision
 // world, so none of this needs per-map authoring.

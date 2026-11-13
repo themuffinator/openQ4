@@ -483,6 +483,7 @@ void idGameLocal::Clear( void ) {
 // RAVEN END
 
 	ResetMPLagCompensationHistory();
+	memset( mpPredictedHitscans, 0, sizeof( mpPredictedHitscans ) );
 
 	demoState = DEMO_NONE;
 	serverDemo = false;
@@ -9990,6 +9991,85 @@ bool idGameLocal::ResolveMPLagCompensationHit( const idEntity *hit, mpLagCompRes
 	return false;
 }
 
+// openQ4 BEGIN
+/*
+================
+idGameLocal::HitscanSpreadSeed
+
+Murmur3's finaliser over the shooter and the shot's game time.  idRandom is a linear
+congruence, so seeds from neighbouring frames or slots would otherwise start neighbouring
+sequences, and the first pellets of consecutive shots would land in step.
+================
+*/
+int idGameLocal::HitscanSpreadSeed( int shooterEntityNumber, int shotTime ) {
+	unsigned int h = static_cast<unsigned int>( shotTime ) * 0x9E3779B1u;
+	h ^= static_cast<unsigned int>( shooterEntityNumber + 1 ) * 0x85EBCA77u;
+	h ^= h >> 16;
+	h *= 0x85EBCA6Bu;
+	h ^= h >> 13;
+	h *= 0xC2B2AE35u;
+	h ^= h >> 16;
+	return static_cast<int>( h & 0x7FFFFFFFu );
+}
+
+// How long a predicted shot waits for the server's copy.  The copy is a round trip and a
+// snapshot behind; the prediction lead is capped at a second, and a note older than that
+// belongs to a shot the server never fired.
+static const int MP_PREDICTED_HITSCAN_EXPIRY_MSEC = 1000;
+
+/*
+================
+idGameLocal::NotePredictedHitscan
+================
+*/
+void idGameLocal::NotePredictedHitscan( int hitscanDefIndex ) {
+	const int now = Max( 1, Sys_Milliseconds() );
+	int slot = 0;
+	for ( int i = 0; i < MP_PREDICTED_HITSCANS; i++ ) {
+		if ( mpPredictedHitscans[ i ].noteMsec == 0 || now - mpPredictedHitscans[ i ].noteMsec > MP_PREDICTED_HITSCAN_EXPIRY_MSEC ) {
+			slot = i;
+			break;
+		}
+		if ( mpPredictedHitscans[ i ].noteMsec < mpPredictedHitscans[ slot ].noteMsec ) {
+			slot = i;
+		}
+	}
+	mpPredictedHitscans[ slot ].hitscanDefIndex = hitscanDefIndex;
+	mpPredictedHitscans[ slot ].noteMsec = now;
+}
+
+/*
+================
+idGameLocal::ConsumePredictedHitscan
+
+The server's copies arrive in the order the shots were fired, so a copy takes the oldest
+waiting note for the same hit-scan.
+================
+*/
+bool idGameLocal::ConsumePredictedHitscan( int hitscanDefIndex ) {
+	const int now = Max( 1, Sys_Milliseconds() );
+	int found = -1;
+	for ( int i = 0; i < MP_PREDICTED_HITSCANS; i++ ) {
+		mpPredictedHitscan_t &note = mpPredictedHitscans[ i ];
+		if ( note.noteMsec == 0 ) {
+			continue;
+		}
+		if ( now - note.noteMsec > MP_PREDICTED_HITSCAN_EXPIRY_MSEC ) {
+			note.noteMsec = 0;
+			continue;
+		}
+		if ( note.hitscanDefIndex == hitscanDefIndex && ( found < 0 || note.noteMsec < mpPredictedHitscans[ found ].noteMsec ) ) {
+			found = i;
+		}
+	}
+	if ( found < 0 ) {
+		return false;
+	}
+	mpPredictedHitscans[ found ].noteMsec = 0;
+	return true;
+}
+// openQ4 END
+
 /*
 ================
 idGameLocal::HitScan
@@ -10007,8 +10087,14 @@ idEntity* idGameLocal::HitScan(
 	float			damageScale,
 // twhitaker: added additionalIgnore parameter
 	idEntity*		additionalIgnore,
-	int				areas[ 2 ]
+	int				areas[ 2 ],
+	hitscanEffects_t effects
 	) {
+
+	// openQ4: a predicted shot draws its path, tracers and the impacts on the world; the
+	// server's copy of a shot this client predicted draws only the impacts on actors.
+	const bool	drawShotEffects = ( effects != HITSCAN_EFFECTS_CONFIRMED );
+	const bool	drawActorImpacts = ( effects != HITSCAN_EFFECTS_PREDICTED );
 
 	idVec3		dir;
 	idVec3		origin;
@@ -10130,10 +10216,12 @@ idEntity* idGameLocal::HitScan(
 			
 			// If the hitscan hit a no impact surface we can just return out
 			//assert( tr.c.material );
-			if ( tr.fraction >= 1.0f || (tr.c.material && tr.c.material->GetSurfaceFlags() & SURF_NOIMPACT) ) {					
-				PlayEffect( hitscanDict, "fx_path", fxOrigin, dir.ToMat3(), false, tr.endpos, false, false, EC_IGNORE, hitscanTint );	
-				const bool liquidTracer = crossedLiquid && PlayLiquidTrailToExit( trailLiquidContents, trailLiquidStart, tr.endpos, owner );
-				if ( random.RandomFloat( ) < tracerChance ) {
+			if ( tr.fraction >= 1.0f || (tr.c.material && tr.c.material->GetSurfaceFlags() & SURF_NOIMPACT) ) {
+				if ( drawShotEffects ) {
+					PlayEffect( hitscanDict, "fx_path", fxOrigin, dir.ToMat3(), false, tr.endpos, false, false, EC_IGNORE, hitscanTint );
+				}
+				const bool liquidTracer = drawShotEffects && crossedLiquid && PlayLiquidTrailToExit( trailLiquidContents, trailLiquidStart, tr.endpos, owner );
+				if ( drawShotEffects && random.RandomFloat( ) < tracerChance ) {
 // openQ4 BEGIN
 					// Never lay an air tracer over the underwater bubbles drawn above.
 					if ( !liquidTracer ) {
@@ -10185,7 +10273,9 @@ idEntity* idGameLocal::HitScan(
 			const int hitLiquidContents = LiquidContentsAtCollision( ent, tr );
 			if ( hitLiquidContents ) {
 				// Apply force to the liquid entity that was hit
-				ent->ApplyImpulse( owner, tr.c.id, tr.c.point, -(hitscanDict.GetFloat( "push", "5000" )) * tr.c.normal );
+				if ( drawShotEffects ) {
+					ent->ApplyImpulse( owner, tr.c.id, tr.c.point, -(hitscanDict.GetFloat( "push", "5000" )) * tr.c.normal );
+				}
 				if ( !crossedLiquid ) {
 					trailLiquidContents = hitLiquidContents;
 					trailLiquidStart = collisionPoint + dir * 0.5f;
@@ -10197,7 +10287,7 @@ idEntity* idGameLocal::HitScan(
 				start = collisionPoint + dir * 0.5f;
 				contents &= (~MASK_WATER);
 
-				if ( !g_perfTest_weaponNoFX.GetBool() && !GetEffect( hitscanDict, "fx_impact", tr.c.materialType ) ) {
+				if ( drawShotEffects && !g_perfTest_weaponNoFX.GetBool() && !GetEffect( hitscanDict, "fx_impact", tr.c.materialType ) ) {
 					// the shooter's def says nothing about hitting this liquid, so fall back to the
 					// shared liquid presentation rather than splashing nothing at all
 					// ClientHitScan replays this whole function on every client, so the splash
@@ -10206,7 +10296,7 @@ idEntity* idGameLocal::HitScan(
 				}
 // openQ4 END
 
-				if ( !g_perfTest_weaponNoFX.GetBool() ) {
+				if ( drawShotEffects && !g_perfTest_weaponNoFX.GetBool() ) {
 					if ( ent->CanPlayImpactEffect( owner, ent ) ) {
 						if ( ent->IsType( idMover::GetClassType( ) ) ) {
 							ent->PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, tr.c.normal.ToMat3(), false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
@@ -10316,9 +10406,11 @@ idEntity* idGameLocal::HitScan(
 		// Path effect 
 		fxDir = collisionPoint - fxOrigin;
 		fxDir.Normalize( );
-		PlayEffect( hitscanDict, "fx_path", fxOrigin, fxDir.ToMat3(), false, collisionPoint, false, false, EC_IGNORE, hitscanTint );	
-		const bool liquidTracer = crossedLiquid && PlayLiquidTrailToExit( trailLiquidContents, trailLiquidStart, collisionPoint, owner );
-		if ( !ent->fl.takedamage && random.RandomFloat ( ) < tracerChance ) {
+		if ( drawShotEffects ) {
+			PlayEffect( hitscanDict, "fx_path", fxOrigin, fxDir.ToMat3(), false, collisionPoint, false, false, EC_IGNORE, hitscanTint );
+		}
+		const bool liquidTracer = drawShotEffects && crossedLiquid && PlayLiquidTrailToExit( trailLiquidContents, trailLiquidStart, collisionPoint, owner );
+		if ( drawShotEffects && !ent->fl.takedamage && random.RandomFloat ( ) < tracerChance ) {
 // openQ4 BEGIN
 			if ( !liquidTracer ) {
 				PlayEffect( hitscanDict, "fx_tracer", fxOrigin, fxDir.ToMat3(), false, collisionPoint );
@@ -10329,7 +10421,7 @@ idEntity* idGameLocal::HitScan(
 			tracer = false;
 		}
 
-		if ( !reflect ) {
+		if ( !reflect && drawShotEffects ) {
 			//on initial trace only
 			if ( hitscanDict.GetBool( "doWhizz" ) ) {
 				//play whizz-by sound if trace is close to player's head
@@ -10349,7 +10441,11 @@ idEntity* idGameLocal::HitScan(
 				axis = tr.c.normal.ToMat3();
 			}
 			
-			if ( !g_perfTest_weaponNoFX.GetBool() ) {
+			// openQ4: an impact on an actor is the server's verdict, so a predicted shot leaves
+			// it to the server's copy, which in turn leaves the world impact to the prediction.
+			const bool actorImpact = ent->IsType( idActor::GetClassType() ) ||
+				( ent->GetTeamMaster() && ent->GetTeamMaster()->IsType( idActor::GetClassType() ) );
+			if ( ( actorImpact ? drawActorImpacts : drawShotEffects ) && !g_perfTest_weaponNoFX.GetBool() ) {
 				if ( ent->CanPlayImpactEffect( owner, ent ) ) {
 					if ( ent->IsType( idMover::GetClassType( ) ) ) {
 						ent->PlayEffect( GetEffect( hitscanDict, "fx_impact", tr.c.materialType ), collisionPoint, axis, false, vec3_origin, false, false, EC_IMPACT, hitscanTint );
@@ -10362,7 +10458,7 @@ idEntity* idGameLocal::HitScan(
 			// End of reflection
 			hitResult = ent;
 			goto hitScanDone;
-		} else {
+		} else if ( drawShotEffects ) {
 			PlayEffect( GetEffect( hitscanDict, "fx_reflect", tr.c.materialType ), collisionPoint, tr.c.normal.ToMat3() );
 		}
 		

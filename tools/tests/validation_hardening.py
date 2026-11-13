@@ -801,6 +801,7 @@ def validate_validation_wiring() -> None:
         "mp_liquid_effects_capture.py",
         "mp_liquid_swim_probe.py",
         "mp_remote_weapon_capture.py",
+        "mp_firing_view_capture.py",
         "mp_match_flow_smoke.py",
         "mp_mvd_smoke.py",
         "mp_pause_lifecycle_smoke.py",
