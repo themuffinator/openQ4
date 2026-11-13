@@ -60,7 +60,7 @@ exact; the estimate column is deliberately approximate.
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
-| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 9 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
+| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 10 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
@@ -3879,7 +3879,7 @@ result is recorded.
 
 ### MP completion checkpoints
 
-**Estimate: 80%; 3/9 tasks closed.** Most systems work and have substantial local
+**Estimate: 80%; 3/10 tasks closed.** Most systems work and have substantial local
 evidence. MP-02's final long-match/catalog safety checks pass, with its timing
 contention caveat accepted for closeout; controlled timing remains unqualified.
 Simulated networking does not close physical peers. The 28 October
@@ -3897,6 +3897,7 @@ prediction/rewind defaults.
 | MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path on IPv4 and IPv6, and over IPv6 even when the path drops IP fragments (connection replies fit one packet). | IPv4 over a fragment-dropping path (1,300-byte channel fragments); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
+| MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
 
 Completion substeps:
 
@@ -4742,6 +4743,23 @@ Completion substeps:
   now sits 60% of the way from skill 1's, giving 83 ± 11, 72 ± 14, 57 ± 9 and
   60 ± 10, consistent with even spacing ([evidence](mp-bots.md#skill-levels-1-november-2026)).
   Remaining: play against people, and retuning the curve from what that shows.
+- [ ] **MP-10 — P2, implementation and qualification: buying rules and the
+  buy card.** A buying server sells by Quake 4's rules or The Awakening's as
+  one option (Create Server, vote, admin), and the buy menu presents in the new
+  interface's in-match card construction ([reference](mp-buying.md)). Gates:
+  `mp_buying_rules_contract.py`, `openq4-ui-retained-buy`, the retained gate's
+  buy-card case and `capture_buy_menu.py` on OpenGL and Vulkan, with a remote
+  client building the modded weapon from the snapshot; then real keyboard and
+  controller purchases and the mods judged in play.
+  Progress, 13 November: the expansion's buy menu was a prototype (prices in
+  its labels, two mods with no def, items that need its content). Its catalog
+  now lives in `buyCatalog` with retail's items priced by the content, its
+  prices and cash awards in code, four mods the base content defines, the Dark
+  Matter Gun and FC Armor Regen. Mods travel in the player snapshot, survive a
+  buying mode's death and never give a clipless weapon a reload. The match
+  rules' buying mask now covers the four CTF modes, which had kept a buying
+  CTF match in warmup. Remaining: hands-on play and the UI register's FLOW-010
+  acceptance with a visual-spec record of the card's detail-column reasons.
 
 ## Audio and voice
 

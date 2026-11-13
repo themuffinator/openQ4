@@ -1659,6 +1659,9 @@ if build_engine or get_option('build_native_tests')
     # The match summary card (ui-visual-design.md 14.14).
     test('openq4-ui-retained-summary', openq4_ui_retained_screens_test,
       args: ['--summary', meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/mp_summary.rui'], timeout: 240)
+    # The buy card over the game's buy menu (ui-visual-design.md 14.18).
+    test('openq4-ui-retained-buy', openq4_ui_retained_screens_test,
+      args: ['--buy', meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/mp_buy.rui'], timeout: 120)
     test('openq4-ui-retained-rosters', openq4_ui_retained_screens_test,
       args: ['--rosters', retained_screens_documents[6], retained_screens_documents[7],
         meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/mp_summary.rui'], timeout: 120)

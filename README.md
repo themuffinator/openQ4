@@ -58,7 +58,7 @@ What you get in **0.14.1**, the latest release:
 - 🌗 **Modern lighting, each switchable**: stable [shadow maps](docs/user/shadow-mapping.md) on the higher presets, bloom, HDR, [temporal AA](docs/user/temporal-presentation.md), motion blur, [baked light grids](docs/user/light-grids.md), [cel shading](docs/user/cel-shading.md) and a CRT filter.
 - ⚡ **Built for modern displays.** Widescreen, ultrawide and portrait screens, smooth motion at 144 Hz and beyond, presets with Auto-Detect, and display changes that apply without a restart.
 - 🔺 **Your choice of renderer.** Vulkan is supported on Windows and chosen automatically, with OpenGL as the fallback.
-- 🎯 **Better multiplayer** (experimental): bots that take orders, quick and voice chat, objective markers, a server browser with favourites and [readable chat](docs/user/multiplayer-chat.md).
+- 🎯 **Better multiplayer** (experimental): bots that take orders, quick and voice chat, objective markers, a server browser with favourites, [readable chat](docs/user/multiplayer-chat.md) and a [buy menu](docs/user/buying.md) with Quake 4's or The Awakening's rules.
 - 📼 **A demo library and player** for full matches and whole campaigns, with markers, fast seeking, Auto-Track and free-fly playback. See [demos](docs/user/multiview-demos.md).
 - 🏆 **More to play.** The experimental [Arena Campaign](docs/user/arena-campaign.md) offers bot matches across five tiers of the stock maps, with boss matches and saved progress.
 - 🔊 **Sound as designed.** [Room reverb](docs/user/gameplay-settings.md#room-reverb) for every map, subtitles and a separate dialogue volume.
@@ -122,7 +122,7 @@ These guides describe 0.14.1. Anything added since is marked **Not in 0.14.1**; 
 **Play**
 - [Campaigns](docs/user/campaigns.md) · [The Awakening](docs/user/awakening.md): choosing and installing a campaign
 - [Arena Campaign](docs/user/arena-campaign.md) (experimental): tiers, unlocks, maps and bots
-- [Multiplayer Networking](docs/user/multiplayer-networking.md) (experimental) · [Multiplayer Chat](docs/user/multiplayer-chat.md) · [Competitive Matches](docs/user/competitive-matches.md) (experimental)
+- [Multiplayer Networking](docs/user/multiplayer-networking.md) (experimental) · [Multiplayer Chat](docs/user/multiplayer-chat.md) · [Buying](docs/user/buying.md) · [Competitive Matches](docs/user/competitive-matches.md) (experimental)
 - [Demo Library and Multi-View Demos](docs/user/multiview-demos.md): browse, play back and record full matches
 
 **Look and feel**

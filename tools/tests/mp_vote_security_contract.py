@@ -206,7 +206,8 @@ def main() -> None:
         "msg.GetRemainingReadBits() != 0",
         "wireFieldFlags & disallowedVotes",
         "if ( !validVote )",
-        "outMsg.WriteByte( voteData.m_buying ? 1 : 0 );",
+        # the buying choice: off, Quake 4's rules or The Awakening's (mp/Buying.h)
+        "outMsg.WriteByte( idMath::ClampInt( BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, voteData.m_buying ) );",
         "outMsg.WriteShort( idMath::ClampShort( voteData.m_controlTime ) );",
     ):
         require(packed if "wireFieldFlags" in token or "validVote" in token or "Remaining" in token else multiplayer, token, "atomic packed vote transport")

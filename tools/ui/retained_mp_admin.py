@@ -73,7 +73,7 @@ ROWS = (
     ("balance", "mpAdminBalance", "#str_200240", ("toggle",)),
     ("shuffle", "mpAdminShuffle", "#str_201044", ("toggle",)),
     ("restart", "mpAdminRestart", "#str_200234", ("toggle",)),
-    ("buying", "mpAdminBuying", "#str_222000", ("toggle",)),
+    ("buying", "mpAdminBuying", "#str_231901", ("choice", 3)),
 )
 LEFT_ROWS = ("map", "gametype", "timelimit", "fraglimit", "capturelimit", "tourneylimit", "controltime")
 

@@ -4063,6 +4063,18 @@ static void Cmd_OpenQ4ReportMPWorld_f( const idCmdArgs &args ) {
 			gameLocal.Printf( "MP_WORLD_WEAPON entity=%d clip=%d ready=%d reloading=%d\n",
 				entity->entityNumber, player->weapon->AmmoInClip(),
 				player->weapon->IsReady(), player->weapon->IsReloading() );
+			// The weapon mods this end knows and the weapon it built from them
+			// (the buying modes' mods travel in the player snapshot).
+			idStr mods;
+			for ( int weaponIndex = 0; weaponIndex < MAX_WEAPONS; ++weaponIndex ) {
+				if ( player->inventory.weaponMods[ weaponIndex ] != 0 ) {
+					mods += va( "%s%d:%d", mods.Length() > 0 ? "," : "", weaponIndex, player->inventory.weaponMods[ weaponIndex ] );
+				}
+			}
+			gameLocal.Printf( "MP_WORLD_WEAPON_MODS entity=%d weapon=%d mods=%s clipSize=%d fireRate=%.3f projectile=%s\n",
+				entity->entityNumber, player->GetCurrentWeapon(), mods.Length() > 0 ? mods.c_str() : "-",
+				player->weapon->ClipSize(), player->weapon->spawnArgs.GetFloat( "fireRate" ),
+				player->weapon->spawnArgs.GetString( "def_projectile", "-" ) );
 		}
 		OpenQ4ReportMPAnimation( player->GetWeaponViewModel(), "weapon" );
 		rvViewWeapon *viewModel = player->GetWeaponViewModel();

@@ -1713,8 +1713,6 @@ idPlayer::idPlayer() {
 		voiceDestTimes[i] = 0;
 	}
 
-	itemCosts = NULL;
-
 	teamHealthRegen		= NULL;
 	teamHealthRegenPending	= false;
 	teamAmmoRegen			= NULL;
@@ -2563,8 +2561,6 @@ void idPlayer::Spawn( void ) {
 	carryOverCurrentWeapon = currentWeapon;
 	inventory.carryOverWeapons = 0;
 //RITUAL END
-
-	itemCosts = static_cast< const idDeclEntityDef * >( declManager->FindType( DECL_ENTITYDEF, "ItemCostConstants", false ) );
 
 	// The local player's retained gameplay documents load now, inside the
 	// level load, so their first use builds nothing.
@@ -3425,6 +3421,10 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 
 // RITUAL BEGIN
 // squirrel: Mode-agnostic buymenus
+	// openQ4: Init() clears the weapon mods; the ones bought for a weapon the
+	// buying mode carries over come back with it below.
+	int carriedWeaponMods[ MAX_WEAPONS ];
+	memcpy( carriedWeaponMods, inventory.weaponMods, sizeof( carriedWeaponMods ) );
 	if ( gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) {
 		// Record previous weapons for later restoration
 		inventory.carryOverWeapons &= ~CARRYOVER_WEAPONS_MASK;
@@ -3572,6 +3572,11 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 			{
 				int ammoIndex	= inventory.AmmoIndexForWeaponIndex( weaponIndex );
 				inventory.ammo[ ammoIndex ] = inventory.StartingAmmoForWeaponIndex( weaponIndex );
+			}
+			// openQ4: and the mods bought for a carried weapon
+			if ( inventory.carryOverWeapons & ( 1 << weaponIndex ) )
+			{
+				inventory.weaponMods[ weaponIndex ] |= carriedWeaponMods[ weaponIndex ];
 			}
 		}
 
@@ -9911,113 +9916,25 @@ bool idPlayer::ExitVehicle ( bool force ) {
 /*
 ==============
 GetItemCost
+
+The item's price under the server's buying rules (mp/Buying.cpp).
 ==============
 */
 int idPlayer::GetItemCost( const char* itemName ) {
-	int price;
-	if ( idBuyItemPrice::Find( itemName, price ) ) {
-		return price;
-	}
-	if ( !itemCosts ) {
-		assert( false );
-		return 99999;
-	}
-	return itemCosts->dict.GetInt( itemName, "99999" );
+	return gameLocal.mpGame.mpBuyingManager.GetItemPrice( itemName );
 }
-
-/*
-==============
-idPlayer::HasItemPrice
-
-True when a layer or the content prices the item. Weapon mods and FC Armor
-Regen, which retail never sold, are for sale only where something does.
-==============
-*/
-bool idPlayer::HasItemPrice( const char* itemName ) {
-	int price;
-	return idBuyItemPrice::Find( itemName, price ) || ( itemCosts != NULL && itemCosts->dict.FindKey( itemName ) != NULL );
-}
-
-/*
-==============
-idBuyItemPrice
-==============
-*/
-idBuyItemPrice *idBuyItemPrice::list = NULL;
-
-idBuyItemPrice::idBuyItemPrice( const char *item, int price ) :
-	item( item ),
-	price( price ),
-	next( list ) {
-	list = this;
-}
-
-bool idBuyItemPrice::Find( const char *item, int &price ) {
-	for ( const idBuyItemPrice *entry = list; entry != NULL; entry = entry->next ) {
-		if ( !idStr::Icmp( entry->item, item ) ) {
-			price = entry->price;
-			return true;
-		}
-	}
-	return false;
-}
-
-/*
-==============
-Buy impulses
-
-A buy travels from client to server as impulse IMPULSE_100 + its index here
-(an 8-bit event, so the list may run past IMPULSE_127). Retail's items keep
-their numbers; the Awakening's fill the numbers retail left unused.
-==============
-*/
-static const char * const buyItemsByImpulse[] = {
-	"weapon_shotgun",					// IMPULSE_100
-	"weapon_machinegun",					// IMPULSE_101
-	"weapon_hyperblaster",				// IMPULSE_102
-	"weapon_grenadelauncher",			// IMPULSE_103
-	"weapon_nailgun",					// IMPULSE_104
-	"weapon_rocketlauncher",				// IMPULSE_105
-	"weapon_railgun",					// IMPULSE_106
-	"weapon_lightninggun",				// IMPULSE_107
-	"weapon_spikegun",					// IMPULSE_108
-	"weapon_napalmgun",					// IMPULSE_109
-	"weapon_dmg",						// IMPULSE_110
-	"wpmod_shotgun_ammo",				// IMPULSE_111
-	"wpmod_hyperblaster_bounce1",		// IMPULSE_112
-	"wpmod_nailgun_rof",					// IMPULSE_113
-	"wpmod_lightninggun_chain",			// IMPULSE_114
-	"wpmod_railgun_penetrate",			// IMPULSE_115
-	"wpmod_grenade_concussion_blast",	// IMPULSE_116
-	"wpmod_rocketlauncher_burst",		// IMPULSE_117
-	"item_armor_small",					// IMPULSE_118
-	"item_armor_large",					// IMPULSE_119
-	"ammorefill",						// IMPULSE_120
-	"wpmod_spikegun_scope",				// IMPULSE_121
-	"wpmod_goobgun_flamethrower",		// IMPULSE_122
-	"ammo_regen",						// IMPULSE_123
-	"health_regen",						// IMPULSE_124
-	"damage_boost",						// IMPULSE_125
-	"fc_armor_regen",					// IMPULSE_126
-	"weapon_freezegun",					// IMPULSE_127
-	"weapon_goobgun",					// IMPULSE_127 + 1
-};
-static const int numBuyItemsByImpulse = sizeof( buyItemsByImpulse ) / sizeof( buyItemsByImpulse[0] );
-static_assert( IMPULSE_100 + (int)( sizeof( buyItemsByImpulse ) / sizeof( buyItemsByImpulse[0] ) ) <= ( 1 << IMPULSE_NUMBER_OF_BITS ), "buy impulses must fit the impulse event" );
 
 /*
 ==============
 GetItemBuyImpulse
+
+A buy travels from client to server as the item's impulse (buyCatalog).
 ==============
 */
 int GetItemBuyImpulse( const char* itemName )
 {
-	for ( int i = 0; i < numBuyItemsByImpulse; i++ ) {
-		if ( !idStr::Icmp( buyItemsByImpulse[ i ], itemName ) ) {
-			return IMPULSE_100 + i;
-		}
-	}
-	return 0;
+	const buyCatalogItem_t *entry = MP_FindBuyCatalogItem( itemName );
+	return entry != NULL ? entry->impulse : 0;
 }
 
 /*
@@ -10027,10 +9944,8 @@ GetBuyItemForImpulse
 */
 static const char* GetBuyItemForImpulse( int impulse )
 {
-	if ( impulse < IMPULSE_100 || impulse >= IMPULSE_100 + numBuyItemsByImpulse ) {
-		return NULL;
-	}
-	return buyItemsByImpulse[ impulse - IMPULSE_100 ];
+	const buyCatalogItem_t *entry = MP_FindBuyCatalogItemForImpulse( impulse );
+	return entry != NULL ? entry->item : NULL;
 }
 
 
@@ -10044,17 +9959,16 @@ bool idPlayer::CanBuyItem( const char* itemName )
 itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 {
 	idStr itemNameStr = itemName;
-	if ( itemNameStr == "notimplemented" )
+
+	// only what the server's buying rules sell and the content defines
+	if ( !gameLocal.mpGame.mpBuyingManager.IsItemSold( itemName ) )
 	{
 		return IBS_NOT_ALLOWED;
 	}
-	else if( !idStr::Cmpn( itemName, "wpmod_", 6 ) )
-	{
-		// a weapon mod is for sale only where something prices it (the Awakening),
-		// and only for a weapon the player carries
-		if ( !HasItemPrice( itemName ) )
-			return IBS_NOT_ALLOWED;
 
+	if( !idStr::Cmpn( itemName, "wpmod_", 6 ) )
+	{
+		// a weapon mod only for a weapon the player carries, and only once
 		const idDict* modDict = gameLocal.FindEntityDefDict( itemName, false );
 		const char* weaponClass = modDict ? modDict->GetString( "weapon" ) : "";
 		const idDict* weaponDict = gameLocal.FindEntityDefDict( weaponClass, false );
@@ -10105,12 +10019,6 @@ itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 				fullAmmo = false;
 		}
 		if ( fullAmmo )
-			return IBS_NOT_ALLOWED;
-	}
-	else if ( itemNameStr == "fc_armor_regen" )
-	{
-		// the Awakening's fourth team special; retail never sold it
-		if ( !HasItemPrice( itemName ) )
 			return IBS_NOT_ALLOWED;
 	}
 
@@ -10430,7 +10338,7 @@ void idPlayer::PerformImpulse( int impulse ) {
 		}
 
 		default: {
-			// the buy menu's impulses (see buyItemsByImpulse)
+			// the buy menu's impulses (buyCatalog in mp/Buying.cpp)
 			const char *buyItem = GetBuyItemForImpulse( impulse );
 			if ( buyItem != NULL ) {
 				AttemptToBuyItem( buyItem );
@@ -15530,6 +15438,43 @@ void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
  	}
 	msg.WriteBits( inBuyZone, 1 );
 	msg.WriteLong( (int)buyMenuCash );
+	WriteWeaponModsToSnapshot( msg );
+}
+
+/*
+================
+idPlayer::WriteWeaponModsToSnapshot
+
+openQ4: the weapon mods a buying mode sells (mp/Buying.cpp) change how the
+weapon fires, and every client builds the weapon from them: which weapons
+carry mods, then each one's mod bits.
+================
+*/
+void idPlayer::WriteWeaponModsToSnapshot( idBitMsgDelta &msg ) const {
+	int moddedWeapons = 0;
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( inventory.weaponMods[ i ] & WEAPON_MODS_SNAPSHOT_MASK ) {
+			moddedWeapons |= ( 1 << i );
+		}
+	}
+	msg.WriteBits( moddedWeapons, MAX_WEAPONS );
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( moddedWeapons & ( 1 << i ) ) {
+			msg.WriteBits( inventory.weaponMods[ i ] & WEAPON_MODS_SNAPSHOT_MASK, MAX_WEAPONMODS );
+		}
+	}
+}
+
+/*
+================
+idPlayer::ReadWeaponModsFromSnapshot
+================
+*/
+void idPlayer::ReadWeaponModsFromSnapshot( const idBitMsgDelta &msg, int weaponMods[ MAX_WEAPONS ] ) {
+	const int moddedWeapons = msg.ReadBits( MAX_WEAPONS );
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		weaponMods[ i ] = ( moddedWeapons & ( 1 << i ) ) ? msg.ReadBits( MAX_WEAPONMODS ) : 0;
+	}
 }
 
 /*
@@ -15560,6 +15505,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	int decodedWeaponAmmo = 0;
 	bool decodedInBuyZone;
 	int decodedCash;
+	int decodedWeaponMods[ MAX_WEAPONS ];
 
 	if ( static_cast<unsigned int>( snapshotSequence ) - static_cast<unsigned int>( lastSnapshotSequence ) > 1u ) {
  		stateHitch = true;
@@ -15606,6 +15552,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 	decodedInBuyZone = msg.ReadBits( 1 ) != 0;
 	decodedCash = msg.ReadLong();
+	ReadWeaponModsFromSnapshot( msg, decodedWeaponMods );
 	if ( msg.IsReadOverflowed() ) {
 		return;
 	}
@@ -15769,6 +15716,21 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		buyMenuCash = (float)decodedCash;
 		gameLocal.mpGame.RedrawLocalBuyMenu();
 	}
+	// A weapon whose mods changed is rebuilt from them, as the server rebuilt
+	// it when they were bought (GiveWeaponMod).
+	bool weaponModsChanged = false;
+	for ( i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( inventory.weaponMods[ i ] != decodedWeaponMods[ i ] ) {
+			if ( i == currentWeapon && weapon != NULL ) {
+				currentWeapon = -1;
+			}
+			inventory.weaponMods[ i ] = decodedWeaponMods[ i ];
+			weaponModsChanged = true;
+		}
+	}
+	if ( weaponModsChanged ) {
+		gameLocal.mpGame.RedrawLocalBuyMenu();
+	}
  	// no msg reading below this
 	
 	// if not a local client assume the client has all ammo types
@@ -15834,8 +15796,13 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		// some powerups since he actually spawned in, so restore those
 		int latchPowerup = inventory.powerups;
 		const unsigned int latchSnapshotSequence = lastSnapshotSequence;
+		// the weapon mods this snapshot carried, which Init() clears: the new
+		// weapon is built with them rather than rebuilt when the next one says so
+		int latchWeaponMods[ MAX_WEAPONS ];
+		memcpy( latchWeaponMods, inventory.weaponMods, sizeof( latchWeaponMods ) );
 		Init();
 		inventory.powerups = latchPowerup;
+		memcpy( inventory.weaponMods, latchWeaponMods, sizeof( latchWeaponMods ) );
 		// openQ4: Init() starts the snapshot sequence over, so the next snapshot read as a
 		// state hitch, and its change of weapon (Init() also clears idealWeapon) caught the new
 		// weapon straight up to ready while the server's raised: the client fired shots the

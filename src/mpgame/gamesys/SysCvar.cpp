@@ -54,6 +54,8 @@ idCVar si_motd(						"si_motd",					"",					CVAR_GAME | CVAR_SERVERINFO | PC_CVA
 // squirrel: Mode-agnostic buymenus
 idCVar si_isBuyingEnabled(			"si_isBuyingEnabled",			"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "enable buying in current mode" );
 idCVar si_dropWeaponsInBuyingModes(	"si_dropWeaponsInBuyingModes",	"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "dead players drop weapons, even in Buying game modes" );
+// openQ4: the rules a buying server sells by: 0 Quake 4 (retail), 1 The Awakening (mp/Buying.h)
+idCVar si_buyingRules(				"si_buyingRules",				"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "buying rules when si_isBuyingEnabled is set: 0 Quake 4, 1 The Awakening", 0, 1 );
 // RITUAL END
 // RAVEN BEGIN
 // ddynerman: new gametype strings

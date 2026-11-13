@@ -154,6 +154,7 @@ struct idModInfo { idStr directory, displayName, version, releaseDate, website, 
 struct idDict {
     std::map<std::string, std::string> values;
     const char* GetString(const char* key, const char* fallback = "") const { const auto found = values.find(key); return found == values.end() ? fallback : found->second.c_str(); }
+    bool GetBool(const char* key, const char* fallback = "0") const { return std::atoi(GetString(key, fallback)) != 0; }
 };
 struct CVarSystem {
     std::map<std::string, std::string> strings;
@@ -832,7 +833,9 @@ public:
     void ReportRetainedScreens();
     idUserInterface *guiRetainedEscape = nullptr, *guiRetainedWelcome = nullptr, *guiRetainedMultiplayer = nullptr;
     idUserInterface *guiRetainedSummary = nullptr, *retainedMultiplayerTarget = nullptr, *guiRetainedArenaPause = nullptr;
+    idUserInterface *guiRetainedBuy = nullptr;
     bool retainedMultiplayerWelcome = false, retainedMultiplayerSummary = false, retainedSummaryTyping = false;
+    bool retainedMultiplayerBuy = false;
     int retainedSummaryCaret = 0, summaryChats = 0, summaryChatEnds = 0;
     bool RetainedSummaryCovers() const;
     // The chat field's typing has its own source contracts (check_retained_multiplayer).
@@ -862,7 +865,7 @@ static const char* const DOCUMENTS[] = {"guis/menu/title.rui", "guis/menu/pause.
     "guis/menu/demos.rui", "guis/menu/restartmenu.rui", "guis/menu/credits.rui",
     "guis/menu/arena.rui", "guis/menu/multiplayer.rui", "guis/menu/createserver.rui", "guis/menu/joingame.rui",
     "guis/menu/arena_pause.rui", "guis/menu/settings/audio.rui", "guis/menu/settings/game.rui",
-    "guis/menu/settings/controls.rui", "guis/menu/settings.rui"};
+    "guis/menu/settings/controls.rui", "guis/menu/settings.rui", "guis/menu/mp_buy.rui"};
 // The documents that fell back to their stock screens, in order.
 static std::vector<std::string> Stock(const idSessionLocal& session) {
     return std::vector<std::string>(session.retainedStock.begin(), session.retainedStock.end());
@@ -3524,7 +3527,30 @@ int main() {
         CHECK(gameObject.guiCommands.back() == "arenaPause resume" && s.guiActive == nullptr &&
               s.guiRetainedMultiplayer == nullptr && arenaPause->named.back() == "release");
         s.guiRetainedReleasing = nullptr;
-        // The chat and buy GUIs are never covered; neither is a test GUI or a preview.
+        // The buy menu takes the buy card, loaded on its first opening where the
+        // map's server sells nothing, on its WEAPONS page. A plate's purchase
+        // reaches the game as the catalog index it froze and keeps the menu
+        // open; a malformed or out-of-range one asks nothing; Back closes.
+        static idUserInterface buyMenu("guis/buymenu.gui"); buyMenu = idUserInterface("guis/buymenu.gui"); buyMenu.state["gameDraw"] = "1";
+        gameObject.publish = [](idUserInterface* gui) { gui->SetStateInt("mp.protocol", 4); gui->SetStateBool("mp.cover_allowed", true); };
+        s.guiActive = &buyMenu; s.UpdateRetainedMultiplayer();
+        auto* shop = s.guiRetainedMultiplayer;
+        CHECK(shop != nullptr && shop == s.guiRetainedBuy && s.retainedMultiplayerBuy && shop->named.back() == "open" &&
+              shop->state["card.tab"] == "0" && managerObject.loads.back() == "guis/menu/mp_buy.rui");
+        s.ReportRetainedScreens(); CHECK(commonObject.output.find(" mp=buy ") != std::string::npos);
+        gameObject.answer = [](const char*) -> const char* { return "continue"; };
+        s.HandleRetainedSessionRequest(shop, "mpBuy 9");
+        CHECK(gameObject.guiCommands.back() == "retained buy 9" && s.guiRetainedMultiplayer == shop);
+        const size_t purchases = gameObject.guiCommands.size();
+        s.HandleRetainedSessionRequest(shop, "mpBuy 20"); s.HandleRetainedSessionRequest(shop, "mpBuy x");
+        s.HandleRetainedSessionRequest(shop, "mpBuy -1"); s.HandleRetainedSessionRequest(shop, "mpBuy 123");
+        CHECK(gameObject.guiCommands.size() == purchases);
+        gameObject.answer = [](const char*) -> const char* { return nullptr; };
+        s.HandleRetainedSessionRequest(shop, "mpClose");
+        CHECK(gameObject.guiCommands.back() == "close" && s.guiActive == nullptr && s.guiRetainedMultiplayer == nullptr &&
+              !s.retainedMultiplayerBuy && shop->named.back() == "release");
+        s.guiRetainedReleasing = nullptr;
+        // The chat GUI is never covered; neither is a test GUI or a preview.
         s.guiActive = &chat; s.UpdateRetainedMultiplayer(); CHECK(s.guiRetainedMultiplayer == nullptr);
         s.guiActive = &mpMenu; idUserInterface probe("guis/probe.gui"); s.guiTest = &probe; s.UpdateRetainedMultiplayer(); CHECK(s.guiRetainedMultiplayer == nullptr);
         s.guiTest = nullptr; preview = true; s.UpdateRetainedMultiplayer(); CHECK(s.guiRetainedMultiplayer == nullptr);
@@ -4705,15 +4731,15 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
     # The title, both pauses, Single Player, Campaign, the campaign difficulty
     # page and CHAPTERS, Multiplayer and SETTINGS, the seven pages with their own
     # prompt bars and the Strogg pause's three, the loading screen, the Escape,
-    # Welcome and summary cards, the Arena pause card and the CONTROLS, GAME
+    # Welcome, summary and buy cards, the Arena pause card and the CONTROLS, GAME
     # OPTIONS, DISPLAY (SYSTEM) and AUDIO sub-pages.
-    assert documents == 28, documents
+    assert documents == 29, documents
     # The cards' and the settings sub-pages' tab keys take the shoulders, as do
-    # the Escape and Welcome cards' Tabs prompts and Player Setup's tab strip
-    # on the Multiplayer page; every Accept and Back prompt follows Swap
+    # the Escape, Welcome and buy cards' Tabs prompts and Player Setup's tab
+    # strip on the Multiplayer page; every Accept and Back prompt follows Swap
     # Confirm and Back.
-    assert shoulders == 18, shoulders
-    assert swapping == 55, swapping
+    assert shoulders == 22, shoulders
+    assert swapping == 57, swapping
     print(f'ui_retained gate: prompt glyphs follow the active device in {documents} documents')
 
 
@@ -5254,13 +5280,15 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     cover = function_body(mp_game, 'void idMultiplayerGame::SetRetainedMenuCover(')
     assert 'card->SetStateInt( "mp.protocol", RETAINED_MENU_PROTOCOL );' in cover
     # The join offer is the Welcome card's; the card's softening replaces the join panel's blur.
-    assert ('const bool allowed = ( ( currentMenu == 1 && mainGui != NULL ) || ( currentMenu == 3 && statSummary != NULL ) ) &&\n'
-            '\t\t!IsArenaCampaignMatch();') in cover.replace('\r\n', '\n')
+    # The buy menu takes the buy card.
+    assert ('const bool allowed = ( ( currentMenu == 1 && mainGui != NULL ) || ( currentMenu == 3 && statSummary != NULL ) ||\n'
+            '\t\t( currentMenu == 4 && buyMenu != NULL ) ) && !IsArenaCampaignMatch();') in cover.replace('\r\n', '\n')
     assert cover.index('retainedMenuCovered = true;') < cover.index('SetJoinScreenSoftFocus( false );')
     assert ('return joinScreenPending || ( player != NULL && player->spectating && !cvarSystem->GetCVarBool( "ui_joined" ) &&\n'
             '\t\t!cvarSystem->GetCVarBool( "ui_autoJoin" ) );' in function_body(mp_game, 'bool idMultiplayerGame::RetainedMenuWelcome(').replace('\r\n', '\n'))
     draw = function_body(mp_game, 'bool idMultiplayerGame::Draw(')
     assert 'if ( !retainedMenuCovered ) {\n\t\t\t\tmainGui->Redraw( gameLocal.time );' in draw.replace('\r\n', '\n')
+    assert 'if ( !retainedMenuCovered ) {\n\t\t\t\tbuyMenu->Redraw(gameLocal.time);' in draw.replace('\r\n', '\n')
     assert 'retainedMenuCovered = false;' in function_body(mp_game, 'void idMultiplayerGame::DisableMenu(')
     mp_local = (ROOT / 'src/mpgame/Game_local.cpp').read_text(encoding='utf-8', errors='replace')
     for verb, call in (('retainedMultiplayerVariant', 'gui->SetStateBool( "mp.welcome", mpGame.RetainedMenuWelcome() );'),
@@ -5516,7 +5544,8 @@ def main() -> int:
                        'guis/menu/demos.rui', 'guis/menu/restartmenu.rui', 'guis/menu/credits.rui', 'guis/menu/arena.rui',
                        'guis/menu/multiplayer.rui', 'guis/menu/createserver.rui', 'guis/menu/joingame.rui',
                        'guis/menu/arena_pause.rui', 'guis/menu/settings/audio.rui', 'guis/menu/settings/game.rui',
-                       'guis/menu/settings/controls.rui', 'guis/menu/settings.rui', 'guis/menu/msgbox.rui'}
+                       'guis/menu/settings/controls.rui', 'guis/menu/settings.rui', 'guis/menu/msgbox.rui',
+                       'guis/menu/mp_buy.rui'}
             assert path in allowed, f'{name} names an ungated retained document {path}'
     # The message box presents the retained pop-up only behind the gate, found
     # through FindRetainedGui; the download progress keeps the stock box.
@@ -5904,6 +5933,8 @@ def main() -> int:
     handled = set(re.findall(r'\{ "([A-Za-z][A-Za-z0-9]*)",\s+"main_b_', menu)) | set(re.findall(r'!idStr::Icmp\(\s*request,\s*"([A-Za-z][A-Za-z0-9]*)"\s*\)', menu))
     assert 'for ( int i = 0; i < 5; ++i ) {\n            if ( !idStr::Icmp( request, va( "campaignSkill%d", i ) ) ) {' in menu.replace('\r\n', '\n')
     handled |= set(re.findall(r'!idStr::Icmpn\( request, \"(loadSelect|saveSelect|loadSave|loadDelete)\",', menu))
+    # The buy card's purchase carries the catalog index it froze.
+    handled |= set(re.findall(r'!idStr::Icmpn\( request, "(mpBuy) ", 6 \)', menu))
     handled.update(f'campaignSkill{i}' for i in range(5))
     # The Arena page's verbs, each mapped to the campaign's own command.
     arena_verbs = menu[menu.index('RETAINED_ARENA_VERBS[][2] = {'):menu.index('RETAINED_ARENA_VERB_COUNT')]
@@ -6031,6 +6062,7 @@ def main() -> int:
         'void idSessionLocal::HandleRetainedArenaRequest(', 'idUserInterface *idSessionLocal::RetainedMultiplayerPage(',
         'bool idSessionLocal::OpenRetainedMultiplayerPage(', 'void idSessionLocal::HandleRetainedMultiplayerPageRequest(',
         'void idSessionLocal::UpdateRetainedMultiplayerPage(', 'static int Session_RetainedCreateGameType(',
+        'static int Session_RetainedCreateValue(', 'static void Session_SetRetainedCreateValue(',
         'static bool Session_RetainedCreateSettingRequest(', 'static idStr Session_RetainedCreateText(',
         'idUserInterface *idSessionLocal::RetainedCreateServerPage(', 'void idSessionLocal::OpenRetainedCreateServer(',
         'void idSessionLocal::PublishRetainedCreateServer(', 'void idSessionLocal::PublishRetainedCreateMaps(',
@@ -6057,7 +6089,7 @@ def main() -> int:
         'void idSessionLocal::PreloadRetainedScreens(', 'void idSessionLocal::PrepareRetainedLevel(',
         'void idSessionLocal::PrecacheRetainedLevelshots(', 'void idSessionLocal::QueueRetainedLevelshot(',
         'static bool Session_IsGameMenu(', 'static bool Session_IsGameSummary(', 'static bool Session_IsArenaPause(',
-        'static bool Session_IsCoveredGameGui(',
+        'static bool Session_IsBuyMenu(', 'static bool Session_IsCoveredGameGui(',
         'bool idSessionLocal::RetainedMultiplayerCovers(', 'bool idSessionLocal::RetainedSummaryCovers(', 'void idSessionLocal::UpdateRetainedMultiplayer(',
         'void idSessionLocal::RetireRetainedMultiplayer(', 'void idSessionLocal::RetainedMultiplayerFrameEvent(',
         'void idSessionLocal::HandleGameMenuReturn(', 'void idSessionLocal::HandleRetainedMultiplayerRequest(',

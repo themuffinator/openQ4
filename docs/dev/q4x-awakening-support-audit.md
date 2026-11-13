@@ -219,6 +219,14 @@ because the index is sent over the wire as a short in `EVENT_POWERUP`
 - 13 offered items have no `ItemBuyStatus`/`GetItemCost` entry
 - openQ4's `idPlayer::ItemBuyStatus` blanket-refuses `wpmod_` purchases, which are the expansion's headline buying feature
 
+> **Resolved, 13 November 2026 (not in 0.14.1).** The expansion's buying is a
+> server option on base content: **Buying** offers Quake 4's rules or The
+> Awakening's (its prices, its cash awards over the content's, the Dark
+> Matter Gun, FC Armor Regen and four weapon mods), bought from a retained buy
+> card. Items that need the expansion's own content, and the two mods the
+> multiplayer weapons already outdo, are left out. See
+> [multiplayer buying](mp-buying.md).
+
 **`maps.def` spells the key `"TeamDM"`; openQ4 looks up `"Team DM"`.** Add a
 whitespace-tolerant compare in `MPMapSupportsGameType`/`MPGameTypeByName`
 (`mpgame/mp/GameTypes.cpp:222-265`). Worth doing engine-side rather than patching the

@@ -30,6 +30,10 @@ while it serves the other players.
   interface its **Match** tab has **Fill With Bots**, **Bot Skill** and
   **Shuffle Teams**, and its **Rules** tab has **Overtime**, **Mercy Lead** and
   **Round Limit**. See [Bots](#bots).
+- **Buying** (**Not in 0.14.1**), on the **Rules** tab, replaces the weapon,
+  armour and ammunition pickups with a buy menu: **Off**, **Quake 4**'s rules or
+  **The Awakening**'s, with its prices, weapon mods and FC Armor Regen. See
+  [Buying in multiplayer](buying.md).
 
 ## Running a dedicated server
 
@@ -182,6 +186,7 @@ address to force IPv6.
 | `si_mercyLimit` | End a team match early once one team leads by this many points; `0` turns it off (**Mercy Lead**) |
 | `si_overtime` | Length of each overtime period in seconds; `0` uses Quake 4's sudden death (**Overtime**) |
 | `si_warmup` | Whether matches start with a warmup |
+| `si_isBuyingEnabled`, `si_buyingRules` | Buying on (`1`) and its rules: `0` Quake 4, `1` The Awakening (**Not in 0.14.1**; see [Buying](buying.md)) |
 | `si_usePass`, `g_password` | `si_usePass 1` admits only players who give the password set in `g_password` |
 | `g_mapCycle` | Map cycle script |
 

@@ -289,6 +289,10 @@ static const char *const RETAINED_MP_SUMMARY_GUI = "guis/menu/mp_summary.rui";
 // The single-player Arena's pause card (section 13.7) covers the game's Arena
 // pause menu as the cards cover the multiplayer menu; all its actions are built.
 static const char *const RETAINED_ARENA_PAUSE_GUI = "guis/menu/arena_pause.rui";
+// The buy card (section 14.18) covers the game's buy menu, and buys through
+// the game ("retained buy <index>", the item's place in the game's catalog).
+static const char *const RETAINED_MP_BUY_GUI = "guis/menu/mp_buy.rui";
+static const int RETAINED_MP_BUY_ITEMS = 20;
 
 #ifndef ID_DEDICATED
 static bool Session_RetainedSummaryEnabled( void ) {
@@ -6801,7 +6805,7 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createSpectators",	"spectators",	"si_spectators",			0, 1,	true },
 	{ "createWarmup",		"warmup",		"si_warmup",				0, 1,	true },
 	{ "createVoice",		"voice",		"si_voiceChat",				0, 1,	true },
-	{ "createBuying",		"buying",		"si_isBuyingEnabled",		0, 1,	true },
+	{ "createBuying",		"buying",		"si_isBuyingEnabled",		0, 2,	false },	// Session_RetainedCreateValue
 	{ "createBots",			"bots",			"bot_minPlayers",			0, 16,	false },
 	{ "createBotSkill",		"botskill",		"bot_skill",				1, 5,	false },
 	// openQ4's match rules, on the advanced dialog's MATCH and RULES tabs.
@@ -9258,6 +9262,28 @@ static int Session_RetainedCreateGameType( void ) {
 	return 0;
 }
 
+// A setting's value as the page offers it. Buying is one choice over two
+// CVars: off, or on with Quake 4's rules or The Awakening's (si_buyingRules,
+// the game's mp/Buying.h).
+static int Session_RetainedCreateValue( const retainedCreateSetting_t &setting ) {
+	if ( !idStr::Icmp( setting.verb, "createBuying" ) ) {
+		return !cvarSystem->GetCVarBool( "si_isBuyingEnabled" ) ? 0 : cvarSystem->GetCVarInteger( "si_buyingRules" ) == 1 ? 2 : 1;
+	}
+	return idMath::ClampInt( setting.minimum, setting.maximum, cvarSystem->GetCVarInteger( setting.cvar ) );
+}
+
+static void Session_SetRetainedCreateValue( const retainedCreateSetting_t &setting, int value ) {
+	if ( !idStr::Icmp( setting.verb, "createBuying" ) ) {
+		// Off keeps the rules for the next time buying is on.
+		cvarSystem->SetCVarBool( "si_isBuyingEnabled", value != 0 );
+		if ( value != 0 ) {
+			cvarSystem->SetCVarInteger( "si_buyingRules", value == 2 ? 1 : 0 );
+		}
+		return;
+	}
+	cvarSystem->SetCVarInteger( setting.cvar, value );
+}
+
 // A setting's request, "<verb> <value>": its index in RETAINED_CREATE_SETTINGS
 // and the value, a whole number from -1 to 999.
 static bool Session_RetainedCreateSettingRequest( const char *request, int &setting, int &value ) {
@@ -9353,7 +9379,7 @@ void idSessionLocal::PublishRetainedCreateServer( idUserInterface *gui ) {
 #ifndef ID_DEDICATED
 	for ( int i = 0; i < RETAINED_CREATE_SETTING_COUNT; ++i ) {
 		const retainedCreateSetting_t &setting = RETAINED_CREATE_SETTINGS[i];
-		const int value = idMath::ClampInt( setting.minimum, setting.maximum, cvarSystem->GetCVarInteger( setting.cvar ) );
+		const int value = Session_RetainedCreateValue( setting );
 		if ( setting.boolean ) {
 			gui->SetStateBool( va( "create.%s", setting.state ), value != 0 );
 		} else {
@@ -9565,7 +9591,7 @@ void idSessionLocal::HandleRetainedCreateServerRequest( idUserInterface *gui, co
 			common->Warning( "retained UI: Create Server asked for %s %d", setting.cvar, value );
 			return;
 		}
-		cvarSystem->SetCVarInteger( setting.cvar, value );
+		Session_SetRetainedCreateValue( setting, value );
 		if ( !idStr::Icmp( setting.cvar, "si_maxPlayers" ) && cvarSystem->GetCVarInteger( "si_minPlayers" ) > value ) {
 			cvarSystem->SetCVarInteger( "si_minPlayers", value );
 		} else if ( !idStr::Icmp( setting.cvar, "si_minPlayers" ) && cvarSystem->GetCVarInteger( "si_maxPlayers" ) < value ) {
@@ -10784,6 +10810,10 @@ void idSessionLocal::PrepareRetainedLevel( const char *mapPath, bool multiplayer
 		if ( Session_RetainedSummaryEnabled() && guiRetainedSummary == NULL ) {
 			guiRetainedSummary = FindRetainedGui( RETAINED_MP_SUMMARY_GUI, false, false );
 		}
+		// The buy card where the server sells; elsewhere on its first opening.
+		if ( Session_RetainedSummaryEnabled() && guiRetainedBuy == NULL && mapSpawnData.serverInfo.GetBool( "si_isBuyingEnabled" ) ) {
+			guiRetainedBuy = FindRetainedGui( RETAINED_MP_BUY_GUI, false, false );
+		}
 		if ( Session_RetainedArenaPauseEnabled() && guiRetainedArenaPause == NULL &&
 				cvarSystem->GetCVarBool( "ui_arenaCampaignActive" ) ) {
 			guiRetainedArenaPause = FindRetainedGui( RETAINED_ARENA_PAUSE_GUI, false, false );
@@ -10865,6 +10895,9 @@ void idSessionLocal::PrefetchRetainedLevel() {
 		}
 		if ( Session_RetainedSummaryEnabled() && guiRetainedSummary == NULL ) {
 			documents.Append( RETAINED_MP_SUMMARY_GUI );
+		}
+		if ( Session_RetainedSummaryEnabled() && guiRetainedBuy == NULL && mapSpawnData.serverInfo.GetBool( "si_isBuyingEnabled" ) ) {
+			documents.Append( RETAINED_MP_BUY_GUI );
 		}
 		if ( Session_RetainedArenaPauseEnabled() && guiRetainedArenaPause == NULL &&
 				cvarSystem->GetCVarBool( "ui_arenaCampaignActive" ) ) {
@@ -10975,7 +11008,8 @@ void idSessionLocal::QueueRetainedLevelshot( const char *picture, bool material 
 }
 
 // The game's in-match menu: its multiplayer menu, drawn over the game. The
-// chat and buy screens are other GUIs and are never covered.
+// chat screen is another GUI and is never covered; the buy menu takes its own
+// card (Session_IsBuyMenu).
 static bool Session_IsGameMenu( idUserInterface *gui ) {
 	return gui != NULL && gui->State().GetBool( "gameDraw" ) && !idStr::Icmp( gui->Name(), "guis/mpmain.gui" );
 }
@@ -10991,9 +11025,14 @@ static bool Session_IsArenaPause( idUserInterface *gui ) {
 	return gui != NULL && gui->State().GetBool( "gameDraw" ) && !idStr::Icmp( gui->Name(), "guis/arena_pause.gui" );
 }
 
+// The game's buy menu, which the buy card covers.
+static bool Session_IsBuyMenu( idUserInterface *gui ) {
+	return gui != NULL && gui->State().GetBool( "gameDraw" ) && !idStr::Icmp( gui->Name(), "guis/buymenu.gui" );
+}
+
 // A game GUI a multiplayer card covers.
 static bool Session_IsCoveredGameGui( idUserInterface *gui ) {
-	return Session_IsGameMenu( gui ) || Session_IsGameSummary( gui ) || Session_IsArenaPause( gui );
+	return Session_IsGameMenu( gui ) || Session_IsGameSummary( gui ) || Session_IsArenaPause( gui ) || Session_IsBuyMenu( gui );
 }
 
 bool idSessionLocal::RetainedMultiplayerCovers() const {
@@ -11190,28 +11229,29 @@ void idSessionLocal::UpdateRetainedMultiplayer() {
 		// card; a game module that does not answer gets Escape, which its join
 		// offer refuses.
 		const bool summary = Session_IsGameSummary( guiActive );
-		// The Arena's pause menu takes its own card.
+		// The Arena's pause menu takes its own card, and so does the buy menu.
 		const bool arena = Session_IsArenaPause( guiActive );
+		const bool buy = Session_IsBuyMenu( guiActive );
 		bool welcome = false;
-		if ( !summary && !arena ) {
+		if ( !summary && !arena && !buy ) {
 			guiActive->SetStateBool( "mp.welcome", false );
 			game->HandleMainMenuCommands( "retainedMultiplayerVariant", guiActive );
 			welcome = guiActive->State().GetBool( "mp.welcome" );
 		}
-		const char *path = arena ? RETAINED_ARENA_PAUSE_GUI : summary ? RETAINED_MP_SUMMARY_GUI :
+		const char *path = arena ? RETAINED_ARENA_PAUSE_GUI : summary ? RETAINED_MP_SUMMARY_GUI : buy ? RETAINED_MP_BUY_GUI :
 			welcome ? RETAINED_MP_WELCOME_GUI : RETAINED_MP_ESCAPE_GUI;
-		idUserInterface *&document = arena ? guiRetainedArenaPause : summary ? guiRetainedSummary :
+		idUserInterface *&document = arena ? guiRetainedArenaPause : summary ? guiRetainedSummary : buy ? guiRetainedBuy :
 			welcome ? guiRetainedWelcome : guiRetainedEscape;
 		// Whatever keeps the stock menu below keeps it for this opening (a
 		// card still waiting for its pages, a fallback, an Arena Campaign
 		// match); the next opening asks again.
 		retainedMultiplayerUncovered = true;
 		const bool enabled = arena ? Session_RetainedArenaPauseEnabled() :
-			summary ? Session_RetainedSummaryEnabled() : Session_RetainedMultiplayerEnabled( welcome );
+			( summary || buy ) ? Session_RetainedSummaryEnabled() : Session_RetainedMultiplayerEnabled( welcome );
 		if ( !enabled || retainedStock.FindIndex( path ) >= 0 ) {
 			return;
 		}
-		const char *stockGui = arena ? "guis/arena_pause.gui" : summary ? "guis/summary.gui" : "guis/mpmain.gui";
+		const char *stockGui = arena ? "guis/arena_pause.gui" : summary ? "guis/summary.gui" : buy ? "guis/buymenu.gui" : "guis/mpmain.gui";
 		if ( Session_ModSuppliesFile( stockGui ) ) {
 			common->DPrintf( "retained UI: the mod supplies its own '%s', so it presents instead of '%s'\n", stockGui, path );
 			retainedStock.Append( path );
@@ -11244,7 +11284,12 @@ void idSessionLocal::UpdateRetainedMultiplayer() {
 		guiRetainedMultiplayer = card;
 		retainedMultiplayerWelcome = welcome;
 		retainedMultiplayerSummary = summary;
+		retainedMultiplayerBuy = buy;
 		retainedMultiplayerRevision = card->State().GetInt( "mp.revision" );
+		if ( buy ) {
+			// Each buy menu opens on its WEAPONS page.
+			card->SetStateInt( "card.tab", 0 );
+		}
 		if ( summary ) {
 			// Each summary opens on its SUMMARY page with the chat field at rest.
 			card->SetStateInt( "card.tab", 0 );
@@ -11303,6 +11348,7 @@ void idSessionLocal::RetireRetainedMultiplayer( bool release ) {
 	// The summary's chat field stops typing with its card.
 	retainedSummaryTyping = false;
 	retainedMultiplayerSummary = false;
+	retainedMultiplayerBuy = false;
 	if ( game != NULL ) {
 		game->HandleMainMenuCommands( "retainedMultiplayerUncover", card );
 	}
@@ -11496,6 +11542,18 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		// checks it against the rule chosen as it stages it.
 		guiActive->SetStateInt( "match_rule_value", voteValue );
 		return;
+	} else if ( !idStr::Icmpn( request, "mpBuy ", 6 ) ) {
+		// The item's place in the game's catalog, frozen when its plate was
+		// chosen; the game checks the purchase again, and the menu stays open.
+		const idStr indexText = request + 6;
+		bool valid = indexText.Length() >= 1 && indexText.Length() <= 2;
+		for ( int i = 0; valid && i < indexText.Length(); ++i ) valid = indexText[i] >= '0' && indexText[i] <= '9';
+		if ( !valid || atoi( indexText.c_str() ) >= RETAINED_MP_BUY_ITEMS ) {
+			common->Warning( "retained UI: the buy card asked for item '%s'", indexText.c_str() );
+			return;
+		}
+		gameCommand = va( "retained buy %d", atoi( indexText.c_str() ) );
+		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpTeamAction" ) ) {
 		const int slot = gui->State().GetInt( "card.team_action", "-1" );
 		if ( slot < 0 || slot >= RETAINED_MP_TEAM_SLOTS ) {
@@ -11885,7 +11943,7 @@ void idSessionLocal::ReportRetainedScreens() {
 		guiRetainedHome != NULL ? guiRetainedHome->Name() : "-",
 		guiRetainedTitle != NULL ? 1 : 0, guiRetainedPause != NULL ? 1 : 0, guiRetainedPauseStrogg != NULL ? 1 : 0,
 		RetainedHomeInputBlocked() ? 1 : 0, guiRetainedReleasing != NULL ? 1 : 0,
-		RetainedMultiplayerCovers() ? ( retainedMultiplayerSummary ? "summary" : retainedMultiplayerWelcome ? "welcome" : "escape" ) : "-",
+		RetainedMultiplayerCovers() ? ( retainedMultiplayerSummary ? "summary" : retainedMultiplayerBuy ? "buy" : retainedMultiplayerWelcome ? "welcome" : "escape" ) : "-",
 		RetainedUI_ViewCount(),
 		stock.Length() > 0 ? stock.c_str() : "-" );
 }

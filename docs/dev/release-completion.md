@@ -71,6 +71,31 @@ does not restore the withdrawn release. See
 - Ordered human play and physical stereo-HUD placement remain open under
   AUD-07.
 
+## Buying by Quake 4's or The Awakening's rules, with a new buy menu, 13 November 2026
+
+- **Buying is one server option with two sets of rules.** Create Server's
+  **Buying** (on the Rules tab of the advanced options), the vote and the
+  admin page offer **Off**, **Quake 4** or **The Awakening**. Quake 4's rules
+  are the retail buy menu at the game's own prices. The Awakening's complete
+  the expansion's unfinished buy menu on the stock game: its prices and cash
+  awards, the Dark Matter Gun, FC Armor Regen and four weapon mods (Bounce
+  Shot, Firepower, Burst Fire and Chain Lightning) for the weapon you carry.
+- **A buy menu that matches the new multiplayer menus.** The buy key opens a
+  card over the match with Weapons, Mods, Armor & Ammo and Team tabs. Each item
+  shows its icon and price; a lock and the reason beside the list say why you
+  cannot buy it yet, a check marks what you own, and the price turns red when
+  you are short of credits. The menu stays open while you shop.
+- **Bought mods stay with you.** A weapon's mod comes back with the weapon
+  after you die, and every player on the server sees the modded weapon fire as
+  it should.
+- **Buying in Capture the Flag works again.** A CTF server with buying on
+  never left its warmup.
+- [x] `mp_buying_rules_contract.py`, the native `openq4-ui-retained-buy`
+  check, the retained gate's buy-card case and `capture_buy_menu.py` on OpenGL
+  and Vulkan pass; a remote client builds the modded hyperblaster from the
+  server's snapshots. Hands-on keyboard and controller play remains under
+  MP-10. See [multiplayer buying](mp-buying.md).
+
 ## Surround placement on real output devices, 13 November 2026
 
 - [x] AUD-04: `audio_surround_endpoint.py` plays stock gameplay through the real

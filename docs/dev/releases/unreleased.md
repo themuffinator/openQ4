@@ -9,6 +9,16 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **Buy your gear by Quake 4's or The Awakening's rules.** A server's
+  **Buying** option (Create Server, the vote and the admin page) now chooses
+  between the retail buy menu and the expansion's, completed on the stock
+  game: its prices and rewards, the Dark Matter Gun, FC Armor Regen and weapon
+  mods such as bouncing hyperblaster bolts and burst-fire homing rockets. The
+  new interface's buy menu is a card like the other multiplayer menus, with
+  tabs, icons, prices and a reason for anything you cannot buy yet. Mods stay
+  on your weapon after you die, and Capture the Flag servers with buying on
+  start their matches again. See [Buying in multiplayer](../../user/buying.md).
+
 - **Build levels in the experimental editor.** `editorExperimental` now edits
   brushes and patches as well as entities: move, turn and scale them in new
   top, front and side views or in 3D, on a grid and with texture lock, draw new
@@ -389,6 +399,9 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Upgrade Notes
 
+- Servers and players must run the same build for buying: the player state now
+  carries weapon mods, and the buying vote names Off, Quake 4 or The Awakening.
+  Replace the engine and both game modules together.
 - If you compiled a map with an earlier openQ4 `dmap` and it uses vehicle, fly,
   shot or item clip brushes, compile it again so its collision file records
   them correctly.

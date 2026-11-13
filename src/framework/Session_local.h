@@ -810,11 +810,13 @@ public:
 	idUserInterface *	guiRetainedEscape;
 	idUserInterface *	guiRetainedWelcome;
 	idUserInterface *	guiRetainedSummary;
+	idUserInterface *	guiRetainedBuy;
 	// The single-player Arena's pause card.
 	idUserInterface *	guiRetainedArenaPause;
 	idUserInterface *	guiRetainedMultiplayer;
 	idUserInterface *	retainedMultiplayerTarget;		// the game GUI the cover was last decided for
 	bool				retainedMultiplayerSummary;		// the card covers the summary
+	bool				retainedMultiplayerBuy;			// the card covers the buy menu
 	bool				retainedSummaryTyping;
 	int					retainedSummaryCaret;			// a byte offset into the stock summary's chattext
 	bool				retainedMultiplayerWelcome;

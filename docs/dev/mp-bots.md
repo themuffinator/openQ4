@@ -1351,7 +1351,9 @@ run arrives about as it respawns: the remaining wait discounts it, up to half,
 and the bot stands on the spot for the return instead of wandering off. An
 unarmed bot puts a real weapon ahead of nearly everything, a pickup a few steps
 away is taken on the way even mid-chase, and a defender keeps its base stocked.
-In a buying mode a bot spends its credit on the weapon or armour it lacks.
+In a buying mode a bot spends its credit on the weapon or armour it lacks and,
+under The Awakening's buying rules, on the mod for the gun in hand once it can
+keep a reserve ([buying](mp-buying.md)).
 
 ### Perception and combat
 

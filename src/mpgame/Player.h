@@ -197,37 +197,8 @@ typedef enum {
 	IBS_CANNOT_AFFORD = 3,
 } itemBuyStatus_t;
 
-/*
-===============================================================================
-
-	idBuyItemPrice
-
-	Buy-menu prices a game-library layer sets in code, as the Awakening expansion
-	did; they come before the content's ItemCostConstants. An item is for sale
-	only when something prices it.
-
-		BUY_ITEM_PRICE( weapon_spikegun, 1300 )
-
-===============================================================================
-*/
-
-class idBuyItemPrice {
-public:
-								idBuyItemPrice( const char *item, int price );
-
-	// the price a layer set for item, if it set one
-	static bool					Find( const char *item, int &price );
-
-private:
-	const char *				item;
-	int							price;
-	idBuyItemPrice *			next;
-
-	static idBuyItemPrice *		list;
-};
-
-#define BUY_ITEM_PRICE( item, price ) \
-	static idBuyItemPrice item##_buyItemPrice( #item, price );
+// the weapon mod bits the player snapshot carries (MAX_WEAPONMODS of them)
+const int	WEAPON_MODS_SNAPSHOT_MASK = ( 1 << MAX_WEAPONMODS ) - 1;
 
 const int	ASYNC_PLAYER_TOURNEY_STATUS_BITS = idMath::BitsForInteger( PTS_NUM_STATES );
 
@@ -775,7 +746,6 @@ public:
 	bool					CanBuy( void );
 	int						CanSelectWeapon				( const char* weaponName );
 	int						GetItemCost(const char* itemName);
-	bool					HasItemPrice( const char* itemName );
 	void					PerformImpulse( int impulse );
 	void					Spectate( bool spectate, bool force = false );
 	void					SpectateFreeFly( bool force );	// force is also used by offline demo controls
@@ -956,6 +926,8 @@ public:
 // RITUAL BEGIN
 // squirrel: added DeadZone multiplayer
 	itemBuyStatus_t			ItemBuyStatus( const char* itemName );
+	void					WriteWeaponModsToSnapshot( idBitMsgDelta &msg ) const;
+	void					ReadWeaponModsFromSnapshot( const idBitMsgDelta &msg, int weaponMods[ MAX_WEAPONS ] );
 	bool					CanBuyItem( const char* itemName );
 	void					GiveCash( float cashDeltaAmount );
 	void					ClampCash( float minCash, float maxCash );
@@ -1219,7 +1191,6 @@ private:
 
 	int						oldInventoryWeapons;
 
-	const idDeclEntityDef*	itemCosts;
 
 	idVec3					leanVelocity;
 

@@ -50,7 +50,9 @@ struct idBitMsg {
     void Init(byte*, int) {} void WriteByte(int) {} void WriteShort(int) {}
     void WriteString(const char*) {}
 };
-struct idMath { static int ClampChar(int x) { return x; } static int ClampShort(int x) { return x; } };
+struct idMath { static int ClampChar(int x) { return x; } static int ClampShort(int x) { return x; }
+    static int ClampInt(int lo, int hi, int x) { return x < lo ? lo : x > hi ? hi : x; } };
+enum { BUYING_MODE_OFF, BUYING_MODE_QUAKE4, BUYING_MODE_AWAKENING, BUYING_MODE_COUNT };
 struct voteStruct_t {
     int m_fieldFlags = 0, m_kick = 0, m_gameType = 0, m_timeLimit = 0, m_fragLimit = 0,
         m_tourneyLimit = 0, m_captureLimit = 0, m_buying = 0, m_teamBalance = 0, m_controlTime = 0;

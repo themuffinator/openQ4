@@ -265,7 +265,7 @@ bool SessionMenuCommand(const std::string& command) {
         "mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction","mpVoteYes","mpVoteNo","mpCallVote",
         "mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpMatch","mpMatchSelect","mpSummaryChat",
         "mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
-        "mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan",
+        "mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan","mpBuy",
         "arenaRestart","arenaLeave"};
 	return commands.contains(command);
 }
@@ -273,6 +273,22 @@ bool SessionMenuCommand(const std::string& command) {
 bool SessionMenuPlayerCommand(const std::string& command) {
 	return command == "mpSelectPlayer" || command == "mpMute" || command == "mpFriend" ||
 		command == "mpAdminSelect" || command == "mpAdminKick" || command == "mpAdminBan" || command == "mpAdminSwitch";
+}
+
+// The buy card's purchase: the item's place in the game's catalog.
+bool SessionMenuBuyCommand(const std::string& command) {
+	return command == "mpBuy";
+}
+
+// Freeze the item when its plate is chosen, as the player rows freeze theirs.
+std::optional<std::string> SessionMenuBuyRequest(const ActionInvocation& invocation) {
+	const auto command = invocation.arguments.find("command"), item = invocation.arguments.find("item");
+	if (invocation.arguments.size() != 2 || command == invocation.arguments.end() || item == invocation.arguments.end() ||
+		!std::holds_alternative<std::string>(command->second) || !SessionMenuBuyCommand(std::get<std::string>(command->second)) ||
+		!std::holds_alternative<double>(item->second)) return {};
+	const double index = std::get<double>(item->second);
+	if (!std::isfinite(index) || index < 0 || index >= 64 || std::floor(index) != index) return {};
+	return std::get<std::string>(command->second)+" "+std::to_string(static_cast<int>(index));
 }
 
 bool SessionMenuSaveCommand(const std::string& command) {
@@ -455,6 +471,10 @@ bool ValidOperation(const Action& action) {
 			return action.arguments.size() == 3 && index != action.arguments.end() && index->second.type == 0 &&
 				generation != action.arguments.end() && generation->second.type == 0;
 		}
+		if (literal && SessionMenuBuyCommand(std::get<std::string>(expression.literal))) {
+			const auto item = action.arguments.find("item");
+			return action.arguments.size() == 2 && item != action.arguments.end() && item->second.type == 0;
+		}
 		if (literal && SessionMenuPlayerCommand(std::get<std::string>(expression.literal))) {
 			const auto client = action.arguments.find("client"), identity = action.arguments.find("identity");
 			return action.arguments.size() == 3 && client != action.arguments.end() && client->second.type == 0 &&
@@ -511,6 +531,11 @@ bool ValidInvocation(const ActionInvocation& invocation, std::string& error) {
 			SessionMenuSaveCommand(std::get<std::string>(command->second))) {
 			if (SessionMenuSaveRequest(invocation)) return true;
 			error = "Invalid save catalog identity: "+invocation.action; return false;
+		}
+		if (command != invocation.arguments.end() && std::holds_alternative<std::string>(command->second) &&
+			SessionMenuBuyCommand(std::get<std::string>(command->second))) {
+			if (SessionMenuBuyRequest(invocation)) return true;
+			error = "Invalid buy catalog item: "+invocation.action; return false;
 		}
 		if (command != invocation.arguments.end() && std::holds_alternative<std::string>(command->second) &&
 			SessionMenuPlayerCommand(std::get<std::string>(command->second))) {
@@ -1774,7 +1799,8 @@ bool idUserInterfaceRetained::DispatchApplicationActions(const char* command, bo
 			// Validated again at resolution; the session maps the verb itself.
 			const auto& command = std::get<std::string>(invocation.arguments.at("command"));
 			const auto request = SessionMenuPlayerCommand(command) ? SessionMenuPlayerRequest(invocation) :
-				SessionMenuSaveCommand(command) ? SessionMenuSaveRequest(invocation) : std::optional<std::string>(command);
+				SessionMenuSaveCommand(command) ? SessionMenuSaveRequest(invocation) :
+				SessionMenuBuyCommand(command) ? SessionMenuBuyRequest(invocation) : std::optional<std::string>(command);
 			const bool accepted = request && impl->sessionRequests.size() < 64;
 			if (accepted) impl->sessionRequests.push_back(*request);
 			else impl->Error(request ? "Session menu request queue exceeded 64 requests" : "Invalid session target identity");

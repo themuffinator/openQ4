@@ -596,6 +596,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "awakening_ci_contract.py",
         root / "tools" / "tests" / "awakening_speeder_physics_contract.py",
         root / "tools" / "tests" / "awakening_gameplay_contract.py",
+        root / "tools" / "tests" / "mp_buying_rules_contract.py",
         root / "tools" / "tests" / "awakening_turret_skin_contract.py",
         root / "tools" / "tests" / "awakening_status_behavior.py",
         root / "tools" / "tests" / "gui_clipping_contract.py",

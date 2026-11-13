@@ -3207,7 +3207,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 				voteData.m_controlTime = msg.ReadShort();
 				if ( ( ( voteData.m_fieldFlags & VOTEFLAG_KICK ) != 0 && ( voteData.m_kick < 0 || voteData.m_kick >= MAX_CLIENTS ) ) ||
 					( ( voteData.m_fieldFlags & VOTEFLAG_GAMETYPE ) != 0 && ( voteData.m_gameType < 0 || voteData.m_gameType >= MPVoteGameTypeCount() ) ) ||
-					( voteData.m_buying != 0 && voteData.m_buying != 1 ) ||
+					( voteData.m_buying < BUYING_MODE_OFF || voteData.m_buying >= BUYING_MODE_COUNT ) ||
 					( voteData.m_teamBalance != 0 && voteData.m_teamBalance != 1 ) ) {
 					Warning( "Ignoring vote update with invalid typed values" );
 					break;

@@ -15,51 +15,106 @@
 #include "../Game_local.h"
 #include "../MultiplayerGame.h"
 
-// jmarshall - the engine UsercmdGen.h only carries the IMPULSE_100/IMPULSE_127
-// buy-menu range bounds; the individual buy impulses stay game-local.
-const int IMPULSE_101			= 101;			// Buy weapon_machinegun
-const int IMPULSE_102			= 102;			// Buy weapon_hyperblaster
-const int IMPULSE_103			= 103;			// Buy weapon_grenadelauncher
-const int IMPULSE_104			= 104;			// Buy weapon_nailgun
-const int IMPULSE_105			= 105;			// Buy weapon_rocketlauncher
-const int IMPULSE_106			= 106;			// Buy weapon_railgun
-const int IMPULSE_107			= 107;			// Buy weapon_lightninggun
-const int IMPULSE_108			= 108;			// UNUSED
-const int IMPULSE_109			= 109;			// Buy weapon_napalmgun
-const int IMPULSE_110			= 110;			// Buy weapon_dmg
-const int IMPULSE_111			= 111;			// UNUSED
-const int IMPULSE_112			= 112;			// UNUSED
-const int IMPULSE_113			= 113;			// UNUSED
-const int IMPULSE_114			= 114;			// UNUSED
-const int IMPULSE_115			= 115;			// UNUSED
-const int IMPULSE_116			= 116;			// UNUSED
-const int IMPULSE_117			= 117;			// UNUSED
-const int IMPULSE_118			= 118;			// Buy item_armor_small
-const int IMPULSE_119			= 119;			// Buy item_armor_large
-const int IMPULSE_120			= 120;			// Buy ammorefill
-const int IMPULSE_121			= 121;			// UNUSED
-const int IMPULSE_122			= 122;			// UNUSED
-const int IMPULSE_123			= 123;			// Buy team powerup: ammo_regen
-const int IMPULSE_124			= 124;			// Buy team powerup: health_regen
-const int IMPULSE_125			= 125;			// Buy team powerup: damage_boost
-const int IMPULSE_126			= 126;			// UNUSED
-// jmarshall end
+/*
+===============================================================================
+
+	Buying rules
+
+	A server that allows buying sells by one of two sets of rules, the
+	"Buying" choice of Create Server, the vote and the admin page:
+
+	- Quake 4: retail's buy menu. Its prices and cash awards come from the
+	  content (ItemCostConstants and BuyingGameBalanceConstants).
+	- The Awakening: the expansion's buy menu as far as the base content
+	  defines it. Its prices, its weapon mods for the weapon in hand, the Dark
+	  Matter Gun, FC Armor Regen, and its own cash awards over the content's.
+	  The expansion kept these in code; its core cannon, fire cannon, freeze
+	  gun and their mods need its content, which multiplayer never mounts.
+
+	si_isBuyingEnabled turns buying on, as in retail; si_buyingRules picks the
+	rules. The three-way choice the menus offer is buyingMode_t.
+
+===============================================================================
+*/
+
+typedef enum {
+	BUYING_RULES_QUAKE4 = 0,
+	BUYING_RULES_AWAKENING,
+	BUYING_RULES_COUNT
+} buyingRules_t;
+
+typedef enum {
+	BUYING_MODE_OFF = 0,
+	BUYING_MODE_QUAKE4,
+	BUYING_MODE_AWAKENING,
+	BUYING_MODE_COUNT
+} buyingMode_t;
+
+// the buy menu's sections, in the order its tabs show them
+typedef enum {
+	BUY_CATEGORY_WEAPONS = 0,
+	BUY_CATEGORY_MODS,
+	BUY_CATEGORY_GEAR,
+	BUY_CATEGORY_TEAM,
+	BUY_CATEGORY_COUNT
+} buyCategory_t;
+
+typedef struct buyCatalogItem_s {
+	const char *	item;			// the def, and what "buy" names
+	int				impulse;		// the buy impulse, IMPULSE_100 to IMPULSE_127
+	buyCategory_t	category;
+	bool			quake4;			// retail sells it, at the ItemCostConstants price
+	int				awakeningPrice;	// the Awakening's price; 0 where it does not sell it
+	const char *	name;			// #str_ of its name
+	const char *	detail;			// #str_ of what it does, or NULL
+} buyCatalogItem_t;
+
+// every item either set of rules sells, in the buy menu's order
+extern const buyCatalogItem_t	buyCatalog[];
+extern const int				buyCatalogCount;
+
+const buyCatalogItem_t *	MP_FindBuyCatalogItem( const char *item );
+const buyCatalogItem_t *	MP_FindBuyCatalogItemForImpulse( int impulse );
+
+// the three-way choice from the two server settings, and back
+int			MP_BuyingModeFromServerInfo( const idDict &serverInfo );
+int			MP_BuyingModeFromCVars( void );
+void		MP_SetBuyingModeCVars( int mode );
+// a stock menu's on/off value as a mode: on keeps the rules a server already sells by
+int			MP_BuyingModeFromOnOff( int on, int currentMode );
+const char *MP_BuyingModeName( int mode );		// #str_ of Off, Quake 4 or The Awakening
+// a vote's line for the mode: BUYING OFF, BUYING QUAKE 4 or BUYING THE AWAKENING
+idStr		MP_BuyingVoteLine( int mode );
 
 class riBuyingManager
 {
 private:
 	const idDeclEntityDef*	_buyingGameBalanceConstants;
+	const idDeclEntityDef*	_itemCostConstants;
 	int						opponentKillCashAward;	// latch
 	int						opponentKillFragCount;
+	int						opponentKillRules;
+
+	const idDeclEntityDef *	FindConstants( const idDeclEntityDef *&constants, const char *name );
 
 public:
 	riBuyingManager();
 	~riBuyingManager();
 
-	int GetIntValueForKey( const char* keyName, int defaultValue );
-	int GetOpponentKillCashAward( void );
+	// the rules the server sells by
+	int						GetRules( void ) const;
 
-	void Reset( void ) { opponentKillFragCount = -1; }
+	// a cash award or balance constant: the Awakening's where its rules set
+	// one, else the content's
+	int						GetIntValueForKey( const char* keyName, int defaultValue );
+	int						GetOpponentKillCashAward( void );
+
+	// the item's price under the current rules
+	int						GetItemPrice( const char *item );
+	// true when the current rules sell the item and the content defines it
+	bool					IsItemSold( const char *item );
+
+	void					Reset( void ) { opponentKillFragCount = -1; opponentKillRules = -1; }
 };
 
 
