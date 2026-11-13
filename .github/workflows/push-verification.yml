@@ -171,6 +171,7 @@ jobs:
             tools/tests/base64_input_safety.py \
             tools/tests/campaign_split_state_transition.py \
             tools/tests/campaign_scope.py \
+            tools/tests/log_write_failure.py \
             tools/tests/campaign_runtime.py \
             tools/tests/campaign_selection_runtime.py \
             tools/tests/clang_tidy_input_safety.py \
@@ -742,6 +743,7 @@ jobs:
           python tools/tests/base64_input_safety.py
           python tools/tests/campaign_split_state_transition.py
           python tools/tests/campaign_scope.py
+          python tools/tests/log_write_failure.py
           python tools/tests/clang_tidy_input_safety.py
           python tools/tests/cmdargs_append_contract.py
           python tools/tests/console_completion_contract.py

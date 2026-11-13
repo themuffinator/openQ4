@@ -500,6 +500,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "base64_input_safety.py",
         root / "tools" / "tests" / "campaign_split_state_transition.py",
         root / "tools" / "tests" / "campaign_scope.py",
+        root / "tools" / "tests" / "log_write_failure.py",
         root / "tools" / "tests" / "clang_tidy_input_safety.py",
         root / "tools" / "tests" / "cmdargs_append_contract.py",
         root / "tools" / "tests" / "console_completion_contract.py",

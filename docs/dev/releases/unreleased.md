@@ -446,6 +446,12 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- The game no longer crashes when it cannot write its log file. With logging
+  on (`logFile 1` or `2`), a failed write to the log, for example on a full or
+  disconnected drive, made openQ4 report the failure into the same log, fail
+  again and repeat until it crashed with a stack overflow; one report caught
+  it right after an Awakening level finished loading. Logging now stops for
+  the rest of the session with one console message, and the game carries on.
 - A level can no longer end with "cannot load collision model" during heavy
   effects. When a burst of effects filled the game's table of client-side
   effects and debris, a piece of debris that did not fit stopped the level

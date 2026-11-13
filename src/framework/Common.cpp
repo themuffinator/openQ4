@@ -1469,7 +1469,12 @@ void idCommonLocal::VPrintf( const char *fmt, va_list args ) {
 #endif
 
 	// logFile
-	if ( com_logFile.GetInteger() && !logFileFailed && fileSystem->IsInitialized() ) {
+	// Each thread writes one print at a time to the log. A print made while
+	// writing the log (idFile_Permanent::Write reports a failed write with
+	// Printf) reaches the console only: written to the failing log, it failed
+	// and printed again, recursing until the stack overflowed (#219).
+	static thread_local bool writingLog = false;
+	if ( com_logFile.GetInteger() && !logFileFailed && !writingLog && fileSystem->IsInitialized() ) {
 		static bool recursing;
 
 		if ( !logFile && !recursing ) {
@@ -1514,8 +1519,22 @@ void idCommonLocal::VPrintf( const char *fmt, va_list args ) {
 			Printf( "log file '%s' opened on %s\n", fileNameToOpen, asctime( newtime ) );
 		}
 		if ( logFile ) {
-			logFile->Write( msg, idLib::SizeToInt( strlen( msg ), "idCommonLocal::VPrintf log message" ) );
-			logFile->Flush();	// ForceFlush doesn't help a whole lot
+			const int length = idLib::SizeToInt( strlen( msg ), "idCommonLocal::VPrintf log message" );
+			writingLog = true;
+			const bool written = logFile->Write( msg, length ) == length;
+			if ( written ) {
+				logFile->Flush();	// ForceFlush doesn't help a whole lot
+			}
+			writingLog = false;
+			if ( !written ) {
+				// A full or vanished disk: stop logging for this session rather
+				// than fail on every later print.
+				idFile *failedLog = logFile;
+				logFile = NULL;
+				logFileFailed = true;
+				fileSystem->CloseFile( failedLog );
+				Printf( "Log file write failed; logging stopped for this session\n" );
+			}
 		}
 	}
 

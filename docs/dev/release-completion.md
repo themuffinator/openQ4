@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A log file that cannot be written no longer crashes the game (#219), 13 November 2026
+
+- **openQ4 no longer crashes when its log file stops accepting writes.** A
+  0.14.1 crash report (#219, a stack overflow right after the first Awakening
+  level loaded, with `logFile 2`) showed 3,400 nested
+  `VPrintf` → `idFile_Permanent::Write` → `Printf` frames: the failed write
+  reported itself through `Printf`, which wrote to the same failing log. Now a
+  print made while the log is being written reaches only the console, and a
+  failed log write closes the log for the rest of the session with one
+  console line ("Log file write failed; logging stopped for this session").
+- Evidence: with log writes forced to fail after `game/airdefense1` loaded,
+  the fixed client printed one failure report and the notice, kept running
+  the after-load commands and quit cleanly; the same build with the guard
+  switched off died with `EXCEPTION_STACK_OVERFLOW`, as in the report (the
+  injection hooks were temporary and are not in the source).
+  `log_write_failure.py` compiles VPrintf's production log block against a
+  failing file double; it passes on the fix and aborts on the old code.
+
 ## Your weapon comes up with the server's after a respawn, 13 November 2026
 
 - **Holding fire through a respawn no longer draws shots that never happened.**
