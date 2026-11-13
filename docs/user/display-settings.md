@@ -64,7 +64,7 @@ Running `applyPerformancePreset` without a name applies the stored `com_performa
 | `enhanced` | 100% scale, SMAA high (no MSAA), 144 FPS cap, 1024 projected shadow maps; point lights keep stencil shadows | 16x anisotropy, full-size textures, automatic speaker layout, room reverb | High-refresh play with modern effects: holds 144 FPS on the reference laptop. |
 | `quality` | 100% scale, 2x MSAA, SMAA high, 144 FPS cap, 2048 projected / 512 point shadows | 16x anisotropy, DDS replacements enabled, larger upload budget, automatic speaker layout, room reverb | Every light shadow-mapped; holds 100 FPS on the reference laptop. |
 | `ultra` | 100% scale, 4x MSAA, SMAA Ultra, 240 FPS cap, 4096 projected / 512 point shadows | 16x anisotropy, full-size textures and DDS replacements enabled, high-end benchmark tag, automatic speaker layout, room reverb | The best image that holds 75 FPS on the reference laptop. Manual choice. |
-| `maximum` | 100% scale, 16x MSAA request, SMAA Ultra, 240 FPS cap, 4096 projected / 2048 point shadows | As Ultra | Everything on. No frame-rate target. Manual choice. |
+| `maximum` | 100% scale, 8x MSAA, SMAA Ultra, 240 FPS cap, 4096 projected / 2048 point shadows | As Ultra | Everything on. No frame-rate target. Manual choice. |
 
 `enhanced`, `quality`, `ultra` and `maximum` enable [shadow maps](shadow-mapping.md), bloom, SSAO and tone mapping. Enhanced shadow-maps projected and parallel lights with 5-tap fixed filtering in a 4096 atlas, keeps the original stencil shadows for point lights, and uses 12 SSAO samples. Quality shadow-maps every light: 2048 projected maps with 9-tap PCSS, 512 point cubes, a 4096 atlas and 20 SSAO samples. Ultra raises projected maps to 4096 with 13-tap PCSS in an 8192 atlas and uses 32 SSAO samples; its point cubes stay at 512 because larger cubes cost more than every other upgrade together. Ultra and Maximum draw SSAO at full resolution; Enhanced and Quality draw it at half resolution on both OpenGL and Vulkan (`r_ssaoResolution 0`, automatic), which is cheaper and looks the same in play. None of these three uses cascades or motion blur. Maximum requests every supported maximum: 2048 point cubes, 13-tap projected and point filtering, four stabilized cascades, a 16384 shadow atlas, 32 SSAO samples and 16-sample motion blur with object vectors. All modern-effects tiers keep unlimited shadow updates and five bloom levels; reducing the level count changes the glow's appearance, not just sampling quality. Low, Performance and Balanced retain the original stencil shadows and leave these post effects and the HDR scene target off. The weapon flashlight casts shadows on every preset that draws them; projectile lights cast them only from Quality up, as on the original game's top setting (`g_dynamicLightShadows`). Minimum and Low Power draw no shadows at all, so that the two presets below the minimum requirements remove rendering work rather than only resolution. On Intel Iris Xe graphics that took 12 to 16 percent off each frame in the hub and combat scenes we measured, about as much as lowering the scene from 75% to 50%. Changing down from Maximum restores the lower tier's sample counts and shadow sizes, including settings for effects currently disabled.
 
@@ -416,8 +416,8 @@ frame; that gap is smaller than without late look.
 - `0`: disabled (fastest, most aliasing).
 - `2`: low-cost MSAA uplift for modest GPUs.
 - `4`: recommended default quality/performance balance.
-- `8`: high quality, noticeably higher GPU cost.
-- `16`: enthusiast/high-end setting where supported.
+- `8`: high quality, noticeably higher GPU cost; the most the Vulkan renderer draws, and what Maximum uses.
+- `16`: OpenGL only, where the GPU supports it; on the reference laptop it costs 6 to 11 ms a frame more than 4x at 2560x1440, more than the whole post-processing chain. Vulkan draws a 16x request at 8x.
 - `1` usually provides no meaningful benefit and is not recommended.
 
 `r_postAA` value guide:
@@ -428,7 +428,8 @@ frame; that gap is smaller than without late look.
 - `4`: color-edge prototype; color-edge detection with a `0.10` threshold and a 16-step search for comparison captures.
 
 Notes:
-- `r_multiSamples` is hardware-limited and may be clamped by the driver/GPU.
+- `r_multiSamples` is hardware-limited and may be clamped by the driver/GPU. Every preset uses at most 8 samples, so a preset draws the same image on OpenGL and Vulkan.
+- When the renderer draws fewer samples than you chose, the Settings menu says so under MSAA, and `gfxInfo` reports `reason=vulkan-clamp` or `gl-max-clamp`. `r_multiSamplesEffective` holds the count the 3D scene last drew with, and `gfxInfo` also lists how many multisample resolves the last frame made.
 - Unsupported `r_multiSamples` values are normalized to the supported ladder before video startup (`1` becomes off; odd/intermediate values step up to `2`, `4`, `8`, or `16`).
 - On SDL3 builds, video startup retries lower MSAA requests if the window or GL context rejects the requested sample count (`16 -> 8 -> 4 -> 2 -> off`) and logs the requested, selected, and driver-reported multisample attributes.
 - The game scene target is validated separately from the window framebuffer. If a driver rejects the RGBA8 + depth/stencil offscreen target at the selected sample count, openQ4 retries lower samples down to `0`; if even the single-sample target is unavailable, it keeps running through the direct-render fallback and logs the exact framebuffer status and attachment details.

@@ -1647,4 +1647,9 @@
 	"#str_231765"	"Kolor celownika"
 	"#str_231766"	"ZMIEŃ"
 	"#str_231767"	"Ponowne uruchomienie renderera zapisuje grę i potem ją wznawia."
+	"#str_231768"	"Wygładza krawędzie geometrii. Każdy wyższy stopień kosztuje czas klatki; Ultra używa 4x z SMAA. Renderer Vulkan rysuje najwyżej 8x."
+	"#str_231769"	"Renderer nie może tu wielokrotnie próbkować sceny, więc MSAA jest wyłączone."
+	"#str_231770"	"Renderer rysuje tu najwyżej 2x, więc scena używa 2x."
+	"#str_231771"	"Renderer rysuje tu najwyżej 4x, więc scena używa 4x."
+	"#str_231772"	"Renderer rysuje tu najwyżej 8x, więc scena używa 8x."
 }

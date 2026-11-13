@@ -1591,4 +1591,9 @@
 	"#str_231765"	"Fadenkreuzfarbe"
 	"#str_231766"	"ÄNDERN"
 	"#str_231767"	"Der Renderer-Neustart speichert das Spiel und setzt es danach fort."
+	"#str_231768"	"Glättet die Kanten der Geometrie. Jede Stufe kostet Bildzeit; Ultra nutzt 4x mit SMAA. Der Vulkan-Renderer zeichnet höchstens 8x."
+	"#str_231769"	"Der Renderer kann die Szene hier nicht mehrfach abtasten, daher ist MSAA aus."
+	"#str_231770"	"Der Renderer zeichnet hier höchstens 2x, daher nutzt die Szene 2x."
+	"#str_231771"	"Der Renderer zeichnet hier höchstens 4x, daher nutzt die Szene 4x."
+	"#str_231772"	"Der Renderer zeichnet hier höchstens 8x, daher nutzt die Szene 8x."
 }

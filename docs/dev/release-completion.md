@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## One MSAA policy on both renderers, and a Settings note that says what MSAA costs (FPS-05), 13 November 2026
+
+- **Maximum now uses 8x MSAA instead of asking for 16x.** The Vulkan renderer never
+  draws more than 8 samples, so Maximum used to look different on OpenGL and Vulkan, and
+  on OpenGL its 16 samples cost 6 to 11 ms a frame more than 4x at 2560x1440. Every preset
+  now draws the same image on both renderers. If you chose Maximum, choose it again to pick
+  up 8x; 16x stays available as a manual choice on OpenGL.
+- **Ultra keeps 4x MSAA with SMAA ultra**, confirmed by measurement: within a third of a
+  millisecond of SMAA alone on OpenGL, 0.6 to 1.6 ms on Vulkan, where 8x would cost 0.75 to
+  2.5 ms more for edges SMAA already smooths.
+- **The Settings menu explains MSAA.** A note under the MSAA row says what it does and
+  costs, and a second line appears when the renderer draws fewer samples than you chose,
+  naming the count it does draw. Both are translated into all twelve languages.
+- Developers: `gfxInfo` reports `reason=vulkan-clamp` and a line with the last frame's
+  multisample resolves; `r_multiSamplesEffective` (read-only) holds the drawn count. The
+  measurements are in the
+  [performance report, section 13](performance-report.md#13-msaa-and-the-hdr-scene-target-fps-05).
+
 ## Mods play over The Awakening, 13 November 2026
 
 - **A mod now stays loaded when you choose The Awakening**, and its files

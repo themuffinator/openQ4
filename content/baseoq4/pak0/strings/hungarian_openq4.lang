@@ -1591,4 +1591,9 @@
 	"#str_231765"	"Célkereszt színe"
 	"#str_231766"	"MÓDOSÍTÁS"
 	"#str_231767"	"A renderelő újraindítása menti a játékot, majd folytatja."
+	"#str_231768"	"Kisimítja a geometria éleit. Minden további fokozat képidőbe kerül; az Ultra 4x-et használ SMAA-val. A Vulkan renderelő legfeljebb 8x-ot rajzol."
+	"#str_231769"	"A renderelő itt nem tudja többmintásan rajzolni a jelenetet, ezért az MSAA ki van kapcsolva."
+	"#str_231770"	"A renderelő itt legfeljebb 2x élsimítást rajzol, ezért a jelenet 2x értéket használ."
+	"#str_231771"	"A renderelő itt legfeljebb 4x élsimítást rajzol, ezért a jelenet 4x értéket használ."
+	"#str_231772"	"A renderelő itt legfeljebb 8x élsimítást rajzol, ezért a jelenet 8x értéket használ."
 }

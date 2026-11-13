@@ -74,6 +74,9 @@ struct idImage {
     bool IsFileBacked()const{return false;}
     bool CopyDepthbuffer(int,int,int,int,int=0);
 };
+// FPS-05: CopyDepthbuffer counts a resolve out of a multisampled target.
+static int msaaResolves=0;
+void R_CountMSAAResolve(bool){++msaaResolves;}
 struct RenderTexture {
     idImage* depth=nullptr;int width=1280,height=720;
     idImage* GetDepthImage(){return depth;}int GetDeviceHandle(){return 9;}

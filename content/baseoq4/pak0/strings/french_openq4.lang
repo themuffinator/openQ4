@@ -1600,4 +1600,9 @@
 	"#str_231765"	"Couleur réticule"
 	"#str_231766"	"MODIFIER"
 	"#str_231767"	"Redémarrer le rendu sauvegarde la partie, puis la reprend."
+	"#str_231768"	"Lisse les bords de la géométrie. Chaque palier coûte du temps d'image ; Ultra utilise 4x avec le SMAA. Le moteur Vulkan dessine au plus 8x."
+	"#str_231769"	"Le moteur de rendu ne peut pas multi-échantillonner la scène ici : le MSAA est désactivé."
+	"#str_231770"	"Le moteur de rendu dessine au plus en 2x ici : la scène utilise 2x."
+	"#str_231771"	"Le moteur de rendu dessine au plus en 4x ici : la scène utilise 4x."
+	"#str_231772"	"Le moteur de rendu dessine au plus en 8x ici : la scène utilise 8x."
 }

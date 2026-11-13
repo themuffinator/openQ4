@@ -48,6 +48,7 @@ static void AssignmentCapture(){
 static void Profiles(){
  const std::vector<std::string> keys={"com_machineSpec","r_rendererBenchmarkPreset","r_screenFraction","r_multiSamples","r_postAA","com_maxfps","image_anisotropy","image_usePrecompressedTextures","image_downSize","image_downSizeLimit","image_downSizeSpecular","image_downSizeBump","image_downSizeSpecularLimit","image_downSizeBumpLimit","image_ignoreHighQuality","image_writeGeneratedImages","s_maxSoundsPerShader","r_useShadowMap","r_shadowMapSize","r_shadowMapMaxUpdatesPerView","r_bloom","r_ssao","r_hdrToneMap","r_motionBlur","r_crt","r_useLightGrid","r_rendererUploadMegs","r_rendererUploadFrameBuffers","s_numberOfSpeakers","s_useEAXReverb","s_maxEmitterChannels","r_shadowMapPointSize","r_shadowMapFilterTaps","r_shadowMapPointFilterTaps","r_shadowMapFilterMode","r_shadowMapPointFilterMode","r_shadowMapAtlasSize","r_ssaoSamples","r_bloomMipCount","r_motionBlurSamples","r_shadowMapPointLights","r_hdrSceneTarget","r_shadows","r_skipBump","r_skipSpecular","r_skipSky","image_picmip","r_shadowMapCSM","r_shadowMapCascadeCount","r_shadowMapProjectedCSM","r_shadowMapCascadeStabilize","r_motionBlurObjectVectors","r_shadowMapHashedAlpha","r_shadowMapTranslucentReceivers","com_performancePreset"};
  // Independent golden setter values for the revised quality progression.
+ // Maximum asks for 8 samples, the most the Vulkan renderer draws (FPS-05).
  const std::vector<std::vector<int>> numbers={
  {0,50,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
  {0,75,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
@@ -57,7 +58,7 @@ static void Profiles(){
  {2,100,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1},
  {3,100,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
  {3,100,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
- {3,100,16,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1}};
+ {3,100,8,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1}};
  const char* names[]={"minimum","lowpower","low","performance","balanced","enhanced","quality","ultra","maximum"};
  const char* renderer[]={"low","low","low","baseline","baseline","modern","modern","high-end","high-end"};
  Check(PerformancePresetCount==9&&numbers.size()==9,"nine profiles");

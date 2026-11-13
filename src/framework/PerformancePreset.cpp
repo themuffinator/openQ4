@@ -79,11 +79,13 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		0, 1, 48, 512, 13, 9, 2, 0, 8192, 32, 5, 8, 0, 1, 1 },
 	// Maximum requests every supported quality maximum and carries no frame-rate
 	// target (FPS-02): it is the choice for players who want everything on.
-	// Hardware clamps MSAA. Render scale stays native. CRT and exposure/strength
+	// MSAA is 8 samples, the most the Vulkan renderer draws, so Maximum is one
+	// image on both renderers (FPS-05); 16 stays a manual choice for OpenGL.
+	// Render scale stays native. CRT and exposure/strength
 	// controls are artistic preferences, not quality levels; experimental
 	// rendering modes stay opt-in.
 	{ "maximum", 3, "high-end",
-		100, 16, 3, 240,
+		100, 8, 3, 240,
 		16, 0, 0, 0, 1, 0,
 		1, 4096, 0, 1, 1, 1, 1, 0, 1, 32, 4,
 		0, 1, 48, 2048, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1 }

@@ -893,6 +893,11 @@ static void VK_Post_SynchronizeHDRExposure( const viewDef_t *viewDef, bool scene
 	vkHDR.sceneFloat = sceneFloat;
 	vkHDR.sceneLinear = sceneLinear;
 	vkHDR.sceneSamples = sceneSamples;
+	{
+		// FPS-05: the count the scene draws with, for the settings page.
+		extern void R_PublishMainSceneSamples( int samples );
+		R_PublishMainSceneSamples( sceneSamples );
+	}
 	vkHDR.width = width;
 	vkHDR.height = height;
 	vkHDR.renderWorld = viewDef->renderWorld;

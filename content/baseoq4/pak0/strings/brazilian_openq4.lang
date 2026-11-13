@@ -1591,4 +1591,9 @@
 	"#str_231765"	"Cor da mira"
 	"#str_231766"	"ALTERAR"
 	"#str_231767"	"Reiniciar o renderizador salva o jogo e o retoma em seguida."
+	"#str_231768"	"Suaviza as bordas da geometria. Cada nível acima custa tempo de quadro; o Ultra usa 4x com SMAA. O renderizador Vulkan desenha no máximo 8x."
+	"#str_231769"	"O renderizador não pode usar multiamostragem na cena aqui, então o MSAA está desligado."
+	"#str_231770"	"O renderizador desenha no máximo 2x aqui, então a cena usa 2x."
+	"#str_231771"	"O renderizador desenha no máximo 4x aqui, então a cena usa 4x."
+	"#str_231772"	"O renderizador desenha no máximo 8x aqui, então a cena usa 8x."
 }

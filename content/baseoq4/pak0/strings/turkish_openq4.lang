@@ -1591,4 +1591,9 @@
 	"#str_231765"	"Nişangâh rengi"
 	"#str_231766"	"DEĞİŞTİR"
 	"#str_231767"	"İşleyiciyi yeniden başlatmak oyunu kaydeder ve sonra sürdürür."
+	"#str_231768"	"Geometri kenarlarını yumuşatır. Her üst kademe kare süresine mal olur; Ultra SMAA ile 4x kullanır. Vulkan oluşturucu en fazla 8x çizer."
+	"#str_231769"	"Oluşturucu burada sahneyi çoklu örnekleyemiyor, bu yüzden MSAA kapalı."
+	"#str_231770"	"Oluşturucu burada en fazla 2x çiziyor, bu yüzden sahne 2x kullanıyor."
+	"#str_231771"	"Oluşturucu burada en fazla 4x çiziyor, bu yüzden sahne 4x kullanıyor."
+	"#str_231772"	"Oluşturucu burada en fazla 8x çiziyor, bu yüzden sahne 8x kullanıyor."
 }

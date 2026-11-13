@@ -22,7 +22,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 8 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **38 / 125 (30.4%)** | **87 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Formally closed roadmap tasks | **39 / 125 (31.2%)** | **86 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
 | Estimated category progress | **19 categories: 3 at 100%, 14 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -1515,12 +1515,13 @@ reference hardware can hold at its declared frame rate rather than every maximum
 
 ### FPS completion checkpoints
 
-**Estimate: 35%; 3/9 tasks closed.** The suite, the two baselines, the per-feature
+**Estimate: 40%; 4/9 tasks closed.** The suite, the two baselines, the per-feature
 cost attribution and the declared per-scenario budgets exist on the reference machine
 (the RTX 4060 Laptop). Enhanced, Quality and Ultra are re-tiered to refresh classes and
 meet them on both backends; the previous Ultra is the Maximum preset. Structural work has
-started: FPS-03 is partial, and FPS-04 closed the post-processing chain with declared
-per-scene budgets on both backends.
+started: FPS-03 is partial, FPS-04 closed the post-processing chain with declared
+per-scene budgets on both backends, and FPS-05 fixed one MSAA policy that draws the same
+image on both backends.
 
 | Task / state | Completed points and evidence | Remaining subpoints / closure boundary |
 | --- | --- | --- |
@@ -1528,7 +1529,7 @@ per-scene budgets on both backends.
 | FPS-02 — Closed | Refresh classes declared at 2560x1440 on the reference machine (Enhanced 144/90, Quality 100/60, Ultra 75/45 fps average/1% low); candidates screened on both backends; the three recipes rebuilt (point cubes 512 or stencil, MSAA 0/2/4, no cascades or motion blur below Maximum); `maximum` added as the everything-on preset without a frame-rate claim; detected starts capped at the display refresh; the startup banner reports the bootstrap and the detected profile with corrected video memory; Vulkan point-policy admission fixed; 42 budgets redeclared from 126 launches, every tier inside its class in every scene. | Closed. |
 | FPS-03 — Partial | Point-light cube maps identified as the dominant shadow cost; static caching and importance budgets already exist. FPS-02 sized the tiers around them: 512 cubes at Quality and Ultra, stencil point shadows at Enhanced, 2048 only at Maximum. The Vulkan light scan no longer keeps the stencil volumes of non-prelit mapped lights, including lights with an interaction left unbuilt in the view (identical images, CPU-neutral on the stock scenes). The point cube cache holds a whole view on both backends (64 slots within a memory bound, no eviction of cubes in use); OpenGL composes moving and cutout casters over cached static cubes; the default nine-tap point filter reads its sixteen texels once; receivers skip unlit fragments; the OpenGL timer queries run only for the report. In hub2 at Quality on OpenGL the shadow-mapped frame fell from 12.0 to 6.6 ms of GPU and 11.8 to 5.2 ms of CPU (hidden-window probe). Since then (10 November): Vulkan composes over cached cubes too, mapped lights shed their stencil front-end work, each projected light takes a tile size that lets a crowded view fit, the projected cache is bounded by memory, OpenGL cubes are depth only, cutouts that cannot change are cached, and Vulkan reads unchanged projected maps where they live. | Fullscreen tier budgets, including whether Enhanced can map point lights; one static cube for both ownerships of a composed Vulkan light; static-world volumes, still built once per mapped light. Per-face cube culling was measured and set aside. |
 | FPS-04 — Closed | OpenGL now draws SSAO at half resolution below 32 samples (Quality, Enhanced) with Vulkan's two passes, blends it into the multisampled scene instead of copying the scene, and reads the scene once for bloom and the tone map; at Ultra it resolves the scene twice a frame instead of four times, like Vulkan. Hidden-window GPU ladders in five scenes on both backends: the OpenGL Ultra frame 0.4-0.7 ms shorter and its chain 0.7-1.1 ms cheaper, OpenGL Quality SSAO 0.4-0.55 ms cheaper; per-scene Ultra chain budgets (1.5-5.0 ms) and per-pass shares of the 13.3 ms Ultra frame declared and met on both backends, where four of five old OpenGL chains were over. Pictures unchanged within one level; PBR laboratory SSAO controls 10/10 on both. [Report section 12](performance-report.md#12-post-processing-chain-fps-04). | Closed. Outside the gate: bloom's full-resolution first level and Ultra's SSAO resolution, a user decision. OpenGL's SSAO depth copies were cut afterwards ([report section 12.8](performance-report.md#128-opengls-ssao-depth-copies-follow-up): hub2 and storage2 0.6-1.05 ms faster on OpenGL, pictures unchanged). |
-| FPS-05 — Not started | 16x MSAA measured as the largest single Ultra cost on OpenGL; the Vulkan backend found to clamp the preset's 16 samples to the device's 8, so the two backends render different Ultra images. FPS-02's Ultra uses 4x MSAA with SMAA ultra, which both backends honour; only Maximum still requests 16. | Sample-count policy per tier, resolve cost, one sample count on both backends, MSAA 4 + SMAA as the Ultra candidate. |
+| FPS-05 — Closed | Sample counts 0/2/4/8/16, the LDR target and SMAA/TAA alternatives priced at Ultra on both backends in five scenes (hidden-window GPU ladders): 16x on OpenGL costs 6.0-10.9 ms over 4x and Vulkan never draws more than 8, 8x costs 0.75-2.5 ms over 4x, 4x + SMAA is within -0.7..+0.3 ms of SMAA alone on OpenGL and 0.6-1.6 ms on Vulkan. Policy: Ultra 4x + SMAA ultra (confirmed), Quality 2x, Enhanced none, Maximum 8x instead of a 16x request, so every preset draws one image on both renderers; no preset asks for more than 8 (self-test); the count does not change with resolution. `gfxInfo` names the Vulkan clamp and the resolves per frame, `r_multiSamplesEffective` holds the drawn count, and the settings menu's MSAA row names the trade-off and the clamp in twelve languages. [Report section 13](performance-report.md#13-msaa-and-the-hdr-scene-target-fps-05). | Closed. |
 | FPS-06 — Not started | Equal-settings deltas attributed: in storage2 the retained HUD's layer composition (17 two-dimensional views and 34 render-target commands per frame against the classic HUD's 7 and 17; about 0.4 ms of main-thread time); on Vulkan the soft-particle depth capture (1.3 ms in airdefense1). The 2 October build equals 0.13.2 and the 15 October build carries the storage2 step, bracketing the 8 October retained-HUD commit (bisection); interpolation, light grid, reverb, portal cull and the five new Vulkan backend features cost nothing measurable. | Bisection pass 2 for the remainder, the retained HUD composed in one pass, the Vulkan soft-particle capture made cheap, closure within 3% average and 10% p99 of 0.13.2 on every suite scene on both backends. |
 | FPS-07 — Not started | Hitch classes recorded: 2-3 s cold draw stalls at Ultra, periodic 100 ms hub2 frames, a 393 ms storage2 frame, first-use events. | Attribution per class, fixes or declared budgets, clean first-use catalog on both backends. |
 | FPS-08 — Not started | HF-07 attribution: the Quality frame is CPU-bound on one thread; Vulkan render-thread stage 1 landed and gains nothing at the GPU-bound Ultra (within 0.4 ms, longer tails). Constant material registers restored on both renderers (they were never marked constant, so every surface evaluated its registers every view): 69-87% of register set-ups now take the parse-time block, saving 5-22 µs per frame in hub2, convoy2 and the airdefense1 arena, which whole-frame timings cannot resolve; see [Constant material registers](material-constant-registers.md). | Front-end and submission cost, stage 2 overlap, game-tic cost; shared with HF-07 and REN-07. |
@@ -1847,7 +1848,7 @@ per-scene budgets on both backends.
   target of its own and resolved where SSAO reads it, and the finished depth is copied
   once per view; hub2 and storage2 are 0.6-1.05 ms faster at Quality and Ultra, outdoor
   poses unchanged ([report section 12.8](performance-report.md#128-opengls-ssao-depth-copies-follow-up)).
-- [ ] **FPS-05 — P1, decision and implementation: MSAA and the HDR scene target.** The
+- [x] **FPS-05 — P1, decision and implementation: MSAA and the HDR scene target.** The
   Ultra recipe requests 16 samples; OpenGL renders them on this GPU (`GL_MAX_SAMPLES` 32)
   into an RGBA16F target at 2560x1440, where MSAA 4 alone doubles the airdefense1 frame
   rate, while the Vulkan backend clamps the request to the device's 8 colour samples
@@ -1860,6 +1861,29 @@ per-scene budgets on both backends.
   Close when the chosen Ultra sample count is justified by the measurements in the
   report, both backends honour it or report the clamp, and the settings menu names the
   trade-off.
+  Closed 13 November 2026. FPS-02 had already moved Ultra to 4x; this item priced every
+  count and fixed the policy. In-launch GPU ladders in hidden 2560x1440 windows at the five
+  reference poses (`rendererBenchmarkCapture` GPU time against neighbouring Ultra base
+  windows; both backends rebuild the scene target on an `r_multiSamples` change): OpenGL draws
+  16 samples at 2.0-2.5 times the 4x frame (6.0-10.9 ms more) while the Vulkan renderer never
+  draws more than 8 (`VK_Image_SelectSampleCount`), so the old Maximum was two images; 8x
+  costs 0.75-1.7 ms over 4x on OpenGL and 1.8-2.5 ms on Vulkan; 4x + SMAA ultra is within
+  -0.7 to +0.3 ms of SMAA alone on OpenGL (SMAA works harder without MSAA) and 0.6-1.6 ms on
+  Vulkan; TAA alone costs what SMAA alone does; the LDR target saves 0.1-1.3 ms but clips
+  the highlights the tone map and bloom need, so tone-mapping tiers keep RGBA16F. Policy:
+  Ultra keeps 4x + SMAA ultra, Quality 2x + SMAA high, Enhanced SMAA high without MSAA, and
+  Maximum asks for 8x instead of 16x, the most the Vulkan renderer draws, so every preset
+  draws one image on both renderers; the presets self-test refuses a preset above 8. The
+  count does not change with resolution (MSAA scales with the pixel count; render scale or
+  a lower tier is the lever above 2560x1440). 16x stays a manual OpenGL choice. Visible:
+  `gfxInfo` reports `reason=vulkan-clamp` and a line of the last frame's resolves (each
+  copy out of a multisampled target), `r_multiSamplesEffective` (read-only) holds the count
+  the last main scene drew with, and the settings menu's MSAA row carries a note naming the
+  trade-off and, where the renderer draws fewer samples than applied, a line naming the
+  count, in all twelve languages. Checked: captures of the page on Vulkan at a 16x request
+  (the clamp line names 8x) and OpenGL (no line), the presets self-test on both, the new
+  `msaa_status` case of `ui_settings_service.py`. See
+  [report section 13](performance-report.md#13-msaa-and-the-hdr-scene-target-fps-05).
 - [ ] **FPS-06 — P1, investigation and implementation: equal-settings regressions.** At
   the 0.13.2 settings the current build is slower than 0.13.2 on OpenGL by a constant
   1.0-1.2 ms per frame in storage2 (0.9-1.0 ms of it in the draw phase, in every window
