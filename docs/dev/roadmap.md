@@ -2211,6 +2211,11 @@ The Quest flavor is integrated, with emulator and test-runtime evidence only.
   per-model limits. Still open: the phone's sustain and multiplayer phases
   (interrupted), audible and gamepad/mouse/keyboard checks, and Mali and
   API-floor hardware.
+  [Quit abort fixed](platform-recovery-review.md#android-quit-abort-13-november-2026)
+  (13 November): quitting through `exit()` ran libhwui's static destructors,
+  which destroyed the HWUI worker pool's mutex under its threads and aborted
+  every quit. Android now leaves with `_exit()` once shutdown is done, and the
+  emulator smoke fails on any native abort in the engine's process.
 - [ ] **AND-03 — P1, implementation and qualification: player setup and upgrades.**
   Finish scoped-storage onboarding, retail-pak validation, localized insufficient
   space/extraction/retry messages, accessible logs and save backup/export. Validate

@@ -169,6 +169,34 @@ class AndroidBuildTests(unittest.TestCase):
             'EMULATOR_GAMEPLAY_READY\n(1.00 -2.50 3.00) 352.8\nEMULATOR_TOUCH_RELEASED\n',
             'GAMEPLAY_READY', 'mp'), [1.0, -2.5, 3.0, 352.8])
 
+    def test_emulator_abort_reader_names_the_engine_process_only(self) -> None:
+        # The 12 November quit: HWUI's pool threads abort although the
+        # activity manager records EXIT_SELF status 0.
+        logcat = (
+            '11-12 22:25:22.243  2401  2421 I openQ4  : --------------- BSE Shutdown ----------------\n'
+            '11-12 22:25:22.440  2401  2424 F libc    : FORTIFY: pthread_mutex_lock called on a destroyed mutex (0x7848df202ab8)\n'
+            '11-12 22:25:22.482  2401  2424 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 2424 (hwuiTask1), pid 2401 (SDLActivity)\n'
+            '11-12 22:25:22.500  3111  3111 F libc    : Fatal signal 11 (SIGSEGV) in tid 3111 (other), pid 3111 (other)\n'
+            '11-12 22:25:24.388   395   395 I Zygote  : Process 2401 exited cleanly (0)\n')
+        aborts = android_emulator_smoke.native_aborts(logcat, ['2401'])
+        self.assertEqual(len(aborts), 2)
+        self.assertIn('destroyed mutex', aborts[0])
+        self.assertIn('hwuiTask1', aborts[1])
+        self.assertEqual(android_emulator_smoke.native_aborts(logcat, ['3112']), [])
+        self.assertEqual(android_emulator_smoke.native_aborts(logcat.replace(' F libc', ' I libc'), ['2401']), [])
+
+    def test_android_quit_leaves_without_static_destructors(self) -> None:
+        # exit() would destroy libhwui's CommonPool mutex under its worker
+        # threads; Android's Posix_Exit must end with _exit() once shutdown is done.
+        source = (ROOT / 'src/sys/posix/posix_main.cpp').read_text(encoding='utf-8', errors='replace')
+        body = source.split('void Posix_Exit(int ret) {', 1)[1].split('\n}\n', 1)[0]
+        tail = body.split('Posix_RunExitSpawn();', 1)[1]
+        android, desktop = tail.split('#if defined( __ANDROID__ )', 1)[1].split('#else', 1)
+        self.assertIn('fflush( NULL );', android)
+        self.assertIn('_exit( set_exit ? set_exit : ret );', android)
+        self.assertNotRegex(android, r'(?m)^\s*exit\(')
+        self.assertIn('exit( ret );', desktop)
+
     def test_release_apk_payload_rejects_mixed_or_incomplete_packages(self) -> None:
         with tempfile.TemporaryDirectory(prefix='android-apk-', dir=ROOT / '.tmp') as temporary:
             stage = Path(temporary) / 'stage'

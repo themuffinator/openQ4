@@ -358,6 +358,21 @@ def pose_after_marker(log: str, marker: str, mode: str = "sp") -> list[float]:
     return pose
 
 
+def native_aborts(logcat: str, pids: list[str]) -> list[str]:
+    """The fatal libc lines (an abort, a FORTIFY check) logged by any thread of the engine's processes.
+
+    The activity manager still records a clean self-exit when the main thread
+    finishes exit() before such an abort, which is how HWUI's destroyed-mutex
+    abort at quit went unnoticed, so logcat is the record that counts.
+    """
+    found = []
+    for line in logcat.splitlines():
+        match = re.match(r"\S+\s+\S+\s+(\d+)\s+\d+\s+F\s+libc\s*:\s*(.*)", line)
+        if match and match.group(1) in pids and match.group(2).startswith(("Fatal signal", "FORTIFY:")):
+            found.append(line.strip())
+    return found
+
+
 class Probe:
     def __init__(self, args: argparse.Namespace):
         self.args = args
@@ -918,6 +933,10 @@ class Probe:
                                  "performance level, thermal report; no headset, visual review separate")
 
     def assess(self):
+        aborts = native_aborts((self.out / "logcat.txt").read_text(errors="replace"), self.pids)
+        self.report["native_aborts"] = aborts
+        if aborts:
+            raise ValueError(f"The engine process aborted: {aborts[0]}")
         if self.mode == "lifecycle":
             return self.assess_lifecycle()
         if self.mode == "resume":

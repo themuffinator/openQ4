@@ -1860,7 +1860,8 @@ interface, save path, setup and touch checks, on HEAD plus this change.
 threads abort on a destroyed mutex (`FORTIFY: pthread_mutex_lock called on a
 destroyed mutex`, SIGABRT in `hwuiTask1`), although the activity manager
 records a clean exit. The 8 and 9 November emulator runs, without VR, show the
-same abort, so it predates this change.
+same abort, so it predates this change. Fixed on 13 November; see
+[Android quit abort](#android-quit-abort-13-november-2026).
 
 Evidence (the run's logs, report and captures, the Quest manifest dump and
 verifier output, the rehearsal certificate and APK hashes) is under
@@ -1870,3 +1871,50 @@ the setup panel into VR, controller and menu interaction, comfort, recovery
 across the system menu, boundary and sleep, sustained refresh and thermal
 budgets, installation and asset import on the headset, and the distribution
 decision.
+
+## Android quit abort, 13 November 2026
+
+Every Android quit since at least 8 November, with or without VR, ended in an
+abort just after the engine's `BSE Shutdown` banner: `FORTIFY:
+pthread_mutex_lock called on a destroyed mutex` in `hwuiTask0` and `hwuiTask1`,
+then SIGABRT and a crash dump. The activity manager still recorded `EXIT_SELF`
+with status 0, because the engine's thread usually finished exiting first.
+
+**Cause.** `Posix_Exit` ended the process with `exit()` once shutdown was done.
+`exit()` runs the static destructors of every library in the process,
+Android's own included. HWUI, Android's UI renderer, keeps its worker pool
+(`android::uirenderer::CommonPool`) in a function-local static and never joins
+its two detached worker threads. The pool's destructor wakes the workers and
+then destroys their mutex; they lock it again, and bionic aborts. openQ4 owns
+neither the object nor the threads. The 12 November APK reproduced it on the
+API 35 emulator, quitting from the main menu:
+
+- the destroyed mutex (`0x781e83e02ab8`) is in `libhwui.so`'s `.bss`, at
+  `0xc02ab8` from its load address;
+- in that library, `CommonPool::instance()` builds the pool at `0xc02aa0` and
+  registers its destructor with `__cxa_atexit`, `CommonPool::post` locks
+  `0xc02ab8`, and `~CommonPool` notifies the workers' condition variable before
+  destroying the mutex at offset `0x18`;
+- a thread dump of the running game shows both `hwuiTask` threads in
+  `CommonPool`'s worker lambda, waiting on that condition variable.
+
+**Fix.** On Android, `Posix_Exit` now flushes stdio and ends the process with
+`_exit()`, keeping the exit status. By then common shutdown has closed the log,
+configuration and saves, the fatal-error breadcrumb has been written with
+`write()`, and a fatal error's console wait has already finished. Nothing
+openQ4 needs is left to a destructor at that point. Desktop POSIX builds still
+use `exit()`. The emulator
+smoke now fails if logcat shows a libc abort or FORTIFY failure in any thread of
+the engine's processes, so the exit record alone can no longer hide one.
+`android_build.py` pins both the Android exit and the logcat check.
+
+**Check.** NDK r30 x86_64 build of HEAD `6613b645b` plus this change (other
+sessions' uncommitted edits held at their base), as emulator debug APK
+`f7b8c214…daaba3`. `android_emulator_smoke.py --mode sp` passes on the same AVD
+with the new check: after `BSE Shutdown` the process exits 31 ms later with no
+libc abort, and the activity manager records `EXIT_SELF` with status 0. Run on
+the capture from the old APK, the check reports its two FORTIFY lines and the
+SIGABRT. `android_build.py` and the other checks that read `posix_main.cpp`
+pass. Evidence (the old APK's maps, thread dump, logcat and `libhwui`
+disassembly, and the fixed run's report and logs) is under
+`.tmp/android-evidence/2026-11-13-quit-abort/` in the main checkout.

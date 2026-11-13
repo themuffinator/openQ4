@@ -7,6 +7,21 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Android app quits without crashing (AND-02), 13 November 2026
+
+- **Quitting the Android app no longer ends in a crash.** Every quit used to
+  abort in Android's own interface threads just after the game had finished
+  shutting down, leaving a crash report behind each time, although Android
+  still counted the exit as normal. The game now ends its process directly
+  once shutdown is complete. Saves, settings and logs are written as before,
+  and there is nothing to change.
+- Developer: on Android, `Posix_Exit` flushes stdio and ends with `_exit()`.
+  `exit()` ran libhwui's `CommonPool` destructor under its detached worker
+  threads (FORTIFY: `pthread_mutex_lock called on a destroyed mutex`).
+  `android_emulator_smoke.py` now fails on any libc abort in the engine's
+  process.
+  [Evidence](platform-recovery-review.md#android-quit-abort-13-november-2026).
+
 ## OpenGL ambient occlusion costs less indoors (FPS-04 follow-up), 13 November 2026
 
 - **Quality and Ultra run faster on OpenGL in interiors.** Ambient occlusion no
