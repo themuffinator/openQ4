@@ -777,6 +777,9 @@ public:
 	idCamera *				GetPrivateCameraView( void ) const { return privateCameraView; }
 	void					StartFxFov( float duration  );
  	void					UpdateHudWeapon( int displayWeapon=-1 );
+	// openQ4: a weapon key that changed nothing (the Remastered strip's refusal).
+	bool					WeaponKeyRefused( int num );
+	void					RefuseWeaponSelection( int num );
 #ifdef _XENON
 	void					ResetHUDWeaponSwitch( void );
 #endif

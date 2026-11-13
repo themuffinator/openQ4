@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.43, 13 November 2026 (1.40 to 1.42 earlier that day, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.44, 13 November 2026 (1.40 to 1.43 earlier that day, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -47,6 +47,11 @@ Version 1.43 shows the title's backdrop as a display signal: its pictures are
 dimmed and stepped through an ordered dither, and brief signal faults replace
 the stock cross-fade when a picture changes. Faults also mark the menu
 opening, leaving for a page and coming home (section 13.8).
+
+Version 1.44 gives the Remastered weapon strip motion: it opens and closes
+instead of cutting, one ring travels between the slots, a refused choice
+shakes the ring red, and a tick marks the weapon a quick switch returns to.
+The Strogg strip, after stroggification, has its own character (section 14.5).
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -2529,6 +2534,40 @@ single-player campaign. Multiplayer keeps its own Quake 4 roster; the former
 requirement for expansion multiplayer ammunition, accuracy and summary rows is
 superseded by the project's single-player expansion policy.
 
+#### Remastered motion
+
+The Remastered strip keeps the stock constructions above and moves quickly and
+quietly between them: every move is over within 240 ms. `easeOut` below is
+the cubic Bézier (0.25, 1, 0.5, 1) and `easeIn` (0.5, 0, 0.75, 0).
+
+| Moment | Marine | Strogg, after stroggification |
+| --- | --- | --- |
+| Open | Rises 4 u to rest with `easeOut` over 140 ms, fading in over 110 ms | Tunes in about the row's middle from 103% wide and 30% tall with `easeOut` over 140 ms, fading in over 90 ms; a 0.9 u #FFCC00 hairline reaching 8 u past the end plates sweeps down through the row over 150 ms, at most 0.55 |
+| Close | Sinks 3 u with `easeIn`, fading out | Collapses to 102% wide and 35% tall with `easeIn`, fading out |
+| Change | The ring travels from the slot it left with `easeOut`; the pending icon settles from 116% over 150 ms; the name slides in 4 u from the side the ring came from, from 0.30 over 130 ms | The ring travels, stretching up to 22% wider at 45% of the way; on landing an #FFCC00 outline of the ring grows to 145% while fading from 0.80 over 220 ms; the name slips in 3 u, then 1.2 u back, in hard 40 ms steps from 0.45 to full over 120 ms |
+| Refusal | The ring shakes −2.5, +2.0, −1.2 and +0.6 u, settling by 190 ms | The ring jumps +2.2, −1.8 (106% wide) and +1.0 u in hard 35 ms steps, settling by 140 ms |
+| Return tick | A 9 × 1.5 u bar leaning with the plates, 1.7 u below the plate, in the ring color at 0.75 | A 5.6 u upward chevron of 1.3 u stroke below the plate, in the ring color |
+
+The strip opens in the frame of a change or refusal and closes 1000 ms after
+the latest one over 150 ms, or over 90 ms on firing. Both start from wherever
+the strip is, so a change during the close turns it back. One ring serves the
+pending weapon. It travels over 100 ms plus 6 ms per slot, at most 170 ms
+(Strogg 10 ms longer), only along a strip already on screen whose weapon count
+has not changed; otherwise it lands at once. A refusal is a weapon key for a
+weapon the player does not carry or that is out of ammunition, or a next or
+previous weapon that leaves the choice unchanged. It opens the strip if
+needed, shakes the ring, and overlays the ring in red (#E0442E, Strogg
+#FF3A1A) that holds 70 ms (Strogg 50 ms) and is gone by 240 ms. An empty
+weapon that was refused throbs its prohibition sign from 135% over 180 ms. The
+return tick marks the weapon a quick switch returns to: the one in hand while
+a change is pending, otherwise the previous weapon, never the pending one.
+Multiplayer's strip moves as the Marine one.
+
+Reduced motion opens and closes the strip with fades of at most 80 ms and
+lands every travel, shake, throb, impulse and sweep at once; the ring, the
+red refusal, the prohibition sign and the tick stay. The classic strip
+(`ui_retained 0`) keeps the stock behavior.
+
 ### 14.6 Weapon wheel
 
 The wheel is an openQ4 addition for controller and touch play (section 13.5).
@@ -4497,6 +4536,27 @@ title no longer reproduces, by `MOT-017`. It carries every other loop and
 alarm unchanged and sends the Remastered title's picture changes to the
 signal. It also appends `MOT-018` for the signal itself. Both are pending,
 and nothing is accepted.
+
+### Version 1.44: the weapon strip's motion
+
+The product owner asked for an interesting but subtle refinement of the new
+interface's weapon strip, with a Strogg variant after stroggification and
+quick, subtle transitions for opening, closing, a refused choice and a change
+of weapon. Section 14.5 adds the strip's Remastered motion; the stock strip's
+measurement stays as recorded.
+
+| Subject | Version 1.43 | Version 1.44 |
+| --- | --- | --- |
+| Opening | In the frame of the change, without motion | Marine rises 4 u over 140 ms; Strogg tunes in about its row with a sweeping hairline |
+| Closing | At once, 1000 ms after the last change or on firing | Over 150 ms after the hold, 90 ms on firing; Marine sinks, Strogg collapses |
+| Ring | A ring on each pending plate | One ring travelling from the slot it left; the Strogg ring stretches and sends an impulse |
+| Refusal | Nothing | The ring shakes (Strogg in hard steps) and flashes red; an empty weapon's sign throbs |
+| Quick switch | Not shown | A tick under the weapon it returns to |
+| Reduced motion | Not applicable | Fades only; the ring, the red, the sign and the tick stay |
+
+Register revision 24 supersedes `FLOW-032`, which closed the strip at once on
+firing, by `FLOW-070`, carrying every construction and timing rule and adding
+the motion, the refusal and the tick. It is pending, and nothing is accepted.
 
 ### Version 1.39: the Awakening chaingun turret
 

@@ -4498,6 +4498,58 @@ void idPlayer::UpdateHudPowerUps( idUserInterface *_hud ) {
 
 /*
 ===============
+idPlayer::WeaponKeyRefused
+
+openQ4: whether a weapon key would leave the choice unchanged because the
+weapon is missing or out of ammunition (SelectWeapon's own refusals).
+===============
+*/
+bool idPlayer::WeaponKeyRefused( int num ) {
+	if ( num < 0 || num >= MAX_WEAPONS ) {
+		return false;
+	}
+	const char *weap = spawnArgs.GetString( va( "def_weapon%d", num ) );
+	if ( !weap[ 0 ] || !( inventory.weapons & ( 1 << num ) ) ) {
+		return true;
+	}
+	return !inventory.HasAmmo( weap ) && !spawnArgs.GetBool( va( "weapon%d_allowempty", num ) );
+}
+
+/*
+===============
+idPlayer::RefuseWeaponSelection
+
+openQ4: tells the HUD that a weapon key changed nothing, so the Remastered
+weapon strip can show the refusal. `num` is the weapon asked for, or -1 when
+there was nothing else to cycle to. The stock HUD has no such event.
+===============
+*/
+void idPlayer::RefuseWeaponSelection( int num ) {
+	if ( !hud || entityNumber != gameLocal.localClientNum ) {
+		return;
+	}
+	if ( !weaponEnabled || spectating || hiddenWeapon || gameLocal.inCinematic || health <= 0 || !inventory.weapons ) {
+		return;
+	}
+	if ( gameLocal.world && gameLocal.world->spawnArgs.GetBool( "no_Weapons" ) ) {
+		return;
+	}
+	// An empty weapon's slot shows why: publish its ammunition as it is now.
+	if ( num >= 0 && num < MAX_WEAPONS && ( inventory.weapons & ( 1 << num ) ) ) {
+		const char *weap = spawnArgs.GetString( va( "def_weapon%d", num ) );
+		if ( weap[ 0 ] ) {
+			hud->SetStateInt( va( "weapon%d_ammo", num ), inventory.ammo[ inventory.AmmoIndexForWeaponClass( weap ) ] );
+		}
+	}
+	hud->SetStateInt( "weapon_refused", num );
+	hud->HandleNamedEvent( "weaponRefused" );
+	hud->StateChanged( gameLocal.time );
+	// Firing closes the strip, as after a change.
+	weaponChangeIconsUp = true;
+}
+
+/*
+===============
 idPlayer::StartRadioChatter
 ===============
 */
@@ -10258,7 +10310,11 @@ void idPlayer::PerformImpulse( int impulse ) {
 	}
 
 	if ( impulse >= IMPULSE_0 && impulse <= IMPULSE_12 ) {
+		const bool refused = WeaponKeyRefused( impulse );
 		SelectWeapon( impulse, false );
+		if ( refused ) {
+			RefuseWeaponSelection( impulse );
+		}
 		return;
 	}
 
@@ -10268,7 +10324,13 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 		case IMPULSE_14: {
-			NextWeapon();
+			{
+				const int asked = idealWeapon;
+				NextWeapon();
+				if ( idealWeapon == asked && ( !gameLocal.isClient || net_clientPredictWeaponSwitch.GetBool() ) ) {
+					RefuseWeaponSelection( -1 );
+				}
+			}
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCycleNext( this );
 			} else if ( gameLocal.isServer && spectating && spectator != entityNumber ) {
@@ -10279,7 +10341,13 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 		case IMPULSE_15: {
-			PrevWeapon();
+			{
+				const int asked = idealWeapon;
+				PrevWeapon();
+				if ( idealWeapon == asked && ( !gameLocal.isClient || net_clientPredictWeaponSwitch.GetBool() ) ) {
+					RefuseWeaponSelection( -1 );
+				}
+			}
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCyclePrev( this );
 			} else if ( gameLocal.isServer && spectating && spectator != entityNumber ) {

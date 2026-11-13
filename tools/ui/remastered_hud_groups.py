@@ -12,8 +12,8 @@ import math
 import build_retained_screens as ui
 import hud_svg
 from remastered_hud_base import (
-    AND, BOUND_TEXT, NOT, OR, S, U, HudDocument, box, fitted_plate_path, num, op, play, cancel, pts_path, rgb, rounded_rect, sel,
-    shadowed, stroke, svg_path, text_box, tr, transform_value, u, vec, when)
+    AND, BOUND_TEXT, NOT, OR, S, U, HudDocument, box, fitted_plate_path, frac_point, num, op, play, cancel, pts_path, rgb, rounded_rect, sel,
+    set_state, shadowed, stroke, svg_path, text_box, tr, transform_value, u, vec, when)
 from remastered_hud_status import WEAPON_GLYPHS, MP_ROSTER, full
 
 PICKUP_TIMES = (3000, 250)        # hold, fade (atlas pickup lines)
@@ -57,38 +57,85 @@ SP_STRIP = ["item_blaster", "item_machinegun", "item_shotgun", "item_hyperblaste
 AWAKENING_STRIP = SP_STRIP[:10] + ["item_corecannon", "item_fire", "item_freeze"]
 
 
+STRIP_EASE = [0.25, 1, 0.5, 1]          # a quick settle (easeOutQuint)
+STRIP_EASE_IN = [0.5, 0, 0.75, 0]      # a quick departure (easeInQuart)
+STRIP_DRIFT = 4.0                      # u the Marine strip rises as it opens
+
+
+def strip_glide_ms(steps: int, strogg: bool) -> int:
+    """A longer move takes a little longer, never past 170 ms (180 ms for the
+    Strogg cursor, which stretches on the way)."""
+    return min(100 + 6 * abs(steps), 170) + (10 if strogg else 0)
+
+
+def balanced(name: str, items: list) -> dict:
+    """An n-ary sum or disjunction as a balanced tree (shallow expressions)."""
+    while len(items) > 1:
+        items = [op(name, items[j], items[j + 1]) if j + 1 < len(items) else items[j] for j in range(0, len(items), 2)]
+    return items[0]
+
+
 def weapon_strip(doc: HudDocument, *, strogg: bool = False, awakening: bool = False, y: float = 350.0) -> dict:
     """The strip (14.5): owned weapons in slot order with no gaps, 24.4 u
     plates on a 30 u pitch sheared about their own centres, upright 18 u
     icons, the pending weapon orange inside a hard 1.6 u ring, an empty
     weapon dim under a red prohibition sign. Remastered sets the name above
-    the slots and the strip above the pickup lines."""
+    the slots and the strip above the pickup lines.
+
+    Remastered motion (14.5, version 1.44): the strip opens and closes
+    instead of cutting, one ring travels from the old choice to the new one,
+    a refused choice shakes the ring red, and a tick marks the weapon a
+    quick switch returns to. The Marine strip drifts and settles; the Strogg
+    strip, after stroggification, tunes in and collapses like a neural link,
+    its ring stretches as it travels and sends an impulse when it lands, and
+    a refusal glitches in hard steps."""
     mp = S("mp")
     roster = AWAKENING_STRIP if awakening else SP_STRIP
-    for i in range(len(roster)):
+    count = len(roster)
+    for i in range(count):
         doc.boolean(f"weapon{i}")
         doc.number(f"weapon{i}_index")
         doc.number(f"weapon{i}_ammo")
         doc.string(f"weapon{i}_icon")
     doc.number("weaponcount")
+    doc.number("player_weapon", -1)
     doc.number("player_idealweapon", -1)
     doc.number("player_lastweapon", -1)
+    doc.number("weapon_refused", -1)
     doc.string("weaponname")
     doc.boolean("oq4.strip")
+    # The ring's last resting place, so the next change knows where it left.
+    doc.number("oq4.stripPos", -1)
+    doc.number("oq4.stripTo", -1)
+    doc.number("oq4.stripCount", 0)
+    doc.boolean("oq4.stripRefuse")
+    if strogg:
+        doc.boolean("oq4.stripPulse")
+        doc.boolean("oq4.stripScan")
     selected_colour = rgb("#FFCC00") if strogg else rgb("#FF8000")
     other_colour = rgb("#F59512", 0.6) if strogg else rgb("#A8A360", 0.6)
     ring_colour = rgb("#F2AD0B", 0.6) if strogg else rgb("#B2CC80")
+    refuse_colour = rgb("#FF3A1A") if strogg else rgb("#E0442E")
     k = 0.22 if strogg else -0.22
+    ideal = S("player_idealweapon")
+    # Where the pending weapon sits in the strip (its weaponN_index).
+    selected_pos = balanced("+", [sel(op("==", ideal, i), S(f"weapon{i}_index"), 0) for i in range(count)])
+    owned_selected = balanced("||", [AND(op("==", ideal, i), S(f"weapon{i}")) for i in range(count)])
+    # The weapon a quick switch returns to: the one in hand while a change is
+    # pending, else the one before it.
+    returns_to = sel(op("!=", S("player_weapon"), ideal), S("player_weapon"), S("player_lastweapon"))
+
+    # The strip is a box about its own middle, so the Strogg variant can
+    # tune in and collapse about the row; children sit `top` u above y.
+    top = 22.0
+    sy = top
     slots = []
-    for i in range(len(roster)):
+    for i in range(count):
         sid = f"slot{i}"
-        selected = op("==", S("player_idealweapon"), i)
+        selected = op("==", ideal, i)
         empty = op("==", S(f"weapon{i}_ammo"), 0)
         plate = vec(sid + "-plate", [pts_path("plate", [(x * U, yy * U) for x, yy in rounded_rect(0.8, 0.8, 24.4, 24.4, 1.0, k, 13)],
                                               fill=ui.solid([0, 0, 0, 0.5]))])
-        ring = vec(sid + "-ring", [pts_path("ring", [(x * U, yy * U) for x, yy in rounded_rect(1.6, 1.6, 22.8, 22.8, 1.0, k, 13)],
-                                             stroke=stroke(ring_colour, u(1.6), join="round"))], {"display": ui.keyword("none")})
-        doc.show(ring["id"], selected)
         icons = []
         # Each slot holds its roster weapon; multiplayer's first slot is the
         # gauntlet (the stock strip's weaponN_icon follows the same order).
@@ -110,35 +157,193 @@ def weapon_strip(doc: HudDocument, *, strogg: bool = False, awakening: bool = Fa
             pts_path("ring", [(13 * U + 7.4 * U * math.cos(t * math.pi / 24), 13 * U + 7.4 * U * math.sin(t * math.pi / 24))
                               for t in range(48)], stroke=stroke(rgb("#A50000"), u(2.3))),
             pts_path("slash", [(18.2 * U, 7.8 * U), (7.8 * U, 18.2 * U)], closed=False, stroke=stroke(rgb("#A50000"), u(2.3)))],
-            {"display": ui.keyword("none")})
+            {"display": ui.keyword("none"), "transform": transform_value()})
         doc.show(sign["id"], empty)
-        slot = box(sid, 0, u(y), u(26), u(26), [plate, ring, full(sid + "-icons", icons), sign])
+        # The return tick under the plate: a short bar leaning with the
+        # Marine plates, a small upward chevron on the Strogg strip.
+        if strogg:
+            tick_paths = [pts_path("tick", [(10.2 * U, 29.4 * U), (13 * U, 26.8 * U), (15.8 * U, 29.4 * U)], closed=False,
+                                   stroke=stroke(ring_colour, u(1.3), join="miter"))]
+        else:
+            tick_paths = [pts_path("tick", [(x * U, yy * U) for x, yy in rounded_rect(8.5, 26.9, 9.0, 1.5, 0.4, k, 27.65, 2)],
+                                   fill=ui.solid([*ring_colour[:3], 0.75]))]
+        tick = vec(sid + "-last", tick_paths, {"display": ui.keyword("none")})
+        doc.show(tick["id"], AND(op("==", returns_to, i), NOT(selected), op(">=", S("player_lastweapon"), 0)))
+        slot = box(sid, 0, u(sy), u(26), u(26),
+                   [plate, full(sid + "-icons", icons, transform=transform_value()), sign, tick])
         # switchLeft = (640 - (weaponcount 30 - 2)) / 2, plus 30 u per index.
         doc.bind(sid + ".left", sid, "left",
                  op("*", op("+", op("-", 321, op("*", 15, S("weaponcount"))), op("*", 30, S(f"weapon{i}_index"))), U))
         doc.show(sid, S(f"weapon{i}"))
         slots.append(slot)
+
+    # One ring for the pending weapon, travelling between slots. Its glide
+    # child carries the travel, the shake child the refusal.
+    ring_points = [(x * U, yy * U) for x, yy in rounded_rect(1.6, 1.6, 22.8, 22.8, 1.0, k, 13)]
+    ring = vec("strip-ring", [pts_path("ring", ring_points, stroke=stroke(ring_colour, u(1.6), join="round"))])
+    refuse = vec("strip-refuse", [pts_path("ring", ring_points, stroke=stroke(refuse_colour, u(1.6), join="round"))],
+                 {"display": ui.keyword("none"), "opacity": num(0)})
+    doc.show(refuse["id"], S("oq4.stripRefuse"))
+    cursor_children = [ring, refuse]
     if strogg:
-        name = shadowed("strip-name", "", face="r_strogg", size=14.4, colour=rgb("#FCFFC8"), baseline=u(y - 7), center=u(320),
+        pulse = vec("strip-pulse", [pts_path("ring", ring_points, stroke=stroke(selected_colour, u(1.2), join="round"))],
+                    {"display": ui.keyword("none"), "opacity": num(0), "transform": transform_value()})
+        doc.show(pulse["id"], S("oq4.stripPulse"))
+        cursor_children.append(pulse)
+    shake = full("strip-shake", cursor_children, transform=transform_value())
+    glide = full("strip-glide", [shake], transform=transform_value())
+    cursor = box("strip-cursor", 0, u(sy), u(26), u(26), [glide])
+    doc.bind("strip-cursor.left", "strip-cursor", "left",
+             op("*", op("+", op("-", 321, op("*", 15, S("weaponcount"))), op("*", 30, selected_pos)), U))
+    doc.show("strip-cursor", owned_selected)
+
+    if strogg:
+        name = shadowed("strip-name-t", "", face="r_strogg", size=14.4, colour=rgb("#FCFFC8"), baseline=u(sy - 7), center=u(320),
                         width=u(600))
     else:
-        name = shadowed("strip-name", "", face="marine", size=18, colour=rgb("#B0C891"), baseline=u(y - 7), center=u(320),
+        name = shadowed("strip-name-t", "", face="marine", size=18, colour=rgb("#B0C891"), baseline=u(sy - 7), center=u(320),
                         width=u(600))
     for node in name:
         doc.bind(node["id"] + ".text", node["id"], "text", S("weaponname"))
-    strip = full("strip", name + slots, display=ui.keyword("none"), opacity=num(1))
+    name_box = full("strip-name", name, transform=transform_value(), opacity=num(1))
+    children = [name_box] + slots + [cursor]
+    if strogg:
+        # The tune-in's scan: a hairline as wide as the row (8 u past each
+        # end plate) that sweeps down through it.
+        line = {"id": "line", "fill": ui.solid([*selected_colour[:3], 1.0]), "commands": [
+            {"id": "c0", "op": "move", "points": [frac_point(0, 0, 0)]},
+            {"id": "c1", "op": "line", "points": [frac_point(1, 0, 0)]},
+            {"id": "c2", "op": "line", "points": [frac_point(1, 0, u(0.9))]},
+            {"id": "c3", "op": "line", "points": [frac_point(0, 0, u(0.9))]},
+            {"id": "c4", "op": "close"}]}
+        scan = vec("strip-scan", [line], {"display": ui.keyword("none"), "opacity": num(0), "transform": transform_value()})
+        doc.show(scan["id"], S("oq4.stripScan"))
+        span = box("strip-scan-span", 0, 0, u(400), u(1), [scan])
+        doc.bind("strip-scan-span.left", "strip-scan-span", "left", op("*", op("-", 313, op("*", 15, S("weaponcount"))), U))
+        doc.bind("strip-scan-span.width", "strip-scan-span", "width", op("*", op("+", 12, op("*", 30, S("weaponcount"))), U))
+        children.append(span)
+    # Closed values are the base: the first opening moves from them.
+    closed = transform_value(sx=1.03, sy=0.3) if strogg else transform_value(ty=u(STRIP_DRIFT))
+    # The hold's clock lives on a node nothing else animates, so a takeover
+    # of the strip's own tracks never completes it early.
+    children.append(ui.group("strip-timer", {**ui.FULL, "display": ui.keyword("none"), "opacity": num(1)}))
+    strip = box("strip", 0, u(y - top), u(640), u(48), children,
+                opacity=num(0), transform=closed)
     # The weapon strip setting (13.9) keeps it hidden.
     doc.show("strip", AND(S("oq4.strip"), S("hud.strip")))
-    # Shown in the frame of a change, never before the first weapon or while
-    # the HUD is hidden; hidden 1000 ms after the latest change or at once on
-    # firing (hud.gui:194-255).
-    hold = doc.timeline("strip-hold", 1000, [tr("strip", "opacity", [(0, num(1)), (1000, num(1))])], complete="stripDone",
+
+    # Opening and closing start from wherever the strip is (no authored
+    # first key), so a change during the close turns it back smoothly.
+    rest = transform_value()
+    if strogg:
+        open_tracks = [tr("strip", "opacity", [(0, num(0)), (90, num(1))]),
+                       tr("strip", "transform", [(0, closed, STRIP_EASE), (140, rest)])]
+        close_tracks = lambda ms: [tr("strip", "opacity", [(0, num(1), STRIP_EASE_IN), (ms, num(0))]),
+                                   tr("strip", "transform", [(0, rest, STRIP_EASE_IN), (ms, transform_value(sx=1.02, sy=0.35))])]
+    else:
+        open_tracks = [tr("strip", "opacity", [(0, num(0)), (110, num(1))]),
+                       tr("strip", "transform", [(0, closed, STRIP_EASE), (140, rest)])]
+        close_tracks = lambda ms: [tr("strip", "opacity", [(0, num(1)), (ms, num(0))]),
+                                   tr("strip", "transform", [(0, rest, STRIP_EASE_IN), (ms, transform_value(ty=u(3)))])]
+    opening = doc.timelines.add("strip-open", 140, open_tracks)
+    closing = doc.timelines.add("strip-close", 150, close_tracks(150), complete="stripDone")
+    closing_fast = doc.timelines.add("strip-close-fast", 90, close_tracks(90), complete="stripDone")
+    hold = doc.timeline("strip-hold", 1000, [tr("strip-timer", "opacity", [(0, num(1)), (1000, num(1))])], complete="stripClose",
                         essential=True)
-    doc.on("weaponChange", when(AND(op(">=", S("player_lastweapon"), 0), NOT(S("oq4.hidden"))),
-                                [{"op": "setState", "values": {"oq4.strip": True}}, play(hold)],
-                                [{"op": "setState", "values": {"oq4.strip": False}}]))
-    doc.on("weaponFire", {"op": "setState", "values": {"oq4.strip": False}}, cancel(hold, "base"))
-    doc.on("stripDone", {"op": "setState", "values": {"oq4.strip": False}})
+
+    # The ring's travel: one timeline per distance, so it starts exactly on
+    # the slot it left.
+    delta = op("-", S("oq4.stripTo"), S("oq4.stripPos"))
+    glides = []
+    for steps in [d for d in range(-(count - 1), count) if d]:
+        ms = strip_glide_ms(steps, strogg)
+        start = u(-30 * steps)
+        if strogg:
+            stretch = 1 + min(0.05 * abs(steps), 0.22)
+            keys = [(0, transform_value(tx=start), [0.4, 0, 0.6, 1]),
+                    (round(ms * 0.45), transform_value(tx=start * 0.3, sx=stretch), STRIP_EASE), (ms, rest)]
+        else:
+            keys = [(0, transform_value(tx=start), STRIP_EASE), (ms, rest)]
+        ident = doc.timeline(f"strip-glide{'n' if steps < 0 else 'p'}{abs(steps)}", ms, [tr("strip-glide", "transform", keys)])
+        glides.append(when(op("==", delta, steps), [play(ident)]))
+    # The name follows the ring in from the side it came from.
+    names = {}
+    for side, sign_ in (("p", 1), ("n", -1)):
+        if strogg:
+            # A hard-stepped slip, like a signal finding its channel.
+            keys = [(0, transform_value(tx=u(3 * sign_))), (40, transform_value(tx=u(3 * sign_))),
+                    (41, transform_value(tx=u(-1.2 * sign_))), (80, transform_value(tx=u(-1.2 * sign_))), (81, rest), (120, rest)]
+            fade = [(0, num(0.45)), (40, num(0.45)), (41, num(0.8)), (80, num(0.8)), (81, num(1)), (120, num(1))]
+        else:
+            keys = [(0, transform_value(tx=u(4 * sign_)), STRIP_EASE), (130, rest)]
+            fade = [(0, num(0.3)), (130, num(1))]
+        names[side] = doc.timeline(f"strip-name-{side}", 130 if not strogg else 120,
+                                   [tr("strip-name", "transform", keys), tr("strip-name", "opacity", fade)])
+    landing = [when(op(">", delta, 0), [play(names["p"])]), when(op("<", delta, 0), [play(names["n"])])]
+    if strogg:
+        # The impulse: an outline leaving the ring where it lands.
+        impulse = doc.timeline("strip-impulse", 220, [
+            tr("strip-pulse", "transform", [(0, transform_value(), STRIP_EASE), (220, transform_value(sx=1.45, sy=1.45))]),
+            tr("strip-pulse", "opacity", [(0, num(0.8)), (220, num(0))])], complete="stripPulseDone")
+        doc.on("stripPulseDone", set_state(**{"oq4.stripPulse": False}))
+        landing.append(when(op("!=", delta, 0), [set_state(**{"oq4.stripPulse": True}), play(impulse)]))
+        scan_line = doc.timeline("strip-scan-sweep", 150, [
+            tr("strip-scan", "transform", [(0, transform_value(ty=u(-6))), (150, transform_value(ty=u(50)))]),
+            tr("strip-scan", "opacity", [(0, num(0)), (30, num(0.55)), (110, num(0.4)), (150, num(0))])], complete="stripScanDone")
+        doc.on("stripScanDone", set_state(**{"oq4.stripScan": False}))
+        tune_in = [set_state(**{"oq4.stripScan": True}), play(scan_line)]
+    else:
+        # The Marine icon settles into the ring.
+        for i in range(count):
+            pop = doc.timeline(f"strip-pop{i}", 150, [tr(f"slot{i}-icons", "transform",
+                                                         [(0, transform_value(sx=1.16, sy=1.16), STRIP_EASE), (150, rest)])])
+            landing.append(when(AND(op("==", ideal, i), op("!=", delta, 0)), [play(pop)]))
+        tune_in = []
+
+    # A refusal: the ring shakes and flashes red; an empty weapon's sign
+    # throbs once to say why.
+    if strogg:
+        shake_keys = [(0, transform_value(tx=u(2.2))), (35, transform_value(tx=u(2.2))), (36, transform_value(tx=u(-1.8), sx=1.06)),
+                      (70, transform_value(tx=u(-1.8), sx=1.06)), (71, transform_value(tx=u(1.0))), (105, transform_value(tx=u(1.0))),
+                      (106, rest), (140, rest)]
+        flash = [(0, num(1)), (50, num(1)), (240, num(0))]
+        shake_ms = 140
+    else:
+        shake_keys = [(0, rest, STRIP_EASE), (30, transform_value(tx=u(-2.5))), (70, transform_value(tx=u(2.0))),
+                      (110, transform_value(tx=u(-1.2))), (150, transform_value(tx=u(0.6))), (190, rest)]
+        flash = [(0, num(1)), (70, num(1)), (240, num(0))]
+        shake_ms = 190
+    shake_tl = doc.timeline("strip-refuse-shake", shake_ms, [tr("strip-shake", "transform", shake_keys)])
+    # The red is a colour cue, not motion: reduced motion keeps it.
+    flash_tl = doc.timeline("strip-refuse-flash", 240, [tr("strip-refuse", "opacity", flash)], complete="stripRefuseDone",
+                            essential=True)
+    doc.on("stripRefuseDone", set_state(**{"oq4.stripRefuse": False}))
+    throbs = []
+    for i in range(count):
+        throb = doc.timeline(f"strip-throb{i}", 180, [tr(f"slot{i}-noammo", "transform",
+                                                         [(0, transform_value(sx=1.35, sy=1.35), STRIP_EASE), (180, rest)])])
+        throbs.append(when(AND(op("==", S("weapon_refused"), i), S(f"weapon{i}")), [play(throb)]))
+
+    # Shown in the frame of a change, never before the first weapon or while
+    # the HUD is hidden; closed 1000 ms after the latest change or quickly on
+    # firing (hud.gui:194-255).
+    def show_steps() -> list:
+        return [*([when(NOT(S("oq4.strip")), tune_in)] if tune_in else []),
+                set_state(**{"oq4.strip": True, "oq4.stripPos": S("oq4.stripTo"), "oq4.stripCount": S("weaponcount")}),
+                play(opening), play(hold)]
+    doc.on("weaponChange", when(AND(op(">=", S("player_lastweapon"), 0), NOT(S("oq4.hidden"))), [
+        set_state(**{"oq4.stripTo": selected_pos}),
+        # The ring travels only along a strip already on screen and unchanged.
+        when(AND(S("oq4.strip"), op("==", S("weaponcount"), S("oq4.stripCount"))), glides + landing),
+        *show_steps()],
+        [set_state(**{"oq4.strip": False})]))
+    doc.on("weaponRefused", when(AND(op(">", S("weaponcount"), 0), NOT(S("oq4.hidden"))), [
+        set_state(**{"oq4.stripTo": selected_pos, "oq4.stripRefuse": True}),
+        play(shake_tl), play(flash_tl), *throbs, *show_steps()]))
+    doc.on("weaponFire", when(S("oq4.strip"), [cancel(hold, "hold"), play(closing_fast)]))
+    doc.on("hideHud", cancel(hold, "hold"), play(closing))
+    doc.on("stripClose", play(closing))
+    doc.on("stripDone", set_state(**{"oq4.strip": False}))
     return strip
 
 

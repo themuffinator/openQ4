@@ -877,8 +877,8 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **123 partial, 231 pending and 0 verified requirements**, counting the
-41 superseded rows at their recorded states. `BEH-002`
+There are **123 partial, 232 pending and 0 verified requirements**, counting the
+42 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -1263,5 +1263,26 @@ with 1.40 to 1.42. The `.rui` rename (`822de6800`) changed `bindings.md`,
 The kick-vote change (`4a5c2a295`) changed `player-identity.md`, and the
 fight audit (`4f3bd6641`) changed `audio-voice-evidence.md`. No evidence scope
 or result changes. There are 354 rows, 313 active requirements and 41
+historical superseded rows; the 358 migration variants and seven final gates
+remain unaccepted.
+
+## Revision 24: the weapon strip's motion
+
+Visual specification 1.44 gives the Remastered weapon strip motion, at the
+product owner's request: it opens and closes over brief transitions instead
+of cutting, one ring travels from the weapon left to the one chosen, a refused
+choice (a weapon not carried or out of ammunition, or a next or previous that
+changes nothing) shakes the ring red and throbs an empty weapon's sign, and a
+tick marks the weapon a quick switch returns to. The Strogg strip, after
+stroggification, tunes in about its row, stretches its ring as it travels,
+sends an impulse when it lands and refuses in hard steps. Reduced motion keeps
+the ring, the red, the sign and the tick and drops the movement. `FLOW-032`
+closed the strip at once on firing, so `FLOW-070` supersedes it, carrying
+every construction, color and classic timing rule. It is pending; the
+generator's native checks and the game's new refusal event bind no evidence
+record yet. The revision re-binds the visual specification and the records
+on `retained-screens.md` and `audio-voice-evidence.md`, whose documents the
+audio and caption work changed after they were bound; no evidence scope or
+result changes. There are 355 rows, 313 active requirements and 42
 historical superseded rows; the 358 migration variants and seven final gates
 remain unaccepted.

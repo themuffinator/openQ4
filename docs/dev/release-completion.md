@@ -7,6 +7,29 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The weapon strip moves, and the Strogg one has its own feel, 13 November 2026
+
+- **The new interface's weapon strip opens and closes smoothly.** It rises
+  into place as you change weapons and sinks away a second later, or fades
+  out quickly as soon as you fire, instead of popping in and out.
+- **The ring follows your choice.** One ring glides from the weapon you had
+  to the one you picked, the gun settles into it and its name slides in from
+  the same side, so scrolling through weapons reads at a glance.
+- **A refused choice now tells you so.** Pressing the key for a weapon you
+  don't carry or that is out of ammunition, or scrolling when there is
+  nothing else to switch to, shakes the ring and flashes it red; an empty
+  gun's crossed-out sign pulses to show why.
+- **A small tick marks your quick-switch weapon,** the one you return to
+  after a change.
+- **After Kane's transformation the Strogg strip has its own character.** It
+  tunes in like a neural link with a scan line, its ring stretches as it
+  travels and sends out a pulse when it lands, and a refusal glitches in hard
+  steps. The Awakening's strips and the multiplayer strip move too.
+- Reduced Motion keeps the strip still apart from short fades, while the red
+  refusal, the empty sign and the tick stay. The classic HUD (`ui_retained 0`)
+  is unchanged. Replace both game modules: they send the new refusal to the
+  HUD.
+
 ## Retail distance comparison (AUD-01), 13 November 2026
 
 - [ ] AUD-01: `sound_distance_retail_compare.py` compares the levels that retail
