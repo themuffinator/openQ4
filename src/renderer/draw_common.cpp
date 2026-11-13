@@ -925,6 +925,44 @@ static idImage *rbSceneRenderTargetPreserveDepthImage = NULL;
 static int rbSceneRenderTargetPreserveDepthFrame = -1;
 static int rbSceneRenderTargetPreserveDepthWidth = 0;
 static int rbSceneRenderTargetPreserveDepthHeight = 0;
+
+/*
+The finished depth of the view being drawn, copied once after its last depth
+write. The far-depth preservation copy, SSAO and the cel world ink all read
+that same buffer: the first of them to copy it hands the copy to the others,
+as Vulkan's VK_Post_FinalDepth does. RB_STD_DrawView forgets the copy before
+the first of them and after the last.
+*/
+static idImage *rbFinishedDepthImage = NULL;
+static const viewDef_t *rbFinishedDepthView = NULL;
+static int rbFinishedDepthFrame = -1;
+static int rbFinishedDepthWidth = 0;
+static int rbFinishedDepthHeight = 0;
+
+static void RB_ForgetFinishedDepthCopy( void ) {
+	rbFinishedDepthImage = NULL;
+	rbFinishedDepthView = NULL;
+	rbFinishedDepthFrame = -1;
+	rbFinishedDepthWidth = 0;
+	rbFinishedDepthHeight = 0;
+}
+
+static void RB_NoteFinishedDepthCopy( idImage *image, int viewportWidth, int viewportHeight ) {
+	rbFinishedDepthImage = image;
+	rbFinishedDepthView = backEnd.viewDef;
+	rbFinishedDepthFrame = backEnd.frameCount;
+	rbFinishedDepthWidth = viewportWidth;
+	rbFinishedDepthHeight = viewportHeight;
+}
+
+static idImage *RB_FinishedDepthCopy( int viewportWidth, int viewportHeight ) {
+	if ( rbFinishedDepthImage == NULL || rbFinishedDepthFrame != backEnd.frameCount
+			|| rbFinishedDepthView != backEnd.viewDef
+			|| rbFinishedDepthWidth != viewportWidth || rbFinishedDepthHeight != viewportHeight ) {
+		return NULL;
+	}
+	return rbFinishedDepthImage;
+}
 static GLhandleARB rbSceneDepthAwarePresentProgram = 0;
 static GLhandleARB rbSceneDepthAwarePresentVertexShader = 0;
 static GLhandleARB rbSceneDepthAwarePresentFragmentShader = 0;
@@ -1923,6 +1961,7 @@ static void RB_CaptureSceneRenderTargetPreserveDepthImage( void ) {
 	rbSceneRenderTargetPreserveDepthFrame = backEnd.frameCount;
 	rbSceneRenderTargetPreserveDepthWidth = viewportWidth;
 	rbSceneRenderTargetPreserveDepthHeight = viewportHeight;
+	RB_NoteFinishedDepthCopy( depthImage, viewportWidth, viewportHeight );
 }
 
 static bool RB_EnsureSceneRenderTexture( const viewDef_t *sceneTargetView ) {
@@ -2400,6 +2439,14 @@ static newShaderStage_t rbSSAOStage;
 static bool rbSSAOStageInitialized = false;
 static idImage *rbSSAOWorldDepthImage = NULL;
 static idImage *rbSSAOFinalDepthImage = NULL;
+// The world snapshot's own multisampled depth target (RB_EnsureSSAOWorldDepthTarget),
+// resolved into _ssaoWorldDepth by the snapshot's first reader.
+static idImage *rbSSAOWorldDepthTargetImage = NULL;
+static idRenderTexture *rbSSAOWorldDepthRenderTexture = NULL;
+static idImage *rbSSAOWorldDepthPending = NULL;
+static const viewDef_t *rbSSAOWorldDepthPendingView = NULL;
+static int rbSSAOWorldDepthPendingFrame = -1;
+static int rbSSAOWorldDepthPendingRect[4];
 static int rbSSAOWorldDepthFrame = -1;
 static int rbSSAOWorldDepthWidth = 0;
 static int rbSSAOWorldDepthHeight = 0;
@@ -2433,6 +2480,14 @@ static idRenderTexture *rbSSAOHalfRenderTexture = NULL;
 
 static idCVar r_glSSAOReferenceComposition( "r_glSSAOReferenceComposition", "0", CVAR_RENDERER | CVAR_BOOL,
 	"OpenGL SSAO validation reference: draw the full-resolution pass over a resolved copy of the scene instead of multiplying the occlusion into the scene target" );
+static idCVar r_glSSAOReferenceSnapshot( "r_glSSAOReferenceSnapshot", "0", CVAR_RENDERER | CVAR_BOOL,
+	"OpenGL SSAO validation reference: draw the world-depth snapshot into the scene's own depth and resolve it at once instead of into a depth target of its own resolved where SSAO reads it" );
+
+static void RB_ResolveSSAOWorldDepth( void );
+// The last 3D view drawn into a render texture, recorded by RB_STD_DrawView.
+static const idRenderTexture *rbSceneTargetDepthViewTarget = NULL;
+static const viewDef_t *rbSceneTargetDepthView = NULL;
+static int rbSceneTargetDepthViewFrame = -1;
 
 static bool RB_SSAOFieldValid( void ) {
 	return rbSSAOFieldFrame == backEnd.frameCount && rbSSAOFieldView == backEnd.viewDef
@@ -2730,6 +2785,8 @@ static void RB_PrepareSSAOIndirectField( void ) {
 			|| idMath::Fabs( backEnd.viewDef->projectionMatrix[5] ) <= 0.00001f ) {
 		return;
 	}
+	RB_ResolveSSAOWorldDepth();
+
 	idImage *finalDepthImage = RB_EnsureSSAODepthScratchImage( rbSSAOFinalDepthImage, "_ssaoFinalDepth", viewportWidth, viewportHeight );
 	if ( finalDepthImage == NULL ) {
 		return;
@@ -2913,32 +2970,44 @@ static void RB_STD_SSAO( void ) {
 			viewportHeight );
 	}
 
+	// The finished depth is copied once (RB_FinishedDepthCopy). Without a
+	// world snapshot the world depth is the finished depth.
 	idImage *depthImage = NULL;
+	idImage *liveDepthImage = NULL;
 	if ( rbSSAOWorldDepthFrame == backEnd.frameCount
 		&& rbSSAOWorldDepthWidth == viewportWidth
 		&& rbSSAOWorldDepthHeight == viewportHeight
 		&& rbSSAOWorldDepthImage != NULL ) {
+		RB_ResolveSSAOWorldDepth();
 		depthImage = rbSSAOWorldDepthImage;
 	} else {
 		if ( !backEnd.currentDepthCopied ) {
 			RB_CaptureCurrentDepthImage( viewportWidth, viewportHeight );
+			liveDepthImage = fallbackDepthImage;
 		}
 		depthImage = fallbackDepthImage;
 	}
 	if ( depthImage == NULL ) {
 		return;
 	}
+	if ( liveDepthImage == NULL ) {
+		liveDepthImage = RB_FinishedDepthCopy( viewportWidth, viewportHeight );
+	}
 
 	idImage *finalDepthImage = field ? rbSSAOFinalDepthImage
+		: liveDepthImage != NULL ? liveDepthImage
 		: RB_EnsureSSAODepthScratchImage( rbSSAOFinalDepthImage, "_ssaoFinalDepth", viewportWidth, viewportHeight );
 	if ( field ) {
 		// The field was drawn before lighting; the apply pass reads only it.
+	} else if ( liveDepthImage != NULL ) {
+		// Already a copy of the finished depth.
 	} else if ( finalDepthImage != NULL ) {
 		finalDepthImage->CopyDepthbuffer(
 			backEnd.viewDef->viewport.x1,
 			backEnd.viewDef->viewport.y1,
 			viewportWidth,
 			viewportHeight );
+		RB_NoteFinishedDepthCopy( finalDepthImage, viewportWidth, viewportHeight );
 	} else {
 		finalDepthImage = depthImage;
 	}
@@ -3148,8 +3217,10 @@ static void RB_STD_CelWorldOutline( void ) {
 	// The depth buffer still holds the finished opaque scene at this point: the
 	// passes since the prepass have all been full-screen and depth-preserving.
 	// That is what tells the shader which world edges are still visible.
-	idImage *sceneDepthImage = RB_EnsureSSAODepthScratchImage( rbCelSceneDepthImage, "_celSceneDepth", viewportWidth, viewportHeight );
+	idImage *sceneDepthImage = RB_FinishedDepthCopy( viewportWidth, viewportHeight );
 	if ( sceneDepthImage != NULL ) {
+		// SSAO or the far-depth preservation copy already holds it.
+	} else if ( ( sceneDepthImage = RB_EnsureSSAODepthScratchImage( rbCelSceneDepthImage, "_celSceneDepth", viewportWidth, viewportHeight ) ) != NULL ) {
 		sceneDepthImage->CopyDepthbuffer(
 			backEnd.viewDef->viewport.x1,
 			backEnd.viewDef->viewport.y1,
@@ -8411,6 +8482,7 @@ void RB_ShutdownScenePostProcess( void ) {
 	rbSceneRenderTargetPreserveDepthFrame = -1;
 	rbSceneRenderTargetPreserveDepthWidth = 0;
 	rbSceneRenderTargetPreserveDepthHeight = 0;
+	RB_ForgetFinishedDepthCopy();
 
 	RB_ResetMotionBlurHistory();
 	RB_ClearTemporalEntityHistory();
@@ -9568,13 +9640,102 @@ static bool RB_SSAOIndirectViewRequested( drawSurf_t **drawSurfs, int numDrawSur
 	return false;
 }
 
-static void RB_CaptureSSAOWorldDepthImage( drawSurf_t **drawSurfs, int numDrawSurfs ) {
+static void RB_ResetSSAOWorldDepthSnapshot( void ) {
+	rbSSAOWorldDepthPending = NULL;
 	rbSSAOWorldDepthFrame = -1;
 	rbSSAOWorldDepthWidth = 0;
 	rbSSAOWorldDepthHeight = 0;
 	rbSSAOIndirectView = NULL;
 	rbSSAOFieldFrame = -1;
 	rbSSAOFieldView = NULL;
+}
+
+/*
+==================
+RB_EnsureSSAOWorldDepthTarget
+
+The world-depth snapshot's own depth target, of the scene depth's format,
+size and sample count, with the scene's colour image attached (never
+written) so that alpha-to-coverage covers the same samples. Drawing the world
+into the scene's own depth and resolving it there before the prepass costs
+hub2 and storage2 0.6-1.05 ms more GPU time per frame than drawing it here
+and leaving the resolve to the snapshot's first reader
+(RB_ResolveSSAOWorldDepth). The samples, and so the resolve, are the ones the
+scene's own depth held. It costs one more depth buffer, about 29 MB at 1440p
+with 2x MSAA and 59 MB with 4x. Single-sample scene targets, views drawn
+after another 3D view into the same target, and r_glSSAOReferenceSnapshot 1
+keep the snapshot in the scene's own depth.
+==================
+*/
+static idRenderTexture *RB_EnsureSSAOWorldDepthTarget( void ) {
+	idRenderTexture *sceneTarget = backEnd.renderTexture;
+	idImage *sceneDepth = sceneTarget != NULL ? sceneTarget->GetDepthImage() : NULL;
+	if ( r_glSSAOReferenceSnapshot.GetBool() || sceneDepth == NULL
+			|| sceneDepth->GetOpts().numMSAASamples <= 1 || globalImages == NULL ) {
+		return NULL;
+	}
+	// After an earlier 3D view of the frame (a portal-sky backdrop) has drawn
+	// into the scene's depth, the snapshot in the scene's own depth costs
+	// almost nothing and a second depth target costs more (Air Defense 1, the
+	// arena and convoy1: 0.2-0.3 ms), so such views keep it there.
+	if ( rbSceneTargetDepthViewFrame == backEnd.frameCount && rbSceneTargetDepthViewTarget == sceneTarget
+			&& rbSceneTargetDepthView != backEnd.viewDef ) {
+		return NULL;
+	}
+
+	const idImageOpts &sceneOpts = sceneDepth->GetOpts();
+	idImageOpts opts;
+	opts.textureType = TT_2D;
+	opts.format = sceneOpts.format;
+	opts.width = sceneOpts.width;
+	opts.height = sceneOpts.height;
+	opts.numLevels = 1;
+	opts.numMSAASamples = sceneOpts.numMSAASamples;
+	opts.isPersistant = true;
+	rbSSAOWorldDepthTargetImage = globalImages->ScratchImage( "_ssaoWorldDepthTarget", &opts, TF_NEAREST, TR_CLAMP, TD_DEPTH );
+	if ( rbSSAOWorldDepthTargetImage == NULL ) {
+		return NULL;
+	}
+	// The scene's colour image is attached as well, never written (the fill
+	// masks colour): alpha-to-coverage needs a multisampled colour target
+	// (RB_UseAlphaToCoverage), and perforated surfaces must cover the same
+	// samples as in the scene's own depth. Never resized through the render
+	// texture, which would resize the scene's colour image with it.
+	idImage *sceneColor = sceneTarget->GetNumColorImages() > 0 ? sceneTarget->GetColorImage( 0 ) : NULL;
+	idRenderTexture *&worldTarget = rbSSAOWorldDepthRenderTexture;
+	if ( worldTarget != NULL
+			&& ( worldTarget->GetDepthImage() != rbSSAOWorldDepthTargetImage
+				|| ( worldTarget->GetNumColorImages() > 0 ? worldTarget->GetColorImage( 0 ) : NULL ) != sceneColor
+				|| worldTarget->GetWidth() != opts.width || worldTarget->GetHeight() != opts.height ) ) {
+		tr.DestroyRenderTexture( worldTarget );
+		worldTarget = NULL;
+	}
+	if ( worldTarget == NULL ) {
+		worldTarget = tr.CreateRenderTexture( sceneColor, rbSSAOWorldDepthTargetImage );
+	}
+	if ( rbSSAOWorldDepthRenderTexture == NULL || rbSSAOWorldDepthRenderTexture->GetDeviceHandle() == 0 ) {
+		return NULL;
+	}
+	return rbSSAOWorldDepthRenderTexture;
+}
+
+static void RB_ResolveSSAOWorldDepth( void ) {
+	idImage *target = rbSSAOWorldDepthPending;
+	rbSSAOWorldDepthPending = NULL;
+	if ( target == NULL || rbSSAOWorldDepthRenderTexture == NULL
+			|| rbSSAOWorldDepthPendingView != backEnd.viewDef || rbSSAOWorldDepthPendingFrame != backEnd.frameCount ) {
+		return;
+	}
+	// CopyDepthbuffer resolves from backEnd.renderTexture.
+	idRenderTexture *sceneTarget = backEnd.renderTexture;
+	backEnd.renderTexture = rbSSAOWorldDepthRenderTexture;
+	target->CopyDepthbuffer( rbSSAOWorldDepthPendingRect[0], rbSSAOWorldDepthPendingRect[1],
+		rbSSAOWorldDepthPendingRect[2], rbSSAOWorldDepthPendingRect[3] );
+	backEnd.renderTexture = sceneTarget;
+}
+
+static void RB_CaptureSSAOWorldDepthImage( drawSurf_t **drawSurfs, int numDrawSurfs ) {
+	RB_ResetSSAOWorldDepthSnapshot();
 
 	if ( !RB_SSAORequestedForCurrentView() || globalImages == NULL || backEnd.viewDef == NULL ) {
 		return;
@@ -9588,6 +9749,14 @@ static void RB_CaptureSSAOWorldDepthImage( drawSurf_t **drawSurfs, int numDrawSu
 	}
 
 	RB_LogComment( "---------- RB_CaptureSSAOWorldDepthImage ----------\n" );
+
+	idRenderTexture *sceneTarget = backEnd.renderTexture;
+	idRenderTexture *worldTarget = RB_EnsureSSAOWorldDepthTarget();
+	if ( worldTarget != NULL ) {
+		backEnd.renderTexture = worldTarget;
+		worldTarget->MakeCurrent();
+		RB_BeginDrawingView();
+	}
 
 	glColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
 	int rendered = 0;
@@ -9609,14 +9778,30 @@ static void RB_CaptureSSAOWorldDepthImage( drawSurf_t **drawSurfs, int numDrawSu
 
 	if ( rendered > 0 ) {
 		rbSSAOIndirectView = classicDepthImage != NULL ? backEnd.viewDef : NULL;
-		worldDepthImage->CopyDepthbuffer(
-			backEnd.viewDef->viewport.x1,
-			backEnd.viewDef->viewport.y1,
-			viewportWidth,
-			viewportHeight );
+		if ( worldTarget != NULL ) {
+			// resolved by the snapshot's first reader
+			rbSSAOWorldDepthPending = worldDepthImage;
+			rbSSAOWorldDepthPendingView = backEnd.viewDef;
+			rbSSAOWorldDepthPendingFrame = backEnd.frameCount;
+			rbSSAOWorldDepthPendingRect[0] = backEnd.viewDef->viewport.x1;
+			rbSSAOWorldDepthPendingRect[1] = backEnd.viewDef->viewport.y1;
+			rbSSAOWorldDepthPendingRect[2] = viewportWidth;
+			rbSSAOWorldDepthPendingRect[3] = viewportHeight;
+		} else {
+			worldDepthImage->CopyDepthbuffer(
+				backEnd.viewDef->viewport.x1,
+				backEnd.viewDef->viewport.y1,
+				viewportWidth,
+				viewportHeight );
+		}
 		rbSSAOWorldDepthFrame = backEnd.frameCount;
 		rbSSAOWorldDepthWidth = viewportWidth;
 		rbSSAOWorldDepthHeight = viewportHeight;
+	}
+
+	if ( worldTarget != NULL ) {
+		backEnd.renderTexture = sceneTarget;
+		sceneTarget->MakeCurrent();
 	}
 
 	RB_RestoreAfterSSAOWorldDepthCapture();
@@ -17058,6 +17243,7 @@ void	RB_STD_DrawView( void ) {
 
 	// clear the z buffer, set the projection matrix, etc
 	RB_BeginDrawingView();
+	const idRenderTexture *viewDepthTarget = backEnd.renderTexture;
 	RB_CaptureSSAOWorldDepthImage( drawSurfs, numDrawSurfs );
 	RB_CaptureCelWorldDepthImage( drawSurfs, numDrawSurfs );
 
@@ -17215,6 +17401,7 @@ void	RB_STD_DrawView( void ) {
 		RB_STD_DrawShaderPasses( drawSurfs, processed, RB_DrawSurfIsPostFogMaterialPass );
 	}
 
+	RB_ForgetFinishedDepthCopy();
 	RB_CaptureSceneRenderTargetPreserveDepthImage();
 
 	// Apply SSAO before bloom and tonemapping so indirect shadowing modulates the lit scene.
@@ -17229,6 +17416,7 @@ void	RB_STD_DrawView( void ) {
 	// World cel edges land after bloom so the ink stays crisp instead of being
 	// smeared by the blur of whatever it borders.
 	RB_STD_CelWorldOutline();
+	RB_ForgetFinishedDepthCopy();
 
 	// now draw any post-processing effects using _currentRender
 	if ( processed < numDrawSurfs ) {
@@ -17280,6 +17468,11 @@ void	RB_STD_DrawView( void ) {
 	RB_WindowView_End( windowView );
 
 	RB_CapturePortalSkyBackdrop( backEnd.viewDef );
+	if ( backEnd.viewDef->viewEntitys != NULL && viewDepthTarget != NULL ) {
+		rbSceneTargetDepthViewTarget = viewDepthTarget;
+		rbSceneTargetDepthView = backEnd.viewDef;
+		rbSceneTargetDepthViewFrame = backEnd.frameCount;
+	}
 
 // jmarshall - stupid OpenGL
 	GL_State(GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO);

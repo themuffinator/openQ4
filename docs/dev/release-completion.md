@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## OpenGL ambient occlusion costs less indoors (FPS-04 follow-up), 13 November 2026
+
+- **Quality and Ultra run faster on OpenGL in interiors.** Ambient occlusion no
+  longer pays for an expensive depth copy early in every frame: hub2 is about
+  1 ms and storage2 about 0.6 ms of GPU work shorter at both presets, and
+  outdoor scenes stay as fast as before. OpenGL's half-resolution occlusion at
+  Quality now costs what Vulkan's does (0.2-0.4 ms in those rooms, down from
+  0.8-1.0).
+- Pictures are unchanged: frozen captures at five reference poses on Quality
+  and Ultra are identical to the old path, and the PBR laboratory's SSAO
+  controls pass 10/10 on OpenGL with and without the modern path.
+- While ambient occlusion is on, OpenGL keeps one more depth buffer (about
+  29 MB at 1440p on Quality, 59 MB on Ultra). Nothing to change in your
+  settings.
+- Developers: `r_glSSAOReferenceSnapshot 1` restores the old depth snapshot for
+  comparisons; the price list is in the
+  [performance report, section 12.8](performance-report.md#128-opengls-ssao-depth-copies-follow-up).
+
 ## A Meta Quest build of openQ4, not yet tried on a headset, 12 November 2026
 
 - **openQ4 can now be built as a standalone Meta Quest app.** Building the

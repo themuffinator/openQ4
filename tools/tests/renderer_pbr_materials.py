@@ -1476,6 +1476,45 @@ def test_vulkan_production_baked_contract() -> None:
             "the ambient walk visits a grid receiver without environment light")
 
 
+def test_gl_ssao_depth_copies_contract() -> None:
+    # OpenGL's SSAO depth copies (FPS-04 follow-up): with a multisampled scene
+    # the world snapshot is drawn into a depth target of its own, of the scene
+    # depth's format and samples and with the scene's colour attached for
+    # alpha-to-coverage, and resolved by its first reader; a view drawn after
+    # another 3D view into the same target keeps it in the scene's depth. The
+    # finished depth is copied once for far-depth preservation, SSAO and the
+    # cel ink.
+    common = read(ROOT / "src/renderer/draw_common.cpp")
+    for token in ('static idCVar r_glSSAOReferenceSnapshot( "r_glSSAOReferenceSnapshot", "0",',
+                  "static idRenderTexture *RB_EnsureSSAOWorldDepthTarget( void ) {",
+                  "if ( r_glSSAOReferenceSnapshot.GetBool() || sceneDepth == NULL\n"
+                  "\t\t\t|| sceneDepth->GetOpts().numMSAASamples <= 1 || globalImages == NULL ) {",
+                  "if ( rbSceneTargetDepthViewFrame == backEnd.frameCount && rbSceneTargetDepthViewTarget == sceneTarget\n"
+                  "\t\t\t&& rbSceneTargetDepthView != backEnd.viewDef ) {",
+                  "rbSceneTargetDepthViewTarget = viewDepthTarget;",
+                  "opts.format = sceneOpts.format;",
+                  "opts.numMSAASamples = sceneOpts.numMSAASamples;",
+                  "worldTarget = tr.CreateRenderTexture( sceneColor, rbSSAOWorldDepthTargetImage );",
+                  "backEnd.renderTexture = worldTarget;\n\t\tworldTarget->MakeCurrent();\n\t\tRB_BeginDrawingView();",
+                  "rbSSAOWorldDepthPending = worldDepthImage;",
+                  "backEnd.renderTexture = sceneTarget;\n\t\tsceneTarget->MakeCurrent();",
+                  "RB_ResolveSSAOWorldDepth();\n\t\tdepthImage = rbSSAOWorldDepthImage;",
+                  "\tRB_ResolveSSAOWorldDepth();\n\n\tidImage *finalDepthImage = RB_EnsureSSAODepthScratchImage( rbSSAOFinalDepthImage",
+                  "|| rbSSAOWorldDepthPendingView != backEnd.viewDef || rbSSAOWorldDepthPendingFrame != backEnd.frameCount ) {",
+                  "RB_ForgetFinishedDepthCopy();\n\tRB_CaptureSceneRenderTargetPreserveDepthImage();",
+                  "RB_STD_CelWorldOutline();\n\tRB_ForgetFinishedDepthCopy();",
+                  "liveDepthImage = RB_FinishedDepthCopy( viewportWidth, viewportHeight );",
+                  "idImage *sceneDepthImage = RB_FinishedDepthCopy( viewportWidth, viewportHeight );"):
+        require(common, token, "OpenGL SSAO depth copies")
+    # The snapshot resets its pending resolve with the rest of its state, so
+    # a later view can never resolve an earlier view's world depth, and the
+    # world target is never resized through the render texture, which would
+    # resize the scene's colour image with it.
+    require(common, "static void RB_ResetSSAOWorldDepthSnapshot( void ) {\n\trbSSAOWorldDepthPending = NULL;",
+            "OpenGL SSAO depth copies")
+    reject(common, "tr.ResizeRenderTexture( rbSSAOWorldDepthRenderTexture", "OpenGL SSAO world-depth target")
+
+
 def test_pbr_ssao_indirect_contract() -> None:
     # SSAO occludes native PBR indirect light only (production readiness,
     # Stage D): an occlusion field drawn after the depth prepass, folded into

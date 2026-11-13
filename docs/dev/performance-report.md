@@ -1463,7 +1463,7 @@ The same ladder with only SSAO and the whole chain toggled:
 Half resolution takes 0.4-0.55 ms off SSAO where it has work to do and the OpenGL Quality
 frame is 0.2-0.4 ms shorter. Its remaining 0.8-1.0 ms in hub2 and storage2 against
 Vulkan's 0.1-0.4 ms sits outside the occlusion shader, most likely in the depth copies
-named above: the next lever, recorded under section 12.7. Enhanced (12 samples) takes the same half-resolution path; it was not priced.
+named above: the next lever, recorded under section 12.7 and taken in section 12.8. Enhanced (12 samples) takes the same half-resolution path; it was not priced.
 
 ### 12.5 Declared budgets and shares
 
@@ -1526,8 +1526,70 @@ launch drifted too far to read).
 - **Not changed:** bloom draws its first level at full resolution on both backends
   (three full-size passes); starting the pyramid at half size would change the glow and is
   left to a decision. Ultra's full-resolution SSAO is the user's choice; half resolution
-  would save about 1 ms there. OpenGL's SSAO depth copies are the largest OpenGL-only
-  cost left in the chain.
+  would save about 1 ms there. OpenGL's SSAO depth copies, the largest OpenGL-only cost
+  left in the chain, were priced and cut afterwards (section 12.8).
+
+### 12.8 OpenGL's SSAO depth copies (follow-up)
+
+The 0.8-1.0 ms that OpenGL's half-resolution SSAO still cost in hub2 and storage2 was
+almost all one depth copy. OpenGL takes its world-only depth snapshot in a depth fill of
+its own before the prepass: the world surfaces are drawn into the scene's multisampled
+depth, resolved into `_ssaoWorldDepth`, and the depth is cleared again. Vulkan draws the
+world first in its own prepass and copies between the phases.
+
+**Price list** (hidden 2560x1440 window, 2x MSAA at Quality and 4x at Ultra, in-launch
+toggles read as GPU frame time; per-copy timestamps proved useless here, because a
+blit's window absorbs the backlog of the work queued before it):
+
+- The snapshot's resolve costs 0.5-1.0 ms of GPU frame time in hub2 and storage2; the
+  world fill and the clear around it about 0.1 ms. In Air Defense 1, the arena and convoy1,
+  where a portal-sky backdrop view draws into the same scene target first, the same
+  resolve costs nothing measurable.
+- The finished-depth copy SSAO takes for its foreground test, the light grid's
+  `_currentDepth` copy after the prepass and the other finished-depth copies cost about
+  0.1 ms or less each. Outdoors one light-grid copy per frame costs about 0.3 ms even with
+  SSAO off; it is not an SSAO cost (lead below).
+- Copying the multisampled depth unresolved, sample for sample, costs almost nothing.
+  The resolve itself is cheap where the snapshot's first reader needs it, and expensive
+  early in the frame or after the scene's depth has been read before the prepass ended.
+
+**What changed:**
+
+- With a multisampled scene target the snapshot is drawn into a depth target of its
+  own, of the scene depth's format, size and sample count, with the scene's colour image
+  attached but never written, so alpha-to-coverage covers exactly the samples it covered
+  before. The snapshot's first reader (the native-PBR occlusion field, or SSAO itself)
+  resolves it. The samples and the resolve are those of the old path, so the picture does
+  not change. The target costs one depth buffer: about 29 MB at 1440p with 2x MSAA and
+  59 MB with 4x.
+- A view drawn after another 3D view into the same scene target in the same frame (a
+  portal-sky backdrop) keeps the snapshot in the scene's depth: there the old resolve is
+  free and the second target would cost 0.2-0.3 ms.
+- The finished depth is copied once per view for far-depth preservation, SSAO and the cel
+  world ink, which used to copy it two or three times when all were active.
+- `r_glSSAOReferenceSnapshot 1` restores the old in-scene snapshot for comparisons.
+
+A Vulkan-style snapshot between the prepass's phases was tried first and dropped: reading
+the scene's depth halfway through the prepass made the frame 0.2-0.7 ms dearer outdoors.
+
+**Result** (GPU ms per frame, the default path against `r_glSSAOReferenceSnapshot 1` in the
+same launch, three alternating rounds; negative is faster):
+
+| Scene | Quality | Ultra |
+|---|---:|---:|
+| hub2 | -1.05 | -1.03 |
+| storage2 | -0.59 | -0.57 |
+| arena | +0.01 | -0.02 |
+| airdefense1 | -0.07 | -0.09 |
+| convoy1 | -0.05 | -0.04 |
+
+OpenGL's half-resolution SSAO at Quality now costs 0.2-0.4 ms in hub2 and storage2, as
+Vulkan's 0.1-0.4 ms does; its full-resolution Ultra SSAO in hub2 1.1 ms, against 1.80 ms
+before and Vulkan's 0.93 ms. Frozen captures at the five reference poses on OpenGL Quality and Ultra, the default path against `r_glSSAOReferenceSnapshot 1` in the same launch, are identical in the final frame and the occlusion debug view (at most three pixels by one level, on the outdoor poses, where both settings take the same path). The PBR laboratory's SSAO controls pass 10/10 on OpenGL with and without the modern visible path.
+
+**Leads:** the outdoor light-grid copy (about 0.3 ms with SSAO off in Air Defense 1, the arena
+and convoy1, absent indoors), and why the in-scene resolve is free after a portal-sky
+backdrop view, which this measurement only exploits.
 
 ## Appendix: artifacts
 
