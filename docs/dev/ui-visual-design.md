@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.41, 13 November 2026 (1.40 earlier that day, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.42, 13 November 2026 (1.40 and 1.41 earlier that day, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -39,7 +39,9 @@ Marine frame and take a glacial palette, frost on the framing bands and snow
 behind the instruments, after the 0.14.1 Awakening Edition release artwork.
 Version 1.41 gives the family its own frames, shaped after the Valkaryne:
 blade ends on its plates, talons on the bands' steps and the dialog's chamfer,
-and a lens around the focused marker.
+and a lens around the focused marker. Version 1.42 reshapes the main frames
+themselves: the bands' steps become horns, and the level block and dialogs
+take horned corners.
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -214,7 +216,7 @@ screens. Do not introduce them or carry them into the replacement:
 | Family | Identity | Required fidelity |
 | --- | --- | --- |
 | Marine menus | Olive/black plates, orange focus, yellow values, Marine title face | Stepped/notched bands, open cut plates, triangular markers, additive light, original scene imagery |
-| Awakening menus | The Valkaryne's black armour in glacial light: blade-ended plates, talons on the bands, a lens around the focused marker, ice rails and values, frost on the bands, snow behind the instruments | Marine positions, type, opacity and motion unchanged; the Valkaryne frames of section 6; the Awakening tokens; frost on the framing bands only; the Marine family everywhere outside the running expansion campaign |
+| Awakening menus | The Valkaryne's black armour in glacial light: horned bands and panels, blade-ended plates, a lens around the focused marker, ice rails and values, frost on the bands, snow behind the instruments | Marine positions, type, opacity and motion unchanged; the Valkaryne frames of section 6; the Awakening tokens; frost on the framing bands only; the Marine family everywhere outside the running expansion campaign |
 | Marine HUD | Tactical overlays, bright critical values, compact instruments | Weapon/ammo/health/armor hierarchy, sheared gauges, feedback and original spatial relationships |
 | Strogg HUD and terminals | Original alien glyphs, mechanical paths and family colors | Each source's geometry and animation; never generic Marine panels |
 | World terminals | Local device panel and in-world illumination | Surface mapping, interaction targets, stateful scripts and intended viewing distance |
@@ -1007,8 +1009,9 @@ family changes, and no picture of her is drawn.
 
 - **The sweep.** A circular arc of 30 degrees that leaves one edge at
   45 degrees and reaches the other at 15. A sweep `c` high is `1.73c` long on
-  a radius of `3.86c`. It keeps the 45-degree break where it begins and ends
-  in a 15-degree point. It is the only curve that cuts a frame.
+  a radius of `3.86c`. It always hollows the frame it cuts: it bows into the
+  frame, never out of it, so the frame keeps a 15-degree point. It is the
+  only curve that cuts a frame.
 - **Blade.** An open plate's trailing end is one sweep from its top edge down
   to its rail, in place of the stock dissolve: 42 u long on a 24.4 u
   navigation plate. The rail runs to the point and the swept edge carries no
@@ -1017,32 +1020,47 @@ family changes, and no picture of her is drawn.
   and the plinth end in blades. A separator inside a card is a needle, 1.2 u
   (about 2 dp) thick at its leading end and tapering to a point at its
   trailing end.
-- **Talon.** Every 45-degree step of 24 u or more in a frame grows a talon at
-  its foot. A talon is a prong a third as high as the step. It continues the
-  thicker side's edge past the step, and one sweep cuts its other side back
-  to the step, so it ends in a 15-degree point and leaves a 90-degree notch
-  against the step. The top band's riser carries one, pointing to the
-  trailing edge along the 103.8 u line, 11.8 u high and 20.4 u long. The
-  bottom band's raised section carries two, pointing outward along the
-  400.4 u line as her legs spread: 10.1 u by 17.4 u on the leading ramp and
-  14.4 u by 25 u on the trailing one. The modal's lower-leading chamfer
-  carries one along its bottom edge, a third of the chamfer high, and the
-  black frame traces it. A talon keeps its place on the 4:3 canvas at every
-  aspect, as the step it stands on does.
-- **Spines.** One 0.5 u line in `awakening.glacier` runs from each band
-  talon's point into the band at 15 degrees, 0.50 at the point and fading out
-  over 60 u in the top band and 44 u in the bottom band. Frost lies over it.
+- **Horns on the bands.** Every 45-degree step of 24 u or more in a band
+  becomes a horn. The thicker side's edge runs on past the step to a point,
+  and one sweep as high as the step cuts back from the point to the other
+  level, which it meets at 45 degrees. A horn is 1.73 times as long as its
+  step is high. The top band's riser becomes one horn pointing to the
+  trailing edge: its point stands at 376.5 u on the 103.8 u line, 61 u past
+  the foot of the stock riser and 14 u above the level block's corner. The
+  bottom band's raised section ends in two horns pointing outward along the
+  400.4 u line, as her legs spread: 52 u long to a point at -50.2 u on the
+  leading side, and 75 u long to a point at 419.9 u on the trailing side,
+  12 u under the level block. A horn keeps its place on the 4:3 canvas at
+  every aspect, as the step it replaces does.
+- **Horned corners.** A card and a modal end in a horn at the top-trailing
+  corner, in place of the card's major cut there and the modal's square
+  corner. The top edge runs on to the corner, a sweep 8 u high cuts back
+  beneath it, and a 45-degree line returns to the trailing edge: a 90-degree
+  bite 13.9 u deep that closes 21.9 u below the top, inside a card's header.
+  The modal's bottom edge also runs on to its lower-leading corner under the
+  chamfer: a sweep 9.3 u high, the chamfer's height over 2.73, rises from the
+  corner to the chamfer, which continues above it. The rail and the black
+  frame trace every horn. A card's lower-leading cut and the minor cuts stay.
+- **Tapers.** A step under 24 u takes no sweep, which reads as a rounded
+  corner at that size. The band before each of the top band's three pockets
+  tapers straight at 15 degrees, over 34 u, to a point at the pocket's
+  leading corner, in place of the stock 45-degree flank. The pocket, its
+  36 u seat and its trailing flank are the stock's, so the crumbs and the
+  band step of section 13.7 keep their places. The bands' other 9 u steps
+  stay.
+- **Fullers.** One 0.5 u line in `awakening.glacier` runs from each band
+  horn's point back along the middle of its blade, at 7.5 degrees to the
+  edge and as long as the horn, 0.50 at the point and fading out. Frost lies
+  over it.
 - **Lens.** The focused control's marker stands in a lens in `marine.orange`:
   a ring of 6.6 u radius, 0.9 u wide at 0.90; a ring of 9.4 u radius, 0.45 u
   wide at 0.45; and an additive halo 13 u in radius, 0.35 at its center. It
   appears and leaves with the stock focus response and takes the place of
   section 13.8's focus light. Nothing else in the family is round. High
   contrast keeps the two rings at 1.00 and drops the halo.
-- **What stays straight.** Cards, the modal's slot, tooth and corners, the
-  bands' 9 u notches and steps and every cut under 24 u keep the Marine
-  family's straight 45-degree cuts. A sweep on a closed panel's corner reads
-  as a rounded corner, and a row of small sweeps along a band reads as a
-  scalloped edge; neither is used. Her crown of spikes is not drawn.
+- **What is not drawn.** A sweep that bows out of its frame, which reads as
+  a rounded corner; a row of small sweeps, which reads as a scalloped edge;
+  her crown of spikes; any picture of her.
 
 ### Frost, snow and haze
 
@@ -1057,7 +1075,7 @@ icicles are not part of the family.
 - **Where frost grows.** Only on the framing bands, which are opaque black and
   hold no content. Frost is fixed to the view: it grows from seeds on the
   view's top and bottom edges and at its four corners, and each band's
-  silhouette masks it, talons included, at full strength up to 6 u inside the
+  silhouette masks it, horns included, at full strength up to 6 u inside the
   band's inner edge and falling to nothing at the edge. A moving band covers
   or uncovers it; it
   never travels with the band. Frost never lies on a plate, a card, a dialog,
@@ -1113,7 +1131,7 @@ icicles are not part of the family.
 The editable [Awakening menu atlas sheet](ui/atlas/awakening-menu.html) draws
 the pause menu and its confirmation at 4:3, 16:9, 21:9 and 32:9 beside the
 Marine family, with the layers switchable, the carved slots outlined and the
-opening replayed, and the constructions of the sweep, blade, talon, lens and
+opening replayed, and the constructions of the sweep, blade, horn, lens and
 frost crystal. `tools/ui/update_design_atlas.py` merges it into the full
 atlas.
 
@@ -2009,10 +2027,10 @@ and parallax off.
     take the Awakening family: Save, Load, Restart Level, Objectives, the
     settings pages and their confirmations. No position, pitch, type,
     opacity, choreography or sound of the Marine pause changes. Its frames
-    become the Valkaryne frames of section 6: the navigation plates, the
-    plinth and the action buttons end in blades, the top band's riser and
-    the bottom band's two ramps grow talons, a confirmation's chamfer grows
-    one, and the focused control's marker stands in the lens. The section 4
+    become the Valkaryne frames of section 6: the bands' 45-degree steps
+    become horns, the level block and a confirmation end in horned corners,
+    the navigation plates, the plinth and the action buttons end in blades,
+    and the focused control's marker stands in the lens. The section 4
     Awakening tokens replace the Marine colors.
     The bands' inner edges gain the rime line, frost grows on the bands with
     `frost.grow`, and snow falls behind the instruments over the low haze
@@ -4399,6 +4417,24 @@ bands' risers read as scalloped edges. Closed panels keep straight 45-degree
 cuts. Her model and textures were rendered for reference outside the
 repository; nothing extracted from them is tracked. The register still does
 not hold this scope, and nothing is accepted.
+
+### Version 1.42: horns on the main frames
+
+Version 1.41's talons were a third as high as the steps they stood on and
+left the bands, the level block and the dialog looking like the Marine
+family's; the product owner asked for the main frames themselves to change.
+Section 6 replaces the talons and their spines with horns, tapers and
+fullers, and sections 2 and 13.7 follow.
+
+| Frame | Version 1.41 | Version 1.42 |
+| --- | --- | --- |
+| Top band | The stock riser with a talon 11.8 u high at its foot | The riser becomes a horn 61 u long, its point at 376.5 u; the band before each pocket tapers to a point at 15 degrees |
+| Bottom band | The stock ramps with talons 10.1 and 14.4 u high | The raised section ends in two horns, 52 and 75 u long, pointing outward |
+| Card | The stock card | A horn at the top-trailing corner, closing inside the header |
+| Modal | A talon 8.4 u high at the foot of the chamfer | A horn at the top-trailing corner; the bottom edge runs on to the lower-leading corner under the chamfer |
+| Rule | Talons on steps of 24 u or more; everything else straight | Horns on steps of 24 u or more and on panel corners; smaller steps taper straight at 15 degrees; every sweep hollows its frame |
+
+The register still does not hold this scope, and nothing is accepted.
 
 ### Version 1.39: the Awakening chaingun turret
 
