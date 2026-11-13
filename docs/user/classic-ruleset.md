@@ -147,3 +147,6 @@ the console, for example `bind MOUSE4 _hook`. It has no default key.
 - Bots play Classic matches but never use the hook.
 - Item names on the pickup notices are still Quake 4's ("Small Armor Vest").
 - The armour counter does not show the tier's colour yet.
+- With [Instagib](server-setup.md#instagib) on, its railgun and one-hit kills
+  replace Classic's weapons and armour. The double jump and the hook still
+  work.
