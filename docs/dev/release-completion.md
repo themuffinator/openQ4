@@ -7,6 +7,25 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Shared rendering paths work with the normal graphics settings, 13 November 2026
+
+- **Nothing changes by default.** The nine shared classic rendering paths
+  (`r_rendererShared*`, off unless a tester turns them on) draw the same frame
+  the regular renderer draws, so turning one on should never change a picture.
+- **Testers can now use them with the usual presets.** Before, they only took
+  effect with every post effect off; with HDR, SSAO, anti-aliasing or MSAA on
+  they quietly did nothing on both renderers. On Vulkan, turning one on also
+  shifted edge pixels in the rest of the frame. Both are fixed: each path now
+  produces a frame identical to the regular renderer's on OpenGL and Vulkan.
+- **Wall screens, characters and the classic HUD are covered.** The in-world
+  GUI path now draws every stock wall screen. The shared lighting path now
+  lights and shadows characters, which it used to hand back to the regular
+  renderer, and handles every shadow-map form the higher presets use. On
+  Vulkan the classic HUD is no longer merged with the scene underneath it.
+- An automated check compares each path with the regular renderer, frame for
+  frame, on stock maps under several presets
+  ([details](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)).
+
 ## A Classic multiplayer ruleset inspired by Quake 2, 13 November 2026
 
 - **Play Quake 4 multiplayer the Quake 2 way.** Hosts can set **Ruleset** to
@@ -159,6 +178,7 @@ does not restore the withdrawn release. See
   finishes loading, Quake 4's ready chime plays as the continue prompt appears,
   and continuing plays its click, in both the new and the classic interface.
   Neither sound was playing before.
+
 ## The main menu's background comes through as a living signal, 13 November 2026
 
 - **The new interface's main menu has a sci-fi display look.** The level

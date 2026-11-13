@@ -2,9 +2,11 @@
 
 ## Status
 
-The fixed-classic interaction transaction is **Implemented (default-off;
-native/static and controlled local OpenGL/Vulkan qualification recorded; stock,
-final-package, and platform release promotion pending)**. It contains two
+The fixed-classic interaction transaction is **Implemented and qualified for
+individual promotion (default-off; REN-01 runtime qualification on stock views
+on Windows OpenGL/Vulkan recorded 13 November 2026; non-Windows platforms and
+human appearance review belong to platform qualification)**; see
+[REN-01 qualification](#ren-01-qualification-13-november-2026). It contains two
 complete Milestone D ownership corridors behind the
 `r_rendererSharedWorldInteraction 1` setting:
 
@@ -135,8 +137,9 @@ The shared corridor admits ordinary root fixed-classic interaction views with:
 
 - no shadows, classic stencil volumes, mapped projected/parallel/CSM lights,
   mapped point lights, mixed per-light modes, or complete hybrid supplements;
-- static and dynamic opaque mapped casters, including authoritative CPU-skinned
-  `idDrawVert` streams;
+- static and dynamic opaque mapped casters and receivers, including
+  authoritative CPU-skinned `idDrawVert` streams (every character's posed
+  generated topology);
 - perforated/alpha-tested mapped casters with sealed alpha stages;
 - exact cache reuse, cache update, or bounded non-cacheable scratch resources;
   and
@@ -154,8 +157,8 @@ conditions:
   receiver; `r_pbrMaterials`, on by default, leaves a view without one
   eligible), cel, flat-
   diffuse, simple/test, or other alternate interaction modes;
-- unsupported or unsealed material-deform output, generated/deformed geometry,
-  GPU-palette-skinned, packed, primitive-batch, missing-cache, depth-hack,
+- unsupported or unsealed material-deform output, GPU-posed generated
+  geometry, GPU-palette-skinned, packed, primitive-batch, missing-cache, depth-hack,
   negative-scale, or otherwise unsealed receiver geometry;
 - subview, mirror, x-ray, editor, offscreen, render-demo, global-material, or
   other non-root view ownership;
@@ -307,6 +310,62 @@ recapture, a freshly staged final package, target-platform coverage, and driver 
 before the default-off option can be promoted. Retain reports,
 logs, engine screenshots, image hashes/deltas, exact per-map records, final
 poses, and Vulkan validation results with that release evidence.
+
+## REN-01 qualification, 13 November 2026
+
+The [shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)
+owns the interaction phase of a frozen stock `game/airdefense1` gameplay view
+on OpenGL and Vulkan under the default preset (mapped projected shadows,
+stencil point lights, HDR scene target), with stencil shadows only, with every
+light shadow-mapped (point cubes and a distant point light's projected map,
+static shadow cache off), with 4x MSAA and with the post chain off. On
+`maps/tools/mv2` it owns a CPU-skinned stock character (`char_doctor`) and a
+spawned crate as dynamic receivers and casters under a projected test light
+and point-cube maps. Every frame is byte-identical to the classic one;
+`r_skipInteractions 1` is the visible control, and the first-person weapon's
+depth hack is the natural zero-commit rollback (a named fallback, nothing
+owned, the classic frame). The stencil-only view is not compared on OpenGL
+with 4x MSAA: there, classic frames flip isolated pixels between identical
+frozen frames with every domain off.
+
+These fixes made this possible:
+
+- The adapters refused any render target, so under the default presets (the
+  game's forward scene target on both backends, Vulkan's own scene target)
+  nothing was ever owned. They now draw where the classic walker draws.
+- Vulkan used to move a view onto the swapchain while any shared domain was
+  requested. That changed the orientation and interpolation rounding of the
+  classic work in the same frame (up to 18 levels along silhouettes), so a
+  shared frame could never match the classic frame. The view now stays in its
+  scene target.
+
+- The domain read `deformedSurface` as GPU posing and refused every
+  CPU-skinned MD5 surface, as a receiver or a mapped caster, which is every
+  character. That flag marks generated
+  topology whose ambient cache already holds the final pose; classic fixed the
+  same misreading in issue #73. Posed generated topology is now admitted, and
+  primitive-batch MD5R and GPU-palette skinning stay refused.
+- A distant point light (its centre far outside its radius) draws a
+  projected map, as classic classifies it, but its pass was labelled a point
+  light, so both backends looked for a cube and declined. The pass class now
+  names the map form drawn; the view's shadow mode and point/projected counts
+  follow it, and OpenGL decides cubes from classic's own classification.
+- A perforated caster whose alpha stages were all inactive (or had zero
+  alpha) kept the start of an alpha range with no stages; the no-op and
+  OpenGL checks refused it. It now seals no range.
+
+Dense stock views also overflowed the per-frame geometry records (1024) that
+every shared domain reads; a frame whose draws fit can no longer overflow them.
+
+Two boundaries remain with the static shadow cache on, both safe. While the
+domain switch is on, classic Vulkan regenerates the maps it would otherwise
+compose from a cached static copy plus the live casters, because the shared
+stream draws each pass's whole caster plan. A composed map is not always
+bit-identical to a regenerated one, so a few pixels of the classic frame move
+by one level (13 to 20 in the all-mapped `game/airdefense1` view; none in the
+caster scene). OpenGL's sealed cache schedule also declines the cached pass of
+a distant point light, a named `shadowMapTransaction` fallback that leaves the
+whole view classic.
 
 ## Milestone D completion and release-promotion boundary
 

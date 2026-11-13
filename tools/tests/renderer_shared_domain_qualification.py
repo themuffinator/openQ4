@@ -395,6 +395,8 @@ SCENES = [
         checks=[
             Check("interaction", control={"r_skipInteractions": "1"}, rollback={"ui_showGun": "1"}),
         ],
+        skip={"msaa-gl": "classic OpenGL stencil shadows with 4x MSAA flip isolated pixels between "
+                         "identical frozen frames, with every domain off"},
     ),
     # Every light shadow-mapped, as the Quality and higher presets do, with
     # the static shadow cache off. With the cache on, the domain switch makes

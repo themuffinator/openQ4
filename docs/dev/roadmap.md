@@ -22,7 +22,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 8 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **39 / 125 (31.2%)** | **86 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Formally closed roadmap tasks | **40 / 125 (32.0%)** | **85 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
 | Estimated category progress | **19 categories: 3 at 100%, 14 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -52,7 +52,7 @@ exact; the estimate column is deliberately approximate.
 | [Governance and baseline evidence](#governance-and-baseline-evidence) — GOV | **100%** | 3 / 3 | Maintain evidence/default alignment as later changes land. |
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
-| [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 0 / 8 | Domain promotion, aggregate lighting ownership and combined-effect/performance qualification. |
+| [Modern rendering engine](#modern-rendering-engine) — REN | **60%** | 2 / 8 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05). |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
@@ -202,7 +202,7 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | High refresh | Rendering is decoupled from exact 60 Hz scheduling. Camera, view weapon, eligible world transforms and skeletons interpolate; local multiplayer body presentation, ordinary joint modifiers, clock-phase correction and weapon GUI, muzzle-flash and flashlight lights are aligned. Alternate views, client debris and active ragdoll poses share the clock, and opt-in late look turns the drawn view toward unapplied input. Remote actors and the recorded exclusions in the [presentation owners contract](presentation-owners.md) remain separate work. |
 | Game time | Ordinary game code advances in 16 ms steps. Network game timestamps deliberately use that same clock while scheduling uses the exact 60 Hz ladder. Do not apply a global 16-to-16.667 ms conversion as a presentation fix. |
 | Vulkan | Stable supported on Windows x64 following the October NVIDIA/Intel qualification; experimental on Linux and macOS. The user-requested 28 October GPU policy makes fresh desktop `best` prefer compatible high-performance Vulkan hardware with OpenGL fallback; saved explicit choices persist. Android keeps GLES. This does not expand hardware qualification. Historical failed runs remain evidence for their specific builds and conditions. |
-| Modern rendering | Native GL/Vulkan PBR is default-on for authored PBR materials; stock materials stay classic. Shared classic rendering domains exist but remain default-off. Aggregate modern-visible lighting still has `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; these are different promotion decisions. |
+| Modern rendering | Native GL/Vulkan PBR is default-on for authored PBR materials; stock materials stay classic. Shared classic rendering domains are qualified individually on Windows GL/Vulkan (REN-01) and remain default-off. Aggregate modern-visible lighting still has `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; these are different promotion decisions. |
 | Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes are excluded, and VR takes only explicit per-eye TAA (`r_temporalAA 1`), without dynamic resolution. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
 | VR | The active source implements PC OpenXR on OpenGL (GLX/WGL, and EGL on Wayland) and Vulkan, headset submission without desktop presentation, stereo, tracked input, room scale, standing/seated play spaces, crouch, two-handed aiming, world-GUI pointing, per-eye TAA, haptics, comfort controls and vehicle views, all qualified on the simulated runtime. A standalone Meta Quest flavor (AND-05) is integrated and checked on the emulator's simulated headset; real-headset qualification remains open ([checklist](vr-headset-qualification.md)). |
 | Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Onboarding/import/export, touch, the per-orientation touch layout editor, the background suspension save and multiplayer resume are integrated with scoped S25/emulator evidence. A Meta Quest flavor (OpenXR on the GLES renderer) is integrated with emulator evidence only. Physical device/lifecycle breadth stays open under AND-01 through AND-05. |
@@ -911,14 +911,14 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
 
 ### REN completion checkpoints
 
-**Estimate: 55%; 1/8 tasks closed.** PBR, temporal features and shared rendering
-domains already exist. Aggregate modern lighting still has
+**Estimate: 60%; 2/8 tasks closed.** PBR, temporal features and qualified shared
+rendering domains exist (REN-01). Aggregate modern lighting still has
 `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; neither feature presence nor domain
 diagnostics establish whole-frame ownership or production performance.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| REN-01 — Partial | Shared classic GUI/world/interaction/fog/deform/subview/post domains have scoped implementations and contracts. | Qualify each on fresh GL/Vulkan packages: executed ownership, matching appearance, zero-commit rollback, human review and platform breadth. |
+| REN-01 — Closed | All nine shared classic domains own stock (and, for subview forms stock content never authors, validation-room) views on a fresh GL/Vulkan package under the default preset, with 4x MSAA and with the post chain off: byte-identical to classic, visible content controls, named zero-commit rollback. They now draw into the scene target the classic walker uses. Defaults stay off. | Human appearance review of the retained captures and physical Linux/macOS/Android runs belong to platform qualification; default promotion is a separate owner decision. |
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations; the remaining decline reasons are inventoried. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). The 9 November [stencil-parity audit](shadowmapping-audit-2026-11-09.md) fixed prelight-only (`noDynamicShadows`) lights losing their shadows, `noSelfShadow` world geometry no longer shadowing `noSelfShadow` receivers under prelit lights, the one-sided five-tap kernel and the packed-depth wrap at the far envelope. | Physical platforms; the audit's open parity items (casters outside an off-centre light's box, cascade range end, images for the two fixed rules). |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
@@ -929,7 +929,7 @@ diagnostics establish whole-frame ownership or production performance.
 
 ### REN task evidence and acceptance
 
-- [ ] **REN-01 — P1, qualification: promote shared classic domains individually.**
+- [x] **REN-01 — P1, qualification: promote shared classic domains individually.**
   Finish fresh-package GL/Vulkan acceptance for root GUI, in-world GUI, ambient,
   interaction, fog/blend, deform, subview, cinematic/post and special-frame owners.
   Cover stock fixed cameras, mapped/stencil/hybrid lights, dynamic/cutout casters,
@@ -937,6 +937,40 @@ diagnostics establish whole-frame ownership or production performance.
   targets, `_currentDepth`, root post and render-demo/Raven effects. Require
   nonzero executed ownership, same-backend classic parity, visible effect deltas,
   complete zero-commit rollback and human/platform evidence for each domain.
+  Completed 13 November 2026 on Windows x64 OpenGL and Vulkan.
+  `renderer_shared_domain_qualification.py` runs each domain on a fixed stock
+  pose (or, for subview forms no stock material authors, a validation room
+  compiled into the run's save path) from a freshly built package, under the
+  default preset, with 4x MSAA and with the post chain off. Each check requires
+  owned views on the active backend and none on the other, a frame
+  byte-identical to classic (alone and with every domain on), a visible
+  content control and a named zero-commit rollback. The final run, from a
+  fresh package built from the change set, passed 98 of 99 domain checks in 87
+  runs (RTX 4060 Laptop GPU). The one failure is classic flicker: OpenGL
+  stencil shadows under 4x MSAA flip isolated pixels between two classic
+  frames, so that combination is excluded, as is OpenGL render-demo playback
+  under the default preset.
+  Under the default presets nothing had ever been owned. Fixed: the adapters
+  refused every render target, though the classic walker draws the view into
+  the renderer's own scene target or the game's forward target (both
+  backends); Vulkan moved a view to the swapchain whenever a domain was on,
+  which changed the classic work beside it by up to 18 levels; dense views
+  overflowed the 1024 per-frame geometry records; every stock in-world GUI was
+  refused for its mirrored GUI transform; the ambient domain refused any lit
+  view; the interaction domain refused every CPU-skinned character (it read
+  `deformedSurface` as GPU posing, the misreading classic fixed in #73) and
+  every distant point light's projected map (labelled a cube); Vulkan batched
+  the HUD with the final scene composite; and Raven fallbacks were miscounted.
+  Stock-content boundaries, by design: the retained HUD's backdrop blur,
+  ambient views with decals/BSE/post surfaces, cubemap and depth subview
+  targets (no producer) and wall-clock GUI video parity. With the static
+  shadow cache on, the interaction switch makes classic Vulkan regenerate maps
+  it would compose (a few pixels move one level) and OpenGL declines a cached
+  distant point light's pass; the all-mapped scene runs with the cache off. The
+  defaults stay off: promotion is an owner decision on the
+  [evidence](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01).
+  Human appearance review and physical Linux/macOS/Android runs belong to
+  platform qualification (PLAT), as for REN-08.
 - [ ] **REN-02 — P2, implementation and qualification: finish aggregate modern
   lit-frame ownership.** Inventory the remaining material/light semantics against
   implemented shared corridors; finish coherent whole-frame lighting and

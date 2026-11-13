@@ -2,10 +2,12 @@
 
 ## Status
 
-The first Milestone D classic-frame domain is **Implemented (default-off; local
-Windows OpenGL/Vulkan implementation evidence recorded; final-package and
-platform release qualification pending)** for complete fixed-function 2D GUI
-views. It is now joined by
+The first Milestone D classic-frame domain is **Implemented and qualified for
+individual promotion (default-off; REN-01 runtime qualification on Windows
+OpenGL/Vulkan recorded 13 November 2026; non-Windows platforms and human
+appearance review belong to platform qualification)** for complete
+fixed-function 2D GUI views; see [REN-01 qualification](#ren-01-qualification-13-november-2026).
+It is now joined by
 the separate [shared in-world GUI domain](classic-inworld-gui-domain-modernization.md),
 [shared world ambient/material domain](classic-world-ambient-domain-modernization.md)
 and [shared interaction-lighting domain](classic-interaction-domain-modernization.md),
@@ -148,6 +150,24 @@ each backend; earlier sampled frames reported two owned views. The off runs
 reported no prepared shared views. Visual inspection of all four engine captures
 showed the complete stock scene and crosshair. These are development-worktree
 results, not clean-package or cross-platform release-promotion evidence.
+
+## REN-01 qualification, 13 November 2026
+
+The [shared-domain qualification harness](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)
+owns the stock legacy HUD (`ui_retained 0`) over a frozen `game/airdefense1`
+view on OpenGL and Vulkan, under the default preset and with the post chain
+off: one owned root view, byte-identical to the classic frame; hiding the HUD
+is the visible control and `r_showOverDraw 1` the named zero-commit rollback.
+
+- **Vulkan HUD batching.** Vulkan used to keep the game's final scene
+  composite and the HUD that follows in one 2D view, so its first surface (a
+  post-process blit) turned the whole HUD away. The composite now ends its 2D
+  batch on both backends, as OpenGL already did for its `_currentRender`
+  capture; the classic frame is unchanged.
+- **Scope boundaries, by design.** The retained HUD (the default interface)
+  samples `_currentRender` for its backdrop blur (`materialPassIneligible`),
+  and the game's fullscreen post passes are post-process views
+  (`sourceSurfaceFallback`); both stay on the classic path.
 
 ## Milestone D completion and release-promotion boundary
 
