@@ -11154,9 +11154,12 @@ void idSessionLocal::SetPlayingSoundWorld() {
 		idStr::Icmp( guiActive->Name(), "guis/arena_pause.gui" ) == 0;
 	// A retained page stands in for a main-menu page, and so does every
 	// retained front-end screen presented without a level: Single Player and
-	// its sub-pages, the Multiplayer page and its sub-pages.
+	// its sub-pages, the Multiplayer page and its sub-pages. In a level the
+	// pages those lead to, such as the settings sub-pages, stand in for
+	// main-menu pages too: their sounds and the menu music must not fall
+	// silent behind the paused game.
 	if ( guiActive && ( guiActive == guiMainMenu || systemMenuActive || arenaPauseMenuActive || guiActive == guiIntro || guiActive == guiLoading ||
-			RetainedPageActive() || ( guiActive == guiMsg && !mapSpawned ) ||
+			RetainedPageActive() || RetainedChildPageActive() || ( guiActive == guiMsg && !mapSpawned ) ||
 			( !mapSpawned && UI_IsRetainedPath( guiActive->Name() ) ) ) ) {
 		SetPlayingSoundWorld( menuSoundWorld );
 	} else {

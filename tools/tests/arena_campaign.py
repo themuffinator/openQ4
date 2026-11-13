@@ -3462,7 +3462,7 @@ def validate_pause_menu() -> None:
     request = function_body(session_menu, "void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, const char *request )")
     for verb, command in (("arenaRestart", "restart"), ("arenaLeave", "leave"), ("settings", "settings"), ("resume", "resume")):
         require(request, f'!idStr::Icmp( request, "{verb}" )', f"the card's {verb}")
-        require(request, f'"play main_menu_selection ; arenaPause {command}"', f"the card's {verb} is the stock menu's own command")
+        require(request, f'"arenaPause {command}"', f"the card's {verb} is the stock menu's own command; the card sounds its own press")
     for verb in ("arenaRestart", "arenaLeave"):
         require(adapter, f'"{verb}"', "the retained adapter allows the Arena pause verbs")
 

@@ -75,6 +75,8 @@ struct idSessionLocal {
     bool mapSpawned=true,retainedPage=false;
     idSoundWorld *sw=nullptr,*menuSoundWorld=nullptr,*selected=nullptr;
     bool RetainedPageActive() const { return retainedPage; }
+    bool childPage=false;
+    bool RetainedChildPageActive() const { return childPage; }
     void SetPlayingSoundWorld(idSoundWorld* world) { selected=world; }
     void SetPlayingSoundWorld();
     void ExitMenu();
@@ -128,6 +130,9 @@ int main() {
     session.guiActive=&arena; session.SetPlayingSoundWorld(); assert(session.selected==&menuWorld);
     session.guiActive=&mp; session.SetPlayingSoundWorld(); assert(session.selected==&gameWorld);
     session.guiActive=nullptr; session.SetPlayingSoundWorld(); assert(session.selected==&gameWorld);
+    // A settings sub-page over a level stands in for a main-menu page.
+    session.guiActive=&mp; session.childPage=true; session.SetPlayingSoundWorld(); assert(session.selected==&menuWorld);
+    session.childPage=false;
     session.guiActive=&settings; session.guiSystem=&settings;
     session.SetPlayingSoundWorld(); assert(session.selected==&menuWorld);
     session.guiSystem=nullptr; session.mapSpawned=false;

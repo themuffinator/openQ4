@@ -3001,6 +3001,19 @@ Completion must advance through the existing dependencies:
   including ABA changes and restoration. The production kick choice freezes that
   catalog through dispatch. Native and GL/Vulkan gameplay checks pass; full
   toolkit and device/platform acceptance remain open.
+  Progress, 13 November: [menu sounds](ui/menu-sounds.md) now come from one
+  semantic cue stream and one router instead of 78 per-request session plays.
+  A device event that moves the lit control or option ticks
+  (`main_menu_mouseover`), and every completed press, value cycle, list or edit
+  opened or closed, and Back selects (`main_menu_selection`). There is at most
+  one sound per input event, played in the session's playing world. Value
+  sliders stay silent, as retail's did. In a level the settings sub-pages
+  now keep the menu world playing instead of the paused game's. Native
+  interaction, runtime and adapter tests pass, and device-free OpenGL engine
+  checks on the title, the `airdefense1` pause and settings pages and a DM
+  Welcome card log one sound per step in the right world. `MOT-006`
+  acceptance still needs physical-device sound counters and a listening
+  review.
 - [x] **UI-10 — P0, investigation and implementation: refresh effective scope and
   source inventory.** Completed [retail/base/Awakening inventory](ui/inventory-report.md):
   264/276/324 effective paths, 358 distinct source/include-bound variants, 18

@@ -789,6 +789,37 @@ struct idUserInterfaceRetained::Impl {
 			it = sessionNumbers.erase(it);
 		}
 	}
+	// A cue from an event this adapter ran itself: a shortcut's onTab* or
+	// onSecondary, or a swipe. The runtime cannot see those.
+	std::optional<ControlCue::Kind> shortcutCue;
+	// The stock menu sounds (visual section 8), at most one per input event:
+	// main_menu_selection when anything was activated, else main_menu_mouseover
+	// when the lit control moved. A tap that both lands and activates, or a
+	// key that lights a control as it cycles it, sounds its activation alone.
+	// They play in the world the session has playing, so the in-game
+	// multiplayer menus sound over the match as the stock ones did, on the
+	// local channel the session's play command uses: a selection cuts short
+	// the tick before it, and the music is untouched.
+	void PlayCues() {
+		auto* runtime = RuntimeView();
+		if (!runtime) return;
+		auto cues = runtime->TakeCues();
+		if (shortcutCue) cues.push_back({*shortcutCue,{}});
+		shortcutCue.reset();
+		if (cues.empty()) return;
+		const auto chosen = std::find_if(cues.begin(),cues.end(),[](const ControlCue& cue) { return cue.kind == ControlCue::Kind::Activate; });
+		const auto& cue = chosen != cues.end() ? *chosen : cues.front();
+		const bool activate = cue.kind == ControlCue::Kind::Activate;
+		const char* shader = activate ? "main_menu_selection" : "main_menu_mouseover";
+		idSoundWorld* world = soundSystem != NULL ? soundSystem->GetPlayingSoundWorld() : NULL;
+		if (world) world->PlayShaderDirectly(shader,1);
+		if (cvarSystem->GetCVarBool("ui_retainedTrace")) {
+			const char* playing = !world ? "none" : world == soundSystem->GetSoundWorldFromId(SOUNDWORLD_MENU) ? "menu" :
+				world == soundSystem->GetSoundWorldFromId(SOUNDWORLD_GAME) ? "game" : "other";
+			common->Printf("RETAINED_GUI_SOUND path=%s cue=%s node=%s shader=%s world=%s cues=%u\n",
+				path.c_str(),activate ? "activate" : "focus",cue.node.c_str(),shader,playing,static_cast<unsigned>(cues.size()));
+		}
+	}
 	bool interactive = true, interactiveSet = false, unique = false, active = false;
 	bool suspended = false, close = false, worldReported = false;
 	// openq4_retainedGui pointer placed the cursor: it shows although the
@@ -1123,7 +1154,10 @@ struct idUserInterfaceRetained::Impl {
 		if (control || alt) return false;
 		const auto widget = RuntimeView()->GetWidgetState(RuntimeView()->FocusedControl());
 		if (widget && widget->role == ControlRole::Number && widget->number && widget->number->active) return false;
-		RunEvent(name); return true;
+		// A shortcut presses the button it stands for; paging lists only moves
+		// the focus between them.
+		if (RunEvent(name)) shortcutCue = key == K_JOY16 || key == K_JOY15 ? ControlCue::Kind::Focus : ControlCue::Kind::Activate;
+		return true;
 	}
 	bool TextCommandKey(int key, bool down, bool repeated, const openq4::KeyEventMetadata* metadata) {
 		auto* runtime = RuntimeView();
@@ -1593,8 +1627,9 @@ const char* idUserInterfaceRetained::HandleEvent(const sysEvent_t* event, int ti
 	}
 	// A swipe across a tab strip runs onTabPrevious or onTabNext, as Q and E do.
 	for (const auto& name : impl->RuntimeView()->TakeGestureEvents())
-		if (impl->RuntimeView()->HasEvent(name)) impl->RunEvent(name);
+		if (impl->RuntimeView()->HasEvent(name) && impl->RunEvent(name)) impl->shortcutCue = ControlCue::Kind::Activate;
 	impl->CollectActions();
+	impl->PlayCues();
 	if (updateVisuals) *updateVisuals = true;
 	return impl->close || !impl->actions.empty() ? ActionMarker : "";
 }
@@ -2296,6 +2331,8 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		unsigned sentinel = 0;
 		okay = owner.ReadFromSaveGame(&save) && save.ReadUnsignedInt(sentinel) == 4 && sentinel == 0x53454e54 && save.Tell() == save.Length();
 	}
+	// A device-free verb sounds as the input it stands for would.
+	impl.PlayCues();
 	common->Printf("RETAINED_GUI_OPERATION %s %s\n",verb.c_str(),okay ? "passed" : "failed");
 	return okay;
 }

@@ -1995,6 +1995,25 @@ struct Runtime::Impl {
 	// presses, the keyboard or controller once a menu input or a program's
 	// focus arrives. The interaction shows focus only while they lead.
 	void SetPointerNavigation(bool pointer) { pointerNavigation = pointer; interaction.SetPointerPresentation(pointer); }
+	// The control the menu shows lit (section 13.4): the one under the pointer
+	// while the pointer leads, else the focus, and within an open list its
+	// highlighted option. Empty while nothing is lit.
+	std::string LitTarget() const {
+		const auto id = pointerNavigation ? interaction.Hovered() : interaction.Focused();
+		if (id.empty()) return {};
+		const auto widget = interaction.Widget(id);
+		return widget && widget->popupOpen ? id+'\n'+widget->highlight : id;
+	}
+	// A device event that moved the lit control from `before` sounds Focus
+	// once (visual section 8). A pointer entering a scrollbar does not: it
+	// is grabbed, not browsed.
+	void CueLit(const std::string& before, bool pointer) {
+		const auto after = LitTarget();
+		if (after.empty() || after == before) return;
+		const auto node = after.substr(0,after.find('\n'));
+		if (pointer && interaction.Role(node) == ControlRole::Scrollbar) return;
+		interaction.CueFocus(node);
+	}
 	// The detail card (DocumentModel::detail): its subject, whether the pointer
 	// chose it, and the card's last placement relative to its containing block.
 	std::string detailSubject;
@@ -4240,6 +4259,7 @@ RuntimeStatistics Runtime::Statistics() const {
 void Runtime::PointerMove(float x, float y, double seconds) {
     if(!Mutate())return;
 
+	const auto lit = impl->LitTarget();
 	impl->SetPointerNavigation(true);
 	impl->pointerPresent = std::isfinite(x) && std::isfinite(y);
 	impl->windowPointerX = x; impl->windowPointerY = y;
@@ -4248,7 +4268,11 @@ void Runtime::PointerMove(float x, float y, double seconds) {
 	if (!impl->touchPointer && impl->pointerPresent) impl->detailPin.clear();
 	if (std::isfinite(seconds) && seconds >= 0) impl->time = std::max(impl->time,seconds);
 	impl->MoveTouch();
-	if(!impl->UpdateInteraction(seconds,false,true))return; impl->Feedback(seconds);
+	if(!impl->UpdateInteraction(seconds,false,true))return;
+	// A mouse finding another control sounds; a finger lands rather than
+	// browses, and a held button is dragging or pressing, not browsing.
+	if (!impl->touchPointer && !impl->interaction.PointerHeld()) impl->CueLit(lit,true);
+	impl->Feedback(seconds);
 }
 void Runtime::PointerButton(bool down, double seconds) {
     if(!Mutate())return;
@@ -4275,12 +4299,13 @@ void Runtime::PointerWheel(int rows, double seconds) {
 		// Keep this selection through layout and subsequent wheel events. The
 		// stationary pointer must not reselect its old row on the next frame;
 		// an actual pointer move or button event restores pointer navigation.
+		const auto lit = impl->LitTarget();
 		impl->SetPointerNavigation(false);
         const auto* node=impl->canonical->Model().FindNode(id);
         const auto* choice=node&&node->control?std::get_if<ChoiceSpec>(&node->control->widget):nullptr;
         if(choice&&choice->scrollbar) {
             if(impl->valueView.ChoiceScrollFresh(id,impl->interaction))impl->interaction.ChoiceScrollPulse(id,rows>0?ScrollStep::LineForward:ScrollStep::LineBackward);
-        } else impl->interaction.NavigationPulse(rows > 0 ? MenuInput::Down : MenuInput::Up);
+        } else { impl->interaction.NavigationPulse(rows > 0 ? MenuInput::Down : MenuInput::Up); impl->CueLit(lit,false); }
 		impl->Feedback(seconds); return;
 	}
 	if (!impl->pointerPresent || !impl->context || !impl->document || impl->pointerX < 0 || impl->pointerY < 0 ||
@@ -4320,8 +4345,12 @@ void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
 	if (down && input != MenuInput::Back && !impl->interaction.CapturedPointerControl().empty()) impl->interaction.Cancel();
 	if (down) { impl->pendingFocus.clear(); impl->fling = {}; impl->detailPin.clear(); }
 	const auto before = impl->interaction.Focused();
+	const auto lit = impl->LitTarget();
 	impl->SetPointerNavigation(false); if(!impl->UpdateInteraction(seconds,false,true))return;
 	if (!down || !impl->PageList(input)) impl->interaction.Input(input,down);
+	// A navigation press that moves the lit control or option sounds Focus;
+	// Accept and Back answer through their activations instead.
+	if (down && input != MenuInput::Accept && input != MenuInput::Back) impl->CueLit(lit,false);
 	impl->ApplyScrollCommands(); impl->Feedback(seconds);
 	if (impl->interaction.Focused() != before) impl->RevealFocus();
 }
@@ -4624,6 +4653,10 @@ std::vector<ControlAction> Runtime::TakeActions() {
 
 	if (impl->interaction.Overflowed()) impl->host.Log(true,"Retained control action queue overflow");
 	return impl->interaction.TakeActions();
+}
+std::vector<ControlCue> Runtime::TakeCues() {
+    if(!Mutate())return {};
+	return impl->interaction.TakeCues();
 }
 
 } // namespace openq4::ui

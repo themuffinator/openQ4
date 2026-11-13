@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The new menus tick and click like Quake 4's, 13 November 2026
+
+- **Moving through the new interface's menus now sounds.** Each move to
+  another button, row, setting or list option plays Quake 4's menu tick,
+  whether you use the mouse, the keyboard or a controller.
+- **Every press answers.** Buttons, checkboxes, opening and closing a
+  dropdown, choosing an option, stepping a setting left or right, starting or
+  finishing a text field, Back, and the controller's shoulder and face-button
+  shortcuts all play Quake 4's select sound. Several of these were silent
+  before, such as Exit on the title, the mods list and Load Defaults.
+- **One sound per action.** A click does not also tick, a held key does not
+  repeat the press sound, sliders stay quiet as they move, as in Quake 4, and
+  nothing sounds while a menu animates or a list refreshes. The in-game
+  multiplayer menus sound over the match, as the original's did.
+- **Fixed: the menus no longer go quiet on the Game, Controls and Audio
+  settings pages during a game.** Their sounds and the menu music now keep
+  playing there, as they do on the pause menu.
+
 ## The main menu's background comes through as a living signal, 13 November 2026
 
 - **The new interface's main menu has a sci-fi display look.** The level

@@ -138,7 +138,7 @@ bool NativeUnsettled(const NativeTextEditorView& view) {
 #define OQ4_INTERACTION_FIELDS(X) \
 	X(document) X(focused) X(hovered) X(armed) X(pointerHeld) X(acceptHeld) X(backHeld) X(pointerArm) X(overflowed) \
 	X(items) X(order) X(parents) X(modals) X(authoredModals) X(modalToken) X(numberEpoch) X(modalBlocked) X(focusPending) X(pointerPresentation) \
-	X(pendingFocus) X(heldNavigation) X(blockedNavigation) X(feedback) X(actions) X(dragging) X(popup) X(highlight) \
+	X(pendingFocus) X(heldNavigation) X(blockedNavigation) X(feedback) X(actions) X(cues) X(dragging) X(popup) X(highlight) \
 	X(pointerOption) X(armedOption) X(pointerFraction) X(dragPreview) X(popupAcceptArm) X(nativeControl) \
     X(pointerScrollThumb) X(scrollGrabFraction) X(scrollSource) X(scrollCommands) X(pointerChoiceTrack) X(choiceScrollArm) X(popupToken) \
     X(popupMeasured) X(lostFocus) X(focusBounds) X(scrollViewports) X(containerFocus)
@@ -209,7 +209,7 @@ void Interaction::Reset(const DocumentModel& model) {
 	nativeModel.reset(); nativeControl.clear();
 	document = model.id; focused.clear(); hovered.clear(); armed.clear();
 	CancelGesture(); pointerOption.clear(); pointerFraction.reset();
-	items.clear(); order.clear(); parents.clear(); modals.clear(); feedback.clear(); actions.clear(); overflowed = false;
+	items.clear(); order.clear(); parents.clear(); modals.clear(); feedback.clear(); actions.clear(); cues.clear(); overflowed = false;
 	authoredModals.clear(); modalBlocked = focusPending = pointerPresentation = false; pendingFocus.clear();
 	lostFocus.clear(); focusBounds = {}; scrollViewports.clear(); containerFocus.clear();
 	modalToken = ProposalToken(); numberEpoch = ProposalToken(); blockedNavigation = heldNavigation;
@@ -482,10 +482,10 @@ void Interaction::Activate(const std::string& id) {
 	switch (item.control.role) {
 		case ControlRole::Button: Queue({ControlAction::Kind::Activate,document,id,item.control.action,item.control.event}); break;
 		case ControlRole::Toggle: Propose(id,item.readback->mixed && !item.pending ? true : !std::get<bool>(EditingValue(item))); break;
-		case ControlRole::Choice: OpenPopup(id); break;
+		case ControlRole::Choice: OpenPopup(id); if (popup == id) Cue(id); break;
 		case ControlRole::Scrollbar: break;
 		case ControlRole::Slider: break; // Value changes have their own semantics.
-		case ControlRole::Number: { std::string unused; BeginNumberEdit(id,unused); break; }
+		case ControlRole::Number: { std::string unused; if (BeginNumberEdit(id,unused)) Cue(id); break; }
 	}
 }
 bool Interaction::AcknowledgeProposal(const std::string& id, std::uint64_t token, bool accepted) {
@@ -1300,7 +1300,8 @@ void Interaction::Pointer(bool down) {
 		if (pointerHeld) return;
 		pointerHeld = true;
 		if (!popup.empty()) {
-			if (hovered != popup) { CancelGesture(); Refresh(); return; }
+			// A press away from an open list closes it, as Back does.
+			if (hovered != popup) { const auto closed = popup; CancelGesture(); Cue(closed); Refresh(); return; }
 			if (!armed.empty()) return; // The matching keyboard release owns this arm.
 			const auto& item = items.at(popup); const auto& options = std::get<ChoiceSpec>(item.control.widget).options;
             if(pointerChoiceTrack) {
@@ -1396,14 +1397,18 @@ void Interaction::Input(MenuInput input, bool down) {
 		}
 	} else if (input == MenuInput::Back) {
 		if (down && !backHeld) {
-			if (!popup.empty() || !dragging.empty() || (!armed.empty() && items.at(armed).control.role==ControlRole::Scrollbar)) CancelGesture();
+			// Back closing an open list or an edit answers as an activation;
+			// dropping a drag, a scroll grab or an unfinished composition does not.
+			if (!popup.empty() || !dragging.empty() || (!armed.empty() && items.at(armed).control.role==ControlRole::Scrollbar)) {
+				const auto closed = popup; CancelGesture(); if (!closed.empty()) Cue(closed);
+			}
 			// Back first cancels an edit; an editor left with nothing to cancel
 			// lets Back through rather than swallowing it.
 			else if (items.contains(focused) && items.at(focused).number && !IdleNumber(items.at(focused))) {
 				auto& item = items.at(focused);
 				if (item.number->buffer.Composition()) {
 					item.number->buffer.CancelComposition(); item.number->identity.revision = item.number->draftRevision = ProposalToken();
-				} else RetireNumber(focused,item);
+				} else { RetireNumber(focused,item); Cue(focused); }
 			}
 			else if (!modalBlocked) {
 				armed.clear();
@@ -1643,10 +1648,15 @@ void Interaction::Queue(ControlAction action) {
 		const auto found = items.find(action.node);
 		if (found != items.end() && found->second.control.context) action.contextToken = found->second.contextToken;
 	}
-	if (!modalToken || actions.size() >= 256) overflowed = true;
-	else actions.push_back(std::move(action));
+	if (!modalToken || actions.size() >= 256) { overflowed = true; return; }
+	// Every queued activation, Back and value change answers once, except a
+	// value slider's step: a stock sliderDef ran no action as its value moved.
+	const auto found = items.find(action.node);
+	if (action.kind == ControlAction::Kind::Back || found == items.end() || found->second.control.role != ControlRole::Slider) Cue(action.node);
+	actions.push_back(std::move(action));
 }
 std::vector<ControlFeedback> Interaction::TakeFeedback() { std::vector<ControlFeedback> result; result.swap(feedback); return result; }
+std::vector<ControlCue> Interaction::TakeCues() { std::vector<ControlCue> result; result.swap(cues); return result; }
 std::vector<ControlAction> Interaction::TakeActions() { std::vector<ControlAction> result; result.swap(actions); overflowed = false; return result; }
 InteractionSnapshot Interaction::Capture() const {
 	InteractionSnapshot result;
@@ -1701,7 +1711,7 @@ bool Interaction::Restore(const InteractionSnapshot& snapshot, std::string& erro
 	candidate.lostFocus.clear(); candidate.focusBounds = {};
 	candidate.pointerOption.clear(); candidate.pointerFraction.reset();
 	for (auto& [id,item] : candidate.items) { item.pending.reset(); item.rejected.reset(); item.proposalToken = 0; item.number.reset(); }
-	candidate.feedback.clear(); candidate.actions.clear(); candidate.overflowed = false;
+	candidate.feedback.clear(); candidate.actions.clear(); candidate.cues.clear(); candidate.overflowed = false;
 	for (auto& [id,item] : candidate.items) item.control.enabled = snapshot.enabled.at(id);
 	// A host-source update may disable the saved selection. Fresh projected
 	// bounds choose the fallback; stale pre-restore geometry is not consulted.

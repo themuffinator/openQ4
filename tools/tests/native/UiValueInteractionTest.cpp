@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "src/ui/retained/Interaction.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -307,6 +308,47 @@ static void QueueBound() {
 	auto a = f.Actions(); Check(a.size() == 256 && !f.input.Overflowed(),"bounded queue retains all frozen preceding proposals");
 	Check(!std::get<bool>(*a.back().proposal),"overflow did not mutate queued values");
 }
+// The menu sound vocabulary (visual section 8): one Activate cue per completed
+// activation, value cycle, list or edit opened or closed, and Back; none for
+// a value slider's steps, held repeats, abandoned presses or an overflowed queue.
+static void ActivationCues() {
+	Fixture f;
+	auto activations = [&](const char* node) {
+		const auto cues = f.input.TakeCues();
+		return std::count_if(cues.begin(),cues.end(),[&](const ControlCue& cue) { return cue.kind == ControlCue::Kind::Activate && cue.node == node; });
+	};
+	Check(f.input.TakeCues().empty(),"a fresh document has nothing to sound");
+	f.input.Focus("button"); f.input.Input(MenuInput::Accept,true); f.input.Input(MenuInput::Accept,true);
+	Check(f.input.TakeCues().empty(),"a press alone sounds nothing until it completes");
+	f.input.Input(MenuInput::Accept,false); f.input.Input(MenuInput::Accept,false);
+	Check(activations("button") == 1 && f.Actions().size() == 1,"a completed activation and its repeats sound exactly once");
+	f.input.Focus("toggle"); Check(f.input.TakeCues().empty(),"programmatic focus is silent");
+	f.Press(MenuInput::Accept); Check(activations("toggle") == 1 && f.Actions().size() == 1,"a toggle sounds as an activation");
+	f.input.Focus("slider"); f.Press(MenuInput::Right); f.Press(MenuInput::Left); f.Press(MenuInput::Home);
+	Check(f.Actions().size() == 3 && f.input.TakeCues().empty(),"a value slider's steps stay silent, as a stock sliderDef ran no action");
+	f.input.PointerPart("slider",.25); f.input.Pointer(true); f.input.PointerPart("slider",.75); f.input.Pointer(false);
+	Check(f.Actions().size() == 1 && f.input.TakeCues().empty(),"a slider drag commits silently");
+	f.input.Hover("button"); f.input.Pointer(true); f.input.Hover("toggle"); f.input.Pointer(false);
+	Check(f.Actions().empty() && f.input.TakeCues().empty(),"a press dragged off its control sounds nothing");
+	f.input.Focus("choice"); f.Press(MenuInput::Right);
+	Check(f.Actions().size() == 1 && activations("choice") == 1,"cycling a closed choice sounds as an activation");
+	f.Press(MenuInput::Accept); Check(f.View("choice").popupOpen && activations("choice") == 1,"opening a list sounds as an activation");
+	f.Press(MenuInput::Down); Check(f.input.TakeCues().empty(),"the interaction leaves list highlights to the runtime's Focus cue");
+	f.Press(MenuInput::Back); Check(!f.View("choice").popupOpen && f.Actions().empty() && activations("choice") == 1,"Back closing a list sounds once");
+	f.Press(MenuInput::Accept); f.input.TakeCues(); f.Press(MenuInput::Accept);
+	Check(f.Actions().size() == 1 && activations("choice") == 1,"choosing an option sounds once");
+	f.Press(MenuInput::Accept); f.input.TakeCues(); f.input.Hover("button"); f.input.Pointer(true); f.input.Pointer(false);
+	Check(!f.View("choice").popupOpen && f.Actions().empty() && activations("choice") == 1,"a press away from an open list closes it with one cue");
+	f.input.Focus("button"); f.input.TakeCues();
+	f.Press(MenuInput::Back); auto back = f.input.TakeCues();
+	Check(back.size() == 1 && back[0].kind == ControlCue::Kind::Activate && back[0].node.empty() && f.Actions().size() == 1,"Back sounds once with its request");
+	f.input.Focus("toggle");
+	for (unsigned i = 0; i < 256; ++i) f.Press(MenuInput::Accept);
+	f.input.TakeCues(); f.Press(MenuInput::Accept);
+	Check(f.input.Overflowed() && f.input.TakeCues().empty(),"an activation the full queue refuses sounds nothing");
+	f.Actions(); f.input.Focus("button"); f.Press(MenuInput::Accept); f.input.Reset(f.model);
+	Check(f.input.TakeCues().empty(),"a replaced document drops the cues it never played");
+}
 static void ButtonContextOwnership() {
 	Fixture f;
 	Expression context; context.type = 2; context.state = "subject";
@@ -371,5 +413,6 @@ static void ChoiceContextOwnership() {
 int main() {
 	ButtonAndToggle(); AtomicReadbacks(); SliderKeyboard(); SliderPointerAndCancel(); ChoiceNavigation(); ChoiceStepping(); FocusPresentation(); LostFocusResumes();
 	ChoicePointerAndReadback(); PersistenceAndLifetime(); QueuedReadbackOwnership(); ButtonContextOwnership(); ChoiceContextOwnership(); QueueBound();
+	ActivationCues();
 	std::printf("PASS: value interaction (%u assertions)\n",checks); return 0;
 }

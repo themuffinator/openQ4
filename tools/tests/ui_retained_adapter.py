@@ -214,6 +214,19 @@ struct Renderer {
     void SetColor4(float,float,float,float) {}
     void FlushGui() {}
 } renderer,*renderSystem=&renderer;
+// The menu sounds the adapter starts, in order, in the world the session has
+// playing (UserInterfaceRetained PlayCues); none while that world is absent.
+struct idSoundWorld {
+    std::vector<std::pair<std::string,int>> played;
+    int PlayShaderDirectly(const char* name,int channel=-1) { played.emplace_back(name,channel); return 0; }
+};
+#define SOUNDWORLD_GAME 1
+#define SOUNDWORLD_MENU 2
+struct SoundSystem {
+    idSoundWorld world; bool playing=true;
+    idSoundWorld* GetPlayingSoundWorld() { return playing?&world:nullptr; }
+    idSoundWorld* GetSoundWorldFromId(int id) { return id==SOUNDWORLD_MENU?&world:nullptr; }
+} soundObject,*soundSystem=&soundObject;
 enum pointerCursor_t { POINTER_ARROW, POINTER_TEXT };
 void UI_DrawPointerCursor(pointerCursor_t,float,float,float,float,float) {}
 struct Decls { const void* FindMaterial(const char*) { return nullptr; } } decls,*declManager=&decls;
@@ -656,6 +669,9 @@ public:
     // events a swipe asks for, which the adapter runs as Q and E.
     std::vector<bool> touchPointers;
     std::vector<std::string> gestureEvents;
+    // The sound cues the fixture stages for the next input event.
+    std::vector<ControlCue> cues;
+    std::vector<ControlCue> TakeCues() { std::vector<ControlCue> result; result.swap(cues); return result; }
     void SetTouchPointer(bool touch) { touchPointers.push_back(touch); }
     std::vector<std::string> TakeGestureEvents() { std::vector<std::string> result; result.swap(gestureEvents); return result; }
     bool PlayTimeline(const std::string& name,double) { timelines.push_back(name); return name=="slide"; }
@@ -2711,6 +2727,37 @@ static void CheckTouch() {
     }
     assert(views.empty());
 }
+// Menu sounds (visual section 8): at most one per input event, the press
+// outranking a hover tick, on the session's local channel in whichever world
+// the session has playing; shortcuts and swipes the adapter runs sound too.
+static void CheckSounds() {
+    assert(views.empty());cvars=CVars{};consoleObject.open=false;windowFocused=true;
+    eventPlans={};eventHistory.clear();soundObject=SoundSystem{};
+    {
+        idUserInterfaceRetained gui;assert(gui.InitFromFile("test.rui"));gui.Activate(true,0);gui.Redraw(0);
+        auto& runtime=Live();auto& played=soundObject.world.played;
+        using Played=std::vector<std::pair<std::string,int>>;
+        sysEvent_t motion{SE_MOUSE,0,0};
+        gui.HandleEvent(&motion,0,nullptr);assert(played.empty());
+        runtime.cues={{ControlCue::Kind::Focus,"a"}};gui.HandleEvent(&motion,0,nullptr);
+        assert((played==Played{{"main_menu_mouseover",1}}));
+        runtime.cues={{ControlCue::Kind::Focus,"a"},{ControlCue::Kind::Activate,"b"},{ControlCue::Kind::Focus,"c"}};gui.HandleEvent(&motion,0,nullptr);
+        assert(played.size()==2 && (played.back()==std::pair<std::string,int>{"main_menu_selection",1}));
+        gui.HandleEvent(&motion,0,nullptr);assert(played.size()==2);
+        soundObject.playing=false;runtime.cues={{ControlCue::Kind::Activate,"b"}};gui.HandleEvent(&motion,0,nullptr);
+        assert(played.size()==2 && runtime.cues.empty());
+        soundObject.playing=true;
+        eventPlans["ontabnext"]={};eventPlans["onsectionprevious"]={};
+        Key(gui,'e',true);Key(gui,'e',false);
+        assert(played.size()==3 && played.back().first=="main_menu_selection");
+        Key(gui,K_JOY16,true);Key(gui,K_JOY16,false);
+        assert(played.size()==4 && played.back().first=="main_menu_mouseover");
+        Key(gui,'q',true);Key(gui,'q',false);assert(played.size()==4);
+        runtime.gestureEvents={"onTabNext"};gui.HandleEvent(&motion,0,nullptr);
+        assert(played.size()==5 && played.back().first=="main_menu_selection");
+    }
+    assert(views.empty());soundObject=SoundSystem{};
+}
 // A document that declares prompt.glyphs gets RetainedUI_PromptGlyphs as
 // each frame draws, once per change, and the session's state pushes carry
 // the adapter's value; a document that does not declare it never gets it.
@@ -3111,6 +3158,7 @@ int main() {
     CheckTypedCharacters();
     CheckTabKeys();
     CheckTouch();
+    CheckSounds();
     CheckPromptGlyphs();
     CheckPromptSwapped();
     CheckPromptAccept();

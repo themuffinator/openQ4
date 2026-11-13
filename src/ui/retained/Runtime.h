@@ -456,6 +456,15 @@ public:
 	bool RetireNumberNativeExact(NativeTextIdentity, const TextEditorIdentity&) noexcept;
 	NativeTextPresence QueryNumberNativePresence(NativeTextIdentity, const TextEditorIdentity&) const noexcept;
 	std::vector<ControlAction> TakeActions();
+	// The menu sound cues of the input routed since the last call (visual
+	// section 8). Focus is the lit control - the one under a leading pointer,
+	// else the focus, or an open list's highlighted option - changing because
+	// of a device event: a navigation input, a wheel step in an open list, or
+	// a mouse moving onto a control other than a scrollbar. Layout, animation,
+	// programs and touch never sound Focus, and keys and a pointer resting on
+	// the same control never sound it twice. Activate follows
+	// Interaction::TakeCues.
+	std::vector<ControlCue> TakeCues();
 	// Recheck queued activations after earlier programs may change eligibility.
 	bool CanActivateControl(const std::string& id, double monotonicSeconds);
 	// Validate every queued Back against the exact still-active scope lifetime.

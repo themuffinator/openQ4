@@ -185,6 +185,7 @@ struct idSessionLocal {
     }
     bool RetainedSettingsParent() const{return guiActive!=nullptr&&(guiActive==guiMainMenu||(guiRetainedSettingsPage!=nullptr&&guiActive==guiRetainedSettingsPage));}
     bool RetainedPageActive() const{return guiActive!=nullptr&&(guiActive==guiRetainedLoad||guiActive==guiRetainedSave);}
+    bool childPage=false;bool RetainedChildPageActive() const{return childPage;}
     // Nor does the multiplayer card, or a loading screen held over a join: these scenarios have no match.
     void UpdateRetainedMultiplayer(){}void RetainedMultiplayerFrameEvent(){}
     idUserInterface* guiLoadingHold=nullptr;void UpdateRetainedLoadingHold(){}
@@ -352,6 +353,9 @@ int main(){
             s.session.guiActive=&front;s.session.mapSpawned=false;s.session.SetPlayingSoundWorld();
             CHECK(s.session.requestedSoundWorld==&s.menuSound);
             s.session.mapSpawned=true;s.session.SetPlayingSoundWorld();CHECK(s.session.requestedSoundWorld==&s.gameSound);
+            // A settings sub-page over a level stands in for a main-menu page.
+            s.session.childPage=true;s.session.SetPlayingSoundWorld();CHECK(s.session.requestedSoundWorld==&s.menuSound);
+            s.session.childPage=false;
             s.session.guiActive=active;
         }
         s.session.ExitMenu();CHECK(s.session.guiActive==s.session.guiMsg && s.session.guiMsgRestore==child && !child->retired && s.gameSound.unpauses==0);
