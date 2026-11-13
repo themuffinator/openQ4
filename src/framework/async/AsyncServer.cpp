@@ -861,6 +861,43 @@ void idAsyncServer::DuplicateUsercmds( int frame, int time ) {
 
 /*
 ==================
+idAsyncServer::CountLateUsercmds
+
+openQ4: numDuplicatedUsercmds also counts a command copied ahead of a frame and then
+overwritten when the real one arrives in time. This counts only the frames about to
+run on a copy: the frames a client's command reached too late for, when the server
+repeated its last one and a shot fired then took the old aim. com_showAsyncStats
+reports each run of them, with the game time of its frames, and the count per second.
+==================
+*/
+void idAsyncServer::CountLateUsercmds( int frame ) {
+	const bool counting = com_showAsyncStats.GetBool();
+	const usercmd_t *frameCmds = userCmds[frame & ( MAX_USERCMD_BACKUP - 1 )];
+	for ( int i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
+		serverClient_t &client = clients[i];
+		if ( !counting || client.clientState != SCS_INGAME || i == localClientNum ||
+			 client.channel.GetRemoteAddress().type == NA_BOT ) {
+			client.lateUsercmdsFrom = -1;
+			continue;
+		}
+		if ( frameCmds[i].duplicateCount > 0 ) {
+			client.statsLateUsercmds++;
+			if ( client.lateUsercmdsFrom < 0 ) {
+				client.lateUsercmdsFrom = frame;
+			}
+			continue;
+		}
+		if ( client.lateUsercmdsFrom >= 0 ) {
+			common->Printf( "client %d: frames %d-%d (game time %d-%d) ran on a repeated command\n", i,
+				client.lateUsercmdsFrom, frame - 1, client.lateUsercmdsFrom * common->GetUserCmdMSec(),
+				( frame - 1 ) * common->GetUserCmdMSec() );
+		}
+		client.lateUsercmdsFrom = -1;
+	}
+}
+
+/*
+==================
 idAsyncServer::ClearClient
 ==================
 */
@@ -890,6 +927,8 @@ void idAsyncServer::ClearClient( int clientNum ) {
 	client.statsSnapshotsSent = 0;
 	client.statsSnapshotBytes = 0;
 	client.statsSendsRefusedByRate = 0;
+	client.statsLateUsercmds = 0;
+	client.lateUsercmdsFrom = -1;
 }
 
 /*
@@ -929,6 +968,8 @@ void idAsyncServer::InitClient( int clientNum, int clientId, int clientRate ) {
 	client.lastInputTime = serverTime;
 	client.acknowledgeSnapshotSequence = 0;
 	client.numDuplicatedUsercmds = 0;
+	client.statsLateUsercmds = 0;
+	client.lateUsercmdsFrom = -1;
 
 	// clear the user commands
 	for ( i = 0; i < MAX_USERCMD_BACKUP; i++ ) {
@@ -3469,6 +3510,7 @@ void idAsyncServer::RunFrame( bool allowBlocking ) {
 
 		// duplicate usercmds for clients if no new ones are available
 		DuplicateUsercmds( gameFrame, gameTime );
+		CountLateUsercmds( gameFrame );
 
 		// advance game
 		gameReturn_t ret = game->RunFrame( userCmds[gameFrame & ( MAX_USERCMD_BACKUP - 1 ) ], 0, true, gameFrame );
@@ -3552,17 +3594,19 @@ void idAsyncServer::RunFrame( bool allowBlocking ) {
 					continue;
 				}
 				if ( statsClient.statsSnapshotsSent > 0 || statsClient.statsSendsRefusedByRate > 0 ) {
-					common->Printf( "client %d: %d snapshots/s (asked %d), avg %d bytes, %d refused by rate, cap %d B/s\n",
+					common->Printf( "client %d: %d snapshots/s (asked %d), avg %d bytes, %d refused by rate, cap %d B/s, "
+									"%d late commands\n",
 									i, statsClient.statsSnapshotsSent,
 									1000 / Max( 1, idAsyncNetwork::serverSnapshotDelay.GetInteger() ),
 									statsClient.statsSnapshotsSent > 0 ?
 										statsClient.statsSnapshotBytes / statsClient.statsSnapshotsSent : 0,
 									statsClient.statsSendsRefusedByRate,
-									statsClient.channel.GetMaxOutgoingRate() );
+									statsClient.channel.GetMaxOutgoingRate(), statsClient.statsLateUsercmds );
 				}
 				statsClient.statsSnapshotsSent = 0;
 				statsClient.statsSnapshotBytes = 0;
 				statsClient.statsSendsRefusedByRate = 0;
+				statsClient.statsLateUsercmds = 0;
 			}
 		}
 

@@ -1224,11 +1224,228 @@ than this fix and remain open under MP-07:
   controller sets its lead from the typical arrival time of the client's
   commands. A frame tens of milliseconds longer than usual can push a command
   past its frame, and the server repeats the last one. The model above shows
-  the same late counts before and after this fix.
+  the same late counts before and after this fix. Fixed in
+  [the next record](#commands-on-time-through-long-client-frames-13-november-2026).
 
 The earlier respawn record's runs saw neither in four impaired runs, but
 three of those four failed elsewhere. Simulated latency does not give this
 harness a dependable pass yet; loopback does.
+
+## Commands on time through long client frames, 13 November 2026
+
+A client frame much longer than usual no longer makes the server repeat the
+client's previous command. Two defects were behind the late commands left
+open above. The controller's target covered only short frames, and a long
+frame's burst of packets could lose commands outright.
+
+**Why a long frame made commands late.** The client makes its commands in
+`idAsyncClient::RunFrame`, once per presented frame, so a frame of N ms holds
+back the commands that fell due during it by up to N. The controller steps
+`clientPrediction` one millisecond per snapshot to keep the median of the
+server's `aheadOfServer` report at `net_clientPrediction`, one tic by
+default. That median covers a frame of about two tics: the target itself,
+plus the tic the median already spans. A longer frame sent its commands after
+the server had run their frames, and the server repeated the last command it
+had. In the failing runs `fix-imp1` and `fix-imp4` the stale server shots sat
+3-6 frames behind the client's aim. In the model a client running steadily
+below 30 fps loses commands all the time: about 25 a minute at 33 ms frames on
+loopback, 69 at 50 ms.
+
+**Measured against the tail.** `mp_client_prediction_state.py` now runs the
+production controller, `PredictionMargin.h` and the per-packet command count
+in a closed loop with long client frames. One long frame comes every one to
+three seconds over 80 ms ±20, with the link reordering bursts. Late commands
+per long frame, with the median target alone and with the margin, and the mean
+time a command waits at the server:
+
+| Client frame | Target alone | With margin | Wait, target alone | Wait, with margin |
+| --- | --- | --- | --- | --- |
+| 21-31 ms | 0.00 | 0.00 | 31-32 ms | 31-32 ms |
+| 36 ms | 0.04 | 0.00 | 31 ms | 47 ms |
+| 46 ms | 0.07 | 0.00 | 32 ms | 47 ms |
+| 56 ms | 0.72 | 0.00 | 31 ms | 62 ms |
+| 66 ms | 1.11 | 0.04 | 32 ms | 77 ms |
+| 76 ms | 1.83 | 0.03 | 32 ms | 77 ms |
+| 96 ms | 3.00 | 0.07 | 32 ms | 93 ms |
+
+The model's server samples fall on a 16 ms lattice, so any margin moves its
+wait by a whole tic (the 36 and 46 ms rows); the engine's samples do not. The
+few late commands left with the margin come from the first long frame of a
+length, before it sets the margin.
+
+**The decision: a margin from the client's own frame times.**
+`idPredictionMargin` (`src/framework/async/PredictionMargin.h`) keeps the
+longest recent client frame. The snapshot block adds its excess over the
+cover (`AsyncClient_PredictionCoverMsec`: the configured target plus one tic,
+about 33 ms at 60 Hz) to the target. When the margin grows, the target takes
+the growth at once, so the next long frame finds it in place; a shrinking
+margin is followed by the one-millisecond steps. Each frame longer than the
+cover holds its own length for 10 s of client time, then decays by 1 ms every
+250 ms, and the margin follows the longest of them (a sliding maximum over up
+to eight frames). A shorter long frame keeps only its own length. A first
+version let any long frame refresh the peak's hold, and in the first capture
+one 82 ms frame at the join then held a 49 ms margin for the whole run, while
+the 36-45 ms frames that kept it alive needed about 12 ms. A frame the 100 ms
+`UpdateTime` clamp cut is a hitch, not a tail. Covering one would hold every
+command back by most of 100 ms for the next ten seconds, so it is left alone,
+and the capture's hitch step raises no margin. `net_clientPredictionMargin 0`
+turns the margin off. The rise counts only the peak's growth: the cover
+follows the exact tic ladder (16, 17, 17 ms), and comparing margins instead
+pushed the target forward on each swing (seen in the same capture).
+
+The cost is wait at the server: while the margin lasts, every command is
+applied that much later than with the target alone. That is about 24 ms after
+56 ms frames, 44 ms after 76 ms frames and 64 ms at most (a 99 ms frame).
+A client that holds its frame rate pays nothing, and neither does a client
+at 60 fps or above whose frames stay under about 33 ms. Alternatives weighed
+in an exploratory model of the same loop:
+
+- **Tracking the worst recent `aheadOfServer` dip.** It sees network jitter as
+  well as frame tails, but the samples come every 33 ms on a 16 ms lattice. A
+  floor tight enough to catch tails held a 6-8 ms margin on clean links
+  (13 ms more wait on loopback, 16 ms at 80 ms ±20 with smooth frames). A
+  floor loose enough to cost nothing there left two to four times the late
+  commands under the same tails. A target raised from samples that show the
+  raise only a round trip later also needs windup protection. A client stall
+  was already gated on local
+  knowledge (frames at the clamp), so the client's frame time is the more
+  direct signal.
+- **A margin from frame-time variance.** A long frame every few seconds
+  barely moves the variance, so a factor large enough to cover it would
+  overprovision dense, mild jitter.
+- **Raising the target on the server's duplicated-command count.** It reacts
+  only after commands are late, and in the model it held 20-50 ms of extra
+  wait with smooth frames.
+
+Network jitter itself stays the median target's job: over a real 80 ms ±20
+link with smooth frames the model has no late commands. The simulated delay
+line releases a datagram only at the client's next socket call, which adds up
+to a frame of delay. With smooth frames it leaves about four late commands a
+minute in the model, with or without the margin.
+
+**Bursts lost commands outright.** A frame longer than a tic makes several
+commands at once, and `SendUsercmdsToServer` sends each in its own packet,
+all in the same instant. A link with jitter delivers them in any order, and
+`idMsgChannel::Process` discards a packet older than the newest it has taken.
+Each packet carried only `net_clientUsercmdBackup` (5) earlier commands. So
+when a burst of more than six arrived newest first, its first commands were
+lost whatever the lead, and the server repeated the command before them. In
+the model this left 76 and 96 ms frames late even with targets of 128 ms. Each
+packet of a frame now also carries the commands that frame has already sent
+(`AsyncClient_UsercmdsPerPacket`, at most `MAX_USERCMD_PACKET_COMMANDS`, 11),
+so whichever arrives first holds the whole burst. Only frames that send more
+than one command carry more.
+
+**Diagnostics.** The server counts, per client, the frames it runs on a
+repeated command because the client's own had not come
+(`idAsyncServer::CountLateUsercmds`). `numDuplicatedUsercmds` also counts
+commands copied ahead of a frame and overwritten in time. With
+`com_showAsyncStats 1` it logs each run, with its frames and game times, and
+adds the count to its per-second line. `net_verbose 1` makes a client log
+each rise of its margin with the frame that caused it, and the `net_verbose 2`
+snapshot line includes the margin.
+
+**The fixture.** `mp_client_prediction_state.py` splices the cover, the
+per-packet count, `MAX_USERCMD_PACKET_COMMANDS` and the whole header as well
+as the snapshot block. It checks that RunFrame still feeds the margin and
+resets the burst count as the fixture's loop does. The new loops require the
+following:
+
+- long frames of 36, 56, 76 and 96 ms leave no late command once the first has
+  set the margin, at 0 ms and at 80 ms ±20, and the target jumps only when
+  the margin first grows;
+- steady 33 and 50 ms frames leave none at all;
+- after one 96 ms frame and then 40 ms frames every few seconds, the margin
+  falls from 64 ms to the 7 ms the 40 ms frames need, with none of them late;
+- random long frames of +20 to +60 ms, twice a second for two minutes, leave a
+  tenth of the late commands the target alone leaves or fewer (2 against 52 and
+  54);
+- smooth 16 and 7 ms frames get no margin and no extra wait;
+- the hitch loops raise no margin.
+
+Six new single-reversal controls (12 in all) fail. They leave the margin out
+of the target, let clamped hitches raise it, drop its hold, let a shorter
+long frame keep a longer one alive, let the rise follow the margin through
+the cover's swings, and send a burst's packets with the backup commands only.
+`async_client_frame_contract.py` stubs the new RunFrame names.
+
+**The harness.** `mp_firing_view_capture.py` sets `com_showAsyncStats 1` on
+the host, and `net_verbose 1` and `net_clientPredictionMargin` on the shooter
+(`--prediction-margin`, default 1). Its report adds three metrics.
+`late_commands` gives the runs of repeated commands, inside the measured steps
+and outside them (the join and the hitch step), and the server shots fired on
+one. Its short runs are those of at most six frames after the first shot and
+more than a second from a longer run: the late commands of long frames, since
+a stall of 100 ms or more makes the longer runs. `frame_tail` comes from
+frame-work traces of the steps before and after the hitch step.
+`prediction_margin` lists each rise and the frame behind it. They are
+reported, not gated: a wrong direction still fails the run.
+
+**Evidence.** Six impaired runs (80 ms ±20, enhanced, OpenGL,
+`--predict-hitscan 1`) used one staged build of this change
+(`openQ4-client_x64.exe`
+`7d1ba6bae96600cbf2d0b11aa36f2f2641a613de3f7b8e66abfae53738712459`,
+`game-mp_x64.dll`
+`cd147ecccb2db524e0465af277a8e61d7f12ae920b3372380fc41a03d15fd1ab`). Four had
+the margin and two did not, interleaved. Other sessions were building and
+running clients on the machine meanwhile, so the shooter's frames ran long on
+their own. The late frames from long frames are the report's short runs.
+
+| Run | Margin | Server shots on the same frame, worst direction | Late frames from long frames (runs) | Late frames in the steps | Server shots on a repeated command | Frames of 36 ms or more, longest | Highest margin | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `m1-f` | 1 | 137 of 137, 0.0° | 1 in 1 | 0 | 0 | 30, longest 69.4 ms | 64 ms | pass |
+| `m0-f` | 0 | 138 of 138, 0.0° | 7 in 6 | 0 | 0 | 63, longest 96.8 ms | 0 ms | pass |
+| `m1-g` | 1 | 135 of 135, 0.0° | 0 in 0 | 16 | 0 | 50, longest 166.2 ms | 57 ms | pass |
+| `m1-h` | 1 | 138 of 138, 0.0° | 6 in 4 | 3 | 1 | 137, longest 135.0 ms | 57 ms | pass |
+| `m0-h` | 0 | 138 of 138, 0.0° | 2 in 2 | 0 | 0 | 46, longest 146.5 ms | 0 ms | pass |
+| `m1-i` | 1 | 134 of 134, 0.0° | 0 in 0 | 0 | 0 | 36, longest 56.0 ms | 61 ms | pass |
+
+Report SHA-256s: `m1-f` `e99a230a…`, `m0-f` `f993d85e…`, `m1-g` `ec456f20…`,
+`m1-h` `3dcd60f7…`, `m0-h` `7807dd91…`, `m1-i` `d8a6f83d…`.
+
+Every run passed: each server shot fell on the client's frame with the
+client's direction. The build before this change failed two of four such runs
+on long-frame late commands (`fix-imp1`, `fix-imp4` above). With the margin,
+long frames left 7 late frames over 253 frames of 36 ms or more. Without it
+they left 9 over 109 here, and 42 over 303 counting two margin-off runs on
+the intermediate builds below. That is 0.03 late frames per long frame with
+the margin against 0.14 without. Six of the 7 came from `m1-h`, the run with the
+heaviest load, and its log places each run. Two follow the first frame of a
+new, longer length: a 77 ms frame after the 86 ms join frame had decayed, and a
+39-60-75 ms cluster. By design the margin rises only after such a frame. The
+other two follow frames past the 100 ms clamp, which the margin leaves to the
+hitch handling. Its server shot on a repeated command fell in a target step,
+where the shooter holds still, so the direction still matched. `m1-g`'s
+16 late frames in the shotgun step are one 166 ms stall. The margin-off runs
+passed too: none of their late frames fell on a fired frame. Both modes carry
+the burst fix, so a handful of runs cannot separate the two changes by pass
+rate. The late-frame counts and the fixture do.
+
+Five earlier runs used intermediate builds. Their margin-off path is the final
+one, because the tracker is cleared every frame. `m1-a` (`95053be3…`), `m1-b`
+(`9e0a2eb7…`) and `m1-d` (`83522c27…`) had the margin and passed. `m1-a` and
+`m1-b` showed the two corrections above: the rise repeated with the cover's
+swings (549 rises), and a join frame held its margin for the whole run. Margin
+off, `m0-b` (`899b8722…`) passed with 2 late frames from long frames over 53
+long frames. `m0-d` (`db8cc846…`) ran while this worktree was compiling. It
+had 141 long frames, which left 31 late frames in 21 runs, and it failed: its
+respawn snapshot followed a dropped one, so the weapon caught up and the
+burst ran out of step (142 of 158 shots on the same frame, every direction
+exact). That is the open respawn defect, not a late command. The logs,
+reports and frame-work traces are under `.tmp/mp07-tail/` in the main
+checkout; the captures were not kept.
+
+`mp_client_prediction_state.py` passes under clang on Windows and under g++
+with `MP_MATCH_TEST_SANITIZERS=1` in WSL (the Windows clang has no ASan
+runtime on its path). `async_client_frame_contract.py` passes with both
+compilers. The 26 other contracts that read the async sources pass, as do
+`repository_path_portability.py`, `docs_link_integrity.py` and the 57 static
+tests that read the four documents changed here.
+
+Still open under MP-07: a respawn snapshot after a dropped one still catches
+the new weapon up (above). The simulated delay line's own release delay
+leaves about four late commands a minute with smooth frames, with or without
+the margin. Network-jitter tails on real links stay with the median target.
 
 ## Remote weapon play and live spectator follows, 5 November 2026
 

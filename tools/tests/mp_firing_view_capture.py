@@ -49,6 +49,15 @@ server's, with or without simulated latency. A retained HUD view built inside a
 burst (`RETAINED_HUD_LOADED`) fails the run: the frame it holds sends the server
 no commands. Engine captures of every step are kept for review by eye.
 
+The report also measures the late commands behind a wrong server direction. The host
+(`com_showAsyncStats`) logs each run of frames it ran on a repeated command of the
+shooter's, because the shooter's own had not come (`late_commands`: inside the measured
+steps, outside them, the short runs that long frames leave, and the server shots fired
+on such a frame). The shooter
+traces its frame times over the steps (`frame_tail`: frames past the two tics the
+median prediction target covers) and logs each rise of its prediction margin
+(`prediction_margin`). `--prediction-margin 0` measures the median target alone.
+
 With `--predict-hitscan 0` the client keeps the old behaviour (every shot drawn
 from the server's copy), the baseline the gaps are measured against.
 """
@@ -89,6 +98,15 @@ INTERVAL_MSEC = 150
 HITCHES = 9
 HITCH_MSEC = 350
 HITCH_FRAMES = 1200
+# Frame-work traces of the steps before and after the hitch step (frame_tail), long enough
+# for either at 60 fps.
+TAIL_FRAMES = 6000
+# A frame this long is past what the median prediction target covers (two tics), so its
+# commands reach the server late unless the client's prediction margin covers them.
+LONG_FRAME_MSEC = 36
+# A run of repeated commands this long or shorter comes from a long frame; a stall of
+# 100 ms or more (the join, the hitch step) makes longer ones.
+SHORT_RUN_FRAMES = 6
 FIRE_MSEC = 4000
 # sensitivity 5 and m_yaw 0.022 make one count 0.11 degrees: 2000 counts a second turn 220 degrees a second.
 SENSITIVITY = 5
@@ -186,6 +204,68 @@ def hitches(trace: Path) -> int:
     return sum(float(row.split(",")[1]) >= 0.8 * HITCH_MSEC for row in rows if row.count(",") >= 1)
 
 
+LATE_RUN = re.compile(r"client (\d+): frames (\d+)-(\d+) \(game time (-?\d+)-(-?\d+)\) ran on a repeated command")
+MARGIN_RISE = re.compile(r"client prediction margin (\d+) ms after a (\d+) ms frame \(game time (-?\d+)\)")
+
+
+def frame_tail(trace: Path) -> dict:
+    """Frame times of a frame-work trace: how many were too long for the median prediction target."""
+    if not trace.is_file():
+        return {"frames": 0}
+    totals = [float(row.split(",")[1]) for row in trace.read_text().splitlines()[1:] if row.count(",") >= 1]
+    if not totals:
+        return {"frames": 0}
+    ordered = sorted(totals)
+    return {"frames": len(ordered), f"at_least_{LONG_FRAME_MSEC}_ms": sum(t >= LONG_FRAME_MSEC for t in ordered),
+            "at_least_56_ms": sum(t >= 56 for t in ordered), "at_least_100_ms": sum(t >= 100 for t in ordered),
+            "p99_ms": round(ordered[max(0, math.ceil(0.99 * len(ordered)) - 1)], 1), "max_ms": round(ordered[-1], 1)}
+
+
+def late_commands(host_log: str, slot: int | None, windows: dict[str, tuple[int, int]], server: list[dict]) -> dict:
+    """The runs of frames the host ran on a repeated command of the shooter's.
+
+    A run belongs to a measured step when its game time falls inside the step's shots
+    (half a second either side); the hitch step makes runs by design. A server shot fired
+    on such a frame took the aim of the command before. Short runs, of at most
+    SHORT_RUN_FRAMES after the shooter's first shot and more than a second from a longer
+    run, are the late commands of long frames: a stall of 100 ms or more (the join, the
+    hitch step) makes the longer runs, and the frames just after it.
+    """
+    runs = [(int(first), int(last), int(start), int(end)) for client, first, last, start, end in LATE_RUN.findall(host_log)
+            if slot is not None and int(client) == slot]
+    started = min((low for low, _ in windows.values()), default=None)
+    stalls = [(start, end) for first, last, start, end in runs if last - first + 1 > SHORT_RUN_FRAMES]
+    short = [(first, last, start) for first, last, start, end in runs
+             if last - first + 1 <= SHORT_RUN_FRAMES and started is not None and start >= started and
+             not any(low - 1000 <= start <= high + 1000 for low, high in stalls)]
+
+    def step_of(start: int, end: int) -> str | None:
+        return next((name for name, (low, high) in windows.items() if start <= high and end >= low), None)
+
+    by_step: dict[str, int] = {}
+    outside = 0
+    for first, last, start, end in runs:
+        name = step_of(start, end)
+        if name is None:
+            outside += last - first + 1
+        else:
+            by_step[name] = by_step.get(name, 0) + last - first + 1
+    stale = [s["time"] for s in server if any(start <= s["time"] <= end + 16 for _, _, start, end in runs)]
+    return {"runs": len(runs), "frames": sum(last - first + 1 for first, last, _, _ in runs),
+            "longest_run": max((last - first + 1 for first, last, _, _ in runs), default=0),
+            "frames_in_steps": sum(by_step.values()), "frames_by_step": by_step, "frames_outside_steps": outside,
+            "short_runs": len(short), "short_run_frames": sum(last - first + 1 for first, last, _ in short),
+            "short_run_times": [start for _, _, start in short],
+            "server_shots_on_repeated_command": stale}
+
+
+def prediction_margin(log: str) -> dict:
+    """Each rise of the shooter's prediction margin, with the frame that caused it."""
+    rises = [(int(margin), int(frame), int(time)) for margin, frame, time in MARGIN_RISE.findall(log)]
+    return {"rises": len(rises), "max_ms": max((m for m, _, _ in rises), default=0),
+            "frames_ms": [f for _, f, _ in rises]}
+
+
 def angle(a: list[float], b: list[float]) -> float:
     # atan2 of the cross and dot products: acos of a dot product near 1 turns the log's
     # five-decimal rounding into a quarter of a degree.
@@ -227,6 +307,8 @@ def main() -> int:
     parser.add_argument("--latency", type=int, default=0, help="forced one-way latency on the shooter, ms")
     parser.add_argument("--jitter", type=int, default=0, help="forced latency jitter on the shooter, ms")
     parser.add_argument("--turn-rate", type=float, default=220.0, help="degrees per second while firing")
+    parser.add_argument("--prediction-margin", type=int, choices=(0, 1), default=1,
+                        help="net_clientPredictionMargin on the shooter (0: the median target alone)")
     args = parser.parse_args()
     runtime, output = args.runtime_dir.resolve(), args.output_dir.resolve()
     verify_runtime_is_current(runtime)
@@ -268,7 +350,10 @@ def main() -> int:
     shooter = ['set g_autoExecAfterMapLoad ""', "set net_mpHitscanDebug 1",
                f"set net_mpPredictHitscan {args.predict_hitscan}", f"set net_mpPredictMode {int(args.enhanced)}",
                f"set sensitivity {SENSITIVITY}", f"set m_yaw {M_YAW}", "set ui_retained 1",
-               "waitMsec 8000", "openq4_reportMPState", "echo FIRING_VIEW_JOINED"]
+               "waitMsec 8000", "openq4_reportMPState", "echo FIRING_VIEW_JOINED",
+               # The frame-time tail of the measured steps (frame_tail): a frame longer than the
+               # prediction target covers sends its commands late unless the margin covers it.
+               f"profileFrameWork {TAIL_FRAMES} diagnostics/frames_steps.csv"]
     shots = []
     hold = max(0, FIRE_MSEC - 300 - BURST * INTERVAL_MSEC)
     # The target steps come first, while the shooter still faces the way its spawn point
@@ -290,9 +375,10 @@ def main() -> int:
     # HITCHES times, then settles. The respawn and rejoin bursts after it must still fall on the
     # server's frames: a client whose prediction never recovered from a hitch sends every
     # command late, and the server repeats its last one.
-    shooter += ["echo FIRING_VIEW_HITCHES", f"profileFrameWork {HITCH_FRAMES} diagnostics/hitches.csv",
+    shooter += ["profileFrameWork 0", "echo FIRING_VIEW_HITCHES", f"profileFrameWork {HITCH_FRAMES} diagnostics/hitches.csv",
                 f"com_presentationStallProbe {HITCH_MSEC}", f"waitMsec {HITCHES * 1000 - 500}",
-                "com_presentationStallProbe 0", "profileFrameWork 0", "waitMsec 3000", "echo FIRING_VIEW_HITCHES_END"]
+                "com_presentationStallProbe 0", "profileFrameWork 0", "waitMsec 3000", "echo FIRING_VIEW_HITCHES_END",
+                f"profileFrameWork {TAIL_FRAMES} diagnostics/frames_lives.csv"]
     shooter += [*select("machinegun"), "echo FIRING_VIEW_SEGMENT respawn",
                 f"in_presentationViewProbe {counts:g}", "in_presentationViewProbeAttack 1", "waitMsec 300"]
     burst(shooter, shots, "respawn_before", 4)
@@ -308,7 +394,8 @@ def main() -> int:
                 "waitMsec 400", f"in_presentationViewProbe {counts:g}", "in_presentationViewProbeAttack 1"]
     burst(shooter, shots, "rejoin", 16)
     shooter += ["in_presentationViewProbeAttack 0", "in_presentationViewProbe 0", "waitMsec 1200",
-                "echo FIRING_VIEW_SEGMENT_END rejoin", "openq4_reportMPState", "echo FIRING_VIEW_COMPLETE",
+                "echo FIRING_VIEW_SEGMENT_END rejoin", "profileFrameWork 0", "openq4_reportMPState",
+                "echo FIRING_VIEW_COMPLETE",
                 "waitMsec 1000", "disconnect", "quit"]
     write_script(games["host"] / "firing_view.cfg", host)
     write_script(games["shooter"] / "firing_view.cfg", shooter)
@@ -339,6 +426,12 @@ def main() -> int:
                  "g_autoExecAfterMapLoadDelayMs": "500"}
         if role == "shooter" and (args.latency or args.jitter):
             cvars.update(net_forceLatency=str(args.latency), net_forceJitter=str(args.jitter), net_forceSeed="40708")
+        # The host reports each run of frames it ran on a repeated command of the shooter's
+        # (late_commands); the shooter logs each rise of its prediction margin.
+        if role == "host":
+            cvars.update(com_showAsyncStats="1")
+        else:
+            cvars.update(net_clientPredictionMargin=str(args.prediction_margin), net_verbose="1")
         command = [str(exe), *[part for key, value in cvars.items() for part in ("+set", key, value)]]
         command += ["+spawnServer", "mp/q4dm1"] if role == "host" else ["+connect", f"127.0.0.1:{args.port}"]
         (output / f"{role}-launch.json").write_text(json.dumps(command, indent=2))
@@ -485,6 +578,11 @@ def main() -> int:
         respawn_time is not None and s["time"] >= respawn_time for s in extras)
     outside = [s for s in server if s["segment"] != "respawn"]
     outside_matched = sum((s["time"], s["def"]) in by_time for s in outside)
+    windows = {}
+    for name in MEASURED_STEPS:
+        times = [s["time"] for s in local + server if s["segment"] == name]
+        if times:
+            windows[name] = (min(times) - 500, max(times) + 500)
     metrics = {
         "shooter_slot": slot,
         "server_shots": len(server),
@@ -502,6 +600,11 @@ def main() -> int:
         "steps": steps,
         "new_life_raises": lives,
         "hitches_observed": hitches(games["shooter"] / "diagnostics/hitches.csv"),
+        "prediction_margin_enabled": args.prediction_margin,
+        "late_commands": late_commands(host_log, slot, windows, server),
+        "frame_tail": {"steps": frame_tail(games["shooter"] / "diagnostics/frames_steps.csv"),
+                       "lives": frame_tail(games["shooter"] / "diagnostics/frames_lives.csv")},
+        "prediction_margin": prediction_margin(log),
         "hud_loads_in_steps": [f"{step}: {source}" for step, source in hud_loads(log)],
         "host_placements": placements,
         "gauntlet_target_captures": sum(1 for s in shots if s.startswith("target_gauntlet")),
@@ -563,7 +666,8 @@ def main() -> int:
 
     report = {"status": "fail" if failures else "pass", "renderer": args.renderer,
               "predict_hitscan": args.predict_hitscan, "enhanced": args.enhanced, "latency": args.latency,
-              "jitter": args.jitter, "turn_rate": args.turn_rate, "identity": identity, "metrics": metrics,
+              "jitter": args.jitter, "turn_rate": args.turn_rate, "prediction_margin": args.prediction_margin,
+              "identity": identity, "metrics": metrics,
               "captures": [str(games["shooter"] / f"screenshots/{s}.tga") for s in shots],
               "failures": failures,
               "logs": {role: str(game / "logs/openq4.log") for role, game in games.items()}}

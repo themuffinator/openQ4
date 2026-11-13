@@ -74,6 +74,7 @@ idCVar				idAsyncNetwork::serverRemoteConsolePassword( "net_serverRemoteConsoleP
 idCVar				idAsyncNetwork::serverAllowLegacyRcon( "net_serverAllowLegacyRcon", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NOCHEAT, "allow the insecure legacy plaintext rcon protocol" );
 idCVar				idAsyncNetwork::clientPrediction( "net_clientPrediction", "16", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "additional client side prediction in milliseconds (legacy value 16 follows one exact base tic)" );
 idCVar				idAsyncNetwork::clientMaxPrediction( "net_clientMaxPrediction", "1000", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "maximum number of milliseconds a client can predict ahead of server." );
+idCVar				idAsyncNetwork::clientPredictionMargin( "net_clientPredictionMargin", "1", CVAR_SYSTEM | CVAR_BOOL | CVAR_NOCHEAT, "after a frame longer than net_clientPrediction covers, predict further ahead for a while so commands still reach the server in time (0: the target alone)" );
 idCVar				idAsyncNetwork::clientUsercmdBackup( "net_clientUsercmdBackup", "5", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "number of usercmds to resend" );
 idCVar				idAsyncNetwork::clientRemoteConsoleAddress( "net_clientRemoteConsoleAddress", "localhost", CVAR_SYSTEM | CVAR_NOCHEAT, "remote console address" );
 idCVar				idAsyncNetwork::clientRemoteConsolePassword( "net_clientRemoteConsolePassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private remote console password" );

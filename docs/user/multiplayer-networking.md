@@ -159,6 +159,7 @@ One exception remains: the server's replies to a join or a server-list query car
 | `net_mpRemoteExtrapolation` | derived | read-only | MP client prediction | What this client tells servers it draws other players ahead by, in frames: `0` in legacy mode, otherwise `net_mpPredictMaxFrames`. |
 | `net_mpPredictHitscan` | `1` | `0..1` | MP client | Draws your own machinegun, shotgun and railgun tracers and wall impacts the moment you fire. `0` waits for the server's copy of each shot, as older builds did. |
 | `net_mpHitscanDebug` | `0` | `0..1` | Client and server | Logs every hit-scan shot: the server's, the ones your client drew itself, and the server's copies it received, with how far each started from your gun and aim. |
+| `net_clientPredictionMargin` | `1` | `0..1` | Client | After a frame of your game takes longer than usual, or when it runs below 30 fps, your client predicts a little further ahead for a while, so your aim and fire still reach the server in time. `0` keeps the shortest lead and lets such frames send late commands, which the server replaces with your previous one. |
 
 ## How prediction and lag compensation fit together
 
@@ -196,6 +197,22 @@ and `net_mpPredictDebug 1` makes a client log how old each remote player was
 on its screen when a server update arrived. `net_verbose 2` also logs, for
 each server update, how far ahead the client is predicting, the target it is
 steering towards and how early the server says its commands arrive.
+
+Your client sends the server one command a game frame: your aim, movement and
+buttons. If one arrives after the server has run that frame, the server reuses
+your previous command, so a shot fired then goes where you were aiming a moment
+before. A frame of your game that takes much longer than usual delays the
+commands that fell due during it. With `net_clientPredictionMargin 1`, the
+default, a long frame makes your client run further ahead, by the frame's
+length less about 33 ms (two server frames). Each long frame keeps its lead for
+ten seconds, then eases back over several seconds, so the next long frame of
+that length arrives in time. Your client follows the longest recent one; a
+single long frame, such as one while joining, does not keep a large lead going
+just because shorter ones follow. The cost is that your actions reach the
+server that much later while it lasts. A game that keeps above 30 fps without
+long frames pays nothing. With
+`com_showAsyncStats 1` a server logs, once a second, how many of each player's
+commands came too late, and each run of them with its game time.
 
 ## Legacy Compatibility Switch
 

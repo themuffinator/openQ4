@@ -93,6 +93,27 @@ static ID_INLINE int AsyncClient_ConfiguredPredictionMsec( int gameFrame ) {
 		idAsyncNetwork::clientPrediction.GetInteger() );
 }
 
+// The longest frame the configured target covers without a margin: the target itself,
+// plus the tic its median already spans (PredictionMargin.h).
+static ID_INLINE int AsyncClient_PredictionCoverMsec( int gameFrame ) {
+	return AsyncClient_ConfiguredPredictionMsec( gameFrame ) + AsyncClient_NextGameFrameMsec( gameFrame );
+}
+
+// openQ4: commands a user command packet carries. A frame longer than a tic makes
+// several commands at once and sends each in its own packet, all in the same
+// instant. A link with jitter delivers such a burst in any order, and the server's
+// channel discards every packet older than the newest it has taken. With each packet
+// carrying only net_clientUsercmdBackup earlier commands, the first commands of a
+// burst of more than that were then lost outright, however early they would have
+// arrived, and the server repeated the command before them. Each packet of a burst
+// now also carries the commands the burst has already sent, so whichever arrives
+// first holds the whole burst.
+static ID_INLINE int AsyncClient_UsercmdsPerPacket( int backupUsercmds, int sentThisFrame ) {
+	const int requested = idMath::ClampInt( 0, MAX_USERCMD_PACKET_COMMANDS - 1, backupUsercmds ) + 1;
+	const int burst = requested + ( sentThisFrame > 0 ? sentThisFrame : 0 );
+	return burst < MAX_USERCMD_PACKET_COMMANDS ? burst : MAX_USERCMD_PACKET_COMMANDS;
+}
+
 static ID_INLINE bool AsyncClient_SameEndpoint( const netadr_t &left, const netadr_t &right ) {
 	return left.port == right.port && Sys_CompareNetAdrBase( left, right );
 }
@@ -197,6 +218,8 @@ const int SETUP_CONNECTION_RESEND_TIME	= 1000;
 const int CONNECT_PROTOCOL_INFO_REQUESTS	= 3;
 const int EMPTY_RESEND_TIME				= 500;
 const int PREDICTION_FAST_ADJUST		= 4;
+// the most UpdateTime gives one frame: a longer stall loses the rest
+const int CLIENT_FRAME_CLAMP_MSEC		= 100;
 
 
 /*
@@ -326,6 +349,8 @@ void idAsyncClient::Clear( void ) {
 	gameFrame = 0;
 	gameTimeResidual = 0;
 	gameTime = 0;
+	predictionMargin.Clear();
+	usercmdsSentThisFrame = 0;
 	memset( userCmds, 0, sizeof( userCmds ) );
 	backgroundDownload.completed = true;
 	backgroundDownload.url.expectedSize = 0;
@@ -1283,9 +1308,10 @@ void idAsyncClient::SendUsercmdsToServer( void ) {
 	msg.WriteByte( CLIENT_UNRELIABLE_MESSAGE_USERCMD );
 	msg.WriteShort( clientPrediction );
 
-	const int requestedUsercmds = idMath::ClampInt( 0, MAX_USERCMD_PACKET_COMMANDS - 1,
-		idAsyncNetwork::clientUsercmdBackup.GetInteger() ) + 1;
+	const int requestedUsercmds = AsyncClient_UsercmdsPerPacket( idAsyncNetwork::clientUsercmdBackup.GetInteger(),
+		usercmdsSentThisFrame );
 	numUsercmds = gameFrame >= requestedUsercmds - 1 ? requestedUsercmds : gameFrame + 1;
+	usercmdsSentThisFrame++;
 
 	// write the user commands
 	msg.WriteLong( gameFrame );
@@ -1550,8 +1576,21 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			// behind its target the catch-up was slammed to -maximumPredictionMsec - full slowdown
 			// instead of speeding up - and it ended one frame behind the server with every command
 			// late.  Step with signed values instead.
+			//
+			// openQ4: the target also carries the margin a recent long frame needs
+			// (PredictionMargin.h). With the median target alone, a frame longer than about two
+			// tics held its commands back until the server had already run the frames they were
+			// for, and a client below 30 fps did that on every frame. When the margin grows the
+			// target takes the growth at once, so the next long frame finds it in place; a
+			// shrinking margin is followed by the one-unit steps.
 			const int configuredPredictionMsec = AsyncClient_ConfiguredPredictionMsec( gameFrame );
-			clientPrediction += ( aheadOfServer < configuredPredictionMsec ) ? 1 : -1;
+			const int predictionCoverMsec = AsyncClient_PredictionCoverMsec( gameFrame );
+			const int predictionMarginMsec = predictionMargin.Margin( predictionCoverMsec );
+			const int predictionMarginRise = predictionMargin.Rise( predictionCoverMsec );
+			clientPrediction += predictionMarginRise;
+			const int targetPredictionMsec = idMath::ClampInt( configuredPredictionMsec, maximumPredictionMsec,
+				configuredPredictionMsec + predictionMarginMsec );
+			clientPrediction += ( aheadOfServer < targetPredictionMsec ) ? 1 : -1;
 			clientPrediction = idMath::ClampInt( configuredPredictionMsec, maximumPredictionMsec, clientPrediction );
 			delta = gameTime - ( snapshotGameTime + clientPrediction );
 			const int deltaStep = ( delta < 0 ) ? -1 : 1;
@@ -1579,9 +1618,14 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 				// whether the snapshot forced a resync, the server's view of how early this
 				// client's commands arrive, and the target and catch-up the controller now holds.
 				common->Printf( "received snapshot, gameInitId = %d, gameFrame = %d, gameTime = %d, snapshotGameTime = %d, "
-					"predictedGameTime = %d%s, aheadOfServer = %d, clientPrediction = %d, clientPredictTime = %d, gameTimeResidual = %d\n",
+					"predictedGameTime = %d%s, aheadOfServer = %d, clientPrediction = %d, clientPredictTime = %d, gameTimeResidual = %d, "
+					"predictionMargin = %d\n",
 					gameInitId, gameFrame, gameTime, snapshotGameTime, predictedGameTime, predictionResynced ? " (resync)" : "",
-					aheadOfServer, clientPrediction, clientPredictTime, gameTimeResidual );
+					aheadOfServer, clientPrediction, clientPredictTime, gameTimeResidual, predictionMarginMsec );
+			}
+			if ( predictionMarginRise > 0 && idAsyncNetwork::verbose.GetInteger() ) {
+				common->Printf( "client prediction margin %d ms after a %d ms frame (game time %d)\n", predictionMarginMsec,
+					predictionMargin.PeakMsec(), gameTime );
 			}
 
 			if ( numDuplicatedUsercmds && ( idAsyncNetwork::verbose.GetInteger() == 2 ) ) {
@@ -2005,6 +2049,7 @@ void idAsyncClient::ProcessConnectResponseMessage( const netadr_t from, const id
 	const std::uint32_t maximumPrediction = static_cast<std::uint32_t>( AsyncClient_MaxPredictionMsec() );
 	clientPredictTime = clientPrediction = static_cast<int>(
 		connectElapsed < maximumPrediction ? connectElapsed : maximumPrediction );
+	predictionMargin.Clear();
 }
 
 /*
@@ -2812,7 +2857,16 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 	byte		msgBuf[MAX_MESSAGE_SIZE];
 	netadr_t	from;
 
-	msec = UpdateTime( 100 );
+	msec = UpdateTime( CLIENT_FRAME_CLAMP_MSEC );
+
+	// openQ4: the commands that fell due during the frame just ended are made only now, so a
+	// frame longer than the target covers sends them late; PredictionMargin.h turns such
+	// frames into a margin, which the snapshots read below add to the target.
+	if ( !idAsyncNetwork::clientPredictionMargin.GetBool() ) {
+		predictionMargin.Clear();
+	} else if ( clientState == CS_INGAME ) {
+		predictionMargin.Frame( clientTime, msec, CLIENT_FRAME_CLAMP_MSEC, AsyncClient_PredictionCoverMsec( gameFrame ) );
+	}
 
 	if ( !clientPort.GetPort() ) {
 		return;
@@ -2841,7 +2895,7 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 				ProcessMessage( from, msg );
 			}
 
-			msec = UpdateTime( 100 );
+			msec = UpdateTime( CLIENT_FRAME_CLAMP_MSEC );
 			gameTimeResidual += msec;
 
 		} while( newPacket );
@@ -2908,6 +2962,7 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 	}
 
 	// generate user commands for the predicted time
+	usercmdsSentThisFrame = 0;
 	while ( gameTimeResidual + clientPredictTime >= AsyncClient_NextGameFrameMsec( gameFrame ) ) {
 		const int nextGameFrameMsec = AsyncClient_NextGameFrameMsec( gameFrame );
 
