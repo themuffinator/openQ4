@@ -526,6 +526,8 @@ struct idClipModel { static void ClearTraceModelCache(){} };
 // attachment teardown are exercised by savegame_restore_cleanup.py.
 struct idRestoreGame { static void PrepareMapShutdown(){} static void DeleteOrphanedObjects(){} };
 struct idSaveGame { static void ClearDictionaryCache(){} };
+// The Classic ruleset's definition overlay comes off at teardown (ClassicRules.cpp).
+struct rvClassicRules { static void RevertDefinitions(){} };
 struct MapName : std::string { using std::string::operator=; void Clear(){clear();} };
 struct idMultiplayerGame {
     int seals=0; bool succeeds=true;
@@ -533,7 +535,7 @@ struct idMultiplayerGame {
     void PrepareForMapShutdown();
 };
 struct idGameLocal {
-    bool isServer=false, isMultiplayer=false, inCinematic=false, entitiesAlive=true;
+    bool isServer=false, isMultiplayer=false, inCinematic=false, entitiesAlive=true, classicRuleset=false;
     int gamestate=GAMESTATE_ACTIVE, clientInstanceFirstFreeIndex=0, warnings=0;
     void *camera=nullptr, *portalSky=nullptr, *gameRenderWorld=nullptr;
     MapName mapFileName;
