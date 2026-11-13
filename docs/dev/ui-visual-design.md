@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.42, 13 November 2026 (1.40 and 1.41 earlier that day, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.43, 13 November 2026 (1.40 to 1.42 earlier that day, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -42,6 +42,11 @@ blade ends on its plates, talons on the bands' steps and the dialog's chamfer,
 and a lens around the focused marker. Version 1.42 reshapes the main frames
 themselves: the bands' steps become horns, and the level block and dialogs
 take horned corners.
+
+Version 1.43 shows the title's backdrop as a display signal: its pictures are
+dimmed and stepped through an ordered dither, and brief signal faults replace
+the stock cross-fade when a picture changes. Faults also mark the menu
+opening, leaving for a page and coming home (section 13.8).
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -1424,7 +1429,8 @@ drops slides, flashes, bursts and jolts.
 
 | Stock loop | Measured | Treatment |
 | --- | --- | --- |
-| Backdrop levelshots | Cross-fade over 2000 ms every 5000 ms, four images | Decorative |
+| Backdrop levelshots | Cross-fade over 2000 ms every 5000 ms, four images | Decorative. The stock menus keep the cross-fade; the Remastered title changes its pictures through the title signal instead (section 13.8) |
+| Title signal slips (openQ4) | Five a 25 s loop, 70–120 ms each at 0.18–0.30 | Decorative; reduced motion and reduced flashing remove them |
 | Static grain | Scrolls 1 texture width and 5 texture heights per second at 2.4% | Decorative |
 | Animated gear | One turn per 10 s | Decorative |
 | Terminal scanlines | Drift 0.2 texture heights per second | Decorative |
@@ -2167,6 +2173,38 @@ and parallax off.
   darkening blend (section 4). A rim light follows its outline at 0.20, and a
   glint 12% of the outline long runs around it every 9 s. Reduced motion keeps
   only the rim.
+- **Title signal.** The Remastered title shows its backdrop as a display
+  signal (openQ4). The controls, bands, reticle grid, emblem and wordmark are
+  never dithered or faulted.
+  - *Dimming.* Black at 0.30 covers the levelshots, beneath the vignette and
+    the additive light band, so the band keeps its strength and the menu
+    leads.
+  - *Dither.* Over the pictures and their light, beneath the grid, an ordered
+    8x8 Bayer dither steps each pixel's brightness between six levels evenly
+    spaced in its square root, mixed in at 0.60. It keeps the hue and a flat
+    area's mean brightness and leaves black and white alone. Its cell is one
+    pixel of a 540-line view, in whole pixels.
+  - *Fault.* Over the pictures, beneath the dither: a few wide bands and
+    many thin rows tear sideways, square blocks 24 across hold as a 3x3
+    mosaic of themselves, and the red and blue channels part, further in a
+    torn row. Torn rows lift by at most 15% and held blocks by 8%. Through a
+    fault the arrangement changes every 55 ms; between faults nothing is
+    drawn.
+  - *Picture changes.* Every 5000 ms, in place of the cross-fade. The fault
+    starts 120 ms before the cut, peaks at 0.85 60 ms after it and is at rest
+    by 520 ms. Meanwhile the next picture shows at 0.40 by 60 ms and 0.80 by
+    220 ms, and holds by 420 ms, never falling back.
+  - *Menu moves.* A second fault resolves from 0.85 to rest over the 250 ms
+    `menu.fade` as the menu opens. It breaks up as the bands leave for a
+    page, peaking at 0.85 at 400 ms and at rest by the hand-off at 550 ms.
+    As they dock home it rises to 0.70 by 120 ms and is at rest by 480 ms.
+  - *Slips.* Between picture changes the signal slips five times a loop
+    (section 8).
+  - *Settings.* Reduced motion keeps the dimming and the dither, holds one
+    picture and drops every fault. A fault changes faster than 3 Hz, so
+    reduced flashing also drops the faults; it keeps the dither and the
+    stepped picture changes. A renderer that cannot read the composed view
+    back, like one without soft focus, shows the pictures dimmed only.
 - **Title continuity.** Activating a navigation item carries its label into the
   screen-title slot, where it becomes the path title, within the stock
   choreography timings.
@@ -4435,6 +4473,30 @@ fullers, and sections 2 and 13.7 follow.
 | Rule | Talons on steps of 24 u or more; everything else straight | Horns on steps of 24 u or more and on panel corners; smaller steps taper straight at 15 degrees; every sweep hollows its frame |
 
 The register still does not hold this scope, and nothing is accepted.
+
+### Version 1.43: the title's signal
+
+The product owner asked for the new interface's main menu background to gain
+a dither and sci-fi digital glitch effects and transitions that are
+interesting but not distracting, then for a slight dimming. Section 13.8 adds
+the title signal and section 8 its slips. The stock measurement stays in
+section 8's table, where the stock menus keep it.
+
+| Subject | Version 1.42 | Version 1.43 |
+| --- | --- | --- |
+| Pictures | The levelshots at full strength under the light band | Black at 0.30 over them, beneath the vignette and light band |
+| Texture | None over the pictures | An ordered 8x8 Bayer dither at 0.60 over the pictures and their light, beneath the reticle grid |
+| Picture change | The stock cross-fade over 2000 ms every 5000 ms | A signal fault over 640 ms about the cut, peaking at 0.85, while the next picture steps in by 420 ms |
+| Menu moves | Bands and content only | A fault as the menu opens, as the bands leave for a page and as they dock home |
+| Between changes | Still | Five brief slips a loop |
+| Reduced motion | One picture, no cross-fade | One picture and the dither, no fault |
+| Reduced flashing | No change | No fault; the dither and the stepped picture changes stay |
+
+Register revision 23 supersedes `MOT-011`, whose levelshot cross-fade the
+title no longer reproduces, by `MOT-017`. It carries every other loop and
+alarm unchanged and sends the Remastered title's picture changes to the
+signal. It also appends `MOT-018` for the signal itself. Both are pending,
+and nothing is accepted.
 
 ### Version 1.39: the Awakening chaingun turret
 

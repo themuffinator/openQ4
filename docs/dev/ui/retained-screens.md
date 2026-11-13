@@ -60,10 +60,10 @@ draws them with `glsl/retained_glitch.glsl` through
 `Host::GlitchBackdrop` and, for a full-view layer in a replayed frame,
 `Host::GlitchBackdropDirect`.
 
-The stock cross-fade (visual specification section 8, ambient loops) remains
-the measured reference. The Remastered title departs from it at the user's
-request, and the specification and its register row have not been revised for
-the change.
+[Visual specification 1.43](../ui-visual-design.md) records the title signal
+in section 13.8. Section 8 keeps the stock cross-fade as the measured
+reference, which the stock menus still play. Register revision 23 supersedes
+`MOT-011` by `MOT-017` and appends `MOT-018`, both pending.
 
 Validation: the native runtime test covers the filter, the property ranges,
 live values in replayed frames, the direct pass, rest and fallback. The host

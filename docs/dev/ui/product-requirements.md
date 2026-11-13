@@ -877,8 +877,8 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **123 partial, 229 pending and 0 verified requirements**, counting the
-40 superseded rows at their recorded states. `BEH-002`
+There are **123 partial, 231 pending and 0 verified requirements**, counting the
+41 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -1240,3 +1240,28 @@ initializing rule. It is pending; engine traces and captures of the entrance
 bind no evidence record yet. The revision re-binds the visual specification.
 There are 352 rows, 312 active requirements and 40 historical superseded rows;
 the 358 migration variants and seven final gates remain unaccepted.
+
+## Revision 23: the title's signal
+
+Visual specification 1.43 shows the Remastered title's backdrop as a display
+signal, at the product owner's request: the levelshots dimmed by black at
+0.30, an ordered dither over them and their light, and brief signal faults
+when a picture changes and as the menu opens, leaves for a page and comes
+home. Reduced motion and reduced flashing drop the faults and keep the
+dither. `MOT-011` quoted the stock levelshot cross-fade, which the title no
+longer plays, so `MOT-017` supersedes it. `MOT-017` carries every other loop
+and alarm and sends the Remastered title's picture changes to the signal,
+while the stock menus keep the cross-fade. `MOT-018` is the signal itself.
+Both are pending. The implementation behind ui_retained is described in
+[the retained screens notes](retained-screens.md#13-november-2026-the-titles-signal),
+and its tests and captures bind no evidence record yet.
+
+The revision re-binds the visual specification and the records whose
+documents had changed since they were bound. The visual specification changed
+with 1.40 to 1.42. The `.rui` rename (`822de6800`) changed `bindings.md`,
+`multiplayer-menus.md`, `runtime-performance.md` and `value-controls.md`.
+The kick-vote change (`4a5c2a295`) changed `player-identity.md`, and the
+fight audit (`4f3bd6641`) changed `audio-voice-evidence.md`. No evidence scope
+or result changes. There are 354 rows, 313 active requirements and 41
+historical superseded rows; the 358 migration variants and seven final gates
+remain unaccepted.
