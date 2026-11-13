@@ -923,6 +923,7 @@ def validate_validation_wiring() -> None:
         "renderer_hdr_stock_fallback.py",
         "renderer_motion_blur_qualification.py",
         "renderer_screen_space_effects_qualification.py",
+        "renderer_shared_domain_qualification.py",
         "renderer_shadow_motion_qualification.py",
         "renderer_temporal_qualification.py",
         "renderer_temporal_stability.py",

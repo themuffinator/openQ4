@@ -62,6 +62,7 @@ static bool RendererBootstrap_BuildDefaultSafetyReport( idStr &report, idStr &is
 		{ "r_rendererSharedWorldFogBlend", &r_rendererSharedWorldFogBlend, 0 },
 		{ "r_rendererSharedSubview", &r_rendererSharedSubview, 0 },
 		{ "r_rendererSharedDeform", &r_rendererSharedDeform, 0 },
+		{ "r_rendererSharedFaultInject", &r_rendererSharedFaultInject, 0 },
 		{ "r_vkShadowFallbackTest", &r_vkShadowFallbackTest, 0 },
 		{ "r_rendererModernLightingParity", &r_rendererModernLightingParity, 0 },
 		{ "r_rendererModernVisibleDepth", &r_rendererModernVisibleDepth, 0 },

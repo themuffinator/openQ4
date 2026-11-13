@@ -1141,14 +1141,12 @@ void idRenderSystemLocal::SetUseUIViewportFor2D( bool enable ) {
 	const bool sameViewport=currentRenderCrop!=0 || activeRenderTexture!=NULL || (viewDef && viewDef->isEditor) ||
 		(glConfig.uiViewportX==crop.x && glConfig.vidHeight-glConfig.uiViewportY-glConfig.uiViewportHeight==crop.y &&
 		 glConfig.uiViewportWidth==crop.width && glConfig.uiViewportHeight==crop.height);
-	bool mustFlush = !sameViewport;
-#if !defined( OPENQ4_RENDERER_VK_MODULE )
-	// GL captures _currentRender at the start of the post-process range. Keep
-	// the final scene composite separate from a following legacy scope even
-	// when their rectangles match. Ordinary UI geometry can still batch.
-	// Vulkan captures just before the consuming pass and keeps its own ordering.
-	mustFlush = mustFlush || guiModel->HasSceneFeedback();
-#endif
+	// Keep the final scene composite separate from a following legacy scope
+	// even when their rectangles match. GL captures _currentRender at the start
+	// of the post-process range and needs it; on both backends it also leaves
+	// the HUD a pure GUI view that the shared GUI domain can own (REN-01).
+	// Ordinary UI geometry can still batch.
+	const bool mustFlush = !sameViewport || guiModel->HasSceneFeedback();
 	if (mustFlush) FlushGui();
 
 	useUIViewportFor2D = enable;

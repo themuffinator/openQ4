@@ -439,6 +439,7 @@ jobs:
             tools/tests/renderer_temporal_qualification.py \
             tools/tests/renderer_temporal_stability.py \
             tools/tests/renderer_screen_space_effects_qualification.py \
+            tools/tests/renderer_shared_domain_qualification.py \
             tools/tests/renderer_shadow_motion_qualification.py \
             tools/tests/renderer_native_ui_output.py \
             tools/tests/renderer_mp_flat_items.py \
@@ -472,6 +473,7 @@ jobs:
             tools/tests/renderer_vulkan_qualification.py \
             tools/tests/renderer_vulkan_shadow_compatibility.py \
             tools/tests/renderer_vulkan_world_interaction_compatibility.py \
+            tools/tests/renderer_shared_domain_targets.py \
             tools/tests/rigid_body_recovery_diagnostics.py \
             tools/tests/ai_medic_approach_watchdog.py \
             tools/tests/savegame_corruption_contract.py \
@@ -1015,6 +1017,7 @@ jobs:
           python tools/tests/renderer_vulkan_probe_safety.py
           python tools/tests/renderer_vulkan_shadow_compatibility.py
           python tools/tests/renderer_vulkan_world_interaction_compatibility.py
+          python tools/tests/renderer_shared_domain_targets.py
           python tools/tests/rigid_body_recovery_diagnostics.py
           python tools/tests/ai_medic_approach_watchdog.py
           python tools/tests/savegame_corruption_contract.py

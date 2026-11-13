@@ -975,6 +975,14 @@ static const classicSubviewDomainView_t *RB_ClassicSubview_Preflight(
 		// the remaining parent edge into a mixed shared/classic ownership case.
 		return NULL;
 	}
+	if ( ( r_rendererSharedFaultInject.GetInteger() & SHARED_FAULT_INJECT_SUBVIEW ) != 0 ) {
+		// Qualification rollback: decline before any child-view or capture work.
+		R_ClassicSubviewDomain_RecordBackendFallback( viewDef,
+			CLASSIC_SUBVIEW_DOMAIN_BACKEND_GL,
+			CLASSIC_SUBVIEW_DOMAIN_FAILURE_BACKEND_REJECTED,
+			SHARED_FAULT_INJECT_DETAIL );
+		return NULL;
+	}
 	const bool nestedDynamicReady =
 		R_ClassicCinematicPostDomain_SubviewTransactionReady( viewDef,
 			CLASSIC_CINEMATIC_POST_BACKEND_GL );

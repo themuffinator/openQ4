@@ -79,6 +79,16 @@ static const classicSubviewDomainView_t *VK_ClassicSubview_Preflight(
 			CLASSIC_SUBVIEW_DOMAIN_FAILURE_BACKEND_NOT_READY, 0 );
 		return NULL;
 	}
+	if ( ( r_rendererSharedFaultInject.GetInteger() & SHARED_FAULT_INJECT_SUBVIEW ) != 0
+			&& view->backendOutcome[ CLASSIC_SUBVIEW_DOMAIN_BACKEND_VULKAN ]
+				== CLASSIC_SUBVIEW_DOMAIN_BACKEND_UNRECORDED ) {
+		// Qualification rollback: decline before any child-view or capture work.
+		R_ClassicSubviewDomain_RecordBackendFallback( viewDef,
+			CLASSIC_SUBVIEW_DOMAIN_BACKEND_VULKAN,
+			CLASSIC_SUBVIEW_DOMAIN_FAILURE_BACKEND_REJECTED,
+			SHARED_FAULT_INJECT_DETAIL );
+		return NULL;
+	}
 	if ( view->backendOutcome[CLASSIC_SUBVIEW_DOMAIN_BACKEND_VULKAN]
 			!= CLASSIC_SUBVIEW_DOMAIN_BACKEND_UNRECORDED ) {
 		// A rejected nested member returns its entire sealed transaction to the

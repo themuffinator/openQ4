@@ -585,7 +585,13 @@ static bool R_ClassicGuiDomain_PrepareView( const idScenePacketFrame &packetFram
 			return FailView( view, CLASSIC_GUI_DOMAIN_FAILURE_MISSING_INSTANCE_RECORD,
 				0, sourceIndex, draw.drawPacketIndex, passPacketIndex );
 		}
-		if ( packet->instanceRecord->negativeScale ) {
+		// R_RenderGuiSurf maps the 640x480 GUI onto its surface with a
+		// mirrored (negative-determinant) matrix, so every stock in-world GUI
+		// carries one. Both classic walkers draw it with the material's own
+		// cull mode and no handedness correction, which is exactly the state
+		// this domain seals, so in-world scope accepts it. A root 2D view never
+		// has one (REN-01).
+		if ( packet->instanceRecord->negativeScale && !inWorld ) {
 			return FailView( view, CLASSIC_GUI_DOMAIN_FAILURE_SOURCE_SURFACE_FALLBACK,
 				CLASSIC_GUI_DOMAIN_SOURCE_SURFACE_FALLBACK_NEGATIVE_SCALE,
 				sourceIndex, draw.drawPacketIndex, passPacketIndex );

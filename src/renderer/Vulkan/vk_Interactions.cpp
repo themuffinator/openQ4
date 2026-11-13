@@ -1141,9 +1141,9 @@ bool VK_ClassicInteraction_Preflight( const viewDef_t *viewDef ) {
 					light->receiverShadowMode[ receiverIndex ] );
 		}
 	}
-	if ( backEnd.renderTexture != NULL
-			|| backEnd.feedbackRenderTexture != NULL
-			|| !VK_Exec_SharedInteractionTargetReady() ) {
+	// The window, the backend scene target or the game's forward scene target
+	// (VK_Exec_SharedInteractionTargetReady); any other target stays classic.
+	if ( !VK_Exec_SharedInteractionTargetReady() ) {
 		return VK_ClassicInteraction_Fail( viewDef,
 			CLASSIC_INTERACTION_FAILURE_BACKEND_REJECTED,
 			VK_CLASSIC_INTERACTION_REJECT_OFFSCREEN_TARGET );
@@ -6465,9 +6465,7 @@ bool VK_ClassicFogBlend_Preflight( const viewDef_t *viewDef ) {
 			CLASSIC_FOG_BLEND_FAILURE_BACKEND_REJECTED,
 			VK_CLASSIC_FOG_BLEND_REJECT_COUNTS );
 	}
-	if ( backEnd.renderTexture != NULL
-			|| backEnd.feedbackRenderTexture != NULL
-			|| !VK_Exec_SharedInteractionTargetReady() ) {
+	if ( !VK_Exec_SharedInteractionTargetReady() ) {
 		return VK_ClassicFogBlend_Fail( viewDef,
 			CLASSIC_FOG_BLEND_FAILURE_BACKEND_REJECTED,
 			VK_CLASSIC_FOG_BLEND_REJECT_OFFSCREEN_TARGET );

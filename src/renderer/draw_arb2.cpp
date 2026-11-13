@@ -15161,8 +15161,7 @@ static bool RB_ARB2_SharedInteractionPreflight( const viewDef_t *viewDef,
 			|| ( viewDef->renderFlags & ~allowedRenderFlags ) != 0
 			|| viewDef->numOutlineDrawSurfs != 0
 			|| viewDef->renderView.globalMaterial != NULL
-			|| backEnd.renderTexture != NULL
-			|| backEnd.feedbackRenderTexture != NULL
+			|| !RB_SharedDomainTargetAllowed()
 			|| r_skipRender.GetBool() || r_skipRenderContext.GetBool()
 			|| r_skipInteractions.GetBool() || r_skipBump.GetBool()
 			|| r_skipDiffuse.GetBool() || r_skipSpecular.GetBool()
