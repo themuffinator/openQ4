@@ -192,7 +192,7 @@ static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 	} else if ( version2 ) {
 		file.Replace( ".openq4-v2.script", ".openq4-v1.script" );
 	}
-	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
+	if ( gameLocal.isMultiplayer || !FS_AwakeningActive() ) {
 		return false;
 	}
 	if ( file.Icmp( "maps/game/m05_bio.openq4-v1.script" ) == 0 ) {
@@ -256,7 +256,7 @@ void Awakening_PrepareM05M06( idDict &worldArgs ) {
 	map.BackSlashesToSlashes();
 	map.StripFileExtension();
 	const char *call = worldArgs.GetString( "call" );
-	if ( !g_awakeningM05M06.GetBool() || gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ||
+	if ( !g_awakeningM05M06.GetBool() || gameLocal.isMultiplayer || !FS_AwakeningActive() ||
 		!( ( map.Icmp( "maps/game/m05_bio" ) == 0 && idStr::Cmp( call, "map_m05::main" ) == 0 ) ||
 		   ( map.Icmp( "maps/game/m06_mcc" ) == 0 && idStr::Cmp( call, "m06::main" ) == 0 ) ||
 		   ( map.Icmp( "maps/game/m06_mcc_invasion" ) == 0 && idStr::Cmp( call, "m06b::main" ) == 0 ) ) ) {
@@ -279,7 +279,7 @@ void Awakening_PrepareM05M06( idDict &worldArgs ) {
 }
 
 void Awakening_CorrectM05M06Entity( idDict &args ) {
-	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
+	if ( gameLocal.isMultiplayer || !FS_AwakeningActive() ) {
 		return;
 	}
 	// The service lift was renamed in the map; its lamp retained the deleted

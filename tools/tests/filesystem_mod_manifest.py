@@ -191,6 +191,37 @@ def validate_invalid_mod_fallback_contract() -> None:
     reject(fallback, "fs_game.SetString( \"\" );", "invalid mod fallback")
 
 
+def validate_campaign_contract() -> None:
+    """mod.json "campaign" ties a single-player mod to The Awakening or Quake 4."""
+    source = read("src/framework/FileSystem.cpp")
+    known = cpp_function_body(source, "static bool FS_ModManifestKeyIsKnown(")
+    parser = cpp_function_body(source, "static bool FS_ParseModManifest(")
+    # (sliced, not brace-matched: comments in Startup carry apostrophes)
+    startup = source[source.index("void idFileSystemLocal::Startup("):source.index("void idFileSystemLocal::Restart(")]
+    require(known, '!key.Icmp( "campaign" )', "campaign is a known mod.json field")
+    require(parser, "modInfo.campaign.Clear();", "campaign starts empty")
+    require(parser, 'value.Icmp( "awakening" ) && value.Icmp( "quake4" )', "campaign accepts only its two values")
+    require(parser, "field 'campaign' must be", "an unknown campaign rejects the manifest")
+    for field in ("name", "version", "releaseDate", "website", "author", "requiredopenQ4Version"):
+        require(parser, f"missing required field '{field}'", "the required fields stay required")
+    reject(parser, "missing required field 'campaign'", "campaign stays optional")
+    # The mod's campaign is read after fs_game is validated and before the
+    # base is validated and mounted; multiplayer never mounts the expansion.
+    require_before(startup, "!ValidateConfiguredGameDir( fs_game.GetString(), &invalidReason )",
+                   'modInfo.campaign.Icmp( "awakening" )', "campaign read after fs_game validation")
+    require_before(startup, 'modInfo.campaign.Icmp( "awakening" ) && awakeningAllowed',
+                   "!ValidateConfiguredGameDir( fs_game_base.GetString(), &invalidReason )",
+                   "campaign base validated before mounting")
+    require_before(startup, "!ValidateConfiguredGameDir( fs_game_base.GetString(), &invalidReason )",
+                   "SetupGameDirectories( BASE_GAMEDIR );", "base validated before the search path is built")
+    require(startup, 'fs_game_base.SetString( "q4xbase" );', "an Awakening mod mounts the expansion beneath it")
+    require_before(startup, "SetupGameDirectories( fs_game_base.GetString() );",
+                   "SetupGameDirectories( fs_game.GetString() );", "the mod is searched above its base")
+    require(startup, "fs_awakeningActive.SetBool(", "the mounted state is published")
+    header = read("src/framework/FileSystem.h")
+    require(cpp_function_body(header, "struct idModInfo {"), "campaign;", "idModInfo carries the campaign")
+
+
 def validate_validation_coverage() -> None:
     validator = read("tools/validation/openq4_validate.py")
     require(validator, "filesystem_mod_manifest.py", "validation runner")
@@ -202,6 +233,7 @@ def main() -> None:
     validate_manifest_only_contract()
     validate_game_module_fallback_contract()
     validate_invalid_mod_fallback_contract()
+    validate_campaign_contract()
     validate_validation_coverage()
     print("filesystem_mod_manifest: ok")
 

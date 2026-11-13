@@ -227,6 +227,28 @@ static idStr DemoCampaignName( const char *gameDir ) {
 	return DemoSanitizeText( gameDir, 32 );
 }
 
+// Whether a recording's levels and assets are the ones mounted now: its game
+// directory and, since a mod can play over either campaign from one directory,
+// its campaign. Streams that name neither make no claim.
+static bool DemoRecordedContentMatches( const idDict &header ) {
+	const char *recordedGame = header.GetString( "game", "" );
+	if ( recordedGame[0] != '\0' && idStr::Icmp( recordedGame, fileSystem->GetActiveGameDir() ) ) {
+		return false;
+	}
+	const char *recordedCampaign = header.GetString( "campaign", "" );
+	return recordedCampaign[0] == '\0' || !idStr::Icmp( recordedCampaign, FS_AwakeningActive() ? "awakening" : "quake4" );
+}
+
+// The campaign a recording holds, as players know it: its game directory's,
+// or, when that is the mod running now, the campaign the mod played over.
+static idStr DemoRecordedCampaignName( const idDict &header ) {
+	const char *recordedGame = header.GetString( "game", "" );
+	if ( recordedGame[0] != '\0' && !idStr::Icmp( recordedGame, fileSystem->GetActiveGameDir() ) ) {
+		return DemoCampaignName( !idStr::Icmp( header.GetString( "campaign", "" ), "awakening" ) ? "q4xbase" : OPENQ4_GAMEDIR );
+	}
+	return DemoCampaignName( recordedGame );
+}
+
 // "startFrame reason map entityFilter [startMS]", as StopRecordingRenderDemo
 // writes it; v13 adds the start time, -1 when absent.
 static bool DemoParseSegmentSummary( const char *text, idSessionLocal::renderDemoSegment_t &segment ) {
@@ -462,8 +484,7 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 			demoRenderSessionInfo_t info;
 			if ( streamVersion >= OPENQ4_RENDERDEMO_SESSION_VERSION &&
 				 DemoReadRenderSessionInfo( entry.path.c_str(), info ) && info.session ) {
-				const char *recordedGame = info.header.GetString( "game", "" );
-				const idStr campaign = DemoCampaignName( recordedGame );
+				const idStr campaign = DemoRecordedCampaignName( info.header );
 				if ( !idStr::Icmp( info.header.GetString( "mode" ), "singleplayer" ) ) {
 					entry.format = DemoLocalized( "#str_41576" );
 				}
@@ -485,7 +506,7 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 					entry.capabilities = 0;
 					entry.status = DemoLocalized( "#str_41581" );
 					entry.details = entry.status;
-				} else if ( recordedGame[0] != '\0' && idStr::Icmp( recordedGame, fileSystem->GetActiveGameDir() ) ) {
+				} else if ( !DemoRecordedContentMatches( info.header ) ) {
 					// Its levels and assets belong to another campaign.
 					entry.playable = false;
 					entry.compatible = false;
@@ -1717,11 +1738,10 @@ bool Session_RenderDemoContentMatches( const char *path, idStr &reason ) {
 		// Older streams make no claim; their own decoder checks remain.
 		return true;
 	}
-	const char *recordedGame = info.header.GetString( "game", "" );
-	if ( recordedGame[0] == '\0' || !idStr::Icmp( recordedGame, fileSystem->GetActiveGameDir() ) ) {
+	if ( DemoRecordedContentMatches( info.header ) ) {
 		return true;
 	}
-	reason = va( DemoLocalized( "#str_41578" ), DemoCampaignName( recordedGame ).c_str() );
+	reason = va( DemoLocalized( "#str_41578" ), DemoRecordedCampaignName( info.header ).c_str() );
 	return false;
 }
 

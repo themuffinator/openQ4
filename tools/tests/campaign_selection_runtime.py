@@ -23,8 +23,32 @@ REQUIRED = ('def/q4xdamage.def','def/weapons/spikegun.def','scripts/main.script'
 CASES = ('absent','metadata-only','partial','ready-loose','ready-pk4','empty-loose-shadow','empty-patch-shadow',
          'absent-retained','partial-retained',
          'real-ready-legacy','real-ready-retained','real-singleplayer-retained',
-         'switch-sp','switch-mp','switch-arena','direct-mp','dedicated')
+         'switch-sp','switch-mp','switch-arena','direct-mp','dedicated',
+         'mod-explicit-base','mod-switch-awakening','mod-manifest-awakening','mod-manifest-quake4','mod-mp')
 DONE = 'CAMPAIGN_SELECTION_COMPLETE'
+# A player's mod over The Awakening (fs_game awkmod, fs_game_base q4xbase).
+MOD = 'awkmod'
+MOD_AWAKENING_CASES = ('mod-explicit-base','mod-switch-awakening','mod-manifest-awakening')
+MOD_CASES = MOD_AWAKENING_CASES + ('mod-manifest-quake4','mod-mp')
+
+
+def mod_manifest(save: Path, campaign: str | None) -> None:
+    """The test mod's mod.json, optionally tying it to one campaign."""
+    manifest = dict(name='Awakening mod test', version='1.0', releaseDate='2026-11-13',
+                    website='https://example.invalid', author='openQ4 tests', requiredopenQ4Version='0.14.0')
+    if campaign:
+        manifest['campaign'] = campaign
+    (save / MOD).mkdir(parents=True, exist_ok=True)
+    (save / MOD / 'mod.json').write_text(json.dumps(manifest, indent=2) + '\n')
+
+
+def search_order(paths: str, *dirs: str) -> bool:
+    """Whether `path` lists each game directory, in the given order (top first).
+
+    A directory entry is a line ending in /<name>; a pack is a line under it."""
+    lowered = paths.replace('\\', '/').lower()
+    found = [match.start() if (match := re.search(rf'/{name}[ \t]*$', lowered, re.M)) else -1 for name in dirs]
+    return all(index >= 0 for index in found) and found == sorted(found)
 
 
 def fixture(root: Path, case: str) -> tuple[Path,int,int]:
@@ -65,7 +89,7 @@ def run(args, case: str) -> dict:
     save = output / 'save'
     for name in ('baseoq4','q4xbase'):
         (save / name).mkdir(parents=True)
-    real = case.startswith('real-') or case in ('switch-sp','switch-mp','switch-arena','direct-mp','dedicated')
+    real = case.startswith('real-') or case in ('switch-sp','switch-mp','switch-arena','direct-mp','dedicated') + MOD_CASES
     if real:
         content,present,ready = args.awakening.resolve(strict=True),1,1
     else:
@@ -108,6 +132,31 @@ def run(args, case: str) -> dict:
             ['waitMsec 3000','openq4_assertMapState game/m01_stranarus_trench1',
              'echo AWAKENING_GAMEPLAY_BEFORE_SWITCH','set g_autoExecAfterMapLoad selection.cfg',*next_action]) + '\n')
         launch = ['+campaignSelect','awakening','start']
+    elif case in MOD_AWAKENING_CASES:
+        # The campaign starts with the mod kept on top of the expansion: an
+        # explicit base, a switch from Quake 4, or the mod's own mod.json.
+        mod_manifest(save, 'awakening' if case == 'mod-manifest-awakening' else None)
+        settings.update(fs_game=MOD, fs_game_base='q4xbase' if case == 'mod-explicit-base' else '',
+                        g_autoExecAfterMapLoad='selection.cfg', g_autoExecAfterMapLoadDelayMs='500')
+        (save / MOD / 'selection.cfg').write_text('\n'.join(
+            ['waitMsec 3000','openq4_assertMapState game/m01_stranarus_trench1','fs_game_base','fs_awakeningActive',
+             'echo AWAKENING_MOD_GAMEPLAY'] + finish) + '\n')
+        launch = ['+campaignSelect','awakening','start']
+    elif case == 'mod-manifest-quake4':
+        # A mod tied to Quake 4 refuses the expansion even when asked for it.
+        mod_manifest(save, 'quake4')
+        settings.update(fs_game=MOD, fs_game_base='q4xbase')
+        (save / MOD / 'selection.cfg').write_text('\n'.join(
+            ['waitMsec 500','fs_game_base','fs_awakeningActive'] + finish) + '\n')
+    elif case == 'mod-mp':
+        # Multiplayer drops the expansion from beneath the mod and keeps the mod.
+        mod_manifest(save, None)
+        settings.update(fs_game=MOD, fs_game_base='q4xbase', si_gameType='CTF', com_gameMode='MP',
+                        g_autoExecAfterMapLoad='selection.cfg', g_autoExecAfterMapLoadDelayMs='500')
+        (save / MOD / 'selection.cfg').write_text('\n'.join(
+            ['waitMsec 3000','openq4_reportMPState','openq4_assertMPClientActive','fs_game_base','fs_awakeningActive'] +
+            finish) + '\n')
+        launch = ['+spawnServer','mp/q4ctf1']
     elif case in ('direct-mp','dedicated'):
         settings.update(fs_game='q4xbase',si_gameType='CTF',com_gameMode='MP',
                         g_autoExecAfterMapLoad='selection.cfg',g_autoExecAfterMapLoadDelayMs='500')
@@ -144,13 +193,16 @@ def run(args, case: str) -> dict:
             process.wait()
             code = 'timeout'
     logs = {name:(save / name / 'logs/selection.log').read_text(encoding='latin1')
-            for name in ('baseoq4','q4xbase') if (save / name / 'logs/selection.log').exists()}
+            for name in ('baseoq4','q4xbase',MOD) if (save / name / 'logs/selection.log').exists()}
     log = '\n'.join(logs.values())
     errors = re.findall(r'(?mi)^(?:\^\d)?(?:ERROR:|FATAL ERROR:|ASSERTION FAILED).*',log)
     readiness = re.findall(r'CAMPAIGN awakening present=(\d) available=(\d)',log)
     mounted = re.findall(r'CAMPAIGN_PATH_BEGIN\s*(.*?)CAMPAIGN_PATH_END',log,re.S)
     isolated = bool(mounted) and all('q4xbase' not in value.lower() for value in mounted)
-    ready_ok = case in ('switch-sp','switch-mp','switch-arena','direct-mp','dedicated') or readiness == [(str(present),str(ready))]
+    ready_ok = case in ('switch-sp','switch-mp','switch-arena','direct-mp','dedicated') + MOD_CASES or readiness == [(str(present),str(ready))]
+    if case in MOD_AWAKENING_CASES:
+        # The mod above the expansion, the expansion above openQ4 and retail.
+        isolated = bool(mounted) and all(search_order(value, MOD, 'q4xbase', 'baseoq4', 'q4base') for value in mounted)
     passed = code == 0 and DONE in log and not errors and isolated and ready_ok
     retained_warnings = [line for line in log.splitlines() if 'WARNING' in line and 'retained' in line.lower()]
     if case.endswith('retained'):
@@ -162,6 +214,23 @@ def run(args, case: str) -> dict:
         passed = passed and '"si_gameType" is:"CTF"' in log and '"com_activeGameModule" is:"game_mp"' in log
     if case == 'switch-arena':
         passed = passed and 'CAMPAIGN_SELECTED id=arena gameDir=baseoq4 module=game_sp' in log
+    if case in MOD_AWAKENING_CASES:
+        modlog = logs.get(MOD,'')
+        passed = (passed and 'AWAKENING_MOD_GAMEPLAY' in modlog and f'"fs_game" is:"{MOD}"' in modlog and
+                  '"fs_game_base" is:"q4xbase"' in modlog and '"fs_awakeningActive" is:"1"' in modlog and
+                  f"The Awakening mounted: fs_game '{MOD}', fs_game_base 'q4xbase'" in modlog and
+                  f'CAMPAIGN_SELECTED id=awakening gameDir={MOD} module=game_sp' in modlog and
+                  "spawning 'rvMonsterTurret' as 'riMonsterTurret'" in modlog)
+        if case == 'mod-manifest-awakening':
+            passed = passed and f"Mod '{MOD}' plays over The Awakening (mod.json campaign)" in modlog
+    if case in ('mod-manifest-quake4','mod-mp'):
+        modlog = logs.get(MOD,'')
+        passed = (passed and f'"fs_game" is:"{MOD}"' in modlog and '"fs_game_base" is:""' in modlog and
+                  '"fs_awakeningActive" is:"0"' in modlog and 'The Awakening mounted' not in modlog)
+        if case == 'mod-manifest-quake4':
+            passed = passed and f"Mod '{MOD}' plays over Quake 4 only (mod.json campaign)" in modlog
+        else:
+            passed = passed and '"com_activeGameModule" is:"game_mp"' in modlog
     shots = []
     for tga in save.rglob('screenshots/*.tga'):
         from PIL import Image

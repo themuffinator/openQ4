@@ -18,7 +18,7 @@ static idCVar g_awakeningLateMissions( "g_awakeningLateMissions", "1", CVAR_GAME
 	"Use openQ4 M08/M09 mission corrections on fresh starts; saves retain their selected revision" );
 
 static bool Awakening_LateCampaignActive() {
-	return !gameLocal.isMultiplayer && !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" );
+	return !gameLocal.isMultiplayer && FS_AwakeningActive();
 }
 
 struct awakeningCorrection_t {

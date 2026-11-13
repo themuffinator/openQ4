@@ -17238,6 +17238,16 @@ void	RB_STD_DrawView( void ) {
 		backEnd.mainSceneTargetIsWindow = ( sceneTarget == NULL );
 		backEnd.mainSceneTargetSamples = sceneColor != NULL ? Max( 0, sceneColor->GetOpts().numMSAASamples ) : 0;
 	}
+	// FPS-05: the count the main scene draws with, for the settings page; it
+	// changes only when the record above does.
+	if ( backEnd.mainSceneTargetContext == tr.glContextGeneration ) {
+		extern void R_PublishMainSceneSamples( int samples );
+		const int drawnSamples = backEnd.mainSceneTargetIsWindow ? R_DefaultFramebufferSamples()
+			: backEnd.mainSceneTargetSamples;
+		if ( drawnSamples >= 0 ) {
+			R_PublishMainSceneSamples( drawnSamples );
+		}
+	}
 
 	RB_DisplaySpecialEffects( backEnd.viewDef->viewEntitys, true );
 

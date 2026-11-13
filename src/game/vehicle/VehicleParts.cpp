@@ -1810,7 +1810,7 @@ defaults to off and stock vehicles behave as they always have.
 =====================
 */
 void rvVehicleTurret::ReadMovementLock ( void ) {
-	const bool awakening = !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" );
+	const bool awakening = FS_AwakeningActive();
 	allowDisableMovement = spawnArgs.GetBool( "allowDisableMovement", awakening ? "1" : "0" );
 }
 

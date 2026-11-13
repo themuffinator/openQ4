@@ -232,6 +232,9 @@ struct idModInfo {
 	idStr					website;
 	idStr					author;
 	idStr					requiredopenQ4Version;
+	// mod.json "campaign": "awakening" when the mod plays only over The
+	// Awakening, "quake4" when only over Quake 4; empty when it plays over either.
+	idStr					campaign;
 	idStr					listLabel;
 };
 
@@ -470,6 +473,17 @@ public:
 };
 
 extern idFileSystem *		fileSystem;
+
+// Whether The Awakening's content is mounted: as the game (fs_game q4xbase) or
+// as the base beneath a single-player mod (fs_game <mod>, fs_game_base
+// q4xbase). The filesystem sets the read-only
+// fs_awakeningActive each time it starts, so this answers for the search path in
+// use, never for a pending fs_game change, and the engine, game and renderer
+// modules all ask it the same way. GetActiveGameDir() still names the directory
+// written to, which is the mod's when one runs.
+ID_INLINE bool FS_AwakeningActive( void ) {
+	return cvarSystem != NULL && cvarSystem->GetCVarBool( "fs_awakeningActive" );
+}
 
 // Reports a missing or mismatched client-only openQ4 content pack that
 // filesystem startup found, now that the string tables can localize it. Call

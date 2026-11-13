@@ -223,7 +223,7 @@ def validate_library() -> None:
     require(probe, "streamVersion >= OPENQ4_RENDERDEMO_SESSION_VERSION", "campaign probe version gate")
     require(probe, 'entry.format = DemoLocalized( "#str_41576" );', "campaign demo kind")
     require_order(probe, ("sessLocal.IsRenderDemoRecording() && !recordingPath.Icmp( entry.path )",
-                          'DemoLocalized( "#str_41581" )', "idStr::Icmp( recordedGame, fileSystem->GetActiveGameDir() )",
+                          'DemoLocalized( "#str_41581" )', "!DemoRecordedContentMatches( info.header )",
                           'DemoLocalized( "#str_41577" )', 'DemoLocalized( "#str_41578" )', "!info.summarized",
                           'DemoLocalized( "#str_41579" )'),
                   "recording, other-campaign and interrupted entries are described honestly")

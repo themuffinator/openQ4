@@ -6403,6 +6403,11 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 	// surface. Matching-format captures in GL row order can resolve directly.
 	// Otherwise resolve into single-sample scratch of the source's own format
 	// before the converting/flipping blit (a resolve can do neither).
+	if ( sourceEntry != NULL && sourceEntry->samples != VK_SAMPLE_COUNT_1_BIT ) {
+		// FPS-05: every copy out of a multisampled target is a resolve.
+		extern void R_CountMSAAResolve( bool depth );
+		R_CountMSAAResolve( copyDepth );
+	}
 	VkImage blitSource = sourceImage;
 	uint32_t blitSourceLayer = sourceLayer;
 	const bool directColorResolve = !copyDepth && sourceEntry != NULL

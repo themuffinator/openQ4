@@ -8,7 +8,7 @@ static idCVar g_debugM01Feedback( "g_debugM01Feedback", "0", CVAR_GAME | CVAR_BO
 
 static void Awakening_M01CameraFeedback( renderView_t *view ) {
 	if ( !view || gameLocal.isMultiplayer || !gameLocal.GetCamera() ||
-		idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), "q4xbase" ) != 0 ) {
+		!FS_AwakeningActive() ) {
 		return;
 	}
 	const idEntity *cue = gameLocal.FindEntity( "oq4_m01_feedback" );

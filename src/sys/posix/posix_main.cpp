@@ -183,12 +183,26 @@ void Posix_Exit(int ret) {
 	Posix_ReleaseInstanceLock();
 	// process spawning. it's best when it happens after everything has shut down
 	Posix_RunExitSpawn();
+#if defined( __ANDROID__ )
+	// Leave without exit(): it runs the static destructors of every library in
+	// the process, Android's own included. libhwui keeps its worker pool
+	// (threads hwuiTask0/1) in a function-local static and never joins those
+	// threads, so exit() destroyed the pool's mutex under them and every clean
+	// quit ended in a FORTIFY abort ("pthread_mutex_lock called on a destroyed
+	// mutex", SIGABRT and a tombstone). Everything openQ4 owns is shut down by
+	// now: the log and saves are closed and the fatal breadcrumb goes out
+	// through write(). Flush any stdio stream still open and end the process
+	// as the framework ends its own, keeping the exit status.
+	fflush( NULL );
+	_exit( set_exit ? set_exit : ret );
+#else
 	// in case of signal, handler tries a common->Quit
 	// we use set_exit to maintain a correct exit code
 	if ( set_exit ) {
 		exit( set_exit );
 	}
 	exit( ret );
+#endif
 }
 
 /*

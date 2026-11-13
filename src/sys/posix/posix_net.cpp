@@ -70,6 +70,8 @@ idCVar net_forceSeed( "net_forceSeed", "0", CVAR_SYSTEM | CVAR_INTEGER, "seed fo
 idCVar net_forceRate( "net_forceRate", "0", CVAR_SYSTEM | CVAR_INTEGER, "simulated bottleneck in bytes per second, each way, shared by everything on the port; 0 for none" );
 idCVar net_forceQueue( "net_forceQueue", "250", CVAR_SYSTEM | CVAR_INTEGER, "milliseconds of traffic the simulated bottleneck holds before it drops packets" );
 idCVar net_forceDropBurst( "net_forceDropBurst", "0", CVAR_SYSTEM | CVAR_INTEGER, "mean number of packets lost in a row; 0 or 1 loses packets independently" );
+idCVar net_forceMTU( "net_forceMTU", "0", CVAR_SYSTEM | CVAR_INTEGER, "simulated path MTU in bytes (576-65535), each way; a larger packet crosses in IP fragments, or is dropped with net_forceMTUDrop; 0 for none" );
+idCVar net_forceMTUDrop( "net_forceMTUDrop", "0", CVAR_SYSTEM | CVAR_BOOL, "drop a packet larger than net_forceMTU instead of sending it in IP fragments, as a path that filters fragments does" );
 
 typedef struct {
 	uint32_t ip;
@@ -1148,7 +1150,13 @@ static netImpairmentPort_t *net_impairedPorts[NET_MAX_IMPAIRED_PORTS];
 static idNetworkImpairment::settings_t Net_ImpairmentSettings( void ) {
 	return idNetworkImpairment::Sanitize( net_forceLatency.GetInteger(), net_forceJitter.GetInteger(),
 		net_forceDrop.GetInteger(), net_forceDuplicate.GetInteger(), net_forceRate.GetInteger(),
-		net_forceQueue.GetInteger(), net_forceDropBurst.GetInteger() );
+		net_forceQueue.GetInteger(), net_forceDropBurst.GetInteger(), net_forceMTU.GetInteger(),
+		net_forceMTUDrop.GetBool() ? 1 : 0 );
+}
+
+// The path MTU and the bottleneck count each family's own IP header.
+static bool Net_ImpairmentIPv6( const netadr_t &adr ) {
+	return adr.type == NA_IP6 || adr.type == NA_MULTICAST6;
 }
 
 static netImpairmentPort_t *Net_OpenImpairment( int port ) {
@@ -1179,13 +1187,15 @@ static void Net_PrintImpairmentLine( int port, const char *direction, const idNe
 	const idNetworkImpairment::stats_t &stats = queue.stats;
 	// New fields go at the end: harnesses parse the line by its leading fields.
 	common->Printf( "NET_IMPAIR port=%d dir=%s offered=%llu dropped=%llu duplicated=%llu released=%llu reordered=%llu "
-		"overflowed=%llu discarded=%llu queued=%d maxQueued=%d bytes=%llu bursts=%llu congested=%llu maxWait=%d\n", port,
+		"overflowed=%llu discarded=%llu queued=%d maxQueued=%d bytes=%llu bursts=%llu congested=%llu maxWait=%d "
+		"oversized=%llu ipFragments=%llu maxSize=%d\n", port,
 		direction, static_cast<unsigned long long>( stats.offered ), static_cast<unsigned long long>( stats.dropped ),
 		static_cast<unsigned long long>( stats.duplicated ), static_cast<unsigned long long>( stats.released ),
 		static_cast<unsigned long long>( stats.reordered ), static_cast<unsigned long long>( stats.overflowed ),
 		static_cast<unsigned long long>( stats.discarded ), queue.Depth(), stats.maxDepth,
 		static_cast<unsigned long long>( stats.offeredBytes ),
-		static_cast<unsigned long long>( stats.bursts ), static_cast<unsigned long long>( stats.congested ), stats.maxWaitMsec );
+		static_cast<unsigned long long>( stats.bursts ), static_cast<unsigned long long>( stats.congested ), stats.maxWaitMsec,
+		static_cast<unsigned long long>( stats.oversized ), static_cast<unsigned long long>( stats.ipFragments ), stats.maxSize );
 }
 
 /*
@@ -1195,9 +1205,10 @@ Sys_NetImpairmentReport
 */
 void Sys_NetImpairmentReport( void ) {
 	const idNetworkImpairment::settings_t settings = Net_ImpairmentSettings();
-	common->Printf( "NET_IMPAIR_SETTINGS latency=%d jitter=%d drop=%d burst=%d duplicate=%d rate=%d queue=%d active=%d\n",
+	common->Printf( "NET_IMPAIR_SETTINGS latency=%d jitter=%d drop=%d burst=%d duplicate=%d rate=%d queue=%d active=%d mtu=%d mtuDrop=%d\n",
 		settings.latencyMsec, settings.jitterMsec, settings.dropPercent, settings.burstLength, settings.duplicatePercent,
-		settings.rateBytes, settings.queueMsec, idNetworkImpairment::Active( settings ) ? 1 : 0 );
+		settings.rateBytes, settings.queueMsec, idNetworkImpairment::Active( settings ) ? 1 : 0, settings.mtuBytes,
+		settings.mtuDrop ? 1 : 0 );
 	for ( int i = 0; i < NET_MAX_IMPAIRED_PORTS; i++ ) {
 		if ( net_impairedPorts[i] != NULL ) {
 			Net_PrintImpairmentLine( net_impairedPorts[i]->port, "receive", net_impairedPorts[i]->receive );
@@ -1383,7 +1394,7 @@ bool idPort::GetPacket( netadr_t &net_from, void *data, int &size, int maxSize )
 			return true;
 		}
 		// Simulated conditions: every received datagram waits in the receive line.
-		if ( impairment->receive.Offer( settings, now, net_from, data, size ) > 0 ) {
+		if ( impairment->receive.Offer( settings, now, net_from, data, size, Net_ImpairmentIPv6( net_from ) ) > 0 ) {
 			packetsRead++;
 			bytesRead += size;
 		}
@@ -1566,7 +1577,7 @@ void idPort::SendPacket( const netadr_t to, const void *data, int size ) {
 	const idNetworkImpairment::settings_t settings = Net_ImpairmentSettings();
 	if ( impairment != NULL && impairment->SendsQueued( settings ) ) {
 		const int now = Sys_Milliseconds();
-		impairment->send.Offer( settings, now, to, packetData, size );
+		impairment->send.Offer( settings, now, to, packetData, size, Net_ImpairmentIPv6( to ) );
 		const int ipv4Socket = netSocket;
 		const int ipv6Socket = netSocket6;
 		impairment->FlushSends( now, [ipv4Socket, ipv6Socket]( const netadr_t &address, const unsigned char *bytes, int length ) {

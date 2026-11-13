@@ -6,7 +6,7 @@
 #define __AWAKENING_PRISON_ALARMS_H__
 
 static bool Awakening_RepairPrisonAlarm( idDict &args ) {
-	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ||
+	if ( gameLocal.isMultiplayer || !FS_AwakeningActive() ||
 		args.GetBool( "oq4_prisonAlarm" ) || idStr::Icmp( args.GetString( "classname" ), "speaker" ) ||
 		args.GetFloat( "wait" ) != 0.0f ) {
 		return false;

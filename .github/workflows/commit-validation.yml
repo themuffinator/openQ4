@@ -249,6 +249,7 @@ jobs:
             tools/tests/arena_sound_runtime.py \
             tools/tests/mp_wsl_peer_smoke.py \
             tools/tests/mp_lan_reconnect_smoke.py \
+            tools/tests/mp_path_mtu_soak.py \
             tools/tests/content_pack_split_smoke.py \
             tools/tests/content_pack_status_smoke.py \
             tools/tests/lightgrid_pack_load_test.py \

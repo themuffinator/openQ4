@@ -1591,4 +1591,9 @@
 	"#str_231765"	"Color de Punto de Mira"
 	"#str_231766"	"CAMBIAR"
 	"#str_231767"	"Reiniciar el renderizador guarda la partida y la reanuda después."
+	"#str_231768"	"Suaviza los bordes de la geometría. Cada nivel más cuesta tiempo de fotograma; Ultra usa 4x con SMAA. El renderizador Vulkan dibuja como máximo 8x."
+	"#str_231769"	"El renderizador no puede usar multimuestreo en la escena aquí, así que el MSAA está desactivado."
+	"#str_231770"	"El renderizador dibuja como máximo 2x aquí, así que la escena usa 2x."
+	"#str_231771"	"El renderizador dibuja como máximo 4x aquí, así que la escena usa 4x."
+	"#str_231772"	"El renderizador dibuja como máximo 8x aquí, así que la escena usa 8x."
 }

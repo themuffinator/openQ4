@@ -175,6 +175,9 @@ def page_state() -> dict:
         state[f"settings.lightGrid.{key}"] = {"type": "boolean", "initial": False}
     for key in ("available", "fallback"):
         state[f"settings.renderer.{key}"] = {"type": "boolean", "initial": False}
+    # FPS-05: the count the scene draws with while it is below the applied MSAA.
+    state["settings.msaa.clamped"] = {"type": "boolean", "initial": False}
+    state["settings.msaa.status"] = {"type": "string", "initial": "#str_231772"}
     state.update(system_display_catalog.keys())
     render = {"catalog": "string", "count": "number", "selected": "number", "active": "string", "pending": "boolean",
               "autoDetect": "boolean", "canRestart": "boolean", "canChoose": "boolean", "vulkan": "boolean", "gl": "boolean",
@@ -621,6 +624,14 @@ def system_document() -> dict:
     msaa = choice(doc, "settings_msaa", "#str_41093", x, edit("r_multiSamples"), draft("r_multiSamples"),
                   listed("#str_230020", (0, 2, 4, 8, 16)))
     gate(doc, "settings_msaa", both(QUIET, st("settings.msaaAvailable")), opacity=dim(st("settings.msaaAvailable"), 0.45))
+    # FPS-05: what MSAA buys and costs, and the count the scene really draws with
+    # where the renderer draws fewer samples than asked.
+    msaa_help = note("settings_msaa-help", "#str_231768", 3)
+    msaa_status = note("settings_msaa-status", "#str_231772", tint=rgb(VALUE, 0.85))
+    msaa_status["properties"]["display"] = keyword("none")
+    doc.bind("settings_msaa-status.display", "settings_msaa-status", "display",
+             op("select", st("settings.msaa.clamped"), "block", "none"))
+    doc.bind("settings_msaa-status.text", "settings_msaa-status", "text", st("settings.msaa.status"))
     vsync = choice(doc, "settings_vsync", "#str_41092", x, edit("r_swapInterval"), draft("r_swapInterval"), listed("#str_200059", (0, 1)))
     gate(doc, "settings_vsync", EDITABLE)
     windowed = no(draft("r_fullscreen"))
@@ -690,7 +701,7 @@ def system_document() -> dict:
             [heading("#str_41098"), preset, autodetect, backend, gpu, renderer, renderer_status, restart, active, notice],
             [heading("#str_230018"), ui_scale, text_scale, aspect, reset, fit]]),
         ("screen", "#str_41099", [
-            [heading("#str_229900"), device, span, span_status, fullscreen, borderless, policy, msaa, vsync],
+            [heading("#str_229900"), device, span, span_status, fullscreen, borderless, policy, msaa, msaa_help, msaa_status, vsync],
             [heading("#str_229943"), width, height, mode, hint, custom_w, custom_h, refresh]]),
         ("image", "#str_41101", [
             [heading("#str_41101"), *image_rows, scale],
@@ -722,7 +733,8 @@ def system_document() -> dict:
                        [apply])])
     check_system_text([("#str_230019", 2), ("#str_230024", 3), ("#str_230088", 2), ("#str_230089", 2), ("#str_42821", 3),
                        ("#str_230078", 2), ("#str_230079", 2), ("#str_230080", 2), ("#str_230081", 2), ("#str_230082", 2),
-                       ("#str_230145", 3)], U * apply_w, message_w)
+                       ("#str_230145", 3), ("#str_231768", 3), ("#str_231769", 2), ("#str_231770", 2), ("#str_231771", 2),
+                       ("#str_231772", 2)], U * apply_w, message_w)
 
     # The pages' bounds hold every list the rows unfold.
     def activate(focus: list) -> list:

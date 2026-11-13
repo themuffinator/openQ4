@@ -85,7 +85,7 @@ def check_find_entity_def() -> None:
     mp = body.find('"%s_mp"')
     q4x = body.find('"%s_q4x_openq4"')
     assert mp >= 0 and q4x > mp, "multiplayer keeps its _mp redirect; the Awakening one is single player only"
-    assert re.search(r'else if \(.*GetActiveGameDir\(\), "q4xbase" \)', body), "the _q4x_openq4 redirect is scoped to q4xbase"
+    assert re.search(r'else if \(.*FS_AwakeningActive\(\) \)', body), "the _q4x_openq4 redirect is scoped to the Awakening"
     assert body.count("FindType( DECL_ENTITYDEF, name, makeDefault )") == 1, "the plain name stays the fallback"
 
 

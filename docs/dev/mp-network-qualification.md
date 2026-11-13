@@ -1,5 +1,71 @@
 # Multiplayer network qualification
 
+## A 1280-byte path MTU, 13 November 2026
+
+MP-08's checklist row 8.1 asks for a full match over a 1280-byte MTU. One
+machine cannot lower a real path, so the network simulator gained one
+(`net_forceMTU`, see [simulated network conditions](#simulated-network-conditions)).
+It models the two ways a path treats a packet larger than its MTU: it carries
+it in IP fragments, as hosts and IPv4 routers do (`net_forceMTUDrop 0`), or it
+loses it, as a path does that filters IP fragments or never delivers IPv6's
+Packet Too Big (`net_forceMTUDrop 1`). Only the client's port carries the path,
+so both directions of its link see it, as when one machine's interface MTU is
+lowered.
+
+`tools/tests/mp_path_mtu_soak.py` runs checklist row 8.1's match: a pure
+dedicated server on `mp/q4ctf1` in CTF, filled by bots to 12 players, and one
+client that joins it and must stay an active player for the whole run. Every
+30 seconds it reads the client's state and delay-line counts and checks both
+logs for reliable-message overflows, snapshot overflows, disconnects and the
+server dropping the client. Results with the staged Windows x64 build of
+`6d3f1a566` plus this change (client `7a045e9e92b1dd71`, dedicated
+`a572191936593cf2`, MP module `e804081afbca9925`):
+
+| Run | Result | Players | Datagrams received | Larger than the path | Largest |
+| --- | --- | ---: | ---: | ---: | ---: |
+| IPv4, fragmenting, 300 s | pass, joined in 25.4 s | 12 | 9,495 | 73 (146 IP fragments) | 1,823 bytes |
+| IPv6, fragmenting, 300 s | pass, joined in 25.0 s | 12 | 9,432 | 2 (4 IP fragments) | 1,823 bytes |
+| IPv4, dropping | fail: never connects | - | - | - | - |
+| IPv6, dropping | fail: never connects | - | - | - | - |
+| IPv6, no path, 20 s (control) | pass | 12 | - | - | - |
+
+Both fragmenting runs held the match for five minutes with no overflow, drop or
+disconnect, and every process exited cleanly. Reports are in
+`.tmp/mp08-mtu/runs/`.
+
+**Inside the match, IPv6 never needs IP fragmentation; the connection replies
+do.** Every channel datagram over IPv6 stayed within 1,232 bytes, the payload a
+1280-byte path carries whole. The only two larger datagrams were out-of-band
+replies, which the channel cannot fragment. Before the challenge the client
+asks for `getInfo`, to learn the server's protocol, and the server's
+`infoResponse` carries the whole server-info dictionary. `connectResponse`
+carries it again. With about 73 server-info CVars at their defaults, each
+reply is about 1.8 KB. A path that drops IP fragments loses them both: in the
+dropping runs the server sent 179 info replies, the client received none and
+sent 200 challenges without an answer. The same replies feed the server
+browser and the LAN scan, so such a path also hides the server from them.
+
+IPv4 relies on IP fragmentation by design: its fragments are 1,300 bytes, and
+its 73 oversized datagrams include those as well as the two replies. IPv4
+hosts and routers fragment by default, so the fragmenting run is the normal
+case there. Reducing the IPv4 fragment size would change the wire format: the
+receiver identifies the last fragment by its length.
+
+Fixed in the same change: `SendMessage` decided whether to fragment from a
+message's unpacked length, but packing can grow it, by up to double for data
+the zero-run coder cannot shorten. A grown message then left as one datagram
+up to about twice the family's limit, over IPv6 as much as roughly 2.3 KB on
+a path that carries 1,232. It is now sent in fragments; receivers already
+assemble either form. `network_fragment_state.py` now also executes production
+`SendMessage` with a packer that grows its input by 0, 25 and 100 percent over
+both families. It checks that no datagram exceeds a full fragment and that the
+receiver gets the packed message intact, and a ninth reversal control
+(without the check) fails it.
+
+This is a one-machine simulation on loopback. It does not replace checklist
+row 8.1 on two physical machines, and it does not cover real path MTU
+discovery, ICMP behaviour or middleboxes.
+
 ## Weapon hit geometry and fragment ordering, 3 November 2026
 
 The MP-07 weapon review found that the gauntlet and lightning restored player
@@ -104,6 +170,8 @@ in the other before they reach the socket.
 | `net_forceRate` | A bottleneck of this many bytes a second, each way, shared by everything on the port (1,000 to 100,000,000; `0` for none). |
 | `net_forceQueue` | Milliseconds of traffic the bottleneck holds before it drops (1-5,000, default 250). |
 | `net_forceDropBurst` | Mean number of datagrams lost in a row; `0` or `1` loses them independently (up to 64). |
+| `net_forceMTU` | Path MTU in bytes, each way (576-65,535; `0` for none). A datagram larger than the path crosses in IP fragments. |
+| `net_forceMTUDrop` | `1` drops a datagram larger than `net_forceMTU` instead, as a path that filters IP fragments or loses Packet Too Big does. |
 
 Datagrams leave in the order they fall due, with ties in arrival order, so jitter
 wider than their spacing reorders them as a real link does. Comparisons use the
@@ -115,8 +183,9 @@ return to zero, so turning impairment off never reorders what is still queued.
 Due sends are flushed whenever the port is polled, not only when the next send
 arrives.
 
-A rate turns a line into a bottleneck. Each datagram, with 28 bytes of IPv4 and
-UDP headers, takes its size over the rate to send, and waits behind whatever
+A rate turns a line into a bottleneck. Each datagram, with its UDP header and
+the IP header of every packet it takes (20 bytes for IPv4, 40 for IPv6, plus an
+8-byte Fragment header on each IPv6 fragment), takes its size over the rate to send, and waits behind whatever
 the link is still sending. One that would finish later than the queue holds is
 dropped, as a full router buffer drops it. An idle link always takes a
 datagram, so one larger than the queue still passes. A datagram lost further
@@ -126,13 +195,24 @@ when the datagram leaves the bottleneck. Burst loss is a two-state
 datagrams on average and spends `net_forceDrop` percent of the time there. A
 loss rate above burst / (burst + 1) cannot be reached and settles at that.
 With no rate and a burst length of 0 or 1, the line behaves exactly as before.
+Until 13 November the bottleneck charged IPv6 datagrams IPv4's 28 header bytes;
+it now charges 48.
+
+A path MTU checks each datagram against the path with its own family's headers:
+over a 1,280-byte path a UDP payload of up to 1,252 bytes fits whole on IPv4 and
+1,232 on IPv6. A larger one is either dropped (`net_forceMTUDrop 1`) or split
+into IP fragments, as the sending host would: every fragment but the last carries
+a multiple of 8 bytes of the UDP datagram, the bottleneck pays every fragment's
+headers, and the datagram is lost if any fragment is.
 
 `netImpairment` prints the settings and, per open port and direction, the
 datagrams offered, dropped, duplicated, released, reordered, refused and
 discarded, and the deepest queue so far (`NET_IMPAIR` lines). The line ends
 with the payload bytes offered, the loss runs, the datagrams the bottleneck
-dropped and its longest wait; these come last so harnesses that read the
-leading fields keep working.
+dropped, its longest wait, the datagrams larger than the path MTU, the IP
+fragments those took and the largest payload offered; these come last so
+harnesses that read the leading fields keep working. `NET_IMPAIR_SETTINGS`
+likewise ends with `mtu=` and `mtuDrop=`.
 
 The CVars are unarchived and not `CVAR_NOCHEAT`, so like the original two they
 count as cheats: hosting or joining a server without `net_allowCheats` or
@@ -150,14 +230,17 @@ duplication rates, seed repeatability, oversize discards, a 9,000-byte
 datagram, clock wrap and capacity. It also covers the bottleneck's pacing to
 the millisecond, its tail drop, an idle link taking a large datagram, draining,
 pacing across the clock wrap, the byte count, burst loss (rate and mean run
-length) and the new settings changing nothing while off. The native core
-safety test runs the cases, and `tools/tests/network_impairment_state.py` also
-runs them against 14 single-reversal copies of the header, each of which must
-fail. `tools/tests/network_impairment_contract.py` checks that both platforms
-define the same CVars, open and release the lines with the port, queue
-receives and sends, flush due sends while polling and report, with the
-report's leading fields unchanged; it carries eight single-reversal controls
-of its own.
+length), the path MTU's limits per family, its dropping and fragmenting modes,
+the loss of a fragmented datagram with any of its fragments, every fragment's
+headers on the bottleneck, and the new settings changing nothing while off.
+The native core safety test runs the cases, and
+`tools/tests/network_impairment_state.py` also runs them against 20
+single-reversal copies of the header, each of which must fail.
+`tools/tests/network_impairment_contract.py` checks that both platforms define
+the same CVars, open and release the lines with the port, queue receives and
+sends with each datagram's family, flush due sends while polling and report,
+with the report's leading fields unchanged; it carries 11 single-reversal
+controls of its own.
 
 ## Prediction and lag compensation under impairment (24 October 2026)
 
@@ -767,6 +850,10 @@ LAN discovery across machines and on Linux and macOS, real multi-record DNS,
 and running the retail client binary (its challenge was reproduced instead). The server does not adapt its rate to a congested link
 on its own: a player whose connection is slower than the match needs has to
 lower `net_clientMaxRate`. Whether to adapt automatically is a design decision.
+The `infoResponse` and `connectResponse` replies are about 1.8 KB and cannot be
+fragmented by the channel, so joining over IPv6 needs a path that passes IP
+fragments ([path MTU](#a-1280-byte-path-mtu-13-november-2026)); how to bring them
+under 1,232 bytes is a protocol decision.
 Simulated conditions do not model route changes, cross-traffic sharing a
 bottleneck, or asymmetric links (the rate applies both ways).
 

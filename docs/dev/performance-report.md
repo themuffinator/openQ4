@@ -1591,6 +1591,102 @@ before and Vulkan's 0.93 ms. Frozen captures at the five reference poses on Open
 and convoy1, absent indoors), and why the in-scene resolve is free after a portal-sky
 backdrop view, which this measurement only exploits.
 
+## 13. MSAA and the HDR scene target (FPS-05)
+
+FPS-05 measured the sample counts, the HDR scene target and the post-AA alternatives at the
+Ultra preset on both backends, fixed one sample-count policy so that a preset draws the same
+image on both, and made the effective count and its resolves visible.
+
+### 13.1 Method
+
+The FPS-04 method (section 12.2): in-launch toggle ladders in hidden 2560x1440 windows at the
+five reference poses, a 360 degree sweep per 4 s window, `rendererBenchmarkCapture` GPU time,
+each configuration against the mean of its neighbouring Ultra base windows (4x MSAA, SMAA
+ultra, RGBA16F target). Both backends rebuild the scene target on the first frame after an
+`r_multiSamples` or `r_hdrSceneTarget` change, so every count is measured in one launch.
+Runtime `fps05-base` (`main` 6d3f1a566), measured with every peer session holding off. The
+base windows varied by 0.03-0.46 ms within a launch, except storage2 (2.1-2.6 ms), whose
+scripted lights change the scene mid-launch.
+
+### 13.2 Results
+
+GPU milliseconds per frame. "LDR target" is `r_hdrSceneTarget 0` (RGBA8) with the rest of
+Ultra unchanged.
+
+**OpenGL**
+
+| Configuration | hub2 | storage2 | arena | airdefense1 | convoy1 |
+|---|---:|---:|---:|---:|---:|
+| 0x + SMAA | 6.71 | 7.41 | 6.69 | 5.82 | 6.27 |
+| 2x + SMAA | 5.51 | 6.76 | 6.41 | 5.92 | 6.40 |
+| **4x + SMAA (Ultra)** | 6.03 | 7.50 | 6.88 | 5.88 | 6.55 |
+| 8x + SMAA | 7.23 | 9.22 | 8.12 | 6.99 | 7.30 |
+| 16x + SMAA | 14.12 | 18.39 | 16.15 | 11.91 | 13.90 |
+| 4x, no SMAA | 5.61 | 7.06 | 6.54 | 5.84 | 6.42 |
+| No AA | 5.88 | 6.93 | 5.93 | 5.77 | 5.98 |
+| TAA only | 6.71 | 7.76 | 6.34 | 5.70 | 6.52 |
+| 4x + SMAA, LDR target | 5.49 | 6.30 | 6.10 | 5.67 | 6.31 |
+| 0x + SMAA, LDR target | 5.94 | 6.72 | 6.28 | 5.83 | 6.21 |
+
+**Vulkan**
+
+| Configuration | hub2 | storage2 | arena | airdefense1 | convoy1 |
+|---|---:|---:|---:|---:|---:|
+| 0x + SMAA | 5.86 | 7.22 | 6.06 | 5.61 | 5.73 |
+| 2x + SMAA | 6.08 | 7.73 | 6.34 | 5.90 | 6.13 |
+| **4x + SMAA (Ultra)** | 6.82 | 8.82 | 7.22 | 6.17 | 6.51 |
+| 8x + SMAA | 8.64 | 11.34 | 9.58 | 8.16 | 8.81 |
+| 16x request (draws 8x) | 8.65 | 11.42 | 9.61 | 8.14 | 9.05 |
+| 4x, no SMAA | 6.40 | 8.55 | 6.83 | 5.96 | 6.37 |
+| No AA | 5.68 | 6.37 | 6.02 | 5.49 | 5.75 |
+| TAA only | 6.02 | 7.47 | 6.21 | 5.83 | 6.13 |
+| 4x + SMAA, LDR target | 6.34 | 7.49 | 6.69 | 6.08 | 6.11 |
+| 0x + SMAA, LDR target | 5.74 | 5.82 | 5.89 | 5.56 | 5.05 |
+
+- **16 samples are the outlier.** OpenGL draws them (`GL_MAX_SAMPLES` 32) at 2.0-2.5 times the
+  4x frame, 6.0-10.9 ms more, more than the whole post chain of section 12. The Vulkan renderer
+  never draws more than 8 (`VK_Image_SelectSampleCount`), so a 16x request costs exactly what 8x
+  does there: the old Maximum drew two different images.
+- **8x costs 0.75-1.7 ms over 4x on OpenGL and 1.8-2.5 ms on Vulkan**, for edges SMAA ultra
+  already smooths.
+- **4x with SMAA costs little over SMAA alone.** On OpenGL it is within -0.7 to +0.3 ms of 0x +
+  SMAA: SMAA works harder without MSAA (0.5-0.8 ms on its own in the indoor scenes, 0.1-0.4 at
+  4x), so in hub2 4x is cheaper than none. On Vulkan 4x costs 0.6-1.6 ms over SMAA alone.
+- **TAA alone costs what SMAA alone does** (within 0.4 ms either way on both backends) and
+  replaces the geometric smoothing with temporal accumulation; it stays the choice for scaled
+  rendering (`r_temporalAA 2`), not a tier default.
+- **The LDR target saves 0.1-1.3 ms at 4x** but clips the highlights bloom and the tone map are
+  built on, so every tier that tone maps keeps the RGBA16F target (`r_hdrSceneTarget` follows
+  the preset's tone map).
+
+### 13.3 Policy
+
+| Preset | MSAA | Post AA | Why |
+|---|---:|---|---|
+| Minimum, Low Power, Low, Performance | 0 | as FPS-02 | no post chain; unchanged |
+| Balanced | 2x | SMAA medium | unchanged |
+| Enhanced | 0 | SMAA high | FPS-02's choice; MSAA was its largest optional cost |
+| Quality | 2x | SMAA high | on OpenGL often cheaper than SMAA alone (SMAA has fewer edges left); 0.2-0.5 ms over it on Vulkan |
+| **Ultra** | **4x** | SMAA ultra | within 0.3 ms of SMAA alone on OpenGL and 0.6-1.6 ms on Vulkan; 8x costs 0.75-2.5 ms more for little |
+| **Maximum** | **8x** (was a 16x request) | SMAA ultra | the most the Vulkan renderer draws, so Maximum is one image on both renderers; 16x on OpenGL cost 6-11 ms over 4x |
+
+No preset asks for more than 8 samples; the presets self-test enforces it. 16x stays a manual
+choice in the settings menu for OpenGL, and Vulkan reports drawing it at 8x. The count does not
+change with resolution: MSAA's cost scales with the pixel count like the rest of the frame, the
+tier classes are declared at 2560x1440 (section 11.1), and render scale or a lower tier is the
+lever above that.
+
+### 13.4 Visibility
+
+- `gfxInfo` names the clamp on Vulkan (`reason=vulkan-clamp` where it draws fewer samples than
+  asked; OpenGL already reported `gl-max-clamp`) and adds a line with the resolves of the last
+  complete frame, each copy out of a multisampled target (`MSAA resolves last frame: color=1
+  depth=3` at Ultra on both backends since FPS-04 and its follow-up).
+- `r_multiSamplesEffective` (read-only) holds the count the last main scene drew with.
+- The settings menu's MSAA row now carries a note naming the trade-off (each step up costs frame
+  time; Ultra uses 4x with SMAA; Vulkan draws at most 8x) and, where the renderer draws fewer
+  samples than applied, a line naming the count it draws, in all twelve languages.
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;

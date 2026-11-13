@@ -1600,4 +1600,9 @@
 	"#str_231765"	"Colore mirino"
 	"#str_231766"	"MODIFICA"
 	"#str_231767"	"Il riavvio del renderer salva la partita e poi la riprende."
+	"#str_231768"	"Smussa i bordi della geometria. Ogni livello in più costa tempo per fotogramma; Ultra usa 4x con SMAA. Il renderer Vulkan disegna al massimo 8x."
+	"#str_231769"	"Qui il renderer non può applicare il multicampionamento alla scena, quindi l'MSAA è disattivato."
+	"#str_231770"	"Qui il renderer disegna al massimo 2x, quindi la scena usa 2x."
+	"#str_231771"	"Qui il renderer disegna al massimo 4x, quindi la scena usa 4x."
+	"#str_231772"	"Qui il renderer disegna al massimo 8x, quindi la scena usa 8x."
 }

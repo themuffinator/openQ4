@@ -5490,7 +5490,7 @@ bool idSessionLocal::OpenRenderDemoRecordFile() {
 	// What playback needs to find the right content and keep time across levels.
 	idDict header;
 	header.Set( "game", fileSystem->GetActiveGameDir() );
-	header.Set( "campaign", !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ? "awakening" : "quake4" );
+	header.Set( "campaign", FS_AwakeningActive() ? "awakening" : "quake4" );
 	header.Set( "mode", idAsyncNetwork::IsActive() ? "multiplayer" : "singleplayer" );
 	header.SetInt( "userCmdHz", common->GetUserCmdHz() );
 	header.SetInt( "skill", cvarSystem->GetCVarInteger( "g_skill" ) );
@@ -7383,7 +7383,7 @@ static const char *const SESSION_CHAPTER_DETAIL_FRESH_CURRENT = "#str_231551";
 static const char *const SESSION_CHAPTER_DETAIL_LOCKED = "#str_231288";
 
 static bool Session_AwakeningCampaignActive() {
-	return !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" );
+	return FS_AwakeningActive();
 }
 
 static const sessionChapter_t *Session_CampaignChapters( int &count ) {
@@ -7415,6 +7415,27 @@ static int Session_CampaignChapterIndex( const char *map, const char *entityFilt
 		}
 	}
 	return -1;
+}
+
+// A mod that plays over either campaign keeps both campaigns' saves in its
+// one save folder. A save made on a level of the campaign not running stays
+// out of this campaign's save lists; saves of any other map (a mod's own
+// levels) list under both.
+bool Session_SaveMapFromOtherCampaign( const char *map ) {
+	const bool awakening = Session_AwakeningCampaignActive();
+	const sessionChapter_t *other = awakening ? SESSION_QUAKE4_CHAPTERS : SESSION_AWAKENING_CHAPTERS;
+	const int count = awakening ?
+		static_cast<int>( sizeof( SESSION_QUAKE4_CHAPTERS ) / sizeof( SESSION_QUAKE4_CHAPTERS[0] ) ) :
+		static_cast<int>( sizeof( SESSION_AWAKENING_CHAPTERS ) / sizeof( SESSION_AWAKENING_CHAPTERS[0] ) );
+	idStr normalizedMap;
+	idStr normalizedFilter;
+	Session_NormalizeMapPathAndEntityFilter( map, "", normalizedMap, normalizedFilter );
+	for ( int i = 0; i < count; i++ ) {
+		if ( !normalizedMap.Icmp( other[i].map ) ) {
+			return true;
+		}
+	}
+	return false;
 }
 
 // The chapters reached, with each one's start autosave as the save list names

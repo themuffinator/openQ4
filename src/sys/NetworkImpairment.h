@@ -11,8 +11,11 @@ Datagrams leave in the order they fall due, so jitter larger than their spacing
 reorders them. A rate turns the line into a bottleneck: datagrams queue behind
 each other at that many bytes a second, and one that would wait longer than the
 queue holds is dropped, as a full router buffer drops it. Losses can come in
-bursts (a two-state Gilbert-Elliott model) instead of one at a time. Every
-random choice comes from a seeded generator, so a run can be repeated exactly.
+bursts (a two-state Gilbert-Elliott model) instead of one at a time. A path MTU
+(net_forceMTU) either drops each datagram larger than the path, as a path that
+filters IP fragments or black-holes Packet Too Big does, or carries it in IP
+fragments that are each lost on their own. Every random choice comes from a
+seeded generator, so a run can be repeated exactly.
 
 It has no engine dependencies, so the native tests drive it directly.
 
@@ -43,6 +46,14 @@ const int DEFAULT_QUEUE_MSEC = 250;
 const int MAX_BURST_LENGTH = 64;
 // The IPv4 and UDP headers a datagram also carries across the bottleneck.
 const int LINK_OVERHEAD_BYTES = 28;
+const int UDP_HEADER_BYTES = 8;
+const int IPV4_HEADER_BYTES = 20;
+const int IPV6_HEADER_BYTES = 40;
+// Each IPv6 fragment also carries a Fragment extension header.
+const int IPV6_FRAGMENT_HEADER_BYTES = 8;
+// A path MTU from the IPv4 minimum reassembly size to the largest IP packet.
+const int MIN_MTU_BYTES = 576;
+const int MAX_MTU_BYTES = 65535;
 
 struct settings_t {
 	int latencyMsec;		// fixed one-way delay added to every datagram
@@ -52,6 +63,8 @@ struct settings_t {
 	int rateBytes;			// bottleneck capacity in bytes a second, 0 for none
 	int queueMsec;			// longest a datagram waits at the bottleneck before it is dropped
 	int burstLength;		// mean datagrams lost in a row; 0 or 1 loses them independently
+	int mtuBytes;			// largest IP packet the path carries whole, 0 for no limit
+	bool mtuDrop;			// a larger datagram is dropped instead of sent in IP fragments
 };
 
 inline int ClampInt( int value, int low, int high ) {
@@ -59,7 +72,8 @@ inline int ClampInt( int value, int low, int high ) {
 }
 
 inline settings_t Sanitize( int latencyMsec, int jitterMsec, int dropPercent, int duplicatePercent,
-							int rateBytes = 0, int queueMsec = DEFAULT_QUEUE_MSEC, int burstLength = 0 ) {
+							int rateBytes = 0, int queueMsec = DEFAULT_QUEUE_MSEC, int burstLength = 0,
+							int mtuBytes = 0, int mtuDrop = 0 ) {
 	settings_t settings;
 	settings.latencyMsec = ClampInt( latencyMsec, 0, MAX_LATENCY_MSEC );
 	settings.jitterMsec = ClampInt( jitterMsec, 0, MAX_JITTER_MSEC );
@@ -68,12 +82,34 @@ inline settings_t Sanitize( int latencyMsec, int jitterMsec, int dropPercent, in
 	settings.rateBytes = rateBytes > 0 ? ClampInt( rateBytes, MIN_RATE_BYTES, MAX_RATE_BYTES ) : 0;
 	settings.queueMsec = ClampInt( queueMsec, 1, MAX_QUEUE_MSEC );
 	settings.burstLength = ClampInt( burstLength, 0, MAX_BURST_LENGTH );
+	settings.mtuBytes = mtuBytes > 0 ? ClampInt( mtuBytes, MIN_MTU_BYTES, MAX_MTU_BYTES ) : 0;
+	settings.mtuDrop = settings.mtuBytes > 0 && mtuDrop != 0;
 	return settings;
 }
 
 inline bool Active( const settings_t &settings ) {
 	return settings.latencyMsec > 0 || settings.jitterMsec > 0 || settings.dropPercent > 0 ||
-		settings.duplicatePercent > 0 || settings.rateBytes > 0;
+		settings.duplicatePercent > 0 || settings.rateBytes > 0 || settings.mtuBytes > 0;
+}
+
+// How many IP packets a UDP datagram of payloadBytes needs on a path of mtuBytes:
+// 1 when it fits whole. Every fragment but the last carries a multiple of 8 bytes
+// of the UDP datagram, behind its own IP header (and, for IPv6, a Fragment header).
+inline int IpPackets( int mtuBytes, int payloadBytes, bool ipv6 ) {
+	const int ipHeader = ipv6 ? IPV6_HEADER_BYTES : IPV4_HEADER_BYTES;
+	const int datagram = payloadBytes + UDP_HEADER_BYTES;
+	if ( mtuBytes <= 0 || datagram + ipHeader <= mtuBytes ) {
+		return 1;
+	}
+	const int perFragment = ( ( mtuBytes - ipHeader - ( ipv6 ? IPV6_FRAGMENT_HEADER_BYTES : 0 ) ) / 8 ) * 8;
+	return perFragment > 0 ? ( datagram + perFragment - 1 ) / perFragment : 1;
+}
+
+// The bytes a datagram occupies on the link: its UDP datagram and every IP header.
+inline int WireBytes( int packets, int payloadBytes, bool ipv6 ) {
+	const int ipHeader = ipv6 ? IPV6_HEADER_BYTES : IPV4_HEADER_BYTES;
+	const int perPacket = ipHeader + ( ipv6 && packets > 1 ? IPV6_FRAGMENT_HEADER_BYTES : 0 );
+	return payloadBytes + UDP_HEADER_BYTES + packets * perPacket;
 }
 
 // Whether time a is at or before time b on a millisecond clock that may wrap.
@@ -127,6 +163,9 @@ struct stats_t {
 	uint64_t	discarded;		// due, but larger than the caller's buffer
 	int			maxDepth;		// most copies queued at once
 	int			maxWaitMsec;	// longest a datagram waited at the bottleneck
+	uint64_t	oversized;		// larger than the path MTU: dropped, or sent in IP fragments
+	uint64_t	ipFragments;	// IP fragments the oversized datagrams that were sent took
+	int			maxSize;		// largest payload offered, in bytes
 };
 
 template <typename Address>
@@ -138,8 +177,9 @@ public:
 				}
 
 	// Hands one datagram to the delay line at time now. Returns how many copies were
-	// queued: 0 when it was dropped or refused, 2 when it was duplicated.
-	int			Offer( const settings_t &settings, int now, const Address &address, const void *data, int size ) {
+	// queued: 0 when it was dropped or refused, 2 when it was duplicated. ipv6 picks
+	// the headers the path MTU and the bottleneck count.
+	int			Offer( const settings_t &settings, int now, const Address &address, const void *data, int size, bool ipv6 = false ) {
 		stats.offered++;
 		const uint64_t offer = nextOffer++;
 		if ( size < 0 || size > MAX_DATAGRAM_BYTES || ( size > 0 && data == NULL ) ) {
@@ -147,14 +187,31 @@ public:
 			return 0;
 		}
 		stats.offeredBytes += static_cast<uint64_t>( size );
+		if ( size > stats.maxSize ) {
+			stats.maxSize = size;
+		}
+		// A datagram larger than the path either never arrives or crosses it in IP
+		// fragments, every one of which must arrive for the datagram to.
+		const int packets = IpPackets( settings.mtuBytes, size, ipv6 );
+		if ( packets > 1 ) {
+			stats.oversized++;
+			if ( settings.mtuDrop ) {
+				return 0;
+			}
+			stats.ipFragments += static_cast<uint64_t>( packets );
+		}
 		// The bottleneck comes first: a datagram lost further along the path still
 		// took its turn on the link.
 		int departure = now;
-		if ( settings.rateBytes > 0 && !Reserve( settings, now, size, departure ) ) {
+		if ( settings.rateBytes > 0 && !Reserve( settings, now, WireBytes( packets, size, ipv6 ), departure ) ) {
 			stats.congested++;
 			return 0;
 		}
-		if ( Lost( settings ) ) {
+		bool lost = false;
+		for ( int packet = 0; packet < packets; packet++ ) {
+			lost = Lost( settings ) || lost;
+		}
+		if ( lost ) {
 			stats.dropped++;
 			return 0;
 		}
@@ -252,11 +309,11 @@ public:
 	stats_t		stats;
 
 private:
-	// Queues the datagram behind whatever the bottleneck is still sending and sets
-	// departure to when its last byte leaves. An idle link always takes it, so a
-	// datagram bigger than the queue still passes; otherwise one that would finish
-	// later than the queue holds is refused, and the link keeps its state.
-	bool		Reserve( const settings_t &settings, int now, int size, int &departure ) {
+	// Queues the datagram's wireBytes behind whatever the bottleneck is still sending
+	// and sets departure to when its last byte leaves. An idle link always takes it,
+	// so a datagram bigger than the queue still passes; otherwise one that would
+	// finish later than the queue holds is refused, and the link keeps its state.
+	bool		Reserve( const settings_t &settings, int now, int wireBytes, int &departure ) {
 		int64_t waitUsec = 0;
 		if ( linkBusy ) {
 			const int32_t aheadMsec = static_cast<int32_t>( static_cast<uint32_t>( linkFreeMsec ) - static_cast<uint32_t>( now ) );
@@ -265,7 +322,7 @@ private:
 				waitUsec = 0;
 			}
 		}
-		const int64_t sendUsec = ( static_cast<int64_t>( size ) + LINK_OVERHEAD_BYTES ) * 1000000 / settings.rateBytes;
+		const int64_t sendUsec = static_cast<int64_t>( wireBytes ) * 1000000 / settings.rateBytes;
 		const int64_t finishUsec = waitUsec + sendUsec;
 		if ( waitUsec > 0 && finishUsec > static_cast<int64_t>( settings.queueMsec ) * 1000 ) {
 			return false;

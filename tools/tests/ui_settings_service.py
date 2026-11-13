@@ -194,6 +194,10 @@ struct Cvars {
     int flags=CVAR_ARCHIVE,clears=0,serializations=0;
     bool trace=false;
     bool GetCVarBool(const char* key) const { Check(std::string(key)=="ui_retainedTrace","trace lookup only");return trace; }
+    // FPS-05: the MSAA row's clamp status reads the request and the drawn count.
+    int samples=4;const char* drawn="";
+    int GetCVarInteger(const char* key) const { Check(std::string(key)=="r_multiSamples","sample request lookup only");return samples; }
+    const char* GetCVarString(const char* key) const { Check(std::string(key)=="r_multiSamplesEffective","drawn sample lookup only");return drawn; }
     int GetModifiedFlags() const { return flags; }
     void ClearModifiedFlags(int value) { flags&=~value;++clears; }
     void WriteFlaggedVariables(int value,const char*,idFile* output) {
@@ -377,9 +381,10 @@ static void Validation() {
           schema.at("settings.display.7.label")==2 && !schema.contains("settings.display.8.label") && schema.at("settings.display.mode.39.label")==2 &&
           !schema.contains("settings.display.mode.40.label") && schema.at("settings.display.refresh.selected")==0 &&
           schema.at("settings.display.refresh.15.label")==2 && !schema.contains("settings.display.refresh.16.label"),"display list schema types");
-    // 20 status keys, 73 display list keys and the draft and baseline of 11 fixture settings.
-    Check(schema.size()==115 && schema.at("settings.lightGrid.pending")==1 && schema.at("settings.lightGrid.mapLoaded")==1 && schema.at("settings.msaaAvailable")==1 && schema.at("settings.message")==2 && schema.at("settings.open")==1 &&
+    // 22 status keys, 73 display list keys and the draft and baseline of 11 fixture settings.
+    Check(schema.size()==117 && schema.at("settings.lightGrid.pending")==1 && schema.at("settings.lightGrid.mapLoaded")==1 && schema.at("settings.msaaAvailable")==1 && schema.at("settings.message")==2 && schema.at("settings.open")==1 &&
           schema.at("settings.renderer.available")==1 && schema.at("settings.renderer.fallback")==1 &&
+          schema.at("settings.msaa.clamped")==1 && schema.at("settings.msaa.status")==2 &&
           schema.at("settings.phase")==0,"service status schema types");
     for(const auto& [key,type]:SystemSettingsHost::Schema())
         Check(schema.at("settings.draft."+key)==type && schema.at("settings.baseline."+key)==type,"typed snapshot schema");
@@ -683,6 +688,25 @@ static void ConfirmationCapability() {
     Check(!Dispatch(owner,"apply") && host.writes.empty() && deviceData.prepares==0,"a combined batch needs an owning view as a display change does");
     Check(Dispatch(owner,"revert"),"clear combined draft");
     Check(Dispatch(owner,"edit",{{"r_mode",1.0}}),"display redraft");Expect(owner,"canApply",false);
+}
+// FPS-05: the MSAA row names the count the scene draws with while it is below
+// the applied request, and only then.
+static void MultisamplingStatus() {
+    const auto owner=Begin();
+    cvars.samples=16;cvars.drawn="";
+    Expect(owner,"msaa.clamped",false);	// no renderer has reported a count
+    cvars.drawn="-1";Expect(owner,"msaa.clamped",false);	// no scene has drawn
+    cvars.drawn="8";Expect(owner,"msaa.clamped",true);Expect(owner,"msaa.status",std::string("#str_231772"));
+    cvars.drawn="16";Expect(owner,"msaa.clamped",false);	// honoured
+    cvars.samples=4;cvars.drawn="0";Expect(owner,"msaa.clamped",true);Expect(owner,"msaa.status",std::string("#str_231769"));
+    cvars.drawn="2";Expect(owner,"msaa.status",std::string("#str_231770"));
+    Check(Dispatch(owner,"edit",{{"r_multiSamples",2.0}}),"stage another count");
+    Expect(owner,"msaa.clamped",false);	// the drawn count belongs to the applied request
+    Check(Dispatch(owner,"cancel"),"discard the staged count");
+    deviceData.msaaSupported=false;Check(Dispatch(owner,"begin"),"reopen on a renderer without MSAA");
+    Expect(owner,"msaa.clamped",false);
+    deviceData.msaaSupported=true;cvars.samples=4;cvars.drawn="";
+    Check(Dispatch(owner,"cancel"),"close");
 }
 static void MultisamplingCapability() {
     const auto owner=Begin();UI_SettingsConfirmationDocument(owner,ConfirmationDocument());
@@ -1553,6 +1577,7 @@ int main(int argc,char** argv) {
     else if(name=="waiting_release")Waiting(true);else if(name=="persistence")Persistence();
     else if(name=="timeout_frame")TimeoutFrame();else if(name=="capability")ConfirmationCapability();
     else if(name=="msaa_capability")MultisamplingCapability();
+    else if(name=="msaa_status")MultisamplingStatus();
     else if(name=="display_draft_preflight")DisplayDraftPreflight();
     else if(name=="display_keep")DisplayDelivery(false);else if(name=="display_persist_failure")DisplayDelivery(true);
     else if(name=="display_close_queued")DisplayClose(false);else if(name=="display_close_written")DisplayClose(true);
@@ -1590,7 +1615,7 @@ SCENARIOS = (
     'validation', 'ownership', 'drafts', 'devices', 'conflict', 'apply_failure',
     'confirmation', 'abandon_editing', 'abandon_pending', 'orphan_refusal',
     'orphan_divergence', 'waiting_close', 'waiting_release', 'persistence',
-    'timeout_frame', 'capability', 'msaa_capability', 'display_draft_preflight', 'display_keep', 'display_persist_failure',
+    'timeout_frame', 'capability', 'msaa_capability', 'msaa_status', 'display_draft_preflight', 'display_keep', 'display_persist_failure',
     'display_close_queued', 'display_close_written', 'startup_shutdown', 'stale_display_actions', 'level_load_policy', 'level_load_unreadable',
     'deferred_apply', 'deferred_mixed', 'deferred_not_ready', 'deferred_persist_failure', 'deferred_close', 'deferred_apply_exit',
     'deferred_apply_exit_restore', 'unsupported_effects', 'deferred_retry_renews', 'light_grid_status', 'renderer_route', 'renderer_status',

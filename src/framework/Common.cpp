@@ -3666,8 +3666,10 @@ static bool Common_CheckPerformancePresetTargetsArchived( const char *presetName
 	return passed;
 }
 
+// A preset names one sample count on every renderer: the Vulkan renderer draws
+// at most 8, so no preset asks for more (FPS-05). 16 stays a manual OpenGL choice.
 static bool Common_PerformancePresetMultiSamplesAreValid( int samples ) {
-	return samples == 0 || samples == 2 || samples == 4 || samples == 8 || samples == 16;
+	return samples == 0 || samples == 2 || samples == 4 || samples == 8;
 }
 
 static bool Common_PerformancePresetBenchmarkNameIsValid( const char *name ) {
@@ -3838,7 +3840,7 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_machineSpec", preset.machineSpec, 3 );
 		passed &= Common_PerformancePresetCheckBenchmarkPreset( preset, "high-end" );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_screenFraction", preset.screenFraction, 100 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 16 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 8 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_postAA", preset.postAA, 3 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 4096 );
@@ -7598,8 +7600,12 @@ void idCommonLocal::InitGame( void ) {
 	openQ4_NormalizeGameTypeForModule( pendingGameModule.c_str() );
 	const idStr pendingGameType = cvarSystem->GetCVarString( "si_gameType" );
 
+    // Multiplayer never mounts The Awakening: neither as the game nor as the
+    // base beneath a mod, which keeps its place on top.
     if ( pendingGameModule == "game_mp" && !idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), "q4xbase" ) ) {
         cvarSystem->SetCVarString( "fs_game", OPENQ4_GAMEDIR );
+        cvarSystem->SetCVarString( "fs_game_base", "" );
+    } else if ( pendingGameModule == "game_mp" && !idStr::Icmp( cvarSystem->GetCVarString( "fs_game_base" ), "q4xbase" ) ) {
         cvarSystem->SetCVarString( "fs_game_base", "" );
     }
 	// initialize the file system

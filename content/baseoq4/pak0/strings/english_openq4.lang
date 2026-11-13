@@ -1591,4 +1591,9 @@
 	"#str_231765"	"Crosshair Color"
 	"#str_231766"	"CHANGE"
 	"#str_231767"	"Restarting the renderer saves your game and resumes it afterwards."
+	"#str_231768"	"Smooths the edges of geometry. Each step up costs frame time; Ultra uses 4x with SMAA. The Vulkan renderer draws at most 8x."
+	"#str_231769"	"The renderer cannot multisample the scene here, so MSAA is off."
+	"#str_231770"	"The renderer draws at most 2x here, so the scene uses 2x."
+	"#str_231771"	"The renderer draws at most 4x here, so the scene uses 4x."
+	"#str_231772"	"The renderer draws at most 8x here, so the scene uses 8x."
 }

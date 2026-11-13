@@ -893,7 +893,7 @@ def validate_dedicated_conversion() -> None:
         [
             "if ( dedicatedSpawnDeferred ) {\n\t\tdedicatedSpawnDeferred = false;\n\t\tserverDedicated.SetInteger( 1 );",
             "serverDedicated.GetInteger() == 1 && renderSystem->IsOpenGLRunning()",
-            '"q4xbase"',
+            "Net_LeaveAwakening()",
             "dedicatedSpawnDeferred = true;\n            serverDedicated.SetInteger( 0 );",
             "cmdSystem->SetupReloadEngineMenu( args );",
             hold,

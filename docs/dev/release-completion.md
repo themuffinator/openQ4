@@ -38,6 +38,94 @@ does not restore the withdrawn release. See
   a second after a join from spectating (two of four runs). This is separate
   from the weapon raise and stays with MP-07.
 
+## One MSAA policy on both renderers, and a Settings note that says what MSAA costs (FPS-05), 13 November 2026
+
+- **Maximum now uses 8x MSAA instead of asking for 16x.** The Vulkan renderer never
+  draws more than 8 samples, so Maximum used to look different on OpenGL and Vulkan, and
+  on OpenGL its 16 samples cost 6 to 11 ms a frame more than 4x at 2560x1440. Every preset
+  now draws the same image on both renderers. If you chose Maximum, choose it again to pick
+  up 8x; 16x stays available as a manual choice on OpenGL.
+- **Ultra keeps 4x MSAA with SMAA ultra**, confirmed by measurement: within a third of a
+  millisecond of SMAA alone on OpenGL, 0.6 to 1.6 ms on Vulkan, where 8x would cost 0.75 to
+  2.5 ms more for edges SMAA already smooths.
+- **The Settings menu explains MSAA.** A note under the MSAA row says what it does and
+  costs, and a second line appears when the renderer draws fewer samples than you chose,
+  naming the count it does draw. Both are translated into all twelve languages.
+- Developers: `gfxInfo` reports `reason=vulkan-clamp` and a line with the last frame's
+  multisample resolves; `r_multiSamplesEffective` (read-only) holds the drawn count. The
+  measurements are in the
+  [performance report, section 13](performance-report.md#13-msaa-and-the-hdr-scene-target-fps-05).
+
+## Mods play over The Awakening, 13 November 2026
+
+- **A mod now stays loaded when you choose The Awakening**, and its files
+  apply on top of the expansion's (search order: the mod, `q4xbase`,
+  `baseoq4`, `q4base`). Load it from **Mods** and pick the campaign, or launch
+  with `+set fs_game mymod +set fs_game_base q4xbase`. Before this, choosing
+  either campaign replaced the running mod, and filesystem startup silently
+  cleared `fs_game_base q4xbase` even though the filesystem's own notes
+  documented it as the way to build on the expansion (asked in discussion 213).
+- **`mod.json` can tie a mod to one campaign** with the optional
+  `"campaign": "awakening"` or `"quake4"`. An Awakening mod then needs only
+  `+set fs_game mymod`; a Quake 4 mod refuses the expansion even when asked
+  for it, and the campaign menu runs the other campaign without such a mod.
+  Any other value rejects the manifest with the reason in the log.
+- One shared mount state: filesystem startup publishes the read-only
+  `fs_awakeningActive`, and the 31 Awakening checks in the engine, game and
+  renderer modules (class substitutions, `_q4x_openq4` definitions, mission
+  repairs, spline banking, the campaign menu and chapters) read it through
+  `FS_AwakeningActive()` instead of comparing the written game directory with
+  `q4xbase`. No module interface changed. Expansion files that replace whole
+  retail declaration files (`player.def`, `debris.def`, `persona.def`,
+  `music.sndshd`) are still layered over retail when the mod above them does
+  not ship its own copy.
+- A mod used with both campaigns keeps one save folder: **Load Game** lists
+  only saves made on the running campaign's levels, and render demos match
+  their recorded campaign as well as their game directory. Multiplayer
+  (hosting, joining, a `game_mp` restart) drops the expansion from beneath a
+  mod and keeps the mod.
+- Evidence: `campaign_selection_runtime.py` gains five real-content cases
+  (explicit base, switch from Quake 4, `mod.json` Awakening, `mod.json`
+  Quake 4, multiplayer). `campaign_scope.py` compiles the production class
+  substitution against a mod over the expansion; `filesystem_mod_manifest.py`
+  checks the manifest key and startup order; `ui_retained_gate.py` checks the
+  Mods page keeps the campaign.
+
+## Online play over small-MTU connections (MP-08), 13 November 2026
+
+- **Large game messages over IPv6 always fit the smallest network size.** A
+  message that grew when it was compressed could leave as one packet about
+  twice the limit IPv6 guarantees, which some VPNs and firewalls silently
+  drop. It is now sent in pieces like any other large message. Nothing to
+  change.
+- **Joining over IPv6 still needs a network that passes split packets.** The
+  server's answers to a join or a server-list query are about 1.8 KB. If an
+  IPv6 server never answers or never appears in the list on such a network,
+  join it over IPv4.
+- Testers: `net_forceMTU` and `net_forceMTUDrop` simulate a small path MTU on
+  one machine, carrying larger packets in IP fragments or dropping them; the
+  [networking guide](../user/multiplayer-networking.md#testing-under-simulated-network-conditions)
+  lists them.
+- Developer: `mp_path_mtu_soak.py` plays a 12-player q4ctf1 match over that
+  path; `netImpairment` reports oversized datagrams, IP fragments and the
+  largest datagram each way.
+  [Evidence](mp-network-qualification.md#a-1280-byte-path-mtu-13-november-2026).
+
+## The Android app quits without crashing (AND-02), 13 November 2026
+
+- **Quitting the Android app no longer ends in a crash.** Every quit used to
+  abort in Android's own interface threads just after the game had finished
+  shutting down, leaving a crash report behind each time, although Android
+  still counted the exit as normal. The game now ends its process directly
+  once shutdown is complete. Saves, settings and logs are written as before,
+  and there is nothing to change.
+- Developer: on Android, `Posix_Exit` flushes stdio and ends with `_exit()`.
+  `exit()` ran libhwui's `CommonPool` destructor under its detached worker
+  threads (FORTIFY: `pthread_mutex_lock called on a destroyed mutex`).
+  `android_emulator_smoke.py` now fails on any libc abort in the engine's
+  process.
+  [Evidence](platform-recovery-review.md#android-quit-abort-13-november-2026).
+
 ## OpenGL ambient occlusion costs less indoors (FPS-04 follow-up), 13 November 2026
 
 - **Quality and Ultra run faster on OpenGL in interiors.** Ambient occlusion no

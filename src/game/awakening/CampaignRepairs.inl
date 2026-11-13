@@ -6,7 +6,7 @@
 #include "PrisonAlarms.h"
 
 static int Awakening_PrepareCampaignRepairs( idMapFile *map ) {
-	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ) {
+	if ( gameLocal.isMultiplayer || !FS_AwakeningActive() ) {
 		return 0;
 	}
 	idStr name = map->GetName();

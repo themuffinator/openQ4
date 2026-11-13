@@ -24,7 +24,8 @@ def fixture(source: str) -> str:
     header = (ROOT / "src/framework/async/MsgChannel.h").read_text(encoding="utf-8")
     definitions += "\n" + re.search(r"^#define\s+MAX_MESSAGE_SIZE\b.*", header, re.M).group(0)
     bodies = "\n".join(block(source, name) for name in (
-        "static int Net_FragmentSize(", "void idMsgChannel::SendNextFragment(", "bool idMsgChannel::Process("))
+        "static int Net_FragmentSize(", "void idMsgChannel::SendNextFragment(", "int idMsgChannel::SendMessage(",
+        "bool idMsgChannel::Process("))
     harness = (ROOT / "tools/tests/native/MsgChannelFragmentFixture.cpp").read_text(encoding="utf-8")
     return harness.replace("// PRODUCTION_DEFINITIONS", definitions).replace("// PRODUCTION_FUNCTIONS", bodies)
 
@@ -44,6 +45,8 @@ def main() -> None:
         ("duplicate sequence accepted", "sequence <= incomingSequence", "sequence < incomingSequence"),
         ("fragments must arrive in order", "const unsigned int fragmentBit =", "if ( fragStart != fragmentLength ) { return false; } const unsigned int fragmentBit ="),
         ("duplicates counted twice", "if ( fragmentReceived & fragmentBit ) {", "if ( false ) {"),
+        ("packing growth leaves as one oversized datagram",
+         " || unsentMsg.GetSize() - 6 >= Net_FragmentSize( remoteAddress )", ""),
     )
     output = ROOT / ".tmp"
     output.mkdir(exist_ok=True)

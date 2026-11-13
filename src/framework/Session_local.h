@@ -150,6 +150,12 @@ int Session_RenderDemoFramesToMS( int frames, int userCmdHz );
 // has none (Session.cpp).
 idStr Session_LevelDisplayName( const char *map, const char *entityFilter );
 
+#ifndef ID_DEDICATED
+// True for a save made on a level of the campaign not running, which a mod's
+// shared save folder can hold (Session.cpp).
+bool Session_SaveMapFromOtherCampaign( const char *map );
+#endif
+
 // False, with the player-facing reason, when a campaign render demo was
 // recorded in another game directory than the active one (Session_demo.cpp).
 bool Session_RenderDemoContentMatches( const char *path, idStr &reason );

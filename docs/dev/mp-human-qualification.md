@@ -113,6 +113,14 @@ the server's copy, late and off to the side.
 
 Use two physical machines.
 
+`mp_path_mtu_soak.py` already plays 8.1's match on one machine over a simulated
+1280-byte path (see [the network record](mp-network-qualification.md#a-1280-byte-path-mtu-13-november-2026)):
+it passes over IPv4 and IPv6 when the path carries IP fragments. Over a path
+that drops them, the client cannot join on either family, because the server's
+info and connect replies are about 1.8 KB. What is left for 8.1 is a real
+lowered MTU between two machines. If that network drops IP fragments (some VPNs
+and firewalls do), expect the join to fail in the same way, and record it.
+
 | # | Do this | Pass when |
 | --- | --- | --- |
 | 8.1 | Lower one machine's interface MTU to 1280 (or connect over a VPN with a small MTU). Join a 12-player match on q4ctf1. | The client joins and plays for five minutes without a reliable-message overflow or disconnect. |

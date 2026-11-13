@@ -6578,7 +6578,7 @@ const idDeclEntityDef *idGameLocal::FindEntityDef( const char *name, bool makeDe
 	const idDecl *decl = NULL;
 	if ( isMultiplayer ) {
 		decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_mp", name ), false );
-	} else if ( name != NULL && name[0] != '\0' && !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ) {
+	} else if ( name != NULL && name[0] != '\0' && FS_AwakeningActive() ) {
 		decl = declManager->FindType( DECL_ENTITYDEF, va( "%s_q4x_openq4", name ), false );
 	}
 	if ( !decl ) {

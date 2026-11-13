@@ -10,10 +10,10 @@
 // PRODUCTION_DEFINITIONS
 
 using byte = unsigned char;
-enum { NA_BAD, NA_IP, NA_IP6 };
+enum { NA_BAD, NA_IP, NA_IP6, NA_BOT };
 struct netadr_t { int type = NA_IP; int port = 28004; };
 static const char *Sys_NetAdrToString( const netadr_t & ) { return "fixture"; }
-struct Common { void Printf( const char *, ... ) {} } commonStorage;
+struct Common { void Printf( const char *, ... ) {} void Error( const char *, ... ) { std::abort(); } } commonStorage;
 static Common *common = &commonStorage;
 struct Cvar { bool GetBool() const { return false; } } net_channelShowPackets, net_channelShowDrop;
 
@@ -25,7 +25,9 @@ public:
 	int GetReadCount() const { return read; }
 	int GetRemaingData() const { return size - read; }
 	byte *GetData() const { return buffer; }
+	int GetMaxSize() const { return maximum; }
 	void BeginReading() { read = 0; }
+	void BeginWriting() { size = read = 0; }
 	void WriteData( const void *data, int n ) {
 		if ( n < 0 || n > maximum - size ) { std::abort(); }
 		std::memcpy( buffer + size, data, n ); size += n;
@@ -68,8 +70,22 @@ public:
 	idBitMsg unsentMsg;
 	std::vector<byte> received;
 	int deliveries = 0;
+	struct { int GetTotalSize() const { return 0; } } reliableSend;
+	byte unsentBuffer[MAX_MESSAGE_SIZE] = {};
+	int growthPercent = 0;
 	void SendNextFragment( idPort &port, const int time );
+	int SendMessage( idPort &port, const int time, const idBitMsg &msg );
 	bool Process( const netadr_t from, int time, idBitMsg &msg, int &sequence );
+	// Stands in for packing: the size, the message, then growthPercent more bytes,
+	// as the zero-run coder grows data it cannot shorten.
+	bool WriteMessageData( idBitMsg &out, const idBitMsg &msg ) const {
+		const int extra = msg.GetSize() * growthPercent / 100;
+		if ( 2 + msg.GetSize() + extra > out.GetMaxSize() - out.GetSize() ) { return false; }
+		out.WriteShort( msg.GetSize() );
+		out.WriteData( msg.GetData(), msg.GetSize() );
+		for ( int i = 0; i < extra; i++ ) { const byte filler = static_cast<byte>( 0x88 + i ); out.WriteData( &filler, 1 ); }
+		return true;
+	}
 	void UpdateOutgoingRate( int, int ) {}
 	void UpdateIncomingRate( int, int ) {}
 	void UpdatePacketLoss( int, int, int ) {}
@@ -209,7 +225,43 @@ static void TestFamily( int family ) {
 	Check( !Receive( receiver, plain ) && receiver.deliveries == 2, "unfragmented duplicates cannot deliver twice" );
 }
 
+// SendMessage decides to fragment on the unpacked length, but packing can grow a
+// message past a fragment. It must then leave in fragments, so no datagram is ever
+// larger than a full fragment and its header (IPv6: within a 1280-byte path).
+static void TestPackedGrowth( int family ) {
+	netadr_t address; address.type = family;
+	const int fragment = Net_FragmentSize( address );
+	for ( int growth : { 0, 25, 100 } ) {
+		for ( int size : { 1, fragment / 2, fragment - 9 } ) {
+			idMsgChannel sender; sender.remoteAddress = address; sender.unsentFragments = false; sender.growthPercent = growth;
+			auto data = Payload( size );
+			idBitMsg msg; msg.Init( data.data(), size ); msg.SetSize( size );
+			byte packedStorage[MAX_MESSAGE_SIZE];
+			idBitMsg packed; packed.Init( packedStorage, sizeof( packedStorage ) );
+			sender.WriteMessageData( packed, msg );
+			const std::vector<byte> expected( packed.GetData(), packed.GetData() + packed.GetSize() );
+			idPort port;
+			const int sequence = sender.SendMessage( port, 0, msg );
+			while ( sender.unsentFragments && port.packets.size() < 32 ) { sender.SendNextFragment( port, 0 ); }
+			Check( sequence == 1 && !sender.unsentFragments && sender.outgoingSequence == 2, "a grown message is sent once, in full" );
+			const bool fits = packed.GetSize() < fragment;
+			Check( port.packets.size() == size_t( fits ? 1 : packed.GetSize() / fragment + 1 ),
+				"a message is fragmented exactly when its packed form does not fit one fragment" );
+			for ( const auto &packet : port.packets ) {
+				Check( packet.size() <= size_t( fragment + 10 ), "packing growth never sends a datagram above a full fragment" );
+				Check( packet.size() + ( family == NA_IP6 ? 48 : 28 ) <= ( family == NA_IP6 ? 1280 : 1500 ), "grown messages fit the family's MTU budget" );
+			}
+			idMsgChannel receiver; receiver.remoteAddress = address;
+			for ( size_t i = 0; i < port.packets.size(); i++ ) {
+				Check( Receive( receiver, port.packets[i] ) == ( i + 1 == port.packets.size() ), "only the last datagram of a grown message delivers" );
+			}
+			Check( receiver.deliveries == 1 && receiver.received == expected, "the receiver gets the packed message intact" );
+		}
+	}
+}
+
 int main() {
 	TestFamily( NA_IP ); TestFamily( NA_IP6 );
+	TestPackedGrowth( NA_IP ); TestPackedGrowth( NA_IP6 );
 	return failures ? 1 : 0;
 }

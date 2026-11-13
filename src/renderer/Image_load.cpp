@@ -77,7 +77,7 @@ static const char *R_FindMissingQ4StockImageFallback( const char *imageName ) {
 	// The recovered tactical trooper material misspells its own texture folder.
 	// Keep the authored source first and salt the generated cache exactly as for
 	// the retail fallbacks below, so an installed correction takes precedence.
-	if ( idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 ) {
+	if ( FS_AwakeningActive() ) {
 		if ( canonicalName.Icmp( "textures/common/white" ) == 0 ) {
 			return "gfx/guis/white.tga";
 		}
@@ -1624,6 +1624,16 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 		}
 
 		glBlitFramebuffer( x, y, x + imageWidth, y + imageHeight, 0, 0, imageWidth, imageHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+		{
+			// FPS-05: a blit out of a multisampled target is a resolve.
+			extern void R_CountMSAAResolve( bool depth );
+			const int sourceSamples = readingFromRenderTexture
+				? backEnd.renderTexture->GetColorImage( 0 )->GetOpts().numMSAASamples
+				: readingFromMultisampledStandIn ? 2 : 0;
+			if ( sourceSamples > 1 ) {
+				R_CountMSAAResolve( false );
+			}
+		}
 		if ( scissorWasEnabled ) {
 			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
 			glEnable( GL_SCISSOR_TEST );
@@ -1806,6 +1816,10 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 		}
 
 		glBlitFramebuffer( x, y, x + imageWidth, y + imageHeight, 0, 0, imageWidth, imageHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
+		if ( sourceDepthIsMSAA ) {
+			extern void R_CountMSAAResolve( bool depth );
+			R_CountMSAAResolve( true );	// FPS-05
+		}
 
 		if ( scissorWasEnabled ) {
 			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );

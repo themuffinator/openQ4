@@ -292,6 +292,56 @@ bool R_WindowCarriesMultisampling( void ) {
 int R_WindowMultiSamplesForNewDevice( void );
 
 idCVar r_multiSamples( "r_multiSamples", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "MSAA sample count: 0 = off, 2/4/8/16 = supported quality steps", 0, 16, idCmdSystem::ArgCompletion_String<r_multiSamplesArgs> );
+idCVar r_multiSamplesEffective( "r_multiSamplesEffective", "-1", CVAR_RENDERER | CVAR_ROM | CVAR_INTEGER,
+	"samples the last main scene drew with (-1 before one has drawn); below r_multiSamples where the renderer clamps it" );
+
+/*
+====================
+R_PublishMainSceneSamples / R_CountMSAAResolve
+
+FPS-05: the sample count the main scene actually drew with, for the settings
+page and gfxInfo, written only when it changes; and the copies out of a
+multisampled target each frame (each one a full resolve), which gfxInfo
+reports for the last complete frame.
+====================
+*/
+void R_PublishMainSceneSamples( int samples ) {
+	samples = samples > 1 ? samples : 0;
+	if ( r_multiSamplesEffective.GetInteger() != samples ) {
+		r_multiSamplesEffective.SetInteger( samples );
+	}
+}
+
+static int rbMSAAResolveFrame = -1;
+static int rbMSAAResolves[2] = { 0, 0 };		// this frame: colour, depth
+static int rbMSAAResolvesLast[2] = { -1, -1 };	// the last complete frame
+
+void R_CountMSAAResolve( bool depth ) {
+	if ( rbMSAAResolveFrame != backEnd.frameCount ) {
+		if ( rbMSAAResolveFrame == backEnd.frameCount - 1 ) {
+			rbMSAAResolvesLast[0] = rbMSAAResolves[0];
+			rbMSAAResolvesLast[1] = rbMSAAResolves[1];
+		} else {
+			// frames in between had none
+			rbMSAAResolvesLast[0] = rbMSAAResolvesLast[1] = 0;
+		}
+		rbMSAAResolves[0] = rbMSAAResolves[1] = 0;
+		rbMSAAResolveFrame = backEnd.frameCount;
+	}
+	rbMSAAResolves[depth ? 1 : 0]++;
+}
+
+static void R_MSAAResolvesLastFrame( int &color, int &depth ) {
+	if ( rbMSAAResolveFrame < 0 || backEnd.frameCount - rbMSAAResolveFrame > 1 ) {
+		color = depth = 0;	// none for over a frame
+	} else if ( rbMSAAResolveFrame == backEnd.frameCount - 1 ) {
+		color = rbMSAAResolves[0];
+		depth = rbMSAAResolves[1];
+	} else {
+		color = rbMSAAResolvesLast[0];
+		depth = rbMSAAResolvesLast[1];
+	}
+}
 idCVar r_postAA( "r_postAA", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "post AA mode: 0 = off, 1 = SMAA 1x medium, 2 = SMAA 1x high, 3 = SMAA 1x ultra, 4 = SMAA 1x colour-edge prototype", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
 idCVar r_postAAStatePoisonTest( "r_postAAStatePoisonTest", "0", CVAR_RENDERER | CVAR_BOOL, "intentionally dirty GL texture/client state before SMAA post-AA draws for validation" );
 idCVar r_pbrMaterials( "r_pbrMaterials", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "draw explicitly PBR-authored materials as PBR; 0 keeps their classic stages. Stock materials are never PBR" );
@@ -4821,7 +4871,10 @@ static void R_GfxInfoPrintAAState( void ) {
 #ifdef OPENQ4_RENDERER_VK_MODULE
 		extern int VK_PostProcess_SceneSamples( void );
 		effectiveMSAA = VK_PostProcess_SceneSamples();
-		msaaReason = effectiveMSAA > 1 ? "vulkan-scene" : "vulkan-scene-single-sample";
+		// The Vulkan renderer draws at most 8 samples (VK_Image_SelectSampleCount),
+		// fewer where the device offers fewer for the scene's formats.
+		msaaReason = effectiveMSAA <= 1 ? "vulkan-scene-single-sample"
+			: effectiveMSAA < requestedMSAA ? "vulkan-clamp" : "vulkan-scene";
 #else
 		if ( modernVisiblePost ) {
 			const modernGLExecutorStats_t &modern = R_ModernGLExecutor_Stats();
@@ -4899,6 +4952,13 @@ static void R_GfxInfoPrintAAState( void ) {
 		screenFraction,
 		supersamplingText,
 		r_resolutionScaleMode.GetInteger() );
+	// Each copy out of a multisampled target resolves every sample of the
+	// copied rectangle (FPS-05). A frame with post-processing resolves the
+	// scene for bloom/tone map, SSAO depth and presentation.
+	int colorResolves = 0, depthResolves = 0;
+	R_MSAAResolvesLastFrame( colorResolves, depthResolves );
+	common->Printf( "Renderer AA: MSAA resolves last frame: color=%d depth=%d (scene samples %d)\n",
+		colorResolves, depthResolves, effectiveMSAA );
 }
 
 

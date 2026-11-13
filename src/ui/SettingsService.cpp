@@ -303,6 +303,23 @@ void RendererStatus(Service& service, StateValues& values) {
     values["settings.renderer.available"] = service.device.SupportsRendererSelection();
     values["settings.renderer.fallback"] = fallback;
 }
+// FPS-05: the count the scene draws with, named under MSAA while it is below
+// the applied request. The Vulkan renderer draws at most 8 samples, OpenGL at
+// most its device's limit; r_multiSamplesEffective is -1 before a scene draws.
+void MultisampleStatus(Service& service, StateValues& values) {
+    const auto& draft = service.transaction.Draft(); const auto& baseline = service.transaction.Baseline();
+    const auto drafted = draft.find("r_multiSamples"), applied = baseline.find("r_multiSamples");
+    const bool unchanged = drafted != draft.end() && applied != baseline.end() &&
+        SettingsValueEqual(drafted->second,applied->second);
+    // Empty while no renderer module has registered it.
+    const char* effectiveText = cvarSystem->GetCVarString("r_multiSamplesEffective");
+    const int requested = cvarSystem->GetCVarInteger("r_multiSamples");
+    const int effective = effectiveText != NULL && effectiveText[0] != 0 ? atoi(effectiveText) : -1;
+    values["settings.msaa.clamped"] = unchanged && service.device.SupportsMultisampling() && requested > 1 &&
+        effective >= 0 && effective < requested;
+    values["settings.msaa.status"] = std::string(effective >= 8 ? "#str_231772" : effective >= 4 ? "#str_231771" :
+        effective >= 2 ? "#str_231770" : "#str_231769");
+}
 const char* Message(SettingsCode code, SettingsPhase phase, bool dirty) {
     switch (code) {
         case SettingsCode::Busy: return "#str_230008";
@@ -756,6 +773,7 @@ const std::map<std::string,std::size_t>& UI_SettingsStateSchema() {
             {"settings.lightGrid.committed",1},{"settings.lightGrid.mapLoaded",1},{"settings.lightGrid.consumed",1},
             {"settings.lightGrid.effective",1},{"settings.lightGrid.pending",1},
             {"settings.renderer.available",1},{"settings.renderer.fallback",1},
+            {"settings.msaa.clamped",1},{"settings.msaa.status",2},
             {"settings.display.available",1},{"settings.display.spanAvailable",1},{"settings.display.catalog",2},
             {"settings.display.count",0},{"settings.display.optionCount",0},
             {"settings.display.mode.optionCount",0},{"settings.display.mode.selected",0},
@@ -827,6 +845,7 @@ bool UI_SettingsRead(std::uint64_t owner, StateValues& values) {
     if (own) {
         LightGridStatus(service,candidate);
         RendererStatus(service,candidate);
+        MultisampleStatus(service,candidate);
         service.rendering.Read(transaction.Draft(),!dirty && phase==SettingsPhase::Editing &&
             !service.display.Active() && !service.closing && !service.abandon && !service.rendererRestartQueued,candidate);
         DisplayCatalogStatus(service,owner,candidate);

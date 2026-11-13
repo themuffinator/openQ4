@@ -483,6 +483,30 @@ void idAsyncNetwork::AbandonDeferredDedicatedSpawn( void ) {
 
 /*
 ==================
+Net_LeaveAwakening
+
+Multiplayer never runs on The Awakening. When it is mounted, or queued for the
+next restart, as the game itself or as the base beneath a mod, this queues the
+game directories multiplayer uses instead: openQ4's own game in place of the
+expansion, a player's mod kept without the expansion beneath it. True when the
+caller must reload the engine for that.
+==================
+*/
+static bool Net_LeaveAwakening( void ) {
+    const bool expansionGame = !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ||
+        !idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), "q4xbase" );
+    if ( !expansionGame && !FS_AwakeningActive() && idStr::Icmp( cvarSystem->GetCVarString( "fs_game_base" ), "q4xbase" ) ) {
+        return false;
+    }
+    if ( expansionGame ) {
+        cvarSystem->SetCVarString( "fs_game", OPENQ4_GAMEDIR );
+    }
+    cvarSystem->SetCVarString( "fs_game_base", "" );
+    return true;
+}
+
+/*
+==================
 idAsyncNetwork::SpawnServer_f
 
 With net_serverDedicated 1, a client showing a window turns itself into a
@@ -504,13 +528,10 @@ void idAsyncNetwork::SpawnServer_f( const idCmdArgs &args ) {
 	}
 	const bool holdDedicatedAcrossReload = serverDedicated.GetInteger() == 1 && renderSystem->IsOpenGLRunning();
 
-    if ( !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ||
-         !idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), "q4xbase" ) ) {
+    if ( Net_LeaveAwakening() ) {
         const idStr requestedGameType = cvarSystem->GetCVarString( "si_gameType" );
         common->StartupVariable( "si_gameType", true );
         cvarSystem->SetCVarString( "si_gameType", requestedGameType.c_str() );
-        cvarSystem->SetCVarString( "fs_game", OPENQ4_GAMEDIR );
-        cvarSystem->SetCVarString( "fs_game_base", "" );
         if ( !idStr::Icmp( cvarSystem->GetCVarString( "si_gameType" ), "singleplayer" ) )
             cvarSystem->SetCVarString( "si_gameType", "DM" );
         cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
@@ -647,13 +668,10 @@ static idStr Net_AddressArgument( const idCmdArgs &args ) {
 
 void idAsyncNetwork::Connect_f( const idCmdArgs &args ) {
 
-    if ( !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ||
-         !idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), "q4xbase" ) ) {
+    if ( Net_LeaveAwakening() ) {
         const idStr requestedGameType = cvarSystem->GetCVarString( "si_gameType" );
         common->StartupVariable( "si_gameType", true );
         cvarSystem->SetCVarString( "si_gameType", requestedGameType.c_str() );
-        cvarSystem->SetCVarString( "fs_game", OPENQ4_GAMEDIR );
-        cvarSystem->SetCVarString( "fs_game_base", "" );
         if ( !idStr::Icmp( cvarSystem->GetCVarString( "si_gameType" ), "singleplayer" ) )
             cvarSystem->SetCVarString( "si_gameType", "DM" );
         cvarSystem->SetCVarString( "com_nextGameModule", "game_mp" );
