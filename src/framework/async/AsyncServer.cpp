@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "AsyncNetwork.h"
 #include "ConnectRoster.h"
+#include "OutOfBandReply.h"
 #include "Rcon2Protocol.h"
 
 #include "../Session_local.h"
@@ -372,7 +373,7 @@ and its length after the connect response's server info, where a client that
 does not know it stops reading.
 ==================
 */
-static void AsyncServer_WriteConnectRoster( idBitMsg &msg, const serverClient_t *clients, int joiner ) {
+static void AsyncServer_WriteConnectRoster( idBitMsg &msg, const serverClient_t *clients, int joiner, int budget = -1 ) {
 	idConnectRoster::roster_t roster;
 	memset( &roster, 0, sizeof( roster ) );
 	for ( int i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
@@ -393,7 +394,10 @@ static void AsyncServer_WriteConnectRoster( idBitMsg &msg, const serverClient_t 
 		}
 	}
 	byte block[ idConnectRoster::MAX_BYTES ];
-	const int size = static_cast<int>( idConnectRoster::Encode( roster, block, sizeof( block ) ) );
+	// A reply held to a packet budget lists the players that fit, in slot order.
+	const int limit = budget >= 0 ? budget - msg.GetSize() - 6 : static_cast<int>( sizeof( block ) );
+	const int size = limit > 0 ? static_cast<int>( idConnectRoster::EncodeWithin( roster, block, sizeof( block ),
+		static_cast<std::size_t>( limit ) ) ) : 0;
 	if ( size > 0 && msg.GetRemainingSpace() >= size + 6 ) {
 		msg.WriteLong( static_cast<int>( idConnectRoster::TAG ) );
 		msg.WriteShort( size );
@@ -402,6 +406,46 @@ static void AsyncServer_WriteConnectRoster( idBitMsg &msg, const serverClient_t 
 	} else {
 		common->DPrintf( "connect roster: not sent (%d bytes, %d free)\n", size, msg.GetRemainingSpace() );
 	}
+}
+
+/*
+==================
+AsyncServer_WriteFittedDict
+
+openQ4: writes the server-info keys a connectionless reply can carry within
+budget bytes for the whole datagram, tailBytes of which follow the dictionary
+(OutOfBandReply.h). The required keys are always written, the rest in order
+while they fit. Returns how many keys were left out.
+==================
+*/
+static int AsyncServer_WriteFittedDict( idBitMsg &msg, const idDict &dict, const char *const *required, int requiredCount,
+		bool requiredOnly, int tailBytes ) {
+	const int count = dict.GetNumKeyVals();
+	idList<const char *> keys;
+	idList<const char *> values;
+	idList<bool> keep;
+	keys.SetNum( count );
+	values.SetNum( count );
+	keep.SetNum( count );
+	for ( int i = 0; i < count; i++ ) {
+		keys[i] = dict.GetKeyVal( i )->GetKey().c_str();
+		values[i] = dict.GetKeyVal( i )->GetValue().c_str();
+	}
+	const int budget = requiredOnly ? 0 : idOutOfBandReply::BUDGET_BYTES - msg.GetSize() - tailBytes;
+	if ( count > 0 ) {
+		idOutOfBandReply::ChooseKeys( keys.Ptr(), values.Ptr(), count, required, requiredCount, budget, keep.Ptr() );
+	}
+	idDict fitted;
+	int omitted = 0;
+	for ( int i = 0; i < count; i++ ) {
+		if ( keep[i] ) {
+			fitted.Set( keys[i], values[i] );
+		} else {
+			omitted++;
+		}
+	}
+	msg.WriteDeltaDict( fitted, NULL );
+	return omitted;
 }
 
 /*
@@ -876,6 +920,7 @@ void idAsyncServer::ClearClient( int clientNum ) {
 	client.gameInitSequence = 0;
 	client.gameFrame = 0;
 	client.gameTime = 0;
+	client.deferredServerInfo = false;
 	client.channel.Shutdown();
 	client.lastConnectTime = 0;
 	client.lastEmptyTime = 0;
@@ -913,6 +958,7 @@ void idAsyncServer::InitClient( int clientNum, int clientId, int clientRate ) {
 	client.gameInitSequence = -1;
 	client.gameFrame = 0;
 	client.gameTime = 0;
+	client.deferredServerInfo = false;
 	client.channel.ResetRate();
 	client.clientRate = clientRate ? clientRate : idAsyncNetwork::serverMaxClientRate.GetInteger();
 	client.channel.SetMaxOutgoingRate( Min( idAsyncNetwork::serverMaxClientRate.GetInteger(), client.clientRate ) );
@@ -1631,6 +1677,13 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 			// send game init to client
 			SendGameInitToClient( clientNum );
 
+			// openQ4: a client still waiting for the server info its deferred
+			// connect reply left out lost that game-init message. It passed the
+			// pure checks before connecting, so it only needs the message again.
+			if ( client.deferredServerInfo ) {
+				return;
+			}
+
 			if ( sessLocal.mapSpawnData.serverInfo.GetBool( "si_pure" ) ) {
 				client.clientState = SCS_PUREWAIT;
 				if ( !SendReliablePureToClient( clientNum ) ) {
@@ -1654,6 +1707,7 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 
 		// the client is in the right game
 		client.clientState = SCS_INGAME;
+		client.deferredServerInfo = false;
 
 		// send the user info of other clients
 		for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
@@ -2493,6 +2547,15 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 		common->DPrintf( "connect from %s rejected: truncated password\n", Sys_NetAdrToString( from ) );
 		return;
 	}
+	// openQ4: after the field no server reads (it once carried PunkBuster's
+	// state), a client may name what it can take (OutOfBandReply.h).
+	int capabilities = 0;
+	if ( msg.GetRemainingData() >= 2 + 8 ) {
+		msg.ReadShort();
+		if ( msg.ReadLong() == idOutOfBandReply::CAPABILITY_TAG ) {
+			capabilities = msg.ReadLong() & idOutOfBandReply::CAPABILITIES;
+		}
+	}
 	char reason[MAX_STRING_CHARS];
 	allowReply_t reply = game->ServerAllowClient(clientId, numClients, Sys_NetAdrToString( from ), guid, password, password, reason );
 	idCrypto::SecureZero( password, sizeof( password ) );
@@ -2581,25 +2644,45 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 		return;
 	}
 
+	// openQ4: a client that can take it gets a reply that fits one packet on a
+	// 1280-byte path (OutOfBandReply.h): no game-init id, so it loads nothing
+	// yet, the keys its loading screen names and the roster that fits. The full
+	// server info follows at once in the channel's game-init message.
+	const bool deferred = ( capabilities & idOutOfBandReply::CAPABILITY_DEFERRED_SERVERINFO ) != 0;
 	common->Printf( "sending connect response to %s\n", Sys_NetAdrToString( from ) );
+	if ( deferred ) {
+		common->DPrintf( "connect response to %s defers the server info to the game-init message\n", Sys_NetAdrToString( from ) );
+	}
 
 	// send connect response message
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.WriteShort( CONNECTIONLESS_MESSAGE_ID );
 	outMsg.WriteString( "connectResponse" );
 	outMsg.WriteLong( clientNum );
-	outMsg.WriteLong( gameInitId );
+	outMsg.WriteLong( deferred ? GAME_INIT_ID_INVALID : gameInitId );
 	outMsg.WriteLong( gameFrame );
 	outMsg.WriteLong( gameTime );
-	outMsg.WriteDeltaDict( sessLocal.mapSpawnData.serverInfo, NULL );
-	AsyncServer_WriteConnectRoster( outMsg, clients, clientNum );
+	if ( deferred ) {
+		AsyncServer_WriteFittedDict( outMsg, sessLocal.mapSpawnData.serverInfo, idOutOfBandReply::LOADING_KEYS,
+			idOutOfBandReply::LOADING_KEY_COUNT, true, 0 );
+		AsyncServer_WriteConnectRoster( outMsg, clients, clientNum, idOutOfBandReply::BUDGET_BYTES );
+	} else {
+		outMsg.WriteDeltaDict( sessLocal.mapSpawnData.serverInfo, NULL );
+		AsyncServer_WriteConnectRoster( outMsg, clients, clientNum );
+	}
 
 	serverPort.SendPacket( from, outMsg.GetData(), outMsg.GetSize() );
-	
+
 	InitClient( clientNum, clientId, clientRate );
 
 	clients[clientNum].gameInitSequence = 1;
 	clients[clientNum].snapshotSequence = 1;
+	if ( deferred ) {
+		// The game-init message is unreliable; while the client still reports
+		// no game, ProcessUnreliableClientMessage sends it again.
+		clients[clientNum].deferredServerInfo = true;
+		SendGameInitToClient( clientNum );
+	}
 
 	// clear the challenge struct so a reconnect from this client IP starts clean
 	AsyncServer_ClearChallenge( challenges[ ichallenge ] );
@@ -3045,19 +3128,50 @@ void idAsyncServer::ProcessGetInfoMessage( const netadr_t from, const idBitMsg &
 	outMsg.WriteString( "infoResponse" );
 	outMsg.WriteLong( challenge );
 	outMsg.WriteLong( ASYNC_PROTOCOL_VERSION );
-	outMsg.WriteDeltaDict( sessLocal.mapSpawnData.serverInfo, NULL );
 
-	for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
-		serverClient_t &client = clients[i];
-
-		if ( client.clientState < SCS_CONNECTED ) {
-			continue;
+	// openQ4: the reply must fit one packet on a 1280-byte path
+	// (OutOfBandReply.h). The browser's keys and the player list come first:
+	// names are cut only if those alone would not fit, and the other keys fill
+	// what is left.
+	const idDict &serverInfo = sessLocal.mapSpawnData.serverInfo;
+	int requiredDictBytes = idOutOfBandReply::DICT_END_BYTES;
+	for ( i = 0; i < serverInfo.GetNumKeyVals(); i++ ) {
+		const idKeyValue *kv = serverInfo.GetKeyVal( i );
+		if ( idOutOfBandReply::InList( kv->GetKey().c_str(), idOutOfBandReply::BROWSER_KEYS, idOutOfBandReply::BROWSER_KEY_COUNT ) ) {
+			requiredDictBytes += idOutOfBandReply::PairBytes( kv->GetKey().c_str(), kv->GetValue().c_str() );
 		}
+	}
+	int playerSlots[ MAX_ASYNC_CLIENTS ];
+	int nameBytes[ MAX_ASYNC_CLIENTS ];
+	int players = 0;
+	for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
+		if ( clients[i].clientState >= SCS_CONNECTED ) {
+			playerSlots[ players ] = i;
+			nameBytes[ players ] = idStr::Length( sessLocal.mapSpawnData.userInfo[i].GetString( "ui_name", "Player" ) );
+			players++;
+		}
+	}
+	const int osMaskBytes = 4;
+	const int nameLimit = idOutOfBandReply::NameLimit( nameBytes, players,
+		idOutOfBandReply::BUDGET_BYTES - outMsg.GetSize() - requiredDictBytes - osMaskBytes );
+	int playerListBytes = 1;
+	for ( i = 0; i < players; i++ ) {
+		playerListBytes += 8 + ( nameLimit >= 0 && nameBytes[i] > nameLimit ? nameLimit : nameBytes[i] );
+	}
+	const int omitted = AsyncServer_WriteFittedDict( outMsg, serverInfo, idOutOfBandReply::BROWSER_KEYS,
+		idOutOfBandReply::BROWSER_KEY_COUNT, false, playerListBytes + osMaskBytes );
+	if ( omitted > 0 || nameLimit >= 0 ) {
+		common->DPrintf( "info response to %s: %d server-info keys left out, names cut to %d bytes\n",
+			Sys_NetAdrToString( from ), omitted, nameLimit );
+	}
 
-		outMsg.WriteByte( i );
+	for ( int player = 0; player < players; player++ ) {
+		serverClient_t &client = clients[ playerSlots[ player ] ];
+		outMsg.WriteByte( playerSlots[ player ] );
 		outMsg.WriteShort( client.clientPing );
 		outMsg.WriteLong( client.channel.GetMaxOutgoingRate() );
-		outMsg.WriteString( sessLocal.mapSpawnData.userInfo[i].GetString( "ui_name", "Player" ) );
+		outMsg.WriteString( sessLocal.mapSpawnData.userInfo[ playerSlots[ player ] ].GetString( "ui_name", "Player" ),
+			nameLimit >= 0 ? nameLimit + 1 : -1 );
 	}
 	outMsg.WriteByte( MAX_ASYNC_CLIENTS );
 	outMsg.WriteLong( fileSystem->GetOSMask() );

@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "AsyncNetwork.h"
 #include "ConnectRoster.h"
+#include "OutOfBandReply.h"
 #include "Rcon2Protocol.h"
 
 #include "../ArenaCampaign.h"
@@ -311,6 +312,7 @@ void idAsyncClient::Clear( void ) {
 	connectInfoRequests = 0;
 	connectProtocolKnown = false;
 	connectChallengeDeferred = false;
+	deferredServerInfo = false;
 	serverId = 0;
 	serverChallenge = 0;
 	serverMessageSequence = 0;
@@ -1406,14 +1408,21 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 				DisconnectFromServer();
 				return;
 			}
-			pureWait = serverSI.GetBool( "si_pure" );
+			// openQ4: the game-init message a deferred connect reply promised
+			// completes that connect. Its pure checks passed before the reply, and
+			// its roster already names the players, so neither starts again.
+			const bool completesConnect = deferredServerInfo;
+			deferredServerInfo = false;
+			pureWait = !completesConnect && serverSI.GetBool( "si_pure" );
 
 			// openQ4: the loading screen's server card lists the players this
 			// map starts with; InitGame below clears their user info.
-			sessLocal.ClearRetainedLoadingRoster();
-			for ( int slot = 0; slot < MAX_ASYNC_CLIENTS; slot++ ) {
-				if ( sessLocal.mapSpawnData.userInfo[ slot ].GetNumKeyVals() > 0 ) {
-					sessLocal.NoteRetainedLoadingPlayer( sessLocal.mapSpawnData.userInfo[ slot ] );
+			if ( !completesConnect ) {
+				sessLocal.ClearRetainedLoadingRoster();
+				for ( int slot = 0; slot < MAX_ASYNC_CLIENTS; slot++ ) {
+					if ( sessLocal.mapSpawnData.userInfo[ slot ].GetNumKeyVals() > 0 ) {
+						sessLocal.NoteRetainedLoadingPlayer( sessLocal.mapSpawnData.userInfo[ slot ] );
+					}
 				}
 			}
 
@@ -1985,11 +1994,21 @@ void idAsyncClient::ProcessConnectResponseMessage( const netadr_t from, const id
 	clientState = CS_CONNECTED;
 	lastPacketTime = -9999;
 
-	InitGame( serverGameInitId, serverGameFrame, serverGameTime, serverSI );
+	if ( serverGameInitId == GAME_INIT_ID_INVALID ) {
+		// openQ4: a deferred reply (OutOfBandReply.h) fits one packet and names
+		// no game. The full server info comes in the channel's game-init
+		// message, which loads the map; until then this client reports no game,
+		// which makes the server send it again if it was lost.
+		deferredServerInfo = true;
+		gameInitId = GAME_INIT_ID_INVALID;
+		common->DPrintf( "connect response deferred the server info to the game-init message\n" );
+	} else {
+		InitGame( serverGameInitId, serverGameFrame, serverGameTime, serverSI );
 
-	// load map
-	session->SetGUI( NULL, NULL );
-	sessLocal.ExecuteMapChange();
+		// load map
+		session->SetGUI( NULL, NULL );
+		sessLocal.ExecuteMapChange();
+	}
 
 	const std::uint32_t connectElapsed = AsyncClient_Elapsed( clientTime, lastConnectTime );
 	const std::uint32_t maximumPrediction = static_cast<std::uint32_t>( AsyncClient_MaxPredictionMsec() );
@@ -2719,6 +2738,10 @@ void idAsyncClient::SetupConnection( void ) {
 		msg.WriteString( cvarSystem->GetCVarString( "password" ), -1 );
 		// do not make the protocol depend on PB
 		msg.WriteShort( 0 );
+		// openQ4: what this client can take (OutOfBandReply.h); servers that do
+		// not know the tag stop reading before it.
+		msg.WriteLong( idOutOfBandReply::CAPABILITY_TAG );
+		msg.WriteLong( idOutOfBandReply::CAPABILITIES );
 		clientPort.SendPacket( serverAddress, msg.GetData(), msg.GetSize() );
 		
 		if ( idAsyncNetwork::LANServer.GetBool() ) {

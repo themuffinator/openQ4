@@ -114,12 +114,13 @@ the server's copy, late and off to the side.
 Use two physical machines.
 
 `mp_path_mtu_soak.py` already plays 8.1's match on one machine over a simulated
-1280-byte path (see [the network record](mp-network-qualification.md#a-1280-byte-path-mtu-13-november-2026)):
-it passes over IPv4 and IPv6 when the path carries IP fragments. Over a path
-that drops them, the client cannot join on either family, because the server's
-info and connect replies are about 1.8 KB. What is left for 8.1 is a real
-lowered MTU between two machines. If that network drops IP fragments (some VPNs
-and firewalls do), expect the join to fail in the same way, and record it.
+1280-byte path (see [the network record](mp-network-qualification.md#connection-replies-that-fit-one-packet-13-november-2026)):
+it passes over IPv4 and IPv6 when the path carries IP fragments, and over IPv6
+when it drops them. Over IPv4 a path that drops IP fragments cannot carry a
+match, because large IPv4 messages travel in 1,300-byte pieces. What is left
+for 8.1 is a real lowered MTU between two machines. Run it over IPv6 too, and
+if the network drops IP fragments (some VPNs and firewalls do), record which
+family joined.
 
 | # | Do this | Pass when |
 | --- | --- | --- |

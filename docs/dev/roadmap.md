@@ -3880,7 +3880,7 @@ prediction/rewind defaults.
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
 | MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
-| MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path that fragments. | The 1.8 KB info/connect replies that a fragment-dropping path loses (protocol decision); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
+| MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path on IPv4 and IPv6, and over IPv6 even when the path drops IP fragments (connection replies fit one packet). | IPv4 over a fragment-dropping path (1,300-byte channel fragments); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
 Completion substeps:
@@ -4695,10 +4695,18 @@ Completion substeps:
   that drops IP fragments neither family can join: the `infoResponse` asked
   for before the challenge and the `connectResponse` carry the whole
   server-info dictionary, about 1.8 KB, outside the fragmenting channel.
-  Shrinking them below 1,232 bytes is a protocol decision. A message that
-  packing grew past a fragment now leaves in fragments instead of one
-  oversized datagram
+  A message that packing grew past a fragment now leaves in fragments instead
+  of one oversized datagram
   ([evidence](mp-network-qualification.md#a-1280-byte-path-mtu-13-november-2026)).
+  Decision and follow-through, same day: the user chose to shrink the replies.
+  The info reply keeps the browser's keys and players and fills the rest to
+  1,232 bytes; a client that names the new connect capability gets a connect
+  reply with only the loading keys and a trimmed roster, and the full server
+  info follows in the channel's game-init message, sent again if lost. Older
+  builds on either end get the old replies. Over a fragment-dropping 1280 path
+  the IPv6 match now joins and holds five minutes with nothing over 1,232
+  bytes; IPv4 still cannot, because its channel fragments are 1,300 bytes
+  ([evidence](mp-network-qualification.md#connection-replies-that-fit-one-packet-13-november-2026)).
   The physical-MTU row stays open.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)

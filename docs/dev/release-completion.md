@@ -116,18 +116,28 @@ does not restore the withdrawn release. See
   twice the limit IPv6 guarantees, which some VPNs and firewalls silently
   drop. It is now sent in pieces like any other large message. Nothing to
   change.
-- **Joining over IPv6 still needs a network that passes split packets.** The
-  server's answers to a join or a server-list query are about 1.8 KB. If an
-  IPv6 server never answers or never appears in the list on such a network,
-  join it over IPv4.
+- **Join and find IPv6 servers on networks that block split packets.** Some
+  VPNs and firewalls drop packets the operating system has split. The server's
+  answers to a join or a server-list query were about 1.8 KB, so on such a
+  network an IPv6 server never answered or never appeared in the list. Both
+  answers now fit one packet: the full server settings follow once you are
+  connected, inside the game's own split-safe messages, and a server-list
+  answer may leave out settings the browser never shows. Player and server
+  must both run this version; older versions on either side keep the old
+  answers and still connect to each other as before. IPv4 games on such a
+  network still need split packets.
 - Testers: `net_forceMTU` and `net_forceMTUDrop` simulate a small path MTU on
   one machine, carrying larger packets in IP fragments or dropping them; the
   [networking guide](../user/multiplayer-networking.md#testing-under-simulated-network-conditions)
   lists them.
 - Developer: `mp_path_mtu_soak.py` plays a 12-player q4ctf1 match over that
   path; `netImpairment` reports oversized datagrams, IP fragments and the
-  largest datagram each way.
-  [Evidence](mp-network-qualification.md#a-1280-byte-path-mtu-13-november-2026).
+  largest datagram each way. A connect request may end with the `OQ4C`
+  capability tag; a capable client gets a connect reply with game-init id
+  `-1`, and the server sends the game-init message through the channel.
+  `oob_reply_budget_state.py` and `oob_reply_contract.py` cover the budget and
+  the wiring.
+  [Evidence](mp-network-qualification.md#connection-replies-that-fit-one-packet-13-november-2026).
 
 ## The Android app quits without crashing (AND-02), 13 November 2026
 

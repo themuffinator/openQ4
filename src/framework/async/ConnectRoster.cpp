@@ -55,6 +55,20 @@ std::size_t Encode( const roster_t &roster, std::uint8_t *out, std::size_t capac
 	return used;
 }
 
+std::size_t EncodeWithin( roster_t &roster, std::uint8_t *out, std::size_t capacity, std::size_t limit ) {
+	if ( Encode( roster, out, capacity ) == 0 ) {
+		return 0;
+	}
+	const std::size_t room = limit < capacity ? limit : capacity;
+	while ( true ) {
+		const std::size_t used = Encode( roster, out, room );
+		if ( used > 0 || roster.count <= 0 ) {
+			return used;
+		}
+		roster.count--;
+	}
+}
+
 bool Decode( const std::uint8_t *data, std::size_t size, roster_t &roster ) {
 	std::memset( &roster, 0, sizeof( roster ) );
 	if ( data == nullptr || size < 3 || data[ 0 ] != VERSION || data[ 1 ] > MAX_ENTRIES || data[ 2 ] > MAX_ENTRIES ) {

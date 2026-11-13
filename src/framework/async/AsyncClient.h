@@ -167,6 +167,7 @@ private:
 	int					connectInfoRequests;		// getInfo requests sent to it so far
 	bool				connectProtocolKnown;		// it answered with our protocol
 	bool				connectChallengeDeferred;	// a challenge answer awaits that
+	bool				deferredServerInfo;			// connected; the game-init message brings the server info
 	int					serverId;					// server identification
 	int					serverChallenge;			// challenge from server
 	int					serverMessageSequence;		// sequence number of last server message

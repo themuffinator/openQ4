@@ -56,6 +56,11 @@ struct roster_t {
 // or 0 when the roster is malformed or does not fit.
 std::size_t Encode( const roster_t &roster, std::uint8_t *out, std::size_t capacity );
 
+// As Encode, for a reply held to limit bytes for the block: drops entries from
+// the end until the rest fits, and leaves 'roster' holding those it wrote.
+// Returns 0 when the roster is malformed or not even its header fits.
+std::size_t EncodeWithin( roster_t &roster, std::uint8_t *out, std::size_t capacity, std::size_t limit );
+
 // Fills 'roster' from a whole block and returns true, or returns false with
 // an empty roster for any other version, a count, slot, team or flag out of
 // range, a name that is unterminated or too long, or bytes left over.

@@ -147,6 +147,9 @@ typedef struct serverClient_s {
 	int					gameInitSequence;
 	int					gameFrame;
 	int					gameTime;
+	// openQ4: the connect reply left the server info to the game-init message
+	// (OutOfBandReply.h); the client passed the pure checks before connecting.
+	bool				deferredServerInfo;
 
 	idMsgChannel		channel;
 	int					lastConnectTime;

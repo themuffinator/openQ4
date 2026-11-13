@@ -409,6 +409,8 @@ jobs:
             tools/tests/network_ipv6_support.py \
             tools/tests/network_impairment_contract.py \
             tools/tests/network_impairment_state.py \
+            tools/tests/oob_reply_budget_state.py \
+            tools/tests/oob_reply_contract.py \
             tools/tests/network_security.py \
             tools/tests/untrusted_file_bounds.py \
             tools/tests/openurl_security.py \
@@ -952,6 +954,8 @@ jobs:
           python tools/tests/network_ipv6_support.py
           python tools/tests/network_impairment_contract.py
           python tools/tests/network_impairment_state.py
+          python tools/tests/oob_reply_budget_state.py
+          python tools/tests/oob_reply_contract.py
           python tools/tests/network_security.py
           python tools/tests/untrusted_file_bounds.py
           python tools/tests/openurl_security.py

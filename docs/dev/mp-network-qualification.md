@@ -1,5 +1,72 @@
 # Multiplayer network qualification
 
+## Connection replies that fit one packet, 13 November 2026
+
+The [path MTU run](#a-1280-byte-path-mtu-13-november-2026) found that a path
+dropping IP fragments stopped every join, because `infoResponse` and
+`connectResponse` carried the whole server-info dictionary (about 1.8 KB)
+outside the fragmenting channel. Both now fit one packet on a 1280-byte path:
+1,232 bytes of UDP payload, the IPv6 minimum less its headers, which also fits
+IPv4 (`src/framework/async/OutOfBandReply.h`).
+
+- **The info reply** (server browser, LAN scan, and the protocol check a join
+  makes first) always carries the keys the browser's rows, filters and details
+  card read, and every player. The other server-info keys follow in order while
+  the reply fits, so a quiet server still sends most of them. Player names are
+  cut only when the browser's keys and the player list alone would not fit
+  (more than about 24 players with long names). The wire format is unchanged,
+  so every client reads it as before.
+- **The connect reply** stays as it was for a client that does not ask.
+  A connect request may now end with a capability tag (`OQ4C`) after the
+  two-byte field no server has ever read; servers that do not know it stop
+  reading before it. To a client that names the capability, the server replies
+  with no game-init id (`-1`, which no server sends, since a game-init id is
+  always positive), only the keys the loading screen names and the connect
+  roster trimmed to the space left. It then sends the existing game-init
+  message, which carries the full server info, through the channel, which
+  fragments it. A lost game-init message is sent again while the client still
+  reports no game, as on a map change, without restarting the pure checks the
+  client passed before connecting. The client waits for that message, then
+  loads the map without the pure prompt and keeps its connect roster.
+
+Mixed builds: an older client never asks, so it still gets the full connect
+reply; a newer client facing an older server gets the full reply and loads as
+before. One edge remains: if the server changes map in the fraction of a second
+while a newer client waits for its game-init message, that client loads, then
+answers the map change's pure check and loads again. It still joins.
+
+Results with the staged Windows x64 build of `f22ea7b98` plus this change
+(client `d365a8435da6a535`, dedicated `bbf0e40b355de946`, MP module
+`1ec8f7187b5032e4`), each a 12-player q4ctf1 CTF match on a pure dedicated
+server, the client joining over the simulated 1280-byte path:
+
+| Run | Result | Datagrams received | Larger than the path | Largest |
+| --- | --- | ---: | ---: | ---: |
+| IPv6, dropping, 300 s | pass, joined in 33.1 s | 9,042 | 0 | 1,230 bytes |
+| IPv6, fragmenting, 300 s | pass, joined in 23.0 s | 9,012 | 0 | 1,226 bytes |
+| IPv4, fragmenting, 300 s | pass, joined in 24.6 s | 9,002 | 36 (72 IP fragments) | 1,310 bytes |
+| IPv4, dropping | fail: never loads the map | - | - | - |
+
+Over IPv6 nothing crosses the path in fragments any more, joining included;
+the server logged its deferred connect reply and an info reply that left out
+24 keys. Over IPv4 the join now gets as far as the connect reply, but the
+game-init message, like every large IPv4 message, travels in 1,300-byte channel
+fragments (1,310-byte datagrams), which a fragment-dropping 1280 path loses.
+That is the IPv4 fragment size, unchanged here because changing it would
+change the wire format. The LAN reconnect smoke (IPv4 scan and IPv6 endpoint,
+three pure joins each) and the retail protocol smoke pass on the same stage.
+Reports are in `.tmp/mp08-mtu/runs2/`.
+
+`oob_reply_budget_state.py` builds a server-info dictionary from every
+`CVAR_SERVERINFO` declaration in the source (81 at their defaults), with a
+63-byte server name, 0 to 32 players with names up to the 47-byte maximum, and
+40 further mod keys. It checks that both replies fit 1,232 bytes, that the info
+reply keeps the browser's keys and fills towards the limit, and that the
+deferred connect reply's trimmed roster decodes. Eight single-reversal copies
+of the sources fail it. `oob_reply_contract.py` checks the production wiring
+on both ends, with nine controls. This remains a one-machine simulation; it
+does not replace the two-machine run in checklist row 8.1.
+
 ## A 1280-byte path MTU, 13 November 2026
 
 MP-08's checklist row 8.1 asks for a full match over a 1280-byte MTU. One
@@ -40,7 +107,9 @@ replies, which the channel cannot fragment. Before the challenge the client
 asks for `getInfo`, to learn the server's protocol, and the server's
 `infoResponse` carries the whole server-info dictionary. `connectResponse`
 carries it again. With about 73 server-info CVars at their defaults, each
-reply is about 1.8 KB. A path that drops IP fragments loses them both: in the
+reply was about 1.8 KB (both now fit one packet; see
+[connection replies](#connection-replies-that-fit-one-packet-13-november-2026)).
+A path that drops IP fragments lost them both: in the
 dropping runs the server sent 179 info replies, the client received none and
 sent 200 challenges without an answer. The same replies feed the server
 browser and the LAN scan, so such a path also hides the server from them.
@@ -850,10 +919,9 @@ LAN discovery across machines and on Linux and macOS, real multi-record DNS,
 and running the retail client binary (its challenge was reproduced instead). The server does not adapt its rate to a congested link
 on its own: a player whose connection is slower than the match needs has to
 lower `net_clientMaxRate`. Whether to adapt automatically is a design decision.
-The `infoResponse` and `connectResponse` replies are about 1.8 KB and cannot be
-fragmented by the channel, so joining over IPv6 needs a path that passes IP
-fragments ([path MTU](#a-1280-byte-path-mtu-13-november-2026)); how to bring them
-under 1,232 bytes is a protocol decision.
+Over IPv4, a path that drops IP fragments still cannot carry a match: large
+messages travel in 1,300-byte channel fragments
+([connection replies](#connection-replies-that-fit-one-packet-13-november-2026)).
 Simulated conditions do not model route changes, cross-traffic sharing a
 bottleneck, or asymmetric links (the rate applies both ways).
 

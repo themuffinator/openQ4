@@ -708,6 +708,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "network_ipv6_support.py",
         root / "tools" / "tests" / "network_impairment_contract.py",
         root / "tools" / "tests" / "network_impairment_state.py",
+        root / "tools" / "tests" / "oob_reply_budget_state.py",
+        root / "tools" / "tests" / "oob_reply_contract.py",
         root / "tools" / "tests" / "network_security.py",
         root / "tools" / "tests" / "untrusted_file_bounds.py",
         root / "tools" / "tests" / "openurl_security.py",
