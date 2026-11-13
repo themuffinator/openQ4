@@ -1598,6 +1598,66 @@ These are still routing probes, not a playthrough: nothing is aimed, dodged or
 driven, teleports can telefrag actors and script null-entity warnings remain.
 Ordered human play, physical listening and devices stay open.
 
+## Real playback endpoints, 13 November 2026
+
+Every earlier AUD-04 measurement came from OpenAL Soft's wave writer or an
+OpenAL loopback context, so the real system backend, its device reopen and the
+operating system's mixer were never in the measured path.
+`tools/tests/audio_surround_endpoint.py` now plays stock gameplay through the
+real backend (WASAPI shared mode on Windows, PulseAudio/PipeWire on Linux) onto
+output devices the operator names. `tools/tests/endpoint_loopback.py` records
+each device's own loopback in its own channel layout (WASAPI loopback through
+ctypes, or the sink's monitor through `parec`). No wave writer, microphone or
+host input is used. Each phase is cut from the recordings at the moment its
+probe appeared in the engine log, and the tones are measured per channel.
+
+In `game/airdefense1` the run plays a 440 Hz radio dialogue fixture (the mono
+global path that is centre-routed on a centre-capable output) and an 880 Hz
+`speaker` entity 64 units to the player's right, then to the left. It then
+forces the other layout (`s_numberOfSpeakers` 6 on a device without a centre
+speaker, 2 on one with), returns to the device's own, and moves the output to a
+second device with `s_deviceName` during the line and back. On a centre-capable
+device it also checks exclusive centre dialogue, a silent LFE and that the
+positional sound is not centred. `--self-test` checks the placement analysis on
+synthetic stereo and 5.1 recordings; the 5.1 case reproduces the 2.27 centre
+ratio of `s_centerFractionVO` 0.75.
+
+Windows x64, debugoptimized client SHA-256
+`4bdb60c18fd88e987ab7f1b7c3d185edde73dd96a53c11ddfb2db44775a67e85`, run from a
+fixed copy in `.tmp/runtime/audio-endpoint` because peers re-staged `.install`
+during the session (a stage closes running clients). The sound code in that
+client is unchanged since `b211275ce`. The endpoints were the two active
+virtual devices, Speakers (Steam Streaming Speakers) and Speakers (Steam
+Streaming Microphone): real WASAPI endpoints, 48 kHz stereo, not routed to a
+speaker. All 19 checks pass:
+
+- OpenAL opened the named device and settled on its own layout (basic stereo,
+  centre not routed).
+- The dialogue was balanced, right/left 0.98–1.07 in every playing phase. The
+  speaker read 1.98 to the right and 0.53 (1/1.88) to the left.
+- Forcing 5.1 reset the device in place, but this real stereo device refused
+  5.1 and OpenAL Soft kept rendering basic stereo. The engine followed the
+  observed layout, left the line un-routed and balanced (1.00), and played it at
+  the same level. Returning to the device layout reset in place again. The line
+  moved 28 ms off its scene clock across both resets.
+- The switch reopened the device in place onto the second endpoint. The line
+  played there at the same level (0.089) and balance (0.98), and the first
+  endpoint fell to silence (0.0000). The return reversed both, 40 ms off the
+  scene clock across the two reopens. No sound restart or sample reload
+  occurred after the map loaded.
+
+An earlier run on the same endpoints failed only its lateral check, with
+2.0 as the threshold. OpenAL's stereo pan of a source at 90 degrees measured
+1.9–2.1, so the threshold is now 1.5 (3.5 dB), well clear of the dialogue's own
+balance.
+
+Limits: no centre-capable endpoint was active on this machine, so the 5.1/7.1
+branch ran only on synthetic data. This measures each device's operating-system
+mix, not speakers or ears. Endpoint loss, hotplug and system-default changes were
+not triggered. The Linux capture path is untested (WSL has no PulseAudio tools).
+The report, both recordings and the engine log are in
+`.tmp/aud04/endpoint-stereo/`.
+
 ## Other verification and limitations
 
 ### PR #212 merge qualification, 4 November 2026

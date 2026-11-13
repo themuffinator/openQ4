@@ -4758,7 +4758,7 @@ automatically satisfied by a listening pass.
 | AUD-01 — Partial | 54 emitter/OpenAL distance measurements validate current map-unit curves; no speculative unit conversion needed. | Human retail comparison on real speakers/headphones. |
 | AUD-02 — Partial | Simulated endpoint recovery, scene-clock save/load repair, Linux checks and repeated-map audio residency evidence exist. | Physical endpoint loss/hotplug, audible pause/cinematics, long sessions and target-OS breadth including macOS. |
 | AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. | Real mobile OS low-memory callbacks, device/provider process-memory budgets, thermal/loading/cancellation behavior and device breadth. |
-| AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio. | Physical surround outputs and real endpoint/layout transitions; preserve positional mix and stock zero-rolloff behavior. |
+| AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio; real-device harness passes on real stereo endpoints, including a forced layout and a mid-line device switch. | Run `audio_surround_endpoint.py` on a real 5.1/7.1 endpoint and listen on speakers; preserve positional mix and stock zero-rolloff behavior. |
 | AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
 | AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit, extensive scripted-scene mute/save checks and a 42-map progression sweep with fights (1,052 kills, no mute leak) exist. | Ordered human play, including `walker` past the step where the probe player dies, and physical listening/device checks; retain effects/music separation. |
 | AUD-07 — Partial | Playback-driven captions, fallback/mapping policy, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue) implemented. | Missing transcripts remain explicit; ordered human play and physical stereo-HUD readability. Installed transcripts are English only. Available mappings do not mean every line is captioned. |
@@ -4942,6 +4942,19 @@ automatically satisfied by a listening pass.
   now fall off exactly as a mono source's do (half at twice the minimum
   distance, a quarter at four times) with standard and EAX reverb, and stock
   presets are unchanged. Physical surround devices remain open.
+  November 13: `audio_surround_endpoint.py` qualifies placement and transitions
+  on real output devices: stock gameplay through WASAPI (or PulseAudio/PipeWire),
+  measured from each device's own loopback in its own layout, with no wave
+  writer. On two real stereo endpoints all 19 checks pass. The automatic layout
+  matches the device, dialogue stays balanced and positional sound follows its
+  side. A forced 5.1 that the stereo device refused leaves the line un-routed
+  and audible. A switch between devices mid-line reopens in place, silences the
+  old device and plays on the new one within 40 ms of the scene clock. The
+  centre branch checks exclusive centre dialogue and a silent LFE, but no
+  centre-capable device was available, so it ran only on synthetic data. The
+  remaining gate is one run of that harness on a 5.1/7.1 endpoint, plus
+  listening on speakers; real endpoint loss and hotplug stay with AUD-02.
+  [Real-endpoint evidence](audio-voice-evidence.md#real-playback-endpoints-13-november-2026).
 - [ ] **AUD-05 — P1, implementation: functional multiplayer voice.** Capture,
   codec, transport and playback are implemented with explicit microphone consent,
   push-to-talk, local-only testing, connection-scoped mute, server moderation and

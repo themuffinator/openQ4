@@ -729,6 +729,9 @@ def validate_validation_wiring() -> None:
         "audio_dialogue_coverage.py",
         "audio_memory_runtime.py",
         "audio_output_recovery_runtime.py",
+        # Plays on, and records the loopback of, real output devices the operator names.
+        "audio_surround_endpoint.py",
+        "endpoint_loopback.py",
         "audio_mod_reverb.py",
         "audio_scene_audit.py",
         "audio_streaming.py",

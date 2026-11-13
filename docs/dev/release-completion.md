@@ -7,6 +7,19 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Surround placement on real output devices, 13 November 2026
+
+- [x] AUD-04: `audio_surround_endpoint.py` plays stock gameplay through the real
+  system audio backend onto named output devices and measures each device's own
+  loopback (`endpoint_loopback.py`: WASAPI on Windows, the sink monitor on
+  Linux). It checks centre or balanced dialogue, lateral positional sound, a
+  forced layout and a mid-line device switch with scene-clock continuity.
+- All 19 checks pass on two real stereo endpoints on Windows. No centre-capable
+  device was available, so the 5.1/7.1 branch ran only on synthetic data. A run
+  on a real 5.1/7.1 endpoint, listening on speakers and the Linux capture path
+  remain open. No player-facing behaviour changed.
+  [Evidence and limits](audio-voice-evidence.md#real-playback-endpoints-13-november-2026).
+
 ## The new menus tick and click like Quake 4's, 13 November 2026
 
 - **Moving through the new interface's menus now sounds.** Each move to

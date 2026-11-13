@@ -540,6 +540,8 @@ jobs:
             tools/tests/audio_memory_runtime.py \
             tools/tests/audio_mod_reverb.py \
             tools/tests/audio_output_recovery_runtime.py \
+            tools/tests/audio_surround_endpoint.py \
+            tools/tests/endpoint_loopback.py \
             tools/tests/audio_scene_audit.py \
             tools/tests/audio_stream_budget.py \
             tools/tests/audio_streaming.py \
