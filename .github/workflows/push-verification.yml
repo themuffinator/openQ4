@@ -335,6 +335,7 @@ jobs:
             tools/tests/loading_wipe_capture_crop_contract.py \
             tools/tests/retained_view_effects.py \
             tools/tests/ui_hud_coverage.py \
+            tools/tests/ui_hud_catalog_state.py \
             tools/tests/ui_retained_scopes.py \
             tools/tests/choice_gui_value_contract.py \
             tools/tests/mp_mvd_smoke.py \
@@ -877,6 +878,7 @@ jobs:
           python tools/tests/loading_wipe_capture_crop_contract.py
           python tools/tests/retained_view_effects.py
           python tools/tests/ui_hud_coverage.py
+          python tools/tests/ui_hud_catalog_state.py
           python tools/tests/ui_retained_scopes.py
           python tools/tests/choice_gui_value_contract.py
           python tools/tests/map_entity_strings.py

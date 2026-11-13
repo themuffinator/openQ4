@@ -9,10 +9,16 @@ together with idlib's INTSIGNBITSET and the client's PREDICTION_FAST_ADJUST.
 It checks each step's direction and clamp, then closes the loop: a server and a client
 trade commands and snapshots over 0, 30 and 75 ms of one-way delay, and once settled the
 client's commands must reach the server before the frame that uses them, with no resyncs.
+A last loop stalls the client's frame again and again, as a hitch does, under delay and
+jitter, with the 100 ms clamp idAsyncClient::UpdateTime gives a stalled frame: a few seconds
+after the last hitch every command must reach the server in time again.
 
 Single-reversal controls re-run it against mutated source. The first restores the
 widened unsigned step that, from 19 August 2026, slammed a client behind its target to
-full slowdown and left every command late.
+full slowdown and left every command late. Another keeps the frame residual apart from the
+catch-up, as before 13 November 2026: each hitch over 100 ms left the catch-up that much
+higher until its clamp held it, and the client's commands then reached the server late for
+good, so the server repeated the last one and its copy of the client's aim stood still.
 """
 from __future__ import annotations
 
@@ -48,6 +54,19 @@ MUTATIONS = (
         "no resync for a snapshot ahead of the client",
         "if ( predictionResynced ) {",
         "if ( false ) {",
+    ),
+    (
+        "residual kept apart from the catch-up (hitches wedge the client, the 13 November defect)",
+        "static_cast<std::int64_t>( clientPredictTime ) + gameTimeResidual -\n"
+        "\t\t\t\t( delta / PREDICTION_FAST_ADJUST ) - deltaStep;\n"
+        "\t\t\tgameTimeResidual = 0;",
+        "static_cast<std::int64_t>( clientPredictTime ) -\n"
+        "\t\t\t\t( delta / PREDICTION_FAST_ADJUST ) - deltaStep;",
+    ),
+    (
+        "residual joins the catch-up and is also kept",
+        "- deltaStep;\n\t\t\tgameTimeResidual = 0;\n",
+        "- deltaStep;\n",
     ),
 )
 

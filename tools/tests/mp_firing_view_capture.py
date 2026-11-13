@@ -21,6 +21,11 @@ point):
   passes through bodies and reports the wall behind) and still inside the
   gauntlet's reach; the shooter holds still and fires. A moving target (the
   rest of 7.2) stays with the by-eye checklist;
+- hitches: the shooter's frame stalls 350 ms once a second, nine times
+  (com_presentationStallProbe), and settles for three seconds. Nothing is fired;
+  the respawn and rejoin bursts after it must still fall on the server's frames
+  with the server's directions, so a client whose prediction does not recover
+  from a hitch fails them. The report counts the stalls the frame-work trace saw;
 - respawn (7.4): the shooter fires the machinegun while turning, kills
   itself, and keeps firing through the respawn. The client's weapon for the
   new life raises from the frame the server's began its raise, so the burst
@@ -39,8 +44,10 @@ with how far each started from the gun and aim the client held at that moment
 and what it hit. The report pairs server shots with the client's predictions
 by game time, compares directions and hits, counts the server's copies drawn
 in full (a round trip late) and those that only added the confirmed impacts on
-a body, and summarises the gaps per step. Engine captures of every step are
-kept for review by eye.
+a body, and summarises the gaps per step. Every matched direction must be the
+server's, with or without simulated latency. A retained HUD view built inside a
+burst (`RETAINED_HUD_LOADED`) fails the run: the frame it holds sends the server
+no commands. Engine captures of every step are kept for review by eye.
 
 With `--predict-hitscan 0` the client keeps the old behaviour (every shot drawn
 from the server's copy), the baseline the gaps are measured against.
@@ -77,6 +84,11 @@ BODY_STEP = "target_machinegun"
 MEASURED_STEPS = (*HITSCAN_SWEEPS, "target_railgun", BODY_STEP, "respawn", "rejoin")
 BURST = 12
 INTERVAL_MSEC = 150
+# The hitch step: HITCHES stalls of HITCH_MSEC, one a second, inside a frame-work trace long
+# enough to hold them (at 60 fps).
+HITCHES = 9
+HITCH_MSEC = 350
+HITCH_FRAMES = 1200
 FIRE_MSEC = 4000
 # sensitivity 5 and m_yaw 0.022 make one count 0.11 degrees: 2000 counts a second turn 220 degrees a second.
 SENSITIVITY = 5
@@ -144,6 +156,34 @@ def new_life_raises(host_events: list[dict], client_events: list[dict], slot: in
                       "client_done": client["done"] if client else None,
                       "client_raised_at": client["time"] if client else None})
     return pairs
+
+
+def hud_loads(log: str) -> list[tuple[str, str]]:
+    """(step, source) for each retained HUD view built inside a measured step.
+
+    Building a HUD view holds the frame for tens of milliseconds, and parsing the HUD artwork
+    for a few hundred. A client sends no commands while its frame stalls, so the server
+    repeats the last one: inside a burst that turns the server's aim away from the client's.
+    The local player builds its views as it spawns, so none should load mid-burst.
+    """
+    loads, segment = [], None
+    for line in log.splitlines():
+        marker = re.search(r"FIRING_VIEW_SEGMENT(_END)? (\w+)", line)
+        if marker:
+            segment = None if marker.group(1) else marker.group(2)
+            continue
+        loaded = re.search(r"RETAINED_HUD_LOADED (\S+)", line)
+        if loaded and segment:
+            loads.append((segment, loaded.group(1)))
+    return loads
+
+
+def hitches(trace: Path) -> int:
+    """The frames of the hitch step's frame-work trace that stalled most of a hitch."""
+    if not trace.is_file():
+        return 0
+    rows = trace.read_text().splitlines()[1:]
+    return sum(float(row.split(",")[1]) >= 0.8 * HITCH_MSEC for row in rows if row.count(",") >= 1)
 
 
 def angle(a: list[float], b: list[float]) -> float:
@@ -246,6 +286,13 @@ def main() -> int:
         burst(shooter, shots, weapon)
         shooter += [f"waitMsec {hold}", "in_presentationViewProbeAttack 0", "in_presentationViewProbe 0",
                     "waitMsec 1200", f"echo FIRING_VIEW_SEGMENT_END {weapon}"]
+    # Hitches: the shooter's frame stalls 350 ms once a second (com_presentationStallProbe),
+    # HITCHES times, then settles. The respawn and rejoin bursts after it must still fall on the
+    # server's frames: a client whose prediction never recovered from a hitch sends every
+    # command late, and the server repeats its last one.
+    shooter += ["echo FIRING_VIEW_HITCHES", f"profileFrameWork {HITCH_FRAMES} diagnostics/hitches.csv",
+                f"com_presentationStallProbe {HITCH_MSEC}", f"waitMsec {HITCHES * 1000 - 500}",
+                "com_presentationStallProbe 0", "profileFrameWork 0", "waitMsec 3000", "echo FIRING_VIEW_HITCHES_END"]
     shooter += [*select("machinegun"), "echo FIRING_VIEW_SEGMENT respawn",
                 f"in_presentationViewProbe {counts:g}", "in_presentationViewProbeAttack 1", "waitMsec 300"]
     burst(shooter, shots, "respawn_before", 4)
@@ -454,6 +501,8 @@ def main() -> int:
         "copy_aim_gap_deg": summary([s["aimGap"] for s in copies]),
         "steps": steps,
         "new_life_raises": lives,
+        "hitches_observed": hitches(games["shooter"] / "diagnostics/hitches.csv"),
+        "hud_loads_in_steps": [f"{step}: {source}" for step, source in hud_loads(log)],
         "host_placements": placements,
         "gauntlet_target_captures": sum(1 for s in shots if s.startswith("target_gauntlet")),
     }
@@ -477,6 +526,11 @@ def main() -> int:
                             f"{life['server_start']}-{life['server_done']}")
     if len(placements) != len(TARGETS):
         failures.append("the host was not placed for every target step")
+    if metrics["hitches_observed"] < HITCHES - 1:
+        failures.append(f"the hitch step stalled the shooter's frame {metrics['hitches_observed']} times, "
+                        f"expected {HITCHES}")
+    if metrics["hud_loads_in_steps"]:
+        failures.append(f"retained HUD views were built mid-burst: {metrics['hud_loads_in_steps']}")
     if not steps[BODY_STEP]["server_body_hits"]:
         failures.append(f"no shot in the {BODY_STEP} step hit the host, so no impact on a body was drawn")
     if args.predict_hitscan and server:
@@ -497,12 +551,7 @@ def main() -> int:
         if rejoin["predictions_without_server_shot"] > 1:
             failures.append(f"the client predicted {rejoin['predictions_without_server_shot']} shots after the "
                             "rejoin that the server never fired")
-        # Under simulated latency the server's aim can drift from the client's a second into
-        # the burst after a join from spectating (MP-07, open): the rejoin's directions are
-        # then reported, and held only without it.
-        impaired = bool(args.latency or args.jitter)
-        held = [(a, b) for a, b in matched if not (impaired and a["segment"] == "rejoin")]
-        worst = summary([angle(a["dir"], b["dir"]) for a, b in held]).get("max", 0.0)
+        worst = metrics["predicted_vs_server_direction_deg"].get("max", 0.0)
         if worst > 0.1:
             failures.append(f"predicted and server shot directions differ by up to {worst} degrees")
         if metrics["copies_drawn_in_full"] > 0.1 * max(1, len(copies)):

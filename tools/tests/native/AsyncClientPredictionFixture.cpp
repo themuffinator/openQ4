@@ -6,7 +6,10 @@
 // commands and snapshots over a fixed one-way delay, and the controller must bring the
 // client's commands to the server ahead of the frame that uses them, with no resyncs once
 // it has settled.  Before the fix a client behind its target was slammed to full slowdown
-// and ended one frame behind the server with every command late.
+// and ended one frame behind the server with every command late.  A last loop stalls the
+// client's frame again and again, as a hitch does, under delay and jitter: before the
+// 13 November fix the catch-up climbed with each hitch to its clamp, and from then on every
+// command the client sent reached the server late.
 
 #include <cstdint>
 #include <cstdio>
@@ -126,6 +129,7 @@ struct Packet {
 	int frame;
 	int time;
 	int ahead;
+	int sequence = 0;
 };
 
 // A server running 16 ms frames, sending a snapshot every other frame, and a client presenting
@@ -214,11 +218,134 @@ static void CheckClosedLoop( int oneWayMsec, int seconds ) {
 		client.clientPrediction, client.clientPredictTime, lateCommands, settledLate, settledResyncs, settledSnapshots );
 }
 
+// Hitches: the client's frame stalls stallMsec, every second, stalls times, once it has settled.
+// idAsyncClient::UpdateTime( 100 ) gives a stalled frame 100 ms of it, and the snapshots that
+// queued meanwhile are read in one go before the frame predicts. Packets take oneWayMsec plus
+// up to jitterMsec, so snapshots reorder and the channel drops the ones older than the last it
+// took. The server uses the command for each frame, if one has come, and reports how early the
+// newest packet's last command arrived. During a stall commands are necessarily late; a few
+// seconds after the last one the client must send them in time again. Before the fix each hitch
+// over 100 ms left the catch-up that much higher, the clamp held it at the maximum, and every
+// command the client sent from then on reached the server late.
+static void CheckHitches( int oneWayMsec, int jitterMsec, int stallMsec, int stalls ) {
+	ClientTiming client;
+	client.clientPrediction = client.clientPredictTime = 2 * oneWayMsec;
+	unsigned int random = 40708;
+	auto jitter = [&]() {
+		random = random * 1103515245u + 12345u;
+		return jitterMsec ? static_cast<int>( ( random >> 16 ) % static_cast<unsigned int>( jitterMsec + 1 ) ) : 0;
+	};
+	int serverFrame = 0;
+	int serverResidual = 0;
+	int lastPacketFrame = -1;
+	int snapshotSequence = 0;
+	int lastSequence = -1;
+	std::vector<int> received;	// the newest command frame the server has for each frame
+	std::vector<Packet> toServer;
+	std::vector<Packet> toClient;
+	const int firstStall = 6000;
+	const int recovered = firstStall + ( stalls - 1 ) * 1000 + stallMsec + 4000;
+	const int end = recovered + 10000;
+	int stalledUntil = -1;
+	int lastPresent = 0;
+	int lateAfterRecovery = 0;
+	int highestCatchUp = 0;
+
+	for ( int now = 0; now < end; now++ ) {
+		for ( size_t i = 0; i < toServer.size(); ) {
+			if ( toServer[i].arrival <= now ) {
+				if ( static_cast<int>( received.size() ) <= toServer[i].frame ) {
+					received.resize( toServer[i].frame + 1, 0 );
+				}
+				received[ toServer[i].frame ] = 1;
+				lastPacketFrame = toServer[i].frame;
+				toServer.erase( toServer.begin() + i );
+			} else {
+				i++;
+			}
+		}
+		if ( ++serverResidual >= FRAME_MSEC ) {
+			serverResidual -= FRAME_MSEC;
+			const bool have = serverFrame < static_cast<int>( received.size() ) && received[ serverFrame ];
+			if ( !have && now >= recovered ) {
+				lateAfterRecovery++;
+			}
+			serverFrame++;
+			if ( ( serverFrame & 1 ) == 0 ) {
+				const int ahead = lastPacketFrame * FRAME_MSEC - serverFrame * FRAME_MSEC - serverResidual;
+				toClient.push_back( { now + oneWayMsec + jitter(), serverFrame, serverFrame * FRAME_MSEC, ahead, snapshotSequence++ } );
+			}
+		}
+
+		for ( int stall = 0; stall < stalls; stall++ ) {
+			if ( now == firstStall + stall * 1000 ) {
+				stalledUntil = now + stallMsec;
+			}
+		}
+		if ( now < stalledUntil || now - lastPresent < FRAME_MSEC ) {
+			continue;
+		}
+		const int elapsed = now - lastPresent;
+		lastPresent = now;
+		client.gameTimeResidual += elapsed < 100 ? elapsed : 100;	// idAsyncClient::UpdateTime( 100 )
+		std::vector<Packet> ready;
+		for ( size_t i = 0; i < toClient.size(); ) {
+			if ( toClient[i].arrival <= now ) {
+				ready.push_back( toClient[i] );
+				toClient.erase( toClient.begin() + i );
+			} else {
+				i++;
+			}
+		}
+		for ( size_t a = 0; a < ready.size(); a++ ) {
+			for ( size_t b = a + 1; b < ready.size(); b++ ) {
+				if ( ready[b].arrival < ready[a].arrival ) {
+					const Packet swap = ready[a];
+					ready[a] = ready[b];
+					ready[b] = swap;
+				}
+			}
+		}
+		for ( const Packet &packet : ready ) {
+			if ( packet.sequence <= lastSequence ) {
+				continue;
+			}
+			lastSequence = packet.sequence;
+			client.snapshotGameFrame = packet.frame;
+			client.snapshotGameTime = packet.time;
+			SnapshotTiming( client, packet.ahead );
+			if ( now >= recovered && client.clientPredictTime > highestCatchUp ) {
+				highestCatchUp = client.clientPredictTime;
+			}
+		}
+		while ( client.gameTimeResidual + client.clientPredictTime >= FRAME_MSEC ) {
+			toServer.push_back( { now + oneWayMsec + jitter(), client.gameFrame, client.gameTime, 0, 0 } );
+			client.gameFrame++;
+			client.gameTime = client.gameFrame * FRAME_MSEC;
+			client.gameTimeResidual -= FRAME_MSEC;
+		}
+	}
+
+	char what[200];
+	std::snprintf( what, sizeof( what ), "%d ms +-%d, %d hitches of %d ms: commands reach the server in time again (%d late frames)",
+		oneWayMsec, jitterMsec, stalls, stallMsec, lateAfterRecovery );
+	Expect( lateAfterRecovery == 0, what );
+	std::snprintf( what, sizeof( what ), "%d ms +-%d, %d hitches of %d ms: the catch-up stays off its clamp (%d)",
+		oneWayMsec, jitterMsec, stalls, stallMsec, highestCatchUp );
+	Expect( highestCatchUp < MAX_PREDICTION_MSEC, what );
+	std::printf( "hitches %3d ms +-%2d, %d x %d ms: target %d, catch-up %d (highest %d), late frames after recovery %d\n",
+		oneWayMsec, jitterMsec, stalls, stallMsec, client.clientPrediction, client.clientPredictTime, highestCatchUp,
+		lateAfterRecovery );
+}
+
 int main() {
 	CheckDirections();
 	CheckClosedLoop( 0, 20 );
 	CheckClosedLoop( 30, 20 );
 	CheckClosedLoop( 75, 20 );
+	CheckHitches( 0, 0, 350, 9 );
+	CheckHitches( 80, 20, 350, 9 );
+	CheckHitches( 150, 20, 500, 4 );
 	if ( failures ) {
 		std::printf( "%d failure(s)\n", failures );
 		return 1;

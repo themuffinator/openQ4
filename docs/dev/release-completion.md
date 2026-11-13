@@ -7,6 +7,43 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Your first hit no longer hitches, and a hitch no longer leaves the server behind your aim, 13 November 2026
+
+- **The first hit of a match no longer freezes the game for a moment.** In the
+  default interface, the first damage number of a match (and the first hit
+  marker, when the animated crosshair is off) loaded about 200 ms of HUD
+  artwork on the spot. Online, the server kept using your aim from before the
+  freeze while you turned, so a few shots went where you had been looking. They
+  now load as you spawn, and every HUD shares one copy of the artwork, loaded
+  in the background during the level load.
+- **Online, your shots stay on target after a hitch.** Under latency, each
+  freeze of your game longer than a tenth of a second could leave your client
+  a little further behind the server. After a few, every command you sent
+  arrived late for the rest of the match: the server's copy of your aim lagged,
+  and it stopped firing for you. Your client now recovers from a hitch within
+  a second or two. Nothing to change in your settings.
+- MP-07: each retained HUD read and parsed `guis/hud/artwork.rui` (8.4 MB) on
+  its first draw, about 150 ms to parse and 50 ms to build its view. The
+  catalog is now parsed once a level on a worker and shared by every HUD.
+  `idPlayer::PrecacheHudPresentation` builds the local player's crosshair, hit
+  marker and damage number views as it spawns, in both games, through
+  `idUserInterfaceManager::PrecacheHudPrimitives`. `RETAINED_HUD_LOADED` logs
+  each view built. The client's prediction controller kept each hitch over
+  100 ms as an offset in `clientPredictTime` until its clamp held it; the frame
+  residual now joins the catch-up.
+- Evidence: in four `mp_firing_view_capture.py` runs at 80 ms ±20 and one on
+  loopback, every shot of the burst after a join from spectating fell on the
+  server's frame with the server's direction, and the client recovered from
+  nine 350 ms hitches each time. Against the old build those hitches left the
+  server firing nothing for the rest of the run. `mp_client_prediction_state.py`
+  adds a hitch loop and two failing controls (six in all);
+  `ui_hud_catalog_state.py` fails all 20 single-reversal controls
+  ([record](mp-network-qualification.md#the-servers-aim-after-a-client-stall-13-november-2026)).
+- Open (MP-07): under simulated jitter, a respawn snapshot that follows a
+  dropped snapshot still catches the new weapon up, and a long client frame
+  can still make one command late. Three of the four impaired runs failed on
+  one of these outside the join.
+
 ## Your weapon comes up with the server's after a respawn, 13 November 2026
 
 - **Holding fire through a respawn no longer draws shots that never happened.**
@@ -34,9 +71,9 @@ does not restore the withdrawn release. See
   shot the server never fired was predicted after a respawn.
   `mp_predicted_hitscan_state.py` fails all 33 single-reversal controls
   ([record](mp-network-qualification.md#the-weapon-for-a-new-life-raises-with-the-servers-13-november-2026)).
-- Open: under simulated latency, the server's aim can drift from the client's
-  a second after a join from spectating (two of four runs). This is separate
-  from the weapon raise and stays with MP-07.
+- The server's aim drifting from the client's a second after a join from
+  spectating, under simulated latency, was a client stall at its first hit on
+  a bot; fixed the same day (entry above).
 
 ## One MSAA policy on both renderers, and a Settings note that says what MSAA costs (FPS-05), 13 November 2026
 

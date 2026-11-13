@@ -3879,7 +3879,7 @@ prediction/rewind defaults.
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
-| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames; the server's aim stays with the client's after a client stall (one HUD artwork parse a level, HUD views built at spawn, a controller that recovers from hitches); defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); a respawn after a dropped snapshot and long client frames under jitter still fail the impaired capture now and then; remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path that fragments. | The 1.8 KB info/connect replies that a fragment-dropping path loses (protocol decision); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
@@ -4565,11 +4565,27 @@ Completion substeps:
   `mp_predicted_hitscan_state.py`. `mp_firing_view_capture.py` gained a
   rejoin step. It holds the respawn and rejoin bursts to same-frame matching,
   and it fails a new life's raise that is caught up or off the server's frame.
-  Open: under 80 ms ±20, the server's aim drifted from the client's in two of
-  four rejoin bursts, about a second after the join. One burst drifted 56°
-  over two shots. The other drifted 119°, with the server's fire four frames
-  behind, where snapshots were lost. The raise matched in every run, and no
-  respawn burst drifted.
+  Later on 13 November: [the server's aim after a client stall](mp-network-qualification.md#the-servers-aim-after-a-client-stall-13-november-2026)
+  no longer drifts. Two rejoin bursts under 80 ms ±20 had drifted because the
+  client's frame stalled about 200 ms at its first hit on a bot. Every retained
+  HUD, the first damage number's included, parsed the 8.4 MB HUD artwork again
+  on its first draw. A client sends no commands while its frame stalls, so the
+  server repeated its last one: its aim stood still, and after 25 repeats it
+  dropped the attack. The artwork now parses once a level, on a worker. The
+  local player builds its crosshair, hit marker and damage number views as it
+  spawns. Deliberate stalls then exposed a second defect. Each hitch over
+  100 ms under latency left the prediction controller's catch-up higher until
+  its clamp held it. From then on every command reached the server late, and
+  the server never fired again. The frame residual now joins the catch-up.
+  `mp_firing_view_capture.py` holds the rejoin's directions under latency too,
+  adds a hitch step before the respawn and fails a HUD view built mid-burst.
+  `mp_client_prediction_state.py` adds a hitch loop and two failing controls,
+  and `ui_hud_catalog_state.py` executes the catalog and the spawn precache
+  with 20 failing controls. Every rejoin burst in four impaired runs and on
+  loopback fell on the server's frames with its directions. Open: a respawn
+  snapshot that follows a snapshot jitter dropped still catches the new
+  weapon up, and a long client frame can still make a command late, so the
+  impaired harness does not pass dependably yet.
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/
   MTU/rate limits, congestion, high player counts, discovery and reconnect. Preserve

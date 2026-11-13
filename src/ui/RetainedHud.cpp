@@ -25,6 +25,10 @@ extern idCVar r_skipGuiShaders;
 #include <string_view>
 #include <unordered_map>
 
+// The parse UI_RetainedPrefetchDocuments made of this source, if it made one
+// (UserInterfaceRetained.cpp).
+bool UI_RetainedTakePrefetched(const std::string& path, const std::string& source, openq4::ui::Document& document);
+
 namespace {
 constexpr const char* Artwork="guis/hud/artwork.rui";
 constexpr const char* Registry="guis/hud/coverage.json";
@@ -37,12 +41,70 @@ std::string Key(std::string key) {
 	for (auto& c:key) { if (c=='\\') c='/'; else if (c>='A' && c<='Z') c+=32; }
 	return key;
 }
+// The HUD artwork (guis/hud/artwork.rui, 8 MB) and its coverage registry, read
+// and parsed once per level for every retained HUD. Each stock HUD GUI and
+// each of the game's own sources (native/damage-numbers, native/hit-marker,
+// ...) builds its view from this one parse. Each used to read and parse the
+// catalog itself on its first draw, so the frame that first drew a damage
+// number, mid-match, stalled for a few hundred milliseconds. A multiplayer
+// client sends no commands while its frame stalls, so the server repeated its
+// last one: its aim stood still while the client's turned, and after
+// MAX_USERCMD_DUPLICATION repeats the attack let go.
+struct Catalog {
+	std::string error; // why there is no catalog
+	bool prefetched=false; // a worker parsed the artwork during the level load
+	openq4::ui::Document artwork;
+	std::map<std::string,std::string> materials,imageAliases;
+	std::set<std::string> images;
+};
+std::shared_ptr<const Catalog> catalog;
+bool ReadRegistry(const std::string& registry,Catalog& loaded) {
+	std::string error;
+	Json::Value data; Json::CharReaderBuilder builder; std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+	if (!reader->parse(registry.data(),registry.data()+registry.size(),&data,&error) || !data.isObject() ||
+		!data["version"].isInt() || data["version"].asInt()!=1 || !data["materials"].isObject() || !data["images"].isArray() ||
+		(!data["imageAliases"].isNull() && !data["imageAliases"].isObject())) {
+		loaded.error="invalid retained HUD coverage registry"; return false;
+	}
+	for (const auto& name:data["materials"].getMemberNames()) if (!data["materials"][name].isString()) {
+		loaded.error="invalid HUD material mapping"; return false;
+	}
+	for (const auto& name:data["images"]) if (!name.isString()) { loaded.error="invalid HUD image mapping"; return false; }
+	for (const auto& name:data["imageAliases"].getMemberNames()) if (!data["imageAliases"][name].isString()) {
+		loaded.error="invalid HUD image alias"; return false;
+	}
+	for (const auto& name:data["materials"].getMemberNames()) loaded.materials.emplace(Key(name),data["materials"][name].asString());
+	for (const auto& name:data["images"]) loaded.images.insert(Key(name.asString()));
+	for (const auto& name:data["imageAliases"].getMemberNames()) loaded.imageAliases.emplace(Key(name),data["imageAliases"][name].asString());
+	return true;
+}
+// The level's catalog, loaded by the first HUD that asks; a failure is kept too,
+// so every HUD reports it without reading the files again.
+std::shared_ptr<const Catalog> SharedCatalog() {
+	if (catalog) return catalog;
+	auto loaded=std::make_shared<Catalog>();
+	std::string registry,artwork;
+	if (!Read(Registry,registry) || !Read(Artwork,artwork)) loaded->error="missing retained artwork catalog";
+	else if (ReadRegistry(registry,*loaded)) {
+		std::vector<openq4::ui::Diagnostic> diagnostics;
+		loaded->prefetched=UI_RetainedTakePrefetched(Artwork,artwork,loaded->artwork);
+		if (!loaded->prefetched && !loaded->artwork.Load(artwork,diagnostics))
+			loaded->error=diagnostics.empty()?"retained HUD view unavailable":diagnostics.front().message;
+	}
+	catalog=loaded;
+	return catalog;
+}
+// A level load drops the last level's catalog (a HUD that keeps its view keeps
+// its own reference) and parses the artwork on a worker meanwhile.
+void PrefetchCatalog() {
+	catalog.reset();
+	if (cvarSystem->GetCVarBool("ui_retained")) UI_RetainedPrefetchDocuments(&Artwork,1);
+}
 }
 struct idRetainedHud::Impl {
 	retainedUIView_t* view=nullptr;
-	std::map<std::string,std::string> materials;
-	std::map<std::string,std::string> imageAliases;
-	std::set<std::string> images,reported;
+	std::shared_ptr<const Catalog> catalog;
+	std::set<std::string> reported;
 	// How each material this HUD has drawn maps (its artwork, an image alias
 	// or itself), by the name pointer the capture hands over, so a frame folds
 	// and looks up a name once per material rather than once per primitive.
@@ -60,6 +122,7 @@ void idRetainedHud::Reset() { impl=std::make_unique<Impl>(); }
 bool idRetainedHud::DrawSucceeded() const { return impl->drawn; }
 bool idRetainedHud::Usable() const { return !impl->attempted || impl->view!=nullptr; }
 void idRetainedHud::Precache() {
+	PrefetchCatalog();
 	if (!cvarSystem->GetCVarBool("ui_retained")) return;
 	// Game-owned damage numbers use the console atlas outside the GUI font
 	// loader. Prepare its retained alias while image loading is deferred too.
@@ -117,37 +180,30 @@ bool idRetainedHud::Covers(const char* source) {
 		"guis/vehicles/turret_hud.gui"};
 	return roots.contains(Key(source));
 }
+bool idRetainedHud::Prepare(const char* source) {
+	using namespace openq4::ui;
+	if (impl->attempted) return impl->view!=nullptr;
+	impl->attempted=true;
+	// A mod's replacement owns its artwork and scripts, even at a stock name.
+	if (idLegacyHudLayout::ModOwns(source)) return false;
+	const int started=Sys_Milliseconds();
+	const bool shared=catalog!=nullptr;
+	impl->catalog=SharedCatalog();
+	if (!impl->catalog->error.empty()) { impl->Failure(source,impl->catalog->error); return false; }
+	impl->view=RetainedUI_CreateView(); std::vector<Diagnostic> diagnostics;
+	if (!impl->view || !RetainedUI_LoadParsedView(impl->view,impl->catalog->artwork,Artwork,diagnostics)) {
+		impl->Failure(source,diagnostics.empty()?"retained HUD view unavailable":diagnostics.front().message); return false;
+	}
+	common->Printf("RETAINED_HUD_LOADED %s\n",source);
+	// How long this HUD kept the frame, and whether it parsed the artwork.
+	common->DPrintf("retained HUD %s loaded in %d ms (%s)\n",source,Sys_Milliseconds()-started,
+		shared ? "artwork shared" : impl->catalog->prefetched ? "artwork parse prefetched" : "artwork parsed here");
+	return true;
+}
 bool idRetainedHud::Draw(const char* source,std::vector<openq4::ui::HudPrimitive>&& captured) {
 	using namespace openq4::ui;
 	impl->drawn=false;
-	if (!impl->attempted) {
-		impl->attempted=true;
-		// A mod's replacement owns its artwork and scripts, even at a stock name.
-		if (idLegacyHudLayout::ModOwns(source)) return false;
-		std::string registry,artwork,error;
-		if (!Read(Registry,registry) || !Read(Artwork,artwork)) { impl->Failure(source,"missing retained artwork catalog"); return false; }
-		Json::Value data; Json::CharReaderBuilder builder; std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-		if (!reader->parse(registry.data(),registry.data()+registry.size(),&data,&error) || !data.isObject() ||
-			!data["version"].isInt() || data["version"].asInt()!=1 || !data["materials"].isObject() || !data["images"].isArray() ||
-			(!data["imageAliases"].isNull() && !data["imageAliases"].isObject())) {
-			impl->Failure(source,"invalid retained HUD coverage registry"); return false;
-		}
-		for (const auto& name:data["materials"].getMemberNames()) if (!data["materials"][name].isString()) {
-			impl->Failure(source,"invalid HUD material mapping"); return false;
-		}
-		for (const auto& name:data["images"]) if (!name.isString()) { impl->Failure(source,"invalid HUD image mapping"); return false; }
-		for (const auto& name:data["imageAliases"].getMemberNames()) if (!data["imageAliases"][name].isString()) {
-			impl->Failure(source,"invalid HUD image alias"); return false;
-		}
-		for (const auto& name:data["materials"].getMemberNames()) impl->materials.emplace(Key(name),data["materials"][name].asString());
-		for (const auto& name:data["images"]) impl->images.insert(Key(name.asString()));
-		for (const auto& name:data["imageAliases"].getMemberNames()) impl->imageAliases.emplace(Key(name),data["imageAliases"][name].asString());
-		impl->view=RetainedUI_CreateView(); std::vector<Diagnostic> diagnostics;
-		if (!impl->view || !RetainedUI_LoadView(impl->view,artwork,Artwork,diagnostics)) {
-			impl->Failure(source,diagnostics.empty()?"retained HUD view unavailable":diagnostics.front().message); return false;
-		}
-	}
-	if (!impl->view || !RetainedUI_PrepareView(impl->view)) return false;
+	if (!Prepare(source) || !RetainedUI_PrepareView(impl->view)) return false;
 	Viewport viewport; if (!RetainedUI_DefaultViewport(viewport)) return false;
 	auto items=std::move(captured);
 	int vectors=0,glyphs=0,images=0;
@@ -157,11 +213,11 @@ bool idRetainedHud::Draw(const char* source,std::vector<openq4::ui::HudPrimitive
 		if (mapped==impl->mappings.end()) {
 			const auto name=Key(item.material);
 			Impl::Mapping mapping;
-			const auto found=impl->materials.find(name);
-			if (found!=impl->materials.end()) mapping.artwork=found->second;
-			else if (impl->images.contains(name) || name.starts_with("gfx/objectives/") || name.starts_with("levelshots/")) {
-				mapping.image=true; const auto alias=impl->imageAliases.find(name);
-				if (alias!=impl->imageAliases.end()) mapping.alias=alias->second;
+			const auto found=impl->catalog->materials.find(name);
+			if (found!=impl->catalog->materials.end()) mapping.artwork=found->second;
+			else if (impl->catalog->images.contains(name) || name.starts_with("gfx/objectives/") || name.starts_with("levelshots/")) {
+				mapping.image=true; const auto alias=impl->catalog->imageAliases.find(name);
+				if (alias!=impl->catalog->imageAliases.end()) mapping.alias=alias->second;
 			}
 			else { impl->Failure(source,"unmapped material "+name); return false; }
 			mapped=impl->mappings.emplace(item.material,std::move(mapping)).first;
@@ -686,6 +742,7 @@ void idRetainedHud::Precache() {}
 bool idRetainedHud::Eligible(const char*) { return false; }
 bool idRetainedHud::Covers(const char*) { return false; }
 bool idRetainedHud::Usable() const { return false; }
+bool idRetainedHud::Prepare(const char*) { return false; }
 bool idRetainedHud::Draw(const char*,std::vector<openq4::ui::HudPrimitive>&&) { return false; }
 struct idRemasteredHud::Impl {};
 idRemasteredHud::idRemasteredHud(const char*) {}
@@ -1013,14 +1070,25 @@ void idUserInterfaceManagerLocal::BuildHudText(const char* text,float scale,floa
 	}
 }
 
+idRetainedHud* idUserInterfaceManagerLocal::GeneratedHud(const char* source) {
+	int index=generatedHudNames.FindIndex(source);
+	if (index<0) {
+		if (generatedHuds.Num()>=16) return nullptr;
+		index=generatedHudNames.Append(source); generatedHuds.Append(new idRetainedHud);
+	}
+	return generatedHuds[index];
+}
+
+void idUserInterfaceManagerLocal::PrecacheHudPrimitives(const char* source) {
+	if (!source || !cvarSystem->GetCVarBool("ui_retained")) return;
+	if (idRetainedHud* hud=GeneratedHud(source)) hud->Prepare(source);
+}
+
 bool idUserInterfaceManagerLocal::DrawHudPrimitives(const char* source,const idList<uiHudPrimitive_t>& packet) {
 	if (!cvarSystem->GetCVarBool("ui_retained")) { ClearHudPrimitives(); return false; }
 	if (!source || packet.Num()>32768) return false;
-	int index=generatedHudNames.FindIndex(source);
-	if (index<0) {
-		if (generatedHuds.Num()>=16) return false;
-		index=generatedHudNames.Append(source); generatedHuds.Append(new idRetainedHud);
-	}
+	idRetainedHud* hud=GeneratedHud(source);
+	if (!hud) return false;
 	std::vector<openq4::ui::HudPrimitive> items;
 	items.reserve(packet.Num());
 	for (int i=0;i<packet.Num();++i) {
@@ -1032,7 +1100,7 @@ bool idUserInterfaceManagerLocal::DrawHudPrimitives(const char* source,const idL
 		}
 		items.push_back(std::move(item));
 	}
-	return generatedHuds[index]->Draw(source,std::move(items));
+	return hud->Draw(source,std::move(items));
 }
 
 void idUserInterfaceManagerLocal::HudTest(const idCmdArgs& args) {

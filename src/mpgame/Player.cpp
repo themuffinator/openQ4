@@ -2570,6 +2570,36 @@ void idPlayer::Spawn( void ) {
 	// level load, so their first use builds nothing.
 	PrecacheWeaponWheelGui();
 	PrecacheQuickChatGui();
+	PrecacheHudPresentation();
+}
+
+/*
+==============
+idPlayer::PrecacheHudPresentation
+
+The crosshair, hit marker and damage numbers the game draws itself
+(rvHudPrimitives) each draw through a retained view of the HUD artwork. A view
+built on its first draw held that frame, so the first damage number of a match
+stalled the client mid-fight. A client sends the server no commands while a
+frame stalls: the server's copy of its aim stood still while it turned, and
+after MAX_USERCMD_DUPLICATION repeated commands the server let go of the
+attack. The local player builds the views as it spawns, inside the level load
+on a listen server (a joining client spawns with its first snapshot). They
+last until the next level load, through respawns and spectating.
+==============
+*/
+void idPlayer::PrecacheHudPresentation( void ) {
+	if ( gameLocal.localClientNum < 0 || entityNumber != gameLocal.localClientNum ) return;
+	if ( !cvarSystem->GetCVarBool( "ui_retained" ) ) return;
+	// The animated crosshair draws the hit marker itself.
+	if ( rvAnimatedCrosshair::Enabled() ) {
+		uiManager->PrecacheHudPrimitives( "native/crosshair" );
+	} else if ( hud_hitMarker.GetBool() ) {
+		uiManager->PrecacheHudPrimitives( "native/hit-marker" );
+	}
+	if ( hud_damageNumbers.GetInteger() > DAMAGENUMBERS_OFF ) {
+		uiManager->PrecacheHudPrimitives( "native/damage-numbers" );
+	}
 }
 
 /*

@@ -1092,6 +1092,8 @@ private:
 	int						oldMouseY;
 #include "gamesys/WeaponWheelState.h"
 #include "gamesys/StatusBarState.h"
+	// the local player's crosshair and hit marker views, built as it spawns
+	void					PrecacheHudPresentation( void );
 
 	bool					tipUp;
 	bool					objectiveUp;

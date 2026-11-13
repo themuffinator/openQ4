@@ -1110,6 +1110,8 @@ private:
 #include "../game/gamesys/WeaponWheelState.h"
 #include "QuickChatState.h"
 #include "../game/gamesys/StatusBarState.h"
+	// the local player's crosshair, hit marker and damage number views, built as it spawns
+	void					PrecacheHudPresentation( void );
 
 	bool					tipUp;
 	bool					objectiveUp;

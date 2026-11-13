@@ -1555,8 +1555,18 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			clientPrediction = idMath::ClampInt( configuredPredictionMsec, maximumPredictionMsec, clientPrediction );
 			delta = gameTime - ( snapshotGameTime + clientPrediction );
 			const int deltaStep = ( delta < 0 ) ? -1 : 1;
-			const std::int64_t adjustedPredictTime = static_cast<std::int64_t>( clientPredictTime ) -
+			// openQ4: the client predicts frames while gameTimeResidual + clientPredictTime covers the
+			// next one, so only their sum matters, and predicting leaves the residual at about
+			// -clientPredictTime. A resync, or a hitch UpdateTime clamps to 100 ms, moves gameTime
+			// past both, and the catch-up kept each such step as an offset: under latency every hitch
+			// over 100 ms left clientPredictTime that much higher. Once the clamp below held it at
+			// maximumPredictionMsec the client could no longer run ahead, and every command it sent
+			// reached the server late for good. The server repeated the last one, so its aim stood
+			// still, and after MAX_USERCMD_DUPLICATION repeats it dropped the attack. The residual
+			// now joins the catch-up, which then holds only the time this client still owes.
+			const std::int64_t adjustedPredictTime = static_cast<std::int64_t>( clientPredictTime ) + gameTimeResidual -
 				( delta / PREDICTION_FAST_ADJUST ) - deltaStep;
+			gameTimeResidual = 0;
 			clientPredictTime = adjustedPredictTime < -maximumPredictionMsec ? -maximumPredictionMsec :
 				( adjustedPredictTime > maximumPredictionMsec ? maximumPredictionMsec :
 					static_cast<int>( adjustedPredictTime ) );
