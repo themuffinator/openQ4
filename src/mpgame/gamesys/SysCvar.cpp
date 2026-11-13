@@ -113,6 +113,7 @@ idCVar si_warmupReadyPercentage(	"si_warmupReadyPercentage",	"0.51",			CVAR_GAME
 idCVar si_teamSizeMin(				"si_teamSizeMin",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "players required on a team before a team match may leave warmup", 1, 16 );
 idCVar si_teamForcePresent(			"si_teamForcePresent",		"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "require both teams to meet si_teamSizeMin, rather than just one" );
 idCVar si_warmupWeapons(			"si_warmupWeapons",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "hand out every weapon on the map during warmup" );
+idCVar si_instagib(					"si_instagib",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Instagib: everyone carries only an unlimited railgun and the gauntlet, any hit from another player kills, falls do no harm and the map's pickups are removed; a change restarts the match" );
 idCVar si_warmupScoring(			"si_warmupScoring",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "count frags scored during warmup" );
 idCVar si_autoShuffle(				"si_autoShuffle",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "shuffle teams automatically during warmup when they are lopsided" );
 idCVar si_shuffleDelay(				"si_shuffleDelay",			"5",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "countdown before an automatic team shuffle runs, in seconds", 1, 60 );

@@ -1596,4 +1596,6 @@
 	"#str_231770"	"Renderer zde kreslí nejvýše 2x, scéna proto používá 2x."
 	"#str_231771"	"Renderer zde kreslí nejvýše 4x, scéna proto používá 4x."
 	"#str_231772"	"Renderer zde kreslí nejvýše 8x, scéna proto používá 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"%s Instagib"
 }

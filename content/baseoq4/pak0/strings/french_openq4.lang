@@ -1605,4 +1605,6 @@
 	"#str_231770"	"Le moteur de rendu dessine au plus en 2x ici : la scène utilise 2x."
 	"#str_231771"	"Le moteur de rendu dessine au plus en 4x ici : la scène utilise 4x."
 	"#str_231772"	"Le moteur de rendu dessine au plus en 8x ici : la scène utilise 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"%s Instagib"
 }

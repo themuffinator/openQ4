@@ -1596,4 +1596,6 @@
 	"#str_231770"	"A renderelő itt legfeljebb 2x élsimítást rajzol, ezért a jelenet 2x értéket használ."
 	"#str_231771"	"A renderelő itt legfeljebb 4x élsimítást rajzol, ezért a jelenet 4x értéket használ."
 	"#str_231772"	"A renderelő itt legfeljebb 8x élsimítást rajzol, ezért a jelenet 8x értéket használ."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"Instagib %s"
 }

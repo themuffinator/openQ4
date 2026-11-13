@@ -387,6 +387,7 @@ jobs:
             tools/tests/mp_bot_regressions.py \
             tools/tests/mp_bot_recovery_traffic.py \
             tools/tests/mp_bot_server_menu.py \
+            tools/tests/mp_instagib_contract.py \
             tools/tests/mp_bot_team_balance.py \
             tools/tests/mp_bot_team_orders.py \
             tools/tests/mp_bot_hazards.py \
@@ -932,6 +933,7 @@ jobs:
           python tools/tests/mp_bot_regressions.py
           python tools/tests/mp_bot_recovery_traffic.py
           python tools/tests/mp_bot_server_menu.py
+          python tools/tests/mp_instagib_contract.py
           python tools/tests/mp_bot_team_balance.py
           python tools/tests/mp_bot_team_orders.py
           python tools/tests/mp_bot_hazards.py

@@ -7,6 +7,40 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Instagib for any multiplayer game type, 13 November 2026
+
+- **Play any game type as Instagib.** Turn on **Instagib** on the **Rules** tab
+  of **Advanced Server Options**, or set `si_instagib 1` on a dedicated server.
+  Everyone spawns with a railgun that never runs out, and the gauntlet. Any hit
+  from another player kills at once and gibs the body, armour or not. Falls do
+  no damage, but lava, pits and other map hazards still kill. The map's
+  weapons, ammo, armour, health and powerups don't spawn, and flags and other
+  objectives stay. In Freeze Tag a hit freezes instead.
+- The scoreboard, join screen and loading screen name the match "Instagib
+  Deathmatch", "Instagib Capture the Flag" and so on, in all twelve languages.
+- Turning it on or off with `rescanSI` during a match restarts the match, so
+  nobody ever plays half the old rules and half the new. Buying, Weapon Stay
+  and dropped weapons stay off while it is on. The single-player Arena
+  campaign ignores it.
+- How it works: `si_instagib` is a server-info rule latched with the game type
+  in `idMultiplayerGame::SetGameType` on every peer, so the pickups each peer
+  leaves out agree. A hit by another player that is worth anything takes
+  exactly the health left, so scores, stats and damage numbers stay honest. The
+  body is then put past the gib threshold, which every client reads from the
+  replicated health. `mp_instagib_contract.py` pins the rule set.
+- Evidence: OpenGL listen servers with three bots on `mp/q4dm1` (DM, Clan
+  Arena, Freeze Tag) and `mp/q4ctf1` (CTF), each switched on mid-match with
+  `si_instagib 1` and `rescanSI`. Each logged the restart. Afterwards no
+  weapon, ammo, item or powerup entity remained (87 before on q4dm1, 75 on
+  q4ctf1), and both CTF flags stayed. Every `g_debugDamage` hit took exactly
+  the victim's remaining health with no armour (15 hits, all railgun kills),
+  so Clan Arena's armour grant stood aside. The player held the railgun with
+  no ammo count. The retained create-server capture shows the RULES tab's row
+  setting `si_instagib` 1 and back to 0, with Weapon Stay and Allow Buying
+  dimmed while it is on.
+- Open: Instagib is not yet a match-rules field, so a managed match's rules
+  digest and evidence do not record it, and it has no vote.
+
 ## The main menu's background comes through as a living signal, 13 November 2026
 
 - **The new interface's main menu has a sci-fi display look.** The level

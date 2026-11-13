@@ -1596,4 +1596,6 @@
 	"#str_231770"	"El renderizador dibuja como máximo 2x aquí, así que la escena usa 2x."
 	"#str_231771"	"El renderizador dibuja como máximo 4x aquí, así que la escena usa 4x."
 	"#str_231772"	"El renderizador dibuja como máximo 8x aquí, así que la escena usa 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"%s Instagib"
 }

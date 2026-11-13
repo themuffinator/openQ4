@@ -110,6 +110,7 @@
   "create.overtime": {"type": "number", "initial": 0},
   "create.mercy": {"type": "number", "initial": 0},
   "create.roundlimit": {"type": "number", "initial": 0},
+  "create.instagib": {"type": "boolean", "initial": false},
   "create.password": {"type": "string", "initial": ""},
   "create.rconpassword": {"type": "string", "initial": ""},
   "create.mapcycle": {"type": "string", "initial": ""},
@@ -362,6 +363,11 @@
    "operation": "session.menuValue",
    "input": "number",
    "arguments": {"command": "createRoundLimit", "value": {"input": "value"}}
+  },
+  "createInstagib": {
+   "operation": "session.menuValue",
+   "input": "boolean",
+   "arguments": {"command": "createInstagib", "value": {"input": "value"}}
   },
   "createPassword": {"operation": "session.menu", "arguments": {"command": "createPassword"}},
   "enter.create-password": {
@@ -19047,6 +19053,30 @@
    "value": {"op": "select", "args": [{"state": "create.usepass"}, 1, 0.38]}
   },
   {
+   "id": "create-weaponstay.enabled",
+   "node": "create-weaponstay",
+   "property": "enabled",
+   "value": {"op": "!", "args": [{"state": "create.instagib"}]}
+  },
+  {
+   "id": "create-weaponstay.opacity",
+   "node": "create-weaponstay",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "create.instagib"}]}, 1, 0.38]}
+  },
+  {
+   "id": "create-buying.enabled",
+   "node": "create-buying",
+   "property": "enabled",
+   "value": {"op": "!", "args": [{"state": "create.instagib"}]}
+  },
+  {
+   "id": "create-buying.opacity",
+   "node": "create-buying",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "create.instagib"}]}, 1, 0.38]}
+  },
+  {
    "id": "create-password-viewport.display",
    "node": "create-password-viewport",
    "property": "display",
@@ -19153,6 +19183,12 @@
    "node": "advanced-tab-1-shown",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.advanced_tab"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "create-instagib.tab",
+   "node": "create-instagib",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.advanced_tab"}, 2]}, "block", "none"]}
   },
   {
    "id": "create-weaponstay.tab",
@@ -21977,6 +22013,109 @@
    "node": "create-botskill-option-4",
    "property": "height",
    "value": {"op": "*", "args": [22.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.create-instagib-head.width",
+   "node": "create-instagib-head",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 532.5, 301.0]}
+  },
+  {
+   "id": "text.create-instagib-head.height",
+   "node": "create-instagib-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+   }
+  },
+  {
+   "id": "text.create-instagib-label.line-height",
+   "node": "create-instagib-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 18.0, 36.0]}
+  },
+  {
+   "id": "text.create-instagib.height",
+   "node": "create-instagib",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+     },
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-instagib-focus.height",
+   "node": "create-instagib-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+     },
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-instagib-box.left",
+   "node": "create-instagib-box",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 330.0]}
+  },
+  {
+   "id": "text.create-instagib-box.top",
+   "node": "create-instagib-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {"op": "+", "args": [-7.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+       {"op": "*", "args": [9.0, {"state": "view.text"}]}
+      ]
+     },
+     11.0
+    ]
+   }
+  },
+  {
+   "id": "text.create-instagib-checked.left",
+   "node": "create-instagib-checked",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 330.0]}
+  },
+  {
+   "id": "text.create-instagib-checked.top",
+   "node": "create-instagib-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": ">", "args": [{"state": "view.text"}, 1]},
+     {
+      "op": "+",
+      "args": [
+       {"op": "+", "args": [-7.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+       {"op": "*", "args": [9.0, {"state": "view.text"}]}
+      ]
+     },
+     11.0
+    ]
+   }
   },
   {
    "id": "text.create-weaponstay-head.width",
@@ -46371,6 +46510,150 @@
     },
     {
      "node": "create-roundlimit-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-instagib.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "create-instagib-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-instagib-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-instagib-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-instagib.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "create-instagib-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-instagib-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "create-instagib-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-instagib.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "create-instagib-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-instagib-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-instagib-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-instagib.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "create-instagib-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-instagib-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-instagib-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-instagib.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "create-instagib-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-instagib-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-instagib-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -88926,6 +89209,226 @@
                 "lineStep": 22.0,
                 "minimumThumb": 24
                }
+              }
+             },
+             {
+              "id": "create-instagib",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "none"},
+               "width": {"type": "length", "value": 565.5, "unit": "dp"},
+               "height": {"type": "length", "value": 36.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 1},
+               "flex-shrink": {"type": "number", "value": 0}
+              },
+              "children": [
+               {
+                "id": "create-instagib-plate",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"}
+                },
+                "paths": [
+                 {
+                  "id": "plate",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-instagib-wash",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "wash",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {
+                   "type": "linear",
+                   "from": [0, 0],
+                   "to": [{"fraction": 1}, 0],
+                   "stops": [
+                    {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                    {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                   ]
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-instagib-focus",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 4, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "rail",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.19444444444444445}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027777777777777776}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.9722222222222222}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.9722222222222222}]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                 }
+                ]
+               },
+               {
+                "id": "create-instagib-head",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 21, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 301.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "flex"},
+                 "flex-direction": {"type": "keyword", "value": "row"},
+                 "align-items": {"type": "keyword", "value": "center"}
+                },
+                "children": [
+                 {
+                  "id": "create-instagib-label",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_231960"},
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "flex-shrink": {"type": "number", "value": 1},
+                   "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                   "white-space": {"type": "keyword", "value": "nowrap"},
+                   "overflow": {"type": "keyword", "value": "hidden"}
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-instagib-box",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 330.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 14, "unit": "dp"},
+                 "height": {"type": "length", "value": 14, "unit": "dp"}
+                },
+                "paths": [
+                 {
+                  "id": "box",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[0.75, 0.75]]},
+                   {"id": "p1", "op": "line", "points": [[13.25, 0.75]]},
+                   {"id": "p2", "op": "line", "points": [[13.25, 13.25]]},
+                   {"id": "p3", "op": "line", "points": [[0.75, 13.25]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                   "widthDp": 1.5,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "create-instagib-checked",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 330.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 14, "unit": "dp"},
+                 "height": {"type": "length", "value": 14, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "none"}
+                },
+                "children": [
+                 {
+                  "id": "create-instagib-mark",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "mark",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[3.5, 3.5]]},
+                     {"id": "p1", "op": "line", "points": [[10.5, 3.5]]},
+                     {"id": "p2", "op": "line", "points": [[10.5, 10.5]]},
+                     {"id": "p3", "op": "line", "points": [[3.5, 10.5]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                   }
+                  ]
+                 }
+                ]
+               }
+              ],
+              "control": {
+               "role": "toggle",
+               "label": "#str_231960",
+               "action": "createInstagib",
+               "value": {"state": "create.instagib"},
+               "states": {
+                "default": "create-instagib.default",
+                "hover": "create-instagib.hover",
+                "focus": "create-instagib.focus",
+                "pressed": "create-instagib.pressed",
+                "disabled": "create-instagib.disabled"
+               },
+               "parts": {"checked": "create-instagib-checked"}
               }
              },
              {

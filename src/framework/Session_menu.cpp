@@ -6801,6 +6801,7 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createOvertime",		"overtime",		"si_overtime",				0, 999,	false },
 	{ "createMercy",		"mercy",		"si_mercyLimit",			0, 999,	false },
 	{ "createRoundLimit",	"roundlimit",	"si_roundLimit",			0, 60,	false },
+	{ "createInstagib",		"instagib",		"si_instagib",				0, 1,	true },
 };
 static const int RETAINED_CREATE_SETTING_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_SETTINGS ) / sizeof( RETAINED_CREATE_SETTINGS[0] ) );
 // The page's text fields: the verb a field asks with once its text is in its

@@ -1652,4 +1652,6 @@
 	"#str_231770"	"Renderer rysuje tu najwyżej 2x, więc scena używa 2x."
 	"#str_231771"	"Renderer rysuje tu najwyżej 4x, więc scena używa 4x."
 	"#str_231772"	"Renderer rysuje tu najwyżej 8x, więc scena używa 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"%s Instagib"
 }

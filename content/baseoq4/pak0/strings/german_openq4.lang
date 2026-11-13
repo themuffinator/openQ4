@@ -1596,4 +1596,6 @@
 	"#str_231770"	"Der Renderer zeichnet hier höchstens 2x, daher nutzt die Szene 2x."
 	"#str_231771"	"Der Renderer zeichnet hier höchstens 4x, daher nutzt die Szene 4x."
 	"#str_231772"	"Der Renderer zeichnet hier höchstens 8x, daher nutzt die Szene 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"Instagib-%s"
 }

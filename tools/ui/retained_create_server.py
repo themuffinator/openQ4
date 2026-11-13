@@ -106,6 +106,8 @@ ADVANCED = (
     ("overtime", "createOvertime", "#str_41310", "number", 0, 999, "#str_231123"),   # seconds; the long label outgrows the column in Russian
     ("mercy", "createMercy", "#str_41638", "number", 0, 999, "#str_231123"),
     ("roundlimit", "createRoundLimit", "#str_41404", "number", 0, 60, "#str_231125"),
+    # Instagib (si_instagib): any game type with an unlimited railgun and one-hit kills.
+    ("instagib", "createInstagib", "#str_231960", "toggle", 0, 1, None),
 )
 # The advanced dialog's tabs (user note, 11 November 2026: its sixteen rows
 # outgrew the view): each tab's name and its rows, in order. SERVER holds who
@@ -116,7 +118,7 @@ ADVANCED_TABS = (
                      "create-mapcycle", "create-banlist")),
     ("#str_231004", ("create-ready", "create-warmup", "create-spectators", "create-voice", "create-shuffle", "create-bots",
                      "create-botskill")),
-    ("#str_41704", ("create-weaponstay", "create-buying", "create-overtime", "create-mercy", "create-roundlimit")),
+    ("#str_41704", ("create-instagib", "create-weaponstay", "create-buying", "create-overtime", "create-mercy", "create-roundlimit")),
 )
 ADVANCED_TAB_H = 32.0   # u: the tab strip and the gap under it
 # Each choice's stock list and its values.
@@ -429,6 +431,11 @@ def advanced_dialog(doc: Document) -> dict:
     rows[1:1] = [password_row(doc, *password) for password in PASSWORDS]
     using = {"state": "create.usepass"}
     lock_unless(doc, "create-password", using)
+    # Instagib spawns no pickups and sells nothing, so Weapon Stay and buying
+    # have nothing to act on while it is on.
+    not_instagib = {"op": "!", "args": [{"state": "create.instagib"}]}
+    lock_unless(doc, "create-weaponstay", not_instagib)
+    lock_unless(doc, "create-buying", not_instagib)
     doc.bind("create-password-viewport.display", "create-password-viewport", "display", {"op": "select", "args": [using, "block", "none"]})
     doc.state["create.mapcycle"] = {"type": "string", "initial": ""}
     doc.session("createMapCycle", "createMapCycle")

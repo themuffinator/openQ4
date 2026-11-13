@@ -462,6 +462,7 @@ extern idCVar	si_warmupReadyPercentage;
 extern idCVar	si_teamSizeMin;
 extern idCVar	si_teamForcePresent;
 extern idCVar	si_warmupWeapons;
+extern idCVar	si_instagib;
 extern idCVar	si_warmupScoring;
 extern idCVar	si_autoShuffle;
 extern idCVar	si_shuffleDelay;

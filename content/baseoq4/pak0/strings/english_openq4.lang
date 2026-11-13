@@ -1596,4 +1596,6 @@
 	"#str_231770"	"The renderer draws at most 2x here, so the scene uses 2x."
 	"#str_231771"	"The renderer draws at most 4x here, so the scene uses 4x."
 	"#str_231772"	"The renderer draws at most 8x here, so the scene uses 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"Instagib %s"
 }

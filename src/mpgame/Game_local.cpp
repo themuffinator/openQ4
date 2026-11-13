@@ -5183,7 +5183,7 @@ void idGameLocal::HandleMainMenuCommands( const char *menuCommand, idUserInterfa
 		// spawns, after the loading screen presents).
 		idDict query;
 		static const char *const keys[] = { "si_gameType", "si_fragLimit", "si_captureLimit", "si_controlTime", "si_roundLimit",
-			"si_scoreLimit", "si_timeLimit" };
+			"si_scoreLimit", "si_timeLimit", "si_instagib" };
 		for ( int i = 0; i < static_cast<int>( sizeof( keys ) / sizeof( keys[0] ) ); i++ ) {
 			query.Set( keys[ i ], gui->State().GetString( va( "query_%s", keys[ i ] ) ) );
 		}
@@ -5206,8 +5206,15 @@ void idGameLocal::HandleMainMenuCommands( const char *menuCommand, idUserInterfa
 		// Duels run as one-on-one deathmatch, and the card must not say so.
 		const char *arenaGameType = cvarSystem->GetCVarBool( "ui_arenaCampaignActive" ) ?
 			cvarSystem->GetCVarString( "ui_arenaMatchGameType" ) : "";
-		gui->SetStateString( "server_gametype", idStr::Cmpn( arenaGameType, "#str_", 5 ) == 0 ?
-			common->GetLocalizedString( arenaGameType ) : common->GetLocalizedString( info->localizedName ) );
+		if ( idStr::Cmpn( arenaGameType, "#str_", 5 ) == 0 ) {
+			gui->SetStateString( "server_gametype", common->GetLocalizedString( arenaGameType ) );
+		} else if ( query.GetBool( "si_instagib" ) ) {
+			// Instagib qualifies the mode, as idMultiplayerGame::LocalizeGametype does in the match.
+			gui->SetStateString( "server_gametype", va( common->GetLocalizedString( "#str_231961" ),
+				common->GetLocalizedString( info->localizedName ) ) );
+		} else {
+			gui->SetStateString( "server_gametype", common->GetLocalizedString( info->localizedName ) );
+		}
 		gui->SetStateString( "server_limit", limits.c_str() );
 		gui->SetStateBool( "server_team_mode", MPGameTypeHasAny( info->type, GTF_TEAM ) );
 		gui->SetStateBool( "server_answered", true );
@@ -6256,14 +6263,21 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 	// This runs at map populate on the server and on every client alike -
 	// SetGameType always precedes MapPopulate - so entity numbering stays in
 	// step, and ResetRound's map restart re-applies it every round.
-	if ( isMultiplayer && MPGameTypeHasAny( gameType, GTF_FULLARSENAL ) ) {
+	//
+	// Instagib clears the same spawns, as Quake Live's does: with one shot
+	// killing, armour, health and powerups decide nothing, and a weapon or
+	// ammo pickup would only hand out a gun nobody is meant to carry.
+	if ( isMultiplayer && ( MPGameTypeHasAny( gameType, GTF_FULLARSENAL ) || mpGame.IsInstagib() ) ) {
 		const char *classname = spawnArgs.GetString( "classname" );
 
 		// An objective is not a pickup.  Attack & Defend also carries
-		// GTF_FULLARSENAL and plays with a flag, so the flag class is named
-		// rather than guessed at from the classname prefix.
+		// GTF_FULLARSENAL and plays with a flag, and Instagib can be played
+		// over any mode, DeadZone's powerup_deadzone token included, so the
+		// objective classes are named rather than guessed at from the prefix.
+		const char *spawnclass = spawnArgs.GetString( "spawnclass" );
 		const bool objective = spawnArgs.GetBool( "inv_objective" ) ||
-			idStr::Icmp( spawnArgs.GetString( "spawnclass" ), "rvItemCTFFlag" ) == 0;
+			idStr::Icmp( spawnclass, "rvItemCTFFlag" ) == 0 ||
+			idStr::Icmp( spawnclass, "riDeadZonePowerup" ) == 0;
 
 		if ( !objective &&
 			 ( idStr::FindText( classname, "weapon_" ) == 0 ||
@@ -11018,7 +11032,7 @@ idGameLocal::IsTeamPowerups
 ===============
 */
 bool idGameLocal::IsTeamPowerups( void ) {
-	if ( !serverInfo.GetBool( "si_isBuyingEnabled" ) ) {
+	if ( !serverInfo.GetBool( "si_isBuyingEnabled" ) || mpGame.IsInstagib() ) {
 		return false;
 	}
 	if ( !IsTeamGameType() ) {

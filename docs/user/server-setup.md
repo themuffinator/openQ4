@@ -28,8 +28,28 @@ while it serves the other players.
   from the same computer, start openQ4 again and join from the server browser.
 - **Advanced Server Options** holds the match rules and bots. In the new
   interface its **Match** tab has **Fill With Bots**, **Bot Skill** and
-  **Shuffle Teams**, and its **Rules** tab has **Overtime**, **Mercy Lead** and
-  **Round Limit**. See [Bots](#bots).
+  **Shuffle Teams**, and its **Rules** tab has **Instagib**, **Overtime**,
+  **Mercy Lead** and **Round Limit**. See [Bots](#bots) and [Instagib](#instagib).
+
+## Instagib
+
+Instagib works with any game type: Deathmatch, Team Deathmatch, Capture the
+Flag, Duel, Clan Arena, Freeze Tag and the rest.
+
+- Everyone spawns with a railgun that never runs out, and the gauntlet.
+- Any hit from another player kills at once and gibs the body. Armour saves
+  nothing. In Freeze Tag a hit freezes instead.
+- Falls do no damage. Lava, pits and other map hazards still kill.
+- The map's weapons, ammo, armour, health and powerups don't spawn, and nobody
+  drops a weapon. Flags and other objectives stay.
+- Buying is off, and team damage still follows the server's **Team Damage**
+  setting.
+
+Turn it on with **Instagib** on the **Rules** tab of **Advanced Server
+Options**, or with `si_instagib 1` on a dedicated server. The match name shows
+it, for example "Instagib Deathmatch". If you change `si_instagib` during a
+match, it takes effect at the next map or restart. Run `rescanSI` to restart
+the match with the new setting straight away.
 
 ## Running a dedicated server
 
@@ -182,6 +202,7 @@ address to force IPv6.
 | `si_mercyLimit` | End a team match early once one team leads by this many points; `0` turns it off (**Mercy Lead**) |
 | `si_overtime` | Length of each overtime period in seconds; `0` uses Quake 4's sudden death (**Overtime**) |
 | `si_warmup` | Whether matches start with a warmup |
+| `si_instagib` | `1` plays any game type as [Instagib](#instagib): railguns only, and one hit kills |
 | `si_usePass`, `g_password` | `si_usePass 1` admits only players who give the password set in `g_password` |
 | `g_mapCycle` | Map cycle script |
 

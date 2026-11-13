@@ -60,6 +60,9 @@ idCVar si_motd(						"si_motd",					"",					CVAR_GAME | CVAR_SERVERINFO | PC_CVA
 idCVar si_isBuyingEnabled(			"si_isBuyingEnabled",			"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "enable buying in current mode" );
 idCVar si_dropWeaponsInBuyingModes(	"si_dropWeaponsInBuyingModes",	"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "dead players drop weapons, even in Buying game modes" );
 // RITUAL END
+// openQ4: game_mp's Instagib switch. Declared here too, with game_mp's default and
+// help, so the create-server menu can set it while game_sp is the loaded module.
+idCVar si_instagib(					"si_instagib",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Instagib: everyone carries only an unlimited railgun and the gauntlet, any hit from another player kills, falls do no harm and the map's pickups are removed; a change restarts the match" );
 // RAVEN BEGIN
 // ddynerman: new gametype strings
 idCVar si_gameType(					"si_gameType",				si_gameTypeArgs[ 0 ],	CVAR_GAME | CVAR_SERVERINFO, "game type - singleplayer, or the multiplayer mode the menu carries to game_mp", si_gameTypeArgs, idCmdSystem::ArgCompletion_String<si_gameTypeArgs> );

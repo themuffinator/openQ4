@@ -1605,4 +1605,6 @@
 	"#str_231770"	"Qui il renderer disegna al massimo 2x, quindi la scena usa 2x."
 	"#str_231771"	"Qui il renderer disegna al massimo 4x, quindi la scena usa 4x."
 	"#str_231772"	"Qui il renderer disegna al massimo 8x, quindi la scena usa 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"%s Instagib"
 }

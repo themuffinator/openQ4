@@ -1173,6 +1173,8 @@ idMultiplayerGame::idMultiplayerGame
 */
 idMultiplayerGame::idMultiplayerGame() {
 	mapRestartCount = 0;
+	instagib = false;
+	instagibRestartPending = false;
 	nextMatchSessionId = 0;
 	matchSeriesId = 0;
 	matchSeriesLinkedSessionId = 0;
@@ -11033,7 +11035,7 @@ void idMultiplayerGame::UpdateDMScoreboard( idUserInterface *scoreBoard ) {
 	scoreBoard->SetStateString( "servermap", ResolveScoreboardMapName( gameLocal.serverInfo.GetString( "si_map" ), mapName ) );
 	scoreBoard->SetStateString( "serverip",	arenaBoard ? "" : serverAddress.c_str() );
 	scoreBoard->SetStateString( "servergametype", arenaBoard ? ArenaCampaignPresentedGameType() :
-		GetLongGametypeName( gameLocal.serverInfo.GetString( "si_gameType" ) ) );
+		LocalizeGametype() );
 	scoreBoard->SetStateString( "servertimelimit", va( "%s: %d", common->GetLocalizedString( "#str_107659" ), gameLocal.serverInfo.GetInt( "si_timeLimit" ) ) );
 	scoreBoard->SetStateString( "serverlimit", va( "%s: %d", common->GetLocalizedString( "#str_107660" ), gameLocal.serverInfo.GetInt( "si_fragLimit" ) ) );
 
@@ -11243,7 +11245,7 @@ void idMultiplayerGame::UpdateTeamScoreboard( idUserInterface *scoreBoard ) {
 // RAVEN END
 	scoreBoard->SetStateString( "serverip",	arenaBoard ? "" : serverAddress.c_str() );
 	scoreBoard->SetStateString( "servergametype", arenaBoard ? ArenaCampaignPresentedGameType() :
-		GetLongGametypeName( gameLocal.serverInfo.GetString( "si_gameType" ) ) );
+		LocalizeGametype() );
 	scoreBoard->SetStateString( "servertimelimit", va( "%s: %d", common->GetLocalizedString( "#str_107659" ), gameLocal.serverInfo.GetInt( "si_timeLimit" ) ) );
 	if ( gameLocal.IsFlagGameType() ) {
 		scoreBoard->SetStateString( "serverlimit", va( "%s: %d", common->GetLocalizedString( "#str_107661" ), gameLocal.serverInfo.GetInt( "si_captureLimit" ) ) );
@@ -16379,6 +16381,7 @@ void idMultiplayerGame::Run( void ) {
 	ReconcileGameplayPhaseAfterMatchMutation();
 
 	CheckVote();
+	CheckInstagibChange();
 
 	// The Arena ceremony deliberately freezes the world around its final tableau,
 	// so the result handoff has to run ahead of the frozen-frame return.  Left
@@ -26509,6 +26512,48 @@ void idMultiplayerGame::SetGameType( void ) {
 		// also set as a CVar for when serverinfo is rescanned
 		cvarSystem->SetCVarString( "si_entityFilter", info->entityFilter );
 	}
+
+	// openQ4: Instagib is latched with the game type. SetGameType runs on the
+	// server and on every client before MapPopulate, both on a map load and on
+	// a map restart, so the pickups each peer leaves out agree and entity
+	// numbering stays in step.
+	instagib = InstagibWanted();
+	instagibRestartPending = false;
+}
+
+/*
+================
+idMultiplayerGame::InstagibWanted
+
+What si_instagib asks for. The single-player Arena campaign hosts its matches
+here too, and a player's archived multiplayer preference must not rewrite them.
+================
+*/
+bool idMultiplayerGame::InstagibWanted( void ) const {
+	return gameLocal.isMultiplayer && gameLocal.serverInfo.GetBool( "si_instagib" ) && !IsArenaCampaignMatch();
+}
+
+/*
+================
+idMultiplayerGame::CheckInstagibChange
+
+A new si_instagib reaches the server info through rescanSI or a menu, mid
+match. Applying it in place would hand some players the new loadout and leave
+the old map pickups standing, and a client joining now would populate the map
+for the new rules while everyone else plays the old ones. Restart the match
+instead, as a passed game-type vote does: the restart latches the new rules on
+every peer at once.
+================
+*/
+void idMultiplayerGame::CheckInstagibChange( void ) {
+	if ( instagibRestartPending || InstagibWanted() == instagib ) {
+		return;
+	}
+	instagibRestartPending = true;
+	common->Printf( "si_instagib changed to %d: restarting the match\n", InstagibWanted() ? 1 : 0 );
+	// Ahead of anything already queued (an exec'd script, say), so nothing
+	// runs under rules the server info no longer advertises.
+	cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "serverMapRestart\n" );
 }
 
 //asalmon: need to access total frags for a team and total score for a team
@@ -26869,6 +26914,12 @@ const char *idMultiplayerGame::LocalizeGametype( void ) {
 		localisedGametype = common->GetLocalizedString( info->localizedName );
 	}
 
+	// openQ4: Instagib is a modifier, so it qualifies the game type's name
+	// ("Instagib Deathmatch") wherever the match is named.
+	if ( IsInstagib() ) {
+		localisedGametype = va( common->GetLocalizedString( "#str_231961" ), localisedGametype.c_str() );
+	}
+
 	return( localisedGametype.c_str() );
 }
 
@@ -27065,6 +27116,11 @@ bool idMultiplayerGame::IsBuyingAllowedInTheCurrentGameMode( void ) {
 	// Freeze Tag thaw defeats the point of both.  Every mode that allowed buying
 	// in retail Quake 4 carries GTF_BUYING, so this is not a change for them.
 	if ( !MPGameTypeHasAny( gameLocal.gameType, GTF_BUYING ) ) {
+		return false;
+	}
+
+	// Instagib's loadout is the whole point of it; there is nothing to buy.
+	if ( IsInstagib() ) {
 		return false;
 	}
 

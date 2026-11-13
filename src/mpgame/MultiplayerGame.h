@@ -801,6 +801,12 @@ public:
 	// game.  Keep its staging and review presentation behind the campaign token
 	// so ordinary multiplayer retains the stock ready, spectate and camera flow.
 	bool			IsArenaCampaignMatch( void ) const;
+	// Instagib (si_instagib): a modifier over any game type, not a game type of
+	// its own. Everyone carries an unlimited railgun and the gauntlet, a hit
+	// from another player kills, falls do no harm, and the map's pickups are
+	// not spawned. It is latched with the game type when a map loads or
+	// restarts, on every peer, so a match never changes rules half way.
+	bool			IsInstagib( void ) const { return instagib; }
 	bool			ArenaCampaignLocksPlayers( void ) const;
 	bool			ArenaCampaignAllowsFreeLook( void ) const;
 	// The local view is an Arena presentation shot rather than gameplay: the
@@ -911,6 +917,11 @@ public:
 	static const char*	teamNames[ TEAM_MAX ];
 
 private:
+	bool			instagib;				// si_instagib as latched by SetGameType
+	bool			instagibRestartPending;	// a restart is queued to apply a new si_instagib
+	bool			InstagibWanted( void ) const;
+	void			CheckInstagibChange( void );
+
 	static const char	*MPGuis[];
 	static const char	*ThrottleVars[];
 	static const char	*ThrottleVarsInEnglish[];

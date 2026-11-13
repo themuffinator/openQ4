@@ -3169,7 +3169,9 @@ def validate_ceremony_flow() -> None:
     )
     require_regex(
         player_source,
-        r"MPGameTypeHasAny\( gameLocal\.gameType, GTF_FULLARSENAL \) \) \{\s*return;",
+        # Instagib, a fixed loadout too, shares the gate (mp_instagib_contract.py).
+        r"MPGameTypeHasAny\( gameLocal\.gameType, GTF_FULLARSENAL \)"
+        r"(?: \|\| gameLocal\.mpGame\.IsInstagib\(\) \))? \) \{\s*return;",
         "fixed-loadout modes must not drop weapons",
     )
     # Red Rover is a two-sided mode and needs the team panel, not the FFA one.

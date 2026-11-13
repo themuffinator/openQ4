@@ -937,6 +937,13 @@ SCENARIOS = {
         'screenshot "screenshots/createserver-banlist-removed.tga"',
         'openq4_retainedGui focus banModal_no', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 600',
         'openq4_retainedGui report',
+        # RULES: Instagib turned on sets si_instagib and dims Weapon Stay and
+        # buying, which have nothing to act on under it; turned off again after.
+        'openq4_retainedGui event advancedTab2', 'waitMsec 400', 'openq4_retainedGui focus "create-instagib"',
+        'screenshot "screenshots/createserver-rules.tga"',
+        'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 400', 'si_instagib',
+        'screenshot "screenshots/createserver-instagib.tga"',
+        'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 300', 'si_instagib',
         'openq4_retainedGui event advancedModalHide', 'waitMsec 600',
         'openq4_retainedGui focus create_back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 150', 'screenshot "screenshots/createserver-back.tga"', 'waitMsec 1200', 'openq4_retainedGui report',

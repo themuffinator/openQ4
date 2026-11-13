@@ -84,6 +84,9 @@ const int SPAWN_KNOCKBACK_MSEC = 100;
 const int	HEALTH_PULSE		= 1000;			// Regen rate and heal leak rate (for health > 100)
 const int	ARMOR_PULSE			= 1000;			// armor ticking down due to being higher than maxarmor
 
+// openQ4: where an Instagib kill leaves the body, well past the gib threshold (health < -20)
+const int	INSTAGIB_GIB_HEALTH	= -100;
+
 // Quake 4: The Awakening's powerups
 const int	ADRENALINE_HEALTH_BOOST	= 400;		// health Adrenaline lends, taken back over its time
 const int	ADRENALINE_HEALTH_FLOOR	= 100;		// Adrenaline ends when the payback reaches this
@@ -3601,9 +3604,16 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 // RITUAL END
 
 // openQ4 BEGIN
+	// Instagib replaces every other loadout, warmup's included: the match is
+	// fought with exactly this from the first spawn to the last.
+	const bool instagib = gameLocal.isMultiplayer && gameLocal.mpGame.IsInstagib();
+	if ( instagib && !spectating ) {
+		GiveInstagibLoadout();
+	}
+
 	// Warmup is for warming up: Quake Live hands out the full arsenal so the
 	// pre-match period is practice rather than a race for the rocket launcher.
-	if ( gameLocal.isMultiplayer && !spectating && gameLocal.serverInfo.GetBool( "si_warmupWeapons" ) ) {
+	if ( gameLocal.isMultiplayer && !spectating && !instagib && gameLocal.serverInfo.GetBool( "si_warmupWeapons" ) ) {
 		mpGameState_t mpState = gameLocal.mpGame.GetGameState()->GetMPGameState();
 
 		if ( mpState == WARMUP || mpState == COUNTDOWN ) {
@@ -3631,7 +3641,7 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 	// player is armed from the moment they exist - through the countdown, after
 	// a mid-round join, and after a thaw - instead of being handed the arsenal
 	// at "FIGHT" with a blaster already in their hands.
-	if ( gameLocal.isMultiplayer && !spectating &&
+	if ( gameLocal.isMultiplayer && !spectating && !instagib &&
 		 MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) ) {
 		// Magazines too. Init() preserves inventory.clip across a respawn, so
 		// without this a player carries last round's part-empty magazines into
@@ -3669,6 +3679,32 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 		botManager.OnPlayerRespawned( entityNumber );
 	}
 // openQ4 END
+}
+
+/*
+===============
+idPlayer::GiveInstagibLoadout
+
+openQ4: the railgun with unlimited slugs, and the gauntlet as the one other
+way to kill. Runs on every spawn, on the server and on each client alike, and
+replaces whatever Init() handed out from the player def.
+===============
+*/
+void idPlayer::GiveInstagibLoadout( void ) {
+	const int railgun = SlotForWeapon( "weapon_railgun" );
+	const int gauntlet = SlotForWeapon( "weapon_gauntlet" );
+	if ( railgun < 0 ) {
+		gameLocal.Warning( "idPlayer::GiveInstagibLoadout: '%s' has no railgun slot", spawnArgs.GetString( "classname" ) );
+		return;
+	}
+
+	inventory.weapons = ( 1 << railgun ) | ( gauntlet >= 0 ? ( 1 << gauntlet ) : 0 );
+	// A negative count is unlimited: HasAmmo always answers it, UseAmmo never
+	// spends it, and the snapshot carries -1 as a value of its own.
+	inventory.ammo[ inventory.AmmoIndexForWeaponIndex( railgun ) ] = -1;
+	inventory.clip[ railgun ] = -1;
+	CacheWeapons();
+	idealWeapon = railgun;
 }
 
 /*
@@ -7192,8 +7228,9 @@ void idPlayer::DropWeapon( void ) {
 	// with the whole arsenal and full ammo, so a dropped weapon can only ever be
 	// an ammo resupply - which turns an equal-terms round into a corpse-camping
 	// game and is exactly what the fixed loadout exists to prevent.
+	// Instagib likewise: a dropped railgun would be a pickup nobody needs.
 	if ( gameLocal.isMultiplayer &&
-		 MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) ) {
+		 ( MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) || gameLocal.mpGame.IsInstagib() ) ) {
 		return;
 	}
 
@@ -8825,6 +8862,12 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
  			noDamage = true;
  			break;
 		}
+	}
+
+	// openQ4: in Instagib only another player can hurt you; the landing still
+	// shows, but costs nothing. A pit's trigger_hurt is world damage and still kills.
+	if ( gameLocal.isMultiplayer && gameLocal.mpGame.IsInstagib() ) {
+		noDamage = true;
 	}
 
 	//jshepard: no falling damage if falling damage is disabled
@@ -12198,6 +12241,17 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	// based on g_skill, and we don't want to compensate for skill level twice.
 	CalcDamagePoints( inflictor, attacker, &damageDef->dict, damageScale, location, &damage, &armorSave );
 
+	// openQ4: Instagib. Whatever another player lands is lethal and armour
+	// saves nothing. A hit that was already worth nothing - a team mate's with
+	// team damage off, or one on god mode - stays that way, and the world and
+	// your own weapons hurt you exactly as they always do.
+	const bool instagibHit = gameLocal.isMultiplayer && gameLocal.mpGame.IsInstagib() &&
+		damage > 0 && health > 0 && attacker != this && attacker->IsType( idPlayer::GetClassType() );
+	if ( instagibHit ) {
+		damage = Max( damage, health );
+		armorSave = 0;
+	}
+
 	//
 	// determine knockback
 	//
@@ -12386,6 +12440,15 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 
 			if ( health < -999 ) {
 				health = -999;
+			}
+
+			// openQ4: and an Instagib kill gibs. The hit took exactly the health
+			// that was left, so the score, the stats and the damage number stay
+			// honest; this takes the body past the gib threshold Killed() and
+			// every client test (health < -20), since health is what replicates.
+			// Freeze Tag freezes instead of killing, and keeps its body whole.
+			if ( instagibHit && !MPGameTypeHasAny( gameLocal.gameType, GTF_FREEZE ) ) {
+				health = Min( health, INSTAGIB_GIB_HEALTH );
 			}
 
  			isTelefragged = damageDef->dict.GetBool( "telefrag" );

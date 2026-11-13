@@ -1596,4 +1596,6 @@
 	"#str_231770"	"O renderizador desenha no máximo 2x aqui, então a cena usa 2x."
 	"#str_231771"	"O renderizador desenha no máximo 4x aqui, então a cena usa 4x."
 	"#str_231772"	"O renderizador desenha no máximo 8x aqui, então a cena usa 8x."
+	"#str_231960"	"Instagib"
+	"#str_231961"	"%s Instagib"
 }

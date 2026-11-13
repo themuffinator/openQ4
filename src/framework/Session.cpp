@@ -6920,7 +6920,7 @@ void idSessionLocal::NoteRetainedLoadingConnecting( int count ) {
 // the players known as the load starts and the server's message.
 void idSessionLocal::PublishRetainedLoadingServer( const idDict &serverInfo ) {
 	static const char *const queried[] = { "si_gameType", "si_fragLimit", "si_captureLimit", "si_controlTime", "si_roundLimit",
-		"si_scoreLimit", "si_timeLimit" };
+		"si_scoreLimit", "si_timeLimit", "si_instagib" };
 	for ( int i = 0; i < static_cast<int>( sizeof( queried ) / sizeof( queried[0] ) ); i++ ) {
 		guiLoading->SetStateString( va( "query_%s", queried[ i ] ), serverInfo.GetString( queried[ i ] ) );
 	}
