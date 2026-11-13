@@ -16,8 +16,16 @@ spread comes from the shared seed; a predicted shot leaves actor impacts to the
 server's copy and the copy leaves everything else to the prediction; damage and the
 server's broadcast are unchanged.
 
-Single-reversal controls re-run both halves against mutated production source and
-require each one to fail.
+tools/tests/native/MpRespawnWeaponRaiseFixture.cpp executes the client's weapon
+bookkeeping across its owner's respawn, spliced from src/mpgame/Player.cpp and
+src/mpgame/Weapon.cpp: the snapshot reader's hitch test, weapon-change block and respawn
+branch, the weapon UpdateWeapon makes, and the raise rvWeapon::PlayAnim plays. The server
+raises the new life's weapon on its own frame; the client raises its weapon from that game
+time, so its shots fall on the server's frames. Only a respawn across a genuine hitch, or a
+weapon swap the client missed, catches the weapon straight up to ready.
+
+Single-reversal controls re-run every part against mutated production source and require
+each one to fail.
 """
 from __future__ import annotations
 
@@ -52,6 +60,56 @@ STATE_MUTATIONS = (
      "h ^= static_cast<unsigned int>( shooterEntityNumber + 1 ) * 0x85EBCA77u;", "h ^= 0u;"),
     ("the seed is the raw shot time", "unsigned int h = static_cast<unsigned int>( shotTime ) * 0x9E3779B1u;",
      "unsigned int h = 0; return shotTime + shooterEntityNumber;"),
+)
+
+
+# Each reverses one rule of the respawn raise; every one must fail its fixture.
+RESPAWN_MUTATIONS = (
+    ("Init() restarts the snapshot sequence on a respawn", "player",
+     "lastSnapshotSequence = latchSnapshotSequence;\n\t\tweaponCatchup = stateHitch;",
+     "(void)latchSnapshotSequence;\n\t\tweaponCatchup = stateHitch;"),
+    ("Init() restarts the snapshot sequence on spectating", "player",
+     "lastSnapshotSequence = latchSnapshotSequence;\n\t\tweaponCatchup = false;",
+     "(void)latchSnapshotSequence;\n\t\tweaponCatchup = false;"),
+    ("a catch-up outlives the life spectating ends", "player",
+     "lastSnapshotSequence = latchSnapshotSequence;\n\t\tweaponCatchup = false;",
+     "lastSnapshotSequence = latchSnapshotSequence;"),
+    ("a respawn always catches up", "player", "weaponCatchup = stateHitch;", "weaponCatchup = true;"),
+    ("a respawn across a hitch raises", "player", "weaponCatchup = stateHitch;", "weaponCatchup = false;"),
+    ("the raise ignores whether the server's weapon exists", "player",
+     "int serverWeaponRaiseTime = gameLocal.time + frameMsec;", "int serverWeaponRaiseTime = gameLocal.time;"),
+    ("the spawn clock is ignored", "player",
+     "serverWeaponRaiseTime = spawnClock ? gameLocal.time + frameMsec - spawnElapsed : gameLocal.time;",
+     "serverWeaponRaiseTime = gameLocal.time;"),
+    ("the spawn clock leaves out the spawn's own frame", "player",
+     "serverWeaponRaiseTime = spawnClock ? gameLocal.time + frameMsec - spawnElapsed : gameLocal.time;",
+     "serverWeaponRaiseTime = spawnClock ? gameLocal.time - spawnElapsed : gameLocal.time;"),
+    ("any knockback reads as the spawn clock", "player", "spawnElapsed % frameMsec == 0;", "true;"),
+    ("the spawn starts some other knockback", "player",
+     "physicsObj.SetKnockBack( SPAWN_KNOCKBACK_MSEC );", "physicsObj.SetKnockBack( 100 );"),
+    ("new weapon entities always catch up", "player",
+     "if ( stateHitch ) {\n\t\t\t\tweaponCatchup = true;\n\t\t\t} else {\n\t\t\t\tnetWeaponRaiseTime = serverWeaponRaiseTime;\n\t\t\t}",
+     "weaponCatchup = true;"),
+    ("the new weapon drops the raise time", "player",
+     "weapon->SetNetRaiseStartTime( netWeaponRaiseTime );", "(void)0;"),
+    ("the raise time outlives the weapon it was for", "player",
+     "netWeaponRaiseTime = -1;\n\t\t\tweaponCatchup = false;", "weaponCatchup = false;"),
+    ("a hitch is never seen", "player", "stateHitch = true;", "stateHitch = false;"),
+    ("a missed weapon swap raises", "player", "if ( stateHitch ) {\n\t\t\tweaponCatchup = true;\n\t\t}", ""),
+    ("the raise plays from now", "weapon",
+     "startTime = Min( netRaiseStartTime, gameLocal.time );", "startTime = gameLocal.time;"),
+    ("the world model raises from now", "weapon",
+     "worldAnimator->PlayAnim( channel, anim, startTime, FRAME2MS( blendFrames ) );",
+     "worldAnimator->PlayAnim( channel, anim, gameLocal.time, FRAME2MS( blendFrames ) );"),
+    ("a catch-up keeps the raise time", "weapon",
+     "netRaiseStartTime = -1;\n\tif ( gameLocal.isMultiplayer", "if ( gameLocal.isMultiplayer"),
+    ("the raise time outlives its raise", "weapon", "netRaiseStartTime = -1;\n\t\t}\n\n\t\tviewModel->Show();",
+     "}\n\n\t\tviewModel->Show();"),
+)
+WEAPON_FUNCTIONS = (
+    "void rvWeapon::PlayAnim( int channel, const char *animname, int blendFrames ) {",
+    "void rvWeapon::SetNetRaiseStartTime( int time ) {",
+    "void rvWeapon::NetCatchup( void ) {",
 )
 
 
@@ -143,6 +201,35 @@ def build_fixture(game_local: str, header: str) -> str:
     return harness.replace("// PRODUCTION_MEMBERS", members).replace("// PRODUCTION_FUNCTIONS", bodies)
 
 
+def build_respawn_fixture(player: str, weapon: str) -> str:
+    snapshot = block(player, "void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {")
+    start = "if ( static_cast<unsigned int>( snapshotSequence ) - static_cast<unsigned int>( lastSnapshotSequence ) > 1u ) {"
+    hitch = snapshot[snapshot.index(start):snapshot.index("oldHealth = health;") + len("oldHealth = health;")]
+    # The fixture records the sequence where production does: after the hitch test, before
+    # the weapon is touched.
+    require_before(snapshot, "oldHealth = health;", "lastSnapshotSequence = snapshotSequence;", "the snapshot sequence")
+    require_before(snapshot, "lastSnapshotSequence = snapshotSequence;", "bool weaponChange = ( idealWeapon != newIdealWeapon );",
+                   "the snapshot sequence")
+    change = snapshot[snapshot.index("bool weaponChange = ( idealWeapon != newIdealWeapon );"):
+                      snapshot.index("// rjohnson: instance persistance information")]
+    respawn = block(snapshot, "else if ( oldHealth <= 0 && health > 0 ) {")
+    update = player.split("void idPlayer::UpdateWeapon( void )", 1)[1].split("{", 1)[1].split("\tif ( hiddenWeapon && tipUp", 1)[0]
+    weapons = "\n".join(block(weapon, signature) for signature in WEAPON_FUNCTIONS)
+    spectate = block(player, "void idPlayer::Spectate( bool spectate, bool force ) {")
+    entering = spectate[spectate.index("const unsigned int latchSnapshotSequence = lastSnapshotSequence;"):
+                        spectate.index("StopRagdoll();")]
+    # The client reads the spawn's own knockback as its clock.
+    constant = "const int SPAWN_KNOCKBACK_MSEC = 100;"
+    require(player, constant, "the spawn knockback constant")
+    require(block(player, "void idPlayer::SpawnToPoint("), "physicsObj.SetKnockBack( SPAWN_KNOCKBACK_MSEC );",
+            "the spawn starts the clock the client reads")
+    harness = read("tools/tests/native/MpRespawnWeaponRaiseFixture.cpp")
+    return (harness.replace("// PRODUCTION_CONSTANTS", constant).replace("// PRODUCTION_HITCH", hitch).replace("// PRODUCTION_WEAPON_CHANGE", change)
+            .replace("// PRODUCTION_RESPAWN", respawn).replace("// PRODUCTION_UPDATE_WEAPON", update)
+            .replace("// PRODUCTION_SPECTATE", entering)
+            .replace("// PRODUCTION_WEAPON", weapons))
+
+
 def compile_and_run(source: str, directory: Path, name: str, compiler: str) -> subprocess.CompletedProcess:
     cpp = directory / f"{name}.cpp"
     exe = directory / (f"{name}.exe" if os.name == "nt" else name)
@@ -213,7 +300,24 @@ def main() -> None:
             if control.returncode == 0:
                 raise SystemExit(f"mp_predicted_hitscan_state: control did not fail: {label}")
 
-    print(f"mp_predicted_hitscan_state: ok ({len(source_controls) + len(STATE_MUTATIONS)} single-reversal controls fail)")
+        respawn_sources = {"player": read("src/mpgame/Player.cpp"), "weapon": weapon}
+        result = compile_and_run(build_respawn_fixture(respawn_sources["player"], weapon), path, "respawn", compiler)
+        if result.returncode != 0:
+            raise SystemExit(f"mp_predicted_hitscan_state: respawn raise FAILED\n{result.stdout}{result.stderr}")
+        for index, (label, name, original, mutated) in enumerate(RESPAWN_MUTATIONS):
+            if respawn_sources[name].count(original) != 1:
+                raise SystemExit(f"mp_predicted_hitscan_state: respawn mutation anchor not unique: {label}")
+            changed = dict(respawn_sources, **{name: respawn_sources[name].replace(original, mutated, 1)})
+            try:
+                source = build_respawn_fixture(changed["player"], changed["weapon"])
+            except AssertionError:
+                continue
+            control = compile_and_run(source, path, f"respawn{index}", compiler)
+            if control.returncode == 0:
+                raise SystemExit(f"mp_predicted_hitscan_state: respawn control did not fail: {label}")
+
+    controls = len(source_controls) + len(STATE_MUTATIONS) + len(RESPAWN_MUTATIONS)
+    print(f"mp_predicted_hitscan_state: ok ({controls} single-reversal controls fail)")
 
 
 if __name__ == "__main__":

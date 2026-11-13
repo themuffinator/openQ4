@@ -856,6 +856,9 @@ Report SHA-256s: `p1-loopback`
   loopback) or three frames (48 ms, impaired) before the server fired it. Its
   muzzle flash and sound already did this before; now its tracer and wall
   mark follow them, while the body impacts come from the server's shots.
+  Fixed on 13 November: the catch-up came from a false state hitch after the
+  respawn, not from new weapon entities
+  ([below](#the-weapon-for-a-new-life-raises-with-the-servers-13-november-2026)).
 - **Captures.** The captures agree. The machinegun and railgun sweeps show
   each tracer or rail leaving the barrel for the crosshair on the capture it
   fires in, with impacts at the crosshair. With prediction off, the same
@@ -879,7 +882,139 @@ screenshot stall under that load. The harness now refuses a busy port.
 Remaining for MP-07: walking through a teleporter while firing, a moving
 gauntlet target and the feel with a real mouse
 ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)),
-real WAN peers, and the post-respawn fire phase above.
+and real WAN peers. The post-respawn fire phase above is fixed (next section).
+
+## The weapon for a new life raises with the server's, 13 November 2026
+
+A client's weapon for a new life now comes up with the server's, so a burst
+held through a respawn stays on the server's frames. Before, the client caught
+that weapon straight up to ready while the server's raised it, so the client
+fired shots the server never fired. It then drew the rest of the burst one to
+three frames ahead of the server's shots.
+
+The cause was the client's own snapshot bookkeeping. The respawn branch of
+`idPlayer::ReadFromSnapshot` calls `Init()`, which sets `lastSnapshotSequence`
+back to 0 and clears `idealWeapon`. The next snapshot therefore read as a
+state hitch (missed snapshots) carrying a change of weapon, and the client
+marked its weapon for catch-up. Raven's `UpdateWeapon` dropped that request
+when it made the weapon, so the weapon raised. On 28 October openQ4 made
+`UpdateWeapon` honour it with `NetCatchup`, so a paused demo seek would draw a
+ready weapon ([multiview demos](multiview-demos.md#paused-seek-weapon-catch-up-28-october-2026)).
+That made every respawn catch up. Joining again after spectating did the same
+by another route. `Spectate( true )` also calls `Init()`, so its next snapshot
+read as a hitch and left a catch-up request standing for the whole time the
+player spectated. The join then caught the weapon for the new life up. The
+server spawns new weapon entities for a joining player, and the client's
+spawn-id check (`SetSpawnId`) asked for catch-up as well.
+
+The server makes the weapon for a new life, and starts its raise, on the
+spawn's own frame. The `MP_WEAPON` logs below show the respawn and the raise
+at the same game time in every run. The fix is in `src/mpgame/` only:
+
+- The respawn branch and `Spectate( true )` keep the snapshot sequence across
+  `Init()`. Entering spectating also drops any catch-up still waiting for the
+  last life's weapon.
+- A respawn, or new weapon entities, catch up only when that snapshot itself
+  came after missed snapshots.
+- Otherwise the client records the frame the server's weapon began its raise:
+  - A snapshot without the server's weapon state means that weapon is made on
+    the next frame.
+  - A snapshot that carries it was taken on the spawn's frame or a frame or two
+    later, since snapshots go out every 33 ms. The spawn's knockback
+    (`SPAWN_KNOCKBACK_MSEC`, 100 ms) tells which. The server's physics runs it
+    down 16 ms a frame from the spawn's frame, and the snapshot carries it. A
+    value that doesn't read as that clock falls back to the snapshot's frame.
+- `UpdateWeapon` hands that time to the new weapon
+  (`rvWeapon::SetNetRaiseStartTime`). `rvWeapon::PlayAnim` plays the view and
+  world raise from it, so `AnimDone` reaches ready, and the weapon fires, on
+  the server's frames.
+- A catch-up the seek path asks for still wins. A weapon swap the client missed
+  across a hitch still catches up. `LoadDeferredModel` keeps Raven's catch-up:
+  in every run, the model reload a join triggers ran before the new weapon
+  existed on both sides.
+
+`net_mpHitscanDebug` now also logs `MP_WEAPON` lines:
+
+- each spawn on the server;
+- each respawn or new set of weapon entities on the client, with the raise
+  time it chose;
+- each catch-up;
+- each raise's start and end, on both sides.
+
+`mp_firing_view_capture.py` gained a rejoin step. The shooter spectates, joins
+again and fires while turning. The harness pairs each scripted new life (the
+respawn and the rejoin) with the client's raise for it. It fails if that raise
+is caught up or starts on another frame, and it holds both bursts to
+same-frame matching. It reports the map-start join without judging it. The
+shooter's script turns logging on after that join, and the join can fall in
+the gaps while a connection starts.
+
+`mp_predicted_hitscan_state.py` adds a native fixture
+(`tools/tests/native/MpRespawnWeaponRaiseFixture.cpp`) spliced from
+production. It covers:
+
+- the snapshot reader's hitch test, weapon-change and weapon-entity blocks, and
+  its respawn branch;
+- the snapshot bookkeeping in `Spectate( true )`;
+- the weapon `UpdateWeapon` makes;
+- the raise `rvWeapon::PlayAnim` plays.
+
+It runs these cases:
+
+- a death and respawn with and without the server's weapon in the respawn
+  snapshot, with spawn clocks of one, two and three frames, plus a clock that
+  ran out, one that never ran, and a knockback that is not the clock;
+- a respawn across a hitch;
+- a join with new weapon entities;
+- spectating and joining again, with and without a catch-up still waiting;
+- missed and seen weapon swaps.
+
+Its 19 single-reversal controls fail. One of them restores the original defect
+by dropping the sequence latch. `mvd_seek_weapon_state.py` checks that a
+seek's catch-up still wins over a respawn's raise time.
+
+Two runs on one staged build (`game-mp_x64.dll` SHA-256
+`e4878ca2607a29d3db2c98b540b47db8dedb6c83a90ef48b12d5f777c1a95ad0`), with
+`--predict-hitscan 1`, under `.tmp/mp07-respawn/`, both pass:
+
+| Run | Server shots, same frame | Respawn burst | Rejoin burst | Respawn raise, server and client | Rejoin raise, server and client |
+| --- | --- | --- | --- | --- | --- |
+| `evidence-loopback`, OpenGL | 135 of 136 | 28 of 28 | 23 of 23 | 77056-77765 both | 89584-90293 both |
+| `evidence-impaired`, 80 ms ±20, enhanced prediction and lag compensation | 136 of 136 | 29 of 29 | 22 of 22 | 77424-78133 both | 90000-90709 both |
+
+Report SHA-256s: `evidence-loopback`
+`39a1c4fd2fceeae59fcdb3338ff9cd68e2d5fb230c4b1ed0c5c1457de70fc5e3`,
+`evidence-impaired`
+`fb61ed70235b182623034bd3f24f05a8680e3892e1b366682c5e4fcec183e0bd`.
+
+- **No shots the server never fired after a respawn.** In both runs, every
+  prediction without a server shot came before the respawn: one shot on
+  loopback, two with latency. A held burst keeps predicting until the client
+  hears of its own death, a round trip after the server killed it. The client's
+  first shots after the respawn started 2634 and 2158 units from where it
+  died. Every matched direction is the server's to the log's five decimals.
+- **The miss on loopback** is one server machinegun shot in the standing target
+  step that the client drew from the server's copy. It has nothing to do with a
+  respawn.
+- **The knockback clock is needed.** On the build before it, a respawn on the
+  frame before its snapshot left the client's raise one frame (16 ms) late
+  (`r2-loopback`). The snapshot carried 68 ms of knockback, two frames down,
+  and the clock now places the spawn on the right frame.
+- **The map-start join** is reported, not judged. In the impaired run the
+  client's raise for it came 160 ms late. It landed in the gaps while the
+  connection started, with the knockback clock run out. Late means the client
+  fires late, never shots the server does not fire.
+- **Open: aim after a join under latency.** In two of four runs at 80 ms ±20,
+  the server's aim drifted from the client's about a second into the burst
+  after the rejoin. In `r9-impaired-diag` it drifted 119°, with the server's
+  fire four frames behind, and snapshots had been lost there. In
+  `final-impaired` it drifted 56° over two shots, which still fell on the same
+  frames. `r10-impaired-diag` and `evidence-impaired` were clean, and no
+  respawn burst drifted. The weapon raise matched in every run, so the cause
+  lies elsewhere. A likely place is the view angles the server sets on its
+  first think after a spawn (`SetViewAngles( spawnAngles )` from whatever
+  command it has then). The harness reports the rejoin's directions under
+  simulated latency and holds them only without it.
 
 ## Remote weapon play and live spectator follows, 5 November 2026
 

@@ -22,11 +22,14 @@ point):
   gauntlet's reach; the shooter holds still and fires. A moving target (the
   rest of 7.2) stays with the by-eye checklist;
 - respawn (7.4): the shooter fires the machinegun while turning, kills
-  itself, and keeps firing through the respawn. The client's new weapon is
-  caught up straight to ready while the server's raises, so this burst can
-  run out of phase with the server; the report gives its offset and where the
-  first shots after the death started instead of holding it to same-frame
-  matching.
+  itself, and keeps firing through the respawn. The client's weapon for the
+  new life raises from the frame the server's began its raise, so the burst
+  after the respawn is held to same-frame matching like every other step. The
+  report also gives each new life's raise on both sides and where the first
+  shots after the death started;
+- rejoin: the shooter spectates, joins again (new weapon entities, as on any
+  join from spectating) and fires the machinegun while turning; its weapon
+  for the new life must raise with the server's too.
 
 The harness feeds the host a control file it executes every 100 ms, which is
 how the bots are paused and the host is placed and moved on cue. Both
@@ -71,7 +74,7 @@ HITSCAN_SWEEPS = ("machinegun", "railgun", "shotgun")
 # checklist.
 TARGETS = (("railgun", 96), ("machinegun", 96), ("gauntlet", 44))
 BODY_STEP = "target_machinegun"
-MEASURED_STEPS = (*HITSCAN_SWEEPS, "target_railgun", BODY_STEP, "respawn")
+MEASURED_STEPS = (*HITSCAN_SWEEPS, "target_railgun", BODY_STEP, "respawn", "rejoin")
 BURST = 12
 INTERVAL_MSEC = 150
 FIRE_MSEC = 4000
@@ -80,6 +83,7 @@ SENSITIVITY = 5
 M_YAW = 0.022
 LINE = re.compile(r"MP_HITSCAN kind=(\w+) client=(\d) owner=(-?\d+) local=(\d) def=(-?\d+) time=(-?\d+) "
                   r"newFrame=(\d) seed=(-?\d+) fx=(\S+) dir=(\S+) gunGap=(\S+) aimGap=(\S+) hit=(-?\d+) actor=(\d)")
+WEAPON = re.compile(r"MP_WEAPON (\w+) client=(\d) owner=(-?\d+) local=(\d) time=(-?\d+)(?:.* start=(-?\d+) done=(-?\d+))?")
 VIEWPOS = re.compile(r"\((-?[\d.]+) (-?[\d.]+) (-?[\d.]+)\) (-?[\d.]+)")
 
 
@@ -100,6 +104,46 @@ def parse(log: str) -> list[dict]:
                       "gunGap": float(gun), "aimGap": float(aim), "hit": int(hit), "actor": int(actor),
                       "segment": segment})
     return shots
+
+
+def weapon_events(log: str) -> list[dict]:
+    """The MP_WEAPON lines in log order: new lives (respawn, entities) and raises."""
+    events = []
+    for match in WEAPON.finditer(log):
+        event, client, owner, local, game_time, start, done = match.groups()
+        events.append({"event": event, "client": int(client), "owner": int(owner), "local": int(local),
+                       "time": int(game_time), "start": int(start) if start else None,
+                       "done": int(done) if done else None})
+    return events
+
+
+def new_life_raises(host_events: list[dict], client_events: list[dict], slot: int, scripted_from: int | None) -> list[dict]:
+    """Pair the raise of each of the shooter's new lives on the server with the client's.
+
+    The server raises the weapon for a life on the frame it makes it, right after the
+    respawn line. The client's raise for it starts from that frame, so its start and end
+    equal the server's; a client that caught its weapon up to ready logs no raise at all.
+    Lives from scripted_from on (the respawn and the rejoin) are judged. The first join is
+    reported only: the shooter turns net_mpHitscanDebug on from its script after the map
+    loads, possibly after that join, and it can land in the gaps of a connection starting.
+    """
+    pairs = []
+    for index, event in enumerate(host_events):
+        if event["event"] != "respawn" or event["owner"] != slot:
+            continue
+        server = next((e for e in host_events[index + 1:] if e["event"] == "raise" and e["owner"] == slot), None)
+        if server is None:
+            continue
+        client = min((e for e in client_events if e["event"] == "raise" and e["local"] and
+                      abs(e["start"] - server["start"]) <= 500),
+                     key=lambda e: abs(e["start"] - server["start"]), default=None)
+        pairs.append({"respawn_time": event["time"],
+                      "judged": scripted_from is not None and event["time"] >= scripted_from,
+                      "server_start": server["start"], "server_done": server["done"],
+                      "client_start": client["start"] if client else None,
+                      "client_done": client["done"] if client else None,
+                      "client_raised_at": client["time"] if client else None})
+    return pairs
 
 
 def angle(a: list[float], b: list[float]) -> float:
@@ -209,7 +253,15 @@ def main() -> int:
     shooter += ["echo FIRING_VIEW_RESPAWN", "kill", "waitMsec 3300"]
     burst(shooter, shots, "respawn_after", 16)
     shooter += ["in_presentationViewProbeAttack 0", "in_presentationViewProbe 0", "waitMsec 1200",
-                "echo FIRING_VIEW_SEGMENT_END respawn", "openq4_reportMPState", "echo FIRING_VIEW_COMPLETE",
+                "echo FIRING_VIEW_SEGMENT_END respawn"]
+    # Spectating removes the weapon entities, so joining again makes new ones. Fire starts
+    # once the join has gone through: a held attack while spectating cycles the camera. The
+    # client refuses a second ui_spectate change within 8 seconds (ThrottleUserInfo).
+    shooter += ["set ui_spectate Spectate", "waitMsec 9000", "echo FIRING_VIEW_SEGMENT rejoin", "set ui_spectate Play",
+                "waitMsec 400", f"in_presentationViewProbe {counts:g}", "in_presentationViewProbeAttack 1"]
+    burst(shooter, shots, "rejoin", 16)
+    shooter += ["in_presentationViewProbeAttack 0", "in_presentationViewProbe 0", "waitMsec 1200",
+                "echo FIRING_VIEW_SEGMENT_END rejoin", "openq4_reportMPState", "echo FIRING_VIEW_COMPLETE",
                 "waitMsec 1000", "disconnect", "quit"]
     write_script(games["host"] / "firing_view.cfg", host)
     write_script(games["shooter"] / "firing_view.cfg", shooter)
@@ -234,7 +286,7 @@ def main() -> int:
                  "net_enableIPv6": "0", "si_pure": "0", "si_gameType": "DM", "si_maxPlayers": "8",
                  # Warmup that never ends: the match waits for 16 players, so the
                  # warmup arsenal (si_warmupWeapons) stays in every hand.
-                 "si_warmup": "1", "si_minPlayers": "16", "si_warmupWeapons": "1", "si_useReady": "0",
+                 "si_warmup": "1", "si_minPlayers": "16", "si_warmupWeapons": "1", "si_useReady": "0", "si_spectators": "1",
                  "si_fragLimit": "999", "si_timeLimit": "0", "g_matchProfile": "casual", "bot_minPlayers": "0",
                  "bot_chat": "0", "com_skipLoadingContinue": "1", "g_autoExecAfterMapLoad": "firing_view.cfg",
                  "g_autoExecAfterMapLoadDelayMs": "500"}
@@ -354,6 +406,7 @@ def main() -> int:
             "server_body_hits": sum(s["actor"] for s in theirs),
             "confirmed_body_impacts": sum(s["actor"] for s in mine if s["kind"] == "confirmed"),
             "hit_agreement": f"{sum(a['actor'] == b['actor'] for a, b in pairs)}/{len(pairs)}",
+            "predicted_vs_server_direction_deg": summary([angle(b["dir"], a["dir"]) for a, b in pairs]),
         }
         own = sorted((s for s in mine if s["kind"] == "predicted"), key=lambda s: s["time"])
         if name == "respawn" and own:
@@ -370,6 +423,19 @@ def main() -> int:
         return result
 
     steps = {name: step(name) for name in MEASURED_STEPS}
+    # The scripted lives follow the shooter's first logged shot (its first target step).
+    scripted_from = min((s["time"] for s in local), default=None)
+    lives = new_life_raises(weapon_events(host_log), weapon_events(log), slot, scripted_from) if slot is not None else []
+    judged = [life for life in lives if life["judged"]]
+    # A held burst keeps predicting shots after the server has killed the shooter until the
+    # client hears of the death, a round trip on; only predictions after the respawn count
+    # against it.
+    respawn_time = judged[0]["respawn_time"] if judged else None
+    extras = [s for s in predicted if s["segment"] == "respawn" and (s["time"], s["def"]) not in server_times]
+    steps["respawn"]["predictions_at_death_without_server_shot"] = sum(
+        respawn_time is None or s["time"] < respawn_time for s in extras)
+    steps["respawn"]["predictions_after_respawn_without_server_shot"] = sum(
+        respawn_time is not None and s["time"] >= respawn_time for s in extras)
     outside = [s for s in server if s["segment"] != "respawn"]
     outside_matched = sum((s["time"], s["def"]) in by_time for s in outside)
     metrics = {
@@ -387,6 +453,7 @@ def main() -> int:
         "full_copy_aim_gap_deg": summary([s["aimGap"] for s in copies if s["kind"] == "echo"]),
         "copy_aim_gap_deg": summary([s["aimGap"] for s in copies]),
         "steps": steps,
+        "new_life_raises": lives,
         "host_placements": placements,
         "gauntlet_target_captures": sum(1 for s in shots if s.startswith("target_gauntlet")),
     }
@@ -397,18 +464,45 @@ def main() -> int:
             failures.append(f"no server copies of shots in the {name} step arrived")
         if args.predict_hitscan and not steps[name]["predicted"]:
             failures.append(f"no predicted shots in the {name} step")
+    # The weapon for each scripted new life raises with the server's, prediction on or off.
+    if len(judged) < 2:
+        failures.append(f"expected the respawn and the rejoin among the shooter's new lives, found {len(judged)}")
+    for life in judged:
+        if life["client_start"] is None:
+            failures.append(f"the client caught its weapon for the life at {life['respawn_time']} up to ready "
+                            "instead of raising it")
+        elif (life["client_start"], life["client_done"]) != (life["server_start"], life["server_done"]):
+            failures.append(f"the client raised its weapon for the life at {life['respawn_time']} over "
+                            f"{life['client_start']}-{life['client_done']}, the server over "
+                            f"{life['server_start']}-{life['server_done']}")
     if len(placements) != len(TARGETS):
         failures.append("the host was not placed for every target step")
     if not steps[BODY_STEP]["server_body_hits"]:
         failures.append(f"no shot in the {BODY_STEP} step hit the host, so no impact on a body was drawn")
     if args.predict_hitscan and server:
-        # After a respawn the client's weapon is caught up straight to ready while the
-        # server's raises, so a burst held through it can run out of phase; that step is
-        # reported on its own above.
-        if outside_matched < 0.9 * len(outside):
-            failures.append(f"only {outside_matched} of {len(outside)} server shots outside the respawn were "
-                            "predicted on the same frame")
-        worst = metrics["predicted_vs_server_direction_deg"].get("max", 0.0)
+        if len(matched) < 0.9 * len(server):
+            failures.append(f"only {len(matched)} of {len(server)} server shots were predicted on the same frame")
+        # The burst held through the respawn is held to the same frames as the server.
+        respawn = steps["respawn"]
+        if respawn["server_shots_predicted_same_frame"] < 0.9 * respawn["server_shots"]:
+            failures.append(f"only {respawn['server_shots_predicted_same_frame']} of {respawn['server_shots']} server "
+                            "shots around the respawn were predicted on the same frame")
+        if respawn["predictions_after_respawn_without_server_shot"] > 1:
+            failures.append(f"the client predicted {respawn['predictions_after_respawn_without_server_shot']} shots "
+                            "after the respawn that the server never fired")
+        rejoin = steps["rejoin"]
+        if rejoin["server_shots_predicted_same_frame"] < 0.9 * rejoin["server_shots"]:
+            failures.append(f"only {rejoin['server_shots_predicted_same_frame']} of {rejoin['server_shots']} server "
+                            "shots after the rejoin were predicted on the same frame")
+        if rejoin["predictions_without_server_shot"] > 1:
+            failures.append(f"the client predicted {rejoin['predictions_without_server_shot']} shots after the "
+                            "rejoin that the server never fired")
+        # Under simulated latency the server's aim can drift from the client's a second into
+        # the burst after a join from spectating (MP-07, open): the rejoin's directions are
+        # then reported, and held only without it.
+        impaired = bool(args.latency or args.jitter)
+        held = [(a, b) for a, b in matched if not (impaired and a["segment"] == "rejoin")]
+        worst = summary([angle(a["dir"], b["dir"]) for a, b in held]).get("max", 0.0)
         if worst > 0.1:
             failures.append(f"predicted and server shot directions differ by up to {worst} degrees")
         if metrics["copies_drawn_in_full"] > 0.1 * max(1, len(copies)):

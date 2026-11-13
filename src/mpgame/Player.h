@@ -1147,6 +1147,9 @@ private:
  	bool					respawning;				// set to true while in SpawnToPoint for telefrag checks
  	bool					leader;					// for sudden death situations
  	bool					weaponCatchup;			// raise up the weapon silently ( state catchups )
+	// openQ4: client only - the game time the server's weapon for this life began its
+	// raise, which the client's weapon for it raises from; -1 when there is none to follow
+	int						netWeaponRaiseTime;
 	int						startupLoadoutDepth;
 	bool					isTelefragged;			// proper obituaries
 	

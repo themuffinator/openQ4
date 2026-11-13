@@ -659,7 +659,11 @@ snapshot reader had requested catch-up; `idPlayer::UpdateWeapon` recreated the
 weapon and cleared that request before `Weapon_Combat` could honour it.
 
 Initialization now calls the existing `NetCatchup` state when requested, before
-clearing the flag. Normal spawns keep their raise animation. The executable
+clearing the flag. Normal spawns keep their raise animation. (13 November:
+live respawns and joins also requested catch-up, through a false state hitch
+and new weapon entities, so they were caught up as well. Those now raise with
+the server's weapon; a seek's catch-up still wins. See the
+[network record](mp-network-qualification.md#the-weapon-for-a-new-life-raises-with-the-servers-13-november-2026).) The executable
 `mvd_seek_weapon_state.py` runs the production initialization block, verifies
 once-only catch-up and absent/dead-player admission, and rejects the old code.
 

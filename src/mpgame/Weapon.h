@@ -202,6 +202,9 @@ public:
 	void				NetReload					( void );
 	void				NetEndReload				( void );
 	void				NetCatchup					( void );
+	// openQ4: a client weapon made for a new life raises from the game time the server's
+	// weapon began its raise, so both reach ready, and fire, on the same frames
+	void				SetNetRaiseStartTime		( int time );
 
 	// Ammo
 	static int			GetAmmoIndexForName			( const char *ammoname );
@@ -411,6 +414,8 @@ public:
 
  	// multiplayer
  	int								clipPredictTime;
+	// openQ4: game time the next raise starts from, -1 for now (SetNetRaiseStartTime)
+	int								netRaiseStartTime;
 
 	// these are the player render view parms, which include bobbing
 	idVec3							playerViewOrigin;

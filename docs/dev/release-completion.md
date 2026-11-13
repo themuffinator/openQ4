@@ -7,6 +7,37 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Your weapon comes up with the server's after a respawn, 13 November 2026
+
+- **Holding fire through a respawn no longer draws shots that never happened.**
+  Online, your client used to treat the weapon you respawn with as ready at
+  once while the server was still raising it. Holding fire drew four or five
+  tracers and wall marks the server never fired, then the rest of the burst a
+  frame or more ahead of the server's shots. Your weapon now comes up exactly
+  when the server's does, so every shot you see after a respawn is one the
+  server fires. Joining a match from spectating gets the same fix. Nothing to
+  change in your settings.
+- MP-07: the client's respawn handling, and its switch to spectating, reset its
+  snapshot sequence in `idPlayer::Init()`. The next snapshot then looked like
+  missed snapshots and asked for a weapon catch-up, which `UpdateWeapon` has
+  honoured since the 28 October demo-seek fix. The sequence now carries on
+  through both, and new weapon entities catch up only across real missed
+  snapshots. Otherwise the new weapon raises from the frame the server's did
+  (`rvWeapon::SetNetRaiseStartTime`). That frame is read from whether the
+  snapshot carries the server's weapon and from the spawn's 100 ms knockback,
+  which counts the frames since the spawn. `net_mpHitscanDebug` logs each new
+  life's raise and every catch-up on both sides as `MP_WEAPON`.
+- Evidence: `mp_firing_view_capture.py` passes on OpenGL loopback and with
+  80 ms ±20 latency. Every server shot in the bursts held through a respawn and
+  through a join after spectating was predicted on its own frame. The client's
+  weapon for each new life raised over exactly the server's frames, and no
+  shot the server never fired was predicted after a respawn.
+  `mp_predicted_hitscan_state.py` fails all 33 single-reversal controls
+  ([record](mp-network-qualification.md#the-weapon-for-a-new-life-raises-with-the-servers-13-november-2026)).
+- Open: under simulated latency, the server's aim can drift from the client's
+  a second after a join from spectating (two of four runs). This is separate
+  from the weapon raise and stays with MP-07.
+
 ## OpenGL ambient occlusion costs less indoors (FPS-04 follow-up), 13 November 2026
 
 - **Quality and Ultra run faster on OpenGL in interiors.** Ambient occlusion no
@@ -82,11 +113,11 @@ does not restore the withdrawn release. See
   drawn twice. `mp_predicted_hitscan_state.py` fails all 14 single-reversal
   controls
   ([record](mp-network-qualification.md#the-firing-players-own-shots-under-prediction-12-november-2026)).
-- Open: a burst held through a respawn can run a frame or more out of phase
-  with the server, because the client's new weapon is caught up straight to
-  ready while the server's raises. A by-eye pass, teleporters, a moving
-  gauntlet target and real WAN peers stay on the
-  [checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction).
+- A burst held through a respawn used to run a frame or more out of phase
+  with the server, because the client's new weapon was caught up straight to
+  ready while the server's raised. That is fixed on 13 November (entry above).
+  A by-eye pass, teleporters, a moving gauntlet target and real WAN peers stay
+  on the [checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction).
 
 ## Swimming stays put on the bottom, and lava looks like lava from inside, 12 November 2026
 

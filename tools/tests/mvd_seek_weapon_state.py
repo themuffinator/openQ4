@@ -23,11 +23,12 @@ def main() -> int:
 #include <cstdio>
 struct { bool isClient = true; } gameLocal;
 struct Weapon {
-    int catches = 0;
+    int catches = 0, raiseStart = -1;
     void NetCatchup() { ++catches; }
+    void SetNetRaiseStartTime(int time) { raiseStart = time; }
 };
 struct idPlayer {
-    int health = 100, idealWeapon = 1, creations = 0;
+    int health = 100, idealWeapon = 1, creations = 0, netWeaponRaiseTime = -1;
     bool spectating = false, weaponViewModel = true, weaponWorldModel = true;
     bool weaponCatchup = false;
     Weapon storage, *weapon = nullptr;
@@ -44,6 +45,15 @@ int main() {
         assert(!player.weaponCatchup);
         player.UpdateWeapon();
         assert(player.creations == 1 && player.storage.catches == catchup);
+    }
+    // A seek's catch-up wins over a respawn's raise time; either way the time is spent.
+    for (int catchup = 0; catchup != 2; ++catchup) {
+        idPlayer player;
+        player.weaponCatchup = catchup != 0;
+        player.netWeaponRaiseTime = 500;
+        player.UpdateWeapon();
+        assert(player.storage.catches == catchup && player.storage.raiseStart == (catchup ? -1 : 500));
+        assert(player.netWeaponRaiseTime == -1 && !player.weaponCatchup);
     }
     for (int admission = 0; admission != 4; ++admission) {
         idPlayer player;

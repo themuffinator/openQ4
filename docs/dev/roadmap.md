@@ -3850,7 +3850,7 @@ prediction/rewind defaults.
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
-| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); the post-respawn weapon catch-up phase; remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames; defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. | Physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 
@@ -4513,13 +4513,34 @@ Completion substeps:
   with the old behaviour as baseline. Every server shot outside the respawn
   burst was predicted on its own frame, with the same seed and direction. No
   copy was drawn twice, and every prediction starts at the drawn gun. After a
-  respawn nothing is drawn from the old position. The respawn burst can run a
+  respawn nothing is drawn from the old position. The respawn burst ran a
   frame or more out of phase with the server, because the client's new weapon
-  is caught up straight to ready while the server's raises; that predates
-  this work and stays open. `mp_predicted_hitscan_state.py` runs the note ring
+  was caught up straight to ready while the server's raised (fixed 13
+  November, below). `mp_predicted_hitscan_state.py` runs the note ring
   and seed natively with 14 failing controls. Remaining: teleporters, a moving
   gauntlet target and the by-eye pass with a real mouse, WAN peers, and the
   defaults decision for enhanced prediction and lag compensation.
+  Progress, 13 November: [the weapon for a new life](mp-network-qualification.md#the-weapon-for-a-new-life-raises-with-the-servers-13-november-2026)
+  raises with the server's. The client's respawn branch and its switch to
+  spectating reset the snapshot sequence in `Init()`. The next snapshot read
+  as a state hitch and caught the new weapon up to ready, which `UpdateWeapon`
+  has honoured since the 28 October seek fix. Both now keep the sequence.
+  A respawn, or new weapon entities, catch up only across a genuine hitch.
+  Otherwise the new weapon raises from the server's raise frame. That frame is
+  read from whether the snapshot carries the server's weapon and from the
+  spawn's knockback clock. On loopback and at 80 ms ±20, every server shot in
+  the respawn and rejoin bursts was predicted on its own frame. Each new
+  life's raise matched the server's frame for frame, and nothing was predicted
+  after a respawn that the server did not fire.
+  A native fixture spliced from production adds 19 failing controls to
+  `mp_predicted_hitscan_state.py`. `mp_firing_view_capture.py` gained a
+  rejoin step. It holds the respawn and rejoin bursts to same-frame matching,
+  and it fails a new life's raise that is caught up or off the server's frame.
+  Open: under 80 ms ±20, the server's aim drifted from the client's in two of
+  four rejoin bursts, about a second after the join. One burst drifted 56°
+  over two shots. The other drifted 119°, with the server's fire four frames
+  behind, where snapshots were lost. The raise matched in every run, and no
+  respawn burst drifted.
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/
   MTU/rate limits, congestion, high player counts, discovery and reconnect. Preserve

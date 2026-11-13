@@ -93,6 +93,9 @@ the same with and without the impaired settings. `mp_firing_view_capture.py`
 already measures 7.1, the gauntlet on a standing target and the respawn half
 of 7.4 without input, from both processes' shot logs and engine captures (see
 [the network record](mp-network-qualification.md#the-firing-players-own-shots-under-prediction-12-november-2026)).
+Since 13 November the weapon for a new life raises with the server's, so a
+burst held through a respawn stays on the server's frames
+([record](mp-network-qualification.md#the-weapon-for-a-new-life-raises-with-the-servers-13-november-2026)).
 What is left here is judging it by eye at full speed with a real mouse, the
 gauntlet on a moving bot, walking through q4dm1's teleporters while firing
 (the harness can do neither), and real WAN peers. For a comparison, run 7.1 once with
@@ -104,7 +107,7 @@ the server's copy, late and off to the side.
 | 7.1 | Fire the machinegun, railgun and lightning gun while turning quickly. | The tracer, beam and impact start at your gun and land where the crosshair was; no visible lag or offset. |
 | 7.2 | Use the gauntlet on a moving bot. | Sparks appear on the bot, not behind it. |
 | 7.3 | Watch a remote player (the other client) fire hitscan and lightning at bots. | Their beams and impacts line up with their weapon and target. |
-| 7.4 | Teleport, die and respawn while firing. | No beam or tracer is drawn from your old position. |
+| 7.4 | Teleport, die and respawn while firing. | No beam or tracer is drawn from your old position. After a respawn the weapon finishes rising before its first shot. |
 
 ## MP-08: real network conditions
 

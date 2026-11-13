@@ -76,6 +76,11 @@ const float	PLAYER_ITEM_DROP_SPEED	= 100.0f;
 // how many units to raise spectator above default view height so it's in the head of someone
 const int SPECTATE_RAISE = 25;
 
+// openQ4: the knockback a fresh spawn starts (SpawnToPoint).  Its physics runs it down a
+// frame at a time from the spawn's own frame, so a client reads from what is left how many
+// frames ago the server placed the player (ReadFromSnapshot).
+const int SPAWN_KNOCKBACK_MSEC = 100;
+
 const int	HEALTH_PULSE		= 1000;			// Regen rate and heal leak rate (for health > 100)
 const int	ARMOR_PULSE			= 1000;			// armor ticking down due to being higher than maxarmor
 
@@ -1638,6 +1643,7 @@ idPlayer::idPlayer() {
  	lastTeleFX				= -9999;
 
  	weaponCatchup			= false;
+	netWeaponRaiseTime		= -1;
 	startupLoadoutDepth		= 0;
  	lastSnapshotSequence	= 0;
  
@@ -2178,6 +2184,7 @@ void idPlayer::Init( void ) {
  	SetPrivateCameraView( NULL );
  
  	lastSnapshotSequence	= 0;
+	netWeaponRaiseTime		= -1;
  
 	if ( !gameLocal.isMultiplayer ) {
 		// in MP we set isStrogg in UpdateModelSetup()
@@ -3433,6 +3440,12 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 	// compensation recorded for them is now a lie about where they can be shot.
 	if ( gameLocal.isServer ) {
 		gameLocal.InvalidateMPLagCompensationHistory( entityNumber );
+		if ( net_mpHitscanDebug.GetBool() && !spectating ) {
+			// The weapon for this life is made and raised on this frame (MP_WEAPON
+			// raise); a client raises its own from that time.
+			gameLocal.Printf( "MP_WEAPON respawn client=0 owner=%d local=%d time=%d\n", entityNumber,
+				entityNumber == gameLocal.localClientNum ? 1 : 0, gameLocal.time );
+		}
 	}
 
 	// Force players to use bounding boxes when in multiplayer
@@ -3536,7 +3549,7 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 	}
 
 	// don't allow full run speed for a bit
-	physicsObj.SetKnockBack( 100 );
+	physicsObj.SetKnockBack( SPAWN_KNOCKBACK_MSEC );
 
 	// set our respawn time and buttons so that if we're killed we don't respawn immediately
 	minRespawnTime = gameLocal.time;
@@ -7547,9 +7560,14 @@ void idPlayer::UpdateWeapon( void ) {
 			// animation frames. Honour that catch-up request before clearing it,
 			// just as Weapon_Combat does for an existing weapon. Otherwise the
 			// first paused frame starts a fresh raise animation below the view.
+			// A weapon for a new life the client saw begin raises with the
+			// server's instead (netWeaponRaiseTime, set in ReadFromSnapshot).
 			if ( weaponCatchup ) {
 				weapon->NetCatchup();
+			} else if ( netWeaponRaiseTime >= 0 ) {
+				weapon->SetNetRaiseStartTime( netWeaponRaiseTime );
 			}
+			netWeaponRaiseTime = -1;
 			weaponCatchup = false;
 			assert( weapon );
 		} else {
@@ -9698,7 +9716,14 @@ void idPlayer::Spectate( bool spectate, bool force ) {
 
 		ClearPowerUps();
 		spectator = this->entityNumber;
+		const unsigned int latchSnapshotSequence = lastSnapshotSequence;
 		Init();
+		// openQ4: as on a respawn (ReadFromSnapshot), Init() must not start the snapshot
+		// sequence over: the next snapshot would read as a state hitch, and its change of
+		// weapon would leave a catch-up request standing until the player joins again,
+		// which then caught the weapon for that life straight up to ready.
+		lastSnapshotSequence = latchSnapshotSequence;
+		weaponCatchup = false;
 		StopRagdoll();
 		SetPhysics( &physicsObj );
 		common->DPrintf( "idPlayer::Spectate() - Disabling clip for %d '%s' - spectate: %d force: %d\n", entityNumber, GetUserInfo() ? GetUserInfo()->GetString( "ui_name" ) : "?", spectate, force );
@@ -15608,12 +15633,39 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		clientIdealWeaponPredictFrame = -1;
 	}
 
+	// openQ4: when this player is placed in the world afresh (a respawn, or a join from
+	// spectating, which also brings new weapon entities), the server makes the weapon for
+	// the new life on the spawn's frame and raises it from there.  The client's weapon for
+	// the new life raises from that time (netWeaponRaiseTime), so both are ready, and fire,
+	// on the same frames.  Catching it straight up to ready instead fired shots the server
+	// never fired; only a genuine state hitch still does.  A snapshot without the server's
+	// weapon means it is made next frame.  One with it was taken on the spawn's frame or a
+	// frame or two later (a snapshot goes out every 33 ms): the spawn's knockback, which
+	// the server's physics runs down from that frame, says which, and only when it reads as
+	// that clock is the snapshot's own frame taken instead.
+	const int frameMsec = gameLocal.GetMSec();
+	const int spawnElapsed = SPAWN_KNOCKBACK_MSEC - physicsObj.GetKnockBack();
+	int serverWeaponRaiseTime = gameLocal.time + frameMsec;
+	if ( hasWeaponState ) {
+		const bool spawnClock = physicsObj.GetKnockBack() > 0 && spawnElapsed >= frameMsec && spawnElapsed % frameMsec == 0;
+		serverWeaponRaiseTime = spawnClock ? gameLocal.time + frameMsec - spawnElapsed : gameLocal.time;
+	}
+
 	// Attach the world and view entities  
 	if ( weaponWorldModel.GetSpawnId() != newWeaponWorldSpawnId || weaponViewModel.GetSpawnId() != newWeaponSpawnId ) {
 		SetWeapon( -1 );
 
 		if ( weaponWorldModel.SetSpawnId( newWeaponWorldSpawnId ) && weaponViewModel.SetSpawnId( newWeaponSpawnId ) ) {
-			weaponCatchup = true;
+			if ( stateHitch ) {
+				weaponCatchup = true;
+			} else {
+				netWeaponRaiseTime = serverWeaponRaiseTime;
+			}
+			if ( net_mpHitscanDebug.GetBool() ) {
+				gameLocal.Printf( "MP_WEAPON entities client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d\n",
+					gameLocal.isClient ? 1 : 0, entityNumber, entityNumber == gameLocal.localClientNum ? 1 : 0,
+					gameLocal.time, stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime );
+			}
 		}
 	}
 
@@ -15713,8 +15765,23 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		// this is the first time we've seen the player since we heard he died - he may have picked up
 		// some powerups since he actually spawned in, so restore those
 		int latchPowerup = inventory.powerups;
+		const unsigned int latchSnapshotSequence = lastSnapshotSequence;
 		Init();
 		inventory.powerups = latchPowerup;
+		// openQ4: Init() starts the snapshot sequence over, so the next snapshot read as a
+		// state hitch, and its change of weapon (Init() also clears idealWeapon) caught the new
+		// weapon straight up to ready while the server's raised: the client fired shots the
+		// server never fired, then the rest of a held burst out of step with it.  Only a
+		// respawn seen across a genuine hitch catches up now; otherwise the new weapon raises
+		// with the server's (serverWeaponRaiseTime above).
+		lastSnapshotSequence = latchSnapshotSequence;
+		weaponCatchup = stateHitch;
+		netWeaponRaiseTime = stateHitch ? -1 : serverWeaponRaiseTime;
+		if ( net_mpHitscanDebug.GetBool() ) {
+			gameLocal.Printf( "MP_WEAPON respawn client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d movementTime=%d movementFlags=%d\n",
+				gameLocal.isClient ? 1 : 0, entityNumber, entityNumber == gameLocal.localClientNum ? 1 : 0, gameLocal.time,
+				stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime, decodedPhysics.movementTime, decodedPhysics.movementFlags );
+		}
 		StopRagdoll();
 		SetPhysics( &physicsObj );
 		physicsObj.EnableClip();

@@ -670,6 +670,7 @@ rvWeapon::rvWeapon ( void ) {
 	memset ( &animDoneTime, 0, sizeof(animDoneTime) );
 	memset ( &wsfl, 0, sizeof(wsfl) );
 	memset ( &wfl, 0, sizeof(wfl) );
+	netRaiseStartTime = -1;
 
 	hitscanAttackDef = -1;
 	
@@ -3969,7 +3970,29 @@ rvWeapon::NetCatchup
 ================
 */
 void rvWeapon::NetCatchup( void ) {
+	netRaiseStartTime = -1;
+	if ( gameLocal.isMultiplayer && net_mpHitscanDebug.GetBool() ) {
+		gameLocal.Printf( "MP_WEAPON catchup client=%d owner=%d local=%d time=%d status=%d\n",
+			gameLocal.isClient ? 1 : 0, owner ? owner->entityNumber : -1,
+			owner != NULL && owner->entityNumber == gameLocal.localClientNum ? 1 : 0, gameLocal.time, (int)status );
+	}
 	ExecuteState ( "NetCatchup" );
+}
+
+/*
+================
+rvWeapon::SetNetRaiseStartTime
+
+openQ4: the server makes a player's weapon for a new life and raises it on its own frame,
+but a client learns of the respawn from a snapshot while it predicts ahead of that frame.
+Starting the client's raise when the snapshot arrives would make it ready late, and the
+catch-up it used to take instead made it ready at once, firing shots the server never
+fired.  The raise the weapon starts next is played from this game time instead, so its
+animation, and the ready frame AnimDone derives from it, match the server's.
+================
+*/
+void rvWeapon::SetNetRaiseStartTime( int time ) {
+	netRaiseStartTime = time;
 }
    
 /*
@@ -3992,16 +4015,34 @@ void rvWeapon::PlayAnim( int channel, const char *animname, int blendFrames ) {
 		viewAnimator->Clear( channel, gameLocal.time, FRAME2MS( blendFrames ) );
 		animDoneTime[channel] = 0;
 	} else {
+		// openQ4: every raise state sets WP_RISING and then plays its "raise", so this is
+		// the raise a weapon made for a new life starts; see SetNetRaiseStartTime.
+		int startTime = gameLocal.time;
+		const bool raise = status == WP_RISING;
+		if ( raise && netRaiseStartTime >= 0 ) {
+			startTime = Min( netRaiseStartTime, gameLocal.time );
+		}
+		if ( raise ) {
+			netRaiseStartTime = -1;
+		}
+
 		viewModel->Show();
-		viewAnimator->PlayAnim( channel, anim, gameLocal.time, FRAME2MS( blendFrames ) );
+		viewAnimator->PlayAnim( channel, anim, startTime, FRAME2MS( blendFrames ) );
 		animDoneTime[channel] = viewAnimator->CurrentAnim( channel )->GetEndTime();
 		
 		// Play the animation on the world model as well
 		if ( worldAnimator ) {
 			worldAnimator->GetAnim( animname );
 			if ( anim ) {
-				worldAnimator->PlayAnim( channel, anim, gameLocal.time, FRAME2MS( blendFrames ) );
+				worldAnimator->PlayAnim( channel, anim, startTime, FRAME2MS( blendFrames ) );
 			}
+		}
+
+		if ( raise && gameLocal.isMultiplayer && net_mpHitscanDebug.GetBool() ) {
+			gameLocal.Printf( "MP_WEAPON raise client=%d owner=%d local=%d time=%d start=%d done=%d\n",
+				gameLocal.isClient ? 1 : 0, owner ? owner->entityNumber : -1,
+				owner != NULL && owner->entityNumber == gameLocal.localClientNum ? 1 : 0,
+				gameLocal.time, startTime, animDoneTime[channel] );
 		}
 	}
 }
