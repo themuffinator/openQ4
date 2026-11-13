@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.40, 13 November 2026 (1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.41, 13 November 2026 (1.40 earlier that day, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -37,6 +37,9 @@ Version 1.40 adds The Awakening's in-game menu family. While the expansion's
 campaign runs, the single-player pause menu and the screens it opens keep the
 Marine frame and take a glacial palette, frost on the framing bands and snow
 behind the instruments, after the 0.14.1 Awakening Edition release artwork.
+Version 1.41 gives the family its own frames, shaped after the Valkaryne:
+blade ends on its plates, talons on the bands' steps and the dialog's chamfer,
+and a lens around the focused marker.
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -211,7 +214,7 @@ screens. Do not introduce them or carry them into the replacement:
 | Family | Identity | Required fidelity |
 | --- | --- | --- |
 | Marine menus | Olive/black plates, orange focus, yellow values, Marine title face | Stepped/notched bands, open cut plates, triangular markers, additive light, original scene imagery |
-| Awakening menus | The Marine frame in glacial light: ice rails and values, frost on the bands, snow behind the instruments, orange focus | Marine geometry, type, opacity and motion unchanged; the Awakening tokens; frost on the framing bands only; the Marine family everywhere outside the running expansion campaign |
+| Awakening menus | The Valkaryne's black armour in glacial light: blade-ended plates, talons on the bands, a lens around the focused marker, ice rails and values, frost on the bands, snow behind the instruments | Marine positions, type, opacity and motion unchanged; the Valkaryne frames of section 6; the Awakening tokens; frost on the framing bands only; the Marine family everywhere outside the running expansion campaign |
 | Marine HUD | Tactical overlays, bright critical values, compact instruments | Weapon/ammo/health/armor hierarchy, sheared gauges, feedback and original spatial relationships |
 | Strogg HUD and terminals | Original alien glyphs, mechanical paths and family colors | Each source's geometry and animation; never generic Marine panels |
 | World terminals | Local device panel and in-world illumination | Surface mapping, interaction targets, stateful scripts and intended viewing distance |
@@ -236,7 +239,7 @@ family tokens; individual terminals and vehicles still need per-source entries.
 | Family (sources) | Measured palette | Type (stock `textscale`) | Geometry and motion |
 | --- | --- | --- | --- |
 | Marine menus (`mainmenu`, `mpmain`, `buymenu`, `restart`, `msg`, `netmenu`) | Section 4 Marine tokens | Marine, Lowpixel; Profont for tabular detail | Section 6 vocabulary; section 8 choreography |
-| Awakening menus (an openQ4 design after the 0.14.1 Awakening Edition release artwork; no expansion source) | Section 4 Awakening tokens | As Marine menus | As Marine menus, with frost, snow and haze (section 6) and `frost.grow` (section 8) |
+| Awakening menus (an openQ4 design after the Valkaryne's model and glow maps, `models/monsters/valkaryne`, and the 0.14.1 Awakening Edition release artwork) | Section 4 Awakening tokens; measured from her: armour black, reactor lenses `#FF8E00`, eyes `#0799D2` | As Marine menus | Marine positions and choreography; Valkaryne frames, frost, snow and haze (section 6); `frost.grow` (section 8) |
 | Marine HUD (`hud`) | Readouts `#DDEBC3`; gauge track `#B3D06E` at 20% and fill at 35% (50% in multiplayer) over black 50%; icons `#A8A360` at 60%; weapon render `#C7BD78` at 40%; weapon name `#B0C891`; selected weapon `#FF8000` in a `#B2CC80` ring; low health `#FF4C00` | Chain 0.50 numerals and 0.32 reserve, trailing-aligned; Marine 0.25 weapon name, 0.20 pickup and radio labels | Rounded gauge plates with a stepped foot, trailing-anchored notched fills, ten-cell armor fill, 0.22 shear about each element's center; EKG; 2 Hz low-health rim (section 14) |
 | Strogg HUD (`hud_strogg`) | Readouts `#FCFFC8`; gauge fill `#FF9000` at 20–35%; icons `#FFCC00` at 60%; selected weapon `#FFCC00`, others `#F59512` at 60%, ring `#F2AD0B` | R_Strogg for all HUD text, 0.12–0.50; numerals 0.50 and unsheared | 30–33° shoulders and small notches; 0.22 backward shear; masked grain over each gauge; low health below 25% |
 | Multiplayer (`mphud`, `scoreboard`, `summary`, `mpmsgmode`, the multiplayer parts of `hud`) | Marine team `#6AA42B`; Strogg team `#FF7B04`; spectators `#999999`; notices `#FFFF8D`; team names and team chat `#AAE355` and `#FF8E00`; deathmatch and Tourney headers `#8B964B`; your Tourney arena `#5EB987` at 40%, finished arenas `#3E57B7`; health icon `#F7C004` and armor icon `#FA2B05`, both at 80% (the stock define names are swapped); ammo fill in the weapon's color | Lowpixel 0.16–0.50; Chain 0.50 gauge numerals; Marine for the chat line's SEND and the summary tabs | Score slabs fading to a sheared cut, team-tinted header bands, faction emblems, award medals; drop-shadowed text over the match (section 14.9) |
@@ -387,7 +390,7 @@ opacity in this section applies to them unchanged.
 | `awakening.rail.card` | `#3AAAC4` | `marine.rail.card` | Card and tooltip frame rail |
 | `awakening.rim` | `#2098BB`, alpha 0.37 falling linearly to 0 across 19 u | `marine.rim` | Rim light outside framing band edges |
 | `awakening.rime` | `#EBFAFF`, alpha 0.45 | New | The crisp 0.5 u line on the bands' inner edges, over the rim light |
-| `awakening.glow` | `#1E6B85` peak | `marine.glow` | Additive backdrop light band; focus light |
+| `awakening.glow` | `#1E6B85` peak | `marine.glow` | Additive backdrop light band |
 | `awakening.glow.modal` | `#154C5E` peak | `marine.glow.modal` | Additive glow field behind modals |
 | `awakening.deep` | `#040E1A` | Black | Dark plate bodies, card bodies at 0.94, the modal silhouette at 0.70, field and list troughs at 0.90 |
 | `awakening.surface.panel` | `#061420`, alpha 0.88 | `surface.panel` | Solid readable backing |
@@ -406,7 +409,12 @@ The family keeps `marine.orange` for hover, focus and selection, with
 `marine.list` and `marine.progress`, and keeps the status colors,
 `marine.scrim` and `modal.softfocus`. Orange is its one warm color. It marks
 only the control the player is on, and no frost, snow or haze is drawn over
-it. That is why the level block's objective headings take `awakening.value`
+it. It is also the Valkaryne's: the bright rings of her reactor lenses
+measure `#FF8E00` in her glow maps, a step from `marine.orange`, and the lens
+of section 6 is drawn in it. Her eyes, `#0799D2`, are the only cold light on
+her and sit inside the family's ice. Almost all of her armour map is black,
+as the bands are. Keeping orange for interaction alone is why the level
+block's objective headings take `awakening.value`
 where the objectives family uses `#FF8000`. Blue and orange also stay apart
 under the common color-vision deficiencies. Team colors, faction marks and the
 weapon and item color code are unchanged.
@@ -985,21 +993,73 @@ Stock details that openQ4 reuses:
 | Swatch | A small square with a chipped corner | Color choices, spinner tiles |
 | Picture frame | A 1 u `#414624` border over black 0.60 | Save, server and map previews |
 
+### Valkaryne frames
+
+The Awakening family (section 13.7) shapes its frames after the Valkaryne,
+the expansion's final enemy, measured from her model and glow maps
+(`models/monsters/valkaryne`). Her armour is black and almost unlit. Each of
+her four legs and both melee arms ends in a blade that sweeps to a point,
+the arms' as scythes. Her back carries swept over- and underplates. Five
+large reactor lenses of concentric rings glow orange on her torso, and her
+eyes are the only cold light on her. The frames take three devices from her
+and one curve to cut them with. No position, pitch or hit area of the Marine
+family changes, and no picture of her is drawn.
+
+- **The sweep.** A circular arc of 30 degrees that leaves one edge at
+  45 degrees and reaches the other at 15. A sweep `c` high is `1.73c` long on
+  a radius of `3.86c`. It keeps the 45-degree break where it begins and ends
+  in a 15-degree point. It is the only curve that cuts a frame.
+- **Blade.** An open plate's trailing end is one sweep from its top edge down
+  to its rail, in place of the stock dissolve: 42 u long on a 24.4 u
+  navigation plate. The rail runs to the point and the swept edge carries no
+  rail, so the plate stays open. The fill thins toward the point, to no less
+  than 0.45 of its strength. Navigation and section plates, action buttons
+  and the plinth end in blades. A separator inside a card is a needle, 1.2 u
+  (about 2 dp) thick at its leading end and tapering to a point at its
+  trailing end.
+- **Talon.** Every 45-degree step of 24 u or more in a frame grows a talon at
+  its foot. A talon is a prong a third as high as the step. It continues the
+  thicker side's edge past the step, and one sweep cuts its other side back
+  to the step, so it ends in a 15-degree point and leaves a 90-degree notch
+  against the step. The top band's riser carries one, pointing to the
+  trailing edge along the 103.8 u line, 11.8 u high and 20.4 u long. The
+  bottom band's raised section carries two, pointing outward along the
+  400.4 u line as her legs spread: 10.1 u by 17.4 u on the leading ramp and
+  14.4 u by 25 u on the trailing one. The modal's lower-leading chamfer
+  carries one along its bottom edge, a third of the chamfer high, and the
+  black frame traces it. A talon keeps its place on the 4:3 canvas at every
+  aspect, as the step it stands on does.
+- **Spines.** One 0.5 u line in `awakening.glacier` runs from each band
+  talon's point into the band at 15 degrees, 0.50 at the point and fading out
+  over 60 u in the top band and 44 u in the bottom band. Frost lies over it.
+- **Lens.** The focused control's marker stands in a lens in `marine.orange`:
+  a ring of 6.6 u radius, 0.9 u wide at 0.90; a ring of 9.4 u radius, 0.45 u
+  wide at 0.45; and an additive halo 13 u in radius, 0.35 at its center. It
+  appears and leaves with the stock focus response and takes the place of
+  section 13.8's focus light. Nothing else in the family is round. High
+  contrast keeps the two rings at 1.00 and drops the halo.
+- **What stays straight.** Cards, the modal's slot, tooth and corners, the
+  bands' 9 u notches and steps and every cut under 24 u keep the Marine
+  family's straight 45-degree cuts. A sweep on a closed panel's corner reads
+  as a rounded corner, and a row of small sweeps along a band reads as a
+  scalloped edge; neither is used. Her crown of spikes is not drawn.
+
 ### Frost, snow and haze
 
 The Awakening family (section 13.7) grows frost on its framing bands, lets
 snow fall behind its instruments and lays a low haze over the softened view.
 All three are editable vector geometry generated from a seed, never bitmaps.
-The frost is the one place where the interface draws an angle other than
-45 degrees on purpose: ice branches at 60 degrees, and the furniture around it
-keeps its 45-degree cuts. The release artwork's 13-degree slant, frosted-glass
-lift, rime grain, lens flare and icicles are not part of the family.
+Ice branches at 60 degrees. With the frames' 45-degree cuts and 15-degree
+points, every angle the family draws is a multiple of 15 degrees. The release
+artwork's 13-degree slant, frosted-glass lift, rime grain, lens flare and
+icicles are not part of the family.
 
 - **Where frost grows.** Only on the framing bands, which are opaque black and
   hold no content. Frost is fixed to the view: it grows from seeds on the
   view's top and bottom edges and at its four corners, and each band's
-  silhouette masks it, at full strength up to 6 u inside the band's inner edge
-  and falling to nothing at the edge. A moving band covers or uncovers it; it
+  silhouette masks it, talons included, at full strength up to 6 u inside the
+  band's inner edge and falling to nothing at the edge. A moving band covers
+  or uncovers it; it
   never travels with the band. Frost never lies on a plate, a card, a dialog,
   text or the view.
 - **Carved slots.** Each screen carves the text and controls standing in its
@@ -1053,7 +1113,8 @@ lift, rime grain, lens flare and icicles are not part of the family.
 The editable [Awakening menu atlas sheet](ui/atlas/awakening-menu.html) draws
 the pause menu and its confirmation at 4:3, 16:9, 21:9 and 32:9 beside the
 Marine family, with the layers switchable, the carved slots outlined and the
-opening replayed. `tools/ui/update_design_atlas.py` merges it into the full
+opening replayed, and the constructions of the sweep, blade, talon, lens and
+frost crystal. `tools/ui/update_design_atlas.py` merges it into the full
 atlas.
 
 ## 7. Components and interaction states
@@ -1946,9 +2007,13 @@ and parallax off.
     with its content active and whether or not a mod is loaded over it, the
     single-player pause menu and every screen it opens over the paused game
     take the Awakening family: Save, Load, Restart Level, Objectives, the
-    settings pages and their confirmations. Nothing moves. The frame, bands,
-    plates, cuts, markers, type, opacities, choreography and sounds are the
-    Marine pause's, and the section 4 Awakening tokens replace its colors.
+    settings pages and their confirmations. No position, pitch, type,
+    opacity, choreography or sound of the Marine pause changes. Its frames
+    become the Valkaryne frames of section 6: the navigation plates, the
+    plinth and the action buttons end in blades, the top band's riser and
+    the bottom band's two ramps grow talons, a confirmation's chamfer grows
+    one, and the focused control's marker stands in the lens. The section 4
+    Awakening tokens replace the Marine colors.
     The bands' inner edges gain the rime line, frost grows on the bands with
     `frost.grow`, and snow falls behind the instruments over the low haze
     (sections 6 and 8). The backdrop light band is `awakening.glow` at the
@@ -4310,6 +4375,30 @@ The editable atlas sheet `ui/atlas/awakening-menu.html` carries the reference
 generator. This version curates the family; no screen is built from it yet.
 The register does not hold this scope: a revision must append the family's
 requirements before any of it can be accepted, and nothing is accepted.
+
+### Version 1.41: Valkaryne frames
+
+The product owner asked that the family's frames change too, and that the
+Valkaryne's design shape the interface into one whole. Version 1.40 had kept
+every Marine frame and changed only light and ornament. Section 6 now adds
+the Valkaryne frames, measured from her model and glow maps, and sections 2,
+4 and 13.7 follow.
+
+| From the Valkaryne | In the menus |
+| --- | --- |
+| Black, almost unlit armour | The opaque black bands, and `awakening.deep` plates, cards and dialog body |
+| Legs and scythe arms that sweep to a point | The sweep, one 30-degree arc from 45 to 15 degrees; blade ends on plates, buttons and the plinth; needle rules |
+| Hooked legs and scythes, spread as she stands | Talons at the foot of every 45-degree step of 24 u or more: one on the top band's riser, two spread under the bottom band's raised section, one on the modal's chamfer |
+| Swept over- and underplates | The spines etched from each band talon |
+| Five orange reactor lenses, `#FF8E00` | The lens around the focused marker, in `marine.orange`; it replaces the focus light |
+| Cyan eyes, `#0799D2`, her only cold light | The family's ice, already taken from the artwork |
+
+Two trials are recorded so they are not repeated: sweeps on the corner cuts
+of cards and dialogs read as rounded corners, and rows of small sweeps on the
+bands' risers read as scalloped edges. Closed panels keep straight 45-degree
+cuts. Her model and textures were rendered for reference outside the
+repository; nothing extracted from them is tracked. The register still does
+not hold this scope, and nothing is accepted.
 
 ### Version 1.39: the Awakening chaingun turret
 
