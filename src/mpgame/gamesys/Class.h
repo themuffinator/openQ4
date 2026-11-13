@@ -626,6 +626,9 @@ public:
 	static void					Validate( void );
 
 private:
+	// whether a substitution scoped to requiredGameDir (NULL: every game) applies
+	static bool					InScope( const char *requiredGameDir );
+
 	const char *				original;
 	const char *				replacement;
 	const char *				requiredGameDir;

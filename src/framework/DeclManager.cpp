@@ -2123,26 +2123,44 @@ its own content still uses. The mod's copy is parsed first, so its decls win;
 each shadowed copy below it (fs_game_base, the openQ4 runtime, then retail) is
 parsed afterwards from its own directory and adds only the decls still missing.
 Only copies the mod itself supplies are layered, so the openQ4 runtime's own
-replacements of retail files keep replacing them.
+replacements of retail files keep replacing them. The layering starts from the
+highest mod directory that holds the file: a mod over the Awakening (fs_game
+<mod>, fs_game_base q4xbase) that leaves player.def alone still gets the
+expansion's copy layered over retail's.
 ===================
 */
+static bool DeclLayer_IsModDir( const char *gameDir ) {
+	return gameDir != NULL && gameDir[0] != '\0' && idStr::Icmp( gameDir, BASE_GAMEDIR ) && idStr::Icmp( gameDir, OPENQ4_GAMEDIR );
+}
+
+static bool DeclLayer_DirHoldsFile( const char *fileName, const char *gameDir ) {
+	idFile *copy = fileSystem->OpenFileRead( fileName, false, gameDir );
+	if ( copy == NULL ) {
+		return false;
+	}
+	fileSystem->CloseFile( copy );
+	return true;
+}
+
 void idDeclManagerLocal::LoadDeclFileLayers( const char *fileName, declType_t defaultType, bool unique ) {
 	if ( !decl_layerModFiles.GetBool() ) {
 		return;
 	}
 
-	const char *modDir = cvarSystem->GetCVarString( "fs_game" );
-	if ( modDir[0] == '\0' || !idStr::Icmp( modDir, BASE_GAMEDIR ) || !idStr::Icmp( modDir, OPENQ4_GAMEDIR ) ) {
-		return;
-	}
-
-	idFile *modCopy = fileSystem->OpenFileRead( fileName, false, modDir );
-	if ( modCopy == NULL ) {
-		return;
-	}
-	fileSystem->CloseFile( modCopy );
-
+	const char *topGameDir = cvarSystem->GetCVarString( "fs_game" );
 	const char *modBaseDir = cvarSystem->GetCVarString( "fs_game_base" );
+	const char *modDir = NULL;
+	if ( DeclLayer_IsModDir( topGameDir ) && DeclLayer_DirHoldsFile( fileName, topGameDir ) ) {
+		modDir = topGameDir;
+	} else if ( DeclLayer_IsModDir( modBaseDir ) && idStr::Icmp( modBaseDir, topGameDir ) && DeclLayer_DirHoldsFile( fileName, modBaseDir ) ) {
+		// the mod leaves the file to its base; layer beneath the base's copy
+		modDir = modBaseDir;
+		modBaseDir = "";
+	}
+	if ( modDir == NULL ) {
+		return;
+	}
+
 	const char *lowerDirs[] = { modBaseDir, OPENQ4_GAMEDIR, BASE_GAMEDIR };
 	for ( int i = 0; i < (int)( sizeof( lowerDirs ) / sizeof( lowerDirs[0] ) ); i++ ) {
 		const char *gameDir = lowerDirs[i];

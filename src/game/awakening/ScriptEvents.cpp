@@ -17,7 +17,7 @@ const idEventDef EV_Thread_ControlPercentToWin( "controlPercentToWin", NULL, 'f'
 
 bool Awakening_DispatchShipStatus( int guiEnum, const char *eventName ) {
 	if ( ( guiEnum != 0 && guiEnum != 2 ) || gameLocal.isMultiplayer ||
-		idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ) {
+		!FS_AwakeningActive() ) {
 		return false;
 	}
 	idStr map = gameLocal.GetMapName();

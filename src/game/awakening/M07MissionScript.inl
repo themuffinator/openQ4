@@ -262,7 +262,7 @@ static bool Awakening_CorrectM07ScriptV3( idStr &source, int race ) {
 static bool Awakening_LoadM07MissionScript( const char *filename, idStr &source ) {
 	idStr normalized = filename;
 	normalized.BackSlashesToSlashes();
-	if ( gameLocal.isMultiplayer || idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
+	if ( gameLocal.isMultiplayer || !FS_AwakeningActive() ) {
 		return false;
 	}
 	for ( int race = 0; race < 3; ++race ) {
@@ -287,7 +287,7 @@ static bool Awakening_LoadM07MissionScript( const char *filename, idStr &source 
 static const char *Awakening_M07MissionScriptName( const char *filename ) {
 	idStr normalized = filename;
 	normalized.BackSlashesToSlashes();
-	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 ) {
+	if ( !gameLocal.isMultiplayer && FS_AwakeningActive() ) {
 		for ( int race = 0; race < 3; ++race ) {
 			if ( normalized.Icmp( awakeningM07Sources[race] ) != 0 ) { continue; }
 			idStr source;

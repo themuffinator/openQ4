@@ -7598,8 +7598,12 @@ void idCommonLocal::InitGame( void ) {
 	openQ4_NormalizeGameTypeForModule( pendingGameModule.c_str() );
 	const idStr pendingGameType = cvarSystem->GetCVarString( "si_gameType" );
 
+    // Multiplayer never mounts The Awakening: neither as the game nor as the
+    // base beneath a mod, which keeps its place on top.
     if ( pendingGameModule == "game_mp" && !idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), "q4xbase" ) ) {
         cvarSystem->SetCVarString( "fs_game", OPENQ4_GAMEDIR );
+        cvarSystem->SetCVarString( "fs_game_base", "" );
+    } else if ( pendingGameModule == "game_mp" && !idStr::Icmp( cvarSystem->GetCVarString( "fs_game_base" ), "q4xbase" ) ) {
         cvarSystem->SetCVarString( "fs_game_base", "" );
     }
 	// initialize the file system

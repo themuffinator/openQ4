@@ -45,8 +45,12 @@ struct idClass {
 std::map<std::string,idTypeInfo*> idClass::classes;
 struct FakeFileSystem {
     const char* mounted="baseoq4";
+    const char* base="";
     const char* GetActiveGameDir() const { return mounted; }
 } fs, *fileSystem=&fs;
+// fs_awakeningActive as FileSystem Startup sets it: the expansion mounted as
+// the game or as the base beneath a mod.
+bool FS_AwakeningActive() { return !idStr::Icmp(fs.mounted,"q4xbase") || !idStr::Icmp(fs.base,"q4xbase"); }
 struct FakeGame {
     int printed=0;
     template<typename... T> [[noreturn]] void Error(const char*,T...) { throw std::runtime_error("invalid substitution"); }
@@ -61,6 +65,7 @@ struct idClassSubstitution {
     idClassSubstitution(const char*,const char*,const char* = nullptr);
     static idTypeInfo* Resolve(idTypeInfo*);
     static void Validate();
+    static bool InScope(const char*);
 };
 idClassSubstitution* idClassSubstitution::list=nullptr;
 '''
@@ -96,6 +101,17 @@ int main() {
         assert(gameLocal.printed==1);
         fs.mounted="baseoq4";
         assert(idClassSubstitution::Resolve(&stock)==&stock);
+        // A mod over the Awakening (fs_game <mod>, fs_game_base q4xbase) gets
+        // the expansion's classes; the same mod over Quake 4 does not.
+        fs.mounted="hidef2k";
+        fs.base="q4xbase";
+        assert(idClassSubstitution::Resolve(&stock)==&expansion);
+        gameLocal.printed=0;
+        idClassSubstitution::Validate();
+        assert(gameLocal.printed==1);
+        fs.base="";
+        assert(idClassSubstitution::Resolve(&stock)==&stock);
+        fs.mounted="baseoq4";
     }
     idClassSubstitution::list=nullptr;
     {
@@ -152,11 +168,19 @@ def validate_isolation() -> None:
     open_file = function_body(fs, 'idFile *idFileSystemLocal::OpenFileReadSearch(')
     for name in ('guis/menu/', 'guis/mainmenu.gui', 'guis/arena_menu.gui', 'guis/campaign_menu.gui', 'default.cfg'):
         assert name in open_file, f'campaign content can override engine navigation: {name}'
-    assert 'protectCampaignNavigation = !gameFolder.Icmp( "q4xbase" )' in open_file
+    assert 'protectCampaignNavigation = fs_awakeningActive.GetBool()' in open_file
+    # the expansion mounts beneath a single-player mod as well as on its own,
+    # and every module reads the mounted state from the one read-only CVar
+    assert "fs_awakeningActive.SetBool(" in startup
+    assert startup.index('!awakeningAllowed') < startup.index('modInfo.campaign')
+    header = (ROOT / 'src/framework/FileSystem.h').read_text(encoding='latin-1')
+    assert 'GetCVarBool( "fs_awakeningActive" )' in function_body(header, 'ID_INLINE bool FS_AwakeningActive(')
     for tree in ('game','mpgame'):
         source = (ROOT / f'src/{tree}/gamesys/Class.cpp').read_text()
         resolve = function_body(source, 'idTypeInfo *idClassSubstitution::Resolve(')
-        assert 'GetActiveGameDir()' in resolve and 'GetCVarString' not in resolve
+        scope = function_body(source, 'bool idClassSubstitution::InScope(')
+        assert 'InScope( sub->requiredGameDir )' in resolve and 'GetCVarString' not in resolve
+        assert 'GetActiveGameDir()' in scope and 'FS_AwakeningActive()' in scope and 'GetCVarString' not in scope
     turret = (ROOT / 'src/game/awakening/ai/Monster_Turret.cpp').read_text()
     assert 'SPAWNCLASS_SUBSTITUTION_FOR_GAME( "q4xbase", rvMonsterTurret, riMonsterTurret )' in turret
     assert not (ROOT / 'src/mpgame/awakening').exists()
@@ -173,6 +197,7 @@ def main() -> None:
             source = (ROOT / f'src/{tree}/gamesys/Class.cpp').read_text()
             bodies = '\n'.join(function_body(source,signature) for signature in (
                 'idClassSubstitution::idClassSubstitution(',
+                'bool idClassSubstitution::InScope(',
                 'idTypeInfo *idClassSubstitution::Resolve(',
                 'void idClassSubstitution::Validate('))
             cpp = Path(directory) / f'{tree}.cpp'

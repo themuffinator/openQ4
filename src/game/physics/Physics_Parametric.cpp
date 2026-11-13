@@ -17,7 +17,7 @@ Retail's movers never banked, so only the Awakening's do.
 ================
 */
 static bool Parametric_SplineBanking( void ) {
-	return !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" );
+	return FS_AwakeningActive();
 }
 
 /*

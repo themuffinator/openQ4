@@ -7,6 +7,41 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Mods play over The Awakening, 13 November 2026
+
+- **A mod now stays loaded when you choose The Awakening**, and its files
+  apply on top of the expansion's (search order: the mod, `q4xbase`,
+  `baseoq4`, `q4base`). Load it from **Mods** and pick the campaign, or launch
+  with `+set fs_game mymod +set fs_game_base q4xbase`. Before this, choosing
+  either campaign replaced the running mod, and filesystem startup silently
+  cleared `fs_game_base q4xbase` even though the filesystem's own notes
+  documented it as the way to build on the expansion (asked in discussion 213).
+- **`mod.json` can tie a mod to one campaign** with the optional
+  `"campaign": "awakening"` or `"quake4"`. An Awakening mod then needs only
+  `+set fs_game mymod`; a Quake 4 mod refuses the expansion even when asked
+  for it, and the campaign menu runs the other campaign without such a mod.
+  Any other value rejects the manifest with the reason in the log.
+- One shared mount state: filesystem startup publishes the read-only
+  `fs_awakeningActive`, and the 31 Awakening checks in the engine, game and
+  renderer modules (class substitutions, `_q4x_openq4` definitions, mission
+  repairs, spline banking, the campaign menu and chapters) read it through
+  `FS_AwakeningActive()` instead of comparing the written game directory with
+  `q4xbase`. No module interface changed. Expansion files that replace whole
+  retail declaration files (`player.def`, `debris.def`, `persona.def`,
+  `music.sndshd`) are still layered over retail when the mod above them does
+  not ship its own copy.
+- A mod used with both campaigns keeps one save folder: **Load Game** lists
+  only saves made on the running campaign's levels, and render demos match
+  their recorded campaign as well as their game directory. Multiplayer
+  (hosting, joining, a `game_mp` restart) drops the expansion from beneath a
+  mod and keeps the mod.
+- Evidence: `campaign_selection_runtime.py` gains five real-content cases
+  (explicit base, switch from Quake 4, `mod.json` Awakening, `mod.json`
+  Quake 4, multiplayer). `campaign_scope.py` compiles the production class
+  substitution against a mod over the expansion; `filesystem_mod_manifest.py`
+  checks the manifest key and startup order; `ui_retained_gate.py` checks the
+  Mods page keeps the campaign.
+
 ## The Android app quits without crashing (AND-02), 13 November 2026
 
 - **Quitting the Android app no longer ends in a crash.** Every quit used to

@@ -84,6 +84,59 @@ content limitations, recorded in the [support audit](../dev/q4x-awakening-suppor
 [The Awakening on openQ4](awakening.md) lists what openQ4 changes and fixes in
 the campaign, and the alpha's known content issues.
 
+## Mods and The Awakening
+
+A mod can play over The Awakening as well as over Quake 4. Its files come
+first, then the expansion's, then openQ4's and Quake 4's, so a mod can replace
+anything the expansion supplies.
+
+- **From the menus.** Load your mod from **Mods**, then choose **The
+  Awakening** under **Single Player → Campaign**. The mod stays loaded.
+  Choosing **Quake 4** plays the same mod over Quake 4 again, and a mod you
+  load while The Awakening is running plays over The Awakening.
+- **From a shortcut or batch file:**
+
+  ```bat
+  openQ4-client_x64.exe +set fs_game mymod +set fs_game_base q4xbase +campaignSelect awakening start
+  ```
+
+  Leave out `+campaignSelect awakening start` to start at the menu instead of
+  the first level. Add `+set fs_awakeningpath "D:\Games\Quake 4 Awakening"`
+  if the expansion is not next to `q4base`.
+- **A mod made for one campaign** can say so in its `mod.json` with
+  `"campaign"`. Then players only need `+set fs_game mymod`:
+
+  ```json
+  {
+    "name": "My Awakening Mod",
+    "version": "1.0",
+    "releaseDate": "2026-11-13",
+    "website": "https://example.com",
+    "author": "You",
+    "requiredopenQ4Version": "0.14.1",
+    "campaign": "awakening"
+  }
+  ```
+
+  `"campaign": "quake4"` keeps a mod off The Awakening instead. Without the
+  key, a mod plays over whichever campaign the player picks. Choosing the
+  other campaign in the menu plays it without a mod tied to one campaign.
+  The value must be `awakening` or `quake4`; anything else makes openQ4 ignore
+  the mod, with the reason in the log. openQ4 0.14.1 and older skip the key, so
+  require a newer version if your mod cannot run without the expansion.
+
+A mod keeps its settings, saves and demos in `fs_savepath/<mod>` for both
+campaigns. **Load Game** lists only the saves of the campaign you are playing,
+and a demo plays only in the campaign it was recorded in. Multiplayer never
+uses The Awakening: hosting or joining a game removes the expansion and keeps
+your mod. A mod that ships its own game module replaces openQ4's, including
+openQ4's Awakening support; content-only mods use openQ4's modules. The
+expansion's own menus are never used, with or without a mod, but a mod's menus
+are.
+
+The console reports `fs_awakeningActive 1` while the expansion is loaded, and
+the log names the game directories it was loaded with.
+
 ## Console use
 
 `campaignSelect quake4` and `campaignSelect awakening` open the corresponding

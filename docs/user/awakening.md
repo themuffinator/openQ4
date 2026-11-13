@@ -43,6 +43,10 @@ What openQ4 changed so the expansion's content loads at all:
   restarts the filesystem, so its overrides never leak into Quake 4, Arena or
   multiplayer. Its saves and settings live apart, under `fs_savepath/q4xbase`.
   `fs_awakeningpath` points openQ4 at content kept outside the Quake 4 folder.
+- **Mods over The Awakening.** A mod stays loaded when you choose The
+  Awakening and plays over the expansion (`fs_game mymod`, `fs_game_base
+  q4xbase`), and a mod's `mod.json` can tie it to one campaign. See
+  [Mods and The Awakening](campaigns.md#mods-and-the-awakening).
 - **Retail definitions kept.** The expansion ships files with retail's names
   (`def/debris.def`, `def/ai/persona.def`, `sound/music.sndshd` and others)
   that would replace retail's whole file. openQ4 also reads the retail file
@@ -319,6 +323,10 @@ supply missing performances or replacement art:
   switched off in the expansion's own HUD.
 
 ## For modders and testers
+
+To ship a mod that builds on The Awakening, see
+[Mods and The Awakening](campaigns.md#mods-and-the-awakening). Everything below
+also applies to a mod running over the expansion.
 
 The keys openQ4 honours in Awakening content (none appears in retail Quake 4,
 so stock behaviour is unchanged):

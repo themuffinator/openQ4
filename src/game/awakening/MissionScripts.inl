@@ -29,7 +29,7 @@ bool Awakening_LoadMissionScript( const char *filename, idStr &source ) {
 	normalizedName.BackSlashesToSlashes();
 	const bool version2 = normalizedName.Icmp( awakeningM02Version2 ) == 0;
 	if ( ( !version2 && normalizedName.Icmp( awakeningM02Version1 ) != 0 ) || gameLocal.isMultiplayer ||
-		idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ) {
+		!FS_AwakeningActive() ) {
 		return false;
 	}
 	char *installed = NULL;
@@ -97,7 +97,7 @@ const char *Awakening_MissionScriptName( const char *filename ) {
 	}
 	idStr normalizedName = filename;
 	normalizedName.BackSlashesToSlashes();
-	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+	if ( !gameLocal.isMultiplayer && FS_AwakeningActive() &&
 		normalizedName.Icmp( awakeningM02Source ) == 0 ) {
 		idStr source;
 		if ( Awakening_LoadMissionScript( awakeningM02Version2, source ) ) {

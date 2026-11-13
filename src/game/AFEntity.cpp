@@ -979,7 +979,7 @@ bool idAFEntity_Base::LoadAF( const char* keyname ) {
 	// Loading a default one-body figure appears to work but creates saves that
 	// cannot reconstruct the required figure. Use the shipped matching rig;
 	// preserve an explicitly supplied definition of the old name.
-	if ( !gameLocal.isMultiplayer && idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+	if ( !gameLocal.isMultiplayer && FS_AwakeningActive() &&
 			idStr::Icmp( spawnArgs.GetString( "classname" ), "env_ragdoll_strogg_marine" ) == 0 && fileName.Icmp( "strogg_marine" ) == 0 ) {
 		const idDecl *original = declManager->FindType( DECL_AF, fileName, false );
 		const idDecl *replacement = declManager->FindType( DECL_AF, "monster_strogg_marine", false );

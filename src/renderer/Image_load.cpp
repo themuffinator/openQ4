@@ -77,7 +77,7 @@ static const char *R_FindMissingQ4StockImageFallback( const char *imageName ) {
 	// The recovered tactical trooper material misspells its own texture folder.
 	// Keep the authored source first and salt the generated cache exactly as for
 	// the retail fallbacks below, so an installed correction takes precedence.
-	if ( idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 ) {
+	if ( FS_AwakeningActive() ) {
 		if ( canonicalName.Icmp( "textures/common/white" ) == 0 ) {
 			return "gfx/guis/white.tga";
 		}

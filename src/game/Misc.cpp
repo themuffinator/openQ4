@@ -4025,7 +4025,7 @@ END_CLASS
 
 bool idFuncAASObstacle::IsAwakeningSquadGate( void ) const {
 	return !gameLocal.isMultiplayer &&
-		idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+		FS_AwakeningActive() &&
 		gameLocal.mapFileNameStripped.Icmp( "m01_stranarus_trench2" ) == 0 &&
 		name.Icmp( "m04_building_unit2_seq_3_ai_blocker_top_level" ) == 0;
 }

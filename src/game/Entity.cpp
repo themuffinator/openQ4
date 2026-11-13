@@ -13,7 +13,7 @@
 
 static void CorrectAwakeningMissionWaypoint( idEntity *ent ) {
 	if ( gameLocal.isMultiplayer ||
-		idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) != 0 ||
+		!FS_AwakeningActive() ||
 		idStr::Icmp( ent->spawnArgs.GetString( "classname" ), "target_null" ) != 0 ) {
 		return;
 	}
@@ -5006,7 +5006,7 @@ bool idEntity::HandleGuiCommands( idEntity *entityGui, const char *cmds ) {
 					// post-introduction saves are recognized by the visible boss;
 					// no suspended script or save layout needs to change.
 					if ( !gameLocal.isMultiplayer &&
-						idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) == 0 &&
+						FS_AwakeningActive() &&
 						gameLocal.mapFileNameStripped.Icmp( "m02_trianfac" ) == 0 &&
 						entityGui->name.Icmp( "boss_screen_4_on_1" ) == 0 &&
 						token2.Icmp( "BringOnTheTank" ) == 0 ) {

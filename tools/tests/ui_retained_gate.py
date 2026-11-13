@@ -150,7 +150,7 @@ static const int MAX_ASYNC_CLIENTS = 32;
 #define BASE_GAMEDIR "q4base"
 #define OPENQ4_GAMEDIR "baseoq4"
 struct idFile {};
-struct idModInfo { idStr directory, displayName, version, releaseDate, website, author, requiredopenQ4Version, listLabel; };
+struct idModInfo { idStr directory, displayName, version, releaseDate, website, author, requiredopenQ4Version, listLabel, campaign; };
 struct idDict {
     std::map<std::string, std::string> values;
     const char* GetString(const char* key, const char* fallback = "") const { const auto found = values.find(key); return found == values.end() ? fallback : found->second.c_str(); }
@@ -195,6 +195,7 @@ struct FileSystem {
     idCampaignContentInfo GetAwakeningContentInfo() { return {}; }
     std::string activeGameDir = "baseoq4";
     const char* GetActiveGameDir() const { return activeGameDir.c_str(); }
+    std::string awakeningBase; // fs_game_base q4xbase as mounted beneath a mod
     // The installed mods, and how often their list was made and freed.
     struct ModList {
         std::vector<idModInfo> mods;
@@ -203,11 +204,17 @@ struct FileSystem {
     } modList; int modLists = 0, modFrees = 0;
     ModList* ListMods() { ++modLists; return &modList; }
     void FreeModList(ModList*) { ++modFrees; }
+    bool GetModInfo(const char* dir, idModInfo& info, idStr* = nullptr) {
+        for (const idModInfo& m : modList.mods) if (!idStr::Icmp(m.directory.c_str(), dir)) { info = m; return true; }
+        return false;
+    }
     // The installed maps' decls, in the file system's order.
     std::vector<idDict> maps;
     int GetNumMaps() const { return static_cast<int>(maps.size()); }
     const idDict* GetMapDecl(int index) const { return index >= 0 && index < GetNumMaps() ? &maps[index] : nullptr; }
 } fileSystemObject, *fileSystem = &fileSystemObject;
+// fs_awakeningActive as filesystem startup sets it (FileSystem.h).
+bool FS_AwakeningActive() { return fileSystemObject.activeGameDir == "q4xbase" || fileSystemObject.awakeningBase == "q4xbase"; }
 using idModList = FileSystem::ModList;
 struct ArenaCampaign {
     int selectors = 0; void OpenSelector() { ++selectors; }
@@ -1442,6 +1449,11 @@ int main() {
         title->state["mods.pick"] = "9"; s.HandleRetainedSessionRequest(title, "modsSelect"); CHECK(title->state["mods.selected"] == "2");
         s.HandleRetainedSessionRequest(title, "modsLoad");
         CHECK(cvarSystemObject.strings["fs_game"] == "dmplus" && commands.buffered.back() == "reloadEngine menu\n");
+        CHECK(cvarSystemObject.strings["fs_game_base"].empty());
+        // A mod loaded while The Awakening runs plays over it (fs_game_base q4xbase).
+        fileSystemObject.activeGameDir = "q4xbase"; s.HandleRetainedSessionRequest(title, "modsLoad");
+        CHECK(cvarSystemObject.strings["fs_game"] == "dmplus" && cvarSystemObject.strings["fs_game_base"] == "q4xbase");
+        fileSystemObject.activeGameDir = "baseoq4"; cvarSystemObject.strings["fs_game_base"] = "";
         // Without mods there is nothing to select or load.
         fileSystemObject.modList.mods.clear(); s.HandleRetainedSessionRequest(title, "mods");
         CHECK(title->state["mods.count"] == "0" && title->state["mods.selected"] == "-1" && title->state["mods.directory"].empty());
@@ -5987,7 +5999,8 @@ def main() -> int:
         'bool idSessionLocal::RetainedHomeInputBlocked(',
         'void idSessionLocal::UpdateRetainedHome(', 'idUserInterface *idSessionLocal::RetainedHomeDocument(',
         'bool idSessionLocal::RetainedPauseIsStrogg(', 'void idSessionLocal::RetainedHomeFrameEvent(',
-        'static bool Session_CampaignNeedsReload(',
+        'static bool Session_IsPlayerMod(', 'static void Session_CampaignGameDirs(', 'static bool Session_CampaignNeedsReload(',
+        'static void Session_SelectModForCampaign(',
         'static const char *Session_LoadFailureText(', 'void idSessionLocal::HandleRetainedSessionRequest(', 'static bool Session_ModSuppliesFile(',
         'void idSessionLocal::BeginRetainedSubpage(', 'void idSessionLocal::UpdateRetainedSubpage(',
         'void idSessionLocal::PresentRetainedSubpage(',

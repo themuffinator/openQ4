@@ -176,7 +176,7 @@ def check_flyers() -> None:
     # the movers they ride bank into turns, in the Awakening only
     parametric = read("src/game/physics/Physics_Parametric.cpp")
     require(function_body(parametric, "static bool Parametric_SplineBanking(", "Physics_Parametric.cpp"),
-            'GetActiveGameDir(), "q4xbase"', "Parametric_SplineBanking")
+            "FS_AwakeningActive()", "Parametric_SplineBanking")
     require_order(function_body(parametric, "static float Parametric_SplineRoll(", "Physics_Parametric.cpp"),
                   ("g_splineRollLookahead.GetFloat()", "t + 2.0f * lookahead", "idMath::TWO_PI",
                    "-g_splineRollMultiplier.GetFloat() * RAD2DEG( turn )"), "Parametric_SplineRoll")
@@ -221,7 +221,7 @@ def check_vehicles() -> None:
                              "godmode = false;"), "rvVehiclePosition::SetDriver")
     parts = read("src/game/vehicle/VehicleParts.cpp")
     lock = function_body(parts, "void rvVehicleTurret::ReadMovementLock (", "VehicleParts.cpp")
-    require_order(lock, ('GetActiveGameDir(), "q4xbase"', '"allowDisableMovement", awakening ? "1" : "0"'),
+    require_order(lock, ("FS_AwakeningActive()", '"allowDisableMovement", awakening ? "1" : "0"'),
                   "rvVehicleTurret::ReadMovementLock")
     require(function_body(parts, "void rvVehicleTurret::Restore (", "VehicleParts.cpp"), "ReadMovementLock ( );",
             "rvVehicleTurret::Restore")

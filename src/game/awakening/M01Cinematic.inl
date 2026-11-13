@@ -29,7 +29,7 @@ void Awakening_TestM01Feedback_f( const idCmdArgs &args ) {
 
 static bool Awakening_PrepareM01Cinematic( idMapFile *map ) {
 	if ( gameLocal.isMultiplayer || !g_awakeningM01Cinematic.GetBool() ||
-		idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), "q4xbase" ) != 0 ) {
+		!FS_AwakeningActive() ) {
 		return false;
 	}
 

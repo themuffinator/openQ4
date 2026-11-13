@@ -1501,6 +1501,26 @@ idClassSubstitution::idClassSubstitution( const char *original, const char *repl
 
 /*
 ================
+idClassSubstitution::InScope
+
+A substitution scoped to a game directory applies while the filesystem has
+that game mounted, never while a queued fs_game change waits for the next
+restart. The Awakening (q4xbase) is mounted as the game itself or as the base
+beneath a single-player mod (fs_game_base q4xbase); FS_AwakeningActive covers both.
+================
+*/
+bool idClassSubstitution::InScope( const char *requiredGameDir ) {
+	if ( requiredGameDir == NULL ) {
+		return true;
+	}
+	if ( idStr::Icmp( requiredGameDir, "q4xbase" ) == 0 ) {
+		return FS_AwakeningActive();
+	}
+	return idStr::Icmp( requiredGameDir, fileSystem->GetActiveGameDir() ) == 0;
+}
+
+/*
+================
 idClassSubstitution::Resolve
 
 Follows substitutions until none applies; Validate rejects cycles.
@@ -1513,8 +1533,7 @@ idTypeInfo *idClassSubstitution::Resolve( idTypeInfo *type ) {
 	for ( int depth = 0; depth < 16; depth++ ) {
 		const idClassSubstitution *sub;
 		for ( sub = list; sub != NULL; sub = sub->next ) {
-			if ( idStr::Cmp( type->classname, sub->original ) == 0 &&
-				 ( sub->requiredGameDir == NULL || idStr::Icmp( sub->requiredGameDir, fileSystem->GetActiveGameDir() ) == 0 ) ) {
+			if ( idStr::Cmp( type->classname, sub->original ) == 0 && InScope( sub->requiredGameDir ) ) {
 				break;
 			}
 		}
@@ -1547,7 +1566,7 @@ void idClassSubstitution::Validate( void ) {
 				gameLocal.Error( "Class '%s' has more than one substitution", sub->original );
 			}
 		}
-		if ( sub->requiredGameDir == NULL || idStr::Icmp( sub->requiredGameDir, fileSystem->GetActiveGameDir() ) == 0 ) {
+		if ( InScope( sub->requiredGameDir ) ) {
 			gameLocal.Printf( "...spawning '%s' as '%s'\n", sub->original, sub->replacement );
 		}
 	}

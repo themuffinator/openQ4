@@ -3557,7 +3557,7 @@ static bool Session_MenuIsCompatibleSaveGameVersion( const int version ) {
 // A save's header: its game name, version, map, entity filter and each
 // client's persistent player info. Whether this build loads the save; with
 // `player`, the first client's persistent info.
-static bool Session_MenuReadSaveGameHeader( const idStr &slotName, idDict *player ) {
+static bool Session_MenuReadSaveGameHeader( const idStr &slotName, idDict *player, idStr *mapName = NULL ) {
 	if ( !sessLocal.FinishPendingSave( true ) ) return false;
 	if ( !Session_MenuIsSafeSaveSlotName( slotName ) ) {
 		common->Warning( "Ignoring savegame slot with unsafe filename '%s'", slotName.c_str() );
@@ -3595,11 +3595,25 @@ static bool Session_MenuReadSaveGameHeader( const idStr &slotName, idDict *playe
 	}
 
 	fileSystem->CloseFile( file );
+	if ( valid && mapName != NULL ) {
+		*mapName = saveMap;
+	}
 	return valid;
 }
 
+// A save this build loads and the running campaign lists: a mod that plays
+// over either campaign keeps both campaigns' saves in its one folder.
 static bool Session_MenuIsLoadableSaveGameSlot( const idStr &slotName ) {
-	return Session_MenuReadSaveGameHeader( slotName, NULL );
+	idStr saveMap;
+	if ( !Session_MenuReadSaveGameHeader( slotName, NULL, &saveMap ) ) {
+		return false;
+	}
+#ifndef ID_DEDICATED
+	if ( Session_SaveMapFromOtherCampaign( saveMap ) ) {
+		return false;
+	}
+#endif
+	return true;
 }
 
 #ifndef ID_DEDICATED
@@ -4346,6 +4360,24 @@ static idStr Session_LocalAddressText( void ) {
 
 /*
 ==============
+Session_SelectModForCampaign
+
+A mod chosen from the Mods page plays over the campaign being played: over
+The Awakening while it runs (fs_game_base q4xbase), else over Quake 4. Its
+mod.json can still tie it to one campaign (idFileSystemLocal::Startup), and an
+fs_game_base set to another directory stays as it was.
+==============
+*/
+static void Session_SelectModForCampaign( const char *directory ) {
+	cvarSystem->SetCVarString( "fs_game", directory );
+	const char *base = cvarSystem->GetCVarString( "fs_game_base" );
+	if ( base[0] == '\0' || !idStr::Icmp( base, "q4xbase" ) ) {
+		cvarSystem->SetCVarString( "fs_game_base", FS_AwakeningActive() ? "q4xbase" : "" );
+	}
+}
+
+/*
+==============
 idSessionLocal::HandleMainMenuCommands
 
 Executes any commands returned by the gui
@@ -4560,11 +4592,11 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			MainMenuApplyNewGameOptions( guiMainMenu );
 			if ( icmd < args.Argc() ) {
 				const char *map = args.Argv( icmd++ );
-                if ( !idStr::Icmp( map, "game/airdefense1" ) && !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ) map = "game/m01_stranarus_trench1";
+                if ( !idStr::Icmp( map, "game/airdefense1" ) && FS_AwakeningActive() ) map = "game/m01_stranarus_trench1";
                 StartNewGame( map );
 			} else {
 #ifndef ID_DEMO_BUILD
-				StartNewGame( !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ? "game/m01_stranarus_trench1" : "game/airdefense1" );
+				StartNewGame( FS_AwakeningActive() ? "game/m01_stranarus_trench1" : "game/airdefense1" );
 #else
 				StartNewGame( "game/demo_mars_city1" );
 #endif
@@ -4579,11 +4611,11 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			MainMenuApplyNewGameOptions( guiMainMenu );
 			if ( icmd < args.Argc() ) {
 				const char *map = args.Argv( icmd++ );
-                if ( !idStr::Icmp( map, "game/airdefense1" ) && !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ) map = "game/m01_stranarus_trench1";
+                if ( !idStr::Icmp( map, "game/airdefense1" ) && FS_AwakeningActive() ) map = "game/m01_stranarus_trench1";
                 StartNewGame( map );
 			} else {
 #ifndef ID_DEMO_BUILD
-				StartNewGame( !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" ) ? "game/m01_stranarus_trench1" : "game/airdefense1" );
+				StartNewGame( FS_AwakeningActive() ? "game/m01_stranarus_trench1" : "game/airdefense1" );
 #else
 				StartNewGame( "game/demo_mars_city1" );
 #endif
@@ -4608,7 +4640,7 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 		if ( !idStr::Icmp( cmd, "loadMod" ) ) {
 			int choice = guiActive->State().GetInt( "modsList_sel_0" );
 			if ( choice >= 0 && choice < modsList.Num() ) {
-				cvarSystem->SetCVarString( "fs_game", modsList[ choice ].directory.c_str() );
+				Session_SelectModForCampaign( modsList[ choice ].directory.c_str() );
 				cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadEngine menu\n" );
 			}
 			continue;
@@ -5380,7 +5412,7 @@ void idSessionLocal::HandleInGameCommands( const char *menuCommand ) {
 static const char *const STOCK_CAMPAIGN_GUI = "guis/campaign_menu.gui";
 
 static bool Session_AwakeningPageActive() {
-    return !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" );
+    return FS_AwakeningActive();
 }
 
 // A campaign page's difficulty and its description, the stock New Game
@@ -7141,7 +7173,7 @@ void idSessionLocal::OpenCampaignSelector( bool campaigns, bool fromArena, bool 
         gui->SetStateBool( "awakening_present", info.present );
         // The campaign being played is the chosen one; the retained page's
         // activation focuses NEW GAME, or CHAPTERS coming back from it.
-        const bool awakening = !idStr::Icmp( fileSystem->GetActiveGameDir(), "q4xbase" );
+        const bool awakening = FS_AwakeningActive();
         gui->SetStateBool( "awakening_chosen", awakening );
         if ( !stock ) {
             gui->SetStateBool( "campaign.awakening", awakening && info.ready );
@@ -7161,11 +7193,40 @@ void idSessionLocal::OpenCampaignSelector( bool campaigns, bool fromArena, bool 
 }
 
 #ifndef ID_DEDICATED
-// Whether entering a campaign's game directory reloads the engine first.
-static bool Session_CampaignNeedsReload( const char *gameDir ) {
-    return idStr::Icmp( fileSystem->GetActiveGameDir(), gameDir ) ||
-           idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), gameDir ) ||
-           cvarSystem->GetCVarString( "fs_game_base" )[0] ||
+// A player's mod: a game directory other than retail, openQ4's runtime or
+// the Awakening itself.
+static bool Session_IsPlayerMod( const char *gameDir ) {
+    return gameDir != NULL && gameDir[0] != '\0' && idStr::Icmp( gameDir, BASE_GAMEDIR ) &&
+           idStr::Icmp( gameDir, OPENQ4_GAMEDIR ) && idStr::Icmp( gameDir, "q4xbase" );
+}
+
+// The game directories a campaign runs in. A mod the player runs stays on
+// top, with the Awakening as its base, unless its mod.json ties it to the
+// other campaign; then the campaign runs without it. Arena runs on stock content.
+static void Session_CampaignGameDirs( bool awakening, bool arena, idStr &game, idStr &base ) {
+    const char *mod = fileSystem->GetActiveGameDir();
+    game = awakening ? "q4xbase" : OPENQ4_GAMEDIR;
+    base = "";
+    if ( arena || !Session_IsPlayerMod( mod ) ) {
+        return;
+    }
+    idModInfo info;
+    if ( fileSystem->GetModInfo( mod, info ) && !info.campaign.Icmp( awakening ? "quake4" : "awakening" ) ) {
+        common->Printf( "Mod '%s' plays over %s only (mod.json campaign); leaving it for this campaign\n",
+            mod, awakening ? "Quake 4" : "The Awakening" );
+        return;
+    }
+    game = mod;
+    base = awakening ? "q4xbase" : "";
+}
+
+// Whether entering a campaign's game directories reloads the engine first.
+static bool Session_CampaignNeedsReload( const char *game, const char *base ) {
+    const bool wantsAwakening = !idStr::Icmp( game, "q4xbase" ) || !idStr::Icmp( base, "q4xbase" );
+    return idStr::Icmp( fileSystem->GetActiveGameDir(), game ) ||
+           idStr::Icmp( cvarSystem->GetCVarString( "fs_game" ), game ) ||
+           idStr::Icmp( cvarSystem->GetCVarString( "fs_game_base" ), base ) ||
+           FS_AwakeningActive() != wantsAwakening ||
            idStr::Icmp( cvarSystem->GetCVarString( "com_activeGameModule" ), "game_sp" );
 }
 #endif
@@ -7183,12 +7244,15 @@ void idSessionLocal::SelectCampaign( const char *campaign, bool start, bool chap
             return;
         }
     }
-    const char *gameDir = awakening ? "q4xbase" : OPENQ4_GAMEDIR;
+    idStr campaignGame;
+    idStr gameBase;
+    Session_CampaignGameDirs( awakening, arena, campaignGame, gameBase );
+    const char *gameDir = campaignGame.c_str();
     // Consume one-shot command-line overrides before a full engine restart.
     common->StartupVariable( "si_gameType", true );
-    if ( Session_CampaignNeedsReload( gameDir ) ) {
+    if ( Session_CampaignNeedsReload( gameDir, gameBase ) ) {
         cvarSystem->SetCVarString( "fs_game", gameDir );
-        cvarSystem->SetCVarString( "fs_game_base", "" );
+        cvarSystem->SetCVarString( "fs_game_base", gameBase );
         cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
         cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
         idCmdArgs continuation;
@@ -7913,7 +7977,7 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
             // ARENA leads deeper to the Arena sub-page when the campaign needs
             // no engine reload into its game directory first; else it is
             // selected as before, and the browser presents after the reload.
-            if ( !idStr::Icmp( gui->Name(), RETAINED_SINGLEPLAYER_GUI ) && !Session_CampaignNeedsReload( OPENQ4_GAMEDIR ) &&
+            if ( !idStr::Icmp( gui->Name(), RETAINED_SINGLEPLAYER_GUI ) && !Session_CampaignNeedsReload( OPENQ4_GAMEDIR, "" ) &&
                  RetainedArenaPage() != NULL ) {
                 BeginRetainedSubpage( gui, true, RETAINED_SUBPAGE_ARENA );
             } else {
@@ -7979,7 +8043,7 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 	if ( !idStr::Icmp( request, "modsLoad" ) ) {
 		if ( retainedModSelected >= 0 && retainedModSelected < modsList.Num() ) {
 			HandleMainMenuCommands( "play main_menu_selection" );
-			cvarSystem->SetCVarString( "fs_game", modsList[ retainedModSelected ].directory.c_str() );
+			Session_SelectModForCampaign( modsList[ retainedModSelected ].directory.c_str() );
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadEngine menu\n" );
 		}
 		return;
