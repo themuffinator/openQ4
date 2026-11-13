@@ -7,6 +7,17 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Retail distance comparison (AUD-01), 13 November 2026
+
+- [ ] AUD-01: `sound_distance_retail_compare.py` compares the levels that retail
+  Quake 4 1.4.2 and openQ4 render, at nine distances for three original shaders,
+  through OpenAL Soft's wave writer. Nothing plays aloud. The openQ4 half follows
+  the authored curve within 0.6 dB and is silent at and beyond the maximum. The
+  retail half needs its window focused by a person, because retail mutes itself
+  while unfocused, and it has not passed yet. No player-facing behaviour changed;
+  the [evidence](audio-modernization.md#rendered-retail-comparison-13-november-2026)
+  also corrects the October distance profile, which had left reverb on.
+
 ## Subtitles mark speech they cannot transcribe, accept caption packs and stay up long enough to read (AUD-07), 13 November 2026
 
 - **Dialogue without a transcript no longer passes silently.** About three in

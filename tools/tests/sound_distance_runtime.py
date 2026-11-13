@@ -214,6 +214,9 @@ def main() -> None:
         "s_volume_dB": "-12" if physical else "0", "s_volume": "1", "s_speakerFraction": ".65",
         "s_quadraticFalloff": "1" if args.quadratic else "0", "s_sourceRadiusScale": ".5",
         "s_useOcclusion": "0", "s_useEAXReverb": "0", "s_airAbsorption": "0",
+        # Without this, a fresh profile's one-time audio migration turns room
+        # reverb back on for the minimum/lowpower/performance presets.
+        "s_audioDefaultsMigrated": "2",
         "logFile": "2", "logFileName": "logs/openq4.log", "developer": "1",
         "com_skipLoadingContinue": "1", "g_autoExecAfterMapLoad": "distance_probe.cfg",
         "g_autoExecAfterMapLoadDelayMs": "500",

@@ -525,6 +525,8 @@ jobs:
             tools/tests/sound_recovery.py \
             tools/tests/sound_distance.py \
             tools/tests/sound_distance_runtime.py \
+            tools/tests/sound_distance_retail.py \
+            tools/tests/sound_distance_retail_compare.py \
             tools/tests/sound_retail_reverb_contract.py \
             tools/tests/sound_screen_shake.py \
             tools/tests/audio_asset_inventory.py \
@@ -1052,6 +1054,7 @@ jobs:
           python tools/tests/sound_settings.py
           python tools/tests/sound_recovery.py
           python tools/tests/sound_distance.py
+          python tools/tests/sound_distance_retail.py
           python tools/tests/sound_retail_reverb_contract.py
           python tools/tests/sound_screen_shake.py
           python tools/tests/audio_decode_budget.py

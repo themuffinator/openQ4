@@ -4759,7 +4759,7 @@ marked for players rather than counted as covered.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| AUD-01 — Partial | 54 emitter/OpenAL distance measurements validate current map-unit curves; no speculative unit conversion needed. | Human retail comparison on real speakers/headphones. |
+| AUD-01 — Partial | 54 emitter/OpenAL distance measurements validate current map-unit curves; no speculative unit conversion needed. A rendered retail/openQ4 comparison harness is implemented; openQ4's rendered half follows the authored curve within 0.6 dB and is silent at and beyond the maximum. | One focused run of the retail half (retail mutes itself while unfocused) passing the comparison. |
 | AUD-02 — Partial | Simulated endpoint recovery, scene-clock save/load repair, Linux checks and repeated-map audio residency evidence exist. | Physical endpoint loss/hotplug, audible pause/cinematics, long sessions and target-OS breadth including macOS. |
 | AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. | Real mobile OS low-memory callbacks, device/provider process-memory budgets, thermal/loading/cancellation behavior and device breadth. |
 | AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio; real-device harness passes on real stereo endpoints, including a forced layout and a mid-line device switch. | Run `audio_surround_endpoint.py` on a real 5.1/7.1 endpoint and listen on speakers; preserve positional mix and stock zero-rolloff behavior. |
@@ -4788,6 +4788,20 @@ marked for players rather than counted as covered.
   October 22 audit: the remaining gate is human listening on real speakers or
   headphones against retail. The measured distance-curve audit is complete;
   keep this item open until that listening pass is recorded.
+  November 13: the listening pass becomes a measured comparison of what each
+  game renders. `sound_distance_retail_compare.py` runs retail 1.4.2 and openQ4
+  on the same three shaders, nine distances and two passes, and writes each mix
+  to a WAV through OpenAL Soft. Nothing plays aloud. openQ4 must follow retail and
+  the authored curve within 1 dB beyond the minimum distance (2 dB inside it, where
+  retail's OpenAL path keeps a point source), and both must be silent at and beyond
+  the maximum. Retail's OpenAL output is a fair reference: 1.4.2 sets rolloff 0 and
+  sends its shared channel volume as the gain. The listener sits in Hangar 1's
+  portal-sky room, with the four map sounds that reach it removed. The openQ4 half
+  passes (within 0.6 dB, silent at and beyond the maximum). Retail selects no sound
+  world while it is not the active application, and faking focus would be
+  synthetic input. The retail half therefore waits for a person to focus its window,
+  and it has not run focused yet. Close this item when it passes.
+  [Rendered comparison](audio-modernization.md#rendered-retail-comparison-13-november-2026).
 - [ ] **AUD-02 — P1, qualification: physical device and timing lifecycle.** Test
   default/selected endpoint loss and return, hotplug, pause/resume/slow motion,
   cinematics, map/restart and long sessions on target OSes. Verify audible output,

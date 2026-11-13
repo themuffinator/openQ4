@@ -861,6 +861,9 @@ def validate_validation_wiring() -> None:
         "mp_bot_rim_replay.py",
         # Stock sound distance measurements launch a staged client on retail assets.
         "sound_distance_runtime.py",
+        # The retail comparison also launches retail Quake4.exe on Windows;
+        # sound_distance_retail.py exercises its analysis without assets.
+        "sound_distance_retail_compare.py",
         # Drives a rooted x86_64 Android emulator; the workflows py_compile it.
         "android_emulator_smoke.py",
         # Drives a USB-connected debug phone; the workflows py_compile it.
