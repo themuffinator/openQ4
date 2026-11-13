@@ -396,26 +396,36 @@ SCENES = [
             Check("interaction", control={"r_skipInteractions": "1"}, rollback={"ui_showGun": "1"}),
         ],
     ),
+    # Every light shadow-mapped, as the Quality and higher presets do, with
+    # the static shadow cache off. With the cache on, the domain switch makes
+    # classic Vulkan regenerate maps it would otherwise compose from a cached
+    # static copy, which moves a few pixels by one level, and OpenGL's sealed
+    # cache schedule declines this view's distant point light (a named
+    # fallback); both are recorded in the interaction domain's document.
     Scene(
         id="ad1mapped",
         map="game/airdefense1",
         pose=AIRDEFENSE1_POSE,
-        purpose="the stock outdoor view with projected, parallel and point lights all shadow-mapped",
+        purpose="the stock outdoor view with every light shadow-mapped (point cubes and a distant point "
+                "light's projected map), static shadow cache off",
         launch={"g_showHud": "0", "ui_showGun": "0", "r_shadows": "1", "r_useShadowMap": "1",
-                "r_shadowMapPointLights": "1"},
+                "r_shadowMapPointLights": "1", "r_shadowMapStaticCache": "0"},
         checks=[
             Check("interaction", control={"r_skipInteractions": "1"}, rollback={"ui_showGun": "1"}),
         ],
     ),
-    # Dynamic casters: stock crates spawned under a stock projected test light
-    # and a point light, as the interaction domain's earlier evidence used.
+    # Dynamic casters: a CPU-skinned stock character (a receiver and a caster,
+    # like every animated MD5) and a spawned stock crate under a stock
+    # projected test light and a point light.
     Scene(
         id="mv2casters",
         map="maps/tools/mv2",
         pose="0 -192 96 20 90 0",
-        purpose="stock crates as dynamic shadow casters under projected and point test lights",
-        launch={"g_showHud": "0", "ui_showGun": "0", "r_skipSubviews": "1"},
-        commands=["testModel models/mapobjects/strogg/crates/crate1_small.lwo",
+        purpose="a CPU-skinned stock character and a spawned crate as dynamic receivers and shadow "
+                "casters under projected and point test lights",
+        launch={"g_showHud": "0", "ui_showGun": "0", "r_skipSubviews": "1", "r_useShadowMap": "1",
+                "r_shadowMapPointLights": "1"},
+        commands=["testModel char_doctor",
                   'spawn func_static model models/mapobjects/strogg/crates/crate1_medium.lwo origin "-90 -70 -5.7"',
                   'testPointLight 300 origin "96 -128 0"',
                   "testLight"],

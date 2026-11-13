@@ -15,7 +15,13 @@ that this contract keeps from silently narrowing again:
   the default-safety audit, and gates subview, special-frame and
   cinematic/post readiness;
 - the final scene composite ends its 2D batch on both backends, so the HUD
-  that follows is a pure GUI view.
+  that follows is a pure GUI view;
+- the interaction domain reads deformedSurface as generated topology, not GPU
+  posing: CPU-skinned characters are admitted as receivers and mapped casters,
+  while primitive-batch MD5R and GPU-palette skinning stay refused;
+- a mapped pass names the map form drawn (a distant point light's projected
+  map is not a cube), and a perforated caster that seals no alpha stage seals
+  no alpha range.
 """
 
 from __future__ import annotations
@@ -142,12 +148,54 @@ def validate_scope_widening() -> None:
     reject(flush, "OPENQ4_RENDERER_VK_MODULE", "2D batch boundary")
 
 
+def validate_generated_topology() -> None:
+    interaction = read("src/renderer/ClassicInteractionDomain.cpp")
+    posed = body(interaction, "static bool GeneratedTopologyIsPosed( const drawSurf_t *drawSurf ) {",
+                 "posed generated topology")
+    for needle in ("!tri->deformedSurface", "MaterialRequestsClassicDeform( drawSurf )",
+                   "tri->primBatchMesh != NULL || ambientTri->primBatchMesh != NULL"):
+        require(posed, needle, "posed generated topology")
+    if interaction.count("GeneratedTopologyIsPosed(") != 4:
+        raise SystemExit("posed generated topology: expected the definition and three uses "
+                         "(receiver packet, receiver material, mapped caster)")
+    flat = re.sub(r"\s+", " ", interaction)
+    for needle in ("drawSurf->geo->deformedSurface && !posedTopology",
+                   "( tri->deformedSurface && !posedTopology )",
+                   "drawSurf.geo->deformedSurface && !GeneratedTopologyIsPosed( &drawSurf )"):
+        require(flat, needle, "deformedSurface refusals")
+    for needle in ("geometry.hasPrimBatchMesh", "geometry.skinningMode != GEOMETRY_SKINNING_CPU"):
+        require(interaction, needle, "GPU-posed geometry stays refused")
+
+
+def validate_shadow_map_forms() -> None:
+    interaction = re.sub(r"\s+", " ", read("src/renderer/ClassicInteractionDomain.cpp"))
+    # Only a cube is POINT; a distant point light's projected map is not.
+    require(interaction, "pass.lightClass = classification.pointLight ? SHADOWMAP_LIGHT_POINT "
+            ": ( classification.lightClass == SHADOWMAP_LIGHT_POINT ? SHADOWMAP_LIGHT_PROJECTED "
+            ": classification.lightClass );", "mapped pass class")
+    reject(interaction, "pass.lightClass = classification.lightClass;", "mapped pass class")
+    require(interaction, "domain.shadowMapPasses[ mappedPassIndex ].lightClass == SHADOWMAP_LIGHT_POINT",
+            "view shadow mode follows the map form")
+    require(interaction, "if ( mappedPointCube ) { view.pointShadowLightCount++;",
+            "point shadow lights counted by cube passes")
+    # A perforated caster that seals no alpha stage seals no range.
+    require(interaction, "if ( caster.alphaStageCount == 0 ) { caster.firstAlphaStage = -1; }",
+            "empty alpha-stage range")
+    gl = re.sub(r"\s+", " ", read("src/renderer/draw_arb2.cpp"))
+    for needle in ("const bool pointLight = light.legacyViewLight != NULL "
+                   "&& R_ClassifyShadowMapLight( light.legacyViewLight ).pointLight;",
+                   "const bool pointLight = viewLight != NULL && R_ClassifyShadowMapLight( viewLight ).pointLight;"):
+        require(gl, needle, "OpenGL cube decision follows classic classification")
+
+
 def main() -> int:
     validate_gl_targets()
     validate_vulkan_targets()
     validate_packet_pools()
     validate_fault_injection()
     validate_scope_widening()
+    validate_generated_topology()
+    validate_shadow_map_forms()
     print("renderer_shared_domain_targets: ok")
     return 0
 
