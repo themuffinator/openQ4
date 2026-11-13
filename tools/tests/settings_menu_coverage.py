@@ -223,11 +223,11 @@ def registry_setting(registry: dict, setting_id: str) -> dict:
 
 
 def performance_doc_preset_order(display_docs: str) -> list[str]:
-    try:
-        section = display_docs.split("## Performance Presets", 1)[1].split("## Core Display Settings", 1)[0]
-    except IndexError as exc:
-        raise AssertionError("Display settings guide is missing the Performance Presets section") from exc
-    return re.findall(r"^\| `([^`]+)` \|", section, re.MULTILINE)
+    # The section runs from its heading to the next level-2 heading.
+    match = re.search(r"^## Performance presets[ \t]*\r?\n(.*?)(?=^## |\Z)", display_docs, re.MULTILINE | re.DOTALL | re.IGNORECASE)
+    if match is None:
+        raise AssertionError("Display settings guide is missing the Performance presets section")
+    return re.findall(r"^\| `([^`]+)` \|", match.group(1), re.MULTILINE)
 
 
 def validate_performance_preset_wiring(

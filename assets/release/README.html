@@ -258,112 +258,135 @@
   <main>
     <section>
       <h1>openQ4</h1>
-      <p><strong>Release package</strong> for the open-source Quake 4 engine and game-code replacement.</p>
-      <p>This package contains openQ4 binaries plus the staged <code>baseoq4/</code> runtime payload and the <code>q4xbase/</code> game modules for Quake 4: The Awakening. Quake 4 assets and the expansion's content are not included.</p>
+      <p><strong>The modern way to play Quake 4.</strong> openQ4 is an open-source engine and game-code replacement that runs the original retail game on today's PCs, handhelds and Macs.</p>
+      <p>This package holds everything openQ4 needs to run: the game, the dedicated server, openQ4's own data in <code>baseoq4/</code> and the offline documentation. Quake 4 assets are not included, and neither is the content of the Quake 4: The Awakening expansion. You need your own copy of Quake 4 from Steam or GOG.</p>
       <div class="actions">
         <a class="button primary" href="docs/index.html">Open Documentation Portal</a>
+        <a class="button" href="docs/docs/user/getting-started.html">Getting Started Guide</a>
         <a class="button" href="docs/README.html">Project Overview</a>
-        <a class="button" href="docs/TECHNICAL.html">Technical Reference</a>
       </div>
     </section>
 
     <section>
+      <h2>Quick Start</h2>
+      <ol>
+        <li>Install Quake 4 from Steam or GOG and leave its <code>q4base/</code> folder as it is.</li>
+        <li>Put openQ4 in its own folder, separate from Quake 4:
+          <ul>
+            <li><strong>Windows:</strong> run the installer, or extract the ZIP.</li>
+            <li><strong>Linux:</strong> extract the archive, or use the AppImage, a single-file app that needs no installing. Run <code>chmod +x openq4-*.AppImage</code> once to make it executable, then start it.</li>
+            <li><strong>macOS:</strong> drag <code>openQ4.app</code> to your Applications folder. See the macOS notes below.</li>
+          </ul>
+        </li>
+        <li>Start the game: <code>openQ4-client_&lt;arch&gt;.exe</code> or the Start menu shortcut on Windows, <code>openQ4-client_&lt;arch&gt;</code> or the AppImage on Linux, and <code>openQ4-steamdeck</code> on Steam Deck.</li>
+        <li>openQ4 finds your Quake 4 installation by itself. If it doesn't, start it with <code>+set fs_basepath "path/to/Quake 4"</code>, naming the folder that contains <code>q4base/</code>, not <code>q4base/</code> itself.</li>
+        <li>On first launch openQ4 picks a performance preset for your hardware. To change it, open <strong>Settings → Display</strong> (<strong>System</strong> in the classic menus) and choose another <strong>Performance Preset</strong>, or press <strong>Auto-Detect</strong> to pick again.</li>
+      </ol>
+      <p><strong>Upgrading from an older openQ4?</strong> Install the complete package rather than replacing individual files. If you use an archive, extract it into a fresh folder, and delete any <code>baseoq4/</code> folder left by an older openQ4 rather than mixing old and new files. Your settings, key bindings and saves carry over, but older versions of openQ4 can't read saves made by newer ones, so back up your saves if you might go back. <a href="docs/docs/user/release-status.html">Release status</a> has the details.</p>
+      <p><strong>Portable setup:</strong> to keep everything in one place, put a copy of Quake 4's <code>q4base/</code> folder next to openQ4's <code>baseoq4/</code>. Never copy Quake 4's <code>.pk4</code> files into <code>baseoq4/</code>.</p>
+    </section>
+
+    <section>
       <h2>Requirements</h2>
-      <p><strong>Minimum client:</strong> 64-bit CPU matching the package architecture, 4 GB RAM, a working OpenGL compatibility driver with ARB2-era vertex/fragment program support, and about 12 GB free for openQ4 plus the retail Quake 4 assets.</p>
-      <p><strong>Recommended client:</strong> modern quad-core CPU, 8 GB RAM, OpenGL 4.1+ compatibility-class GPU with 2 GB+ VRAM, current graphics drivers, and 15 GB+ free. Use 16 GB RAM and 6 GB+ VRAM for high resolutions, <code>quality</code>, or <code>ultra</code> presets.</p>
       <ul>
-        <li>A legitimate Quake 4 installation from Steam or GOG.</li>
-        <li>The stock retail PK4 files in a <code>q4base/</code> directory, available through openQ4's asset discovery or a manual <code>fs_basepath</code> setting.</li>
-        <li>A supported package target: Windows x64, Linux x64, or Steam Deck/SteamOS; preview Linux ARM64 or preview Apple Silicon/arm64 macOS; or experimental Windows ARM64.</li>
-        <li>Use the <code>minimum</code>, <code>lowpower</code>, <code>low</code> or <code>performance</code> presets on constrained systems before enabling expensive visual options.</li>
+        <li>Your own copy of Quake 4 from Steam or GOG, with its original <code>q4base/</code> files. openQ4 finds Steam and GOG installations automatically.</li>
+        <li><strong>Minimum:</strong> a 64-bit dual-core CPU that matches this package (x64 or arm64), 4 GB of memory, working OpenGL graphics drivers with about 1 GB of video memory, and about 12 GB of free space including Quake 4.</li>
+        <li><strong>Recommended:</strong> a modern quad-core CPU, 8 GB of memory (16 GB for the higher presets and resolutions), OpenGL 4.1 or Vulkan graphics with 2 GB or more of video memory (6 GB or more for the Quality preset and above), current graphics drivers, and 15 GB or more of free space.</li>
+        <li>Windows 10 or 11 is recommended. The Linux builds need a modern 64-bit desktop comparable to Ubuntu 24.04 or newer.</li>
+        <li>On older or low-power hardware, start with the <strong>Minimum</strong>, <strong>Low Power</strong>, <strong>Low</strong> or <strong>Performance</strong> preset before turning on expensive options.</li>
+      </ul>
+      <p><strong>Packages:</strong> the main builds are Windows x64 (installer or ZIP), Linux x64 (AppImage or archive) and Steam Deck (the Linux archive). The others are less tested: preview Linux ARM64, preview Apple Silicon/arm64 macOS, and experimental Windows ARM64 and Android. Signed macOS builds for Apple Silicon and Intel Macs are offered separately by <a href="https://www.macsourceports.com/game/quake4">Mac Source Ports</a>.</p>
+    </section>
+
+    <section>
+      <h2>Graphics Renderer</h2>
+      <ul>
+        <li>A new installation starts on <strong>Automatic</strong>: openQ4 tries Vulkan first and uses OpenGL if Vulkan can't start, noting the reason in its log. A renderer you chose in an older openQ4 stays chosen.</li>
+        <li>Vulkan is supported on Windows and experimental on Linux and macOS.</li>
+        <li>To choose a renderer yourself, pick it under <strong>Settings → Display → Rendering Backend</strong> and follow the restart prompt, or start openQ4 with <code>+set r_renderApi gl</code> for OpenGL or <code>+set r_renderApi vulkan</code> for Vulkan. If the game won't start or draws incorrectly, try the other one.</li>
       </ul>
     </section>
 
     <section>
-      <h2>Getting Started</h2>
-      <ol>
-        <li>Install Quake 4 from Steam or GOG and leave its retail <code>q4base/</code> folder intact.</li>
-        <li>Install or extract openQ4 to its own folder when possible. On Windows, either run the installer executable or extract the archive; the installer can detect an existing openQ4 install, adds a standard uninstall entry, and optionally registers <code>openq4://</code> browser links. On Linux, you can instead run the matching AppImage directly after <code>chmod +x openq4-*.AppImage</code>.</li>
-        <li>Use a clean layout: preferably keep retail Quake 4 separate with assets under <code>q4base/</code>; for a portable setup, keep a copied retail <code>q4base/</code> beside openQ4's <code>baseoq4/</code>. Never copy retail PK4s into <code>baseoq4/</code>.</li>
-        <li>Run <code>openQ4-client_&lt;arch&gt;</code>, <code>openQ4-client_&lt;arch&gt;.exe</code>, or the Linux AppImage. The AppImage bundles openQ4 runtime libraries but still discovers the separately installed retail Quake 4 assets; it never embeds them.</li>
-        <li>On Steam Deck, use <code>openQ4-steamdeck</code> when it is included in the package. Direct <code>openQ4-client_&lt;arch&gt;</code> launches on Steam Deck or SteamOS also auto-select the Deck profile when <code>com_platformProfile</code> is still <code>default</code>.</li>
-        <li>Open <code>docs/index.html</code> for the full offline documentation set, or use the installer-created Start Menu shortcuts on Windows.</li>
-        <li>If auto-detection fails, launch with <code>+set fs_basepath "path\\to\\Quake 4"</code>, pointing at the retail root that contains <code>q4base/</code>.</li>
-      </ol>
+      <h2>Windows Notes</h2>
+      <ul>
+        <li>The installer adds Start menu shortcuts for the game, the dedicated server, the documentation and this page, plus a standard uninstall entry. It notices an existing openQ4 installation, and it can register <code>openq4://</code> links so that a server link in your browser opens openQ4 and joins that server.</li>
+        <li>The installer downloads the light-grid and loadscreen packs during setup when your openQ4 folder doesn't already have them, so stay online while it runs. The ZIP already contains them.</li>
+        <li>Debugging symbols (<code>.pdb</code> files) are not in this package. They are only needed to analyse crashes, and are published separately as <code>openq4-&lt;version&gt;-windows-&lt;arch&gt;-symbols.zip</code>.</li>
+      </ul>
     </section>
 
     <section>
       <h2>Windows ARM64 Experimental Notes</h2>
       <ul>
-        <li>Windows ARM64 packages are experimental. They are built natively for Arm64 and automated tests start the dedicated server, but nothing has started the game client automatically yet, and no real-hardware report has confirmed that the packages run.</li>
-        <li>openQ4 renders with OpenGL by default. If the renderer does not start on a Windows on Arm device, launch with <code>+set r_renderApi vulkan</code>.</li>
-        <li>Please report what happens, including runs that simply work, with the Windows ARM64 issue template on the <a href="https://github.com/themuffinator/openQ4/issues">openQ4 issue tracker</a>.</li>
+        <li>Windows ARM64 packages are experimental. They are built natively for Arm and automated tests start the dedicated server, but nothing has started the game client automatically yet, and no one has yet reported running them on real hardware.</li>
+        <li>If the game doesn't start or draws incorrectly on a Windows on Arm device, try each renderer in turn: launch with <code>+set r_renderApi gl</code>, then with <code>+set r_renderApi vulkan</code>.</li>
+        <li>Please tell us what happens, even if it simply works, with the Windows ARM64 issue template on the <a href="https://github.com/themuffinator/openQ4/issues">openQ4 issue tracker</a>.</li>
       </ul>
     </section>
 
     <section>
       <h2>Linux ARM64 Preview Notes</h2>
       <ul>
-        <li>Linux ARM64 packages remain preview builds until physical ARM64 hardware completes native-Wayland SP/MP gameplay, dedicated-server, audio, input, and package signoff.</li>
-        <li>The package requires 64-bit little-endian AArch64 hardware, an Ubuntu 24.04-class desktop userspace, and a desktop OpenGL compatibility driver with Wayland/EGL or X11/GLX support.</li>
-        <li>GLES-only boards are not covered by the current Linux ARM64 package.</li>
+        <li>Linux ARM64 packages are preview builds: they have not yet been fully tested on real ARM64 hardware.</li>
+        <li>They need a 64-bit ARM (AArch64) computer running a desktop Linux comparable to Ubuntu 24.04, with full desktop OpenGL drivers, on either a Wayland or an X11 desktop.</li>
+        <li>Boards whose graphics drivers offer only OpenGL ES can't run this package.</li>
       </ul>
     </section>
 
     <section>
       <h2>Steam Deck Notes</h2>
       <ul>
-        <li>The Deck launcher enables the <code>steamdeck</code> platform profile and sets <code>OPENQ4_STEAMDECK=1</code>.</li>
-        <li>Native Wayland is the default SDL path when available. Set <code>OPENQ4_FORCE_X11=1</code> to force the XWayland fallback from the Deck launcher or a direct client launch.</li>
-        <li>If native Wayland hits a compositor/libdecor startup or decoration issue, set <code>OPENQ4_WAYLAND_DISABLE_LIBDECOR=1</code> for that launch.</li>
-        <li>Deck controller tuning lives under <code>Settings -&gt; Game Options -&gt; Controller</code>, including gyro, touchpad mode, touchscreen routing, and low-battery rumble caps.</li>
-        <li>Run <code>listControllers</code> from the console when reporting Deck input, battery, gyro, touchpad, or touchscreen issues.</li>
+        <li>Start <code>openQ4-steamdeck</code> from the Linux archive. It switches on openQ4's Steam Deck profile and sets <code>OPENQ4_STEAMDECK=1</code>. Direct <code>openQ4-client_&lt;arch&gt;</code> launches on Steam Deck or SteamOS also auto-select the Deck profile, unless you have changed <code>com_platformProfile</code> yourself.</li>
+        <li>openQ4 uses the Deck's native Wayland display when it can. If the window misbehaves, set <code>OPENQ4_FORCE_X11=1</code> for that launch to use the older X11 (XWayland) path instead. If only start-up or the window's title bar has trouble, try <code>OPENQ4_WAYLAND_DISABLE_LIBDECOR=1</code>.</li>
+        <li>Tune gyro aiming, touchpad mode, the touchscreen and the low-battery rumble limit under <code>Settings -&gt; Game Options -&gt; Controller</code>.</li>
+        <li>When you report a controller, battery, gyro, touchpad or touchscreen problem, run <code>listControllers</code> in the console and include what it prints.</li>
       </ul>
     </section>
 
     <section>
       <h2>macOS Preview Notes</h2>
       <ul>
-        <li>macOS support is a preview. Current packages are for Apple Silicon/arm64 Macs on macOS 11 or later. Players have run them on macOS 26, including the single-player campaign and multiplayer with sound, but nothing older than the current macOS has been tested. Intel Mac and universal2 packages are not published yet, and Rosetta is not a supported release target.</li>
-        <li>Release runs with Apple Developer ID signing and notarization credentials publish signed/notarized OpenGL and Metal bridge DMGs. Those credentials are not set up yet, so current releases publish clearly labeled <code>-unsigned.tar.gz</code> archives instead.</li>
-        <li>Unsigned macOS archives are ad-hoc signed only for bundle validity, are not notarized, and may require normal Gatekeeper approval on first launch.</li>
-        <li>The Metal package is a bridge mode around the existing OpenGL renderer, preserving stock-asset compatibility while Metal translation-layer work continues; it is not a native Metal renderer.</li>
-        <li>Both macOS packages also carry openQ4's experimental Vulkan renderer. Apple ships no Vulkan driver, so on macOS it runs on top of MoltenVK, a Vulkan-on-Metal translation layer bundled inside the package. It is a translation layer, not a Metal renderer.</li>
-        <li>macOS packages bundle OpenAL Soft for audio; no Homebrew or separate audio install is required. Its LGPL notice and corresponding source archive are included inside <code>openQ4.app/Contents/Resources/licenses/openal-soft/</code>.</li>
-        <li>OpenGL remains the default and recommended macOS renderer in both packages. Vulkan is opt-in: run <code>r_renderApi vulkan</code> in the console, then quit and relaunch openQ4. It is a runtime option rather than a separate download, so there is no third macOS package to install.</li>
-        <li>Expect problems if you try it. The Vulkan renderer is experimental on every platform, and on macOS only one player has reported it working. If it cannot start, openQ4 logs the reason and renders with OpenGL instead; if it only fails later, while creating the window, openQ4 stops with an error and the next launch uses OpenGL. Run <code>r_renderApi gl</code> and restart to go back.</li>
-        <li>Open the DMG or unpack the <code>-unsigned.tar.gz</code> archive, drag <code>openQ4.app</code> to <code>/Applications</code> (or another user-writable folder), then launch it. The app contains openQ4's runtime data and signed SP/MP modules. Keep the whole package only for the loose diagnostic client, dedicated server, or support collector; do not add retail <code>q4base</code> assets to the signed app.</li>
-        <li>For macOS crashes, attach full terminal output as text plus <code>openq4.log</code> and any matching <code>.ips</code> report. Run <code>collect_macos_support_info.sh</code> from the package root to collect Rosetta, renderer, architecture, dependency, signing, and quarantine diagnostics, then see the <a href="docs/docs/user/macos-support-data.html">macOS support-data guide</a>.</li>
+        <li>macOS support is a preview. Current packages are for Apple Silicon/arm64 Macs on macOS 11 or later. Players have run them on macOS 26, including the single-player campaign and multiplayer with sound, but nothing older than the current macOS has been tested. Intel Mac and universal2 packages are not published yet, and Rosetta is not a supported release target. For a signed build that also runs on Intel Macs, see <a href="https://www.macsourceports.com/game/quake4">Mac Source Ports</a>.</li>
+        <li>When Apple signing is available, releases publish signed/notarized OpenGL and Metal bridge DMGs. It is not set up yet, so current releases publish clearly labeled <code>-unsigned.tar.gz</code> archives instead. These are ad-hoc signed only for bundle validity and are not notarized, so macOS asks you to approve the app the first time you open it.</li>
+        <li>Open the DMG or unpack the <code>-unsigned.tar.gz</code> archive, drag <code>openQ4.app</code> to <code>/Applications</code> (or another folder you can write to), then open it. The app contains openQ4's runtime data and signed SP/MP modules (the single-player and multiplayer game code), so it is all you need to play. Keep the rest of the package only if you want the separate diagnostic client, dedicated server or support collector, and don't add Quake 4's <code>q4base</code> files to the app.</li>
+        <li>The OpenGL and Metal bridge packages both draw with openQ4's OpenGL renderer. The Metal bridge package is groundwork for future Metal support, not a native Metal renderer.</li>
+        <li>Both packages also include the experimental Vulkan renderer. Apple ships no Vulkan driver, so it runs through MoltenVK, a layer bundled with the app that translates Vulkan to Apple's Metal graphics. New installations start on Automatic, which tries Vulkan and uses OpenGL if it can't start. Only one player has reported Vulkan working on a Mac, so expect problems. To stay on OpenGL, choose OpenGL under <strong>Settings → Display → Rendering Backend</strong>, or run <code>r_renderApi gl</code> in the console and restart openQ4.</li>
+        <li>Sound works out of the box: the packages bundle OpenAL Soft, so no Homebrew or separate audio install is required. Its licence notice and source archive are in <code>openQ4.app/Contents/Resources/licenses/openal-soft/</code>.</li>
       </ul>
     </section>
 
     <section>
       <h2>Package Contents</h2>
       <ul>
-        <li><code>openQ4-client_&lt;arch&gt;</code> and <code>openQ4-ded_&lt;arch&gt;</code>: engine binaries.</li>
-        <li><code>*.pdb</code> files on Windows: diagnostic symbols that make crash dumps actionable.</li>
-        <li><code>baseoq4/pak0.pk4</code> (inside <code>openQ4.app/Contents/Resources</code> on macOS): openQ4-owned runtime content and overrides.</li>
-        <li><strong>Single Player → Campaign</strong>: choose Quake 4 or The Awakening when expansion content is installed. Both use the bundled <code>baseoq4</code> SP module, with separate saves and content mounts. Supply the unfinished alpha content separately; see the <a href="docs/docs/user/campaigns.html">campaign guide</a>.</li>
-        <li><code>docs/index.html</code>: full packaged HTML documentation portal.</li>
-        <li><code>docs/docs/user/</code> and <code>docs/docs/dev/</code>: converted user and developer references.</li>
-        <li><code>VERSION.txt</code>: packaged version metadata.</li>
-        <li><code>LICENSING.md</code>: component terms and distribution considerations. <code>LICENSE</code> and the accompanying Additional Terms cover the engine; <code>LICENSES/QUAKE-4-SDK-EULA.rtf</code> covers SDK-derived game code.</li>
+        <li><code>openQ4-client_&lt;arch&gt;</code> is the game and <code>openQ4-ded_&lt;arch&gt;</code> the dedicated server for hosting multiplayer games. On Windows both end in <code>.exe</code>; on macOS you play from <code>openQ4.app</code>.</li>
+        <li><code>openQ4-steamdeck</code> (Linux archives) is the Steam Deck launcher.</li>
+        <li><code>baseoq4/</code> (inside <code>openQ4.app/Contents/Resources</code> on macOS) holds openQ4's game code and its own data, in three packs: <code>pak0.pk4</code> for the menus, fonts, text and shaders, <code>pak1.pk4</code> for the baked light grids and <code>pak2.pk4</code> for the loadscreens. Later patch releases may also offer a small update archive without <code>pak1.pk4</code> and <code>pak2.pk4</code>; their release notes say when you can use it.</li>
+        <li><strong>The Awakening</strong> needs nothing extra from this package: the expansion runs on the same game code as Quake 4. Put the expansion's <code>q4xbase</code> folder, which you supply yourself, next to Quake 4's <code>q4base</code> folder, then choose it under <strong>Single Player → Campaign</strong>. See the <a href="docs/docs/user/campaigns.html">campaign guide</a>.</li>
+        <li><code>docs/index.html</code> opens the offline documentation.</li>
+        <li><code>VERSION.txt</code> records the version, platform and architecture of this package.</li>
+        <li><code>LICENSE</code>, <code>LICENSING.md</code> and the <code>licenses/</code> folder set out the terms for each part of openQ4. The engine is under the GNU GPL (<code>LICENSE</code> and its accompanying Additional Terms); the game code comes from the Quake 4 SDK and is covered by <code>licenses/QUAKE-4-SDK-EULA.rtf</code>. <code>CONTRIBUTORS.md</code> lists the people behind openQ4.</li>
+        <li><code>collect_macos_support_info.sh</code> (macOS packages) gathers diagnostics for bug reports.</li>
       </ul>
     </section>
 
     <section>
-      <h2>Crash Reports</h2>
-      <p>On Windows, unhandled openQ4 crashes write a crash log and memory dump under <code>crashes/</code> beside the executable. Attach both generated files when reporting a crash.</p>
+      <h2>Crash Reports and Help</h2>
+      <ul>
+        <li><strong>Windows:</strong> if openQ4 crashes, it writes a crash log and a memory dump to the <code>crashes/</code> folder beside the executable. Attach both files to your report.</li>
+        <li><strong>macOS:</strong> run <code>collect_macos_support_info.sh</code> from the package root, then attach the archive it creates, the full terminal output as text, <code>openq4.log</code> and any matching <code>.ips</code> crash report. The <a href="docs/docs/user/macos-support-data.html">macOS support-data guide</a> explains each step.</li>
+        <li>Report problems on the <a href="https://github.com/themuffinator/openQ4/issues">openQ4 issue tracker</a> with your log file and setup details, or ask in <strong>#openq4</strong> on the <a href="https://discord.gg/T32mFejwR4">DarkMatter Discord</a>.</li>
+      </ul>
     </section>
 
     <section>
       <h2>Documentation</h2>
-      <p>The release archive includes a full offline HTML docs site instead of only a single readme. Start with <a href="docs/index.html"><code>docs/index.html</code></a>, then move into the overview, build guide, technical reference, user guides, and developer notes.</p>
+      <p>The full documentation is included for offline reading. Start at <a href="docs/index.html"><code>docs/index.html</code></a> for installation, settings, campaigns, multiplayer, Steam Deck, macOS and every other player guide, plus the build guide and technical reference for developers. On Windows, the installer also adds a Documentation Portal shortcut to the Start menu.</p>
     </section>
 
     <section>
       <h2>More Information</h2>
-      <p><a href="https://github.com/themuffinator/openQ4">Repository</a> | <a href="https://github.com/themuffinator/openQ4/releases">Releases</a> | <a href="https://www.darkmatter-quake.com">Website</a></p>
+      <p><a href="https://github.com/themuffinator/openQ4">Repository</a> | <a href="https://github.com/themuffinator/openQ4/releases">Releases</a> | <a href="https://www.darkmatter-quake.com">Website</a> | <a href="https://discord.gg/T32mFejwR4">Discord</a></p>
     </section>
   </main>
 </body>

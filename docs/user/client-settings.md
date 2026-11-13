@@ -1,52 +1,46 @@
-# Client Settings Guide
+# Client settings guide
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-This guide helps players find the most useful openQ4 settings without digging through every advanced option.
+This page shows where openQ4's most useful options live, so you can set the game up without reading every guide. Open **Settings** from the main menu or the pause menu.
 
-## Best Places to Start
+## First things to check
 
-If you are setting up openQ4 for the first time, these are the areas most players adjust first:
+- **Performance preset.** openQ4 picks one for your hardware on first launch. Change it under **Settings → Display → Performance Preset**, or press **Auto-Detect** to pick again. If your PC is near the [minimum requirements](getting-started.md#system-requirements), start low.
+- **Screen.** Choose fullscreen or a borderless window, the resolution and, with several monitors, the **Display Device**.
+- **Mouse and controller.** Set mouse sensitivity, controller stick dead zone and look sensitivity under **Settings → Game Options**.
+- **Volume and subtitles.** Set music and dialogue volume and turn on subtitles under **Settings → Audio**.
 
-- **Display** for fullscreen mode, resolution, monitor selection, and image quality
-- **Controls** for keyboard, mouse, controller, and bindings
-- **Game Options** for gameplay comfort settings and a few audio-related tweaks
+## What each Settings tab holds
 
-## Recommended First Checks
+| Tab | What you'll find |
+|---|---|
+| **Controls** | Key and button bindings for movement, weapons, attack and look, and everything else (chat, quick chat, voice chat, the weapon wheel, quick save and load). |
+| **Game Options** | Gameplay comfort: auto reload and weapon switch, gun position and field of view, corpses and decals, language, cinematics, the HUD and crosshair, mouse feel, and controller options including gyro, touchpad and rumble. |
+| **Display** | Performance preset and Auto-Detect, renderer and graphics card, interface and text size, monitor, fullscreen and window size, V-Sync, anti-aliasing, resolution scale, and effects such as shadows, bloom, ambient occlusion, HDR and the CRT filter. Press **Apply Changes** to use them: most take effect without a restart, and screen changes ask you to keep or revert them. |
+| **Audio** | Volume, music and dialogue volume, sound device, speaker layout and headphone mode, and dialogue subtitles. |
 
-- Set your preferred fullscreen or borderless mode
-- Run **Auto-Detect** for the Performance Preset if this is a new machine or you are near the [minimum requirements](getting-started.md#system-requirements)
-- Adjust mouse sensitivity or controller dead zone
-- Confirm your display target if you use multiple monitors
-- Pick whether you want extra visual effects such as bloom or shadow mapping
-- Lower or raise music volume to taste
+The classic menus have the same options in a different layout, and call the **Display** tab **System**.
 
-## Which Guide Covers What?
+To change difficulty during a single-player game, choose **Restart Level** in the pause menu and pick a difficulty; the level starts again at it. The classic menus have a separate **Difficulty** entry. See [Gameplay Settings](gameplay-settings.md#difficulty).
 
-- [Display Settings](display-settings.md) - resolution, fullscreen, windowed mode, multi-monitor, anti-aliasing, and aspect behavior
-- [Input Settings](input-settings.md) - keybinds, mouse tuning, controller support, and config-file behavior
-- [Gameplay Settings](gameplay-settings.md) - convenience toggles and a few gameplay/audio settings
-- [Shadow Mapping](shadow-mapping.md) - optional advanced shadow-map tuning
-- [Cel Shading](cel-shading.md) - banded lighting and outline settings for the cel-shaded look
-- [DDS Texture Replacements](texture-replacements.md) - DXT/BC7 texture-pack layout and diagnostics
-- [Steam Deck](steam-deck.md) - launcher and handheld-specific input notes
+## Which guide covers what
 
-## In-Game Menus
+- [Display Settings](display-settings.md): presets, screen and window modes, multiple monitors, anti-aliasing and the renderer.
+- [Input Settings](input-settings.md): key bindings, mouse feel, controllers and your config files.
+- [Gameplay Settings](gameplay-settings.md): difficulty, HUD and crosshair, field of view, subtitles, sound and corpses.
+- [Shadow Mapping](shadow-mapping.md): shadow quality and tuning.
+- [Cel Shading](cel-shading.md): the cartoon-style look.
+- [DDS Texture Replacements](texture-replacements.md): installing texture packs.
+- [Steam Deck](steam-deck.md): the Deck launcher and handheld controls.
+- [Languages](languages.md): menu and dialogue languages.
 
-Most player-facing options are available directly in the in-game menus:
+## New and classic interface
 
-- `Settings -> System`
-- `Settings -> Controls`
-- `Settings -> Game Options`
-- `Difficulty` (single-player) - restart the current level at another difficulty; see [Gameplay Settings](gameplay-settings.md#difficulty)
+openQ4 0.14.1 uses its new interface by default: rebuilt menus, settings, loading screens and the Remastered HUD, made for controllers, touch, tall screens and large text. The classic Quake 4 menus and HUD are still there.
 
-## Modern and Classic Screens
+- To switch, open the console and enter `seta ui_retained 0` for the classic interface or `seta ui_retained 1` for the new one. Your choice is saved, and upgrading never changes a choice you already made.
+- If a new screen can't be shown, openQ4 shows the classic one instead. This happens when a mod brings its own main menu, or when a screen's files are missing or damaged. There is nothing for you to fix.
+- The centred ammo, health and armour bar has its own size and screen-edge settings; see [Gameplay Status Bar](gameplay-settings.md#gameplay-status-bar).
 
-Current source builds default to the modern interface (`ui_retained 1`) for new profiles. The [0.14.000 release](../dev/releases/v0.14.000.md) shipped with the classic interface (`ui_retained 0`); the modern default was restored afterward. Existing saved preferences are preserved, so upgrading does not change an interface choice already saved in your profile.
-
-The modern UI replaces the title screen and its pages (Single Player with the campaign and difficulty choice and the Arena ladder, Load Game, Save Game, Restart Level, Credits, the MODS list, Settings with its Controls, Game Options, Display and Audio pages, and Multiplayer with its server browser, Create Server, Demos and Player Setup), the single-player pause menu, the screen after a death, loading screens, the multiplayer join and in-match menus, the match summary, and the gameplay HUD. HUD coverage includes crosshairs, objectives, radio, powerups, boss and vehicle displays, multiplayer scores/chat/summary panels and Awakening overlays. See [Gameplay Status Bar](gameplay-settings.md#gameplay-status-bar) for the centered ammo/health/armor bar's independent size and safe-inset settings.
-
-- Enter `seta ui_retained 1` for the modern UI or `seta ui_retained 0` for classic. The choice is saved. An explicit launch option overrides the saved choice; the VS Code retained-UI configurations explicitly enable it for development testing.
-- If a modern screen can't be shown, openQ4 shows the classic one instead, with nothing to fix on your side. This happens when a mod brings its own main menu, or when a modern screen's files are missing or damaged.
-
-If you want deeper technical details or console-level configuration, see [TECHNICAL.md](../../TECHNICAL.md).
+For console-level configuration and file locations, see [TECHNICAL.md](../../TECHNICAL.md).

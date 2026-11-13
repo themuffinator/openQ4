@@ -1,81 +1,68 @@
-# Level-Load Cache
+# Level-load cache (experimental)
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-openQ4 learns which source files a map actually uses and can prepare those
-bytes during a later matching load. Worker jobs read or inflate the selected
-source, validate supported container framing and whole-buffer integrity, then
-hand immutable bytes back to the normal owner. openQ4 also keeps validated local
-binary caches for parsed models, classic map worlds, collision data, and MD5
-animations.
+The level-load cache is an experimental option that aims to make maps load
+faster the second time. On the first visit, openQ4 notes which files the map
+uses and saves ready-processed copies of its models, map geometry, collision
+data and animations in your save folder. A later visit can read those files
+ahead of time and skip work it has already done.
 
-The experimental cache is disabled by default because current stock-map
-measurements do not yet prove a reliable improvement over classic loading. If
-enabled, the first visit still uses the installed Quake 4 or mod sources and may
-take longer while private cache files are written. A later visit can reuse work
-only when the map, game mode, entity filter, active search/PK4 set, source
-identity, and load-affecting settings still match.
+It is **off by default**: on the stock maps measured so far, it has not yet
+proved reliably faster than normal loading. Try it if you are curious, and turn
+it off again if loading is no quicker for you.
+
+## Turning it on and off
+
+Enter this in the console (it is a console variable, or cvar), then load a map:
+
+```text
+com_levelLoadModernization 1
+```
+
+- The first visit to each map loads from the game files as usual, and may take
+  a little longer while the cache files are written.
+- A later visit reuses them only when everything that affects loading still
+  matches: the same map, game mode, installed packages and mods, and the same
+  load-related settings. Otherwise openQ4 quietly builds fresh copies.
+
+To go back to normal loading, enter `com_levelLoadModernization 0`. In that mode
+no cache file is read or written, whatever the other settings below say.
 
 ## Safety and compatibility
 
-The retail or mod file selected by the normal virtual filesystem always remains
-authoritative. openQ4 resolves that file through the usual search and pure-PK4
-rules before it may substitute already prepared, immutable bytes. Parsing,
-validation, and renderer/audio upload stay with the normal resource owner.
-The worker framing step recognizes RIFF/WAVE, Ogg, PNG, and JPEG sources; DDS
-and other formats remain opaque until their ordinary owner parses them.
+Your installed Quake 4 and mod files always come first: openQ4 finds each
+file through the normal game search rules before it uses a prepared copy, and
+the normal loading code still checks and uses the result.
 
-Generated model, world, collision, and animation readers build private state
-first and publish it only after the whole payload is valid. A stale, truncated,
-corrupt, oversized, wrong-version, or otherwise mismatched cache is ignored;
-the affected private file is removed where appropriate and openQ4 loads the
-original source instead. Packed MD5RProc map worlds remain on their source path
-rather than being flattened into an incompatible world cache.
+Every cache file is checked in full before it is used. A stale, truncated, corrupt, or mismatched cache is ignored, the bad file is removed where appropriate, and openQ4 loads the original instead.
 
-These files are disposable runtime data. They are not replacement assets, do
-not change pure-server package negotiation, and must not be copied into retail
-Quake 4 PK4s.
+Cache files are disposable. They do not replace any game assets and do not
+affect joining pure servers (servers that require matching game files). Never
+copy them into Quake 4's PK4 packages.
 
-## Location
+## Where the files are
 
-Caches are written below the active game directory under `fs_savepath`, normally
-`<fs_savepath>/baseoq4/`:
+The cache lives in openQ4's save folder (`fs_savepath`), inside the active game
+folder, normally `<fs_savepath>/baseoq4/`:
 
 ```text
-generated/manifests/       learned per-map source lists
-generated/models/          parsed render-model data
-generated/worlds/          finalized classic .proc world data
-generated/collision/       parsed/generated collision data
-generated/animations/      parsed MD5 animation data
+generated/manifests/       which files each map uses
+generated/models/          processed models
+generated/worlds/          processed map geometry
+generated/collision/       processed collision data
+generated/animations/      processed MD5 animations
 ```
 
-With the standard unified game directory, the full animation root is
-`<fs_savepath>/baseoq4/generated/animations/`.
+So the animation cache, for example, is in `<fs_savepath>/baseoq4/generated/animations/`.
 
-Manifest and model/world/collision filenames are opaque hashes of their
-validated keys. Animation files retain the normalized source path and add a
-`.banim` suffix. Moving cache files between installations is neither necessary
-nor recommended; a different source package or setting can intentionally cause
-a clean miss and rebuild.
+Most file names are codes rather than readable names; animation files keep the
+animation's path and end in `.banim`. Animation cache files are portable: x64 and ARM64 builds use the same format. There is no need to copy cache files between installations; a different
+set of packages or settings simply builds new ones.
 
-Animation v3 stores fixed-width values and floating-point arrays in a portable
-byte order; x64 and ARM64 builds use the same format. It identifies the exact
-source that the parser would select (`<name>c` when binary reads are enabled and
-that compiled source exists, otherwise the requested `.md5anim`), uses a content
-CRC for loose sources, and verifies a whole-record length/CRC trailer before
-parsing cache fields. A stale, truncated, corrupt, or mismatched cache is ignored
-and the selected source animation is parsed.
+## Settings
 
-Learned preload identity for a loose file uses its normalized path, size, and
-timestamp. A tool that deliberately preserves both size and timestamp while
-rewriting a loose file can evade that preparation check; close openQ4 and remove
-the generated data, or disable `com_levelLoadCache`, when testing such edits.
-PK4 members remain tied to the containing archive checksum.
-
-## Controls
-
-The master switch defaults off. The individual controls retain their enabled
-defaults so an intentional experiment needs only the master switch:
+Defaults:
 
 ```text
 com_levelLoadModernization 0
@@ -83,62 +70,52 @@ com_levelLoadCache 1
 com_levelLoadCacheWrite 1
 com_levelLoadPreload 1
 com_levelLoadCacheReport 0
-```
-
-- Set `com_levelLoadModernization 1` before loading a map to opt into all
-  individually enabled cache paths. This also permits the SP/MP animation-cache
-  controls below to take effect.
-- Set `com_levelLoadModernization 0` for the classic loading path. This master
-  rollback overrides archived values from builds that previously enabled the
-  individual controls by default.
-- Set `com_levelLoadPreload 0` before loading a map to disable learned source
-  preparation while retaining valid generated model/world/collision caches.
-- Set `com_levelLoadCacheWrite 0` to stop new manifests and generated
-  model/world/collision files from being written while valid existing files can
-  still be read.
-- Set `com_levelLoadCache 0` before loading a map to bypass learned manifests
-  and generated model/world/collision caches completely.
-- Set `com_levelLoadCacheReport 1` for per-map hit, miss, replay, byte,
-  framing/integrity decode, cancellation, and staging/decoded-memory diagnostics
-  in the log.
-
-Advanced staging limits are available as
-`com_levelLoadPreloadMaxEntries`, `com_levelLoadPreloadMaxFileMB`,
-`com_levelLoadPreloadMaxStagingMB`, `com_levelLoadPreloadMaxDecodeMB`,
-`com_levelLoadPreloadReadChunkKB`, and
-`com_levelLoadPreloadDecodeChunkKB`. Their defaults are deliberately bounded;
-increasing them can raise transient memory use and is not normally needed. The
-normal owner can allocate its parsed representation in addition to the retained
-source bytes, so these controls are pipeline limits rather than a cap on total
-level-load memory.
-
-Animation caches are owned separately by the SP and MP game modules. Their
-individual controls default to enabled, but reads and writes occur only while
-`com_levelLoadModernization 1`:
-
-```text
 g_useGeneratedAnimCache 1
 g_writeGeneratedAnimCache 1
 ```
 
-- Set `g_useGeneratedAnimCache 0` to bypass existing `.banim` files.
-- Set `g_writeGeneratedAnimCache 0` to prevent new `.banim` files.
+`com_levelLoadModernization` is the master switch; the others only take effect
+while it is `1`, so turning it on is all you need. Change them before loading a
+map:
 
-## Clean rebuild and rollback
+| Setting | What it does |
+| --- | --- |
+| `com_levelLoadModernization` | Master switch. `1` turns on every cache part that is set to `1` below; `0` is normal loading, even if older settings turned parts on. |
+| `com_levelLoadCache` | `0` ignores the saved file lists and the model, map geometry and collision caches completely. |
+| `com_levelLoadCacheWrite` | `0` stops new cache files being written; existing valid ones are still read. |
+| `com_levelLoadPreload` | `0` stops openQ4 reading a map's files ahead of time, while still using valid model, geometry and collision caches. |
+| `com_levelLoadCacheReport` | `1` writes per-map cache hits, misses, bytes and memory use to the log. |
+| `g_useGeneratedAnimCache` | `0` ignores existing animation cache (`.banim`) files. |
+| `g_writeGeneratedAnimCache` | `0` stops new animation cache files being written. |
 
-To force a clean rebuild, close openQ4 and delete one or more of the
-`generated/` subdirectories listed above under the active `fs_savepath`. openQ4
-will recreate needed private data from the installed sources.
+Advanced limits on how much openQ4 reads ahead are also available:
+`com_levelLoadPreloadMaxEntries`, `com_levelLoadPreloadMaxFileMB`,
+`com_levelLoadPreloadMaxStagingMB`, `com_levelLoadPreloadMaxDecodeMB`,
+`com_levelLoadPreloadReadChunkKB` and `com_levelLoadPreloadDecodeChunkKB`. The
+defaults are deliberately modest and you should not need to change them;
+raising them can increase memory use while a map loads.
 
-For a complete source-path comparison, leave `com_levelLoadModernization 0`.
-No framework or animation cache is read or written in that mode, regardless of
-older archived values for the individual controls.
+## Troubleshooting
 
-Never delete the original `.proc`, `.cm`, model, image, sound, or
-`models/**/*.md5anim` files from the Quake 4 installation. If a map still fails
-with all generated caches disabled, the problem is not caused by this cache
-layer; include the active `fs_savepath` and `logs/openq4.log` when reporting it.
+**Start the cache afresh.** Close openQ4 and delete one or more of the
+`generated/` folders listed above. openQ4 rebuilds what it needs from the
+installed game files.
 
-Developers and testers can find the exact key, ownership, validation, and
-pending evidence contract in
-[Level-Load Cache Modernization](../dev/loading-cache-modernization.md).
+**Never delete Quake 4's own files.** Only the `generated/` folders in your save
+folder are cache. Leave the game's `.proc`, `.cm`, model, image, sound and
+animation files alone.
+
+**A map fails to load.** Set `com_levelLoadModernization 0` and try again. If
+it still fails, the cache is not the cause. When you report the problem, include
+your `fs_savepath` and a console log: start openQ4 with
+`+set logFile 2 +set logFileName logs/openq4.log`, and the log is written to
+`<fs_savepath>/baseoq4/logs/openq4.log`.
+
+**Modders editing loose files.** openQ4 recognises a changed loose file by its
+path, size and date. A tool that rewrites a file but keeps both its size and its
+date can slip past that check, so delete the `generated/` folders or set
+`com_levelLoadCache 0` while testing such edits. Files inside PK4s are tied to
+the package's checksum and are not affected.
+
+Developers: the cache's full design is in
+[level-load cache modernization](../dev/loading-cache-modernization.md).

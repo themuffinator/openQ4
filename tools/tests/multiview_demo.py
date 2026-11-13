@@ -591,11 +591,11 @@ def validate_documented_compatibility() -> None:
 
     for needle in (
         "MVD `.mvd` 1.3",
-        "MVD 1.3 is the current writer",
+        "New recordings use MVD 1.3",
         "every active multiplayer instance",
-        "version-1 decoder",
-        "no index and a zero snapshot count",
-        "separately versioned MVD game schema",
+        "still plays MVD 1.0, 1.1 and 1.2 demos",
+        "stopped cleanly before its first snapshot",
+        "its own version of the game data",
         "not network-synchronized",
         "returns to the menu with a warning",
         "replay-based seek",

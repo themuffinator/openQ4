@@ -1,59 +1,32 @@
-# Temporal AA And Dynamic Resolution
+# Temporal AA and dynamic resolution
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-openQ4's temporal anti-aliasing (TAA) collects detail from several frames. On
-OpenGL and Vulkan it smooths edges and upscales a lower-resolution 3D scene
-back to your screen far more cleanly than a plain stretch. The picture stays
-still while it does so: when nothing moves, nothing on screen moves.
+Temporal anti-aliasing (TAA) combines detail from several frames. It smooths edges and, when the 3D scene renders below your screen's resolution, rebuilds a much sharper image than a plain stretch. It works on OpenGL and Vulkan, and a still picture stays still: when nothing moves, nothing on screen moves. Dynamic resolution builds on it, lowering the scene's resolution when your graphics card is busy.
+
+Neither has a menu control; both use console settings ("console variables"). Most players never need to change them.
 
 ## Automatic upscaling (default)
 
-`r_temporalAA` defaults to `2`, automatic. Temporal AA switches itself on only
-when the 3D scene renders below your screen's resolution, either because
-`r_screenFraction` is below `100` or because dynamic resolution is on. At
-native resolution it stays off, and your MSAA and SMAA settings apply as
-before. The **Performance**, **Low**, **Low Power** and **Minimum** presets render below
-native resolution, so they now get temporal upscaling.
+Temporal AA is automatic by default (`r_temporalAA 2`). It switches itself on only when the 3D scene renders below your screen's resolution: when **Settings → Display → Image Quality → Resolution Scale** is below 100%, or when dynamic resolution is on. At full resolution it stays off and your MSAA and SMAA settings apply as usual. The **Performance**, **Low**, **Low Power** and **Minimum** presets render below full resolution, so they use temporal upscaling.
 
-Automatic mode leaves the `0` (cropped) and `3` (nearest-neighbour) scale modes
-alone, because those looks are chosen on purpose. It also stays off on
-OpenGL ES and on OpenGL contexts without GLSL 1.30.
+Automatic mode leaves alone the cropped and pixelated scale modes (`r_resolutionScaleMode 0` and `3`), because those looks are chosen on purpose; see [Resolution scale](display-settings.md#resolution-scale). It also stays off on OpenGL ES and on OpenGL drivers too old to run its shaders (without GLSL 1.30).
 
-| Setting | Default | What it does |
-|---|---:|---|
-| `r_temporalAA` | `2` | `0` off, `1` always on (native resolution too), `2` automatic: on below native resolution |
-| `r_temporalAASharpness` | `0.5` | Sharpening applied to the image you see (`0..1`); the frames TAA accumulates stay unsharpened |
-| `r_temporalAAFeedback` | `0.9` | How much of the previous frames is kept (`0..0.98`); higher is smoother and slower to react. Parts of the picture that are not moving keep a little more |
-| `r_temporalAAReactiveEffects` | `0.85` | How strongly particles, effects and moving glass reject old frames (`0..1`), which keeps them from smearing |
-| `r_temporalAAReactiveScale` | `1.0` | Multiplies every reactive rejection (`0..2`) |
-
-To use temporal AA at native resolution too, in place of SMAA:
+To use temporal AA at full resolution too, in place of SMAA:
 
 ```cfg
 r_temporalAA 1
 ```
 
-In VR, `r_temporalAA 1` gives each eye its own history; automatic mode and
-dynamic resolution stay off there. See the [VR guide](vr.md#display).
+In VR, `r_temporalAA 1` gives each eye its own history; automatic mode and dynamic resolution stay off there. See the [VR guide](vr.md#display).
 
-Builds made before 11 November 2026, 0.13.2 included, had a fault that made
-the whole 3D view tremble by a fraction of a pixel while temporal AA was on.
-If you see that, set `r_temporalAA 0` until you update.
+## What stays sharp in motion
 
-## What moves correctly
-
-Every moving thing on screen is tracked to the pixel. The world and doors,
-lifts and other moving brushwork follow the camera and their own motion. Animated
-characters follow their skeleton's motion from one frame to the next, and your
-weapon follows its own projection. All of these keep their anti-aliasing while
-they move. Particles, explosions, smoke, in-world screens, mirrors and portals
-change on their own, so only the pixels they actually cover lean on the
-current frame, and the rest of the view keeps its history.
+Everything that moves is tracked to the pixel, so it keeps its anti-aliasing while it moves: the world, doors, lifts and other moving parts of the map, animated characters, and your weapon. Particles, explosions, smoke, in-world screens, mirrors and portals change on their own, so only the pixels they cover rely on the current frame, and the rest of the view keeps its smoothing.
 
 ## Dynamic resolution
 
-To let the 3D scene adjust its resolution to GPU load as well:
+Dynamic resolution adjusts the 3D scene's resolution to keep up with your graphics card. To turn it on, with the scene allowed to range from 50% to 100%:
 
 ```cfg
 r_rendererDynamicResolution 1
@@ -61,23 +34,29 @@ r_dynamicResolutionMinScale 50
 r_dynamicResolutionMaxScale 100
 ```
 
-Dynamic resolution always uses temporal upscaling unless `r_temporalAA` is `0`.
+Dynamic resolution always uses temporal upscaling unless `r_temporalAA` is `0`. The HUD, menus and console stay at full resolution.
 
-The HUD, menus and console remain at your native output resolution. Screenshots
-and save previews bypass temporal history so they cannot feed captured pixels
-back into later gameplay. `r_dynamicResolutionCaptureNative 1` asks known
-capture frames to render the 3D scene at full resolution; its default of `0`
-keeps the current scale and avoids disturbing the controller.
+Screenshots and save-game pictures don't feed into temporal AA's history, so they can't leave traces in later frames. `r_dynamicResolutionCaptureNative 1` renders known capture frames at full resolution; the default of `0` keeps the current scale and doesn't disturb the automatic adjustment.
 
-For a fixed scale instead of automatic adjustment, leave
-`r_rendererDynamicResolution 0` and set `r_screenFraction` below `100`.
+For a fixed scale instead, leave `r_rendererDynamicResolution 0` and lower **Resolution Scale** (`r_screenFraction`).
 
-Use `rendererTemporalPresentationStatus` in the console to inspect the current
-scene size, GPU target, delayed timing sample, history reset reason and what the
-last frame's motion tracking covered (`Temporal ownership`). Set
-`r_temporalAA 0` and `r_rendererDynamicResolution 0` to restore the plain
-SMAA/spatial presentation path immediately.
+## Settings
 
-Profiles saved by an earlier version that had `r_temporalAA 0` move to the
-automatic default once. Set `r_temporalAA 0` again afterwards to keep temporal
-AA off; that choice is kept.
+| Setting | Default | What it does |
+|---|---:|---|
+| `r_temporalAA` | `2` | `0` off, `1` always on (full resolution too), `2` automatic: on below full resolution. |
+| `r_temporalAASharpness` | `0.5` | Sharpening applied to the image you see (`0` to `1`). The frames TAA collects stay unsharpened. |
+| `r_temporalAAFeedback` | `0.9` | How much of earlier frames is kept (`0` to `0.98`). Higher is smoother but slower to react. Still parts of the picture keep a little more. |
+| `r_temporalAAReactiveEffects` | `0.85` | How strongly particles, effects and moving glass ignore earlier frames (`0` to `1`), which stops them smearing. |
+| `r_temporalAAReactiveScale` | `1.0` | Multiplies that rejection for everything (`0` to `2`). |
+| `r_rendererDynamicResolution` | `0` | `1` turns dynamic resolution on. |
+| `r_dynamicResolutionMinScale` | `50` | The lowest scene scale dynamic resolution may use, in percent. |
+| `r_dynamicResolutionMaxScale` | `100` | The highest scene scale dynamic resolution may use, in percent. |
+| `r_dynamicResolutionCaptureNative` | `0` | `1` renders screenshots and other capture frames at full resolution. |
+
+## Troubleshooting
+
+- **Turn it all off at once:** set `r_temporalAA 0` and `r_rendererDynamicResolution 0`. The plain SMAA and stretched picture returns immediately.
+- **Keeping temporal AA off:** configurations saved by older versions with `r_temporalAA 0` move to the automatic default once. Set `r_temporalAA 0` again afterwards and openQ4 keeps that choice.
+- **The whole 3D view trembles slightly with temporal AA on:** this was a fault in releases before 0.14.1, such as 0.13.2. Update, or set `r_temporalAA 0`.
+- **Checking what it's doing:** `rendererTemporalPresentationStatus` prints the current scene size, the dynamic-resolution target and timing, the reason for the last history reset, and how much of the last frame's motion was tracked (`Temporal ownership`).

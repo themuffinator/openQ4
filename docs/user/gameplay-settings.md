@@ -1,427 +1,163 @@
-# Gameplay Settings and Runtime Toggles
+# Gameplay settings
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-This guide covers a small set of gameplay and audio cvars that are useful for testing, accessibility, and personal preference.
+This guide covers how the game plays, looks and sounds: difficulty and Turbo Mode, the HUD and crosshair, multiplayer hit feedback, field of view, subtitles and sound, and a few convenience options. For keys, mouse and controllers, see [Input settings](input-settings.md).
 
-The auto-skip cinematics, corpse cleanup, and corpse sink controls are also available in the in-game menu at `Settings -> Game Options`.
+## Where to find these settings
 
-## Quick Reference
+| You want to change | New interface | Classic menus (`ui_retained 0`) |
+|---|---|---|
+| Difficulty, Turbo Mode | The **New Game** page; during a campaign, the in-game menu's **Restart Level** | The **New Game** page; during a campaign, the in-game menu's **Difficulty** |
+| HUD layout, size and opacity | **Settings → Game Options → HUD** | Game Options, **HUD** section |
+| Crosshair, hit marker, animated crosshair | **Settings → Game Options → HUD** | Game Options, **Crosshair** section (no animated crosshair) |
+| Skip cinematics, corpses, language, console access | **Settings → Game Options → General** | Game Options, **Gameplay** section |
+| Weapon field of view and position | **Settings → Game Options → General** | Game Options, **View Weapon** section |
+| Volume, room reverb, speakers, subtitles | **Settings → Audio** | **Settings → Audio** |
 
-| Setting | Default | Scope | What it does |
-|---|---:|---|---|
-| `ui_weaponWheelOffset` | `27` | SP and MP client | Horizontal wheel offset as a percentage of screen width from center, −40 to +40. `0` centers it; `27` preserves the usual right-side position. Also in Game Options > Controller, beside wheel sensitivity. |
-| `g_skill` | `1` | Single-player | Difficulty, `0` Private to `4` Warlord. A saved game brings back its own; change it mid-campaign with [Difficulty](#difficulty). |
-| `g_autoSkipCinematics` | `0` | SP and MP game code | Automatically skips cinematics as soon as they begin. Disabled by default. |
-| `g_corpseRemoveDelaySP` | `0` | Single-player | Controls how long SP corpses remain before disappearing. `0` uses stock timing, `-1` disables corpse removal. |
-| `g_corpseRemoveDelayMP` | `0` | Multiplayer | Controls how long MP corpses remain before disappearing. `0` uses stock timing, `-1` disables corpse removal. |
-| `g_corpseSink` | `0` | SP and MP game code | Selects corpse sink mode instead of the normal dissolve or burn-away behavior. |
-| `g_classicDynamicLights` | `1` | SP and MP game code | Quake II/III style dynamic lights on muzzle flashes, bright projectiles and explosions. On by default. |
-| `g_classicDynamicLightScale` | `1` | SP and MP game code | Radius multiplier for the classic dynamic lights, `0.25` to `4`. |
-| `s_musicVolume` | `0.5` | Client audio | Controls music volume independently of the main sound mix. |
-| `s_dialogueVolume` | `1` | Client audio | Spoken dialogue volume, from `0` (mute) to `1` (full), independently of effects and music. |
-| `s_useEAXReverb` | `1` | Client audio | Quake 4's per-area room reverb, as the level designers set it up. See [Room Reverb](#room-reverb). |
-| `s_useEAXOcclusion` | `1` | Client audio | Closed doors muffle the sounds behind them. Works while `s_useEAXReverb` is on. |
-| `s_numberOfSpeakers` | `0` | Client audio | Speaker layout. `0` follows your output device, `2` forces stereo, `6` forces 5.1. See [Speaker Layout](#speaker-layout). |
-| `hud_damageNumbers` | `0` | Multiplayer client | Floating damage numbers over the players you hit. `0` off, `1` opponents only, `2` all damage you deal. |
-| `hud_objectiveMarkers` | `1` | Multiplayer client | World-positioned CTF bases, Arena CTF assault points and DeadZone scoring zones, with distance, status and off-screen directions. `0` hides them. |
-| `hud_damageNumberStyle` | `1` | Multiplayer client | How damage numbers are coloured. `1` white through red, `2` one colour per damage band, `3` one colour per weapon. |
-| `hud_damageNumberScale` | `1` | Multiplayer client | Damage number size multiplier, `0.25` to `4`. |
-| `hud_hitMarker` | `1` | SP and MP client | Crosshair hit marker on hits you land. On by default. |
-| `hud_hitMarkerScale` | `1` | SP and MP client | Hit marker size multiplier, `0.25` to `4`, on top of `g_crosshairSize`. |
-| `hud_crosshairHitFlash` | `0` | SP and MP client | Recolours the crosshair on a hit, as stock Quake 4 does. Implied when `hud_hitMarker` is off. |
-| `hud_crosshairAnimated` | `1` | SP and MP client | Draws the weapon's crosshair live, answering shots, charge, reload and hits. New interface only. See [Animated Crosshair](#animated-crosshair). |
-| `g_hitFeedback` | `2` | Multiplayer server | Whether the server tells attackers about their hits at all. `0` none, `1` without the amount, `2` with the amount. |
-
-## Multiplayer objective markers
-
-Compact symbols mark the permanent bases in CTF and One Flag CTF, including
-the Arena variants, plus control points and DeadZone zones. Distance is the
-only text. A solid pennant means a flag is home; a hollow pennant with an upward
-cue means carried, and a lowered pennant with a downward cue means dropped.
-The marker stays at the base. Zone brackets have an empty core when unclaimed,
-a filled faction-coloured core when controlled and two opposing halves when
-contested. A small padlock indicates that you need a DeadZone artifact to score.
-
-Distances are straight-line metres, not route lengths. Markers remain visible
-through walls and arrows point toward objectives outside the view. They dim near
-the crosshair, suppress overlapping distances, and disappear while dead, zoomed,
-using a menu or viewing the scoreboard. Following spectators see their player's
-objectives; free-camera spectators do not. In VR, markers follow your head's
-bearing on the stereo HUD, respecting its distance, width and height offset.
-They sit at HUD depth. The setting is saved and works with both Classic and
-retained HUDs. See [VR display settings](vr.md#display).
-
-Use `seta hud_objectiveMarkers 0` to disable it, or `1` to restore it. HUD Size,
-Safe Area Inset and Opacity also affect the markers; marker size is bounded to
-keep its screen-edge distance visible. Update the engine and both game modules
-together when upgrading a development build.
-
-## Cinematics
-
-`g_autoSkipCinematics` is intended for repeat testing runs, speed-focused replays, and development workflows where you do not want to manually skip every scripted sequence.
-
-The in-game menu exposes this as `Settings -> Game Options -> Auto Skip Cinematics`.
-
-Behavior:
-- `0`: normal behavior, cinematics play as authored.
-- `1`: cinematics are skipped automatically when they start.
-
-Notes:
-- The cvar is archived, but it is disabled by default.
-- The change affects future cinematics. It does not retroactively alter one that has already finished.
-
-Example:
-
-```cfg
-seta g_autoSkipCinematics 1
-```
-
-## Turbo Mode
-
-Choose **Turbo Mode** on the single-player New Game page. The choice applies when
-you start the new game; selecting Off starts a normal campaign even after a turbo
-game or a multiplayer session. Turbo increases movement speeds and removes weapon
-reloads, including the shotgun pump after each shot. Shots still use ammunition.
-Doors, platforms and elevators you operate move faster too. Machinery that the
-level's own scripts choreograph, such as the lift your squad rides in Hangar
-Perimeter, keeps its normal speed so those scenes stay in step.
-
-The console setting is `g_turboMode` (`0` off, `1` on). Enabling it during a reload
-cancels that reload; disabling it restores normal magazine and reload behavior.
+The classic Game Options page has a **Section** chooser at the top that jumps between its groups. Settings you change are saved automatically.
 
 ## Difficulty
 
-During a single-player game the in-game menu has a **Difficulty** entry, between **Settings** and **Return to Game**. It opens the difficulty list from New Game with the difficulty you are playing selected. Pick one and choose **Restart Level**: the level starts again from its beginning at that difficulty, with the weapons, ammo, health and armor you had when you entered it. **Back** changes nothing.
+Pick a difficulty on the **New Game** page when you start a campaign. To change it during a campaign, open the in-game menu and choose **Restart Level** (in the classic menus, **Difficulty**, between **Settings** and **Return to Game**). The difficulty list opens with the difficulty you are playing selected. Pick one and choose **Restart Level**: the level starts again from its beginning at that difficulty, with the weapons, ammunition, health and armour you had when you entered it. **Back** changes nothing.
 
-The level has to restart because a saved game keeps the difficulty it was saved at, and a level picks its enemies, their health and its pickups as it loads. Changing `g_skill` in the middle of a level only changes what the game reads as it goes, such as the damage you take.
+The level has to restart because a level sets up its enemies, their health and its pickups as it loads, and a saved game keeps the difficulty it was saved at. Changing `g_skill` from the console in the middle of a level only changes what the game reads as it goes, such as the damage you take.
 
 | `g_skill` | Difficulty | Damage you take from enemies, and enemy health |
 |---:|---|---|
 | `0` | Private | -30% |
-| `1` | Corporal | normal |
+| `1` | Corporal (default) | normal |
 | `2` | Lieutenant | +40% |
 | `3` | General | +80%, and no medkits |
 | `4` | Warlord | +180%, and no medkits |
 
-The console command `restartLevel` does the same: `restartLevel` alone restarts the current level at the current difficulty, and `restartLevel 3` restarts it on General. The loadout comes from the level's start autosave, the same save the death screen's **Restart** loads, and the restart writes a new one at the new difficulty. Anything done in the level since it started is lost.
+The console command `restartLevel` does the same job: `restartLevel` alone restarts the current level at the current difficulty, and `restartLevel 3` restarts it on General. Your loadout comes from the level's start autosave (the same save the death screen's **Restart** loads), and the restart writes a new one at the new difficulty. Anything you did in the level since it started is lost.
 
-## Corpse Cleanup
+## Turbo mode
 
-openQ4 now exposes separate corpse-removal timing controls for single-player and multiplayer.
+Choose **Turbo Mode** on the single-player **New Game** page. It applies when you start the new game; choosing Off starts a normal campaign, even after a turbo game or a multiplayer session.
 
-### Single-player
+Turbo makes you move faster and removes weapon reloads, including the shotgun pump after each shot. Shots still use ammunition. Doors, platforms and elevators you operate move faster too. Machinery that a level's own scripts choreograph, such as the lift your squad rides in Hangar Perimeter, keeps its normal speed so those scenes stay in step.
 
-`g_corpseRemoveDelaySP` accepts three useful ranges:
-- `0`: use stock timing.
-- `-1`: never remove corpses automatically.
-- `> 0`: override the delay in seconds before corpse removal begins.
+The console setting is `g_turboMode` (`0` off, `1` on). Turning it on during a reload cancels that reload; turning it off restores normal magazines and reloads.
 
-Example:
+## HUD and crosshair
 
-```cfg
-seta g_corpseRemoveDelaySP 20
-```
+### Gameplay status bar
 
-### Multiplayer
+The new interface (the default, `ui_retained 1`) draws a centred bar for ammunition, health and armour, with Marine or Strogg artwork to match the campaign. In multiplayer it shows the current weapon's total ammunition in that weapon's colour. When your armour runs out, the other gauges stay where they are.
 
-`g_corpseRemoveDelayMP` behaves the same way, but applies to the multiplayer game module.
+Choose a layout with **Settings → Game Options → HUD → HUD Layout**:
 
-Example:
+- **Remastered** (default): the HUD follows your screen. The status bar sits centred on the bottom edge, the radio in the top-right corner and objective notices in the top corners; multiplayer's kill feed, standing, timer and chat keep to the edges.
+- **Minimal**: health, armour, ammunition and the crosshair, keeping prompts, chat and votes.
+- **Competitive** (multiplayer): a match bar at the top with both sides' scores, the timer and network quality, your team's health and armour at the left edge, and a larger status bar.
+- **Classic**: the original Quake 4 positions.
 
-```cfg
-seta g_corpseRemoveDelayMP 10
-```
+In the Remastered layout, vehicles get the same centred status bar with an Exit prompt naming your jump key (the air-defence cannon keeps its scope and adds the radio display). The objectives display lists every objective, with the completed ones below. The scoreboard adds your place, ping bars and the Tourney bracket. After you die in multiplayer, a Respawn prompt names your attack key once you can return, with a countdown while overtime delays your respawn.
 
-Notes:
-- These cvars affect corpse cleanup timing. They do not change health, gibbing, or damage behavior.
-- New values are most useful for newly created corpses. Existing corpses may already be partway through their current cleanup path.
+The same page also sets:
 
-## Corpse Sinking
+- **HUD Size**, independent of the menu size. On narrow screens the status bar is kept small enough for every gauge to fit.
+- **HUD Width**: how far edge items spread on wide screens (16:9, 21:9 or Full).
+- **Safe Area Inset**: moves the HUD in from the screen edges. On a screen with a camera cutout or system bars, the HUD also keeps clear of them.
+- **Toggle Objectives**: Off shows the objectives while you hold the scores button; On opens and closes them with each press.
+- **HUD Opacity**, **Damage Direction**, **Pickup Messages** and **Weapon Strip**. These four work in the Remastered and Minimal layouts.
+- **Reduced Flashing**, which works in every layout. It keeps the damage direction indicator and the vehicle hit glow at 40% at most, dims the white flash of teleporters and multiplayer spawns, and drops the red flash when you die.
+- **Opaque Menu Backing**: draws a solid backing behind menu dialogs instead of softening the screen beneath.
 
-`g_corpseSink` switches corpse disappearance to a Quake 3 style sink animation.
+The classic interface (`ui_retained 0`) uses the same layout with its original artwork. The status bar is centred on the bottom edge, and the weapon strip shows the weapon's name above it. Up to two pickup lines sit over the gauges, and a repeated item counts up on its line ("Armor Shard ×2"). Vehicles get the centred status bar and an Exit prompt in the bottom-right corner. Multiplayer shows your standing and the gap, or the team panels with your team first, the flags and their carriers, with the timer beneath. Tourney shows its bracket strip with your match highlighted, the kill feed sits in the top-right corner, and chat sits at the bottom left, clear of the status bar. Spectators get a card naming the player they follow; a vote shows as a card at the left edge with the Yes and No keys, the tally and the time left; and while you wait to respawn, a prompt names the control. Layout, HUD Size, HUD Opacity, HUD Width, Safe Area Inset, Pickup Messages, Weapon Strip and Damage Direction all work there; Minimal hides the same extras, and Competitive uses the Remastered positions.
 
-Behavior:
-- `0`: use the normal stock-style dissolve or burn-away path.
-- `1`: sink corpses into the floor before removal while keeping ragdoll active.
-- `2`: sink corpses into the floor before removal after stopping ragdoll first.
+If the new HUD cannot load, the classic HUD appears automatically.
 
-Notes:
-- This cvar is shared by SP and MP.
-- The configured SP or MP corpse delay still controls when the sink starts.
-- If the relevant corpse-delay cvar is `-1`, corpse removal is disabled and sinking will not start.
-- Mode `2` uses the actor's normal corpse physics while the sink runs, so the body no longer keeps simulating as a ragdoll during the sink.
+### Crosshair
 
-Example:
+**Settings → Game Options → HUD** has the crosshair controls:
 
-```cfg
-seta g_corpseSink 1
-seta g_corpseRemoveDelaySP 15
-```
+- **Crosshair**: **Weapon Default** uses each weapon's own crosshair; **Custom** uses the one you pick with **Set Crosshair** on every weapon.
+- **Crosshair Size**: Small to Extra Large (`g_crosshairSize` `16` to `48`, default `32`).
+- **Crosshair Color**: eight colours, white by default (`g_crosshairColor`).
+- **Hit Marker** and **Animated Crosshair**, described next.
 
-No-ragdoll sink example:
+### Hit marker
 
-```cfg
-seta g_corpseSink 2
-seta g_corpseRemoveDelaySP 15
-```
+Turn on **Settings → Game Options → HUD → Hit Marker** (`hud_hitMarker 1`) to have every hit you land bloom four short angled marks out of your crosshair and fade them within a fraction of a second. It works in single-player and multiplayer. It is off by default, so you get stock Quake 4's cue instead: the crosshair turns red for a moment when you hit something.
 
-## Music Volume
+The marker tells you what kind of hit it was:
 
-`s_musicVolume` controls the volume of music-tagged sound shaders without changing the rest of the game mix.
-
-Behavior:
-- `0`: mute music.
-- `0.5`: default music level.
-- `1`: full music level.
-
-Notes:
-- This is separate from the master sound volume.
-- It applies to music shaders authored under the stock Quake 4 music paths, including both `sound/musical/` and `sound/ambience/musical/`.
-- The setting is live and can be adjusted while the game is running.
-
-Examples:
-
-```cfg
-seta s_musicVolume 0.2
-```
-
-```cfg
-seta s_musicVolume 0
-```
-
-## Dialogue Volume
-
-**Settings > Audio > Dialogue Volume** changes spoken dialogue without lowering
-weapons or music. The setting takes effect immediately and is saved for both the
-retail campaign and The Awakening. `seta s_dialogueVolume 0.6` sets it to 60% of
-the authored level; `0` mutes dialogue. Master volume still affects everything.
-
-NPC lip-sync speech, radio lines and sounds using the game's voice-over asset
-paths share this control, including English audio fallback in other text
-languages. Multiplayer microphone audio has its own settings. A mod that mixes
-speech and music into one recording cannot separate those parts with this slider.
-
-## Room Reverb
-
-Every Quake 4 map tells the game which reverb each of its rooms, corridors and outdoor areas uses: a
-tiled bathroom rings, a hangar booms, a canyon sounds open. openQ4 plays these the way the original
-game did with EAX sound hardware:
-
-- the reverb follows you from area to area, and the areas next to you keep their own reverb, so a
-  gunshot in the hangar next door still sounds like the hangar;
-- each nearby area's reverb comes from the doorway that leads to it;
-- closed doors muffle the sounds behind them, and their reverb with them;
-- radio chatter stays dry and voice-over sits a little further back, as in the original mix.
-
-It needs OpenAL's EFX extension. OpenAL Soft provides it: openQ4 ships it on Windows and macOS, and
-Linux distributions install it as their OpenAL. Apple's own OpenAL framework has no EFX, so a build
-using it plays without reverb.
-
-Behavior:
-- `s_useEAXReverb 1` (default): room reverb on, in every performance preset. `0` turns it off, along with door muffling, as in
-  the original game. Changing it from the console takes effect after `s_restart`.
-- `s_useEAXOcclusion 1` (default): closed doors muffle sound while reverb is on.
-- `s_muteEAXReverb 1`: silences the reverb of the area you are standing in, for comparison.
-
-Notes:
-- Maps without a reverb table, including The Awakening's, use the Generic reverb everywhere, as
-  the original game does.
-- `listReverbs` lists the reverbs, the current map's areas and the reverbs playing around you.
-  `s_showReverb 1` prints a line whenever they change.
-
-## Speaker Layout
-
-openQ4 now follows your audio device by default. Headphones and stereo speakers get stereo, with
-OpenAL Soft's 3D headphone audio (HRTF) switching on by itself when the system reports headphones,
-and a 5.1 or 7.1 system gets all of its channels.
-
-The in-game menu exposes this as `Settings -> Audio -> Surround Speakers`: `Auto`, `Off` (stereo)
-or `On` (5.1).
-
-Behavior:
-- `s_numberOfSpeakers 0` (default, `Auto`): use the output device's own layout.
-- `s_numberOfSpeakers 2` (`Off`): always stereo, as the original game's default.
-- `s_numberOfSpeakers 6` (`On`): always 5.1. On a stereo device the system downmixes it, and
-  headphone HRTF cannot engage, so pick this only for a 5.1 system that misreports its layout.
-
-Notes:
-- Earlier openQ4 builds asked for 5.1 on every device. A saved `6` from those builds moves to `0`
-  once. A saved `2` is kept.
-- `s_openALHRTF` chooses headphone HRTF: `0` automatic (default), `1` off, `2` on. Earlier builds
-  could not turn it off on headphones; `1` now does.
-- Unplugging a headset or switching the default device keeps the sound going, including music
-  and looping ambience, and keeps your speaker and HRTF choices. Dialogue and other sounds that
-  were playing pick up where the scene is when audio returns, instead of being cut off, and a
-  line paused in a menu continues from where it stopped.
-- Changing `s_numberOfSpeakers`, `s_openALHRTF` or `s_outputLimiter` applies to the open device
-  in place: sounds keep playing without reloading, and a line that is playing moves to or from
-  the centre speaker at its current point.
-
-## Audio Quality
-
-These are on by default and rarely need changing. Each takes effect after `s_restart`.
-
-- `s_sourceRadiusScale 0.5`: a sound has a size, half of its shader's `minDistance`. Standing next
-  to a machine or a fire, it surrounds you instead of jumping from ear to ear as you turn, and
-  your own footsteps and weapons play evenly instead of from straight ahead. `0` makes every
-  positioned sound a point.
-- `s_directStereo 1`: music and other stereo sounds play straight to your speakers or headphones.
-  With 3D headphone audio on, they used to pass through it as two virtual speakers, which
-  narrowed the stereo and made them quieter.
-- `s_resampler auto`: most Quake 4 sounds are recorded at 22 kHz; `auto` upsamples them with a
-  sinc filter for cleaner high frequencies. `default` keeps OpenAL's own, and `listResamplers`
-  lists the choices.
-- `s_outputLimiter 1`: loud scenes compress instead of clipping.
-- `s_airAbsorption 1`: distant sounds lose a little treble, by the air absorption each room's
-  reverb preset sets.
-
-## Hit Marker
-
-Every hit you land blooms four short angled marks out of your crosshair and fades
-them within a fraction of a second. It works in single-player and multiplayer, and
-it is on by default: `Settings -> Game Options -> Crosshair -> Hit Marker`.
-
-The marker reads the hit back to you rather than just confirming it:
-
-- A graze or a splash hit is a small, quiet tick.
+- A graze or splash hit is a small, quiet tick.
 - A normal hit is the reference pulse.
-- A heavy hit - a rail, a rocket, a direct dark matter hit - is wider, brighter,
-  and lasts a beat longer.
-- A hit that finishes the target flashes white hot and travels furthest.
+- A heavy hit (a rail, a rocket, a direct dark matter hit) is wider, brighter and lasts a beat longer.
+- A hit that finishes the target flashes white-hot and travels furthest.
 - Armour absorbing part of the hit lifts the marks towards white.
-- Team damage shows amber and self damage shows a muted grey-blue, so a mistake
-  never reads like a reward.
+- Team damage shows amber and self damage a muted grey-blue, so a mistake never looks like a reward.
 
-Sustained fire re-arms the marker instead of stacking a second one, and a heavier
-hit landing behind a lighter one keeps the heavier look for the rest of the pulse.
+Sustained fire re-arms the marker instead of stacking a second one, and a heavier hit landing behind a lighter one keeps the heavier look for the rest of the pulse.
 
-`hud_hitMarker 0` turns it off. `hud_hitMarkerScale` scales it between `0.25` and
-`4`; it already follows `g_crosshairSize`, so the marks frame whatever crosshair
-you use.
+The marker follows your crosshair size, and `hud_hitMarkerScale` scales it further. While the marker is on, the red crosshair flash is off; `hud_crosshairHitFlash 1` asks for both.
 
-Stock Quake 4 recolours the crosshair red for a moment when you hit something. The
-marker replaces that cue, so the recolour is off while the marker is on. Turning
-the marker off brings the recolour back on its own, and
-`hud_crosshairHitFlash 1` asks for both at once.
+In multiplayer the marker uses the same hit information the server allows for damage numbers. On a server that withholds the damage amount (`g_hitFeedback 1` or `0`), you still get a marker on every hit, but always the normal one.
 
-In multiplayer the marker sizes itself from the same server-permitted hit
-information as damage numbers, so with `g_hitFeedback 1` or `0` you still get a
-marker on every hit - just always the normal one, because the server is not
-telling you what the hit was worth.
+### Animated crosshair
 
-## Animated Crosshair
+**Settings → Game Options → HUD → Animated Crosshair** (`hud_crosshairAnimated`, on by default) draws each weapon's own Quake 4 crosshair live instead of as a still picture. The designs are the originals, split into the arcs, ticks, bars, darts and brackets they were drawn from, and those pieces follow the weapon, so the crosshair tells you what the gun is doing. Turn it off for the still picture.
 
-`Settings -> Game Options -> HUD -> Animated Crosshair` (`hud_crosshairAnimated 1`)
-draws each weapon's own Quake 4 crosshair live instead of as a still picture. The
-designs are the originals. Each one comes apart into the pieces it was drawn from,
-arcs, ticks, bars, darts and brackets, and those pieces follow the weapon, so the
-crosshair tells you what the gun is doing without a second readout to look at.
-It is on by default; set `hud_crosshairAnimated 0`, or switch the option off, for
-the still picture.
+Every design:
 
-Every design does these:
-
-- **Assembles as the weapon comes up.** The pieces sweep, slide or turn into
-  place while the weapon is raised, so the design is whole by the time you can
-  fire. They fold away while a weapon is put down and while the use hand, the
-  talk frame or another context cursor is showing.
-- **Never leaves the aim unmarked.** While the design is folded away between
-  weapons, a dot stays on the aim point and hands over to the design as it
-  assembles.
+- **Assembles as the weapon comes up**, so it is whole by the time you can fire. It folds away while a weapon is put down and while the use hand, the talk frame or another context cursor shows. A dot always marks the aim point while it is folded away.
 - **Kicks with each shot** and settles before the next one.
-- **Stands down while you can't fire.** Reloading dims the design and shows the
-  reload: one pip for each round where the weapon is loaded a round at a time,
-  a sweep otherwise. Out of ammunition, a design with a cross turns it into an X.
-- **Takes the hit.** A hit squeezes the design for the length of the pulse, and
-  a kill also sends one thin ring out from its edge. See hit feedback below for
-  the marks and the tint.
+- **Stands down while you can't fire.** Reloading dims the design and shows the reload: one pip per round for weapons loaded a round at a time, a sweep otherwise. Out of ammunition, a design with a cross turns it into an X.
+- **Takes the hit.** A hit squeezes the design for the length of the pulse, and a kill also sends a thin ring out from its edge.
 
-And each design has its own behavior:
+Each design also has its own behaviour:
 
 | Crosshair | What it shows |
 | --- | --- |
-| Blaster | The four arcs wind shut into an unbroken ring as the blaster charges, and a thin outer ring breathes while a full charge is held. |
-| Hyperblaster | The same arcs turn with the barrels for as long as they spin. |
-| Machinegun | The ticks walk out under sustained fire and back as it stops, and draw in to the ring while you sight the weapon. |
+| Blaster | The four arcs wind shut into a ring as the blaster charges, and a thin outer ring breathes while a full charge is held. |
+| Hyperblaster | The arcs turn with the barrels for as long as they spin. |
+| Machinegun | The ticks walk out under sustained fire and back as it stops, and draw in to the ring while you aim down the sights. |
 | Shotgun | The ring is thrown wide by the shot and sends a faint echo out to the edge of the pattern; reloading counts the shells back in. |
-| Grenade launcher | The quarters break open top from bottom on the shot, like a breech, and stand apart left from right until the next round is ready. |
-| Dark matter gun | The same quarters turn and draw tight as the core charges, then spring back to rest when it is ready. |
-| Nailgun | The brackets draw together as the drum comes up to speed, and clamp shut with four pips between them on a seeker lock. |
-| Rocket launcher | The faint halo of the original design sweeps round as the launcher cycles and closes when the next rocket is ready. |
-| Railgun | The shot throws the four bars out and the recharge draws them back: they are home, with a brief flash, when the next slug is. |
-| Lightning gun | The beam draws the four darts in and sets them crackling. They already sit where a hit marker would, so they are the hit marker: every hit drives them home in the hit's color. |
-| Napalm launcher | The shot throws the splatter ring wide and a quarter turn round; it draws back in and turns home as the next charge comes up. |
+| Grenade launcher | The quarters break open on the shot, like a breech, and stand apart until the next round is ready. |
+| Dark matter gun | The quarters turn and draw tight as the core charges, then spring back to rest when it is ready. |
+| Nailgun | The brackets draw together as the drum spins up, and clamp shut with four pips between them on a seeker lock. |
+| Rocket launcher | The faint halo sweeps round as the launcher cycles and closes when the next rocket is ready. |
+| Railgun | The shot throws the four bars out and the recharge draws them back; they are home, with a brief flash, when the next slug is. |
+| Lightning gun | The beam draws the four darts in and sets them crackling. They are the hit marker: every hit drives them home in the hit's colour. |
+| Napalm launcher | The shot throws the splatter ring wide and a quarter turn round; it draws back in as the next charge comes up. |
 | Gauntlet | Three teeth turn round the disc while the blade spins. |
 
-**Hit feedback** follows the [Hit Marker](#hit-marker) setting. With the marker on,
-its four marks dock into the clear space of the design in hand, between the
-machinegun's ticks, inside the rocket launcher's ring, between the nailgun's
-brackets, with the same sizes, colors and timing as before. The marks carry the
-hit, so the design keeps the color you chose and takes only a light cast of the
-hit's color. With the marker off the design takes the whole tint instead, as it
-does with `hud_crosshairHitFlash 1`, and on the lightning gun, whose darts are the
-marks. `hud_hitMarkerScale` applies to the docked marks too.
+**Hits.** With the [hit marker](#hit-marker) on, its marks dock into the clear space of the design in hand, and the design keeps your crosshair colour with only a light cast of the hit's colour. With the marker off, the design takes the whole tint instead. A hit that lands while the design is folded away still draws its marks at full strength round the aim point.
 
-A hit never waits for the crosshair. If one lands while the design is folded
-away, a rocket arriving as the next weapon comes up, or with the use hand
-showing, the marks draw at full strength round the aim point.
+**Vehicles** get the same treatment for your seat's gun. A cannon that recharges between shots shows the recharge as a sweep, a gun with a target closes four corners on its crosshair, and hits you land from a vehicle show on its crosshair too.
 
-**Vehicles** get the same treatment for the gun of your seat. A cannon that
-recharges between shots shows the recharge as a measured sweep, and a gun with a
-target closes four corners on its crosshair. Hits you land from a vehicle show on
-its crosshair, which the still picture never did.
+Good to know:
 
-Things to know:
+- It needs the new interface. The classic interface keeps the still crosshair.
+- It follows your crosshair size and colour. Black outlines stay black at every colour, as in the original art.
+- With **Custom** chosen, that design is the one animated on every weapon. The ten simple marks of the custom set animate as one piece.
+- **Reduced Flashing** softens the hit tint and drops the flashes. Reduced motion (`ui_retainedReducedMotion 1`) fades the design in place instead of flying it in, and stops the turning and trembling.
+- The Awakening's space cannon keeps its own lock-on reticule, which already changes with the lock.
 
-- It needs the new interface (`ui_retained 1`, the default). The classic interface
-  keeps the still crosshair, and the setting has no effect there.
-- It follows `g_crosshairSize` and `g_crosshairColor`. Black outlines stay black
-  at every color, as in the original art.
-- With a custom crosshair chosen, that design is the one animated on every
-  weapon. The ten simple marks of the custom set animate as one piece.
-- `Reduced Flashing` softens the hit tint and drops the flashes. Reduced motion
-  (`ui_retainedReducedMotion 1`) fades the design in where it belongs instead of
-  flying it there, and stops the turning and the tremble.
-- The Awakening's space cannon keeps its own lock-on reticule, which already
-  changes with the lock.
+### Multiplayer objective markers
 
-## Damage Numbers
+Small markers show where the objectives are in CTF and One Flag CTF (including the Arena variants), control points and DeadZone zones, with the straight-line distance in metres as the only text. They are on by default; `hud_objectiveMarkers 0` hides them.
 
-In multiplayer, openQ4 can float the damage you deal above the player you hit, the
-way Quake Live's damage plums do. The numbers are projected from the point of
-impact and then drift along a short arc before fading, so they stay readable
-during a fight without ever sitting on top of your crosshair.
+- **Flags:** a solid pennant means the flag is home, a hollow pennant with an upward cue means it is carried, and a lowered pennant with a downward cue means it is dropped. The marker stays at the base.
+- **Zones:** an empty core means unclaimed, a filled core in a team's colour means controlled, and two opposing halves mean contested. A small padlock means you need a DeadZone artifact to score.
 
-This is a display choice and it is off by default.
+Markers show through walls, and arrows point to objectives outside your view. They dim near the crosshair and hide while you are dead, zoomed, in a menu or looking at the scoreboard. Spectators following a player see that player's markers; free-camera spectators see none. HUD Size, Safe Area Inset and HUD Opacity apply to them, and they work with both interfaces. In VR they follow your head on the HUD; see [VR display settings](vr.md#display).
 
-`hud_damageNumbers` decides which of your hits are shown:
-- `0`: off.
-- `1`: opponents only. This is what Quake Live shows.
-- `2`: everything you deal, adding team damage and self damage.
+### Damage numbers (multiplayer)
 
-`hud_damageNumberStyle` decides how they are coloured:
-- `1`: white for a scratch through red at 100 damage.
-- `2`: one colour per damage band - blue up to 25, yellow to 50, orange to 75, red above.
-- `3`: one colour per weapon.
+In multiplayer, openQ4 can float the damage you deal above the player you hit, like Quake Live's damage numbers. Each number starts at the point of impact and drifts along a short arc before fading, so it never sits on your crosshair. The number is the full worth of the hit: armour counts towards it rather than being taken off.
 
-`hud_damageNumberScale` scales the text between `0.25` and `4`.
+There is no menu row for these; use the console:
 
-The number is the full worth of the hit, so armour counts towards it rather than
-being subtracted from it.
+- `hud_damageNumbers`: `0` off, `1` opponents only (the default, as in Quake Live), `2` everything you deal, including team and self damage.
+- `hud_damageNumberStyle`: `1` white for a scratch through to red at 100 damage, `2` one colour per damage band (blue up to 25, yellow to 50, orange to 75, red above), `3` one colour per weapon.
+- `hud_damageNumberScale`: text size, `0.25` to `4`.
 
-### Server permission
-
-`g_hitFeedback` is a **server** setting and it decides whether attackers are told
-about their hits at all:
-- `0`: no hit feedback. Damage numbers show nothing regardless of client settings.
-- `1`: the hit is announced but the amount is withheld, so damage numbers stay blank.
-- `2`: the amount is included. This is the default.
-
-A server that wants to keep exact damage off the table sets `g_hitFeedback 1` or
-`0`; no client setting can override it.
-
-Example:
+The server decides whether you get any of this. Its `g_hitFeedback` setting is `2` (send the amount) by default; at `1` the hit is announced but the amount is withheld, so numbers stay blank, and at `0` there is no hit feedback at all. No client setting can override it.
 
 ```cfg
 seta hud_damageNumbers 1
@@ -429,134 +165,164 @@ seta hud_damageNumberStyle 2
 seta hud_damageNumberScale 1.25
 ```
 
-## Classic Dynamic Lights
+## Field of view
 
-`g_classicDynamicLights` restores the Quake II / Quake III habit of lighting the world from the
-action: muzzle flashes throw a short, wide pool of light, bright projectiles carry their own glow,
-and explosions flash the surrounding geometry. It is on by default, and the colors come from the
-shipped Quake 4 assets.
+There is no field-of-view slider in the menus; set it from the console with `g_fov` (default `90`), for example `g_fov 100`. The number is the horizontal angle on a 4:3 screen. On a wider screen openQ4 keeps the same vertical view and shows more at the sides, so you don't need to raise it for widescreen. Multiplayer accepts `90` to `175`. To make sure your value is applied every time, put `set g_fov 100` in your `autoexec.cfg` (see [Input settings](input-settings.md#config-files)).
 
-`g_classicDynamicLightScale` scales the radius of all of them between `0.25` and `4`. Lower it
-before turning the feature off if the effect is stronger than you want.
+The weapon on screen has its own controls on **Settings → Game Options → General**: **Weapon FOV** (`0` follows your field of view), **Weapon FOV Aspect**, and **Weapon X/Y/Z Offset**, described in [Display settings](display-settings.md). **Weapon Kick** (`g_weaponMuzzleKick`) makes the weapon kick back when it fires; turn it off to hold the weapon still.
 
-See [Classic Dynamic Lights](classic-dynamic-lights.md) for the per-weapon colors, the content
-override keys, and the `testClassicLight` console command.
+## Dialogue subtitles
 
-## Example Presets
+Turn on **Settings → Audio → Dialogue Subtitles** (scroll down). Subtitles work in both interfaces, including The Awakening, and stay visible when dialogue or master volume is muted. Up to two speakers appear at once, and long lines advance in pages as the audio plays. Pausing, saving and loading keep the caption at the current point in the line. **Subtitle Size**, **Subtitle Background** and **Speaker Names** sit beside it.
 
-### Fast Testing Setup
+The text comes from your installed game's lip-sync transcripts. The Steam release installs these in English only, and The Awakening's are written in English, so other menu languages show English captions. Coverage is incomplete: a line without a transcript stays blank, and scene descriptions are never added. Voice chat and sound effects are not transcribed. In portrait windows, cinematic captions sit below the picture, clear of title cards; at the largest text sizes they show one line at a time there, with a second speaker above the picture. A speaker name too wide for half the line is left out.
+
+## Sound
+
+### Music and dialogue volume
+
+**Settings → Audio** has **Volume** (everything), **Music Volume** and **Dialogue Volume**. Changes apply at once.
+
+- **Music Volume** (`s_musicVolume`, default `0.5`) changes the music without touching the rest of the mix.
+- **Dialogue Volume** (`s_dialogueVolume`, default `1`) changes spoken dialogue without lowering weapons or music. It covers character speech, radio lines and other voice-over, including the English audio you hear in other text languages, and it is saved for both the original campaign and The Awakening. Multiplayer voice chat has its own settings. A mod that mixes speech and music into one recording cannot separate them with this slider.
+
+### Room reverb
+
+Every Quake 4 map tells the game which reverb each of its rooms, corridors and outdoor areas uses: a tiled bathroom rings, a hangar booms, a canyon sounds open. openQ4 plays these the way the original game did with EAX sound hardware:
+
+- the reverb follows you from area to area, and nearby areas keep their own, so a gunshot in the hangar next door still sounds like the hangar;
+- each nearby area's reverb comes from the doorway that leads to it;
+- closed doors muffle the sounds behind them, and their reverb with them;
+- radio chatter stays dry and voice-over sits a little further back, as in the original mix.
+
+Room reverb is on in every performance preset. Turn it off with **Settings → Audio → EAX Advanced HD**, which also turns off door muffling, as in the original game. From the console the setting is `s_useEAXReverb`; a console change takes effect after `s_restart`.
+
+Maps without a reverb table, including The Awakening's, use a generic reverb everywhere, as the original game does.
+
+Reverb needs OpenAL Soft, the sound library openQ4 ships on Windows and macOS and that Linux distributions install as their OpenAL. A build that uses Apple's own OpenAL plays without reverb.
+
+### Speakers and headphones
+
+openQ4 follows your audio device by default: headphones and stereo speakers get stereo, and a 5.1 or 7.1 system gets all of its channels. When the system reports headphones, 3D headphone audio (HRTF, which makes sounds seem to come from around you) switches on by itself.
+
+- **Settings → Audio → Surround Speakers**: **Auto** (default) uses the device's own layout, **Off** always plays stereo, as the original game did by default, and **On** always plays 5.1. On a stereo device 5.1 is downmixed and headphone audio cannot engage, so choose **On** only for a 5.1 system that reports the wrong layout.
+- **Settings → Audio → Headphone HRTF**: **Auto** (default), **Off** or **On**.
+
+These changes apply straight away: sounds keep playing, and a line that is playing moves to or from the centre speaker where it is. Unplugging a headset or switching the default device keeps the sound going, including music and looping ambience, and keeps your choices. Dialogue that was playing picks up where the scene is when audio returns, and a line paused in a menu continues from where it stopped.
+
+### Audio quality
+
+These are on by default and rarely need changing. Each takes effect after `s_restart`.
+
+- `s_sourceRadiusScale 0.5`: gives each sound a size, so standing next to a machine or a fire surrounds you instead of jumping from ear to ear as you turn, and your own footsteps and weapons play evenly. `0` makes every positioned sound a point.
+- `s_directStereo 1`: music and other stereo sounds play straight to your speakers or headphones instead of through 3D headphone audio, which narrowed and quietened them.
+- `s_resampler auto`: most Quake 4 sounds are recorded at 22 kHz; `auto` upsamples them with a high-quality filter for cleaner high frequencies. `default` keeps OpenAL's own, and `listResamplers` lists the choices.
+- `s_outputLimiter 1`: loud scenes compress instead of clipping.
+- `s_airAbsorption 1`: distant sounds lose a little treble, as each room's reverb sets.
+
+## Other options
+
+### Cinematics
+
+**Settings → Game Options → General → Auto Skip Cinematics** (`g_autoSkipCinematics 1`) skips every cinematic as soon as it starts, which is handy for replays and speed runs. It is off by default and affects the next cinematic, not one already playing. **Cinematic Shake** on the same page scales the extra camera movement added to cinematics (`ui_cinematicShake`, `0` none to `1` full); VR always turns it off.
+
+### Corpses
+
+**Settings → Game Options → General** has **Corpse Time** (how long bodies stay) and **Corpse Sink** (how they leave). From the console:
+
+- `g_corpseRemoveDelaySP` (single-player) and `g_corpseRemoveDelayMP` (multiplayer): `0` uses the stock timing, `-1` never removes corpses, and a number above `0` is the delay in seconds before removal starts.
+- `g_corpseSink`: `0` uses the normal dissolve or burn-away; `1` sinks corpses into the floor, Quake 3 style, while they stay ragdolls; `2` stops the ragdoll first, then sinks.
+
+The corpse delay still decides when sinking starts, so with a delay of `-1` corpses never sink. These settings change only when bodies disappear, not health, gibbing or damage, and a new value applies best to bodies created after the change.
 
 ```cfg
-seta g_autoSkipCinematics 1
-seta g_corpseRemoveDelaySP 2
-seta g_corpseSink 1
-seta s_musicVolume 0.2
-```
-
-### Keep Corpses Around
-
-```cfg
+// Keep corpses around in both modes
 seta g_corpseRemoveDelaySP -1
 seta g_corpseRemoveDelayMP -1
 ```
 
+### Classic dynamic lights
+
+`g_classicDynamicLights` (on by default) brings back the Quake II and Quake III habit of lighting the world from the action: muzzle flashes throw a short, wide pool of light, bright projectiles carry their own glow, and explosions flash the surrounding walls. The colours come from the shipped Quake 4 assets. `g_classicDynamicLightScale` scales the radius of all of them from `0.25` to `4`; try lowering it before turning the feature off. See [Classic dynamic lights](classic-dynamic-lights.md) for the per-weapon colours.
+
+## Settings reference
+
+All of these are saved automatically. Type them in the console, or put them in a config file as described in [Input settings](input-settings.md#config-files).
+
+### HUD and crosshair
+
+| Setting | Default | What it does |
+|---|---:|---|
+| `ui_hudLayout` | `1` | `1` Remastered, `2` Minimal, `3` Competitive, `0` Classic. |
+| `ui_hudScale` | `1` (`1.25` on Steam Deck and with the [Couch profile](display-settings.md#television-viewing-couch-profile)) | HUD size, `0.5` to `2`. |
+| `ui_hudWidth` | `1` | Spread of edge items: `0` 16:9, `1` 21:9, `2` full width. |
+| `ui_hudSafeInset` | `0` | Inset from the screen edges, `0` to `10` percent. |
+| `ui_hudOpacity` | `1` | HUD opacity, `0.25` to `1`. |
+| `ui_hudDamageDirection` | `1` | `0` hides the damage direction indicator. |
+| `ui_hudPickups` | `1` | `0` hides pickup messages. |
+| `ui_hudWeaponStrip` | `1` | `0` keeps the weapon strip hidden when you change weapon. |
+| `ui_reducedFlashing` | `0` | `1` turns on Reduced Flashing. |
+| `g_objectivesToggle` | `0` | `1` opens and closes the objectives with each press of the scores button. |
+| `g_crosshairSize` | `32` | Crosshair size: `16`, `24`, `32`, `40` or `48`. |
+| `g_crosshairColor` | `1 1 1 1` | Crosshair colour as red, green, blue and opacity. |
+| `hud_hitMarker` | `0` | `1` shows the hit marker. |
+| `hud_hitMarkerScale` | `1` | Hit marker size, `0.25` to `4`, on top of the crosshair size. |
+| `hud_crosshairHitFlash` | `0` | `1` also turns the crosshair red on a hit while the hit marker is on. |
+| `hud_crosshairAnimated` | `1` | Animated crosshair (new interface only). |
+| `ui_retainedReducedMotion` | `0` | `1` reduces decorative motion in the new interface, including the animated crosshair. |
+| `ui_retained` | `1` | `1` new interface, `0` classic interface. |
+
+### Multiplayer feedback
+
+| Setting | Default | What it does |
+|---|---:|---|
+| `hud_objectiveMarkers` | `1` | Objective markers for CTF bases, control points and DeadZone zones. |
+| `hud_damageNumbers` | `1` | Damage numbers: `0` off, `1` opponents only, `2` everything you deal. |
+| `hud_damageNumberStyle` | `1` | `1` white to red, `2` colour per damage band, `3` colour per weapon. |
+| `hud_damageNumberScale` | `1` | Damage number size, `0.25` to `4`. |
+| `g_hitFeedback` | `2` | **Server setting.** `0` no hit feedback, `1` hits without the amount, `2` hits with the amount. |
+
+### Game
+
+| Setting | Default | What it does |
+|---|---:|---|
+| `g_skill` | `1` | Difficulty, `0` Private to `4` Warlord. A saved game brings back its own. |
+| `g_turboMode` | `0` | Turbo Mode (single-player). |
+| `g_fov` | `90` | Field of view, measured on a 4:3 screen. |
+| `g_autoSkipCinematics` | `0` | `1` skips cinematics as they start. |
+| `ui_cinematicShake` | `1` | Extra cinematic camera movement, `0` to `1`. |
+| `g_corpseRemoveDelaySP` | `0` | Single-player corpse delay in seconds; `0` stock, `-1` never. |
+| `g_corpseRemoveDelayMP` | `0` | Multiplayer corpse delay in seconds; `0` stock, `-1` never. |
+| `g_corpseSink` | `0` | `0` dissolve, `1` sink as a ragdoll, `2` sink without ragdoll. |
+| `g_classicDynamicLights` | `1` | Dynamic lights on muzzle flashes, bright projectiles and explosions. |
+| `g_classicDynamicLightScale` | `1` | Radius of those lights, `0.25` to `4`. |
+
+### Sound and subtitles
+
+| Setting | Default | What it does |
+|---|---:|---|
+| `s_musicVolume` | `0.5` | Music volume, `0` to `1`. |
+| `s_dialogueVolume` | `1` | Dialogue volume, `0` (mute) to `1`. |
+| `s_useEAXReverb` | `1` | Room reverb and door muffling. Apply a console change with `s_restart`. |
+| `s_useEAXOcclusion` | `1` | Closed doors muffle sounds behind them while reverb is on. |
+| `s_numberOfSpeakers` | `0` | `0` follow the device, `2` stereo, `6` 5.1. |
+| `s_openALHRTF` | `0` | Headphone HRTF: `0` automatic, `1` off, `2` on. |
+| `s_sourceRadiusScale` | `0.5` | Sound size; `0` makes every sound a point. |
+| `s_directStereo` | `1` | Stereo sounds bypass 3D headphone audio. |
+| `s_resampler` | `auto` | Upsampling filter; `listResamplers` lists the choices. |
+| `s_outputLimiter` | `1` | Compresses loud scenes instead of clipping. |
+| `s_airAbsorption` | `1` | Distant sounds lose a little treble. |
+| `ui_subtitles` | `0` | `1` shows dialogue subtitles. |
+| `ui_subtitleScale` | `1` | Subtitle text size, `1` to `2`; also follows the interface text size. |
+| `ui_subtitleBackground` | `0.6` | Opacity of the black backing, `0` to `1`. |
+| `ui_subtitleSpeakers` | `1` | Shows the speaker's name, or the radio label, when known. |
+
 ## Troubleshooting
 
-- If `g_autoSkipCinematics 1` appears to do nothing, verify you are testing a real in-game cinematic and not a normal scripted gameplay event.
-- If corpses still disappear quickly, check whether you are in SP or MP and set the matching delay cvar for that game module.
-- If `g_corpseSink 1` or `g_corpseSink 2` is enabled but corpses never sink, make sure the relevant corpse delay is not set to `-1`.
-- If music does not respond to `s_musicVolume`, test on a map or menu that is actively playing music rather than general ambience or voice-over audio.
-- If damage numbers never appear, check `g_hitFeedback` on the server: at `0` or `1` the amount never reaches you. They are also multiplayer only, and they only cover damage dealt to players.
-- If damage numbers appear for opponents but not team mates, that is `hud_damageNumbers 1` working as intended. Set it to `2` to include team and self damage.
-
-## Dialogue Subtitles
-
-Enable **Dialogue Subtitles** in **Settings > Audio** (scroll down). Subtitles
-work in both Classic and modern UI, including The Awakening, and remain visible
-when dialogue or master audio is muted. Up to two speakers appear at once;
-long lines advance in pages as their audio plays. Pause and save/load keep the
-caption at the current point in the line.
-
-| Setting | Default | Range | Effect |
-| --- | --- | --- | --- |
-| `ui_subtitles` | `0` | `0`–`1` | Enable dialogue subtitles |
-| `ui_subtitleScale` | `1` | `1`–`2` | Text size; also respects the interface text scale |
-| `ui_subtitleBackground` | `0.6` | `0`–`1` | Black backing opacity |
-| `ui_subtitleSpeakers` | `1` | `0`–`1` | Show an available speaker name or the radio label |
-
-All four settings are saved. Text comes from your installed game's lip-sync
-declarations, with the normal language fallback. The Steam release installs
-these transcripts in English only, and The Awakening's are written in English,
-so other menu languages show English captions. Coverage is incomplete: a
-missing transcript stays blank, and a scene description is never substituted.
-Player voice chat and sound effects are not transcribed. In portrait windows,
-cinematic captions sit below the picture, clear of title cards; at the largest
-text sizes they show one line at a time there, with a second speaker above the
-picture. A speaker name too wide for half the line is left out.
-
-## Gameplay Status Bar
-
-Current source builds default to the modern UI (`ui_retained 1`). Select classic with
-`seta ui_retained 0`, or modern with `seta ui_retained 1`.
-Saved preferences from earlier versions are preserved. For released-package
-defaults, see [Modern and Classic Screens](client-settings.md#modern-and-classic-screens).
-
-The modern UI (`ui_retained 1`) shows a centered ammo, health and armor
-bar, with Marine and Strogg artwork matching the campaign. Multiplayer shows
-total ammo in the current weapon's color. Armor reaching zero leaves the other
-gauges in place.
-
-With the Remastered HUD layout (the default) the whole HUD follows your screen:
-the status bar stays centered on the bottom edge, the radio sits in the top-right
-corner, objective notices use the top corners, and multiplayer's kill feed,
-standing, timer and chat keep to the edges. Vehicles get the same centered status
-bar with an Exit prompt naming your jump key (the air-defence cannon keeps its
-scope and adds the radio display), the objectives display lists every
-objective with the completed ones below, and the scoreboard adds your place, ping
-bars and the Tourney bracket. After you die in multiplayer, a Respawn prompt
-names your attack key once you can return, with a countdown while overtime
-delays your respawn.
-
-**Settings > Game Options > HUD** sets the layout, size, width and safe area,
-whether the objectives open while you hold the scores button or with one
-press, the HUD's opacity, and whether the damage direction indicator, the
-pickup messages and the weapon strip appear (these four apply to the Remastered
-and Minimal layouts), and Reduced Flashing, which works in every layout. The
-same settings are console variables, saved automatically:
-
-| Setting | Default | Range | Effect |
-| --- | --- | --- | --- |
-| `ui_hudLayout` | `1` | `0`–`3` | `1` Remastered layout, `2` Minimal (health, armor, ammunition and the crosshair, keeping prompts, chat and votes), `3` Competitive (multiplayer: a match bar at the top with both sides' scores, the timer and network quality, your team's health and armor at the left edge and a larger status bar), `0` Classic (the original Quake 4 positions) |
-| `ui_hudWidth` | `1` | `0`–`2` | How far edge HUD items spread on wide screens: `0` 16:9, `1` 21:9, `2` the full width |
-| `ui_hudScale` | `1` (`1.25` on Steam Deck and with the [Couch profile](display-settings.md#television-viewing-couch-profile)) | `0.5`–`2` | HUD size, independent of menu size |
-| `ui_hudSafeInset` | `0` | `0`–`10` | Distance inward, as a percentage of the viewport; on a screen with a camera cutout or system bars, the HUD also keeps clear of them |
-| `g_objectivesToggle` | `0` | `0`–`1` | Toggle Objectives: `0` shows the objectives while the scores button is held, `1` opens and closes them with each press (the Remastered display then shows a Close prompt) |
-| `ui_hudOpacity` | `1` | `0.25`–`1` | HUD Opacity: fades the whole HUD |
-| `ui_hudDamageDirection` | `1` | `0`–`1` | Damage Direction: `0` hides the indicator pointing toward damage |
-| `ui_hudPickups` | `1` | `0`–`1` | Pickup Messages: `0` hides the item lines |
-| `ui_hudWeaponStrip` | `1` | `0`–`1` | Weapon Strip: `0` keeps the strip of weapons hidden when you change weapon |
-| `ui_reducedFlashing` | `0` | `0`–`1` | Reduced Flashing: `1` keeps the damage direction indicator and the vehicle hit glow at 40% at most, dims the white flash of teleporters and multiplayer spawns, and drops the red flash when you die |
-
-For example, `ui_hudScale 1.25` enlarges the HUD by 25%. On narrow screens the
-status bar's size is limited to keep every gauge visible. `ui_retained 0`
-restores the stock interface; the stock HUD also appears automatically if a new
-one cannot load.
-
-The stock interface (`ui_retained 0`) uses the same layout with its original
-artwork. The status bar is centered on the bottom edge, and the weapon strip
-shows the weapon's name above it. Up to two pickup lines sit over the gauges,
-and a repeated item counts up on its line ("Armor Shard ×2"). Vehicles get the
-centered status bar and an Exit prompt with your jump key in the bottom-right
-corner. Multiplayer shows the standing with your gap, or the team panels with
-your team first, the flags and their carriers, on compact plates with the timer
-under them. Tourney shows its bracket strip with your match highlighted, and the
-kill feed puts each line on its own plate in the top-right corner. Chat sits at
-the bottom left, clear of the status bar, with each message on its own plate.
-Spectators get a card above the status bar naming who they follow, with that
-player's place and score; a vote shows as a card at the left edge with the Yes
-and No keys, a tally and the time left; and while you wait to respawn, a prompt
-names the control.
-Layout, HUD size, HUD opacity, HUD width, safe area, pickup messages, weapon
-strip and damage direction all work there. Minimal hides the same extras, and
-Competitive uses the Remastered positions. `ui_hudLayout 0` keeps the original
-Quake 4 positions.
+- **Damage numbers never appear.** They are multiplayer only and cover damage to players. Check the server's `g_hitFeedback`: at `0` or `1` the amount never reaches you. If they show for opponents but not team mates, that is `hud_damageNumbers 1`; set it to `2`.
+- **Corpses still disappear quickly.** Set the delay for the mode you are playing: `g_corpseRemoveDelaySP` for single-player, `g_corpseRemoveDelayMP` for multiplayer.
+- **Corpses never sink.** Make sure that mode's corpse delay is not `-1`.
+- **Auto Skip Cinematics seems to do nothing.** It skips cinematics only, not scripted moments that play while you keep control.
+- **Music Volume seems to do nothing.** Test where music is actually playing; general ambience and voice-over are not music.
+- **No room reverb on a Mac.** The build is using Apple's own OpenAL, which has no reverb support; openQ4's macOS packages bundle OpenAL Soft instead.
+- **To compare with and without reverb**, `s_muteEAXReverb 1` silences the reverb of the area you are standing in. `listReverbs` lists the reverbs, the current map's areas and those playing around you, and `s_showReverb 1` prints a line whenever they change.

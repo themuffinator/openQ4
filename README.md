@@ -27,7 +27,7 @@ An open-source engine and game-code replacement that runs the original retail ga
 
 ## What is openQ4?
 
-openQ4 replaces Quake 4's engine and game binaries with its own: a GPL engine and source-available game modules built from the Quake 4 SDK. Your original campaign and multiplayer maps play as they always did, now with widescreen and high-refresh displays, modern controls, optional visual upgrades and one install for single-player and multiplayer.
+openQ4 replaces Quake 4's engine and game code with its own: an open-source engine, and game code rebuilt from the Quake 4 SDK. Your original campaign and multiplayer maps play as they always did, now with widescreen and high-refresh support, modern controls, optional visual upgrades and one install for single-player and multiplayer.
 
 > [!NOTE]
 > openQ4 does **not** include any Quake 4 game data. You need your own copy from [Steam](https://store.steampowered.com/app/2210/Quake_4/) or [GOG](https://www.gog.com/en/game/quake_4).
@@ -37,13 +37,15 @@ openQ4 replaces Quake 4's engine and game binaries with its own: a GPL engine an
 1. Install **Quake 4** from Steam or GOG.
 2. Download [openQ4 0.14.1](https://github.com/themuffinator/openQ4/releases/tag/v0.14.1) for your system and extract it into its own folder.
 3. Launch it:
-   - **Windows:** `openQ4-client_x64.exe`
-   - **Linux:** make the `x86_64` or `aarch64` AppImage executable and run it
-   - **Steam Deck:** `openQ4-steamdeck` from the Linux archive
+   - **Windows:** run the installer, or `openQ4-client_x64.exe` from the ZIP.
+   - **Linux:** download the AppImage (`x86_64` for most PCs, `aarch64` for ARM64), make it executable and run it.
+   - **Steam Deck:** run `openQ4-steamdeck` from the Linux archive.
+   - **macOS (preview):** move `openQ4.app` to Applications and open it, or get the signed build from [Mac Source Ports](https://www.macsourceports.com/game/quake4).
+   - **Android (experimental):** follow [Android setup](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/android-setup.md).
 4. openQ4 finds your Quake 4 install on its own. If it doesn't, see [If auto-detection fails](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/getting-started.md#if-auto-detection-fails).
 
 > [!TIP]
-> Not sure which settings to pick? Open **Settings → System** and press **Auto-Detect** next to the performance preset.
+> On first launch openQ4 picks a performance preset to suit your hardware. To change it, open **Settings → Display** and choose another preset, or press **Auto-Detect** to pick again.
 
 Upgrading? Install the whole package into a fresh folder rather than replacing individual files, and read [upgrading to 0.14.1](docs/user/release-status.md#installing-or-upgrading-to-0141) first: it covers your saves.
 
@@ -53,7 +55,7 @@ What you get in **0.14.1**, the latest release:
 
 - 🪐 **Two campaigns.** Play Quake 4 or [The Awakening](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/awakening.md), the recovered expansion, from **Single Player → Campaign**, each with its own saves. You supply the expansion files.
 - 🖥️ **A new interface.** Rebuilt menus and settings, the Remastered HUD, weapon wheels, scopes and animated crosshairs, ready for controllers, touch, tall screens and larger text. The classic look is one setting away.
-- 🌗 **Modern lighting, each switchable**: stable [shadow maps](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/shadow-mapping.md) on the Quality and Ultra presets, bloom, HDR, [temporal AA](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/temporal-presentation.md), motion blur, [baked light grids](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/light-grids.md), [cel shading](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/cel-shading.md) and a CRT filter.
+- 🌗 **Modern lighting, each switchable**: stable [shadow maps](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/shadow-mapping.md) on the higher presets, bloom, HDR, [temporal AA](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/temporal-presentation.md), motion blur, [baked light grids](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/light-grids.md), [cel shading](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/cel-shading.md) and a CRT filter.
 - ⚡ **Built for modern displays.** Widescreen, ultrawide and portrait screens, smooth motion at 144 Hz and beyond, presets with Auto-Detect, and display changes that apply without a restart.
 - 🔺 **Your choice of renderer.** Vulkan is supported on Windows and chosen automatically, with OpenGL as the fallback.
 - 🎯 **Better multiplayer** (experimental): bots that take orders, quick and voice chat, objective markers, a server browser with favourites and [readable chat](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/multiplayer-chat.md).
@@ -92,8 +94,8 @@ Packages are built for Windows x64, Linux x64 and Steam Deck, with preview Linux
 | **Windows x64** | Installer or ZIP | Windows 10/11 recommended |
 | **Linux x64** | AppImage (`x86_64`) or archive | A modern 64-bit desktop, comparable to Ubuntu 24.04 or newer |
 | **Steam Deck** | Linux archive | Launch `openQ4-steamdeck`; see the [Steam Deck guide](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/steam-deck.md) |
-| **Linux ARM64** | AppImage (`aarch64`) or archive | Preview; needs a desktop OpenGL compatibility driver |
-| **macOS** | Apple Silicon archive | Preview. These are unsigned OpenGL/Metal bridge packages; players have run them only on current macOS |
+| **Linux ARM64** | AppImage (`aarch64`) or archive | Preview; needs full desktop OpenGL drivers, so boards with only OpenGL ES won't run it |
+| **macOS** | Apple Silicon archive | Preview. Unsigned OpenGL/Metal bridge packages, so macOS asks you to approve them on first launch; players have run them only on current macOS |
 | **macOS (signed)** | [Mac Source Ports](https://www.macsourceports.com/game/quake4) | Signed and notarized Apple Silicon and Intel builds by Schnapple |
 | **Windows ARM64** | Installer or ZIP | Experimental; not yet confirmed on real hardware |
 | **Android** | ARM64 APK | Experimental; Android 7.0 or newer with OpenGL ES 3.0. See [Android setup](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/android-setup.md) |
@@ -102,7 +104,7 @@ Packages are built for Windows x64, Linux x64 and Steam Deck, with preview Linux
 |---|---|---|
 | **CPU** | 64-bit, dual-core | Modern quad-core |
 | **Memory** | 4 GB | 8 GB (16 GB for high presets and resolutions) |
-| **Graphics** | OpenGL driver with ARB2-era vertex/fragment program support, ~1 GB VRAM | OpenGL 4.1+ GPU with 2 GB+ VRAM (6 GB+ for `quality` and `ultra`) |
+| **Graphics** | Working OpenGL drivers, about 1 GB of video memory | OpenGL 4.1 or Vulkan graphics with 2 GB+ of video memory (6 GB+ for the Quality preset and above) |
 | **Storage** | ~12 GB including Quake 4 | 15 GB+ |
 
 Details for each platform are in [Getting Started](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/getting-started.md#system-requirements).
@@ -115,7 +117,6 @@ These guides match the 0.14.1 release. Start with [release status](docs/user/rel
 - [Getting Started](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/getting-started.md): install, first launch and common questions
 - [Client Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/client-settings.md): where the most useful options live
 - [Display Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/display-settings.md) · [Input Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/input-settings.md) · [Gameplay Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/gameplay-settings.md) · [Steam Deck](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/steam-deck.md)
-
 - [Languages](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/languages.md) · [VR](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/vr.md) (experimental) · [Android Setup](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/android-setup.md) (experimental)
 
 **Play**
@@ -143,9 +144,9 @@ These guides match the 0.14.1 release. Start with [release status](docs/user/rel
 
 ## Getting help
 
-- **Something broken?** Open an [issue](https://github.com/themuffinator/openQ4/issues) with your log file and setup details.
+- **Something broken?** Open an [issue](https://github.com/themuffinator/openQ4/issues) with your setup details and a log file; [Getting Started](docs/user/getting-started.md#reporting-a-problem) shows how to make one.
 - **On a Mac?** Collect support data with the [macOS support-data guide](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/macos-support-data.md) first.
-- **On ARM64?** The Windows and Linux ARM64 issue templates want your results, and "it just worked" counts as a useful report.
+- **On ARM64?** Tell us how it runs with the Windows or Linux ARM64 [issue template](https://github.com/themuffinator/openQ4/issues/new/choose). "It just worked" is a useful report too.
 - **Want to chat?** Find us in **#openq4** on the [DarkMatter Discord](https://discord.gg/T32mFejwR4).
 
 ## For developers

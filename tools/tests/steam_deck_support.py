@@ -335,7 +335,7 @@ def validate_menu_and_docs() -> None:
         "Direct",
         "auto-select",
         "OPENQ4_FORCE_X11=1",
-        "Settings -> Game Options -> Controller",
+        "Settings → Game Options → Controller",
         "Settings -&gt; Game Options -&gt; Controller",
         "listControllers",
     ):

@@ -2409,7 +2409,7 @@ def validate_docs() -> None:
         "controller back action",
         "five tiers",
         "twenty",
-        "Mission",
+        "**Single Player → Arena**",
         "q4cmp",
         "do not yet pursue flags or map objectives",
         "Its bars always reach every screen edge",

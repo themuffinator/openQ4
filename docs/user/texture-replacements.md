@@ -1,100 +1,149 @@
-# DDS Texture Replacements
+# DDS texture replacements
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-openQ4 can use DDS texture-pack replacements without changing the original Quake 4 materials. This includes the stock game's `progimg/` image-program results, dhewm3-style `dds/` packs, and same-folder replacements used by some Quake 4 packs.
+openQ4 can load texture packs made of DDS files (a compressed image format that
+graphics cards read directly) in place of Quake 4's own textures, without
+changing the original game files. It reads packs laid out the dhewm3 way, in a
+`dds/` folder, and packs that put the DDS files next to the original textures,
+as some Quake 4 packs do. It also reuses the precomputed textures that ship
+inside Quake 4 itself.
 
-## Where files belong
+The first part of this guide is for players installing a pack; the rest is for
+pack authors.
 
-Put your `.dds` files under a `dds/` folder inside `baseoq4` (loose, or at the root of a PK4 you drop in `baseoq4`). Mirror the original asset path underneath it and change the extension:
+## Installing a texture pack
+
+1. Put the pack in openQ4's `baseoq4` folder: either its loose `dds/` folder,
+   or the pack's PK4 file (a Quake 4 package, which is a renamed zip file).
+2. Start openQ4 and load a map. Replacements are on by default, so there is
+   nothing to switch on.
+
+Keep packs in `baseoq4`, not in Quake 4's `q4base` folder: `q4base` also works,
+but a Steam file verification may delete them there.
+
+To check that the pack is being used, see [Troubleshooting](#troubleshooting).
+
+## The replacement setting
+
+`image_usePrecompressedTextures` is a console variable (cvar) with three values.
+Set it, then load a map or run `reloadImages all`:
+
+- `1` (default) uses any supported replacement (DXT1, DXT5, RXGB and BC7) and
+  also reuses the precomputed textures in Quake 4's own PK4s. **This is the
+  right setting for a BC7 pack.** The performance presets keep it at 1.
+- `2` uses only BC7 replacements, and ignores DXT and RXGB files, including the
+  ones in Quake 4's PK4s. Use it only if you want everything else to come from
+  the uncompressed originals.
+- `0` turns off all DDS replacements, including your own packs.
+
+**BC7 needs graphics support.** Run `gfxInfo` and check the
+`Texture compression: S3TC/DXT=1 BC7/BPTC=1` line. Without BC7 support, BC7
+files still load, uncompressed, so they use more video memory. DXT and RXGB
+files are decoded by the processor when the graphics card cannot take them
+directly.
+
+> **macOS:** with OpenGL, a Mac has no BC7 support. Apple's OpenGL stops below
+> the version that added it, so `gfxInfo` reports `BC7/BPTC=0` on every Mac,
+> Apple Silicon and Intel alike, and every BC7 file loads uncompressed. No
+> setting or driver update changes that. With the experimental Vulkan renderer,
+> `gfxInfo` shows whether the Mac's graphics support it. Pack authors: ship DXT
+> or RXGB files alongside BC7 if Mac players matter to you.
+
+## Making a pack
+
+### Where files belong
+
+Mirror the original texture's path under `dds/` and change the extension:
 
 ```text
-Original asset:  textures/stone/wall01.tga
-Replacement:     baseoq4/dds/textures/stone/wall01.dds
+Original texture:  textures/stone/wall01.tga
+Replacement:       baseoq4/dds/textures/stone/wall01.dds
 ```
 
-```text
-baseoq4/
-  dds/
-    textures/
-      stone/
-        wall01.dds
-```
-
-A `.dds` placed next to the original asset path instead — `baseoq4/textures/stone/wall01.dds`, the layout some Quake 4 packs use — also works. The `dds/` tree is preferred and wins if both exist.
-
-`q4base/dds/...` is on the search path too, but keep your files in `baseoq4` so a Steam file verification does not delete them.
+A `.dds` placed beside the original path instead, such as
+`baseoq4/textures/stone/wall01.dds`, also works. If both exist, the `dds/` copy
+wins.
 
 ### Bump maps and other image programs
 
-Quake 4 materials rarely name a bump texture directly. They usually write an image *program*:
+Quake 4 materials rarely name a bump texture directly. They usually build it
+with an image *program*:
 
 ```text
 bumpmap addnormals( textures/stone/wall01_local, heightmap( textures/stone/wall01_h, 4 ) )
 ```
 
-You can replace either end of that:
+You can replace either end:
 
-- **Replace an input.** Shipping `dds/textures/stone/wall01_local.dds` replaces the source texture and openQ4 recomputes the program result on load. This is the simplest option and is what a Quake-4-shaped pack normally does.
-- **Replace the finished result.** Name the file after the whole program using dhewm3's mangling:
+- **Replace an input.** Ship `dds/textures/stone/wall01_local.dds` and openQ4
+  recomputes the program's result from it at load. This is the simplest option
+  and what a pack made for Quake 4 normally does.
+- **Replace the finished result.** Name the file after the whole program, using
+  dhewm3's naming:
 
   ```text
   heightmap(models/monsters/foo_local, 4)
       -> dds/heightmap/models/monsters/foo_local 4.dds
   ```
 
-  Texture-pack tools should preserve that mapping for composed programs such as `heightmap`, `addnormals`, `add`, and `scale`.
+  Pack tools should keep that naming for combined programs such as
+  `heightmap`, `addnormals`, `add` and `scale`.
 
-If you are unsure what a given material image is called, turn on `image_showPrecompressedTextures` (below) — openQ4 prints every path it looked for.
+If you are not sure what an image is called, turn on
+`image_showPrecompressedTextures` (see [Troubleshooting](#troubleshooting)):
+openQ4 prints every path it looked for.
 
 ### Search order
 
-For each image, openQ4 probes in this order and takes the first usable file:
+For each image, openQ4 tries these in order and uses the first usable file:
 
-1. `dds/<image program name>.dds` — the dhewm3 naming scheme
-2. `dds/<asset path>.dds` — for plain image references
-3. `<asset path>.dds` — beside the original `.tga`/`.jpg`, the Quake 4 style
-4. `progimg/...` — the stock precomputed results shipped in the retail PK4s
+1. `dds/<image program name>.dds`, the dhewm3 naming
+2. `dds/<texture path>.dds`, for plain textures
+3. `<texture path>.dds`, beside the original `.tga` or `.jpg`, as Quake 4 packs do
+4. `progimg/...`, the precomputed results inside Quake 4's own PK4s
 
-The retail `progimg/` tree is probed **last**, so a user replacement always wins. openQ4 recognizes those retail paths automatically, including nested image programs and plain `gfx/env/` cube sides; you do not need to extract, rename, or regenerate the retail files.
+Quake 4's own files come last, so your pack always wins. openQ4 finds them
+automatically, including nested programs and environment cube faces under
+`gfx/env/`; you don't need to extract, rename or regenerate them.
 
-## Enable replacements
+### BC7 files
 
-Set `image_usePrecompressedTextures` before loading a map:
-
-- `0` disables automatic DDS replacements entirely, including your own packs.
-- `1` (default) uses any supported DDS replacement — DXT1, DXT5, RXGB and BC7 — and also reuses the stock `progimg/` files shipped in the Quake 4 PK4s. **This is the right setting for a BC7 pack.**
-- `2` uses only BC7/BPTC replacements and ignores DXT/RXGB data, including the stock `progimg/` tree. Use this only if you specifically want everything else to come from the uncompressed sources.
-
-BC7 requires a renderer with BPTC support. Run `gfxInfo` and look for the BC7/BPTC capability line if a pack is not being selected.
-DXT/RXGB files fall back to CPU decoding when direct texture-compression upload is unavailable. A BC7 file on a renderer without BPTC support is uploaded uncompressed rather than failing the load.
-
-> **macOS has no BC7.** BPTC entered OpenGL in 4.2, and Apple's OpenGL
-> implementation stops at 4.1 — and at 2.1 on the compatibility profile openQ4
-> actually runs there. `gfxInfo` reports `BC7/BPTC=0` on every Mac, Apple
-> Silicon and Intel alike, and every BC7 file is uploaded uncompressed. This is
-> a platform limit, not a configuration problem: no cvar, driver update or
-> `image_usePrecompressedTextures` value changes it. Ship DXT/RXGB alongside BC7
-> if Mac users matter to your pack.
-
-## BC7 file requirements
-
-Supported BC7 files are single 2D textures using either:
+openQ4 accepts single 2D BC7 textures with either:
 
 - a DX10 header with `DXGI_FORMAT_BC7_UNORM` or `DXGI_FORMAT_BC7_UNORM_SRGB`; or
-- a common `BC7` FourCC variant.
+- a common `BC7` FourCC code.
 
-Texture arrays, cube maps, volume textures, invalid dimensions, and truncated declared mip chains are rejected safely. Authored mip levels are uploaded directly. Texture downsizing skips leading authored levels, and images using an unmipped sampler upload only their base level.
+Texture arrays, cube maps, volume textures, invalid sizes and files with
+missing mipmap levels are rejected safely. Your own mipmaps are used as they
+are. When texture size is reduced, openQ4 skips the largest levels, and images
+that never use mipmaps upload only the full-size level.
 
 ### Normal maps
 
-Write BC7 normal maps the ordinary way: X, Y, Z in RGB, alpha unused. That is what `texconv`, NVTT, Compressonator and `bc7enc` all produce by default, and it is what openQ4 expects.
+Write BC7 normal maps the ordinary way: X, Y and Z in red, green and blue, with
+alpha unused. That is the default in `texconv`, NVTT, Compressonator and
+`bc7enc`, and it is what openQ4 expects.
 
-> **Changed:** earlier openQ4 builds incorrectly forced BC7 bump maps into the DXT5nm/RXGB channel layout, which required encoding with `bc7enc -r2a`. A pack authored that way will now render with flat lighting and must be re-encoded without `-r2a`. Only DXT5 and true `RXGB` files use the alpha-swizzled layout; that convention exists because DXT5 gives alpha its own higher-precision interpolator, and BC7 has no such limitation.
+> **Packs encoded with `bc7enc -r2a` need re-encoding.** That option moves the
+> channels into the DXT5 normal-map layout. openQ4 reads BC7 normal maps as
+> plain RGB, so such a pack shows flat lighting; encode it again without
+> `-r2a`. Only DXT5 and true `RXGB` files use the swapped layout.
+
+### Stale files
+
+openQ4 ignores a loose replacement that is older than its original texture, so
+an out-of-date DDS cannot hide a newer edit. Rebuild or re-save a DDS after
+changing its source image. Quake 4's own precomputed files get a few seconds'
+grace for timestamp rounding.
+
+Files inside a PK4 have no timestamp, so a packed replacement is never
+considered stale. If you work with loose DDS files next to extracted `.tga`
+sources, the extracted sources can look newer and your `.dds` will be skipped.
 
 ## Troubleshooting
 
-Use these commands when checking a pack:
+Enter these in the console to check a pack:
 
 ```text
 image_usePrecompressedTextures 1
@@ -102,7 +151,9 @@ image_showPrecompressedTextures 1
 reloadImages all
 ```
 
-The log then prints the DDS path selected for each replacement, and — for every image where nothing was selected — the full list of candidate paths it tried with the reason each one was rejected. That list is the fastest way to find out what a file should be named:
+The log then shows the DDS file chosen for each replacement. For every image
+where nothing was chosen, it lists each path it tried and why that path was
+rejected, which is the quickest way to find out what a file should be called:
 
 ```text
 no DDS replacement for 'textures/stone/wall01':
@@ -110,6 +161,8 @@ no DDS replacement for 'textures/stone/wall01':
    textures/stone/wall01.dds           [alongside the original asset (Quake 4 style)] no such file
 ```
 
-`listImages` identifies loaded BC7 images, while `imageDDSSelfTest` validates the built-in retail/dhewm3 naming conversions plus RXGB and BC7 header checks.
-
-During development, an automatic DDS replacement older than its original source is ignored so stale generated data cannot hide a newer texture edit. The stock `progimg/` archives receive a four-second timestamp-granularity allowance; a genuinely newer loose source still wins. Rebuild or retimestamp a custom DDS after changing its source image. Note that files inside a PK4 report no timestamp at all, so a packed replacement is never treated as stale — if you are authoring loose files alongside extracted `.tga` sources, the extracted sources will look newer and your `.dds` will be skipped.
+- `listImages` marks which loaded images are BC7.
+- `imageDDSSelfTest` checks openQ4's built-in DDS naming and BC7 header
+  handling, if you suspect the engine rather than your pack.
+- If nothing is replaced at all, check `gfxInfo` for BC7 support and that
+  `image_usePrecompressedTextures` is not `0`.

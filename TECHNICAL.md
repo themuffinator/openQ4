@@ -64,7 +64,7 @@ openQ4/
 
 - Single-player loads `game-sp_<arch>` and multiplayer loads `game-mp_<arch>`. Quake 4 and The Awakening both use the same single-player module.
 - Your retail game data stays in the Quake 4 install's `q4base` directory; openQ4 reads it from there. Optional Awakening content goes in its own `q4xbase` directory, described in the [campaign guide](docs/user/campaigns.md).
-- Windows packages also include `OpenAL32.dll` and `.pdb` debug symbols. Linux debug symbols are a separate download.
+- Windows packages also include `OpenAL32.dll`. Debug symbols are a separate download on every platform: `openq4-<version>-windows-<arch>-symbols.zip` for Windows `.pdb` files, a debug-symbols archive for Linux and a symbols archive for macOS.
 - When upgrading, replace the whole package. The engine, renderer modules and game modules must come from the same release.
 
 ---

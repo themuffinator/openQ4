@@ -48,10 +48,10 @@ def validate_docs() -> None:
     shadow_doc = read("docs/user/shadow-mapping.md")
 
     for token in (
-        "Platform Support Matrix",
+        "## Platform support",
         "Apple legacy GL2.1 tier",
         "Stencil only",
-        "Lights fall back to the retail stencil path automatically",
+        "Lights fall back to the original stencil shadows automatically",
         "rejects incomplete maps and uses complete stencil coverage when available",
     ):
         require(shadow_doc, token, "shadow-mapping user doc platform matrix")

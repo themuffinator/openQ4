@@ -1,92 +1,174 @@
 # macOS Support Data
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-macOS support is a preview for Apple Silicon/arm64 Macs. If openQ4 crashes on
-macOS, a complete report is much more useful than a screenshot because the
-maintainer may not have access to a Mac. Reports that it simply works are useful
-too, especially on a macOS version older than the current one.
+This page shows Mac players how to put together a useful bug report. macOS
+support is a preview for Apple Silicon (arm64) Macs, and the maintainer may not
+have a Mac to reproduce your problem, so a complete report helps far more than
+a screenshot. Reports that openQ4 simply works are welcome too, especially on
+a macOS version older than the current one.
 
-This page is especially useful for startup crashes like
-[GitHub issue #73](https://github.com/themuffinator/openQ4/issues/73), where
-the last visible lines can be in the Apple OpenGL 2.1, ARB2, and interaction
-program startup path.
+The short version:
 
-Current builds default to `r_appleARB2Interactions 0`: stock surfaces use the
-GLSL 1.10 material-interaction shader with neutral Quake 4 lighting values,
-while unsupported/generated surfaces use a guarded `SimpleInteraction.vfp`
-fallback. This restores interaction lighting instead of accepting the flat,
-ambient-only image produced by the earlier workaround. Modes `1` and `2` force
-the simple/full ARB paths for diagnosis; mode `3` is the emergency no-interaction
-bypass and requires `vid_restart`.
+1. [Capture the terminal output](#capture-terminal-output) while you
+   reproduce the problem.
+2. [Run the support collector](#run-the-support-collector) to make a support
+   archive.
+3. Attach both, plus the crash report if macOS made one, to your
+   [GitHub issue](https://github.com/themuffinator/openQ4/issues).
 
-If a current log contains `ARB2 interaction driver bypass`, the emergency mode
-is active; older packages used that degraded bypass by default. It skips light
-interaction drawing to avoid the known startup crash, so attach the terminal
-output and support archive even if the game continues with visibly flat
-lighting. Bypass builds also print breadcrumbs such as `ARB2 interaction bypass state
-restored`, `ARB2 interaction bypass light scale skipped`,
-`ARB2 interaction bypass ambient rescue`, and `ARB2 interaction bypass frame
-tail` to identify the next classic renderer operation reached. Older 0.6.92
-test builds could stop at `ARB2 interaction bypass light scale`; newer builds
-skip that post-interaction light-scale pass on the degraded Apple GL 2.1 path.
+Never attach your retail Quake 4 `q4base/*.pk4` files.
 
-## What To Attach
+## What to attach
 
-Attach or paste these items when possible:
+Attach or paste as many of these as you can:
 
-- The exact openQ4 version and package artifact name, such as
-  `openq4-0.6.8-macos-arm64-metal.dmg`.
-- Whether you used the OpenGL package, the Metal bridge package, or both.
-- Whether you launched `openQ4.app`, `openQ4-client_arm64` from Terminal,
-  `openQ4-ded_arm64` from Terminal, or more than one path.
-- macOS version/build and hardware model. `sw_vers` plus the Apple Silicon
-  generation, such as M4 Max or M5, is enough.
+- The exact openQ4 version and the name of the file you downloaded, such as
+  `openq4-0.14.1-macos-arm64-metal-unsigned.tar.gz`, and whether you used the
+  OpenGL package, the Metal bridge package, or both.
+- How you started it: `openQ4.app`, `openQ4-client_arm64` from Terminal,
+  `openQ4-ded_arm64` from Terminal, or more than one of these. Say whether
+  `openQ4.app` ran from the download or after you dragged it to
+  `/Applications`, and whether the Terminal tools ran from a complete copy of
+  the package.
+- Your macOS version and Mac model. The output of `sw_vers` plus the chip, such
+  as M4 Max or M5, is enough.
 - Full terminal output as text, not only a screenshot.
-- `~/Library/Application Support/openQ4/baseoq4/logs/openq4.log` when it
-  exists.
-- The matching `.ips` or `.crash` file from
-  `~/Library/Logs/DiagnosticReports` when macOS writes one.
-- `SYMBOLS.txt` from the package root or from `package/SYMBOLS.txt` inside the
-  support archive, if present.
-- `package/build-metadata.txt` from the support archive, or the package
-  `VERSION.txt` lines for `openq4_commit` and `openq4_game_commit` when
-  present.
-- OpenAL audio lines from `openq4.log` when present: `OpenAL vendor:`,
-  `OpenAL renderer:`, `OpenAL active device:`, and any `OpenAL EFX ...`
-  warning/status lines.
-- `system/rosetta.txt`, `logs/renderer-summary.txt`, `logs/renderer-config.txt`,
-  `package/binary-architecture.txt`, `package/dylib-dependencies.txt`,
-  `package/signing.txt`, and
-  `package/quarantine.txt` from the support archive when present.
-- Whether `openQ4.app` was launched from the DMG or after being dragged to
-  `/Applications`, and whether loose client/dedicated tools were launched from
-  a whole copied package.
+- `~/Library/Application Support/openQ4/baseoq4/logs/openq4.log`, if it exists.
+- The matching `.ips` or `.crash` file from `~/Library/Logs/DiagnosticReports`,
+  if macOS wrote one.
+- `SYMBOLS.txt` from the package folder (the support archive also copies it to
+  `package/SYMBOLS.txt`).
+- The support archive. Its `package/build-metadata.txt` records exactly which
+  build you have; without the archive, copy the `openq4_commit` and
+  `openq4_game_commit` lines from the package's `VERSION.txt` instead.
+- For sound problems, the OpenAL lines from `openq4.log`: `OpenAL vendor:`,
+  `OpenAL renderer:`, `OpenAL active device:`, and any `OpenAL EFX ...` warning
+  or status lines.
 
-Do not attach retail Quake 4 `q4base/*.pk4` assets.
+If you share files from the support archive one at a time, the most useful are
+`system/rosetta.txt`, `logs/renderer-summary.txt`, `logs/renderer-config.txt`,
+`package/binary-architecture.txt`, `package/dylib-dependencies.txt`,
+`package/signing.txt` and `package/quarantine.txt`.
 
-## Capture Terminal Output
+## Capture terminal output
 
-From Terminal, run the app executable from any working directory and redirect
-output to a text file:
+In Terminal, run the app's executable and send its output to a text file. You
+can run it from any folder:
 
 ```sh
 cd /tmp
 "/Applications/openQ4.app/Contents/MacOS/openQ4" > ~/Desktop/openq4-terminal.txt 2>&1
 ```
 
-For dedicated-server reports, run the dedicated binary from the same package
-root and redirect output separately:
+For a dedicated-server problem, run the dedicated server from the package
+folder and save its output separately:
 
 ```sh
 cd "/path/to/openQ4 package"
 ./openQ4-ded_arm64 +set dedicated 1 > ~/Desktop/openq4-ded-terminal.txt 2>&1
 ```
 
-If the app, client, or dedicated server crashes, attach the matching terminal
-text file or paste its full contents into the issue.
+Reproduce the problem, then attach the text file or paste its full contents
+into the issue.
 
-For issue #73 style reports, keep the lines around these markers:
+## Run the support collector
+
+macOS packages include `collect_macos_support_info.sh` in the package folder.
+Run it from Terminal:
+
+```sh
+cd "/path/to/openQ4 package"
+./collect_macos_support_info.sh
+```
+
+If macOS refuses to run the script directly, run it through `sh`:
+
+```sh
+sh ./collect_macos_support_info.sh
+```
+
+It creates an archive named like:
+
+```text
+openq4-macos-support-YYYYMMDD-HHMMSSZ.tar.gz
+```
+
+### What the collector protects
+
+Review the archive before you attach it publicly. The collector:
+
+- replaces `/Users/<name>` in paths and removes anything that looks like an
+  email address;
+- does not dump the environment, does not launch openQ4, and does not copy retail `q4base` PK4 assets;
+- reads only renderer and performance settings from your config (`r_*`,
+  `com_machineSpec` and `com_performancePreset`), never your bindings, player,
+  network or audio-device settings;
+- does not follow symlinked package, log, or crash-report inputs; it notes each skipped link instead;
+- notes a skipped file instead of copying it when a DiagnosticReports filename contains unusual characters;
+- still makes an archive when Terminal did not set `HOME`, and notes that it
+  skipped your logs and crash reports;
+- strips control characters from copied text, keeps only the last 2 MiB of a
+  log or text file and the last 8 MiB of a crash report (noting the cut), and
+  caps the output of system tools;
+- makes the archive readable only by you and never overwrites an existing
+  archive.
+
+### What the archive contains
+
+| File | What it records |
+| --- | --- |
+| `package/path-resolution.txt` | The package root, app path, expected loose runtime paths, and any log lines that mention `fs_basepath`, `fs_cdpath`, and `fs_savepath`, all gathered without launching openQ4 |
+| `package/build-metadata.txt` | The `VERSION.txt` lines, including `openq4_commit`, `openq4_dirty`, `openq4_game_commit` and `openq4_game_dirty`, plus the game module file names in `baseoq4/` |
+| `package/SYMBOLS.txt` | The symbol manifest, if the package has one (see [Crash reports and symbols](#crash-reports-and-symbols)) |
+| `logs/openal-summary.txt` | From an existing log: the OpenAL vendor, renderer, version, requested, default or active device, and `OpenAL EFX` warning and status lines |
+| `logs/renderer-summary.txt` | From an existing log: renderer start-up, driver workarounds, lighting fallbacks, render targets and MSAA, the selected folders and game module, and crash signals, such as `R_InitOpenGL`, `Renderer driver quirks`, `material_interaction`, `GL_FRAMEBUFFER_*`, `Forward render target MSAA`, `Filesystem paths:`, `Selected game module:`, `ARB2 interaction driver bypass`, `Game module search failed:`, `Game module load failed:`, `dlopen ... failed:` and `fatal signal SIGSEGV` |
+| `logs/renderer-config.txt` | Only the renderer and performance lines from a saved `openQ4Config.cfg`, so graphics settings can be compared without your full config |
+| `system/rosetta.txt` | `arch`, `uname -m` and `sysctl.proc_translated`, to spot Terminal running under Rosetta, which is not supported |
+| `package/binary-architecture.txt` | `file` and `lipo -archs` for the app, Terminal tools and game modules, to spot a wrong-architecture file |
+| `package/dylib-dependencies.txt` | `otool -L` and `otool -D` for the same files, to spot unexpected libraries or broken game module names |
+| `package/signing.txt` | `codesign`, `spctl --assess --type execute --verbose=4` and `xcrun stapler validate` checks for the app, Terminal tools and game modules, without launching openQ4 |
+| `package/quarantine.txt` | The names of extended attributes and whether `com.apple.quarantine` is present; their values are not copied |
+
+The architecture, signing and quarantine reports also look for x64 or x86
+openQ4 executables if any are present, so wrong-architecture files show up even
+though packages are Apple Silicon only.
+
+## If the game can't find or load its game module
+
+If start-up stops with `couldn't find game dynamic library`, include the
+`Game module search failed:` line. It lists the package folders that were
+checked, which tells a damaged app apart from an older package layout. A
+current app looks in `openQ4.app/Contents/Frameworks` for
+`game-sp_arm64.dylib` and `game-mp_arm64.dylib`. Do not copy game modules into
+your retail `q4base` folder.
+
+If the module was found but start-up stops with `couldn't load game dynamic
+library`, include both the `Game module load failed:` line and the
+`dlopen ... failed:` line before it. Together they name the module and macOS's
+reason, such as a code-signing or missing-library problem.
+
+## Start-up crashes and flat lighting
+
+Some Macs crashed at start-up in Apple's older OpenGL 2.1 driver, as in
+[GitHub issue #73](https://github.com/themuffinator/openQ4/issues/73), with the
+last lines of output in the lighting shader setup. Current builds default to
+`r_appleARB2Interactions 0`: normal surfaces draw their lighting with a
+compatible shader, and anything else falls back to the simpler
+`SimpleInteraction.vfp` program, so you get proper lighting rather than the
+flat look of the earlier workaround.
+
+For diagnosis, `r_appleARB2Interactions 1` and `2` force the simple and full
+older lighting paths, and `3` is an emergency mode that skips lighting
+altogether. A change needs `vid_restart`.
+
+If your log contains `ARB2 interaction driver bypass`, the emergency mode is on
+(older packages used it by default). It skips lighting to avoid the crash, so
+the game looks flat. Please still attach the terminal output and the support
+archive.
+
+For a start-up crash, keep the lines around any of these markers when you paste
+output:
 
 - `----- R_InitOpenGL -----`
 - `R_ReloadARBPrograms`
@@ -122,137 +204,22 @@ For issue #73 style reports, keep the lines around these markers:
 - `Apple GL 2.1 interaction routes:`
 - `the Apple GL 2.1 corridor was not applied`
 
-## Run The Support Collector
+## Crash reports and symbols
 
-macOS packages include `collect_macos_support_info.sh` in the package root. Run
-it from Terminal:
+macOS packages include a small `SYMBOLS.txt` file in the package folder. It
+names the matching debug-symbol (dSYM) archive, a separate
+`...-symbols.tar.xz` download, and lists the checksums and identifiers of the
+packaged programs.
 
-```sh
-cd "/path/to/openQ4 package"
-./collect_macos_support_info.sh
-```
+If you attach an `.ips` or `.crash` report, also attach `SYMBOLS.txt`, or run
+the support collector, which copies it to `package/SYMBOLS.txt`. The maintainer
+uses it to pick the right symbols to read your crash report; the support
+archive does not include the `.dSYM` debug files themselves. Maintainer details
+are in [macOS Symbolication Workflow](../dev/macos-symbolication.md).
 
-If macOS refuses to execute the script directly, run it through `sh`:
+## Manual locations
 
-```sh
-sh ./collect_macos_support_info.sh
-```
-
-The script creates an archive named like:
-
-```text
-openq4-macos-support-YYYYMMDD-HHMMSSZ.tar.gz
-```
-
-Review the archive before attaching it publicly. The collector redacts
-`/Users/<name>` paths and email-like strings, does not dump the environment,
-does not launch openQ4, and does not copy retail `q4base` PK4 assets.
-Copied text is sanitized for embedded control characters, and command/report
-output is stream-limited before redaction so noisy system tools cannot inflate
-the support archive.
-It also does not follow symlinked package, log, or crash-report inputs; skipped
-symlinks are recorded in the relevant report files instead of copying or
-inspecting their targets.
-If the Terminal or automation environment did not set `HOME`, the collector
-still creates the archive and records notes that home-scoped logs and
-DiagnosticReports were skipped.
-If a DiagnosticReports filename contains unusual characters, the collector
-records a skipped-file note instead of placing that name into the support
-archive.
-Generated support archives are private by default and the collector refuses to
-overwrite an existing archive with the same timestamp. Very large copied text
-files are bounded: package/log text is limited to the final 2 MiB, and crash
-reports are limited to the final 8 MiB, with a truncation note written into the
-copied file.
-
-The archive includes `package/path-resolution.txt`. That file records the
-package root, app path, expected loose runtime paths, and any copied log lines
-that mention `fs_basepath`, `fs_cdpath`, and `fs_savepath`. It does this
-without launching openQ4.
-
-The archive also includes `package/build-metadata.txt`. That file copies the
-package/app `VERSION.txt` metadata lines, including `openq4_commit`,
-`openq4_dirty`, `openq4_game_commit`, and `openq4_game_dirty` when the package
-contains them, plus the `baseoq4/` game module filenames.
-
-The archive also includes `logs/openal-summary.txt` when the collector can read
-an existing log. It copies the OpenAL vendor, renderer, version, requested/default
-or active device name, and `OpenAL EFX` warning/status lines without launching
-openQ4.
-
-The archive also includes `logs/renderer-summary.txt` when an existing log is
-available. It copies renderer startup, driver-quirk, interaction fallback,
-render-target/MSAA, selected filesystem/module, and fatal-signal diagnostics.
-That includes lines such as `R_InitOpenGL`, `Renderer driver quirks`,
-`material_interaction`, `GL_FRAMEBUFFER_*`, `Forward render target MSAA`,
-`Filesystem paths:`, `Selected game module:`, `ARB2 interaction driver bypass`,
-`Game module search failed:`, `Game module load failed:`, `dlopen ... failed:`,
-and `fatal signal SIGSEGV`.
-
-If a launch stops with `couldn't find game dynamic library`, include the
-`Game module search failed:` line. It lists only the trusted package locations
-that were checked, so maintainers can distinguish a damaged app from an older
-package layout. A current self-contained app should search its
-`openQ4.app/Contents/Frameworks` directory for `game-sp_arm64.dylib` and
-`game-mp_arm64.dylib`; do not manually copy game modules into retail `q4base`.
-
-If the module was found but the launch stops with `couldn't load game dynamic
-library`, include both `Game module load failed:` and the preceding
-`dlopen ... failed:` line. Together they identify the selected module and the
-platform loader's reason, such as a code-signing or dependent-library problem.
-
-The archive also includes `logs/renderer-config.txt` when a saved
-`openQ4Config.cfg` is available. It copies only renderer/performance cvar lines:
-`r_*`, `com_machineSpec`, and `com_performancePreset`. It does not copy
-bindings, player/account, network, audio-device, or arbitrary config settings.
-This lets maintainers compare graphics changes from issue #73-style reports
-without requesting a user's full personal config.
-
-The archive also includes `system/rosetta.txt`. That file records `arch`,
-`uname -m`, and `sysctl.proc_translated` output from the collector process so
-maintainers can spot unsupported Rosetta or translated-Terminal reports.
-
-The archive also includes `package/binary-architecture.txt`. That file records
-read-only `file` and `lipo -archs` output for the app executable, loose
-client/dedicated binaries, and game modules so maintainers can spot wrong-arch
-or universal-binary surprises.
-
-The archive also includes `package/dylib-dependencies.txt`. That file records
-read-only `otool -L` dependency output and `otool -D` game-module install names
-so maintainers can spot unexpected non-system dependencies or broken
-`@loader_path` module names.
-
-The archive also includes `package/signing.txt`. That file records read-only
-`codesign`, `spctl --assess --type execute --verbose=4`, and
-`xcrun stapler validate` checks for the app bundle, loose binaries, and game
-modules without launching openQ4.
-
-The archive also includes `package/quarantine.txt`. That file lists
-extended-attribute names and reports whether `com.apple.quarantine` is present;
-it does not copy extended-attribute values.
-
-Current release packages remain Apple Silicon/arm64 only, but the architecture,
-signing, Gatekeeper, and quarantine reports also inspect any loose `x64` or
-`x86` openQ4 executable names if they are present. That makes wrong-arch or
-future cross-arch package contents visible without treating those paths as
-supported release targets.
-
-## Symbolication Data
-
-macOS packages include a small `SYMBOLS.txt` manifest at the package root. It
-names the matching `openq4-<version>-macos-arm64-<bridge>-symbols.tar.xz`
-dSYM archive and lists the packaged binary checksums and Mach-O UUIDs.
-
-If you attach a `.ips` or `.crash` report, also attach `SYMBOLS.txt` or run the
-support collector so it can copy the file to `package/SYMBOLS.txt`. Maintainers
-use that manifest to choose the correct symbol archive; the support archive does
-not include `.dSYM` debug bundles.
-
-Maintainer details live in [macOS Symbolication Workflow](../dev/macos-symbolication.md).
-
-## Manual Locations
-
-If the helper is not available, collect these manually:
+If the collector isn't available, collect these by hand:
 
 ```text
 ~/Library/Application Support/openQ4/baseoq4/logs/openq4.log
@@ -273,9 +240,9 @@ system_profiler SPHardwareDataType
 system_profiler SPDisplaysDataType
 ```
 
-## Package Layout Check
+## Package layout check
 
-The current macOS client is self-contained. It uses this internal layout:
+The macOS app is self-contained:
 
 ```text
 openQ4.app/Contents/MacOS/openQ4
@@ -284,10 +251,8 @@ openQ4.app/Contents/Frameworks/game-sp_arm64.dylib
 openQ4.app/Contents/Frameworks/game-mp_arm64.dylib
 ```
 
-Finder may start the app with an unrelated process working directory; current
-builds use embedded `Contents/Resources` as `fs_cdpath`, while a separately
-discovered Steam/GOG install remains `fs_basepath` for retail `q4base`. Dragging
-only `openQ4.app` to `/Applications` is supported. Keep the whole extracted
-package only when testing the loose diagnostic client, dedicated server, or
-support collector, which discover the sibling app runtime. Do not modify the
-signed app by adding retail assets.
+The app finds openQ4's own files inside `Contents/Resources` wherever Finder
+starts it from, and finds your Steam or GOG Quake 4 installation separately for
+the retail `q4base` files. Dragging only `openQ4.app` to `/Applications` is supported. Keep the whole extracted package only if you use the Terminal client, the
+dedicated server or the support collector, which find the app next to them. Do
+not add retail game files to the signed app.

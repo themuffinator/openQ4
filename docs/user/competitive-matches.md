@@ -1,64 +1,331 @@
-# Competitive Matches
+# Competitive matches
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-> **Experimental.** Multiplayer and the single-player Arena Campaign are
-> under active development and are not yet considered stable. Expect rough
-> edges, changing behaviour between builds, and bugs. They are not
-> representative of the finished feature.
+> **Experimental.** Multiplayer is still under active development. Expect rough
+> edges, bugs and behaviour that changes between versions.
 
-## Current status
+An openQ4 server runs either **casual** games, which play like stock Quake 4,
+or **managed** competitive matches. In a managed match the server looks after
+ready-up, team rosters and roles, timeouts, votes, best-of series with map
+vetoes, and a saved match report with a multi-view demo. Players, captains,
+referees and organisers all use it through the in-game **Match Control** page.
 
-openQ4's managed competitive-match framework is implemented in the current
-working tree. The server owns one match session for rules, readiness, roles,
-rosters, pauses, proposals, series progress, recipient-specific views and match
-evidence. The localized **Match Control** page exposes those same typed actions
-to players, captains, coaches, broadcasters, referees and a local listen-server
-operator.
+This guide starts with what you need as a player, then covers the match roles,
+game rules, and setting up and running a managed server.
 
-Automated domain, protocol, storage, localization and UI-contract tests cover
-the implementation, including the transactional series/report boundary and
-the casual/managed compatibility boundary. Automated gameplay runs also cover
-supported modes, role permissions, repeated pauses, BO1/BO3/BO5 series,
-multi-map recovery and playback of generated MVDs. Remaining qualification
-includes roster and invitation lifecycles, proposal and map-load failure paths,
-and complete windowed keyboard/controller workflows. Until that matrix is
-signed off, a league should
-retain its normal independent result-verification procedure rather than
-treating one openQ4 artifact as its sole authority.
+**For leagues:** managed matches are still experimental. Keep your usual way of
+checking results rather than relying on openQ4's report alone.
 
-The detailed implementation and remaining acceptance work are tracked in the
-[competitive reference audit](../dev/competitive-match-reference-audit.md).
-Persistent results and spectator controls pass windowed OpenGL and Vulkan
-gameplay checks, including server camera restrictions, winner disconnects,
-late joins and clearing the previous result at the next countdown. Script
-includes also pass map-cycle loading and Windows/Linux native regressions.
+## Play in a managed match
 
-## Casual servers and managed matches
+### Open Match Control
 
-A normal server stays casual unless its operator selects a managed competitive
-profile. The `casual` profile preserves the familiar flexible server settings,
-team menu and legacy vote behaviour. A managed profile instead enables:
+During a match, press Escape and open the **Match** tab (in the classic menus,
+choose **Match Control**). It has six sections: **Status**, **Teams**,
+**Proposals**, **Rules**, **Series** and **Evidence**. Each shows only what
+your current role is allowed to see.
 
-- a server-authoritative ready gate with explicit blockers;
-- a validated rules snapshot which is frozen for the map;
-- connection-scoped players, captains, coaches, broadcasters and referees;
-- roster seats, substitutions, team locks and the Duel queue;
-- per-team or Duel-contestant timeout budgets and referee technical pauses;
-- typed proposals which cannot execute arbitrary console text;
-- optional best-of series, map vetoes and atomic cross-map recovery; and
-- bounded JSON evidence with automatic server-side MVD recording.
+- An action you cannot use stays visible and says why when you point at it or
+  move to it with the keyboard or a controller. Long explanations wrap and
+  scroll.
+- Actions that are hard to undo, such as forcing ready, committing rules,
+  removing or substituting a player, cancelling a series, forfeiting and
+  aborting, ask you to confirm.
+- If the match changed while you were deciding, the server refuses the outdated
+  request instead of acting on it.
 
-Managed matches reject the inherited text-command vote routes and mutable
-legacy server-admin settings, then use the typed proposal and Match Control
-services. A vote which was already open—or had passed and was waiting for its
-old delayed execution—is cancelled when managed authority becomes active.
-Casual matches retain those compatibility paths. Ban-list administration
-remains a separate rcon/server-security responsibility and never grants a
-match role. Selecting a competitive profile does not grant rcon, expose server
-files or require any replacement Quake 4 assets.
+The HUD and scoreboard also show a compact card with your role, the match
+phase, any pause, readiness, timeouts left, open votes, series progress and any
+item timers you are allowed to see.
 
-The supported competitive modes are:
+### Get ready
+
+Choose ready on **Status**, or use these console commands:
+
+| Command | What it does |
+| --- | --- |
+| `ready` | Marks you ready. |
+| `notready` | Withdraws your ready state. |
+| `readyup` | Switches between ready and not ready. |
+
+Readiness shows during warmup and countdown only. Spectators and bots never
+count towards a managed match's ready check. If you withdraw during the
+countdown and the match no longer has enough ready players, the countdown stops
+and starts again once it does.
+
+### Join a team or the Duel queue
+
+On **Teams** you can join a side, spectate, or join, defer or leave the Duel
+queue, and accept a roster invitation. Joining a team follows the server's
+**Auto Balance Teams** setting, as the team menu does: a join that would put
+that team two or more players ahead is refused with that reason, and you stay
+where you are.
+
+The Duel queue keeps arrival order. Joining it again does not move you
+forward, and deferring moves you behind the current challengers. When you are
+promoted to play, you still need to ready up. Disconnecting removes you from
+the queue.
+
+### Take a timeout
+
+In a managed Duel, choose **Request timeout** on **Status** to spend one of your
+timeouts (you appear as **Contestant A** or **Contestant B**), and **Resume** to
+end your own pause. In team modes, captains call timeouts.
+
+While the match is paused:
+
+- chat, the scoreboard, Match Control and looking around keep working;
+- movement, attacks, damage and the rest of the game stay frozen;
+- the match clock and the respawn, item, powerup and other game timers stop,
+  and pick up where they left off;
+- play resumes after a countdown.
+
+A timeout is charged once, when the pause starts, however many times it is
+requested. A referee's technical pause does not use either side's timeouts.
+
+### Vote on proposals
+
+Managed matches use **proposals** instead of the old console-command votes. A
+proposal is one match action from a fixed list, such as changing the rules or
+aborting, never free-form console text. Vote yes, no or abstain on
+**Proposals**, which shows who called the vote, the action, the time left, the
+vote count, how many yes votes are needed and your own vote.
+
+- Only active human players vote. Who can vote, and how many yes votes are
+  needed, are fixed when the proposal opens, so players joining or leaving
+  cannot change the threshold. Bots and ordinary spectators never vote.
+- One match-wide proposal and one proposal per team can be open at the same
+  time.
+- **Forfeit (Side)** is the one team proposal: any active player can open it for
+  their own team during live play. Only that team sees it, and a majority of
+  the team's connected players must vote yes. If it passes, the team forfeits
+  exactly as if its captain had chosen Forfeit. Referees and the other team
+  cannot open it, and Duel has no team proposal.
+- A proposal that fails, expires, is cancelled or no longer applies frees its
+  place for another, after the normal cooldown.
+- A passed proposal is checked again when it runs: the match phase, the
+  caller's eligibility and the target must still allow it. It runs once, and
+  fails if the caller has left.
+
+### Spectate
+
+While you spectate, **Status** has **Previous**, **Next** and **Free Camera**
+buttons, or use these console commands:
+
+| Command | What it does |
+| --- | --- |
+| `follow next` or `follownext` | Follow the next player you are allowed to watch. |
+| `follow prev` or `followprev` | Follow the previous player. |
+| `follow free` or `followfree` | Fly freely, if the server allows it. |
+| `follow <client-slot>` | Follow the player now in that numbered slot. |
+
+During a managed match's countdown and live play, ordinary spectators cannot
+follow players. Coaches can follow their own side, and broadcasters and
+referees have their own views. The server checks your permissions each time you
+switch, and never sends information your role may not see. A request to
+follow one player never ends up following someone else who has since taken
+their slot. Bots can be followed. Demo playback has its own camera controls.
+
+### See the result
+
+At the end of a match the summary shows the outcome separately from the
+scores: the winning player or team, a forfeit, a draw or an aborted match. A
+forfeit awards the opponent even if the forfeiting side was ahead. Score rows
+keep their original scores and order, and a draw or abort names no winner.
+
+The winner is fixed when the match ends: later renames, disconnects, reused
+slots and team changes cannot change it. **Status** shows the last result
+through the review and the following warmup, until the next countdown starts.
+It shows even when the server saves no match report.
+
+## Roles
+
+Roles belong to your current connection in the current match. Reconnecting, or
+reusing a name, slot or IP address, never brings a role back. No role gives
+remote console (rcon), ban-list or file access.
+
+| Role | Who | What they can do |
+| --- | --- | --- |
+| Player | Anyone playing | Join a side or the Duel queue, ready up, take Duel timeouts, vote, and forfeit for their own side. |
+| Captain | Assigned to the first roster seat of a team | Everything a player can, plus manage their team's roster, readiness and timeouts. |
+| Coach | An observer assigned to one team | Watch their team, including its health and armour, during live play. |
+| Broadcaster | A neutral observer granted by the host | Watch both teams, with item timers. Cannot change the match. |
+| Referee | A neutral observer with the referee password | Run the match: force ready, pause, change rules, manage rosters, run series, record forfeits and aborts. |
+| Server operator | Whoever runs the server | Choose the profile, set the referee password and map pool, and use a few server-only commands. |
+
+### Captain
+
+For a team match, the server operator first sets **Roster Size per Team** in
+**Rules**. The first seat on each side is its captain seat. To appoint a
+captain, select the player on **Teams**, choose **Captain** and use **Assign
+role**. Role changes have a short cooldown; wait for the action to become
+available again.
+
+A captain can also:
+
+- set team readiness and lock or unlock their side;
+- invite, remove and assign roles to roster members, and swap in substitutes;
+- keep substitutes on a bench without counting them as active players;
+- call their side's timeout and agree to resume; and
+- make their side's map-veto and starting-side choices in a series.
+
+Invitations need the captain's authority to still hold when accepted. A captain
+who disconnects, is demoted or is benched loses any invitations they sent.
+Accept invitations and assign roles during warmup; substitutions also work
+during the countdown. Captains cannot invite an ordinary spectator to watch
+live play; give that person a coach or broadcaster role instead.
+
+### Coach
+
+A coach is assigned to one team by a captain or referee. Coaches do not play,
+cannot ready up and cannot change rosters, pauses, rules or vetoes. A coach
+cannot also be a player, broadcaster or referee.
+
+A coach or substitute who is not playing can use **Leave roster** on **Teams**
+to give up their own seat. It cannot remove anyone else.
+
+### Broadcaster
+
+A broadcaster is a neutral observer outside both rosters. They can watch both
+teams' players and health, and in managed matches see timers for the major
+items on the map. Those timers stop during pauses, and only broadcasters and
+referees see them.
+
+On a listen server, the host selects a spectator on **Teams** and chooses
+**Grant broadcaster** or **Revoke broadcaster**. On a dedicated server, the
+operator uses:
+
+```text
+matchBroadcaster <current-client-slot> <on|off>
+```
+
+For example, `matchBroadcaster 5 on` makes the person in slot 5 a broadcaster.
+It refuses an active player, bot, roster member, team member, referee, coach or
+an empty slot.
+
+openQ4 does not yet have working Q4TV repeaters, delayed broadcasts or live
+multi-view feeds. To keep a watchable copy of a match, use the server's
+multi-view demo recording.
+
+### Referee
+
+A neutral spectator outside both rosters enters the referee password on
+**Status** and chooses **Sign in**. The password is never sent as plain text,
+shown to other players or written to reports, and repeated wrong guesses are
+slowed down.
+
+A referee can, when the match phase allows:
+
+- force the ready check, which is recorded in the match report;
+- call a technical pause and start the resume countdown;
+- stage, check, commit or discard rule changes;
+- make exceptional roster and role changes;
+- moderate proposals;
+- set up, start, advance or cancel a series; and
+- record an abort or a forfeit.
+
+Choose **Sign out** when you are done. Disconnecting or a new match also signs
+you out.
+
+## Game rules worth knowing
+
+These apply to casual games unless marked as managed.
+
+### Warmup and starting
+
+- With warmup on, `si_minPlayers` counts active humans and bots together, and
+  at least one human must be playing.
+- Only humans count towards the ready percentage (`si_warmupReadyPercentage`).
+  Duel needs both seated players ready; waiting spectators do not count.
+- Team games need players on both sides. With `si_teamForcePresent 1` both
+  teams need `si_teamSizeMin` players; with `0`, one side must reach it. Red
+  Rover handles its own round rosters.
+- `si_useReady 0` starts as soon as there are enough players, and `si_warmup 0`
+  skips warmup for practice. A `si_warmupReadyPercentage` of `0` also turns off
+  the ready percentage outside Duel; Duel still needs both players ready when
+  ready-up is on.
+
+### Ending a match
+
+- A tie at the frag or capture limit goes to sudden death. A tie when the clock
+  runs out gets overtime. If both teams pass the score limit, the leader wins.
+- Losing all the opponents ends live play, even with no time limit. If the last
+  human leaves, the match is aborted and any bots wait for players.
+- Tied scores share a place: `10, 10, 9` is first, first, third.
+
+### Duel
+
+Duel is winner-stays. Only the two seated players are ranked; the queue stays
+in the spectator list. Both finalists stay on the final scoreboard until the
+review ends, then the loser goes to the back of the queue and the next
+challenger takes the seat.
+
+In a managed Duel, a forfeit retires the player who forfeited even if they were
+ahead, and a tie sends both finalists back to the queue. Players promoted from
+the queue must ready up. During a best-of series the same two players stay
+seated between maps, and aborting a match keeps both of them and the queue.
+
+### Voting on casual servers
+
+Turn on option voting with `si_allowVoting 1`. Only active human players call
+and cast votes; bots do not, and they do not raise the number needed to pass.
+Who can vote is fixed until the vote ends, even if players disconnect.
+
+### Round modes
+
+- Clan Arena, Freeze Tag and Red Rover reset the map between rounds while the
+  match carries on.
+- **Freeze Tag:** frozen bodies stay even after heavy damage. Stand within
+  `si_freezeThawRadius` of a frozen teammate, with a clear view of them, for
+  `si_freezeThawTime` seconds to thaw them and score a point. Stepping away
+  undoes some of the progress. `si_freezeThawThroughSurface 1` lets you thaw
+  through walls.
+- **Red Rover (managed):** a defeated player moves to the other side for the
+  rest of the round without counting as a team change. Roster seats and captain
+  roles stay, and the next round puts everyone back on their home side. Team
+  text and voice chat follow the side a player is on now.
+
+### Objective modes
+
+- **DeadZone:** control time counts only during live play. Dead or spectating
+  players, and players without a required token, cannot hold or contest the
+  zone. Any eligible opponent in the zone contests it, whoever entered first.
+- **One Flag** modes can use the original CTF maps. On a map with both team
+  bases but no neutral flag, openQ4 places the neutral flag at the spare pickup
+  spot nearest to both bases. A neutral flag placed by the mapper, or a map's
+  own One Flag layout, always comes first. Check flag placement when you choose
+  a competition map pool.
+
+## Run a managed server
+
+### Choose a profile
+
+Set up a server as in the [server setup guide](server-setup.md), then choose a
+profile with `g_matchProfile` before the match starts. This example uses only
+stock Quake 4 content:
+
+```text
+openQ4-ded_x64 +set si_name "Managed Duel" +set si_map mp/q4dm1 +set si_gameType Duel +set g_matchProfile competitive_duel +spawnServer
+```
+
+| Profile | Modes | Main rules |
+| --- | --- | --- |
+| `casual` | Every available mode | The default. Flexible server settings, the team menu and the old votes; no managed-match restrictions |
+| `competitive_dm` | DM | Every human must ready up; no frag limit |
+| `competitive_tourney` | Tourney | Every human must ready up for the tournament arena |
+| `competitive_duel` | Duel | Two active humans, both ready; two 60-second timeouts each |
+| `competitive_tdm` | Team DM | Every human ready; friendly fire, 15 minutes, 50 frags, two 60-second timeouts per side |
+| `competitive_ctf` | CTF family | Every human ready; friendly fire, 20 minutes, five captures, two 60-second timeouts per side |
+| `competitive_deadzone` | DeadZone | Every human ready; friendly fire, 15 minutes and 120 seconds of control |
+| `competitive_round` | Clan Arena, Freeze Tag and Red Rover | Every human ready; eight rounds, three-minute rounds, sudden death |
+
+A profile that does not suit the game type is replaced by that game type's
+recommended profile. The server publishes the committed profile in the
+read-only `si_matchRules` server-info value; its code identifies the rules and
+is not a password or proof of who runs the server.
+
+Managed matches support:
 
 - DM and Tourney;
 - Duel;
@@ -67,591 +334,166 @@ The supported competitive modes are:
 - DeadZone; and
 - Clan Arena, Freeze Tag and Red Rover.
 
-Overload, Harvester, Domination and Attack & Defend remain reserved wire values.
-They do not have the complete authoritative game-state and scoring path needed
-for managed competition, so they stay hidden from hosting, voting, browser
-filters and map compatibility checks.
+Overload, Harvester, Domination and Attack & Defend are not complete, so they
+are hidden from hosting, voting, the browser filters and map checks.
 
-## Casual warmup and match endings
+The **Rules** section separates **Minimum Active Players** (bots included) from
+**Minimum Active Humans**.
 
-With warmup enabled, `si_minPlayers` counts active humans and bots together;
-at least one active human is required. Bots do not vote in the casual ready
-percentage. Duel uses its two seated contenders and requires every human
-contender to be ready; waiting spectators do not affect the gate. Practice
-with warmup disabled retains the one-human start policy.
+### What changes in a managed match
 
-Casual team games need opponents on both sides. `si_teamForcePresent 1`
-requires both teams to meet `si_teamSizeMin`; with it disabled, one side must
-meet that larger minimum. Red Rover keeps its own round roster handling.
+- The old console-command votes are refused; any vote already open, or passed
+  and waiting to run, is cancelled when the managed match takes over. Use
+  proposals instead.
+- The old ways to change server settings, shuffle or kick players and force
+  team changes are blocked. Change rules, rosters and players through Match
+  Control.
+- Banning and unbanning stay with the normal server administration (rcon); see
+  [server security](server-security.md). A profile never grants rcon, exposes
+  server files or needs replacement Quake 4 content.
 
-Players and captains may withdraw readiness during countdown. If the ready
-requirement no longer holds, the server cancels that countdown and starts a
-fresh one once the requirements are met again.
+### Set a referee password
 
-Ties at a frag or capture limit enter sudden death after the finishing delay.
-Timed overtime is granted when the match clock expires with a tie. The
-current score leader wins when both teams have passed the score limit.
-Losing the required opponents ends live play even with no time limit;
-losing the last active human aborts the match while any remaining bots wait
-for players. Completed and cancelled matches clear their pending timers.
+If you want remote referees, set `g_refPassword` in a protected server
+configuration or at the server's own console before the match starts. The game
+keeps only a check value made from it and clears the setting when the match
+begins. It is not the rcon password; do not reuse your administration password.
 
-Set `si_useReady 0` to start once the population requirement is met, or
-`si_warmup 0` for warmup-free practice. A zero `si_warmupReadyPercentage`
-also disables the percentage gate outside Duel; Duel still requires both
-contenders when ready-up is enabled.
+### Set the map pool for a series
 
-Casual option voting is enabled with `si_allowVoting 1`. Only active human
-players enter a vote's electorate; AI bots cannot call or cast votes and do
-not raise the majority needed to pass one. The electorate stays fixed until
-that vote ends, including when players disconnect.
-
-Clan Arena, Freeze Tag and Red Rover reset the world between rounds while
-remote clients retain the ongoing match state. Use matching updated clients
-and servers for the new round-reset message.
-
-Managed Red Rover converts a defeated player to the opposite gameplay side
-without opening ordinary live team changes. Declared roster seats and captain
-roles remain intact, and the next round restores the roster's home sides.
-Team text and voice routing follow the player's current gameplay side.
-
-In Freeze Tag, frozen bodies remain available after overkills. Stand within
-`si_freezeThawRadius` with a clear view of a teammate for
-`si_freezeThawTime` seconds to rescue them and earn a point. Stepping away
-reduces the accumulated rescue progress. `si_freezeThawThroughSurface 1`
-explicitly permits rescues through geometry.
-
-DeadZone awards control time only during live play. Dead or spectating players
-and players without a required token cannot control or contest the zone;
-opponents who remain eligible contest it regardless of entry order.
-
-One Flag modes can use the original CTF maps. When a map has both team bases
-but no neutral flag, openQ4 places the stock neutral flag at the unteamed
-pickup location nearest both bases. Map-authored neutral flags take priority,
-and explicit One Flag entity filters override the inherited CTF layout.
-For organized competition, review the chosen map's objective placement as
-part of selecting the map pool. Update both clients and servers together;
-older development CTF demos require their recording build.
-
-Tied scores share their place and occupy every tied seat: `10, 10, 9` means
-first, first, third. Duel ranks only its two contenders; waiting players stay
-in the spectator list. Both finalists remain on the final scoreboard until
-review ends and the next challenger takes the loser's seat.
-
-Managed Duel uses the same winner-stays flow. The waiting queue preserves
-arrival order: joining it again does not move a player forward, and deferring
-moves them behind the current challengers. After review, the loser joins the
-back of the queue and the next challenger takes the vacant seat. A forfeit
-retires the forfeiting player even if they were ahead on score. A tied result
-returns both finalists to the queue. Promoted players must ready up for the
-next match. An unfinished best-of series keeps its two contestants between
-maps. Aborting a match preserves both contestants and the waiting queue.
-
-Managed summaries show the committed outcome separately from the score table:
-the winning player or team, a forfeit, a draw, or an aborted match. A forfeit
-awards the validated opponent even when the forfeiting contestant led on score.
-Summary rows retain their original scores and score order; draws and aborts
-do not label either side a winner.
-
-The result freezes the winning participant's identity and display name, or the
-winning team, when the match ends. Later renames, disconnects, slot reuse and
-team changes cannot rewrite it. It remains visible through review and the
-following warmup, and clears when the next countdown starts or a new session
-begins. **Match Control > Status** shows it as **Last Result**, including during
-the following warmup. This public result is available even when optional
-match-evidence recording is disabled.
-
-The rules snapshot now distinguishes **Minimum Active Players** (including
-bots) from **Minimum Active Humans**. Use matching updated clients and server
-binaries, and finish any active managed series before upgrading: rules
-identities from the previous snapshot schema do not match the new schema.
-Duel contender membership also uses an updated network layout. Structured
-match views now use schema 4 to carry the committed result; clients and servers
-must use the same updated build. Replay older development multiplayer demos
-with the build that recorded them.
-
-## Start a managed server
-
-Follow the regular [server setup guide](server-setup.md), then select an
-applicable profile before the session starts. This example uses stock Quake 4
-assets:
-
-```text
-openQ4-ded_x64 +set si_name "Managed Duel" +set si_map mp/q4dm1 +set si_gameType Duel +set g_matchProfile competitive_duel +spawnServer
-```
-
-The built-in profile keys are:
-
-| Profile | Intended modes | Main policy |
-| --- | --- | --- |
-| `casual` | Every implemented public mode | Flexible server settings; managed-match restrictions are off |
-| `competitive_dm` | DM | Unanimous human readiness, no frag limit |
-| `competitive_tourney` | Tourney | Unanimous human readiness for the tournament arena |
-| `competitive_duel` | Duel | Two active humans, unanimous readiness, two 60-second timeouts per contestant |
-| `competitive_tdm` | Team DM | Unanimous human readiness, friendly fire, 15 minutes, 50 frags, two 60-second timeouts per side |
-| `competitive_ctf` | CTF family | Unanimous human readiness, friendly fire, 20 minutes, five captures, two 60-second timeouts per side |
-| `competitive_deadzone` | DeadZone | Unanimous human readiness, friendly fire, 15 minutes and 120 seconds of control |
-| `competitive_round` | Clan Arena, Freeze Tag and Red Rover | Unanimous human readiness, eight rounds, three-minute round limit, sudden death |
-
-Profiles are mode checked. An inapplicable profile is rejected in favour of the
-mode's recommended profile. The read-only `si_matchRules` server-info value
-publishes the committed profile, schema and digest for diagnostics; the digest
-is not a password or proof of server identity.
-
-Initial auto-join waits for the managed warmup session to become available.
-An authorized force-ready action then starts the normal countdown and enters
-gameplay when that countdown expires.
-
-For a series, `si_mapCycle` may contain a semicolon-delimited pool such as:
+List the maps in `si_mapCycle`, separated by semicolons:
 
 ```text
 set si_mapCycle "mp/q4dm1;mp/q4dm3;mp/q4dm5;mp/q4dm7;mp/q4dm9"
 ```
 
-Every entry is normalized, deduplicated, checked as an installed map and
-validated for the current mode. If the value is empty, the server builds a
-bounded deterministic pool from compatible installed maps.
+The server removes duplicates and checks that each map is installed and suits
+the game type. If the list is empty, it builds a pool from the installed maps
+that suit the game type. Map-cycle scripts in the game folder can include other
+scripts by relative path on every platform.
 
-Map-cycle scripts placed at the game-directory root now resolve relative
-includes correctly on Windows and POSIX systems. No replacement scripts or
-assets are required for this path-handling fix.
+### Server operator commands
 
-If remote referees are needed, set `g_refPassword` through a protected server
-configuration or trusted local server console before the match session begins.
-The game converts it into a verifier and clears the cvar at session start. It is
-not rcon and should not be reused as an administration password.
+On a listen server, the host gets operator actions in Match Control. A
+dedicated server operator uses these console commands, which follow the same
+checks as Match Control:
 
-## Use Match Control
+| Command | What it does |
+| --- | --- |
+| `forceReady` | Forces the match through the ready check and starts the countdown. |
+| `matchBroadcaster <slot> <on\|off>` | Grants or removes the broadcaster role. |
+| `matchSeriesBind <a\|b> <slot>` | After a Duel series is restored, binds each current player to their series seat. |
 
-During multiplayer, open the in-game menu and choose **Match Control**. Its
-**Status**, **Teams**, **Proposals**, **Rules**, **Series** and **Evidence** tabs
-are projections of the latest view authorized for your current connection.
+## Series and map vetoes
 
-Unavailable actions remain visible and show the server's localized reason.
-Mouse hover and keyboard/controller focus both reveal that explanation.
-Joining a team on the **Teams** tab follows the server's **Auto Balance Teams**
-setting, as the team menu does. A join that would put that team two or more
-players ahead of the other is refused with that reason, and you stay where
-you are.
-Long explanations and operation results wrap and can be scrolled. Readiness
-is shown during warmup and countdown; live play and review do not label
-players unready, and observers are not asked to ready up.
-Selections refer to bounded structured rows, not text parsed from a player name
-or translated label. Destructive actions such as force-ready, committing rules,
-removing or substituting a roster member, cancelling a series, forfeiting and
-aborting require confirmation. Match-changing requests carry the accepted
-session and control revision, and the server rejects stale state before
-changing anything.
+Match Control runs best-of-one, best-of-three and best-of-five series for Duel
+and team modes. A referee sets the series up on **Series**; the server checks
+the profile, the two contestants, the game type, the map pool and the veto
+order together.
 
-The **Status** tab also shows the committed **Last Result** and, while you are
-spectating, a camera row with **Previous**, **Next** and **Free Camera** buttons.
-These use the same live camera requests as the console commands below; the
-server checks your current permissions when each request arrives.
+- Each ban, pick, decider and starting-side choice is taken in turn. In team
+  modes the turn belongs to a team's series side, as Match Control shows it,
+  even when the teams have swapped Marine and Strogg for a map.
+- When the veto is done, the first map loads automatically. After each map's
+  review, **Advance map** loads the next one, or ends the series once a
+  contestant has enough wins.
+- Only a decided result or a forfeit scores a series point; an abort does not.
+- If a chosen map is missing before it loads, the attempt is recorded and the
+  series waits to retry. If the map loads but fails, for example because its
+  file is damaged, the next match on any other map records it as an aborted
+  attempt with no score; Match Control shows it as a review, and **Advance map**
+  tries the same map again once it is fixed. The same happens if the server
+  restarts mid-map and comes back on a different map. Each aborted attempt
+  counts towards the series attempt limit.
 
-The compatibility commands below still submit the managed ready operation:
+### Recover a series after a restart
 
-```text
-ready
-notready
-readyup
-```
-
-They do not form a second ready system. A spectator, bot or disconnected player
-cannot satisfy a managed human ready gate, and a roster or rules change can send
-an invalid countdown safely back to warmup.
-
-## Role workflows
-
-Roles are capability bundles, not an administration hierarchy. All role and
-ready state belongs to the current connection and session. A reused client slot,
-display name, IP address or userinfo value never recovers authority.
-
-### Player
-
-Use **Status** and **Teams** to:
-
-- join a legal side, spectate, or join/defer/leave the Duel queue;
-- accept a roster invitation and see playing, waiting, bench and ready state;
-- set ready or not ready;
-- request and resume your own contestant timeout in managed Duel;
-- create an eligible proposal and vote yes, no or abstain; and
-- forfeit only the contestant or side represented by the current connection.
-
-The Duel queue is FIFO and keyed by the session participant, not a name. A
-promoted contestant must still ready. Disconnecting removes connection-scoped
-queue, ballot and ready authority.
-
-Once admitted to a managed Duel, use **Request timeout** in **Status** to spend
-your contestant's budget, shown as **Contestant A** or **Contestant B**. Use
-**Resume** to end your own pause; gameplay restarts after the resume countdown.
-This does not grant captain or team-management permissions.
-
-### Captain
-
-For a managed team match, the operator first sets **Roster Size Per Team** in
-**Rules**. The first declared seat on each side is its captain seat. Select the
-participant in **Teams**, choose **Captain**, and use **Assign role**. Consecutive
-administrative changes have a short cooldown; wait for the action to become
-available again before the next change.
-
-A captain receives the normal player actions plus the permitted side-scoped
-controls:
-
-- set team readiness and lock or unlock that side;
-- invite, remove, assign roles and atomically substitute roster members;
-- keep substitutes on a durable bench without counting them as active players;
-- request the side's tactical timeout and consent to resume; and
-- make the current contestant's map-veto or starting-side choice.
-
-Captain authority is limited to the current side and session. It is never rcon,
-ban-list or filesystem access.
-
-Invitations require the issuer's current authority when they are accepted.
-Disconnecting, demoting or benching a captain revokes that captain's outstanding
-invitations. Accept invitations and assign roster roles during warmup;
-substitutions also remain available during countdown. Review and next-game
-screens explain when these actions are unavailable. Self-withdrawal for an
-inactive coach or substitute remains available independently.
-
-Captain-controlled invitations for an ordinary neutral spectator to bypass a
-managed live POV lock are deliberately disabled in this release. They fail
-closed rather than reusing a roster invitation as a spectator credential. Give
-an observer an explicit coach or broadcaster role through an authorized path
-instead.
-
-### Coach
-
-An authorized roster/role action assigns a coach to one side. A coach is an
-inactive observer, can receive that side's permitted vitals and can follow only
-that side during protected live play. The role does not imply readiness, roster,
-pause, rules or veto authority, and it cannot be combined with an active player,
-broadcaster or referee role.
-
-An inactive coach or substitute can use **Leave roster** on the **Teams** page
-to withdraw their own seat. This narrowly scoped action never grants general
-team-changing or captain authority and cannot remove another participant.
-
-### Broadcaster
-
-A broadcaster is an inactive, neutral, unrostered human observer. The role may
-receive both sides' permitted live vitals and follow targets but cannot mutate
-the match. In managed matches, explicitly granted broadcasters and referees may
-also receive authoritative timers for supported placed, respawning major items.
-Those timers use the pause-safe match clock and are never projected to players,
-coaches or ordinary spectators. The UI renders localized item names (or a
-generic localized fallback), never an internal item token.
-
-openQ4 does not currently provide a functioning Q4TV/repeater transport or a
-live repeater recipient. The match-view policy contains a public-only,
-no-item-timing result for a possible future repeater adapter; that fail-closed
-boundary is not a shipped live capability and never inherits broadcaster or
-referee authority. Delayed broadcast and live multi-POV composition remain
-deferred. The supported recording path is the server-owned MVD described below.
-
-On a listen server, the local operator can select an eligible participant on
-**Teams** and choose **Grant broadcaster** or **Revoke broadcaster**. A dedicated
-server operator can use the equivalent trusted-local command:
-
-```text
-matchBroadcaster <current-client-slot> <on|off>
-```
-
-For example, `matchBroadcaster 5 on` resolves slot 5 against its current
-connection binding and grants only the broadcaster role. The command rejects an
-active player, bot, roster member, sided participant, referee, coach, stale slot
-or any other ambiguous target.
-
-### Referee
-
-An eligible inactive, neutral, unrostered human enters the configured credential
-on **Status** and chooses **Sign in**. Authentication uses a fresh challenge and
-proof, rate limiting and constant-time verification; the reusable password is
-not sent as a console command, replicated in a match view or written to evidence.
-The UI clears its local credential buffer after success or failure.
-
-The referee can then use the actions authorized for the current phase to:
-
-- force the readiness gate with an audited override;
-- apply a technical pause and resume countdown;
-- stage, validate, commit or discard rules at a legal boundary;
-- manage exceptional roster and role changes;
-- moderate proposals;
-- stage, start, operate, advance or cancel a series; and
-- record an abort or forfeit.
-
-Choose **Sign out** when finished. Referee access is connection scoped, is
-revoked on disconnect or session change, and never grants console, rcon,
-ban-list, process or filesystem authority.
-
-### Server operator
-
-The server operator chooses the profile, referee credential and series map
-pool, monitors the console and evidence outputs, and uses only trusted-local
-adapters for operations which cannot safely belong to a remote role. A local
-listen host receives operator-only Match Control availability. Dedicated
-servers also provide `forceReady`, `matchBroadcaster` and the Duel recovery
-command described below; these adapters build the same typed requests and use
-the same schema, phase, capability, target and revision checks as Match Control.
-The inherited server-settings, shuffle, kick and force-team administration
-paths fail closed while a managed session is active. Configure managed rules,
-rosters and participant removal through Match Control instead. Ordinary
-ban/unban remains outside match authority and requires the normal trusted
-server administration channel.
-
-## Pauses and timeouts
-
-A tactical timeout belongs to one side and consumes one unit of that side's
-budget when the pause commits. Duplicate or late requests cannot consume it
-twice. A referee technical pause is a separate exceptional action and does not
-charge either team.
-
-While paused:
-
-- network traffic, chat, view movement, scoreboards and Match Control continue;
-- player movement, attacks, damage and gameplay simulation remain frozen; and
-- resume uses a server-owned countdown before match time advances again.
-
-The engine/network clock remains monotonic. Regulation, overtime, round,
-respawn, projectile, mover, item, powerup, weapon and gameplay-event deadlines
-are frozen or rebased exactly once through the centralized pause adapter.
-Automated gameplay checks cover repeated world pauses and Clan Arena/Tourney
-countdown pauses; remaining mode and overlapping-request cases are tracked in
-the competitive reference audit.
-
-## Proposals
-
-Proposals contain one validated match operation and typed arguments, never a
-console command string. The human electorate and required yes count are frozen
-when a proposal opens, so a join or disconnect cannot move the threshold.
-Bots and ordinary spectators do not silently decide competitive settings.
-
-One global proposal and one proposal for each side can coexist. Match Control
-shows the caller, action, remaining time, vote counts, threshold, eligibility
-and recorded ballot. Every creation template but one is global.
-**Forfeit (Side)** is a team forfeit vote: any active player can open it for
-their own team during live play. Only that team sees and votes on it, and a
-majority of the team's connected players must vote yes. If it passes, the team
-forfeits exactly as if its captain had chosen Forfeit. Referees and the other
-team cannot open one, and Duel has no team ballot. The side selector otherwise
-only picks which open ballot to vote on or cancel.
-
-When a proposal fails, expires, is canceled or becomes invalid after a phase
-change, its slot is released for another proposal. The normal cooldown still
-applies, and an old ballot cannot affect the replacement proposal.
-
-A passed proposal is checked again when it runs, against the match as it is
-then: the phase, the caller's eligibility and the target must all still allow
-the action. Players readying up, joining or leaving while the vote was open do
-not void it. A passed proposal runs once, and it still fails if its caller has
-left.
-
-Legacy vote commands remain available on casual servers. A managed session
-rejects those old routes so they cannot bypass the proposal validator.
-
-## Series, veto and cross-map recovery
-
-Match Control supports best-of-one, best-of-three and best-of-five series for
-Duel and team modes. The server validates the profile, two contestants, current
-mode, installed map pool and deterministic veto pattern as one transaction.
-Each ban, pick, decider or starting-side choice is turn- and revision-checked.
-The turn belongs to a team's series side, the same side Match Control shows,
-even when the gameplay sides have been swapped for a map.
-
-Completing the veto schedules the first selected map automatically. After each
-map's review, **Advance map** loads the next validated selection or completes
-the series when a contestant has enough wins. The server records the chosen
-side mapping, starts the map through the normal `nextMap` path, and commits only an authoritative decided or
-forfeit result to the series score. An abort does not award a series point. If a
-selected map's metadata or actual map file is unavailable before handoff, the
-attempt is recorded and the series remains ready to retry. If the map passes
-that check but then fails to load, for example because its file is corrupt, the
-next session started on any other map records that selection as an aborted
-attempt with no score. Match Control then shows it as a review, and
-**Advance map** loads the same map again once it has been repaired. The same
-applies when a server restarts from a checkpoint whose map had been selected
-but not completed, if it comes back on a different map. Each aborted attempt
-counts toward the series attempt limit.
-
-Every active series mutation is captured in one schema-versioned bounded
-checkpoint under the active save path:
+The server saves every series change to a recovery file in your save path:
 
 ```text
 baseoq4/match-series/series-<series-id>.oq4series
 ```
 
-Current schema-4 checkpoints store the series core and its mutable report draft
-together. One checksummed promotion is therefore the only durable commit point: a map cannot
-advance without the corresponding report row, and a report row cannot get
-ahead of the series score. Paired schema-3 checkpoints remain supported.
-Schema-2 recovery files can still be decoded for diagnosis, but are not resumed
-because they have no paired report state.
+The series score and its report are saved together, so one can never get ahead
+of the other. While a series runs, the server keeps its identity in
+`g_matchSeriesRecoveryId` and clears it when the series ends or is cancelled.
+On the next map or server start, openQ4 checks the file against the rules, game
+type, current map and map pool before restoring the series.
 
-The write uses a same-directory pending file and atomic promotion. The archived
-server cvar `g_matchSeriesRecoveryId` is updated automatically while a series is
-active and cleared when it completes or is cancelled. On the next map or server
-start, openQ4 validates that identity, record digest, rules digest, mode, state,
-current map and every installed pool entry before transactionally restoring
-both aggregates. The selected-map checkpoint is distinct from the newly bound
-map session, so a lobby or previous-map journal cannot be mistaken for the next
-map's result. Do not edit the record or cvar during an ordinary series. If an
-operator intentionally abandons an unrecoverable series, set
-`g_matchSeriesRecoveryId 0` and retain the old file for diagnosis.
+- Do not edit the file or the setting during a series. To abandon a series that
+  cannot be recovered, set `g_matchSeriesRecoveryId 0` and keep the old file for
+  investigation.
+- If the server stopped after a completed map, Match Control shows that map's
+  review in warmup. Use **Advance map** to continue.
+- Team series reconnect to the current teams automatically.
+- **Duel** recovery stores no names, addresses or slots, so in warmup the
+  operator binds both current players to their seats, using the server's
+  current player list:
 
-If the restored checkpoint was saved after a completed map, Match Control
-shows the saved review in warmup. Use **Advance map** to continue to the next
-selection or publish a completed series. The saved score and reports remain
-attached to that series.
+  ```text
+  matchSeriesBind a 3
+  matchSeriesBind b 7
+  ```
 
-Team series authority follows the recovered competition-side to current
-Marine/Strogg-side mapping. Duel has no persistent gameplay side and openQ4 does
-not store a name, address, client slot or other counterfeit identity in the
-recovery file. After a Duel recovery, a trusted server operator must bind both
-current active human connections during warmup:
+  Each binding lasts only for that connection. The command works only in Duel
+  warmup with a restored series, for a current active human player.
 
-```text
-matchSeriesBind a <current-client-slot>
-matchSeriesBind b <current-client-slot>
-```
+## Match reports and demos
 
-For example:
+### Match reports
 
-```text
-matchSeriesBind a 3
-matchSeriesBind b 7
-```
+A managed match can save a report for each map. `g_matchEvidence` chooses how
+much:
 
-Use the server's current client listing, not slots copied from an earlier map or
-connection. Each binding dies with that connection and is never persisted. The
-command fails unless the server is in Duel warmup with a live recovered series
-and the target is a current active human contestant.
+- `0`: no report file (a series still keeps the result in memory for its own
+  report);
+- `1`: the final report for each map;
+- `2` (the default): the final report plus a full log of the match's events.
 
-## Spectator privacy
-
-The server builds a separate bounded view for every recipient and authorizes
-data before serialization. Match Control cannot reveal information merely by
-hiding a row after the client received it.
-
-During managed countdown and live play, neutral ordinary spectators are locked
-out of both live POV domains. Coaches can follow their own side; explicitly
-granted broadcasters and referees use their role-specific paths. Every actual
-camera cycle rechecks the current session, connection generation, role, target
-and lock state on the server. Stale rows are discovery data, not reusable
-permission tokens.
-
-Human spectators can use the **Status** camera row or these console commands
-for live camera navigation:
-
-| Command | Action |
-| --- | --- |
-| `follow next` or `follownext` | Follow the next eligible player. |
-| `follow prev` or `followprev` | Follow the previous eligible player. |
-| `follow free` or `followfree` | Request free flight under the current camera policy. |
-| `follow <client-slot>` | Request the player currently occupying that numeric client slot. |
-
-Every request obeys the server's current spectator permissions and locks.
-Direct requests also validate the target's current spawn identity, so a stale
-request cannot follow a replacement player who reused the slot. Existing
-eligible bot targets remain available; bots cannot issue these observer
-commands. Demo playback keeps its separate camera controls.
-
-The live policy exposes authorized team vitals and follow targets. For managed
-matches, it also tracks supported placed, respawning major items by stable
-map-instance and source identity. Pickup and respawn deadlines use match time,
-so a pause neither consumes a timer nor causes a jump on resume. Item timers are
-projected only to explicit broadcaster and referee recipients; players,
-coaches, ordinary spectators and the fail-closed future repeater policy receive
-none. Presentation maps supported semantic identifiers to localized names and
-never renders a raw internal token.
-
-Captain spectator invitations remain disabled, as described above. The engine
-has no reachable Q4TV/repeater transport in this release. Its pure public-only
-projection rule is reserved for a future adapter, not advertised as live
-repeater support. Delayed broadcast and live multi-POV composition are separate
-future work; an unrestricted spectator view is never described as a delay
-service.
-
-## Match evidence and MVDs
-
-A managed match keeps a bounded evidence journal and final statistics.
-`g_matchEvidence` controls the optional per-map artifact and defaults to `2`:
-
-- `0` keeps no per-map JSON artifact (an active series still keeps the minimum
-  in-memory result journal needed for its transactional report);
-- `1` writes the final per-map JSON; and
-- `2` writes the full bounded journal and final per-map JSON.
-
-At finalization the server stops an automatically owned MVD, records any output
-failure, then attempts to atomically promote the per-map JSON beneath the
-active save path:
+Reports are saved in your save path:
 
 ```text
 baseoq4/match-results/session-<session>_series-<series>_<map>.json
 ```
 
-The schema-versioned report includes server-authored build, map, mode, rules
-digest, series link, bounded lifecycle/pause/roster/role/proposal events, final
-participant and team statistics, map result, journal drop counters and the safe
-qpath of a linked MVD. It excludes IP addresses, passwords, authentication
-material and transient series connection bindings. Output failure never changes
-the winner.
+A report includes the build, map, game type, rules, series link, match events
+(phases, pauses, roster and role changes, proposals), final player and team
+statistics, the result and the path of the match's demo. It never includes IP
+addresses, passwords or login details. A report that fails to save never
+changes the winner.
 
-For a series, each authoritative map result, score, rules identity, session and
-evidence/MVD artifact status is appended to the paired report draft before the
-series and report are checkpointed together. On completion or cancellation,
-openQ4 first atomically stores the immutable schema-1 series report and only
-then publishes the terminal recovery checkpoint:
+When a series ends or is cancelled, openQ4 also saves a series report with the
+contestants, every map attempt and its result, the combined statistics and
+which reports and demos are available:
 
 ```text
 baseoq4/match-results/series-<series-id>.json
 ```
 
-That report contains the stable series/profile/rules identity, report-scoped
-contestants, ordered map attempts and outcomes, available aggregate statistics,
-artifact availability/failure reasons, drop counters and final authorizer. It
-does not use a client slot, address or display name as reconnect authority.
+### Automatic demos
 
-A managed profile starts server-side MVD recording after the rules freeze for
-countdown and stops it after result metadata is committed to the journal. If an
-operator already started a server MVD, the match does not take ownership or stop
-it. A recording still open at map completion has no playable link in that map's
-sealed JSON. Stopping it before the series is finalized lets the series report
-link the completed file; if it remains open when the series is finalized, that
-immutable report retains its pending status even after a later manual stop.
-Use Match Control's **Evidence** tab to distinguish
-initialized, recording, finalized and persisted state. A displayed qpath is not
-by itself proof that promotion succeeded.
+A managed match starts recording a [multi-view demo](multiview-demos.md) when
+the countdown begins and stops it once the result is saved. If an operator
+already started a recording, the match leaves it alone.
 
-Completed `.mvd` files appear in the **Demos** library (Multiplayer > Demos on
-the main menu) and can be
-validated and played with the controls in
-[Demo Playback and Multi-View Demo Architecture](../dev/multiview-demos.md#current-operator-interface).
-A `.mvd.part` is a recoverable incomplete stream, not a completed match artifact.
-If either the JSON or MVD fails, preserve the log, pending file and other output
-for diagnosis rather than renaming a partial file as evidence.
+- A recording still open when a map ends has no playable link in that map's
+  report. Stop it before the series ends and the series report links the
+  finished file; if it is still open when the series ends, the series report
+  stays marked as pending.
+- The **Evidence** section shows whether a report and demo are starting,
+  recording, finished or saved. A file path on screen does not by itself mean
+  the file was saved.
+- Finished `.mvd` demos appear in **Multiplayer → Demos**; see
+  [Watch a demo](multiview-demos.md#watch-a-demo). A `.mvd.part` file is an
+  unfinished recording, not a match record.
+- If a report or demo fails, keep the log and the partial files for
+  investigation rather than renaming a partial file.
 
-## Qualification checklist
+## Compatibility and upgrading
 
-For a release or league signoff:
-
-1. Run the correct mode in a window and complete the full player, captain,
-   coach, broadcaster, referee and operator workflow through Match Control.
-2. Verify every unavailable action shows the expected localized reason and that
-   stale menus cannot commit an operation.
-3. Exercise individual/team readiness, countdown cancellation, tactical and
-   technical pauses, repeated resume cycles, overtime and round transitions.
-4. Complete BO1, BO3 and BO5 veto/result paths, including one map-load failure,
-   team recovery and explicit Duel rebinding.
-5. Inspect recipient bytes and live camera cycling for ordinary spectators,
-   coaches, broadcasters and referees; forbidden enemy data must be absent
-   rather than cosmetically hidden. Exercise supported placed major-item pickup,
-   respawn and pause cycles, proving that only broadcaster/referee views contain
-   timers. Test the synthetic future-repeater policy separately for its
-   public-only, no-timer result; there is no live repeater transport to exercise.
-6. Verify the JSON report was atomically persisted, its series and MVD links are
-   correct, and the generated MVD plays through the Demos library.
-7. Validate the Match Control layout and keyboard/controller navigation at 16:9
-   and 4:3 without taking over user input or using fullscreen.
-
-The HUD and scoreboard now share a compact recipient-scoped card for role,
-phase, pause, readiness, timeout budgets, proposals, series progress and any
-authorized item timing. Match Control remains the detailed surface for actions,
-denial reasons, roster management, rules and evidence.
+- The server and every player need the same openQ4 version (0.14.1).
+- Finish any managed series before upgrading openQ4. Rules and series saved by
+  an older version may not match, and some older recovery files can be read for
+  investigation but not resumed.
+- Multiplayer demos recorded by older development versions may play only in the
+  version that recorded them.

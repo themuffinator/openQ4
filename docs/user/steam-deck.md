@@ -1,74 +1,79 @@
 # Steam Deck
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-openQ4 supports Steam Deck through the dedicated `openQ4-steamdeck` launcher shipped in Linux packages as of March 30, 2026.
+openQ4 runs natively on the Steam Deck from the Linux x64 download. Its Steam Deck launcher sets up the Deck's controls, gyro aiming, a larger HUD and a frame-rate cap for the handheld screen.
 
-## Launching
+## Getting started
 
-- Use `openQ4-steamdeck` instead of `openQ4-client_x64`.
-- The launcher adds `+set com_platformProfile steamdeck`, exports `OPENQ4_STEAMDECK=1`, and preserves any extra command-line arguments you pass.
-- Native Wayland is used when your compositor supports the fifo-v1 protocol (or `SDL_VIDEO_DRIVER=wayland` is set); otherwise SDL runs through XWayland. To force the old XWayland fallback path, launch with `OPENQ4_FORCE_X11=1`; the dedicated launcher and direct client launches both honor it unless an explicit SDL video-driver override is already set.
-- If native Wayland hits a libdecor startup or window-decoration issue on a specific compositor stack, launch with `OPENQ4_WAYLAND_DISABLE_LIBDECOR=1`.
-- If you launch `openQ4-client_x64` directly on a Steam Deck or SteamOS host, openQ4 auto-selects the `steamdeck` platform profile when `com_platformProfile` is still `default`. Set `OPENQ4_NO_STEAMDECK_AUTODETECT=1` or `OPENQ4_DISABLE_STEAMDECK_AUTODETECT=1` to disable that fallback.
+1. Install Quake 4 from Steam on the Deck. openQ4 finds it in any of your Steam libraries, including one on a microSD card.
+2. In Desktop Mode, download the openQ4 Linux x64 package and extract it.
+3. Run `openQ4-steamdeck` from the extracted folder.
+4. To play from Game Mode, add `openQ4-steamdeck` to Steam as a non-Steam game.
+
+The launcher turns on openQ4's Steam Deck profile (it adds `+set com_platformProfile steamdeck` and sets `OPENQ4_STEAMDECK=1`) and passes on any extra options you give it.
+
+If you run `openQ4-client_x64` directly on a Steam Deck or another SteamOS device, openQ4 picks the Steam Deck profile automatically, unless you start it with a different `com_platformProfile`. To stop the automatic choice and play with the normal desktop settings, set `OPENQ4_NO_STEAMDECK_AUTODETECT=1` (or `OPENQ4_DISABLE_STEAMDECK_AUTODETECT=1`).
+
+### What the Steam Deck profile changes
+
+- Gyro aiming is on, at a gentle `in_gyroSensitivity 0.20`.
+- The trackpads move the menu and console pointer (`in_touchpadMode 1`), and the touchscreen works the menus (`in_touchscreen 1`).
+- Vibration is limited while the battery is at 20% or below.
+- The HUD starts at 125% (`ui_hudScale 1.25`) so it stays readable on the small screen.
+- The frame rate is capped to suit the screen (see [Performance](#performance)).
+- Menu and HUD prompts show the Deck's own buttons once you use its controls.
+
+These are starting points. Anything you change in the menus is saved and kept on later launches.
 
 ## Controls
 
-Default gameplay bindings shipped by the stock openQ4 config:
+| Deck control | Action |
+|---|---|
+| R2 | Attack |
+| L2 | Zoom |
+| A | Jump |
+| B | Crouch |
+| X | Reload |
+| Y | Flashlight |
+| L1 | Weapon wheel |
+| R1 | Last weapon |
+| Left stick click (L3) | Run / walk |
+| Right stick click (R3) | Centre view |
+| Menu button (☰) | In-game menu |
+| View button (⧉) | Scores or objectives while held |
+| D-pad up | Objectives or scores |
+| D-pad down | Quick-chat wheel (multiplayer) |
+| D-pad left / right | Next / previous weapon |
+| Back buttons R4 / L4 / R5 / L5 | Jump / crouch / reload / weapon wheel, when Steam passes them to the game |
 
-- `JOY15` = attack
-- `JOY16` = zoom
-- `JOY3` = jump
-- `JOY4` = crouch
-- `JOY6` = reload
-- `JOY5` = flashlight
-- `JOY1` = weapon wheel
-- `JOY2` = last weapon
-- `JOY13` = run toggle / walk modifier
-- `JOY18` = show objectives / scores
-- `JOY19` = jump if exposed as right rear paddle 1
-- `JOY20` = crouch if exposed as left rear paddle 1
-- `JOY21` = reload if exposed as right rear paddle 2
-- `JOY22` = weapon wheel if exposed as left rear paddle 2
+In the menus, the D-pad and left stick move the selection (the D-pad always does this while a menu is open, whatever it is bound to in play), A selects and B goes back. Holding the D-pad, stick or bumpers repeats for long lists. Rebind anything on **Settings → Controls**; see [Input settings](input-settings.md#default-controller-buttons) for the full button list.
 
-Menu behavior:
+## Tuning the controls
 
-- `JOY7` opens the in-game menu and `JOY8` (View) shows the scores or objectives while held; `JOY17` also opens the menu when the OS delivers the Guide button to the game.
-- `JOY3` selects the focused menu item, while `JOY4`, `JOY7`, and `JOY8` back out of menus (View hides or shows Join Game's server details).
-- The D-pad is reserved for menu focus movement whenever a menu is open, even though those same buttons also have gameplay bindings.
-- The movement stick can also move menu focus, and holding the D-pad, movement stick, or shoulder buttons repeats navigation/scrolling for longer lists.
-- Extra `JOY23` through `JOY32` and `AUX1` through `AUX16` buttons are bindable but left unbound by default for user customization.
+All the controller settings are on **Settings → Game Options → Controller**: stick layout, dead zone, look sensitivity, look curve, invert look, trigger press, rumble, gyro, trackpad mode, touchscreen and the low-battery rumble limit.
 
-Tuning and haptics:
+- **Gyro aim too slow or too fast:** change **Gyro Sensitivity** (`in_gyroSensitivity`). Turn **Gyro** off (`in_gyro 0`) to aim with the sticks only.
+- **Trackpads:** **Touchpad Mode** (`in_touchpadMode`) is **Menu Cursor** on the Deck. Choose **Mouse Look** to aim with a trackpad during play, **Off** to ignore trackpad movement, or **Button Only** to ignore movement but keep trackpad clicks.
+- **Touchscreen:** with **Touchscreen** on (`in_touchscreen 1`), taps and drags work the menus, the console and the loading screen's continue prompt.
+- **Vibration:** turn off **Rumble** (`in_joystickRumble 0`) or lower **Rumble Strength** (`in_joystickRumbleScale`). The Deck profile sets **Low Battery Rumble** to `20` (`in_joystickLowBatteryRumbleThreshold`) and **Low Battery Cap** to `0.75`, so at 20% battery or below vibration is limited to three-quarters strength; your Rumble Strength setting is kept. Set **Low Battery Rumble** to `0` to remove the limit.
+- **Button prompts:** to show another controller's buttons, change **Prompt Style**; see [Button prompts](input-settings.md#button-prompts).
+- **HUD size:** change **Settings → Game Options → HUD → HUD Size**.
 
-- Controller rumble is driven from Quake 4 sound shake/rumble metadata during gameplay.
-- Use `in_joystickRumble 0` to disable motor output, or tune strength with `in_joystickRumbleScale`.
-- The Steam Deck profile sets `in_joystickLowBatteryRumbleThreshold 20` and `in_joystickLowBatteryRumbleScale 0.75`, which caps effective rumble output while SDL reports a controller battery at or below 20 percent. This does not rewrite your configured rumble strength.
-- The Steam Deck profile enables native SDL gyro aiming with a conservative `in_gyroSensitivity 0.20`; raise or lower that cvar if gyro aim feels slow or fast.
-- With the Steam Deck profile, menu prompts show the Deck's own button glyphs once you use its controls. Set `in_promptStyle` to pick another style for the menus and the HUD; see [Input Settings](input-settings.md#button-prompts).
-- `in_touchpadMode 1` routes gamepad touchpad motion to menu/console cursor movement. Use `in_touchpadMode 2` for touchpad mouse-look, `0` to disable touchpad motion, or `3` to leave touchpad motion off while keeping touchpad button binds.
-- `in_touchscreen 1` routes direct touchscreen taps and drags to menus, console, and loading-continue input when SDL delivers native touch events.
-- The Steam Deck profile starts the HUD at 125% (`ui_hudScale 1.25`) so its readouts stay legible on the handheld screen; change it under `Settings -> Game Options -> HUD`.
-- The in-game menu exposes controller controls under `Settings -> Game Options -> Controller`, including stick layout, radial dead-zone, look sensitivity, look curve, invert-look, trigger threshold, rumble tuning, gyro, touchpad mode, touchscreen input, and low-battery rumble caps.
-- For the full input settings guide, see [input-settings.md](input-settings.md).
+The [Input settings](input-settings.md) guide explains every option.
 
-## Steam Input and Diagnostics
+## Steam Input
 
-For native Steam Deck testing, use a Steam Input profile that exposes the Deck as a gamepad with its gyro and touchpad capabilities available to SDL. Steam-level gyro-to-mouse or touchpad-to-mouse mappings can still be useful for users, but they hide those inputs from openQ4's native `in_gyro` and `in_touchpadMode` paths.
-
-If a build expects native touchscreen or multi-touch events, enable Touch API pass-through in the Steamworks/partner configuration. Without that partner-side setting, Steam may deliver touch as mouse emulation instead of SDL touchscreen events.
-
-Run `listControllers` from the console when diagnosing Deck input. It prints the active SDL gamepad/joystick, GUID, type, path, power state, touchpad count, sensor capability, gyro/touchpad cvars, touchscreen routing, and low-battery rumble state. Save the log output with bug reports when gyro, touchpad, touchscreen, or rumble behavior is unclear.
+openQ4 reads the Deck's gyro and trackpads itself. For that to work, your Steam controller layout must pass the Deck to the game as a gamepad. If the layout turns the gyro or trackpads into mouse movement, Steam handles them before openQ4 sees them, and openQ4's own gyro and trackpad settings do nothing. A mouse-style layout still works if you prefer it; turn openQ4's **Gyro** off so the two don't fight.
 
 ## Performance
 
-- When the Steam Deck profile is active, `com_steamDeckAutoFrameCap 1` applies a Deck-friendly `com_maxfps` only if `com_maxfps` is still the global default of `240`.
-- The automatic cap uses SDL's current display refresh and clamps it to the Deck-oriented `40..90` range. LCD Deck sessions normally land on `60`; OLED or higher-refresh sessions can land higher.
-- Set `com_maxfps` yourself to preserve a specific cap. Set `com_steamDeckAutoFrameCap 0` to disable the automatic default, or set `com_steamDeckFrameCap` to a nonzero value to choose the Deck default cap explicitly.
+- A fresh install picks the Performance preset on a Steam Deck, as does **Auto-Detect** on **Settings → Display**.
+- With the Steam Deck profile, openQ4 caps the frame rate to the screen's refresh rate, kept between 40 and 90: an LCD Deck normally gets 60, and an OLED Deck can get more. This only happens while `com_maxfps` is still at its default of `240`, so a cap you set yourself is kept. Set `com_steamDeckAutoFrameCap 0` to turn this off, or `com_steamDeckFrameCap` to a number to choose the Deck's cap.
 
-### Shadow Maps on Deck
+### Shadow maps on the Deck
 
-Shadow maps run well on Deck-class hardware with a bounded update budget. Recommended settings:
+The Performance preset uses Quake 4's original stencil shadows. If you want [shadow maps](shadow-mapping.md) instead, these settings run well on the Deck because they limit how many shadows are redrawn each frame:
 
 ```cfg
 seta r_shadows 1
@@ -81,11 +86,21 @@ seta r_shadowMapMaxUpdatesPerView 2
 vid_restart
 ```
 
-With the update budget set, the renderer spends each frame's shadow renders on the most important stale lights and serves the rest from the resident cache, so shadow cost stays bounded in dense scenes. See `docs/user/shadow-mapping.md` for the full settings reference.
+## Troubleshooting
 
-## Asset Discovery
+### The game window does not start, or looks wrong
 
-Linux Steam auto-discovery checks these roots and then expands any additional library folders from `libraryfolders.vdf`:
+Linux desktops draw windows with one of two display systems: **Wayland**, the newer one, and **X11**, the older one. openQ4 uses Wayland directly when the desktop supports it, and otherwise runs through **XWayland**, a compatibility layer that lets X11 programs run on Wayland.
+
+- If the window fails to open or misbehaves, launch with `OPENQ4_FORCE_X11=1` to use X11 through XWayland instead. Both the launcher and a direct `openQ4-client_x64` launch honour it.
+- If the problem is with the window's title bar or borders on Wayland, try `OPENQ4_WAYLAND_DISABLE_LIBDECOR=1`. libdecor is the helper some Wayland desktops use to draw those window decorations.
+- To force Wayland, set `SDL_VIDEO_DRIVER=wayland`.
+
+Set these in front of the command, for example `OPENQ4_FORCE_X11=1 ./openQ4-steamdeck` in a terminal, or `OPENQ4_FORCE_X11=1 %command%` in the launch options of your Steam shortcut.
+
+### openQ4 cannot find Quake 4
+
+openQ4 looks for `steamapps/common/Quake 4` in every Steam library it can find. It starts from these Steam folders and then adds every library listed in Steam's `libraryfolders.vdf`:
 
 - `OPENQ4_STEAM_ROOT` / `OPENQ4_STEAM_ROOTS`
 - `STEAM_COMPAT_CLIENT_INSTALL_PATH`
@@ -93,16 +108,14 @@ Linux Steam auto-discovery checks these roots and then expands any additional li
 - `~/.steam/steam`
 - `~/.steam/root`
 - `~/.local/share/Steam`
-- `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`
+- `~/.var/app/com.valvesoftware.Steam/.local/share/Steam` (Flatpak Steam)
 
-openQ4 then looks for `steamapps/common/Quake 4` under each Steam library root.
+To point it at the game directly, set `OPENQ4_QUAKE4_PATH` (or `OPENQ4_QUAKE4_ROOT`) to the Quake 4 folder, or `OPENQ4_STEAM_LIBRARY` (or `OPENQ4_STEAM_LIBRARIES`) to a Steam library that contains `steamapps/common/Quake 4`. Separate several folders with `:` or `;`.
 
-For deterministic testing, set `OPENQ4_QUAKE4_PATH` or `OPENQ4_QUAKE4_ROOT` to the Quake 4 install root directly, or set `OPENQ4_STEAM_LIBRARY` / `OPENQ4_STEAM_LIBRARIES` to Steam library roots that contain `steamapps/common/Quake 4`. On Linux, multiple roots may be separated with `:` or `;`.
+### Gyro, trackpads or rumble don't work
 
-## Notes
+Check your Steam Input layout first (see [Steam Input](#steam-input)). Then open the console and run `listControllers`. It shows the controller openQ4 is using, its battery, whether it has a gyro and trackpads, how the touchscreen is handled and whether the low-battery rumble limit is active. Include what it prints when you report a controller problem.
 
-- Steam Deck support is still profile-driven, but the engine now has a Deck/SteamOS fallback detector for direct client launches.
-- Suspend/resume and foreground/background SDL events release captured input, stop rumble, write the current config, and reacquire controllers when the app returns.
-- Native Wayland is supported through the SDL3 backend; XWayland remains available through `OPENQ4_FORCE_X11=1` or explicit SDL video-driver environment variables.
-- `OPENQ4_WAYLAND_DISABLE_LIBDECOR=1` is available as a native Wayland troubleshooting switch for compositor/libdecor problems.
-- The developer-facing Deck QA checklist lives in [../dev/steam-deck-qa.md](../dev/steam-deck-qa.md).
+### After suspending
+
+When the Deck suspends or openQ4 goes to the background, the game releases the controls, stops vibration and saves your settings. Controllers reconnect when you return.

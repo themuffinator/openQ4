@@ -1,63 +1,72 @@
-# Shadow Mapping and Transparency Shadowing Guide
+# Shadow mapping
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-This guide covers openQ4's user-facing shadow-map settings, including projected-light shadow maps, experimental point-light shadow maps, cascaded shadow maps (CSM), alpha-tested transparency shadows, and the current experimental translucent-shadow path.
+Shadow maps give Quake 4's lights soft, stable shadows: sharp where an object touches the floor, softer further from it, with holes where light passes through grates, fences and foliage. They replace Quake 4's original hard-edged shadows (called stencil shadows) for the lights they cover. The Quality, Ultra and Maximum presets turn them on for you. This guide explains what each preset does, how to tune shadows yourself, and what to try when something looks wrong.
 
-## Quick Start
+## Turning shadow maps on
 
-The `enhanced`, `quality` and `ultra` [performance presets](display-settings.md) turn shadow maps on for you. On any other preset, this is the recommended starting point:
+Choose a preset on **Settings → Display → Graphics → Performance Preset** (the System page in the classic menus). The preset decides which shadows you get:
+
+| Preset | Shadows |
+|---|---|
+| Minimum, Low Power | None, to save work on weak or battery-powered hardware. |
+| Low, Performance, Balanced | Quake 4's original stencil shadows. |
+| Enhanced | Shadow maps for spotlights and sunlight. Point lights, which are most of Quake 4's lights, keep the original shadows, because their shadow maps cost the most. |
+| Quality | Shadow maps for every light, with soft edges that harden where objects meet surfaces. |
+| Ultra | As Quality, with sharper spotlight and sunlight shadows and smoother edges. |
+| Maximum | Every shadow setting at its highest, including sharper point-light shadows and extra detail for distant light. |
+
+The change applies at once; you don't need to restart the renderer. **Settings → Display → Image Quality → Enable Shadows** turns all shadows off or on, whichever kind the preset uses.
+
+To use shadow maps with any other preset, open the console and enter:
 
 ```cfg
 seta r_shadows 1
 seta r_useShadowMap 1
-seta r_shadowMapCSM 1
-seta r_shadowMapHashedAlpha 1
-vid_restart
 ```
 
-Optional experimental translucent-shadow overlay:
+Choosing a preset again replaces these with the preset's own values. Shadow settings ("console variables", or cvars) take effect immediately, without `vid_restart`.
+
+## What you see
+
+- **Soft, grounded edges.** Quality and above use contact-hardening shadows (known as PCSS): crisp where an object meets the surface it stands on, softening with distance. Enhanced uses a simple fixed soft edge.
+- **See-through shadows.** Grates, chain-link fences, railings and leaf cards cast shadows with their holes in them.
+- **Your flashlight casts shadows** on every preset that draws shadows. Projectile lights, such as a rocket's glow, cast shadows only on Quality, Ultra and Maximum, as on the original game's top setting.
+- **Stable while you move.** openQ4 draws the shadows of still scenery under still lights once and keeps them, so they cost little and don't shimmer as you walk. Only moving objects and moving lights are drawn again each frame.
+- **Distance.** As in the original game, moving objects far away and small on screen stop casting shadows. Still scenery keeps its shadow at any distance.
+- **No half-drawn shadows.** If a light's shadow map can't be finished in a frame, that light uses its original stencil shadow instead. Some lights on animated characters also keep the original shadows so that character lighting looks as Quake 4 intended.
+- **Mirrors and security cameras** reuse stored shadow maps or fall back to the original shadows, to keep their cost down.
+
+## Tuning quality and speed
+
+These are the settings that matter most. Each is described fully in the [settings reference](#settings-reference).
+
+- **Sharpness.** `r_shadowMapSize` sets the resolution of spotlight and sunlight shadows (presets use 1024 to 4096). `r_shadowMapPointSize` does the same for point lights (512, or 2048 on Maximum). Higher values are sharper but use more video memory; point-light size costs the most, because each point light stores six images.
+- **Point lights.** `r_shadowMapPointLights 0` keeps the original shadows for point lights only. It is the biggest single saving, and it is what Enhanced does.
+- **Soft edges.** `r_shadowMapFilterMode` picks the edge style: `2` contact-hardening (the default), `1` an even soft edge, `0` a simple fixed blur. `r_shadowMapFilterTaps` (5, 9 or 13) sets how many samples smooth each edge: more is smoother and costs more.
+- **Large outdoor areas.** `r_shadowMapCSM 1` turns on cascades: a distant light, such as sunlight, gets several shadow maps, with the sharpest one closest to you. Only Maximum turns cascades on, because they cost more.
+- **Crowded views.** All spotlight and sunlight shadows share one large texture, the shadow atlas (`r_shadowMapAtlasSize`). When a view has more lights than fit, openQ4 draws the lights that cover the least of the world at half or quarter size, rather than dropping any of them.
+
+### Example settings
+
+Lighter, for modest graphics cards:
 
 ```cfg
-seta r_shadowMapTranslucentMoments 1
-seta r_shadowMapTranslucentDensity 1.0
-seta r_shadowMapTranslucentMinAlpha 0.02
-vid_restart
+seta r_shadows 1
+seta r_useShadowMap 1
+seta r_shadowMapCSM 0
+seta r_shadowMapSize 512
+seta r_shadowMapPointSize 256
+seta r_shadowMapFilterMode 0
+seta r_shadowMapFilterRadius 0.75
+seta r_shadowMapFilterTaps 5
+seta r_shadowMapPointFilterRadius 1.0
+seta r_shadowMapPointFilterTaps 5
+seta r_shadowMapHashedAlpha 1
 ```
 
-Notes:
-- `r_shadows` must stay enabled for any shadow path to render.
-- If a light cannot use a complete shadow map, openQ4 uses its stencil representation when available. Vulkan logs a missing-resource warning and preserves direct illumination if neither representation can be submitted.
-- If only part of a receiver ownership can be represented in a shadow map, the classic renderer combines that exact map with the missing casters' stencil supplements. If those supplements are incomplete, the complete ownership falls back to stencil instead of publishing a partial shadow.
-- Point lights shadow-map by default (`r_shadowMapPointLights 1`); they are the dominant light class in Quake 4 content. Set `r_shadowMapPointLights 0` to fall back to stencil shadows for point lights only.
-- Lights touching animated, deformed, or packed character receivers can also fall back to the legacy stencil path so stock character lighting, mirrored seams, and eye materials retain retail-style interaction behavior.
-- The weapon flashlight casts shadows on every preset that draws shadows; projectile lights cast them only at the highest machine spec (Quality, Ultra and Maximum), as in the original game. `g_dynamicLightShadows` overrides both: `-1` (default) follows these rules, `0` turns them off, `1` turns them on. A weapon picks the setting up when it is drawn or a save is loaded.
-- The player flashlight uses its authored single projected shadow map; disabling flashlight cascades does not select stencil shadows. `testFlashlight 1` enables the current SP weapon's flashlight for rendering tests without simulated player input (`testFlashlight 0` turns it off).
-- Light-emitting panels that cast no stencil volume no longer force an entire point light into fallback. Panels with a real surface volume are admitted to the depth map, including the moving lift panel in Storage 2. A real missing caster still requires a complete map or stencil supplement.
-- Quake 4 stops casting shadows from entities that are far away and small on screen (`r_lod_shadows`, 768 units by default). Scenery that was close enough when a light first reached it keeps its shadow afterwards, as in the original game, and that shadow now stays in the shadow map. Before, walking away from such an object took it out of the map while its stencil volume remained, which left the light on the stencil supplement for the rest of the level. In a shadow map the distance rule now applies only to what is drawn every frame: objects that move, and the casters of lights that move. Still scenery under a still light is drawn into the map once and kept, so it casts at any distance instead of gaining its shadow as you walk up to it.
-- Update budgets and subview policy may select stencil only when it covers all admitted casters. Required map updates can exceed `r_shadowMapMaxUpdatesPerView`; use `0` for unrestricted updates. Cache slot exhaustion alone can use scratch maps and does not require stencil.
-- Modern renderer diagnostics keep lighting visible when shadow-map receiver sampling is not ready, but full modern visible-frame replacement stays fail-closed so the legacy path continues to provide the actual shadowed frame.
-- Most shadow cvars can be changed live, but `vid_restart` is the safest way to apply large changes such as map resolution, cascade layout, or switching the shadow pipeline on/off.
-
-## What the System Does
-
-openQ4 currently supports:
-- Projected-light shadow maps for regular projected lights.
-- Point-light cubemap shadow maps for omni/point lights (the dominant Quake 4 light class), on by default.
-- Fitted perspective shadow maps for off-centre point sources whose entire light volume lies in front of the source. Distant outdoor lights, including Air Defense 1's opening light, can use the projected cascade machinery without changing their authored illumination.
-- Optional projected-light cascaded shadow maps (CSM).
-- Alpha-tested transparency shadows for cutout materials such as fences, grates, and foliage cards.
-- Optional experimental translucent-shadow accumulation for some blended materials.
-
-High-level behavior:
-- Opaque materials cast normal solid shadows.
-- Alpha-tested or perforated materials cast cutout shadows in the shadow-map pass.
-- Blended/translucent materials do not cast translucent shadowing unless `r_shadowMapTranslucentMoments 1` is enabled.
-- The translucent-shadow path is experimental and intentionally conservative.
-
-## Recommended Presets
-
-### Balanced Quality
+Balanced:
 
 ```cfg
 seta r_shadows 1
@@ -72,10 +81,9 @@ seta r_shadowMapPointFilterTaps 9
 seta r_shadowMapCasterCulling 2
 seta r_shadowMapHashedAlpha 1
 seta r_shadowMapCascadeStabilize 1
-vid_restart
 ```
 
-### Higher Quality
+Sharper:
 
 ```cfg
 seta r_shadows 1
@@ -92,369 +100,199 @@ seta r_shadowMapPointFilterTaps 13
 seta r_shadowMapCasterCulling 2
 seta r_shadowMapHashedAlpha 1
 seta r_shadowMapCascadeStabilize 1
-vid_restart
 ```
 
-### Filtering Modes
-
-Projected lights use PCSS-lite by default (`r_shadowMapFilterMode 2`): shadows stay sharp where a caster meets the receiver and soften with distance, never narrower than `r_shadowMapFilterRadius` (default `2.0` texels). Hardware depth-compare sampling cannot run the blocker search needed for PCSS-lite, so filter mode 2 automatically switches the renderer to the manual raw-depth path even while `r_shadowMapDepthCompare 1` is set.
-
-For a uniform edge instead, use stable rotated Poisson sampling:
+For an even soft edge instead of contact-hardening, add:
 
 ```cfg
 seta r_shadowMapFilterMode 1
 seta r_shadowMapPointFilterMode 1
-seta r_shadowMapStaticCache 1
-vid_restart
 ```
 
-Point lights have their own filter cvars and do not use PCSS-lite.
+## Shadows through see-through surfaces
 
-### Performance-Focused
+### Grates, fences and foliage
 
-```cfg
-seta r_shadows 1
-seta r_useShadowMap 1
-seta r_shadowMapCSM 0
-seta r_shadowMapSize 512
-seta r_shadowMapPointSize 256
-seta r_shadowMapFilterMode 0
-seta r_shadowMapFilterRadius 0.75
-seta r_shadowMapFilterTaps 5
-seta r_shadowMapPointFilterRadius 1.0
-seta r_shadowMapPointFilterTaps 5
-seta r_shadowMapHashedAlpha 1
-vid_restart
-```
+Surfaces with holes cut in them cast shadows with the same holes, on every light that uses shadow maps. `r_shadowMapHashedAlpha 1` (the default) gives steadier shadows from distant fences and foliage but can look slightly grainy; set it to `0` for harder, cleaner edges. A few materials whose holes come from a video or a generated texture can't be traced this way: they cast a solid shadow on OpenGL, or use the original shadow on Vulkan.
 
-### Experimental Blended Transparency
+### Glass and other blended surfaces (experimental)
+
+Glass, pickup orbs and similar blended surfaces cast no shadow by default. `r_shadowMapTranslucentMoments 1` lets them cast partial, tinted shadows, coloured by the surface's texture and tint. It is experimental:
+
+- It adds a shadow pass for every light that reaches such a surface, so it costs noticeably more.
+- It covers common blended and additive materials. GUI screens, particles and many effect materials are left out.
+- Colours are approximate.
+- OpenGL and Vulkan both draw it. With many such lights in one view, Vulkan lowers their resolution to fit, and it skips surfaces whose texture is a video or a generated image.
+- It needs a graphics card with three extra render targets and texture samplers; without them openQ4 turns it off.
+
+Start with these values, then adjust:
 
 ```cfg
-seta r_shadows 1
-seta r_useShadowMap 1
-seta r_shadowMapCSM 1
-seta r_shadowMapHashedAlpha 1
 seta r_shadowMapTranslucentMoments 1
 seta r_shadowMapTranslucentDensity 1.0
 seta r_shadowMapTranslucentMinAlpha 0.02
-vid_restart
 ```
 
-## Core Shadow Settings
+- Raise `r_shadowMapTranslucentDensity` if the effect is too weak, or lower it if it's too strong.
+- Raise `r_shadowMapTranslucentMinAlpha` if very faint surfaces cast more shadow than you want.
+- Use `r_shadowMapTranslucentFilterRadius` to give these shadows a different softness from solid ones.
+- Raise `r_shadowMapTranslucentBleedReduction` only if light visibly bleeds through; higher values make the shadows harsher.
+- Turn the feature off for the most predictable performance.
 
-| Setting | Default | Range | What it does |
-|---|---:|---:|---|
-| `r_shadows` | `1` | `0..1` | Master shadow toggle. |
-| `r_useShadowMap` | `0` | `0..1` | Enables the shadow-map pipeline for supported lights. The `enhanced`, `quality`, `ultra` and `maximum` performance presets set it to `1`; Enhanced leaves `r_shadowMapPointLights` at `0`, so point lights keep stencil shadows there. |
-| `r_shadowMapCSM` | `0` | `0..1` | Enables cascaded shadow maps for projected lights. |
-| `r_shadowMapProjectedCSM` | `1` | `0..1` | Allows ordinary projected lights to use CSM when `r_shadowMapCSM` is enabled; parallel/global lights keep their dedicated large-coverage policy. |
-| `r_shadowMapConservativeCasters` | `1` | `0..1` | Keeps shadow-map caster submission separate from visible receiver scissors, so off-screen blockers can still shadow visible receivers. |
-| `r_shadowMapSkipStencilShadows` | `1` | `0..1` | Skips stencil shadow volume generation and linking for lights that will render shadow maps, removing the duplicate CPU shadow work: animated characters get no volumes built, and the volumes of static scenery are kept but not submitted. A light that fails a shadow-map pass automatically restores its stencil volumes on the next frame. Point lights always qualify; projected and parallel lights do when every such light in the view is certain of room in the atlas, which holds for at least thirty-two of them in a view at the shipped presets (see `r_shadowMapSize`). An update budget above `0` turns this off, and subviews keep their volumes under `r_shadowMapSubviewPolicy` 1 or 2. |
-| `r_shadowMapCasterCulling` | `2` | `0..4` | Which side of a caster a shadow map stores. `0` always stores both sides. `1` forces the material-oriented light-facing near shell. `2`, automatic, stores the near shell of a sealed hull the light is outside of, and for every other caster the triangles that face away from the light, which are the ones a stencil shadow is built from: a lamp then shines through a one-sided surface it is mounted behind, as it does with stencil shadows, and sealed props keep a grounded contact shadow. `3` stores the away-facing triangles of every caster, sealed or not. `4` is the earlier automatic mode, kept for comparison: sealed hulls as in `2`, both sides of everything else. A sealed hull that encloses its light, and a caster whose transform has no usable winding, store both sides in every automatic mode. |
-| `r_shadowMapSize` | `1024` | `128..4096` | Shadow-map resolution of a projected, parallel or distant point light: the edge of its tile in the atlas. Higher values cost more VRAM and GPU time. Every such light gets this size while the lights of a view fit the atlas together. When they do not, lights are cut to half and then a quarter of it (never under 128), the ones that cover the least world first, so a crowded view keeps every light on shadow maps instead of sending some to stencil. Sunlight and other fitted sources are cut last. `r_shadowMapReport 2` prints each light's `tile=`. |
-| `r_shadowMapAtlasSize` | `4096` | `2048..16384` | Edge size of the shared projected-light shadow atlas. A light takes one block of it per receiver ownership, `r_shadowMapSize` on a side (a CSM light's block is 2x2 tiles). Quality (2048 in 4096) and Ultra (4096 in 8192) hold four full-size blocks, Enhanced sixteen; lights are cut down before a view runs out (see `r_shadowMapSize`). On OpenGL the atlas also stores the cached tiles; Vulkan keeps those in images of their own. |
-| `r_shadowMapFilterRadius` | `2.0` | `0..8` | Projected-light filter radius in texels: the fixed PCF width in modes `0` and `1`, and the minimum penumbra in PCSS-lite. Increase resolution for more detail; increasing this value deliberately softens and widens the edge. |
-| `r_shadowMapFilterTaps` | `9` | `1..13` | Projected-light PCF tap budget. Values up to `1`, `5`, `9`, and `13` select progressively denser sample sets without changing the requested radius. |
-| `r_shadowMapFilterMode` | `2` | `0..2` | Projected-light filter mode: fixed PCF, stable rotated Poisson, or PCSS-lite with raw depth sampling. Profiles still holding the old `0.75`/`0` pair move to `2.0`/`2` once on upgrade; any other choice is kept. |
-| `r_shadowMapDistantFilterScale` | `0.35` | `0..1` | Scales projected PCF and PCSS radii for parallel/global sources and fitted distant point sources such as outdoor sky lights. Their texels cover much more world space than local projectors, so a tighter kernel preserves caster silhouettes instead of over-blurring them. Set `1` to use the ordinary projected-light radii unchanged. |
-| `r_shadowMapPCSSLightRadius` | `4.0` | `0..16` | Projected PCSS-lite blocker search radius in shadow texels. |
-| `r_shadowMapPCSSMaxRadius` | `8.0` | `0..16` | Maximum projected PCSS-lite filter radius in shadow texels. |
-| `r_shadowMapPointFilterRadius` | `1.0` | `0..8` | Point-light PCF radius in cubemap texels. Large-radius lights can cover substantial world distance per texel, so wide values can visibly erase contact detail. |
-| `r_shadowMapPointFilterTaps` | `9` | `1..13` | Point-light PCF tap budget. Values up to `1`, `5`, `9`, and `13` select progressively denser sample sets without changing the requested radius. |
-| `r_shadowMapPointFilterMode` | `0` | `0..1` | Point-light filter mode: fixed PCF or stable rotated Poisson. |
-| `r_shadowMapDepthCompare` | `1` | `0..1` | Uses hardware comparison sampling (with hardware-filtered PCF taps) for projected depth maps. Selecting PCSS-lite (`r_shadowMapFilterMode 2`) automatically uses the manual raw-depth path instead. Set `0` if a driver has trouble with GLSL shadow samplers. |
-| `r_shadowMapPointDepthCompare` | `1` | `0..1` | Uses hardware comparison sampling for point-light depth cubemaps when GLSL 1.30 support is available. |
-| `r_shadowMapPointDepthOnly` | `1` | `0..1` | OpenGL: keeps point-light shadow cubes as depth only while nothing samples their packed colour cube, which halves their memory and stops the caster pass writing colour. The colour cube comes back by itself when something reads it: without hardware compare (`r_shadowMapPointDepthCompare 0`, or a driver that lacks it), under the opt-in modern renderers or the shared interaction stream, and while the debug overlay is on. `0` always keeps it. Vulkan cubes were always depth only. |
-| `r_shadowMapPointHighPrecision` | `0` | `0..1` | Stores point-light shadow depth in an fp16 color cubemap instead of packed RGBA8. The packed path quantizes finer at half the memory, and the default hardware-compare path samples the depth cubemap directly and stores no colour cubemap at all (`r_shadowMapPointDepthOnly`), so this only affects the manual fallback. |
-| `r_shadowMapPointLights` | `1` | `0..1` | Shadow-maps point lights when `r_useShadowMap 1` is enabled. Point lights are the dominant light class in Quake 4 content, so disabling this makes shadow mapping nearly a no-op; set `0` to fall back to stencil shadows for point lights only. |
-| `r_shadowMapPointSize` | `512` | `128..2048` | Point-light cube face resolution, separate from `r_shadowMapSize`: each cached point light stores six faces of depth (and of colour as well on OpenGL when something samples it, see `r_shadowMapPointDepthOnly`), so cube resolution dominates shadow VRAM. |
-| `r_shadowMapHashedAlpha` | `1` | `0..1` | Uses hashed alpha testing for perforated/alpha-tested casters when supported. |
-| `r_shadowMapStableAlphaHash` | `1` | `0..1` | Seeds hashed alpha from world-space caster coordinates to reduce atlas/camera-space dither drift. |
-| `r_shadowMapProjectionPad` | `0.15` | `0..1` | Padding around projected-light shadow coverage. |
-| `r_shadowMapPointFarScale` | `1.25` | `1..4` | Padding multiplier for point-light shadow range. |
-| `r_shadowMapCascadeCount` | `4` | `1..4` | Number of projected-light cascades when CSM is enabled. |
-| `r_shadowMapCascadeDistance` | `1536` | `64..8192` | Camera-space distance covered by projected-light cascades. |
-| `r_shadowMapCascadeLambda` | `0.75` | `0..1` | Mix between uniform and logarithmic cascade split placement. |
-| `r_shadowMapCascadeBlend` | `0.15` | `0..0.5` | Crossfade width between projected-light cascades. |
-| `r_shadowMapCascadeStabilize` | `1` | `0..1` | Snaps cascade bounds to texels to reduce shimmering. |
+## For mappers and modders
 
-## Residency and Update Budgeting
+- Materials marked `noShadows`, and decals (`DECAL_MACRO`), never cast shadows, even with see-through shadows on. `forceShadows` makes a material cast one.
+- Off-centre point lights whose whole light volume lies in front of them, such as distant outdoor lights, are shadowed like spotlights: they use `r_shadowMapSize` and the cascade settings instead of `r_shadowMapPointSize`.
+- A door at rest can join a light's stored shadow; once it moves, the stored shadow is redrawn, so it never leaves a ghost of the closed door.
+- Freezing single-player time with `g_stopTime 1` also holds doors and animated materials, which helps when comparing shadows at one moment.
 
-openQ4 keeps opaque static depth resident and reuses it across backend views. Moving and cutout casters are composed over that depth each frame on both renderers: a projected light draws them over its restored atlas tile, and a point light over a copy of its cached cube, so a walking character or an alpha-tested grate costs one cube copy plus its own draws instead of six faces of static scenery. A stored spotlight map with nothing moving in its light costs no work at all: OpenGL keeps it in the atlas it is sampled from, and Vulkan samples the stored map directly instead of copying it into the view's atlas first. Translucent caster passes continue to update normally, and view-fitted CSM/global cache reuse requires an explicit opt-in.
-
-Point lights are nineteen in twenty of Quake 4's shadow-casting lights, and a dense view shows forty at once, so the point cube cache is sized for a whole view within a memory bound. A light with no slot is still shadowed: it renders into a scratch cube every view.
-
-OpenGL preserves the world's cache while drawing 2D HUD, console, and post-processing views. Changing the actual render world or map still invalidates its resident maps.
-
-| Setting | Default | Range | What it does |
-|---|---:|---:|---|
-| `r_shadowMapStaticCache` | `1` | `0..1` | Reuses opaque static depth for projected and point lights. |
-| `r_shadowMapStaticHysteresisFrames` | `2` | `0..120` | Frames to wait after dynamic casters disappear before a point light that cannot compose (`r_shadowMapPointCompose 0`, or the experimental shared interaction path on Vulkan) becomes cacheable again. Composed lights stay cached while dynamic casters move: their static depth persists and the moving casters are drawn on top each frame. |
-| `r_shadowMapResidentFrames` | `120` | `1..3600` | Frames an unused static shadow map can stay resident before its slot may be expired. |
-| `r_shadowMapProjectedCacheSize` | `8` | `0..16` | How many full-size (`r_shadowMapSize`) static projected-light shadow maps the cache keeps; `0` turns the cache off. A map cut down for a crowded view takes its share of one: the default holds eight full-size maps, or thirty-two of the half-size ones. On Vulkan this bounds the cache's memory, at most 128 MiB at Quality and 512 MiB at Ultra as before; a cached CSM block is four tiles of memory and counts as one map. OpenGL caches into the atlas, so there `r_shadowMapAtlasSize` is the bound and this only turns the cache on or off. A tile a light on screen is using is never evicted: maps that do not fit are drawn again each view. The `Vulkan shadow cache:` line reports `projectedTiles=used/limit` and the `SM cache:` line `projectedCells=used/atlas`. |
-| `r_shadowMapPointCacheSize` | `64` | `0..96` | Static point-light cubemap cache slots. Profiles still holding the old `12` move to `64` once on upgrade; any other count is kept. |
-| `r_shadowMapCacheMovingLights` | `0` | `0..1` | A light that is moving has a new shadow map every frame, so it is drawn directly rather than stored. `1` sends moving lights through the stored-map path as well, for comparison. A light that only changes colour is not moving. Not archived. |
-| `r_shadowMapStencilFallbackViews` | `240` | `0..100000` | A light whose shadow map fails once builds its stencil volumes again so that it has a fallback, while it keeps trying its map. This is how many views it must then go through without another failure before it stops building them. `0` keeps building them for the rest of the level, as before. |
-| `r_shadowMapPointCacheMegs` | `512` | `64..8192` | Video memory the point cube cache may fill, in MiB. On Vulkan the scratch cubes of a view (uncached and composed point lights) may fill the same amount again, and are released a few seconds after a view stops needing them. Slots beyond it stay unused, except that the first twelve are always available. At the default 512 cube size this allows all 64 cubes on both renderers (6 MiB each); OpenGL cubes that also carry a colour cubemap cost twice that and 42 fit. The `SM cache:` report line shows the count in use and `pointColorCube=0` when cubes are depth only. |
-| `r_shadowMapPointCompose` | `1` | `0..1` | Draws a point light's moving casters, and the cutout casters whose coverage can animate, over a copy of its cached static cube instead of re-rendering all six faces, on both renderers. `0` restores the full re-render for comparison. Not archived. |
-| `r_shadowMapStaticCutouts` | `1` | `0..1` | Caches cutout (alpha-tested) casters with the static shadow depth when their coverage cannot change: the material's registers are constant, its alpha stages sample ordinary images, and it has no deform. Grates, railings and fences are of this kind, and a light that reaches one no longer copies and redraws its map every frame. A cutout whose alpha follows time or an entity parm, or samples a video or a render target, is still drawn every frame. `0` treats every cutout that way. |
-| `r_vkShadowSampleResident` | `1` | `0..1` | Vulkan: samples a stored projected (spotlight, parallel or distant point) shadow map where it is kept when no moving caster has to be drawn over it, instead of copying it into the view's atlas every frame. The picture is identical. Maps with a moving caster, the shared interaction stream and the debug overlay still use the copy. `0` copies every stored map, for comparison. Not archived. |
-| `r_shadowMapCacheCSM` | `0` | `0..1` | Allows static-cache reuse for CSM/global shadow-map passes when their fitted projection is unchanged. Both backends refresh the map when camera movement or coverage settings change the fit. Most useful for fixed-view or otherwise stable scenes. |
-| `r_shadowMapSubviewPolicy` | `1` | `0..2` | Shadow maps in mirror/remote-camera subviews: `0` renders them like main views, `1` reuses cached maps or falls back to stencil, `2` prefers stencil in subviews. When the target has no usable stencil attachment or an ownership contains map-only casters, Vulkan still renders the required fresh map rather than dropping its shadow. |
-| `r_shadowMapTranslucentReceivers` | `1` | `0..1` | Lets translucent surfaces sample the shadow map like opaque receivers, matching the stencil path's `r_stencilTranslucentShadows` behavior. |
-
-`r_shadowMapMaxUpdatesPerView` limits discretionary fresh shadow-map work. Resident cache hits do not consume that budget. When it constrains a frame, admission considers screen coverage, staleness, and view proximity. Both renderers require exact cache hits, including current caster membership and projection. A cache miss uses complete current stencil coverage or renders a required map. A light needing separate LOCAL and GLOBAL maps can begin filling its cache with a budget of one; it is no longer denied indefinitely because both passes cannot fit at once.
-
-On both renderers, an ownership containing map-only casters can exceed the nominal budget because no equivalent complete stencil result exists. Vulkan also admits those required maps before optional maps consume bounded resources. Cache signatures include caster materials, alpha/hash settings, caster offsets, point-light range/depth mode, and fitted CSM state. Changing those inputs invalidates ordinary exact reuse.
-
-Resident entries are scoped to the loaded render world and are invalidated on map changes. Recreated atlas or cube storage invalidates its old metadata before cache occupancy and eviction are counted. Modern OpenGL also verifies the exact world, light, GLOBAL-pass signature, resolution, storage generation, and selected atlas slot or cube immediately before use; a resource belonging to another light, pass, storage generation, or previous map is treated as unavailable. Because that path exposes one shadow resource per light and cannot compose stencil supplements, it accepts only a complete GLOBAL ownership with no distinct local/no-self caster ownership and otherwise leaves the complete shadowed frame to the classic path. GLOBAL ownership is the union of opaque and enabled translucent receivers, so a translucent-only receiver can still request a complete map; if that map cannot be prepared, the affected translucent subset returns to filtered stencil shadowing at its normal depth phase instead of being drawn unshadowed.
-
-In the classic interaction path, projected lights can retain their opaque static geometry in the shared atlas, copy it to a working map, and draw only moving and cutout casters on top; point lights do the same with a cached cube and a working cube. Perforated materials always remain in these live chains, even on stationary entities: stage conditions, image animation, and texture matrices can change their coverage without moving the model. Adding or removing live casters does not by itself invalidate the opaque static depth.
-
-The copy still costs GPU time, especially with several large cascades; cache reuse is not free. `r_shadowMapCacheCSM` remains off by default. The experimental shared interaction path keeps conservative cache admission where live composition is unavailable.
-
-Normal cache hits preserve the exact floating-point projection and caster transforms. Cascaded-map keys include the fitted clip planes and receiver parameters, so changes to cascade blend overlap, PCSS guards, or distant-light filter scaling cannot silently retain an obsolete fit. Stabilization reserves space for center snapping and moves edge crops back inside the projection without trimming their resolution. Budgets and subviews cannot bypass these cache checks.
-
-### Doors and other movers
-
-A resting door may enter static depth. When it moves, its old static membership must invalidate that depth before its current pose is composed into a projected map. Adding the moving leaf over an old closed-door map would leave a ghost blocker. Point lights follow the same rule where they compose; elsewhere a point map with moving casters regenerates. Changed portal connectivity also changes the participating caster and receiver sets; returning after a door moved elsewhere must validate them again.
-
-Freezing single-player simulation with `g_stopTime 1` also holds the door's rendered pose and material clock. This allows consistent comparisons of cached and freshly rendered shadows at the same point in its travel.
-
-The Vulkan shadow-light table supports 256 lights, with space for both receiver ownerships and matching descriptor capacity. Cubemap images remain allocated on demand. This removes the earlier 64-light failure seen in a stock Air Defense 2 door view; it does not remove hardware, atlas, or memory limits. Dense scenes containing more lights than the resident cache can still require substantial fresh shadow work.
-
-The [door regression report](../dev/shadowmapping-movers-2026-09-05.md) covers real paired doors, portal state, opening and reversal, point lights, the weapon flashlight, and return after off-screen movement. `testDoor <entity name> [open|close]` is a single-player cheat diagnostic: omit the action to report every leaf's physics state and portal blocking flags. It uses the normal door movement logic.
-
-## Transparency Shadowing
-
-### Cutout / Alpha-Tested Materials
-
-These are materials with holes cut by alpha test, such as:
-- Chain-link fences
-- Grates
-- Leaf cards
-- Other perforated or masked surfaces
-
-Behavior:
-- They cast cutout shadows in both projected and point shadow-map paths.
-- `r_shadowMapHashedAlpha 1` is the recommended mode and is enabled by default.
-- Supported perforated stages with explicit texture coordinates can use hashed alpha or hard alpha-test shadowing. OpenGL can use conservative solid depth for unsupported coverage stages; Vulkan retains stencil fallback for unsupported cinematic, dynamic-image, or generated-coordinate coverage. These cases still prevent removing the stencil implementation entirely.
-- Translucent shadow coverage stages preserve the same material alpha-test mode, so blended foliage/glass masks stay consistent with opaque cutouts.
-
-Hashed alpha notes:
-- Usually gives more stable distant foliage/fence shadows than hard binary alpha test.
-- Can look slightly noisy on some surfaces.
-- If you prefer harder but cleaner cutout edges, set `r_shadowMapHashedAlpha 0`.
-
-### Blended / Translucent Materials
-
-These are materials with real blending instead of alpha-test cutouts, such as:
-- Some glass-like surfaces
-- Certain layered blended materials
-- Some effect-style soft transparency
-
-Behavior:
-- Off by default.
-- Optional with `r_shadowMapTranslucentMoments 1`.
-- Implemented as an additional experimental translucent shadow overlay on top of the main shadow map.
-
-Current limits:
-- OpenGL and the experimental Vulkan renderer both draw these shadows, with matching results in openQ4's test scene. Vulkan keeps every shadowed light's translucent shadows in one shared buffer, so when many such lights share a view it lowers their resolution to make them fit, and it skips translucent stages whose texture is a video or a generated image.
-- Supported stages currently include old-style alpha and premultiplied-alpha stages with explicit ST texture coordinates, plus common additive `blend add` / `GL_ONE, GL_ONE` stages.
-- When a translucent shell/tint stage is layered on top of a separate explicit-ST coverage stage, openQ4 now reuses that coverage stage, including its alpha-test threshold when present, so layered pickup-orb and similar materials can cast shaped transmitted shadows instead of only uniform blobs.
-- Supported translucent casters now derive colored transmission from the material inputs available to that stage: texture alpha, sampled texture RGB, stage color, and applicable vertex color.
-- View-dependent reflection cubemaps are treated as tinted transmissive shells instead of using the reflected sample directly, so pickup orbs can tint transmitted light without camera-dependent shadow color shifts.
-- The current high-quality path stores separate translucent shadow moments for red, green, and blue, so each channel resolves blocker depth independently instead of sharing one grayscale depth distribution.
-- GUI/subview materials are skipped.
-- BSE/FX particles, unusual custom stage setups, and many effect-style materials are intentionally not forced into the translucent shadow pass.
-- Colored transmission is still approximate rather than a full deep-shadow solution, but it is materially closer to real tinted transmission than the earlier scalar/grayscale model.
-- This path adds extra GPU work because eligible lights render an additional translucent caster pass.
-- The feature now expects enough hardware for 3 translucent MRT attachments and 3 extra texture samplers in the receiver path; if that is unavailable, openQ4 disables this experimental translucent-shadow feature.
-
-Controls:
-
-| Setting | Default | Range | What it does |
-|---|---:|---:|---|
-| `r_shadowMapTranslucentMoments` | `0` | `0..1` | Enables the experimental blended/translucent shadow overlay. |
-| `r_shadowMapTranslucentDensity` | `1.0` | `0..8` | Scales resolved translucent-shadow strength. |
-| `r_shadowMapTranslucentMinAlpha` | `0.02` | `0..1` | Ignores very faint translucent stages below this alpha. |
-| `r_shadowMapTranslucentFilterRadius` | `-1.0` | `-1..8` | Translucent moment filter radius in texels. `-1` inherits the opaque shadow filter radius. |
-| `r_shadowMapTranslucentMinVariance` | `0.00001` | `0.000001..0.01` | Minimum variance used when resolving translucent shadow moments. |
-| `r_shadowMapTranslucentBleedReduction` | `0.0` | `0..0.95` | Reduces light bleed in the translucent moment resolve. Higher values can make translucent shadows harsher. |
-
-Suggested use:
-- Start with `r_shadowMapTranslucentMoments 1`, `r_shadowMapTranslucentDensity 1.0`, `r_shadowMapTranslucentMinAlpha 0.02`.
-- Raise `r_shadowMapTranslucentDensity` if the effect looks too weak.
-- Raise `r_shadowMapTranslucentMinAlpha` if very faint blended surfaces create more shadowing than you want.
-- Use `r_shadowMapTranslucentFilterRadius` when translucent shadows need a different softness than opaque shadows.
-- Increase `r_shadowMapTranslucentBleedReduction` only when moment light bleed is visibly worse than the added hardness.
-- Turn the feature back off if you want the most predictable performance and compatibility.
-
-## Bias and Artifact Tuning
-
-Point-light filtering compares each under-resolved sample against the receiver
-triangle at the sampled cubemap texel. This removes repeating self-shadow lines
-on terrain without increasing the world-space bias cap or disabling soft edges.
-The ordinary lookup remains in use where the existing bias covers the texel's
-depth variation. Both OpenGL and Vulkan use this correction.
-
-Keep `r_shadowMapCSM 1` for distant outdoor sources. Off-centre point lights that
-fit in one forward projection use `r_shadowMapSize` and the projected cascade
-settings; ordinary surrounding point lights still use `r_shadowMapPointSize`.
-`r_shadowMapPointLights 0` returns both kinds of point source to stencil shadows.
-See the [outdoor regression report](../dev/shadowmapping-outdoor-terrain.md).
-
-Shadow artifacts are usually one of two classes:
-- Shadow acne or speckling: bias is too low.
-- Peter Panning or detached shadows: bias is too high.
-
-Projected-light tuning:
-
-Projected shadow maps store Quake 4's authored light falloff depth directly, so the projected defaults are intentionally small. Raise them only when you see acne or speckling.
-
-Soft projected shadows sample the shadow map at several points around each pixel. On a wall or floor lit at a shallow angle, the surface itself is nearer the light at some of those points, so each sample allows for the surface's tilt in proportion to its distance from the centre. Wide filters such as the default `2.0` texels therefore stay free of speckles on grazing surfaces, while the centre sample keeps the ordinary bias, so shadows still meet the objects that cast them. OpenGL and Vulkan do this automatically; it needs no tuning.
-
-| Setting | Default | Range | What it does |
-|---|---:|---:|---|
-| `r_shadowMapBias` | `0.00016` | `0..0.05` | Constant receiver depth bias for projected lights. |
-| `r_shadowMapNormalBias` | `0.00075` | `0..0.05` | Extra projected-light bias on sloped receivers. |
-| `r_shadowMapTexelBiasScale` | `0.45` | `0..8` | Uses texel-aware receiver bias based on fitted cascade/light footprint. Constant bias acts as a compatibility floor. The tilt allowance of projected filter samples away from the centre is separate and does not depend on this scale. |
-| `r_shadowMapNormalOffsetScale` | `1.0` | `0..8` | Normal-offset bias in shadow texels. It helps slope acne but can move contact edges when set too high, especially on lights whose texels cover a large world-space footprint. |
-| `r_shadowMapReceiverPlaneBias` | `0` | `0..1` | Enables the experimental derivative receiver-plane approximation. Keep it disabled for ordinary play. |
-| `r_shadowMapPolygonFactor` | `0.25` | `0..16` | Slope-scale caster depth offset applied by the caster shaders while rendering shadow maps (shadow casters write shader depth, which `glPolygonOffset` cannot bias). |
-| `r_shadowMapPolygonOffset` | `0.5` | `0..64` | Constant caster depth offset in resolvable depth-buffer steps, applied by the caster shaders alongside the slope-scale term. |
-
-Point-light tuning:
-
-| Setting | Default | Range | What it does |
-|---|---:|---:|---|
-| `r_shadowMapPointBias` | `0.00010` | `0..0.05` | Constant receiver depth bias for point lights. |
-| `r_shadowMapPointNormalBias` | `0.0010` | `0..0.05` | Extra point-light bias on sloped receivers. |
-| `r_shadowMapPointMaxWorldBias` | `4.0` | `0..64` | Conservative world-space ceiling for the combined point-light receiver depth and normal-offset bias. It prevents huge-radius lights from turning small normalized values into large contact gaps. `0` disables the ceiling for comparison. |
-
-Point-light constant and texel-aware receiver bias use the larger value rather than stacking both terms. The slope-amplified texel-aware term is bounded internally, and the complete receiver-depth plus normal-offset budget is scaled together when it would exceed `r_shadowMapPointMaxWorldBias`.
-
-Practical advice:
-- Raise bias values slowly in very small steps.
-- If shadows detach from contact points, lower the relevant bias before changing many other settings.
-- Existing configs may keep older archived bias values. If detached shadows persist after updating, compare your local cvars against the defaults above.
-- If CSM shimmers while moving the camera, keep `r_shadowMapCascadeStabilize 1`.
-- Projected filter radii allow for surface tilt themselves. Wider point-light radii usually need more careful bias tuning.
-
-## Debugging and Diagnostics
-
-| Setting / Command | Default | What it does |
-|---|---:|---|
-| `r_shadowMapDebugMode` | `0` | Projected-light shadow debug mode. |
-| `r_shadowMapDebugOverlay` | `0` | Draws a top-left mini-map of the selected shadow map plus frame counters. |
-| `r_shadowMapReport` | `0` | Shadow-map diagnostics: `0` off, `1` summary, `2` per-light decisions, `3` verbose receiver-submit decisions. |
-| `r_shadowMapReportInterval` | `30` | Frames between report prints when `r_shadowMapReport` is enabled. |
-| `r_shadowMapMaxUpdatesPerView` | `0` | Optional per-view update budget; `0` means unlimited. Both renderers require exact cache hits. Budget misses use stencil only when it is complete, and may exceed the limit for map-only casters. Two-pass lights can fill their cache over successive views. |
-| `r_shadowMapGpuTimerQueries` | `1` | Uses non-blocking GL timer queries for shadow-map GPU timing when the driver supports them. The queries are issued only while `r_shadowMapReport` or `r_shadowMapDebugOverlay` is on, so they cost nothing in normal play. |
-| `r_shadowMapGpuSyncTimings` | `0` | Diagnostic-only GPU-synchronized pass timing using `glFinish`; leave off during normal play. |
-| `reportShaderPrograms` | n/a | Prints current ARB/GLSL shader validity, including shadow programs. |
-
-If Vulkan cannot submit either a required shadow map or the matching stencil
-ownership for one frame, it keeps that receiver's direct light unshadowed and
-logs the degradation. This avoids a complete light pop-out; the sticky fallback
-requests stencil ownership for later frames.
-
-`r_shadowMapDebugMode` values:
-- `0`: Off
-- `1`: Projected shadow atlas/depth
-- `2`: Cascade index
-- `3`: Projected UV
-- `4`: Projected depth
-- `5`: Projected W
-- `6`: Invalid mask
-- `7`: Bias heatmap
-- `8`: Bias off
-- `9`: PCF off
-- `10`: Caster polygon offset off
-- `11`: Receiver-plane/normal bias off
-- `12`: Compare-depth delta
-- `13`: Receiver eligibility
-- `14`: Receiver fallback reason
-
-Useful workflow:
-1. Enable `r_useShadowMap 1`.
-2. Set `r_shadowMapDebugMode 1` to inspect projected atlas/depth content.
-3. Set `r_shadowMapDebugOverlay 1` to keep a live mini-map in the top-left corner while you play.
-4. Use `r_singleLight` to lock the overlay to one light; otherwise OpenGL follows the last successfully rendered mapped light that frame, and Vulkan shows the first light in its prepared table (stable while the view is).
-5. The overlay stats are:
-   `POINT` / `PROJ` = light type, `L` / `G` = local/global interaction pass, `F` / `C` = point faces or projected cascades, `MAP` / `FB` = whether the selected pass stayed on shadow maps or fell back. On OpenGL the extra caster row reports alpha, translucent, rejected, and expanded off-screen caster counts. Vulkan reports its own accounting instead: the selected pass's cache decision (`SCRATCH`, `REUSE`, `PUB`, or either with `+DYN` when this view's dynamic casters composed over cached static depth) and its tile size and caster split, then `HIT` projected/point cache hits, `NEW` projected/point fresh updates, `CMP` composed passes, `TILE` atlas tiles rendered against allocated, `FACE` cube faces rendered, and `FB` budget/admission/subview fallbacks.
-6. Point-light overlay tiles are face indices `0..5` in a `3x2` layout:
-   `0 = +X`, `1 = -X`, `2 = +Y`, `3 = -Y`, `4 = +Z`, `5 = -Z`.
-7. Use `reportShaderPrograms` if the scene looks unlit or obviously wrong.
-8. Use `r_shadowMapReport 1`, `2`, or `3` for live diagnostic logging. Summary lines include point depth-compare usage as `pointCmp`, timer-query totals as `gpuQuery`, and the `SM cache:` line reports cache hits, misses, resident reuse, budget reuse, evictions, active projected/point cache slots, and resident shadow VRAM. The `SM metrics:` line reports per-frame updates, composed static/dynamic layer passes (`composed`), subview reuse/fallback activity, translucent receiver chains drawn with shadow sampling, and importance-budget denials. The `SM modern:` line summarizes the modern path's consumption of the persistent atlas (live atlas slots, mapped/cache-reuse lights, and per-light blocking counts). Verbose projected CSM bias lines include per-cascade near/far range, fitted depth range, world texel size, and clip-space depth extent. Level `3` adds receiver-submit diagnostics for mapped-light cases that had visible receivers but no GLSL interaction submissions.
-   Per-light lines separate semantic light class from backing shadow-map resource shape. For example, a stock authored parallel light may report `class=parallel type=point` when it uses the point-resource path.
-   Vulkan reports cache work after rendering the view, so `tiles`, `pointFaces`, and `composed` describe completed work. `casterFaces=C/T culled/tested` counts candidate point-caster submissions rejected before geometry binding by conservative cube-face bounds tests. It is not an FPS or whole-frame performance measurement.
-9. When rejected casters are present, the `SM caster-reject:` line breaks them down by reason, such as view-only entities, depth-hack models, disconnected portal areas, GUI/subview surfaces, non-shadowing materials, or disabled/unsupported translucent casters.
-
-## Troubleshooting
-
-- If shadows do not appear at all, check `r_shadows 1` and `r_useShadowMap 1`, then run `vid_restart`.
-- If projected-light shadows shimmer while moving, keep `r_shadowMapCSM 1` and `r_shadowMapCascadeStabilize 1`.
-- Parallel/global sky shadows automatically use the tighter `r_shadowMapDistantFilterScale 0.35` policy. If a particular outdoor scene still looks too soft, lower it toward `0`; if you want the old shared projected-light softness, set it to `1`.
-- If cutout materials cast solid-looking shadows, check the material's alpha-test and explicit texture coordinates. Unsupported coverage can use conservative solid depth on OpenGL or stencil fallback on Vulkan. Changing `r_shadowMapHashedAlpha` cannot add support for an unsupported stage type.
-- If translucent shadows are too strong or too noisy, lower `r_shadowMapTranslucentDensity` or disable `r_shadowMapTranslucentMoments`.
-- If blended materials still do not cast translucent shadows, that material may be outside the currently supported stage set. Common additive pickup orbs are supported, but many particle/effect materials still are not.
-- If point-light shadows look too detached, first confirm `r_shadowMapCasterCulling 2` and `r_shadowMapPointMaxWorldBias 4`; then reduce `r_shadowMapPointFilterRadius`, `r_shadowMapPointBias`, or `r_shadowMapPointNormalBias` in small steps.
-- If projected-light shadows look detached, reduce `r_shadowMapBias`, `r_shadowMapNormalBias`, `r_shadowMapTexelBiasScale`, `r_shadowMapPolygonFactor`, or `r_shadowMapPolygonOffset` in small steps.
-- If projected-light acne appears only with a large filter radius, prefer a higher shadow-map resolution or a narrower radius before increasing bias. The experimental receiver-plane approximation remains off by default.
-- If PCSS-lite seems unchanged, confirm `r_shadowMapFilterMode 2` is active; the renderer selects the manual raw-depth path for that mode automatically.
-- If point-light depth compare causes shader trouble on a driver, leave `r_shadowMapPointDepthCompare 0`; the renderer falls back to the high-precision color-depth cubemap path.
-- If static-cache reuse hides expected updates while testing unusual content, set `r_shadowMapStaticCache 0` or reduce `r_shadowMapResidentFrames`.
-- If performance drops sharply after enabling translucent shadowing, turn off `r_shadowMapTranslucentMoments` first; it adds an extra pass for eligible lights.
-
-## Platform Support Matrix
+## Platform support
 
 | Platform | Shadow maps | Notes |
 |---|---|---|
-| Windows (GL3.3+) | Supported | Primary development and validation platform; the bit-exact regression net runs here. |
-| Linux (GL3.3+) | Supported | Same GL feature path as Windows. |
-| Steam Deck | Supported | Recommended: `r_shadowMapSize 1024`, `r_shadowMapPointSize 512`, `r_shadowMapMaxUpdatesPerView 2`, `r_shadowMapCSM 1` with `r_shadowMapCascadeCount 3`. The importance-ordered update budget keeps per-frame shadow cost bounded. |
-| macOS (Apple legacy GL2.1 tier) | Stencil only | The Apple compatibility corridor lacks the GLSL/FBO feature set the shadow-map receiver and caster programs require. Lights fall back to the retail stencil path automatically; this is expected and documented behavior, not an error. |
-| macOS (Vulkan through MoltenVK) | Implemented, shadows untested on Apple hardware | Used when Automatic or `r_renderApi vulkan` starts Vulkan. MoltenVK is a Vulkan-on-Metal translation layer bundled in both macOS packages, not a Metal renderer. This path uses the same Vulkan shadow implementation as Windows and Linux — projected, point, parallel, and global lights, cascades, PCF/PCSS-lite, and static caching — but no real-Mac shadow evidence exists yet (one player has reported the Vulkan renderer running on an Apple Silicon Mac), so treat it as experimental and expect problems. OpenGL, the fallback and any saved OpenGL choice, uses the row above. |
+| Windows | Supported | OpenGL 3.3 or newer, and Vulkan. |
+| Linux | Supported | OpenGL 3.3 or newer. The Vulkan renderer is experimental on Linux. |
+| Steam Deck | Supported, off by default | Auto-Detect picks Performance on Deck, which uses the original shadows. To try shadow maps, use `r_shadowMapSize 1024`, `r_shadowMapPointSize 512`, `r_shadowMapMaxUpdatesPerView 2`, and `r_shadowMapCSM 1` with `r_shadowMapCascadeCount 3`. The update limit keeps shadow cost bounded in busy scenes. See the [Steam Deck guide](steam-deck.md). |
+| macOS, OpenGL (Apple legacy GL2.1 tier) | Stencil only | Apple's OpenGL lacks the shader features shadow maps need. Lights fall back to the original stencil shadows automatically; this is expected, not an error. |
+| macOS, Vulkan (through MoltenVK) | Experimental, untested on Apple hardware | Used when Automatic or `r_renderApi vulkan` starts Vulkan. MoltenVK, included in the macOS packages, runs Vulkan on Apple's Metal. It uses the same shadow code as Windows and Linux, but nobody has checked its shadows on a real Mac yet, so expect problems. If macOS uses OpenGL instead, the row above applies. |
+| Android (OpenGL ES) | Stencil only | The OpenGL ES renderer has no shadow maps; lights use the original stencil shadows. |
 
-The shadow-map pipeline rejects incomplete maps and uses complete stencil coverage when available. If Vulkan temporarily has neither usable representation, it preserves direct illumination and logs the missing resource while requesting stencil ownership for later frames. This recovery case and unsupported material/platform paths still prevent treating shadow mapping as a universal replacement.
+On every platform, openQ4 never draws a half-finished shadow: it rejects incomplete maps and uses complete stencil coverage when available, so the light shows its original shadow instead. If Vulkan briefly has neither, it keeps the light on without a shadow for that frame and notes it in the log, rather than letting the light vanish.
 
-## Summary
+## Troubleshooting
 
-Recommended default user setup:
-- `r_shadows 1`
-- `r_useShadowMap 1`
-- `r_shadowMapCSM 1`
-- `r_shadowMapHashedAlpha 1`
-- `r_shadowMapCascadeStabilize 1`
-- `r_shadowMapStaticCache 1`
+- **No shadows at all.** Check **Settings → Display → Image Quality → Enable Shadows** (`r_shadows 1`), then `r_useShadowMap 1`, or pick Quality or higher.
+- **Shadows shimmer as you move.** Keep `r_shadowMapCascadeStabilize 1` and `r_shadowMapStaticCache 1`.
+- **Shadows float away from the objects casting them.** For point lights, first confirm `r_shadowMapCasterCulling 2` and `r_shadowMapPointMaxWorldBias 4`, then lower `r_shadowMapPointFilterRadius`, `r_shadowMapPointBias` or `r_shadowMapPointNormalBias` in small steps. For spotlights, lower `r_shadowMapBias`, `r_shadowMapNormalBias`, `r_shadowMapTexelBiasScale`, `r_shadowMapPolygonFactor` or `r_shadowMapPolygonOffset` in small steps.
+- **Speckles or stripes on surfaces (shadow acne).** Raise the matching bias a very little. If it only happens with a wide soft edge, raise the shadow resolution or narrow `r_shadowMapFilterRadius` first.
+- **Outdoor sunlight shadows look too soft or too sharp.** Distant lights use a tighter edge (`r_shadowMapDistantFilterScale 0.35`). Lower it toward `0` for sharper shadows, or set `1` for the same softness as other lights.
+- **Soft edges don't change with distance.** Check `r_shadowMapFilterMode 2`.
+- **A fence or grate casts a solid shadow.** Its material's holes come from something shadow maps can't trace (a video, a generated texture or unusual texture coordinates). `r_shadowMapHashedAlpha` can't change that.
+- **Glass casts no shadow, or too much.** Glass shadows need `r_shadowMapTranslucentMoments 1`, and only common blended materials are supported. Lower `r_shadowMapTranslucentDensity` if they're too strong.
+- **Frame rate drops with glass shadows on.** Turn `r_shadowMapTranslucentMoments` off first.
+- **Shader errors with point-light shadows on one driver.** Set `r_shadowMapPointDepthCompare 0`.
+- **A shadow doesn't update on unusual content.** Set `r_shadowMapStaticCache 0` or lower `r_shadowMapResidentFrames`.
+- **After upgrading from an older openQ4.** openQ4 moves a few outdated shadow values to their new defaults once (the soft-edge radius and mode, and the point-light cache size); anything else you saved is kept. If shadows look detached after upgrading, compare your bias settings with the defaults below.
 
-Only enable `r_shadowMapTranslucentMoments 1` if you specifically want experimental blended transparency shadows and accept the extra cost and current material-support limits.
+## Settings reference
 
-Authored `noShadows` and `DECAL_MACRO` materials remain non-casting under both
-the translucent stencil option and translucent moment maps. `forceShadows`
-retains precedence when a material explicitly requests it. This prevents lit
-slime and other decals from becoming solid shadow blockers.
+### Main switches
 
-For repeatable stock-map comparisons, see the [individual map test report](../dev/shadowmapping-map-tests-2026-09-05.md) and `tools/tests/renderer_shadow_mapping_maps.py`. It captures mapped, stencil, and disabled shadows in isolated windowed SP/MP runs; images still require visual inspection.
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `r_shadows` | `1` | `0..1` | Draws shadows at all. Must be on for shadow maps. |
+| `r_useShadowMap` | `0` | `0..1` | Uses shadow maps for the lights that support them. Enhanced, Quality, Ultra and Maximum set it to `1`. |
+| `r_shadowMapPointLights` | `1` | `0..1` | Uses shadow maps for point lights too. Most of Quake 4's lights are point lights (about 19 in 20 shadow-casting ones), so `0` keeps nearly every light on the original shadows. Enhanced sets `0`. |
+| `r_shadowMapCSM` | `0` | `0..1` | Cascades for spotlights and sunlight: several shadow maps per light, sharpest nearest you. Maximum sets `1`. |
+| `r_shadowMapProjectedCSM` | `1` | `0..1` | Lets ordinary spotlights use cascades when `r_shadowMapCSM` is on. Sunlight and other parallel lights keep their own wide coverage either way. |
+| `r_shadowMapHashedAlpha` | `1` | `0..1` | Steadier shadows from grates, fences and foliage. `0` gives harder, cleaner cutout edges. |
+| `r_shadowMapStableAlphaHash` | `1` | `0..1` | Keeps that cutout pattern fixed to the world, so it doesn't crawl as the camera moves. |
+| `r_shadowMapTranslucentReceivers` | `1` | `0..1` | Lets see-through surfaces receive shadows like solid ones, as `r_stencilTranslucentShadows` does for the original shadows. |
+| `r_shadowMapCasterCulling` | `2` | `0..4` | Which side of an object's surfaces the shadow records. `2` (automatic) matches the original shadows: a lamp behind a one-sided panel shines through it, and solid props keep a grounded contact shadow. `0` records both sides, `1` the side facing the light, `3` the side facing away for every object, and `4` is the earlier automatic mode, kept for comparison. |
 
-Use `--scenario airdefense1-outdoor` for nine outdoor viewpoints, an early
-entrance approach and return visits. It compares terrain and caster shadows
-against stencil/shadows-off captures and checks cached shadows against fresh
-renders. See the [outdoor regression report](../dev/shadowmapping-outdoor-terrain.md)
-for coverage and the railing-shadow regression.
+### Sharpness and memory
 
-The runner also accepts `--scenario flashlight-cycle`, `caster-cycle`,
-`caster-cycle-point`, `caster-cycle-cutout`, `emitter-lift`, `resource-cycle`, or `cascade-motion` to exercise changes
-during gameplay. See the [transition test report](../dev/shadowmapping-transition-tests-2026-09-05.md)
-for commands, coverage, and interpretation of animated-scene comparisons.
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `r_shadowMapSize` | `1024` | `128..4096` | Resolution of each spotlight, sunlight or distant point light shadow. Higher is sharper and uses more video memory. In a crowded view, the lights covering the least of the world drop to half, then a quarter, of this size (never below 128); sunlight is reduced last. |
+| `r_shadowMapPointSize` | `512` | `128..2048` | Resolution of each face of a point light's shadow. Each point light stores six faces, so this setting dominates shadow memory. |
+| `r_shadowMapAtlasSize` | `4096` | `2048..16384` | Size of the shared texture that holds every spotlight and sunlight shadow in view. Quality fits four full-size shadows in 4096, Ultra four in 8192, Enhanced sixteen. |
+| `r_shadowMapProjectionPad` | `0.15` | `0..1` | Extra margin around a spotlight's shadow coverage. |
+| `r_shadowMapPointFarScale` | `1.25` | `1..4` | Extra range for point-light shadows. |
+| `r_shadowMapPointDepthCompare` | `1` | `0..1` | Uses the graphics card's built-in comparison for point-light shadows where available. Set `0` if a driver has trouble. |
+| `r_shadowMapPointDepthOnly` | `1` | `0..1` | OpenGL: stores point-light shadows as depth only, which halves their memory. openQ4 adds the extra colour copy by itself when something needs it (no hardware comparison, the experimental renderer paths, or the debug overlay). `0` always keeps it. Vulkan always stores depth only. |
+| `r_shadowMapPointHighPrecision` | `0` | `0..1` | Stores that colour copy at higher precision. It only matters when the colour copy is in use. |
+| `r_shadowMapDepthCompare` | `1` | `0..1` | Uses the graphics card's built-in comparison for spotlight shadows. Contact-hardening (`r_shadowMapFilterMode 2`) reads the shadow map directly instead, whatever this is set to. Set `0` if a driver has trouble. |
 
-The [replacement progress report](../dev/shadowmapping-replacement-progress-2026-09-05.md)
-records the next round's cutout-cache, emitter, and point-face improvements,
-retained map tests, measured shadow-pass costs, and remaining stencil dependencies.
+### Soft edges
 
-Use `--random-maps 4 --seed 20260905` to sample the stock SP launch catalog
-reproducibly. The runner saves the candidate pool and chosen maps, verifies the
-requested renderer module, and checks the Air Defense 1 reference camera after
-its presentation pose has updated. See the [final audit and random-map report](../dev/shadowmapping-final-audit-2026-09-05.md)
-for the decal repair, comparison evidence, and remaining limitations.
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `r_shadowMapFilterMode` | `2` | `0..2` | Spotlight edge style: `0` fixed blur, `1` even soft edge, `2` contact-hardening (sharp at contact, softer with distance). |
+| `r_shadowMapFilterRadius` | `2.0` | `0..8` | Spotlight edge width in shadow-map pixels: the blur width in modes `0` and `1`, and the narrowest edge in mode `2`. Raising it softens and widens edges; for more detail, raise the resolution instead. |
+| `r_shadowMapFilterTaps` | `9` | `1..13` | Samples per spotlight edge (1, 5, 9 or 13). More is smoother and costs more. |
+| `r_shadowMapPCSSLightRadius` | `4.0` | `0..16` | How far contact-hardening searches for the object casting a shadow, in shadow-map pixels. |
+| `r_shadowMapPCSSMaxRadius` | `8.0` | `0..16` | The widest edge contact-hardening can draw, in shadow-map pixels. |
+| `r_shadowMapDistantFilterScale` | `0.35` | `0..1` | Narrows soft edges for sunlight and other distant lights, whose shadow pixels cover far more ground, so their outlines stay crisp. `1` uses the ordinary spotlight width. |
+| `r_shadowMapPointFilterMode` | `0` | `0..1` | Point-light edge style: `0` fixed blur, `1` even soft edge. Point lights don't use contact-hardening. |
+| `r_shadowMapPointFilterRadius` | `1.0` | `0..8` | Point-light edge width. Large lights cover a lot of ground per pixel, so wide values can wash out contact detail. |
+| `r_shadowMapPointFilterTaps` | `9` | `1..13` | Samples per point-light edge (1, 5, 9 or 13). |
+
+### Cascades
+
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `r_shadowMapCascadeCount` | `4` | `1..4` | Number of cascades when `r_shadowMapCSM` is on. |
+| `r_shadowMapCascadeDistance` | `1536` | `64..8192` | How far from you the cascades reach, in game units. |
+| `r_shadowMapCascadeLambda` | `0.75` | `0..1` | How the cascades divide that distance: lower spaces them evenly, higher packs more detail close to you. |
+| `r_shadowMapCascadeBlend` | `0.15` | `0..0.5` | Width of the crossfade between neighbouring cascades. |
+| `r_shadowMapCascadeStabilize` | `1` | `0..1` | Holds cascades steady to stop shimmering as you move. |
+
+### Stored shadows and update limits
+
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `r_shadowMapStaticCache` | `1` | `0..1` | Stores the shadows of still scenery and reuses them every frame. Moving objects are drawn on top. |
+| `r_shadowMapStaticCutouts` | `1` | `0..1` | Stores grates, railings and fences with the still scenery when their holes can't change, so a light reaching one isn't redrawn every frame. Cutouts that animate are still drawn each frame. `0` redraws every cutout each frame. |
+| `r_shadowMapResidentFrames` | `120` | `1..3600` | Frames an unused stored shadow is kept before its space can be reused. |
+| `r_shadowMapStaticHysteresisFrames` | `2` | `0..120` | Frames to wait after moving objects leave before a point light that can't layer moving objects over its stored shadow is stored again. |
+| `r_shadowMapProjectedCacheSize` | `8` | `0..16` | How many full-size spotlight shadows to store (half-size ones count as a quarter each). `0` turns storing off. On Vulkan this caps the memory used, at most 128 MiB on Quality and 512 MiB on Ultra; on OpenGL the shadow atlas is the limit. Shadows in use on screen are never dropped. |
+| `r_shadowMapPointCacheSize` | `64` | `0..96` | How many point-light shadows to store. |
+| `r_shadowMapPointCacheMegs` | `512` | `64..8192` | Video memory the stored point-light shadows may use, in MiB. The default holds all 64 at the default size. A light without a slot is still shadowed; it is just drawn afresh each frame. |
+| `r_shadowMapCacheCSM` | `0` | `0..1` | Also stores cascade shadows while their fit is unchanged. Most useful for fixed views. |
+| `r_shadowMapMaxUpdatesPerView` | `0` | `0..1024` | Limits how many shadows are drawn afresh per frame; `0` means no limit, which every preset uses. A low limit keeps cost bounded on weak hardware but can leave moving shadows slightly behind. A light whose shadow would otherwise go missing is drawn anyway. |
+| `r_shadowMapSubviewPolicy` | `1` | `0..2` | Shadows in mirrors and security cameras: `0` draws them like the main view, `1` reuses stored shadows or falls back to the original shadows, `2` prefers the original shadows. A shadow that would otherwise go missing is still drawn. |
+| `r_shadowMapStencilFallbackViews` | `240` | `0..100000` | After a light's shadow map fails once, it keeps its original shadow ready as a backup. This is how many views must pass without another failure before it stops. `0` keeps the backup for the rest of the level. |
+
+### Shadow acne and detached shadows
+
+Shadow artifacts usually come in two kinds: speckles or stripes on a lit surface (bias too low), or shadows that float away from the object casting them (bias too high). Change bias in very small steps. Soft spotlight edges already allow for surfaces lit at a shallow angle, so they need no extra bias for that.
+
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `r_shadowMapBias` | `0.00016` | `0..0.05` | Basic spotlight bias. |
+| `r_shadowMapNormalBias` | `0.00075` | `0..0.05` | Extra spotlight bias on sloped surfaces. |
+| `r_shadowMapTexelBiasScale` | `0.45` | `0..8` | Bias that scales with how much ground each shadow pixel covers. `r_shadowMapBias` acts as its minimum. |
+| `r_shadowMapNormalOffsetScale` | `1.0` | `0..8` | Nudges the shadow lookup off sloped surfaces. Helps with stripes, but too high moves contact edges, especially on large lights. |
+| `r_shadowMapReceiverPlaneBias` | `0` | `0..1` | An experimental alternative bias. Leave it off for normal play. |
+| `r_shadowMapPolygonFactor` | `0.25` | `0..16` | Pushes shadow-casting surfaces back in proportion to their slope while the shadow is drawn. |
+| `r_shadowMapPolygonOffset` | `0.5` | `0..64` | Pushes shadow-casting surfaces back by a fixed amount while the shadow is drawn. |
+| `r_shadowMapPointBias` | `0.00010` | `0..0.05` | Basic point-light bias. |
+| `r_shadowMapPointNormalBias` | `0.0010` | `0..0.05` | Extra point-light bias on sloped surfaces. |
+| `r_shadowMapPointMaxWorldBias` | `4.0` | `0..64` | Caps the total point-light bias in game units, so very large lights don't open gaps at contact points. `0` removes the cap. |
+
+### Glass and blended surfaces
+
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `r_shadowMapTranslucentMoments` | `0` | `0..1` | Turns on the experimental shadows from glass and other blended surfaces. |
+| `r_shadowMapTranslucentDensity` | `1.0` | `0..8` | Strength of those shadows. |
+| `r_shadowMapTranslucentMinAlpha` | `0.02` | `0..1` | Ignores surfaces fainter than this. |
+| `r_shadowMapTranslucentFilterRadius` | `-1.0` | `-1..8` | Edge softness of those shadows. `-1` uses the solid-shadow setting. |
+| `r_shadowMapTranslucentMinVariance` | `0.00001` | `0.000001..0.01` | A precision floor for those shadows. Rarely needs changing. |
+| `r_shadowMapTranslucentBleedReduction` | `0.0` | `0..0.95` | Reduces light bleeding through them. Higher values make them harsher. |
+
+### Light shadows from gameplay
+
+| Setting | Default | Range | What it does |
+|---|---:|---:|---|
+| `g_dynamicLightShadows` | `-1` | `-1..1` | Shadows from your weapon's flashlight and from projectile lights. `-1` follows the preset (flashlight wherever shadows are drawn, projectile lights on Quality and up), `0` never, `1` always. A weapon picks up the change when it is next drawn or a save is loaded. |
+
+### Troubleshooting and diagnostics
+
+These help when reporting a shadow problem. Leave the last five settings at their defaults for play; the comparison switches exist to compare against the older way of drawing.
+
+| Setting or command | Default | What it does |
+|---|---:|---|
+| `r_shadowMapReport` | `0` | Prints shadow statistics to the console: `1` a summary, `2` each light's decisions, `3` more detail. |
+| `r_shadowMapReportInterval` | `30` | Frames between report prints. |
+| `r_shadowMapDebugOverlay` | `0` | Shows a small view of one light's shadow map in the top-left corner, with counters. Use `r_singleLight` to pick the light. |
+| `r_shadowMapDebugMode` | `0` | Colours the scene to show one part of the shadow calculation: `1` the shadow atlas, `2` which cascade each pixel uses, `7` a bias heatmap; the other values up to `14` isolate individual stages. |
+| `reportShaderPrograms` | | Lists shader programs and whether they compiled. Try it if the scene looks unlit or plainly wrong. |
+| `testFlashlight 1` | | Cheat: switches on the current single-player weapon's flashlight without input, for testing. `testFlashlight 0` turns it off. |
+| `testDoor <name> [open\|close]` | | Cheat: reports or moves a single-player door, for checking its shadow. |
+| `r_shadowMapSkipStencilShadows` | `1` | Skips building original shadows for lights drawn with shadow maps, which saves processor time. A light whose map fails gets them back the next frame. |
+| `r_shadowMapConservativeCasters` | `1` | Lets objects off screen cast shadows onto what you can see. |
+| `r_shadowMapPointCompose` | `1` | Comparison switch: draws a point light's moving objects over its stored shadow instead of redrawing all six faces. |
+| `r_shadowMapCacheMovingLights` | `0` | Comparison switch: a moving light gets a new shadow every frame, so it is drawn directly rather than stored. `1` stores it anyway. A light that only changes colour is not moving. |
+| `r_vkShadowSampleResident` | `1` | Comparison switch, Vulkan: reads a stored spotlight shadow in place instead of copying it each frame. The picture is identical. |

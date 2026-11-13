@@ -7,6 +7,29 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Player guides in plain language, checked against 0.14.1, 13 November 2026
+
+- **The README, every player guide and the package README read more simply.**
+  Each guide opens with what the feature does and how to reach it from the
+  menus, console settings sit in reference tables, and developer, test and
+  investigation detail is gone. The repository's project overview page
+  (`assets/docs/README.html`) is now a player overview of 0.14.1.
+- **Corrected against 0.14.1.** Menu paths name the new interface's tabs
+  (**Settings → Display**, not System). Wrong facts in 0.14.1's guides are
+  fixed: the hit marker is off by default and damage numbers show for
+  opponents; Arena is under **Single Player → Arena** and its end-of-match
+  buttons are Retry, Replay and Next; changing difficulty mid-game uses the
+  pause menu's **Restart Level**; motion blur belongs to Maximum, not Ultra;
+  `com_platformProfile` must be set on the launch line. The package README no
+  longer calls Vulkan experimental everywhere or OpenGL the macOS default, and
+  no longer lists `.pdb` files, which ship separately.
+- **Version marking.** Anything newer than 0.14.1 is marked **Not in 0.14.1**,
+  and release status explains the convention. Getting Started gains a
+  "Reporting a problem" section, because openQ4 writes no log unless asked.
+- Documentation pins in `arena_campaign.py`, `macos_shadow_policy.py`,
+  `multiview_demo.py`, `renderer_picmip_policy.py`, `settings_menu_coverage.py`
+  and `steam_deck_support.py` follow the new wording.
+
 ## A log file that cannot be written no longer crashes the game (#219), 13 November 2026
 
 - **openQ4 no longer crashes when its log file stops accepting writes.** A

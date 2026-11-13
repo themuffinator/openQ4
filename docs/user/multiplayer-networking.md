@@ -1,94 +1,103 @@
-# Multiplayer Networking Guide
+# Multiplayer networking
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-> **Experimental.** Multiplayer and the single-player Arena Campaign are
-> under active development and are not yet considered stable. Expect rough
-> edges, changing behaviour between builds, and bugs. They are not
-> representative of the finished feature.
+> **Experimental.** Multiplayer is still under active development. Expect rough
+> edges, bugs and behaviour that changes between versions.
 
-This guide covers openQ4 multiplayer networking behavior and the cvars used to tune or revert prediction/lag-comp behavior.
+This guide shows you how to find and join online games, connect to a server by
+address over IPv4 or IPv6, and choose how other players' movement and your own
+shots are shown on a connection with delay. To host a server, see the
+[server setup guide](server-setup.md).
 
-## Quick Summary
+## Before you play
 
-- The server browser lists discovered servers, keeps your selection through sorting, and remembers favorite server addresses.
-- Direct connections accept numeric IPv4 addresses, IPv6 addresses, and hostnames with either kind of DNS record.
-- IPv4 ports use the complete unsigned 16-bit range, including high ports above `32767`.
-- IPv6 is enabled by default. A server binds both families on the same port, so one address works for every client.
-- LAN scanning finds IPv6 servers through link-local multicast, which replaces the IPv4 broadcast that IPv6 does not have.
-- Server-side hitscan lag compensation is off by default (`net_mpLagCompensation 0`).
-- Remote-client prediction uses legacy mode by default (`net_mpPredictMode 0`).
-- Enhanced prediction and lag compensation are opt-in experiments. Each client tells the server how far ahead it draws other players, and the server rewinds only the rest, so the two settings no longer correct the same delay twice. Their combined behavior is still being measured on real connections.
-- Retail Quake 4 1.4.2 clients and servers use protocol 2.85 and cannot play with openQ4. Each side is refused with a message naming the protocol; see [Retail Quake 4 servers](#retail-quake-4-servers).
-- Use matching openQ4 releases and content on the server and clients. The voice-enabled candidate and release 0.13.0 refuse to join each other: pure servers report missing packages, while non-pure servers report data out of sync. Other release pairs need their own compatibility check. Voice packets are sent only to peers advertising the supported voice protocol.
+- **Use the same openQ4 version everywhere.** The server and every client need
+  openQ4 0.14.1 and the same game files. Different openQ4 versions are not
+  guaranteed to play together: 0.13.0 and 0.14.1, for example, refuse each
+  other, with a pure server reporting missing packages and other servers
+  reporting that data is out of sync.
+- **Retail Quake 4 cannot play with openQ4.** Retail Quake 4 1.4.2 clients and
+  servers use a different network protocol (2.85), so neither side can join the
+  other. openQ4 refuses them with an explanation instead of hanging; see
+  [Retail Quake 4 servers](#retail-quake-4-servers).
 
 ## Find and join a server
 
-Open **Multiplayer > Join Game**, then choose **Internet** or **LAN**. The
-list shows the server name, ping, player count, game type and map, with the
-stock icons for favorites, passwords, dedicated servers and Q4TV repeaters.
-Select a row to see its map preview, then choose **Join Server** to play, or
-in the new menus **Spectate** to join it watching. Passworded servers use the
-existing password prompt.
+Open **Multiplayer → Join Game**, then choose **Internet** or **LAN**. The list
+shows each server's name, ping, player count, game type and map, with icons for
+favourites, passwords, dedicated servers and Q4TV repeaters. Select a row to
+see its map preview, then choose **Join Server** to play or, in the new menus,
+**Spectate** to join it watching. A passworded server asks for its password.
 
-In the new menus the layout button beside **Source** switches the list
-between rows and larger tiles, which show each server's map picture with its
-name, game type, map, ping and players. The game remembers the choice
-(`ui_browserView`: `0` rows, `1` tiles).
+In the new menus, the layout button beside **Source** switches the list between
+rows and larger tiles that show each server's map picture. The game remembers
+your choice.
 
-Choose a column heading to sort, and **Clear Sorting** to list servers in the
-order they answered. **Mod** shows one mod's servers; the `gui_filter_*`
-console settings can also hide full or empty servers, passworded servers or
-game types. When a filter hides the selected server, Join Server is disabled
-until you select a visible server, and the list tells you when the filters
-hide every server. **Refresh List** updates the currently known addresses;
-**Get New List** runs discovery again. The bar under the list fills as
-servers answer and names the step the scan is on. Bars beside each ping
-show the connection's quality: four up to 60 ms, three to 120 ms, two to
-200 ms and one above, turning amber at two bars and red at one. Point at a server, or
-move to it with the keyboard or a controller, to see its address, players
-and settings in a card beside it. With a controller, the left face button
-refreshes the list and the top one sorts it by the next column; pressing the
-left stick spectates the selected server and pressing the right stick adds
-it to or removes it from your favorites, as the stick symbols beside
-**Spectate** and the favorite control show.
+**Sorting and filtering**
 
-**Join IP Address** connects to an address you type, in any form the direct
-connections below accept, and shows your own IP address to pass on to
-friends. An address that cannot be joined keeps the dialog open with the
-reason.
+- Choose a column heading to sort, and **Clear Sorting** to list servers in the
+  order they answered.
+- **Mod** shows one mod's servers. The `gui_filter_*` console variables can
+  also hide full, empty or passworded servers, or game types. When a filter
+  hides the selected server, **Join Server** is unavailable until you select a
+  visible one, and the list tells you when the filters hide every server.
+- **Refresh List** asks the servers you already know for fresh details; **Get
+  New List** searches for servers again. The bar under the list fills as
+  servers answer.
+- The bars beside each ping show connection quality: four bars up to 60 ms,
+  three up to 120 ms, two up to 200 ms and one above that. Two bars turn amber
+  and one turns red.
+- Point at a server, or move to it with the keyboard or a controller, to see its
+  address, players and settings in a card beside it.
+
+**With a controller,** the left face button refreshes the list and the top face
+button sorts by the next column. Press the left stick to spectate the selected
+server and the right stick to add it to or remove it from your favourites, as
+the stick symbols on screen show.
+
+**Join IP Address** connects to an address you type, in any of the forms under
+[Connect by address](#connect-by-address), and shows your own IP address to
+pass on to friends. If the address cannot be joined, the dialog stays open and
+says why.
 
 **Find Player/Clan** shows only the listed servers with a player whose name
-contains what you type, ignoring colors and case; a clan tag counts as part of
-the name. The search shows as a tag below the list: select it to end the
-search. Get New List ends it as well. The original game asked id's master
-server for this search, which no longer answers.
+contains what you type, ignoring colours and case. A clan tag counts as part of
+the name. The search shows as a tag below the list: select the tag, or choose
+**Get New List**, to end it.
 
-The favorite control saves the selected server's address locally. Favorites
-are queried alongside Internet discovery, so a saved address can still appear
-when it is absent from the master list. Removing a favorite leaves the server
-available in ordinary discovery results.
+**Favourites.** The favourite control saves the selected server's address on
+your computer. Favourites are asked for details along with the Internet search,
+so a saved server can appear even when the master server does not list it.
+Removing a favourite does not hide the server from ordinary results.
 
-LAN discovery probes ports `28004` through `28011`. Use a direct connection
-for a server on another port. Internet results depend on the configured master
-service and reachable servers; direct connections remain available below.
-Over IPv6 the scan reaches servers on the same network link, including
-IPv6-only servers on Windows. A server that listens only on the IPv6 loopback
-address `::1` has no link to scan, so join it with `connect [::1]:<port>`.
+**LAN games.** The LAN scan looks for servers on ports `28004` to `28011`. For a
+server on any other port, connect by address. Over IPv6 the scan finds servers
+on the same local network, including IPv6-only servers on Windows. A server
+that listens only on the IPv6 loopback address `::1` cannot be found by a scan;
+join it with `connect [::1]:<port>`.
 
 ### Retail Quake 4 servers
 
-Retail Quake 4 1.4.2 servers use network protocol 2.85; openQ4 uses 2.41, so
-the two cannot play together. A LAN scan leaves retail servers out of the list
-(the console notes each one as `ignored - protocol 2.85`). Connecting to one
-directly shows **Network protocol mismatch** with both versions, before openQ4
-would switch to the retail server's `q4mp` folder. A retail player who tries an
-openQ4 server sees `server uses protocol 2.41`. See
-[server security](server-security.md#retail-quake-4-clients-and-servers).
+Retail Quake 4 1.4.2 servers use network protocol 2.85 and openQ4 uses 2.41, so
+the two cannot play together:
 
-## IPv4 Connections
+- A LAN scan leaves retail servers out of the list. The console notes each one
+  as `ignored - protocol 2.85`.
+- Connecting to one directly shows **Network protocol mismatch** with both
+  versions, before openQ4 would switch to the retail server's `q4mp` folder.
+- A retail player who tries an openQ4 server sees `server uses protocol 2.41`.
 
-Use `connect <address>:<port>` for a direct IPv4 connection. These forms are supported:
+See [server security](server-security.md#retail-quake-4-clients-and-servers)
+for more.
+
+## Connect by address
+
+Open the console and use `connect <address>`, or type the address into **Join
+IP Address**. If you leave out the port, openQ4 uses the default server port
+`28004`.
+
+### IPv4 connections
 
 ```text
 connect 192.168.1.50:28004
@@ -96,17 +105,26 @@ connect 203.0.113.25:32000
 connect play.example.net:28004
 ```
 
-The first form is suitable for a local network, the second illustrates an internet-facing IPv4 address, and the third uses a hostname with an IPv4 DNS record. If the port is omitted, openQ4 uses the default server port `28004`.
+The first is a typical local-network address, the second an internet address
+on a different port, and the third a hostname.
 
-Endpoint ports are parsed as unsigned 16-bit values from `0` through `65535`. For a direct connection, an omitted port or literal `:0` selects `28004`; ports from `1` through `65535` select that exact destination. Internet server-list entries also preserve the full range, so servers using ports `32768` through `65535` remain connectable.
+Any port from `1` to `65535` works, including ports above `32767`, and servers
+on those ports stay joinable from the Internet list. A port of `0` means the
+default port. openQ4 rejects malformed addresses, non-numeric ports and ports
+out of range rather than guessing.
 
-Malformed addresses, non-numeric port text, and ports outside the valid range are rejected. An unresolved remote-console address is rejected as well, rather than sending a command to an unintended wildcard address.
+Server operators set the address and port with `net_ip` and `net_port`, and
+need a firewall rule and possibly a router port forward; see
+[IPv4 binding and ports](server-setup.md#ipv4-binding-and-ports).
 
-Server operators should configure `net_ip`, `net_port`, host firewall rules, and any router port forward as described in the [Server Setup Guide](server-setup.md#ipv4-binding-and-ports).
+### IPv6 connections
 
-## IPv6 Connections
+IPv6 is on by default. A server listens on IPv4 and IPv6 at the same port, so
+one server address works for every client.
 
-An IPv6 address contains colons, so it must be wrapped in brackets whenever a port follows it. Without the brackets the last colon would be read as the port separator and eat part of the address.
+An IPv6 address contains colons, so wrap it in square brackets whenever a port
+follows it. Without the brackets, the last colon would be read as the start of
+the port.
 
 ```text
 connect [2001:db8::1]:27650
@@ -115,109 +133,96 @@ connect 2001:db8::1
 connect play.example.net:28004
 ```
 
-The first form is an ordinary global IPv6 address. The second adds a *zone index*, which a link-local `fe80::/10` address needs so the system knows which network interface to use; openQ4 prints and accepts the numeric index. The third omits the port, which selects the default server port `28004` — brackets are optional when there is no port. The fourth resolves a hostname: if it has both an A and a AAAA record, openQ4 tries the IPv4 address first, so use the bracketed literal to go straight to IPv6.
+- The first is an ordinary IPv6 address.
+- The second is a local-network (link-local, `fe80::`) address, which needs the
+  number of your network interface after a `%` so the system knows which
+  connection to use.
+- The third leaves out the port, so it uses `28004`. Brackets are optional when
+  there is no port.
+- The fourth is a hostname. If it has both an IPv4 and an IPv6 address, openQ4
+  tries IPv4 first; type the bracketed IPv6 address to go straight to IPv6.
 
 A hostname can have several addresses. openQ4 connects to the first one, and if
-three connection attempts a second apart go unanswered it tries the host's other
-addresses in turn: up to eight of them, alternating between IPv4 and IPv6, and
-starting over after the last. The console names each address as it is tried, and
-the first server to answer is the one you join. A numeric address and a server
-list entry are a single address, so they keep retrying that address until you
+three attempts a second apart go unanswered, it tries the host's other addresses
+in turn: up to eight of them, alternating between IPv4 and IPv6, starting over
+after the last. The console names each address as it tries it, and
+the first server to answer is the one you join. A numeric address or a
+server-list entry is a single address, so openQ4 keeps retrying it until you
 cancel.
 
-Addresses are displayed in the canonical [RFC 5952](https://www.rfc-editor.org/rfc/rfc5952) form — lowercase, with the longest run of zero groups collapsed to `::` — so `[2001:0db8:0000:0000:0000:0000:0000:0001]:27650` is shown as `[2001:db8::1]:27650`. The same text is used by the server browser and by server-side ban lists, so one address always has exactly one spelling.
+openQ4 always writes an IPv6 address in its shortest standard form
+([RFC 5952](https://www.rfc-editor.org/rfc/rfc5952)): lower case, with the
+longest run of zeros shortened to `::`. So
+`[2001:0db8:0000:0000:0000:0000:0000:0001]:27650` appears as
+`[2001:db8::1]:27650`. The server browser and server ban lists use the same
+spelling, so one address is never listed twice. A player who reaches a server
+over IPv4 is treated as an IPv4 player, even though the server also listens on
+IPv6.
 
-A client reaching a dual-stack server over IPv4 is recorded as an IPv4 client even though the server also listens on IPv6, so bans and client-slot handling see a single identity per host.
+### IPv6 and packet size
 
-Run `netIPv6SelfTest` from the console to check IPv6 parsing, canonical formatting, and loopback transport on the local machine. It reports `IPv6 network self-test: passed`, or skips the transport checks on a host with no IPv6 configured. `netIPv4SelfTest` does the same for IPv4.
+Every network carries packets up to a certain size in one piece. IPv6
+guarantees only 1,280 bytes and does not let routers split larger packets on
+the way, so on an IPv6 connection openQ4 sends its game messages in smaller
+pieces than on IPv4. This is automatic. It stops the problem where a player
+connects and then waits forever for a game update that never arrives.
 
-### Why IPv6 packets are smaller
+- **If an IPv6 server never answers when you join, or never appears in the
+  list,** your network may be blocking split packets (some VPNs and firewalls
+  do). In 0.14.1 the server's replies to a join or a server-list request are
+  larger than 1,280 bytes, so your operating system has to split them. Join
+  that server over IPv4 instead.
+- **Not in 0.14.1:** those replies now fit one packet, and a game message that
+  grew when compressed is split like any other, so joining and listing work on
+  such networks when you and the server both run the next release. A server
+  list reply may then leave out settings the browser never shows.
 
-IPv6 guarantees only a 1280-byte path MTU and forbids routers from splitting a datagram in transit, so openQ4 fragments its own messages more aggressively on an IPv6 connection than on IPv4. This is automatic and needs no configuration; it prevents the failure where a client connects and then stalls forever waiting for a snapshot that no router will deliver.
+## How other players and your shots are shown
 
-One exception remains: the server's replies to a join or a server-list query carry its full settings and are larger than that limit, so your operating system splits them. If an IPv6 server never answers a join or never shows up in the list, and your network (some VPNs and firewalls) blocks split packets, join over IPv4 instead.
+Every update from the server takes time to reach you, so the game fills the gap
+in a few ways:
 
-## CVar Reference
+- **Your own movement is predicted.** Your game works out where you are going
+  without waiting for the server, so movement responds at once.
+- **Your own instant-hit shots** (**Not in 0.14.1**). Machinegun, shotgun and
+  railgun tracers and their marks on walls appear the moment you fire, from your
+  gun and along your crosshair, as the lightning gun's beam and the gauntlet's
+  sparks always did. The server fires the same shotgun pellets, because both
+  sides use the same spread. Hits on players are still the server's decision:
+  the impact on a body, the hit marker and damage numbers arrive with the
+  server's update. Rockets, grenades and other projectiles appear when the
+  server launches them. In 0.14.1, all of your shots appear when the server's
+  copy arrives. Set `net_mpPredictHitscan 0` to keep that behaviour.
+- **Other players** are drawn from the server's last update, which is slightly
+  old by the time it arrives:
+  - **Legacy prediction** (`net_mpPredictMode 0`, the default) shows them about
+    one round trip behind where the server has them.
+  - **Enhanced prediction** (`net_mpPredictMode 1`) replays their latest inputs
+    to draw them up to `net_mpPredictMaxFrames` frames closer to the present.
+- **Lag compensation** (`net_mpLagCompensation 1`, set on the server) makes
+  aiming at what you see count. When your instant-hit weapon, lightning gun or
+  gauntlet attack is checked, the server briefly moves the other players back
+  to where your screen showed them.
 
-| Setting | Default | Range | Scope | What it does |
-|---|---:|---:|---|---|
-| `net_ip` | `localhost` | address | Client and server | IPv4 interface to bind. `localhost` or empty binds every interface. |
-| `net_ip6` | *(empty)* | address | Client and server | IPv6 interface to bind. Empty binds every interface. |
-| `net_enableIPv4` | `1` | `0..1` | Client and server | Opens the IPv4 socket. |
-| `net_enableIPv6` | `1` | `0..1` | Client and server | Opens the IPv6 socket. Set `net_enableIPv4 0` for an IPv6-only host. |
-| `net_mcast6addr` | `ff02::1` | address | Client and server | IPv6 multicast group used by the LAN server scan. |
-| `net_mcast6iface` | `0` | index | Client and server | IPv6 interface index for the LAN scan. `0` scans every attached link. |
-| `net_clientMaxRate` | `128000` | bytes/s | Client | The most a server may send you each second, sent when you connect. Lower it below your connection's real download speed if matches stutter on a slow or shared line. |
-| `net_serverMaxClientRate` | `128000` | bytes/s | Server | The most the server sends any one player each second, whatever they ask for. |
-| `net_mpLagCompensation` | `0` | `0..1` | Server gameplay | Enables server-side lag compensation for multiplayer hitscan traces. |
-| `net_mpLagCompMaxMS` | `200` | `0..1000` | Server gameplay | Caps rewind window in milliseconds used by lag compensation. |
-| `net_mpLagCompBiasMS` | `0` | `-200..200` | Server gameplay | Adds/subtracts additional rewind bias in milliseconds. |
-| `net_mpLagCompDebug` | `0` | `0..2` | Server gameplay | Debug logging for lag compensation (`0` off, `1` summary, `2` verbose). |
-| `net_mpLagCompSlackMS` | `48` | `0..200` | Server gameplay | How far past the round trip the server measured a rewind may reach. |
-| `net_mpPredictMode` | `0` | `0..1` | MP client prediction | Selects remote-player prediction mode (`0` legacy limited, `1` enhanced per-frame). |
-| `net_mpPredictMaxFrames` | `16` | `1..64` | MP client prediction | The most game frames (16 ms each) enhanced prediction draws another player ahead. |
-| `net_mpRemoteExtrapolation` | derived | read-only | MP client prediction | What this client tells servers it draws other players ahead by, in frames: `0` in legacy mode, otherwise `net_mpPredictMaxFrames`. |
-| `net_mpPredictHitscan` | `1` | `0..1` | MP client | Draws your own machinegun, shotgun and railgun tracers and wall impacts the moment you fire. `0` waits for the server's copy of each shot, as older builds did. |
-| `net_mpHitscanDebug` | `0` | `0..1` | Client and server | Logs every hit-scan shot: the server's, the ones your client drew itself, and the server's copies it received, with how far each started from your gun and aim. |
+The two settings work together without correcting the same delay twice. Your
+game tells the server how far ahead it draws other players
+(`net_mpRemoteExtrapolation`), and the server rewinds a shot only by the delay
+your screen really had. The server caps every figure at the round trip it
+measures itself, so a player cannot claim a longer rewind. Damage, blood,
+impact effects and knockback always happen where the target is now.
 
-## How prediction and lag compensation fit together
+### Try enhanced prediction or lag compensation
 
-Your own movement is predicted, so you see it at once. So are your own shots:
-machinegun, shotgun and railgun tracers and their marks on walls appear the
-moment you fire, from your gun and along your crosshair, as the lightning gun's
-beam and the gauntlet's sparks always did. The server fires the same pellets,
-because both sides take the spread from the same seed. Hits on players stay
-the server's decision: the impact on a body, the hit marker and damage numbers
-come with the server's update. Rockets, grenades and other projectiles still
-appear when the server launches them. Other players are shown from the last
-update the server sent, which is a little old by the time it arrives.
+Both features are experimental and off by default while they are tested on
+real connections with delay, jitter and packet loss.
 
-- **Legacy prediction** (`net_mpPredictMode 0`) shows other players about one
-  round trip behind where the server has them.
-- **Enhanced prediction** (`net_mpPredictMode 1`) re-simulates them from their
-  relayed inputs, drawing them up to `net_mpPredictMaxFrames` frames closer to
-  the present.
-- **Lag compensation** (`net_mpLagCompensation 1`, server only) briefly moves
-  other players back to where your screen showed them when your hitscan,
-  lightning gun or gauntlet attack lands.
-
-Each client advertises how far ahead it draws other players
-(`net_mpRemoteExtrapolation`). The server takes that off the rewind, so a shot
-is rewound only by the delay the client really showed. Every figure the client
-reports is capped by the round trip the server measured itself, so a client
-cannot claim a longer rewind. Damage, blood, impact effects and knockback are
-always applied where the target is now.
-
-Server operators can run `lagCompStatus` to see, for each player, the reported
-lead, the measured round trip, the advertised extrapolation and the rewind a
-shot from that player would get. It works whether or not lag compensation is
-on. `net_mpLagCompDebug 1` logs the same figures for each compensated shot,
-and `net_mpPredictDebug 1` makes a client log how old each remote player was
-on its screen when a server update arrived. `net_verbose 2` also logs, for
-each server update, how far ahead the client is predicting, the target it is
-steering towards and how early the server says its commands arrive.
-
-## Legacy Compatibility Switch
-
-Use this to restore legacy multiplayer behavior:
-
-```cfg
-seta net_mpLagCompensation 0
-seta net_mpPredictMode 0
-```
-
-## Experimental Settings
-
-Both features are still being measured on real connections with delay,
-jitter and packet loss, so neither is on by default. To try them:
-
-### Clients: enhanced prediction
+On a client, to draw other players closer to the present:
 
 ```cfg
 seta net_mpPredictMode 1
 ```
 
-### Servers: lag compensation
+On a server, to rewind shots to what each player saw:
 
 ```cfg
 seta net_mpLagCompensation 1
@@ -226,27 +231,78 @@ seta net_mpLagCompBiasMS 0
 ```
 
 On a LAN, a smaller `net_mpLagCompMaxMS` such as `80` keeps the rewind short.
-Clients may use either prediction mode on a lag-compensated server; the rewind
-follows each client's own setting.
+Adjust `net_mpLagCompMaxMS` before reaching for large `net_mpLagCompBiasMS`
+offsets. Clients may use either prediction mode on a lag-compensated server;
+the rewind follows each client's own setting.
+
+To go back to the defaults:
+
+```cfg
+seta net_mpLagCompensation 0
+seta net_mpPredictMode 0
+```
+
+## Settings reference
+
+Type these into the console, or put them in your configuration file.
+
+### Connection
+
+| Setting | Default | Set on | What it does |
+|---|---|---|---|
+| `net_ip` | `localhost` | Client and server | IPv4 address to listen on. `localhost` or empty listens on every network interface. |
+| `net_ip6` | *(empty)* | Client and server | IPv6 address to listen on. Empty listens on every network interface. |
+| `net_enableIPv4` | `1` | Client and server | Uses IPv4. |
+| `net_enableIPv6` | `1` | Client and server | Uses IPv6. Set `net_enableIPv4 0` as well for an IPv6-only host. |
+| `net_mcast6addr` | `ff02::1` | Client and server | The IPv6 group address the LAN scan uses. |
+| `net_mcast6iface` | `0` | Client and server | Network interface number for the IPv6 LAN scan. `0` scans every connected network. |
+| `net_clientMaxRate` | `128000` | Client | The most a server may send you each second, in bytes. Lower it below your real download speed if matches stutter on a slow or shared line. |
+| `net_serverMaxClientRate` | `128000` | Server | The most the server sends any one player each second, in bytes, whatever they ask for. |
+| `ui_browserView` | `0` | Client | Server browser layout in the new menus: `0` rows, `1` tiles. |
+
+### Prediction and lag compensation
+
+| Setting | Default | Set on | What it does |
+|---|---|---|---|
+| `net_mpPredictMode` | `0` | Client | How other players are drawn: `0` legacy, `1` enhanced. |
+| `net_mpPredictMaxFrames` | `16` | Client | With enhanced prediction, the most game frames (16 ms each) another player is drawn ahead, from `1` to `64`. |
+| `net_mpRemoteExtrapolation` | automatic | Client (read-only) | How far ahead this client tells servers it draws other players, in frames: `0` in legacy mode, otherwise `net_mpPredictMaxFrames`. |
+| `net_mpPredictHitscan` | `1` | Client | **Not in 0.14.1:** draws your own machinegun, shotgun and railgun tracers and wall marks the moment you fire. `0` waits for the server's copy of each shot. |
+| `net_mpLagCompensation` | `0` | Server | Turns on lag compensation for instant-hit weapons, the lightning gun and the gauntlet. |
+| `net_mpLagCompMaxMS` | `200` | Server | The longest rewind, in milliseconds (`0` to `1000`). |
+| `net_mpLagCompBiasMS` | `0` | Server | Adds to or takes from every rewind, in milliseconds (`-200` to `200`). |
+| `net_mpLagCompSlackMS` | `48` | Server | How far past the measured round trip a rewind may reach, in milliseconds (`0` to `200`). |
+
+### Troubleshooting and diagnostics
+
+| Command or setting | What it does |
+|---|---|
+| `netIPv6SelfTest` | Checks IPv6 address handling and a local IPv6 connection on this computer. It reports `IPv6 network self-test: passed`, or skips the connection checks when the computer has no IPv6. |
+| `netIPv4SelfTest` | The same for IPv4. |
+| `lagCompStatus` | On a server, shows for each player the lead they report, the round trip the server measured, how far ahead they draw others and the rewind their shot would get. Works whether or not lag compensation is on. |
+| `net_mpLagCompDebug` | On a server, logs those figures for each compensated shot: `0` off, `1` summary, `2` detailed. |
+| `net_mpPredictDebug 1` | On a client, logs how old each other player was on screen when a server update arrived. |
+| `net_verbose 2` | On a client, also logs for each server update how far ahead the client is predicting and how early the server says your commands arrive. |
+| `net_mpHitscanDebug 1` | **Not in 0.14.1:** logs every instant-hit shot: the server's, the ones your client drew itself and the server's copies it received, with how far each started from your gun and aim. |
 
 ## Testing under simulated network conditions
 
 openQ4 can add the delay, jitter, loss and duplication of a real connection to
 its own packets, so a server and client on one computer behave like players on
-the internet. Every setting applies to the computer that sets it, in both
+the internet. Each setting applies to the computer that sets it, in both
 directions of each connection:
 
-| CVar | Effect |
+| Setting | Effect |
 | --- | --- |
 | `net_forceLatency` | Milliseconds added to every packet, each way. |
-| `net_forceJitter` | Up to this many further milliseconds, chosen at random per packet. Packets sent closer together than this can arrive out of order, as they do on real links. |
+| `net_forceJitter` | Up to this many further milliseconds, chosen at random per packet. Packets sent closer together than this can arrive out of order, as on real connections. |
 | `net_forceDrop` | Percentage of packets lost. |
 | `net_forceDuplicate` | Percentage of packets delivered twice. |
 | `net_forceDropBurst` | Loses packets in runs of about this many instead of one at a time, keeping the `net_forceDrop` rate. |
 | `net_forceRate` | Limits the connection to this many bytes a second each way, like a slow line. Packets queue behind each other and are dropped when the queue is full. `0` for no limit. |
 | `net_forceQueue` | How many milliseconds of packets that slow line holds before it drops them (default `250`). |
-| `net_forceMTU` | The largest packet, in bytes, the connection carries whole, like a small-MTU VPN (`1280` is the IPv6 minimum). Larger packets are split as your operating system would split them, and are lost if any piece is. `0` for no limit. |
-| `net_forceMTUDrop` | `1` loses every packet larger than `net_forceMTU` instead, like a network that blocks split packets. |
+| `net_forceMTU` | **Not in 0.14.1:** the largest packet, in bytes, the connection carries in one piece, like a VPN with a small packet size (`1280` is the IPv6 minimum). Larger packets are split as your operating system would split them, and are lost if any piece is lost. `0` for no limit. |
+| `net_forceMTUDrop` | **Not in 0.14.1:** `1` loses every packet larger than `net_forceMTU` instead, like a network that blocks split packets. |
 | `net_forceSeed` | Makes the random choices repeat exactly when a connection opens; `0` picks new ones each time. |
 
 For example, on the client:
@@ -259,16 +315,13 @@ set net_forceDrop 5
 
 `netImpairment` prints the settings and, for each open connection, how many
 packets were delayed, lost, duplicated and delivered out of order, the bytes
-sent through it, and how many packets the slow line dropped. A match with three
-bots needs about 6 KB a second downstream. On a line slower than that the game
-stutters and falls behind, and setting `net_clientMaxRate` a little below the
-line's speed before connecting keeps it smooth, with fewer updates a second.
-These settings count as cheats: hosting or joining a server that does not allow
-cheats (`net_allowCheats 1` or `sv_cheats 1`) resets them to `0`, and they
-cannot be changed during such a match. They are for testing only.
+sent and how many packets the slow line dropped.
 
-## Notes
+A match with three bots needs about 6 KB a second from the server. On a slower
+line the game stutters and falls behind; setting `net_clientMaxRate` a little
+below the line's speed before you connect keeps it smooth, with fewer updates a
+second.
 
-- Lag compensation applies to authoritative multiplayer hitscan, lightning gun and gauntlet traces on the server.
-- `net_mpLagCompDebug` output is intended for server diagnostics and tuning.
-- Tune `net_mpLagCompMaxMS` before using large `net_mpLagCompBiasMS` offsets.
+These settings count as cheats and are for testing only. Hosting or joining a
+server that does not allow cheats (`net_allowCheats 1` or `sv_cheats 1`) resets
+them to `0`, and they cannot be changed during such a match.

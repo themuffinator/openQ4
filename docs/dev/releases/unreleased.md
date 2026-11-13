@@ -446,6 +446,11 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- The player guides and the package README are rewritten in plain language
+  and corrected against 0.14.1. Menu paths name the new interface's tabs,
+  several wrong defaults and menu routes are fixed, anything newer than 0.14.1
+  is marked **Not in 0.14.1**, and Getting Started explains how to capture a
+  log file for a bug report.
 - The game no longer crashes when it cannot write its log file. With logging
   on (`logFile 1` or `2`), a failed write to the log, for example on a full or
   disconnected drive, made openQ4 report the failure into the same log, fail

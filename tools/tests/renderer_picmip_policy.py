@@ -305,7 +305,7 @@ def test_reduction_changes_reload_images_without_a_restart():
 def test_picmip_is_documented_for_players():
     display_settings = read_repo_file(Path("docs/user") / "display-settings.md")
 
-    assert_true("## Texture Quality (Picmip and Downsizing)" in display_settings, "picmip should have a user-facing section")
+    assert_true("## Texture quality and memory" in display_settings, "picmip should have a user-facing section")
     for snippet in (
         "`image_picmip`",
         "`image_picmipFilter`",

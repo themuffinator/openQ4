@@ -1,51 +1,52 @@
-# Map Entity Strings
+# Map entity strings
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-openQ4 can replace or extend the entities spawned by a retail map without
-editing, recompiling, or redistributing that map. This is intended for mods,
-server packages, compatibility fixes, and alternate gameplay layouts.
+Map entity strings let you change what spawns in a stock Quake 4 map (its
+lights, spawn points, items, triggers, scripts and other entities) without
+editing, recompiling or redistributing the map itself. Use them for mods,
+server packages, compatibility fixes and alternate gameplay layouts.
 
-For a map named `maps/mp/q4dm1.map`, place either or both companion files at:
+## Quick start
 
-- `maps/mp/q4dm1.ent`
-- `maps/mp/q4dm1.entx`
+Put a companion file next to the map's path, with the same name:
 
-The files use the normal virtual filesystem, so they may be loose development
-files or members of a PK4. Normal filesystem/package priority determines which
-file with each extension is selected.
+- `maps/mp/q4dm1.ent` replaces every entity in `maps/mp/q4dm1.map`.
+- `maps/mp/q4dm1.entx` adds entities to it.
 
-## Replacement and extension order
+You can use either file or both. They are found through the normal game search
+path, so they can be loose files or sit inside a PK4 (a Quake 4 package, which
+is a renamed zip file). When several packages carry the same file, the usual
+package priority decides which one is used.
 
-`.ent` is a complete replacement for the map's runtime entity string. It must
-contain worldspawn and every other map entity that should still spawn.
+To add a spawn point, a light or an item, use an `.entx`. To move, remove or
+change existing entities, use an `.ent`.
 
-`.entx` appends point entities to whichever entity string is active: the
-original map entities when there is no `.ent`, or the complete `.ent`
-replacement when both files exist. The fixed load order is therefore:
+## How the two files combine
 
-1. Load and resolve the original `.map` or `.reg`.
-2. Build the original map's collision data.
-3. Replace the entity string with `.ent`, when present.
-4. Append the entities from `.entx`, when present.
-5. Spawn the resulting entity list normally.
+`.ent` is a complete replacement for the map's entity list. It must contain worldspawn (the entity that holds map-wide settings) and every other entity that should still spawn.
 
-This timing lets a replacement change runtime entity behavior without making
-the original map's compiled geometry or collision unavailable. It also means
-these files cannot add, remove, or reshape map brushes and patches.
+`.entx` appends entities to whichever list is active: the map's own entities when there is no `.ent`, or the `.ent` replacement when both exist.
 
-The feature does not rewrite the original `.map`. Runtime-only entities are
-also excluded from map/export writes, and an editor write is refused while a
-complete `.ent` replacement is active. Map tools such as dmap continue to use
-the original map source rather than applying runtime companion files.
+When a map loads, openQ4:
 
-## File syntax
+1. Loads the original `.map` or `.reg`.
+2. Builds the map's collision from it.
+3. Swaps in the `.ent` entity list, if there is one.
+4. Adds the entities from the `.entx`, if there is one.
+5. Spawns the result as normal.
 
-Both files are text entity dictionaries. An optional `Version 1` header is
-accepted. Quote keys and values for predictable parsing; `//` comments are
-allowed.
+Because the swap happens after the map's geometry and collision are built,
+these files cannot add, remove or reshape brushes and patches. They change
+entities only.
 
-An additive `.entx` example:
+## File format
+
+Both files are plain-text entity lists in the usual map format. An optional
+`Version 1` header is accepted, `//` comments are allowed, and you should put
+quotes around every key and value.
+
+An `.entx` that adds a spawn point:
 
 ```text
 Version 1
@@ -58,7 +59,7 @@ Version 1
 }
 ```
 
-A complete `.ent` replacement example:
+A complete `.ent` replacement:
 
 ```text
 Version 1
@@ -77,43 +78,40 @@ Version 1
 }
 ```
 
-The example replacement is deliberately small. A real replacement must retain
-all lights, scripts, triggers, movers, spawn points, and other entities needed
-by that map and game mode.
+That replacement is deliberately tiny. A real one must keep every light,
+script, trigger, mover, spawn point and other entity the map and game mode
+need, so start from a copy of the map's full entity list.
 
-## Validation and limits
+## Rules and limits
 
-Entity-string files are parsed into temporary storage and applied only after
-both files validate. A malformed file stops the map load with a specific
-warning instead of leaving a partially modified entity list.
+Both files are checked in full before either is used. If one is malformed, the
+map stops loading with a warning that names the problem, rather than spawning a
+half-changed entity list.
 
-The following rules are enforced:
-
-- A `.ent` must be nonempty, begin with exactly one `worldspawn`, and contain no
-  later worldspawn.
+- A `.ent` must not be empty, must begin with exactly one worldspawn, and must contain no other worldspawn.
 - An `.entx` must not contain worldspawn.
-- Every entity needs a nonempty `classname`.
-- Each entity key may appear only once, ignoring case.
-- Nonempty entity names must be unique within a file, ignoring case. An
-  `.entx` name also may not collide with the active original or replacement
-  entity string.
-- `spawn_entnum` is reserved for the game and cannot be authored in either
-  file.
-- Only entity key/value dictionaries are accepted. Nested brush and patch
-  blocks are rejected.
+- Every entity needs a `classname`.
+- A key may appear only once per entity (ignoring upper and lower case).
+- Entity names must be unique within a file, ignoring case. A name in an
+  `.entx` must also not match an entity already in the active list.
+- `spawn_entnum` is reserved for the game; you cannot set it.
+- Only key/value entities are accepted. Brush and patch blocks are rejected.
 - Each file is limited to 16 MiB, 4,096 entities, and 4,096 keys per entity.
-- The final runtime entity string must fit the game entity table. On normal
-  desktop builds, the initial map limit is 4,062 entities; leave additional
-  room for entities created during play.
+- The final entity list must fit the game's entity table: at most 4,062
+  entities on desktop builds. Leave room for entities created during play.
 
-The parser also rejects incomplete reads and embedded NUL bytes, accepts a
-UTF-8 byte-order mark, and tracks the selected `.ent` and `.entx` timestamps so
-a subsequent map reload notices files that were added, removed, or changed.
+The files may start with a UTF-8 byte-order mark. openQ4 notices when you add,
+remove or change either file, so reloading the map picks up your edits.
 
-## Multiplayer packaging
+## Editing tools and the original map
 
-Package the same entity-string files for the server and every client. These
-files are runtime map content; they are not transferred to clients as console
-commands and should not be treated as a server-local configuration override.
-Using one PK4 for the map-specific `.ent`/`.entx` files is the simplest way to
-keep every participant on the same layout.
+The feature does not rewrite the original `.map`. Entities added this way are
+never written out when a map is saved or exported, and the level editor refuses
+to save a map while a complete `.ent` replacement is active. Map tools such as
+dmap compile the original map source and ignore these files.
+
+## Multiplayer
+
+Ship the same entity-string files to the server and every client, ideally in
+one PK4 for each map. They are map content, not a server setting, and the
+server does not send them to clients, so every player needs the same files.

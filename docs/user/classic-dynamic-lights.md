@@ -1,53 +1,35 @@
-# Classic Dynamic Lights
+# Classic dynamic lights
 
-> **Development documentation:** This page follows the current source tree and may describe changes newer than the public download. See [release status and released-version guides](release-status.md) before using it with a release package.
+> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
-Quake II and Quake III lit the world from the action itself. Every muzzle flash threw a pool of light
-across the room, every rocket and plasma ball carried its own glow down the corridor, and every
-explosion flashed the walls for a tenth of a second. Quake 4 replaced that with authored BSE effects,
-and most of the shipped effects carry no light at all: apart from the single-player rocket and
-grenade trails, player projectiles are unlit, and **no explosion in the game flashes the room**.
+In Quake II and Quake III, the action lit the world: muzzle flashes threw light across the room, rockets and plasma carried their glow down the corridor, and explosions flashed the walls. Quake 4's shipped effects mostly don't: apart from the single-player rocket and grenade trails, player projectiles carry no light, and no explosion in the game lights the room. openQ4 adds that classic layer back, in single-player and multiplayer. It is on by default.
 
-openQ4 adds that classic layer back. It is on by default.
+## Turning it down or off
 
-## Quick Reference
+There is no menu switch; use the console.
 
-| Setting | Default | Scope | What it does |
-|---|---:|---|---|
-| `g_classicDynamicLights` | `1` | SP and MP game code | Quake II/III style dynamic lights on muzzle flashes, bright projectiles and explosions. |
-| `g_classicDynamicLightScale` | `1` | SP and MP game code | Radius multiplier for those lights, `0.25` to `4`. |
+- `g_classicDynamicLightScale` makes every classic light reach further or less far, from `0.25` to `4`. If the effect is too strong, try `0.5` before turning it off.
+- `g_classicDynamicLights 0` turns it off. Live flashes end at once and no new ones start; projectiles already in flight keep their light until they expire.
 
-Both are archived, so a change survives a restart.
+Both are saved, so your choice survives a restart. `g_projectileLights 0` still hides all projectile lights, classic ones included, and `g_muzzleFlash 0` still hides muzzle flashes.
 
 ## What it adds
 
-**Muzzle flashes.** Firing raises a short, wide world light at the barrel — roughly 100 ms, and half
-again the radius of the weapon's own authored flash. It is layered on top of the stock flash rather
-than replacing it, so the shot reads as a punchier pop that briefly reaches further into the room.
-Weapons that carry no flash light of their own get one from this.
+**Muzzle flashes.** Firing adds a short, wide light at the barrel: about 100 ms long, with half again the reach of the weapon's own flash. It sits on top of the stock flash, so each shot pops harder and briefly lights more of the room. Weapons without a flash light of their own get one.
 
-**Bright projectiles.** A rocket, plasma bolt or dark matter sphere carries a light with it. This
-only fills gaps: a projectile whose def authors its own light (`mtr_light_shader`) keeps that light
-untouched, and the single-player rocket and grenade — whose shipped trail effects already contain a
-light segment — are left alone so their glow is not doubled. Their multiplayer trails carry no light
-segment, so those do take the classic light.
+**Bright projectiles.** Rockets, plasma bolts and dark matter spheres carry a light. This only fills gaps: a projectile that already has its own light keeps it, and the single-player rocket and grenade, whose trails already light their surroundings, are left alone so their glow isn't doubled. Their multiplayer trails have no light, so those get the classic one.
 
-**Explosions.** A detonation flashes the surrounding geometry and fades over 120–400 ms depending on
-what went off. This is entirely new: nothing in the shipped explosion effects lights the room.
-Exploding barrels and damagables get it too.
+**Explosions.** A detonation flashes the surrounding walls and fades over 120 to 400 ms, depending on what went off. Exploding barrels and other breakables flash too.
 
-Bullets, nails, debris and glass deliberately get nothing. They are not bright, there are far too
-many of them in flight to afford lighting them, and Quake II and Quake III did not light them either.
+Bullets, nails, debris and glass get nothing: they aren't bright, there are far too many of them to light, and Quake II and Quake III didn't light them either.
 
-## Colors
+## Colours
 
-The colors are taken from the shipped Quake 4 assets rather than invented, so a classic light reads
-as part of the effect it belongs to instead of a wash of arbitrary color over it.
+The colours come from Quake 4's own assets, so each light looks like part of the effect it belongs to.
 
-Muzzle flashes use the firing weapon's own `flashColor`, whatever a mod sets it to. For stock
-weapons that is:
+Muzzle flashes use the firing weapon's own `flashColor`, including any colour a mod sets. For the stock weapons:
 
-| Weapon | `flashColor` | Reads as |
+| Weapon | `flashColor` | Looks |
 |---|---|---|
 | Blaster, Hyperblaster, Gauntlet | `0.7 0.8 1` | blue-white |
 | Machinegun, Shotgun, Nailgun | `1 0.8 0.4` | warm white |
@@ -55,51 +37,50 @@ weapons that is:
 | Railgun | `0.72 1 0.9` | pale green-white |
 | Lightning Gun | `0.5 0.8 1` | pale blue |
 
-Projectile and explosion colors come from the light segments Raven did author elsewhere in the same
-asset set:
+Projectile and explosion colours come from lights Raven authored elsewhere in the same assets:
 
-| Class | Color | Source |
+| Light | Colour | Taken from |
 |---|---|---|
 | Rocket | `0.906 0.518 0.161` | `effects/weapons/rocketlauncher/fly.fx` |
 | Grenade | `0.973 0.286 0.086` | `effects/weapons/grenadelauncher/trail.fx` |
 | Napalm | `0.922 0.545 0.322` | `effects/weapons/napalmgun/globburn.fx` |
 | Dark matter | `0.502 0 1` | `effects/weapons/dmg/core.fx` |
 | Energy bolts | `0.7 0.8 1` | the energy weapons' own `flashColor` |
-| Explosions | `1 0.824 0.290` | `effects/monsters/strogg_flyer/bomb_burst.fx` |
+| Most explosions | `1 0.824 0.290` | `effects/monsters/strogg_flyer/bomb_burst.fx` |
 
-## Content overrides
+Energy bolts, napalm and dark matter flash in their own colours when they detonate.
 
-An entity def can override the class the table picks for it:
+## For modders: content overrides
+
+An entity definition can override what openQ4 picks for it:
 
 ```
 "classic_light"         "0"             // never give this one a classic light
-"classic_light_color"   "1 0.5 0.2"     // use this color instead of the table's
-"classic_light_radius"  "180"           // tracking light radius, in units
+"classic_light_color"   "1 0.5 0.2"     // use this colour instead
+"classic_light_radius"  "180"           // light radius while in flight, in game units
 ```
 
-`classic_light_radius` also overrides the "the shipped effect already lights this" rule, so a mod
-that replaces the single-player rocket trail with an unlit one can ask for the classic light back.
+`classic_light_radius` also overrides the rule that skips projectiles whose effect already has a light, so a mod that replaces the single-player rocket trail with an unlit one can ask for the classic light back.
 
-## Cost and tuning
+## Cost
 
-Each of these is a real light in this renderer, not the cheap vertex tint it was in Quake II. They
-are all unshadowed, at most 24 one-shot flashes are alive at a time, flashes more than about 3000
-units from the viewer are skipped, and the oldest flash is recycled when the pool is full.
+Each classic light is a real light in openQ4's renderer, not the cheap tint it was in Quake II. To keep the cost down, they cast no shadows, at most 24 flashes are alive at once (the oldest is reused when the pool is full), and flashes more than about 3000 units from you are skipped.
 
-If the effect is too strong for your taste, lower `g_classicDynamicLightScale` before turning the
-feature off — `0.5` keeps the character at half the reach. Setting `g_classicDynamicLights 0` retires
-every live flash immediately and stops new ones; projectiles already in flight keep the light they
-were launched with until they expire.
+## Seeing them without firing
 
-`g_projectileLights 0` still hides projectile lights, classic ones included, and `g_muzzleFlash 0`
-still suppresses muzzle flashes.
-
-## Looking at them
-
-With cheats enabled, `testClassicLight` raises the flashes in front of you without firing a shot:
+With cheats enabled, `testClassicLight` raises the flashes in front of you:
 
 ```
 testClassicLight                                  // one muzzle flash and one explosion
-testClassicLight muzzle weapon_railgun            // that weapon's flash color
-testClassicLight explosion projectile_dmg         // that projectile class's detonation flash
+testClassicLight muzzle weapon_railgun            // that weapon's flash colour
+testClassicLight explosion projectile_dmg         // that projectile's explosion flash
 ```
+
+## Settings reference
+
+| Setting | Default | Range | What it does |
+|---|---:|---|---|
+| `g_classicDynamicLights` | `1` | `0..1` | Quake II and III style lights on muzzle flashes, bright projectiles and explosions. |
+| `g_classicDynamicLightScale` | `1` | `0.25..4` | Reach of those lights. |
+| `g_projectileLights` | `1` | `0..1` | Shows lights on projectiles, classic ones included. |
+| `g_muzzleFlash` | `1` | `0..1` | Shows muzzle flashes. |
