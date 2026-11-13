@@ -390,6 +390,19 @@ struct TestHost final : Host {
 		}
 		return softFocus;
 	}
+	struct Glitched { std::uint32_t destination; float dither, strength, phase; Bounds region; };
+	std::vector<Glitched> glitched;
+	bool GlitchBackdrop(std::uint32_t destination, float dither, float strength, float phase, const Bounds& region) override {
+		glitched.push_back({destination,dither,strength,phase,region});
+		if (softFocus) activeLayer = destination;
+		return softFocus;
+	}
+	bool CanGlitchBackdropDirect(const Bounds& region) const override {
+		return directBackdrop && softFocus && region.x<=0 && region.y<=0 && region.x+region.width>=1280 && region.y+region.height>=720;
+	}
+	bool GlitchBackdropDirect(float dither, float strength, float phase, const Bounds& region) override {
+		return GlitchBackdrop(0,dither,strength,phase,region);
+	}
 	struct Streaked { std::uint32_t destination; float strength; Bounds region; };
 	std::vector<Streaked> streaked;
 	bool StreakBackdrop(std::uint32_t destination, float strength, const Bounds& region) override {
@@ -555,6 +568,88 @@ static void CheckSpeedStreak(TestHost& host) {
 	Check(host.streaked.size() == 1 && host.softened.empty() && Near(host.streaked[0].strength,.5f) && host.streaked[0].destination != 0 &&
 		Near(host.streaked[0].region.width,1280) && Near(host.streaked[0].region.height,720) && host.errors == 0,
 		"a streak replaces the soft focus at its strength over the node's box");
+}
+
+// The signal fault: a node's backdrop-dither, backdrop-glitch and
+// backdrop-glitch-phase become one glitch() in RmlUi's backdrop-filter, and the
+// renderer asks the host to draw the view through it over the node's box. The
+// values are the element's live paint inputs: a timeline moves them without a
+// style change, so a settled frame keeps replaying while a fault runs, and a
+// full-view fault then finishes on the base surface where the host can. At
+// rest and without a dither nothing is drawn or counted.
+static void CheckSignalFault(TestHost& host) {
+	const auto source = [](const char* dither) {
+		return std::string(R"json({"format":"retained-ui","version":1,"id":"signal-fault",
+	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
+	  "children":[{"id":"signal","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},
+	   "left":{"type":"length","value":0,"unit":"dp"},"top":{"type":"length","value":0,"unit":"dp"},
+	   "width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"},
+	   "backdrop-dither":{"type":"number","value":)json")+dither+R"json(},"backdrop-glitch":{"type":"number","value":0},
+	   "backdrop-glitch-phase":{"type":"number","value":0}}}]},
+	 "timelines":[{"id":"fault","durationMs":200,"tracks":[
+	   {"node":"signal","property":"backdrop-glitch","keys":[{"atMs":0,"value":{"type":"number","value":0}},{"atMs":200,"value":{"type":"number","value":0.8}}]},
+	   {"node":"signal","property":"backdrop-glitch-phase","keys":[{"atMs":0,"value":{"type":"number","value":0}},{"atMs":200,"value":{"type":"number","value":4}}]}]}],
+	 "events":{"fault":[{"op":"playTimeline","timeline":"fault"}]}})json";
+	};
+	Document document; std::vector<Diagnostic> diagnostics;
+	Check(document.Load(source("0.5"),diagnostics),"a signal fault document compiles");
+	for (const char* bad : {R"json("backdrop-dither":{"type":"number","value":1.5})json", R"json("backdrop-glitch":{"type":"number","value":-0.1})json",
+		R"json("backdrop-glitch-phase":{"type":"number","value":-1})json", R"json("backdrop-glitch":{"type":"length","value":1,"unit":"dp"})json"}) {
+		Document refused;
+		Check(!refused.Load(std::string(R"json({"format":"retained-ui","version":1,"id":"signal-fault-range","root":{"id":"root","type":"group",
+			"properties":{)json")+bad+"}}}",diagnostics),"a fault value out of range is rejected");
+	}
+	Check(NodeBackdropFilterCss(*document.Model().FindNode("signal")) == "glitch(0.5 0 0)" && BackdropFaultCss(*document.Model().FindNode("root")).empty(),
+		"the node's backdrop-filter carries its authored fault");
+	Runtime runtime(host);
+	Check(runtime.Initialize() && runtime.LoadDocument(source("0.5"),"signal-fault.rui",diagnostics),"signal fault document loads");
+	Viewport viewport; viewport.width = 1280; viewport.height = 720;
+	host.glitched.clear(); host.softened.clear(); host.streaked.clear();
+	runtime.Frame(viewport,1);
+	Check(host.glitched.size() == 1 && host.softened.empty() && host.streaked.empty() && Near(host.glitched[0].dither,.5f) &&
+		host.glitched[0].strength == 0 && host.glitched[0].phase == 0 && host.glitched[0].destination != 0 &&
+		Near(host.glitched[0].region.width,1280) && Near(host.glitched[0].region.height,720) &&
+		runtime.Statistics().backdropComposites == 1 && runtime.Statistics().backdropFallbacks == 0 && host.errors == 0,
+		"a dither alone draws the view through the fault over the node's box");
+	for (int frame = 0; frame < 3; ++frame) runtime.Frame(viewport,1.01+frame*.01);
+	host.glitched.clear(); runtime.Frame(viewport,1.05);
+	Check(runtime.Statistics().frameReplays == 1 && host.glitched.size() == 1 && host.glitched[0].destination != 0 &&
+		runtime.Statistics().layerPushes == 1,"a settled fault replays into a transient target");
+	host.directBackdrop = true; host.glitched.clear(); runtime.Frame(viewport,1.06);
+	Check(runtime.Statistics().frameReplays == 1 && host.glitched.size() == 1 && host.glitched[0].destination == 0 && host.activeLayer == 0 &&
+		runtime.Statistics().layerPushes == 0 && runtime.Statistics().backdropComposites == 1,
+		"a full-view fault finishes on the base surface where the host can");
+	// The timeline moves the element's live values: no style change, so the
+	// recorded frame keeps replaying and reads them as it draws.
+	Runtime::EventEffects effects; std::string error;
+	Check(runtime.RunEvent("fault",1.06,effects,error),"start the fault");
+	host.glitched.clear(); runtime.Frame(viewport,1.16);
+	Check(runtime.Statistics().frameReplays == 1 && runtime.Statistics().layoutUpdates == 0 && host.glitched.size() == 1 &&
+		Near(host.glitched[0].dither,.5f) && Near(host.glitched[0].strength,.4f) && Near(host.glitched[0].phase,2) &&
+		host.glitched[0].destination == 0,"a running fault replays the settled frame at its live strength and phase");
+	host.replayFrames = false; host.glitched.clear(); runtime.Frame(viewport,1.26);
+	Check(runtime.Statistics().frameReplays == 0 && host.glitched.size() == 1 && Near(host.glitched[0].strength,.8f) &&
+		Near(host.glitched[0].phase,4) && host.glitched[0].destination != 0,"an ordinary traversal draws the same live values");
+	host.replayFrames = true;
+	host.softFocus = false; host.glitched.clear(); runtime.Frame(viewport,1.3);
+	Check(runtime.Statistics().backdropComposites == 0 && runtime.Statistics().backdropFallbacks == 1 && host.errors == 0,
+		"a host without the fault is counted and logs nothing");
+	host.softFocus = true;
+	// At rest and without a dither the layer draws nothing: no host call and no
+	// fallback, in a traversal or a replayed frame; the fault still runs.
+	Check(runtime.LoadDocument(source("0"),"signal-rest.rui",diagnostics),"resting fault document loads");
+	host.glitched.clear();
+	for (int frame = 0; frame < 5; ++frame) {
+		runtime.Frame(viewport,2+frame*.01);
+		Check(host.glitched.empty() && runtime.Statistics().backdropComposites == 0 && runtime.Statistics().backdropFallbacks == 0,
+			"a fault at rest draws nothing");
+	}
+	Check(runtime.Statistics().frameReplays == 1,"the resting fault's frame replays");
+	Check(runtime.RunEvent("fault",2.05,effects,error),"start the resting fault");
+	runtime.Frame(viewport,2.15);
+	Check(host.glitched.size() == 1 && host.glitched[0].dither == 0 && Near(host.glitched[0].strength,.4f) && host.glitched[0].destination == 0 &&
+		runtime.Statistics().frameReplays == 1,"a fault leaving rest draws without rebuilding the frame");
+	host.directBackdrop = false;
 }
 
 // Timeline completion programs: a fade hides its box when it plays to its end,
@@ -2279,6 +2374,7 @@ int main(int argc, char** argv) {
 	CheckSoftFocus(host);
 	CheckDirectBackdrop(host);
 	CheckSpeedStreak(host);
+	CheckSignalFault(host);
 	CheckRetainedMeshes(host);
 	CheckFrameReplay(host);
 	CheckGuiStateNumbers();

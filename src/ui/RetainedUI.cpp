@@ -647,6 +647,54 @@ public:
 		DrawBlurPass(blurStreakMaterial,{x0,y0,x1-x0,y1-y0},{x0/right,1-y0/bottom,x1/right,1-y1/bottom},{strength,0,0,0});
 		return true;
 	}
+	// The signal fault: the view beneath a menu as a faulting display shows it,
+	// an ordered dither with rows torn sideways, the colour channels split and
+	// blocks held as mosaic (glsl/retained_glitch.glsl). Where the view is the
+	// whole window the pass reads the window capture itself; otherwise an
+	// unblurred pass first copies the view out of it, as the streak's does.
+	bool GlitchBackdrop(std::uint32_t destination, float dither, float strength, float phase, const openq4::ui::Bounds& region) override {
+		if (!destination || destination > layers.size() || !layers[destination-1].target) return false;
+		return DrawGlitchedBackdrop(layers[destination-1].target,dither,strength,phase,region);
+	}
+	bool CanGlitchBackdropDirect(const openq4::ui::Bounds& region) const override {
+		return ui_retainedDirectBackdrop.GetBool() && softFocus && blurScratch && backdropCreated && blurGlitchMaterial &&
+			blurGlitchWindowMaterial && blurWidth==viewportWidth && blurHeight==viewportHeight &&
+			viewportWidth>0 && viewportHeight>0 && captureWidth>0 && captureHeight>0 &&
+			region.x<=0 && region.y<=0 && region.x+region.width>=viewportWidth && region.y+region.height>=viewportHeight;
+	}
+	bool GlitchBackdropDirect(float dither, float strength, float phase, const openq4::ui::Bounds& region) override {
+		if (!CanGlitchBackdropDirect(region)) return false;
+		return DrawGlitchedBackdrop(nullptr,dither,strength,phase,region);
+	}
+	bool DrawGlitchedBackdrop(idRenderTexture* destination, float dither, float strength, float phase, const openq4::ui::Bounds& region) {
+		if (!softFocus || !(dither>=0 && dither<=1) || !(strength>=0 && strength<=1) || !(phase>=0 && phase<=65536) ||
+			!(dither>0 || strength>0)) return false;
+		const float right = static_cast<float>(viewportWidth), bottom = static_cast<float>(viewportHeight);
+		const float x0 = Max(region.x,0.f), x1 = Min(region.x+region.width,right);
+		const float y0 = Max(region.y,0.f), y1 = Min(region.y+region.height,bottom);
+		if (!(x0 < x1 && y0 < y1) || captureWidth <= 0 || captureHeight <= 0 || !EnsureBlurTargets()) return false;
+		if (!blurGlitchMaterial || !blurGlitchWindowMaterial) {
+			const idMaterial* view = declManager->FindMaterial("_retainedBlur/glitch");
+			const idMaterial* window = declManager->FindMaterial("_retainedBlur/glitchWindow");
+			if (!view || view->GetState() == DS_DEFAULTED || !window || window->GetState() == DS_DEFAULTED) return false;
+			blurGlitchMaterial = view; blurGlitchWindowMaterial = window;
+		}
+		BindTarget(nullptr,true);
+		renderSystem->CaptureRenderToImage("_retainedBackdrop");
+		const bool whole = viewportX==0 && viewportY==0 && viewportWidth==captureWidth && viewportHeight==captureHeight;
+		if (!whole) {
+			const float w = static_cast<float>(captureWidth), h = static_cast<float>(captureHeight);
+			BindTarget(blurScratch);
+			DrawBlurPass(blurBackdropMaterial,{0,0,right,bottom},
+				{viewportX/w,1-viewportY/h,(viewportX+right)/w,1-(viewportY+bottom)/h},{1/w,0,0,1});
+		}
+		BindTarget(destination);
+		// The dither's cell: one pixel of a 540-line view, in whole pixels.
+		const float cell = Max(1.f,std::floor(bottom/540.f+.5f));
+		DrawBlurPass(whole ? blurGlitchWindowMaterial : blurGlitchMaterial,{x0,y0,x1-x0,y1-y0},
+			{x0/right,1-y0/bottom,x1/right,1-y1/bottom},{dither,strength,phase,cell},right,bottom);
+		return true;
+	}
 	bool EnsureBlurTargets() {
 		if (blurScratch && blurWidth == viewportWidth && blurHeight == viewportHeight) return true;
 		renderSystem->DestroyRenderTexture(blurScratch); blurScratch = nullptr;
@@ -693,7 +741,9 @@ public:
 	// One blur pass over a view-space box. The program reads the step along its
 	// axis (in the source's UV), the sigma in pixels and the saturation from
 	// parm0..3, which the GUI colour supplies unclamped.
-	void DrawBlurPass(const idMaterial* material, const openq4::ui::Bounds& box, const float (&uv)[4], const float (&parms)[4]) {
+	// The extent reaches the program as its tangent attribute: the fault's view size.
+	void DrawBlurPass(const idMaterial* material, const openq4::ui::Bounds& box, const float (&uv)[4], const float (&parms)[4],
+		float extentX = 1, float extentY = 0) {
 		const float sx = 640.f / viewportWidth, sy = 480.f / viewportHeight;
 		const float xs[4] = {box.x,box.x+box.width,box.x+box.width,box.x}, ys[4] = {box.y,box.y,box.y+box.height,box.y+box.height};
 		const float us[4] = {uv[0],uv[2],uv[2],uv[0]}, vs[4] = {uv[1],uv[1],uv[3],uv[3]};
@@ -703,7 +753,7 @@ public:
 			v.Clear();
 			v.xyz.Set(xs[i]*sx,ys[i]*sy,0);
 			v.st.Set(us[i],vs[i]);
-			v.normal.Set(0,0,1); v.tangents[0].Set(1,0,0); v.tangents[1].Set(0,1,0);
+			v.normal.Set(0,0,1); v.tangents[0].Set(extentX,extentY,0); v.tangents[1].Set(0,1,0);
 			for (int channel = 0; channel < 4; ++channel) v.color[channel] = v.color2[channel] = 255;
 		}
 		const glIndex_t indices[6] = {0,1,2,0,2,3};
@@ -785,6 +835,7 @@ public:
 		}
 		layers.clear(); blurScratch = nullptr;
 		blurBackdropMaterial = blurScratchMaterial = blurStreakMaterial = nullptr;
+		blurGlitchMaterial = blurGlitchWindowMaterial = nullptr;
 		linearMaskMaterial=nullptr;
 		backdropCreated = false; blurWidth = blurHeight = 0;
 		reducedBlurScratch=reducedBlurResult=nullptr;
@@ -1071,6 +1122,8 @@ private:
 	idRenderTexture* boundTarget=nullptr;
 	idRenderTexture* blurScratch = nullptr;
 	const idMaterial* blurBackdropMaterial = nullptr;
+	const idMaterial* blurGlitchMaterial = nullptr;
+	const idMaterial* blurGlitchWindowMaterial = nullptr;
 	const idMaterial* blurScratchMaterial = nullptr;
 	const idMaterial* blurStreakMaterial = nullptr;
 	bool backdropCreated = false;

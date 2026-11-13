@@ -1,0 +1,64 @@
+// Retained UI signal fault: the view beneath a menu as a faulting display
+// shows it. fault.x mixes in an ordered dither, fault.y is the fault's
+// strength, each whole number of fault.z another arrangement of it, and
+// fault.w the dither's cell in pixels.
+//
+// The fault tears rows sideways (a few wide bands and many thin lines, most of
+// them still), holds some blocks as coarse mosaic and parts the red and blue
+// channels, further in a torn row. The dither then steps each pixel's
+// brightness between six levels spaced evenly in its square root, against an
+// 8x8 Bayer threshold: the steps are finest in the dark, the hue is kept, a
+// flat area keeps its mean brightness, and black and white stay as they are.
+uniform sampler2D Source;
+uniform vec4 fault;
+
+varying vec2 faultTexCoord;
+varying vec2 faultView;
+
+float hash1( float n ) { return fract( sin( n ) * 43758.5453 ); }
+float hash2( vec2 p ) { return fract( sin( dot( p, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); }
+float bayer2( vec2 a ) { a = floor( a ); return fract( a.x * 0.5 + a.y * a.y * 0.75 ); }
+float bayer4( vec2 a ) { return bayer2( 0.5 * a ) * 0.25 + bayer2( a ); }
+float bayer8( vec2 a ) { return bayer4( 0.5 * a ) * 0.25 + bayer2( a ); }
+
+void main(void)
+{
+	vec2 uv = faultTexCoord;
+	float dither = clamp( fault.x, 0.0, 1.0 );
+	float strength = clamp( fault.y, 0.0, 1.0 );
+	vec3 colour;
+	if ( strength > 0.0 ) {
+		float seed = mod( floor( fault.z ), 251.0 ) + 1.0;
+		float wide = floor( uv.y * ( 5.0 + floor( hash1( seed * 1.7 ) * 9.0 ) ) );
+		float thin = floor( uv.y * ( 38.0 + floor( hash1( seed * 3.1 ) * 40.0 ) ) );
+		float wideTorn = step( 1.0 - 0.45 * strength, hash2( vec2( wide, seed ) ) );
+		float thinTorn = step( 1.0 - 0.30 * strength, hash2( vec2( thin, seed + 17.0 ) ) );
+		float shift = wideTorn * ( hash2( vec2( wide, seed + 5.0 ) ) - 0.5 ) * 0.08 * strength
+			+ thinTorn * ( hash2( vec2( thin, seed + 9.0 ) ) - 0.5 ) * 0.16 * strength;
+		vec2 at = vec2( uv.x + shift, uv.y );
+		// Square blocks, 24 across; a held one shows a 3x3 mosaic of itself.
+		vec2 blocks = vec2( 24.0, max( 1.0, floor( 24.0 * faultView.y / max( faultView.x, 1.0 ) + 0.5 ) ) );
+		float held = step( 1.0 - 0.12 * strength, hash2( floor( at * blocks ) + vec2( seed, seed * 0.37 ) ) );
+		at = mix( at, ( floor( at * blocks * 3.0 ) + 0.5 ) / ( blocks * 3.0 ), held );
+		float torn = max( wideTorn, thinTorn );
+		float split = ( 0.0012 + 0.0040 * torn ) * strength;
+		colour.r = texture2D( Source, at + vec2( split, 0.0 ) ).r;
+		colour.g = texture2D( Source, at ).g;
+		colour.b = texture2D( Source, at - vec2( split, 0.0 ) ).b;
+		colour *= 1.0 + strength * ( 0.15 * thinTorn + 0.08 * held );
+	} else {
+		colour = texture2D( Source, uv ).rgb;
+	}
+	if ( dither > 0.0 ) {
+		vec2 pixel = floor( faultTexCoord * faultView / max( fault.w, 1.0 ) );
+		float threshold = bayer8( pixel );
+		float luma = clamp( dot( colour, vec3( 0.299, 0.587, 0.114 ) ), 0.0, 1.0 );
+		float below = floor( sqrt( luma ) * 5.0 ) / 5.0;
+		float above = below + 0.2;
+		below *= below;
+		above = min( above * above, 1.0 );
+		float stepped = ( luma - below ) > threshold * ( above - below ) ? above : below;
+		colour = mix( colour, min( colour * ( stepped / max( luma, 0.0001 ) ), vec3( 1.0 ) ), dither );
+	}
+	gl_FragColor = vec4( colour, 1.0 );
+}

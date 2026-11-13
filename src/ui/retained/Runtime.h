@@ -229,6 +229,20 @@ public:
 	// False means unsupported: the layer stays transparent and the view
 	// unchanged, and the runtime counts it.
 	virtual bool StreakBackdrop(std::uint32_t destination, float strength, const Bounds& region) { return false; }
+	// The signal fault (backdrop-filter: glitch()): draw the base surface, as
+	// composed so far, into `destination`, opaque within `region`, as a
+	// faulting display would show it. `dither` (0..1) mixes in an ordered
+	// dither of it, on a cell that follows the view's size. `strength` (0..1)
+	// tears rows sideways, splits the colour channels and holds blocks as
+	// coarse mosaic; each whole number of `phase` is another arrangement of
+	// them. The runtime never asks for a fault with neither. False means
+	// unsupported: the layer stays transparent and the view unchanged, and the
+	// runtime counts it.
+	virtual bool GlitchBackdrop(std::uint32_t destination, float dither, float strength, float phase, const Bounds& region) { return false; }
+	// A full-view fault in a settled frame can finish directly on the base
+	// surface, as soft focus can; the same contract.
+	virtual bool CanGlitchBackdropDirect(const Bounds& region) const { return false; }
+	virtual bool GlitchBackdropDirect(float dither, float strength, float phase, const Bounds& region) { return false; }
 private:
 	// Target identities must survive a last-context close/reopen within one
 	// host submission frame, even though RmlUi services can be shut down then.

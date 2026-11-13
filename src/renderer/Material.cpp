@@ -4974,6 +4974,15 @@ bool idMaterial::SetDefaultText( void ) {
 			"shaderParm streak parm0, parm1, parm2, parm3 shaderTexture Source linear clamp nopicmip _retainedBlurScratch } }",GetName()));
 		return true;
 	}
+	if ( idStr::Icmp(GetName(),"_retainedBlur/glitch") == 0 || idStr::Icmp(GetName(),"_retainedBlur/glitchWindow") == 0 ) {
+		// Retained signal fault: opaque, over the scratch target's copy of the
+		// view or, where the view is the whole window, the window capture.
+		// parm0..3 carry the dither, the strength, the phase and the dither's cell.
+		SetText(va("material %s { sort gui twoSided { blend gl_one, gl_zero glslProgram glsl/retained_glitch.glsl "
+			"shaderParm fault parm0, parm1, parm2, parm3 shaderTexture Source linear clamp nopicmip %s } }",
+			GetName(),GetName()[20] ? "_retainedBackdrop" : "_retainedBlurScratch"));
+		return true;
+	}
 	if ( idStr::Icmp(GetName(),"_retainedSolid") == 0 ) {
 		// RmlUi's native winding differs from legacy GUI quads; UI planes
 		// also remain visible under mirrored document transforms.

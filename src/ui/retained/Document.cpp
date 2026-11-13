@@ -52,6 +52,8 @@ bool ValidProperty(const std::string& name, const Value& value) {
 		} else if (colours.contains(name)) valid = value.type == ValueType::Colour;
 		else if (auto entry = keywords.find(name); entry != keywords.end()) valid = value.type == ValueType::Keyword && entry->second.contains(value.text);
 		else if (name == "opacity" || name == "backdrop-saturate" || name == "backdrop-streak") valid = value.type == ValueType::Number && value.data[0] >= 0 && value.data[0] <= 1;
+		else if (name == "backdrop-dither" || name == "backdrop-glitch") valid = value.type == ValueType::Number && value.data[0] >= 0 && value.data[0] <= 1;
+		else if (name == "backdrop-glitch-phase") valid = value.type == ValueType::Number && value.data[0] >= 0 && value.data[0] <= 65536;
 		else if (name == "flex-grow" || name == "flex-shrink") valid = value.type == ValueType::Number && value.data[0] >= 0;
 		else if (name == "image-offset-x" || name == "image-offset-y") valid = value.type == ValueType::Number;
 		else if (name == "image-scale-x" || name == "image-scale-y") valid = value.type == ValueType::Number && value.data[0] > 0;
@@ -68,6 +70,34 @@ std::string BackdropFilterCss(const Value* blur, const Value* saturate, const Va
 	std::string css = blurs ? "blur("+blur->Css()+")" : "";
 	if (desaturates) css += std::string(css.empty() ? "" : " ")+"saturate("+saturate->Css()+")";
 	if (streaks) css += std::string(css.empty() ? "" : " ")+"streak("+streak->Css()+")";
+	return css;
+}
+int BackdropFaultIndex(const std::string& name) {
+	if (name.size() < 15 || name[0] != 'b' || !name.starts_with("backdrop-")) return -1;
+	return name == "backdrop-dither" ? 0 : name == "backdrop-glitch" ? 1 : name == "backdrop-glitch-phase" ? 2 : -1;
+}
+std::string BackdropFaultCss(const Node& node) {
+	const Value* values[3] = {};
+	bool any = false;
+	for (const auto* name : {"backdrop-dither","backdrop-glitch","backdrop-glitch-phase"})
+		if (const auto found = node.properties.find(name); found != node.properties.end()) {
+			values[BackdropFaultIndex(name)] = &found->second; any = true;
+		}
+	if (!any) return {};
+	std::string css = "glitch(";
+	for (int i = 0; i < 3; ++i) { if (i) css += ' '; css += values[i] ? values[i]->Css() : "0"; }
+	return css+")";
+}
+std::string NodeBackdropFilterCss(const Node& node) {
+	const auto blur = node.properties.find("backdrop-blur"), saturate = node.properties.find("backdrop-saturate");
+	const auto streak = node.properties.find("backdrop-streak");
+	std::string css;
+	if (blur != node.properties.end() || saturate != node.properties.end() || streak != node.properties.end()) {
+		css = BackdropFilterCss(blur != node.properties.end() ? &blur->second : nullptr,
+			saturate != node.properties.end() ? &saturate->second : nullptr, streak != node.properties.end() ? &streak->second : nullptr);
+		if (css == "none") css.clear();
+	}
+	if (const auto fault = BackdropFaultCss(node); !fault.empty()) { if (!css.empty()) css += ' '; css += fault; }
 	return css;
 }
 bool ValidImageSource(const std::string& source) {
@@ -1932,16 +1962,10 @@ void MarkupNode(const Node& node, std::string& output) {
 	// when the button itself participates in normal document flow.
 	if (node.control) output += "position:relative;";
 	if (node.mask) output += "mask-image:q4-mask(alpha);";
-	const auto blur = node.properties.find("backdrop-blur"), saturate = node.properties.find("backdrop-saturate");
-	const auto streak = node.properties.find("backdrop-streak");
-	if (blur != node.properties.end() || saturate != node.properties.end() || streak != node.properties.end()) {
-		const auto css = BackdropFilterCss(blur != node.properties.end() ? &blur->second : nullptr,
-			saturate != node.properties.end() ? &saturate->second : nullptr, streak != node.properties.end() ? &streak->second : nullptr);
-		if (css != "none") { output += "backdrop-filter:"; output += css; output += ';'; }
-	}
+	if (const auto css = NodeBackdropFilterCss(node); !css.empty()) { output += "backdrop-filter:"; output += css; output += ';'; }
 	for (const auto& [name,value] : node.properties) if (name != "text") {
 		if (name == "opacity") { if (value.data[0] < 1) { output += "filter:opacity("; output += value.Css(); output += ");"; } }
-		else if (name == "backdrop-blur" || name == "backdrop-saturate" || name == "backdrop-streak") continue; // Folded into backdrop-filter.
+		else if (name == "backdrop-blur" || name == "backdrop-saturate" || name == "backdrop-streak" || BackdropFaultIndex(name) >= 0) continue; // Folded into backdrop-filter.
 		else if (name == "image") { if (!HasImageCoordinates(node)) { output += "decorator:"; output += ImageDecorator(node,value.text); output += ';'; } }
 		else if (name == "image-offset-x" || name == "image-offset-y" || name == "image-scale-x" || name == "image-scale-y") continue;
 		else if (name == "image-fit" || name == "image-align-x" || name == "image-align-y" || name == "image-blend") continue; // Folded into the decorator.

@@ -1,0 +1,13 @@
+// Retained UI signal fault: a view-space quad whose texture coordinate spans
+// the view; the tangent carries the view's size in pixels.
+attribute vec3 attr_Tangent;
+
+varying vec2 faultTexCoord;
+varying vec2 faultView;
+
+void main(void)
+{
+	faultTexCoord = gl_MultiTexCoord0.xy;
+	faultView = attr_Tangent.xy;
+	gl_Position = ftransform();
+}

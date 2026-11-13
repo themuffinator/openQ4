@@ -123,6 +123,32 @@ the view out of the window capture and runs `glsl/retained_streak.glsl` on
 OpenGL and Vulkan; a host that cannot leaves the view unchanged and counts a
 fallback.
 
+`backdrop-dither` and `backdrop-glitch` (numbers 0–1) and
+`backdrop-glitch-phase` (a number 0–65536) show the view beneath the node's
+border box as a faulting display would.
+
+- **Dither.** `backdrop-dither` mixes in an ordered dither: each pixel's
+  brightness steps between six levels, evenly spaced in its square root,
+  against an 8x8 Bayer threshold. The hue is kept, and the cell is one pixel
+  of a 540-line view in whole pixels.
+- **Fault.** `backdrop-glitch` tears rows sideways, holds square blocks as a
+  coarse mosaic and parts the red and blue channels.
+- **Phase.** Each whole number of `backdrop-glitch-phase` is another
+  arrangement of the fault, so a timeline that steps it animates the fault.
+
+A node that declares any of them carries the fault in its backdrop-filter at
+every value, after any soft focus or streak. Its values are paint inputs: a
+timeline or binding changes them without a style change, so a settled frame
+keeps replaying while a fault runs. A full-view one finishes directly on the
+base surface where the host can. With neither a dither nor a strength the
+layer draws nothing and counts nothing. The host draws it through
+`Host::GlitchBackdrop` (`GlitchBackdropDirect` for the direct case), reading
+the window capture where the view is the whole window and a copy of the view
+otherwise, with `glsl/retained_glitch.glsl` on OpenGL and Vulkan. A host that
+cannot leaves the view unchanged and counts a fallback, as soft focus does,
+and documents gate it on the same `ui_retainedSoftFocus` CVar. Like soft focus,
+a node inside a composition layer gets none.
+
 `opacity` applies to the node's complete subtree using
 [isolated composition](composition.md), including when it is animated. Paint
 alpha is separate. Nested group opacities compose inside-out, and subtree paint

@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
         // Compile the shipped source pairs and their material interfaces
         // through the actual Vulkan
         // compatibility compiler rather than a duplicate test shader.
-        for (const char *name : {"retained_blur", "retained_linear_mask"}) {
+        for (const char *name : {"retained_blur", "retained_linear_mask", "retained_streak", "retained_glitch"}) {
             material::CompileRequest retained;
             const auto base = std::filesystem::path(argv[2]) / name;
             const auto read = [&](const char *extension, std::string &path) {
@@ -93,7 +93,9 @@ int main(int argc, char **argv) {
             };
             retained.vertexSource = read(".glslvp", retained.vertexName);
             retained.fragmentSource = read(".glslfp", retained.fragmentName);
-            retained.parameters = {{std::string(name) == "retained_blur" ? "blur" : "maskConfig", 0, 4}};
+            const std::string program = name;
+            retained.parameters = {{program == "retained_blur" ? "blur" : program == "retained_streak" ? "streak" :
+                program == "retained_glitch" ? "fault" : "maskConfig", 0, 4}};
             retained.textures = {{"Source", 0}};
             Require(Accept(name, retained).textureMask == 1, "retained source texture binding");
         }

@@ -63,6 +63,7 @@ void VectorElement::CopyArtworkFrom(const VectorElement& source) {
 	coordinatesImage=source.coordinatesImage; additiveImage=source.additiveImage; imageSource=source.imageSource;
 	imageCoordinates=std::make_shared<ImageCoordinates>(*source.imageCoordinates); imageSampling=source.imageSampling;
 	replayOpacity=source.replayOpacity ? std::make_shared<float>(*source.replayOpacity) : nullptr;
+	backdropFault=source.backdropFault ? std::make_shared<std::array<float,3>>(*source.backdropFault) : nullptr;
 	replayText=source.replayText;
 	imageTexture={}; imageGeometry={};
 }
@@ -599,6 +600,12 @@ void VectorElement::Configure(const Node& node, Host& owner, RuntimeStatistics& 
 	if (node.model) (*imageCoordinates)[3]=-1; // Engine targets have their origin at the lower edge.
 	for (const auto* property : {"image-offset-x","image-offset-y","image-scale-x","image-scale-y"})
 		if (const auto found=node.properties.find(property);found!=node.properties.end()) SetImageCoordinate(property,found->second.data[0]);
+	backdropFault.reset();
+	for (const auto* property : {"backdrop-dither","backdrop-glitch","backdrop-glitch-phase"})
+		if (const auto found=node.properties.find(property);found!=node.properties.end()) {
+			if (!backdropFault) backdropFault=std::make_shared<std::array<float,3>>(std::array<float,3>{0,0,0});
+			SetBackdropFault(BackdropFaultIndex(property),float(found->second.data[0]));
+		}
 }
 namespace {
 class VectorMask final : public Rml::Decorator {

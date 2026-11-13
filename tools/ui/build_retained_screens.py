@@ -2819,12 +2819,80 @@ MENU_BACKGROUNDS = ["gfx/guis/mainmenu/level_mcc.dds", "gfx/guis/mainmenu/level_
                     "gfx/guis/mainmenu/level_process1_first.dds", "gfx/guis/mainmenu/level_tram1.dds"]
 
 
-def montage(doc: Document) -> dict:
-    """Backdrop levelshots cross-fade over 2000 ms every 5000 ms (section 8,
-    ambient loops); decorative, so reduced motion holds the first picture."""
+BACKDROP_DIM = 0.3         # black over the title's pictures, under their light (user note, 13 November 2026)
+SIGNAL_DITHER = 0.6        # the backdrop's ordered dither (backdrop-dither)
+SIGNAL_LEAD = 150          # ms: a picture change's place in its 5000 ms slot, so the loop's wrap has its lead-in too
+SIGNAL_STEP = 55.0         # ms: how long one arrangement of a fault stands
+# A picture change's fault about the change: (ms, strength). It leads the
+# picture by 120 ms, peaks as the picture turns and has settled 520 ms on.
+SIGNAL_CHANGE = ((-120, 0.0), (-40, 0.5), (60, 0.85), (200, 0.55), (330, 0.22), (520, 0.0))
+# The picture's own reveal across the change: (ms, opacity). It catches in
+# two steps before it holds, never falling back, so it is no flash.
+SIGNAL_REVEAL = ((0, 0.0), (60, 0.4), (150, 0.4), (220, 0.8), (420, 1.0))
+# Between changes the signal slips now and then: (ms in the loop, strength, ms it lasts).
+SIGNAL_SLIPS = ((3300, 0.22, 110), (12600, 0.3, 90), (12780, 0.2, 70), (17400, 0.18, 90), (23100, 0.26, 120))
+
+
+def level(value: float) -> dict:
+    """A 0..1 key value, whole where it is whole."""
+    return number(int(value) if float(value).is_integer() else value)
+
+
+def fault_tracks(node: str, bursts: list, duration: float) -> list:
+    """The strength and phase tracks of a signal fault. `bursts` lists each
+    burst's (ms, strength) keys in order; between bursts the fault rests. The
+    phase runs on one arrangement every SIGNAL_STEP through a burst and holds
+    between them, and both tracks end at rest, where reduced motion leaves
+    them."""
+    strength, phase, count = [(0, number(0))], [(0, number(0))], 0
+    for keys in bursts:
+        first, last = keys[0][0], keys[-1][0]
+        if first > strength[-1][0]:
+            strength.append((first, number(0)))
+            phase.append((first, number(count)))
+        strength += [(at, level(value)) for at, value in keys if at > strength[-1][0]]
+        count += max(1, round((last - first) / SIGNAL_STEP))
+        phase.append((last, number(count)))
+    if strength[-1][0] < duration:
+        strength.append((duration, number(0)))
+        phase.append((duration, number(count)))
+    return [track(node, "backdrop-glitch", strength), track(node, "backdrop-glitch-phase", phase)]
+
+
+def signal_layer(doc: Document, ident: str, dither: float = 0.0) -> dict:
+    """A signal over whatever the document has drawn beneath it (the
+    backdrop-dither and backdrop-glitch filter): a layer with a `dither`
+    holds it steadily; one without is a fault, which draws nothing at rest.
+    Either reads the composed view as soft focus does, so where the renderer
+    has none (ui_retainedSoftFocus) the layer is not there and the view stays
+    as drawn. A fault changes its arrangement faster than 3 Hz, so reduced
+    flashing (ui_reducedFlashing, section 13.10) removes it too."""
+    doc.state.setdefault("soft_focus", {"type": "boolean", "initial": False, "cvar": "ui_retainedSoftFocus"})
+    shown = {"state": "soft_focus"}
+    if not dither:
+        doc.state.setdefault("reduced_flashing", {"type": "boolean", "initial": False, "cvar": "ui_reducedFlashing"})
+        shown = {"op": "&&", "args": [shown, {"op": "!", "args": [{"state": "reduced_flashing"}]}]}
+    doc.bind(f"{ident}.display", ident, "display", {"op": "select", "args": [shown, "block", "none"]})
+    return group(ident, {**FULL, "display": keyword("none"), "pointer-events": keyword("none"), "backdrop-dither": number(dither),
+                         "backdrop-glitch": number(0), "backdrop-glitch-phase": number(0)})
+
+
+def montage(doc: Document, signal: str | None = None) -> dict:
+    """Backdrop levelshots change every 5000 ms (section 8, ambient loops).
+    With a `signal` layer over them each change is a signal fault: the layer
+    tears and re-syncs across 640 ms while the next picture catches and holds
+    within 420 ms, and between changes the signal slips briefly five times a
+    loop. Without one the pictures cross-fade over 2000 ms. Decorative, so
+    reduced motion holds one picture and no fault."""
     shots = []
     period = 5000 * len(MENU_BACKGROUNDS)
     tracks = []
+
+    def reveal(start: float, shown: bool = True) -> list:
+        if signal is None:
+            return [(start, number(0 if shown else 1)), (start + 2000, number(1 if shown else 0))]
+        return [(start + SIGNAL_LEAD + at, level(value if shown else round(1 - value, 3))) for at, value in SIGNAL_REVEAL]
+
     for index, source in enumerate(MENU_BACKGROUNDS):
         ident = f"shot-{index}"
         # The pictures keep a white tint. Animate isolated opacity so the
@@ -2835,14 +2903,18 @@ def montage(doc: Document) -> dict:
         start = 5000 * index
         last = index == len(MENU_BACKGROUNDS) - 1
         if not last:
-            keys = [(0, number(0)), (start, number(0)), (start + 2000, number(1)),
+            keys = [(0, number(0)), *reveal(start),
                     (period - 3000, number(1)), (period - 2990, number(0)), (period, number(0))]
         else:
-            # The newest picture fades out as the loop wraps, revealing the first.
-            keys = [(0, number(1)), (2000, number(0)), (start, number(0)),
-                    (start + 2000, number(1)), (period, number(1))]
+            # The newest picture leaves as the loop wraps, revealing the first.
+            keys = [(0, number(1)), *reveal(0, shown=False), *reveal(start), (period, number(1))]
             shots[-1]["properties"]["opacity"] = number(1)
+        keys = [key for position, key in enumerate(keys) if position == 0 or key[0] > keys[position - 1][0]]
         tracks.append(track(ident, "opacity", keys))
+    if signal is not None:
+        changes = [[(5000 * index + SIGNAL_LEAD + at, value) for at, value in SIGNAL_CHANGE] for index in range(len(MENU_BACKGROUNDS))]
+        slips = [[(at, 0.0), (at + 20, value), (at + lasts - 30, round(value * 0.8, 3)), (at + lasts, 0.0)] for at, value, lasts in SIGNAL_SLIPS]
+        tracks += fault_tracks(signal, sorted(changes + slips, key=lambda keys: keys[0][0]), period)
     doc.timelines.add("montage", period, tracks, iterations=0)
     doc.events.setdefault("onInit", []).append({"op": "playTimeline", "timeline": "montage"})
     return group("shots", dict(FULL), shots)
@@ -3065,13 +3137,23 @@ def title_document() -> dict:
     ])
     tall_title(doc, stage, content["children"][0], nav, base, [row[3] for row in rows])
     tall_dialog(doc, exit_modal)
+    field = lit_field("field", 0.7)
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"),
                             "font-size": length(16), "color": colour([1, 1, 1, 0.8])}, [
-        depth_layer(doc, "depth-backdrop", 1.0, [montage(doc)]),
+        depth_layer(doc, "depth-backdrop", 1.0, [montage(doc, signal="field-signal")]),
         # The scene retains continuous parallax. Keep pixel-coverage vector
         # furniture still: fractional translation would retessellate the
         # grid and every broad band/glow on each pointer movement.
-        group("depth-light", {**FULL, "pointer-events": keyword("none")}, lit_field("field", 0.7)),
+        # The pictures, dimmed a little so the menu leads, and their light
+        # reach the view through a signal: faulting as the picture changes
+        # (field-signal) and as the menu opens, leaves for a page and comes
+        # home (field-burst), then an ordered dither over all of it
+        # (field-dither), so a torn row keeps crisp dots. The reticle grid
+        # stays over it, undithered.
+        group("depth-light", {**FULL, "pointer-events": keyword("none")}, [
+            group("field-dim", {**FULL, "background-color": colour([0, 0, 0, BACKDROP_DIM])}),
+            *field[:2], signal_layer(doc, "field-signal"), signal_layer(doc, "field-burst"),
+            signal_layer(doc, "field-dither", SIGNAL_DITHER), *field[2:]]),
         stage,
         group("depth-frame", {**FULL, "pointer-events": keyword("none")}, framing_bands("band")),
         content,
@@ -3085,6 +3167,17 @@ def title_document() -> dict:
     band_motion(doc, "band", "home", [("wordmark", "image-color", colour([1, 1, 1, 1]), colour([1, 1, 1, 0])),
                                       ("home-stage", "opacity", number(1), number(0))], quick=("plinth", "prompts"))
     hide_carry_at_home(doc)
+    # The signal faults with the menu's own moves: it resolves as the menu
+    # opens, breaks up as the bands leave for a page (most as the page takes
+    # the view, at rest again by the hand-off) and settles as they dock home.
+    for timeline in doc.timelines.items:
+        # A play retargets its first key to the current value, so a fault
+        # that starts at strength reaches it by 1 ms.
+        bursts = {"open": [[(0, 0.0), (1, 0.85), (90, 0.6), (180, 0.3), (250, 0.0)]],
+                  "depart": [[(0, 0.0), (60, 0.4), (200, 0.6), (400, 0.85), (510, 0.4), (550, 0.0)]],
+                  "returnHome": [[(0, 0.0), (1, 0.6), (120, 0.7), (300, 0.3), (480, 0.0)]]}.get(timeline["id"])
+        if bursts:
+            timeline["tracks"] += fault_tracks("field-burst", bursts, timeline["durationMs"])
     # Opening the menu focuses its primary action (section 13.4): CONTINUE
     # while there is a save to continue, else SINGLE PLAYER. Coming back from
     # a page (returnHome) keeps the focus on the item that led there.

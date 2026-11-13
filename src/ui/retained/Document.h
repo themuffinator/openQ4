@@ -139,6 +139,20 @@ bool ValidImageSource(const std::string& source);
 // sigma) and `backdrop-saturate` (0..1), or its speed streak `backdrop-streak`
 // (0..1, The Awakening's speeder blur); "none" when none applies.
 std::string BackdropFilterCss(const Value* blur, const Value* saturate, const Value* streak = nullptr);
+struct Node;
+// A node's signal fault, RmlUi's `glitch(<dither> <strength> <phase>)` in the
+// same backdrop-filter: `backdrop-dither` (0..1, an ordered dither of the
+// view beneath), `backdrop-glitch` (0..1, a digital fault over it) and
+// `backdrop-glitch-phase` (the fault's arrangement, a new one at each whole
+// number). Empty unless the node declares one. The filter stands at any
+// values, none included: they animate as paint, never as style.
+std::string BackdropFaultCss(const Node& node);
+// A node's whole authored backdrop-filter: its soft focus or streak, then its
+// signal fault. Empty when it has none.
+std::string NodeBackdropFilterCss(const Node& node);
+// The index of a signal fault property in dither, strength, phase order; -1
+// for any other name.
+int BackdropFaultIndex(const std::string& name);
 enum class ControlState { Default, Hover, Focus, Pressed, Disabled };
 enum class ControlRole { Button, Toggle, Slider, Choice, Number, Scrollbar };
 struct ToggleSpec {

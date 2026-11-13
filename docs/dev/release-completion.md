@@ -7,6 +7,26 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The main menu's background comes through as a living signal, 13 November 2026
+
+- **The new interface's main menu has a sci-fi display look.** The level
+  pictures behind the title are dimmed a little so the menu stands out. They
+  reach the screen through a fine ordered dither, like a ship's console
+  display.
+- **Glitch transitions.** Each picture change is a brief signal fault: rows
+  tear sideways, blocks break into mosaic and the colours part, then the new
+  picture locks in. The fault also passes when the menu opens, when you leave
+  for a page and when you come back, and now and then the signal slips. Each
+  fault lasts about half a second, and the menu itself never moves or dims.
+- **Comfort settings respected.** Reduced flashing removes the faults and
+  keeps the dither. Reduced motion holds one picture with no faults. Renderers
+  that cannot read the screen back, such as the GLES renderer, show the
+  pictures plain and dimmed.
+- Engine captures on OpenGL and Vulkan at 720p and 1080p show the dither, a
+  picture change, a page departure and return, and a still reduced-motion
+  title. The retained title still measured under 0.6 ms of median CPU a frame
+  on a debugoptimized build.
+
 ## Player guides in plain language, checked against 0.14.1, 13 November 2026
 
 - **The README, every player guide and the package README read more simply.**

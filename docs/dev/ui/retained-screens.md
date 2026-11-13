@@ -9,6 +9,71 @@ adds partial evidence for `FLOW-024`, `FLOW-047`, `FLOW-048`, `ART-030` and
 `REN-014` in the [requirement register](product-requirements.md); the
 remaining screen migrations and the final gates stay open.
 
+## 13 November 2026: the title's signal
+
+The title's backdrop now reaches the player as a display signal (user request:
+a dither and sci-fi digital faults that are interesting but not distracting,
+and a slight dimming).
+
+- **Dimming.** Black at 0.30 covers the levelshots, under the vignette and the
+  additive light band, so the band's olive light keeps its strength and the
+  menu leads (`field-dim`).
+- **Dither.** Over the pictures and their light, `field-dither` steps each
+  pixel's brightness between six levels, evenly spaced in its square root,
+  against an 8x8 Bayer threshold, mixed in at 0.60. It keeps the hue and a flat
+  area's mean brightness, and leaves black and white as they are. The cell is
+  one pixel of a 540-line view in whole pixels: 1 px at 720p, 2 px at 1080p.
+  The reticle grid, the bands and every control stay over it, undithered.
+- **Picture changes.** The levelshots change every 5000 ms as before, but by a
+  signal fault in place of the stock 2000 ms cross-fade. `field-signal`, beneath
+  the dither, tears from 120 ms before the cut, peaks at 0.85 just after it and
+  is at rest 520 ms on. Meanwhile the next picture catches at 0.40, then 0.80,
+  and holds by 420 ms, never falling back. Between changes the signal slips
+  five times a loop, 70–120 ms at 0.18–0.30.
+- **Menu moves.** `field-burst` resolves as the menu opens (0.85 to rest over
+  250 ms) and breaks up as the bands leave for a page, most as the page takes
+  the view and at rest by the hand-off at 550 ms. It settles over 480 ms as
+  they dock home.
+- **The fault.** A few wide bands and many thin rows tear sideways, square
+  blocks (24 across) hold as a 3x3 mosaic of themselves, and the red and blue
+  channels part, further in a torn row. Torn rows lift at most 15% and held
+  blocks 8%. Each whole number of `backdrop-glitch-phase` is another
+  arrangement; the timelines step it every 55 ms through a fault and hold it
+  between faults.
+- **Settings.** Reduced motion keeps the dither and drops every fault (the
+  tracks end at rest). Reduced flashing (`ui_reducedFlashing`) hides both
+  fault layers, because their arrangements change faster than 3 Hz, and keeps
+  the dither and the stepped picture changes. Where the renderer cannot read
+  the composed view (`ui_retainedSoftFocus` 0, the GLES renderer or the
+  opaque-backing option), none of the three layers is there and the pictures
+  show as drawn, dimmed.
+- **Cost.** The dither is one view copy and one full-view pass a frame. A
+  full-view, settled frame finishes it directly on the base surface, and a
+  fault adds a second pass only while it runs. On a debugoptimized build at
+  1280x720, the retained title measured 0.39 ms median CPU on OpenGL and 0.55
+  ms on Vulkan over 240 frames, at a steady 16.6 ms frame interval with no
+  backdrop fallbacks.
+
+The format additions are in [the document format](document-format.md):
+`backdrop-dither`, `backdrop-glitch` and `backdrop-glitch-phase`. The engine
+draws them with `glsl/retained_glitch.glsl` through
+`Host::GlitchBackdrop` and, for a full-view layer in a replayed frame,
+`Host::GlitchBackdropDirect`.
+
+The stock cross-fade (visual specification section 8, ambient loops) remains
+the measured reference. The Remastered title departs from it at the user's
+request, and the specification and its register row have not been revised for
+the change.
+
+Validation: the native runtime test covers the filter, the property ranges,
+live values in replayed frames, the direct pass, rest and fallback. The host
+harness covers the view copy, the whole-window read, the parameters and a
+defaulted material. The material compiler compiles the shader through the
+Vulkan compiler, and the title's screen test plays a whole montage loop, the
+menu's moves, reduced flashing and reduced motion. Hidden engine captures on
+OpenGL and Vulkan at 1280x720 and 1920x1080 show the dither, a picture change,
+a page departure and return, and a still reduced-motion title.
+
 ## 11 October 2026: death and crash awakening
 
 The shared SP/MP view effect now layers death's existing 1800 ms colour drain
@@ -353,7 +418,10 @@ after editing the script; `--check` fails when an output is stale.
   stays put. Reduced motion (`ui_retainedReducedMotion`) hides the glint and
   keeps the rim. The backdrop, the light and grid, and the framing bands lean
   up to 6 dp away from the pointer, deeper layers further, while the content
-  stays fixed (section 13.8 depth). The session publishes the pointer's
+  stays fixed (section 13.8 depth). The pictures are dimmed and reach the
+  view through an ordered dither, and each picture change and each of the
+  menu's moves is a brief signal fault ([the title's signal](#13-november-2026-the-titles-signal)).
+  The session publishes the pointer's
   place, or a held look stick's deflection while it leads (menu focus moves
   with the other stick), and reduced motion holds the layers still.
   CONTINUE leads the navigation when a save exists and its
