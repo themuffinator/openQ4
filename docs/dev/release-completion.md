@@ -26,6 +26,9 @@ does not restore the withdrawn release. See
 - **Version marking.** Anything newer than 0.14.1 is marked **Not in 0.14.1**,
   and release status explains the convention. Getting Started gains a
   "Reporting a problem" section, because openQ4 writes no log unless asked.
+- **The README's guide links open the current guides** instead of the frozen
+  0.14.1 copies, so readers see the corrected text now. Release status still
+  lists the guides exactly as 0.14.1 shipped them.
 - Documentation pins in `arena_campaign.py`, `macos_shadow_policy.py`,
   `multiview_demo.py`, `renderer_picmip_policy.py`, `settings_menu_coverage.py`
   and `steam_deck_support.py` follow the new wording.

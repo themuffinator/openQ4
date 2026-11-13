@@ -41,8 +41,8 @@ openQ4 replaces Quake 4's engine and game code with its own: an open-source engi
    - **Linux:** download the AppImage (`x86_64` for most PCs, `aarch64` for ARM64), make it executable and run it.
    - **Steam Deck:** run `openQ4-steamdeck` from the Linux archive.
    - **macOS (preview):** move `openQ4.app` to Applications and open it, or get the signed build from [Mac Source Ports](https://www.macsourceports.com/game/quake4).
-   - **Android (experimental):** follow [Android setup](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/android-setup.md).
-4. openQ4 finds your Quake 4 install on its own. If it doesn't, see [If auto-detection fails](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/getting-started.md#if-auto-detection-fails).
+   - **Android (experimental):** follow [Android setup](docs/user/android-setup.md).
+4. openQ4 finds your Quake 4 install on its own. If it doesn't, see [If auto-detection fails](docs/user/getting-started.md#if-auto-detection-fails).
 
 > [!TIP]
 > On first launch openQ4 picks a performance preset to suit your hardware. To change it, open **Settings → Display** and choose another preset, or press **Auto-Detect** to pick again.
@@ -53,18 +53,18 @@ Upgrading? Install the whole package into a fresh folder rather than replacing i
 
 What you get in **0.14.1**, the latest release:
 
-- 🪐 **Two campaigns.** Play Quake 4 or [The Awakening](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/awakening.md), the recovered expansion, from **Single Player → Campaign**, each with its own saves. You supply the expansion files.
+- 🪐 **Two campaigns.** Play Quake 4 or [The Awakening](docs/user/awakening.md), the recovered expansion, from **Single Player → Campaign**, each with its own saves. You supply the expansion files.
 - 🖥️ **A new interface.** Rebuilt menus and settings, the Remastered HUD, weapon wheels, scopes and animated crosshairs, ready for controllers, touch, tall screens and larger text. The classic look is one setting away.
-- 🌗 **Modern lighting, each switchable**: stable [shadow maps](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/shadow-mapping.md) on the higher presets, bloom, HDR, [temporal AA](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/temporal-presentation.md), motion blur, [baked light grids](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/light-grids.md), [cel shading](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/cel-shading.md) and a CRT filter.
+- 🌗 **Modern lighting, each switchable**: stable [shadow maps](docs/user/shadow-mapping.md) on the higher presets, bloom, HDR, [temporal AA](docs/user/temporal-presentation.md), motion blur, [baked light grids](docs/user/light-grids.md), [cel shading](docs/user/cel-shading.md) and a CRT filter.
 - ⚡ **Built for modern displays.** Widescreen, ultrawide and portrait screens, smooth motion at 144 Hz and beyond, presets with Auto-Detect, and display changes that apply without a restart.
 - 🔺 **Your choice of renderer.** Vulkan is supported on Windows and chosen automatically, with OpenGL as the fallback.
-- 🎯 **Better multiplayer** (experimental): bots that take orders, quick and voice chat, objective markers, a server browser with favourites and [readable chat](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/multiplayer-chat.md).
-- 📼 **A demo library and player** for full matches and whole campaigns, with markers, fast seeking, Auto-Track and free-fly playback. See [demos](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/multiview-demos.md).
-- 🏆 **More to play.** The experimental [Arena Campaign](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/arena-campaign.md) offers bot matches across five tiers of the stock maps, with boss matches and saved progress.
-- 🔊 **Sound as designed.** [Room reverb](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/gameplay-settings.md#room-reverb) for every map, subtitles and a separate dialogue volume.
-- 🌍 **Twelve languages**, including German, Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian. See [Languages](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/languages.md).
-- 🌊 **Real liquids.** Swim, wade and drown in water, and take damage in slime and lava, in maps built for them. See [Liquids](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/liquids.md).
-- 🧪 **Experimental extras**: [VR](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/vr.md) through OpenXR, an [Android app](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/android-setup.md), a [level editor](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/level-editor.md) and [PBR materials](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/pbr-materials.md) for mods.
+- 🎯 **Better multiplayer** (experimental): bots that take orders, quick and voice chat, objective markers, a server browser with favourites and [readable chat](docs/user/multiplayer-chat.md).
+- 📼 **A demo library and player** for full matches and whole campaigns, with markers, fast seeking, Auto-Track and free-fly playback. See [demos](docs/user/multiview-demos.md).
+- 🏆 **More to play.** The experimental [Arena Campaign](docs/user/arena-campaign.md) offers bot matches across five tiers of the stock maps, with boss matches and saved progress.
+- 🔊 **Sound as designed.** [Room reverb](docs/user/gameplay-settings.md#room-reverb) for every map, subtitles and a separate dialogue volume.
+- 🌍 **Twelve languages**, including German, Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian. See [Languages](docs/user/languages.md).
+- 🌊 **Real liquids.** Swim, wade and drown in water, and take damage in slime and lava, in maps built for them. See [Liquids](docs/user/liquids.md).
+- 🧪 **Experimental extras**: [VR](docs/user/vr.md) through OpenXR, an [Android app](docs/user/android-setup.md), a [level editor](docs/user/level-editor.md) and [PBR materials](docs/user/pbr-materials.md) for mods.
 
 Read the full [0.14.1 release notes](docs/dev/releases/v0.14.1.md). Development continues toward 1.0; see the [roadmap](docs/dev/roadmap.md).
 
@@ -93,12 +93,12 @@ Packages are built for Windows x64, Linux x64 and Steam Deck, with preview Linux
 |---|---|---|
 | **Windows x64** | Installer or ZIP | Windows 10/11 recommended |
 | **Linux x64** | AppImage (`x86_64`) or archive | A modern 64-bit desktop, comparable to Ubuntu 24.04 or newer |
-| **Steam Deck** | Linux archive | Launch `openQ4-steamdeck`; see the [Steam Deck guide](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/steam-deck.md) |
+| **Steam Deck** | Linux archive | Launch `openQ4-steamdeck`; see the [Steam Deck guide](docs/user/steam-deck.md) |
 | **Linux ARM64** | AppImage (`aarch64`) or archive | Preview; needs full desktop OpenGL drivers, so boards with only OpenGL ES won't run it |
 | **macOS** | Apple Silicon archive | Preview. Unsigned OpenGL/Metal bridge packages, so macOS asks you to approve them on first launch; players have run them only on current macOS |
 | **macOS (signed)** | [Mac Source Ports](https://www.macsourceports.com/game/quake4) | Signed and notarized Apple Silicon and Intel builds by Schnapple |
 | **Windows ARM64** | Installer or ZIP | Experimental; not yet confirmed on real hardware |
-| **Android** | ARM64 APK | Experimental; Android 7.0 or newer with OpenGL ES 3.0. See [Android setup](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/android-setup.md) |
+| **Android** | ARM64 APK | Experimental; Android 7.0 or newer with OpenGL ES 3.0. See [Android setup](docs/user/android-setup.md) |
 
 | | Minimum | Recommended |
 |---|---|---|
@@ -107,33 +107,33 @@ Packages are built for Windows x64, Linux x64 and Steam Deck, with preview Linux
 | **Graphics** | Working OpenGL drivers, about 1 GB of video memory | OpenGL 4.1 or Vulkan graphics with 2 GB+ of video memory (6 GB+ for the Quality preset and above) |
 | **Storage** | ~12 GB including Quake 4 | 15 GB+ |
 
-Details for each platform are in [Getting Started](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/getting-started.md#system-requirements).
+Details for each platform are in [Getting Started](docs/user/getting-started.md#system-requirements).
 
 ## Player guides
 
-These guides match the 0.14.1 release. Start with [release status](docs/user/release-status.md) for corrections made since it shipped.
+These guides describe 0.14.1. Anything added since is marked **Not in 0.14.1**; [release status](docs/user/release-status.md) explains what each download includes.
 
 **Set up**
-- [Getting Started](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/getting-started.md): install, first launch and common questions
-- [Client Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/client-settings.md): where the most useful options live
-- [Display Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/display-settings.md) · [Input Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/input-settings.md) · [Gameplay Settings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/gameplay-settings.md) · [Steam Deck](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/steam-deck.md)
-- [Languages](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/languages.md) · [VR](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/vr.md) (experimental) · [Android Setup](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/android-setup.md) (experimental)
+- [Getting Started](docs/user/getting-started.md): install, first launch and common questions
+- [Client Settings](docs/user/client-settings.md): where the most useful options live
+- [Display Settings](docs/user/display-settings.md) · [Input Settings](docs/user/input-settings.md) · [Gameplay Settings](docs/user/gameplay-settings.md) · [Steam Deck](docs/user/steam-deck.md)
+- [Languages](docs/user/languages.md) · [VR](docs/user/vr.md) (experimental) · [Android Setup](docs/user/android-setup.md) (experimental)
 
 **Play**
-- [Campaigns](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/campaigns.md) · [The Awakening](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/awakening.md): choosing and installing a campaign
-- [Arena Campaign](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/arena-campaign.md) (experimental): tiers, unlocks, maps and bots
-- [Multiplayer Networking](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/multiplayer-networking.md) (experimental) · [Multiplayer Chat](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/multiplayer-chat.md) · [Competitive Matches](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/competitive-matches.md) (experimental)
-- [Demo Library and Multi-View Demos](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/multiview-demos.md): browse, play back and record full matches
+- [Campaigns](docs/user/campaigns.md) · [The Awakening](docs/user/awakening.md): choosing and installing a campaign
+- [Arena Campaign](docs/user/arena-campaign.md) (experimental): tiers, unlocks, maps and bots
+- [Multiplayer Networking](docs/user/multiplayer-networking.md) (experimental) · [Multiplayer Chat](docs/user/multiplayer-chat.md) · [Competitive Matches](docs/user/competitive-matches.md) (experimental)
+- [Demo Library and Multi-View Demos](docs/user/multiview-demos.md): browse, play back and record full matches
 
 **Look and feel**
-- [Shadow Mapping](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/shadow-mapping.md) · [Light Grids](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/light-grids.md) · [Classic Dynamic Lights](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/classic-dynamic-lights.md) · [Cel Shading](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/cel-shading.md)
-- [Temporal AA and Dynamic Resolution](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/temporal-presentation.md) · [Advanced Screen-Space Lighting](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/advanced-screen-space-lighting.md) (both experimental)
-- [DDS Texture Replacements](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/texture-replacements.md) · [Level-Load Cache](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/level-load-cache.md) (experimental)
+- [Shadow Mapping](docs/user/shadow-mapping.md) · [Light Grids](docs/user/light-grids.md) · [Classic Dynamic Lights](docs/user/classic-dynamic-lights.md) · [Cel Shading](docs/user/cel-shading.md)
+- [Temporal AA and Dynamic Resolution](docs/user/temporal-presentation.md) · [Advanced Screen-Space Lighting](docs/user/advanced-screen-space-lighting.md) (both experimental)
+- [DDS Texture Replacements](docs/user/texture-replacements.md) · [Level-Load Cache](docs/user/level-load-cache.md) (experimental)
 
 **Host and create**
-- [Server Setup](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/server-setup.md) · [Server Security](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/server-security.md) (read the [protocol correction](docs/user/release-status.md#guides-for-the-available-release))
-- [Liquids](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/liquids.md) · [Map Entity Strings](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/map-entity-strings.md): for mappers and modders
-- [Level Editor](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/level-editor.md) (experimental) · [PBR Materials](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/pbr-materials.md): build maps and author modern materials
+- [Server Setup](docs/user/server-setup.md) · [Server Security](docs/user/server-security.md)
+- [Liquids](docs/user/liquids.md) · [Map Entity Strings](docs/user/map-entity-strings.md): for mappers and modders
+- [Level Editor](docs/user/level-editor.md) (experimental) · [PBR Materials](docs/user/pbr-materials.md): build maps and author modern materials
 
 ## Compatibility
 
@@ -145,7 +145,7 @@ These guides match the 0.14.1 release. Start with [release status](docs/user/rel
 ## Getting help
 
 - **Something broken?** Open an [issue](https://github.com/themuffinator/openQ4/issues) with your setup details and a log file; [Getting Started](docs/user/getting-started.md#reporting-a-problem) shows how to make one.
-- **On a Mac?** Collect support data with the [macOS support-data guide](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/macos-support-data.md) first.
+- **On a Mac?** Collect support data with the [macOS support-data guide](docs/user/macos-support-data.md) first.
 - **On ARM64?** Tell us how it runs with the Windows or Linux ARM64 [issue template](https://github.com/themuffinator/openQ4/issues/new/choose). "It just worked" is a useful report too.
 - **Want to chat?** Find us in **#openq4** on the [DarkMatter Discord](https://discord.gg/T32mFejwR4).
 

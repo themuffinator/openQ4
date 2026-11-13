@@ -2426,7 +2426,7 @@ def validate_docs() -> None:
         require(user_doc, token, "Arena Campaign player guide")
     require(
         readme,
-        "[Arena Campaign](https://github.com/themuffinator/openQ4/blob/v0.14.1/docs/user/arena-campaign.md)",
+        "[Arena Campaign](docs/user/arena-campaign.md)",
         "Arena Campaign README link",
     )
     for token in (
