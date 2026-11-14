@@ -3932,7 +3932,7 @@ prediction/rewind defaults.
 | MP-04 — Partial | Arena audio pause/result persistence, in-place restart and ceremony disconnect/quit preservation checked. | Physical navigation and endpoint loss/return ([checklist](mp-human-qualification.md#mp-04-arena-by-hand)); retain failure-path and UI/audio dependencies. |
 | MP-05 — Closed at selected scope | Seek repairs, quota/retention policy and MVD 1.3 markers/keyframes/late-join identity/autotracking pass selected runtime checks. | Reverse scrub, timedemo, AVI, thumbnails and named list remain deferred; 1.3 Vulkan/Linux/macOS playback breadth belongs to release qualification. |
 | MP-06 — Partial | Static-liquid compiler output, bot swimming, remote air/HUD/demo state, muffle and projectile crossings checked; player swimming, climbing out, drowning and the wade sound pass under `in_movementProbe` on OpenGL and Vulkan after the floor-slide and lava/slime haze fixes. | Real keys/controller, hearing the sounds and a by-eye pass at play distance ([checklist](mp-human-qualification.md#mp-06-swimming-and-liquid-effects-by-eye)); swimming as a remote client (prediction) is unexercised. Captured splash/bubble presentation passes after the slime/lava splash fix. Swimming monsters, new animations and moving volumes remain deferred. |
-| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames, also when jitter drops the snapshot before or after the respawn; the server's aim stays with the client's after a client stall (one HUD artwork parse a level, HUD views built at spawn, a controller that recovers from hitches); defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); long client frames under jitter still make the odd command late, so the impaired capture fails now and then; remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
+| MP-07 — Partial | Coupled pose-age/rewind, signed timing controller, impairment simulation and weapon geometry fixes tested; the firing player's own hit-scan shots are predicted on the fire frame and pass loopback, impaired and Vulkan captures; the weapon for a new life raises with the server's, so a burst held through a respawn stays on the server's frames, also when jitter drops the snapshot before or after the respawn; the server's aim stays with the client's after a client stall (one HUD artwork parse a level, HUD views built at spawn, a controller that recovers from hitches); long client frames no longer make commands late (a prediction margin from the client's frame times, whole bursts per packet); defaults remain off. | By-eye pass with real input, teleporters and a moving gauntlet target ([checklist](mp-human-qualification.md#mp-07-weapon-visuals-under-prediction)); remote weapon play passes from spectator captures after the casual follow fix; real WAN and default promotion only when selected and qualified. |
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path on IPv4 and IPv6, and over IPv6 even when the path drops IP fragments (connection replies fit one packet). | IPv4 over a fragment-dropping path (1,300-byte channel fragments); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
@@ -4639,9 +4639,41 @@ Completion substeps:
   with 20 failing controls. Every rejoin burst in four impaired runs and on
   loopback fell on the server's frames with its directions. Open: a respawn
   snapshot that follows a snapshot jitter dropped still catches the new
-  weapon up (fixed later the same day, below), and a long client frame can
-  still make a command late, so the impaired harness does not pass
-  dependably yet.
+  weapon up, and a long client frame can still make a command late (both
+  fixed later the same day, below), so the impaired harness did not pass
+  dependably then.
+  Later on 13 November: [commands stay on time through long client frames](mp-network-qualification.md#commands-on-time-through-long-client-frames-13-november-2026).
+  The controller steps its target to the median of the server's
+  `aheadOfServer` report, which covers a client frame of about two tics. A
+  longer frame held its commands back until the server had run their frames,
+  and a client below 30 fps did that on every frame. Measured in the fixture
+  over 80 ms ±20, lateness starts at frames about 20 ms longer than a tic and
+  reaches 0.7 late commands per long frame at 56 ms and 3.0 at 96 ms.
+  Decision: a client-side margin from the client's own frame times
+  (`src/framework/async/PredictionMargin.h`, `net_clientPredictionMargin`,
+  default 1). The target gains the longest recent frame less the two tics the
+  median covers. Each long frame holds its own length for 10 s and then decays
+  at 4 ms a second, so one spike at a join does not hold a large margin while
+  milder long frames continue. A frame cut by the 100 ms `UpdateTime` clamp is
+  a hitch and is left out. The cost is extra server-side wait equal to the
+  margin while it lasts, for example 24 ms after 56 ms frames and 44 ms after
+  76 ms frames. Smooth clients pay nothing. Tracking the server's worst
+  `aheadOfServer` dips was rejected. Those samples sit on a 16 ms lattice
+  33 ms apart, so a floor that caught tails also added 13-16 ms to every clean
+  connection in the model, and it needed windup protection. A second defect
+  lost commands outright: a long frame's burst of one-command packets
+  reorders on a jittery link, and the channel discards the older ones. Each
+  packet of a burst now carries the whole burst. The server counts the frames
+  it runs on a repeated command (`com_showAsyncStats`), and
+  `mp_firing_view_capture.py` reports them (`late_commands`), the shooter's
+  frame-time tail and the margin's rises. `mp_client_prediction_state.py` adds
+  long-frame, slow-client, spike, random-tail and cost loops, a measurement
+  table and six failing controls (12 in all). Six interleaved impaired runs,
+  four with the margin and two without, all passed with every server shot on
+  the client's frame and direction. Long frames left 7 late frames over 253
+  frames of 36 ms or more with the margin. Without it they left 42 over 303,
+  counting two margin-off runs on intermediate builds. The ones left are each
+  first long frame of a new length and stalls past the clamp.
   Later on 13 November: [a respawn read across a dropped snapshot](mp-network-qualification.md#a-respawn-read-across-a-dropped-snapshot-13-november-2026)
   raises with the server's. Under 80 ms ±20 the shooter's channel loses a
   snapshot whenever one client frame reads two at once and the jitter swaps
@@ -4659,7 +4691,7 @@ Completion substeps:
   frames with its directions, each raise exact; the control with the old rule
   caught the weapon up (9 of 34 respawn shots on the frame). The sixth run,
   on a busy machine, raised exactly but lost shots to stale commands, the long
-  client frame problem, which remains open. `mp_predicted_hitscan_state.py`
+  client frame problem fixed in the same round (above). `mp_predicted_hitscan_state.py`
   fails 42 single-reversal controls (nine new).
 - [ ] **MP-08 — P1, qualification and decision: network and content interoperability.**
   Qualify real cross-platform/architecture peers over IPv4 and IPv6, fragmentation/

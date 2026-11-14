@@ -193,6 +193,15 @@ in a few ways:
   server's update. Rockets, grenades and other projectiles appear when the
   server launches them. In 0.14.1, all of your shots appear when the server's
   copy arrives. Set `net_mpPredictHitscan 0` to keep that behaviour.
+- **Your commands keep up after a slow frame** (**Not in 0.14.1**). Your game
+  sends the server your aim, movement and buttons once a game frame. If one
+  arrives after the server has run that frame, the server reuses your previous
+  command, so a shot fired then goes where you were aiming a moment before.
+  When a frame of your game takes much longer than usual, your game predicts
+  further ahead for about ten seconds, by the frame's length less about 33 ms,
+  then eases back, so the next slow frame still arrives in time. A game that
+  stays above 30 fps pays nothing. Set `net_clientPredictionMargin 0` to keep
+  the shortest lead instead.
 - **Other players** are drawn from the server's last update, which is slightly
   old by the time it arrives:
   - **Legacy prediction** (`net_mpPredictMode 0`, the default) shows them about
@@ -268,6 +277,7 @@ Type these into the console, or put them in your configuration file.
 | `net_mpPredictMaxFrames` | `16` | Client | With enhanced prediction, the most game frames (16 ms each) another player is drawn ahead, from `1` to `64`. |
 | `net_mpRemoteExtrapolation` | automatic | Client (read-only) | How far ahead this client tells servers it draws other players, in frames: `0` in legacy mode, otherwise `net_mpPredictMaxFrames`. |
 | `net_mpPredictHitscan` | `1` | Client | **Not in 0.14.1:** draws your own machinegun, shotgun and railgun tracers and wall marks the moment you fire. `0` waits for the server's copy of each shot. |
+| `net_clientPredictionMargin` | `1` | Client | **Not in 0.14.1:** after a frame of your game takes longer than usual, or while it runs below 30 fps, your game predicts a little further ahead for a while so your aim and fire still reach the server in time. `0` keeps the shortest lead and lets such frames send late commands, which the server replaces with your previous one. |
 | `net_mpLagCompensation` | `0` | Server | Turns on lag compensation for instant-hit weapons, the lightning gun and the gauntlet. |
 | `net_mpLagCompMaxMS` | `200` | Server | The longest rewind, in milliseconds (`0` to `1000`). |
 | `net_mpLagCompBiasMS` | `0` | Server | Adds to or takes from every rewind, in milliseconds (`-200` to `200`). |
@@ -284,6 +294,7 @@ Type these into the console, or put them in your configuration file.
 | `net_mpPredictDebug 1` | On a client, logs how old each other player was on screen when a server update arrived. |
 | `net_verbose 2` | On a client, also logs for each server update how far ahead the client is predicting and how early the server says your commands arrive. |
 | `net_mpHitscanDebug 1` | **Not in 0.14.1:** logs every instant-hit shot: the server's, the ones your client drew itself and the server's copies it received, with how far each started from your gun and aim. |
+| `com_showAsyncStats 1` | On a server, logs once a second each player's updates sent, their size, how many the rate limit held back and (**not in 0.14.1**) how many of that player's commands arrived too late. |
 
 ## Testing under simulated network conditions
 

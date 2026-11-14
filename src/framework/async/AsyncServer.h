@@ -171,6 +171,10 @@ typedef struct serverClient_s {
 	int					statsSnapshotsSent;
 	int					statsSnapshotBytes;
 	int					statsSendsRefusedByRate;
+	// openQ4: frames run on a repeated command because this client's own had not
+	// come, and the first frame of the run in progress (-1 for none).
+	int					statsLateUsercmds;
+	int					lateUsercmdsFrom;
 	oq4voice::Mailbox	voiceMailbox;
 
 	char				guid[12];  // Even Balance - M. Quinn
@@ -288,6 +292,7 @@ private:
 
 	void				PrintOOB( const netadr_t to, int opcode, const char *string );
 	void				DuplicateUsercmds( int frame, int time );
+	void				CountLateUsercmds( int frame );
 	void				ClearClient( int clientNum );
 	void				InitClient( int clientNum, int clientId, int clientRate );
 // jmarshall

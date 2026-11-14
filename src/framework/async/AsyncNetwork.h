@@ -67,6 +67,7 @@ const int GAME_INIT_ID_MAP_LOAD		= -2;
 #include "MsgChannel.h"
 #include "AsyncServer.h"
 #include "ServerScan.h"
+#include "PredictionMargin.h"
 #include "AsyncClient.h"
 #include "MultiViewDemo.h"
 
@@ -193,6 +194,7 @@ public:
 	static idCVar			serverAllowLegacyRcon;			// explicit plaintext compatibility opt-in
 	static idCVar			clientPrediction;				// how many additional milliseconds the clients runs ahead
 	static idCVar			clientMaxPrediction;			// max milliseconds into the future a client can run prediction
+	static idCVar			clientPredictionMargin;			// predict further after long frames (PredictionMargin.h)
 	static idCVar			clientUsercmdBackup;			// how many usercmds the client sends from previous frames
 	static idCVar			clientRemoteConsoleAddress;		// remote console address
 	static idCVar			clientRemoteConsolePassword;	// remote console password

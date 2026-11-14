@@ -10,11 +10,27 @@
 // client's frame again and again, as a hitch does, under delay and jitter: before the
 // 13 November fix the catch-up climbed with each hitch to its clamp, and from then on every
 // command the client sent reached the server late.
+//
+// The long-frame loops run the production PredictionMargin.h, the user command count per
+// packet (AsyncClient_UsercmdsPerPacket) and the prediction cover as well. A client frame
+// longer than about two tics holds back the commands that fell due during it; with the
+// median target alone they reached the server after the frame that needed them, and a
+// client below 30 fps did that on every frame. Long frames of a fixed length must leave no
+// late command once the first has set the margin, a client at 30 or 20 fps none at all, and
+// a realistic tail (random long frames of +20 to +60 ms, twice a second) a tenth of the late
+// commands the target alone leaves. After one long frame, milder ones must not hold its
+// margin. Smooth clients must get no margin at all, and neither must hitches the 100 ms
+// clamp cut. A table of late commands per long frame against its
+// length, with the margin and without it (net_clientPredictionMargin 0), measures the tail.
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+
+#define ID_INLINE inline
 
 // PRODUCTION_SIGN_MACRO
 
@@ -25,17 +41,33 @@ inline int ClampInt( int min, int max, int value ) {
 }
 
 // PRODUCTION_FAST_ADJUST
+// PRODUCTION_PACKET_COMMANDS
+
+// PRODUCTION_PREDICTION_MARGIN
 
 static const int FRAME_MSEC = 16;
 static const int MAX_PREDICTION_MSEC = 1000;
+static const int FRAME_CLAMP_MSEC = 100;		// idAsyncClient::UpdateTime( CLIENT_FRAME_CLAMP_MSEC )
+static const int USERCMD_BACKUP = 5;			// net_clientUsercmdBackup
 
 static int AsyncClient_MaxPredictionMsec() {
 	return MAX_PREDICTION_MSEC;
 }
 
+// The exact 60 Hz tic ladder (common->GetUserCmdDeltaMsec): 16, 17, 17 ms. Only the
+// prediction cover reads it here; the loops below keep 16 ms frames on both ends.
+static int AsyncClient_NextGameFrameMsec( int gameFrame ) {
+	const int tic = gameFrame + 1;
+	return tic * 1000 / 60 - ( tic - 1 ) * 1000 / 60;
+}
+
 static int AsyncClient_ConfiguredPredictionMsec( int ) {
 	return FRAME_MSEC;
 }
+
+// PRODUCTION_PREDICTION_COVER
+
+// PRODUCTION_USERCMDS_PER_PACKET
 
 struct ClientTiming {
 	int gameFrame = 0;
@@ -45,7 +77,25 @@ struct ClientTiming {
 	int clientPrediction = 0;
 	int snapshotGameFrame = 0;
 	int snapshotGameTime = 0;
+	int clientTime = 0;
+	idPredictionMargin predictionMargin;
 };
+
+// What idAsyncClient::RunFrame does with a frame of elapsed milliseconds before it reads the
+// snapshots that came meanwhile: UpdateTime clamps it, and the margin sees it unless
+// net_clientPredictionMargin is 0.
+static int ClientFrame( ClientTiming &client, int elapsed, bool margin ) {
+	const int msec = elapsed < FRAME_CLAMP_MSEC ? elapsed : FRAME_CLAMP_MSEC;
+	client.clientTime += msec;
+	if ( !margin ) {
+		client.predictionMargin.Clear();
+	} else {
+		client.predictionMargin.Frame( client.clientTime, msec, FRAME_CLAMP_MSEC,
+			AsyncClient_PredictionCoverMsec( client.gameFrame ) );
+	}
+	client.gameTimeResidual += msec;
+	return msec;
+}
 
 static bool SnapshotTiming( ClientTiming &client, int aheadOfServer ) {
 	int &gameFrame = client.gameFrame;
@@ -54,6 +104,7 @@ static bool SnapshotTiming( ClientTiming &client, int aheadOfServer ) {
 	int &clientPredictTime = client.clientPredictTime;
 	int &clientPrediction = client.clientPrediction;
 	int &snapshotGameTime = client.snapshotGameTime;
+	idPredictionMargin &predictionMargin = client.predictionMargin;
 	const int snapshotGameFrame = client.snapshotGameFrame;
 	int delta = 0;
 	(void)snapshotGameFrame;
@@ -179,7 +230,7 @@ static void CheckClosedLoop( int oneWayMsec, int seconds ) {
 		if ( now % FRAME_MSEC != 0 ) {
 			continue;
 		}
-		client.gameTimeResidual += FRAME_MSEC;
+		ClientFrame( client, FRAME_MSEC, true );
 		for ( size_t i = 0; i < toClient.size(); ) {
 			if ( toClient[i].arrival <= now ) {
 				client.snapshotGameFrame = toClient[i].frame;
@@ -214,6 +265,9 @@ static void CheckClosedLoop( int oneWayMsec, int seconds ) {
 	std::snprintf( what, sizeof( what ), "%d ms each way: the target stays near the round trip (%d)", oneWayMsec,
 		client.clientPrediction );
 	Expect( client.clientPrediction <= 2 * oneWayMsec + 4 * FRAME_MSEC, what );
+	std::snprintf( what, sizeof( what ), "%d ms each way: frames of one tic raise no margin (%d)", oneWayMsec,
+		client.predictionMargin.PeakMsec() );
+	Expect( client.predictionMargin.PeakMsec() == 0, what );
 	std::printf( "loop %3d ms: target %d, catch-up %d, late frames %d (settled %d), resyncs %d of %d\n", oneWayMsec,
 		client.clientPrediction, client.clientPredictTime, lateCommands, settledLate, settledResyncs, settledSnapshots );
 }
@@ -250,6 +304,7 @@ static void CheckHitches( int oneWayMsec, int jitterMsec, int stallMsec, int sta
 	int lastPresent = 0;
 	int lateAfterRecovery = 0;
 	int highestCatchUp = 0;
+	int highestMargin = 0;
 
 	for ( int now = 0; now < end; now++ ) {
 		for ( size_t i = 0; i < toServer.size(); ) {
@@ -287,7 +342,8 @@ static void CheckHitches( int oneWayMsec, int jitterMsec, int stallMsec, int sta
 		}
 		const int elapsed = now - lastPresent;
 		lastPresent = now;
-		client.gameTimeResidual += elapsed < 100 ? elapsed : 100;	// idAsyncClient::UpdateTime( 100 )
+		ClientFrame( client, elapsed, true );
+		highestMargin = std::max( highestMargin, client.predictionMargin.PeakMsec() );
 		std::vector<Packet> ready;
 		for ( size_t i = 0; i < toClient.size(); ) {
 			if ( toClient[i].arrival <= now ) {
@@ -333,9 +389,351 @@ static void CheckHitches( int oneWayMsec, int jitterMsec, int stallMsec, int sta
 	std::snprintf( what, sizeof( what ), "%d ms +-%d, %d hitches of %d ms: the catch-up stays off its clamp (%d)",
 		oneWayMsec, jitterMsec, stalls, stallMsec, highestCatchUp );
 	Expect( highestCatchUp < MAX_PREDICTION_MSEC, what );
+	std::snprintf( what, sizeof( what ), "%d ms +-%d, %d hitches of %d ms: hitches the clamp cut raise no margin (%d)",
+		oneWayMsec, jitterMsec, stalls, stallMsec, highestMargin );
+	Expect( highestMargin == 0, what );
 	std::printf( "hitches %3d ms +-%2d, %d x %d ms: target %d, catch-up %d (highest %d), late frames after recovery %d\n",
 		oneWayMsec, jitterMsec, stalls, stallMsec, client.clientPrediction, client.clientPredictTime, highestCatchUp,
 		lateAfterRecovery );
+}
+
+// A link with long client frames. The server runs 16 ms frames and sends a snapshot every
+// other one; packets take oneWayMsec plus up to jitterMsec each way, so a burst reorders and
+// the server's channel discards a packet older than the newest it has taken, as
+// idMsgChannel::Process does. A packet carries AsyncClient_UsercmdsPerPacket commands up to
+// its own frame. The server uses the command for each frame if one has come and otherwise
+// repeats the last: that frame is late. The client presents frameMsec frames (one more or
+// less at random); longFrame() gives the length of the next long frame, or 0 for an ordinary
+// one. The commands that fell due during a frame are made after it, as RunFrame does.
+struct LinkResult {
+	int late = 0;				// frames the server ran on a repeated command after settling
+	int lateAfterLearn = 0;		// of those, the ones after learnMsec past the first long frame
+	int longFrames = 0;			// long frames after settling
+	int firstLong = -1;
+	double waitMsec = 0;		// how long a command waited at the server, on average
+	int highestMargin = 0;
+	double meanMargin = 0;
+	int rises = 0;				// snapshots that moved the target forward by more than its step
+	int finalMargin = 0;
+};
+
+struct Link {
+	int oneWayMsec = 0;
+	int jitterMsec = 0;
+	int frameMsec = FRAME_MSEC;
+	bool margin = true;
+	int settleMsec = 8000;
+	int seconds = 60;
+	int learnMsec = 1000;
+	unsigned int seed = 40708;
+};
+
+template<typename LongFrame>
+static LinkResult RunLink( const Link &link, LongFrame longFrame ) {
+	ClientTiming client;
+	client.clientPrediction = client.clientPredictTime = 2 * link.oneWayMsec;
+	unsigned int random = link.seed;
+	auto next = [&]() {
+		random = random * 1103515245u + 12345u;
+		return random >> 8;
+	};
+	auto jitter = [&]() {
+		return link.jitterMsec ? static_cast<int>( next() % static_cast<unsigned int>( link.jitterMsec + 1 ) ) : 0;
+	};
+	struct Datagram {
+		int arrival;
+		int sequence;
+		int frame;
+		int count;
+		int ahead;
+	};
+	std::vector<Datagram> toServer;
+	std::vector<Datagram> toClient;
+	std::vector<int> received;		// arrival time of each frame's command, -1 for none yet
+	int serverFrame = 0;
+	int serverResidual = 0;
+	int lastPacketFrame = -1;
+	int lastPacketSequence = -1;
+	int sendSequence = 0;
+	int snapshotSequence = 0;
+	int lastSnapshotSequence = -1;
+	int nextPresent = 0;
+	int lastPresent = 0;
+	const int end = link.settleMsec + link.seconds * 1000;
+	LinkResult result;
+	double waitSum = 0;
+	int waitCount = 0;
+	double marginSum = 0;
+	int marginCount = 0;
+	auto byArrival = []( const Datagram &a, const Datagram &b ) { return a.arrival < b.arrival; };
+
+	for ( int now = 0; now < end; now++ ) {
+		std::stable_sort( toServer.begin(), toServer.end(), byArrival );
+		while ( !toServer.empty() && toServer.front().arrival <= now ) {
+			const Datagram datagram = toServer.front();
+			toServer.erase( toServer.begin() );
+			if ( datagram.sequence <= lastPacketSequence ) {
+				continue;	// out of order: the channel discards it
+			}
+			lastPacketSequence = datagram.sequence;
+			lastPacketFrame = datagram.frame;
+			if ( static_cast<int>( received.size() ) <= datagram.frame ) {
+				received.resize( datagram.frame + 1, -1 );
+			}
+			for ( int frame = std::max( 0, datagram.frame - datagram.count + 1 ); frame <= datagram.frame; frame++ ) {
+				if ( received[frame] < 0 ) {
+					received[frame] = now;
+				}
+			}
+		}
+		if ( ++serverResidual >= FRAME_MSEC ) {
+			serverResidual -= FRAME_MSEC;
+			const int arrived = serverFrame < static_cast<int>( received.size() ) ? received[serverFrame] : -1;
+			if ( now >= link.settleMsec ) {
+				if ( arrived < 0 ) {
+					result.late++;
+					if ( result.firstLong >= 0 && now >= result.firstLong + link.learnMsec ) {
+						result.lateAfterLearn++;
+					}
+				} else {
+					waitSum += now - arrived;
+					waitCount++;
+				}
+			}
+			serverFrame++;
+			if ( ( serverFrame & 1 ) == 0 ) {
+				const int ahead = lastPacketFrame * FRAME_MSEC - serverFrame * FRAME_MSEC - serverResidual;
+				toClient.push_back( { now + link.oneWayMsec + jitter(), snapshotSequence++, serverFrame, 0, ahead } );
+			}
+		}
+
+		if ( now < nextPresent ) {
+			continue;
+		}
+		const int elapsed = now - lastPresent;
+		lastPresent = now;
+		int frame = link.frameMsec + static_cast<int>( next() % 3u ) - 1;
+		if ( now >= link.settleMsec ) {
+			const int longMsec = longFrame( now, next );
+			if ( longMsec > 0 ) {
+				frame = longMsec;
+				result.longFrames++;
+				if ( result.firstLong < 0 ) {
+					result.firstLong = now;
+				}
+			}
+		}
+		nextPresent = now + frame;
+
+		ClientFrame( client, elapsed, link.margin );
+		std::stable_sort( toClient.begin(), toClient.end(), byArrival );
+		while ( !toClient.empty() && toClient.front().arrival <= now ) {
+			const Datagram snapshot = toClient.front();
+			toClient.erase( toClient.begin() );
+			if ( snapshot.sequence <= lastSnapshotSequence ) {
+				continue;
+			}
+			lastSnapshotSequence = snapshot.sequence;
+			client.snapshotGameFrame = snapshot.frame;
+			client.snapshotGameTime = snapshot.frame * FRAME_MSEC;
+			const int before = client.clientPrediction;
+			SnapshotTiming( client, snapshot.ahead );
+			if ( client.clientPrediction > before + 1 ) {
+				result.rises++;
+			}
+		}
+		int usercmdsSentThisFrame = 0;
+		while ( client.gameTimeResidual + client.clientPredictTime >= FRAME_MSEC ) {
+			const int count = AsyncClient_UsercmdsPerPacket( USERCMD_BACKUP, usercmdsSentThisFrame );
+			usercmdsSentThisFrame++;
+			toServer.push_back( { now + link.oneWayMsec + jitter(), sendSequence++, client.gameFrame, count, 0 } );
+			client.gameFrame++;
+			client.gameTime = client.gameFrame * FRAME_MSEC;
+			client.gameTimeResidual -= FRAME_MSEC;
+		}
+		if ( now >= link.settleMsec ) {
+			const int margin = client.predictionMargin.Margin( AsyncClient_PredictionCoverMsec( client.gameFrame ) );
+			result.highestMargin = std::max( result.highestMargin, margin );
+			result.finalMargin = margin;
+			marginSum += margin;
+			marginCount++;
+		}
+	}
+	result.waitMsec = waitCount ? waitSum / waitCount : 0.0;
+	result.meanMargin = marginCount ? marginSum / marginCount : 0.0;
+	return result;
+}
+
+// A long frame of longMsec every one to three seconds.
+static auto EveryFewSeconds( int longMsec ) {
+	int due = -1;
+	return [longMsec, due]( int now, auto &next ) mutable {
+		if ( due < 0 ) {
+			due = now + 1000 + static_cast<int>( next() % 2001u );
+		}
+		if ( now < due ) {
+			return 0;
+		}
+		due = now + 1000 + static_cast<int>( next() % 2001u );
+		return longMsec;
+	};
+}
+
+// Long frames of +minExtra to +maxExtra ms over a 16 ms frame, perSecond of them a second on
+// average (exponential spacing).
+static auto RandomTail( double perSecond, int minExtra, int maxExtra ) {
+	int due = -1;
+	return [perSecond, minExtra, maxExtra, due]( int now, auto &next ) mutable {
+		auto spacing = [&]() {
+			const double uniform = ( static_cast<double>( next() % 1000000u ) + 0.5 ) / 1000000.0;
+			return static_cast<int>( -std::log( uniform ) / perSecond * 1000.0 );
+		};
+		if ( due < 0 ) {
+			due = now + spacing();
+		}
+		if ( now < due ) {
+			return 0;
+		}
+		due = now + spacing();
+		return FRAME_MSEC + minExtra + static_cast<int>( next() % static_cast<unsigned int>( maxExtra - minExtra + 1 ) );
+	};
+}
+
+static auto NoLongFrames() {
+	return []( int, auto & ) { return 0; };
+}
+
+// One 96 ms frame, as a join or a level's first fight can make, then 40 ms frames every
+// one to three seconds.
+static auto SpikeThenMild() {
+	bool spiked = false;
+	auto mild = EveryFewSeconds( 40 );
+	return [spiked, mild]( int now, auto &next ) mutable {
+		if ( !spiked ) {
+			spiked = true;
+			return 96;
+		}
+		return mild( now, next );
+	};
+}
+
+static void CheckLongFrames() {
+	char what[220];
+	// Long frames of one length: once the first has set the margin, none may leave a late
+	// command, over a clean link or 80 ms +-20 each way. The 96 ms frames make bursts of six
+	// commands and more, which reorder on the jittery link.
+	const int lengths[] = { 36, 56, 76, 96 };
+	const int links[][2] = { { 0, 0 }, { 80, 20 } };
+	for ( const auto &delay : links ) {
+		for ( const int length : lengths ) {
+			Link link;
+			link.oneWayMsec = delay[0];
+			link.jitterMsec = delay[1];
+			const LinkResult result = RunLink( link, EveryFewSeconds( length ) );
+			std::snprintf( what, sizeof( what ), "%d ms +-%d, %d ms frames every few seconds: no late command once the "
+				"margin is set (%d late frames after the first, %d in all, margin %d)", delay[0], delay[1], length,
+				result.lateAfterLearn, result.late, result.highestMargin );
+			Expect( result.longFrames > 10 && result.lateAfterLearn == 0, what );
+			// Frames of one length set the margin once; the cover's 16/17 ms swings must not
+			// push the target forward again and again.
+			std::snprintf( what, sizeof( what ), "%d ms +-%d, %d ms frames every few seconds: the target jumps only "
+				"when the margin first grows (%d jumps)", delay[0], delay[1], length, result.rises );
+			Expect( result.rises <= 2, what );
+			std::printf( "long frames %3d ms +-%2d, %2d ms: %d long, late %d (after the first %d), margin %d, wait %.1f ms, "
+				"%d jumps\n", delay[0], delay[1], length, result.longFrames, result.late, result.lateAfterLearn,
+				result.highestMargin, result.waitMsec, result.rises );
+		}
+	}
+
+	// A client below 30 fps makes every command late with the target alone.
+	const int slowFrames[] = { 33, 50 };
+	for ( const auto &delay : links ) {
+		for ( const int frameMsec : slowFrames ) {
+			Link link;
+			link.oneWayMsec = delay[0];
+			link.jitterMsec = delay[1];
+			link.frameMsec = frameMsec;
+			const LinkResult result = RunLink( link, NoLongFrames() );
+			std::snprintf( what, sizeof( what ), "%d ms +-%d, steady %d ms frames: commands reach the server in time "
+				"(%d late frames, margin %d)", delay[0], delay[1], frameMsec, result.late, result.highestMargin );
+			Expect( result.late == 0, what );
+			std::printf( "steady %3d ms +-%2d, %d ms frames: late %d, margin %d, wait %.1f ms\n", delay[0], delay[1],
+				frameMsec, result.late, result.highestMargin, result.waitMsec );
+		}
+	}
+
+	// Smooth clients pay nothing: no margin, and commands wait no longer than with the target alone.
+	const int smoothFrames[] = { 16, 7 };
+	for ( const auto &delay : links ) {
+		for ( const int frameMsec : smoothFrames ) {
+			Link link;
+			link.oneWayMsec = delay[0];
+			link.jitterMsec = delay[1];
+			link.frameMsec = frameMsec;
+			const LinkResult with = RunLink( link, NoLongFrames() );
+			link.margin = false;
+			const LinkResult without = RunLink( link, NoLongFrames() );
+			std::snprintf( what, sizeof( what ), "%d ms +-%d, smooth %d ms frames: no margin and no extra wait (margin %d, "
+				"wait %.1f against %.1f ms)", delay[0], delay[1], frameMsec, with.highestMargin, with.waitMsec, without.waitMsec );
+			Expect( with.highestMargin == 0 && with.waitMsec <= without.waitMsec + 0.5, what );
+		}
+	}
+
+	// One long frame must not hold its margin while milder long frames keep coming: they
+	// keep only their own. Once the 96 ms frame has decayed (10 s held, then 1 ms per
+	// 250 ms), the margin covers the 40 ms frames and no more.
+	for ( const auto &delay : links ) {
+		Link link;
+		link.oneWayMsec = delay[0];
+		link.jitterMsec = delay[1];
+		const LinkResult result = RunLink( link, SpikeThenMild() );
+		std::snprintf( what, sizeof( what ), "%d ms +-%d, one 96 ms frame then 40 ms frames: the margin falls back to what "
+			"the 40 ms frames need (%d, highest %d) and they stay on time (%d late after the first)", delay[0], delay[1],
+			result.finalMargin, result.highestMargin, result.lateAfterLearn );
+		Expect( result.highestMargin >= 60 && result.finalMargin > 0 && result.finalMargin <= 8 &&
+			result.lateAfterLearn == 0, what );
+		std::printf( "spike then mild %3d ms +-%2d: margin %d at first, %d at the end, late %d (after the first %d), "
+			"wait %.1f ms\n", delay[0], delay[1], result.highestMargin, result.finalMargin, result.late,
+			result.lateAfterLearn, result.waitMsec );
+	}
+
+	// A realistic tail: long frames of +20 to +60 ms, twice a second on average, over two
+	// minutes. With the margin, at most a tenth of the late commands the target alone leaves.
+	for ( const auto &delay : links ) {
+		Link link;
+		link.oneWayMsec = delay[0];
+		link.jitterMsec = delay[1];
+		link.seconds = 120;
+		const LinkResult with = RunLink( link, RandomTail( 0.5, 20, 60 ) );
+		link.margin = false;
+		const LinkResult without = RunLink( link, RandomTail( 0.5, 20, 60 ) );
+		std::snprintf( what, sizeof( what ), "%d ms +-%d, random long frames of +20 to +60 ms: the margin keeps nine in ten "
+			"late commands on time (%d late against %d)", delay[0], delay[1], with.late, without.late );
+		Expect( without.late > 0 && with.late * 10 <= without.late, what );
+		std::printf( "random tail %3d ms +-%2d: late %d with the margin (mean %.1f ms, wait %.1f ms), %d without "
+			"(wait %.1f ms), %d long frames\n", delay[0], delay[1], with.late, with.meanMargin, with.waitMsec,
+			without.late, without.waitMsec, with.longFrames );
+	}
+}
+
+// The measurement: late commands per long frame against its length, one long frame every one
+// to three seconds over 80 ms +-20, with the margin and without it. Printed only.
+static void MeasureTail() {
+	std::printf( "late commands per long frame, 80 ms +-20, against frame length (target alone / with margin, "
+		"mean wait at the server):\n" );
+	const int lengths[] = { 21, 26, 31, 36, 41, 46, 56, 66, 76, 86, 96 };
+	for ( const int length : lengths ) {
+		Link link;
+		link.oneWayMsec = 80;
+		link.jitterMsec = 20;
+		link.margin = false;
+		const LinkResult without = RunLink( link, EveryFewSeconds( length ) );
+		link.margin = true;
+		const LinkResult with = RunLink( link, EveryFewSeconds( length ) );
+		std::printf( "  %2d ms (+%2d): %.2f / %.2f   wait %5.1f / %5.1f ms\n", length, length - FRAME_MSEC,
+			without.longFrames ? static_cast<double>( without.late ) / without.longFrames : 0.0,
+			with.longFrames ? static_cast<double>( with.late ) / with.longFrames : 0.0, without.waitMsec, with.waitMsec );
+	}
 }
 
 int main() {
@@ -346,6 +744,8 @@ int main() {
 	CheckHitches( 0, 0, 350, 9 );
 	CheckHitches( 80, 20, 350, 9 );
 	CheckHitches( 150, 20, 500, 4 );
+	CheckLongFrames();
+	MeasureTail();
 	if ( failures ) {
 		std::printf( "%d failure(s)\n", failures );
 		return 1;

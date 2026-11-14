@@ -436,6 +436,44 @@ does not restore the withdrawn release. See
   probe run on a busy machine raised its weapon exactly but lost shots in both
   bursts that way.
 
+## Your aim and fire reach the server in time after a slow frame, 13 November 2026
+
+- **Online, a slow frame no longer sends your shots where you were aiming a
+  moment before.** Your client sends the server one command each game frame.
+  When one frame of your game took clearly longer than usual (from about 36 ms,
+  or every frame below 30 fps), the commands made after it reached the server
+  too late, and the server reused your previous one. A shot fired then went
+  where you had been aiming, sometimes 10-30 degrees off at a fast turn. After
+  such a frame your client now runs further ahead for a while, so the next one
+  arrives in time. A game that holds its frame rate is unaffected. Nothing to
+  change in your settings; `net_clientPredictionMargin 0` turns it off.
+- **Long frames no longer lose commands outright.** The commands made after a
+  long frame went out in separate packets at once. A connection that delivered
+  them out of order lost the first ones for good, however early they arrived.
+  Each packet now carries the whole group.
+- MP-07: `idPredictionMargin` (`src/framework/async/PredictionMargin.h`) adds the
+  longest recent client frame, less the two tics the median `aheadOfServer`
+  target covers, to the controller's target. Each long frame holds its own
+  length for 10 s and then decays at 4 ms a second, and the margin follows the
+  longest; a shorter long frame does not keep a longer one alive. Frames cut by
+  the 100 ms `UpdateTime` clamp are hitches and are excluded. Each user-command packet of
+  a frame now carries the commands that frame has already sent
+  (`AsyncClient_UsercmdsPerPacket`, at most 11). The server counts the frames
+  it runs on a repeated command per client and logs each run under
+  `com_showAsyncStats`; `net_verbose 1` logs each rise of the margin.
+- Evidence: in the fixture at 80 ms ±20, late commands per long frame fall from
+  0.72 to 0 at 56 ms frames and from 3.0 to 0.07 at 96 ms. Clients at 30 or
+  20 fps lose none. The extra wait at the server equals the margin, so a
+  smooth client pays nothing. Six interleaved `mp_firing_view_capture.py`
+  runs at 80 ms ±20 on a busy machine all passed, four with the margin and two
+  without. Long frames left 7 late frames over 253 frames of 36 ms or more
+  with the margin, against 42 over 303 in all margin-off runs.
+  `mp_client_prediction_state.py`
+  fails all 12 single-reversal controls
+  ([record](mp-network-qualification.md#commands-on-time-through-long-client-frames-13-november-2026)).
+- Open (MP-07): a respawn snapshot that follows a dropped snapshot still
+  catches the new weapon up.
+
 ## Your first hit no longer hitches, and a hitch no longer leaves the server behind your aim, 13 November 2026
 
 - **The first hit of a match no longer freezes the game for a moment.** In the

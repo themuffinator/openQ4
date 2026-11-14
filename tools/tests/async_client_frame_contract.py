@@ -12,7 +12,7 @@ SUPPORT = r'''
 #include <cassert>
 #include <string>
 using byte = unsigned char;
-constexpr int MAX_MESSAGE_SIZE=32, MAX_USERCMD_BACKUP=16, CVAR_USERINFO=1;
+constexpr int MAX_MESSAGE_SIZE=32, MAX_USERCMD_BACKUP=16, CVAR_USERINFO=1, CLIENT_FRAME_CLAMP_MSEC=100;
 enum { CS_DISCONNECTED, CS_PURERESTART, CS_CONNECTING, CS_CONNECTED, CS_INGAME };
 struct netadr_t {};
 struct idBitMsg { void Init(byte*,int){} void SetSize(int){} void BeginReading(){} };
@@ -29,8 +29,12 @@ struct Cvars { int flags=0; int GetModifiedFlags(){return flags;} void ClearModi
 struct Commands { void GetDirectUsercmd() {} } commands, *usercmdGen=&commands;
 struct Common { int GetUserCmdMSec(){return 16;} } commonValue, *common=&commonValue;
 struct Session { struct { int userInfo[1]{}; } mapSpawnData; } sessLocal;
-struct idAsyncNetwork { static void ExecuteSessionCommand(const char*){} };
+struct BoolCvar { bool value=true; bool GetBool() const {return value;} };
+struct idAsyncNetwork { static void ExecuteSessionCommand(const char*){} static BoolCvar clientPredictionMargin; };
+BoolCvar idAsyncNetwork::clientPredictionMargin;
+struct PredictionMargin { void Clear(){} void Frame(int,int,int,int){} };
 int AsyncClient_NextGameFrameMsec(int) {return 16;}
+int AsyncClient_PredictionCoverMsec(int) {return 32;}
 struct idAsyncClient {
     struct Port {
         bool opened=true;
@@ -41,6 +45,8 @@ struct idAsyncClient {
     int gameTimeResidual=0, clientPredictTime=0, clientState=CS_INGAME;
     int gameFrame=0, gameTime=0, snapshotGameFrame=0, snapshotGameTime=0;
     int lastFrameDelta=0, clientNum=0, elapsed=0, userCmds[MAX_USERCMD_BACKUP]{};
+    int clientTime=0, usercmdsSentThisFrame=0;
+    PredictionMargin predictionMargin;
     bool timeout=false;
     int UpdateTime(int){int value=elapsed; elapsed=0; return value;}
     void UpdateRemoteConsoleRequest(){}
