@@ -173,6 +173,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Force Model | `choiceDef` | `set_game_forcemodel_value` | GUI state `ui_proskins` via `applyForceModelChoice` | `0 No`, `1 Yes` | The C++ menu adapter writes the pro-skin force-model cvars when enabled and clears `g_forceModel`, `g_forceMarineModel`, and `g_forceStroggModel` when disabled. |
 | Auto Skip Cinematics | `choiceDef` | `set_game_autoskipcinematics_value` | `g_autoSkipCinematics` | `No;Yes` | Archived SP/MP gameplay cvar. Affects future cinematics. |
 | Cinematic Shake | `choiceDef` | `set_game_cinematicshake_value` | `ui_cinematicShake` | `Off;Low;Full` (`0;0.5;1`) | Scales scripted cinematic camera shake. |
+| Enhanced Physics | `choiceDef` | `set_game_enhancedphysics_value` | `g_enhancedPhysics` | `0 No`, `1 Yes` | Yes uses the enhanced rigid-body and ragdoll solver from the next map load; No keeps the legacy simulation. Multiplayer peers follow the server. |
 
 ### Mouse
 

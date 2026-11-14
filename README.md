@@ -64,7 +64,7 @@ What you get in **0.14.1**, the latest release:
 - 🔊 **Sound as designed.** [Room reverb](docs/user/gameplay-settings.md#room-reverb) for every map, subtitles and a separate dialogue volume.
 - 🌍 **Twelve languages**, including German, Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian. See [Languages](docs/user/languages.md).
 - 🌊 **Real liquids.** Swim, wade and drown in water, and take damage in slime and lava, in maps built for them. See [Liquids](docs/user/liquids.md).
-- 🧪 **Experimental extras**: [VR](docs/user/vr.md) through OpenXR, an [Android app](docs/user/android-setup.md), a [level editor](docs/user/level-editor.md) and [PBR materials](docs/user/pbr-materials.md) for mods.
+- 🧪 **Experimental extras**: [VR](docs/user/vr.md) through OpenXR, an [Android app](docs/user/android-setup.md), a [level editor](docs/user/level-editor.md), [PBR materials](docs/user/pbr-materials.md) for mods and [enhanced physics](docs/user/gameplay-settings.md#enhanced-physics) for ragdolls and debris.
 
 Read the full [0.14.1 release notes](docs/dev/releases/v0.14.1.md). Development continues toward 1.0; see the [roadmap](docs/dev/roadmap.md).
 

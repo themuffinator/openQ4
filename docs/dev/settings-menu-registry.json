@@ -3795,6 +3795,33 @@
       "accessibility": "Focusable choiceDef row. Off, Low or Full scales scripted cinematic camera shake, such as the Awakening dropship's."
     },
     {
+      "id": "game.enhanced_physics",
+      "pane": "Game Options",
+      "section": "Gameplay And View",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Gameplay And View > Enhanced Physics",
+      "container": "set_game_enhancedphysics",
+      "widgets": [
+        "set_game_enhancedphysics_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231720",
+      "choices_key": "#str_200059",
+      "values": [
+        "0",
+        "1"
+      ],
+      "target": "g_enhancedPhysics",
+      "default": "0",
+      "cvar_range": {
+        "low": "0",
+        "high": "1"
+      },
+      "accessibility": "Focusable choiceDef row. The physics mode is committed when a map loads, so a change applies from the next map or saved game; in multiplayer every peer follows the server's value."
+    },
+    {
       "id": "game.gun_position",
       "pane": "Game Options",
       "section": "Gameplay And View",

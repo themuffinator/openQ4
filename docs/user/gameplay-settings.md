@@ -11,7 +11,7 @@ This guide covers how the game plays, looks and sounds: difficulty and Turbo Mod
 | Difficulty, Turbo Mode | The **New Game** page; during a campaign, the in-game menu's **Restart Level** | The **New Game** page; during a campaign, the in-game menu's **Difficulty** |
 | HUD layout, size and opacity | **Settings → Game Options → HUD** | Game Options, **HUD** section |
 | Crosshair, hit marker, animated crosshair | **Settings → Game Options → HUD** | Game Options, **Crosshair** section (no animated crosshair) |
-| Skip cinematics, corpses, language, console access | **Settings → Game Options → General** | Game Options, **Gameplay** section |
+| Skip cinematics, corpses, enhanced physics, language, console access | **Settings → Game Options → General** | Game Options, **Gameplay** section |
 | Weapon field of view and position | **Settings → Game Options → General** | Game Options, **View Weapon** section |
 | Volume, room reverb, speakers, subtitles | **Settings → Audio** | **Settings → Audio** |
 
@@ -256,6 +256,12 @@ seta g_corpseRemoveDelaySP -1
 seta g_corpseRemoveDelayMP -1
 ```
 
+### Enhanced physics
+
+**Settings → Game Options → General → Enhanced Physics** (`g_enhancedPhysics 1`) switches corpses, crates, barrels, debris and other loose objects to a newer simulation. Stacks settle and stay put, ragdolls fall on from the motion they had instead of dropping dead on the spot, and it costs less processor time than the original. Hits still push bodies about as hard as before.
+
+It is off by default; off runs the original physics exactly. A change takes effect from the next map or loaded save. In multiplayer the server's setting applies to everyone, and a demo plays back with the setting it was recorded with.
+
 ### Classic dynamic lights
 
 `g_classicDynamicLights` (on by default) brings back the Quake II and Quake III habit of lighting the world from the action: muzzle flashes throw a short, wide pool of light, bright projectiles carry their own glow, and explosions flash the surrounding walls. The colours come from the shipped Quake 4 assets. `g_classicDynamicLightScale` scales the radius of all of them from `0.25` to `4`; try lowering it before turning the feature off. See [Classic dynamic lights](classic-dynamic-lights.md) for the per-weapon colours.
@@ -309,6 +315,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `g_corpseRemoveDelaySP` | `0` | Single-player corpse delay in seconds; `0` stock, `-1` never. |
 | `g_corpseRemoveDelayMP` | `0` | Multiplayer corpse delay in seconds; `0` stock, `-1` never. |
 | `g_corpseSink` | `0` | `0` dissolve, `1` sink as a ragdoll, `2` sink without ragdoll. |
+| `g_enhancedPhysics` | `0` | `1` uses the enhanced ragdoll and object physics from the next map; multiplayer follows the server. |
 | `g_classicDynamicLights` | `1` | Dynamic lights on muzzle flashes, bright projectiles and explosions. |
 | `g_classicDynamicLightScale` | `1` | Radius of those lights, `0.25` to `4`. |
 

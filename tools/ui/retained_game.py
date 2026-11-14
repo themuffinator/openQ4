@@ -128,6 +128,7 @@ SECTIONS = (
         choice("game_console", "#str_229922", "con_allowConsole", "#str_229923", (0, 1)),
         toggle("game_skipcinematics", "#str_229951", "g_autoSkipCinematics"),
         slider("game_cinematicshake", "#str_230157", "ui_cinematicShake", 0, 1, 0.1, 1),
+        toggle("game_enhancedphysics", "#str_231720", "g_enhancedPhysics"),
     )),
     ("viewweapon", "#str_229952", (
         slider("game_gunfov", "#str_229953", "cl_gunfov", 0, 179, 1),
