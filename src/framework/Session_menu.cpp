@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "NativeInputDispatch.h"
 #include "Session_local.h"
+#include "SessionPresetCheck.h"
 #include "NativeInputPublications.h"
 #include "../ui/Rectangle.h"
 #include "ArenaCampaign.h"
@@ -7833,6 +7834,11 @@ void idSessionLocal::ShowSaveRestoreFailure( const char *saveName ) {
 
 void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
+	// The system check's answers (Session_presetcheck.cpp).
+	if ( request != NULL && Session_PresetCheckOwns( gui ) ) {
+		Session_PresetCheckRequest( gui, request );
+		return;
+	}
 	// The retained message box's buttons answer as the stock box's commands.
 	if ( request != NULL && gui != NULL && gui == guiMsgRetained ) {
 		if ( gui == guiActive && gui == guiMsg ) {

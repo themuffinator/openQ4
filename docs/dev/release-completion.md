@@ -7,6 +7,43 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A system check offers the right preset after the presets change, 14 November 2026
+
+- **When an update changes the presets, openQ4 now offers to retune your
+  settings.** The next start shows a System Check screen before the main
+  menu. It lists the graphics card, video and system memory, processor and
+  display it found, and shows the nine presets as a ladder with the
+  recommended one lit and yours outlined, plus the recommendation's render
+  scale and frame cap. **Apply Recommended** switches and restarts the
+  renderer before the menu opens. **Keep Current** leaves everything as it
+  is until the presets next change. **Ask Me Next Time** (or Escape) asks
+  again at the next start. The screen exists in both the new and the classic
+  interface, in all twelve languages.
+- **Nothing to do.** A new install is never asked, because its first launch
+  already picks a preset. A configuration saved by an earlier version is asked
+  once. Starting straight into a map or server skips the check.
+- How it works: the preset system has a version (`1.6c792296` now). It is a
+  manual revision plus a fingerprint of every preset's values and of the
+  detector's answer for 9,036 sample machines, so any preset or detection
+  change moves it by itself. `com_performancePresetCheck` records the version
+  last checked, and `performancePresetCheck` reports, opens, answers or resets
+  the check. See
+  [performance presets](ui/performance-presets.md#preset-system-version-and-system-check-14-november-2026).
+- Evidence: `performance_preset_check.py` covers the strings in all twelve
+  tables, both screens against the session's published state and verbs, the
+  startup and first-launch paths, and the generated document. It also builds
+  the preset model with a preset value changed and with a detection rule
+  changed, and requires a new version from each. The pinned version is in
+  `UiPerformancePresetTest`. Hidden-window runs of the staged client with a
+  configuration from before this version showed the check, applied
+  `enhanced` over `low` (15 settings, renderer and sound restarted), recorded
+  the version, and reported the check no longer due. Keep Current recorded
+  the version and changed nothing, Ask Me Next Time recorded nothing, the next
+  start did not ask, and a new install recorded the version at its first launch
+  without asking. The retained screen was captured on OpenGL and Vulkan and in
+  German, the stock one on OpenGL. Not run: Linux, macOS and Android, or a
+  real click (the runs used the console verbs).
+
 ## Allies fire the gun they carry, 14 November 2026
 
 - **A marine seen holding a hyperblaster now fires one.** Every marine

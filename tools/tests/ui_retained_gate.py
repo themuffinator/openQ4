@@ -442,6 +442,9 @@ static bool UI_LegacyWindowExists(idUserInterface*, const char* window) { return
 static bool UI_LegacyNamedEventExists(idUserInterface* gui, const char* event) { return gui && !legacyEventsMissing.count(event); }
 static std::string UI_RetainedFocusedControl(idUserInterface* gui) { return gui->focused; }
 static bool UI_RetainedViewFailed(idUserInterface* gui) { return gui->failed; }
+// The system check (Session_presetcheck.cpp) owns none of these screens.
+static bool Session_PresetCheckOwns(const idUserInterface*) { return false; }
+static void Session_PresetCheckRequest(idUserInterface*, const char*) {}
 // The legacy menu's timelines run to a time (each GUI, in order).
 static std::vector<std::string> timeRuns;
 static void UI_RunTimeEvents(idUserInterface* gui, int) { timeRuns.push_back(gui->source); }
@@ -5936,6 +5939,9 @@ def main() -> int:
     # The buy card's purchase carries the catalog index it froze.
     handled |= set(re.findall(r'!idStr::Icmpn\( request, "(mpBuy) ", 6 \)', menu))
     handled.update(f'campaignSkill{i}' for i in range(5))
+    # The system check's answers, handled in its own session file.
+    preset_check = (ROOT / 'src/framework/Session_presetcheck.cpp').read_text(encoding='utf-8')
+    handled |= set(re.findall(r'!idStr::Icmp\(\s*request,\s*"(presetCheck[A-Za-z]*)"\s*\)', preset_check))
     # The Arena page's verbs, each mapped to the campaign's own command.
     arena_verbs = menu[menu.index('RETAINED_ARENA_VERBS[][2] = {'):menu.index('RETAINED_ARENA_VERB_COUNT')]
     handled |= set(re.findall(r'\{ "(arena[A-Za-z0-9]*)", "arena', arena_verbs))

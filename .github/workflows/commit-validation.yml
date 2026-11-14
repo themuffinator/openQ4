@@ -557,6 +557,7 @@ jobs:
             tools/tests/voice_protocol_gating_contract.py \
             tools/tests/voice_transport.py \
             tools/tests/ui_performance_presets.py \
+            tools/tests/performance_preset_check.py \
             tools/tests/ui_system_number_fields.py \
             tools/tests/ui_system_presets.py \
             tools/tests/system_settings_archive_policy.py \
@@ -1076,6 +1077,7 @@ jobs:
           python tools/tests/voice_transport.py
           python tools/tests/voice_protocol_gating_contract.py
           python tools/tests/ui_performance_presets.py --mutations --adjacent
+          python tools/tests/performance_preset_check.py
           python tools/tests/ui_system_number_fields.py
           python tools/tests/ui_system_presets.py
           python tools/tests/system_settings_archive_policy.py

@@ -355,9 +355,25 @@ static void Generated(){
  SettingsAttempt attempt;Check(tx.PrepareApply(1,0,attempt).code==SettingsCode::Ok,"freeze for device");const int before=called;
  Check(tx.EditGenerated(1,good).code==SettingsCode::Busy&&called==before,"frozen device transaction never observes profile");
 }
+// The preset system version (docs/dev/ui/performance-presets.md, "Preset
+// system version"): the revision and an automatic fingerprint of every preset
+// and of detection. The pin below is meant to move: any change to a preset,
+// a target or a detection rule changes the fingerprint, and players are then
+// offered the system check again. Update the pin with that change and say so
+// in the release notes.
+static void SystemVersion(){
+ const std::string version=PerformancePresetSystemVersion();
+ Check(version==PerformancePresetSystemVersion()&&PerformancePresetSystemFingerprint()==PerformancePresetSystemFingerprint(),"version is stable");
+ const std::string revision=std::to_string(PerformancePresetSystemRevision)+".";
+ Check(version.compare(0,revision.size(),revision)==0&&version.size()==revision.size()+8,"version is revision.fingerprint");
+ for(size_t i=revision.size();i<version.size();++i)
+  Check((version[i]>='0'&&version[i]<='9')||(version[i]>='a'&&version[i]<='f'),"fingerprint is lower-case hex");
+ Check(PerformancePresetFingerprintMachines()==9036,"detection matrix covers every GPU class, memory band, resolution class and platform ceiling");
+ Check(version=="1.6c792296","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
+}
 int main(){
 #if defined(_WIN32) && defined(_DEBUG)
  _CrtSetReportMode(_CRT_ASSERT,_CRTDBG_MODE_FILE);_CrtSetReportFile(_CRT_ASSERT,_CRTDBG_FILE_STDERR);
  _CrtSetReportMode(_CRT_ERROR,_CRTDBG_MODE_FILE);_CrtSetReportFile(_CRT_ERROR,_CRTDBG_FILE_STDERR);
 #endif
- AssignmentCapture();Profiles();Detection();DetectionResolution();Generated();std::printf("performance profiles and generated transaction: %d checks passed\n",checks);}
+ AssignmentCapture();Profiles();Detection();DetectionResolution();Generated();SystemVersion();std::printf("performance profiles and generated transaction: %d checks passed\n",checks);}

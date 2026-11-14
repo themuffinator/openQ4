@@ -327,4 +327,97 @@ bool ResolveDetectedPerformancePreset(const PerformancePresetDetection& detectio
  resolved.screenFraction=detection.screenFraction;resolved.postAA=detection.postAA;resolved.maxFps=detection.maxFps;
  output=resolved;return true;
 }
+
+namespace {
+struct Fnv1a {
+ std::uint32_t value=2166136261u;
+ void Byte(unsigned char byte) noexcept{value^=byte;value*=16777619u;}
+ void Text(const char* text) noexcept{for(;text&&*text;++text)Byte(static_cast<unsigned char>(*text));Byte(0);}
+ void Number(long long number) noexcept{
+  // Little-endian 64-bit, so the hash is the same on every host.
+  const auto bits=static_cast<unsigned long long>(number);
+  for(int i=0;i<8;++i)Byte(static_cast<unsigned char>(bits>>(8*i)));
+ }
+};
+// Every machine shape the detector distinguishes: each GPU class, the video
+// and system memory bands either side of their thresholds, the resolution
+// classes, CPU concurrency, a known and unknown refresh and the modern-effects
+// split, then each platform ceiling on three common machines.
+template<typename Visit> int VisitFingerprintMachines(Visit&& visit) {
+ static constexpr RendererGpuClass classes[]={RendererGpuClass::Unknown,RendererGpuClass::Integrated,
+  RendererGpuClass::Discrete,RendererGpuClass::Virtual,RendererGpuClass::Software};
+ static constexpr int vram[]={0,512,1024,2048,4096,PerformancePresetVram8GiB,PerformancePresetVram12GiB,
+  PerformancePresetVram16GiB,PerformancePresetVram24GiB};
+ static constexpr int ram[]={0,2048,4096,8192,16384};
+ static constexpr int sizes[][2]={{0,0},{1280,720},{1920,1080},{2560,1440},{3840,2160}};
+ static constexpr int cpus[]={2,8};
+ static constexpr int refresh[]={0,144};
+ int machines=0;
+ for(const auto gpu:classes)for(const int video:vram)for(const int memory:ram)for(const auto& size:sizes)
+  for(const int threads:cpus)for(const int hertz:refresh)for(int effects=0;effects<2;++effects){
+   PerformancePresetSignals signals;
+   signals.gpuClass=gpu;signals.videoRamMB=video;signals.systemRamMB=memory;
+   signals.drawableWidth=size[0];signals.drawableHeight=size[1];
+   signals.logicalCpus=threads;signals.displayRefreshHz=hertz;
+   signals.modernEffects=signals.postAAAvailable=effects!=0;
+   visit(signals);++machines;
+  }
+ PerformancePresetSignals common[3];
+ common[0].gpuClass=RendererGpuClass::Discrete;common[0].videoRamMB=PerformancePresetVram8GiB;common[0].systemRamMB=16384;
+ common[0].drawableWidth=2560;common[0].drawableHeight=1440;
+ common[1].gpuClass=RendererGpuClass::Integrated;common[1].systemRamMB=16384;common[1].drawableWidth=1920;common[1].drawableHeight=1080;
+ common[2].gpuClass=RendererGpuClass::Integrated;common[2].systemRamMB=PerformancePresetMobileFlagshipRamMB+2048;
+ common[2].drawableWidth=2400;common[2].drawableHeight=1080;
+ for(auto& machine:common){machine.logicalCpus=8;machine.modernEffects=machine.postAAAvailable=true;}
+ for(int flag=0;flag<6;++flag)for(const auto& machine:common)for(const int hertz:{0,90}){
+  auto signals=machine;signals.displayRefreshHz=hertz;
+  switch(flag){
+   case 0:signals.explicitLowPower=true;break;
+   case 1:signals.raspberryPi=true;break;
+   case 2:signals.steamDeck=true;break;
+   case 3:signals.arm64=true;break;
+   case 4:signals.legacyRenderer=true;break;
+   default:signals.mobile=true;break;
+  }
+  visit(signals);++machines;
+ }
+ return machines;
+}
+std::uint32_t ComputeFingerprint() noexcept {
+ Fnv1a hash;
+ hash.Number(PerformancePresetCount);hash.Number(PerformancePresetTargetCount);
+ for(const auto& preset:Presets){
+  PerformancePresetAssignments expansion;std::string error;
+  if(!ExpandPerformancePreset(preset,expansion,error)){hash.Text("unexpandable");hash.Text(preset.name);continue;}
+  for(const auto& assignment:expansion){
+   hash.Text(assignment.key);
+   if(const auto number=std::get_if<int>(&assignment.value))hash.Number(*number);
+   else hash.Text(std::get<std::string>(assignment.value).c_str());
+  }
+ }
+ VisitFingerprintMachines([&hash](const PerformancePresetSignals& signals){
+  const auto found=DetectPerformancePreset(signals);
+  hash.Text(found.preset?found.preset->name:"");
+  hash.Number(static_cast<int>(found.reason));
+  hash.Number(found.systemRamMB);hash.Number(found.videoRamMB);hash.Number(found.screenFraction);
+  hash.Number(found.postAA);hash.Number(found.scenePixelBudget);hash.Number(found.maxFps);
+ });
+ return hash.value;
+}
+}
+std::uint32_t PerformancePresetSystemFingerprint() noexcept {
+ static const std::uint32_t fingerprint=ComputeFingerprint();
+ return fingerprint;
+}
+int PerformancePresetFingerprintMachines() noexcept {
+ return VisitFingerprintMachines([](const PerformancePresetSignals&){});
+}
+std::string PerformancePresetSystemVersion() {
+ static constexpr char digits[]="0123456789abcdef";
+ const std::uint32_t fingerprint=PerformancePresetSystemFingerprint();
+ std::string version=std::to_string(PerformancePresetSystemRevision);
+ version+='.';
+ for(int shift=28;shift>=0;shift-=4)version+=digits[(fingerprint>>shift)&0xF];
+ return version;
+}
 } // namespace openq4

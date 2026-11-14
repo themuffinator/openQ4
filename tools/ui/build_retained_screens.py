@@ -49,6 +49,7 @@ OUTPUTS = {
     "restartlevel_strogg": PAK0 / "guis" / "menu" / "restartlevel_strogg.rui",
     "restartmenu": PAK0 / "guis" / "menu" / "restartmenu.rui",
     "msgbox": PAK0 / "guis" / "menu" / "msgbox.rui",
+    "presetcheck": PAK0 / "guis" / "menu" / "presetcheck.rui",
     "credits": PAK0 / "guis" / "menu" / "credits.rui",
     "demos": PAK0 / "guis" / "menu" / "demos.rui",
     "arena": PAK0 / "guis" / "menu" / "arena.rui",
@@ -5275,6 +5276,7 @@ def main() -> int:
     from retained_demos import demos_document
     from retained_death import restart_menu_document
     from retained_msgbox import message_box_document
+    from retained_preset_check import preset_check_document
     from retained_credits import credits_document
     from retained_arena import arena_document
     from retained_mp_page import multiplayer_document
@@ -5298,6 +5300,7 @@ def main() -> int:
                  "demos": demos_document(),
                  "restartmenu": restart_menu_document(),
                  "msgbox": message_box_document(),
+                 "presetcheck": preset_check_document(),
                  "credits": credits_document(),
                  "arena": arena_document(),
                  "multiplayer": multiplayer_document(),

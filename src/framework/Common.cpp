@@ -48,6 +48,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "DurableFile.h"
 #include "SettingsPersistence.h"
 #include "PerformancePreset.h"
+#include "PerformancePresetCheck.h"
+#include "SessionPresetCheck.h"
 #include "CVarAssignmentCapture.h"
 #include "InitializationPresentation.h"
 #include <atomic>
@@ -125,6 +127,7 @@ idCVar com_machineSpec( "com_machineSpec", "-1", CVAR_INTEGER | CVAR_ARCHIVE | C
 const char *com_performancePresetArgs[] = { "minimum", "lowpower", "low", "performance", "balanced", "enhanced", "quality", "ultra", "maximum", NULL };
 static const char *com_performancePresetValueStrings[] = { "balanced", "minimum", "lowpower", "low", "performance", "enhanced", "quality", "ultra", "maximum", NULL };
 idCVar com_performancePreset( "com_performancePreset", "balanced", CVAR_ARCHIVE | CVAR_SYSTEM, "coherent system performance preset: minimum, lowpower (both without shadows), low, performance, balanced, enhanced, quality, ultra, maximum (everything on, no frame-rate target)", com_performancePresetValueStrings, idCmdSystem::ArgCompletion_String<com_performancePresetArgs> );
+idCVar com_performancePresetCheck( "com_performancePresetCheck", "", CVAR_ARCHIVE | CVAR_SYSTEM | CVAR_NOCHEAT, "the performance preset system version this configuration last checked; a different version shows the system check before the main menu (see performancePresetCheck)" );
 idCVar com_purgeAll( "com_purgeAll", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_SYSTEM, "purge everything between level loads" );
 idCVar com_WriteSingleDeclFile( "com_WriteSingleDeclFile", "0", CVAR_SYSTEM | CVAR_BOOL, "write a packed decl file after startup or map loads; use com_singleDeclFileWriteMode for openQ4 or exact-retail game-type coverage" );
 idCVar com_memoryMarker( "com_memoryMarker", "-1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_INIT, "used as a marker for memory stats" );
@@ -3569,6 +3572,145 @@ static bool Common_ApplyStartupPerformancePreset(
 static const char *commonCommandCompletionMatch = NULL;
 static bool commonCommandCompletionFound = false;
 
+/*
+==============================================================================
+The system check (PerformancePresetCheck.h). com_performancePresetCheck holds
+the preset system version this configuration last checked: the first launch's
+detection records it, as does any answer to the check. The session asks
+Common_PerformancePresetCheckDue before the main menu first opens.
+==============================================================================
+*/
+
+static int Common_PerformancePresetTier( const char *name ) {
+	const auto &presets = openq4::PerformancePresets();
+	for ( int i = 0; i < OPENQ4_PERFORMANCE_PRESET_COUNT; ++i ) {
+		if ( name != NULL && idStr::Icmp( presets[i].name, name ) == 0 ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+// The settings applying `preset` would change: each target whose live value differs.
+static int Common_PerformancePresetDifferences( const openQ4PerformancePreset_t &preset ) {
+	openq4::PerformancePresetAssignments expansion;
+	std::string error;
+	if ( !openq4::ExpandPerformancePreset( preset, expansion, error ) ) {
+		return OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT;
+	}
+	int differences = 0;
+	for ( const auto &assignment : expansion ) {
+		const idCVar *cvar = cvarSystem->Find( assignment.key );
+		if ( cvar == NULL ) {
+			++differences;
+		} else if ( const auto number = std::get_if<int>( &assignment.value ) ) {
+			differences += cvar->GetInteger() != *number;
+		} else {
+			differences += idStr::Icmp( cvar->GetString(), std::get<std::string>( assignment.value ).c_str() ) != 0;
+		}
+	}
+	return differences;
+}
+
+static bool Common_DetectPerformancePresetCheck( openq4::PerformancePresetCheck &check, openQ4PerformancePreset_t &resolved, std::string &error ) {
+	openq4::PerformancePresetSignals signals;
+	if ( !Common_CapturePerformancePresetSignals( signals, error ) ) {
+		return false;
+	}
+	const auto detected = openq4::DetectPerformancePreset( signals );
+	if ( !openq4::ResolveDetectedPerformancePreset( detected, resolved ) ) {
+		error = "detected profile is unavailable";
+		return false;
+	}
+	openq4::PerformancePresetCheck found;
+	found.stored = com_performancePresetCheck.GetString();
+	found.version = openq4::PerformancePresetSystemVersion();
+	found.neverChecked = found.stored.empty();
+	found.current = com_performancePreset.GetString();
+	found.recommended = resolved.name;
+	found.currentTier = Common_PerformancePresetTier( com_performancePreset.GetString() );
+	found.recommendedTier = Common_PerformancePresetTier( resolved.name );
+	found.differences = Common_PerformancePresetDifferences( resolved );
+	found.matches = found.differences == 0;
+	const auto &config = renderSystem->GetGLConfig();
+	found.adapter = config.renderer_string != NULL ? config.renderer_string : "";
+	found.gpuClass = signals.gpuClass;
+	found.reason = detected.reason;
+	found.systemRamMB = detected.systemRamMB;
+	found.videoRamMB = detected.videoRamMB;
+	found.logicalCpus = signals.logicalCpus;
+	found.drawableWidth = signals.drawableWidth;
+	found.drawableHeight = signals.drawableHeight;
+	found.displayRefreshHz = signals.displayRefreshHz;
+	found.screenFraction = resolved.screenFraction;
+	found.maxFps = resolved.maxFps;
+	found.postAA = resolved.postAA;
+	idStr reason;
+	openQ4PerformancePreset_t again;
+	if ( Common_DetectPerformancePreset( again, reason ) ) {
+		found.summary = reason.c_str();
+	}
+	check = std::move( found );
+	error.clear();
+	return true;
+}
+
+bool Common_PerformancePresetCheckDue() {
+#ifdef ID_DEDICATED
+	return false;
+#else
+	if ( cvarSystem->GetCVarBool( "net_serverDedicated" ) || com_editorActive || com_skipRenderer.GetBool() ) {
+		return false;
+	}
+	// A pending settings recovery owns the display and preset fields first.
+	if ( UI_SettingsStartupActive() || UI_SettingsRecoveryPending() ) {
+		return false;
+	}
+	return idStr::Cmp( com_performancePresetCheck.GetString(), openq4::PerformancePresetSystemVersion().c_str() ) != 0;
+#endif
+}
+
+bool Common_DescribePerformancePresetCheck( openq4::PerformancePresetCheck &check, std::string &error ) {
+	openQ4PerformancePreset_t resolved;
+	return Common_DetectPerformancePresetCheck( check, resolved, error );
+}
+
+void Common_RecordPerformancePresetCheck( const char *answer ) {
+	const std::string version = openq4::PerformancePresetSystemVersion();
+	common->Printf( "Performance preset check: recorded version %s (was '%s'; %s)\n", version.c_str(),
+		com_performancePresetCheck.GetString(), answer != NULL ? answer : "recorded" );
+	com_performancePresetCheck.SetString( version.c_str() );
+}
+
+void Common_ClearPerformancePresetCheck() {
+	com_performancePresetCheck.SetString( "" );
+}
+
+bool Common_ApplyPerformancePresetCheck( bool &changed, std::string &error ) {
+	changed = false;
+	openq4::PerformancePresetCheck check;
+	openQ4PerformancePreset_t resolved;
+	if ( !Common_DetectPerformancePresetCheck( check, resolved, error ) ) {
+		common->Printf( "Performance preset check: detection unavailable (%s); settings were preserved\n", error.c_str() );
+		return false;
+	}
+	if ( !Common_ApplyPerformancePreset( resolved, true ) ) {
+		error = "the detected preset did not apply; settings were preserved";
+		common->Printf( "Performance preset check: %s\n", error.c_str() );
+		return false;
+	}
+	changed = check.differences > 0;
+	// The detection observed this device; record what it reported, as the
+	// first launch does.
+	if ( check.videoRamMB > 0 ) {
+		com_videoRam.SetInteger( check.videoRamMB );
+	}
+	common->Printf( "Performance preset check: applied '%s' (%d setting%s changed; %s)\n", resolved.name,
+		check.differences, check.differences == 1 ? "" : "s", check.summary.c_str() );
+	Common_RecordPerformancePresetCheck( "applied the recommendation" );
+	return true;
+}
+
 static void Common_CommandCompletionFindCallback( const char *name ) {
 	if ( commonCommandCompletionMatch != NULL && idStr::Icmp( name, commonCommandCompletionMatch ) == 0 ) {
 		commonCommandCompletionFound = true;
@@ -6089,6 +6231,7 @@ void idCommonLocal::InitCommands( void ) {
 	cmdSystem->AddCommand( "execMachineSpec", Com_ExecMachineSpec_f, CMD_FL_SYSTEM, "execs the appropriate config files and sets cvars based on com_machineSpec" );
 	cmdSystem->AddCommand( "applyPerformancePreset", Com_ApplyPerformancePreset_f, CMD_FL_SYSTEM, "applies the selected openQ4 performance preset", idCmdSystem::ArgCompletion_String<com_performancePresetArgs> );
 	cmdSystem->AddCommand( "autoDetectPerformancePreset", Com_AutoDetectPerformancePreset_f, CMD_FL_SYSTEM, "detects and applies a conservative openQ4 performance preset" );
+	cmdSystem->AddCommand( "performancePresetCheck", Session_PresetCheck_f, CMD_FL_SYSTEM, "reports the performance preset system version and the system check, opens or answers the check, or clears its record" );
 	cmdSystem->AddCommand( "performancePresetSelfTest", Com_PerformancePresetSelfTest_f, CMD_FL_SYSTEM, "validates openQ4 performance preset commands and cvar mappings" );
 	cmdSystem->AddCommand( "jobsStats", Com_JobsStats_f, CMD_FL_SYSTEM, "prints bounded job-service scheduling and timing counters" );
 	cmdSystem->AddCommand( "jobsSelfTest", Com_JobsSelfTest_f, CMD_FL_SYSTEM, "validates job execution, dependencies, deterministic fallback, and metrics" );
@@ -7498,8 +7641,12 @@ void idCommonLocal::Init( int argc, const char **argv, const char *cmdline ) {
 		}
 
 		if ( !AddStartupCommands() ) {
-			// if the user didn't give any commands, run default action
-			session->StartMenu( true );
+			// if the user didn't give any commands, run default action: the
+			// main menu, after the system check when the presets have changed
+			// since this configuration last checked (SessionPresetCheck.h)
+			if ( !Session_StartPresetCheck() ) {
+				session->StartMenu( true );
+			}
 		}
 
 		if ( com_WriteSingleDeclFile.GetBool() ) {
@@ -7882,6 +8029,9 @@ void idCommonLocal::InitGame( void ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart\ns_restart\n" );
 		cmdSystem->ExecuteCommandBuffer();
 		startupPresetReady = true;
+		// This detection is the system check: a new configuration starts on the
+		// current presets, so the check has nothing to offer it.
+		Common_RecordPerformancePresetCheck( "first launch" );
 	}
 	if ( sysDetect && startupPresetReady && !startupRecovery ) {
 		file = fileSystem->OpenFileWrite( CONFIG_SPEC );

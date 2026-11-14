@@ -45,7 +45,7 @@ openQ4 replaces Quake 4's engine and game code with its own: an open-source engi
 4. openQ4 finds your Quake 4 install on its own. If it doesn't, see [If auto-detection fails](docs/user/getting-started.md#if-auto-detection-fails).
 
 > [!TIP]
-> On first launch openQ4 picks a performance preset to suit your hardware. To change it, open **Settings → Display** and choose another preset, or press **Auto-Detect** to pick again.
+> On first launch openQ4 picks a performance preset to suit your hardware, and after an update that changes the presets it offers a [system check](docs/user/display-settings.md#system-check). To change it, open **Settings → Display** and choose another preset, or press **Auto-Detect** to pick again.
 
 Upgrading? Install the whole package into a fresh folder rather than replacing individual files, and read [upgrading to 0.14.1](docs/user/release-status.md#installing-or-upgrading-to-0141) first: it covers your saves.
 

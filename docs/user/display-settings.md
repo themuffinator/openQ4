@@ -43,6 +43,16 @@ What the effects are:
 
 Brightness, exposure, CRT emulation and the experimental rendering modes are separate controls that presets leave alone. Choosing a lower preset restores all of its values, including those for effects you have switched off.
 
+### System check
+
+When an update changes the presets or how openQ4 picks one, the next start shows a **System Check** screen before the main menu. It lists the graphics card, memory, processor and display openQ4 found, and shows the recommended preset next to your current one. You have three choices:
+
+- **Apply Recommended** switches to the recommended preset, briefly restarts the renderer, then opens the menu. It reads **Continue** when your settings already match.
+- **Keep Current** leaves your settings alone. You won't be asked again until the presets change.
+- **Ask Me Next Time** (or Escape) also leaves your settings alone, and asks again at the next start.
+
+A new install never sees the screen, because the first launch already picks a preset for your hardware. Starting straight into a map or server (for example with `+map`) skips the check. In the console, `performancePresetCheck` shows the preset version and the current recommendation, and `performancePresetCheck reset` makes the next start ask again.
+
 ### Frame-rate targets
 
 Enhanced, Quality and Ultra are each built to hold a frame rate on the project's reference machine, a laptop with an RTX 4060 Laptop GPU and an i7-13700H, at 2560x1440 fullscreen on both OpenGL and Vulkan:

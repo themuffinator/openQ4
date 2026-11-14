@@ -1,6 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #pragma once
 #include <array>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -121,6 +122,27 @@ inline constexpr int PerformancePresetMaxDisplayRefreshHz=1000;
 int SanitizePerformancePresetMemoryMB(int raw,int fallback,int maximum) noexcept;
 PerformancePresetDetection DetectPerformancePreset(const PerformancePresetSignals&) noexcept;
 bool ResolveDetectedPerformancePreset(const PerformancePresetDetection&,PerformancePreset&) noexcept;
+
+// The preset system's version (docs/dev/ui/performance-presets.md, "Preset
+// system version"). A configuration records the version it last checked in
+// com_performancePresetCheck; a different version brings up the system check
+// before the main menu, so a player whose settings came from older presets is
+// offered the current recommendation.
+//
+// The fingerprint moves by itself with any change to the presets: it hashes
+// every preset's expansion (each target and value, in order) and the
+// detector's answer for a fixed matrix of machines, so a new tier, a changed
+// value or a moved detection threshold all change it. Bump the revision for a
+// change the fingerprint cannot see, such as a new detection signal read from
+// the live device, that should still ask players to check again.
+inline constexpr int PerformancePresetSystemRevision = 1;
+// FNV-1a 32 over the preset expansions and the detection matrix; computed
+// once. Pure: no engine state, the same on every host and build.
+std::uint32_t PerformancePresetSystemFingerprint() noexcept;
+// "<revision>.<fingerprint as 8 lower-case hex digits>", e.g. "1.0a1b2c3d".
+std::string PerformancePresetSystemVersion();
+// The number of machines the fingerprint's detection matrix asks about.
+int PerformancePresetFingerprintMachines() noexcept;
 } // namespace openq4
 
 // Engine-private observation, implemented by Common. No setters, commands,

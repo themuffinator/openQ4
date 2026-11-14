@@ -1,0 +1,786 @@
+// Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
+// The system check for the stock interface (docs/dev/ui/performance-presets.md
+// "System check"): shown before the main menu when the performance presets have
+// changed since this configuration last checked them. The retained interface
+// shows its own document instead. The session publishes every value
+// below already localized (src/framework/Session_presetcheck.cpp) and takes
+// the answers presetCheckApply, presetCheckKeep and presetCheckLater.
+windowDef Desktop
+{
+	rect		0,0,640,480
+	menugui		1
+	noclip		1
+	backcolor	0,0,0,1
+
+	onActivate {
+		resetTime "pc_intro" "0" ;
+	}
+
+	// Back asks again at the next start; it changes no setting.
+	onESC {
+		if ( "gui::check_busy" == 0 ) {
+			set "cmd" "play main_menu_selection ; presetCheckLater" ;
+		}
+	}
+
+	windowDef pc_backdrop
+	{
+		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		backcolor	0,0,0,1
+		noevents	1
+	}
+
+	windowDef pc_screen_tint
+	{
+		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		background	"gfx/guis/mainmenu/screen"
+		matcolor	0.5,0.5,0.5,1
+		noclip		1
+		noevents	1
+	}
+
+	windowDef pc_grid
+	{
+		rect		( 0 - "gui::virtual_screen_x_expand" ),( 0 - "gui::virtual_screen_y_expand" ),( 640 + ( "gui::virtual_screen_x_expand" * 2 ) ),( 480 + ( "gui::virtual_screen_y_expand" * 2 ) )
+		background	"gfx/guis/loading/bg_grid_tiled"
+		matcolor	0.35,0.42,0.22,0.16
+		naturalmatscale	1
+		noevents	1
+	}
+
+	windowDef pc_topbar
+	{
+		rect		-77,-63,1045,129
+		noclip		1
+		background	"gfx/guis/mainmenu/topbar"
+		matcolor	1,1,1,0.9
+		noevents	1
+
+		windowDef pc_topbar_tile_left
+		{
+			rect		-4096,0,4097,129
+			background	"gfx/guis/mainmenu/topbar_tile_left"
+			matscalex	128
+			matcolor	1,1,1,0.9
+			noevents	1
+		}
+
+		windowDef pc_topbar_tile_right
+		{
+			rect		1044,0,4097,129
+			background	"gfx/guis/mainmenu/topbar_tile_right"
+			matscalex	128
+			matcolor	1,1,1,0.9
+			noevents	1
+		}
+	}
+
+	windowDef pc_btmbar
+	{
+		rect		-26,386,1045,129
+		noclip		1
+		background	"gfx/guis/mainmenu/btmbar"
+		matcolor	1,1,1,0.9
+		noevents	1
+
+		windowDef pc_btmbar_tile_left
+		{
+			rect		-4096,0,4097,129
+			background	"gfx/guis/mainmenu/btmbar_tile_left"
+			matscalex	128
+			matcolor	1,1,1,0.9
+			noevents	1
+		}
+
+		windowDef pc_btmbar_tile_right
+		{
+			rect		1044,0,4097,129
+			background	"gfx/guis/mainmenu/btmbar_tile_right"
+			matscalex	128
+			matcolor	1,1,1,0.9
+			noevents	1
+		}
+	}
+
+	// The stock pop-up's art, widened to the readout: its glow, title slot,
+	// body and foot.
+	windowDef pc_glow
+	{
+		rect		100,0,440,480
+		background	"gfx/guis/mainmenu/popup_bg"
+		matcolor	0,0,0,1
+		noevents	1
+	}
+	windowDef pc_top
+	{
+		rect		100,58,440,19
+		background	"gfx/guis/mainmenu/popup_top"
+		matcolor	0,0,0,0
+		noevents	1
+	}
+	windowDef pc_mid
+	{
+		rect		100,77,440,318
+		background	"gfx/guis/mainmenu/popup_mid"
+		matcolor	0,0,0,0
+		noevents	1
+	}
+	windowDef pc_btm
+	{
+		rect		100,395,440,38
+		background	"gfx/guis/mainmenu/popup_btm"
+		matcolor	0,0,0,0
+		noevents	1
+	}
+
+	windowDef pc_content
+	{
+		rect		0,0,640,480
+		visible		0
+
+		windowDef pc_title
+		{
+			rect		122,52,300,17
+			forecolor	1,1,1,0.8
+			text		"#str_232000"
+			textscale	0.28
+			font		"fonts/marine"
+			textspacing	-1
+			noevents	1
+		}
+		windowDef pc_body
+		{
+			rect		122,82,396,44
+			forecolor	1,1,1,0.8
+			text		"gui::check_body"
+			textscale	0.22
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_hardware
+		{
+			rect		122,128,396,12
+			forecolor	0.545,0.588,0.294,1
+			text		"#str_232025"
+			textscale	0.2
+			font		"fonts/marine"
+			noevents	1
+		}
+		windowDef pc_hardware_rule
+		{
+			rect		122,141,396,1
+			backcolor	0.545,0.588,0.294,0.35
+			noevents	1
+		}
+		windowDef pc_gpu_name
+		{
+			rect		122,145.0,108,13
+			forecolor	0.72,0.76,0.62,1
+			text		"#str_232004"
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_gpu_value
+		{
+			rect		232,145.0,286,13
+			forecolor	1,1,1,0.85
+			text		"gui::check_gpu"
+			textscale	0.2
+			nowrap		1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_vram_name
+		{
+			rect		122,157.5,108,13
+			forecolor	0.72,0.76,0.62,1
+			text		"#str_232005"
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_vram_value
+		{
+			rect		232,157.5,286,13
+			forecolor	1,1,1,0.85
+			text		"gui::check_vram"
+			textscale	0.2
+			nowrap		1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_ram_name
+		{
+			rect		122,170.0,108,13
+			forecolor	0.72,0.76,0.62,1
+			text		"#str_232006"
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_ram_value
+		{
+			rect		232,170.0,286,13
+			forecolor	1,1,1,0.85
+			text		"gui::check_ram"
+			textscale	0.2
+			nowrap		1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_cpu_name
+		{
+			rect		122,182.5,108,13
+			forecolor	0.72,0.76,0.62,1
+			text		"#str_232007"
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_cpu_value
+		{
+			rect		232,182.5,286,13
+			forecolor	1,1,1,0.85
+			text		"gui::check_cpu"
+			textscale	0.2
+			nowrap		1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_display_name
+		{
+			rect		122,195.0,108,13
+			forecolor	0.72,0.76,0.62,1
+			text		"#str_232008"
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_display_value
+		{
+			rect		232,195.0,286,13
+			forecolor	1,1,1,0.85
+			text		"gui::check_display"
+			textscale	0.2
+			nowrap		1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_preset
+		{
+			rect		122,212,396,12
+			forecolor	0.545,0.588,0.294,1
+			text		"#str_232026"
+			textscale	0.2
+			font		"fonts/marine"
+			noevents	1
+		}
+		windowDef pc_preset_rule
+		{
+			rect		122,225,396,1
+			backcolor	0.545,0.588,0.294,0.35
+			noevents	1
+		}
+		// The nine presets, Minimum leading: the recommended cell lit orange, the
+		// current one outlined with a marker under it.
+		windowDef pc_tier0
+		{
+			rect		122.0,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.14
+			noevents	1
+		}
+		windowDef pc_tier0_lit
+		{
+			rect		122.0,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 0 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier0_current
+		{
+			rect		122.0,230,41.33,12
+			visible		( "gui::check_currentTier" == 0 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier0_marker
+		{
+			rect		140.66,244,4,3
+			visible		( "gui::check_currentTier" == 0 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier1
+		{
+			rect		166.33,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.17
+			noevents	1
+		}
+		windowDef pc_tier1_lit
+		{
+			rect		166.33,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 1 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier1_current
+		{
+			rect		166.33,230,41.33,12
+			visible		( "gui::check_currentTier" == 1 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier1_marker
+		{
+			rect		185.0,244,4,3
+			visible		( "gui::check_currentTier" == 1 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier2
+		{
+			rect		210.67,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.2
+			noevents	1
+		}
+		windowDef pc_tier2_lit
+		{
+			rect		210.67,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 2 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier2_current
+		{
+			rect		210.67,230,41.33,12
+			visible		( "gui::check_currentTier" == 2 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier2_marker
+		{
+			rect		229.33,244,4,3
+			visible		( "gui::check_currentTier" == 2 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier3
+		{
+			rect		255.0,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.23
+			noevents	1
+		}
+		windowDef pc_tier3_lit
+		{
+			rect		255.0,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 3 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier3_current
+		{
+			rect		255.0,230,41.33,12
+			visible		( "gui::check_currentTier" == 3 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier3_marker
+		{
+			rect		273.67,244,4,3
+			visible		( "gui::check_currentTier" == 3 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier4
+		{
+			rect		299.33,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.26
+			noevents	1
+		}
+		windowDef pc_tier4_lit
+		{
+			rect		299.33,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 4 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier4_current
+		{
+			rect		299.33,230,41.33,12
+			visible		( "gui::check_currentTier" == 4 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier4_marker
+		{
+			rect		318.0,244,4,3
+			visible		( "gui::check_currentTier" == 4 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier5
+		{
+			rect		343.67,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.29
+			noevents	1
+		}
+		windowDef pc_tier5_lit
+		{
+			rect		343.67,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 5 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier5_current
+		{
+			rect		343.67,230,41.33,12
+			visible		( "gui::check_currentTier" == 5 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier5_marker
+		{
+			rect		362.34,244,4,3
+			visible		( "gui::check_currentTier" == 5 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier6
+		{
+			rect		388.0,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.32
+			noevents	1
+		}
+		windowDef pc_tier6_lit
+		{
+			rect		388.0,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 6 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier6_current
+		{
+			rect		388.0,230,41.33,12
+			visible		( "gui::check_currentTier" == 6 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier6_marker
+		{
+			rect		406.67,244,4,3
+			visible		( "gui::check_currentTier" == 6 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier7
+		{
+			rect		432.33,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.35
+			noevents	1
+		}
+		windowDef pc_tier7_lit
+		{
+			rect		432.33,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 7 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier7_current
+		{
+			rect		432.33,230,41.33,12
+			visible		( "gui::check_currentTier" == 7 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier7_marker
+		{
+			rect		451.0,244,4,3
+			visible		( "gui::check_currentTier" == 7 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier8
+		{
+			rect		476.67,230,41.33,12
+			backcolor	0.545,0.588,0.294,0.38
+			noevents	1
+		}
+		windowDef pc_tier8_lit
+		{
+			rect		476.67,230,41.33,12
+			visible		( "gui::check_recommendedTier" == 8 )
+			backcolor	0.890,0.537,0,0.9
+			noevents	1
+		}
+		windowDef pc_tier8_current
+		{
+			rect		476.67,230,41.33,12
+			visible		( "gui::check_currentTier" == 8 )
+			bordersize	1
+			bordercolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier8_marker
+		{
+			rect		495.34,244,4,3
+			visible		( "gui::check_currentTier" == 8 )
+			backcolor	1,1,1,0.9
+			noevents	1
+		}
+		windowDef pc_tier_low
+		{
+			rect		122,247,198,11
+			forecolor	1,1,1,0.45
+			text		"gui::check_tierLow"
+			nowrap		1
+			textscale	0.17
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_tier_high
+		{
+			rect		320,247,198,11
+			forecolor	1,1,1,0.45
+			text		"gui::check_tierHigh"
+			nowrap		1
+			textscale	0.17
+			textalign	2
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_recommended_name
+		{
+			rect		122,262,108,13
+			forecolor	0.72,0.76,0.62,1
+			text		"#str_232010"
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_recommended_value
+		{
+			rect		232,262,286,13
+			forecolor	0.890,0.537,0,1
+			text		"gui::check_recommended"
+			textscale	0.25
+			nowrap		1
+			font		"fonts/marine"
+			noevents	1
+		}
+		windowDef pc_detail
+		{
+			rect		232,277,286,12
+			forecolor	1,1,1,0.6
+			text		"gui::check_detail"
+			nowrap		1
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_current_name
+		{
+			rect		122,290,108,13
+			forecolor	0.72,0.76,0.62,1
+			text		"#str_232009"
+			textscale	0.19
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+		windowDef pc_current_value
+		{
+			rect		232,290,286,13
+			forecolor	1,1,1,0.85
+			text		"gui::check_current"
+			textscale	0.23
+			nowrap		1
+			font		"fonts/marine"
+			noevents	1
+		}
+		windowDef pc_footer
+		{
+			rect		122,308,396,12
+			forecolor	1,1,1,0.45
+			text		"gui::check_footer"
+			nowrap		1
+			textscale	0.18
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef pc_busy
+		{
+			rect		122,338,396,20
+			visible		( "gui::check_busy" == 1 )
+			forecolor	0.890,0.537,0,1
+			text		"#str_232022"
+			textscale	0.28
+			textalign	1
+			font		"fonts/marine"
+			noevents	1
+		}
+		// presetCheckApply
+		windowDef pc_apply
+		{
+			rect		120,332,198,30
+			visible		( "gui::check_busy" == 0 )
+			background	"gfx/guis/mainmenu/b4_light"
+			matcolor	0.545,0.588,0.294,0.4
+			noevents	1
+		}
+		windowDef pc_apply_corner
+		{
+			rect		130,340,11,11
+			visible		( "gui::check_busy" == 0 )
+			background	"gfx/guis/mainmenu/corner"
+			matcolor	0.564,0.603,0.286,0.4
+			noevents	1
+		}
+		windowDef pc_apply_text
+		{
+			rect		142,335,176,17
+			visible		( "gui::check_busy" == 0 )
+			forecolor	1,1,1,0.8
+			text		"gui::check_primary"
+			textscale	0.26
+			nowrap		1
+			font		"fonts/marine"
+			noevents	1
+		}
+		windowDef pc_b_apply
+		{
+			rect		124,335,190,23
+			visible		( "gui::check_busy" == 0 )
+
+			onMouseEnter {
+				stoptransitions "pc_b_apply" ;
+				set "pc_apply::matcolor_w" "0.8" ;
+				transition "pc_apply_text::forecolor" "1,1,1,0.8" "0.890,0.537,0,1" "0" ;
+				transition "pc_apply_corner::matcolor" "0.564,0.603,0.286,0.4" "0.890,0.537,0,1" "0" ;
+				set "pc_apply_text::textscale" "0.27" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "pc_apply::matcolor_w" "0.8" "0.4" "300" ;
+				transition "pc_apply_text::forecolor" "0.890,0.537,0,1" "1,1,1,0.8" "300" ;
+				transition "pc_apply_corner::matcolor" "0.890,0.537,0,1" "0.564,0.603,0.286,0.4" "300" ;
+				transition "pc_apply_text::textscale" "0.27" "0.26" "300" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; presetCheckApply" ;
+			}
+		}
+		// presetCheckKeep
+		windowDef pc_keep
+		{
+			rect		320,332,198,30
+			visible		( "gui::check_busy" == 0 )
+			background	"gfx/guis/mainmenu/b4_light"
+			matcolor	0.545,0.588,0.294,0.4
+			noevents	1
+		}
+		windowDef pc_keep_corner
+		{
+			rect		330,340,11,11
+			visible		( "gui::check_busy" == 0 )
+			background	"gfx/guis/mainmenu/corner"
+			matcolor	0.564,0.603,0.286,0.4
+			noevents	1
+		}
+		windowDef pc_keep_text
+		{
+			rect		342,335,176,17
+			visible		( "gui::check_busy" == 0 )
+			forecolor	1,1,1,0.8
+			text		"#str_232012"
+			textscale	0.26
+			nowrap		1
+			font		"fonts/marine"
+			noevents	1
+		}
+		windowDef pc_b_keep
+		{
+			rect		324,335,190,23
+			visible		( "gui::check_busy" == 0 )
+
+			onMouseEnter {
+				stoptransitions "pc_b_keep" ;
+				set "pc_keep::matcolor_w" "0.8" ;
+				transition "pc_keep_text::forecolor" "1,1,1,0.8" "0.890,0.537,0,1" "0" ;
+				transition "pc_keep_corner::matcolor" "0.564,0.603,0.286,0.4" "0.890,0.537,0,1" "0" ;
+				set "pc_keep_text::textscale" "0.27" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "pc_keep::matcolor_w" "0.8" "0.4" "300" ;
+				transition "pc_keep_text::forecolor" "0.890,0.537,0,1" "1,1,1,0.8" "300" ;
+				transition "pc_keep_corner::matcolor" "0.890,0.537,0,1" "0.564,0.603,0.286,0.4" "300" ;
+				transition "pc_keep_text::textscale" "0.27" "0.26" "300" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; presetCheckKeep" ;
+			}
+		}
+		// presetCheckLater: the quiet choice under the two.
+		windowDef pc_later_text
+		{
+			rect		170,372,300,14
+			visible		( "gui::check_busy" == 0 )
+			forecolor	1,1,1,0.5
+			text		"#str_232013"
+			textscale	0.22
+			textalign	1
+			font		"fonts/marine"
+			noevents	1
+		}
+		windowDef pc_b_later
+		{
+			rect		230,370,180,18
+			visible		( "gui::check_busy" == 0 )
+
+			onMouseEnter {
+				transition "pc_later_text::forecolor" "1,1,1,0.5" "0.890,0.537,0,1" "0" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "pc_later_text::forecolor" "0.890,0.537,0,1" "1,1,1,0.5" "300" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; presetCheckLater" ;
+			}
+		}
+	}
+
+	// The stock pop-up's entrance: the art over 200 ms, then its contents.
+	windowDef pc_intro
+	{
+		rect		0,0,1,1
+		notime		1
+
+		onTime 0 {
+			set "pc_content::visible" "0" ;
+			transition "pc_glow::matcolor" "0,0,0,1" "1,1,1,1" "200" ;
+			transition "pc_top::matcolor_w" "0" "0.7" "200" ;
+			transition "pc_mid::matcolor_w" "0" "0.7" "200" ;
+			transition "pc_btm::matcolor_w" "0" "0.7" "200" ;
+		}
+
+		onTime 200 {
+			set "pc_content::visible" "1" ;
+		}
+	}
+}
