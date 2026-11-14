@@ -25,9 +25,11 @@ From the console or a server config:
 | `si_ruleset` | `0` Quake 4 (default), `1` Classic |
 | `si_classicGrapple` | `0` off, `1` flag modes only (default), `2` every mode |
 
-Changing `si_ruleset` while a map is running restarts the map, so everyone
-always plays by the same rules. Players joining a Classic server need nothing
-extra; they pick the rules up from the server.
+A new `si_ruleset` takes effect when the map next loads or restarts. On a
+running server, type `serverMapRestart` after changing it; the restart loads
+the map again under the new rules, so everyone always plays by the same ones.
+Players joining a Classic server need nothing extra; they pick the rules up
+from the server.
 
 ## What changes
 

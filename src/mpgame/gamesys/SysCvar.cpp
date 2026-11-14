@@ -163,7 +163,8 @@ idCVar si_entityFilter(				"si_entityFilter",			"",				CVAR_GAME | CVAR_SERVERIN
 idCVar si_countDown(				"si_countDown",				"10",			CVAR_GAME | CVAR_SERVERINFO | CVAR_INTEGER, "pregame countdown in seconds", 4, 3600 );
 // MCG: added "weapon stay" option
 idCVar si_weaponStay(				"si_weaponStay",			"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "cannot pick up weapons you already have (get no ammo from them)" );
-// openQ4: Classic ruleset (mp/ClassicRules.h). Latched at map load; changing it restarts the map.
+// openQ4: Classic ruleset (mp/ClassicRules.h). Latched at map load; a server-info rescan that changes it
+// (serverMapRestart, a vote) reloads the map fully, and a plain set waits for the next load.
 idCVar si_ruleset(					"si_ruleset",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "multiplayer ruleset: 0 Quake 4, 1 Classic (Quake 2 inspired: tiered armour, blaster start, double jump, Threewave CTF scoring and grappling hook)", 0, 1 );
 idCVar si_classicGrapple(			"si_classicGrapple",		"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "grappling hook under the Classic ruleset: 0 off, 1 flag modes only, 2 every mode", 0, 2 );
 // RAVEN END
