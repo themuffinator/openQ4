@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Structural contracts for campaign render demos (render demo v11 to v13).
+"""Structural contracts for campaign render demos (render demo v11 to v14).
 
 A campaign recording spans every single-player level it reaches as
 self-contained segments, records only gameplay frames, and ends with a raw
@@ -7,9 +7,13 @@ summary trailer. Playback loads each segment's level, keeps one timeline and
 offers the level starts as markers. v12 predicts animated entities' joints
 from the joints last recorded for the same handle. v13 records every drawn
 gameplay frame with its own time instead of holding the game to two tics a
-frame (30 Hz), and playback paces frames on those times. These checks pin
-the ordering and gating that keep a long recording decodable and its
-library entry honest.
+frame (30 Hz), and playback paces frames on those times. v14 carries the
+stream in checked blocks that place themselves on the timeline, so a recording
+that was cut short or damaged plays its intact blocks, a file may pass 2 GiB,
+and a seek opens the file at the last level start or keyframe before its
+target. These checks pin the
+ordering and gating that keep a long recording decodable and its library
+entry honest.
 """
 
 from __future__ import annotations
@@ -61,7 +65,8 @@ def require_order(text: str, needles: tuple[str, ...], context: str) -> None:
 
 def validate_format() -> None:
     session_h = read("src/framework/Session.h")
-    require(session_h, "OPENQ4_RENDERDEMO_CURRENT_VERSION = 13;", "current render-demo version")
+    require(session_h, "OPENQ4_RENDERDEMO_CURRENT_VERSION = 14;", "current render-demo version")
+    require(session_h, "OPENQ4_RENDERDEMO_BLOCK_VERSION = 14;", "block-container version")
     require(session_h, "OPENQ4_RENDERDEMO_SESSION_VERSION = 11;", "session-record version")
     require(session_h, "OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION = 12;", "joint-prediction version")
     require(session_h, "OPENQ4_RENDERDEMO_FRAME_TIME_VERSION = 13;", "frame-time version")
@@ -69,7 +74,7 @@ def validate_format() -> None:
     demo_h = read("src/framework/DemoFile.h")
     require_order(demo_h, ("DS_FINISHED,", "DS_RENDER,", "DS_SOUND,", "DS_VERSION,", "DS_SESSION"),
                   "stable top-level demo tokens")
-    require_order(demo_h, ("DSC_HEADER = 1,", "DSC_SEGMENT,", "DSC_SEGMENT_READY,", "DSC_END,", "DSC_FRAME_TIME"),
+    require_order(demo_h, ("DSC_HEADER = 1,", "DSC_SEGMENT,", "DSC_SEGMENT_READY,", "DSC_END,", "DSC_FRAME_TIME,", "DSC_RESYNC"),
                   "session record kinds only append")
     require(demo_h, '#define DEMO_TRAILER_MAGIC\t\t\t"OQ4DSUM1"', "summary trailer magic")
     for needle in ("void\t\t\tResetHashStrings();", "bool\t\t\tCloseWithTrailer( const idDict &summary );",
@@ -78,21 +83,37 @@ def validate_format() -> None:
         require(demo_h, needle, "demo file campaign API")
 
     demo_cpp = read("src/framework/DemoFile.cpp")
+    build = between(demo_cpp, "static bool Demo_BuildTrailer", "bool idDemoFile::CloseWithTrailer", "trailer layout")
+    require_order(build, ("length > DEMO_TRAILER_MAX_PAYLOAD", "CRC32_BlockChecksum( payload.GetDataPtr(), length )",
+                          "memcpy( out, payload.GetDataPtr(), length );", "static_cast<unsigned int>( length ) >> shift",
+                          "crc >> shift", "memcpy( out, DEMO_TRAILER_MAGIC, DEMO_TRAILER_MAGIC_LENGTH );"),
+                  "payload, little-endian length, CRC-32, magic")
     trailer = between(demo_cpp, "bool idDemoFile::CloseWithTrailer", "bool idDemoFile::ReadTrailer", "trailer writer")
-    require_order(trailer, ("compressor->FinishCompress();", "CRC32_BlockChecksum", "f->Write( payload.GetDataPtr(), length )",
-                            "f->WriteInt( length )", "f->WriteUnsignedInt( crc )", "DEMO_TRAILER_MAGIC"),
-                  "raw trailer layout after the compressed stream")
-    reader = between(demo_cpp, "bool idDemoFile::ReadTrailer", "const char *idDemoFile::ReadHashString", "trailer reader")
-    for needle in ("memcmp( magic, DEMO_TRAILER_MAGIC, DEMO_TRAILER_MAGIC_LENGTH ) == 0",
-                   "length <= DEMO_TRAILER_MAX_PAYLOAD",
+    require_order(trailer, ("writer.Finish( true );", "!writer.failed && built", "fwrite( trailer.Ptr(), 1, trailer.Num(), writer.file )",
+                            "compressor->FinishCompress();", "f->Write( trailer.Ptr(), trailer.Num() )"),
+                  "the raw trailer follows the block that ends the stream, or an older stream's compressor")
+    reader = between(demo_cpp, "bool idDemoFile::ReadTrailer", "bool idDemoFile::ReadTimeline", "trailer reader")
+    for needle in ("memcmp( footer + 8, DEMO_TRAILER_MAGIC, DEMO_TRAILER_MAGIC_LENGTH ) == 0",
+                   "storedLength <= static_cast<unsigned int>( DEMO_TRAILER_MAX_PAYLOAD )",
+                   "length <= fileLength - footerBytes",
                    "CRC32_BlockChecksum( payload.Ptr(), length ) == crc",
                    "count > MAX_DEMO_DICT_ENTRIES"):
         require(reader, needle, "bounded, checksummed trailer reader")
+    require_order(reader, ("bytes.Attach( file );", "bytes.Seek( fileLength - footerBytes )"),
+                  "the trailer is found from the end of a file of any size")
+    info = between(demo_cpp, "bool idDemoFile::FileInfo", "bool idDemoFile::ReadTimeline", "file info")
+    require_order(info, ("source.Attach( file );", "bytes = source.length;", "timestamp = file->Timestamp();"),
+                  "a demo's size is measured past 2 GiB")
+    library = read("src/framework/Session_demo.cpp")
+    require(library, "idDemoFile::FileInfo( entry.path.c_str(), fileBytes, entry.timestamp )",
+            "the library lists a recording of any size")
+    reject(between(library, "static void DemoProbeEntry", "static void Session_CycleDemoAutoTrack", "library probe"),
+           "fileSystem->ReadFile( entry.path.c_str(), NULL", "the library measuring a demo with an int")
     writer = between(demo_cpp, "void idDemoFile::WriteHashString", "void idDemoFile::ReadDict", "hash-string writer")
     require(writer, "demoStringHash.First( key )", "hashed string lookup")
     require(writer, "demoStringHash.Add( key, demoStrings.Num() );", "hash index kept in step")
     reject(writer, "for ( int i = 0 ; i < demoStrings.Num() ; i++ )", "linear hash-string search")
-    reset = between(demo_cpp, "void idDemoFile::ResetHashStrings", "bool idDemoFile::CloseWithTrailer", "hash reset")
+    reset = between(demo_cpp, "void idDemoFile::ResetHashStrings", "static bool Demo_BuildTrailer", "hash reset")
     require(reset, "demoStrings.DeleteContents( true );", "string table reset")
     require(reset, "demoStringHash.Clear();", "string index reset")
 
@@ -154,9 +175,11 @@ def validate_recorder() -> None:
 
     segment = between(demo, "void idSessionLocal::BeginRenderDemoSegment", "void idSessionLocal::SuspendRenderDemoRecording", "segment writer")
     require_order(segment, ("renderDemoRecordFile == NULL && !OpenRenderDemoRecordFile()",
-                            "DSC_SEGMENT );", "WriteDict( record );", "ResetHashStrings();", "writeDemo = renderDemoRecordFile;",
+                            "renderDemoRecordFile->BeginSegment();", "DSC_SEGMENT );", "WriteDict( record );",
+                            "writeDemo = renderDemoRecordFile;",
                             "sw->StartWritingDemo( writeDemo );", "rw->StartWritingDemo( writeDemo );", "DSC_SEGMENT_READY"),
-                  "a segment stands alone: fresh strings, full sound and world state")
+                  "a segment stands alone: its own block and strings from its record on, full sound and world state")
+    reject(segment, "ResetHashStrings();", "a string table reset after the segment record, which v14 moved before it")
     cont = between(demo, "void idSessionLocal::ContinueRenderDemoAfterMapChange", "void idSessionLocal::PrintRenderDemoRecordStatus", "continue")
     require_order(cont, ("IsMultiplayer()", "multiViewDemo.IsPlaying()", "StopRecordingRenderDemo();", "BeginRenderDemoSegment("),
                   "only single-player levels continue a campaign recording")
@@ -180,6 +203,11 @@ def validate_player() -> None:
     records = between(demo, "bool idSessionLocal::ProcessRenderDemoSessionRecord", "bool idSessionLocal::SeekRenderDemoSegment", "session records")
     require(records, "userCmdHz < 10 || userCmdHz > 1000", "bounded tic rate")
     require(records, "renderDemoFrameClock = true;", "frame-clock timeline")
+    require_order(records, ("const bool segmentOwnsItsRecord = renderdemoVersion >= OPENQ4_RENDERDEMO_BLOCK_VERSION;",
+                            "( record == DSC_SEGMENT || record == DSC_RESYNC ) && segmentOwnsItsRecord",
+                            "readDemo->ResetHashStrings();", "idDict dict;",
+                            "case DSC_SEGMENT:", "if ( !segmentOwnsItsRecord ) {", "readDemo->ResetHashStrings();"),
+                  "a v14 segment's strings begin with its record; older ones after it")
     require_order(records, ("case DSC_SEGMENT:", "readDemo->ResetHashStrings();", 'dict.GetInt( "frame", "-1" ) != numDemoFrames',
                             "CloseRenderDemoLevelLoad();", "sw->StopAllSounds();", "declManager->BeginLevelLoad();",
                             "renderSystem->BeginLevelLoad();", "soundSystem->BeginLevelLoad();", "renderDemoLevelLoadOpen = true;"),
@@ -431,6 +459,191 @@ def validate_frame_timing() -> None:
                   "the library reads a v13 duration, and older ones from their frames")
 
 
+def validate_block_container() -> None:
+    """v14: checked blocks on a timeline, files past 2 GiB, keyframes, direct seeks, a recording that ends itself."""
+    codec_h = read("src/framework/DemoBlockCodec.h")
+    for needle in ("const uint32_t\tMAGIC\t\t\t= 0x4234514Fu;", "const int\t\tHEADER_BYTES\t= 52;",
+                   "const uint32_t\tMAX_RAW_BYTES\t= 1u << 20;", "const uint32_t\tWINDOW_BYTES\t= 2u << 20;",
+                   "const size_t\tTARGET_RAW_BYTES = 128 * 1024;"):
+        require(codec_h, needle, "block container constants")
+    require_order(codec_h, ("CODEC_STORED\t\t= 0,", "CODEC_LONG_RANGE\t= 1"), "block codecs only append")
+    require_order(codec_h, ("FLAG_RESET\t\t\t= 1 << 0,", "FLAG_SEGMENT_START\t= 1 << 1,", "FLAG_FRAME_END\t\t= 1 << 2,",
+                            "FLAG_STREAM_END\t\t= 1 << 3,", "FLAG_UNTIMED\t\t= 1 << 4,", "FLAG_KEYFRAME\t\t= 1 << 5,"),
+                  "block flags only append")
+    reject(codec_h, "idlib", "an engine dependency in the block container")
+    codec = read("src/framework/DemoBlockCodec.cpp")
+    read_header = between(codec, "bool ReadHeader(", "uint32_t PayloadChecksum", "block header reader")
+    for needle in ("Get32( in ) != MAGIC", "CRC32_BlockChecksum( in, HEADER_BYTES - 4 )", "header.flags & ~FLAG_KNOWN_MASK",
+                   "header.rawBytes > MAX_RAW_BYTES", "return header.packedBytes == header.rawBytes;",
+                   "header.packedBytes < header.rawBytes"):
+        require(read_header, needle, "a block header is checked before anything it says is used")
+    unpack = between(codec, "bool decoder_t::Unpack", "void PackJob", "block decoder")
+    for needle in ("Zlib_Inflate( packed + 4, packedBytes - 4, layer.data(), layerBytes, true ) != ZLIB_OK",
+                   "distance > WINDOW_BYTES", "distance > filled + produced", "matchBytes > rawBytes - produced",
+                   "produced != rawBytes || literal != literalEnd"):
+        require(unpack, needle, "the block decoder trusts nothing it has not checked")
+    next_block = between(codec, "bool reader_t::NextBlock", "size_t reader_t::Read", "stream reader")
+    require_order(next_block, ("ReadHeader( head, header )", "needReset && ( header.flags & FLAG_RESET ) == 0",
+                               "PayloadChecksum( packed.data(), packed.size() ) != header.payloadCRC",
+                               "decoder.Unpack( header.codec", "enteredKeyframe = keyframe;",
+                               "if ( keyframe && !enteredKeyframe && !everyBlock ) {", "continue;"),
+                  "header, then checksum, then decode; a seek lands only on a block that stands alone; a keyframe "
+                  "met in order is decoded for the blocks after it and not handed out")
+    walk = between(codec, "void ReadTimeline(", "reader_t::reader_t()", "timeline walk")
+    require_order(walk, ("( header.flags & ( FLAG_KEYFRAME | FLAG_RESET ) ) == ( FLAG_KEYFRAME | FLAG_RESET )",
+                         "( header.flags & FLAG_SEGMENT_START ) != 0 || keyframe", "timeline.entries.push_back( entry );"),
+                  "level starts and keyframes are the ways into a recording")
+
+    demo_h = read("src/framework/DemoFile.h")
+    require_order(demo_h, ("DEMO_SCHEME_NONE\t\t= 0;", "DEMO_SCHEME_LZW\t\t= 1;", "DEMO_SCHEME_LZSS\t\t= 2;",
+                           "DEMO_SCHEME_HUFFMAN\t= 3;", "DEMO_SCHEME_BLOCKS\t= 4;"), "stream schemes only append")
+    for needle in ("void\t\t\tBeginSegment();", "void\t\t\tEndFrame( int deltaUS );", "bool\t\t\tWriteFailed() const;",
+                   "static bool\t\tReadTimeline( const char *fileName, demoTimeline_t &timeline );",
+                   "void\t\t\tBeginKeyframe();", "void\t\t\tEndKeyframe();",
+                   "bool\t\t\tSeekToEntry( const demoTimelineEntry_t &entry );", "int64\t\t\tDamagedAt() const;",
+                   "bool\t\t\tIsOpen() const { return compressor != NULL || blocks != NULL; }"):
+        require(demo_h, needle, "block container API")
+
+    demo_cpp = read("src/framework/DemoFile.cpp")
+    alloc = between(demo_cpp, "idCompressor *idDemoFile::AllocCompressor", "bool idDemoFile::OpenForReading", "older schemes")
+    for scheme in ("DEMO_SCHEME_NONE", "DEMO_SCHEME_LZW", "DEMO_SCHEME_LZSS", "DEMO_SCHEME_HUFFMAN"):
+        require(alloc, f"case {scheme}:", "every older stream still reads")
+    large = between(demo_cpp, "static bool Demo_Seek64", "struct demoBlockReader_t", "64-bit file access")
+    for needle in ("_fseeki64( file, offset, SEEK_SET )", "fseeko( file, static_cast<off_t>( offset ), SEEK_SET )",
+                   "looseLength > idMath::INT_MAX || looseLength == length"):
+        require(large, needle, "a demo is addressed past 2 GiB")
+    writer = between(demo_cpp, "struct demoBlockWriter_t {", "struct demoBlockState_t {", "block writer")
+    run = between(writer, "void Run() {", "void StartWorker() {", "worker")
+    require(run, "idDemoBlock::PackJob( encoder, level, *job );", "the worker packs")
+    reject(run, "fwrite", "the worker thread writing the file")
+    require_order(writer, ("void WriteJob( idDemoBlock::job_t *job ) {", "fwrite( head, 1, sizeof( head ), file )",
+                           'Fail( "a block could not be written; the disk may be full" );', "void Flush() {", "fflush( file )"),
+                  "the game thread writes whole blocks, flushes them and records a failure")
+    require(writer, "behind = inputBytes > DEMO_BLOCK_MAX_QUEUED_BYTES;", "the game waits only when the worker is far behind")
+    open_write = between(demo_cpp, "bool idDemoFile::OpenForRepacking", "void idDemoFile::Close()", "open for writing")
+    require_order(open_write, ("scheme != DEMO_SCHEME_BLOCKS", "fileSystem->CloseFile( f );", 'fopen( fullPath.c_str(), "wb" )',
+                               "wrapper[DEMO_MAGIC_LENGTH + 0] = static_cast<byte>( DEMO_SCHEME_BLOCKS );",
+                               "demo_recordThread.GetBool()"),
+                  "a recording writes the block container directly")
+
+    session = read("src/framework/Session.cpp")
+    demo = read("src/framework/Session_demo.cpp")
+    end_record = between(demo, "void idSessionLocal::EndRenderDemoRecordFrame", "void idSessionLocal::WriteRenderDemoKeyframe",
+                         "frame end")
+    require_order(end_record, ("renderSystem->WriteDemoEndFrame();", "writeDemo->EndFrame( deltaUS );",
+                               "demo_recordKeyframeSeconds.GetInteger()",
+                               "renderDemoRecordTimeUS - renderDemoRecordKeyframeUS >=", "WriteRenderDemoKeyframe();",
+                               "CheckRenderDemoRecordHealth();"),
+                  "a whole frame goes onto the block timeline; a keyframe follows it when one is due; then the "
+                  "recording's health is looked at")
+    keyframe = between(demo, "void idSessionLocal::WriteRenderDemoKeyframe", "void idSessionLocal::CheckRenderDemoRecordHealth",
+                       "keyframe writer")
+    require_order(keyframe, ('record.SetInt( "frame", renderDemoRecordFrames );', 'record.SetInt( "levelFrame", level.startFrame );',
+                             'record.Set( "reason", "keyframe" );', "renderDemoRecordFile->BeginKeyframe();", "DSC_SEGMENT );",
+                             "sw->StartWritingDemo( writeDemo );", "rw->WriteDemoKeyframe( false );", "DSC_SEGMENT_READY );",
+                             "rw->WriteDemoKeyframe( true );", "renderDemoRecordFile->EndKeyframe();", "DSC_RESYNC );",
+                             "renderDemoRecordKeyframeUS = renderDemoRecordTimeUS;"),
+                  "a keyframe is a segment start in blocks of its own, its definitions after the record that ends the "
+                  "level's load; the stream's strings start again after it")
+    segment_writer = between(demo, "void idSessionLocal::BeginRenderDemoSegment", "void idSessionLocal::SuspendRenderDemoRecording",
+                             "segment writer")
+    require(segment_writer, "renderDemoRecordKeyframeUS = renderDemoRecordTimeUS;", "a level start counts as a way in")
+    world_demo = read("src/renderer/RenderWorld_demo.cpp")
+    world_keyframe = between(world_demo, "void idRenderWorldLocal::WriteDemoKeyframe", "// Entity handles a render demo may carry",
+                             "render world keyframe")
+    require_order(world_keyframe, ("this != session->rw || session->writeDemo == NULL", "if ( !definitions ) {", "WriteLoadMap();",
+                                   "SetPortalState(", "return;", "entityDefs[i]->archived", "WriteRenderEntity(", "lightDefs[i]->archived", "WriteRenderLight(",
+                                   "effectsDef[i]->archived", "WriteRenderEffect(", "ResetDemoJointHistory( -1 );",
+                                   "demoGuiSurfaceChecksums.Clear();", "tr.demoLastGuiModelValid = false;"),
+                  "a keyframe holds the level, its portals and every archived definition, and what follows it is "
+                  "predicted from nothing before it")
+    reject(world_keyframe, "archived = ", "a keyframe changing what the recording considers written")
+    world_h = read("src/renderer/RenderWorld.h")
+    require_order(world_h, ("virtual void\t\t\tDrawText(", "virtual void\t\t\tWriteDemoKeyframe( bool definitions ) = 0;", "};"),
+                  "the keyframe entry is appended to the render world interface")
+    for cvar in ("demo_recordKeyframeSeconds",):
+        declaration = between(demo, f'"{cvar}"', ");", f"{cvar} declaration")
+        require(declaration, "CVAR_NOCHEAT", "recorder cvars obey a cheat-free server")
+    health = between(demo, "void idSessionLocal::CheckRenderDemoRecordHealth", "void idSessionLocal::BeginRenderDemoSegment",
+                     "recording health")
+    require_order(health, ("renderDemoRecordFile->WriteFailed()", "demo_recordMaxSizeMB.GetInteger()",
+                           "demo_recordMinFreeMB.GetInteger()", 'Sys_GetDriveFreeSpace( cvarSystem->GetCVarString( "fs_savepath" ) )',
+                           '"Recording %s ends here: %s"', "StopRecordingRenderDemo();"),
+                  "a failed write, a size limit or a nearly full disk ends the recording cleanly, there and then")
+    reject(health, "BufferCommandText", "a queued stop, which a waiting script would hold back")
+    for cvar in ("demo_recordMinFreeMB", "demo_recordMaxSizeMB"):
+        declaration = between(demo, f'"{cvar}"', ");", f"{cvar} declaration")
+        require(declaration, "CVAR_NOCHEAT", "recorder cvars obey a cheat-free server")
+
+    seek = between(demo, "bool idSessionLocal::SeekDemoMS", "bool idSessionLocal::SkipDemoMS", "seek")
+    require_order(seek, ("const int targetEntry = RenderDemoTimelineEntryAt( target );",
+                         "target < DemoCurrentRenderTimeMS( *this ) ||",
+                         "targetEntry >= 0 && renderDemoPlayTimeline.entries[targetEntry].startFrame > numDemoFrames",
+                         "renderDemoSeekRestartPending = true;", "renderDemoSeekJumpEntry = targetEntry;"),
+                  "a seek back, or past a later way in, opens the file at the level start or keyframe before its target")
+    processor = between(demo, "void idSessionLocal::ProcessRenderDemoSeekBudget", "bool idSessionLocal::SeekDemoMS", "seek processor")
+    require_order(processor, ("renderDemoSeekRestartPending && renderDemoSeekJumpEntry >= 0",
+                              "while ( readDemo != NULL && renderDemoFramePayloadPending ) {",
+                              "JumpRenderDemoToEntry( entry )", "renderDemoSeekRestartPending = false;",
+                              "AdvanceRenderDemo( true );", "if ( renderDemoSeekRestartPending ) {",
+                              "StartPlayingRenderDemo( demoName );"),
+                  "the frame being read ends, the file opens at the level, and only a recording without a "
+                  "block timeline replays from its first frame")
+    jump = between(demo, "bool idSessionLocal::JumpRenderDemoToEntry", "bool idSessionLocal::ResumeRenderDemoAfterDamage", "jump")
+    require_order(jump, ("readDemo->SeekToEntry( entry )", "numDemoFrames = entry.startFrame;",
+                         "renderDemoFrameTimeUS = entry.startTimeUS;", "renderDemoPendingFrameDeltaUS = -1;",
+                         "renderDemoFramePayloadPending = false;"),
+                  "a jump moves the frame count and the timeline to where the level or keyframe lies")
+    resume = between(demo, "bool idSessionLocal::ResumeRenderDemoAfterDamage", "bool idSessionLocal::SeekRenderDemoSegment", "resume")
+    require_order(resume, ("readDemo->DamagedAt()", "renderDemoPlayTimeline.entries[i].fileOffset <= damagedAt",
+                           "JumpRenderDemoToEntry( i )", "frames %d to %d are lost"),
+                  "after a damaged block playback goes on from the next level start or keyframe")
+    at = between(demo, "int idSessionLocal::RenderDemoTimelineEntryAt", "bool idSessionLocal::JumpRenderDemoToEntry", "entry at")
+    for needle in ("!readDemo->IsBlockStream()", "!renderDemoPlayTimelineValid",
+                   "renderdemoVersion < OPENQ4_RENDERDEMO_BLOCK_VERSION"):
+        require(at, needle, "only a v14 block recording with a timeline jumps")
+    reset = between(demo, "void idSessionLocal::ResetRenderDemoPlaybackSession", "void idSessionLocal::CloseRenderDemoLevelLoad",
+                    "playback reset")
+    require_order(reset, ("idDemoFile::ReadTimeline( activeRenderDemoName.c_str(), renderDemoPlayTimeline )",
+                          "renderDemoPlayTimeline.timed", "idDemoFile::ReadTrailer( activeRenderDemoName.c_str(), summary )",
+                          'renderDemoPlayHeader.SetInt( "durationMS",', "if ( entry.keyframe ) {",
+                          "renderDemoPlaySegments.Append( segment );"),
+                  "a recording without its summary still has a length and its level starts from its blocks")
+    records = between(demo, "bool idSessionLocal::ProcessRenderDemoSessionRecord", "int idSessionLocal::RenderDemoTimelineEntryAt",
+                      "session records")
+    require_order(records, ('const bool keyframe = !segment.reason.Icmp( "keyframe" );', 'dict.GetInt( "levelFrame"',
+                            "renderDemoPlaySegments[index].map.IsEmpty()", "case DSC_RESYNC:"),
+                  "a keyframe enters the level it belongs to, not a new one")
+    advance = between(session, "void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {", "idSessionLocal::Draw", "AdvanceRenderDemo")
+    require_order(advance, ("if ( ds == DS_FINISHED ) {", "if ( ResumeRenderDemoAfterDamage() ) {", "continue;",
+                            "if ( renderDemoFramePayloadPending ) {"),
+                  "a damaged block is stepped over before the stream is treated as ended")
+    require_order(advance, ("if ( !readDemo->IsBlockStream() || numDemoFrames <= 0 ) {", "ended before DC_END_FRAME",
+                            "renderDemoFramePayloadPending = false;", "readDemo->IsBlockStream() && !readDemo->ReachedCleanEnd()",
+                            "the recording was interrupted"),
+                  "a block recording that was cut short ends as an interrupted recording, not a malformed one")
+    probe = between(demo, "static bool DemoReadRenderSessionInfo", "static idStr DemoCampaignName", "session info probe")
+    require_order(probe, ("info.streamVersion >= OPENQ4_RENDERDEMO_BLOCK_VERSION", "probe.ResetHashStrings();",
+                          "probe.ReadDict( segment );", "idDemoFile::ReadTimeline( path, timeline )"),
+                  "the library reads a v14 segment record with its own strings, and an interrupted recording's length")
+
+    compress = between(session, "void idSessionLocal::CompressDemoFile", "idSessionLocal::StartNewGame", "compressDemo")
+    require_order(compress, ("targetScheme < DEMO_SCHEME_NONE || targetScheme > DEMO_SCHEME_BLOCKS",
+                             "demowrite.OpenForRepacking( compressedName, targetScheme )",
+                             "targetScheme == DEMO_SCHEME_BLOCKS && demoread.IsBlockStream()",
+                             "demowrite.CopyBlocksFrom( demoread )", "idDemoFile::ReadTrailer( fullDemoName.c_str(), summary )",
+                             "demowrite.CloseWithTrailer( summary )"),
+                  "a repack keeps a block recording's timeline and carries the summary over")
+
+    meson = read("meson.build")
+    require(meson, "files('tools/tests/native/DemoBlockCodecTest.cpp')", "native block container test")
+    require(meson, "test('openq4-demo-block-codec', openq4_demo_block_codec_test", "native block container test registered")
+    native = read("tools/tests/native/DemoBlockCodecTest.cpp")
+    for needle in ("TestHeader();", "TestHostileLayers();", "TestDamagedPayloads();", "TestCuts();", "TestStreamDamage();",
+                   "builder.BeginKeyframe( closed );", "from each of %zu keyframes"):
+        require(native, needle, "native test covers headers, hostile and damaged payloads, cuts, stream damage and keyframes")
+
+
 def validate_localization() -> None:
     for language in LANGUAGES:
         table = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
@@ -455,6 +668,7 @@ def main() -> int:
     validate_renderer()
     validate_joints()
     validate_frame_timing()
+    validate_block_container()
     validate_localization()
     print("campaign demo contracts: ok")
     return 0

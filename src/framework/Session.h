@@ -46,7 +46,7 @@ typedef struct {
 } logStats_t;
 
 static const int	MAX_LOGGED_STATS = 60 * 120;		// log every half second 
-static const int	OPENQ4_RENDERDEMO_CURRENT_VERSION = 13;
+static const int	OPENQ4_RENDERDEMO_CURRENT_VERSION = 14;
 static const int	OPENQ4_RENDERDEMO_ENTITY_EXTRAS_VERSION = 3;
 static const int	OPENQ4_RENDERDEMO_LIGHT_EXTRAS_VERSION = 4;
 static const int	OPENQ4_RENDERDEMO_RENDER_VIEW_DECLS_VERSION = 5;
@@ -66,6 +66,11 @@ static const int	OPENQ4_RENDERDEMO_JOINT_PREDICTION_VERSION = 12;
 // so a recording keeps the frame rate it was played at and no longer holds
 // the game to two tics a frame. Earlier versions are two tics per frame.
 static const int	OPENQ4_RENDERDEMO_FRAME_TIME_VERSION = 13;
+// The stream is carried in checked blocks that place themselves on the
+// timeline (DemoBlockCodec.h), and a segment's record begins the segment's
+// hash-string table instead of ending the one before, so playback can open
+// the file at the block any level begins with.
+static const int	OPENQ4_RENDERDEMO_BLOCK_VERSION = 14;
 
 typedef enum {
 	MSG_OK,

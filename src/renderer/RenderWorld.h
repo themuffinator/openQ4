@@ -723,6 +723,13 @@ public:
 
 	// Text drawing for debug visualization.
 	virtual void			DrawText( const char *text, const idVec3 &origin, float scale, const idVec4 &color, const idMat3 &viewAxis, const int align = 1, const int lifetime = 0, bool depthTest = false ) = 0;
+
+	// Render demo v14, between two recorded frames, without disturbing what the
+	// recording goes on to write: first the level, as a segment start writes
+	// it; then, once the caller has written the record that ends the level's
+	// load, every definition playback holds at this point. Last, so the
+	// interface's other entries stay where they are.
+	virtual void			WriteDemoKeyframe( bool definitions ) = 0;
 };
 
 #endif /* !__RENDERWORLD_H__ */

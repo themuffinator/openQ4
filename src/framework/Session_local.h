@@ -1080,6 +1080,13 @@ public:
 	double				renderDemoRecordLastFrameClockUS;	// when it was drawn, real time
 	int					renderDemoRecordLastFrameDraw;	// renderDemoDrawSerial it was drawn on
 	int					renderDemoDrawSerial;			// counts idSessionLocal::Draw calls
+	// A recording ends itself, with its summary, when a block cannot be
+	// written, the disk runs low (demo_recordMinFreeMB) or it reaches
+	// demo_recordMaxSizeMB.
+	int					renderDemoRecordHealthMsec;		// when the disk was last looked at
+	// Keyframes: every demo_recordKeyframeSeconds of recorded time a level
+	// gains a second way in, so a seek replays seconds, not the level.
+	int64				renderDemoRecordKeyframeUS;		// the timeline at the last level start or keyframe
 
 	// Playback of a v11 recording. Its timeline is the time of its recorded
 	// frames, so it runs on across levels whose game clocks restart: each v13
@@ -1101,6 +1108,15 @@ public:
 	int					renderDemoPlaySegment;		// the segment playing, or -1
 	idStr				renderDemoPlayMap;			// the playing segment's map
 	bool				renderDemoLevelLoadOpen;	// a segment's media load is open
+	// A v14 recording's block headers say where its levels and keyframes
+	// begin, whether or not it was stopped cleanly, so a seek opens the file
+	// at the last of them before its target instead of replaying everything
+	// before it, and playback carries on from the next one after a damaged
+	// block.
+	demoTimeline_t		renderDemoPlayTimeline;
+	bool				renderDemoPlayTimelineValid;
+	int					renderDemoSeekJumpEntry;		// the timeline entry a pending seek opens, or -1
+	int					renderDemoSeekStartedMsec;		// when the seek in progress was asked for
 
 	bool				IsRenderDemoRecording() const { return renderDemoRecordState != RENDER_DEMO_RECORD_IDLE; }
 	bool				OpenRenderDemoRecordFile();
@@ -1119,6 +1135,11 @@ public:
 	double				RenderDemoCaptureStepUS() const;
 	void				EndRenderDemoRecordFrame();
 	bool				SeekRenderDemoSegment( int direction );
+	int					RenderDemoTimelineEntryAt( int timeMS ) const;
+	bool				JumpRenderDemoToEntry( int timelineEntry );
+	bool				ResumeRenderDemoAfterDamage();
+	void				CheckRenderDemoRecordHealth();
+	void				WriteRenderDemoKeyframe();
 	idStr				RenderDemoSegmentLabel() const;
 
 	idUserInterface *	GetActiveMenu();

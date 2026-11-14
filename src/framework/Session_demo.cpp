@@ -33,6 +33,31 @@ static idCVar demo_renderSeekBudgetMS(
 	"cooperative render-demo seek budget checked between stream commands; indivisible map/renderer work may exceed it",
 	1, 50 );
 
+// Recording ends itself rather than fill the disk the campaign saves to, or
+// grow without bound when left running.
+static idCVar demo_recordMinFreeMB(
+	"demo_recordMinFreeMB", "256",
+	CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NOCHEAT,
+	"a demo recording stops cleanly when the save path's disk has less than this many megabytes free; 0 never stops for it",
+	0, 1048576 );
+
+static idCVar demo_recordMaxSizeMB(
+	"demo_recordMaxSizeMB", "0",
+	CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NOCHEAT,
+	"a demo recording stops cleanly when its file reaches this many megabytes; 0 sets no limit",
+	0, 1048576 );
+
+static idCVar demo_recordKeyframeSeconds(
+	"demo_recordKeyframeSeconds", "10",
+	CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NOCHEAT,
+	"seconds of recording between keyframes, the points inside a level a seek can start from and playback can resume at after damage; 0 records none",
+	0, 600 );
+
+static idCVar demo_useKeyframes(
+	"demo_useKeyframes", "1",
+	CVAR_SYSTEM | CVAR_BOOL | CVAR_NOCHEAT,
+	"a seek in a render demo starts from the keyframe before its target; 0 replays from the level's start, for troubleshooting" );
+
 static const char *DemoLocalized( const char *key ) {
 	return common->GetLanguageDict()->GetString( key );
 }
@@ -177,6 +202,9 @@ struct demoRenderSessionInfo_t {
 	idStr			firstEntityFilter;
 	bool			summarized = false;	// a clean stop wrote the trailer
 	idDict			summary;
+	// v14: the length its block headers give when it has no trailer
+	bool			timeline = false;
+	int				timelineDurationMS = -1;
 };
 
 static bool DemoReadRenderSessionInfo( const char *path, demoRenderSessionInfo_t &info ) {
@@ -201,6 +229,10 @@ static bool DemoReadRenderSessionInfo( const char *path, demoRenderSessionInfo_t
 		if ( info.session &&
 			 probe.ReadInt( token ) == sizeof( token ) && token == DS_SESSION &&
 			 probe.ReadInt( record ) == sizeof( record ) && record == DSC_SEGMENT ) {
+			if ( info.streamVersion >= OPENQ4_RENDERDEMO_BLOCK_VERSION ) {
+				// v14: the segment's string table begins with its record
+				probe.ResetHashStrings();
+			}
 			probe.ReadDict( segment );
 			if ( probe.IsOpen() ) {
 				info.firstMap = segment.GetString( "map" );
@@ -212,6 +244,13 @@ static bool DemoReadRenderSessionInfo( const char *path, demoRenderSessionInfo_t
 	if ( info.session ) {
 		info.summarized = idDemoFile::ReadTrailer( path, info.summary ) &&
 			info.summary.GetInt( "version" ) >= OPENQ4_RENDERDEMO_SESSION_VERSION;
+		// A recording that was cut short has no trailer; its blocks still say
+		// how long it is and how many levels it reached.
+		demoTimeline_t timeline;
+		if ( !info.summarized && idDemoFile::ReadTimeline( path, timeline ) && timeline.timed && timeline.frames > 0 ) {
+			info.timeline = true;
+			info.timelineDurationMS = static_cast<int>( Min( timeline.durationUS / 1000, static_cast<int64>( idMath::INT_MAX ) ) );
+		}
 	}
 	return true;
 }
@@ -388,7 +427,10 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 		entry.displayName = DemoLocalized( "#str_41500" );
 	}
 
-	entry.sizeBytes = fileSystem->ReadFile( entry.path.c_str(), NULL, &entry.timestamp );
+	// a recording can pass the 2 GiB an int counts to
+	int64 fileBytes = 0;
+	entry.sizeBytes = idDemoFile::FileInfo( entry.path.c_str(), fileBytes, entry.timestamp )
+		? static_cast<int>( Min( fileBytes, static_cast<int64>( idMath::INT_MAX ) ) ) : -1;
 	if ( entry.sizeBytes < 0 ) {
 		entry.status = DemoLocalized( "#str_41548" );
 		entry.details = DemoLocalized( "#str_41548" );
@@ -517,6 +559,10 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 					// Interrupted: every complete frame before the cut still plays.
 					entry.status = DemoLocalized( "#str_41579" );
 					entry.details = DemoLocalized( "#str_41580" );
+					if ( info.timeline ) {
+						// its blocks still give its length
+						entry.durationMS = info.timelineDurationMS;
+					}
 				} else {
 					entry.details = levels > 0
 						? va( "%s / %s", campaign.c_str(), va( DemoLocalized( "#str_41582" ), levels ) )
@@ -702,6 +748,8 @@ static void Session_OpenQ4DemoLibrary_f( const idCmdArgs &args ) {
 			const idStr path = DemoSanitizeText( entry.path, MAX_OSPATH );
 			common->Printf( "DEMO_LIBRARY_ENTRY index=%d type=%d playable=%d capabilities=%d path=%s\n",
 				i, static_cast<int>( entry.type ), entry.playable, entry.capabilities, path.c_str() );
+			common->Printf( "DEMO_LIBRARY_DETAIL index=%d durationMS=%d cleanEnd=%d status=%s\n",
+				i, entry.durationMS, entry.cleanEnd, DemoSanitizeText( entry.status ).c_str() );
 		}
 		return;
 	}
@@ -1239,10 +1287,15 @@ void idSessionLocal::FinishRenderDemoSeek() {
 	if ( renderDemoSeekMuteOwned ) {
 		soundSystem->SetMute( renderDemoSeekRestoreMute );
 	}
+	if ( renderDemoSeeking && readDemo != NULL && DemoCurrentRenderTimeMS( *this ) >= renderDemoSeekTargetMS ) {
+		common->DPrintf( "render demo: seek to %d ms reached frame %d in %d ms\n", renderDemoSeekTargetMS, numDemoFrames,
+			Sys_Milliseconds() - renderDemoSeekStartedMsec );
+	}
 	renderDemoSeekMuteOwned = false;
 	renderDemoSeeking = false;
 	renderDemoSeekRestartPending = false;
 	renderDemoSeekRestartPresentationPending = false;
+	renderDemoSeekJumpEntry = -1;
 	renderDemoSeekWorkDeferred = false;
 	renderDemoSeekTargetMS = 0;
 	renderDemoSeekDeadlineMS = 0;
@@ -1274,6 +1327,41 @@ void idSessionLocal::ProcessRenderDemoSeekBudget() {
 	if ( renderDemoSeekRestartPending &&
 		 renderDemoSeekRestartPresentationPending ) {
 		renderDemoSeekRestartPresentationPending = false;
+		UpdateDemoMenuGui();
+		return;
+	}
+	if ( renderDemoSeekRestartPending && renderDemoSeekJumpEntry >= 0 ) {
+		// A v14 recording: read on from the level start or keyframe before
+		// the target. The frame being read ends first, so the jump leaves
+		// nothing half applied.
+		const int entry = renderDemoSeekJumpEntry;
+		renderDemoSeekJumpEntry = -1;
+		renderDemoSeekDeadlineMS = 0;
+		renderDemoSeekWorkDeferred = false;
+		while ( readDemo != NULL && renderDemoFramePayloadPending ) {
+			const int before = numDemoFrames;
+			AdvanceRenderDemo( true );
+			if ( readDemo != NULL && numDemoFrames == before && renderDemoFramePayloadPending ) {
+				break;
+			}
+		}
+		if ( readDemo == NULL ) {
+			// the stream ended on the way: its teardown restored the mute
+			return;
+		}
+		if ( !JumpRenderDemoToEntry( entry ) ) {
+			// replay from the first frame instead
+			return;
+		}
+		renderDemoSeekRestartPending = false;
+		// the first frame from there: a level's load is one indivisible step
+		AdvanceRenderDemo( true );
+		if ( readDemo == NULL ) {
+			return;
+		}
+		if ( DemoCurrentRenderTimeMS( *this ) >= renderDemoSeekTargetMS ) {
+			FinishRenderDemoSeek();
+		}
 		UpdateDemoMenuGui();
 		return;
 	}
@@ -1392,13 +1480,20 @@ bool idSessionLocal::SeekDemoMS( int timeMS ) {
 		return true;
 	}
 
-	if ( target < DemoCurrentRenderTimeMS( *this ) ) {
+	// A v14 recording opens at the last level start or keyframe before the
+	// target: a seek back replays the seconds since it, and a seek ahead skips
+	// what lies before it. Any other recording replays from its first frame
+	// to go back.
+	const int targetEntry = RenderDemoTimelineEntryAt( target );
+	if ( target < DemoCurrentRenderTimeMS( *this ) ||
+		 ( targetEntry >= 0 && renderDemoPlayTimeline.entries[targetEntry].startFrame > numDemoFrames ) ) {
 		const bool restoreMute = renderDemoSeekMuteOwned
 			? renderDemoSeekRestoreMute : soundSystem->IsMuted();
 		FinishRenderDemoSeek();
 		renderDemoSeekRestoreMute = restoreMute;
 		renderDemoSeekRestartPending = true;
 		renderDemoSeekRestartPresentationPending = true;
+		renderDemoSeekJumpEntry = targetEntry;
 	} else {
 		const bool restoreMute = renderDemoSeekMuteOwned
 			? renderDemoSeekRestoreMute : soundSystem->IsMuted();
@@ -1410,6 +1505,9 @@ bool idSessionLocal::SeekDemoMS( int timeMS ) {
 
 	renderDemoStepPending = false;
 	renderDemoSeekTargetMS = target;
+	if ( !renderDemoSeeking ) {
+		renderDemoSeekStartedMsec = Sys_Milliseconds();
+	}
 	renderDemoSeeking = true;
 	renderDemoSeekMuteOwned = true;
 	soundSystem->SetMute( true );
@@ -1904,6 +2002,8 @@ void idSessionLocal::EndRenderDemoRecordFrame() {
 	writeDemo->WriteInt( DSC_FRAME_TIME );
 	writeDemo->WriteInt( deltaUS );
 	renderSystem->WriteDemoEndFrame();
+	// the frame is whole: its block may close here, and carries its time
+	writeDemo->EndFrame( deltaUS );
 
 	renderDemoRecordTimeUS += deltaUS;
 	renderDemoRecordFrames++;
@@ -1915,6 +2015,112 @@ void idSessionLocal::EndRenderDemoRecordFrame() {
 	for ( int i = renderDemoRecordSegments.Num() - 1; i >= 0 && renderDemoRecordSegments[i].startMS < 0; i-- ) {
 		renderDemoRecordSegments[i].startMS = startMS;
 	}
+	const int keyframeSeconds = demo_recordKeyframeSeconds.GetInteger();
+	if ( keyframeSeconds > 0 &&
+		 renderDemoRecordTimeUS - renderDemoRecordKeyframeUS >= static_cast<int64>( keyframeSeconds ) * 1000000 ) {
+		WriteRenderDemoKeyframe();
+	}
+	CheckRenderDemoRecordHealth();
+}
+
+/*
+================
+idSessionLocal::WriteRenderDemoKeyframe
+
+Between two frames, gives the level being recorded a second way in: the
+records a segment starts with (reason "keyframe") and every definition
+playback holds, in blocks of their own that playback in order skips. A seek
+then replays the seconds since the keyframe instead of the level so far, and
+playback that meets a damaged block resumes at the next one.
+
+The keyframe has a hash-string table of its own. The stream after it starts
+another, announced by DSC_RESYNC, which both kinds of playback read.
+================
+*/
+void idSessionLocal::WriteRenderDemoKeyframe() {
+	if ( writeDemo == NULL || renderDemoRecordFile == NULL || renderDemoRecordSegments.Num() == 0 ||
+		 rw == NULL || sw == NULL ) {
+		return;
+	}
+	const int startMsec = Sys_Milliseconds();
+	const int64 streamBefore = renderDemoRecordFile->StreamBytesWritten();
+	const renderDemoSegment_t &level = renderDemoRecordSegments[renderDemoRecordSegments.Num() - 1];
+	idDict record;
+	record.SetInt( "index", renderDemoRecordSegments.Num() - 1 );
+	record.SetInt( "frame", renderDemoRecordFrames );
+	record.SetInt( "levelFrame", level.startFrame );
+	record.Set( "map", level.map );
+	record.Set( "entityFilter", level.entityFilter );
+	record.Set( "reason", "keyframe" );
+	record.SetInt( "skill", cvarSystem->GetCVarInteger( "g_skill" ) );
+
+	renderDemoRecordFile->BeginKeyframe();
+	renderDemoRecordFile->WriteInt( DS_SESSION );
+	renderDemoRecordFile->WriteInt( DSC_SEGMENT );
+	renderDemoRecordFile->WriteDict( record );
+	sw->StartWritingDemo( writeDemo );
+	rw->WriteDemoKeyframe( false );
+	renderDemoRecordFile->WriteInt( DS_SESSION );
+	renderDemoRecordFile->WriteInt( DSC_SEGMENT_READY );
+	renderDemoRecordFile->WriteDict( idDict() );
+	// the definitions come after the level's load, as they do in a level
+	// played from its start
+	rw->WriteDemoKeyframe( true );
+	renderDemoRecordFile->EndKeyframe();
+
+	renderDemoRecordFile->WriteInt( DS_SESSION );
+	renderDemoRecordFile->WriteInt( DSC_RESYNC );
+	renderDemoRecordFile->WriteDict( idDict() );
+
+	renderDemoRecordKeyframeUS = renderDemoRecordTimeUS;
+	common->DPrintf( "render demo: keyframe at frame %d, %d s: %d KB of stream written in %d ms\n", renderDemoRecordFrames,
+		static_cast<int>( renderDemoRecordTimeUS / 1000000 ),
+		static_cast<int>( ( renderDemoRecordFile->StreamBytesWritten() - streamBefore ) / 1024 ),
+		Sys_Milliseconds() - startMsec );
+}
+
+/*
+================
+idSessionLocal::CheckRenderDemoRecordHealth
+
+Ends the recording cleanly, with its summary, before it can be cut off: when
+a block could not be written, when the save path's disk runs low (a campaign
+must still be able to save) or when the file reaches its size limit. Called
+when a recorded frame is whole and nothing after it in the draw writes to the
+recording, so the recording ends here and now; a queued command would wait
+behind whatever script is running.
+================
+*/
+void idSessionLocal::CheckRenderDemoRecordHealth() {
+	if ( renderDemoRecordFile == NULL ) {
+		return;
+	}
+	idStr reason;
+	if ( renderDemoRecordFile->WriteFailed() ) {
+		reason = renderDemoRecordFile->WriteError();
+	} else {
+		static const int HEALTH_INTERVAL_MSEC = 2000;
+		const int now = Sys_Milliseconds();
+		if ( now - renderDemoRecordHealthMsec < HEALTH_INTERVAL_MSEC ) {
+			return;
+		}
+		renderDemoRecordHealthMsec = now;
+		const int maxMB = demo_recordMaxSizeMB.GetInteger();
+		const int minFreeMB = demo_recordMinFreeMB.GetInteger();
+		if ( maxMB > 0 && renderDemoRecordFile->BytesWritten() >= static_cast<int64>( maxMB ) * 1024 * 1024 ) {
+			reason = va( "the file reached demo_recordMaxSizeMB (%d MB)", maxMB );
+		} else if ( minFreeMB > 0 ) {
+			const int freeMB = Sys_GetDriveFreeSpace( cvarSystem->GetCVarString( "fs_savepath" ) );
+			if ( freeMB >= 0 && freeMB < minFreeMB ) {
+				reason = va( "the disk has %d MB free, less than demo_recordMinFreeMB (%d MB)", freeMB, minFreeMB );
+			}
+		}
+	}
+	if ( reason.IsEmpty() ) {
+		return;
+	}
+	common->Warning( "Recording %s ends here: %s", renderDemoRecordPath.c_str(), reason.c_str() );
+	StopRecordingRenderDemo();
 }
 
 /*
@@ -1940,6 +2146,8 @@ void idSessionLocal::BeginRenderDemoSegment( const char *reason ) {
 	segment.startMS = -1;		// its first frame's time, once drawn
 	// the level load in between is no time on the timeline
 	renderDemoRecordLastFrameDraw = idMath::INT_MIN;
+	// a level's start is a way in already: the next keyframe is an interval on
+	renderDemoRecordKeyframeUS = renderDemoRecordTimeUS;
 	segment.map = mapSpawnData.serverInfo.GetString( "si_map", currentMapName.c_str() );
 	segment.entityFilter = mapSpawnData.serverInfo.GetString( "si_entityFilter", "" );
 	segment.reason = reason != NULL && reason[0] != '\0' ? reason : "level";
@@ -1951,13 +2159,14 @@ void idSessionLocal::BeginRenderDemoSegment( const char *reason ) {
 	record.Set( "entityFilter", segment.entityFilter );
 	record.Set( "reason", segment.reason );
 	record.SetInt( "skill", cvarSystem->GetCVarInteger( "g_skill" ) );
+	// The segment begins its own block and its own string table, the record
+	// that announces it included (v14). Nothing in it refers to anything
+	// before it, so the table stays bounded across a long campaign and
+	// playback can open the file here.
+	renderDemoRecordFile->BeginSegment();
 	renderDemoRecordFile->WriteInt( DS_SESSION );
 	renderDemoRecordFile->WriteInt( DSC_SEGMENT );
 	renderDemoRecordFile->WriteDict( record );
-	// Nothing in the segment refers to a string written before it, so its
-	// table stays bounded across a long campaign and playback can begin a
-	// segment from scratch.
-	renderDemoRecordFile->ResetHashStrings();
 
 	writeDemo = renderDemoRecordFile;
 	renderDemoRecordState = RENDER_DEMO_RECORD_RECORDING;
@@ -2031,11 +2240,13 @@ void idSessionLocal::PrintRenderDemoRecordStatus() {
 	const int state = idMath::ClampInt( 0, 3, static_cast<int>( renderDemoRecordState ) );
 	const renderDemoSegment_t *segment = renderDemoRecordSegments.Num() > 0
 		? &renderDemoRecordSegments[renderDemoRecordSegments.Num() - 1] : NULL;
-	common->Printf( "RENDER_DEMO_RECORDING state=%s path=%s frames=%d seconds=%d segments=%d map=%s elapsed=%d\n",
+	common->Printf( "RENDER_DEMO_RECORDING state=%s path=%s frames=%d seconds=%d segments=%d map=%s elapsed=%d bytes=%lld streamBytes=%lld\n",
 		states[state], renderDemoRecordPath.IsEmpty() ? "-" : renderDemoRecordPath.c_str(),
 		renderDemoRecordFrames, static_cast<int>( renderDemoRecordTimeUS / 1000000 ),
 		renderDemoRecordSegments.Num(), segment != NULL ? segment->map.c_str() : "-",
-		IsRenderDemoRecording() ? ( Sys_Milliseconds() - renderDemoRecordStartMsec ) / 1000 : 0 );
+		IsRenderDemoRecording() ? ( Sys_Milliseconds() - renderDemoRecordStartMsec ) / 1000 : 0,
+		renderDemoRecordFile != NULL ? static_cast<long long>( renderDemoRecordFile->BytesWritten() ) : 0LL,
+		renderDemoRecordFile != NULL ? static_cast<long long>( renderDemoRecordFile->StreamBytesWritten() ) : 0LL );
 }
 
 /*
@@ -2054,10 +2265,36 @@ void idSessionLocal::ResetRenderDemoPlaybackSession() {
 	renderDemoPlaySegments.Clear();
 	renderDemoPlaySegment = -1;
 	renderDemoPlayMap.Clear();
+	renderDemoSeekJumpEntry = -1;
+	// A v14 recording's blocks place its levels and keyframes in the file and
+	// on the timeline, stopped cleanly or not.
+	renderDemoPlayTimelineValid = idDemoFile::ReadTimeline( activeRenderDemoName.c_str(), renderDemoPlayTimeline ) &&
+		renderDemoPlayTimeline.timed && renderDemoPlayTimeline.frames > 0;
+	if ( !renderDemoPlayTimelineValid ) {
+		renderDemoPlayTimeline.entries.Clear();
+	}
 
 	idDict summary;
 	if ( !idDemoFile::ReadTrailer( activeRenderDemoName.c_str(), summary ) ||
 		 summary.GetInt( "version" ) < OPENQ4_RENDERDEMO_SESSION_VERSION ) {
+		if ( renderDemoPlayTimelineValid ) {
+			// Cut short: the blocks still give its length and where each level
+			// starts, so it seeks and has level markers like any other. A
+			// level is named once playback reaches it.
+			renderDemoPlayHeader.SetInt( "frames", renderDemoPlayTimeline.frames );
+			renderDemoPlayHeader.SetInt( "durationMS",
+				static_cast<int>( Min( renderDemoPlayTimeline.durationUS / 1000, static_cast<int64>( idMath::INT_MAX ) ) ) );
+			for ( int i = 0; i < renderDemoPlayTimeline.entries.Num(); i++ ) {
+				const demoTimelineEntry_t &entry = renderDemoPlayTimeline.entries[i];
+				if ( entry.keyframe ) {
+					continue;
+				}
+				renderDemoSegment_t segment;
+				segment.startFrame = entry.startFrame;
+				segment.startMS = static_cast<int>( Min( entry.startTimeUS / 1000, static_cast<int64>( idMath::INT_MAX ) ) );
+				renderDemoPlaySegments.Append( segment );
+			}
+		}
 		return;
 	}
 	renderDemoUserCmdHz = idMath::ClampInt( 0, 1000, summary.GetInt( "userCmdHz" ) );
@@ -2131,6 +2368,12 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 		renderDemoPendingFrameDeltaUS = deltaUS;
 		return true;
 	}
+	const bool segmentOwnsItsRecord = renderdemoVersion >= OPENQ4_RENDERDEMO_BLOCK_VERSION;
+	if ( ( record == DSC_SEGMENT || record == DSC_RESYNC ) && segmentOwnsItsRecord ) {
+		// v14: a segment's string table begins with the record that announces
+		// it, and the table starts again after a keyframe
+		readDemo->ResetHashStrings();
+	}
 	idDict dict;
 	readDemo->ReadDict( dict );
 	if ( !readDemo->IsOpen() ) {
@@ -2150,7 +2393,9 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 		return true;
 	}
 	case DSC_SEGMENT: {
-		readDemo->ResetHashStrings();
+		if ( !segmentOwnsItsRecord ) {
+			readDemo->ResetHashStrings();
+		}
 		renderDemoSegment_t segment;
 		segment.startFrame = numDemoFrames;
 		// a v13 level starts at its first frame's time (CompleteRenderDemoFrame)
@@ -2162,6 +2407,20 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 			// Its frame count must agree with the frames played: a segment
 			// out of step means the stream lost or gained frames.
 			return false;
+		}
+		// A keyframe is a way into a level that began earlier: the level is
+		// the segment, not the keyframe.
+		const bool keyframe = !segment.reason.Icmp( "keyframe" );
+		if ( keyframe ) {
+			segment.startFrame = idMath::ClampInt( 0, numDemoFrames, dict.GetInt( "levelFrame", va( "%d", numDemoFrames ) ) );
+			segment.startMS = -1;
+			segment.reason = "level";
+			for ( int i = 0; renderDemoPlayTimelineValid && i < renderDemoPlayTimeline.entries.Num(); i++ ) {
+				const demoTimelineEntry_t &entry = renderDemoPlayTimeline.entries[i];
+				if ( !entry.keyframe && entry.startFrame == segment.startFrame ) {
+					segment.startMS = static_cast<int>( Min( entry.startTimeUS / 1000, static_cast<int64>( idMath::INT_MAX ) ) );
+				}
+			}
 		}
 		int index = -1;
 		for ( int i = 0; i < renderDemoPlaySegments.Num(); i++ ) {
@@ -2177,6 +2436,11 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 				index++;
 			}
 			renderDemoPlaySegments.Insert( segment, index );
+		} else if ( renderDemoPlaySegments[index].map.IsEmpty() ) {
+			// known from the block headers of a recording without its summary: now it has a name
+			renderDemoPlaySegments[index].map = segment.map;
+			renderDemoPlaySegments[index].entityFilter = segment.entityFilter;
+			renderDemoPlaySegments[index].reason = segment.reason;
 		}
 		renderDemoPlaySegment = index;
 
@@ -2207,10 +2471,17 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 			}
 			renderDemoLevelLoadOpen = true;
 		}
-		common->Printf( "RENDER_DEMO_SEGMENT play index=%d frame=%d reason=%s map=%s\n",
-			index, segment.startFrame, segment.reason.c_str(), segment.map.c_str() );
+		if ( keyframe ) {
+			common->DPrintf( "render demo: entered level %d at a keyframe, frame %d\n", index, numDemoFrames );
+		} else {
+			common->Printf( "RENDER_DEMO_SEGMENT play index=%d frame=%d reason=%s map=%s\n",
+				index, segment.startFrame, segment.reason.c_str(), segment.map.c_str() );
+		}
 		return true;
 	}
+	case DSC_RESYNC:
+		// its string table reset is all there is to it
+		return true;
 	case DSC_SEGMENT_READY:
 		CloseRenderDemoLevelLoad();
 		// the level load took real time the recording never had
@@ -2225,6 +2496,98 @@ bool idSessionLocal::ProcessRenderDemoSessionRecord( bool &finished ) {
 		common->DPrintf( "Render demo '%s': skipped session record %d\n", activeRenderDemoName.c_str(), record );
 		return true;
 	}
+}
+
+/*
+================
+idSessionLocal::RenderDemoTimelineEntryAt
+
+Where a seek to a time in a v14 recording starts reading: the last level
+start or keyframe at or before it, as an index into the block timeline. -1
+when the recording has no block timeline, and every seek back replays from its
+first frame.
+================
+*/
+int idSessionLocal::RenderDemoTimelineEntryAt( int timeMS ) const {
+	if ( readDemo == NULL || !readDemo->IsBlockStream() || !renderDemoPlayTimelineValid ||
+		 renderdemoVersion < OPENQ4_RENDERDEMO_BLOCK_VERSION || !renderDemoFrameClock ) {
+		return -1;
+	}
+	const bool keyframes = demo_useKeyframes.GetBool();
+	int index = -1;
+	for ( int i = 0; i < renderDemoPlayTimeline.entries.Num(); i++ ) {
+		// the frames an entry leads to come after the time it is stamped with
+		if ( i > 0 && renderDemoPlayTimeline.entries[i].startTimeUS / 1000 > timeMS ) {
+			break;
+		}
+		if ( keyframes || !renderDemoPlayTimeline.entries[i].keyframe ) {
+			index = i;
+		}
+	}
+	return index;
+}
+
+/*
+================
+idSessionLocal::JumpRenderDemoToEntry
+
+Continues playback at the first block of a level or at a keyframe. Either
+decodes and plays with nothing before it, as a level does when playback
+reaches it in order, so only the frame count and the timeline move there.
+================
+*/
+bool idSessionLocal::JumpRenderDemoToEntry( int timelineEntry ) {
+	if ( readDemo == NULL || !renderDemoPlayTimelineValid || timelineEntry < 0 ||
+		 timelineEntry >= renderDemoPlayTimeline.entries.Num() ) {
+		return false;
+	}
+	const demoTimelineEntry_t &entry = renderDemoPlayTimeline.entries[timelineEntry];
+	if ( !readDemo->SeekToEntry( entry ) ) {
+		return false;
+	}
+	numDemoFrames = entry.startFrame;
+	renderDemoFrameTimeUS = entry.startTimeUS;
+	renderDemoPrevFrameTimeUS = entry.startTimeUS;
+	renderDemoPendingFrameDeltaUS = -1;
+	renderDemoFramePayloadPending = false;
+	renderDemoStepPending = false;
+	common->DPrintf( "render demo: opened at %s of level %d, frame %d, %lld ms\n", entry.keyframe ? "a keyframe" : "the start",
+		entry.level, numDemoFrames, static_cast<long long>( renderDemoFrameTimeUS / 1000 ) );
+	return true;
+}
+
+/*
+================
+idSessionLocal::ResumeRenderDemoAfterDamage
+
+The stream stopped at a block that is cut or fails its checksum. Everything
+after it leans on it, up to the next level start or keyframe, which leans on
+nothing: playback goes on from there, having lost the frames in between.
+================
+*/
+bool idSessionLocal::ResumeRenderDemoAfterDamage() {
+	if ( readDemo == NULL || !readDemo->IsBlockStream() || !renderDemoPlayTimelineValid ||
+		 renderdemoVersion < OPENQ4_RENDERDEMO_BLOCK_VERSION ) {
+		return false;
+	}
+	const int64 damagedAt = readDemo->DamagedAt();
+	if ( damagedAt < 0 ) {
+		return false;
+	}
+	for ( int i = 0; i < renderDemoPlayTimeline.entries.Num(); i++ ) {
+		if ( renderDemoPlayTimeline.entries[i].fileOffset <= damagedAt ) {
+			continue;
+		}
+		const int lostFrom = numDemoFrames;
+		if ( !JumpRenderDemoToEntry( i ) ) {
+			return false;
+		}
+		common->Warning( "Render demo '%s' resumes at %s after the damage: frames %d to %d are lost",
+			activeRenderDemoName.c_str(), DemoFormatTime( static_cast<int>( renderDemoFrameTimeUS / 1000 ), false ).c_str(),
+			lostFrom + 1, numDemoFrames );
+		return true;
+	}
+	return false;
 }
 
 /*
@@ -2283,7 +2646,9 @@ idStr idSessionLocal::RenderDemoSegmentLabel() const {
 	}
 	const renderDemoSegment_t &segment = renderDemoPlaySegments[renderDemoPlaySegment];
 	const idStr level = Session_LevelDisplayName( segment.map, segment.entityFilter );
-	const int known = renderDemoPlayHeader.GetInt( "frames" ) > 0 ? renderDemoPlaySegments.Num() : 0;
+	// how many levels there are: a v14 recording's blocks say, cut short or not
+	const int known = renderDemoPlayTimelineValid ? renderDemoPlayTimeline.levels
+		: ( renderDemoPlayHeader.GetInt( "frames" ) > 0 ? renderDemoPlaySegments.Num() : 0 );
 	if ( known > 0 ) {
 		return va( "%s %d/%d: %s", DemoLocalized( "#str_41583" ), renderDemoPlaySegment + 1, known, level.c_str() );
 	}

@@ -346,6 +346,14 @@ if get_option('build_native_tests')
     args: [files('tools/tests/png_codec.py'), '--run', openq4_png_codec_test, meson.project_build_root() / 'png-codec-test'],
     depends: openq4_png_codec_test, timeout: 300)
 
+  # Render demo block container: the codec, the stream of blocks cut at any
+  # byte or damaged anywhere, and the timeline its headers alone give
+  openq4_demo_block_codec_test = executable(
+    'openq4-demo-block-codec-test', files('tools/tests/native/DemoBlockCodecTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-demo-block-codec', openq4_demo_block_codec_test, timeout: 300)
+
   openq4_save_dict_under_test = custom_target(
     'openq4-save-dict-under-test', input: files('src/game/gamesys/SaveGame.cpp', 'src/mpgame/gamesys/SaveGame.cpp'),
     output: 'SaveDictUnderTest.inc',

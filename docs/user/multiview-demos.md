@@ -128,7 +128,9 @@ folder. In **Demos** a campaign recording is listed as **Campaign demo**, with
 its first level, length and number of levels. A demo recorded in the other
 campaign (Quake 4 or The Awakening) says so and plays only after you switch
 campaigns. A recording cut short by a crash or power loss is marked
-**Interrupted recording** and still plays up to its last complete frame.
+**Interrupted recording**. It still shows its length, seeks and has its level
+markers, and it plays up to the last moment that reached the disk, at most
+about half a second before the cut.
 
 During playback each new level shows its loading screen, and the overlay names
 the level you are watching. **Prev Marker** and **Next Marker**, or
@@ -145,10 +147,22 @@ your own frame rate, and plays back at that rate on a display fast enough to
 show it. Demos from older openQ4 versions, which held the game to 30 frames per
 second while recording, still play at 30.
 
-File size grows with the frame rate. A busy level takes about 1.7 MB per second
-at 60 frames per second, so a long campaign recording needs several gigabytes.
-To record smaller files, lower your frame cap first, for example
-`com_maxfps 60`.
+File size grows with the frame rate. A busy level takes about 0.7 MB per second
+at 60 frames per second, roughly 2.5 GB an hour, and a quiet one much less.
+That is about 40% of what openQ4 0.14.1 and earlier wrote for the same play.
+Files can grow past 2 GB. To record smaller files, lower your frame cap first,
+for example `com_maxfps 60`.
+
+A recording never fills your disk. It stops by itself, as a complete demo, when
+less than 256 MB is free where your saves are kept, so the game can still
+save. `demo_recordMinFreeMB` changes that amount and `demo_recordMaxSizeMB`
+stops a recording at a size you choose.
+
+### Shrink a recording from an older version
+
+`compressDemo my_campaign` writes `my_campaign_compressed.demo` in the new,
+smaller format; the original is left alone. The copy plays exactly as before,
+though only recordings made by this version seek quickly.
 
 ## Record a match
 
@@ -212,23 +226,30 @@ recording with no complete snapshot cannot be recovered.
 |---|---|---|---|
 | openQ4 MVD `.mvd` 1.3 | Supported | Pause, speed, step, and fast seeking from the nearest keyframe | Free camera over the whole match, player follow, markers and auto-tracking |
 | openQ4 MVD `.mvd` 1.0–1.2 | Supported, from game versions openQ4 still recognises | Pause, speed, step, and replay-based seek (replays from the start) | Free camera over the whole match, player follow and auto-tracking |
-| openQ4 render `.demo`, including campaign demos | Supported | Pause, speed, step, replay-based seek and level markers | The recorded view only |
+| openQ4 render `.demo`, including campaign demos | Supported | Pause, speed, step, level markers, and fast seeking from the nearest keyframe (older recordings replay from the start) | The recorded view only |
 | Retail Quake 4 render `.demo` | Not supported yet | None | None |
 | Retail Quake 4 `.netdemo` | Not supported yet | None | None |
 | Command `.cdemo` | Developer use only | Play and stop only | Whatever the recording did |
 | `.mvd.part`, `.part`, `.ucmd` | Incomplete and not playable (`mvdRecover` can save an interrupted `.mvd.part`) | None | None |
 
 **Render demos** store the picture, sound and menus you saw, not the whole
-match, so they cannot offer a free camera or player following. Rewinding one
-restarts it and fast-forwards to the time you asked for, showing **Seeking...**
-meanwhile; a map load can still cause a short pause. Starting another seek just
-changes the target. A render demo recorded in a multiplayer match by an older
+match, so they cannot offer a free camera or player following. A recording made
+by this version stores a keyframe every ten seconds, so seeking, backwards or
+forwards, takes about a second, a little longer when it lands in another level
+and that level has to load. A recording from an older version restarts and
+fast-forwards to the time you asked for instead. **Seeking...** shows
+meanwhile, and starting another seek just changes the target. A render demo recorded in a multiplayer match by an older
 openQ4 version plays in slow motion, because those versions recorded every
 frame but replayed at 30 frames per second; record it again for real-time
 playback.
 
 Render demos from early openQ4 versions still play when openQ4 can verify
 them. If one is damaged, playback closes it and returns to the menu with a warning instead of crashing openQ4.
+
+A recording made by this version is checked piece by piece as it plays. If part
+of the file is damaged, playback skips ahead to the next keyframe or level,
+at most ten seconds later, tells you in the console how much was lost, and
+carries on to the end.
 
 **Retail Quake 4** `.demo` and `.netdemo` files use different formats. The
 library marks them as **Legacy** and keeps **Play** unavailable rather than
@@ -255,6 +276,9 @@ your configuration.
 | `mvd_enforceContent` | `1` | Refuses playback when the demo's game data differs from yours. |
 | `mvd_seekBudgetMS` | `12` | The most time per displayed frame spent replaying while seeking a multi-view demo. |
 | `demo_renderSeekBudgetMS` | `10` | The same for render demos. |
+| `demo_recordKeyframeSeconds` | `10` | Seconds between keyframes in a render demo, which make seeking fast and let playback recover from a damaged file; `0` records none. |
+| `demo_recordMinFreeMB` | `256` | A render demo recording stops when less than this many MB are free on the disk your saves are on; `0` never stops for it. |
+| `demo_recordMaxSizeMB` | `0` | Largest render demo file in MB; `0` for no limit. |
 | `mvd_markerLeadMS` | `2000` | How many milliseconds before a marker a jump lands. |
 
 ## Versions, seeking and damaged files

@@ -240,8 +240,14 @@ def validate_playback_controls() -> None:
     )
     require(
         render_seek,
-        "if ( target < DemoCurrentRenderTimeMS( *this ) )",
+        "target < DemoCurrentRenderTimeMS( *this ) ||",
         "render-demo rewind detection",
+    )
+    require(
+        render_seek,
+        "renderDemoSeekJumpEntry = targetEntry;",
+        "a v14 rewind opens the file at the level start or keyframe before its target instead of "
+        "replaying from the first frame",
     )
     require(
         render_seek,

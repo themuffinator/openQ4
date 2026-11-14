@@ -7,6 +7,61 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Recordings less than half the size, that seek in a second and survive a crash, 14 November 2026
+
+- **A recording takes about 40% of the space.** A busy level at 60 frames per
+  second now costs about 0.7 MB per second (roughly 2.5 GB an hour) instead
+  of 1.7 MB. The picture, sound and frame rate recorded are exactly the same.
+- **Recordings can be as long as you like.** A recording larger than 2 GB
+  could not be opened at all before, which was about twenty minutes of busy
+  play. The limit is gone.
+- **Seeking takes about a second.** Rewinding used to replay the recording
+  from its first frame, loading every level on the way. A recording now
+  stores a keyframe every ten seconds, and a seek, backwards or forwards,
+  starts from the nearest one and loads only the level it lands in.
+- **A crash no longer costs the recording.** Everything up to about half a
+  second before a crash or power cut plays back, and the Demos list shows
+  such a recording's length and level markers like any other.
+- **A damaged file plays on.** Every piece of a recording is checked as it
+  plays. If part of the file is damaged, playback skips ahead to the next
+  keyframe or level, at most ten seconds later, and says in the console how
+  much was lost, instead of ending there.
+- **A recording never fills your disk.** It stops by itself, as a complete
+  demo, when less than 256 MB is free where your saves are kept, so the game
+  can still save.
+- **Recording costs the game less.** The packing runs on its own processor
+  thread.
+- **Smoke and fire no longer start over.** A long-running effect that
+  playback meets partway, after a seek or as it first comes into view, now
+  appears as it stood instead of beginning again from its first burst.
+- **Older recordings still play**, every frame of them. To shrink one, enter
+  `compressDemo <name>`: it writes `<name>_compressed.demo` in the new format
+  and leaves the original alone. Only recordings made by this version seek
+  quickly.
+- **This version's recordings do not play in openQ4 0.14.1 or earlier**, which
+  report that they could not open the file.
+- New settings: `demo_recordKeyframeSeconds` (10; 0 records no keyframes),
+  `demo_recordMinFreeMB` (256), `demo_recordMaxSizeMB` (0, no limit).
+  `com_compressDemos` now means 1 packed (the default), 0 stored unpacked for
+  tools.
+- How it works: render demo v14 carries its stream in blocks, each with its
+  own checksums and its place on the timeline, packed by a long-range match
+  stage and then DEFLATE. See
+  [the block container](multiview-demos.md#block-container-keyframes-and-large-files-v14-14-november-2026).
+- Evidence (staged Windows client, hidden window, no input): an 82-second,
+  two-level recording at 60 frames per second is 56.9 MB where the same stream
+  in the old format is 140.0 MB, and all 4,913 frames play on OpenGL and
+  Vulkan; seeks that took 1.7 to 5.1 s by replay take 0.6 to 1.1 s; a frame
+  reached through a keyframe matches the same frame reached by replay; a
+  recording killed at 35 s played its 2,093 frames; one flipped bit lost 83
+  frames, not the rest of the file; a 2.35 GiB file lists, opens and seeks
+  beyond the 2 GiB mark; the v11, v12 and v13 recordings play in full. The
+  container has a native test that needs no engine: 2,264 truncations, 400
+  bit flips and hostile payloads. Not run: recording on Vulkan, Linux or
+  macOS; a multiplayer recording; a recording that is really hours long (the
+  large file was built for the test); and nobody has listened to one, since
+  every run was silent.
+
 ## Smoother, steadier and harder-to-break online play (netcode audit), 14 November 2026
 
 - **Online play is smoother, most of all above 60 fps.** When an update from the

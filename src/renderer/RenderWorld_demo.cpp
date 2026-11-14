@@ -289,11 +289,11 @@ bool R_ReadDemoRenderViewData( idDemoFile *demo, renderView_t *renderView, int r
 	return true;
 }
 
-void R_WriteDemoEffectData( idDemoFile *demo, const rvRenderEffectLocal *effectDef ) {
+void R_WriteDemoEffectData( idDemoFile *demo, const rvRenderEffectLocal *effectDef, int time ) {
 	const renderEffect_t &effect = effectDef->parms;
 	const bool stopped = bse->IsEffectStopped( effectDef );
 
-	demo->WriteInt( effectDef->gameTime );
+	demo->WriteInt( time );
 	demo->WriteFloat( effect.startTime );
 	demo->WriteInt( effect.suppressSurfaceInViewID );
 	demo->WriteInt( effect.allowSurfaceInViewID );
@@ -413,6 +413,68 @@ void		idRenderWorldLocal::StartWritingDemo( idDemoFile *demo ) {
 
 void idRenderWorldLocal::StopWritingDemo() {
 //	writeDemo = NULL;
+}
+
+/*
+==============
+WriteDemoKeyframe
+
+A keyframe is a second way into the level being recorded: the level, its
+portal states and every definition playback holds at this point, which is
+exactly the archived ones (a definition that changed since it was written was
+deleted from the stream when it changed). The archive flags stay as they are,
+since playback that came through the frames before skips the keyframe and
+goes on with what it has.
+
+What the two kinds of playback do not share afterwards is what later records
+are predicted from, so that starts again: joints are written in full, the 2D
+in full, and in-world GUIs as they next draw.
+
+It is written in two parts, with the record that ends playback's level load
+between them, so the definitions reach playback after the load as they do
+when it plays a level from its start: media a definition is the first to
+name is then loaded as it is used, not left to a load that has already
+decided what the level needs.
+==============
+*/
+void idRenderWorldLocal::WriteDemoKeyframe( bool definitions ) {
+	if ( this != session->rw || session->writeDemo == NULL ) {
+		return;
+	}
+
+	if ( !definitions ) {
+		// the level, and no joints predicted from before it
+		WriteLoadMap();
+
+		for ( int i = 0; i < numInterAreaPortals; i++ ) {
+			if ( doublePortals[i].blockingBits ) {
+				SetPortalState( i + 1, doublePortals[i].blockingBits );
+			}
+		}
+		return;
+	}
+
+	for ( int i = 0; i < entityDefs.Num(); i++ ) {
+		if ( entityDefs[i] != NULL && entityDefs[i]->archived ) {
+			WriteRenderEntity( entityDefs[i]->index, &entityDefs[i]->parms );
+		}
+	}
+	for ( int i = 0; i < lightDefs.Num(); i++ ) {
+		if ( lightDefs[i] != NULL && lightDefs[i]->archived ) {
+			WriteRenderLight( lightDefs[i]->index, &lightDefs[i]->parms );
+		}
+	}
+	for ( int i = 0; i < effectsDef.Num(); i++ ) {
+		if ( effectsDef[i] != NULL && effectsDef[i]->archived ) {
+			WriteRenderEffect( effectsDef[i]->index, effectsDef[i] );
+		}
+	}
+
+	// Playback that skipped the keyframe predicts from the frames before it,
+	// playback that entered here from the keyframe: neither, from here on.
+	ResetDemoJointHistory( -1 );
+	demoGuiSurfaceChecksums.Clear();
+	tr.demoLastGuiModelValid = false;
 }
 
 // Entity handles a render demo may carry an in-world GUI for.
@@ -1063,6 +1125,7 @@ void	idRenderWorldLocal::WriteRenderView( const renderView_t *renderView ) {
 	session->writeDemo->WriteInt( DS_RENDER );
 	session->writeDemo->WriteInt( DC_RENDERVIEW );
 	R_WriteDemoRenderViewData( session->writeDemo, renderView );
+	demoViewTime = renderView->time;
 	
 	if ( r_showDemo.GetBool() ) {
 		common->Printf( "write DC_RENDERVIEW: %i\n", renderView->time );
@@ -1334,10 +1397,16 @@ void	idRenderWorldLocal::WriteRenderEffect( qhandle_t handle, const rvRenderEffe
 		return;
 	}
 
+	// Playback starts or updates the effect at the time written here. An
+	// effect nobody updated since it began (a map's standing smoke) is written
+	// when it first comes into view, or at a keyframe, long after that: it is
+	// written as of now, so playback never has to leap from then to now in one
+	// step, which stretches its particles across the gap.
+	const int time = Max( effectDef->gameTime, demoViewTime );
 	session->writeDemo->WriteInt( DS_RENDER );
 	session->writeDemo->WriteInt( DC_UPDATE_EFFECTDEF );
 	session->writeDemo->WriteInt( handle );
-	R_WriteDemoEffectData( session->writeDemo, effectDef );
+	R_WriteDemoEffectData( session->writeDemo, effectDef, time );
 
 	if ( r_showDemo.GetBool() ) {
 		const char *effectName = effectDef->parms.declEffect ? effectDef->parms.declEffect->GetName() : "NULL";
@@ -1364,6 +1433,31 @@ bool	idRenderWorldLocal::ReadRenderEffect() {
 	}
 	if ( !R_ReadDemoEffectData( session->readDemo, &effect, &effectGameTime, &stopped ) ) {
 		return false;
+	}
+
+	// Playback learns of an effect when the recording first wrote it: at a
+	// keyframe, at a level start recorded mid-level, or when it first came
+	// into view. One that had been running for a while by then is run through
+	// its last seconds first, so it is shown as it stood (a column of smoke in
+	// full flow) instead of starting over, opening burst and all, in front of
+	// the viewer. The run is silent: an effect's sounds reach playback through
+	// the recording's sound commands.
+	static const float DEMO_EFFECT_PREROLL_SECONDS = 12.0f;
+	static const float DEMO_EFFECT_PREROLL_STEP = 0.25f;
+	const bool known = index < effectsDef.Num() && effectsDef[index] != NULL;
+	const float now = effectGameTime * 0.001f;
+	if ( !known && !stopped && effect.declEffect != NULL && effect.startTime >= 0.0f &&
+		 now - effect.startTime > DEMO_EFFECT_PREROLL_STEP ) {
+		renderEffect_t silent = effect;
+		silent.referenceSoundHandle = 0;
+		const float from = Max( effect.startTime, now - DEMO_EFFECT_PREROLL_SECONDS );
+		for ( float t = from; t < now - 0.5f * DEMO_EFFECT_PREROLL_STEP; t += DEMO_EFFECT_PREROLL_STEP ) {
+			if ( UpdateEffectDef( index, &silent, static_cast<int>( t * 1000.0f ) ) ) {
+				// it ran out on the way, which the recorded one had not: start it as recorded
+				FreeEffectDef( index );
+				break;
+			}
+		}
 	}
 
 	UpdateEffectDef( index, &effect, effectGameTime );

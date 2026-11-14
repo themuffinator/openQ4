@@ -4202,6 +4202,8 @@ void idSessionLocal::Clear() {
 	renderDemoRecordLastFrameClockUS = 0.0;
 	renderDemoRecordLastFrameDraw = 0;
 	renderDemoDrawSerial = 0;
+	renderDemoRecordHealthMsec = 0;
+	renderDemoRecordKeyframeUS = 0;
 	renderDemoFrameClock = false;
 	renderDemoUserCmdHz = 0;
 	renderDemoTimedFrames = false;
@@ -4215,6 +4217,10 @@ void idSessionLocal::Clear() {
 	renderDemoPlaySegment = -1;
 	renderDemoPlayMap.Clear();
 	renderDemoLevelLoadOpen = false;
+	renderDemoPlayTimeline.entries.Clear();
+	renderDemoPlayTimelineValid = false;
+	renderDemoSeekJumpEntry = -1;
+	renderDemoSeekStartedMsec = 0;
 
 	syncNextGameFrame = false;
 	syncNextGameFrameAwaitingAsyncTicLog = false;
@@ -5280,11 +5286,13 @@ Session_CompressDemo_f
 */
 static void Session_CompressDemo_f( const idCmdArgs &args ) {
 	if ( args.Argc() == 2 ) {
-		sessLocal.CompressDemoFile( "2", args.Argv(1) );
+		sessLocal.CompressDemoFile( va( "%d", DEMO_SCHEME_BLOCKS ), args.Argv(1) );
 	} else if ( args.Argc() == 3 ) {
 		sessLocal.CompressDemoFile( args.Argv(2), args.Argv(1) );
 	} else {
-		common->Printf("use: CompressDemo <file> [scheme]\nscheme is the same as com_compressDemo, defaults to 2" );
+		common->Printf( "use: compressDemo <file> [scheme]\n"
+			"writes <file>_compressed.demo; scheme 4 (the default) is the block container every\n"
+			"recording now uses, 0 to 3 the older streams: none, LZW, LZSS, Huffman\n" );
 	}
 }
 
@@ -5487,6 +5495,7 @@ void idSessionLocal::StartRecordingRenderDemo( const char *demoName ) {
 	renderDemoRecordStartMsec = Sys_Milliseconds();
 	renderDemoRecordSegments.Clear();
 	renderDemoNextSegmentReason.Clear();
+	renderDemoRecordHealthMsec = Sys_Milliseconds();
 
 	if ( mapSpawned && !insideExecuteMapChange ) {
 		// if we are in a map already, dump the current state
@@ -5607,12 +5616,16 @@ void idSessionLocal::StopRecordingRenderDemo() {
 			segment.map.c_str(), segment.entityFilter.IsEmpty() ? "-" : segment.entityFilter.c_str(),
 			segment.startMS >= 0 ? segment.startMS : durationMS ) );
 	}
+	const double streamMB = file->StreamBytesWritten() / ( 1024.0 * 1024.0 );
 	const bool summarized = file->CloseWithTrailer( summary );
+	// the file is whole now: its blocks, the one that ends it and the summary
+	const double fileMB = file->BytesWritten() / ( 1024.0 * 1024.0 );
 	delete file;
-	common->Printf( "stopped recording %s: %d frames, %d s over %d segment%s%s.\n", path.c_str(),
+	common->Printf( "stopped recording %s: %d frames, %d s over %d segment%s, %.1f MB of stream in a %.1f MB file%s.\n", path.c_str(),
 		renderDemoRecordFrames, durationMS / 1000,
 		renderDemoRecordSegments.Num(), renderDemoRecordSegments.Num() == 1 ? "" : "s",
-		summarized ? "" : "; its summary could not be written" );
+		streamMB, fileMB,
+		summarized ? "" : "; it could not be finished cleanly and is kept as an interrupted recording" );
 	renderDemoRecordSegments.Clear();
 	renderDemoRecordFrames = 0;
 	renderDemoRecordTimeUS = 0;
@@ -5650,6 +5663,9 @@ void idSessionLocal::StopPlayingRenderDemo() {
 	renderDemoFrameClock = false;
 	renderDemoPlaySegments.Clear();
 	renderDemoPlaySegment = -1;
+	renderDemoPlayTimeline.entries.Clear();
+	renderDemoPlayTimelineValid = false;
+	renderDemoSeekJumpEntry = -1;
 	activeRenderDemoName.Clear();
 	renderDemoPaused = false;
 	renderDemoSeeking = false;
@@ -5773,6 +5789,7 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 	renderDemoPaused = false;
 	renderDemoSeekRestartPending = false;
 	renderDemoSeekRestartPresentationPending = false;
+	renderDemoSeekJumpEntry = -1;
 	renderDemoSeekWorkDeferred = false;
 	renderDemoStepPending = false;
 	renderDemoFramePayloadPending = false;
@@ -5993,49 +6010,60 @@ void idSessionLocal::CompressDemoFile( const char *scheme, const char *demoName 
 	compressedName.StripFileExtension();
 	compressedName.Append( "_compressed.demo" );
 
-	int savedCompression = cvarSystem->GetCVarInteger("com_compressDemos");
-	bool savedPreload = cvarSystem->GetCVarBool("com_preloadDemos");
+	const int targetScheme = idStr::IsNumeric( scheme ) ? atoi( scheme ) : -1;
+	if ( targetScheme < DEMO_SCHEME_NONE || targetScheme > DEMO_SCHEME_BLOCKS ) {
+		common->Printf( "compressDemo: scheme must be 0 to %d\n", DEMO_SCHEME_BLOCKS );
+		return;
+	}
+	const int savedCompression = cvarSystem->GetCVarInteger( "com_compressDemos" );
+	const bool savedPreload = cvarSystem->GetCVarBool( "com_preloadDemos" );
 	cvarSystem->SetCVarBool( "com_preloadDemos", false );
-	cvarSystem->SetCVarInteger("com_compressDemos", atoi(scheme) );
+	// a copy in the block container is always packed
+	cvarSystem->SetCVarInteger( "com_compressDemos", 1 );
 
 	idDemoFile demoread, demowrite;
-	if ( !demoread.OpenForReading( fullDemoName ) ) {
+	const bool opened = demoread.OpenForReading( fullDemoName );
+	if ( !opened ) {
 		common->Printf( "Could not open %s for reading\n", fullDemoName.c_str() );
-		return;
-	}
-	if ( !demowrite.OpenForWriting( compressedName ) ) {
+	} else if ( !demowrite.OpenForRepacking( compressedName, targetScheme ) ) {
 		common->Printf( "Could not open %s for writing\n", compressedName.c_str() );
 		demoread.Close();
-		cvarSystem->SetCVarBool( "com_preloadDemos", savedPreload );
-		cvarSystem->SetCVarInteger("com_compressDemos", savedCompression);
-		return;
-	}
-	common->SetRefreshOnPrint( true );
-	common->Printf( "Compressing %s to %s...\n", fullDemoName.c_str(), compressedName.c_str() );
-
-	static const int bufferSize = 65535;
-	char buffer[bufferSize];
-	int bytesRead;
-	while ( 0 != (bytesRead = demoread.Read( buffer, bufferSize ) ) ) {
-		demowrite.Write( buffer, bytesRead );
-		common->Printf( "." );
-	}
-
-	demoread.Close();
-	// A campaign demo's summary sits outside its compressed stream; carry it
-	// over so the library still describes the recompressed copy.
-	idDict summary;
-	if ( idDemoFile::ReadTrailer( fullDemoName.c_str(), summary ) ) {
-		demowrite.CloseWithTrailer( summary );
 	} else {
-		demowrite.Close();
+		common->SetRefreshOnPrint( true );
+		common->Printf( "Compressing %s to %s...\n", fullDemoName.c_str(), compressedName.c_str() );
+
+		bool copied = true;
+		if ( targetScheme == DEMO_SCHEME_BLOCKS && demoread.IsBlockStream() ) {
+			// block for block: the copy keeps the frames, times and level starts
+			copied = demowrite.CopyBlocksFrom( demoread );
+		} else {
+			static const int bufferSize = 65535;
+			static char buffer[bufferSize];
+			int bytesRead;
+			while ( 0 != ( bytesRead = demoread.Read( buffer, bufferSize ) ) ) {
+				demowrite.Write( buffer, bytesRead );
+				common->Printf( "." );
+			}
+			copied = !demowrite.WriteFailed();
+		}
+
+		demoread.Close();
+		// A campaign demo's summary sits outside its stream; carry it over so
+		// the library still describes the copy. A source without one was cut
+		// short, and so is its copy.
+		idDict summary;
+		bool closed = true;
+		if ( copied && idDemoFile::ReadTrailer( fullDemoName.c_str(), summary ) ) {
+			closed = demowrite.CloseWithTrailer( summary );
+		} else {
+			demowrite.Close();
+		}
+		common->Printf( copied && closed ? "Done\n" : "The copy is incomplete: the source is damaged or the disk is full\n" );
+		common->SetRefreshOnPrint( false );
 	}
 
 	cvarSystem->SetCVarBool( "com_preloadDemos", savedPreload );
-	cvarSystem->SetCVarInteger("com_compressDemos", savedCompression);
-
-	common->Printf( "Done\n" );
-	common->SetRefreshOnPrint( false );
+	cvarSystem->SetCVarInteger( "com_compressDemos", savedCompression );
 
 }
 
@@ -9856,6 +9884,10 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 			break;
 		}
 		if ( ds == DS_FINISHED ) {
+			if ( ResumeRenderDemoAfterDamage() ) {
+				// a damaged block: playback goes on from the next level or keyframe
+				continue;
+			}
 			if ( renderDemoFramePayloadPending ) {
 				// Early demoShot writers could end directly after a complete
 				// first render view without emitting DC_END_FRAME. Accept only
@@ -9873,11 +9905,18 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 						activeRenderDemoName.c_str() );
 					break;
 				}
-				common->Warning( "Render demo '%s' ended before DC_END_FRAME; playback stopped safely",
-					activeRenderDemoName.c_str() );
-				Stop();
-				StartMenu( false );
-				break;
+				if ( !readDemo->IsBlockStream() || numDemoFrames <= 0 ) {
+					common->Warning( "Render demo '%s' ended before DC_END_FRAME; playback stopped safely",
+						activeRenderDemoName.c_str() );
+					Stop();
+					StartMenu( false );
+					break;
+				}
+				// A block recording cut short between two blocks of one frame, or
+				// damaged from there on: that frame is lost with them, and what
+				// played before it is the demo. It ends as any interrupted
+				// recording does.
+				renderDemoFramePayloadPending = false;
 			}
 			if ( numDemoFrames <= 0 ) {
 				common->Warning( "Render demo '%s' contains no complete frames",
@@ -9888,6 +9927,11 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 			}
 			renderDemoKnownDurationMS = RenderDemoCurrentTimeMS();
 			renderDemoDurationName = activeRenderDemoName;
+			if ( readDemo->IsBlockStream() && !readDemo->ReachedCleanEnd() ) {
+				// a recording that was cut short, or damaged from here on
+				common->Printf( "Render demo '%s' ends at frame %d without its closing record: the recording was interrupted.\n",
+					activeRenderDemoName.c_str(), numDemoFrames );
+			}
 			if ( numDemoFrames != 1 ) {
 				// if the demo has a single frame (a demoShot), continuously replay
 				// the renderView that has already been read

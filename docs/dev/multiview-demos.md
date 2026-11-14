@@ -19,6 +19,12 @@ artifacts. Playback has one capability-gated control surface for pause/resume,
 speed, relative and absolute seeking, stepping, MVD free roam/follow, and
 stopping. Formats do not receive controls for state they did not record.
 
+A render demo recording (stream v14) is a container of checked blocks with
+keyframes: it plays what is intact of a file that was cut short or damaged, may
+pass 2 GiB, takes about 40% of the space the v13 stream did, and seeks from
+the last level start or keyframe before its target
+([block container](#block-container-keyframes-and-large-files-v14-14-november-2026)).
+
 The format is intentionally new. An openQ4 `.mvd` is not labelled as a legacy
 Quake 4 `.netdemo`, because the latter is a packet-oriented client recording
 with different compatibility and safety properties.
@@ -467,6 +473,11 @@ Relevant MVD cvars are:
 - `demo_renderSeekBudgetMS` is a cooperative render-demo replay budget checked
   between stream commands. An indivisible renderer command or map load can
   exceed it;
+- `demo_recordKeyframeSeconds` (10) spaces a render demo's keyframes and
+  `demo_useKeyframes` lets seeks start from them; `demo_recordMinFreeMB` (256)
+  and `demo_recordMaxSizeMB` (0, none) end a recording cleanly before the disk
+  fills or at a size; `demo_recordThread` packs its blocks on a worker thread
+  and `com_compressDemos 0` stores them unpacked;
 - `mvd_snapshotDelay` defaults to 50 ms;
 - `mvd_maxSnapshotMB`, `mvd_maxSizeMB`, and
   `mvd_maxDurationMinutes` bound recording resources;
@@ -515,7 +526,7 @@ runtime before and after and records exit 0. Repeat with
 |---|---:|---:|---:|---|---|
 | Native openQ4 `.mvd` 1.3 | Yes | Yes | Yes, through keyframes, then replay | Full-world free roam, player follow, markers and auto-tracking | Markers, keyframes and user-info updates are optional records. |
 | Native openQ4 `.mvd` 1.0-1.2 | Yes | Yes | Yes, replay based | Full-world free roam, player follow and auto-tracking | 1.0/1.1 retain legacy instance-0 capture semantics; protocol/content checks still apply. |
-| Native or historical openQ4 render `.demo` | Yes | Yes | Yes, replay based | Fixed recorded camera | Presentation stream; it has no off-camera game state. A v11 campaign demo spans single-player levels as segments whose starts are markers ([campaign render demos](#campaign-render-demos-v11-7-november-2026)). |
+| Native or historical openQ4 render `.demo` | Yes | Yes | Yes: a v14 recording from the last level start or keyframe, then replay; older ones replay from the first frame | Fixed recorded camera | Presentation stream; it has no off-camera game state. A v11 campaign demo spans single-player levels as segments whose starts are markers ([campaign render demos](#campaign-render-demos-v11-7-november-2026)); a v14 one is a container of checked blocks ([block container](#block-container-keyframes-and-large-files-v14-14-november-2026)). |
 | Retail Quake 4 render `.demo` | No | No | No | Recorded camera only in the original engine | Detected as legacy; the byte-oriented retail stream needs a separate decoder. |
 | Retail Quake 4 `.netdemo` | No | No | No | Depends on original client/server recording | `NDMO` metadata is shown, but retail packet protocols are not decoded. |
 | openQ4 `.cdemo` | Best effort | No | No | Simulation-defined | Unversioned developer artifact; safe only with the matching engine/game build. |
@@ -528,7 +539,9 @@ decoded first token proves it is the 32-bit openQ4 stream; a retail
 byte-oriented stream is reported as unsupported.
 
 Render demos can pause, change rate, step, and seek by consuming their command
-stream. Rewinding restarts that render demo and replays commands with sound
+stream. Rewinding a v14 recording opens the file at the last level start or
+keyframe before the target ([block container](#block-container-keyframes-and-large-files-v14-14-november-2026));
+rewinding an older one restarts it. Either then replays commands with sound
 muted until the target. Replay is advanced incrementally on the main thread
 under the cooperative `demo_renderSeekBudgetMS` budget; the restart is deferred
 so the seeking state can be presented first, although an indivisible map load
@@ -753,18 +766,24 @@ v11 adds session records (`DS_SESSION`, `DemoFile.h`). Each is a dictionary;
 readers skip unknown record kinds.
 
 ```text
-DS_VERSION 13 (11 and 12 still play)
+DS_VERSION 14 (11 to 13 still play)
 DS_SESSION DSC_HEADER   game, campaign, mode, userCmdHz, skill, build
 per segment (one level):
+  -- v14: both sides reset the hash-string table here, before the record --
   DS_SESSION DSC_SEGMENT        index, frame, map, entityFilter, reason, skill
-  -- both sides reset the hash-string table here --
+  -- v11 to v13: both sides reset the hash-string table here, after it --
   DS_SOUND  SCMD_STATE          the complete sound world
   DS_RENDER DC_LOADMAP          the level, then its portal states
   DS_SESSION DSC_SEGMENT_READY
   frames ... DS_SESSION DSC_FRAME_TIME int microseconds (v13), DS_RENDER DC_END_FRAME
+  v14, every ten seconds: a keyframe in blocks of its own, then
+    DS_SESSION DSC_RESYNC       both sides reset the hash-string table
 DS_SESSION DSC_END              frames, segments, durationMS (v13)
-raw trailer (outside the compressed stream): payload | int length | uint crc32 | "OQ4DSUM1"
+raw trailer (outside the stream): payload | int length | uint crc32 | "OQ4DSUM1"
 ```
+
+Through v13 the stream is one `idCompressor` stream; from v14 it is carried in
+checked blocks ([block container](#block-container-keyframes-and-large-files-v14-14-november-2026)).
 
 A segment depends on nothing before it: a fresh string table, the full sound
 state, a level load that frees every definition, archive flags reset so every
@@ -1010,6 +1029,221 @@ Validation, staged Windows client, hidden window (its presentation cap is
   and of the three-level v11 demo (745) was shown exactly once, across level
   changes; the 60 fps recording gave 496 captured frames for 16.5 s.
 
+### Block container, keyframes and large files (v14), 14 November 2026
+
+**Why.** Through v13 a recording's stream went through one `idCompressor`
+(LZW with a 12-bit dictionary) from its first byte to its last, with nothing
+between the bytes and the decoder. Four things followed:
+
+- **Size.** A render demo repeats itself one frame back, 50 to 250 KB away,
+  which that dictionary cannot hold, and raw floats came out 1:1. A busy level
+  at 60 frames a second cost about 1.7 MB a second.
+- **Fragility.** Nothing in the file was checked. A recording that was killed
+  ended wherever the compressor's buffer happened to be, and one bad byte took
+  every byte after it. Only a joint checksum, by accident, ever noticed damage.
+- **Seeking.** The one way to an earlier time was to play the file again from
+  its first frame, through the load of every level on the way.
+- **2 GiB.** `idFile` carries `int` lengths and `long` seeks. A file of 2 GiB
+  or more could not be opened at all, which at that rate was twenty minutes.
+
+**Container.** A recording is now the wrapper (`openQ4 RDEMO`, then the scheme
+int, `4`) followed by blocks, and the summary trailer after the last one
+(`DemoBlockCodec.h`; no engine types, so the whole container is tested without
+the engine):
+
+```text
+block = header (52 bytes, little endian) | packed payload
+
+ 0  u32 magic "OQ4B"          28  u64 startTimeUS  the timeline at the last frame before it
+ 4  u16 header bytes (52)     36  u64 durationUS   what the frames inside it add
+ 6  u8  flags                 44  u32 CRC-32 of the packed payload
+ 7  u8  codec                 48  u32 CRC-32 of the 48 bytes before
+ 8  u32 raw bytes (<= 1 MiB)
+12  u32 packed bytes          flags: RESET 1, SEGMENT_START 2, FRAME_END 4,
+16  u32 level segment                STREAM_END 8, UNTIMED 16, KEYFRAME 32
+20  u32 startFrame            codec: 0 stored, 1 long-range matches + zlib
+24  u32 frames ending inside
+```
+
+A block is checked before a byte of it is used: the header's own CRC, known
+flags and codec, sizes within the limits, then the payload's CRC, then the
+decoder, which accepts only an exact encoding of the block's size. The stream
+ends, with the reason and the byte offset, at the first block that fails. A
+block closes at the end of the first frame that fills it to 128 KiB, or that
+ends half a second after the block before it, so blocks end on frame
+boundaries (a frame or a level's first state larger than 1 MiB is split) and a
+crash costs about half a second of recording.
+
+Every header also places its block on the timeline. Walking the headers alone
+(`idDemoFile::ReadTimeline`, no payload decoded) gives the frames, the
+duration, where every level and keyframe begins and whether the recording was
+stopped cleanly, so a recording without its summary trailer is described and
+seeks like any other. The block flagged `STREAM_END` ends the stream; the
+trailer after it is never read as a block.
+
+**Compression.** Two stages (`idDemoBlock::encoder_t`). The long-range stage
+indexes one position in eight of the last 2 MiB of the stream by the 16 bytes
+that begin there, probes every position of a new block and replaces any run of
+24 bytes or more that already occurred with a length and a distance. A record
+that differs from the frame before in a few fields lines up with it at one
+distance, so a match at the last distance costs one byte to name and may be 8
+bytes short, and the bytes between two such matches are stored as the XOR with
+the bytes one distance back whenever that leaves more zeros, the same idea as
+LZMA's matched literals. What is left goes through the in-tree DEFLATE
+(`imagetools/PNG/ZlibStream.h`, level 6). The history runs across blocks and
+starts again at a `RESET` block: the file's first, and the first of every
+level and keyframe, which therefore decode with nothing before them. A block
+that would not shrink is stored.
+
+On the 51.00 MiB stream of the v13 size study (16.5 s, two levels, 60 frames a
+second): LZW 26.47 MiB, zlib level 9 as one stream 16.49 MiB, xz level 6
+8.35 MiB, the block container 10.68 MiB (4.78:1). It packs at 87 MiB a second
+(a block takes 4.6 ms at worst) and unpacks at about 1 GiB a second (1.2 ms at
+worst), on one core. The window was measured, not assumed: 1, 2, 4 and 8 MiB
+came within 0.3% of each other, and the anchor, match and block sizes within
+1%.
+
+**Recording.** The game thread fills blocks (`idDemoBlock::builder_t`) and, as
+each closes, hands it to a worker thread that packs it; the game thread writes
+the packed blocks to the file in order as they come back and flushes them.
+Only the game thread touches the file, and it waits for the worker only when
+8 MiB are queued (`demo_recordThread 0` packs on the game thread). The file is
+written through the C runtime directly, so no `int` length is involved.
+`BeginSegment` closes the open block and resets the hash-string table before
+the `DSC_SEGMENT` record, not after it as v13 did, so a level's first block
+names every string it uses. `EndFrame` stamps the frame onto the block
+timeline.
+
+A recording ends itself, cleanly and with its summary, when a block cannot be
+written, when the save path's disk has less than `demo_recordMinFreeMB` free
+(256 by default: a campaign must still be able to save) or when the file
+reaches `demo_recordMaxSizeMB` (0, no limit). It ends in the draw that found
+out, after the frame is whole; a queued `stopRecording` would wait behind any
+script that is waiting. `com_compressDemos 0` stores the blocks unpacked, for
+tools that read the stream. `demoRecordStatus` adds the file and stream sizes.
+
+**Keyframes.** Every `demo_recordKeyframeSeconds` (10) of recorded time, between
+two frames, the recording gives the level a second way in
+(`WriteRenderDemoKeyframe`): the records a segment starts with (a `DSC_SEGMENT`
+whose reason is `keyframe`, the sound world, the level and its portal states,
+`DSC_SEGMENT_READY`) and then every definition playback holds at that point,
+in blocks flagged `KEYFRAME` with a hash-string table of their own. The
+definitions playback holds are exactly the archived ones, because a definition
+that changes after it was written is deleted from the stream as it changes.
+The archive flags stay as they are. Only what later records are predicted from
+starts again: joints are written in full, the 2D in full, in-world GUIs as
+they next draw, and a `DSC_RESYNC` record starts a new string table for the
+stream that follows.
+
+Playback in order never sees a keyframe: the block reader decodes its blocks,
+since the blocks after it lean on their bytes, and hands none of them out. It
+reads `DSC_RESYNC` and goes on with the definitions it has. Playback that was
+sent to a keyframe is handed its blocks, takes the level's records exactly as
+it takes a level's start, and reads on. The definitions follow the record that
+ends the level's load, as they do in a level played from its start: a
+keyframe that put them inside the load left the smoke of a level entered from
+another one drawn with the default image.
+
+A keyframe is about 100 KB of stream on airdefense1 (34 KB in a corridor) and
+takes 0 to 2 ms to write; its first block packs to under 90 KB with no history
+and the blocks after it then match against it, so eight keyframes in an
+82-second recording cost less than 1% of the file.
+
+**Playback.** A seek opens the file at the last level start or keyframe at or
+before its target (`RenderDemoTimelineEntryAt`, `JumpRenderDemoToEntry`): the
+frame being read ends, the reader moves to the block, the frame count and the
+timeline are set from its header, and replay runs from there under the usual
+budget. A seek back replays the seconds since the keyframe; a seek ahead skips
+what lies before a later one; neither loads a level it does not land in.
+`demo_useKeyframes 0` starts from the level's start instead. A v11 to v13
+recording, or a v14 stream without a block timeline, still restarts and
+replays.
+
+When the stream stops at a damaged block, everything after it leans on it up
+to the next level start or keyframe, which leans on nothing: playback warns,
+goes on from there and says which frames were lost
+(`ResumeRenderDemoAfterDamage`). A recording that simply ends without its
+closing block plays to its last whole frame and reports that it was
+interrupted; neither is a malformed-demo stop.
+
+Two things playback now does for any effect it learns of late (at a keyframe,
+at a level start recorded mid-level, or when the effect first comes into
+view), because a keyframe made the old behaviour visible: the recording stamps
+an effect record with the view's time when nobody has updated the effect since
+it began, so playback no longer creates a standing column of smoke in the past
+and leaps to the present; and playback runs an effect that has been going for
+a while through its last 12 seconds, silently, before showing it, so it
+appears in full flow and not from its opening burst.
+
+**Large files.** `demoBytes_t` (`DemoFile.cpp`) addresses a loose demo file
+through the C runtime's 64-bit seeks alongside the `idFile` the file system
+opened, and falls back to the `idFile` for a file inside a pack or preloaded
+into memory. The reader, the timeline walk, the trailer and the library's size
+all go through it, so the trailer of an older LZW recording past 2 GiB is
+found as well.
+
+**`compressDemo <name> [scheme]`** writes `<name>_compressed.demo` in the block
+container by default; schemes 0 to 3 remain for the older streams. A block
+container is copied block for block, keyframes included, so the copy keeps
+its timeline, and at the same level the copy is the same file. An older
+recording becomes a block container without a timeline (`UNTIMED`): it gains
+the size and the checks and still seeks by replay.
+
+**Validation.** Staged Windows client, hidden window (60 Hz), no input; cases
+under `.tmp/demo-revise/` (local only). Another session's client ran alongside
+most runs, so the seek times are upper bounds.
+
+- `openq4-demo-block-codec` (native, no engine): header round trip, all 416
+  single-bit header flips and 7 well-formed invalid headers refused; round
+  trips at every level and block size, noise stored, 7.5 MB past the window;
+  10 hostile payloads with a valid zlib wrapper refused (distances before the
+  history or beyond the window, lengths past the block, literals left over,
+  overlong varints) with no byte written past the block; 600 bit-flip trials on
+  a packed block never produced wrong bytes; a three-level recording with nine
+  keyframes read back in order, from each level and from each keyframe; 2,264
+  truncations each played and described exactly their whole blocks; 400
+  single-bit flips each stopped the stream at the block they hit, and the
+  stream resumed at each later way in; a block-for-block copy equalled its
+  source.
+- An 82.3 s recording at 60 frames a second, airdefense1 for 61 s then
+  airdefense2 (4,913 frames, two levels, eight keyframes): 281.3 MB of stream
+  in a 56.9 MB file, 0.69 MB a second. The same stream as LZW is 140.0 MB
+  (1.70 MB a second), 2.46 times the size. `timeDemoQuit` played all 4,913
+  frames on OpenGL and on Vulkan.
+- The v13 (965 frames), v12 (500), v11 (500) and three-level v11 (745)
+  recordings play every frame.
+- Seeks on that recording: to 55 s from 3 s 0.55 s (3.3 s by replay on the
+  same build without keyframes), back to 25 s 0.49 s, into level two at 75 s
+  0.81 s with its load, back into level one 1.1 s. With `demo_useKeyframes 0`
+  the same three targets took 2.4, 1.7 and 5.1 s against 0.64, 1.0 and 1.1 s.
+- A paused frame reached through a keyframe and the same frame reached by
+  replay from the level's start (27 s, 44.5 s after a visit to level two, and
+  77 s): the same view, entities, weapon, HUD and smoke columns; 0.05% of the
+  pixels differ by more than 24 levels, all in the smoke, whose particles are
+  random in any playback.
+- A recording killed at 35 s: 830 whole blocks, 2,093 frames, all played, then
+  "the recording was interrupted" and a normal exit; the library lists it as
+  an interrupted recording of 35 s.
+- One flipped bit at 31% of the file: a warning with the byte offset, playback
+  resumed at the keyframe at 20 s having lost 83 frames, and reached the end.
+  A copy cut in the middle of a block played its 1,005 whole frames.
+- `demo_recordMaxSizeMB 6`: the recording ended itself at 6.1 MB with its
+  summary, 351 frames, all playable.
+- A 2.35 GiB file (level one, 2.3 GiB of stored filler blocks as a level, then
+  level two and the trailer): a seek to 70 s opened the file at byte
+  2,522,491,343 and played on; a seek to 79 s opened at a keyframe beyond it;
+  the library lists it with its duration.
+- `compressDemo`: the block copy of the recording is byte-identical; the v13
+  LZW recording (28.1 MB) became an 11.4 MB block container that plays its 965
+  frames; a v14 stream written as LZW plays its 4,913.
+- `com_compressDemos 0` with `demo_recordThread 0`: 384 stored blocks, played.
+
+Not covered: recording on Vulkan, Linux and macOS (the container and the
+64-bit file access are portable C++, and the native test runs everywhere, but
+no recording was made there); a multiplayer recording; a recording that is
+really hours long rather than a synthetic large file; and hearing the result,
+since every run was silent.
+
 ### Library
 
 A v11 single-player entry shows **Campaign demo**, its first level, the date,
@@ -1017,7 +1251,10 @@ the duration from the trailer and `<campaign> / Levels: N`. The file being
 recorded is listed as **Recording in progress** and cannot be played. A demo
 from the other campaign is **Other campaign**, with Play disabled and the
 reason. A demo without a trailer is **Interrupted recording**, still playable to
-its last complete frame. `compressDemo` carries the trailer over.
+its last complete frame; a v14 one also shows its length, which its blocks
+give, and has its level markers. `compressDemo` carries the trailer over. The
+library measures a file with 64-bit lengths, so a recording past 2 GiB is
+listed like any other.
 
 ### Validation, 7 November 2026
 
@@ -1058,10 +1295,13 @@ captures under `.tmp/campaign-demos/` (local only):
   quarter off ([joint prediction](#joint-prediction-v12-7-november-2026)).
 
 `campaign_demo_contract.py` pins the format, both ends, the joint coding, the
-library and the strings. Remaining (Q4-09): Vulkan recording, Linux and macOS, a
-long session with measured seek times and size, the 2D model, sound and effect
-records that now dominate the size, masked HUD groups and local sounds already
-playing at a segment start.
+block container, the library and the strings; `openq4-demo-block-codec` runs
+the container itself. Remaining (Q4-09): Vulkan recording, Linux and macOS, a
+session that is really hours long, a multiplayer recording in the block
+container, hearing a recording played back, masked HUD groups and local sounds
+already playing at a segment start. Animated entities' joints are now most of
+what a recording stores; a smaller exact coding of them is the next step in
+size.
 
 ## Update policy
 

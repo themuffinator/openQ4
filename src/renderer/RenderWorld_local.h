@@ -398,6 +398,7 @@ public:
 
 	void					StartWritingDemo( idDemoFile *demo );
 	void					StopWritingDemo();
+	void					WriteDemoKeyframe( bool definitions );
 	bool					ProcessDemoCommand( idDemoFile *readDemo, renderView_t *demoRenderView, int *demoTimeOffset );
 
 	void					WriteLoadMap();
@@ -424,6 +425,7 @@ public:
 	idList<class idGuiModel *>	demoGuiSurfaces;		// playback, handle * MAX_RENDERENTITY_GUI + slot
 	idList<unsigned int>	demoGuiSurfaceChecksums;	// recording, same index; 0 = not written
 	class idGuiModel *		demoGuiScratch = NULL;		// recording: the filtered copy written
+	int						demoViewTime = 0;			// recording: the time of the view last written
 
 	// An entity's joints in a render demo (v12). Recording predicts them from the
 	// joints it last wrote for the handle and playback from the joints it last
