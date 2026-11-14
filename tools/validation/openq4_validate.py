@@ -809,6 +809,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / "remastered_hud_behavior.py", ['--output', str(root / '.tmp/remastered-hud-behavior')]),
         (root / "tools" / "tests" / "retained_view_effects.py", []),
         (root / "tools" / "tests" / "ui_hud_coverage.py", []),
+        (root / "tools" / "tests" / "ui_hud_catalog_state.py", []),
         (root / "tools" / "tests" / "ui_retained_scopes.py", []),
         (root / "tools" / "tests" / "ui_legacy_feedback.py", []),
         (root / "tools" / "tests" / 'renderer_native_ui_output.py', []),

@@ -204,6 +204,10 @@ public:
 	// policy. Returned quads are local to the supplied box, centered in white.
 	virtual void BuildHudText( const char* text, float scale, float width, float height,
 		idList<uiHudPrimitive_t>& output ) { output.Clear(); }
+	// Build the retained view a game presentation source (DrawHudPrimitives)
+	// draws with, ahead of its first draw: as the local player spawns, so the
+	// first damage number or hit marker of a match draws without loading.
+	virtual void PrecacheHudPrimitives( const char* source ) { }
 };
 
 extern idUserInterfaceManager *	uiManager;

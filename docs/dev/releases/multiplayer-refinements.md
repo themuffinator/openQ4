@@ -4,6 +4,13 @@
 
 ## Highlights
 
+- **Holding fire through a respawn no longer draws shots that never
+  happened.** Online, your client used to treat the weapon you respawn with as
+  ready at once while the server was still raising it, so a held burst drew
+  tracers the server never fired and then ran out of step with it. Your weapon
+  now comes up exactly when the server's does, after a respawn or a join from
+  spectating, and also when a jittery connection loses the update that carried
+  your respawn. Nothing to change in your settings.
 - **Your shots land where you aim, the moment you fire.** On a server, your
   machinegun, shotgun and railgun tracers and their marks on walls used to wait
   for the server's copy of each shot. They arrived a round trip after the muzzle

@@ -2384,6 +2384,28 @@ void idPlayer::Spawn( void ) {
 	// The local player's retained gameplay documents load now, inside the
 	// level load, so their first use builds nothing.
 	PrecacheWeaponWheelGui();
+	PrecacheHudPresentation();
+}
+
+/*
+==============
+idPlayer::PrecacheHudPresentation
+
+The crosshair and hit marker the game draws itself (rvHudPrimitives) each draw
+through a retained view of the HUD artwork. A view built on its first draw held
+that frame, so the first hit of a level stalled. The local player builds the
+views as it spawns, inside the level load; they last until the next one.
+==============
+*/
+void idPlayer::PrecacheHudPresentation( void ) {
+	if ( gameLocal.localClientNum < 0 || entityNumber != gameLocal.localClientNum ) return;
+	if ( !cvarSystem->GetCVarBool( "ui_retained" ) ) return;
+	// The animated crosshair draws the hit marker itself.
+	if ( rvAnimatedCrosshair::Enabled() ) {
+		uiManager->PrecacheHudPrimitives( "native/crosshair" );
+	} else if ( hud_hitMarker.GetBool() ) {
+		uiManager->PrecacheHudPrimitives( "native/hit-marker" );
+	}
 }
 
 /*

@@ -1114,6 +1114,8 @@ private:
 #include "../game/gamesys/WeaponWheelState.h"
 #include "QuickChatState.h"
 #include "../game/gamesys/StatusBarState.h"
+	// the local player's crosshair, hit marker and damage number views, built as it spawns
+	void					PrecacheHudPresentation( void );
 
 	bool					tipUp;
 	bool					objectiveUp;
@@ -1165,6 +1167,10 @@ private:
 	int						spectatorFollowSpawnId;
  	int						lastTeleFX;
  	unsigned int			lastSnapshotSequence;	// track state hitches on clients
+	// openQ4: client only - the game time of the last snapshot read for this player, which
+	// says whether the spawn's knockback can still be read as the spawn's clock (Init()
+	// leaves it alone, as a respawn must keep it)
+	int						lastSnapshotTime;
  	
 	int						aimClientNum;			// player num in aim
 

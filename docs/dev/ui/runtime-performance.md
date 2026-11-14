@@ -1827,6 +1827,35 @@ and 6.9-8.1 s after on a shared machine, Q4DM1 1.4-1.9 s before and
 pause pages' loads inside the level fell from about 60 to 10 ms each with
 their parses prefetched.
 
+### The HUD artwork
+
+13 November 2026. The HUD artwork (`guis/hud/artwork.rui`, 8.4 MB) backs a
+view for every retained HUD: each stock HUD GUI the coverage bridge draws, and
+each source the game draws itself through `rvHudPrimitives`
+(`native/crosshair`, `native/hit-marker`, `native/damage-numbers`,
+`native/lagometer` and others). Each `idRetainedHud` read and parsed the file
+on its first draw, and the prefetch above never covered it. A diagnostic
+build timed the parse at 145-155 ms and the view at 45-50 ms. The first damage
+number of a match therefore held a frame for about 200 ms mid-fight. Online
+that froze the server's copy of the player's aim
+([MP-07 record](../mp-network-qualification.md#the-servers-aim-after-a-client-stall-13-november-2026)).
+
+- `idRetainedHud::Precache`, at each level load, drops the last level's
+  catalog and queues the artwork's parse on a worker. The first HUD to load
+  takes that parse, and every other HUD builds its view from it. The catalog
+  is the parse plus the coverage registry, and a HUD that keeps its view keeps
+  its reference.
+- The local player builds the views of the sources its settings show as it
+  spawns (`idPlayer::PrecacheHudPresentation` and
+  `idUserInterfaceManager::PrecacheHudPrimitives`), in both games.
+- `RETAINED_HUD_LOADED <source>` and a developer line with the time, and
+  whether the HUD took the worker's parse or shared it, log each view built.
+
+In multiplayer captures the crosshair's view now loads at the join in
+94-101 ms with the worker's parse. The damage numbers load in 48-60 ms and the
+cursor in 41-91 ms, sharing it. Nothing loads during play.
+`tools/tests/ui_hud_catalog_state.py` executes the catalog and the precache.
+
 ### The view build and the remaining validation
 
 15 October 2026, continued. With the parse and the validator faster, the

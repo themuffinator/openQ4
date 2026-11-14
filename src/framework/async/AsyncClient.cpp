@@ -76,6 +76,35 @@ static void AsyncClient_StopAfterMalformedSnapshot() {
 	session->Stop();
 }
 
+static idCVar net_clientSnapshotDropProbe( "net_clientSnapshotDropProbe", "0", CVAR_SYSTEM | CVAR_INTEGER | CVAR_CHEAT,
+	"development probe: discard every Nth snapshot, as the channel discards one that arrives after a later one, so a client "
+	"can be tested across single missed snapshots; 0 for none; requires cheats", 0, 64 );
+
+/*
+==================
+AsyncClient_DiscardSnapshotForProbe
+
+openQ4: under jitter the channel drops a snapshot that arrives after a later one, so a
+client routinely reads a snapshot across one it missed. This discards every Nth snapshot
+before any of it is read, as that loss does; the next snapshot's delta comes from the last
+one the client acknowledged, as after a real loss.
+==================
+*/
+static bool AsyncClient_DiscardSnapshotForProbe() {
+	static int snapshotsSinceDiscard = 0;
+	const int every = net_clientSnapshotDropProbe.GetInteger();
+	if ( every < 2 ) {
+		snapshotsSinceDiscard = 0;
+		return false;
+	}
+	if ( ++snapshotsSinceDiscard < every ) {
+		return false;
+	}
+	snapshotsSinceDiscard = 0;
+	common->Printf( "SNAPSHOT_DROP_PROBE discarded a snapshot\n" );
+	return true;
+}
+
 static ID_INLINE int AsyncClient_MaxPredictionMsec() {
 	return idMath::ClampInt( 0, ASYNC_CLIENT_MAX_PREDICTION_MSEC,
 		idAsyncNetwork::clientMaxPrediction.GetInteger() );
@@ -1460,6 +1489,9 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 				}
 				break;
 			}
+			if ( AsyncClient_DiscardSnapshotForProbe() ) {
+				break;
+			}
 
 			if ( msg.GetRemainingReadBits() < 32 + 32 + 32 + 8 + 16 ) {
 				common->Warning( "server sent a truncated snapshot header; disconnecting safely" );
@@ -1564,8 +1596,18 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			clientPrediction = idMath::ClampInt( configuredPredictionMsec, maximumPredictionMsec, clientPrediction );
 			delta = gameTime - ( snapshotGameTime + clientPrediction );
 			const int deltaStep = ( delta < 0 ) ? -1 : 1;
-			const std::int64_t adjustedPredictTime = static_cast<std::int64_t>( clientPredictTime ) -
+			// openQ4: the client predicts frames while gameTimeResidual + clientPredictTime covers the
+			// next one, so only their sum matters, and predicting leaves the residual at about
+			// -clientPredictTime. A resync, or a hitch UpdateTime clamps to 100 ms, moves gameTime
+			// past both, and the catch-up kept each such step as an offset: under latency every hitch
+			// over 100 ms left clientPredictTime that much higher. Once the clamp below held it at
+			// maximumPredictionMsec the client could no longer run ahead, and every command it sent
+			// reached the server late for good. The server repeated the last one, so its aim stood
+			// still, and after MAX_USERCMD_DUPLICATION repeats it dropped the attack. The residual
+			// now joins the catch-up, which then holds only the time this client still owes.
+			const std::int64_t adjustedPredictTime = static_cast<std::int64_t>( clientPredictTime ) + gameTimeResidual -
 				( delta / PREDICTION_FAST_ADJUST ) - deltaStep;
+			gameTimeResidual = 0;
 			clientPredictTime = adjustedPredictTime < -maximumPredictionMsec ? -maximumPredictionMsec :
 				( adjustedPredictTime > maximumPredictionMsec ? maximumPredictionMsec :
 					static_cast<int>( adjustedPredictTime ) );

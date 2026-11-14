@@ -17,7 +17,12 @@ public:
 	// A covered GUI is worth capturing: until its first attempt, and after one
 	// that loaded the artwork. A mod-owned GUI or a missing catalog never is.
 	bool Usable() const;
+	// A level load: drop the last level's artwork catalog and parse the next
+	// one on a worker, then precache the images the HUDs draw.
 	static void Precache();
+	// Build the view now, from the level's one parse of the artwork, so the
+	// first draw draws without loading. Draw does it on a first draw.
+	bool Prepare(const char* source);
 	// Takes the frame's captured primitives: it maps them in place.
 	bool Draw(const char* source, std::vector<openq4::ui::HudPrimitive>&& items);
 	void Reset();

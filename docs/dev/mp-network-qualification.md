@@ -1159,17 +1159,279 @@ Report SHA-256s: `evidence-loopback`
   client's raise for it came 160 ms late. It landed in the gaps while the
   connection started, with the knockback clock run out. Late means the client
   fires late, never shots the server does not fire.
-- **Open: aim after a join under latency.** In two of four runs at 80 ms ±20,
-  the server's aim drifted from the client's about a second into the burst
-  after the rejoin. In `r9-impaired-diag` it drifted 119°, with the server's
-  fire four frames behind, and snapshots had been lost there. In
-  `final-impaired` it drifted 56° over two shots, which still fell on the same
-  frames. `r10-impaired-diag` and `evidence-impaired` were clean, and no
-  respawn burst drifted. The weapon raise matched in every run, so the cause
-  lies elsewhere. A likely place is the view angles the server sets on its
-  first think after a spawn (`SetViewAngles( spawnAngles )` from whatever
-  command it has then). The harness reports the rejoin's directions under
-  simulated latency and holds them only without it.
+- **Aim after a join under latency (fixed the same day).** In two of four runs
+  at 80 ms ±20, the server's aim drifted from the client's about a second into
+  the burst after the rejoin: 119° in `r9-impaired-diag`, with the server's
+  fire four frames behind, and 56° over two shots in `final-impaired`. The
+  weapon raise matched in every run. The cause was not the join or the spawn
+  angles but the client's frame stalling at its first hit on a bot
+  ([the server's aim after a client stall](#the-servers-aim-after-a-client-stall-13-november-2026)).
+
+## The server's aim after a client stall, 13 November 2026
+
+The server's copy of a client's aim no longer drifts from the client's after
+the client's frame stalls. Two defects caused the drift seen after a join from
+spectating. The first stalled the frame; the second, in the client's
+prediction controller, made a stall worse, and enough stalls wedged the client
+for good.
+
+**The drift was a stall, not the join.** In both drifting runs
+(`r9-impaired-diag`, `final-impaired`) the burst hit a bot, and the client drew
+the session's first damage number then. The two clean runs hit nothing. Only
+the yaw drifted: the shots matched the server's in pitch exactly, and the
+server's yaw stood still while the client turned. That is the server repeating
+an old command. A client sends no commands while its frame stalls, so the
+server duplicated the last one it had. After `MAX_USERCMD_DUPLICATION` (25)
+repeats it released the attack, and its fire restarted 64 ms behind the
+client's for the rest of the burst. The respawn run `r2-loopback` shows the
+same freeze at its first hit on a bot, on loopback. Spawn angles would leave a
+lasting offset, but here the aims matched again once the stall ended.
+
+**What stalled.** Every retained HUD builds its view from
+`guis/hud/artwork.rui`, 8.4 MB of vector art: each stock HUD GUI, and each
+source the game draws itself (`native/crosshair`, `native/hit-marker`,
+`native/damage-numbers`). Each one read and parsed the file again on its first
+draw. Timed in a diagnostic build, the parse took 145-155 ms and the view
+45-50 ms, so a first draw cost about 200 ms. The first damage number of a match
+drew its first frame mid-fight.
+
+- `idRetainedHud` now keeps one catalog per level: the artwork's parse and the
+  coverage registry. A level load (`idRetainedHud::Precache`) drops the last
+  level's catalog and queues the artwork's parse on a worker. The first HUD
+  takes that parse, and every later HUD builds its view from it. A failure is
+  kept too, so each HUD reports it without reading the files again.
+- The local player builds its crosshair, hit marker and damage number views as
+  it spawns (`idPlayer::PrecacheHudPresentation`, through the new
+  `idUserInterfaceManager::PrecacheHudPrimitives`), only for those its
+  settings show. It does this in both games. The views last until the next
+  level load, through respawns and spectating.
+- `RETAINED_HUD_LOADED <source>` logs each view built, and a developer line
+  gives its time and whether it took the worker's parse or shared it.
+
+In the runs below the views loaded only at the join: the crosshair in 94-101 ms
+(taking the worker's parse), the damage numbers in 48-60 ms and the cursor in
+41-91 ms (sharing it). None loaded during a burst. The first damage number
+drew without loading.
+
+**A stall could wedge the client.** In a diagnostic run, two deliberate
+350 ms stalls (`com_presentationStallProbe`) in the machinegun sweep stopped
+the server firing for the rest of the run (`base-imp1`). `net_verbose 2` showed
+the controller pinned: `clientPrediction` and `clientPredictTime` at 1000,
+`gameTimeResidual` near -980, and every command arriving about 148 ms late.
+The client predicts frames while `gameTimeResidual + clientPredictTime` covers
+the next one. Only the sum matters, and predicting leaves the residual near
+`-clientPredictTime`. A stalled frame gets at most 100 ms
+(`idAsyncClient::UpdateTime( 100 )`), and resyncs move `gameTime`, so the
+catch-up kept each such step as an offset. Every hitch over 100 ms under
+latency left `clientPredictTime` that much higher. Once its clamp held it at
+`net_clientMaxPrediction`, the client could not run ahead of the server again.
+The residual now joins the catch-up at each snapshot, so `clientPredictTime`
+holds only the time the client still owes. Frame generation is unchanged:
+the sum is the same, and only the clamp can no longer be reached by drift.
+
+`mp_client_prediction_state.py` adds a loop with a client stall. The client's
+frame stalls 350 ms nine times at 0 ms and at 80 ms ±20, and 500 ms four times
+at 150 ms ±20. The loop models the 100 ms clamp, the snapshots read in one go
+after a stall, and the channel dropping reordered snapshots. A few seconds
+after the last hitch, every command must reach the server in time. The old
+controller fails both latency cases with 625 late frames of 625 and its
+catch-up at 1000. Two new controls (six in all) restore it and drop the
+residual's reset. The same model with random long frames under 100 ms gives
+identical late counts for both controllers, so steady-state margins are
+unchanged.
+
+**The harness.** `mp_firing_view_capture.py` holds every matched direction,
+the rejoin's included, with or without simulated latency. It gained a hitch
+step before the respawn: the shooter's frame stalls 350 ms once a second,
+nine times, then settles for three seconds. A frame-work trace counts the
+stalls. The respawn and rejoin bursts after it must still fall on the server's
+frames. A retained HUD view built inside a burst fails the run. Against the
+build before the fix (`control-old-imp`), every step before the hitches passed
+and neither later burst got a single server shot.
+
+`ui_hud_catalog_state.py` executes, spliced from production, the catalog,
+`idRetainedHud::Prepare`, the manager's precache and both games'
+`PrecacheHudPresentation` against a fake file system, worker and view
+builder. It checks one parse per level for every HUD, from a worker when there
+is one. A new level reads the artwork again while a kept view keeps its
+parse. Failures and mod-owned HUDs are covered, as is the 16-HUD cap and each
+game's sources. Its 20 single-reversal controls fail, the first restoring
+every HUD's own parse.
+
+The runs below used one staged build (`game-mp_x64.dll` SHA-256
+`11d4aed2373497ba34bdd5e7e5da28a454539922819efe2dd88a3d89dae83dd5`,
+`openQ4-client_x64.exe`
+`3fcb6e782f4b87eb2f9362335893b7a881a6ba3941faa088036e6f8122b886ce`) on OpenGL
+with `--predict-hitscan 1`. Their logs, reports and traces, and those of
+`base-imp1` and `control-old-imp`, are under `.tmp/mp07-aim/`; the captures
+were not kept.
+
+| Run | Server shots, same frame | Rejoin burst | Respawn burst | Hitches seen | Status |
+| --- | --- | --- | --- | --- | --- |
+| `fix-imp1`, 80 ms ±20, enhanced | 141 of 141 | 23 of 23, 0.0° | 31 of 31; last shot 11.5° | 9 | fail |
+| `fix-imp2`, 80 ms ±20, enhanced | 139 of 139 | 23 of 23, 0.0° | 30 of 30, 0.0° | 9 | pass |
+| `fix-imp3`, 80 ms ±20, enhanced | 134 of 155 | 24 of 24, 0.0° | 8 of 29: weapon caught up | 8 | fail |
+| `fix-imp4`, 80 ms ±20, enhanced | 137 of 137 | 23 of 23, 0.0° | 29 of 29, 0.0° | 9 | fail |
+| `fix-loop1`, loopback | 136 of 136 | 22 of 22, 0.0° | 29 of 29, 0.0° | 9 | pass |
+
+Report SHA-256s: `fix-imp1` `170e8ce6…`, `fix-imp2` `c0cbf03c…`, `fix-imp3`
+`f1a5e082…`, `fix-imp4` `b0bda8c4…`, `fix-loop1` `15d89b72…`.
+
+Every rejoin burst fell on the server's frames with the server's directions,
+and the client recovered from every hitch step. The three failures are older
+than this fix and remain open under MP-07:
+
+- **A respawn after a missed snapshot catches the weapon up** (`fix-imp3`).
+  Under 80 ms ±20 jitter reorders snapshots now and then, and the channel drops
+  the older one. The respawn snapshot followed such a gap (`hitch=1`), and the
+  weapon for a new life catches up only across a gap, by design. The burst then
+  ran out of step with the server's. Fixed the same day:
+  [a respawn read across a dropped snapshot](#a-respawn-read-across-a-dropped-snapshot-13-november-2026).
+- **A long client frame can still make one command late** (`fix-imp1`, one
+  shot at the end of the respawn burst; `fix-imp4`, two shots in the
+  machinegun sweep, before the hitch step). Nothing was loading. The
+  controller sets its lead from the typical arrival time of the client's
+  commands. A frame tens of milliseconds longer than usual can push a command
+  past its frame, and the server repeats the last one. The model above shows
+  the same late counts before and after this fix.
+
+The earlier respawn record's runs saw neither in four impaired runs, but
+three of those four failed elsewhere. Simulated latency does not give this
+harness a dependable pass yet; loopback does.
+
+## A respawn read across a dropped snapshot, 13 November 2026
+
+A client now raises its weapon for a new life with the server's when it reads
+the respawn across a dropped snapshot, as simulated jitter makes it do now and
+then. Before, a respawn read across any missed snapshot (`hitch=1`) caught
+the weapon straight up to ready while the server's was still raising. In
+`fix-imp3` only 8 of 29 server shots around the respawn fell on predicted
+frames, and the client predicted 26 shots after the respawn that the server
+never fired.
+
+**Why snapshots go missing under jitter.** `net_forceJitter 20` delays each
+datagram by a further 0-20 ms. The delay line gives every datagram read from
+the socket in one go the same offer time, and in foreground play a client
+drains its socket once a frame. Snapshots arrive 33 ms apart, so a client frame
+long enough to collect two of them gives the jitter roughly even odds of
+swapping them. The channel then discards the late one (`out of order
+packet`), and the next snapshot reads as a state hitch.
+`mp_firing_view_capture.py` now logs every loss on the shooter
+(`net_channelShowDrop 1`) and the delay line's counts (`netImpairment`). In
+the runs below, all at 80 ms ±20:
+
+| Run | Play | Losses in play | Per minute | Snapshots read after one | Hitch step | Connect and join |
+| --- | --- | --- | --- | --- | --- | --- |
+| `probe-imp2` | 70 s | 19, all single | 16 | 0.9% | 18, longest 9 | 17, longest 6 |
+| `probe-imp3` | 70 s | 15, all single | 13 | 0.7% | 19, longest 10 | 19, longest 6 |
+| `probe-imp4` | 70 s | 14, all single | 12 | 0.7% | 15, longest 11 | 19, longest 6 |
+| `nat-imp1` | 69 s | 12, all single | 10 | 0.6% | 18, longest 11 | 21, longest 6 |
+| `nat-imp2` | 69 s | 9, all single | 8 | 0.4% | 18, longest 10 | 18, longest 6 |
+| `control-imp1` | 70 s | 7, all single | 6 | 0.3% | 14, longest 9 | 18, longest 6 |
+| `v1-imp1`, other sessions building and capturing | 71 s | 35, 33 single | 30 | 1.7% | 19, longest 8 | 26, longest 10 |
+| `probe-imp1`, machine under load | 78 s | 223, 150 single | 172 | 9.6% | 50, longest 14 | 83, longest 38 |
+
+"Play" is the measured steps without the hitch step. On a quiet machine every
+loss in play was a single packet, 6-16 a minute: 0.3-0.9% of snapshots are
+read across one. The respawn snapshot or the one after it (both mattered,
+below) follows one about one or two times in a hundred. Anything that
+lengthens the client's frames makes that more likely: with other sessions
+building and capturing it was 1.7%, and on a busy machine nearly one
+snapshot in ten. Of the nine judged lives in the four earlier impaired runs
+(`fix-imp1` to `fix-imp4`), one was read across a drop: `fix-imp3`'s respawn.
+Each of the hitch step's 350 ms stalls collects about a dozen packets at once,
+and the step lost up to eleven in a row. The connect and join lose several in a row too, while the
+level loads.
+
+**The fix** (`src/mpgame/Player.cpp`):
+
+- The spawn's knockback places the server's raise across a hitch too, when it
+  must still be the spawn's clock. The spawn fell after the last snapshot read
+  for the player, and `SetKnockBack` refuses a knockback while another runs.
+  So if that snapshot is at most 96 ms old (`spawnClockSpan`: the frames the
+  100 ms knockback lasts) and the knockback reads as the clock, it is the
+  spawn's. One dropped snapshot always falls inside that span: two snapshot
+  intervals are 64-96 ms. A longer loss, a knockback that does not read as the
+  clock, or a snapshot without the server's weapon still catches up, and so
+  does a snapshot older than the last one read (a demo seeking back). The
+  player records the game time of each snapshot it reads
+  (`lastSnapshotTime`), which `Init()` leaves alone.
+- The respawn's `Init()` clears `idealWeapon`, so the next snapshot names the
+  weapon again. Read across a dropped snapshot, that change asked for a
+  catch-up as if it were a weapon swap the client had missed, and the
+  catch-up beat the raise time. A weapon change read while a new life's raise
+  time still waits for its weapon no longer asks for one. This also caught the
+  weapon up when the respawn itself arrived cleanly and the snapshot after it
+  was the one dropped. The first probe run found it (`v1-probe-imp1`): the
+  respawn's raise was placed exactly, and the next snapshot caught it up.
+- The client's `MP_WEAPON respawn` and `MP_WEAPON entities` lines now give the
+  snapshots missed (`missed=`) and the game time since the last one read
+  (`age=`).
+
+**A probe that makes it certain.** Jitter puts a respawn behind a dropped
+snapshot only now and then. `net_clientSnapshotDropProbe N` (a development
+probe that requires cheats) discards every Nth snapshot before any of it is
+read, as the channel discards a late one. The next snapshot's delta comes from
+the last one the client acknowledged, as after a real loss.
+`mp_firing_view_capture.py --drop-respawn-snapshot` discards every other
+snapshot from 1.5 s to 3.8 s after the shooter's death. The respawn, and the
+snapshot after it, are then each read across one dropped snapshot, wherever
+the respawn falls. The run fails unless the respawn was read with `missed=1`.
+
+**Tests.** `MpRespawnWeaponRaiseFixture.cpp` adds the respawn read across one
+dropped snapshot over short and long intervals and at the edge of the clock's
+span. It also covers longer losses, a clock that does not read, no server
+weapon, a snapshot older than the last one read, new weapon entities across a
+drop, and a snapshot dropped right after the respawn's. The respawn's sequence
+latch through `Init()` is checked directly: the snapshot after a respawn must
+not read as a hitch. `mp_predicted_hitscan_state.py` now fails 42
+single-reversal controls. The new ones restore the old rule (any hitch catches
+up), let the clock span any loss or read an older snapshot, move its span a
+frame either way, read the clock without the server's weapon, keep a weapon
+change's catch-up for new entities across a drop, and drop the raise-time test
+from the weapon-change block.
+
+The runs used one staged build (`game-mp_x64.dll` SHA-256
+`d6472846dd19c9222135070f43cdad3ef0469ea82aac7f6df01bad1ee13fcc87`,
+`openQ4-client_x64.exe`
+`847963db91333507fad1602ca5a3cf8368c6b1ae1dddf64b30e43ac1377225ff`) on OpenGL
+with `--enhanced --predict-hitscan 1` at 80 ms ±20. The control swapped in a
+game module built with the old rule restored in `Player.cpp` (any hitch
+catches up, and so does a weapon change across one); its SHA-256 is
+`63198ccc12a1140ae98ef109174b6d2e65f53b88c15148949efa9d51adc0922f`.
+
+| Run | Respawn read | New life's raise | Respawn burst, same frame | Rejoin burst | All server shots | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `probe-imp2` | 1 dropped, 64 ms | 91312-92021, both sides | 33 of 33, 0.0° | 22 of 22, 0.0° | 139 of 139 | pass |
+| `probe-imp3` | 1 dropped, 80 ms | 89616-90325, both sides | 33 of 33, 0.0° | 22 of 22, 0.0° | 139 of 139 | pass |
+| `probe-imp4` | 1 dropped, 64 ms | 89136-89845, both sides | 34 of 34, 0.0° | 22 of 22, 0.0° | 140 of 140 | pass |
+| `nat-imp1` | clean, 48 ms | 89136-89845, both sides | 29 of 29, 0.0° | 22 of 22, 0.0° | 136 of 136 | pass |
+| `nat-imp2` | clean, 32 ms | 89040-89749, both sides | 29 of 29, 0.0° | 22 of 22, 0.0° | 135 of 135 | pass |
+| `probe-imp1`, machine under load | 1 dropped, 80 ms | 140368-141077, both sides | 30 of 41: stale commands | 11 of 22: stale commands | 129 of 151 | fail |
+| `control-imp1`, old rule | 1 dropped, 64 ms | caught up; server 88992-89701 | 9 of 34; 26 shots never fired | 22 of 22, 0.0° | 115 of 140 | fail |
+
+Report SHA-256s: `probe-imp2` `d2c3d98b…`, `probe-imp3` `3490b19a…`,
+`probe-imp4` `89fefaac…`, `nat-imp1` `0f0054c4…`, `nat-imp2` `90528aab…`,
+`probe-imp1` `70cf7a4a…`, `control-imp1` `4491e222…`.
+
+On a quiet machine every respawn burst fell on the server's frames with the
+server's directions, whether the respawn was read across a dropped snapshot or
+not, and every new life's raise matched the server's frame for frame. The
+control, with the old rule and the same probe, fails as `fix-imp3` did. The
+loaded run raised its weapon exactly too. Its misses in both bursts are stale
+commands: the server's yaw stood still while the pitch matched, and after 25
+repeats its fire fell out of phase. That is the long client frame problem,
+still open under MP-07, made worse by a machine that also ran another
+session's renderer captures (356 channel losses, runs of up to nine).
+
+Two runs on the first build (`v1-*`) came before the weapon-change fix. In
+`v1-probe-imp1` the respawn's raise was placed exactly across the dropped
+snapshot, and the next snapshot, also read across one, caught it up (8 of 33
+on the frame). In `v1-imp1`, without the probe, the respawn arrived cleanly
+and its burst matched (30 of 30), but one shot had a stale yaw (26.8°).
+
+Logs and reports, for these runs and the `v1-*` ones, are under
+`.tmp/mp07-reorder/` in the main checkout; the captures were not kept.
 
 ## Remote weapon play and live spectator follows, 5 November 2026
 

@@ -346,6 +346,9 @@ public:
 	bool DrawHudPrimitives(const char* source, const idList<uiHudPrimitive_t>& items) override;
 	void BuildHudText(const char* text, float scale, float width, float height,
 		idList<uiHudPrimitive_t>& output) override;
+	void PrecacheHudPrimitives(const char* source) override;
+	// The generated HUD for a source, made on first use; null once 16 exist.
+	idRetainedHud* GeneratedHud(const char* source);
 	void ClearHudPrimitives();
 	idList<idRetainedHud*> generatedHuds;
 	idStrList generatedHudNames;
