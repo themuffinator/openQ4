@@ -541,7 +541,23 @@ inline float PlaneSeparation( const float *vertices, int count, const Vec3 &norm
 // used. A plane alone is not enough: for a long body resting on a curved or
 // faceted surface the lowest vertex overall can belong to a different contact.
 inline float SweptContactSeparation( const float *vertices, int count, const Vec3 &normal, const Vec3 &point,
-									const Vec3 &sweepDir, float reach ) {
+									const Vec3 &sweepDir, float reach, Vec3 *pointNow = nullptr );
+
+// A swept contact moved to where the body is now. The sweep reports the point
+// where the moving body meets the surface, which for a fast body lies far ahead
+// of it (a 1600 units/s ragdoll limb's sweep reaches 27 units). A constraint
+// row applied there has the wrong lever arm: it couples into rotation and its
+// friction brakes motion the body never had. The row belongs at the foot, on
+// the surface, of the body vertex that made the contact.
+inline Vec3 ContactPointNow( const float *vertices, int count, const Vec3 &normal, const Vec3 &point,
+							const Vec3 &sweepDir, float reach, float &separation ) {
+	Vec3 now = point;
+	separation = SweptContactSeparation( vertices, count, normal, point, sweepDir, reach, &now );
+	return now;
+}
+
+inline float SweptContactSeparation( const float *vertices, int count, const Vec3 &normal, const Vec3 &point,
+									const Vec3 &sweepDir, float reach, Vec3 *pointNow ) {
 	if ( count <= 0 ) {
 		return 0.0f;
 	}
@@ -560,22 +576,31 @@ inline float SweptContactSeparation( const float *vertices, int count, const Vec
 			best = i;
 		}
 	}
-	const float edgeTolerance = MaxF( 1.0f, 0.1f * reach );
-	if ( best >= 0 && bestError <= edgeTolerance * edgeTolerance ) {
-		return normal.Dot( Vec3( vertices + best * 3 ) ) - planeDist;
+	if ( best < 0 ) {
+		const float separation = PlaneSeparation( vertices, count, normal, point );
+		if ( pointNow ) {
+			*pointNow = point;
+		}
+		return separation;
 	}
-	// fallback: the lowest vertex near the contact point
-	float lowest = 1e30f;
-	for ( int i = 0; i < count; i++ ) {
-		const Vec3 v( vertices + i * 3 );
-		if ( ( v - point ).LengthSqr() <= reach * reach ) {
-			lowest = MinF( lowest, normal.Dot( v ) - planeDist );
+	const Vec3 vertex( vertices + best * 3 );
+	float separation = normal.Dot( vertex ) - planeDist;
+	const float edgeTolerance = MaxF( 1.0f, 0.1f * reach );
+	if ( bestError > edgeTolerance * edgeTolerance ) {
+		// an edge or face contact: its point lies between vertices near the
+		// line, so take the lowest of those (conservative: a smaller gap)
+		const float edgeReach = MaxF( edgeTolerance, std::sqrt( bestError ) * 2.0f );
+		for ( int i = 0; i < count; i++ ) {
+			const Vec3 v( vertices + i * 3 );
+			if ( ( v - vertex ).LengthSqr() <= edgeReach * edgeReach ) {
+				separation = MinF( separation, normal.Dot( v ) - planeDist );
+			}
 		}
 	}
-	if ( lowest < 1e29f ) {
-		return lowest;
+	if ( pointNow ) {
+		*pointNow = vertex - normal * ( normal.Dot( vertex ) - planeDist );		// the vertex's foot on the surface
 	}
-	return PlaneSeparation( vertices, count, normal, point );
+	return separation;
 }
 
 // Index of the vertex lowest above a plane (normal, point on it), or -1.
@@ -657,6 +682,51 @@ inline float EnergyScale( float energy, float allowed ) {
 		return 0.0f;
 	}
 	return std::sqrt( allowed / energy );
+}
+
+// The energy guard for a body set that moves together (an articulated figure).
+// Scaling every velocity uniformly would also scale the centre-of-mass motion,
+// which no internal force can change: a splashed corpse lost most of its
+// momentum that way. Excess energy is taken from the motion relative to the
+// centre of mass first; only an excess larger than that relative energy also
+// scales the shared motion. energy is the set's kinetic energy, comEnergy the
+// part carried by its centre of mass (0.5 M V^2). relativeScale multiplies
+// every body's velocity relative to V (and its angular velocity); comScale
+// multiplies V itself.
+struct energySplit_t {
+	float	relativeScale;
+	float	comScale;
+};
+
+inline energySplit_t EnergyScaleKeepingMomentum( float energy, float comEnergy, float allowed ) {
+	energySplit_t split;
+	split.relativeScale = 1.0f;
+	split.comScale = 1.0f;
+	if ( !( energy > allowed ) || energy <= 0.0f ) {
+		return split;
+	}
+	comEnergy = MinF( MaxF( comEnergy, 0.0f ), energy );
+	const float relative = energy - comEnergy;
+	if ( allowed >= comEnergy && relative > 0.0f ) {
+		split.relativeScale = std::sqrt( MaxF( 0.0f, allowed - comEnergy ) / relative );
+		return split;
+	}
+	// even the shared motion exceeds the allowance: remove the relative motion
+	// and scale what remains
+	split.relativeScale = 0.0f;
+	split.comScale = ( allowed > 0.0f && comEnergy > 0.0f ) ? std::sqrt( allowed / comEnergy ) : 0.0f;
+	return split;
+}
+
+// The friction a contact may apply during an impact. Legacy figures resolve a
+// fast touch without friction (the collision impulse and the closing-velocity
+// projection are both normal-only); Coulomb friction on an impact-sized normal
+// force instead stops a ragdoll thrown along a slope dead within one step.
+// During an impact the friction rows are therefore bounded by the friction
+// coefficient times the body's share of its resting load on that surface,
+// which is what friction does once the body slides.
+inline float ImpactFrictionLoad( float mass, float gravity, float normalDotUp ) {
+	return mass * gravity * MaxF( 0.0f, normalDotUp );
 }
 
 // ---------------------------------------------------------------------------

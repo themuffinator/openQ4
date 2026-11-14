@@ -4833,6 +4833,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "listEntities",			Cmd_EntityList_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"lists game entities" );
 	cmdSystem->AddCommand( "physicsStats",			Cmd_PhysicsStats_f,			CMD_FL_GAME,				"records per-frame physics CPU time: start [label] | stop | report" );
 	cmdSystem->AddCommand( "physicsDigest",			Cmd_PhysicsDigest_f,		CMD_FL_GAME,				"prints a hash of all rigid body and articulated figure states [verbose]" );
+	cmdSystem->AddCommand( "physicsReport",			Cmd_PhysicsReport_f,		CMD_FL_GAME,				"prints mass, centre, momentum and peak speed of entities by name prefix" );
 	cmdSystem->AddCommand( "physicsSpawn",			Cmd_PhysicsSpawn_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"spawns physics workload entities around the player" );
 	cmdSystem->AddCommand( "physicsRadiusDamage",	Cmd_PhysicsRadiusDamage_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"radius damage and push ahead of the player" );
 	cmdSystem->AddCommand( "physicsImpulse",		Cmd_PhysicsImpulse_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"applies an impulse to an entity" );

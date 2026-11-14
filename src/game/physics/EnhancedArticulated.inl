@@ -127,11 +127,19 @@ bool idPhysics_AF::EvaluateContactsEnhanced( float timeStep ) {
 				}
 			}
 			if ( k >= contacts.Num() && numBodyContacts < 3 ) {
-				contacts.Append( contactInfo[j] );
+				// the row goes where the body is now, not where the sweep met the surface
+				contactInfo_t info = contactInfo[j];
+				float separation = 0.0f;
+				if ( numVertices ) {
+					const OpenQ4Physics::Vec3 now = OpenQ4Physics::ContactPointNow( vertices, numVertices,
+						OpenQ4Physics::Vec3( info.normal.ToFloatPtr() ), OpenQ4Physics::Vec3( info.point.ToFloatPtr() ),
+						OpenQ4Physics::Vec3( dir.SubVec3( 0 ).ToFloatPtr() ), reach, separation );
+					info.point.Set( now.x, now.y, now.z );
+					info.dist = info.normal * info.point;
+				}
+				contacts.Append( info );
 				contactBodies.Append( i );
-				enhancedSeparation.Append( numVertices ? OpenQ4Physics::SweptContactSeparation( vertices, numVertices,
-						OpenQ4Physics::Vec3( contactInfo[j].normal.ToFloatPtr() ), OpenQ4Physics::Vec3( contactInfo[j].point.ToFloatPtr() ),
-						OpenQ4Physics::Vec3( dir.SubVec3( 0 ).ToFloatPtr() ), reach ) : 0.0f );
+				enhancedSeparation.Append( separation );
 				enhancedContactAge.Append( 0 );
 			}
 		}
@@ -192,9 +200,11 @@ bool idPhysics_AF::EvaluateContactsEnhanced( float timeStep ) {
 idPhysics_AF::SetupContactConstraintsEnhanced
 
   Legacy setup, then each contact's right-hand side becomes speculative: a gap
-  may close within the step but not past the slop, and a new touch above the
-  bounce threshold bounces by the body's bouncyness. (Legacy wrote the bounce
-  with the opposite sign, which let a bouncy body keep closing instead.)
+  may close within the step but not past the slop. Legacy wrote the bounce
+  with the opposite sign, so stock figures never bounced and were tuned that
+  way; a figure thrown at a wall bouncing back by its bouncyness travelled a
+  third as far as legacy's sliding one. The enhanced step therefore does not
+  bounce figures either unless af_enhancedBounce is set.
 ================
 */
 void idPhysics_AF::SetupContactConstraintsEnhanced( float timeStep ) {
@@ -204,6 +214,7 @@ void idPhysics_AF::SetupContactConstraintsEnhanced( float timeStep ) {
 	const float slop = af_enhancedSlop.GetFloat();
 	const float bounceThreshold = Max( 2.0f * SUSPEND_LINEAR_VELOCITY, 2.0f * gravityVector.Length() * timeStep );
 
+	enhancedImpact.SetNum( contactConstraints.Num(), false );
 	for ( int i = 0; i < contactConstraints.Num(); i++ ) {
 		idAFConstraint_Contact *cc = contactConstraints[i];
 		idAFConstraint *c = cc;
@@ -245,7 +256,8 @@ void idPhysics_AF::SetupContactConstraintsEnhanced( float timeStep ) {
 
 		const float bouncyness = c->body1->GetBouncyness();
 		const bool impact = vel < -bounceThreshold && separation + vel * timeStep <= slop;
-		if ( impact && !matched && enhancedContactAge[i] == 0 && bouncyness > 0.0f ) {
+		enhancedImpact[i] = impact;
+		if ( impact && !matched && enhancedContactAge[i] == 0 && bouncyness > 0.0f && af_enhancedBounce.GetBool() ) {
 			c->c1[0] = bouncyness * vel;					// J v >= -e vel
 		} else if ( separation > slop ) {
 			c->c1[0] = ( separation - slop ) * invTimeStep;	// J v >= -(gap - slop) / dt
@@ -382,6 +394,7 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 	const float maxRecovery = af_enhancedMaxRecovery.GetFloat();
 	const float warmStart = af_enhancedWarmStart.GetFloat();
 	const int previousFrame = gameLocal.framenum - 1;
+	const bool impactFriction = af_enhancedImpactFriction.GetBool();
 
 	for ( k = 0, i = 0; i < auxiliaryConstraints.Num(); i++ ) {
 		constraint = auxiliaryConstraints[i];
@@ -433,6 +446,22 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 					gameLocal.Error( "cannot reference primary constraints for the box index" );
 				}
 				boxIndex[k] = constraint->boxConstraint->firstIndex + constraint->boxIndex[j];
+				// a fast new touch: friction bounded by the resting load, not by the
+				// impact force (legacy resolves impacts without friction)
+				if ( impactFriction && constraint->boxConstraint->GetType() == CONSTRAINT_CONTACT ) {
+					for ( int c = 0; c < contactConstraints.Num() && c < enhancedImpact.Num(); c++ ) {
+						if ( contactConstraints[c] == constraint->boxConstraint ) {
+							if ( enhancedImpact[c] ) {
+								const idVec3 &normal = contactConstraints[c]->GetContact().normal;
+								const float load = OpenQ4Physics::ImpactFrictionLoad( constraint->body1->mass, gravityVector.Length(), -( normal * gravityNormal ) );
+								lo[k] = constraint->lo[j] * load;
+								hi[k] = constraint->hi[j] * load;
+								boxIndex[k] = -1;
+							}
+							break;
+						}
+					}
+				}
 			} else {
 				boxIndex[k] = -1;
 			}
@@ -589,15 +618,34 @@ void idPhysics_AF::EvolveEnhanced( float timeStep, float energyBefore ) {
 		}
 	}
 
-	// energy guard: constraint and contact resolution may not add kinetic energy
+	// energy guard: constraint and contact resolution may not add kinetic energy.
+	// The excess comes out of the motion relative to the centre of mass first,
+	// which internal forces can change, so the figure keeps its momentum.
 	{
 		const float energyAfter = EnhancedKineticEnergy( true );
-		const float scale = OpenQ4Physics::EnergyScale( energyAfter, energyBefore + work + 1e-3f * ( energyBefore + 1.0f ) );
-		if ( scale < 1.0f ) {
+		const float allowed = energyBefore + work + 1e-3f * ( energyBefore + 1.0f );
+		if ( energyAfter > allowed ) {
+			float totalMass = 0.0f;
+			idVec3 momentum = vec3_origin;
 			for ( int i = 0; i < bodies.Num(); i++ ) {
-				bodies[i]->next->spatialVelocity *= scale;
+				totalMass += bodies[i]->mass;
+				momentum += bodies[i]->mass * bodies[i]->next->spatialVelocity.SubVec3( 0 );
 			}
-			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_ENERGY_CLAMPS );
+			const idVec3 comVelocity = totalMass > 0.0f ? momentum / totalMass : vec3_origin;
+			const float comEnergy = 0.5f * totalMass * comVelocity.LengthSqr();
+			const OpenQ4Physics::energySplit_t split = OpenQ4Physics::EnergyScaleKeepingMomentum( energyAfter, comEnergy, allowed );
+			if ( af_enhancedDebug.GetInteger() & 1 ) {
+				gameLocal.Printf( "AF_ENERGY %s before=%.0f work=%.0f after=%.0f com=%.0f relative=%.3f shared=%.3f\n", self ? self->name.c_str() : "?",
+					energyBefore, work, energyAfter, comEnergy, split.relativeScale, split.comScale );
+			}
+			if ( !( af_enhancedDebug.GetInteger() & 2 ) ) {
+				for ( int i = 0; i < bodies.Num(); i++ ) {
+					idVec6 &v = bodies[i]->next->spatialVelocity;
+					v.SubVec3( 0 ) = split.comScale * comVelocity + split.relativeScale * ( v.SubVec3( 0 ) - comVelocity );
+					v.SubVec3( 1 ) *= split.relativeScale;
+				}
+				OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_ENERGY_CLAMPS );
+			}
 		}
 	}
 
@@ -699,6 +747,14 @@ void idPhysics_AF::CacheEnhancedContacts( void ) {
 			}
 		}
 		enhancedCache.Append( cached );
+		if ( af_enhancedDebug.GetInteger() & 8 ) {
+			float pre = c->J1.SubVec6( 0 ) * c->body1->current->spatialVelocity;
+			float post = c->J1.SubVec6( 0 ) * c->body1->next->spatialVelocity;
+			gameLocal.Printf( "AF_CONTACT %s imp=%d f=%d b=%d ent=%d n=(%.2f %.2f %.2f) sep=%.2f age=%d pre=%.0f post=%.0f lm=%.0f fr=(%.0f %.0f) v=(%.0f %.0f %.0f)\n",
+				self ? self->name.c_str() : "?", i < enhancedImpact.Num() && enhancedImpact[i] ? 1 : 0, gameLocal.framenum, contactBodies[i], contacts[i].entityNum, contacts[i].normal.x, contacts[i].normal.y, contacts[i].normal.z,
+				i < enhancedSeparation.Num() ? enhancedSeparation[i] : 0.0f, cached.age, pre, post, cached.impulse[0], cached.impulse[1], cached.impulse[2],
+				c->body1->current->spatialVelocity.SubVec3( 0 ).x, c->body1->current->spatialVelocity.SubVec3( 0 ).y, c->body1->current->spatialVelocity.SubVec3( 0 ).z );
+		}
 	}
 }
 

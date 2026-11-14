@@ -232,8 +232,11 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 		} else if ( ages[i] > 0 ) {
 			c.separation = OpenQ4Physics::PlaneSeparation( vertices, numVertices, c.normal, c.point );	// renewed: measured at its own vertex
 		} else {
-			c.separation = OpenQ4Physics::SweptContactSeparation( vertices, numVertices, c.normal, c.point,
-								OpenQ4Physics::Vec3( dir.SubVec3( 0 ).ToFloatPtr() ), clipModel->GetBounds().GetRadius() );
+			// the row goes where the body is now, not where the sweep met the surface
+			c.point = OpenQ4Physics::ContactPointNow( vertices, numVertices, c.normal, c.point,
+								OpenQ4Physics::Vec3( dir.SubVec3( 0 ).ToFloatPtr() ), clipModel->GetBounds().GetRadius(), c.separation );
+			infos[i].point.Set( c.point.x, c.point.y, c.point.z );
+			infos[i].dist = infos[i].normal * infos[i].point;
 		}
 		idEntity *other = gameLocal.entities[infos[i].entityNum];
 		if ( other && other != gameLocal.world ) {

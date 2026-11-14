@@ -114,6 +114,30 @@ WORKLOADS: dict[str, dict] = {
             "physicsStats stop",
         ],
     },
+    # Visual check: corpses and debris photographed at fixed moments after death
+    # and after an explosion, in each mode, for a side-by-side review.
+    "sp-visual": {
+        "map": "game/airdefense1",
+        "steps": [
+            "god", "notarget", "killMonsters", "g_showHud 0", "@wait 30",
+            "physicsStats start sp_visual",
+            "physicsSpawn monster_strogg_marine 3 line 96 16 40",
+            "physicsSpawn moveable_crate1_small 4 grid 120 8 48",
+            "@wait 90",
+            "physicsDamage phys_0 damage_machinegun 20",
+            "physicsDamage phys_1 damage_rocketSplash 4",
+            "physicsDamage phys_2 damage_gauntlet 4",
+            "@wait 12", "screenshot \"screenshots/physics_death_0200ms.tga\"",
+            "@wait 48", "screenshot \"screenshots/physics_death_1000ms.tga\"",
+            "@wait 240", "screenshot \"screenshots/physics_death_5000ms.tga\"",
+            "physicsRadiusDamage damage_rocketSplash 140 16",
+            "@wait 12", "screenshot \"screenshots/physics_blast_0200ms.tga\"",
+            "@wait 108", "screenshot \"screenshots/physics_blast_2000ms.tga\"",
+            "@wait 300", "screenshot \"screenshots/physics_blast_7000ms.tga\"",
+            "@digest",
+            "physicsStats stop",
+        ],
+    },
     # Stacks on a flat hangar floor: they must stand still after the nudge.
     "sp-flatstacks": {
         "map": "game/hangar1",
@@ -196,9 +220,42 @@ def build_cfg(workload: dict, verbose_digest: bool = False) -> list[str]:
     return lines
 
 
-def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int) -> dict:
+def free_commit_gb() -> float | None:
+    """Free commit charge (page file included), or None off Windows."""
+    if os.name != "nt":
+        return None
+    import ctypes
+
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong), ("totalPhys", ctypes.c_ulonglong),
+                    ("availPhys", ctypes.c_ulonglong), ("totalPageFile", ctypes.c_ulonglong),
+                    ("availPageFile", ctypes.c_ulonglong), ("totalVirtual", ctypes.c_ulonglong),
+                    ("availVirtual", ctypes.c_ulonglong), ("availExtended", ctypes.c_ulonglong)]
+    status = MemoryStatus()
+    status.length = ctypes.sizeof(MemoryStatus)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+        return None
+    return status.availPageFile / (1024 ** 3)
+
+
+def wait_for_memory(minimum_gb: float, limit_seconds: float = 900.0) -> None:
+    """The machine is shared: a map load near the commit limit dies with FATAL: Out of memory."""
+    started = time.monotonic()
+    while True:
+        free = free_commit_gb()
+        if free is None or free >= minimum_gb or time.monotonic() - started > limit_seconds:
+            return
+        time.sleep(10)
+
+
+def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int, attempt: int = 0,
+                 save_root: Path | None = None) -> dict:
+    """Run one workload. save_root lets several runs share a profile (save in one, load in another)."""
+    wait_for_memory(getattr(args, "min_free_gb", 5.0))
     workload = WORKLOADS[name]
-    save_root = task_path(args.save_root) / f"{name}-{mode}-{run_index}{'-' + args.map.replace('/', '_') if args.map else ''}"
+    if save_root is None:
+        save_root = task_path(args.save_root) / f"{name}-{mode}-{run_index}{'-' + args.map.replace('/', '_') if args.map else ''}"
+    save_root = task_path(save_root)
     game_root = save_root / "baseoq4"
     game_root.mkdir(parents=True, exist_ok=True)
     cfg_name = "physics_workload.cfg"
@@ -221,7 +278,8 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int)
         "r_renderApi": args.renderer,
     }
     multiplayer = workload.get("multiplayer", False)
-    if multiplayer:
+    client = workload.get("client", False)		# joins a server or plays a demo: multiplayer settings, no server
+    if multiplayer or client:
         # loopback-only listen server: no firewall prompt, no LAN exposure
         settings.update({
             "com_gameMode": "MP", "fs_game": "baseoq4", "net_serverDedicated": "0", "net_LANServer": "1",
@@ -234,6 +292,8 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int)
         })
     else:
         settings["si_gameType"] = "singleplayer"
+    if workload.get("dedicated"):
+        settings["net_serverDedicated"] = "1"
     if args.retail:
         settings["fs_basepath"] = str(args.retail.resolve(strict=True))
     settings["win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances"] = "1"
@@ -243,7 +303,10 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int)
     for extra in args.set or []:
         key, _, value = extra.partition("=")
         command += ["+set", key, value]
-    command += ["+spawnServer" if multiplayer else "+map", args.map or workload["map"]]
+    if workload.get("startup"):
+        command += list(workload["startup"])		# e.g. +connect, +playMVD, or +map then a loadGame in the cfg
+    else:
+        command += ["+spawnServer" if multiplayer else "+map", args.map or workload["map"]]
     options: dict = {}
     if os.name == "nt":
         startup = subprocess.STARTUPINFO()
@@ -262,6 +325,10 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int)
             process.wait()
             code = "timeout"
     log = log_path.read_text(encoding="latin-1") if log_path.exists() else ""
+    if "FATAL: Out of memory" in log and attempt == 0:
+        # another process held the commit charge: wait for room and run once more
+        time.sleep(30)
+        return run_workload(args, name, mode, run_index, attempt + 1, save_root)
     stats = [json.loads(m.group(1)) for m in STATS.finditer(log)]
     digests = [{"time": int(m.group(1)), "mode": m.group(2), "bodies": int(m.group(3)),
                 "hash": m.group(4), "all": m.group(5), "workload": m.group(6),
@@ -278,8 +345,12 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int)
         "skipped_spawns": len(re.findall(r"^PHYSICS_SPAWN_SKIPPED ", log, re.M)),
         "log": str(log_path),
     }
-    result["passed"] = bool(code == 0 and result["done"] and not errors and result["stats"]
-                            and result["latched_mode"] == mode)
+    latched_modes = re.findall(r"^physics: (\w+) simulation", log, re.M)
+    result["latched_modes"] = latched_modes
+    expected_mode = workload.get("expect_mode", mode)
+    result["passed"] = bool(code == 0 and result["done"] and not errors
+                            and (result["stats"] or not workload.get("needs_stats", True))
+                            and latched_modes and latched_modes[-1] == expected_mode)
     s = result["stats"] or {}
     all_ms = s.get("all", {})
     print(f"{name} {mode} #{run_index}: {'PASS' if result['passed'] else 'FAIL'} "
@@ -321,6 +392,7 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--port", type=int, default=28977, help="loopback port for multiplayer workloads")
     parser.add_argument("--map", help="run the workloads on this map instead of their own (probing)")
+    parser.add_argument("--min-free-gb", type=float, default=5.0, help="wait for this much free commit before a launch")
     parser.add_argument("--set", action="append", help="extra cvar KEY=VALUE for every run")
     parser.add_argument("--verbose-digest", action="store_true", help="also print per-entity digests")
     parser.add_argument("--output", type=Path, help="write the JSON results here (under .tmp)")

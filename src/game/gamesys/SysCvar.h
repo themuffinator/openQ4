@@ -238,8 +238,11 @@ extern idCVar	af_enhancedSleepSpeed;
 extern idCVar	af_enhancedSleepAngularSpeed;
 extern idCVar	af_enhancedSleepFrames;
 extern idCVar	af_enhancedImpulseGuard;
+extern idCVar	af_enhancedImpactFriction;
+extern idCVar	af_enhancedBounce;
 extern idCVar	af_enhancedInheritTime;
 extern idCVar	af_enhancedMaxInheritSpeed;
+extern idCVar	af_enhancedDebug;
 
 extern idCVar	rb_showTimings;
 extern idCVar	rb_showBodies;

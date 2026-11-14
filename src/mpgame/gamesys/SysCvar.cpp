@@ -509,8 +509,11 @@ idCVar af_enhancedSleepSpeed(		"af_enhancedSleepSpeed",	"4",			CVAR_GAME | CVAR_
 idCVar af_enhancedSleepAngularSpeed("af_enhancedSleepAngularSpeed","0.2",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: angular speed below which every body of a figure counts as quiet" );
 idCVar af_enhancedSleepFrames(		"af_enhancedSleepFrames",	"30",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: quiet steps before a figure that may rest goes to sleep", 1, 600 );
 idCVar af_enhancedImpulseGuard(		"af_enhancedImpulseGuard",	"300",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: largest velocity change one hit gives the struck body before the rest of its momentum is spread over the figure" );
+idCVar af_enhancedImpactFriction(	"af_enhancedImpactFriction",	"1",			CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enhanced physics: limit the friction of a fast new touch to the body's resting load, as legacy figures resolve impacts without friction" );
+idCVar af_enhancedBounce(			"af_enhancedBounce",		"0",			CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enhanced physics: let a fast new touch bounce an articulated figure by its bouncyness (legacy figures never bounce)" );
 idCVar af_enhancedInheritTime(		"af_enhancedInheritTime",	"32",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: ms of animation a new ragdoll takes its joint velocities from (when its def sets no velocityTime)", 0, 500 );
 idCVar af_enhancedMaxInheritSpeed(	"af_enhancedMaxInheritSpeed","400",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on the speed a new ragdoll body inherits" );
+idCVar af_enhancedDebug(			"af_enhancedDebug",			"0",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: articulated-figure diagnostics (1 print the energy guard, 2 also disable it, 8 print every contact after the solve)" );
 idCVar si_enhancedPhysics(			"si_enhancedPhysics",		"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM | CVAR_BOOL, "physics mode the server committed for the current map; clients and demo playback follow it" );
 
 idCVar rb_showTimings(				"rb_showTimings",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid body cpu usage" );

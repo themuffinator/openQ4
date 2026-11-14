@@ -113,6 +113,44 @@ static void Cmd_PhysicsDigest_f( const idCmdArgs &args ) {
 		(unsigned int)( own >> 32 ), (unsigned int)( own & 0xffffffffu ), workload.Count() );
 }
 
+// physicsReport <namePrefix>: one PHYSICS_BODY line per matching entity with
+// rigid-body or articulated physics: total mass, mass-weighted centre, linear
+// momentum and the fastest body's speed. The envelope test (PHYS-04) compares
+// these before and after a hit in both physics modes.
+static void Cmd_PhysicsReport_f( const idCmdArgs &args ) {
+	const char *prefix = args.Argc() > 1 ? args.Argv( 1 ) : "phys_";
+	const int prefixLength = idStr::Length( prefix );
+	gameLocal.Printf( "PHYSICS_REPORT prefix=%s time=%d\n", prefix, gameLocal.time );
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		idEntity *ent = gameLocal.entities[i];
+		if ( !ent || idStr::Cmpn( ent->name.c_str(), prefix, prefixLength ) ) {
+			continue;
+		}
+		const idPhysics *physics = ent->GetPhysics();
+		if ( !OpenQ4Physics_IsSimulated( physics ) ) {
+			continue;
+		}
+		const int count = Max( 1, physics->GetNumClipModels() );
+		float mass = 0.0f;
+		float peak = 0.0f;
+		idVec3 centre = vec3_zero;
+		idVec3 momentum = vec3_zero;
+		for ( int id = 0; id < count; id++ ) {
+			const float m = physics->GetMass( id );
+			mass += m;
+			centre += m * physics->GetOrigin( id );
+			momentum += m * physics->GetLinearVelocity( id );
+			peak = Max( peak, physics->GetLinearVelocity( id ).Length() );
+		}
+		if ( mass > 0.0f ) {
+			centre /= mass;
+		}
+		gameLocal.Printf( "PHYSICS_BODY %s class=%s bodies=%d mass=%.2f centre=%s momentum=%s peak=%.2f rest=%d time=%d\n",
+			ent->name.c_str(), physics->GetClassname(), count, mass, centre.ToString( 2 ), momentum.ToString( 1 ), peak,
+			physics->IsAtRest() ? 1 : 0, gameLocal.time );
+	}
+}
+
 // Workload tools for the physics harness (cheats): they stage repeatable scenes
 // without any player input.
 //

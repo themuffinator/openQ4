@@ -191,7 +191,7 @@ struct Scene {
 				if ( !Inside( onPlane, f.mins - Vec3( 0.1f, 0.1f, 0.1f ), f.maxs + Vec3( 0.1f, 0.1f, 0.1f ), 0.0f ) ) continue;
 				rigidContact_t &c = out[n++];
 				std::memset( &c, 0, sizeof( c ) );
-				c.point = onPlane;
+				c.point = p - f.normal * h0;	// where the body is now (the game glue does the same)
 				c.normal = f.normal;
 				c.separation = h0;
 				if ( f.owner >= 0 ) {
@@ -513,6 +513,32 @@ static void TestImpulseGuard() {
 	std::printf( "impulse guard: checks passed\n" );
 }
 
+static void TestEnergyGuardKeepsMomentum() {
+	// two 10 kg bodies at 100 and 300 u/s along x: V = 200, KE = 500000,
+	// centre-of-mass part 400000, relative part 100000
+	const float m = 10.0f, v1 = 100.0f, v2 = 300.0f;
+	const float energy = 0.5f * m * ( v1 * v1 + v2 * v2 );
+	const float V = ( v1 + v2 ) * 0.5f;
+	const float comEnergy = 0.5f * 2.0f * m * V * V;
+	// allow 450000: half the relative energy goes, the shared motion stays
+	energySplit_t s = EnergyScaleKeepingMomentum( energy, comEnergy, 450000.0f );
+	CHECK( s.comScale == 1.0f, "guard scaled the centre-of-mass motion (%.4f)", s.comScale );
+	const float n1 = V + s.relativeScale * ( v1 - V ), n2 = V + s.relativeScale * ( v2 - V );
+	CHECK( std::fabs( m * ( n1 + n2 ) - m * ( v1 + v2 ) ) < 1e-2f, "guard changed the momentum" );
+	CHECK( std::fabs( 0.5f * m * ( n1 * n1 + n2 * n2 ) - 450000.0f ) < 1.0f, "guarded energy %.1f, want 450000", 0.5f * m * ( n1 * n1 + n2 * n2 ) );
+	// allowance below the shared motion: relative motion removed, V scaled to fit
+	s = EnergyScaleKeepingMomentum( energy, comEnergy, 100000.0f );
+	CHECK( s.relativeScale == 0.0f && std::fabs( 0.5f * 2.0f * m * ( V * s.comScale ) * ( V * s.comScale ) - 100000.0f ) < 1.0f,
+		"over-budget split rel %.3f com %.3f", s.relativeScale, s.comScale );
+	// within the allowance nothing changes
+	s = EnergyScaleKeepingMomentum( energy, comEnergy, energy + 1.0f );
+	CHECK( s.relativeScale == 1.0f && s.comScale == 1.0f, "guard changed an allowed step" );
+	// impact friction load: the resting share on a 30-degree slope
+	CHECK( std::fabs( ImpactFrictionLoad( 10.0f, 1066.0f, 0.866f ) - 9231.56f ) < 0.5f, "impact friction load" );
+	CHECK( ImpactFrictionLoad( 10.0f, 1066.0f, -0.2f ) == 0.0f, "a ceiling carries no load" );
+	std::printf( "energy guard momentum: checks passed\n" );
+}
+
 static void TestSweptSeparation() {
 	// a long bar (64 x 4 x 4) tilted so its left end is 0.5 above the floor and its right end 6 above:
 	// a contact under the left end must report 0.5, not the lowest vertex of the whole body
@@ -579,6 +605,7 @@ int main() {
 	TestSleepCounter();
 	TestSweptSeparation();
 	TestImpulseGuard();
+	TestEnergyGuardKeepsMomentum();
 	TestBoxedPGS();
 	TestSolverNeverAddsEnergy();
 	TestDroppedBoxSettles();
