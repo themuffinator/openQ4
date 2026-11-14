@@ -3,9 +3,14 @@
 #pragma hdrstop
 
 #include "../Game_local.h"
+#include "../../game/physics/PhysicsTelemetry.h"
 
 CLASS_DECLARATION( idPhysics_Base, idPhysics_AF )
 END_CLASS
+
+// openQ4: set while an enhanced step builds its responses, so every body records
+// its response to every auxiliary row (legacy's symmetry shortcut skips some)
+static bool afEnhancedFullResponses = false;
 
 const float ERROR_REDUCTION					= 0.5f;
 const float ERROR_REDUCTION_MAX				= 256.0f;
@@ -71,6 +76,7 @@ idAFConstraint::idAFConstraint( void ) {
 	boxIndex[5]			= -1;
 
 	firstIndex			= 0;
+	enhancedSolvedFrame	= 0;
 
 	memset( &fl, 0, sizeof( fl ) );
 }
@@ -4128,6 +4134,7 @@ void idAFBody::Init( void ) {
 	numResponses				= 0;
 	maxAuxiliaryIndex			= 0;
 	maxSubTreeAuxiliaryIndex	= 0;
+	enhancedPseudoVelocity.Zero();
 
 	memset( &fl, 0, sizeof( fl ) );
 
@@ -4581,7 +4588,7 @@ void idAFTree::Solve( int auxiliaryIndex ) const {
 		}
 	}
 
-	bool useSymmetry = af_useSymmetry.GetBool();
+	bool useSymmetry = af_useSymmetry.GetBool() && !afEnhancedFullResponses;
 
 	// from the root down towards the leaves
 	for ( i = 0; i < sortedBodies.Num(); i++ ) {
@@ -4698,7 +4705,7 @@ void idAFTree::Response( const idAFConstraint *constraint, int row, int auxiliar
 	// solve for primary constraints
 	Solve( auxiliaryIndex );
 
-	bool useSymmetry = af_useSymmetry.GetBool();
+	bool useSymmetry = af_useSymmetry.GetBool() && !afEnhancedFullResponses;
 
 	// store body forces in response to the constraint force
 	idVecX force;
@@ -6056,6 +6063,9 @@ idPhysics_AF::Activate
 void idPhysics_AF::Activate( void ) {
 	// if the articulated figure was at rest
 	if ( current.atRest >= 0 ) {
+		// openQ4: a figure woken from rest counts its quiet steps again (enhanced sleeping)
+		OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_WAKES );
+		enhancedQuietFrames = 0;
 		// normally gravity is added at the end of a simulation frame
 		// if the figure was at rest add gravity here so it is applied this simulation frame
 		AddGravity();
@@ -6260,10 +6270,10 @@ const idBounds &idPhysics_AF::GetAbsBounds( int id ) const {
 
 /*
 ================
-idPhysics_AF::Evaluate
+idPhysics_AF::EvaluateLegacy
 ================
 */
-bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
+bool idPhysics_AF::EvaluateLegacy( int timeStepMSec, int endTimeMSec ) {
 	float timeStep;
 
 	if ( timeScaleRampStart < MS2SEC( endTimeMSec ) && timeScaleRampEnd > MS2SEC( endTimeMSec ) ) {
@@ -6477,6 +6487,41 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 #endif
 
 	return true;
+}
+
+/*
+================
+idPhysics_AF::Evaluate
+
+  openQ4: dispatches to the physics mode committed at map load and records
+  per-frame telemetry while physicsStats is recording.
+================
+*/
+bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
+	OpenQ4Physics::ScopedEvaluation telemetry( OpenQ4Physics::EVAL_ARTICULATED );
+	const bool wasAtRest = current.atRest >= 0;
+	const bool moved = telemetry.Moved( gameLocal.enhancedPhysics ? EvaluateEnhanced( timeStepMSec, endTimeMSec ) : EvaluateLegacy( timeStepMSec, endTimeMSec ) );
+	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
+		float peak = 0.0f;
+		for ( int i = 0; i < bodies.Num(); i++ ) {
+			peak = Max( peak, bodies[i]->current->spatialVelocity.SubVec3( 0 ).Length() );
+		}
+		OpenQ4Physics::GetTelemetry().NoteLinearSpeed( peak );
+		if ( !wasAtRest && current.atRest >= 0 ) {
+			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SLEEPS );
+		}
+		const double elapsed = telemetry.ElapsedMs();
+		if ( elapsed > 10.0 ) {
+			int rows = 0;
+			for ( int i = 0; i < auxiliaryConstraints.Num(); i++ ) {
+				rows += auxiliaryConstraints[i]->J1.GetNumRows();
+			}
+			gameLocal.Printf( "PHYSICS_SLOW af entity=%s class=%s ms=%.2f bodies=%d constraints=%d contacts=%d auxRows=%d peak=%.1f time=%d\n",
+				self ? self->name.c_str() : "?", self ? self->GetClassname() : "?", elapsed, bodies.Num(), constraints.Num(),
+				contacts.Num(), rows, peak, gameLocal.time );
+		}
+	}
+	return moved;
 }
 
 /*
@@ -6722,6 +6767,8 @@ idPhysics_AF::idPhysics_AF( void ) {
 // rjohnson: fast AF eval to skip some things that are not needed for specific circumstances
 	fastEval = false;
 // RAVEN END
+
+	enhancedQuietFrames = 0;
 
 #ifdef AF_TIMINGS
 	lastTimerReset = 0;
@@ -7525,10 +7572,19 @@ void idPhysics_AF::ApplyImpulse( const int id, const idVec3 &point, const idVec3
 	if ( noImpact || impulse.LengthSqr() < Square( impulseThreshold ) ) {
 		return;
 	}
+	// openQ4: the enhanced impulse guard (PHYS-04)
+	if ( gameLocal.enhancedPhysics ) {
+		ApplyImpulseEnhanced( id, point, impulse );
+		return;
+	}
 	idMat3 invWorldInertiaTensor = bodies[id]->current->worldAxis.Transpose() * bodies[id]->inverseInertiaTensor * bodies[id]->current->worldAxis;
 	bodies[id]->current->spatialVelocity.SubVec3(0) += bodies[id]->invMass * impulse;
 	bodies[id]->current->spatialVelocity.SubVec3(1) += invWorldInertiaTensor * (point - bodies[id]->current->worldOrigin).Cross( impulse );
 	Activate();
+	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
+		const float magnitude = impulse.Length();
+		OpenQ4Physics::GetTelemetry().NoteImpulse( magnitude, magnitude * bodies[id]->invMass, false );
+	}
 }
 
 /*
@@ -8145,3 +8201,6 @@ void idPhysics_AF::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 	UpdateClipModels();
 }
+
+// openQ4: enhanced articulated figures (PHYS-03)
+#include "../../game/physics/EnhancedArticulated.inl"

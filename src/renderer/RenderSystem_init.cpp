@@ -2910,6 +2910,22 @@ bool VK_GLStubs_ConsumeReadPixelsFailure( void );
 bool VK_Device_DrawableSize( int &width, int &height );
 #endif
 
+/*
+====================
+r_screenshotFormat
+
+The file format of automatically named screenshots. Explicit names choose by
+extension: "screenshot shots/view.png" always writes PNG. TGA stays the
+default because capture harnesses read screenshots/shot<n>.tga.
+====================
+*/
+idCVar r_screenshotFormat( "r_screenshotFormat", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
+		"file format of automatically named screenshots: 0 = TGA, 1 = PNG (compressed by image_pngCompressionLevel)", 0, 1 );
+
+static const char *R_ScreenshotExtension() {
+	return r_screenshotFormat.GetInteger() == 1 ? ".png" : ".tga";
+}
+
 // TakeScreenshot's verdict for the commands that report "Wrote".
 static bool r_screenshotCaptureFailed = false;
 
@@ -3140,6 +3156,18 @@ void idRenderSystemLocal::TakeScreenshot( int width, int height, const char *fil
 		return;
 	}
 
+	if ( idStr( fileName ).CheckExtension( ".png" ) ) {
+		// RGB rows come bottom-up from glReadPixels
+		if ( !R_WritePNG( fileName, buffer + 18, width, height, 3, true,
+				strstr( fileName, "viewnote" ) ? "fs_cdpath" : "fs_savepath" ) ) {
+			r_screenshotCaptureFailed = true;
+			common->Warning( "TakeScreenshot: could not write %s", fileName );
+		}
+		R_StaticFree( buffer );
+		takingScreenshot = false;
+		return;
+	}
+
 	// fill in the header (this is vertically flipped, which glReadPixels emits)
 	buffer[2] = 2;		// uncompressed type
 	buffer[12] = width & 255;
@@ -3181,7 +3209,7 @@ from the beginning, because recording demo avis can involve
 thousands of shots
 ================== 
 */  
-void R_ScreenshotFilename( int &lastNumber, const char *base, idStr &fileName ) {
+void R_ScreenshotFilename( int &lastNumber, const char *base, idStr &fileName, const char *extension = ".tga" ) {
 	int	a,b,c,d, e;
 
 	bool restrict = cvarSystem->GetCVarBool( "fs_restrict" );
@@ -3205,7 +3233,7 @@ void R_ScreenshotFilename( int &lastNumber, const char *base, idStr &fileName ) 
 		e = frac;
 
 		char suffix[16];
-		idStr::snPrintf( suffix, sizeof( suffix ), "%i%i%i%i%i.tga", a, b, c, d, e );
+		idStr::snPrintf( suffix, sizeof( suffix ), "%i%i%i%i%i%s", a, b, c, d, e, extension );
 		fileName = base;
 		fileName += suffix;
 		if ( lastNumber == 99999 ) {
@@ -4047,8 +4075,11 @@ screenshot
 screenshot [filename]
 screenshot [width] [height]
 screenshot [width] [height] [samples]
-screenshot image <imageName> screenshots/<name>.tga
-================== 
+screenshot image <imageName> screenshots/<name>.tga|.png
+==================
+
+Automatically named shots use r_screenshotFormat; an explicit filename picks
+the format by its extension (.png writes PNG, anything else TGA).
 */ 
 #define	MAX_BLENDS	256	// to keep the accumulation in shorts
 void R_ScreenShot_f( const idCmdArgs &args ) {
@@ -4056,13 +4087,13 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 	idStr checkname;
 	if ( args.Argc() >= 2 && !idStr::Icmp( args.Argv( 1 ), "image" ) ) {
 		if ( args.Argc() != 4 ) {
-			common->Printf( "usage: screenshot image <imageName> screenshots/<name>.tga\n" );
+			common->Printf( "usage: screenshot image <imageName> screenshots/<name>.tga|.png\n" );
 			return;
 		}
 		idStr path( args.Argv( 3 ) );
 		if ( path.Icmpn( "screenshots/", 12 ) != 0 || path.Find( ".." ) >= 0
-				|| path.Find( ':' ) >= 0 || path.Find( '\\' ) >= 0 || !path.CheckExtension( ".tga" ) ) {
-			common->Printf( "screenshot image: use screenshots/<name>.tga\n" );
+				|| path.Find( ':' ) >= 0 || path.Find( '\\' ) >= 0 || ( !path.CheckExtension( ".tga" ) && !path.CheckExtension( ".png" ) ) ) {
+			common->Printf( "screenshot image: use screenshots/<name>.tga or screenshots/<name>.png\n" );
 			return;
 		}
 		idImage *image = globalImages->GetImage( args.Argv( 2 ) );
@@ -4077,7 +4108,7 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 		}
 		const int width = image->GetUploadWidth(), height = image->GetUploadHeight();
 		if ( pixels.Num() != width * height * 4
-				|| !R_WriteTGA( path.c_str(), pixels.Ptr(), width, height, true ) ) {
+				|| !R_WriteImageFile( path.c_str(), pixels.Ptr(), width, height, true ) ) {
 			common->Printf( "screenshot image: write failed\n" );
 			return;
 		}
@@ -4102,7 +4133,7 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 		width = glConfig.vidWidth;
 		height = glConfig.vidHeight;
 		blends = 1;
-		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname );
+		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname, R_ScreenshotExtension() );
 		break;
 	case 2:
 		width = glConfig.vidWidth;
@@ -4114,7 +4145,7 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 		width = atoi( args.Argv( 1 ) );
 		height = atoi( args.Argv( 2 ) );
 		blends = 1;
-		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname );
+		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname, R_ScreenshotExtension() );
 		break;
 	case 4:
 		width = atoi( args.Argv( 1 ) );
@@ -4126,7 +4157,7 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 		if ( blends > MAX_BLENDS ) {
 			blends = MAX_BLENDS;
 		}
-		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname );
+		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname, R_ScreenshotExtension() );
 		break;
 	default:
 		common->Printf( "usage: screenshot\n       screenshot <filename>\n       screenshot <width> <height>\n       screenshot <width> <height> <blends>\n" );

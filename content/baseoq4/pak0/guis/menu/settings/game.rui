@@ -72,6 +72,7 @@
   "cvar.con_allowConsole": {"type": "number", "initial": 0, "cvar": "con_allowConsole"},
   "cvar.g_autoSkipCinematics": {"type": "boolean", "initial": false, "cvar": "g_autoSkipCinematics"},
   "cvar.ui_cinematicShake": {"type": "number", "initial": 0, "cvar": "ui_cinematicShake"},
+  "cvar.g_enhancedPhysics": {"type": "boolean", "initial": false, "cvar": "g_enhancedPhysics"},
   "cvar.cl_gunfov": {"type": "number", "initial": 0, "cvar": "cl_gunfov"},
   "cvar.cl_gunfov_adjust": {"type": "number", "initial": 0, "cvar": "cl_gunfov_adjust"},
   "cvar.cl_gun_x": {"type": "number", "initial": 0, "cvar": "cl_gun_x"},
@@ -419,6 +420,11 @@
    "operation": "settings.player.set",
    "input": "number",
    "arguments": {"cvar": "ui_cinematicShake", "value": {"input": "value"}}
+  },
+  "set.g_enhancedPhysics": {
+   "operation": "settings.player.set",
+   "input": "boolean",
+   "arguments": {"cvar": "g_enhancedPhysics", "value": {"input": "value"}}
   },
   "set.cl_gunfov": {
    "operation": "settings.player.set",
@@ -7668,21 +7674,21 @@
    }
   },
   {
-   "id": "tall.game-general-head-1-6.width",
-   "node": "game-general-head-1-6",
+   "id": "tall.game_enhancedphysics.width",
+   "node": "game_enhancedphysics",
    "property": "width",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     837.5488,
-     {"op": "*", "args": [409.5, {"state": "view.text"}]}
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
     ]
    }
   },
   {
-   "id": "tall.game-general-head-1-6.height",
-   "node": "game-general-head-1-6",
+   "id": "tall.game_enhancedphysics.height",
+   "node": "game_enhancedphysics",
    "property": "height",
    "value": {
     "op": "select",
@@ -7694,21 +7700,73 @@
    }
   },
   {
-   "id": "tall.game-general-head-1-6.padding-left",
-   "node": "game-general-head-1-6",
-   "property": "padding-left",
+   "id": "tall.game_enhancedphysics-focus.width",
+   "node": "game_enhancedphysics-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-focus.height",
+   "node": "game_enhancedphysics-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-head.left",
+   "node": "game_enhancedphysics-head",
+   "property": "left",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
      42.9512,
-     {"op": "*", "args": [21.0, {"state": "view.text"}]}
+     {"op": "*", "args": [21, {"state": "view.text"}]}
     ]
    }
   },
   {
-   "id": "tall.game-general-head-1-6.font-size",
-   "node": "game-general-head-1-6",
+   "id": "tall.game_enhancedphysics-head.width",
+   "node": "game_enhancedphysics-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     383.9205,
+     {"op": "*", "args": [187.709, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-head.height",
+   "node": "game_enhancedphysics-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-label.font-size",
+   "node": "game_enhancedphysics-label",
    "property": "font-size",
    "value": {
     "op": "select",
@@ -7720,8 +7778,177 @@
    }
   },
   {
-   "id": "tall.game-general-head-1-6.line-height",
-   "node": "game-general-head-1-6",
+   "id": "tall.game_enhancedphysics-label.line-height",
+   "node": "game_enhancedphysics-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-box.left",
+   "node": "game_enhancedphysics-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     443.2341,
+     {"op": "*", "args": [216.709, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-box.top",
+   "node": "game_enhancedphysics-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-box.width",
+   "node": "game_enhancedphysics-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-box.height",
+   "node": "game_enhancedphysics-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-checked.left",
+   "node": "game_enhancedphysics-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     443.2341,
+     {"op": "*", "args": [216.709, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-checked.top",
+   "node": "game_enhancedphysics-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-checked.width",
+   "node": "game_enhancedphysics-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_enhancedphysics-checked.height",
+   "node": "game_enhancedphysics-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game-general-head-1-7.width",
+   "node": "game-general-head-1-7",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     837.5488,
+     {"op": "*", "args": [409.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game-general-head-1-7.height",
+   "node": "game-general-head-1-7",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game-general-head-1-7.padding-left",
+   "node": "game-general-head-1-7",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game-general-head-1-7.font-size",
+   "node": "game-general-head-1-7",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game-general-head-1-7.line-height",
+   "node": "game-general-head-1-7",
    "property": "line-height",
    "value": {
     "op": "select",
@@ -10886,6 +11113,12 @@
   {
    "id": "game_cinematicshake.enabled",
    "node": "game_cinematicshake",
+   "property": "enabled",
+   "value": {"op": "==", "args": [{"state": "page.tab"}, 0]}
+  },
+  {
+   "id": "game_enhancedphysics.enabled",
+   "node": "game_enhancedphysics",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 0]}
   },
@@ -44392,6 +44625,150 @@
    ]
   },
   {
+   "id": "game_enhancedphysics.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_enhancedphysics-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_enhancedphysics-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_enhancedphysics-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_enhancedphysics.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_enhancedphysics-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_enhancedphysics.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_enhancedphysics-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_enhancedphysics.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_enhancedphysics-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_enhancedphysics.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_enhancedphysics-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_enhancedphysics-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
    "id": "game_gunfov.default",
    "durationMs": 300,
    "tracks": [
@@ -48297,6 +48674,265 @@
      "node": "game-page-hud",
      "property": "opacity",
      "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    }
+   ]
+  },
+  {
+   "id": "prompts-lead.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "prompt-231042-glyph",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.85}},
+      {"atMs": 300, "value": {"type": "number", "value": 0.85}}
+     ]
+    },
+    {
+     "node": "prompt-231042-glyph",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.8]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.8]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompts-lead-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    }
+   ]
+  },
+  {
+   "id": "prompts-lead.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "prompt-231042-glyph",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "prompt-231042-glyph",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompts-lead-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "prompts-lead.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "prompt-231042-glyph",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "prompt-231042-glyph",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompts-lead-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "prompts-lead.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "prompt-231042-glyph",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "prompt-231042-glyph",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [1, 1, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompts-lead-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "prompts-lead.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "prompt-231042-glyph",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.4}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0.4}}
+     ]
+    },
+    {
+     "node": "prompt-231042-glyph",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.4]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.4]}}
+     ]
+    },
+    {
+     "node": "prompt-231042-verb",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    },
+    {
+     "node": "prompts-lead-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
     }
    ]
   },
@@ -54236,7 +54872,7 @@
                   "disabled": "game_showgun.disabled"
                  },
                  "parts": {"checked": "game_showgun-checked"},
-                 "navigation": {"down": "game_gunposition", "up": "game_decals", "right": "game_gunfov", "left": "game_showgun"}
+                 "navigation": {"down": "game_gunposition", "up": "game_decals", "right": "game_enhancedphysics", "left": "game_showgun"}
                 }
                },
                {
@@ -54882,7 +55518,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_simpleitems", "up": "game_showgun", "right": "game_gunfovadjust", "left": "game_gunposition"}
+                 "navigation": {"down": "game_simpleitems", "up": "game_showgun", "right": "game_gunfov", "left": "game_gunposition"}
                 }
                },
                {
@@ -55618,7 +56254,12 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_opponentweapons", "up": "game_gunposition", "right": "game_gunx", "left": "game_simpleitems"}
+                 "navigation": {
+                  "down": "game_opponentweapons",
+                  "up": "game_gunposition",
+                  "right": "game_gunfovadjust",
+                  "left": "game_simpleitems"
+                 }
                 }
                },
                {
@@ -56174,7 +56815,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_forcemodel", "up": "game_simpleitems", "right": "game_guny", "left": "game_opponentweapons"}
+                 "navigation": {"down": "game_forcemodel", "up": "game_simpleitems", "right": "game_gunx", "left": "game_opponentweapons"}
                 }
                },
                {
@@ -56395,7 +57036,7 @@
                   "disabled": "game_forcemodel.disabled"
                  },
                  "parts": {"checked": "game_forcemodel-checked"},
-                 "navigation": {"down": "game_corpsesink", "up": "game_opponentweapons", "right": "game_gunz", "left": "game_forcemodel"}
+                 "navigation": {"down": "game_corpsesink", "up": "game_opponentweapons", "right": "game_guny", "left": "game_forcemodel"}
                 }
                }
               ]
@@ -60848,11 +61489,237 @@
                   "thumb": "game_cinematicshake-thumb",
                   "value": "game_cinematicshake-value"
                  },
-                 "navigation": {"down": "game_gunfov", "up": "game_skipcinematics", "left": "game_decals", "right": "game_cinematicshake"}
+                 "navigation": {
+                  "down": "game_enhancedphysics",
+                  "up": "game_skipcinematics",
+                  "left": "game_decals",
+                  "right": "game_cinematicshake"
+                 }
                 }
                },
                {
-                "id": "game-general-head-1-6",
+                "id": "game_enhancedphysics",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_enhancedphysics-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_enhancedphysics-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_enhancedphysics-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_enhancedphysics-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 187.709, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_enhancedphysics-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_231720"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_enhancedphysics-box",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 216.709, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "box",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_enhancedphysics-checked",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 216.709, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_enhancedphysics-mark",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "mark",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "toggle",
+                 "label": "#str_231720",
+                 "action": "set.g_enhancedPhysics",
+                 "value": {"state": "cvar.g_enhancedPhysics"},
+                 "states": {
+                  "default": "game_enhancedphysics.default",
+                  "hover": "game_enhancedphysics.hover",
+                  "focus": "game_enhancedphysics.focus",
+                  "pressed": "game_enhancedphysics.pressed",
+                  "disabled": "game_enhancedphysics.disabled"
+                 },
+                 "parts": {"checked": "game_enhancedphysics-checked"},
+                 "navigation": {"down": "game_gunfov", "up": "game_cinematicshake", "left": "game_showgun", "right": "game_enhancedphysics"}
+                }
+               },
+               {
+                "id": "game-general-head-1-7",
                 "type": "text",
                 "properties": {
                  "text": {"type": "text", "value": "#str_229952"},
@@ -61459,7 +62326,7 @@
                     "thumb": "game_gunfov-thumb",
                     "value": "game_gunfov-value"
                    },
-                   "navigation": {"down": "game_gunfov_number", "up": "game_cinematicshake", "left": "game_showgun"}
+                   "navigation": {"down": "game_gunfov_number", "up": "game_enhancedphysics", "left": "game_gunposition"}
                   }
                  },
                  {
@@ -62258,7 +63125,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_gunx", "up": "game_gunfov_number", "left": "game_gunposition", "right": "game_gunfovadjust"}
+                 "navigation": {"down": "game_gunx", "up": "game_gunfov_number", "left": "game_simpleitems", "right": "game_gunfovadjust"}
                 }
                },
                {
@@ -63122,7 +63989,7 @@
                    "decimals": 2,
                    "orientation": "horizontal",
                    "parts": {"track": "game_gunx-track", "fill": "game_gunx-fill", "thumb": "game_gunx-thumb", "value": "game_gunx-value"},
-                   "navigation": {"down": "game_gunx_number", "up": "game_gunfovadjust", "left": "game_simpleitems"}
+                   "navigation": {"down": "game_gunx_number", "up": "game_gunfovadjust", "left": "game_opponentweapons"}
                   }
                  },
                  {
@@ -64229,7 +65096,7 @@
                    "decimals": 2,
                    "orientation": "horizontal",
                    "parts": {"track": "game_guny-track", "fill": "game_guny-fill", "thumb": "game_guny-thumb", "value": "game_guny-value"},
-                   "navigation": {"down": "game_guny_number", "up": "game_gunx_number", "left": "game_opponentweapons"}
+                   "navigation": {"down": "game_guny_number", "up": "game_gunx_number", "left": "game_forcemodel"}
                   }
                  },
                  {
@@ -102643,13 +103510,14 @@
           "type": "group",
           "properties": {
            "position": {"type": "keyword", "value": "absolute"},
-           "top": {"type": "length", "value": 11.5, "unit": "dp"},
-           "height": {"type": "length", "value": 22, "unit": "dp"},
-           "right": {"type": "length", "value": 176.0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "height": {"type": "length", "value": 45.0, "unit": "dp"},
+           "right": {"type": "length", "value": 168.0, "unit": "dp"},
            "display": {"type": "keyword", "value": "flex"},
            "flex-direction": {"type": "keyword", "value": "row"},
            "align-items": {"type": "keyword", "value": "center"},
-           "pointer-events": {"type": "keyword", "value": "none"}
+           "padding-left": {"type": "length", "value": 8.0, "unit": "dp"},
+           "padding-right": {"type": "length", "value": 8.0, "unit": "dp"}
           },
           "children": [
            {
@@ -102661,7 +103529,9 @@
              "flex-direction": {"type": "keyword", "value": "row"},
              "align-items": {"type": "keyword", "value": "center"},
              "height": {"type": "length", "value": 22, "unit": "dp"},
-             "margin-right": {"type": "length", "value": 6, "unit": "dp"}
+             "margin-right": {"type": "length", "value": 6, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0.85},
+             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
             },
             "children": [
              {
@@ -102685,7 +103555,7 @@
                  {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -6}]]},
                  {"id": "close", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                }
               ],
               "children": [
@@ -102725,7 +103595,7 @@
                  {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                },
                {
                 "id": "mark-a1",
@@ -102775,7 +103645,7 @@
                  {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                },
                {
                 "id": "mark-b1",
@@ -102832,7 +103702,7 @@
                  {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                },
                {
                 "id": "mark-x1",
@@ -102878,7 +103748,7 @@
                  {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                },
                {
                 "id": "mark-o",
@@ -102920,7 +103790,7 @@
                  {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                },
                {
                 "id": "mark-b1",
@@ -102977,7 +103847,7 @@
                  {"id": "d", "op": "cubic", "points": [[16.854, 0.4], [21.6, 5.146], [21.6, 11.0]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                },
                {
                 "id": "mark-a1",
@@ -103028,7 +103898,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.5,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103043,7 +103913,7 @@
                  {"id": "p2", "op": "line", "points": [[14.6, 15.5]]}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.9,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103054,7 +103924,7 @@
                 "id": "mark-a2",
                 "commands": [{"id": "p0", "op": "move", "points": [[8.8, 12.3]]}, {"id": "p1", "op": "line", "points": [[13.2, 12.3]]}],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.9,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103084,7 +103954,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.5,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103101,7 +103971,7 @@
                  {"id": "c4", "op": "line", "points": [[8.2, 10.9]]}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.9,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103117,7 +103987,7 @@
                  {"id": "c3", "op": "line", "points": [[8.2, 15.5]]}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.9,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103147,7 +104017,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.3,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103165,7 +104035,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.3,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103183,7 +104053,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.3,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103200,7 +104070,7 @@
                  {"id": "d", "op": "cubic", "points": [[12.988, 14.1], [14.6, 15.712], [14.6, 17.7]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                }
               ]
              },
@@ -103225,7 +104095,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.3,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103243,7 +104113,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.3,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103260,7 +104130,7 @@
                  {"id": "d", "op": "cubic", "points": [[19.688, 7.4], [21.3, 9.012], [21.3, 11.0]]},
                  {"id": "z", "op": "close"}
                 ],
-                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}}
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}}
                },
                {
                 "id": "dot-south",
@@ -103273,7 +104143,7 @@
                  {"id": "z", "op": "close"}
                 ],
                 "stroke": {
-                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.85]}},
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 1]}},
                  "widthDp": 1.3,
                  "minimumPixels": 1,
                  "join": "miter",
@@ -103295,10 +104165,50 @@
              "font-size": {"type": "length", "value": 14, "unit": "dp"},
              "line-height": {"type": "length", "value": 22, "unit": "dp"},
              "color": {"type": "color", "value": [1, 1, 1, 0.8]},
-             "white-space": {"type": "keyword", "value": "nowrap"}
+             "white-space": {"type": "keyword", "value": "nowrap"},
+             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
             }
+           },
+           {
+            "id": "prompts-lead-focus",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 8.0, "unit": "dp"},
+             "top": {"type": "length", "value": 35.5, "unit": "dp"},
+             "height": {"type": "length", "value": 2, "unit": "dp"},
+             "right": {"type": "length", "value": 8.0, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "inset",
+              "commands": [{"id": "p0", "op": "move", "points": [[0, 1]]}, {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]}],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 1.2,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
            }
-          ]
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_231042",
+           "states": {
+            "default": "prompts-lead.default",
+            "hover": "prompts-lead.hover",
+            "focus": "prompts-lead.focus",
+            "pressed": "prompts-lead.pressed",
+            "disabled": "prompts-lead.disabled"
+           },
+           "input": "accept",
+           "focusable": false
+          }
          },
          {
           "id": "game_back",

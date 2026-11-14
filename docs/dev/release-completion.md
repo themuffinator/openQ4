@@ -64,6 +64,183 @@ does not restore the withdrawn release. See
   channel packets carry no secret, so a spoofed packet can end a player's
   connection; presentation above 60 fps and real connections are not measured.
 
+## Multiview demos play again (0.14.1 regression), 14 November 2026
+
+- **Watching a multiview demo from the menu works again.** In 0.14.1, playing
+  a recorded match without being connected to a server stopped at the map
+  load with "idGameLocal::RegisterEntity: spawn_entnum 4095 out of range".
+  A safety check added late in 0.14.1 rejected the slot the game uses for the
+  demo's own viewer.
+- **Nothing to do.** Demos recorded with 0.14.1 are fine; only playback was
+  affected.
+- How it works: `RegisterEntity` now accepts any slot inside the entity
+  table, the viewer's `ENTITYNUM_NONE` included, in both game modules.
+  `mp_match_demo_follow_contract.py` checks both trees.
+- Evidence: found by the PHYS-05 integration run, which plays a demo
+  recorded on a listen server from a freshly started client. On the fixed
+  build the same playback ran its 742 frames to the end of the demo without
+  an error. Not run: playback from the Demos menu by hand, Linux and macOS.
+
+## An Enhanced Physics option for ragdolls, debris and moveables (PHYS), 14 November 2026
+
+- **New option: Settings > Game Options > Gameplay > Enhanced Physics.** It
+  switches corpses, crates, barrels, debris and other loose objects to a new
+  simulation. Stacks stand and settle instead of jittering, bodies come to
+  rest instead of waking and settling over and over, and a ragdoll falls on
+  from its last motion instead of stopping dead. It also costs less: from a
+  quarter to three quarters less physics time than the original simulation
+  on every scene measured.
+- **It is off by default.** With the option off, the game runs the original
+  physics code unchanged, and saves and demos are byte for byte what they
+  were. A change applies from the next map or loaded save, never under
+  bodies in mid-air. In multiplayer everyone follows the server's choice, so
+  a client's own setting never changes what it sees in an online match, and
+  a multiview demo plays back with the setting it was recorded with.
+- Hits still move bodies the way they used to: every shot, blast and death
+  push delivers the momentum it always did. A light hit can no longer fling a
+  limb across the room, and a heavy blast still throws corpses about as far
+  as before.
+- **Nothing to do.** Existing settings and saves are untouched, and a save
+  loads whichever way the option is set. The row is in both the new and the
+  classic interface, in all twelve languages.
+- How it works: `g_enhancedPhysics` (archived, default `0`) is committed when
+  a map loads; servers publish it as `si_enhancedPhysics`. Rigid bodies get a
+  semi-implicit step with persistent, warm-started contacts, friction,
+  sleeping and swept motion only where needed; articulated figures get a
+  warm-started iterative constraint solve with bounded recovery, an energy
+  guard that keeps the figure's momentum, and an impulse guard that spreads a
+  hit on a light limb over the figure. See the
+  [physics reference](physics-reference.md).
+- Evidence (Windows x64, hidden-window runs): with the option off, five
+  single-player scenes repeat the pre-solver build's body states exactly. The
+  hit test drives machinegun, gauntlet, small and large splash, rockets,
+  grenades, Dark Matter and a vehicle-sized bump into resting and falling
+  corpses in both modes, and every class stays within the legacy envelope;
+  the Dark Matter splash, which first left corpses at an eighth of their
+  legacy travel, now reaches two thirds of it. Physics time fell 23-76 % on
+  six scenes, including a seven-bot deathmatch. Saves made in either mode
+  load in the other, and clients took the server's mode both ways round.
+  Details: [physics reference](physics-reference.md#evidence).
+- Open: the campaign, The Awakening, multiplayer corpses and moveables with
+  the option on; a dedicated-server join and a full demo playback; Linux and
+  ARM64; a by-eye review; and the decision on turning it on by default.
+
+## Click the key prompts in the new menus, 14 November 2026
+
+- **The key prompts at the bottom of every new menu now work with the
+  mouse.** Hover over one and it lights up. Click it and it does what its
+  key does. **Select** (Enter) acts on the item you last chose or moved to.
+  **Back**, **Exit** or **Resume** (Escape) goes back. This covers the main
+  menu, the pause menus, every page (Load, Save, Demos, Settings, Create
+  Server, Join Game and the rest) and the multiplayer cards. On those cards
+  you can also click the Q and E keys to change tabs.
+- **Nothing to do.** Keyboard and controller play are unchanged. A prompt
+  never takes the highlight from the item you are on, so Select still acts on
+  that item. The classic interface is unchanged.
+- How it works: a prompt is a button that cannot take the focus. Its click
+  replays its key's menu input (`"input": "accept"` or `"back"`), or runs
+  the tab event. A prompt that is faded out, or outside an open dialog, lets
+  clicks through to what lies under it. See
+  [prompt controls](ui/interaction.md#prompt-controls).
+- Evidence: `UiModalInteractionTest` covers the semantics: navigation and
+  programs never focus a prompt, a press leaves the focus where it was,
+  Accept reaches the focused control, Back is Back, a held key wins, and
+  malformed prompts are refused. `UiRetainedScreensTest` checks every page's
+  SELECT and BACK targets and the pointer-reach probe over every menu. In a
+  hidden-window run of the staged client on OpenGL, the title's SELECT lit
+  under the cursor and opened Single Player, and that page's BACK returned to
+  the title. The cursor and clicks came from console verbs (`openq4_retainedGui
+  pointer`, and the new `click`), not a physical mouse. Not run: Vulkan,
+  Linux, macOS, Android touch, or a real mouse.
+
+
+## The Awakening: lost dialogue, enemies that see, two missing effects, 14 November 2026
+
+- **Seventeen lines of The Awakening's dialogue play for the first time.**
+  Their scripts called them by names the recordings do not have, and the game
+  drops a missing line without a word. The largest part is the radio traffic
+  of the MCC cannon defence (m06 invasion), nine calls that left the whole
+  battle silent. The others: Navajas's "Strogg!" at the bunker charge (m01);
+  Tak at the cellblock door, Darnell's "Above us!" and Private Hoff's mumbling
+  in the prison (m04); Navajas's reply to Tak, his alarm as the cryocene
+  floods in, and Darnell's and Tak's last cries in Cryofac (m08).
+- **The Tank and the Retch see from their heads.** Both name an eye joint
+  their models do not have, which left their eyes on the floor between their
+  feet, so anything knee-high hid the player from them. Low cover no longer
+  blinds them. Their weapons and damage are unchanged.
+- **Two effects show.** The opening's dropships (m01) light both thrusters,
+  and the Tank's rockets leave its launcher with a muzzle flash.
+- **What to do.** Replace the single-player game module. The dialogue comes
+  back on a fresh start of a map; the sight fix also applies to old saves.
+  `g_awakeningContentRepairs 0`, set before starting a map, keeps the alpha's
+  behaviour.
+- How it works: `src/game/awakening/ContentRepairs.inl` lists each written
+  name beside the surviving one. Dialogue keys are added to the speaker when
+  the map spawns, radio sound names are translated as the radio plays, and
+  joints resolve at the two places that look them up. No mission script
+  changes. The Tank's flash is the one borrowed asset: its rocket attack's
+  frame commands are the retail Iron Maiden's, so it plays her rocket flash.
+  The dropship mesh never had a right engine joint; the right plume is the
+  left one mirrored across the hull.
+- Testers get `openq4_testSpeak <entity> <key or sound>`, which reports a
+  missing line, and `aiDumpState` prints each AI's eye height.
+- Evidence: `tools/tests/awakening_content_repairs.py` proves every row
+  against the installed content. Hidden, input-free OpenGL probes measured
+  the lines at the lengths of their recordings, eye heights of 0.0 against
+  124.6 (Tank) and 67.3 (Retch), four failed flashes a volley against none,
+  and four failed thrusters against none. See the
+  [mission audit](awakening-missions.md#silent-names--14-november-2026).
+- Open: scene timing with the restored lines and the look of the two effects
+  were not reviewed by ear or eye. Twenty-two scripted lines were never
+  recorded, and about 250 recorded lines are used by no script.
+
+## PNG textures and PNG screenshots, 14 November 2026
+
+- **Textures can be PNG files, and screenshots can be saved as PNG.** A
+  material that names a missing `.tga` or `.jpg` now finds a `.png` of the same
+  name, and materials may name `.png` files directly. Every PNG the
+  specification defines loads: greyscale, colour, palette and alpha images at
+  every bit depth, interlaced files and transparency. 16-bit images load at
+  8 bits per channel. `r_screenshotFormat 1` saves screenshots as PNG, usually
+  under a third of the size of TGA, and `screenshot <name>.png` writes PNG
+  whatever the setting.
+- **Nothing to do.** Screenshots stay TGA by default, because capture tools
+  and harnesses read `screenshots/shot<n>.tga`. `image_pngCompressionLevel`
+  (0-9, default 4) sets the trade-off between file size and capture time.
+- How it works: openQ4 has its own PNG reader and writer and its own zlib
+  inflate and deflate, under `src/imagetools/PNG/`, with no new dependency.
+  Inflate decodes straight into the image with table-driven Huffman decoding
+  and 64-bit refills; rows unfilter with SSE2 for 3- and 4-byte pixels, with a
+  portable path elsewhere. The writer picks each row's filter by the
+  minimum-sum heuristic, keeps the smallest lossless colour type, and
+  compresses with 4-byte hash chains, lazy matching and per-block
+  stored/fixed/dynamic choice, directly into the IDAT chunk.
+- Measured with `openq4-png-codec-test --bench` against CPython's zlib 1.2.13
+  on the same filtered rows. On a 1280x720 in-game frame from `game/hangar1`
+  (OpenGL), the default level 4 encodes in 54 ms to 29% of the TGA's size;
+  zlib's level 4 takes 74 ms for a 3% larger file. Level 6 takes 304 ms
+  against 319 ms, and level 9 2.2 s against 2.8 s: dark, noisy frames are slow
+  for both at the top levels. On a synthetic 1920x1080 frame inflate takes
+  6-8 ms against 13-18 ms, and a whole PNG decodes at 110-165 megapixels a
+  second (70-80 on the darker in-game frame).
+- Evidence: `openq4-png-codec` decodes 106 PNG files built with CPython's zlib
+  across every colour type, bit depth, Adam7, tRNS, all five filters, split
+  and empty IDAT chunks and eight zlib strategies, plus damaged files that must
+  fail with the right error. It inflates eight real-zlib streams and rejects
+  every truncation of them, flips bits in every fixture, round-trips 750
+  deflate streams at every level and 1,344 encoded images, and
+  `png_codec.py --verify` decodes 410 of the encoder's outputs with CPython's
+  zlib and an independent reader. The same test passed under ASan and UBSan with
+  clang 18 and gcc 13, on the portable path and as an arm64 build under
+  qemu. In `game/hangar1` on OpenGL and Vulkan (staged client, hidden window,
+  isolated save path), four PNG textures from the save path (8-bit RGBA,
+  interlaced 4-bit palette with tRNS, 16-bit RGB reached through the
+  extensionless-name fallback, interlaced 2-bit greyscale) loaded without a
+  warning and read back from the GPU equal to their source pixels; an
+  automatically named and an explicit PNG screenshot were written; and a PNG
+  and a TGA written from the same image held identical pixels. Not run: Linux,
+  macOS or Android, and a real texture pack.
+
 ## A system check offers the right preset after the presets change, 14 November 2026
 
 - **When an update changes the presets, openQ4 now offers to retune your

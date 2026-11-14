@@ -2,7 +2,9 @@
 
 
 #include "Game_local.h"
+#include "physics/PhysicsTelemetry.h"
 #include "awakening/MissionScripts.h"
+#include "awakening/ContentRepairs.h"
 
 // RAVEN BEGIN
 #include "../bse/BSEInterface.h"
@@ -720,6 +722,7 @@ void idGameLocal::Clear( void ) {
 	isMultiplayer = false;
 	isServer = false;
 	isClient = false;
+	enhancedPhysics = false;
 	mpInteractionsGenerated = false;
 	realClientTime = 0;
 	isNewFrame = true;
@@ -1762,6 +1765,19 @@ void idGameLocal::SetServerInfo( const idDict &_serverInfo ) {
 }
 
 /*
+===========
+idGameLocal::LatchPhysicsMode
+
+openQ4: the physics mode is fixed for the lifetime of a map, so a change to
+g_enhancedPhysics never switches solvers under bodies that are in motion.
+===========
+*/
+void idGameLocal::LatchPhysicsMode( void ) {
+	enhancedPhysics = g_enhancedPhysics.GetBool();
+	Printf( "physics: %s simulation\n", enhancedPhysics ? "enhanced" : "legacy" );
+}
+
+/*
 ============idGameLocal::LoadMap
 
 Initializes all map variables common to both save games and spawned games.
@@ -1797,6 +1813,9 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	// these can changed based upon sp / mp
 	mHz = common->GetUserCmdHz();
 	msec = common->GetUserCmdMSec();
+
+	// openQ4: commit the physics mode before any entity spawns
+	LatchPhysicsMode();
 
 	if ( !sameMap || ( mapFile && mapFile->NeedsReload() ) ) {
 		// load the .map file
@@ -2664,6 +2683,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 
 	// precache any media specified in the map
 	BeginMapMediaPrecache();
+	Awakening_PrecacheContentRepairs();
 	for ( i = 0; i < mapFile->GetNumEntities(); i++ ) {
 		idMapEntity *mapEnt = mapFile->GetEntity( i );
 
@@ -4371,6 +4391,8 @@ void idGameLocal::MenuFrame( void ) { }
 =========*/
 // RAVEN BEGIN
  gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame ) {
+	// openQ4: one physics telemetry sample per game frame (no-op unless physicsStats is recording)
+	OpenQ4Physics::GetTelemetry().FrameTick( framenum + 1 );
 	idEntity *	ent;
 	int			num;
 	float		ms;
@@ -6224,8 +6246,9 @@ void idGameLocal::RegisterEntity( idEntity *ent ) {
 	} else {
 		assert( spawn_entnum < MAX_CLIENTS || spawn_entnum >= minSpawnIndex );
 		// openQ4: the number comes from spawn args, which a map or a script can
-		// set, and it indexes entities[] and spawnIds[] below
-		if ( spawn_entnum < 0 || spawn_entnum >= ENTITYNUM_NONE ) {
+		// set, and it indexes entities[] and spawnIds[] below. ENTITYNUM_NONE is
+		// a real slot: the offline demo viewer is spawned there (InitLocalClient)
+		if ( spawn_entnum < 0 || spawn_entnum >= MAX_GENTITIES ) {
 			Error( "idGameLocal::RegisterEntity: spawn_entnum %d out of range", spawn_entnum );
 		}
 	}
@@ -6704,6 +6727,7 @@ Parses textual entity definitions out of an entstring and spawns gentities.
 // ddynerman: multiple game instances
 #include "awakening/M01Cinematic.inl"
 #include "awakening/CampaignRepairs.inl"
+#include "awakening/ContentRepairs.inl"
 #include "awakening/MissionScripts.h"
 
 void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, unsigned short* entityNumOut, int* startSpawnCount ) {
@@ -6799,6 +6823,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 	// capture spawn count of start of map entities (after we've spawned in the physics ents)
 	const bool directAwakeningM01 = Awakening_PrepareM01Cinematic( mapFile );
 	const int awakeningChapter = Awakening_PrepareCampaignRepairs( mapFile );
+	Awakening_PrecacheContentRepairs();
 	if ( startSpawnCount ) {
 		(*startSpawnCount) = spawnCount;
 	}
@@ -6837,6 +6862,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 		}
 		args.SetDefaults( &(entityDef->dict) );
 		Awakening_CorrectM05M06Entity( args );
+		Awakening_RestoreDialogueKeys( args );
 // RAVEN END
 		if ( profileMapSpawn ) {
 			mapDefaultsTimer.Stop();

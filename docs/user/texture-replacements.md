@@ -65,6 +65,12 @@ A `.dds` placed beside the original path instead, such as
 `baseoq4/textures/stone/wall01.dds`, also works. If both exist, the `dds/` copy
 wins.
 
+**Not in 0.14.1:** uncompressed replacements and new textures can also be PNG
+files. When a material names `wall01.tga` and there is no `.tga` or `.jpg`,
+openQ4 loads `wall01.png`, and a material may name a `.png` directly. Every
+kind of PNG works: greyscale, colour and palette images at any bit depth,
+interlaced files, and transparency. 16-bit images load at 8 bits per channel.
+
 ### Bump maps and other image programs
 
 Quake 4 materials rarely name a bump texture directly. They usually build it
@@ -100,7 +106,7 @@ For each image, openQ4 tries these in order and uses the first usable file:
 
 1. `dds/<image program name>.dds`, the dhewm3 naming
 2. `dds/<texture path>.dds`, for plain textures
-3. `<texture path>.dds`, beside the original `.tga` or `.jpg`, as Quake 4 packs do
+3. `<texture path>.dds`, beside the original `.tga`, `.jpg` or `.png`, as Quake 4 packs do
 4. `progimg/...`, the precomputed results inside Quake 4's own PK4s
 
 Quake 4's own files come last, so your pack always wins. openQ4 finds them

@@ -2833,6 +2833,10 @@ struct Runtime::Impl {
 		const Rml::Vector2f point(pointerX,pointerY);
 		std::map<Rml::Element*,bool> checked;
 		const auto allowed = [&](Rml::Element* element) {
+			// A prompt-bar entry (an unfocusable button) outside the input scope,
+			// or faded out, lets the pointer through: a bar left under a page or
+			// a dialog never covers that page's own controls.
+			bool prompt = false, scoped = true; float opacity = 1;
 			for (auto* ancestor = element; ancestor && ancestor != document; ancestor = ancestor->GetParentNode()) {
 				if (ancestor->GetTagName() != "q4-node" && ancestor->GetTagName() != "q4-vector") continue;
 				// Popup parts have live visibility owned by the widget view; their
@@ -2842,8 +2846,13 @@ struct Runtime::Impl {
 				auto [entry,inserted] = checked.emplace(ancestor,false);
 				if (inserted) entry->second = static_cast<VectorElement*>(ancestor)->AllowsMaskedPoint(point);
 				if (!entry->second) return false;
+				opacity *= ancestor->GetComputedValues().opacity();
+				if (!prompt && canonical) {
+					const auto* node = canonical->Model().FindNode(ancestor->GetId());
+					if (node && node->control && !node->control->focusable) { prompt = true; scoped = interaction.AllowsNode(node->id); }
+				}
 			}
-			return true;
+			return !prompt || (scoped && opacity > .01f);
 		};
 		return context->GetElementAtPoint(point,nullptr,document,allowed);
 	}

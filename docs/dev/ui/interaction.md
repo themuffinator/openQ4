@@ -61,6 +61,38 @@ The [fixture](../../../tools/ui/fixtures/interaction-smoke.rui) uses separate
 editable orange inset rails, label color and a 1 dp pressed label offset. Its
 right-hand panel is a test input scope, not an accepted production modal design.
 
+### Prompt controls
+
+14 November 2026. A prompt bar's entries (visual design section 13.4) are
+buttons the mouse can click. Two optional button fields support them:
+
+```json
+{"role": "button", "label": "#str_231042", "input": "accept", "focusable": false, "states": {...}}
+```
+
+- `focusable: false` keeps a button out of the focus. Navigation, Tab order,
+  initial focus, a press and a program `focus` all pass it by. The pointer
+  still hovers, presses and activates it, so its five states still play.
+  Such a button cannot carry `navigation`. No navigation link, `focus` step or
+  modal `initialFocus` may name it.
+- `input` replaces the action or event with a menu input, `accept` or
+  `back`, and needs `focusable: false`. A click gives that input as its key
+  would. Accept goes to the focused control, which is why the button never
+  takes the focus. Back is Back, scoped like any other. A click made while
+  that key is held gives nothing of its own, and the key's release still
+  activates once. A button with an `input` has no `detail`, `context` or
+  `prompt`.
+- An unfocusable button with an `event` runs that event. The multiplayer
+  cards' Q and E caps run `onTabPrevious` and `onTabNext` this way.
+- The runtime's hit test lets the pointer through an unfocusable button that
+  is outside the open input scope, or whose presented opacity is under
+  0.01. A faded bar left over a page or dialog never takes that page's
+  clicks.
+
+`UiModalInteractionTest`'s `PromptButtonsReplayKeys` covers the semantics
+and the schema. `UiRetainedScreensTest`'s page-prompt and pointer-reach
+groups cover the production bars.
+
 ### Detail cards
 
 A document may define one detail card (section 7's hover card, WID-025), and

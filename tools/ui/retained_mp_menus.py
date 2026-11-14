@@ -206,10 +206,13 @@ def card_header(doc: Document, width: float, title_state: str, trailing: list) -
     return [wash, rule, row]
 
 
-def keycap(ident: str, key: str, *, fixed: bool = False, event: str | None = None, doc: Document | None = None) -> dict:
+def keycap(ident: str, key: str, *, fixed: bool = False, event: str | None = None, doc: Document | None = None,
+           focusable: bool = True, glyphs: bool = True) -> dict:
     """A keycap plate with a 45-degree lower-leading cut (section 13.4) and
     its key name in Lowpixel. A `fixed` cap is the strip's 20 dp glyph; the
-    prompt bar's caps fit their key names. With `event` it is a button."""
+    prompt bar's caps fit their key names. With `event` it is a button, one
+    that never takes the focus unless `focusable`. With `doc` and `glyphs`
+    the cap of a menu key shows the active device's button instead."""
     shape = path("cap", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (6, {"fraction": 1}),
                          (0, {"fraction": 1, "dp": -6})], fill=solid([1, 1, 1, 1]))
     name_props = {"position": keyword("relative"), "display": keyword("block"), **typeface("lowpixel", 13, PROMPT_H, [0.04, 0.05, 0.035, 1]),
@@ -227,25 +230,67 @@ def keycap(ident: str, key: str, *, fixed: bool = False, event: str | None = Non
         children = [vector(f"{ident}-cap", {**cap_props, "display": keyword("block")}, [shape]), name]
     else:
         children = [vector(f"{ident}-cap", cap_props, [shape], [name])]
-    if doc is not None and key in b.FACE_FOR_KEY:
+    padded = doc is not None and glyphs and key in b.FACE_FOR_KEY
+    if padded:
         # Section 13.5: the keycap for the keyboard, otherwise the controller
         # family's button that does the same, at the cap's size.
         keyboard = {"op": "select", "args": [{"op": "==", "args": [{"state": b.PROMPT_GLYPHS}, 0]}, "block", "none"]}
         for node in children:
             doc.bind(f"{node['id']}.display", node["id"], "display", keyboard)
-        glyphs = b.device_glyphs(doc, ident, b.FACE_FOR_KEY[key], [1, 1, 1, 1], PROMPT_H, KEYCAP_W if fixed else None)
+        buttons = b.device_glyphs(doc, ident, b.FACE_FOR_KEY[key], [1, 1, 1, 1], PROMPT_H, KEYCAP_W if fixed else None)
         pad_props = (absolute(left=0, top=0, width=KEYCAP_W, height=PROMPT_H) if fixed else
                      {"position": keyword("relative"), "height": length(PROMPT_H)})
-        children.append(group(f"{ident}-pad", {**pad_props, "display": keyword("none"), "opacity": number(0.85)}, glyphs))
+        children.append(group(f"{ident}-pad", {**pad_props, "display": keyword("none"), "opacity": number(0.85)}, buttons))
         doc.bind(f"{ident}-pad.display", f"{ident}-pad", "display",
                  {"op": "select", "args": [{"op": "==", "args": [{"state": b.PROMPT_GLYPHS}, 0]}, "none", "block"]})
     if event is None:
         return group(ident, props, children)
     tracks = {"default": 0.85, "hover": 1, "focus": 1, "pressed": 1, "disabled": 0.4}
     ids = doc.states(ident, {state: [(f"{ident}-cap", "opacity", number(value))] +
-                             ([(f"{ident}-pad", "opacity", number(value))] if key in b.FACE_FOR_KEY else [])
+                             ([(f"{ident}-pad", "opacity", number(value))] if padded else [])
                              for state, value in tracks.items()})
-    return group(ident, props, children, control={"role": "button", "label": key, "event": event, "states": ids})
+    control = {"role": "button", "label": key, "event": event, "states": ids}
+    if not focusable:
+        control["focusable"] = False
+    return group(ident, props, children, control=control)
+
+
+# The menu input a prompt's key gives in menus (section 13.4), and the event
+# Q and E run (the strip's ends).
+PROMPT_INPUTS = {KEY_ESCAPE: "back", KEY_ENTER: "accept"}
+PROMPT_EVENTS = {KEY_PREVIOUS: "onTabPrevious", KEY_NEXT: "onTabNext"}
+
+
+def prompt_entry(doc: Document, ident: str, keys: list, verb: str, *, glyphs: bool = True, clickable: bool = True) -> list:
+    """One prompt of a card's bar (section 14.18): each key's cap, 3 dp
+    apart and 6 dp before the verb, which has 18 dp after it. With `glyphs`
+    each cap shows the active device's button (section 13.5). A `clickable`
+    prompt answers the mouse as its key does (section 13.4) and never takes
+    the focus: Escape's and Enter's caps and verb are one target giving Back,
+    or Accept to the focused control, and Q's and E's caps each run the
+    previous or next tab, their shared verb a legend. The pointer lights a
+    target's caps and turns its verb orange."""
+    target = clickable and len(keys) == 1 and keys[0] in PROMPT_INPUTS
+    caps = [keycap(f"{ident}-{n}", key, doc=doc, glyphs=glyphs, event=PROMPT_EVENTS.get(key) if clickable and not target else None,
+                   focusable=False) for n, key in enumerate(keys)]
+    for cap in caps:
+        cap["properties"]["margin-right"] = length(3 if cap is not caps[-1] else 6)
+        cap["properties"]["flex-shrink"] = number(0)
+    words = label(f"{ident}-verb", verb, {"position": keyword("relative"), "display": keyword("block"),
+                                          **typeface("marine", 14, PROMPT_H, [1, 1, 1, 0.8]), "white-space": keyword("nowrap"),
+                                          "flex-shrink": number(0)})
+    if not target:
+        words["properties"]["margin-right"] = length(18)
+        return caps + [words]
+    parts = [f"{cap['id']}-{part}" for cap in caps for part in (("cap", "pad") if glyphs else ("cap",))]
+    tracks = {"default": (0.85, [1, 1, 1, 0.8]), "hover": (1, rgb(ORANGE)), "focus": (1, rgb(ORANGE)),
+              "pressed": (1, rgb(ORANGE)), "disabled": (0.4, [1, 1, 1, 0.4])}
+    ids = doc.states(ident, {state: [(part, "opacity", number(alpha)) for part in parts] + [(f"{ident}-verb", "color", colour(tint))]
+                             for state, (alpha, tint) in tracks.items()})
+    return [group(ident, {"position": keyword("relative"), "display": keyword("flex"), "flex-direction": keyword("row"),
+                          "align-items": keyword("center"), "height": length(PROMPT_H), "margin-right": length(18)},
+                  caps + [words], control={"role": "button", "label": verb, "states": ids, "input": PROMPT_INPUTS[keys[0]],
+                                           "focusable": False})]
 
 
 def tab(doc: Document, index: int, ident: str, key: str, state: str = "card.tab") -> dict:
@@ -3112,15 +3157,8 @@ def prompt_row(doc: Document, width: float, height: float, back_verb: str, trail
     actions, the destructive one last. Each key shows the active device's
     glyph (section 13.5): its keycap, or the controller's east button,
     shoulders and south button."""
-    def prompt(ident: str, keys: list, verb: str) -> list:
-        caps = [keycap(f"prompt-{ident}-{n}", key, doc=doc) for n, key in enumerate(keys)]
-        for cap in caps:
-            cap["properties"]["margin-right"] = length(3 if cap is not caps[-1] else 6)
-        return caps + [label(f"prompt-{ident}-verb", verb, {"position": keyword("relative"), "display": keyword("block"),
-                       "margin-right": length(18), **typeface("marine", 14, PROMPT_H, [1, 1, 1, 0.8]),
-                       "white-space": keyword("nowrap")})]
-    items = (prompt("back", [KEY_ESCAPE], back_verb) + prompt("tabs", [KEY_PREVIOUS, KEY_NEXT], VERB_TABS) +
-             prompt("select", [KEY_ENTER], VERB_SELECT))
+    items = (prompt_entry(doc, "prompt-back", [KEY_ESCAPE], back_verb) + prompt_entry(doc, "prompt-tabs", [KEY_PREVIOUS, KEY_NEXT], VERB_TABS) +
+             prompt_entry(doc, "prompt-select", [KEY_ENTER], VERB_SELECT))
     spacer = group("prompt-spacer", {"position": keyword("relative"), "display": keyword("block"), "flex-grow": number(1),
                                      "height": length(PROMPT_H)})
     # Prompts never shrink: the card is fitted to the bar, and a bar that did

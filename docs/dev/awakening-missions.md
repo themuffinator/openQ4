@@ -1047,3 +1047,149 @@ indexed by `.tmp/m08-m09-refinement/validation-summary.json`. Existing recovered
 content still emits unrelated duplicate-declaration, embedded-item and empty ASE
 mesh warnings. The isolated freezer setup also emits a medic-follow warning;
 that is distinct from the scripted route, which completes successfully.
+
+## Silent names — 14 November 2026
+
+A round on one class of alpha defect: content that names something which does
+not exist, beside something that does and is plainly what was meant. The engine
+fails all of these without a word. `idAI::Speak` returns when its key is absent,
+a radio entity shows its HUD over a sound that is not there, an effect on a
+missing joint is skipped, and an actor with no eye joint and no `eye_height`
+keeps a zero eye offset. A boot of all thirteen maps therefore shows none of
+them as errors, and earlier mission reviews, which followed warnings and
+callbacks, did not reach them.
+
+The corrections live in `src/game/awakening/ContentRepairs.inl`, one table row
+per name. They apply only in The Awakening's single player, only while the
+written name is still missing, and nothing is matched by spelling at run time.
+`g_awakeningContentRepairs 0` leaves every name as the alpha has it. No script
+is changed, so no mission script gains a revision and saved programs are
+untouched.
+
+### How the intended names were found
+
+- **Dialogue.** The content ships ten generated `scripts/maps/*_vo.script`
+  files that nothing loads. Each wraps one recorded line and keeps the writers'
+  text in a comment (speaker, context, words). A static pass resolved every
+  `aiSpeak`/`aiSpeakWait` call of the campaign's scripts against its speaker's
+  definition chain (`inherit1`/`inherit2` included) and every
+  `radioChatterPlay` against the sound declarations. Thirty-nine calls name nothing.
+  The writers' text and, on m06, the mission script's own comments identify the
+  surviving recording for seventeen of them.
+- **Joints.** A second pass checked every `fx` and `ai_attack` frame command of
+  the expansion's model declarations, and every joint key of its entity
+  definitions, against the joints of the mesh.
+
+### Dialogue restored
+
+| Map | Speaker | Script names | Plays | Evidence |
+| --- | --- | --- | --- | --- |
+| m01 (both parts) | Navajas | `lipsync_tak_strg1` | `vo_nava_strgg1` | The line is "Strogg!". The script hands Navajas Tak's take; his own take of the same word is recorded. |
+| m04 | Tak | `tak_pris_door2` | `vo_tak_pris_door2` | The key lost its `lipsync_` prefix. |
+| m04 | Darnell | `vo_darn_aboveus` | `vo_darn_aboveus` | The script passes the sound's name where the key `lipsync_darn_aboveus` belongs. |
+| m04 | Private Hoff (`insane_marine`) | `lipsync_insane1_mumble` | `vo_insane1_mumble` | He is placed as a generic unarmed marine, without the dialogue definition that carries the key. |
+| m08 | Navajas | `lipsync_nava_smrttak` | `vo_nava_smarttak` | Misspelt. "You're a smart man, there, Tak, but your priorities are a bit out of whack." |
+| m08 | Navajas | `lipsync_nava_whathll` | `vo_nava_whathellgo` | Misspelt. "What the hell is going on?", as the cryocene floods in. |
+| m08 | Tak | `lipsync_tak_deathscrm` | `vo_tak_die` | Renamed in the recording pass; played as the Valkaryne kills him. |
+| m08 | radio | `vo_darn_dir` | `vo_darn_die` | Misspelt. Darnell's death cry. |
+| m06 invasion | radio | `vo_7_13_11`, `_18`, `_2`, `_6`, `_12`, `_5`, `_1`, `_9`, `_3` | `vo_marine6_theydroppte`, `vo_marine1_gotcnt3`, `vo_marine1_thereact`, `vo_marine3_panthersq`, `vo_marine6_thatnegpan`, `vo_marine3_nexassalms`, `vo_marine1_contaceng`, `vo_marine5_igotthreemen`, `vo_marine2_thecomport` | The script comments each call with its words ("they're dropping teleporters!", "panther squad requesting support on deck 12", ...). The lines were re-recorded under speaker names and the script kept the scene numbers, so the cannon defence's whole radio backdrop was silent. |
+
+Dialogue keys are added to the speaker's spawn arguments when the map spawns
+(`Awakening_RestoreDialogueKeys`, after the definition's defaults). Radio names
+are translated when the radio entity plays (`Awakening_RecordedLine`). A key or
+sound the content does supply is never replaced.
+
+**Left alone: never recorded.** Twenty `vo_4_*` radio calls in m01's opening
+battle (the numbering dates from when the trench was mission 4) and two m08
+lines (`lipsync_nava_herightsrg`, `vo_darn_dntwrryct`) have no recording under
+any name. One m01 call has the same words as Markswell's later `vo_marks_getmov`
+talk line; a line recorded for a face-to-face reply was not moved onto the radio
+on that evidence. About 250 recorded lines are also named by no script or map
+(race chatter, further squad conversation). Where they were meant to play is not
+recoverable from the content, so they stay unused.
+
+### Eyes at the feet
+
+`monster_q4x_tank` sets `joint_eyeOffset` to `rt_up_lid`; its mesh has
+`l_uplid` and `r_uplid`. `monster_q4x_retch` sets it to `jaw`; its skull is the
+single joint `head`. Neither sets `eye_height`, so both kept a zero eye offset:
+every sight check started at the floor between their feet, and anything knee
+high between them and the player hid the player. The joints resolve to
+`r_uplid` and `head` (`Awakening_IntendedJoint`, from `idActor`'s setup).
+Saves made earlier hold no eye joint for these two; `idActor::Restore` resolves
+it when the actor has no `eye_height` and no separate head.
+
+This changes combat as the definitions intended: both now keep sight of a
+player behind low cover. Their attacks, ranges and damage are unchanged.
+
+### Effects
+
+- **Tank rocket flash.** Its `rocket_attack` frame commands are the retail
+  Iron Maiden's (`ai_attack rocket gunBarrelReal`, `fx fx_rocket_flash
+  gunBarrelReal`) with the attack moved to `tube1`. The flash kept the Maiden's
+  joint, which the Tank lacks, and the Tank's definition never received an
+  `fx_rocket_flash` key; no Tank rocket flash exists in the content. The flash
+  now plays on `tube1` with the Maiden's `effects/monsters/iron_maiden/
+  muzzleflash.fx`, the effect those frame commands were written for and one
+  every installation has. This is the one place the round supplies a name the
+  Tank's own files never held. The four launches still leave `tube1`, as
+  authored.
+- **Opening dropships (m01).** Each of the three ships lights `fx_thrusters` on
+  `engine_righ` and then `engine_left`. Retail's dropship mesh has
+  `engine_left` and `engine_center` but never had a right engine joint (its
+  export list names one; retail's own animations use only the other two). The
+  right plume is placed by reflecting `engine_left` through the plane midway
+  between `gun_left_01` and `gun_right_01`, attached to `engine_left` so it
+  follows the animation.
+
+**Left alone: never played.** The Strogg marine's `teleport_fail` animation
+(`r_wrist`, `head` for `rWrist`, `head_1`) and the fuel mixer's `blowup`
+(`base_pivot` for `base`) carry the same kind of slip, but no script or code
+plays either. The spike gun's `charging` animation is core-cannon residue.
+Retail's dispersal harvester (m01) fails its own muzzle effects as it does in
+retail. None is corrected without a way to see the result.
+
+### Validation
+
+`tools/tests/awakening_content_repairs.py` checks the tables, the call sites and
+the single-player scope from the sources. With the content available it also
+proves every row against it: the script speaks the written name, the name is
+absent, the replacement exists with its recording or joint, and the Iron Maiden
+still plays the borrowed flash from the same frame command. A row whose written
+name later appears in the content fails as obsolete.
+
+Runtime, Windows x64 OpenGL, hidden window, no input, the staged client with
+the rebuilt single-player module, sound device open at zero volume. The cheat
+command `openq4_testSpeak <entity> <key or sound>` makes the call a mission
+script makes and reports a missing line; `aiDumpState` now prints each AI's eye
+height.
+
+| Probe | Alpha names (`g_awakeningContentRepairs 0`) | Corrected |
+| --- | --- | --- |
+| m08 dialogue | — | Navajas 3343 ms and 1323 ms, Tak 940 ms: the lengths of the three recordings. Darnell's cry resolves. The two unrecorded lines still report missing. |
+| m04 dialogue | — | Tak 917 ms, Darnell 847 ms, Hoff 4549 ms. |
+| m01 dialogue, both parts | — | Navajas 1201 ms. |
+| m06 radio | — | All nine calls play their recorded line. |
+| Tank and Retch eye height | 0.0 and 0.0 | 124.6 and 67.3 units above the origin. |
+| Tank rocket volley | Four "Failed to play effect" per volley | None; the flash plays on `tube1`, loaded with the map. |
+| m01 dropship thrusters | Four failures in the first 30 s | None; the right plume sits 154.7 units from `engine_left`, the figure the bind pose gives by hand. |
+
+Restore: a save made with `g_awakeningContentRepairs 0` holds a Tank and a
+Retch at eye height 0.0. Loaded in a fresh process with the corrections on,
+they report 125.2 and 57.2 (the Retch mid-animation). An AI that has not
+animated yet, such as a hidden one, reports 0 in any campaign; that is the
+retail behaviour. A stock run (`game/airdefense1` on `baseoq4`) prints no
+correction and loads as before.
+
+A boot of all thirteen maps before the round (25 s each, developer mode) logged
+no error; the same boot on the final
+module logs none either, with identical warning counts on twelve maps and four
+fewer on m01 part 1 (the thruster failures).
+
+Limits. The lines were started by the tester command and the effects by spawned
+actors, not by playing each scene, so scene timing with the restored lines
+(overlap with neighbouring dialogue, lip sync on screen) has not been watched or
+heard. The Tank's flash and the dropship's right plume are confirmed as played
+and placed, not judged by eye. Sight over low cover follows from the measured
+eye heights; no encounter was replayed to compare difficulty. Linux and macOS
+were not run.

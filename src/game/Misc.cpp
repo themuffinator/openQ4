@@ -16,6 +16,7 @@ Various utility objects and functions.
 #endif
 #include "ai/AI.h"
 // RAVEN END
+#include "awakening/ContentRepairs.h"
 
 /*
 ===============================================================================
@@ -1785,11 +1786,14 @@ bool idAnimated::StartRagdoll( void ) {
 		return true;
 	}
 
+	// openQ4: the motion a ragdoll inherits in enhanced physics (PHYS-03)
+	const idVec3 inheritedVelocity = GetPhysics()->GetLinearVelocity();
+
 	// disable any collision model used
 	GetPhysics()->DisableClip();
 
 	// start using the AF
-	af.StartFromCurrentPose( spawnArgs.GetInt( "velocityTime", "0" ) );
+	af.StartFromCurrentPoseForDeath( spawnArgs.GetInt( "velocityTime", "0" ), inheritedVelocity );
 	
 	return true;
 }
@@ -4210,7 +4214,9 @@ void idFuncRadioChatter::Event_Activate( idEntity *activator ) {
 	isActive = true;
 // RAVEN END
 
-	sound = spawnArgs.GetString( "snd_radiochatter", "" );
+	// openQ4: the Awakening's scripts name some radio lines by numbers their
+	// recordings no longer carry
+	sound = Awakening_RecordedLine( spawnArgs.GetString( "snd_radiochatter", "" ) );
 	if ( sound && *sound ) {
 		shader = declManager->FindSound( sound );
 		if ( shader && shader->IsVO_ForPlayer()){

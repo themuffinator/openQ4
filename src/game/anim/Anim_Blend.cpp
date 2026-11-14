@@ -10,6 +10,7 @@
 #include "framework/SaveGameReleases.h"
 #include "../../game/Projectile.h"
 #include "../ai/AI.h"
+#include "../awakening/ContentRepairs.h"
 
 static const char *channelNames[ ANIM_NumAnimChannels ] = {
 	"all", "torso", "legs", "head", "eyelids"
@@ -938,15 +939,30 @@ void idAnim::CallFrameCommands( idEntity *ent, int from, int to ) const {
 // RAVEN BEGIN
 // bdube: use raven effect system
 					rvClientEffect* cent;
+					// openQ4: a joint the Awakening's content mistypes resolves to
+					// the one it meant; every other missing joint still fails below
+					jointHandle_t effectJoint = INVALID_JOINT;
+					idVec3 effectJointOffset = vec3_zero;
+					if ( command.joint ) {
+						effectJoint = ent->GetAnimator()->GetJointHandle ( *command.joint );
+						if ( effectJoint == INVALID_JOINT ) {
+							effectJoint = Awakening_IntendedEffectJoint( ent, command.joint->c_str(), effectJointOffset );
+						}
+					}
 					if ( command.string ) {
 						if ( command.joint ) {
-							cent = ent->PlayEffect( command.string->c_str(), ent->GetAnimator()->GetJointHandle ( *command.joint ) );
+							const idDecl *intendedEffect = Awakening_IntendedEffect( ent, command.string->c_str() );
+							if ( intendedEffect ) {
+								cent = ent->PlayEffect( intendedEffect, effectJoint, effectJointOffset, mat3_identity );
+							} else {
+								cent = ent->PlayEffect( command.string->c_str(), effectJoint, effectJointOffset, mat3_identity );
+							}
 						} else {
 							cent = gameLocal.PlayEffect( ent->spawnArgs, command.string->c_str(), ent->GetRenderEntity()->origin, ent->GetRenderEntity()->axis );
 						}
 					} else {
 						if ( command.joint ) {
-							cent = ent->PlayEffect( command.effect, ent->GetAnimator()->GetJointHandle ( *command.joint ), vec3_zero, mat3_identity );
+							cent = ent->PlayEffect( command.effect, effectJoint, effectJointOffset, mat3_identity );
 						} else {
 							cent = gameLocal.PlayEffect(  command.effect, ent->GetRenderEntity()->origin, ent->GetRenderEntity()->axis );
 						}

@@ -7488,7 +7488,7 @@ bool idFileSystemLocal::FileAllowedFromDir( const char *path ) {
 		return true;
 	}
 	// screen shots
-	if ( strstr( path, "screenshots" ) == path && l >= 4 && !strcmp( path + l - 4, ".tga" ) ) {
+	if ( strstr( path, "screenshots" ) == path && l >= 4 && ( !strcmp( path + l - 4, ".tga" ) || !strcmp( path + l - 4, ".png" ) ) ) {
 		return true;
 	}
 	// objective tgas

@@ -337,9 +337,79 @@ static void ManualScopeCompatibility() {
 	Check(f.interaction.PopModal(),"manual scope still pops explicitly");
 	Check(f.interaction.Focused() == "page.opener" && !f.interaction.CanDispatchModalBack(back),"manual Pop restores focus and invalidates old Back");
 }
+// A prompt-bar entry (section 13.4) answers the mouse as its key does and
+// never takes the focus: Accept goes to the focused control, Back is Back,
+// and an unfocusable event button runs its own event.
+static void PromptButtonsReplayKeys() {
+	const auto prompt = [](const std::string& id, ControlInput input, const std::string& event = {}) {
+		Node node = Button(id); node.control->action.clear(); node.control->event = event;
+		node.control->input = input; node.control->focusable = false; return node;
+	};
+	DocumentModel model; model.id = "prompt-interaction"; model.root.id = "root"; model.root.type = "group";
+	model.root.children = {prompt("prompt.select",ControlInput::Accept), Button("row.first"), Button("row.second"),
+		prompt("prompt.back",ControlInput::Back), prompt("prompt.next",ControlInput::None,"ontabnext")};
+	Interaction interaction; interaction.Reset(model);
+	std::map<std::string,ControlBounds> bounds;
+	unsigned row = 0;
+	for (const auto* id : {"prompt.select","row.first","row.second","prompt.back","prompt.next"}) bounds[id] = {0,float(row++ * 40),160,32,true};
+	interaction.SetBounds(bounds);
+	interaction.Input(MenuInput::Down,true); interaction.Input(MenuInput::Down,false);
+	Check(interaction.Focused() == "row.first","navigation passes over a leading prompt to the first focusable control");
+	for (const auto input : {MenuInput::Down,MenuInput::Down,MenuInput::Next,MenuInput::Next,MenuInput::Previous,MenuInput::Previous,MenuInput::Previous}) {
+		interaction.Input(input,true); interaction.Input(input,false);
+		Check(interaction.Focused().rfind("row.",0) == 0,"no directional or tab move lands on a prompt");
+	}
+	Check(!interaction.Focus("prompt.select") && !interaction.Focus("prompt.back"),"a program cannot focus a prompt");
+	Check(interaction.Focus("row.second"),"focus the second row");
+	interaction.TakeActions();
+	const auto click = [&](const std::string& id, const std::string& focus = "row.second") {
+		interaction.Hover(id);
+		Check(interaction.State(id) == ControlState::Hover,"the pointer lights a prompt");
+		interaction.Pointer(true);
+		Check(interaction.State(id) == ControlState::Pressed && interaction.Focused() == focus,"a press on a prompt leaves the focus");
+		interaction.Pointer(false);
+		return interaction.TakeActions();
+	};
+	auto actions = click("prompt.select");
+	Check(actions.size() == 1 && actions[0].kind == ControlAction::Kind::Activate && actions[0].node == "row.second" &&
+		actions[0].action == "row.second.activate","a click on SELECT activates the focused control, as Accept does");
+	actions = click("prompt.back");
+	Check(actions.size() == 1 && actions[0].kind == ControlAction::Kind::Back,"a click on BACK is Back");
+	actions = click("prompt.next");
+	Check(actions.size() == 1 && actions[0].node == "prompt.next" && actions[0].event == "ontabnext","an event prompt runs its own event");
+	Check(interaction.Focused() == "row.second","the focus never moved");
+	// A held Enter owns Accept: the click does not activate a second time.
+	interaction.Input(MenuInput::Accept,true);
+	interaction.Hover("prompt.select"); interaction.Pointer(true); interaction.Pointer(false);
+	Check(interaction.TakeActions().empty(),"a click while Enter is held gives nothing of its own");
+	interaction.Input(MenuInput::Accept,false);
+	actions = interaction.TakeActions();
+	Check(actions.size() == 1 && actions[0].node == "row.second","the held key's release activates once");
+	// With nothing focused, Accept has nothing to act on.
+	Check(interaction.Focus(""),"leave the page without focus");
+	Check(click("prompt.select","").empty(),"a click on SELECT without a focused control does nothing");
+	// The document contract: an input replaces the action or event and needs focusable false.
+	const auto load = [](const char* control) {
+		const std::string source = std::string(R"({"format":"retained-ui","version":1,"id":"prompt-schema",)") +
+			R"("actions":{"go":{"operation":"session.menu","arguments":{"command":"go"}}},"timelines":[)"
+			R"({"id":"s","durationMs":1,"tracks":[{"node":"p","property":"opacity","keys":[{"atMs":0,"value":{"type":"number","value":1}},{"atMs":1,"value":{"type":"number","value":1}}]}]}],)"
+			R"("root":{"id":"root","type":"group","children":[{"id":"p","type":"group","properties":{"opacity":{"type":"number","value":1}},"control":)" + control + "}]}}";
+		Document document; std::vector<Diagnostic> diagnostics;
+		const bool loaded = document.Load(source,diagnostics);
+		if (std::getenv("OPENQ4_PROMPT_SCHEMA_DIAGNOSTICS")) for (const auto& d : diagnostics) std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());
+		return loaded;
+	};
+	const std::string states = R"("states":{"default":"s","hover":"s","focus":"s","pressed":"s","disabled":"s"})";
+	Check(load((R"({"role":"button","label":"#str_1","input":"accept","focusable":false,)" + states + "}").c_str()),"an accept prompt loads");
+	Check(load((R"({"role":"button","label":"#str_1","action":"go","focusable":false,)" + states + "}").c_str()),"an unfocusable action button loads");
+	Check(!load((R"({"role":"button","label":"#str_1","input":"accept",)" + states + "}").c_str()),"an input button must not take the focus");
+	Check(!load((R"({"role":"button","label":"#str_1","input":"back","action":"go","focusable":false,)" + states + "}").c_str()),
+		"an input replaces the action");
+	Check(!load((R"({"role":"button","label":"#str_1","input":"next","focusable":false,)" + states + "}").c_str()),"only accept and back replay");
+}
 int main() {
 	PreviousFocusAndFreshLayout(); DefaultEligibilityAndAsyncChanges(); NestedAndDisjointScopes();
 	HeldSourcesAndRepeats(); IndependentNavigationPulse(); BackIdentityAndNoImplicitDismiss(); PendingSnapshotRestoration(); ActivationOwnership();
-	InvalidLayoutAndEmptyRestoration(); ManualScopeCompatibility();
+	InvalidLayoutAndEmptyRestoration(); ManualScopeCompatibility(); PromptButtonsReplayKeys();
 	std::printf("UiModalInteractionTest: %u checks passed (production Interaction/Input, no devices or rendering).\n",checks);
 }

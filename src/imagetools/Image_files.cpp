@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ImageTools.h"
 #include "LegacyScopeMask.h"
 #include "DXT/DXTCodec.h"
+#include "PNG/PNGCodec.h"
 
 idCVar image_usePrecompressedTextures(
 	"image_usePrecompressedTextures",
@@ -42,6 +43,14 @@ idCVar image_usePrecompressedTextures(
 	"automatic DDS texture replacements: 0 = off, 1 = stock progimg plus supported DDS formats, 2 = BC7/BPTC DDS only; custom dhewm3-compatible replacements belong under dds/",
 	0,
 	2 );
+
+idCVar image_pngCompressionLevel(
+	"image_pngCompressionLevel",
+	"4",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
+	"compression for PNG screenshots and other PNG files the engine writes: 0 = store, 1 = fastest, 9 = smallest; 4 balances speed and size",
+	0,
+	9 );
 
 idCVar image_showPrecompressedTextures(
 	"image_showPrecompressedTextures",
@@ -129,8 +138,51 @@ bool R_WriteTGA( const char *filename, const byte *data, int width, int height, 
 	return fileSystem->WriteFile( filename, buffer, bufferSize, basePath ) == bufferSize;
 }
 
+/*
+================
+R_WritePNG
+
+data holds width x height pixels of channels (3 or 4) bytes, top row first
+unless flipVertical is set. The encoder keeps the smallest lossless colour
+type, so opaque RGBA data is written without an alpha channel.
+================
+*/
+bool R_WritePNG( const char *filename, const byte *data, int width, int height, int channels, bool flipVertical, const char *basePath ) {
+	pngEncodeOptions_t options;
+	options.compressionLevel = image_pngCompressionLevel.GetInteger();
+	options.format = PNG_WRITE_AUTO;
+	options.flipVertical = flipVertical;
+
+	uint8_t *file = NULL;
+	size_t fileSize = 0;
+	const pngResult_t result = PNG_Encode( data, width, height, channels, 0, &options, &file, &fileSize );
+	if ( result != PNG_OK ) {
+		common->Warning( "R_WritePNG( %s ): %s", filename, PNG_ResultString( result ) );
+		return false;
+	}
+	const bool written = fileSize <= 0x7FFFFFFF && fileSystem->WriteFile( filename, file, (int)fileSize, basePath ) == (int)fileSize;
+	PNG_FreeEncoded( file );
+	return written;
+}
+
+/*
+================
+R_WriteImageFile
+
+Writes RGBA data as PNG when filename ends in .png, otherwise as TGA.
+================
+*/
+bool R_WriteImageFile( const char *filename, const byte *data, int width, int height, bool flipVertical, const char *basePath ) {
+	idStr name( filename );
+	if ( name.CheckExtension( ".png" ) ) {
+		return R_WritePNG( filename, data, width, height, 4, flipVertical, basePath );
+	}
+	return R_WriteTGA( filename, data, width, height, flipVertical, basePath );
+}
+
 static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
 static void LoadJPG( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
+static void LoadPNG( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
 static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp, bool decodeRXGBNormalMap );
 
 /*
@@ -643,6 +695,67 @@ static void LoadJPG( const char *filename, unsigned char **pic, int *width, int 
    */
 
   /* And we're done! */
+}
+
+/*
+=========================================================
+
+PNG LOADING
+
+=========================================================
+*/
+
+/*
+=============
+LoadPNG
+
+Every PNG colour type, bit depth and interlace mode decodes to RGBA8. A
+damaged file warns and loads nothing, so the caller falls back to the next
+source or the default image.
+=============
+*/
+static void LoadPNG( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp ) {
+	if ( !pic ) {
+		fileSystem->ReadFileContentStamp( name, NULL, timestamp );
+		return;	// just getting timestamp
+	}
+	*pic = NULL;
+
+	byte *buffer = NULL;
+	const int fileSize = fileSystem->ReadFileContentStamp( name, (void **)&buffer, timestamp );
+	if ( !buffer ) {
+		return;
+	}
+
+	pngInfo_t info;
+	pngResult_t result = PNG_ReadInfo( buffer, (size_t)( fileSize > 0 ? fileSize : 0 ), info );
+	// the same 2 GiB RGBA ceiling as the TGA and JPG loaders
+	if ( result == PNG_OK && (uint64)info.width * info.height * 4 > 0x7FFFFFFF ) {
+		result = PNG_ERR_TOO_LARGE;
+	}
+	if ( result != PNG_OK ) {
+		common->Warning( "LoadPNG( %s ): %s", name, PNG_ResultString( result ) );
+		fileSystem->FreeFile( buffer );
+		return;
+	}
+
+	const size_t rgbaBytes = (size_t)info.width * info.height * 4;
+	byte *rgba = (byte *)R_StaticAlloc( rgbaBytes );
+	result = PNG_DecodeRGBA8( buffer, (size_t)fileSize, rgba, rgbaBytes, NULL );
+	fileSystem->FreeFile( buffer );
+	if ( result != PNG_OK ) {
+		common->Warning( "LoadPNG( %s ): %s", name, PNG_ResultString( result ) );
+		R_StaticFree( rgba );
+		return;
+	}
+
+	*pic = rgba;
+	if ( width ) {
+		*width = (int)info.width;
+	}
+	if ( height ) {
+		*height = (int)info.height;
+	}
 }
 
 //===================================================================
@@ -1214,7 +1327,7 @@ static void R_BuildDDSCandidates( const char *cname, idStrList &candidates, idSt
 
 		idStr ext;
 		sourceName.ExtractFileExtension( ext );
-		if ( ext == "tga" || ext == "jpg" ) {
+		if ( ext == "tga" || ext == "jpg" || ext == "png" ) {
 			if ( !R_ImageNameHasDDSShadowPrefix( sourceName ) ) {
 				idStr shadowDDSName = "dds/";
 				shadowDDSName += sourceName;
@@ -1753,7 +1866,8 @@ R_LoadImage
 Loads any of the supported image types into a cannonical
 32 bit format.
 
-Automatically attempts to load .jpg / .dds files if .tga files fail to load.
+Automatically attempts to load .jpg / .png / .dds files if .tga files fail to
+load, and the other source formats when a named .jpg or .png is missing.
 
 *pic will be NULL if the load failed.
 
@@ -1846,6 +1960,11 @@ static void R_LoadImageInternal( const char *cname, byte **pic, int *width, int 
 		}
 		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
 			name.StripFileExtension();
+			name.DefaultFileExtension( ".png" );
+			LoadPNG( name.c_str(), pic, width, height, timestamp );
+		}
+		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
+			name.StripFileExtension();
 			name.DefaultFileExtension( ".dds" );
 			LoadDDS( name.c_str(), pic, width, height, timestamp, decodeRXGBNormalMap );
 		}
@@ -1857,6 +1976,23 @@ static void R_LoadImageInternal( const char *cname, byte **pic, int *width, int 
 			name.StripFileExtension();
 			name.DefaultFileExtension( ".tga" );
 			LoadTGA( name.c_str(), pic, width, height, timestamp );
+		}
+		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
+			name.StripFileExtension();
+			name.DefaultFileExtension( ".dds" );
+			LoadDDS( name.c_str(), pic, width, height, timestamp, decodeRXGBNormalMap );
+		}
+	} else if ( ext == "png" ) {
+		LoadPNG( name.c_str(), pic, width, height, timestamp );
+		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
+			name.StripFileExtension();
+			name.DefaultFileExtension( ".tga" );
+			LoadTGA( name.c_str(), pic, width, height, timestamp );
+		}
+		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
+			name.StripFileExtension();
+			name.DefaultFileExtension( ".jpg" );
+			LoadJPG( name.c_str(), pic, width, height, timestamp );
 		}
 		if ( ( pic && *pic == 0 ) || ( timestamp && *timestamp == -1 ) ) { //-V595
 			name.StripFileExtension();

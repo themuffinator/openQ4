@@ -2,6 +2,7 @@
 #pragma hdrstop
 
 #include "Game_local.h"
+#include "../game/physics/PhysicsTelemetry.h"
 // RAVEN BEGIN
 // bdube: client entities
 #include "client/ClientEffect.h"
@@ -3431,6 +3432,8 @@ server demos: clientNum == MAX_CLIENTS
 ================
 */
 gameReturn_t idGameLocal::ClientPrediction( int clientNum, const usercmd_t *clientCmds, bool lastPredictFrame, ClientStats_t *cs ) {
+	// openQ4: predicted client frames run corpse and debris physics too (PHYS-01 telemetry)
+	OpenQ4Physics::GetTelemetry().FrameTick( framenum + 1 );
 	idEntity		*ent;
 	idPlayer		*player;	// may be NULL when predicting for a server demo
 	gameReturn_t	ret;

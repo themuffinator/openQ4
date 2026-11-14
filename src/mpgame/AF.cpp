@@ -1068,6 +1068,42 @@ void idAF::StartFromCurrentPose( int inheritVelocityTime ) {
 
 /*
 ================
+idAF::StartFromCurrentPoseForDeath
+
+  openQ4 (PHYS-03): the start of a death or scripted ragdoll. Legacy starts the
+  figure from rest unless its def authors a velocityTime. In enhanced physics a
+  figure without one takes its joint velocities from the last
+  af_enhancedInheritTime ms of its animation and adds the entity's own motion,
+  so a running monster falls forward instead of stopping dead; each body's
+  inherited speed is capped by af_enhancedMaxInheritSpeed.
+================
+*/
+void idAF::StartFromCurrentPoseForDeath( int velocityTime, const idVec3 &entityVelocity ) {
+	if ( !gameLocal.enhancedPhysics ) {
+		StartFromCurrentPose( velocityTime );
+		return;
+	}
+	if ( velocityTime <= 0 ) {
+		velocityTime = af_enhancedInheritTime.GetInteger();
+	}
+	StartFromCurrentPose( velocityTime );
+	if ( !IsLoaded() ) {
+		return;
+	}
+	const float maxSpeed = af_enhancedMaxInheritSpeed.GetFloat();
+	for ( int i = 0; i < physicsObj.GetNumBodies(); i++ ) {
+		idAFBody *body = physicsObj.GetBody( i );
+		idVec3 velocity = body->GetLinearVelocity() + entityVelocity;
+		if ( maxSpeed > 0.0f && velocity.LengthSqr() > Square( maxSpeed ) ) {
+			velocity *= maxSpeed / velocity.Length();
+		}
+		body->SetLinearVelocity( velocity );
+	}
+	physicsObj.Activate();
+}
+
+/*
+================
 idAF::Stop
 ================
 */

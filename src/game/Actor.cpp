@@ -18,6 +18,7 @@
 
 #include "ai/AI.h"
 #include "ai/AI_Manager.h"
+#include "awakening/ContentRepairs.h"
 
 /***********************************************************************
 
@@ -983,6 +984,13 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadJoint( neckJoint );
 	savefile->ReadJoint( headJoint );
 
+	// openQ4: a save made before the Awakening's eye joints were corrected holds
+	// none for its Tanks and Retches. Neither has a separate head or an eye_height.
+	if ( eyeOffsetJoint == INVALID_JOINT && spawnArgs.FindKey( "eye_height" ) == NULL &&
+		!spawnArgs.GetString( "def_head" )[ 0 ] ) {
+		eyeOffsetJoint = Awakening_IntendedJoint( &animator, spawnArgs.GetString( "joint_eyeOffset" ) );
+	}
+
 	walkIK.Restore( savefile, this );
 
 	savefile->ReadString( animPrefix );
@@ -1214,6 +1222,11 @@ void idActor::SetupBody( void ) {
 		}
 		// Get the eye offset joint
 		eyeOffsetJoint = headAnimator->GetJointHandle ( jointname );
+		if ( eyeOffsetJoint == INVALID_JOINT ) {
+			// openQ4: the Awakening's Tank and Retch name eye joints their meshes
+			// spell differently, which left their eyes at their feet
+			eyeOffsetJoint = Awakening_IntendedJoint( headAnimator, jointname );
+		}
 	}
 
 	// If eye height is specified, just use that
@@ -1857,6 +1870,9 @@ bool idActor::StartRagdoll( void ) {
 		return true;
 	}
 
+	// openQ4: the motion a ragdoll inherits in enhanced physics (PHYS-03)
+	const idVec3 inheritedVelocity = GetPhysics()->GetLinearVelocity();
+
 	// Raise the origin up 5 units to help ensure the ragdoll doesnt start in the ground
 	GetPhysics()->SetOrigin( GetPhysics()->GetOrigin() + GetPhysics()->GetGravityNormal() * -5.0f );
 	UpdateModelTransform();
@@ -1864,7 +1880,7 @@ bool idActor::StartRagdoll( void ) {
 	// disable the monster bounding box
 	GetPhysics()->DisableClip();
 
-	af.StartFromCurrentPose( spawnArgs.GetInt( "velocityTime", "0" ) );
+	af.StartFromCurrentPoseForDeath( spawnArgs.GetInt( "velocityTime", "0" ), inheritedVelocity );
 
 	slomoStart = MS2SEC( gameLocal.time ) + spawnArgs.GetFloat( "ragdoll_slomoStart", "-1.6" );
 	slomoEnd = MS2SEC( gameLocal.time ) + spawnArgs.GetFloat( "ragdoll_slomoEnd", "0.8" );

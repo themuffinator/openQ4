@@ -402,7 +402,7 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"ui_hudWidth",{0,0,2,true,{},{0,1,2}}},{"ui_hudSafeInset",{0,0,10,false}},{"g_objectivesToggle",{1}},
 		{"ui_hudOpacity",{0,0.25,1,false}},{"ui_hudDamageDirection",{1}},{"ui_hudPickups",{1}},{"ui_hudWeaponStrip",{1}},
 		{"ui_reducedFlashing",{1}},{"ui_retainedOpaqueBacking",{1}},{"g_corpseSink",{0,0,2,true,{},{0,1,2}}},{"con_allowConsole",{0,0,1,true,{},{0,1}}},
-		{"g_autoSkipCinematics",{1}},{"ui_cinematicShake",{0,0,1,false}},
+		{"g_autoSkipCinematics",{1}},{"ui_cinematicShake",{0,0,1,false}},{"g_enhancedPhysics",{1}},
 		{"cl_gunfov",{0,0,179,false}},{"cl_gunfov_adjust",{0,0,1,true,{},{0,1}}},
 		{"cl_gun_x",{0,-5,5,false}},{"cl_gun_y",{0,-5,5,false}},{"cl_gun_z",{0,-5,5,false}},{"g_weaponMuzzleKick",{1}},
 		{"vr_enable",{0,0,1,true,{},{0,1}}},{"vr_aimMode",{0,0,1,true,{},{1,0}}},{"vr_leftHanded",{0,0,1,true,{},{0,1}}},
@@ -648,7 +648,7 @@ bool ValidateApplication(const DocumentModel& model, std::string& error) {
 				!std::holds_alternative<ScrollSpec>(control.widget)) {
 				error = "Scrollbar has invalid application output: " + node->id; return false;
 			}
-		} else if (node->control && (node->control->event.empty() ? !model.actions.contains(node->control->action) :
+		} else if (node->control && node->control->input == ControlInput::None && (node->control->event.empty() ? !model.actions.contains(node->control->action) :
 			!model.events.contains(PresentationAliasKey(node->control->event)))) {
 			error = "Control has no typed application action or event: " + node->id; return false;
 		}
@@ -2313,6 +2313,16 @@ bool UI_RetainedDiagnostic(idUserInterface* gui, const idCmdArgs& args) {
 		// it, without a device: hover follows, and it shows in a capture.
 		owner.SetCursor(static_cast<float>(atof(args.Argv(2))),static_cast<float>(atof(args.Argv(3))));
 		impl.pointerPlaced = true; impl.Pointer(); okay = true;
+	} else if (verb == "click" && args.Argc() == 2) {
+		// A left-button press and release where the cursor stands, through the
+		// path a mouse's takes, without a device: a prompt or a control under
+		// the cursor answers as it would to the mouse.
+		const double now = RetainedUI_PresentationTime();
+		for (const bool down : {true,false}) {
+			impl.Pointer(); impl.input.Pointer(K_MOUSE1,down,now);
+			impl.input.Advance(now); impl.ApplyInput();
+		}
+		impl.CollectActions(true); impl.PlayCues(); okay = true;
 	} else if (verb == "menu" && args.Argc() == 4 && (!idStr::Cmp(args.Argv(3),"0") || !idStr::Cmp(args.Argv(3),"1"))) {
 		const std::map<std::string,MenuInput> inputs = {{"next",MenuInput::Next},{"previous",MenuInput::Previous},
 			{"up",MenuInput::Up},{"down",MenuInput::Down},{"left",MenuInput::Left},{"right",MenuInput::Right},{"accept",MenuInput::Accept},{"back",MenuInput::Back},

@@ -45,6 +45,8 @@ public:
 	int						EntitiesTouchingAF( afTouch_t touchList[ MAX_GENTITIES ] ) const;
 	void					Start( void );
 	void					StartFromCurrentPose( int inheritVelocityTime );
+							// openQ4: ragdoll start that inherits the pose's motion in enhanced physics
+	void					StartFromCurrentPoseForDeath( int velocityTime, const idVec3 &entityVelocity );
 	void					Stop( void );
 	void					Rest( void );
 	bool					IsActive( void ) const { return isActive; }

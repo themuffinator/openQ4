@@ -53,6 +53,8 @@ struct Files {
 	}
 	void FreeFile(void *data) { std::free(data); }
 } files, *fileSystem=&files;
+// The mission code asks whether The Awakening is running (a mod may own the game directory).
+static bool FS_AwakeningActive() { return std::strcmp(fileSystem->GetActiveGameDir(),"q4xbase")==0; }
 
 // @MISSION@
 

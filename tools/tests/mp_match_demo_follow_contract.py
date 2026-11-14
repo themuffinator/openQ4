@@ -25,6 +25,16 @@ def main() -> None:
     set_follow = function_body(network, "bool idGameLocal::SetDemoFollowClient")
     interface = (ROOT / "src/game/Game.h").read_text(encoding="utf-8")
     follow_targets = function_body(interface, "enum demoFollowTarget_t")
+    # The offline viewer that InitLocalClient spawns lives in ENTITYNUM_NONE, so
+    # RegisterEntity's spawn_entnum guard must admit that slot in both game
+    # trees (the 9 November guard refused it and every offline MVD playback
+    # failed at map load with "spawn_entnum 4095 out of range").
+    assert "SpawnPlayer( ENTITYNUM_NONE );" in initialize
+    for tree in ("game", "mpgame"):
+        register = function_body((ROOT / f"src/{tree}/Game_local.cpp").read_text(encoding="latin-1"),
+                                 "void idGameLocal::RegisterEntity")
+        assert "spawn_entnum < 0 || spawn_entnum >= MAX_GENTITIES" in register, f"{tree}: RegisterEntity must admit ENTITYNUM_NONE"
+        assert "spawn_entnum >= ENTITYNUM_NONE" not in register, f"{tree}: RegisterEntity refuses the demo viewer's slot"
     harness = r'''
 #include <stdio.h>
 #include <cassert>

@@ -16684,6 +16684,8 @@ windowDef Desktop
 			set "set_game_autoskipcinematics_hover::visible" "1" ;
 			set "set_game_cinematicshake::visible" "1" ;
 			set "set_game_cinematicshake_hover::visible" "1" ;
+			set "set_game_enhancedphysics::visible" "1" ;
+			set "set_game_enhancedphysics_hover::visible" "1" ;
 			set "set_game_viewweapon::visible" "1" ;
 			set "set_game_cl_gunfov::visible" "1" ;
 			set "set_game_cl_gunfov_hover::visible" "1" ;
@@ -16785,6 +16787,7 @@ windowDef Desktop
 			set "set_game_language_value::noevents" "0" ;
 			set "set_game_consoleaccess::noevents" "0" ;
 			set "set_game_autoskipcinematics::noevents" "0" ;
+			set "set_game_enhancedphysics::noevents" "0" ;
 			set "set_game_cl_gunfov::noevents" "0" ;
 			set "set_game_cl_gunfov_adjust::noevents" "0" ;
 			set "set_game_cl_gun_x::noevents" "0" ;
@@ -16938,6 +16941,8 @@ windowDef Desktop
 			set "set_game_autoskipcinematics_hover::visible" "0" ;
 			set "set_game_cinematicshake::visible" "0" ;
 			set "set_game_cinematicshake_hover::visible" "0" ;
+			set "set_game_enhancedphysics::visible" "0" ;
+			set "set_game_enhancedphysics_hover::visible" "0" ;
 			set "set_game_viewweapon::visible" "0" ;
 			set "set_game_cl_gunfov::visible" "0" ;
 			set "set_game_cl_gunfov_hover::visible" "0" ;
@@ -17039,6 +17044,7 @@ windowDef Desktop
 			set "set_game_language_value::noevents" "1" ;
 			set "set_game_consoleaccess::noevents" "1" ;
 			set "set_game_autoskipcinematics::noevents" "1" ;
+			set "set_game_enhancedphysics::noevents" "1" ;
 			set "set_game_cl_gunfov::noevents" "1" ;
 			set "set_game_cl_gunfov_adjust::noevents" "1" ;
 			set "set_game_cl_gun_x::noevents" "1" ;
@@ -19244,6 +19250,7 @@ windowDef Desktop
 				set "set_game_language_background::matcolor_w" "0.4" ;
 				set "set_game_consoleaccess_background::matcolor_w" "0.4" ;
 				set "set_game_autoskipcinematics_background::matcolor_w" "0.4" ;
+				set "set_game_enhancedphysics_background::matcolor_w" "0.4" ;
 				set "set_game_cl_gunfov_background::matcolor_w" "0.4" ;
 				set "set_game_cl_gunfov_adjust_background::matcolor_w" "0.4" ;
 				set "set_game_cl_gun_x_background::matcolor_w" "0.4" ;

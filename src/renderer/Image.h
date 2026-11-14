@@ -414,6 +414,11 @@ bool R_IsMutableRenderImage( const idImage *image );
 bool	R_WriteTGA(const char* filename, const byte* data, int width, int height, bool flipVertical = false, const char* basePath = "fs_savepath");
 // data is in top-to-bottom raster order unless flipVertical is set
 
+// data is RGB (channels 3) or RGBA (channels 4); see ImageTools.h
+bool	R_WritePNG(const char* filename, const byte* data, int width, int height, int channels = 4, bool flipVertical = false, const char* basePath = "fs_savepath");
+// data is RGBA; PNG for a .png filename, otherwise TGA
+bool	R_WriteImageFile(const char* filename, const byte* data, int width, int height, bool flipVertical = false, const char* basePath = "fs_savepath");
+
 
 
 class idImageManager {
