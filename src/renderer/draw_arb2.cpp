@@ -13511,14 +13511,21 @@ typedef struct rbSharedWorldInteractionGLPreparedView_s {
 static rbSharedWorldInteractionGLPreparedView_t
 	rbSharedWorldInteractionGLPreparedView;
 
+// The detail reads as decimal RR LLL IIII: the reject reason, then the light
+// plus one, then the innermost item plus one (the primitive or shadow caster
+// when one is named, else the surface); zero means none. Indexes saturate at
+// 999 and 9999, and the reason field holds up to 213 before the value leaves
+// int. The old layout multiplied the reason by 10^8, so every reason from
+// SHADOW_MAP_ALPHA (22) on overflowed, and its light and surface fields
+// overlapped the fields above them.
 static int RB_SharedWorldInteractionGLFailureDetail(
 		rbSharedWorldInteractionGLReject_t reason, int lightIndex = -1,
 		int surfaceIndex = -1, int primitiveIndex = -1 ) {
-	const int lightDetail = lightIndex >= 0 ? Min( lightIndex + 1, 255 ) : 0;
-	const int surfaceDetail = surfaceIndex >= 0 ? Min( surfaceIndex + 1, 4095 ) : 0;
-	const int primitiveDetail = primitiveIndex >= 0 ? Min( primitiveIndex + 1, 4095 ) : 0;
-	return static_cast<int>( reason ) * 100000000
-		+ lightDetail * 1000000 + surfaceDetail * 4096 + primitiveDetail;
+	const int lightDetail = lightIndex >= 0 ? Min( lightIndex + 1, 999 ) : 0;
+	const int itemIndex = primitiveIndex >= 0 ? primitiveIndex : surfaceIndex;
+	const int itemDetail = itemIndex >= 0 ? Min( itemIndex + 1, 9999 ) : 0;
+	return static_cast<int>( reason ) * 10000000
+		+ lightDetail * 10000 + itemDetail;
 }
 
 static bool RB_SharedWorldInteractionGLFinite( float value ) {
@@ -14290,6 +14297,18 @@ static bool RB_SharedWorldInteractionGLScheduleSealedMapPass(
 	return true;
 }
 
+// Cache records are shared with the classic walker, which stamps them with its
+// classification's light class (RB_ShadowMapLightClass). That class names the
+// light, not the map form: a distant point light is POINT there although it
+// renders a projected map, while the sealed pass class names the form and says
+// PROJECTED. Stamping or matching records with the pass class made every record
+// classic published for such a light a mismatch, so the sealed schedule found
+// the entry and then declined the view (shadowMapTransaction).
+static int RB_SharedWorldInteractionGLCacheLightClass(
+		const classicInteractionDomainShadowMapPass_t &pass ) {
+	return static_cast<int>( RB_ShadowMapLightClass( pass.legacyViewLight ) );
+}
+
 static void RB_SharedWorldInteractionGLCompleteSealedCacheUpdate(
 		const rbSharedWorldInteractionGLPreparedMapPass_t &preparedPass,
 		const shadowMapSchedule_t &schedule, bool renderOk ) {
@@ -14309,7 +14328,7 @@ static void RB_SharedWorldInteractionGLCompleteSealedCacheUpdate(
 		entry->valid = true;
 		entry->lightIndex = preparedPass.cacheLightIndex;
 		entry->passKind = preparedPass.cachePassKind;
-		entry->lightClass = static_cast<int>( pass.lightClass );
+		entry->lightClass = RB_SharedWorldInteractionGLCacheLightClass( pass );
 		entry->signature = schedule.signature;
 		entry->size = pass.point.faceSize;
 		entry->highPrecision = pass.point.highPrecision;
@@ -14340,7 +14359,7 @@ static void RB_SharedWorldInteractionGLCompleteSealedCacheUpdate(
 	entry->valid = true;
 	entry->lightIndex = preparedPass.cacheLightIndex;
 	entry->passKind = preparedPass.cachePassKind;
-	entry->lightClass = static_cast<int>( pass.lightClass );
+	entry->lightClass = RB_SharedWorldInteractionGLCacheLightClass( pass );
 	entry->signature = schedule.signature;
 	entry->tileSize = pass.projected.state.tileSize;
 	entry->atlasDiv = pass.projected.state.atlasDiv;
@@ -14386,7 +14405,7 @@ static bool RB_SharedWorldInteractionGLProjectedEntryMatches(
 	return entry != NULL && entry->valid
 		&& entry->lightIndex == preparedPass.cacheLightIndex
 		&& entry->passKind == preparedPass.cachePassKind
-		&& entry->lightClass == static_cast<int>( pass.lightClass )
+		&& entry->lightClass == RB_SharedWorldInteractionGLCacheLightClass( pass )
 		&& entry->signature == preparedPass.signature
 		&& entry->atlasStorageGeneration != 0
 		&& entry->atlasStorageGeneration
@@ -14449,7 +14468,7 @@ static bool RB_SharedWorldInteractionGLPointEntryMatches(
 	return entry != NULL && entry->valid
 		&& entry->lightIndex == preparedPass.cacheLightIndex
 		&& entry->passKind == preparedPass.cachePassKind
-		&& entry->lightClass == static_cast<int>( pass.lightClass )
+		&& entry->lightClass == RB_SharedWorldInteractionGLCacheLightClass( pass )
 		&& entry->signature == preparedPass.signature
 		&& entry->size == pass.point.faceSize
 		&& entry->highPrecision == pass.point.highPrecision

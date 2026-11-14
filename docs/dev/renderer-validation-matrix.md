@@ -1204,7 +1204,7 @@ straight into the window; `msaa` adds 4x MSAA to the default. Captures are
 
 | Scene | Content | Domains |
 | --- | --- | --- |
-| `ad1`, `ad1stencil`, `ad1mapped` | `game/airdefense1` outdoor gameplay view: default (no projected light in view, so every light stencil-shadowed) / stencil only (not compared on OpenGL with 4x MSAA, where classic frames themselves flicker) / every light mapped, point cubes, a distant point light's projected map and hybrid supplements, static shadow cache off | interaction, root authored post |
+| `ad1`, `ad1stencil`, `ad1mapped` | `game/airdefense1` outdoor gameplay view: default (no projected light in view, so every light stencil-shadowed) / stencil only (not compared on OpenGL with 4x MSAA, where classic frames themselves flicker) / every light mapped, point cubes, a distant point light's projected map and hybrid supplements, static shadow cache on (off until 14 November 2026) | interaction, root authored post |
 | `mv2casters` | a CPU-skinned stock character (`char_doctor`) and a spawned crate as dynamic receivers and casters under a projected test light and point-cube maps on `maps/tools/mv2` | interaction |
 | `mv2amb`, `mv2lit` | the stock mv2 floor with every light suppressed, and under its own lights | world ambient |
 | `mv2deform` | the same view with the stock `shaderDemos/move` deforming material | material deform (consumed by ambient) |

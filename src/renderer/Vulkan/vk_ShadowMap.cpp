@@ -377,6 +377,10 @@ typedef struct vkClassicShadowTransaction_s {
 	int			projectedFreshCount;
 	int			pointFreshCount;
 	int			pointHitCount;
+	// Passes whose static depth comes from a resident entry and whose sealed
+	// live chains are drawn over a copy, counted as the classic walk counts.
+	int			projectedComposeCount;
+	int			pointComposeCount;
 	int			passPlanCount;
 	int			casterPlanCount;
 	int			casterRefCount;
@@ -1483,12 +1487,11 @@ static bool VK_ShadowMap_PointComposeAvailable( void );
 // ownerships: the entry holds static depth, which is the global casters' for
 // LOCAL and GLOBAL alike, and the live local casters reach the GLOBAL map
 // only through its composed copy. That needs the light to compose. A point
-// cube does while r_shadowMapPointCompose is on, a projected tile always,
-// and neither under the sealed shared stream, which draws every pass's whole
-// caster plan (VK_ShadowMap_StaticCacheable).
+// cube does while r_shadowMapPointCompose is on, a projected tile always.
+// The sealed shared stream composes the same passes (allowCacheCompose), so
+// the opt-in switch no longer changes which lights share an entry.
 static bool VK_ShadowMap_ComposesLocalCasters( const viewLight_t *vLight ) {
-	if ( vLight == NULL || vLight->localShadowMapDynamicCasters == NULL
-			|| r_rendererSharedWorldInteraction.GetBool() ) {
+	if ( vLight == NULL || vLight->localShadowMapDynamicCasters == NULL ) {
 		return false;
 	}
 	return !R_ClassifyShadowMapLight( vLight ).pointLight
@@ -1698,12 +1701,12 @@ static vkShadowLightHistory_t *VK_ShadowMap_FindLightHistory(
 // projected tile. The resident cube keeps static depth only, and each view
 // copies it to a scratch cube and draws the live casters over the copy.
 //
-// The sealed shared stream draws every pass's complete caster plan and never
-// composes, so a point light keeps the old regenerate-every-view rule while
-// that opt-in stream can own the view, exactly as projected lights do.
+// The sealed shared stream shares this schedule and composes the same passes
+// from its sealed chains, so the opt-in switch must not change the rule: while
+// it did, classic regenerated what it otherwise composed, and the frame moved
+// even where the domain declined the view.
 static bool VK_ShadowMap_PointComposeAvailable( void ) {
-	return r_shadowMapPointCompose.GetBool()
-		&& !r_rendererSharedWorldInteraction.GetBool();
+	return r_shadowMapPointCompose.GetBool();
 }
 
 static bool VK_ShadowMap_StaticCacheable(
@@ -1730,16 +1733,16 @@ static bool VK_ShadowMap_StaticCacheable(
 	// copy of the resident cube (vkShadowPassState_t::composeDynamic). A point
 	// cube that cannot compose keeps the old rule and regenerates every view.
 	//
-	// Composition is a legacy-walker feature on both backends. The sealed
-	// domain sets allowCacheReuse false for any pass with dynamic casters
-	// (ClassicInteractionDomain.cpp), and OpenGL likewise composes only in
-	// RB_ARB2_DrawInteractions, never in its shared-stream executor. Keep the
-	// old conservative rule while that opt-in stream can own the view so a
-	// composed hit can never fail the domain's physical reconciliation.
+	// The sealed shared stream consumes these composed passes too: its records
+	// permit a composed hit or publication (allowCacheCompose), and its commit
+	// draws the sealed static and live chains exactly where this walk would.
+	// The rule is therefore the same with the opt-in switch on. It used to
+	// regenerate every light with live casters instead, and a regenerated map
+	// is not bit-identical to the composed one: an exact LOCAL hit is read in
+	// its resident image, through other sampling arithmetic than an atlas
+	// tile, so classic pixels moved by a level even where the domain declined.
 	const bool dynamicsDefeatCache = haveDynamicCasters
-			&& ( r_rendererSharedWorldInteraction.GetBool()
-				|| ( pointLight
-					&& !VK_ShadowMap_PointComposeAvailable() ) );
+			&& pointLight && !VK_ShadowMap_PointComposeAvailable();
 	if ( !r_shadowMapStaticCache.GetBool() || vLight == NULL
 			|| renderWorld == NULL || lightIndex < 0
 			|| dynamicsDefeatCache
@@ -2337,9 +2340,7 @@ static bool VK_ShadowMap_StaticCacheableReadOnly(
 			|| vLight->localShadowMapDynamicCasters != NULL;
 	const bool pointRegenerates = pointLight
 			&& !VK_ShadowMap_PointComposeAvailable();
-	if ( haveDynamicCasters
-			&& ( pointRegenerates
-				|| r_rendererSharedWorldInteraction.GetBool() ) ) {
+	if ( haveDynamicCasters && pointRegenerates ) {
 		return false;
 	}
 	if ( !pointLight && cascadeCount > 1
@@ -2699,12 +2700,14 @@ static bool VK_ShadowMap_HasLocalCasters( const viewLight_t *vLight ) {
 // the record's image changed, and never once this frame has bound it: the
 // frame that last recorded with the slot has retired (its fence is waited
 // before a frame begins), while a set the commands already recorded name must
-// not change under them. The sealed stream and the debug overlay address the
-// atlas, so they keep the copy.
+// not change under them. The debug overlay addresses the atlas, so it keeps
+// the copy. The sealed shared stream binds the resident tile like the classic
+// receivers (VK_ClassicInteraction_BuildMappedShadowBlock): an atlas copy of
+// the same depth is sampled through other arithmetic and moved pixels of the
+// view by a level against classic.
 static VkDescriptorSet VK_ShadowMap_ProjectedEntryResidentSet(
 		vkProjectedShadowCacheEntry_t &entry ) {
 	if ( !r_vkShadowSampleResident.GetBool()
-			|| vkClassicShadowTransaction.active
 			|| r_shadowMapDebugOverlay.GetBool()
 			|| entry.image == VK_NULL_HANDLE
 			|| entry.sampleView == VK_NULL_HANDLE ) {
@@ -2822,11 +2825,10 @@ static bool VK_ShadowMap_AllocateProjectedPass( vkShadowLightState_t &light,
 	// one go.
 	//
 	// This can only become true when VK_ShadowMap_StaticCacheable admitted a
-	// light that has dynamic casters, which its dynamicsDefeatCache term
-	// permits for projected lights only while the sealed shared stream is
-	// off. That coupling is load-bearing: the sealed stream draws each pass's
-	// complete caster plan and never composes, so a composed pass reaching it
-	// would publish dynamics into a tile later reused as static content.
+	// light that has dynamic casters. The sealed shared stream honours it as
+	// well: its commit draws only the sealed static chains into a tile it
+	// publishes and the live chains in the compose scope, so no dynamic depth
+	// ever reaches an entry later reused as static content.
 	pass.composeDynamic = ( pass.cacheHit || pass.cacheUpdate )
 			&& VK_ShadowMap_PassHasDynamicCasters( light.vLight,
 					receiverPass );
@@ -2936,8 +2938,8 @@ static bool VK_ShadowMap_AllocatePointPass( vkShadowLightState_t &light,
 	// Cached point content is static-only whenever the light composes, so a
 	// pass that restores or publishes an entry owes this view's dynamic
 	// casters a draw over a copy of it. VK_ShadowMap_StaticCacheable admits a
-	// point light with dynamic casters only while this holds, and the sealed
-	// shared stream, which never composes, turns it off.
+	// point light with dynamic casters only while this holds; the sealed
+	// shared stream composes such a pass from its own chains.
 	const bool composeDynamic = VK_ShadowMap_PointComposeAvailable()
 			&& VK_ShadowMap_PassHasDynamicCasters( light.vLight,
 					receiverPass );
@@ -4882,14 +4884,28 @@ static bool VK_ClassicShadow_ValidatePhysicalPass(
 					pass.resourcePass ) ) {
 		return false;
 	}
-	if ( pass.cacheHit && !sealed.allowCacheReuse ) {
-		return false;
-	}
-	if ( pass.cacheUpdate && !sealed.allowCacheUpdate ) {
-		return false;
-	}
-	if ( !pass.cacheHit && !pass.cacheUpdate && !sealed.allowScratch ) {
-		return false;
+	// A composed pass takes its static depth from a resident entry (restored,
+	// shared with the light's LOCAL pass, or published in this view from the
+	// sealed static chains alone) and draws the sealed live chains over a
+	// copy, exactly as the classic walk schedules it. Only a record that
+	// permits composition may own one; every other pass is an exact hit, a
+	// publication of its whole plan, or scratch.
+	const bool composed = pass.composeDynamic || pass.sharesStatic;
+	if ( composed ) {
+		if ( !sealed.allowCacheCompose || !sealed.hasDynamicCasters
+				|| ( pass.cacheUpdate && !sealed.allowCacheUpdate ) ) {
+			return false;
+		}
+	} else {
+		if ( pass.cacheHit && !sealed.allowCacheReuse ) {
+			return false;
+		}
+		if ( pass.cacheUpdate && !sealed.allowCacheUpdate ) {
+			return false;
+		}
+		if ( !pass.cacheHit && !pass.cacheUpdate && !sealed.allowScratch ) {
+			return false;
+		}
 	}
 	// The physical cache signature is built from the live caster state.  Reject
 	// any drift after the front end sealed the pass so a cache hit cannot use
@@ -4918,6 +4934,18 @@ static bool VK_ClassicShadow_ValidatePhysicalPass(
 				|| sealed.point.lightOrigin[ 2 ] != light.pointLightOrigin[ 2 ]
 				|| pass.pointSet == VK_NULL_HANDLE ) {
 			return false;
+		}
+		// the scratch cube the receivers sample once the live chains are in
+		if ( composed && VK_ShadowMap_PointComposeTarget( pass ) == NULL ) {
+			return false;
+		}
+		if ( pass.sharesStatic && !pass.cacheHit ) {
+			// the LOCAL pass publishes the static source in this view
+			return pass.cacheEntry >= 0
+				&& pass.cacheEntry < VK_SHADOW_MAX_CACHE_SLOTS
+				&& vkShadow.pointCache[ pass.cacheEntry ].reserved
+				&& vkShadow.pointCache[ pass.cacheEntry ].cube.image
+					!= VK_NULL_HANDLE;
 		}
 		if ( pass.cacheHit ) {
 			const vkPointShadowCacheEntry_t *cache =
@@ -4966,7 +4994,9 @@ static bool VK_ClassicShadow_ValidatePhysicalPass(
 				== VK_ShadowMap_ProjectedBlockSize( light )
 			&& VK_ShadowMap_ProjectedEntryHoldsContent( *cache );
 	}
-	return !pass.cacheUpdate || ( pass.cacheEntry >= 0
+	// A publication, and a pass restored from the entry its LOCAL pass
+	// publishes in this view, both need that reserved entry.
+	return !( pass.cacheUpdate || pass.sharesStatic ) || ( pass.cacheEntry >= 0
 		&& pass.cacheEntry < VK_SHADOW_MAX_CACHE_SLOTS
 		&& vkShadow.projectedCache[ pass.cacheEntry ].reserved
 		&& vkShadow.projectedCache[ pass.cacheEntry ].image
@@ -5133,6 +5163,10 @@ bool VK_ShadowMap_PreflightClassicInteractionView(
 				return false;
 			}
 
+			// Counted as the classic walk counts them (VK_ShadowMap_RenderAtlas):
+			// a projected pass restored from its LOCAL pass's entry renders
+			// nothing fresh, and a composed pass of either kind owes a copy
+			// plus its live chains.
 			if ( passPlan.resourceOwner ) {
 				if ( physicalLight->pointLight ) {
 					if ( physicalPass->cacheHit ) {
@@ -5140,10 +5174,18 @@ bool VK_ShadowMap_PreflightClassicInteractionView(
 					} else {
 						transaction.pointFreshCount++;
 					}
+					if ( physicalPass->composeDynamic ) {
+						transaction.pointComposeCount++;
+					}
 				} else {
 					transaction.projectedCount++;
-					if ( !physicalPass->cacheHit ) {
+					if ( !physicalPass->cacheHit
+							&& !physicalPass->sharesStatic ) {
 						transaction.projectedFreshCount++;
+					}
+					if ( physicalPass->composeDynamic
+							|| physicalPass->sharesStatic ) {
+						transaction.projectedComposeCount++;
 					}
 				}
 			}
@@ -5185,9 +5227,11 @@ bool VK_ShadowMap_PreflightClassicInteractionView(
 			|| physicalPassCount != transaction.passPlanCount
 			|| transaction.projectedCount + transaction.pointFreshCount
 				+ transaction.pointHitCount <= 0
-			|| ( transaction.projectedFreshCount > 0
+			|| ( ( transaction.projectedFreshCount > 0
+					|| transaction.projectedComposeCount > 0 )
 				&& transaction.projectedCasterPipeline == VK_NULL_HANDLE )
-			|| ( transaction.pointFreshCount > 0
+			|| ( ( transaction.pointFreshCount > 0
+					|| transaction.pointComposeCount > 0 )
 				&& transaction.pointCasterPipeline == VK_NULL_HANDLE ) ) {
 		VK_ShadowMap_AbortClassicInteractionView( view );
 		return false;
@@ -5332,10 +5376,23 @@ static bool VK_ClassicShadow_CasterOutsideCascade(
 	return outsideMask != 0;
 }
 
+// The sealed chains a scope draws: a composed pass publishes its static
+// chains alone and draws its live chains over the restored copy, as the
+// classic walk does with the light's own chains (VK_ShadowMap_DrawPassCasters).
+static bool VK_ClassicShadow_ChainSelected(
+		const classicInteractionDomainShadowChain_t chain,
+		const vkShadowChainSelect_t select ) {
+	const bool liveChain =
+		chain == CLASSIC_INTERACTION_SHADOW_CHAIN_MAP_GLOBAL_DYNAMIC
+		|| chain == CLASSIC_INTERACTION_SHADOW_CHAIN_MAP_LOCAL_DYNAMIC;
+	return select == VK_SHADOW_CHAINS_ALL
+		|| ( select == VK_SHADOW_CHAINS_DYNAMIC_ONLY ) == liveChain;
+}
+
 static int VK_ClassicShadow_DrawProjectedPass(
 		vkCasterPassCtx_t &ctx,
 		const vkClassicShadowPassPlan_t &passPlan,
-		const int cascadeIndex ) {
+		const int cascadeIndex, const vkShadowChainSelect_t select ) {
 	const classicInteractionDomainShadowMapPass_t &pass = *passPlan.pass;
 	const int safeCascade = idMath::ClampInt( 0,
 		SHADOWMAP_PROJECTED_MAX_CASCADES - 1, cascadeIndex );
@@ -5349,8 +5406,10 @@ static int VK_ClassicShadow_DrawProjectedPass(
 			vkClassicShadowTransaction.casterPlans[
 				vkClassicShadowTransaction.casterRefs[
 					passPlan.firstCasterRef + i ] ];
-		if ( VK_ClassicShadow_CasterOutsideCascade(
-				casterPlan, pass, safeCascade ) ) {
+		if ( !VK_ClassicShadow_ChainSelected( casterPlan.caster->chain,
+				select )
+				|| VK_ClassicShadow_CasterOutsideCascade(
+					casterPlan, pass, safeCascade ) ) {
 			continue;
 		}
 		const classicInteractionDomainShadowCaster_t &caster =
@@ -5378,7 +5437,8 @@ static int VK_ClassicShadow_DrawProjectedPass(
 static int VK_ClassicShadow_DrawPointPass(
 		vkCasterPassCtx_t &ctx,
 		const vkClassicShadowPassPlan_t &passPlan,
-		const float faceViewMatrix[ 16 ], const float projRow[ 2 ], const int cubeFace ) {
+		const float faceViewMatrix[ 16 ], const float projRow[ 2 ], const int cubeFace,
+		const vkShadowChainSelect_t select ) {
 	const classicInteractionDomainShadowMapPass_t &pass = *passPlan.pass;
 	int draws = 0;
 	for ( int i = 0; i < passPlan.casterRefCount; ++i ) {
@@ -5386,6 +5446,10 @@ static int VK_ClassicShadow_DrawPointPass(
 			vkClassicShadowTransaction.casterPlans[
 				vkClassicShadowTransaction.casterRefs[
 					passPlan.firstCasterRef + i ] ];
+		if ( !VK_ClassicShadow_ChainSelected( casterPlan.caster->chain,
+				select ) ) {
+			continue;
+		}
 		const classicInteractionDomainShadowCaster_t &caster =
 			*casterPlan.caster;
 		vkCasterPush_t push;
@@ -6232,13 +6296,15 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 		? vkClassicShadowTransaction.pointHitCount : 0;
 	// Projected passes whose cached tile holds static depth only and still owe
 	// this view's dynamic casters a LOAD-op scope after publication/restore.
-	int projectedComposeCount = 0;
+	int projectedComposeCount = classicCommit
+		? vkClassicShadowTransaction.projectedComposeCount : 0;
 	// Exact projected hits read where they live whose image already rests in
 	// the layout the receivers read it in: they owe no GPU work at all.
 	int projectedRestingCount = 0;
 	// Point passes that owe the same over a scratch copy of their resident
-	// cube. The sealed stream never prepares one.
-	int pointComposeCount = 0;
+	// cube. The sealed stream composes the same passes from its sealed chains.
+	int pointComposeCount = classicCommit
+		? vkClassicShadowTransaction.pointComposeCount : 0;
 	VkPipeline casterPipeline = classicCommit
 		? vkClassicShadowTransaction.projectedCasterPipeline
 		: VK_Exec_CasterPipeline();
@@ -6713,14 +6779,17 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							profileMainView && vkCtx.pipelineStatisticsEnabled, 1 + passIndex * 4 + cascadeIndex, i,
 							projectionW[0] == 0.0f && projectionW[1] == 0.0f && projectionW[2] == 0.0f && projectionW[3] == 1.0f );
 
+						// A pass that will publish this tile as a cache
+						// entry renders static depth only; its dynamics
+						// compose over the published copy below.
 						if ( classicCommit ) {
 							drawnCasters +=
 								VK_ClassicShadow_DrawProjectedPass(
-									ctx, *classicPass, cascadeIndex );
+									ctx, *classicPass, cascadeIndex,
+									pass.composeDynamic
+										? VK_SHADOW_CHAINS_STATIC_ONLY
+										: VK_SHADOW_CHAINS_ALL );
 						} else {
-							// A pass that will publish this tile as a cache
-							// entry renders static depth only; its dynamics
-							// compose over the published copy below.
 							drawnCasters +=
 									VK_ShadowMap_DrawPassCasters(
 											ctx, light, receiverPass,
@@ -7083,6 +7152,16 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							light.projectedState.cascadeCount );
 					const int atlasDiv = idMath::ClampInt( 1, 2,
 							light.projectedState.atlasDiv );
+					// The sealed stream draws the live chains of its own plan,
+					// over the same restored tile the classic walk would use.
+					const vkClassicShadowPassPlan_t *classicPass =
+						classicCommit ? VK_ClassicShadow_FindPassPlan(
+							&light, receiverPass ) : NULL;
+					if ( classicCommit && classicPass == NULL ) {
+						R_RenderThread_Error(
+							"Vulkan: sealed projected compose plan was lost after preflight", true );
+						continue;
+					}
 					ctx.unsupportedCaster = false;
 					for ( int cascadeIndex = 0 ;
 							cascadeIndex < cascadeCount ;
@@ -7113,15 +7192,22 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 								(uint32_t)light.tileSize;
 						vkCmdSetScissor( cmd, 0, 1, &scissor );
 
-						VK_ShadowMap_DrawPassCasters( ctx, light,
-								receiverPass, cascadeIndex,
-								VK_SHADOW_CHAINS_DYNAMIC_ONLY );
+						if ( classicCommit ) {
+							VK_ClassicShadow_DrawProjectedPass( ctx,
+									*classicPass, cascadeIndex,
+									VK_SHADOW_CHAINS_DYNAMIC_ONLY );
+						} else {
+							VK_ShadowMap_DrawPassCasters( ctx, light,
+									receiverPass, cascadeIndex,
+									VK_SHADOW_CHAINS_DYNAMIC_ONLY );
+						}
 					}
 					// The static half of this map is already published or
 					// resident and correct; only the composed dynamics can
 					// fail here, and a partial compose would shadow some
-					// receivers while leaking others.
-					if ( ctx.unsupportedCaster ) {
+					// receivers while leaking others. The sealed plan proved
+					// every caster in preflight.
+					if ( !classicCommit && ctx.unsupportedCaster ) {
 						VK_ShadowMap_InvalidatePassResource(
 								light, receiverPass );
 					}
@@ -7237,8 +7323,9 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 				// Copy it to the pass's scratch cube and draw only the dynamic
 				// chains over the copy, so a moving or cutout caster costs one
 				// cube copy plus its own draws instead of six static faces.
-				// The sealed stream never prepares a composed pass.
-				const bool composePass = !classicCommit && pass.composeDynamic;
+				// The sealed stream composes the same passes, drawing its
+				// sealed static and live chains where these draw the light's.
+				const bool composePass = pass.composeDynamic;
 				if ( pass.cacheHit && !composePass ) {
 					continue;
 				}
@@ -7321,7 +7408,8 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 
 						if ( classicCommit ) {
 							drawnCasters += VK_ClassicShadow_DrawPointPass(
-								ctx, *classicPass, faceViewMatrix, projRow, cubeFace );
+								ctx, *classicPass, faceViewMatrix, projRow, cubeFace,
+								select );
 						} else {
 							const viewLight_t *vLight = light.vLight;
 							if ( drawStatic ) {
@@ -7447,7 +7535,8 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 					// The static half is published or resident and correct;
 					// only the composed dynamics can fail here, and a partial
 					// compose would shadow some receivers while leaking others.
-					if ( ctx.unsupportedCaster ) {
+					// The sealed plan proved every caster in preflight.
+					if ( !classicCommit && ctx.unsupportedCaster ) {
 						VK_ShadowMap_InvalidatePassResource( light, receiverPass );
 					}
 					// the cube the receivers sample

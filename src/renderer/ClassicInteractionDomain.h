@@ -312,6 +312,11 @@ typedef struct classicInteractionDomainShadowMapPass_s {
 	bool			hasAlphaCasters;
 	bool			hasTranslucentCasters;
 	bool			allowCacheReuse;
+	// The pass may take its static chains from a resident static-only entry
+	// and draw its live chains over a copy, as the classic walker composes.
+	// Only a backend that reproduces that composition consumes it (Vulkan);
+	// OpenGL's sealed executor redraws the whole plan instead.
+	bool			allowCacheCompose;
 	bool			allowCacheUpdate;
 	bool			allowScratch;
 	bool			hashedAlpha;

@@ -317,8 +317,9 @@ The [shared-domain qualification harness](renderer-validation-matrix.md#shared-c
 owns the interaction phase of a frozen stock `game/airdefense1` gameplay view
 on OpenGL and Vulkan under the default preset (mapped projected shadows,
 stencil point lights, HDR scene target), with stencil shadows only, with every
-light shadow-mapped (point cubes and a distant point light's projected map,
-static shadow cache off), with 4x MSAA and with the post chain off. On
+light shadow-mapped (point cubes and a distant point light's projected map),
+with 4x MSAA and with the post chain off, all with the static shadow cache on
+(the shipped default). On
 `maps/tools/mv2` it owns a CPU-skinned stock character (`char_doctor`) and a
 spawned crate as dynamic receivers and casters under a projected test light
 and point-cube maps. Every frame is byte-identical to the classic one;
@@ -357,15 +358,36 @@ These fixes made this possible:
 Dense stock views also overflowed the per-frame geometry records (1024) that
 every shared domain reads; a frame whose draws fit can no longer overflow them.
 
-Two boundaries remain with the static shadow cache on, both safe. While the
-domain switch is on, classic Vulkan regenerates the maps it would otherwise
-compose from a cached static copy plus the live casters, because the shared
-stream draws each pass's whole caster plan. A composed map is not always
-bit-identical to a regenerated one, so a few pixels of the classic frame move
-by one level (13 to 20 in the all-mapped `game/airdefense1` view; none in the
-caster scene). OpenGL's sealed cache schedule also declines the cached pass of
-a distant point light, a named `shadowMapTransaction` fallback that leaves the
-whole view classic.
+The all-mapped view first passed only with the static shadow cache off. Two
+gaps with the cache on were closed on 14 November 2026:
+
+- On Vulkan, while the domain switch was on, classic stopped caching any light
+  with live casters and redrew its maps every view, because the sealed stream
+  never composed. The redrawn maps hold the same depth, but the classic walk
+  reads an exact hit with no live casters (the distant point light's LOCAL
+  map) where it lives in the cache, and a tile in its own image is sampled
+  through other arithmetic than the same depth in an atlas tile. So 20 to 26
+  pixels of the classic frame moved by one to three levels, even when the
+  domain declined the view. Classic now keeps its cache rules whatever the
+  switch says, and the sealed stream, which copied every exact hit into the
+  atlas, follows them. A sealed pass with live casters may consume the
+  same composition (`allowCacheCompose`): it publishes its sealed static chains
+  alone, the live chains are drawn over the restored tile or a copy of the
+  resident cube, and the sealed receivers read an exact hit in place as the
+  classic ones do. A pass with alpha casters still neither reuses nor
+  composes, which declines the view on Vulkan when such a pass comes from the
+  cache.
+- On OpenGL, the sealed schedule found the distant point light's cache record
+  that classic had published and then declined the view (a named
+  `shadowMapTransaction` fallback). Classic stamps its records with its
+  classification's light class, which is `POINT` for that light, while the
+  sealed path stamped and compared the pass class, `PROJECTED`, the form of the
+  map. Both now use classic's class.
+
+The OpenGL failure detail of the interaction stream also overflowed `int` for
+the reject reasons from `SHADOW_MAP_ALPHA` on. It now reads as decimal
+`RR LLL IIII`: the reason, the light plus one, and the innermost item plus one
+(the primitive or shadow caster when one is named, else the surface).
 
 ## Milestone D completion and release-promotion boundary
 

@@ -399,19 +399,18 @@ SCENES = [
                          "identical frozen frames, with every domain off"},
     ),
     # Every light shadow-mapped, as the Quality and higher presets do, with
-    # the static shadow cache off. With the cache on, the domain switch makes
-    # classic Vulkan regenerate maps it would otherwise compose from a cached
-    # static copy, which moves a few pixels by one level, and OpenGL's sealed
-    # cache schedule declines this view's distant point light (a named
-    # fallback); both are recorded in the interaction domain's document.
+    # the static shadow cache on (the shipped default). The distant point
+    # light's projected map has live casters, so classic reads its LOCAL map
+    # where it lives in the cache and composes the live casters over a copy of
+    # its GLOBAL map; the domain must consume the same cached maps.
     Scene(
         id="ad1mapped",
         map="game/airdefense1",
         pose=AIRDEFENSE1_POSE,
         purpose="the stock outdoor view with every light shadow-mapped (point cubes and a distant point "
-                "light's projected map), static shadow cache off",
+                "light's projected map), static shadow cache on",
         launch={"g_showHud": "0", "ui_showGun": "0", "r_shadows": "1", "r_useShadowMap": "1",
-                "r_shadowMapPointLights": "1", "r_shadowMapStaticCache": "0"},
+                "r_shadowMapPointLights": "1"},
         checks=[
             Check("interaction", control={"r_skipInteractions": "1"}, rollback={"ui_showGun": "1"}),
         ],

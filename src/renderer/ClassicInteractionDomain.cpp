@@ -1079,6 +1079,7 @@ static std::uint64_t HashShadowMapPass(
 	HashBool( hash, pass.hasAlphaCasters );
 	HashBool( hash, pass.hasTranslucentCasters );
 	HashBool( hash, pass.allowCacheReuse );
+	HashBool( hash, pass.allowCacheCompose );
 	HashBool( hash, pass.allowCacheUpdate );
 	HashBool( hash, pass.allowScratch );
 	HashBool( hash, pass.hashedAlpha );
@@ -2349,6 +2350,16 @@ static bool BuildShadowMapPasses(
 		}
 		pass.allowCacheReuse = r_shadowMapStaticCache.GetBool()
 			&& !pass.hasDynamicCasters && !pass.hasAlphaCasters
+			&& ( classification.cascadeCount == 1
+				|| r_shadowMapCacheCSM.GetBool() );
+		// Classic keeps a pass with live casters cached: the resident entry
+		// holds its static depth and each view draws the live chains over a
+		// copy of it. A backend whose sealed stream shares classic's physical
+		// schedule (Vulkan) consumes that composition, so the light's maps,
+		// tiles and in-place reads stay exactly classic's; OpenGL's sealed
+		// executor never composes and redraws the whole plan.
+		pass.allowCacheCompose = r_shadowMapStaticCache.GetBool()
+			&& pass.hasDynamicCasters && !pass.hasAlphaCasters
 			&& ( classification.cascadeCount == 1
 				|| r_shadowMapCacheCSM.GetBool() );
 		pass.allowCacheUpdate = true;

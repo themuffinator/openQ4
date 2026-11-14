@@ -965,10 +965,12 @@ diagnostics establish whole-frame ownership or production performance.
   the HUD with the final scene composite; and Raven fallbacks were miscounted.
   Stock-content boundaries, by design: the retained HUD's backdrop blur,
   ambient views with decals/BSE/post surfaces, cubemap and depth subview
-  targets (no producer) and wall-clock GUI video parity. With the static
-  shadow cache on, the interaction switch makes classic Vulkan regenerate maps
-  it would compose (a few pixels move one level) and OpenGL declines a cached
-  distant point light's pass; the all-mapped scene runs with the cache off. The
+  targets (no producer) and wall-clock GUI video parity. The all-mapped scene
+  ran with the static shadow cache off until 14 November, when its two gaps
+  closed: classic Vulkan no longer regenerates composed maps under the
+  interaction switch (the sealed stream composes and reads resident hits
+  like classic), and OpenGL's sealed cache records carry classic's light
+  class, so a distant point light's cached pass is owned. The
   defaults stay off: promotion is an owner decision on the
   [evidence](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01).
   Human appearance review and physical Linux/macOS/Android runs belong to

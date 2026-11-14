@@ -184,6 +184,7 @@ def main() -> None:
         "hasAlphaCasters",
         "hasTranslucentCasters",
         "allowCacheReuse",
+        "allowCacheCompose",
         "allowCacheUpdate",
         "allowScratch",
         "hashedAlpha",
@@ -346,6 +347,7 @@ def main() -> None:
         "pass.hasAlphaCasters",
         "pass.hasTranslucentCasters",
         "pass.allowCacheReuse",
+        "pass.allowCacheCompose",
         "pass.allowCacheUpdate",
         "pass.allowScratch",
         "pass.hashedAlpha",
@@ -1141,13 +1143,54 @@ def main() -> None:
     for token in (
         "preparedPass.cacheLightIndex",
         "preparedPass.cachePassKind",
-        "pass.lightClass",
+        "RB_SharedWorldInteractionGLCacheLightClass( pass )",
         "schedule.signature",
         "entry->valid",
         "entry->atlasStorageGeneration = preparedPass.projectedDepthImage != NULL",
         "preparedPass.projectedDepthImage->GetStorageGeneration()",
     ):
         require(gl_map_complete, token, "OpenGL sealed cache publication")
+    # Cache records are shared with the classic walker, which stamps them with
+    # its classification's light class (POINT for a distant point light that
+    # renders a projected map). The sealed path stamps and matches the same
+    # class, never the pass class that names the map form, or every record
+    # classic published for such a light would decline the view.
+    cache_class = function_body(
+        gl, "static int RB_SharedWorldInteractionGLCacheLightClass("
+    )
+    require(
+        cache_class,
+        "return static_cast<int>( RB_ShadowMapLightClass( pass.legacyViewLight ) );",
+        "sealed cache records carry classic's light class",
+    )
+    for body, label in (
+        (gl_map_complete, "OpenGL sealed cache publication"),
+        (gl_projected_resource_match, "OpenGL sealed projected record match"),
+        (gl_point_resource_match, "OpenGL sealed point record match"),
+    ):
+        reject(body, "static_cast<int>( pass.lightClass )", label)
+    for body, label in (
+        (gl_projected_resource_match, "OpenGL sealed projected record match"),
+        (gl_point_resource_match, "OpenGL sealed point record match"),
+    ):
+        require(
+            body,
+            "entry->lightClass == RB_SharedWorldInteractionGLCacheLightClass( pass )",
+            label,
+        )
+    # The failure detail stays inside int for every reject reason: decimal
+    # RR LLL IIII. Reasons from SHADOW_MAP_ALPHA (22) used to overflow.
+    failure_detail = function_body(
+        gl, "static int RB_SharedWorldInteractionGLFailureDetail("
+    )
+    for token in (
+        "Min( lightIndex + 1, 999 )",
+        "Min( itemIndex + 1, 9999 )",
+        "static_cast<int>( reason ) * 10000000",
+        "+ lightDetail * 10000 + itemDetail;",
+    ):
+        require(failure_detail, token, "int-safe OpenGL failure detail")
+    reject(failure_detail, "100000000", "overflowing OpenGL failure detail")
     for field in ("lightOrigin[3];", "farDistance;"):
         require(gl, field, "point-cube render-time projection provenance")
     point_active = function_body(
@@ -1458,6 +1501,19 @@ def main() -> None:
             token,
             "Vulkan sealed bounded point receiver upload",
         )
+    # An exact projected hit is read where it lives by the sealed receivers
+    # as by the classic ones; an atlas copy of the same depth is sampled
+    # through other arithmetic and moved classic pixels by a level.
+    require_order(
+        vk_mapped_shadow_block,
+        (
+            "const bool residentMap = physicalPass.residentSet != VK_NULL_HANDLE",
+            "plan.sets[ 7 ] = residentMap ? physicalPass.residentSet : atlasSet;",
+            "block.texelSize[ 0 ] = residentMap",
+            "? physicalPass.invMapSize : physicalLight.invAtlasSize[ 0 ];",
+        ),
+        "Vulkan sealed receivers read resident projected hits in place",
+    )
     vk_draw = function_body(vk, "void VK_ClassicInteraction_DrawOwnedView(")
     vk_receiver_draw = function_body(
         vk, "static void VK_ClassicInteraction_DrawReceiverRange("
@@ -1543,6 +1599,71 @@ def main() -> None:
         "transaction.ready = true",
     ):
         require(vk_map_preflight, token, "Vulkan sealed mapped preflight")
+    # Classic Vulkan keeps a light with live casters cached and composes its
+    # live chains over the resident static depth whether or not the switch is
+    # on, so the sealed stream consumes the same composed passes wherever its
+    # record permits composition, and draws its sealed static and live chains
+    # in the scopes the classic walk would.
+    require_compact(
+        source,
+        """pass.allowCacheCompose = r_shadowMapStaticCache.GetBool()
+            && pass.hasDynamicCasters && !pass.hasAlphaCasters""",
+        "sealed composition permission follows classic's cache rule",
+    )
+    vk_validate_physical = function_body(
+        vk_shadow, "static bool VK_ClassicShadow_ValidatePhysicalPass("
+    )
+    require_order(
+        vk_validate_physical,
+        (
+            "const bool composed = pass.composeDynamic || pass.sharesStatic;",
+            "if ( !sealed.allowCacheCompose || !sealed.hasDynamicCasters",
+            "if ( pass.cacheHit && !sealed.allowCacheReuse ) {",
+            "if ( composed && VK_ShadowMap_PointComposeTarget( pass ) == NULL ) {",
+        ),
+        "Vulkan sealed composed-pass admission",
+    )
+    for token in (
+        "transaction.pointComposeCount++;",
+        "transaction.projectedComposeCount++;",
+    ):
+        require(vk_map_preflight, token, "Vulkan sealed composed-pass counts")
+    vk_chain_select = function_body(
+        vk_shadow, "static bool VK_ClassicShadow_ChainSelected("
+    )
+    for token in (
+        "CLASSIC_INTERACTION_SHADOW_CHAIN_MAP_GLOBAL_DYNAMIC",
+        "CLASSIC_INTERACTION_SHADOW_CHAIN_MAP_LOCAL_DYNAMIC",
+        "select == VK_SHADOW_CHAINS_ALL",
+    ):
+        require(vk_chain_select, token, "Vulkan sealed static/live chain selection")
+    vk_render_atlas = function_body(vk_shadow, "bool VK_ShadowMap_RenderAtlas(")
+    require_compact(
+        vk_render_atlas,
+        """VK_ClassicShadow_DrawProjectedPass(
+            ctx, *classicPass, cascadeIndex,
+            pass.composeDynamic
+                ? VK_SHADOW_CHAINS_STATIC_ONLY
+                : VK_SHADOW_CHAINS_ALL );""",
+        "a sealed pass that publishes for composition draws its static chains only",
+    )
+    require_compact(
+        vk_render_atlas,
+        """VK_ClassicShadow_DrawProjectedPass( ctx,
+            *classicPass, cascadeIndex,
+            VK_SHADOW_CHAINS_DYNAMIC_ONLY );""",
+        "a sealed composed tile draws its live chains over the restored copy",
+    )
+    require(
+        vk_render_atlas,
+        "const bool composePass = pass.composeDynamic;",
+        "sealed point passes compose like classic ones",
+    )
+    reject(
+        vk_render_atlas,
+        "!classicCommit && pass.composeDynamic",
+        "sealed point composition refusal",
+    )
     for command in ("vkCmdDraw", "vkCmdClear", "VK_ShadowMap_RenderAtlas("):
         reject(vk_map_preflight, command, "Vulkan attachment write during mapped preflight")
     require(vk_map_abort, "VK_ShadowMap_ReleasePreparedLights( false )", "Vulkan mapped resource rollback")

@@ -6197,17 +6197,20 @@ def validate_dynamic_caster_composition_contract() -> None:
         "static cache admission",
     )
     # Dynamics compose, so they must not defeat or invalidate the cache --
-    # except while the opt-in shared stream can own the view, whose sealed
-    # allowCacheReuse forbids a composed hit on both backends, and for a
-    # point cube that cannot compose, which regenerates instead.
+    # except for a point cube that cannot compose, which regenerates instead.
+    # The opt-in shared stream consumes the composed passes (allowCacheCompose),
+    # so its switch must not change the rule: while it did, classic Vulkan
+    # regenerated what it otherwise composed and its frame moved by a level.
     require_compact(
         cacheable,
         """const bool dynamicsDefeatCache = haveDynamicCasters
-            && ( r_rendererSharedWorldInteraction.GetBool()
-                || ( pointLight
-                    && !VK_ShadowMap_PointComposeAvailable() ) );""",
+            && pointLight && !VK_ShadowMap_PointComposeAvailable();""",
         "dynamics keep the cache unless the light cannot compose",
     )
+    if "r_rendererSharedWorldInteraction" in cacheable:
+        raise AssertionError(
+            "The shared interaction switch must not change classic static cacheability"
+        )
     require_compact(
         cacheable,
         """if ( dynamicsDefeatCache ) {
@@ -6237,9 +6240,7 @@ def validate_dynamic_caster_composition_contract() -> None:
         (
             """const bool pointRegenerates = pointLight
                 && !VK_ShadowMap_PointComposeAvailable();""",
-            """if ( haveDynamicCasters
-                && ( pointRegenerates
-                    || r_rendererSharedWorldInteraction.GetBool() ) ) {""",
+            "if ( haveDynamicCasters && pointRegenerates ) {",
             "if ( history != NULL && pointRegenerates",
         ),
         "the admission estimate predicts the same cacheability the walk decides",
@@ -6321,9 +6322,8 @@ def validate_dynamic_caster_composition_contract() -> None:
     )
     require_compact(
         available,
-        """return r_shadowMapPointCompose.GetBool()
-            && !r_rendererSharedWorldInteraction.GetBool();""",
-        "the sealed shared stream never composes a point cube",
+        "return r_shadowMapPointCompose.GetBool();",
+        "a point cube composes whether or not the sealed stream may own the view",
     )
     create_cube = braced_body(
         shadow_map,
@@ -6412,7 +6412,7 @@ def validate_dynamic_caster_composition_contract() -> None:
         render,
         (
             "if ( pointFreshCount > 0 || pointComposeCount > 0 ) {",
-            "const bool composePass = !classicCommit && pass.composeDynamic;",
+            "const bool composePass = pass.composeDynamic;",
             """if ( pass.cacheHit && !composePass ) {
                 continue;
             }""",
@@ -9400,9 +9400,7 @@ def validate_shared_static_cube_contract() -> None:
     require_order(
         composes,
         (
-            "vLight->localShadowMapDynamicCasters == NULL",
-            # the sealed shared stream draws every pass's whole caster plan
-            "|| r_rendererSharedWorldInteraction.GetBool() ) {",
+            "vLight->localShadowMapDynamicCasters == NULL ) {",
             "return false;",
             "return !R_ClassifyShadowMapLight( vLight ).pointLight",
             "|| VK_ShadowMap_PointComposeAvailable();",
@@ -9907,12 +9905,16 @@ def validate_resident_projected_sampling_contract() -> None:
         "static VkDescriptorSet VK_ShadowMap_ProjectedEntryResidentSet(",
         "the resident tile's descriptor set for this frame",
     )
+    if "vkClassicShadowTransaction.active" in resident_set:
+        raise AssertionError(
+            "The sealed shared stream must read an exact projected hit in place, as classic does"
+        )
     require_order(
         resident_set,
         (
             "!r_vkShadowSampleResident.GetBool()",
-            # the sealed stream and the overlay address the atlas
-            "vkClassicShadowTransaction.active",
+            # the overlay addresses the atlas; the sealed stream reads the
+            # resident tile in place as the classic receivers do
             "r_shadowMapDebugOverlay.GetBool()",
             "entry.image == VK_NULL_HANDLE",
             "entry.sampleView == VK_NULL_HANDLE",

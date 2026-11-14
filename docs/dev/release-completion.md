@@ -77,6 +77,12 @@ does not restore the withdrawn release. See
   lights and shadows characters, which it used to hand back to the regular
   renderer, and handles every shadow-map form the higher presets use. On
   Vulkan the classic HUD is no longer merged with the scene underneath it.
+- **The shared lighting path also matches with the shadow cache on** (14
+  November). With every light shadow-mapped, as the Quality preset and above
+  do, turning it on made Vulkan redraw shadow maps it normally reuses, which
+  moved a few pixels of the regular frame by a level or three; OpenGL handed
+  views with a distant point light back to the regular renderer. Both now
+  match the regular renderer frame for frame with the cache on, its default.
 - An automated check compares each path with the regular renderer, frame for
   frame, on stock maps under several presets
   ([details](renderer-validation-matrix.md#shared-classic-domain-qualification-ren-01)).
