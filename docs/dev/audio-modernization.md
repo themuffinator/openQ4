@@ -207,8 +207,11 @@ listener as the source spreads. Evidence is in `.tmp/aud01/openq4-only-r6/`.
 active application: its session selects no sound world, and its view and
 listener stop updating. Faking focus would be synthetic input. The harness
 therefore waits, for up to ten minutes, until a person focuses the retail
-window. It checks focus throughout the run and refuses the result if focus is
-lost. Unattended runs before this was understood rendered pure silence, and are
+window. It starts the probe only after two seconds of focus and once retail's
+own printed view has moved to the sky room, which retail only does while it is
+drawing. If focus is lost during the probe, the harness stops retail at once.
+`--openq4-report` reuses the openQ4 levels from an earlier report, so a retail
+rerun does not repeat the openQ4 half. Unattended runs before this was understood rendered pure silence, and are
 kept as failed records in `.tmp/aud01/compare-r1/` and `compare-r3/`. The
 retail comparison has not passed yet.
 

@@ -490,7 +490,17 @@ def run_retail(output: Path, install: Path, runtime: Path, cases: list[dict]) ->
     session = Session(command, runtime, env, game / "qconsole.log", root / "mix.wav", root / "console.log",
                       show=1)
     state = {"loaded": None, "published": False, "prompted": False, "focus_lost": [], "focused_at": None,
-             "aborted": None}
+             "aborted": None, "idle": False, "active_at": None}
+    x, y, z = LISTENER
+    # After the load the idle loop keeps placing the player in the sky room and
+    # printing the drawn view. Retail only draws, and so only moves that view,
+    # while it is the active application: the printed position is its own
+    # confirmation that it is active, independent of the foreground check.
+    idle = [f"setviewpos {x:g} {y:g} {z - .5:g} 0", "wait 20", "getviewpos", "exec cmp_stage.cfg"]
+
+    def active(text: str) -> bool:
+        views = re.findall(r"(?m)^\(([-\d.]+) ([-\d.]+) [-\d.]+\) [-\d.]+\s*$", text[-4000:])
+        return bool(views) and math.dist(tuple(map(float, views[-1])), (x, y)) < 1.0
 
     def on_text(text: str) -> None:
         # Never let retail play aloud: without OpenAL it opens DirectSound on
@@ -506,11 +516,18 @@ def run_retail(output: Path, install: Path, runtime: Path, cases: list[dict]) ->
         if state["published"]:
             # Retail selects no sound world and sleeps while it is not the
             # active application, so every moment of the probe needs focus.
+            # Stop at once rather than finish a run that cannot be used.
             if not focused:
                 state["focus_lost"].append(current.wav_size())
+                state["aborted"] = ("retail lost focus during the probe; rerun and leave its window "
+                                    "focused until it closes")
+                current.process.kill()
             return
         if state["loaded"] is None or time.monotonic() - state["loaded"] < 3:
             return
+        if not state["idle"]:
+            write_script(stage, idle)
+            state["idle"] = True
         if not focused:
             if not state["prompted"]:
                 print("Retail Quake 4 must be the focused window while it plays (it mutes itself otherwise).\n"
@@ -519,17 +536,18 @@ def run_retail(output: Path, install: Path, runtime: Path, cases: list[dict]) ->
                 state["prompted"] = True
             state["focused_at"] = None
             return
-        # Require a second of continuous focus before starting, so the game
-        # has left its inactive sleep and selected the game sound world.
+        # Require two seconds of continuous focus and retail's own sign that it
+        # is drawing again before starting the probe.
         state["focused_at"] = state["focused_at"] or time.monotonic()
-        if time.monotonic() - state["focused_at"] >= 1:
+        if time.monotonic() - state["focused_at"] >= 2 and active(current.text):
             write_script(stage, probe)
             state["published"] = True
 
     code = session.run(FOCUS_TIMEOUT + 600, on_text, on_poll)
     return session, {"command": command, "exit_code": code, "settings": settings,
                      "probe_published": state["published"], "focus_lost_wav_bytes": state["focus_lost"][:20],
-                     "focus_lost_samples": len(state["focus_lost"]), "aborted": state["aborted"]}
+                     "focus_lost_samples": len(state["focus_lost"]), "aborted": state["aborted"],
+                     "focus_prompted": state["prompted"]}
 
 
 def run_openq4(output: Path, install: Path, runtime: Path, cases: list[dict]) -> tuple[Session, dict]:
@@ -598,6 +616,8 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--runtime-dir", type=Path, default=ROOT / ".install")
     parser.add_argument("--retail-runtime", type=Path, default=RETAIL_RUNTIME)
+    parser.add_argument("--openq4-report", type=Path,
+                        help="reuse the openQ4 levels of an earlier report.json from this harness")
     parser.add_argument("--skip-retail", action="store_true",
                         help="unattended partial check: openQ4 against the authored curve only")
     args = parser.parse_args()
@@ -633,12 +653,22 @@ def main() -> None:
             report["runtime_sha256"][path.relative_to(runtime).as_posix()] = sha(path)
     (output / "runner.py").write_bytes(Path(__file__).read_bytes())
     try:
-        runners = [("openq4", run_openq4)]
+        measured = {}
+        runners = [] if args.openq4_report else [("openq4", run_openq4)]
+        if args.openq4_report:
+            earlier = json.loads(args.openq4_report.read_text(encoding="utf-8"))
+            levels = earlier.get("openq4", {}).get("levels")
+            if not levels or [c["tag"] for c in levels] != [c["tag"] for c in cases]:
+                raise ValueError("--openq4-report has no openQ4 levels for these placements")
+            if earlier.get("source_sha256", {}).get("tools/tests/sound_distance_retail_compare.py") is None:
+                raise ValueError("--openq4-report did not come from this harness")
+            report["openq4"] = {**earlier["openq4"], "reused_from": str(args.openq4_report.resolve()),
+                                "reused_runtime_sha256": earlier.get("runtime_sha256")}
+            measured["openq4"] = levels
         if not args.skip_retail:
             report["retail_runtime"] = prepare_retail_runtime(install, args.retail_openal.resolve(),
                                                               args.retail_runtime.resolve())
             runners.append(("retail", run_retail))
-        measured = {}
         for name, runner in runners:
             print(f"Running {name} ...", flush=True)
             session, info = runner(output, install, runtime if name == "openq4" else args.retail_runtime.resolve(),
