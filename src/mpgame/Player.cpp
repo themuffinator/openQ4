@@ -4324,6 +4324,13 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		_hud->SetStateFloat	( "player_armorpct", idMath::ClampFloat ( 0.0f, 1.0f, (float)inventory.armor / (float)inventory.maxarmor ) );
 		_hud->HandleNamedEvent ( "updateArmor" );
 	}
+
+	// openQ4: the Classic ruleset's armour tier (classicArmorTier_t) colours the HUD's
+	// armour icon green, yellow or red; 0 keeps the stock icon (Quake 4 rules, no armour).
+	const int armorTier = gameLocal.IsClassicRuleset() ? rvClassicRules::EffectiveArmorTier( inventory.armorTier, inventory.armor ) : 0;
+	if ( _hud->State().GetInt( "player_armorTier", "-1" ) != armorTier ) {
+		_hud->SetStateInt( "player_armorTier", armorTier );
+	}
 	
 	// Boss bar
 	if ( _hud->State().GetInt ( "boss_health", "-1" ) != (bossEnemy ? bossEnemy->health : -1) ) {

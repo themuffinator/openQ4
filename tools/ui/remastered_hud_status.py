@@ -26,6 +26,11 @@ ST_FILL = "M46.7 15.7H124V40.3H69.3L56.3 48.7H5.1V39.8L15.8 33L24.2 32.5L33.4 26
 
 MARINE = {"fill": "#B3D06E", "armor": "#B2CF6D", "low": "#FF4C00", "ink": "#DDEBC3", "icon": rgb("#A8A360", 0.6),
           "gun": rgb("#C7BD78", 0.4), "ekg": "#161B0E", "ekg_low": "#4C0D00"}
+# The Classic multiplayer ruleset's armour tiers (player_armorTier 1-3: jacket,
+# combat, body) colour the multiplayer armour icon the way Quake 2 coloured its
+# armour; body armour and any armour under Quake 4's rules (tier 0) keep the
+# stock red.  Combat is a lemon yellow, apart from the health icon's gold.
+CLASSIC_ARMOR_TINTS = ((1, "jacket", "#45C83A"), (2, "combat", "#EFE23A"))
 STROGG = {"fill": "#FF9000", "armor": "#FF9000", "low": "#FF4C00", "ink": "#FCFFC8", "icon": rgb("#FFCC00", 0.6),
           "gun": rgb("#C6BC77", 0.4), "ekg": "#1D1403", "ekg_low": "#4C0D00", "static": "#161616"}
 # The multiplayer ammunition gauge's weapon tints (hud.gui:200-234), grey
@@ -475,10 +480,21 @@ def marine_gauge(doc: HudDocument, kind: str, gx: float, gy: float, *, mp_varian
         # Multiplayer: health yellow and armor red at 0.80 (hud.gui:1001, 1087).
         mp_tint = rgb("#F7C004", 0.8) if kind == "health" else rgb("#FA2B05", 0.8)
         icon_mp = full(kind + "-icon-mp", hud_svg.icon_nodes(glyph, kind + "-icon-mpg", u(98), u(38), u(16), tint=mp_tint))
-        doc.show(icon_mp["id"], mp)
+        tiers = []
+        if kind == "armor" and mp_variants:
+            doc.number("player_armorTier", 0)
+            tier = S("player_armorTier")
+            doc.show(icon_mp["id"], AND(mp, *[op("!=", tier, value) for value, _name, _colour in CLASSIC_ARMOR_TINTS]))
+            for value, name, colour in CLASSIC_ARMOR_TINTS:
+                holder = full(f"armor-icon-mp-{name}", hud_svg.icon_nodes(glyph, f"armor-icon-mpg-{name}", u(98), u(38), u(16),
+                                                                         tint=rgb(colour, 0.8)), display=ui.keyword("none"))
+                doc.show(holder["id"], AND(mp, op("==", tier, value)))
+                tiers.append(holder)
+        else:
+            doc.show(icon_mp["id"], mp)
         flash = full(kind + "-flash", hud_svg.icon_nodes(glyph, kind + "-flash-g", u(98), u(38), u(16), tint=[1, 1, 1, 1]),
                      opacity=num(0))
-        children += [icon, icon_mp, flash]
+        children += [icon, icon_mp, *tiers, flash]
     if kind == "ammo":
         for node, rect, scale in ((clip,(31,9,49,26),.5),(reserve,(78,12,40,18),.32),(total,(69,9,49,26),.5)):
             status_gain(doc,node["id"],flash["id"],rect,ink,scale)

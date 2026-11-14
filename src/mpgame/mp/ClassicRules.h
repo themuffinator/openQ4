@@ -96,6 +96,7 @@ public:
 	// Armour.
 	static bool				GiveArmor( idPlayer *player, const char *tierName );
 	static int				AbsorbDamage( int tier, int armor, int damage, bool energy );
+	static int				EffectiveArmorTier( int tier, int armor );	// what the armour counts as; NONE without armour
 	static const char *		ArmorTierName( int tier );
 
 	// Threewave CTF scoring.  Each returns true when it handled the award, so

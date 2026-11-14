@@ -3936,7 +3936,7 @@ prediction/rewind defaults.
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path on IPv4 and IPv6, and over IPv6 even when the path drops IP fragments (connection replies fit one packet). | IPv4 over a fragment-dropping path (1,300-byte channel fragments); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
-| MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), bot hook use, Classic pickup names and an armour-tier HUD tint. |
+| MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), bot hook use, Classic pickup names. |
 
 Completion substeps:
 
@@ -4816,6 +4816,11 @@ Completion substeps:
   blaster spawns, Quake 2 armour conversion, mega health drain, hook pull on
   the host and a predicted remote client, Create Server Rules tab. Remaining:
   real-input play, bot hook use, Classic pickup names and an armour-tier HUD tint.
+  Progress, 14 November: the multiplayer armour icon takes the tier's colour
+  (green jacket, yellow combat, red body) on the Remastered and stock HUDs;
+  `guis/hud.gui` keeps its earlier layout as save revision `hud_r4`, and The
+  Awakening's generated HUD leaves the tint out. Remaining: real-input play,
+  bot hook use and Classic pickup names.
 
 ## Audio and voice
 

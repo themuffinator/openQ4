@@ -7,6 +7,16 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Classic armour shows its tier on the HUD, 14 November 2026
+
+- **Under the Classic multiplayer ruleset the armour icon takes the colour of
+  the armour you wear:** green for jacket, yellow for combat and red for body
+  armour, on both the Remastered HUD and the stock HUD. Quake 4 rules keep the
+  usual red icon.
+- Single-player saves are unaffected: the stock HUD's earlier layout is kept
+  so saves made before this change still restore, and The Awakening's HUD is
+  unchanged.
+
 ## Render demos hold still on OpenGL, 13 November 2026
 
 - **No more creeping glow where the map draws nothing.** On OpenGL with bloom

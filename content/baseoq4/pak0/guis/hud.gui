@@ -1140,12 +1140,28 @@ windowDef Desktop
 			}
 
 		}		
+		// openQ4: the Classic ruleset's armour tiers colour the vest (player_armorTier:
+		// 1 jacket green, 2 combat yellow); body armour and Quake 4 rules keep the red.
 		windowDef icon_armorvest_mp
 		{
 			rect	424,458,16,16
-			visible	1
+			visible	( "gui::player_armorTier" != 1 && "gui::player_armorTier" != 2 )
 			background	"gfx/guis/hud/icons/item_armor"
 			matcolor	0.980,0.168,0.0196,0.8
+		}
+		windowDef icon_armorvest_mp_jacket
+		{
+			rect	424,458,16,16
+			visible	( "gui::player_armorTier" == 1 )
+			background	"gfx/guis/hud/icons/item_armor"
+			matcolor	0.271,0.784,0.227,0.8
+		}
+		windowDef icon_armorvest_mp_combat
+		{
+			rect	424,458,16,16
+			visible	( "gui::player_armorTier" == 2 )
+			background	"gfx/guis/hud/icons/item_armor"
+			matcolor	0.937,0.886,0.227,0.8
 		}
 	}
 	

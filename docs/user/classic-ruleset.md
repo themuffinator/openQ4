@@ -86,6 +86,9 @@ The nailgun, lightning gun and Dark Matter Gun ammo boxes give bullets or cells.
 - Armour can stop a hit completely, and it never drains away.
 - **Energy** weapons (blaster, hyperblaster, lightning gun, Dark Matter Gun)
   get through armour more easily.
+- The armour icon on your HUD takes the colour of the armour you wear: green
+  jacket, yellow combat or red body armour. Armour from outside the tiers,
+  such as a Clan Arena round's, counts as combat armour.
 
 ### Health
 
@@ -146,7 +149,6 @@ the console, for example `bind MOUSE4 _hook`. It has no default key.
 
 - Bots play Classic matches but never use the hook.
 - Item names on the pickup notices are still Quake 4's ("Small Armor Vest").
-- The armour counter does not show the tier's colour yet.
 - With [Instagib](server-setup.md#instagib) on, its railgun and one-hit kills
   replace Classic's weapons and armour. The double jump and the hook still
   work.

@@ -409,13 +409,13 @@ static const int CLASSIC_SHARD_ARMOR = 2;
 
 /*
 ================
-ClassicEffectiveTier
+rvClassicRules::EffectiveArmorTier
 
 Armour handed out outside the tier system - Clan Arena's round loadout,
 "give armor" - has no tier of its own and counts as combat armour.
 ================
 */
-static int ClassicEffectiveTier( int tier, int armor ) {
+int rvClassicRules::EffectiveArmorTier( int tier, int armor ) {
 	if ( armor <= 0 ) {
 		return CLASSIC_ARMOR_NONE;
 	}
@@ -448,7 +448,7 @@ bool rvClassicRules::GiveArmor( idPlayer *player, const char *tierName ) {
 	}
 
 	idInventory &inv = player->inventory;
-	const int oldTier = ClassicEffectiveTier( inv.armorTier, inv.armor );
+	const int oldTier = EffectiveArmorTier( inv.armorTier, inv.armor );
 
 	if ( !idStr::Icmp( tierName, "shard" ) ) {
 		if ( inv.armor >= CLASSIC_ARMOR_CAP ) {
@@ -511,7 +511,7 @@ and through jacket armour untouched.
 ================
 */
 int rvClassicRules::AbsorbDamage( int tier, int armor, int damage, bool energy ) {
-	tier = ClassicEffectiveTier( tier, armor );
+	tier = EffectiveArmorTier( tier, armor );
 	if ( tier == CLASSIC_ARMOR_NONE || damage <= 0 ) {
 		return 0;
 	}

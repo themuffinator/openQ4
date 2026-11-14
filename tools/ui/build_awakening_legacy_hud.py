@@ -266,8 +266,29 @@ def slot(text: str, number: int) -> str:
     return re.sub(r"\b10\b", str(number), text.replace("weapon10", f"weapon{number}"))
 
 
+# The Classic multiplayer ruleset tints guis/hud.gui's multiplayer armour vest by
+# tier. The Awakening has no multiplayer, so its definition keeps the stock vest
+# (and the save layout its earlier builds wrote).
+CLASSIC_ARMOR_NOTE = "\t\t// openQ4: the Classic ruleset's armour tiers colour the vest"
+CLASSIC_ARMOR_VEST = "\t\twindowDef icon_armorvest_mp\n\t\t{\n\t\t\trect\t424,458,16,16\n"
+
+
+def without_classic_armor(text: str) -> str:
+    """guis/hud.gui with the Classic tint taken back out: the note and the two
+    tinted vests gone, the stock vest visible again."""
+    start = once(text, CLASSIC_ARMOR_NOTE)
+    end = line_end(text, block_end(text, once(text, "\t\twindowDef icon_armorvest_mp_combat\n")))
+    block = text[start:end]
+    vest = block.index(CLASSIC_ARMOR_VEST)
+    stock = block[vest:line_end(block, block_end(block, vest))]
+    stock, count = re.subn(r"\n\t\t\tvisible\t\([^\n]*\)\n", "\n\t\t\tvisible\t1\n", stock, count=1)
+    if count != 1:
+        raise ValueError("guis/hud.gui's multiplayer armour vest has no tier visibility to take out")
+    return text[:start] + stock + text[end:]
+
+
 def generate(source: str) -> str:
-    text = source.replace("\r\n", "\n")
+    text = without_classic_armor(source.replace("\r\n", "\n"))
     for name in ("deathFade", "p_failedobjective", "shipstatus", "ws_weapon11"):
         if re.search(rf"windowDef\s+{name}\b", text):
             raise ValueError(f"guis/hud.gui already defines {name}")

@@ -213,6 +213,8 @@ static const openQ4SaveGameGuiRevision_t OPENQ4_SAVEGAME_GUI_REVISIONS[] = {
 	{ "guis/vehicles/airassault/turretplayerhud.gui",	2342,	"guis/savecompat/q4x_turretplayerhud_r1.gui",	"lock_state_msg" },
 	{ "guis/vehicles/mcc/cannonplayerhud.gui",	2342,	"guis/savecompat/q4x_cannonplayerhud_r1.gui",	"lock_state_msg" },
 	{ "guis/vehicles/speederplayerhud.gui",	2342,	"guis/savecompat/q4x_speederplayerhud_r1.gui",	"lock_state_msg" },
+	// The Classic multiplayer ruleset tints the multiplayer armour vest by tier: two more vest windows
+	{ "guis/hud.gui",			2438,	"guis/savecompat/hud_r4.gui",			"icon_armorvest_mp_jacket" },
 };
 
 static inline const openQ4SaveGameGuiRevision_t *OpenQ4_FindSaveGameGuiRevision( const char *guiName, int layoutBuild ) {

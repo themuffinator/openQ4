@@ -43,7 +43,7 @@ REVISION_ROOT = "guis/savecompat"
 # objective and cinematic GUIs, weapon and vehicle zoom GUIs and vehicle HUDs.
 SERIALIZED_GUIS: dict[str, str] = {
     "guis/cinematic.gui": "63d5f187afe545a3533f14780605a7e614463f5c",
-    "guis/hud.gui": "79d25f0c7b5035f118655e1f9f01db89157e6140",
+    "guis/hud.gui": "721d98ac9507ad08c0be68bea10b65a5c96d9ce3",
     "guis/hud_strogg.gui": "51981879a988f53c7b884a84036b6ef66968a37a",
     # The Awakening's guis/q4xhud.gui, which the engine reads from this definition
     # (idLegacyHudLayout::DefinitionFor; generated from guis/hud.gui).
@@ -213,6 +213,14 @@ GUI_REVISIONS: list[dict[str, object]] = [
         "savedBlob": "8c51b2aef073eb06156e596cd35b9e18c84dc235",
         "shippedIn": "9dc0fecf8",
         "definition": "guis/openq4/awakening/speederplayerhud.gui",
+    },
+    {
+        "gui": "guis/hud.gui",
+        "firstBuild": 2438,
+        "savedDefinition": "guis/savecompat/hud_r4.gui",
+        "marker": "icon_armorvest_mp_jacket",
+        "savedBlob": "79d25f0c7b5035f118655e1f9f01db89157e6140",
+        "shippedIn": "25ba79add",
     },
 ]
 
