@@ -22,7 +22,14 @@ really present, so a table row cannot rot into a guess:
 - the written joint is missing from the mesh that names it and the intended
   joint is there;
 - no definition supplies the effect key a model's frame commands name, and the
-  effect given in its place is the one retail's source of those commands plays.
+  effect given in its place is the one retail's source of those commands plays;
+- a map entity's written sound is missing (or is the retail leftover the row
+  says) and the intended one is on disk;
+- a speech row's sound declaration asks for a sample that is not on disk, its
+  recording and its lip-sync declaration are, and a speaker really holds it;
+- each reply the Cryofac script revision adds has one anchor in the installed
+  script, directly follows that anchor's line in the writers' own order, and is
+  a key its speaker has, with its recording.
 """
 
 from __future__ import annotations
@@ -43,6 +50,14 @@ DIALOGUE_SCRIPTS = {
     "maps/game/m08_cryofac": "maps/game/m08_cryofac.script",
 }
 RADIO_SCRIPTS = ("scripts/maps/m06_mcc_invasion.script", "maps/game/m08_cryofac.script")
+# The replies maps/game/m08_cryofac.openq4-v4.script adds: (the line the scene
+# already speaks, the speaker of the reply, the reply). LateMissions.inl holds
+# the edits; the writers' order comes from scripts/maps/m08_cryo_vo.script.
+CRYOFAC_REPLIES = (
+    ("nava_whyisplc", "tak", "tak_goodquest"),
+    ("nava_sorryserg", "tak", "tak_darnman"),
+    ("tak_die", "navajas", "nava_takthatbitch"),
+)
 JOINT_MODELS = {
     # written joint -> (entityDef or model that names it, the key or command that does)
     "rt_up_lid": ("monster_q4x_tank", "joint_eyeOffset"),
@@ -83,15 +98,19 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
         "joints": table(source, "awakeningJoints", 2),
         "mirrored": table(source, "awakeningMirroredJoints", 4),
         "effects": table(source, "awakeningEffects", 3),
+        "sounds": table(source, "awakeningEntitySounds", 5),
+        "speech": table(source, "awakeningSpeech", 5),
     }
     for kind, rows in tables.items():
         seen = set()
         for row in rows:
-            written = row[:3] if kind == "dialogue" else row[:1]
+            written = row[:3] if kind in ("dialogue", "sounds") else row[1:2] if kind == "speech" else row[:1]
             if written in seen:
                 raise AssertionError(f"{kind}: {written} is listed twice")
             seen.add(written)
-            if len(set(value.lower() for value in row)) != len(row):
+            # a speech row's lip-sync declaration is usually the speech's own name
+            names = row[:1] + row[2:] if kind == "speech" and row[1] == row[2] else row
+            if len(set(value.lower() for value in names)) != len(names):
                 raise AssertionError(f"{kind}: {row} repeats a name")
     for row in tables["dialogue"]:
         if row[0] not in DIALOGUE_SCRIPTS:
@@ -106,13 +125,17 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     # Every correction is switched off outside the campaign and by one setting.
     require(source, "return !gameLocal.isMultiplayer && g_awakeningContentRepairs.GetBool() && FS_AwakeningActive();", SOURCE)
     for function in ("Awakening_RestoreDialogueKeys", "Awakening_RecordedLine", "Awakening_IntendedJoint",
-                     "Awakening_IntendedEffectJoint", "Awakening_IntendedEffect", "Awakening_PrecacheContentRepairs"):
+                     "Awakening_IntendedEffectJoint", "Awakening_IntendedEffect", "Awakening_PrecacheContentRepairs",
+                     "Awakening_CorrectEntitySounds", "Awakening_SpeechNames"):
         body = source[source.find(f"{function}("):]     # its definition comes before any use
         body = body[:body.find("\n}\n")]
         require(body, "Awakening_ContentRepairsActive()", function)
     # A key or sound the content does supply is never replaced.
     require(source, "args.FindKey( line.key ) != NULL", SOURCE)
-    require(source, "written->GetState() != DS_DEFAULTED", SOURCE)
+    # A declaration the engine made up for a missing name does not count as supplied.
+    require(source, "return decl != NULL && !decl->IsImplicit() && decl->GetState() != DS_DEFAULTED;", SOURCE)
+    require(source, "if ( Awakening_SoundDeclared( line.stale ) || !Awakening_SoundDeclared( line.recorded ) ) {", SOURCE)
+    require(source, "( !sound.leftover && Awakening_SoundPlayable( sound.written ) )", SOURCE)
     require(source, "ent->spawnArgs.FindKey( key ) != NULL", SOURCE)
 
     game_local = read(ROOT / "src/game/Game_local.cpp")
@@ -123,6 +146,22 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     inhibit = spawn.find("InhibitEntitySpawn( args )")
     if not 0 <= defaults < restore < inhibit:
         raise AssertionError("SpawnMapEntities must restore dialogue keys after the definition's defaults")
+    # entity sounds are corrected wherever an entity's media is gathered
+    if game_local.count("Awakening_CorrectEntitySounds(") != game_local.count("Awakening_CorrectLateMissionMedia(") or \
+            game_local.count("Awakening_CorrectEntitySounds(") != 3:
+        raise AssertionError("Game_local.cpp must correct entity sounds at the spawn and at both precache passes")
+    # speech is redirected where a line starts, with and without a head
+    require(read(ROOT / "src/game/LipSync.cpp"),
+            "StartSoundShader( declManager->FindSound( speechSound ? speechSound : lipSync->GetName() )", "StartLipSyncing")
+    require(read(ROOT / "src/game/LipSync.cpp"), "lipSync = declManager->FindLipSync( lipSyncName );", "StartLipSyncing")
+    require(read(ROOT / "src/game/ai/AI.cpp"),
+            "StartSoundShader (declManager->FindSound ( speechSound ? speechSound : lipsync )", "idAI::Speak")
+    late = read(ROOT / "src/game/awakening/LateMissions.inl")
+    require(late, 'awakeningM08Version4 = "maps/game/m08_cryofac.openq4-v4.script"', "LateMissions.inl")
+    require(late, "return awakeningM08Version4;", "LateMissions.inl")
+    require(late, "cryoProgram.Icmp( awakeningM08Version4 ) == 0", "LateMissions.inl")
+    for line, speaker, reply in CRYOFAC_REPLIES:
+        require(late, f'aiSpeakWait( ${speaker}, \\"lipsync_{reply}\\" );', "LateMissions.inl v4 edits")
     require(read(ROOT / "src/game/Misc.cpp"),
             'sound = Awakening_RecordedLine( spawnArgs.GetString( "snd_radiochatter", "" ) );', "idFuncRadioChatter")
     actor = read(ROOT / "src/game/Actor.cpp")
@@ -230,6 +269,14 @@ class Content:
                         return True
         return False
 
+    def playable(self, sound: str) -> bool:
+        """A declared sound with its sample, or a sample named by its path."""
+        if "/" not in sound:
+            return self.has_sample(sound)
+        relative = sound.replace("\\", "/")
+        localized = re.sub(r"^sound/vo/", "sound/vo_english/", relative, flags=re.I)
+        return any((root / candidate).is_file() for root in self.roots for candidate in (relative, localized))
+
     def joints(self, model: str) -> list[str]:
         seen = set()
         while model and model not in seen:
@@ -253,7 +300,11 @@ def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, ret
 
     for map_name, entity, key, source in tables["dialogue"]:
         script = strip_comments(read(awakening / DIALOGUE_SCRIPTS[map_name]))
-        if not re.search(r"aiSpeak\w*\s*\(\s*\$" + re.escape(entity) + r"\s*,\s*\"" + re.escape(key) + r"\"", script, re.I):
+        if key.lower().startswith("lipsync_talk_"):
+            # a key idAI::TalkTo builds itself: retail spells it this way
+            if not re.fullmatch(r"lipsync_talk_(primary|secondary|loop\d+)", key):
+                raise AssertionError(f"{map_name}: '{key}' is not a key the game reads")
+        elif not re.search(r"aiSpeak\w*\s*\(\s*\$" + re.escape(entity) + r"\s*,\s*\"" + re.escape(key) + r"\"", script, re.I):
             raise AssertionError(f"{map_name}: the script never has ${entity} speak '{key}'")
         args = content.map_entity(map_name, entity)
         keys = content.keys(args.get("classname", ""))
@@ -308,6 +359,51 @@ def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, ret
         if not re.search(r"\bfx\s+" + re.escape(key) + r"\s+gunBarrelReal\b",
                          content.models[maiden["model"].lower()]["body"]):
             raise AssertionError("retail's Iron Maiden no longer plays the flash on gunBarrelReal")
+
+    for map_name, entity, key, written, intended in tables["sounds"]:
+        args = content.map_entity(map_name, entity)
+        if args.get(key.lower(), "").lower() != written.lower():
+            raise AssertionError(f"{map_name}: {entity} \"{key}\" is no longer '{written}'")
+        if not content.playable(intended):
+            raise AssertionError(f"{map_name}: '{intended}' for {entity} is not in the content")
+        if content.playable(written):
+            # a leftover: it must be a retail line, and the scene's own line must be the expansion's
+            if not re.fullmatch(r"vo_\d+(_\d+)+", written) or intended.lower() not in content.sounds:
+                raise AssertionError(f"{map_name}: '{written}' on {entity} plays; the row is obsolete")
+
+    lipsyncs = set()
+    for root in content.roots:
+        for path in (root / "lipsync").rglob("*.lipsync"):
+            lipsyncs.update(name.lower() for name in re.findall(r"^\s*lipsync\s+(\S+)", read(path), re.M | re.I))
+    for map_name, speech, lip_sync, declared, sample in tables["speech"]:
+        if content.playable(declared):
+            raise AssertionError(f"speech: '{declared}' is on disk; the row for '{speech}' is obsolete")
+        if content.has_sample(speech):
+            raise AssertionError(f"speech: '{speech}' is declared with a sample; the row is obsolete")
+        if not content.playable(sample):
+            raise AssertionError(f"speech: the recording '{sample}' is not in the content")
+        if lip_sync.lower() not in lipsyncs:
+            raise AssertionError(f"speech: no lip-sync declaration '{lip_sync}'")
+        # some speaker of that map holds the line: a definition key or a map key
+        holders = [name for name, keys in content.defs.items() if speech.lower() in (v.lower() for v in keys.values())]
+        in_map = f'"{speech.lower()}"' in read(awakening / f"{map_name}.map").lower()
+        if not holders and not in_map:
+            raise AssertionError(f"speech: nothing in {map_name} speaks '{speech}'")
+
+    vo = read(awakening / "scripts/maps/m08_cryo_vo.script")
+    order = [name.lower() for name in re.findall(r"void\s+VO_(\w+)\s*\(", vo)]
+    cryofac = strip_comments(read(awakening / "maps/game/m08_cryofac.script"))
+    for line, speaker, reply in CRYOFAC_REPLIES:
+        if order.index(reply) != order.index(line) + 1:
+            raise AssertionError(f"m08: the writers no longer place '{reply}' directly after '{line}'")
+        if f'"lipsync_{reply}"' in cryofac:
+            raise AssertionError(f"m08: the installed script already speaks '{reply}'; the edit is obsolete")
+        args = content.map_entity("maps/game/m08_cryofac", speaker)
+        keys = content.keys(args.get("classname", ""))
+        keys.update(args)
+        recorded = keys.get(f"lipsync_{reply}")
+        if not recorded or not content.has_sample(recorded):
+            raise AssertionError(f"m08: ${speaker} cannot speak 'lipsync_{reply}'")
 
     for written, counterpart, pair_left, pair_right in tables["mirrored"]:
         owner, user = JOINT_MODELS[written]

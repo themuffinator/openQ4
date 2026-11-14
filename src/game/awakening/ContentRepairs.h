@@ -15,6 +15,16 @@
 // Call with the map entity's arguments after its definition's defaults.
 void Awakening_RestoreDialogueKeys( idDict &args );
 
+// Replaces a map entity's sound key that names nothing, or a line left over
+// from the retail map it was built from. Call wherever the entity's media is
+// gathered: its spawn arguments and both precache passes.
+void Awakening_CorrectEntitySounds( idDict &args );
+
+// For a line whose sound declaration cannot reach its recording: the lip-sync
+// declaration to start it under and the recording to play. False, with both
+// left alone, for every other line.
+bool Awakening_SpeechNames( const char *speech, const char *&lipSync, const char *&sound );
+
 // The recorded line a stale radio sound name refers to, or the name itself.
 const char *Awakening_RecordedLine( const char *sound );
 

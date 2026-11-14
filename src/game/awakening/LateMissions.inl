@@ -9,6 +9,7 @@ static const char * const awakeningM08Source = "maps/game/m08_cryofac.script";
 static const char * const awakeningM08Version1 = "maps/game/m08_cryofac.openq4-v1.script";
 static const char * const awakeningM08Version2 = "maps/game/m08_cryofac.openq4-v2.script";
 static const char * const awakeningM08Version3 = "maps/game/m08_cryofac.openq4-v3.script";
+static const char * const awakeningM08Version4 = "maps/game/m08_cryofac.openq4-v4.script";
 static const char * const awakeningM09Source = "scripts/maps/m09_valkaryne.script";
 static const char * const awakeningM09Version1 = "maps/game/m09_valkaryne.openq4-v1.script";
 static const char * const awakeningM09Version2 = "maps/game/m09_valkaryne.openq4-v2.script";
@@ -90,7 +91,8 @@ static bool Awakening_CorrectColdBreath( idStr &source ) {
 static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source ) {
 	idStr path = filename;
 	path.BackSlashesToSlashes();
-	const bool cryoVersion3 = path.Icmp( awakeningM08Version3 ) == 0;
+	const bool cryoVersion4 = path.Icmp( awakeningM08Version4 ) == 0;
+	const bool cryoVersion3 = cryoVersion4 || path.Icmp( awakeningM08Version3 ) == 0;
 	const bool cryo = cryoVersion3 || path.Icmp( awakeningM08Version1 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
 	const bool version4 = path.Icmp( awakeningM09Version4 ) == 0;
 	const bool version3 = version4 || path.Icmp( awakeningM09Version3 ) == 0;
@@ -233,6 +235,26 @@ static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source
 		if ( !Awakening_ApplyCorrections( source, thirdCryoEdits, sizeof( thirdCryoEdits ) / sizeof( thirdCryoEdits[0] ) ) ) { return false; }
 		source.Insert( "float openq4_firstThawComplete = 0;\n", 0 );
 	}
+	if ( cryoVersion4 ) {
+		// Three recorded replies the writers placed directly after a line this
+		// script speaks, in scenes that end on the line before. Evidence for
+		// each: docs/dev/awakening-missions.md, "Replies the scenes stop short of".
+		static const awakeningCorrection_t fourthCryoEdits[] = {
+			// Navajas: "Then why is this place so poorly defended?" Tak: "Good question.."
+			{ "aiSpeakWait( $navajas, \"lipsync_nava_whyisplc\" );",
+			  "aiSpeakWait( $navajas, \"lipsync_nava_whyisplc\" );\n\taiSpeakWait( $tak, \"lipsync_tak_goodquest\" );", 1 },
+			// Navajas: "...Darnell. He was a good soldier." Tak: "Good soldier?
+			// Darnell was a good man." The alpha has this call commented out in
+			// the scene before Darnell dies.
+			{ "aiSpeakWait( $navajas, \"lipsync_nava_sorryserg\" );",
+			  "aiSpeakWait( $navajas, \"lipsync_nava_sorryserg\" );\n\taiSpeakWait( $tak, \"lipsync_tak_darnman\" );", 1 },
+			// Navajas's outburst over Tak's death, once the Valkaryne has gone
+			// and before he turns for the ladder: "...Dekard, let's go."
+			{ "aiScriptedAnimWait( $navajas, \"turn_180\", 0, 0 );",
+			  "aiSpeakWait( $navajas, \"lipsync_nava_takthatbitch\" );\n\taiScriptedAnimWait( $navajas, \"turn_180\", 0, 0 );", 1 },
+		};
+		if ( !Awakening_ApplyCorrections( source, fourthCryoEdits, sizeof( fourthCryoEdits ) / sizeof( fourthCryoEdits[0] ) ) ) { return false; }
+	}
 	if ( version3 ) {
 		static const awakeningCorrection_t thirdFinaleEdits[] = {
 			// The bomb is ready at this warning. The ensuing scripted death must
@@ -301,9 +323,9 @@ static const char *Awakening_LateMissionScriptName( const char *filename ) {
 	path.BackSlashesToSlashes();
 	if ( g_awakeningLateMissions.GetBool() && Awakening_LateCampaignActive() && path.Icmp( awakeningM08Source ) == 0 ) {
 		idStr source;
-		if ( Awakening_LoadLateMissionScript( awakeningM08Version3, source ) ) {
-			gameLocal.Printf( "Awakening M08: mission corrections v3 enabled\n" );
-			return awakeningM08Version3;
+		if ( Awakening_LoadLateMissionScript( awakeningM08Version4, source ) ) {
+			gameLocal.Printf( "Awakening M08: mission corrections v4 enabled\n" );
+			return awakeningM08Version4;
 		}
 		gameLocal.Warning( "Awakening M08: unrecognized script; keeping installed mission behaviour" );
 	}
@@ -340,7 +362,8 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 	idStr cryoProgram = main ? gameLocal.program.GetFilename( main->filenum ) : "";
 	cryoProgram.BackSlashesToSlashes();
 	const bool correctedCryo = map.Icmp( "maps/game/m08_cryofac" ) == 0 &&
-		( cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 || cryoProgram.Icmp( awakeningM08Version3 ) == 0 );
+		( cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 || cryoProgram.Icmp( awakeningM08Version3 ) == 0 ||
+		cryoProgram.Icmp( awakeningM08Version4 ) == 0 );
 	const char *finaleNamespace = gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ? "oq4_m09_v4::" :
 		gameLocal.program.FindFunction( "oq4_m09_v3::main" ) ? "oq4_m09_v3::" :
 		gameLocal.program.FindFunction( "oq4_m09_v2::main" ) ? "oq4_m09_v2::" : "oq4_m09_v1::";

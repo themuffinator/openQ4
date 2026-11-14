@@ -27,10 +27,33 @@ static bool Awakening_ContentRepairsActive( void ) {
 ===============================================================================
 */
 
+// A sound declaration the content really has: not one the engine made up for a
+// name it was asked for, which a missing sound also gets.
+static bool Awakening_SoundDeclared( const char *name ) {
+	const idDecl *decl = declManager->FindType( DECL_SOUND, name, false );
+	return decl != NULL && !decl->IsImplicit() && decl->GetState() != DS_DEFAULTED;
+}
+
+// A declaration, or a sample named by its path. Voice samples are stored under
+// the language's folder, which only the sample loader maps.
+static bool Awakening_SoundPlayable( const char *name ) {
+	idStr path = name;
+	if ( path.Find( '/' ) < 0 ) {
+		return Awakening_SoundDeclared( name );
+	}
+	// file lookups ignore case; a lower-case request is the portable one
+	path.ToLower();
+	if ( fileSystem->ReadFile( path, NULL, NULL ) > 0 ) {
+		return true;
+	}
+	return path.Replace( "/vo/", va( "/vo_%s/", cvarSystem->GetCVarString( "sys_lang" ) ) ) &&
+		fileSystem->ReadFile( path, NULL, NULL ) > 0;
+}
+
 typedef struct awakeningDialogueKey_s {
 	const char *map;		// maps/game/<map>, without extension
 	const char *entity;		// the map entity that speaks
-	const char *key;		// the key the mission script speaks
+	const char *key;		// the key the mission script speaks, or the game reads when the speaker is talked to
 	const char *source;		// the speaker's key that holds the line, or the line's decl
 } awakeningDialogueKey_t;
 
@@ -46,6 +69,11 @@ static const awakeningDialogueKey_t awakeningDialogueKeys[] = {
 	// Private Hoff is placed as a generic unarmed marine, without the dialogue
 	// definition that carries his mumbling.
 	{ "maps/game/m04_prison",				"insane_marine",	"lipsync_insane1_mumble",	"vo_insane1_mumble" },
+	// The two Fox marines' third reply when talked to. The game reads
+	// lipsync_talk_loop1, as every retail map spells it; this map alone has
+	// lipsync_talk_loop_1, so Meakim and Pappas fell silent after two replies.
+	{ "maps/game/m04_prison",				"sq2_marine_2",		"lipsync_talk_loop1",		"lipsync_talk_loop_1" },
+	{ "maps/game/m04_prison",				"sq2_marine_3",		"lipsync_talk_loop1",		"lipsync_talk_loop_1" },
 	// Three misspelt keys: Navajas's reply to Tak's sightseeing, his alarm as
 	// the cryocene floods in, and Tak's death at the Valkaryne's hands.
 	{ "maps/game/m08_cryofac",				"navajas",			"lipsync_nava_smrttak",		"lipsync_nava_smarttak" },
@@ -77,7 +105,7 @@ void Awakening_RestoreDialogueKeys( idDict &args ) {
 		}
 		// a key of the speaker's own definition, or the line's declaration
 		const char *recorded = idStr::Icmpn( line.source, "lipsync_", 8 ) == 0 ? args.GetString( line.source ) : line.source;
-		if ( !recorded[ 0 ] || declManager->FindType( DECL_SOUND, recorded, false ) == NULL ) {
+		if ( !recorded[ 0 ] || !Awakening_SoundDeclared( recorded ) ) {
 			continue;
 		}
 		args.Set( line.key, recorded );
@@ -117,17 +145,141 @@ const char *Awakening_RecordedLine( const char *sound ) {
 			continue;
 		}
 		// content that supplies the written name keeps it
-		const idDecl *written = declManager->FindType( DECL_SOUND, line.stale, false );
-		if ( written != NULL && written->GetState() != DS_DEFAULTED ) {
-			return sound;
-		}
-		if ( declManager->FindType( DECL_SOUND, line.recorded, false ) == NULL ) {
+		if ( Awakening_SoundDeclared( line.stale ) || !Awakening_SoundDeclared( line.recorded ) ) {
 			return sound;
 		}
 		gameLocal.DPrintf( "Awakening: radio line '%s' plays '%s'\n", line.stale, line.recorded );
 		return line.recorded;
 	}
 	return sound;
+}
+
+/*
+===============================================================================
+
+	Map entities
+
+	The same slip in a map's own keys: a speaker or a character names a sound
+	that does not exist, or one left over from the retail map it was built from.
+
+===============================================================================
+*/
+
+typedef struct awakeningEntitySound_s {
+	const char *map;		// maps/game/<map>, without extension
+	const char *entity;
+	const char *key;
+	const char *written;	// the value the map has
+	const char *intended;	// a declaration, or a sample by its path
+	bool leftover;			// the written sound exists, but belongs to another scene
+} awakeningEntitySound_t;
+
+static const awakeningEntitySound_t awakeningEntitySounds[] = {
+	// Cryofac was mission 9 when its music was delivered: the tracks are
+	// m9_cryo_*, the speakers ask for m8_cryo_*, and the level had no music.
+	{ "maps/game/m08_cryofac",	"music_intro",		"s_shader",	"sound/music/m8_cryo_intro.ogg",	"sound/music/m9_cryo_intro.ogg",	false },
+	{ "maps/game/m08_cryofac",	"music_cryo_cue",	"s_shader",	"sound/music/m8_cryo_cue.ogg",		"sound/music/m9_cryo_cue.ogg",		false },
+	{ "maps/game/m08_cryofac",	"music_cryo_exit",	"s_shader",	"sound/music/m8_cryo_exit.ogg",		"sound/music/m9_cryo_exit.ogg",		false },
+	// Renner's radio call: "What is your position?" The first reply's speaker
+	// kept retail MCC's line ("But a Strogg unit is headed directly for Cougar
+	// squad."). Its twin talkRichards_2 has the recorded second reply, and the
+	// script's commented-out call beside the trigger names the first.
+	{ "maps/game/m06_mcc",		"talkRichards_1",	"s_shader",	"vo_1_1_11_360_2",					"vo_marine_noideawe",				true },
+};
+
+void Awakening_CorrectEntitySounds( idDict &args ) {
+	if ( !Awakening_ContentRepairsActive() ) {
+		return;
+	}
+	const char *name = args.GetString( "name" );
+	if ( !name[ 0 ] ) {
+		return;
+	}
+	idStr map;
+	for ( int i = 0; i < (int)( sizeof( awakeningEntitySounds ) / sizeof( awakeningEntitySounds[ 0 ] ) ); i++ ) {
+		const awakeningEntitySound_t &sound = awakeningEntitySounds[ i ];
+		if ( idStr::Icmp( name, sound.entity ) != 0 || idStr::Icmp( args.GetString( sound.key ), sound.written ) != 0 ) {
+			continue;
+		}
+		if ( !map.Length() ) {
+			map = gameLocal.GetMapName();
+			map.BackSlashesToSlashes();
+			map.StripFileExtension();
+		}
+		if ( map.Icmp( sound.map ) != 0 || !Awakening_SoundPlayable( sound.intended ) ||
+			( !sound.leftover && Awakening_SoundPlayable( sound.written ) ) ) {
+			continue;
+		}
+		args.Set( sound.key, sound.intended );
+	}
+}
+
+/*
+===============================================================================
+
+	Speech
+
+	A line can have its key, its lip-sync declaration and its recording and
+	still be silent: its sound declaration names a folder or a file that is
+	spelt differently on disk. The speech starts under the lip-sync
+	declaration that carries its mouth shapes and plays the recording by path.
+
+===============================================================================
+*/
+
+typedef struct awakeningSpeech_s {
+	const char *map;		// maps/game/<map>, without extension: where the line is preloaded
+	const char *speech;		// the name the speaker's dialogue key holds
+	const char *lipSync;	// the lip-sync declaration of the line
+	const char *declared;	// the sample its sound declaration asks for, which does not exist
+	const char *sample;		// the recording
+} awakeningSpeech_t;
+
+static const awakeningSpeech_t awakeningSpeech[] = {
+	// Navajas sets and blows the charges (m08). These six declarations alone
+	// spell the mission's folder with a hyphen, which also ends the path for
+	// the declaration parser; every other m08 line has M08_Cryo.
+	{ "maps/game/m08_cryofac",	"vo_nava_herewegset2",		"vo_nava_herewegset2",		"sound/vo/M08-Cryo/nava_herewegset2.wav",		"sound/vo/m08_cryo/nava_herewegset2.wav" },
+	{ "maps/game/m08_cryofac",	"vo_nava_seconchrg2",		"vo_nava_seconchrg2",		"sound/vo/M08-Cryo/nava_seconchrg2.wav",		"sound/vo/m08_cryo/nava_seconchrg2.wav" },
+	{ "maps/game/m08_cryofac",	"vo_nava_thatsit2",			"vo_nava_thatsit2",			"sound/vo/M08-Cryo/nava_thatsit2.wav",			"sound/vo/m08_cryo/nava_thatsit2.wav" },
+	{ "maps/game/m08_cryofac",	"vo_nava_demvawaychrg2",	"vo_nava_demvawaychrg2",	"sound/vo/M08-Cryo/nava_demvawaychrg2.wav",		"sound/vo/m08_cryo/nava_demvawaychrg2.wav" },
+	{ "maps/game/m08_cryofac",	"vo_nava_thosechrglive2",	"vo_nava_thosechrglive2",	"sound/vo/M08-Cryo/nava_thosechrglive2.wav",	"sound/vo/m08_cryo/nava_thosechrglive2.wav" },
+	{ "maps/game/m08_cryofac",	"vo_nava_detonat2",			"vo_nava_detonat2",			"sound/vo/M08-Cryo/nava_detonat2.wav",			"sound/vo/m08_cryo/nava_detonat2.wav" },
+	// Private Pappas's second reply when talked to (m04). The map and the
+	// definitions name vo_fox3_prismed; the line was generated as vo_fox_prismed
+	// over fox_prismed.wav, and recorded as fox3_prismed.wav.
+	{ "maps/game/m04_prison",	"vo_fox3_prismed",			"vo_fox_prismed",			"sound/vo/M04_Prison/fox_prismed.wav",			"sound/vo/m04_prison/fox3_prismed.wav" },
+};
+
+// Whether each row applies to the installed content: 0 not yet asked, 1 yes,
+// -1 no. Asked once a map (the precache clears it), not on every spoken line.
+static signed char awakeningSpeechApplies[ sizeof( awakeningSpeech ) / sizeof( awakeningSpeech[ 0 ] ) ];
+
+bool Awakening_SpeechNames( const char *speech, const char *&lipSync, const char *&sound ) {
+	if ( !speech || !speech[ 0 ] || !Awakening_ContentRepairsActive() ) {
+		return false;
+	}
+	for ( int i = 0; i < (int)( sizeof( awakeningSpeech ) / sizeof( awakeningSpeech[ 0 ] ) ); i++ ) {
+		const awakeningSpeech_t &line = awakeningSpeech[ i ];
+		if ( idStr::Icmp( speech, line.speech ) != 0 ) {
+			continue;
+		}
+		if ( awakeningSpeechApplies[ i ] == 0 ) {
+			// content whose declaration reaches a sample keeps it
+			const bool applies = !Awakening_SoundPlayable( line.declared ) && Awakening_SoundPlayable( line.sample );
+			awakeningSpeechApplies[ i ] = applies ? 1 : -1;
+			if ( applies ) {
+				gameLocal.DPrintf( "Awakening: speech '%s' plays '%s'\n", line.speech, line.sample );
+			}
+		}
+		if ( awakeningSpeechApplies[ i ] < 0 ) {
+			return false;
+		}
+		lipSync = line.lipSync;
+		sound = line.sample;
+		return true;
+	}
+	return false;
 }
 
 /*
@@ -218,6 +370,17 @@ void Awakening_PrecacheContentRepairs( void ) {
 	// parse a model declaration to learn whether the map will use it
 	for ( int i = 0; i < (int)( sizeof( awakeningEffects ) / sizeof( awakeningEffects[ 0 ] ) ); i++ ) {
 		declManager->FindType( DECL_EFFECT, awakeningEffects[ i ].effect, false );
+	}
+	// the recordings a map's speech plays by path
+	memset( awakeningSpeechApplies, 0, sizeof( awakeningSpeechApplies ) );
+	idStr map = gameLocal.GetMapName();
+	map.BackSlashesToSlashes();
+	map.StripFileExtension();
+	for ( int i = 0; i < (int)( sizeof( awakeningSpeech ) / sizeof( awakeningSpeech[ 0 ] ) ); i++ ) {
+		const char *lipSync = NULL, *sound = NULL;
+		if ( map.Icmp( awakeningSpeech[ i ].map ) == 0 && Awakening_SpeechNames( awakeningSpeech[ i ].speech, lipSync, sound ) ) {
+			declManager->FindSound( sound );
+		}
 	}
 }
 

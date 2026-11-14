@@ -99,14 +99,22 @@ does not restore the withdrawn release. See
 
 ## The Awakening: lost dialogue, enemies that see, two missing effects, 14 November 2026
 
-- **Seventeen lines of The Awakening's dialogue play for the first time.**
-  Their scripts called them by names the recordings do not have, and the game
-  drops a missing line without a word. The largest part is the radio traffic
-  of the MCC cannon defence (m06 invasion), nine calls that left the whole
-  battle silent. The others: Navajas's "Strogg!" at the bunker charge (m01);
-  Tak at the cellblock door, Darnell's "Above us!" and Private Hoff's mumbling
-  in the prison (m04); Navajas's reply to Tak, his alarm as the cryocene
-  floods in, and Darnell's and Tak's last cries in Cryofac (m08).
+- **Thirty lines of The Awakening's dialogue play for the first time.**
+  Scripts, maps and sound definitions called most of them by names or folders
+  the recordings do not have,
+  and the game drops a missing line without a word. The largest part is the
+  radio traffic of the MCC cannon defence (m06 invasion), nine calls that left
+  the whole battle silent. The others: Navajas's "Strogg!" at the bunker
+  charge (m01); Tak at the cellblock door, Darnell's "Above us!", Private
+  Hoff's mumbling and more replies from Privates Meakim and Pappas in the
+  prison (m04); the pinned-down marine's answer to Renner on the MCC (m06),
+  where a line from Quake 4's own MCC used to play; and in Cryofac (m08)
+  all six of Navajas's lines as he sets and blows his charges, his reply to
+  Tak, his alarm as the cryocene floods in, Darnell's and Tak's last cries,
+  and three replies their scenes stopped short of.
+- **Cryofac (m08) has its music.** Its three cues asked for tracks under the
+  wrong mission number, so the level played none at its start, its mid-level
+  cue or its exit.
 - **The Tank and the Retch see from their heads.** Both name an eye joint
   their models do not have, which left their eyes on the floor between their
   feet, so anything knee-high hid the player from them. Low cover no longer
@@ -120,8 +128,12 @@ does not restore the withdrawn release. See
 - How it works: `src/game/awakening/ContentRepairs.inl` lists each written
   name beside the surviving one. Dialogue keys are added to the speaker when
   the map spawns, radio sound names are translated as the radio plays, and
-  joints resolve at the two places that look them up. No mission script
-  changes. The Tank's flash is the one borrowed asset: its rocket attack's
+  joints resolve at the two places that look them up. A map entity's wrong
+  sound name is replaced as it spawns, and a line whose sound definition
+  cannot reach its recording plays the recording by its path, under its own
+  lip-sync data. Cryofac's three added replies are the
+  only script change (revision 4; saves keep the revision they were made
+  with). The Tank's flash is the one borrowed asset: its rocket attack's
   frame commands are the retail Iron Maiden's, so it plays her rocket flash.
   The dropship mesh never had a right engine joint; the right plume is the
   left one mirrored across the hull.
@@ -133,9 +145,14 @@ does not restore the withdrawn release. See
   124.6 (Tank) and 67.3 (Retch), four failed flashes a volley against none,
   and four failed thrusters against none. See the
   [mission audit](awakening-missions.md#silent-names--14-november-2026).
-- Open: scene timing with the restored lines and the look of the two effects
-  were not reviewed by ear or eye. Twenty-two scripted lines were never
-  recorded, and about 250 recorded lines are used by no script.
+  The second pass adds the Renner scene run end to end, Cryofac's intro
+  track starting five seconds into the level where nothing started before,
+  and its first-cave scene speaking the added reply in order.
+- Open: scene timing with the restored lines, the level of Cryofac's music
+  and the look of the two effects were not reviewed by ear or eye. Twenty-two
+  scripted lines were never recorded. About 350 recorded lines are still
+  played by nothing: most are earlier takes of lines that do play, and the
+  races' radio chatter has no placement the content can prove.
 
 ## PNG textures and PNG screenshots, 14 November 2026
 

@@ -3390,6 +3390,14 @@ Completion substeps must keep three forms of evidence distinct:
   input-free probes measure each correction against `g_awakeningContentRepairs 0`.
   Scene timing with the restored lines and the look of the two effects have not
   been reviewed by ear or eye, and the playthroughs remain.
+  A second pass the same day sorted the 376 recorded lines the alpha never plays
+  (most are earlier takes of lines that do play) and restored what has a
+  provable place: Cryofac's three music cues, which named tracks under the wrong
+  mission number, Navajas's six charge-setting lines there, whose sound
+  declarations name a folder that does not exist, the radio marine's reply in
+  M06's Renner scene, three more replies from M04's Fox marines, and three
+  replies in Cryofac through script revision 4. The races' unused chatter has
+  no recoverable placement and stays out. See [the second pass](awakening-missions.md#replies-the-scenes-stop-short-of--14-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
