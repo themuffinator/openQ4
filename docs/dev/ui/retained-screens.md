@@ -3334,16 +3334,21 @@ glyph. Each prompt is the title's construction: the active device's glyph
   control ID (`load_back`, `credits_back` and so on) and the page's Back.
   With the pointer anywhere in its target, its verb turns orange and its
   glyph lights from 0.85 to full; focus also underlines it, and a press
-  insets it 1 dp. SELECT is a legend for Enter or the south button and never
-  takes the pointer: a click would act on a focus that the pointer
-  presentation hides. Credits and the Objectives page show Back alone, since
-  Accept has nothing else to do there. The Strogg Objectives page tints its
-  glyph #FFCC00 and sets BACK in R_Strogg #FCFFC8, turning #FFCC00.
+  insets it 1 dp. SELECT lights and presses the same way, and a click on it
+  is Accept, as Enter or the south button is: it acts on the focused control
+  (the row a click chose, or the one the keys reached) and never takes the
+  focus itself ([prompt controls](interaction.md#prompt-controls); 14 November
+  2026, at the user's request, where SELECT had been a legend because the
+  pointer presentation hides that focus). Credits and the Objectives page
+  show Back alone, since Accept has nothing else to do there. The Strogg
+  Objectives page tints its glyph #FFCC00 and sets BACK in R_Strogg
+  #FCFFC8, turning #FFCC00.
 - **Single Player, Campaign, the campaign difficulty page and Multiplayer**
-  show the same bar in the same place, as legends, since their own BACK is
-  in the content. The bar keeps its place between Multiplayer and Create
-  Server or Join Game. At 21:9 it stays on the raised section, where the
-  view-anchored bar hung past it.
+  show the same bar in the same place. Their own BACK is in the content, so
+  the bar's BACK is a prompt for Back's key: a click is Back, as Escape is.
+  The bar keeps its place between Multiplayer and Create Server or Join
+  Game. At 21:9 it stays on the raised section, where the view-anchored bar
+  hung past it.
 - **Fit.** `check_page_prompts` fails generation unless every shipped
   language's prompts fit, with the wider of each keycap and a controller
   button: Back's verb ends at least 8 dp inside the 4:3 view, and Accept,
@@ -3352,18 +3357,24 @@ glyph. Each prompt is the title's construction: the active device's glyph
   bar begins. German REFRESH did not fit, so the Refresh plates keep SELECT;
   their own labels already name the action.
 - **Pointer.** The bar's box runs from 380 u to the 4:3 view's trailing edge
-  and covers no control of the page's own. Legend bars, the title's and the
-  pauses' included, never take the pointer, so the pause's faded bar cannot
-  cover the Objectives page's Back.
+  and covers no control of the page's own. Every prompt bar answers the
+  mouse, the title's and the pauses' included (Select and Exit or Resume on
+  their keys), and so do the multiplayer cards' (Escape and Enter as one
+  target each, Q and E each a tab). The summary card's typing prompts stay
+  legends, since the chat field owns Enter and Escape. A prompt outside the
+  open dialog or page scope, or faded out, lets the pointer through, and the
+  pause turns its bar's pointer off while the Objectives page shows, so the
+  faded bar cannot cover that page's Back.
 
 Checks:
 
 - The native screens test lays out each page's bar at 16:9 and 21:9 in the
   same canvas place, Back's glyph at every `prompt.glyphs` value and SELECT
-  where it shows. The pointer over SELECT lights nothing and a click there
-  does nothing; anywhere in Back's target the pointer lights Back, and a
-  click runs the page's Back. Single Player's, Campaign's and Multiplayer's
-  legends take no input. On the Load, Save, Demos and Join Game pages it
+  where it shows. The pointer lights SELECT in its 45 dp target, and a click
+  there acts only on the focused control and leaves the focus where it
+  stood. Anywhere in Back's target the pointer lights Back, and a click runs
+  the page's Back. On Single Player, Campaign and Multiplayer it lights the
+  bar's BACK, and a click there is Back. On the Load, Save, Demos and Join Game pages it
   checks each control's Accept verb, and that the bar shows a published
   verb and drops Accept while none is published.
 - The retained runtime test checks `AcceptPrompt` for a named verb, the

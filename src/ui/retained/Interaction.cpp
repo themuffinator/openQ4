@@ -480,7 +480,13 @@ bool Interaction::Propose(const std::string& id, const StateValue& value) {
 void Interaction::Activate(const std::string& id) {
 	auto& item = items.at(id);
 	switch (item.control.role) {
-		case ControlRole::Button: Queue({ControlAction::Kind::Activate,document,id,item.control.action,item.control.event}); break;
+		case ControlRole::Button:
+			// A prompt button replays its key (section 13.4): Accept on the focused
+			// control, or Back, unless that key is already held.
+			if (item.control.input == ControlInput::Accept) { if (!acceptHeld) { Input(MenuInput::Accept,true); Input(MenuInput::Accept,false); } }
+			else if (item.control.input == ControlInput::Back) { if (!backHeld) { Input(MenuInput::Back,true); Input(MenuInput::Back,false); } }
+			else Queue({ControlAction::Kind::Activate,document,id,item.control.action,item.control.event});
+			break;
 		case ControlRole::Toggle: Propose(id,item.readback->mixed && !item.pending ? true : !std::get<bool>(EditingValue(item))); break;
 		case ControlRole::Choice: OpenPopup(id); if (popup == id) Cue(id); break;
 		case ControlRole::Scrollbar: break;
@@ -1241,7 +1247,7 @@ bool Interaction::Eligible(const std::string& id) const {
          (found->second.control.role == ControlRole::Scrollbar ? found->second.scroll && found->second.scroll->available &&
           found->second.scroll->geometry.usable && !found->second.scrollRestore : found->second.readback.has_value()));
 }
-std::string Interaction::First() const { for (const auto& id : order) if (Eligible(id)) return id; return {}; }
+std::string Interaction::First() const { for (const auto& id : order) if (Focusable(id)) return id; return {}; }
 void Interaction::SetBounds(const std::map<std::string,ControlBounds>& bounds, bool freshLayout) {
 	for (auto& [id,item] : items) {
 		const auto found = bounds.find(id); item.bounds = found == bounds.end() ? ControlBounds{} : found->second;
@@ -1264,7 +1270,7 @@ void Interaction::InvalidateLayout() {
 }
 bool Interaction::Focus(const std::string& id) {
 	if (focusPending && !id.empty()) return false;
-	if (!id.empty() && !Eligible(id)) return false;
+	if (!id.empty() && !Focusable(id)) return false;
 	focusPending = false; pendingFocus.clear(); lostFocus.clear();
 	if (focused != id) { CancelGesture(); focused = id; }
 	Refresh(); return true;
@@ -1318,7 +1324,8 @@ void Interaction::Pointer(bool down) {
 			}
 		} else if (Eligible(hovered) && armed.empty()) {
 			const auto id = hovered;
-            if(items.at(id).control.role!=ControlRole::Scrollbar) Focus(id);
+            // A prompt button leaves the focus where it stands: Accept acts on it.
+            if(items.at(id).control.role!=ControlRole::Scrollbar && items.at(id).control.focusable) Focus(id);
             armed = id; pointerArm = true;
             if(items.at(id).control.role==ControlRole::Scrollbar) {
                 if(!pointerFraction) armed.clear();
@@ -1461,7 +1468,7 @@ void Interaction::ModalChanged() {
 }
 void Interaction::ResolvePendingFocus() {
 	if (!focusPending || modalBlocked) return;
-	focused = Eligible(pendingFocus) ? pendingFocus : First();
+	focused = Focusable(pendingFocus) ? pendingFocus : First();
 	if (!focused.empty()) { focusPending = false; pendingFocus.clear(); }
 }
 bool Interaction::SyncAuthoredModals(const std::vector<std::string>& roots, std::string& error) {
@@ -1530,7 +1537,7 @@ bool Interaction::PushModal(const std::string& root) {
 bool Interaction::PopModal() {
 	if (modalBlocked || modals.empty() || modals.back().authored) return false;
 	const auto restore = modals.back().restore; modals.pop_back(); ModalChanged();
-	focused = Eligible(restore) ? restore : First(); Refresh(); return true;
+	focused = Focusable(restore) ? restore : First(); Refresh(); return true;
 }
 void Interaction::Navigate(MenuInput input) {
 	static const char* names[] = {"next","previous","up","down","left","right"};
@@ -1547,7 +1554,7 @@ void Interaction::Navigate(MenuInput input) {
 			if (next.empty()) next = ordered ? Following(lostFocus,input) : focusBounds.visible ? Toward(focusBounds,lostFocus,input) : std::string{};
 			if (!next.empty()) { Focus(next); return; }
 		}
-		if (input == MenuInput::Previous) { for (auto it = order.rbegin(); it != order.rend(); ++it) if (Eligible(*it)) { Focus(*it); return; } }
+		if (input == MenuInput::Previous) { for (auto it = order.rbegin(); it != order.rend(); ++it) if (Focusable(*it)) { Focus(*it); return; } }
 		Focus(First()); return;
 	}
 	const auto& item = items.at(focused);
@@ -1576,7 +1583,7 @@ std::string Interaction::Authored(const std::string& from, const char* name) con
 	for (auto found = items.find(from); found != items.end();) {
 		const auto target = found->second.control.navigation.find(name);
 		if (target == found->second.control.navigation.end() || !visited.insert(target->second).second) break;
-		if (Eligible(target->second)) return target->second;
+		if (Focusable(target->second)) return target->second;
 		if (hidden.empty()) hidden = target->second;
 		found = items.find(target->second);
 	}
@@ -1589,7 +1596,7 @@ std::string Interaction::Authored(const std::string& from, const char* name) con
 		for (auto found = items.find(hidden); found != items.end();) {
 			const auto target = found->second.control.navigation.find(along);
 			if (target == found->second.control.navigation.end() || !walked.insert(target->second).second) break;
-			if (Eligible(target->second)) return target->second;
+			if (Focusable(target->second)) return target->second;
 			found = items.find(target->second);
 		}
 	}
@@ -1599,14 +1606,14 @@ std::string Interaction::Following(const std::string& from, MenuInput input) con
 	const auto current = std::find(order.begin(),order.end(),from)-order.begin();
 	for (size_t n = 1; n <= order.size(); ++n) {
 		const auto i = (current+order.size()+(input == MenuInput::Next ? n : order.size()-n))%order.size();
-		if (Eligible(order[i])) return order[i];
+		if (Focusable(order[i])) return order[i];
 	}
 	return {};
 }
 std::string Interaction::Toward(const ControlBounds& a, const std::string& from, MenuInput input) const {
 	const double ax = a.x+a.width*.5, ay = a.y+a.height*.5;
 	double best = std::numeric_limits<double>::infinity(); std::string next;
-	for (const auto& id : order) if (id != from && Eligible(id)) {
+	for (const auto& id : order) if (id != from && Focusable(id)) {
 		const auto& b = items.at(id).bounds;
 		const double dx = b.x+b.width*.5-ax, dy = b.y+b.height*.5-ay;
 		const bool horizontal = input == MenuInput::Left || input == MenuInput::Right;

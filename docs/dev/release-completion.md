@@ -7,6 +7,35 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Click the key prompts in the new menus, 14 November 2026
+
+- **The key prompts at the bottom of every new menu now work with the
+  mouse.** Hover over one and it lights up. Click it and it does what its
+  key does. **Select** (Enter) acts on the item you last chose or moved to.
+  **Back**, **Exit** or **Resume** (Escape) goes back. This covers the main
+  menu, the pause menus, every page (Load, Save, Demos, Settings, Create
+  Server, Join Game and the rest) and the multiplayer cards. On those cards
+  you can also click the Q and E keys to change tabs.
+- **Nothing to do.** Keyboard and controller play are unchanged. A prompt
+  never takes the highlight from the item you are on, so Select still acts on
+  that item. The classic interface is unchanged.
+- How it works: a prompt is a button that cannot take the focus. Its click
+  replays its key's menu input (`"input": "accept"` or `"back"`), or runs
+  the tab event. A prompt that is faded out, or outside an open dialog, lets
+  clicks through to what lies under it. See
+  [prompt controls](ui/interaction.md#prompt-controls).
+- Evidence: `UiModalInteractionTest` covers the semantics: navigation and
+  programs never focus a prompt, a press leaves the focus where it was,
+  Accept reaches the focused control, Back is Back, a held key wins, and
+  malformed prompts are refused. `UiRetainedScreensTest` checks every page's
+  SELECT and BACK targets and the pointer-reach probe over every menu. In a
+  hidden-window run of the staged client on OpenGL, the title's SELECT lit
+  under the cursor and opened Single Player, and that page's BACK returned to
+  the title. The cursor and clicks came from console verbs (`openq4_retainedGui
+  pointer`, and the new `click`), not a physical mouse. Not run: Vulkan,
+  Linux, macOS, Android touch, or a real mouse.
+
+
 ## PNG textures and PNG screenshots, 14 November 2026
 
 - **Textures can be PNG files, and screenshots can be saved as PNG.** A

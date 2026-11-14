@@ -654,25 +654,23 @@ def prompt_bars(doc: Document, width: float, height: float) -> list:
     """The prompt bar (section 14.18): Return to game on the back key, Tabs
     and Select; while you type, Send, Channel where team chat exists, and
     Cancel instead."""
-    def prompt(ident: str, keys: list, verb: str) -> list:
-        caps = [keycap(f"{ident}-{n}", key) for n, key in enumerate(keys)]
-        for cap in caps:
-            cap["properties"]["margin-right"] = length(3 if cap is not caps[-1] else 6)
-            cap["properties"]["flex-shrink"] = number(0)
-        words = label(f"{ident}-verb", verb, {"position": keyword("relative"), "display": keyword("block"), "margin-right": length(18),
-                                              **typeface("marine", 14, PROMPT_H, [1, 1, 1, 0.8]), "white-space": keyword("nowrap"),
-                                              "flex-shrink": number(0)})
-        return caps + [words]
+    # The card's own prompts answer the mouse as their keys do; while you
+    # type, the chat field owns Enter and Escape, so those are legends.
+    def prompt(ident: str, keys: list, verb: str, clickable: bool = True) -> list:
+        entry = mp.prompt_entry(doc, ident, keys, verb, glyphs=False, clickable=clickable)
+        for item in entry:
+            item["properties"]["flex-shrink"] = number(0)
+        return entry
     box = absolute(left=INSET, top=height - PROMPT_BOTTOM - PROMPT_H, width=width - 2 * INSET, height=PROMPT_H)
     rest = row_flex("prompts", {**box, "display": keyword("flex")},
                     prompt("prompt-back", [KEY_ESCAPE], RETURN_TO_GAME) + prompt("prompt-tabs", [KEY_PREVIOUS, KEY_NEXT], VERB_TABS) +
                     prompt("prompt-select", [KEY_ENTER], VERB_SELECT))
     channel = group("prompt-channel", {"position": keyword("relative"), "display": keyword("none"), "flex-direction": keyword("row"),
-                                       "align-items": keyword("center")}, prompt("prompt-channel-k", [KEY_TAB], CHANNEL_WORD))
+                                       "align-items": keyword("center")}, prompt("prompt-channel-k", [KEY_TAB], CHANNEL_WORD, False))
     doc.state["mp.summary.channels"] = {"type": "boolean", "initial": False}
     shown(doc, "prompt-channel", S("mp.summary.channels"), "flex")
     typing = row_flex("prompts-typing", {**box, "display": keyword("none")},
-                      prompt("prompt-send", [KEY_ENTER], SEND_WORD) + [channel] + prompt("prompt-cancel", [KEY_ESCAPE], CANCEL_WORD))
+                      prompt("prompt-send", [KEY_ENTER], SEND_WORD, False) + [channel] + prompt("prompt-cancel", [KEY_ESCAPE], CANCEL_WORD, False))
     shown(doc, "prompts", NOT(S("mp.summary.typing")), "flex")
     shown(doc, "prompts-typing", S("mp.summary.typing"), "flex")
     return [rest, typing]

@@ -380,6 +380,9 @@ private:
 	struct ModalScope { std::string root, restore; bool authored = false; };
 	bool Within(const std::string& id, const std::string& root) const;
 	bool Eligible(const std::string& id) const;
+	// Eligible and able to take the focus: a prompt button (Control::focusable
+	// false) answers the pointer only.
+	bool Focusable(const std::string& id) const { return Eligible(id) && items.at(id).control.focusable; }
 	std::string First() const;
 	void Navigate(MenuInput input);
 	// The eligible control after `from` in tab order (Next or Previous), and

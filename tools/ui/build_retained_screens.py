@@ -2388,23 +2388,58 @@ def prompt_glyph(doc: Document, ident: str, key_name: str, tint: list[float], ex
                  [cap] + device_glyphs(doc, ident, FACE_FOR_KEY[key_name], tint))
 
 
+# The menu input a prompt's key gives in menus (section 13.4): a click on
+# the prompt gives it too, Accept to the focused control.
+PROMPT_INPUT = {"#str_107019": "accept", "#str_107020": "back"}
+
+
+def prompt_target(doc: Document, node: str, glyph_ident: str, key_name: str, verb_node: str, verb: str, box: dict,
+                  control: dict, *, tint: list[float], verb_face: tuple, hot: str, pad: float, top: float) -> dict:
+    """A prompt the mouse can click (section 13.4): the active device's glyph
+    and its verb in one target, `pad` dp past them either side, with the
+    verb's 22 dp line `top` dp down the target. The pointer turns the verb
+    `hot` and lights the glyph, focus underlines it and a press insets it
+    1 dp. `control` names what the click does: an action or event, which a
+    focusable Back plate carries, or a key's menu `input`, which never takes
+    the focus, so Accept goes to the control that holds it."""
+    face, size, verb_tint = verb_face
+    # The glyph is painted opaque and rests at the legends' 0.85.
+    glyph = prompt_glyph(doc, glyph_ident, key_name, tint[:3] + [1], {"opacity": number(0.85), "transform": transform()})
+    words = label(verb_node, verb, {"position": keyword("relative"), "display": keyword("block"), **typeface(face, size, 22, verb_tint),
+                                    "white-space": keyword("nowrap"), "transform": transform()})
+    focus = vector(f"{node}-focus", {**absolute(left=pad, top=top + 22 + 2, height=2), "right": length(pad),
+                                     "opacity": number(0), "pointer-events": keyword("none")}, [
+        path("inset", [(0, 1), ({"fraction": 1}, 1)], closed=False, stroke=stroke(solid(rgb(hot)), 1.2))])
+    lit, pressed, rest = colour(rgb(hot)), transform(tx=1, ty=1), transform()
+
+    def feedback(glyph_alpha: float, tint_value: dict, moved: dict, underline: float) -> list:
+        return [(f"{glyph_ident}-glyph", "opacity", number(glyph_alpha)), (f"{glyph_ident}-glyph", "transform", moved),
+                (verb_node, "color", tint_value), (verb_node, "transform", moved), (f"{node}-focus", "opacity", number(underline))]
+    ids = doc.states(node, {"default": feedback(0.85, colour(verb_tint), rest, 0), "hover": feedback(1, lit, rest, 0),
+                            "focus": feedback(1, lit, rest, 1), "pressed": feedback(1, lit, pressed, 1),
+                            "disabled": feedback(0.4, colour(verb_tint[:3] + [0.4]), rest, 0)})
+    if "input" in control:
+        control = {**control, "focusable": False}
+    return group(node, {**box, "display": keyword("flex"), "flex-direction": keyword("row"), "align-items": keyword("center"),
+                        "padding-left": length(pad), "padding-right": length(pad)},
+                 [glyph, words, focus], control={"role": "button", "label": verb, "states": ids, **control})
+
+
 def prompt_bar(doc: Document, prompts: list, cap_tint: list[float] | None = None,
-               verb_face: tuple = ("marine", 14, [1, 1, 1, 0.8])) -> dict:
+               verb_face: tuple = ("marine", 14, [1, 1, 1, 0.8]), hot: str = ORANGE) -> dict:
     """The prompt bar in the bottom band's raised trailing section (section
     13.4): per prompt the active device's glyph, the keyboard's keycap plate
     with a 45-degree cut or the controller family's face button that does
-    the same (section 13.5), then its verb. The prompts are legends, which
-    never take the pointer from what lies under them."""
+    the same (section 13.5), then its verb. A click on a prompt gives its
+    key's menu input: Accept on the focused control, or Back."""
     items = []
     tint = cap_tint or [1, 1, 1, 0.85]
     for key_name, verb in prompts:
         name = verb[5:]
-        glyph = prompt_glyph(doc, f"prompt-{name}", key_name, tint)
-        face, size, verb_tint = verb_face
-        verb_node = label(f"prompt-{name}-verb", verb, {"position": keyword("relative"), "display": keyword("block"),
-            "margin-right": length(22), **typeface(face, size, 22, verb_tint), "white-space": keyword("nowrap")})
-        items += [glyph, verb_node]
-    bar = group("prompts", {**absolute(top=U * 447, height=22, right=U * 12), "opacity": number(1), "pointer-events": keyword("none"),
+        items.append(prompt_target(doc, f"prompt-{name}", f"prompt-{name}", key_name, f"prompt-{name}-verb", verb,
+                                   {"position": keyword("relative"), "height": length(22), "margin-right": length(22)},
+                                   {"input": PROMPT_INPUT[key_name]}, tint=tint, verb_face=verb_face, hot=hot, pad=0, top=0))
+    bar = group("prompts", {**absolute(top=U * 447, height=22, right=U * 12), "opacity": number(1),
                             "display": keyword("flex"), "flex-direction": keyword("row"), "align-items": keyword("center")}, items)
     # As on a page's bar, the key caps and verbs keep their size.
     fixed_text(doc, bar)
@@ -2485,8 +2520,9 @@ def page_prompts(doc: Document, back: str | None = None, *, action: str | None =
     can act. With `action` or `event` Back is the button `back`, standing in
     for the stock BACK plate in its 45 dp target: the pointer or focus turns
     its verb `hot` and lights its glyph, focus underlines it and a press
-    insets it 1 dp. Otherwise both are legends. Legends never take the
-    pointer. `select` False leaves Accept out where it has nothing to do.
+    insets it 1 dp. Otherwise Back, like Accept always, is a prompt the
+    mouse clicks for its key, which never takes the focus (prompt_target).
+    `select` False leaves Accept out where it has nothing to do.
     The bar sits in a 4:3 canvas group, or with `in_canvas` False in a node
     spanning the view; Accept starts after `lead_limit` (canvas dp).
     `accept_shown` adds a condition to Accept's own: a page whose Accept
@@ -2496,55 +2532,39 @@ def page_prompts(doc: Document, back: str | None = None, *, action: str | None =
     tint = cap_tint or [1, 1, 1, 0.85]
     middle = (PROMPT_TARGET - 22) / 2
     back_x = PAGE_BACK_X - PAGE_BAR_LEFT
-
-    def verb_label(node: str, key: str, more: dict | None = None) -> dict:
-        return label(node, key, {"position": keyword("relative"), "display": keyword("block"), **typeface(face, size, 22, verb_tint),
-                                 "white-space": keyword("nowrap"), **(more or {})})
-    lead = []
+    style = {"tint": tint, "verb_face": verb_face, "hot": hot, "pad": PROMPT_PAD, "top": middle}
+    # Each prompt's target is the stock plate's 45 dp, PROMPT_PAD past its
+    # glyph and verb: SELECT's ends 6 dp before Back's.
+    children = []
     if select:
         name = f"prompt-{PROMPT_SELECT[5:]}"
-        lead = [prompt_glyph(doc, name, KEY_ENTER, tint), verb_label(f"{name}-verb", PROMPT_SELECT)]
+        children.append(prompt_target(doc, f"{ident}-lead", name, KEY_ENTER, f"{name}-verb", PROMPT_SELECT,
+                                      absolute(top=0, height=PROMPT_TARGET, right=PAGE_BAR_W - back_x + 22 - PROMPT_PAD),
+                                      {"input": "accept"}, **style))
         doc.state[PROMPT_ACCEPT] = {"type": "string", "initial": PROMPT_SELECT}
         doc.bind(f"{name}-verb.text", f"{name}-verb", "text", {"state": PROMPT_ACCEPT})
         idle = {"op": "==", "args": [{"state": PROMPT_ACCEPT}, ""]}
         if accept_shown is not None:
             idle = {"op": "||", "args": [idle, {"op": "!", "args": [accept_shown]}]}
         doc.bind(f"{ident}-lead.display", f"{ident}-lead", "display", {"op": "select", "args": [idle, "none", "flex"]})
-    leading = group(f"{ident}-lead", {**absolute(top=middle, height=22, right=PAGE_BAR_W - back_x + 22), "display": keyword("flex"),
-                                      "flex-direction": keyword("row"), "align-items": keyword("center"),
-                                      "pointer-events": keyword("none")}, lead)
-    legends = action is None and event is None
-    if legends:
-        name = f"prompt-{PROMPT_BACK[5:]}"
-        back_node = group(f"{ident}-back", {**absolute(left=back_x, top=middle, height=22), "display": keyword("flex"),
-                                            "flex-direction": keyword("row"), "align-items": keyword("center")},
-                          [prompt_glyph(doc, name, KEY_ESCAPE, tint), verb_label(f"{name}-verb", PROMPT_BACK)])
     else:
-        # The glyph is painted opaque and rests at the legends' 0.85.
-        glyph = prompt_glyph(doc, back, KEY_ESCAPE, tint[:3] + [1], {"opacity": number(0.85), "transform": transform()})
-        focus = vector(f"{back}-focus", {**absolute(left=PROMPT_PAD, top=middle + 22 + 2, height=2), "right": length(PROMPT_PAD),
-                                         "opacity": number(0), "pointer-events": keyword("none")}, [
-            path("inset", [(0, 1), ({"fraction": 1}, 1)], closed=False, stroke=stroke(solid(rgb(hot)), 1.2))])
-        lit, pressed, rest = colour(rgb(hot)), transform(tx=1, ty=1), transform()
-
-        def feedback(glyph_alpha: float, tint_value: dict, moved: dict, underline: float) -> list:
-            return [(f"{back}-glyph", "opacity", number(glyph_alpha)), (f"{back}-glyph", "transform", moved),
-                    (f"{back}-label", "color", tint_value), (f"{back}-label", "transform", moved), (f"{back}-focus", "opacity", number(underline))]
-        ids = doc.states(back, {"default": feedback(0.85, colour(verb_tint), rest, 0), "hover": feedback(1, lit, rest, 0),
-                                "focus": feedback(1, lit, rest, 1), "pressed": feedback(1, lit, pressed, 1),
-                                "disabled": feedback(0.4, colour(verb_tint[:3] + [0.4]), rest, 0)})
-        control = {"role": "button", "label": PROMPT_BACK, "states": ids}
-        control.update({"action": action} if action else {"event": event})
-        back_node = group(back, {**absolute(left=back_x - PROMPT_PAD, top=0, height=PROMPT_TARGET), "display": keyword("flex"),
-                                 "flex-direction": keyword("row"), "align-items": keyword("center"), "padding-left": length(PROMPT_PAD),
-                                 "padding-right": length(PROMPT_PAD)},
-                          [glyph, verb_label(f"{back}-label", PROMPT_BACK, {"transform": transform()}), focus], control=control)
+        # Nothing for Accept to do: the lead stays, empty.
+        children.append(group(f"{ident}-lead", {**absolute(top=middle, height=22, right=PAGE_BAR_W - back_x + 22), "display": keyword("flex"),
+                                                "flex-direction": keyword("row"), "align-items": keyword("center"),
+                                                "pointer-events": keyword("none")}, []))
+    if action is None and event is None:
+        # The page's own BACK is elsewhere: this one gives Back as its key does.
+        name = f"prompt-{PROMPT_BACK[5:]}"
+        children.append(prompt_target(doc, f"{ident}-back", name, KEY_ESCAPE, f"{name}-verb", PROMPT_BACK,
+                                      absolute(left=back_x - PROMPT_PAD, top=0, height=PROMPT_TARGET), {"input": "back"}, **style))
+    else:
+        children.append(prompt_target(doc, back, back, KEY_ESCAPE, f"{back}-label", PROMPT_BACK,
+                                      absolute(left=back_x - PROMPT_PAD, top=0, height=PROMPT_TARGET),
+                                      {"action": action} if action else {"event": event}, **style))
     box = absolute(left=PAGE_BAR_LEFT, top=PAGE_BAR_TOP, width=PAGE_BAR_W, height=PROMPT_TARGET)
     if not in_canvas:
         box.update({"left": length(50, "%"), "margin-left": length(-CANVAS_W / 2 + PAGE_BAR_LEFT)})
-    if legends:
-        box["pointer-events"] = keyword("none")
-    bar = group(ident, {**box, "opacity": number(1)}, [leading, back_node])
+    bar = group(ident, {**box, "opacity": number(1)}, children)
     # The key caps and verbs keep their size in the bar's fixed slots, so BACK
     # stays on the screen at any text size.
     fixed_text(doc, bar)
@@ -4639,6 +4659,9 @@ def objectives_page(doc: Document, strogg: bool) -> tuple:
                  modal={"initialFocus": "objectives_scroll", "back": "objectivesHide"})
     for part in ("objectives", "objectives-bar"):
         doc.bind(f"{part}.display", part, "display", {"op": "select", "args": [{"state": visible}, "block", "none"]})
+    # The home's prompt bar fades out over the page but stays over it: while
+    # the page shows, the bar lets the pointer through to the page's Back.
+    doc.bind("prompts.pointer-events", "prompts", "pointer-events", {"op": "select", "args": [{"state": visible}, "none", "auto"]})
     # Choosing OBJECTIVES docks the bands and carries the label as a page
     # hand-off does; the stock entry motion follows at 550 ms. Back fades the
     # page and brings the bands home; the page closes when they arrive, and
@@ -4752,13 +4775,15 @@ def pause_document(strogg: bool = False) -> dict:
         # The Strogg light, crosses and bands.
         field = lit_field("field", 0.55, glow=ST_LIGHT, grid={"tint": rgb(ST_GRID), "arm_u": 5.5})
         bands = framing_bands("band", STROGG_BANDS)
-        prompt = prompt_bar(doc, prompts, cap_tint=rgb(ST_SELECT, 0.85), verb_face=("r_strogg", 14, rgb(ST_READ, 0.8)))
+        prompt = prompt_bar(doc, prompts, cap_tint=rgb(ST_SELECT, 0.85), verb_face=("r_strogg", 14, rgb(ST_READ, 0.8)), hot=ST_SELECT)
         carry = title_carry(doc, carries, face="r_strogg", tint=ST_SELECT)
     else:
         field = lit_field("field", 0.45)
         bands = framing_bands("band")
         prompt = prompt_bar(doc, prompts)
         carry = title_carry(doc, carries)
+    # The Objectives page turns the bar's pointer off while it shows.
+    prompt["properties"]["pointer-events"] = keyword("auto")
     # Everything but the softened view and its stand-in: returning to the
     # game hides it at once (section 8), while the backdrop releases.
     doc.state["pause.released"] = {"type": "boolean", "initial": False}

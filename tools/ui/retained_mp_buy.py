@@ -30,7 +30,7 @@ from build_retained_screens import (EASE_OUT, FULL, MARKER, OLIVE, ORANGE, VALUE
                                     transform, typeface, vector)
 from retained_mp_menus import (ERROR, INSET, KEY_ENTER, KEY_ESCAPE, KEY_NEXT, KEY_PREVIOUS, PAGE_TOP, PLACEHOLDER, PROMPT_BOTTOM,
                                PROMPT_H, VERB_RESUME, VERB_TABS, any_text, backdrop, bound_text, card_frame, card_header,
-                               card_motion, fit_card, keycap, padlock, page_group, tab_strip, table_text)
+                               card_motion, fit_card, keycap, padlock, page_group, prompt_entry, tab_strip, table_text)
 from retained_mp_summary import card_width
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -315,15 +315,9 @@ def buy_page(doc: Document, index: int, ident: str, items: list, width: float, h
 def prompt_bar(doc: Document, width: float, height: float) -> dict:
     """The prompt bar (section 14.18): Resume on the back key, Tabs on Q and E
     and Buy on Enter, each showing the active device's glyph (section 13.5)."""
-    def prompt(ident: str, keys: list, verb: str) -> list:
-        caps = [keycap(f"prompt-{ident}-{n}", key, doc=doc) for n, key in enumerate(keys)]
-        for cap in caps:
-            cap["properties"]["margin-right"] = length(3 if cap is not caps[-1] else 6)
-        return caps + [label(f"prompt-{ident}-verb", verb, {"position": keyword("relative"), "display": keyword("block"),
-                       "margin-right": length(18), **typeface("marine", 14, PROMPT_H, [1, 1, 1, 0.8]),
-                       "white-space": keyword("nowrap")})]
-    items = (prompt("back", [KEY_ESCAPE], VERB_RESUME) + prompt("tabs", [KEY_PREVIOUS, KEY_NEXT], VERB_TABS) +
-             prompt("buy", [KEY_ENTER], VERB_BUY))
+    # Each prompt answers the mouse as its key does (prompt_entry).
+    items = (prompt_entry(doc, "prompt-back", [KEY_ESCAPE], VERB_RESUME) +
+             prompt_entry(doc, "prompt-tabs", [KEY_PREVIOUS, KEY_NEXT], VERB_TABS) + prompt_entry(doc, "prompt-buy", [KEY_ENTER], VERB_BUY))
     for item in items:
         item["properties"]["flex-shrink"] = number(0)
     return group("prompts", {**absolute(left=INSET, top=height - PROMPT_BOTTOM - PROMPT_H, width=width - 2 * INSET, height=PROMPT_H),

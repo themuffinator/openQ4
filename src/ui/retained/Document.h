@@ -155,6 +155,8 @@ std::string NodeBackdropFilterCss(const Node& node);
 int BackdropFaultIndex(const std::string& name);
 enum class ControlState { Default, Hover, Focus, Pressed, Disabled };
 enum class ControlRole { Button, Toggle, Slider, Choice, Number, Scrollbar };
+// The menu input an unfocusable prompt button replays (Control::input).
+enum class ControlInput { None, Accept, Back };
 struct ToggleSpec {
 	std::optional<Expression> mixed;
 	std::string checkedPart, mixedPart;
@@ -237,6 +239,13 @@ struct Control {
 	// focus (section 13.4): a localization key, or a string expression whose
 	// result is one. Without it the bar keeps its own verb.
 	std::optional<Expression> prompt;
+	// Buttons only: a prompt-bar entry the mouse can click (section 13.4). An
+	// unfocusable button never takes the focus, from navigation, a press or a
+	// program; the pointer lights, presses and activates it. One with an
+	// `input` in place of an action or event replays that menu input, Accept
+	// on the focused control or Back, as its key would.
+	bool focusable = true;
+	ControlInput input = ControlInput::None;
 };
 // A document's detail card (section 7's hover card). While the pointer moved
 // last, the control it is over is the subject; otherwise the focused control

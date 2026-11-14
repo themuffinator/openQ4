@@ -286,7 +286,7 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"mpModelSelf","mpModelEnemy","mpModelTeam","mpCrosshair","mpMatchRole","mpMatchScope","mpMatchRuleValue",
 	"mpMatchSeriesProfile","mpAdminMap","mpAdminGameType","mpAdminTimeLimit","mpAdminFragLimit","mpAdminCaptureLimit","mpAdminTourneyLimit",
 	"mpAdminControlTime","mpAdminBalance","mpAdminShuffle","mpAdminRestart","mpAdminBuying",
-	"createGameType","createLan","createDedicated","createAutoBalance","createFragLimit","createCaptureLimit","createControlTime",
+	"createGameType","createRuleset","createGrapple","createInstagib","createLan","createDedicated","createAutoBalance","createFragLimit","createCaptureLimit","createControlTime",
 	"createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit","createUsePass",
 	"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
 	"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
@@ -5367,20 +5367,36 @@ static void CheckPagePrompts(ScreenHost& host, const char* path, const char* nam
 	}
 	Check(runtime.SetState({{"prompt.glyphs",0.0}},error,now += .1),"back to the keyboard");
 	runtime.Frame(viewport,now += .1);
-	if (back.empty()) {
-		Check(!runtime.CanActivateControl("prompts-back",now) && !runtime.CanActivateControl("prompt-230045-glyph",now),"the legends take no input");
-		return;
-	}
-	// The pointer over SELECT lights nothing; over Back it lights Back, and a
-	// click runs the page's Back.
+	runtime.TakeActions();
+	// The pointer lights SELECT, and a click on it is Accept for the focused
+	// control: it never takes the focus itself (section 13.4).
 	if (select) {
-		const auto legend = bounds("prompt-231042-verb");
+		const auto lead = bounds(bar+"-lead"), legend = bounds("prompt-231042-verb");
+		Check(lead.x <= legend.x && lead.x+lead.width >= legend.x+legend.width && Near(lead.height,45,.5f),"SELECT's target is 45 dp around it");
+		const auto focused = runtime.FocusedControl();
 		runtime.PointerMove(legend.x+legend.width/2,legend.y+legend.height/2,now += .1);
 		runtime.Frame(viewport,now += .1);
-		Check(runtime.GetControlState(back) == ControlState::Default,"SELECT is a legend");
+		Check(runtime.GetControlState(bar+"-lead") == ControlState::Hover,"the pointer lights SELECT");
 		runtime.PointerButton(true,now); runtime.PointerButton(false,now += .02);
-		Check(runtime.TakeActions().empty(),"a click on SELECT does nothing");
+		const auto accepted = runtime.TakeActions();
+		Check(runtime.FocusedControl() == focused,"a click on SELECT leaves the focus where it stood");
+		Check(std::all_of(accepted.begin(),accepted.end(),[&](const ControlAction& taken) {
+			return taken.kind == ControlAction::Kind::Activate && taken.node == focused; }) && accepted.size() <= (focused.empty() ? 0u : 1u),
+			"a click on SELECT acts only on the focused control, as Accept does");
 	}
+	if (back.empty()) {
+		// The page's own BACK is in its content: this one is Back's key.
+		const auto target = bounds(bar+"-back");
+		Check(Near(target.height,45,.5f) && target.x <= bounds(glyphId+"-glyph").x,"BACK's target is 45 dp around it");
+		runtime.PointerMove(target.x+target.width-3,target.y+target.height-3,now += .1);
+		runtime.Frame(viewport,now += .1);
+		Check(runtime.GetControlState(bar+"-back") == ControlState::Hover,"the pointer lights BACK");
+		runtime.PointerButton(true,now); runtime.PointerButton(false,now += .02);
+		const auto actions = runtime.TakeActions();
+		Check(actions.size() == 1 && actions[0].kind == ControlAction::Kind::Back,"a click on BACK is Back, as its key is");
+		return;
+	}
+	// Over Back the pointer lights Back, and a click runs the page's Back.
 	const auto target = bounds(back);
 	runtime.PointerMove(target.x+target.width-3,target.y+target.height-3,now += .1);
 	runtime.Frame(viewport,now += .1);
