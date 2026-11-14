@@ -2,6 +2,7 @@
 
 
 #include "Game_local.h"
+#include "awakening/ContentRepairs.h"
 
 // 1	normal
 // 2	scared
@@ -378,7 +379,12 @@ int idAFAttachment::StartLipSyncing( const char *speechDecl )
 		int					emotion;
 		idStr				anim;
 
-        lipSync = declManager->FindLipSync( speechDecl );
+		// openQ4: a few Awakening lines have a declaration that cannot reach
+		// its recording; start those under their lip-sync data, by sample path
+		const char *lipSyncName = speechDecl;
+		const char *speechSound = NULL;
+		Awakening_SpeechNames( speechDecl, lipSyncName, speechSound );
+        lipSync = declManager->FindLipSync( lipSyncName );
 		lipSyncData = FAS_StartVisemeExtraction( lipSync, gameLocal.GetTime() );
 
 		// Output debug info
@@ -392,7 +398,7 @@ int idAFAttachment::StartLipSyncing( const char *speechDecl )
 		// Start the associated sound
 		refSound.diversity = 0.0f; 
 		renderEntity.referenceSoundHandle = refSound.referenceSoundHandle;
-		StartSoundShader( declManager->FindSound( lipSync->GetName() ), SND_CHANNEL_VOICE, refSound.parms.soundShaderFlags | SSF_IS_VO, false, &length );
+		StartSoundShader( declManager->FindSound( speechSound ? speechSound : lipSync->GetName() ), SND_CHANNEL_VOICE, refSound.parms.soundShaderFlags | SSF_IS_VO, false, &length );
 
 		// Start the default emotion
 		anim = "emotion_";

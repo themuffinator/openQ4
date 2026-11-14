@@ -14,6 +14,7 @@ AI.cpp
 #include "AI.h"
 #include "AI_Manager.h"
 #include "AI_Util.h"
+#include "../awakening/ContentRepairs.h"
 #include "../Projectile.h"
 #include "../spawner.h"
 #include "AI_Tactical.h"
@@ -5130,7 +5131,11 @@ bool idAI::Speak( const char *lipsync, bool random ){
 		speakTime = head->StartLipSyncing( lipsync );
 	} else {
 		speakTime = 0;		
-		StartSoundShader (declManager->FindSound ( lipsync ), SND_CHANNEL_VOICE, SSF_IS_VO, false, &speakTime );
+		// openQ4: see idAFAttachment::StartLipSyncing
+		const char *unusedLipSync = lipsync;
+		const char *speechSound = NULL;
+		Awakening_SpeechNames( lipsync, unusedLipSync, speechSound );
+		StartSoundShader (declManager->FindSound ( speechSound ? speechSound : lipsync ), SND_CHANNEL_VOICE, SSF_IS_VO, false, &speakTime );
 	}
 
 	speakTime += gameLocal.time;

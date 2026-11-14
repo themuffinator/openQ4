@@ -2691,6 +2691,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 			idDict mediaArgs = mapEnt->epairs;
 			Awakening_CorrectM05M06Entity( mediaArgs );
 			Awakening_CorrectLateMissionMedia( mediaArgs );
+			Awakening_CorrectEntitySounds( mediaArgs );
 			CacheDictionaryMedia( &mediaArgs );
 			const char *classname = mapEnt->epairs.GetString( "classname" );
 			if ( classname[0] != '\0' ) {
@@ -6841,6 +6842,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 		}
 		Awakening_DirectLateMissionEntity( args );
 		Awakening_CorrectLateMissionMedia( args );
+		Awakening_CorrectEntitySounds( args );
 		if ( profileMapSpawn ) {
 			mapCopyTimer.Stop();
 			mapDefLookupTimer.Start();
@@ -6902,6 +6904,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			idDict mediaArgs = mapEnt->epairs;
 			Awakening_CorrectM05M06Entity( mediaArgs );
 			Awakening_CorrectLateMissionMedia( mediaArgs );
+			Awakening_CorrectEntitySounds( mediaArgs );
 			CacheDictionaryMedia( &mediaArgs );
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Stop();

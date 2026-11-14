@@ -1105,8 +1105,9 @@ lines (`lipsync_nava_herightsrg`, `vo_darn_dntwrryct`) have no recording under
 any name. One m01 call has the same words as Markswell's later `vo_marks_getmov`
 talk line; a line recorded for a face-to-face reply was not moved onto the radio
 on that evidence. About 250 recorded lines are also named by no script or map
-(race chatter, further squad conversation). Where they were meant to play is not
-recoverable from the content, so they stay unused.
+(race chatter, further squad conversation). The
+[second pass](#replies-the-scenes-stop-short-of--14-november-2026) counts them
+strictly, sorts them by kind and places the seven whose scene is provable.
 
 ### Eyes at the feet
 
@@ -1192,4 +1193,157 @@ actors, not by playing each scene, so scene timing with the restored lines
 heard. The Tank's flash and the dropship's right plume are confirmed as played
 and placed, not judged by eye. Sight over low cover follows from the measured
 eye heights; no encounter was replayed to compare difficulty. Linux and macOS
+were not run.
+
+## Replies the scenes stop short of — 14 November 2026
+
+A second pass on the same day, on recorded lines nothing plays. The first pass
+counted about 250; that count let a generated copy of a line's key in a
+hand-written definition stand for a use. Counted strictly (a script speaks the
+key, or a map or definition binds the line to a talk, busy or speaker key),
+the alpha plays 981 of the 1,357 lines in its nine current voice-over files and
+leaves 376 unplayed. The two passes restore thirty lines, six of which the
+alpha does speak, silently.
+
+### Reading the writers' order
+
+Each generated `<mission>_vo.script` lists its lines in the order of the
+writers' document, and every line carries its text. Laid beside the calls that
+do play (`.tmp/awakening-round/voorder.py`), the unused lines fall into four
+kinds:
+
+- **Earlier takes.** Most of them. "Walkers nearly functional, Sir." sits next
+  to the played "Walker number one nearly functional, Sir."; "Our last two
+  walkers" next to "Our last walker". The script plays the rewrite. Nothing is
+  missing.
+- **Talk replies beyond the first set.** A marine's replies when the player
+  uses him. The maps bind two or three per character and the writers wrote more
+  for later phases of a level (m02 has fourteen). Which phase each belongs to
+  would have to be invented.
+- **Ambient pools.** The races' radio chatter, below.
+- **Replies with a scene.** A line the writers placed directly after one the
+  script speaks, where the scene ends on the line before or holds a silent wait
+  there. These are the ones restored.
+
+The rule for restoring a line: it directly follows a played line in the
+writers' order, the script has exactly one place for it, and nothing else in the
+scene has to be retimed. A line that needs a new trigger, a new wait loop or a
+choice between two scenes stays out.
+
+### Sounds a map names wrongly
+
+`Awakening_CorrectEntitySounds` replaces a map entity's sound key at spawn and
+in both precache passes, from the table `awakeningEntitySounds`. A second audit
+(`.tmp/awakening-round/mapsoundaudit.py`) checked every sound key of every
+campaign map entity against the declarations and samples of the expansion and
+of retail.
+
+| Map | Entity | Map has | Plays | Evidence |
+| --- | --- | --- | --- | --- |
+| m08 | `music_intro`, `music_cryo_cue`, `music_cryo_exit` | `sound/music/m8_cryo_intro.ogg`, `..._cue.ogg`, `..._exit.ogg` | `sound/music/m9_cryo_*.ogg` | The three files do not exist. The tracks are on disk as `m9_cryo_intro`, `m9_cryo_cue` and `m9_cryo_exit`, declared in `music.sndshd` under "M9 Cryo": Cryofac was mission 9 when its music was delivered. The level played no music at its start, at its cue or at its exit. |
+| m06 | `talkRichards_1` | `vo_1_1_11_360_2` | `vo_marine_noideawe` | Renner asks a pinned-down squad "What is your position?". The reply's speaker still holds the retail MCC line it was copied with ("But a Strogg unit is headed directly for Cougar squad."). Its twin `talkRichards_2` holds the recorded second reply, and the script's commented-out call beside the trigger names the first: `vo_marine_noideawe`. This row replaces a sound that does play, because it is another scene's line. |
+| m04 | `sq2_marine_2`, `sq2_marine_3` | `lipsync_talk_loop_1` | read as `lipsync_talk_loop1` | `idAI::TalkTo` builds `lipsync_talk_loop1`, the spelling of every retail map. Only this map has the underscore, so Meakim and Pappas went silent after two replies. Their third replies, `vo_fox2_roughrider` and `vo_fox3_makesnerv`, are added under the key the game reads (the dialogue-key table of the first pass). |
+
+A sound declaration the engine makes up for a name it was asked for no longer
+counts as "the content supplies it": the checks use `idDecl::IsImplicit`, so a
+stale name stays corrected after something has looked it up.
+
+### Declarations that cannot reach their recording
+
+A line can have its key, its lip-sync declaration and its recording and still
+be silent, because its sound declaration asks for a sample path that does not
+exist. A third audit (`.tmp/awakening-round/sampleaudit.py`) checked every
+voice declaration's sample against the disk: seventeen reach nothing, and
+seven of those have their recording elsewhere.
+
+| Map | Line | Declaration asks for | Recording | Evidence |
+| --- | --- | --- | --- | --- |
+| m08 | Navajas sets and blows the charges: `vo_nava_herewegset2`, `_seconchrg2`, `_thatsit2`, `_demvawaychrg2`, `_thosechrglive2`, `_detonat2` | `sound/vo/M08-Cryo/...` | `sound/vo/m08_cryo/...` | These six alone spell the mission's folder with a hyphen (every other m08 line has `M08_Cryo`), and the hyphen also ends the path for the declaration parser. The script speaks all six; each played the default 185 ms blank. |
+| m04 | Private Pappas's second reply, `vo_fox3_prismed` | `sound/vo/M04_Prison/fox_prismed.wav`, under the name `vo_fox_prismed` | `fox3_prismed.wav` | The map and the definitions name `vo_fox3_prismed`; the generated declaration and lip-sync data dropped the 3, and the sample name it asks for does not exist either. |
+
+`Awakening_SpeechNames` is asked where a line starts
+(`idAFAttachment::StartLipSyncing`, and `idAI::Speak` for a speaker without a
+head). For these rows it starts the line under the lip-sync declaration that
+carries its mouth shapes and plays the recording by its path, so the lip
+movement is kept. The recordings are preloaded with their map, and a
+declaration that does reach a sample is left alone.
+
+Ten declarations have no recording under any name: the Pain Lord's three tube
+marines' screams (`vo_marine1_agony1` to `vo_marine3_agony1`, spoken by
+m05's script), two unused m01 lines and five empty generated entries in m06.
+
+### Three replies in Cryofac
+
+Fresh starts of m08 compile `maps/game/m08_cryofac.openq4-v4.script`. Revisions
+1 to 3 are unchanged, and a save keeps the revision it was made with.
+
+| Scene | The script speaks | Added | Evidence |
+| --- | --- | --- | --- |
+| First cave (`FirstCave2`) | Navajas: "Then why is this place so poorly defended?" | Tak: "Good question.." | Next line in the writers' order; the scene moves on to the walk directly after. |
+| After the freezer (`TurnOffFreeze`) | Navajas: "I'm sorry, Sarge. Darnell. He was a good soldier..." | Tak: "Good soldier? Darnell was a good man. Falcon Squad won't be the same without him." | Next line in the writers' order, and an answer to Navajas's own words. The alpha has this call commented out one scene earlier, before Darnell dies. |
+| Tak's death (`FinalValkaryne`) | Tak's death cry; the Valkaryne's "Your race dies here" | Navajas: "Tak! That Strogg bitch! She's gonna pay. Dekard, let's go..." | Next line in the writers' order after Tak's death. It plays once the Valkaryne has gone and before Navajas turns for the ladder, so it talks over nothing, and "let's go" is what he then does. |
+
+### Not placed
+
+- **The races (m07), all twenty-one unused lines.** Each race script holds an
+  ambient radio thread (`miscRadioChatterThread`): a random line every 6 to 25
+  seconds, each once. It is commented out whole, names thirty-eight `vo_8_3_*`
+  sounds that no longer exist, and does not compile as written. Its start is
+  marked in the second and third maps only. Sixteen marine lines survive that
+  could be its pool, but nothing says which map each belongs to, and the lines
+  are not interchangeable: six are about the Hannibal ("The Hannibal can't take
+  this kind of punishment"), which blows up partway through the first map, and
+  two are about a ridge. The six Hannibal lines also sit, in the writers'
+  order, inside the opening cinematic, whose shots leave one second where they
+  would need seven. Tak's two lock warnings mirror Darnell's in the second map,
+  as the boost calls swap speakers between maps, but the third map's only
+  gate-locking function is never called. "Harvester!" and the two "Look out!"
+  lines each have more than one event they could answer.
+- **Cryofac.** Tak's "I wonder how they maintain the temperature differential"
+  and Navajas's answer lie between two scenes with no scene of their own. The
+  Valkaryne's two further monitor lines would take 13.9 seconds in a scene that
+  holds the screen for nine. "Everybody, over here! Look!" has two plausible
+  scenes. Navajas's three hurry-up lines after Tak's death need a loop that
+  waits for the player, which the scene does not have.
+- **Two that pass the rule but were not done.** m02's ending: Darnell's
+  "Allright! Vansen's back..." between Vansen's hail and Markswell's reply.
+  m01: Darnell's "Yes sir." between two of Markswell's lines. Both sit in
+  cinematics whose camera timing has to be watched with the line in, and
+  neither scene can be reached without playing its level.
+
+### Validation
+
+`tools/tests/awakening_content_repairs.py` covers the new table and the script
+revision: each written sound is missing (or is the retail line the row says),
+each intended one is on disk, and each added reply has one anchor in the
+installed script, follows its anchor in the writers' order, is not already
+spoken, and is a key its speaker has with its recording. Seven negative
+controls (a reply out of order, one already spoken, an obsolete sound row, a
+leftover that is not a retail line, a talk key the game never reads, a declared
+radio line, a present joint) were each rejected.
+
+Runtime, as for the first pass (Windows x64 OpenGL, hidden, no input, sound
+device open at zero volume; `fas_debug 1` prints each lip-synced line as it
+starts and `s_showStartSound 1` each sound):
+
+| Probe | Result |
+| --- | --- |
+| m08 start | "mission corrections v4 enabled". The three speakers name `m9_cryo_*`; `sound/music/m9_cryo_intro` starts 5.0 s into the level. Before, the same run starts no music. |
+| m08 replies | Tak 981 ms and 4078 ms, Navajas 6107 ms, the lengths of the recordings. |
+| m08 `FirstCave2`, through its own trigger | `vo_tak_maynotknw`, `vo_tak_lookathis`, `vo_nava_whyisplc`, `vo_tak_goodquest`, in that order. |
+| m06 `rennerChatter` | `vo_renner_whatpos`, the speaker plays `marine_noideawe`, `vo_renner_yousigisnt`, the second speaker plays `marine_ifwemovedie`. |
+| m04 Fox marines | Pappas: 3624 ms, 2849 ms (the restored second reply, started under its lip-sync data), 4241 ms. Meakim's third reply: 3778 ms. |
+| m08 charge lines | With `g_awakeningContentRepairs 0` the first line lasts 185 ms, the default blank. Corrected: 1602, 1834, 2275, 1703, 1741 and 696 ms, the lengths of the six recordings. |
+| m08 saved on revision 4 and restored in a fresh process | The restore compiles `m08_cryofac.openq4-v4.script`; `FirstCave2` then speaks the added reply in order. |
+
+A boot of all thirteen maps on the final module logs no error. Twelve maps
+have the warning counts they had before the pass; m01 part 1 has one more, a
+ragdoll contact warning for a marine whose other leg warned before.
+
+Limits. The freezer reply and Navajas's outburst were proved by the script
+revision compiling (each edit must match the installed script exactly once, or
+the revision is refused) and by their keys playing, not by running those two
+scenes: both sit behind the level's cold-damage and Valkaryne sequences. No
+scene was watched or heard, so the pacing of the three added replies and the
+level of Cryofac's music against its ambience are unreviewed. Linux and macOS
 were not run.
