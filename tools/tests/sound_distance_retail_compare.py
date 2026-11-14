@@ -479,6 +479,9 @@ def run_retail(output: Path, install: Path, runtime: Path, cases: list[dict]) ->
         "s_useOcclusion": "0", "s_volume": "1", "s_speakerFraction": ".65", "s_quadraticFalloff": "0",
         "s_numberOfSpeakers": "2", "s_deviceName": "", "r_fullscreen": "0", "r_mode": "3",
         "in_mouse": "0", "net_ip": "127.0.0.1", "logFile": "2", "developer": "0", "com_allowConsole": "1",
+        # Without this retail holds the loaded level behind "click to continue":
+        # the game never starts, so no view is drawn and no listener is placed.
+        "com_skipLevelLoadPause": "1",
     }
     command = [str(runtime / "Quake4.exe"), *(s for k, v in settings.items() for s in ("+set", k, v)),
                "+devmap", MAP, "+exec", "cmp_stage.cfg"]
