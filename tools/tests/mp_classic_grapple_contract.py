@@ -103,7 +103,9 @@ def check_player() -> None:
 def check_bots() -> None:
     bot = read("src/mpgame/bots/Bot.cpp")
     hook = function_body(bot, "bool rvBot::UpdateHook( idPlayer *self, usercmd_t &cmd )")
-    find = function_body(bot, "bool rvBot::FindHookShortcut( idPlayer *self, idVec3 &bite, idVec3 &landing ) const")
+    find = function_body(bot, "bool rvBot::FindHookShortcut( idPlayer *self, bool relaxed, idVec3 &bite, idVec3 &landing ) const")
+    bite = function_body(bot, "bool rvBot::FindHookBite( idPlayer *self, const idVec3 &landing, const idVec3 &along, idVec3 &bite ) const")
+    rescue = function_body(bot, "bool rvBot::FindHookRescue( idPlayer *self, idVec3 &bite, idVec3 &landing ) const")
     movement = function_body(bot, "void rvBot::UpdateMovement( idPlayer *self, usercmd_t &cmd )")
     aim = function_body(bot, "void rvBot::UpdateAim( idPlayer *self, usercmd_t &cmd )")
     cvars = read("src/mpgame/gamesys/SysCvar.cpp")
@@ -115,7 +117,22 @@ def check_bots() -> None:
     require(re.search(r"BOTTRAIT\(\s*hookUse,", traits) is not None and "traits.hookUse" in hook,
             "the hookUse trait decides how often a bot takes a shortcut")
     require("NAVTRAVEL_TELEPORT" in find and "NAVTRAVEL_JUMPPAD" in find, "shortcuts never reach past a teleporter or pad")
-    require("TraceBounds" in find and "MASK_PLAYERSOLID" in find, "the body must fit along the pull")
+    require("FindHookBite( self, corner, along, bite )" in find, "shortcuts use the shared bite search")
+    require("TraceBounds" in bite and "MASK_PLAYERSOLID" in bite, "the body must fit along the pull")
+    require("BOT_HOOK_CEILING_REACH" in bite and "BOT_HOOK_BITE_RADIUS" in bite,
+            "a bite is a ceiling over the landing or a wall near it, never far from it")
+    # a rescue answers a fall the navmesh proves unsafe, back over trusted floor
+    rescue_gate = hook[hook.index("BotAirLandingUnsafe( self, touchdown )"):][:400]
+    require("BOT_HOOK_RESCUE_MIN_DROP" in rescue_gate and "FindHookRescue(" in rescue_gate,
+            "a rescue needs an unsafe fall into nothing or well down")
+    require("hookLastGround" in rescue and "FindHookBite(" in rescue, "a rescue lands on the floor the bot left or a corner")
+    stuck = bot[bot.index("stuckChecks++;"):][:400]
+    require("hookUnstickRequest = gameLocal.time;" in stuck, "a stall asks for the hook before the route is thrown away")
+    require("FindHookShortcut( self, true," in hook, "a stall searches the nearest corners")
+    require("BOT_HOOK_CARRIER_USE" in hook and "Withdrawing( self )" in hook,
+            "carriers and withdrawing bots may turn away from a fight to throw")
+    audit = read("tools/tests/mp_bot_audit.py")
+    require('"hook_pulled"' in audit and "--min-hook-pulls" in audit, "the bot audit counts hook pulls and can require them")
     require("ENTITYNUM_WORLD" in function_body(bot, "static bool BotHookBiteOk( const trace_t &tr )"),
             "bots plan only on bites in the world")
     require("aimAngles.ToForward()" in hook, "the throw waits until the bot's own view would put the hook on the bite")

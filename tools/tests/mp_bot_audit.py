@@ -58,6 +58,12 @@ NAV_EVENTS = {
     # Rate-limited to one a second between them, so floors, not counts.
     "snap_report": re.compile(r"^rvNavMesh: no node near route", re.M),
     "leg_report": re.compile(r"^rvNavMesh: final leg .* refused", re.M),
+    # The Classic ruleset's grappling hook (si_ruleset 1): plans, pulls that
+    # came down where planned, and throws or pulls that did not.
+    "hook_planned": re.compile(r"^bot [^:]+: hook (?:shortcut|rescue|unstick) from", re.M),
+    "hook_rescue": re.compile(r"^bot [^:]+: hook rescue from", re.M),
+    "hook_pulled": re.compile(r"^bot [^:]+: hook let go at .*\((?:over the landing|hanging),", re.M),
+    "hook_failed": re.compile(r"^bot [^:]+: hook (?:missed at|let go at .*\((?:stalled|timeout),)", re.M),
 }
 
 
@@ -184,6 +190,9 @@ def main() -> int:
     parser.add_argument("--speeds", action="store_true", help="log com_speeds frame timings")
     parser.add_argument("--set", action="append", default=[], metavar="CVAR=VALUE",
                         help="extra server cvar, e.g. si_warmup=1 for Tourney's bracket; repeatable")
+    parser.add_argument("--min-hook-pulls", type=int, default=None,
+                        help="fail unless bots finish at least this many grappling hook pulls in the sample "
+                             "(needs --set si_ruleset=1 and a server that allows the hook)")
     parser.add_argument("--team-order", default="",
                         help="team chat the observer says once the window opens, e.g. 'everyone follow me'; "
                              "the report then tracks how far its bot team-mates keep from it")
@@ -399,6 +408,9 @@ def main() -> int:
     kills = [(victim, killer) for victim, killer in obituaries if killer not in ("world", victim)]
 
     nav = {name: len(pattern.findall(sample)) for name, pattern in NAV_EVENTS.items()}
+    if args.min_hook_pulls is not None and nav["hook_pulled"] < args.min_hook_pulls:
+        failures.append(f"bots finished {nav['hook_pulled']} grappling hook pulls, "
+                        f"fewer than the {args.min_hook_pulls} required")
 
     frames = [float(v) for v in re.findall(r"^frame:\s*\d+\s+all:\s*\d+\s+gfr:\s*(\d+)", sample, re.M)]
     profile = re.findall(

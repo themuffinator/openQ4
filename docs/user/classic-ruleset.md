@@ -147,16 +147,19 @@ shows in your team's colour.
 - Going through a teleporter lets go of the hook.
 - You hear it throw, bite and come back, and the reel hums while it holds.
 - You can carry the flag while hooked.
-- Bots use it too, as a shortcut up to ledges and across rooms. Turn that off
-  with `bot_grapple 0`.
+- Bots use it too: as a shortcut up to ledges and across rooms, to pull
+  themselves back when they are knocked off a walkway, and to get past
+  something they are stuck on. Better bots and flag carriers use it most.
+  Turn it off with `bot_grapple 0`.
 
 Bind it under **Settings → Controls → Attack/Look → Grappling Hook**, or from
 the console, for example `bind MOUSE4 _hook`. It has no default key.
 
 ## Limits
 
-- Bots only hook into walls and ceilings, never onto moving parts, and only
-  when no enemy is in sight, unless they carry the flag.
+- Bots only hook into walls and ceilings, never onto moving parts. They turn
+  away from a fight to throw only when they carry the flag or are breaking
+  off to heal.
 - Item names on the pickup notices are still Quake 4's ("Small Armor Vest").
 - With [Instagib](server-setup.md#instagib) on, its railgun and one-hit kills
   replace Classic's weapons and armour. The double jump and the hook still

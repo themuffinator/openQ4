@@ -12,6 +12,9 @@
 style "ambusher" {
 	description	"holds a choke point and shoots what walks into it"
 
+	// Waits rather than travels, so it reaches for the hook less.
+	scale	hookUse			0.75
+
 	set	combatRange		700
 	set	aggression		0.30
 	set	patience		0.95

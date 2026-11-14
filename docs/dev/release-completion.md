@@ -40,7 +40,9 @@ does not restore the withdrawn release. See
 
 - **Bots use the grappling hook.** Under the Classic ruleset, wherever the
   server allows the hook, bots now use it as a shortcut: up to ledges, across
-  rooms and on flag runs. Better bots use it more. `bot_grapple 0` turns it off.
+  rooms and on flag runs. They also hook themselves back when knocked off a
+  walkway over a drop, and hook past spots they get stuck on. Better bots,
+  flag carriers and fast-moving styles use it most. `bot_grapple 0` turns it off.
 - **The hook holds on to moving parts of the map.** Bite a door, lift or
   platform and it carries you along; the hook lets go if that part disappears.
 - **Teleporting lets go of the hook.** It used to drag you back across the

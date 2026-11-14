@@ -1648,6 +1648,50 @@ Jump input is pulsed on alternating grounded frames rather than held.
 `upmove` is released. Grounded pulses provide a fresh edge within one frame
 without spraying jump input through the flight.
 
+### The Classic grappling hook
+
+Under the Classic ruleset (`si_ruleset 1`), wherever the server allows the hook
+(`si_classicGrapple`), bots use it (`rvBot::UpdateHook`, `bot_grapple`). The
+navmesh has no hook links, so every pull is planned against a point the bot
+already trusts to stand on, and a bite in the world that pulls it there.
+
+- **The bite** (`FindHookBite`): a ceiling straight over the landing first,
+  then points above it, then points just past it in the direction the route
+  goes on. The hit must be world geometry the hook holds (not the sky, never a
+  mover, a player or a pickup), sit within 192 units across of the landing and
+  at least 32 above its floor, and the player's box must sweep clear along the
+  pull's straight line as far as the hang. That last check is what keeps a pull
+  from dragging a bot into a ledge lip.
+- **A shortcut**: on foot, every 300 ms, with no enemy in view, a bot rolls its
+  `hookUse` trait (0.10 at skill 1 up to 0.85 at skill 5; styles scale it, the
+  rusher and roamer up, the sniper and ambusher down). It then weighs up to four
+  route corners ahead, farthest first and never past a teleporter or pad. A
+  corner counts when the route to it is 192 units longer than the straight
+  line, or it is 64 units up, or the straight line is 640 units long. A flag
+  carrier rolls at least 0.9, and carriers and withdrawing bots may turn away
+  from a fight to throw.
+- **A rescue**: during a fall the navmesh proves will not land safely, with
+  no floor under it at all or one at least 128 units down, sampled
+  every 100 ms, the bot looks for a bite over the floor it last stood on or a
+  corner near the fall. It has 0.7 s to turn and throw, and the air steering
+  carries on while it does.
+- **A stall**: the first stuck sample asks for a relaxed search of the nearest
+  corners, so a bot hooks its way past an obstacle before the route is thrown
+  away.
+
+The bot turns to the bite (`UpdateAim` looks at it instead of the fight), throws
+only when its own view puts the hook within 48 units of the bite, rides the pull
+with no movement input, and lets go once it is over the landing or hanging at
+the bite. The route is then rebuilt from wherever it came down. A pull that
+stalls for 0.3 s, a miss or an aim that runs out of time backs off for 1.5 s; a
+pull that arrived can be followed by the next after 0.3 s. Combat carries on
+while the bot is on the cable.
+
+`bot_debug 1` logs `hook <shortcut|rescue|unstick> from`, `hook missed at` and
+`hook let go at ... (<why>, <reason>)`; `bot_debugNav 2` draws the cable plan.
+`mp_bot_audit.py` counts them under `nav_events`, and `--min-hook-pulls N`
+fails a run that finishes fewer pulls.
+
 ### Team orders
 
 A human player can order the bots on their own team in team chat, Quake III
@@ -2271,6 +2315,7 @@ restricts delivery by the team field.
 | `bot_profile` | `0` | Every N seconds print `botprofile:` costs (average/worst think, searches/failures, expansions and pricing/navigation time) plus `botprofile-percentiles:` conservative p50/p95/p99 think-time ceilings from a bounded quarter-millisecond histogram. |
 | `bot_navCellSize` | `24` | Sampling resolution in world units. Smaller finds more ground and costs more to build. |
 | `bot_pause` | `0` | Freeze all bot input. |
+| `bot_grapple` | `1` | Under the Classic ruleset, use the grappling hook wherever the server allows it (shortcuts, fall rescues, stalls). See "The Classic grappling hook". Archived. |
 
 Bots are server-side only. Everything a server operator is expected to set is
 archived - `bot_enable`, `bot_minPlayers`, `bot_skill`, `bot_skillVariance`,

@@ -4833,6 +4833,17 @@ Completion substeps:
   pool, and the client crashed on quit after every Classic map.
   `mp_classic_grapple_contract.py` pins all of it. Remaining: real-input play
   and Classic pickup names.
+  Progress, 14 November (bot hook): one bite search for any landing (a ceiling
+  over it, points above it, points just past it); fall rescues back over the
+  last floor or a nearby corner when the navmesh proves a fall into nothing or
+  128+ units down unsafe; a stalled route tries the hook on its nearest corners;
+  carriers and withdrawing bots may turn from a fight to throw; a pull that
+  arrived allows the next after 0.3 s; `hookUse` scaled by style; `bot_debugNav 2`
+  draws the plan; `mp_bot_audit.py` counts hook events and `--min-hook-pulls`
+  gates them. Six skill-4 bots, 120 s: q4dm1 (all modes) 8 and 6 pulls, no misses,
+  no world deaths; q4ctf1 26 pulls (2 rescues, 1 unstick). q4ctf5's open
+  walkways give the hook nothing to hold, so it planned two rescues and made
+  no pulls there.
 
 ## Audio and voice
 

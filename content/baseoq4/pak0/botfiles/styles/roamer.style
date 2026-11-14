@@ -12,6 +12,9 @@
 style "roamer" {
 	description	"runs the item rotation and fights what gets in the way"
 
+	// Covers ground with the Classic ruleset's grappling hook wherever it can.
+	scale	hookUse			1.20
+
 	set	combatRange		620
 	set	aggression		0.50
 	set	patience		0.45

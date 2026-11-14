@@ -11,6 +11,9 @@
 style "skirmisher" {
 	description	"hits, moves, and breaks off early"
 
+	// Hooks around the edges of a fight under the Classic ruleset.
+	scale	hookUse			1.15
+
 	set	combatRange		850
 	set	aggression		0.45
 	set	patience		0.35

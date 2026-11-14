@@ -10,6 +10,9 @@
 style "sniper" {
 	description	"holds range and trades with hitscan"
 
+	// Prefers to walk to a perch it can hold rather than fly in on a hook.
+	scale	hookUse			0.70
+
 	set	combatRange		1400
 	set	aggression		0.28
 	set	patience		0.85

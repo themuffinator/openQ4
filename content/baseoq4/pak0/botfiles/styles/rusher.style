@@ -33,6 +33,8 @@ style "rusher" {
 	// which is what actually beats a rocket at this distance.
 	scale	strafeChance		0.85
 	scale	jumpChance		1.35
+	// The Classic ruleset's grappling hook is the fastest way into a fight.
+	scale	hookUse			1.25
 	scale	dodgeReactMsec		0.85
 
 	// Fires early and holds it down.  This is a real accuracy loss and it is

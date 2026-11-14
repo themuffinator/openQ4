@@ -75,6 +75,13 @@ typedef enum {
 	BOTHOOK_REEL				// held and pulling
 } botHookPhase_t;
 
+// why the hook is out
+typedef enum {
+	BOTHOOK_SHORTCUT,			// a corner further along the route
+	BOTHOOK_RESCUE,				// a fall with nowhere safe to land
+	BOTHOOK_UNSTICK				// route progress that stopped
+} botHookReason_t;
+
 class rvBot {
 public:
 							rvBot( void );
@@ -254,7 +261,10 @@ private:
 	// openQ4: the Classic ruleset's grappling hook as a route shortcut.  True
 	// while the hook owns movement: thrown and pulling, the bot gives no input.
 	bool					UpdateHook( idPlayer *self, usercmd_t &cmd );
-	bool					FindHookShortcut( idPlayer *self, idVec3 &bite, idVec3 &landing ) const;
+	bool					FindHookBite( idPlayer *self, const idVec3 &landing, const idVec3 &along, idVec3 &bite ) const;
+	bool					FindHookShortcut( idPlayer *self, bool relaxed, idVec3 &bite, idVec3 &landing ) const;
+	bool					FindHookRescue( idPlayer *self, idVec3 &bite, idVec3 &landing ) const;
+	void					StartHook( idPlayer *self, int reason );
 	void					EndHook( int cooldownMsec );
 
 	void					ApplyMove( const idVec3 &moveDir, usercmd_t &cmd ) const;
@@ -472,6 +482,11 @@ private:
 	idVec3					hookLanding;		// the route corner the shortcut ends over
 	float					hookBestDistance;	// closest the pull has brought the chest to the bite
 	int						hookProgressTime;
+	int						hookReason;			// botHookReason_t
+	int						hookUnstickRequest;	// when the stuck watch last saw no progress, 0 for none
+	int						nextHookRescueTime;
+	idVec3					hookLastGround;		// the last floor the bot stood on, for a rescue
+	bool					hookLastGroundValid;
 	float					strafeSide;
 	int						strafeFlipTime;
 	bool					dodgeJump;

@@ -84,6 +84,15 @@ static const float	BOT_HOOK_BITE_RADIUS	= 192.0f;	// horizontal reach from the b
 static const float	BOT_HOOK_THROW_TOLERANCE = 48.0f;	// the view must put the hook this close to the planned bite
 static const float	BOT_HOOK_LAND_RADIUS	= 48.0f;	// over the landing corner this closely, the bot lets go
 static const float	BOT_HOOK_CHEST_HEIGHT	= 48.0f;	// idPhysics_Player::ClassicGrappleMove pulls from here
+static const float	BOT_HOOK_CEILING_REACH	= 512.0f;	// how high over a landing a ceiling bite is looked for
+static const int	BOT_HOOK_CHAIN_MSEC		= 300;		// after a pull that arrived, before the next look
+static const float	BOT_HOOK_CARRIER_USE	= 0.9f;		// a flag carrier takes nearly every shortcut, at any skill
+static const float	BOT_HOOK_RESCUE_FALL_SPEED = -150.0f;	// falling at least this fast before a rescue is weighed
+static const int	BOT_HOOK_RESCUE_SCAN_MSEC = 100;	// how often a fall's landing is proved for a rescue
+static const int	BOT_HOOK_RESCUE_AIM_MSEC = 700;		// a fall leaves little time to turn
+static const float	BOT_HOOK_RESCUE_MIN_DROP = 128.0f;	// an unsafe landing nearer than this is left to the air steering
+static const float	BOT_HOOK_UNSTICK_DISTANCE = 96.0f;	// a stalled bot hooks to a corner at least this far
+static const int	BOT_HOOK_UNSTICK_WINDOW_MSEC = 1000;	// a stall's request lapses after this
 static const float	BOT_SAFE_FALL			= 512.0f;	// floor this far down is a fall, not the void (NAV_MAX_DROP)
 static const float	BOT_AIR_RECOVER_STOP_SPEED = 10.0f;	// match RecoveryBrakeClear's final friction-only coast
 static const int	BOT_AIR_RECOVER_RUNOUT_MSEC = 600;	// and at most this long after touchdown
@@ -703,6 +712,11 @@ rvBot::rvBot( void ) {
 	hookLanding.Zero();
 	hookBestDistance	= 0.0f;
 	hookProgressTime	= 0;
+	hookReason			= BOTHOOK_SHORTCUT;
+	hookUnstickRequest	= 0;
+	nextHookRescueTime	= 0;
+	hookLastGround.Zero();
+	hookLastGroundValid	= false;
 	strafeSide			= 1.0f;
 	strafeFlipTime		= 0;
 	dodgeJump			= false;
@@ -1034,6 +1048,11 @@ void rvBot::OnSpawn( void ) {
 	hookLanding.Zero();
 	hookBestDistance	= 0.0f;
 	hookProgressTime	= 0;
+	hookReason			= BOTHOOK_SHORTCUT;
+	hookUnstickRequest	= 0;
+	nextHookRescueTime	= 0;
+	hookLastGround.Zero();
+	hookLastGroundValid	= false;
 	strafeFlipTime		= 0;
 	dodgeJump			= false;
 
@@ -5344,13 +5363,21 @@ bool rvBot::GuardLandingContinuation( idPlayer *self, usercmd_t &cmd ) {
 
 	openQ4: the Classic ruleset's grappling hook (mp/ClassicRules.h).
 
-	The navmesh has no hook links, so the hook is a shortcut taken over a route
-	the bot already has: a corner further along it that is in plain sight, much
-	nearer in a straight line than by the route, with a wall or ceiling just
-	beyond or above it that will take the hook.  The bot turns to that bite,
-	throws when its own view would put the hook there, rides the pull with no
-	other movement, and lets go over the corner.  The route is then rebuilt from
-	wherever it came down.
+	The navmesh has no hook links, so every use of the hook is planned against
+	a point the bot already trusts to stand on - a corner of its route, the last
+	floor it stood on, the floor its recovery is heading for - and a bite in the
+	world that pulls it there: a ceiling over the point, or a wall just beyond
+	or above it.  The bot turns to that bite, throws when its own view would put
+	the hook there, rides the pull with no other movement input, and lets go
+	over the point.  The route is then rebuilt from wherever it came down.
+
+	Three things make a bot reach for it:
+	- a shortcut: a corner further along the route in sight, well short of the
+	  route in a straight line, or above the bot, or at the end of a long run;
+	- a rescue: a fall that will not come down anywhere safe, which is pulled
+	  back over the floor the bot left or a corner near it;
+	- a stall: route progress that stopped, which tries the next corners
+	  directly instead of waiting for the route to be thrown away.
 
 ===============================================================================
 */
@@ -5372,6 +5399,19 @@ static bool BotHookBiteOk( const trace_t &tr ) {
 
 /*
 ================
+BotHookReasonName
+================
+*/
+static const char *BotHookReasonName( int reason ) {
+	switch ( reason ) {
+		case BOTHOOK_RESCUE:	return "rescue";
+		case BOTHOOK_UNSTICK:	return "unstick";
+		default:				return "shortcut";
+	}
+}
+
+/*
+================
 rvBot::EndHook
 ================
 */
@@ -5385,97 +5425,200 @@ void rvBot::EndHook( int cooldownMsec ) {
 
 /*
 ================
-rvBot::FindHookShortcut
+rvBot::FindHookBite
+
+A bite in the world that pulls the bot to come down over landing.  The aim
+points, in order: the ceiling straight over the landing, points above it,
+and points just past it along the way the bot is going (along may be zero).
+A bite has to sit over the landing - within BOT_HOOK_BITE_RADIUS across and
+above its floor - or the pull ends somewhere else, and the body has to fit
+along the pull's straight line as far as the hang.
 ================
 */
-bool rvBot::FindHookShortcut( idPlayer *self, idVec3 &bite, idVec3 &landing ) const {
+bool rvBot::FindHookBite( idPlayer *self, const idVec3 &landing, const idVec3 &along, idVec3 &bite ) const {
+	const idVec3 origin = self->GetPhysics()->GetOrigin();
+	const idVec3 eye = self->GetEyePosition();
+	const idBounds &bounds = self->GetPhysics()->GetBounds();
+	const idVec3 up( 0.0f, 0.0f, 1.0f );
+
+	idVec3 targets[ 10 ];
+	float beyond[ 10 ];
+	int numTargets = 0;
+
+	// a ceiling over the landing gives the cleanest drop onto it
+	trace_t ceiling;
+	gameLocal.TracePoint( self, ceiling, landing + up * 48.0f, landing + up * BOT_HOOK_CEILING_REACH, MASK_SHOT_RENDERMODEL, self );
+	if ( BotHookBiteOk( ceiling ) && ceiling.endpos.z > landing.z + 96.0f ) {
+		targets[ numTargets ] = ceiling.endpos - up * 2.0f;
+		beyond[ numTargets++ ] = 24.0f;
+	}
+	static const float heights[] = { 112.0f, 64.0f, 176.0f, 256.0f };
+	for ( int h = 0; h < 4; h++ ) {
+		targets[ numTargets ] = landing + up * heights[ h ];
+		beyond[ numTargets++ ] = BOT_HOOK_BITE_BEYOND;
+	}
+	if ( along.LengthSqr() > 0.5f ) {
+		static const float pastHeights[] = { 96.0f, 160.0f };
+		for ( int h = 0; h < 2; h++ ) {
+			targets[ numTargets ] = landing + along * 96.0f + up * pastHeights[ h ];
+			beyond[ numTargets++ ] = BOT_HOOK_BITE_BEYOND;
+		}
+	}
+
+	for ( int t = 0; t < numTargets; t++ ) {
+		idVec3 dir = targets[ t ] - eye;
+		const float toTarget = dir.Normalize();
+		if ( toTarget <= 0.0f || toTarget > CLASSIC_HOOK_REACH * 0.9f ) {
+			continue;
+		}
+		const float reach = Min( CLASSIC_HOOK_REACH * 0.9f, toTarget + beyond[ t ] );
+		trace_t tr;
+		gameLocal.TracePoint( self, tr, eye, eye + dir * reach, MASK_SHOT_RENDERMODEL, self );
+		if ( !BotHookBiteOk( tr ) ) {
+			continue;
+		}
+		// Wherever it bites - a ceiling over, a wall beyond, a pillar beside -
+		// it has to be over the landing.
+		idVec3 flat = tr.endpos - landing;
+		flat.z = 0.0f;
+		if ( flat.LengthSqr() > Square( BOT_HOOK_BITE_RADIUS ) || tr.endpos.z < landing.z + 32.0f ) {
+			continue;
+		}
+
+		// The pull carries the chest straight at the bite: the body must fit
+		// along that line as far as the hang.
+		idVec3 pull = tr.endpos - ( origin + idVec3( 0.0f, 0.0f, BOT_HOOK_CHEST_HEIGHT ) );
+		const float pullLength = pull.Normalize();
+		const float carried = pullLength - CLASSIC_HOOK_HANG_DISTANCE;
+		if ( carried <= 0.0f ) {
+			continue;
+		}
+		const idVec3 lift = origin + idVec3( 0.0f, 0.0f, 4.0f );
+		trace_t body;
+		gameLocal.TraceBounds( self, body, lift, lift + pull * carried, bounds, MASK_PLAYERSOLID, self );
+		if ( body.fraction < 0.95f ) {
+			continue;
+		}
+
+		bite = tr.endpos;
+		return true;
+	}
+	return false;
+}
+
+/*
+================
+rvBot::FindHookShortcut
+
+relaxed is the stall's search: the nearest few corners, however little they
+save, instead of the farthest that save a lot.
+================
+*/
+bool rvBot::FindHookShortcut( idPlayer *self, bool relaxed, idVec3 &bite, idVec3 &landing ) const {
 	if ( path.IsEmpty() || pathCorner < 0 || pathCorner >= path.Num() ) {
 		return false;
 	}
 
 	const idVec3 origin = self->GetPhysics()->GetOrigin();
-	const idVec3 eye = self->GetEyePosition();
-	const idBounds &bounds = self->GetPhysics()->GetBounds();
-	const idVec3 chest( 0.0f, 0.0f, BOT_HOOK_CHEST_HEIGHT );
 
 	// Route distance to each corner ahead.  Nothing past a teleporter or a pad
 	// counts: the route's length there says nothing about the straight line.
-	float routed = ( path[pathCorner].origin - origin ).Length();
+	float routed[ BOT_HOOK_LOOKAHEAD ];
 	int last = pathCorner;
+	float sum = ( path[pathCorner].origin - origin ).Length();
 	for ( int i = pathCorner; i < path.Num() && i < pathCorner + BOT_HOOK_LOOKAHEAD; i++ ) {
 		if ( i > pathCorner ) {
-			routed += ( path[i].origin - path[i - 1].origin ).Length();
+			sum += ( path[i].origin - path[i - 1].origin ).Length();
 		}
 		if ( path[i].travelType == NAVTRAVEL_TELEPORT || path[i].travelType == NAVTRAVEL_JUMPPAD ) {
 			break;
 		}
+		routed[ i - pathCorner ] = sum;
 		last = i;
 	}
 
-	// Farthest corner first: the further the shortcut, the more it saves.
+	const int first = relaxed ? pathCorner : pathCorner + 1;
+	const int count = last - first + 1;
 	int traced = 0;
-	for ( int i = last; i > pathCorner && traced < BOT_HOOK_MAX_CANDIDATES; i-- ) {
+	for ( int n = 0; n < count && traced < BOT_HOOK_MAX_CANDIDATES; n++ ) {
+		// a shortcut takes the farthest corner first, a stall the nearest
+		const int i = relaxed ? first + n : last - n;
 		const idVec3 &corner = path[i].origin;
-		float along = ( path[pathCorner].origin - origin ).Length();
-		for ( int j = pathCorner + 1; j <= i; j++ ) {
-			along += ( path[j].origin - path[j - 1].origin ).Length();
-		}
 		const float straight = ( corner - origin ).Length();
 		const float climb = corner.z - origin.z;
-		const float saves = along - straight;
-		if ( straight < BOT_HOOK_MIN_DISTANCE || straight > CLASSIC_HOOK_REACH * 0.8f || climb < -BOT_HOOK_MAX_DROP ) {
+		const float saves = routed[ i - pathCorner ] - straight;
+		if ( straight > CLASSIC_HOOK_REACH * 0.8f || climb < -BOT_HOOK_MAX_DROP ) {
 			continue;
 		}
-		if ( saves < BOT_HOOK_MIN_SAVING && climb < BOT_HOOK_CLIMB && straight < BOT_HOOK_LONG_RUN ) {
+		if ( relaxed ) {
+			if ( straight < BOT_HOOK_UNSTICK_DISTANCE ) {
+				continue;
+			}
+		} else if ( straight < BOT_HOOK_MIN_DISTANCE ||
+					( saves < BOT_HOOK_MIN_SAVING && climb < BOT_HOOK_CLIMB && straight < BOT_HOOK_LONG_RUN ) ) {
 			continue;
 		}
 		traced++;
 
-		// Aim a little above the corner; a wall behind it or a ceiling over it
-		// takes the hook, and the pull ends hanging just short of the bite.
-		static const float heights[] = { 112.0f, 64.0f, 176.0f, 256.0f };
-		for ( int h = 0; h < 4; h++ ) {
-			const idVec3 target = corner + idVec3( 0.0f, 0.0f, heights[h] );
-			idVec3 dir = target - eye;
-			const float toTarget = dir.Normalize();
-			if ( toTarget <= 0.0f ) {
-				continue;
-			}
-			const float reach = Min( CLASSIC_HOOK_REACH * 0.9f, toTarget + BOT_HOOK_BITE_BEYOND );
-			trace_t tr;
-			gameLocal.TracePoint( self, tr, eye, eye + dir * reach, MASK_SHOT_RENDERMODEL, self );
-			if ( !BotHookBiteOk( tr ) ) {
-				continue;
-			}
-			// Wherever it bites - a wall beyond, a ceiling over, a pillar beside -
-			// it has to be over the corner, or the pull ends somewhere else.
-			idVec3 flat = tr.endpos - corner;
-			flat.z = 0.0f;
-			if ( flat.LengthSqr() > Square( BOT_HOOK_BITE_RADIUS ) || tr.endpos.z < corner.z + 32.0f ) {
-				continue;
-			}
-
-			// The pull carries the chest straight at the bite: the body must fit
-			// along that line as far as the hang.
-			idVec3 pull = tr.endpos - ( origin + chest );
-			const float pullLength = pull.Normalize();
-			const float carried = pullLength - CLASSIC_HOOK_HANG_DISTANCE;
-			if ( carried <= 0.0f ) {
-				continue;
-			}
-			const idVec3 lift = origin + idVec3( 0.0f, 0.0f, 4.0f );
-			trace_t body;
-			gameLocal.TraceBounds( self, body, lift, lift + pull * carried, bounds, MASK_PLAYERSOLID, self );
-			if ( body.fraction < 0.95f ) {
-				continue;
-			}
-
-			bite = tr.endpos;
+		idVec3 along = vec3_origin;
+		if ( i + 1 < path.Num() ) {
+			along = path[i + 1].origin - corner;
+			along.z = 0.0f;
+			along.Normalize();
+		}
+		if ( FindHookBite( self, corner, along, bite ) ) {
 			landing = corner;
 			return true;
 		}
 	}
 	return false;
+}
+
+/*
+================
+rvBot::FindHookRescue
+
+A fall with nowhere safe to come down: back over the floor the bot last stood
+on, or a route corner near the fall, whichever the hook can reach first.
+================
+*/
+bool rvBot::FindHookRescue( idPlayer *self, idVec3 &bite, idVec3 &landing ) const {
+	idVec3 candidates[ 4 ];
+	int numCandidates = 0;
+	if ( hookLastGroundValid ) {
+		candidates[ numCandidates++ ] = hookLastGround;
+	}
+	for ( int i = pathCorner; i >= 0 && i < path.Num() && i <= pathCorner + 2 && numCandidates < 4; i++ ) {
+		if ( path[i].travelType == NAVTRAVEL_WALK || path[i].travelType == NAVTRAVEL_JUMP ) {
+			candidates[ numCandidates++ ] = path[i].origin;
+		}
+	}
+	const idVec3 origin = self->GetPhysics()->GetOrigin();
+	for ( int i = 0; i < numCandidates; i++ ) {
+		if ( ( candidates[ i ] - origin ).LengthSqr() > Square( CLASSIC_HOOK_REACH * 0.8f ) ) {
+			continue;
+		}
+		if ( FindHookBite( self, candidates[ i ], vec3_origin, bite ) ) {
+			landing = candidates[ i ];
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+================
+rvBot::StartHook
+================
+*/
+void rvBot::StartHook( idPlayer *self, int reason ) {
+	hookPhase = BOTHOOK_AIM;
+	hookReason = reason;
+	hookPhaseTime = gameLocal.time;
+	if ( bot_debug.GetBool() ) {
+		gameLocal.Printf( "bot %s: hook %s from %s, bite %s, landing %s\n", name.c_str(), BotHookReasonName( reason ),
+						  self->GetPhysics()->GetOrigin().ToString( 0 ), hookBite.ToString( 0 ), hookLanding.ToString( 0 ) );
+	}
 }
 
 /*
@@ -5491,37 +5634,80 @@ bool rvBot::UpdateHook( idPlayer *self, usercmd_t &cmd ) {
 		if ( hookPhase != BOTHOOK_NONE ) {
 			EndHook( 0 );
 		}
+		hookUnstickRequest = 0;
 		return false;
 	}
 
+	if ( self->pfl.onGround && !LiquidAtFeet() ) {
+		hookLastGround = physics->GetOrigin();
+		hookLastGroundValid = true;
+	}
+
+	// A flag carrier running home, or a bot breaking off to heal, turns away from
+	// a fight to throw; anyone else waits for a quiet moment.
 	const bool carrier = BotCarriesScoringObjective( self );
+	const bool urgent = carrier || Withdrawing( self );
 	const bool foeInView = enemy.GetEntity() != NULL && gameLocal.time == enemyLastSeenTime;
+
+	if ( bot_debugNav.GetInteger() >= 2 && hookPhase != BOTHOOK_NONE && gameRenderWorld != NULL ) {
+		gameRenderWorld->DebugArrow( colorCyan, self->GetEyePosition(), hookBite, 4, 0 );
+		gameRenderWorld->DebugLine( colorCyan, hookBite, hookLanding, 0 );
+	}
 
 	switch ( hookPhase ) {
 		case BOTHOOK_NONE: {
+			// A fall that will not come down anywhere safe.  The proof is a
+			// simulation, so it is sampled rather than run every frame.
+			if ( !self->pfl.onGround && gameLocal.time >= nextHookRescueTime &&
+				 physics->GetLinearVelocity().z < BOT_HOOK_RESCUE_FALL_SPEED && !traversalStarted &&
+				 self->GetClassicHookState() == CLASSIC_HOOK_NONE && !LiquidAtFeet() ) {
+				nextHookRescueTime = gameLocal.time + BOT_HOOK_RESCUE_SCAN_MSEC;
+				// Only a real fall: nothing to land on at all (the proof leaves the
+				// touchdown where the bot is), or a landing well below.  A short
+				// unsafe drop lands before the bot could turn and throw, and the
+				// air steering handles it.
+				idVec3 touchdown;
+				const idVec3 here = physics->GetOrigin();
+				if ( BotAirLandingUnsafe( self, touchdown ) &&
+					 ( ( touchdown - here ).LengthSqr() < 1.0f || here.z - touchdown.z >= BOT_HOOK_RESCUE_MIN_DROP ) &&
+					 FindHookRescue( self, hookBite, hookLanding ) ) {
+					StartHook( self, BOTHOOK_RESCUE );
+					return false;
+				}
+			}
+
+			// A stalled route tries its next corners directly.
+			if ( hookUnstickRequest && gameLocal.time - hookUnstickRequest < BOT_HOOK_UNSTICK_WINDOW_MSEC &&
+				 self->pfl.onGround && !traversalStarted ) {
+				hookUnstickRequest = 0;
+				if ( FindHookShortcut( self, true, hookBite, hookLanding ) ) {
+					StartHook( self, BOTHOOK_UNSTICK );
+					return false;
+				}
+			}
+
 			if ( gameLocal.time < nextHookScanTime ) {
 				return false;
 			}
 			nextHookScanTime = gameLocal.time + BOT_HOOK_SCAN_MSEC;
-			// Turning away to throw is for a quiet moment or a flag run, and
-			// never in the middle of a jump, a pad or a dodge.
-			if ( ( foeInView && !carrier ) || !self->pfl.onGround || traversalStarted || IsDodging( self ) ||
-				 gameLocal.random.RandomFloat() > traits.hookUse ) {
+			// never in the middle of a jump, a pad or a dodge
+			const float use = carrier ? Max( traits.hookUse, BOT_HOOK_CARRIER_USE ) : traits.hookUse;
+			if ( ( foeInView && !urgent ) || !self->pfl.onGround || traversalStarted || IsDodging( self ) ||
+				 gameLocal.random.RandomFloat() > use ) {
 				return false;
 			}
-			if ( FindHookShortcut( self, hookBite, hookLanding ) ) {
-				hookPhase = BOTHOOK_AIM;
-				hookPhaseTime = gameLocal.time;
-				if ( bot_debug.GetBool() ) {
-					gameLocal.Printf( "bot %s: hook shortcut from %s, bite %s, landing %s\n", name.c_str(),
-									  self->GetPhysics()->GetOrigin().ToString( 0 ), hookBite.ToString( 0 ), hookLanding.ToString( 0 ) );
-				}
+			if ( FindHookShortcut( self, false, hookBite, hookLanding ) ) {
+				StartHook( self, BOTHOOK_SHORTCUT );
 			}
 			return false;
 		}
 
 		case BOTHOOK_AIM: {
-			if ( gameLocal.time - hookPhaseTime > BOT_HOOK_AIM_MSEC || ( foeInView && !carrier ) || !self->pfl.onGround ) {
+			const bool rescue = ( hookReason == BOTHOOK_RESCUE );
+			const int aimMsec = rescue ? BOT_HOOK_RESCUE_AIM_MSEC : BOT_HOOK_AIM_MSEC;
+			if ( gameLocal.time - hookPhaseTime > aimMsec ||
+				 ( foeInView && !urgent && hookReason == BOTHOOK_SHORTCUT ) ||
+				 ( rescue ? self->pfl.onGround : !self->pfl.onGround ) ) {
 				EndHook( BOT_HOOK_RETRY_MSEC );
 				return false;
 			}
@@ -5553,10 +5739,14 @@ bool rvBot::UpdateHook( idPlayer *self, usercmd_t &cmd ) {
 			if ( ( self->GetClassicHookState() == CLASSIC_HOOK_NONE && gameLocal.time - hookPhaseTime > 2 * gameLocal.GetMSec() ) ||
 				 gameLocal.time - hookPhaseTime > CLASSIC_HOOK_MAX_FLY_TIME ) {
 				// missed: it hit something it could not hold, or nothing
+				if ( bot_debug.GetBool() ) {
+					gameLocal.Printf( "bot %s: hook missed at %s (%s)\n", name.c_str(),
+									  physics->GetOrigin().ToString( 0 ), BotHookReasonName( hookReason ) );
+				}
 				EndHook( BOT_HOOK_RETRY_MSEC );
 				cmd.buttons &= ~BUTTON_HOOK;
 			}
-			// the bot keeps walking its route while the hook flies
+			// the bot keeps walking its route, or steering its fall, while the hook flies
 			return false;
 		}
 
@@ -5580,18 +5770,24 @@ bool rvBot::UpdateHook( idPlayer *self, usercmd_t &cmd ) {
 			}
 			const bool stalled = gameLocal.time - hookProgressTime > BOT_HOOK_STALL_MSEC;
 			if ( overLanding || hanging || stalled || gameLocal.time - hookPhaseTime > BOT_HOOK_REEL_MSEC ) {
+				const bool arrived = overLanding || hanging;
 				if ( bot_debug.GetBool() ) {
-					gameLocal.Printf( "bot %s: hook let go at %s (%s)\n", name.c_str(), origin.ToString( 0 ),
-									  overLanding ? "over the landing" : hanging ? "hanging" : stalled ? "stalled" : "timeout" );
+					gameLocal.Printf( "bot %s: hook let go at %s (%s, %s)\n", name.c_str(), origin.ToString( 0 ),
+									  overLanding ? "over the landing" : hanging ? "hanging" : stalled ? "stalled" : "timeout",
+									  BotHookReasonName( hookReason ) );
 				}
 				// no hook button this frame, which is the release
 				cmd.buttons &= ~BUTTON_HOOK;
-				EndHook( BOT_HOOK_RETRY_MSEC );
+				// a pull that arrived may be followed by the next one at once
+				EndHook( arrived ? BOT_HOOK_CHAIN_MSEC : BOT_HOOK_RETRY_MSEC );
 				ResetTraversal();
 				Repath( self, goalOrigin, false );
+				stuckTime = gameLocal.time;
 				return true;
 			}
 			cmd.buttons |= BUTTON_HOOK;
+			// the stuck watch says nothing about a bot on the end of a cable
+			stuckTime = gameLocal.time;
 			return true;
 		}
 	}
@@ -6301,6 +6497,8 @@ void rvBot::UpdateMovement( idPlayer *self, usercmd_t &cmd ) {
 			stuckChecks = 0;
 		} else if ( !routeProgress ) {
 			stuckChecks++;
+			// openQ4: where the Classic hook is allowed, a stall first tries it on the next corners
+			hookUnstickRequest = gameLocal.time;
 			unstickUntil	= gameLocal.time + BOT_UNSTICK_MSEC;
 			unstickSide		= ( gameLocal.random.RandomFloat() < 0.5f ) ? -1.0f : 1.0f;
 
@@ -7728,6 +7926,8 @@ void rvBot::ShiftMatchTime( int deltaMsec ) {
 	SHIFT_BOT_TIME( hookPhaseTime );
 	SHIFT_BOT_TIME( nextHookScanTime );
 	SHIFT_BOT_TIME( hookProgressTime );
+	SHIFT_BOT_TIME( hookUnstickRequest );
+	SHIFT_BOT_TIME( nextHookRescueTime );
 	SHIFT_BOT_TIME( strafeFlipTime );
 
 	// -- weapon, chat and throttles --
