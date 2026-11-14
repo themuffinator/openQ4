@@ -1481,9 +1481,13 @@ idPlayer::idPlayer() {
 	classicMegaDecayTime	= 0;
 	classicHookState		= CLASSIC_HOOK_NONE;
 	classicHookOrigin.Zero();
+	classicHookStart.Zero();
 	classicHookDir.Zero();
 	classicHookFireTime		= 0;
 	classicHookReleaseTime	= 0;
+	classicHookAnchor		= NULL;
+	classicHookAnchorLocal.Zero();
+	classicHookReelSound	= false;
 	memset( &classicHookCable, 0, sizeof( classicHookCable ) );
 	classicHookCableHandle	= -1;
 	memset( &classicHookHead, 0, sizeof( classicHookHead ) );
@@ -12590,6 +12594,10 @@ void idPlayer::Teleport( const idVec3 &origin, const idAngles &angles, idEntity 
 	}
  	idVec3 org;
  
+	// openQ4: Classic ruleset: a teleport takes the player away from whatever the hook holds,
+	// and a pull left in place would drag them straight back across the map.
+	ResetClassicHook( false );
+
  	if ( weapon ) {
  		weapon->LowerWeapon();
  	}
@@ -15553,7 +15561,16 @@ void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
 	if ( gameLocal.IsClassicRuleset() ) {
 		msg.WriteBits( inventory.armorTier, CLASSIC_ARMOR_TIER_BITS );
 		msg.WriteBits( classicHookState, CLASSIC_HOOK_STATE_BITS );
-		if ( classicHookState != CLASSIC_HOOK_NONE ) {
+		if ( classicHookState == CLASSIC_HOOK_FLYING ) {
+			// the throw, from which every end works out where the hook is
+			msg.WriteFloat( classicHookStart[0] );
+			msg.WriteFloat( classicHookStart[1] );
+			msg.WriteFloat( classicHookStart[2] );
+			msg.WriteFloat( classicHookDir[0] );
+			msg.WriteFloat( classicHookDir[1] );
+			msg.WriteFloat( classicHookDir[2] );
+			msg.WriteLong( classicHookFireTime );
+		} else if ( classicHookState == CLASSIC_HOOK_ATTACHED ) {
 			msg.WriteFloat( classicHookOrigin[0] );
 			msg.WriteFloat( classicHookOrigin[1] );
 			msg.WriteFloat( classicHookOrigin[2] );
@@ -15638,6 +15655,9 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	int decodedArmorTier = CLASSIC_ARMOR_NONE;
 	int decodedHookState = CLASSIC_HOOK_NONE;
 	idVec3 decodedHookOrigin = vec3_origin;
+	idVec3 decodedHookStart = vec3_origin;
+	idVec3 decodedHookDir = vec3_origin;
+	int decodedHookFireTime = 0;
 	int decodedLastDamageDef;
 	idVec3 decodedLastDamageDir;
 	int decodedLastDamageLocation;
@@ -15672,10 +15692,21 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	if ( gameLocal.IsClassicRuleset() ) {
 		decodedArmorTier = msg.ReadBits( CLASSIC_ARMOR_TIER_BITS );
 		decodedHookState = msg.ReadBits( CLASSIC_HOOK_STATE_BITS );
-		if ( decodedHookState != CLASSIC_HOOK_NONE ) {
+		if ( decodedHookState == CLASSIC_HOOK_FLYING ) {
+			decodedHookStart[0] = msg.ReadFloat();
+			decodedHookStart[1] = msg.ReadFloat();
+			decodedHookStart[2] = msg.ReadFloat();
+			decodedHookDir[0] = msg.ReadFloat();
+			decodedHookDir[1] = msg.ReadFloat();
+			decodedHookDir[2] = msg.ReadFloat();
+			decodedHookFireTime = msg.ReadLong();
+			decodedHookOrigin = decodedHookStart;
+		} else if ( decodedHookState == CLASSIC_HOOK_ATTACHED ) {
 			decodedHookOrigin[0] = msg.ReadFloat();
 			decodedHookOrigin[1] = msg.ReadFloat();
 			decodedHookOrigin[2] = msg.ReadFloat();
+		} else if ( decodedHookState != CLASSIC_HOOK_NONE ) {
+			msg.MarkReadOverflowed();
 		}
 	}
 	decodedLastDamageDef = msg.ReadBits( gameLocal.entityDefBits );
@@ -15738,6 +15769,9 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	inventory.armorTier = decodedArmorTier;
 	classicHookState = decodedHookState;
 	classicHookOrigin = decodedHookOrigin;
+	classicHookStart = decodedHookStart;
+	classicHookDir = decodedHookDir;
+	classicHookFireTime = decodedHookFireTime;
 	lastDamageDef = decodedLastDamageDef;
 	lastDamageDir = decodedLastDamageDir;
 	lastDamageLocation = decodedLastDamageLocation;
@@ -18050,11 +18084,57 @@ void idPlayer::ResetClassicHook( bool playSound ) {
 	if ( classicHookState != CLASSIC_HOOK_NONE ) {
 		classicHookReleaseTime = gameLocal.time;
 		if ( playSound && !gameLocal.isClient ) {
-			StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+			StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_RELEASE, false ), SND_CHANNEL_ITEM, 0, true, NULL );
 		}
 	}
 	classicHookState = CLASSIC_HOOK_NONE;
+	classicHookAnchor = NULL;
+	classicHookAnchorLocal.Zero();
 	physicsObj.ClearClassicGrapple();
+}
+
+/*
+================
+idPlayer::ClassicHookFlightPoint
+
+Where a thrown hook is at a given time.  The flight is a straight line at a
+fixed speed from the throw, so the snapshot carries the throw and every client
+draws the hook in step with its own clock instead of jumping from snapshot to
+snapshot.  The frame of the throw already counts, as the server moves the hook
+in that frame.
+================
+*/
+idVec3 idPlayer::ClassicHookFlightPoint( int time ) const {
+	const int elapsed = idMath::ClampInt( 0, CLASSIC_HOOK_MAX_FLY_TIME, time - classicHookFireTime + gameLocal.GetMSec() );
+	return classicHookStart + classicHookDir * ( CLASSIC_HOOK_FLY_SPEED * MS2SEC( elapsed ) );
+}
+
+/*
+================
+idPlayer::UpdateClassicHookAnchor
+
+Server side.  A hook that bit into a mover - a door, a lift, a platform - rides
+it: the held point is kept in the mover's own frame and put back in the world
+every frame, and the pull follows it.  The hook lets go when the mover is
+removed, hidden or stops being solid.  Returns false when the hook let go.
+================
+*/
+bool idPlayer::UpdateClassicHookAnchor( void ) {
+	if ( !classicHookAnchor.IsValid() ) {
+		// held by the world, which never moves
+		return true;
+	}
+	idEntity *anchor = classicHookAnchor.GetEntity();
+	if ( anchor == NULL || anchor->IsHidden() || anchor->GetPhysics() == NULL || anchor->GetPhysics()->GetContents() == 0 ) {
+		ResetClassicHook( true );
+		return false;
+	}
+	const idVec3 point = anchor->GetPhysics()->GetOrigin() + classicHookAnchorLocal * anchor->GetPhysics()->GetAxis();
+	if ( point != classicHookOrigin ) {
+		classicHookOrigin = point;
+		physicsObj.SetClassicGrapple( classicHookOrigin );
+	}
+	return true;
 }
 
 /*
@@ -18062,11 +18142,10 @@ void idPlayer::ResetClassicHook( bool playSound ) {
 idPlayer::UpdateClassicHook
 
 Server side.  Pressing _hook throws the hook from the eye; it flies until it
-bites into the world, then the player physics reels the player in for as long
-as the button stays down (idPhysics_Player::ClassicGrappleMove).  Letting go,
-dying, or the hook striking a player, the sky or nothing within its reach
-brings it back.  It does not hurt anyone, and it holds on to the point it hit
-rather than riding a mover.
+bites into the world or a mover, then the player physics reels the player in
+for as long as the button stays down (idPhysics_Player::ClassicGrappleMove).
+Letting go, dying, teleporting, or the hook striking a player, an item, the sky
+or nothing within its reach brings it back.  It does not hurt anyone.
 ================
 */
 void idPlayer::UpdateClassicHook( void ) {
@@ -18088,23 +18167,29 @@ void idPlayer::UpdateClassicHook( void ) {
 		if ( ( oldButtons & BUTTON_HOOK ) != 0 || gameLocal.time < classicHookReleaseTime + CLASSIC_HOOK_REFIRE_DELAY ) {
 			return;
 		}
-		classicHookOrigin = GetEyePosition();
+		classicHookStart = GetEyePosition();
+		classicHookOrigin = classicHookStart;
 		classicHookDir = viewAngles.ToForward();
 		classicHookFireTime = gameLocal.time;
 		classicHookState = CLASSIC_HOOK_FLYING;
-		StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+		StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_THROW, false ), SND_CHANNEL_ITEM, 0, true, NULL );
+	}
+
+	if ( classicHookState == CLASSIC_HOOK_ATTACHED ) {
+		UpdateClassicHookAnchor();
+		return;
 	}
 
 	if ( classicHookState != CLASSIC_HOOK_FLYING ) {
 		return;
 	}
 
-	if ( gameLocal.time - classicHookFireTime > CLASSIC_HOOK_MAX_FLY_TIME ) {
+	if ( gameLocal.time - classicHookFireTime >= CLASSIC_HOOK_MAX_FLY_TIME ) {
 		ResetClassicHook( true );
 		return;
 	}
 
-	const idVec3 end = classicHookOrigin + classicHookDir * ( CLASSIC_HOOK_FLY_SPEED * MS2SEC( gameLocal.msec ) );
+	const idVec3 end = ClassicHookFlightPoint( gameLocal.time );
 	trace_t tr;
 	gameLocal.TracePoint( this, tr, classicHookOrigin, end, MASK_SHOT_RENDERMODEL, this );
 	if ( tr.fraction >= 1.0f ) {
@@ -18115,16 +18200,24 @@ void idPlayer::UpdateClassicHook( void ) {
 	const idMaterial *material = tr.c.material;
 	idEntity *hit = ( tr.c.entityNum >= 0 && tr.c.entityNum < MAX_GENTITIES ) ? gameLocal.entities[ tr.c.entityNum ] : NULL;
 	if ( ( material != NULL && ( material->GetSurfaceFlags() & SURF_NOIMPACT ) ) ||
-		( hit != NULL && hit->IsType( idActor::GetClassType() ) ) ) {
-		// the sky, or a player: the hook has nothing to hold
+		( hit != NULL && ( hit->IsType( idActor::GetClassType() ) || hit->IsType( idItem::GetClassType() ) ||
+						   hit->IsType( idProjectile::GetClassType() ) ) ) ) {
+		// the sky, a player, a pickup or a shot: the hook has nothing to hold
 		ResetClassicHook( true );
 		return;
 	}
 
 	classicHookOrigin = tr.endpos - classicHookDir * 2.0f;
+	classicHookAnchor = NULL;
+	classicHookAnchorLocal.Zero();
+	if ( hit != NULL && hit != gameLocal.world && hit->GetPhysics() != NULL ) {
+		// anything but the world may move, so the bite is kept in its frame
+		classicHookAnchor = hit;
+		classicHookAnchorLocal = ( classicHookOrigin - hit->GetPhysics()->GetOrigin() ) * hit->GetPhysics()->GetAxis().Transpose();
+	}
 	classicHookState = CLASSIC_HOOK_ATTACHED;
 	physicsObj.SetClassicGrapple( classicHookOrigin );
-	StartSoundShader( declManager->FindSound( "weapon_blaster_charge_click", false ), SND_CHANNEL_ITEM, 0, true, NULL );
+	StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_BITE, false ), SND_CHANNEL_ITEM, 0, true, NULL );
 }
 
 /*
@@ -18143,6 +18236,10 @@ void idPlayer::FreeClassicHookPresentation( void ) {
 	}
 	classicHookCableHandle = -1;
 	classicHookHeadHandle = -1;
+	if ( classicHookReelSound ) {
+		StopSound( SND_CHANNEL_HEART, false );
+		classicHookReelSound = false;
+	}
 }
 
 /*
@@ -18152,7 +18249,10 @@ idPlayer::PresentClassicHook
 The cable is a beam in Quake 4's multiplayer pulse-line material, tinted by
 team, from the player's hand to the hook; the hook head is the nailgun's nail.
 Both are client side render entities, so nothing new rides the snapshot beyond
-the hook's state and position.
+the hook's state, its throw and the point it holds.  A flying hook is placed by
+the clock (ClassicHookFlightPoint) and stopped at the first wall this end can
+see, so it moves smoothly between snapshots.  While the hook holds, the reel
+hums on this end, so nothing is broadcast for it.
 ================
 */
 void idPlayer::PresentClassicHook( void ) {
@@ -18167,12 +18267,38 @@ void idPlayer::PresentClassicHook( void ) {
 
 	idVec3 start;
 	const idPlayer *local = gameLocal.GetLocalPlayer();
+	idVec3 muzzle;
+	idMat3 muzzleAxis;
 	if ( local == this && !pm_thirdPerson.GetBool() ) {
 		start = firstPersonViewOrigin + firstPersonViewAxis[ 0 ] * 20.0f - firstPersonViewAxis[ 1 ] * 8.0f - firstPersonViewAxis[ 2 ] * 10.0f;
+	} else if ( weapon != NULL && weapon->flashJointWorld != INVALID_JOINT &&
+				weapon->GetGlobalJointTransform( false, weapon->flashJointWorld, muzzle, muzzleAxis ) ) {
+		// from the hands, which hold the weapon
+		start = muzzle;
 	} else {
 		start = GetPhysics()->GetOrigin() + idVec3( 0.0f, 0.0f, 48.0f );
 	}
-	const idVec3 end = classicHookOrigin;
+
+	idVec3 end = classicHookOrigin;
+	if ( classicHookState == CLASSIC_HOOK_FLYING ) {
+		end = ClassicHookFlightPoint( gameLocal.time );
+		trace_t tr;
+		gameLocal.TracePoint( this, tr, classicHookStart, end, MASK_SHOT_RENDERMODEL, this );
+		if ( tr.fraction < 1.0f ) {
+			end = tr.endpos - classicHookDir * 2.0f;
+		}
+	}
+
+	const bool reeling = ( classicHookState == CLASSIC_HOOK_ATTACHED );
+	if ( reeling != classicHookReelSound ) {
+		if ( reeling ) {
+			StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_REEL, false ), SND_CHANNEL_HEART, 0, false, NULL );
+		} else {
+			StopSound( SND_CHANNEL_HEART, false );
+		}
+		classicHookReelSound = reeling;
+	}
+
 	idVec3 dir = end - start;
 	if ( dir.Normalize() < 1.0f ) {
 		dir = viewAngles.ToForward();

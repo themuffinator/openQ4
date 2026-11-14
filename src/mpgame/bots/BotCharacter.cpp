@@ -132,6 +132,9 @@ static const botTraitDef_t botTraitTable[] = {
 	BOTTRAIT( retreatHealth,		0.0f,		1.0f,		0.15f,		0.18f,		0.25f,		0.30f,		0.35f ),
 	BOTTRAIT( pursuit,				0.0f,		2.0f,		0.30f,		0.37f,		0.55f,		0.68f,		0.80f ),
 	BOTTRAIT( itemFocus,			0.0f,		2.0f,		0.25f,		0.33f,		0.50f,		0.65f,		0.80f ),
+	// Classic ruleset only: a novice rarely thinks of the hook; a strong player
+	// takes nearly every shortcut it offers.
+	BOTTRAIT( hookUse,				0.0f,		1.0f,		0.10f,		0.25f,		0.50f,		0.70f,		0.85f ),
 
 	// -- tactical personality --
 	// Most stay flat because they decide what kind of fight a character creates,

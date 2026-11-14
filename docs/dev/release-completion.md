@@ -7,6 +7,23 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Classic grappling hook grows up, 14 November 2026
+
+- **Bots use the grappling hook.** Under the Classic ruleset, wherever the
+  server allows the hook, bots now use it as a shortcut: up to ledges, across
+  rooms and on flag runs. Better bots use it more. `bot_grapple 0` turns it off.
+- **The hook holds on to moving parts of the map.** Bite a door, lift or
+  platform and it carries you along; the hook lets go if that part disappears.
+- **Teleporting lets go of the hook.** It used to drag you back across the
+  map towards the old bite.
+- **The flying hook moves smoothly** on every screen instead of jumping from
+  update to update, and it has proper throw, bite, reel and release sounds,
+  all from the stock game.
+- **No more crash on quit after a Classic match.** Leaving the game after
+  playing a Classic map could crash the client as it closed.
+- **Nothing to do.** Servers and players need the new game module on both
+  ends; a Classic server and an older client do not mix.
+
 ## Classic armour shows its tier on the HUD, 14 November 2026
 
 - **Under the Classic multiplayer ruleset the armour icon takes the colour of

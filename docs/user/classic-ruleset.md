@@ -138,16 +138,23 @@ straight from your eyes, bites into walls and ceilings, and reels you in while
 you keep holding the key. Let go to drop off and keep your momentum. The cable
 shows in your team's colour.
 
-- It does not hurt anyone, and it lets go if it hits a player or the sky.
-- It does not follow moving platforms.
+- It does not hurt anyone, and it lets go if it hits a player, a pickup or
+  the sky. It reaches about 2400 units.
+- It holds on to doors, lifts and other moving parts of the map and carries you
+  along with them. It lets go if what it holds disappears.
+- Going through a teleporter lets go of the hook.
+- You hear it throw, bite and come back, and the reel hums while it holds.
 - You can carry the flag while hooked.
+- Bots use it too, as a shortcut up to ledges and across rooms. Turn that off
+  with `bot_grapple 0`.
 
 Bind it under **Settings → Controls → Attack/Look → Grappling Hook**, or from
 the console, for example `bind MOUSE4 _hook`. It has no default key.
 
 ## Limits
 
-- Bots play Classic matches but never use the hook.
+- Bots only hook into walls and ceilings, never onto moving parts, and only
+  when no enemy is in sight, unless they carry the flag.
 - Item names on the pickup notices are still Quake 4's ("Small Armor Vest").
 - With [Instagib](server-setup.md#instagib) on, its railgun and one-hit kills
   replace Classic's weapons and armour. The double jump and the hook still

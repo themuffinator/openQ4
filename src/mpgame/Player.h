@@ -389,10 +389,14 @@ public:
 	// openQ4: Classic ruleset (mp/ClassicRules.h). MP only, not saved.
 	int						classicMegaDecayTime;	// next mega health drain; 0 when no mega health is draining
 	int						classicHookState;		// classicHookState_t, server authoritative, in the snapshot
-	idVec3					classicHookOrigin;
+	idVec3					classicHookOrigin;		// where the hook is now: in flight, or the point it holds
+	idVec3					classicHookStart;		// where it was thrown from; flight is a function of time
 	idVec3					classicHookDir;
 	int						classicHookFireTime;
 	int						classicHookReleaseTime;
+	idEntityPtr<idEntity>	classicHookAnchor;		// server: the mover the hook bit into, NULL for the world
+	idVec3					classicHookAnchorLocal;	// server: the bite in the anchor's own frame
+	bool					classicHookReelSound;	// presentation: the reel loop is playing
 	renderEntity_t			classicHookCable;
 	int						classicHookCableHandle;
 	renderEntity_t			classicHookHead;
@@ -768,6 +772,10 @@ public:
 	void					UpdateClassicHook( void );
 	void					ResetClassicHook( bool playSound );
 	void					PresentClassicHook( void );
+	idVec3					ClassicHookFlightPoint( int time ) const;
+	bool					UpdateClassicHookAnchor( void );
+	int						GetClassicHookState( void ) const { return classicHookState; }
+	const idVec3 &			GetClassicHookOrigin( void ) const { return classicHookOrigin; }
 	void					FreeClassicHookPresentation( void );
 	void					SpectateFreeFly( bool force );	// force is also used by offline demo controls
 	void					RequestSpectatorFollow( spectatorFollow_t operation, int targetSlot = -1 );

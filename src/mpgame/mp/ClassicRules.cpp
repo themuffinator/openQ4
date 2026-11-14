@@ -230,16 +230,61 @@ static const classicDefPatch_t classicDefPatches[] = {
 };
 
 typedef struct classicAppliedPatch_s {
-	idDeclEntityDef *	decl;
 	idStr				key;
-	idStr				original;
-	bool				hadOriginal;
 	idStr				applied;
 	bool				deleted;
 } classicAppliedPatch_t;
 
-static idList<classicAppliedPatch_t>	classicApplied;
+// One definition the overlay rewrote: its shipped dictionary, flattened to the
+// text the engine parses it back from, and the rows written into it.
+typedef struct classicAppliedDecl_s {
+	idDeclEntityDef *				decl;
+	idStr							original;
+	idList<classicAppliedPatch_t>	rows;
+} classicAppliedDecl_t;
+
+static idList<classicAppliedDecl_t>		classicApplied;
+static int								classicAppliedRows = 0;
 static bool								classicDefinitionsApplied = false;
+
+/*
+================
+ClassicDictText
+
+A resolved entityDef dictionary as entityDef text: its "inherit" keys were
+consumed when it was parsed, so the flat key list parses back to the same
+dictionary.  Declaration strings carry no escapes, so quoting is enough.
+================
+*/
+static void ClassicDictText( const idDict &dict, idStr &text ) {
+	text = "{\n";
+	for ( int i = 0; i < dict.GetNumKeyVals(); i++ ) {
+		const idKeyValue *kv = dict.GetKeyVal( i );
+		text += "\t\"";
+		text += kv->GetKey();
+		text += "\" \"";
+		text += kv->GetValue();
+		text += "\"\n";
+	}
+	text += "}\n";
+}
+
+/*
+================
+ClassicReparse
+
+Replaces a definition's dictionary with the one the text describes.  The
+dictionary belongs to the engine's decl manager and its strings to the engine's
+string pools, so it is cleared and rebuilt by the engine's own FreeData and
+Parse, never through the game module's idDict code: that would mix the two
+modules' pools and heaps, and the engine would later free strings it no longer
+counted - which crashed the client on quit after any Classic map.
+================
+*/
+static void ClassicReparse( idDeclEntityDef *decl, const idStr &text ) {
+	decl->FreeData();
+	decl->Parse( text.c_str(), text.Length(), true );
+}
 
 /*
 ================
@@ -274,8 +319,10 @@ void rvClassicRules::ApplyDefinitions( void ) {
 	}
 
 	classicApplied.Clear();
-	classicApplied.SetGranularity( 64 );
+	classicApplied.SetGranularity( 32 );
+	classicAppliedRows = 0;
 
+	// Gather the rows by definition, in table order.
 	int missing = 0;
 	const int patchCount = (int)( sizeof( classicDefPatches ) / sizeof( classicDefPatches[ 0 ] ) );
 	for ( int i = 0; i < patchCount; i++ ) {
@@ -288,25 +335,48 @@ void rvClassicRules::ApplyDefinitions( void ) {
 		}
 
 		idDeclEntityDef *editable = const_cast<idDeclEntityDef *>( def );
-		classicAppliedPatch_t &applied = classicApplied.Alloc();
-		applied.decl = editable;
-		applied.key = patch.key;
-
-		const idKeyValue *kv = editable->dict.FindKey( patch.key );
-		applied.hadOriginal = ( kv != NULL );
-		applied.original = kv ? kv->GetValue().c_str() : "";
-		applied.deleted = ( patch.value == NULL );
-		applied.applied = patch.value ? patch.value : "";
-
-		if ( patch.value ) {
-			editable->dict.Set( patch.key, patch.value );
-		} else {
-			editable->dict.Delete( patch.key );
+		classicAppliedDecl_t *entry = NULL;
+		for ( int j = 0; j < classicApplied.Num(); j++ ) {
+			if ( classicApplied[ j ].decl == editable ) {
+				entry = &classicApplied[ j ];
+				break;
+			}
 		}
+		if ( entry == NULL ) {
+			entry = &classicApplied.Alloc();
+			entry->decl = editable;
+			entry->rows.Clear();
+			ClassicDictText( editable->dict, entry->original );
+		}
+
+		classicAppliedPatch_t &row = entry->rows.Alloc();
+		row.key = patch.key;
+		row.deleted = ( patch.value == NULL );
+		row.applied = patch.value ? patch.value : "";
+		classicAppliedRows++;
+	}
+
+	// Rewrite each definition once.  The patched copy is a game-side dictionary,
+	// so its edits stay in this module's pools; only its text reaches the engine.
+	for ( int i = 0; i < classicApplied.Num(); i++ ) {
+		classicAppliedDecl_t &entry = classicApplied[ i ];
+		idDict patched;
+		patched.Copy( entry.decl->dict );
+		for ( int j = 0; j < entry.rows.Num(); j++ ) {
+			const classicAppliedPatch_t &row = entry.rows[ j ];
+			if ( row.deleted ) {
+				patched.Delete( row.key );
+			} else {
+				patched.Set( row.key, row.applied );
+			}
+		}
+		idStr text;
+		ClassicDictText( patched, text );
+		ClassicReparse( entry.decl, text );
 	}
 
 	classicDefinitionsApplied = true;
-	gameLocal.Printf( "Classic ruleset: %d definition values applied%s\n", classicApplied.Num(),
+	gameLocal.Printf( "Classic ruleset: %d definition values applied%s\n", classicAppliedRows,
 		missing ? va( ", %d definitions missing", missing ) : "" );
 }
 
@@ -314,9 +384,8 @@ void rvClassicRules::ApplyDefinitions( void ) {
 ================
 rvClassicRules::RevertDefinitions
 
-Puts the shipped values back, newest change first, so two rows on one key
-unwind to the original.  A value that no longer reads as the one written means
-the declaration was re-parsed since (reloadDecls); that row is left alone.
+Puts the shipped definitions back.  A definition whose values no longer read as
+the ones written was re-parsed since (reloadDecls) and is left alone.
 ================
 */
 void rvClassicRules::RevertDefinitions( void ) {
@@ -325,21 +394,32 @@ void rvClassicRules::RevertDefinitions( void ) {
 	}
 
 	for ( int i = classicApplied.Num() - 1; i >= 0; i-- ) {
-		classicAppliedPatch_t &applied = classicApplied[ i ];
-		idDict &dict = applied.decl->dict;
-		const idKeyValue *kv = dict.FindKey( applied.key );
-		const bool stillOurs = applied.deleted ? ( kv == NULL ) : ( kv != NULL && kv->GetValue() == applied.applied );
-		if ( !stillOurs ) {
-			continue;
+		classicAppliedDecl_t &entry = classicApplied[ i ];
+		const idDict &dict = entry.decl->dict;
+		bool stillOurs = true;
+		// the last row on a key is the value it holds
+		for ( int j = entry.rows.Num() - 1; j >= 0 && stillOurs; j-- ) {
+			const classicAppliedPatch_t &row = entry.rows[ j ];
+			bool laterRow = false;
+			for ( int k = j + 1; k < entry.rows.Num(); k++ ) {
+				if ( !entry.rows[ k ].key.Icmp( row.key ) ) {
+					laterRow = true;
+					break;
+				}
+			}
+			if ( laterRow ) {
+				continue;
+			}
+			const idKeyValue *kv = dict.FindKey( row.key );
+			stillOurs = row.deleted ? ( kv == NULL ) : ( kv != NULL && kv->GetValue() == row.applied );
 		}
-		if ( applied.hadOriginal ) {
-			dict.Set( applied.key, applied.original );
-		} else {
-			dict.Delete( applied.key );
+		if ( stillOurs ) {
+			ClassicReparse( entry.decl, entry.original );
 		}
 	}
 
 	classicApplied.Clear();
+	classicAppliedRows = 0;
 	classicDefinitionsApplied = false;
 }
 

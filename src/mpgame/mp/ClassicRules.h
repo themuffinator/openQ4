@@ -74,6 +74,14 @@ const float	CLASSIC_HOOK_PULL_SPEED		= 750.0f;	// Threewave 650, against Quake 4
 const float	CLASSIC_HOOK_HANG_DISTANCE	= 64.0f;
 const int	CLASSIC_HOOK_MAX_FLY_TIME	= 2000;
 const int	CLASSIC_HOOK_REFIRE_DELAY	= 250;
+const float	CLASSIC_HOOK_REACH			= CLASSIC_HOOK_FLY_SPEED * ( CLASSIC_HOOK_MAX_FLY_TIME / 1000.0f );
+
+// Grappling hook sounds, all stock Quake 4 weapon sounds: the throw, the bite,
+// the reel loop while the hook holds, and the hook coming back.
+#define CLASSIC_HOOK_SND_THROW		"weapon_machinegun_bolt"
+#define CLASSIC_HOOK_SND_BITE		"weapon_nailgun_clipin"
+#define CLASSIC_HOOK_SND_REEL		"weapon_nailgun_spinslow"
+#define CLASSIC_HOOK_SND_RELEASE	"weapon_machinegun_clipout"
 
 class rvClassicRules {
 public:

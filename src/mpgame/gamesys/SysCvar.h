@@ -540,6 +540,7 @@ extern idCVar bot_debug;
 extern idCVar bot_debugNav;
 extern idCVar bot_navCellSize;
 extern idCVar bot_pause;
+extern idCVar bot_grapple;
 extern idCVar bot_characters;
 extern idCVar bot_forceCharacter;
 extern idCVar bot_skillVariance;

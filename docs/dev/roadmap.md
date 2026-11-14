@@ -3936,7 +3936,7 @@ prediction/rewind defaults.
 | MP-08 — Partial | Local IPv4/IPv6 pure/discovery/reconnect/content checks, family fallback and fragment repair pass; Windows/Linux peer evidence exists. A 12-player match holds over a simulated 1280-byte path on IPv4 and IPv6, and over IPv6 even when the path drops IP fragments (connection replies fit one packet). | IPv4 over a fragment-dropping path (1,300-byte channel fragments); physical MTU/multi-record DNS, cross-machine load and the elevated retail-binary run ([checklist](mp-human-qualification.md#mp-08-real-network-conditions)); deferred WAN/other-architecture peers. No interoperability claim. |
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
-| MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), bot hook use, Classic pickup names. |
+| MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. Bots use the hook as a route shortcut; the hook rides movers and lets go on teleport. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), Classic pickup names. |
 
 Completion substeps:
 
@@ -4821,6 +4821,19 @@ Completion substeps:
   `guis/hud.gui` keeps its earlier layout as save revision `hud_r4`, and The
   Awakening's generated HUD leaves the tint out. Remaining: real-input play,
   bot hook use and Classic pickup names.
+  Progress, 14 November (hook): bots take hook shortcuts (`rvBot::UpdateHook`,
+  `hookUse` trait, `bot_grapple`): a corner further along the route in sight,
+  well short of the route in a straight line or a climb, with a world bite over
+  it that the body can follow; two or three pulls a minute with four skill-5 bots
+  on q4dm1, landing over the corner. The hook anchors to movers, lets go on
+  teleport, flies by a function of the throw so every end draws it smoothly,
+  and has stock throw/bite/reel/release sounds. The overlay now rebuilds the
+  engine's entityDef dictionaries through the engine's own `FreeData`/`Parse`;
+  editing them with game-module `idDict` code had corrupted the engine's string
+  pool, and the client crashed on quit after every Classic map.
+  `mp_classic_grapple_contract.py` pins all of it. Remaining: real-input play
+  and Classic pickup names; a mid-map `si_ruleset` change typed at the console
+  was not seen to restart the map, which needs a look.
 
 ## Audio and voice
 

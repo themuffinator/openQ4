@@ -151,6 +151,7 @@ typedef struct botTraits_s {
 	float			retreatHealth;			// 0..1 of max health; below this the bot breaks off and looks for health
 	float			pursuit;				// 0..1, how long a lost enemy is chased before the bot gives up on it
 	float			itemFocus;				// 0..1, how much an item goal outweighs an enemy goal
+	float			hookUse;				// 0..1, chance a Classic grappling hook shortcut on offer is taken
 
 	// -- tactical personality --
 	float			initiative;				// 0..1, willingness to take an imperfect shot instead of waiting

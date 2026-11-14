@@ -875,6 +875,7 @@ idCVar bot_debug(							"bot_debug",						"0",			CVAR_GAME | CVAR_INTEGER | CVAR
 idCVar bot_debugNav(						"bot_debugNav",						"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "draw the navmesh (1) and bot routes (2) near the local player" );
 idCVar bot_navCellSize(						"bot_navCellSize",					"24",			CVAR_GAME | CVAR_FLOAT | CVAR_NOCHEAT, "navmesh sampling resolution in world units; smaller finds more ground and costs more to build", 8, 64 );
 idCVar bot_pause(							"bot_pause",						"0",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "freeze all bot input" );
+idCVar bot_grapple(						"bot_grapple",						"1",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "let bots use the Classic ruleset's grappling hook as a route shortcut where the server allows the hook" );
 
 // Bot personalities.  Skill is the baseline curve; a character file layers a
 // play style and a voice on top of it, so two bots at the same skill still play

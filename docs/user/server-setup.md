@@ -257,6 +257,7 @@ longer lines, and Quake 4's typing icon shows above it until it sends.
 | `bot_characters` | `1` gives bots named characters with their own play style and voice; `0` uses anonymous bots on the plain skill curve |
 | `bot_chat` | Bot chat: `0` silent, `1` normal, `2` chatty |
 | `bot_chatCPM` | Bot typing speed in visible characters per minute (default `900`) |
+| `bot_grapple` | `1` (default) lets bots use the [Classic ruleset](classic-ruleset.md)'s grappling hook wherever the server allows it; `0` keeps them off it. **Not in 0.14.1** |
 
 Bot settings are saved with your configuration, so a value you pick in the
 menu or set once in your server config is still there next time. For the full

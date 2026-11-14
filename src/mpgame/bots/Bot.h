@@ -67,6 +67,14 @@ typedef enum {
 //----------------------------------------------------------------
 // rvBot
 //----------------------------------------------------------------
+// openQ4: rvBot::UpdateHook
+typedef enum {
+	BOTHOOK_NONE,
+	BOTHOOK_AIM,				// turning to the bite
+	BOTHOOK_THROWN,				// the hook is in flight
+	BOTHOOK_REEL				// held and pulling
+} botHookPhase_t;
+
 class rvBot {
 public:
 							rvBot( void );
@@ -242,6 +250,12 @@ private:
 	bool					HandleJumpTakeoff( idPlayer *self, usercmd_t &cmd );
 	bool					GuardLandingContinuation( idPlayer *self, usercmd_t &cmd );
 	bool					RecoverInAir( idPlayer *self, usercmd_t &cmd );
+
+	// openQ4: the Classic ruleset's grappling hook as a route shortcut.  True
+	// while the hook owns movement: thrown and pulling, the bot gives no input.
+	bool					UpdateHook( idPlayer *self, usercmd_t &cmd );
+	bool					FindHookShortcut( idPlayer *self, idVec3 &bite, idVec3 &landing ) const;
+	void					EndHook( int cooldownMsec );
 
 	void					ApplyMove( const idVec3 &moveDir, usercmd_t &cmd ) const;
 	void					PressJump( usercmd_t &cmd ) const;
@@ -449,6 +463,15 @@ private:
 	int						dodgeStartTime;
 	int						dodgeEndTime;
 	int						nextThreatScanTime;
+
+	// -- grappling hook (Classic ruleset) --
+	int						hookPhase;			// botHookPhase_t
+	int						hookPhaseTime;
+	int						nextHookScanTime;
+	idVec3					hookBite;			// where the hook is meant to hold
+	idVec3					hookLanding;		// the route corner the shortcut ends over
+	float					hookBestDistance;	// closest the pull has brought the chest to the bite
+	int						hookProgressTime;
 	float					strafeSide;
 	int						strafeFlipTime;
 	bool					dodgeJump;
