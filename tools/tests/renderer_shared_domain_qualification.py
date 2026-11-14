@@ -527,11 +527,10 @@ SCENES = [
                   rollback={"r_rendererSharedFaultInject": "2"}),
         ],
     ),
-    # Render-demo playback of a frozen view. Under the default preset, OpenGL
-    # plays back successive frames of a frozen demo differently even on the
-    # classic path (the airdefense1 portal sky, and the mv2 horizon), which
-    # no parity check can pin; plain OpenGL and both Vulkan configurations are
-    # stable. That classic playback defect is tracked separately.
+    # Render-demo playback of a frozen view. Playback draws through the
+    # renderer's own scene target, which must start every frame cleared: the
+    # mv2 void above the horizon once kept each frame's bloom and brightened
+    # from step to step on OpenGL under the default preset.
     Scene(
         id="mv2demo",
         map="maps/tools/mv2",
@@ -540,8 +539,6 @@ SCENES = [
         launch={"g_showHud": "0", "ui_showGun": "0", "r_skipSubviews": "1"},
         frozen_commands=["recordDemo ren01demo", "wait 900", "stopRecording", "wait 5",
                          "playDemo ren01demo", "wait 30"],
-        skip={"default-gl": "classic OpenGL render-demo playback is unstable under the default preset",
-              "msaa-gl": "classic OpenGL render-demo playback is unstable under the default preset"},
         checks=[
             Check("specialframe", control={"r_skipAmbient": "1"},
                   rollback={"r_rendererSharedFaultInject": "2"}),

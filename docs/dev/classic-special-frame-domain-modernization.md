@@ -118,12 +118,12 @@ post chain off:
   effect off is the visible control.
 - **Render-demo playback.** A demo recorded from the frozen, lit
   `maps/tools/mv2` floor plays back with every frame owned and byte-identical
-  to classic playback on Vulkan (both configurations) and on OpenGL with the
-  post chain off. Under the default preset, OpenGL plays back successive
-  frames of a frozen demo differently even on the classic path (the
-  `game/airdefense1` portal sky, the mv2 horizon), so no comparison can be
-  pinned there; that classic playback defect is outside this domain and is
-  tracked separately.
+  to classic playback on OpenGL and Vulkan, under the default preset, with 4x
+  MSAA and with the post chain off. Classic OpenGL playback under the default
+  preset was not stable at first: playback draws through the renderer's own
+  scene target, which cleared only depth and stencil, so the void above the
+  horizon kept each frame's bloom and brightened frame by frame. That target
+  now starts every frame cleared to the window's `r_clear` color.
 
 The rollback is the qualification diagnostic `r_rendererSharedFaultInject 2`:
 both backends run the complete classic executor and record a named fallback.

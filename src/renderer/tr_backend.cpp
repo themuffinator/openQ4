@@ -523,6 +523,39 @@ void RB_SetGL2D( void ) {
 
 /*
 =============
+RB_FrameClearColor
+
+The color each frame starts from (r_clear), or false when a frame keeps what
+was there. The window starts from it in RB_SetBuffer, and the renderer's own
+scene target starts from it too (draw_common.cpp): a 3D view clears only depth
+and stencil.
+=============
+*/
+bool RB_FrameClearColor( float color[4] ) {
+	// clear screen for debugging
+	// automatically enable this with several other debug tools
+	// that might leave unrendered portions of the screen
+	if ( !( r_clear.GetFloat() || idStr::Length( r_clear.GetString() ) != 1 || r_lockSurfaces.GetBool() || r_singleArea.GetBool() || r_showOverDraw.GetBool() ) ) {
+		return false;
+	}
+	color[3] = 1.0f;
+	if ( sscanf( r_clear.GetString(), "%f %f %f", &color[0], &color[1], &color[2] ) == 3 ) {
+		return true;
+	}
+	if ( r_clear.GetInteger() == 2 ) {
+		color[0] = color[1] = color[2] = 0.0f;
+	} else if ( r_showOverDraw.GetBool() ) {
+		color[0] = color[1] = color[2] = 1.0f;
+	} else {
+		color[0] = 0.4f;
+		color[1] = 0.0f;
+		color[2] = 0.25f;
+	}
+	return true;
+}
+
+/*
+=============
 RB_SetBuffer
 
 =============
@@ -538,20 +571,9 @@ static void	RB_SetBuffer( const void *data ) {
 
 	glDrawBuffer( cmd->buffer );
 
-	// clear screen for debugging
-	// automatically enable this with several other debug tools
-	// that might leave unrendered portions of the screen
-	if ( r_clear.GetFloat() || idStr::Length( r_clear.GetString() ) != 1 || r_lockSurfaces.GetBool() || r_singleArea.GetBool() || r_showOverDraw.GetBool() ) {
-		float c[3];
-		if ( sscanf( r_clear.GetString(), "%f %f %f", &c[0], &c[1], &c[2] ) == 3 ) {
-			glClearColor( c[0], c[1], c[2], 1 );
-		} else if ( r_clear.GetInteger() == 2 ) {
-			glClearColor( 0.0f, 0.0f,  0.0f, 1.0f );
-		} else if ( r_showOverDraw.GetBool() ) {
-			glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
-		} else {
-			glClearColor( 0.4f, 0.0f, 0.25f, 1.0f );
-		}
+	float c[4];
+	if ( RB_FrameClearColor( c ) ) {
+		glClearColor( c[0], c[1], c[2], c[3] );
 		glClear( GL_COLOR_BUFFER_BIT );
 	}
 }

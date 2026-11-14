@@ -117,7 +117,7 @@ static bool R_TemporalPresentation_ScreenSpaceEffectsRequested(){return effects;
 static bool R_ModernGLExecutor_ModernVisibleRequestedForPost(){return modern;}
 static idImage sceneColor,sceneDepth,*rbSceneColorImage=nullptr,*rbSceneDepthStencilImage=nullptr;
 static RenderTexture sceneTexture,*rbSceneRenderTexture=nullptr;
-static int rbSceneRenderTextureSamples=0,rbBackendTemporalHistoryFrame=0;
+static int rbSceneRenderTextureSamples=0,rbBackendTemporalHistoryFrame=0,rbSceneRenderTargetClearedFrame=0;
 static bool rbBackendTemporalHistoryValid=true;
 struct Images {
     idImage* ScratchImage(const char* name,const idImageOpts* opts,int,int,int){
@@ -236,6 +236,20 @@ def main():
     for signature in ('bool GLimp_Init(', 'void GLimp_Shutdown('):
         body = function_body(gl, signature)
         assert 's_strictSwapIntervalActive = false;' in body
+    # The renderer's scene target starts every frame from the window's r_clear
+    # color: a 3D view clears only depth and stencil, and pixels no surface
+    # covers otherwise carried the last composite into bloom again (frozen
+    # render-demo playback brightened frame by frame). The first view of the
+    # frame clears it, before an imported portal-sky backdrop draws into it.
+    backend = (ROOT / 'src/renderer/tr_backend.cpp').read_text(encoding='utf-8')
+    assert 'RB_FrameClearColor( c )' in function_body(backend, 'static void\tRB_SetBuffer(')
+    frame_clear = function_body(draw, 'static void RB_BeginSceneRenderTargetFrame(')
+    assert 'rbSceneRenderTargetClearedFrame == backEnd.frameCount' in frame_clear
+    assert 'RB_FrameClearColor( color )' in frame_clear and 'glClear( GL_COLOR_BUFFER_BIT );' in frame_clear
+    assert 'rbSceneRenderTargetClearedFrame = -1;' in scene
+    view = function_body(draw, 'void\tRB_STD_DrawView( void )')
+    assert view.index('backEnd.renderTexture->MakeCurrent();') < view.index('RB_BeginSceneRenderTargetFrame();') \
+        < view.index('RB_DrawPortalSkyBackdrop( portalSkyBackdrop );')
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++ compiler required')

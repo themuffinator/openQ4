@@ -1212,7 +1212,7 @@ straight into the window; `msaa` adds 4x MSAA to the default. Captures are
 | `ad1hud` | the stock (legacy) HUD over the frozen outdoor view | root GUI |
 | `ad1screen` | the stock `vidcomm1` monitor near the airdefense1 start | in-world GUI |
 | `ad1blur` | Raven's special-effect controller blur (`r_forceSpecialEffects 1`) | special frame (Raven) |
-| `mv2demo` | playback of a render demo recorded from the frozen, lit mv2 floor (not compared on OpenGL under the default preset, where classic playback itself is unstable) | special frame (render demo) |
+| `mv2demo` | playback of a render demo recorded from the frozen, lit mv2 floor | special frame (render demo) |
 | `rootvideo` | a root 2D view playing stock `video/idlogo` (wall clock: parity recorded, not required) | root cinematic |
 | `fixpanels`, `fixxray`, `fixrefraction`, `fixnested` | validation rooms: reflection, dynamic-mirror, remote-camera (stock `camera1.gui`), direct-mirror, x-ray and refraction captures; a nested direct/capture mirror chain; a post tail with `_currentDepth`, `_currentRender` and a frozen stock video | subview, cinematic/post |
 | `fixmalformed` | validation room: a direct mirror whose x-ray descendant inherits the mirror's clip plane; the whole tree must decline (nothing owned, a named fallback, the classic image) | subview |
@@ -1259,8 +1259,8 @@ runs. Each cell gives passing checks and, in parentheses, owned views:
 
 - The subview counts include `fixmalformed`, which passes by declining: it
   owns nothing and records a named fallback.
-- `mv2demo` is not compared on OpenGL under the default preset, where classic
-  render-demo playback differs from frame to frame.
+- `mv2demo` was left out on OpenGL under the default preset in this run, and
+  passes there since the follow-up below.
 - `ad1stencil` on OpenGL with 4x MSAA owned its view, but its two classic
   references differed at four isolated pixels and its rollback pair at three
   others. Two reruns showed the same flicker at different pixels with every
@@ -1282,6 +1282,22 @@ Package SHA-256:
 | `renderer-vk_x64.dll` | `a878815b7f67011513f8e8e8d2795279cfd98b321db9fec8f8c4f346cd1e1454` |
 | `baseoq4/game-sp_x64.dll` | `0f4529e6bd668f6bd285edd6efcd953794872df01bea40dfe2b4a1db2eca08bd` |
 | `baseoq4/game-mp_x64.dll` | `01bd3544a36b3b7cb036755ec6b69d8a4152e17ebeac3e263ed282bf0f791d38` |
+
+**Follow-up, render-demo playback on OpenGL (13 November 2026).** Classic
+OpenGL playback of the frozen `mv2demo` recording brightened the void above
+the horizon from one capture to the next under the default preset (its mean
+rose from 0.37 to 1.87 levels across the seven captures; the floor held). The
+renderer's scene target, which playback draws through while the live game
+draws through its own targets, cleared only depth and stencil for a 3D view,
+so the pixels no surface covers kept the previous frame's composite and bloom
+took it in again each frame. Turning bloom or SMAA off hid it: without SMAA
+the live game had already drawn through that target long enough to settle.
+The first view to draw into the scene target in a frame now clears it to the
+window's `r_clear` color. With the exclusion removed, `mv2demo` passes on both
+backends under the default preset, with 4x MSAA and with the post chain off:
+six runs, one owned view each, identical classic references, a visible
+`r_skipAmbient` control and a named rollback. Package: client `c278976d…`,
+`renderer-gl_x64.dll` `b1225463…`, `renderer-vk_x64.dll` `e5dca690…`.
 
 Human appearance review of these captures and the non-Windows platforms
 belong to platform qualification.

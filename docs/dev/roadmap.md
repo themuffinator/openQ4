@@ -948,8 +948,10 @@ diagnostics establish whole-frame ownership or production performance.
   fresh package built from the change set, passed 98 of 99 domain checks in 87
   runs (RTX 4060 Laptop GPU). The one failure is classic flicker: OpenGL
   stencil shadows under 4x MSAA flip isolated pixels between two classic
-  frames, so that combination is excluded, as is OpenGL render-demo playback
-  under the default preset.
+  frames, so that combination is excluded. OpenGL render-demo playback under
+  the default preset, left out of that run, now passes: the renderer's scene
+  target starts every frame cleared, so uncovered pixels no longer carry the
+  last frame's bloom.
   Under the default presets nothing had ever been owned. Fixed: the adapters
   refused every render target, though the classic walker draws the view into
   the renderer's own scene target or the game's forward target (both

@@ -897,6 +897,8 @@ static idImage *rbSceneColorImage = NULL;
 static idImage *rbSceneDepthStencilImage = NULL;
 static idRenderTexture *rbSceneRenderTexture = NULL;
 static int rbSceneRenderTextureSamples = -1;
+// the frame whose first view cleared the scene target (RB_BeginSceneRenderTargetFrame)
+static int rbSceneRenderTargetClearedFrame = -1;
 // window-view multisampling (see RB_WindowView_Begin)
 static idImage *rbWindowViewColorImage = NULL;
 static idImage *rbWindowViewDepthImage = NULL;
@@ -2048,9 +2050,41 @@ static bool RB_EnsureSceneRenderTexture( const viewDef_t *sceneTargetView ) {
 		}
 		rbSceneRenderTexture = tr.CreateRenderTexture( rbSceneColorImage, rbSceneDepthStencilImage );
 		rbSceneRenderTextureSamples = sceneSamples;
+		rbSceneRenderTargetClearedFrame = -1;
 	}
 
 	return rbSceneRenderTexture != NULL;
+}
+
+/*
+The window starts every frame from r_clear's color (RB_SetBuffer), but a 3D
+view clears only depth and stencil. Drawn into the scene target, the pixels no
+surface covers (the void beyond a map's geometry, a sky that render-demo
+playback does not draw) used to keep the previous frame's composite, which
+bloom and tone mapping then took in again: a frozen view brightened frame by
+frame, and demo playback, which first draws through this target, never held
+still. The first view to draw into the target in a frame clears it as the
+window is cleared, so an inline portal sky drawn before its root view stays.
+Called with the target current.
+*/
+static void RB_BeginSceneRenderTargetFrame( void ) {
+	if ( rbSceneRenderTargetClearedFrame == backEnd.frameCount ) {
+		return;
+	}
+	rbSceneRenderTargetClearedFrame = backEnd.frameCount;
+	float color[4];
+	if ( !RB_FrameClearColor( color ) ) {
+		return;
+	}
+	// color writes on, and the whole target rather than the view's scissor
+	GL_State( GLS_DEFAULT );
+	const bool scissorTest = glIsEnabled( GL_SCISSOR_TEST ) == GL_TRUE;
+	glDisable( GL_SCISSOR_TEST );
+	glClearColor( color[0], color[1], color[2], color[3] );
+	glClear( GL_COLOR_BUFFER_BIT );
+	if ( scissorTest ) {
+		glEnable( GL_SCISSOR_TEST );
+	}
 }
 
 static bool RB_SceneRenderTargetRequested( void ) {
@@ -8485,6 +8519,7 @@ void RB_ShutdownScenePostProcess( void ) {
 	rbWindowViewMirroredFramebuffer = 0;
 	rbSceneColorImage = NULL;
 	rbSceneDepthStencilImage = NULL;
+	rbSceneRenderTargetClearedFrame = -1;
 	rbSceneRenderTargetPreserveDepthImage = NULL;
 	rbSceneRenderTargetPreserveFarDepthFrame = -1;
 	rbSceneRenderTargetPreserveFarDepthView = NULL;
@@ -17243,6 +17278,9 @@ void	RB_STD_DrawView( void ) {
 	if (backEnd.renderTexture)
 	{
 		backEnd.renderTexture->MakeCurrent();
+	}
+	if ( sceneRenderTargetReady ) {
+		RB_BeginSceneRenderTargetFrame();
 	}
 	RB_DrawPortalSkyBackdrop( portalSkyBackdrop );
 

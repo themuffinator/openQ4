@@ -7,6 +7,27 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Render demos hold still on OpenGL, 13 November 2026
+
+- **No more creeping glow where the map draws nothing.** On OpenGL with bloom
+  on (the Enhanced preset and above), pixels no surface covers, such as the
+  void past the edge of a test map, kept the last frame's picture and bloom
+  added to it again every frame, so they slowly brightened. A render demo
+  played back from a frozen moment never looked the same twice. Those pixels
+  now start black every frame, as they always did on Vulkan and with post
+  effects off. Replace the OpenGL renderer module.
+- How it works: the renderer's own scene target, which render-demo playback
+  and the game's direct route draw through, cleared only depth and stencil for
+  a 3D view. The first view to draw into it in a frame now clears it to the
+  window's `r_clear` color (`RB_BeginSceneRenderTargetFrame`), before an
+  imported portal-sky backdrop is drawn; `renderer_gl_display_policy.py` pins
+  the order.
+- Evidence: `renderer_shared_domain_qualification.py --scenes mv2demo` passes
+  on OpenGL and Vulkan under the default preset, with 4x MSAA and with the post
+  chain off, with OpenGL's former default-preset exclusion removed. Before the
+  change the void's mean rose from 0.37 to 1.87 levels across the run's seven
+  frozen captures; it now stays at 0 on both backends.
+
 ## Instagib for any multiplayer game type, 13 November 2026
 
 - **Play any game type as Instagib.** Turn on **Instagib** on the **Rules** tab

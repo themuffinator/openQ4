@@ -2274,6 +2274,7 @@ bool RB_UnderwaterViewAvailable( void );
 void RB_DetermineLightScale( void );
 void RB_STD_LightScale( void );
 void RB_HDRPrintGfxInfo( void );
+bool RB_FrameClearColor( float color[4] );
 void RB_BeginDrawingView (void);
 
 /*
