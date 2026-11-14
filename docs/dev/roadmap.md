@@ -3379,6 +3379,17 @@ Completion substeps must keep three forms of evidence distinct:
   [late-mission audit and runtime limits](awakening-missions.md#m08-cryofac-and-m09-valkaryne--4-november-2026).
   Normal combat, complete traversal and timed extraction remain qualification
   requirements; focused script callbacks do not close this work item.
+  Silent names, 14 November: content that names a dialogue key, radio sound or
+  joint which does not exist fails without a warning, so the earlier reviews did
+  not reach it. Seventeen scripted lines now play the recordings their scripts
+  meant, the nine radio calls of the M06 cannon defence among them; the Tank and
+  the Retch see from their heads, where they saw from their feet; the Tank's
+  rockets flash and the opening dropships light both thrusters. The tables,
+  evidence and limits are in the
+  [mission audit](awakening-missions.md#silent-names--14-november-2026). Hidden
+  input-free probes measure each correction against `g_awakeningContentRepairs 0`.
+  Scene timing with the restored lines and the look of the two effects have not
+  been reviewed by ear or eye, and the playthroughs remain.
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented

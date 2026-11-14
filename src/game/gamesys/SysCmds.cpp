@@ -3416,6 +3416,49 @@ static void AIDumpState_DebugInfoProc( const char *classname, const char *name, 
 
 /*
 ==================
+Cmd_OpenQ4TestSpeak_f
+
+openQ4: speaks a dialogue key on an AI, or plays a sound on a radio chatter
+entity, the way a mission script does, and says whether the line exists.
+idAI::Speak fails silently, so a mistyped key is otherwise invisible.
+==================
+*/
+#include "../awakening/ContentRepairs.h"
+
+static void Cmd_OpenQ4TestSpeak_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk() ) {
+		return;
+	}
+	if ( args.Argc() < 3 ) {
+		gameLocal.Printf( "usage: openq4_testSpeak <AI or radio chatter entity> <dialogue key or sound>\n" );
+		return;
+	}
+	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
+	const char *line = args.Argv( 2 );
+	if ( ent == NULL ) {
+		gameLocal.Printf( "openq4_testSpeak: no entity '%s'\n", args.Argv( 1 ) );
+	} else if ( ent->IsType( idAI::GetClassType() ) ) {
+		idAI *ai = static_cast<idAI *>( ent );
+		if ( ai->Speak( line ) ) {
+			gameLocal.Printf( "openq4_testSpeak: %s speaks '%s' ('%s') for %d ms\n", ent->GetName(), line,
+				ent->spawnArgs.GetString( line ), ai->speakTime - gameLocal.time );
+		} else {
+			gameLocal.Printf( "openq4_testSpeak: %s has no dialogue key '%s'\n", ent->GetName(), line );
+		}
+	} else if ( ent->IsType( idFuncRadioChatter::GetClassType() ) ) {
+		const char *recorded = Awakening_RecordedLine( line );
+		const idDecl *decl = declManager->FindType( DECL_SOUND, recorded, false );
+		ent->spawnArgs.Set( "snd_radiochatter", line );
+		ent->ProcessEvent( &EV_Activate, gameLocal.GetLocalPlayer() );
+		gameLocal.Printf( "openq4_testSpeak: %s plays '%s'%s\n", ent->GetName(), recorded,
+			decl != NULL && decl->GetState() != DS_DEFAULTED ? "" : " (no such sound)" );
+	} else {
+		gameLocal.Printf( "openq4_testSpeak: '%s' is neither an AI nor a radio chatter entity\n", ent->GetName() );
+	}
+}
+
+/*
+==================
 Cmd_AIDumpState_f
 ==================
 */
@@ -3505,7 +3548,7 @@ static void Cmd_AIDumpState_f( const idCmdArgs &args ) {
 		idAI *ai = static_cast<idAI *>( ent );
 		const idVec3 &origin = ai->GetPhysics()->GetOrigin();
 		gameLocal.Printf(
-			"  #%d entity=%d name=%s def=%s class=%s hidden=%d origin=(%.1f %.1f %.1f)\n",
+			"  #%d entity=%d name=%s def=%s class=%s hidden=%d origin=(%.1f %.1f %.1f) eyeHeight=%.1f\n",
 			count,
 			ent->entityNumber,
 			ent->GetName(),
@@ -3514,7 +3557,9 @@ static void Cmd_AIDumpState_f( const idCmdArgs &args ) {
 			ent->IsHidden() ? 1 : 0,
 			origin.x,
 			origin.y,
-			origin.z
+			origin.z,
+			// sight checks start here: an actor with no eye joint and no eye_height sees from its origin
+			( ai->GetEyePosition() - origin ) * -ai->GetPhysics()->GetGravityNormal()
 		);
 		ai->GetDebugInfo( AIDumpState_DebugInfoProc, &context );
 		count++;
@@ -4816,6 +4861,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "openq4_killHostiles",	Cmd_OpenQ4KillHostiles_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"kills the AI fighting the player through ordinary damage, for headless progression tests" );
 	cmdSystem->AddCommand( "openq4_testInput",	Cmd_OpenQ4TestInput_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"holds buttons and movement on the local player for headless tests" );
 	cmdSystem->AddCommand( "openq4_viewReport",	Cmd_OpenQ4ViewReport_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"prints the local player's view, field of view and god mode for headless tests" );
+	cmdSystem->AddCommand( "openq4_testSpeak",	Cmd_OpenQ4TestSpeak_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"speaks a dialogue key on an AI or plays a sound on a radio chatter entity, and reports a missing line" );
 	cmdSystem->AddCommand( "remove",				Cmd_Remove_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"removes an entity", idGameLocal::ArgCompletion_EntityName );
 	cmdSystem->AddCommand( "killMonsters",			Cmd_KillMonsters_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"removes all monsters" );
 	cmdSystem->AddCommand( "killMoveables",			Cmd_KillMovables_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"removes all moveables" );

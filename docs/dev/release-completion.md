@@ -36,6 +36,46 @@ does not restore the withdrawn release. See
   Linux, macOS, Android touch, or a real mouse.
 
 
+## The Awakening: lost dialogue, enemies that see, two missing effects, 14 November 2026
+
+- **Seventeen lines of The Awakening's dialogue play for the first time.**
+  Their scripts called them by names the recordings do not have, and the game
+  drops a missing line without a word. The largest part is the radio traffic
+  of the MCC cannon defence (m06 invasion), nine calls that left the whole
+  battle silent. The others: Navajas's "Strogg!" at the bunker charge (m01);
+  Tak at the cellblock door, Darnell's "Above us!" and Private Hoff's mumbling
+  in the prison (m04); Navajas's reply to Tak, his alarm as the cryocene
+  floods in, and Darnell's and Tak's last cries in Cryofac (m08).
+- **The Tank and the Retch see from their heads.** Both name an eye joint
+  their models do not have, which left their eyes on the floor between their
+  feet, so anything knee-high hid the player from them. Low cover no longer
+  blinds them. Their weapons and damage are unchanged.
+- **Two effects show.** The opening's dropships (m01) light both thrusters,
+  and the Tank's rockets leave its launcher with a muzzle flash.
+- **What to do.** Replace the single-player game module. The dialogue comes
+  back on a fresh start of a map; the sight fix also applies to old saves.
+  `g_awakeningContentRepairs 0`, set before starting a map, keeps the alpha's
+  behaviour.
+- How it works: `src/game/awakening/ContentRepairs.inl` lists each written
+  name beside the surviving one. Dialogue keys are added to the speaker when
+  the map spawns, radio sound names are translated as the radio plays, and
+  joints resolve at the two places that look them up. No mission script
+  changes. The Tank's flash is the one borrowed asset: its rocket attack's
+  frame commands are the retail Iron Maiden's, so it plays her rocket flash.
+  The dropship mesh never had a right engine joint; the right plume is the
+  left one mirrored across the hull.
+- Testers get `openq4_testSpeak <entity> <key or sound>`, which reports a
+  missing line, and `aiDumpState` prints each AI's eye height.
+- Evidence: `tools/tests/awakening_content_repairs.py` proves every row
+  against the installed content. Hidden, input-free OpenGL probes measured
+  the lines at the lengths of their recordings, eye heights of 0.0 against
+  124.6 (Tank) and 67.3 (Retch), four failed flashes a volley against none,
+  and four failed thrusters against none. See the
+  [mission audit](awakening-missions.md#silent-names--14-november-2026).
+- Open: scene timing with the restored lines and the look of the two effects
+  were not reviewed by ear or eye. Twenty-two scripted lines were never
+  recorded, and about 250 recorded lines are used by no script.
+
 ## PNG textures and PNG screenshots, 14 November 2026
 
 - **Textures can be PNG files, and screenshots can be saved as PNG.** A

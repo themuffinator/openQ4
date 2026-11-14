@@ -18,6 +18,7 @@
 
 #include "ai/AI.h"
 #include "ai/AI_Manager.h"
+#include "awakening/ContentRepairs.h"
 
 /***********************************************************************
 
@@ -983,6 +984,13 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadJoint( neckJoint );
 	savefile->ReadJoint( headJoint );
 
+	// openQ4: a save made before the Awakening's eye joints were corrected holds
+	// none for its Tanks and Retches. Neither has a separate head or an eye_height.
+	if ( eyeOffsetJoint == INVALID_JOINT && spawnArgs.FindKey( "eye_height" ) == NULL &&
+		!spawnArgs.GetString( "def_head" )[ 0 ] ) {
+		eyeOffsetJoint = Awakening_IntendedJoint( &animator, spawnArgs.GetString( "joint_eyeOffset" ) );
+	}
+
 	walkIK.Restore( savefile, this );
 
 	savefile->ReadString( animPrefix );
@@ -1214,6 +1222,11 @@ void idActor::SetupBody( void ) {
 		}
 		// Get the eye offset joint
 		eyeOffsetJoint = headAnimator->GetJointHandle ( jointname );
+		if ( eyeOffsetJoint == INVALID_JOINT ) {
+			// openQ4: the Awakening's Tank and Retch name eye joints their meshes
+			// spell differently, which left their eyes at their feet
+			eyeOffsetJoint = Awakening_IntendedJoint( headAnimator, jointname );
+		}
 	}
 
 	// If eye height is specified, just use that
