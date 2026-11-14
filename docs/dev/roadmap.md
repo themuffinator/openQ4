@@ -23,7 +23,7 @@ UI toolkit/editor/corpus remain major completion gates.
 | Progress measure, 8 November 2026 | Current result | Meaning |
 | --- | --- | --- |
 | Formally closed roadmap tasks | **40 / 125 (32.0%)** | **85 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
-| Estimated category progress | **19 categories: 3 at 100%, 14 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
+| Estimated category progress | **19 categories: 3 at 100%, 15 partial, 1 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
@@ -59,7 +59,7 @@ exact; the estimate column is deliberately approximate.
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
-| [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **0%** | 0 / 6 | Measured baseline, enhanced solvers, behavior preservation and integration. |
+| [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **45%** | 0 / 6 | Map defect repros, worst-frame and visual review, campaign/MP/moveable coverage, interpolation review, Linux/ARM64 and the default decision. |
 | [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 11 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
@@ -3823,18 +3823,24 @@ is also cheaper to run. Every item honors three product rules:
 
 ### PHYS completion checkpoints
 
-**Estimate: 0%; 0/6 tasks closed.** The legacy physics engine, recent AF restore
-hardening and presentation interpolation are not implementation of the proposed
-enhanced solver. The product rules below are requirements, not current features.
+**Estimate: 45%; 0/6 tasks closed (14 November 2026).** The enhanced solver is
+implemented behind `g_enhancedPhysics` (default `0`) with its Settings row,
+telemetry, workloads and harnesses; legacy mode replays the pre-solver
+binary's workload digests exactly, the PHYS-04 envelope passes every hit class
+and enhanced mode costs less in total on every reference workload. Open: the
+defect repros not yet staged in maps, a worst-frame decision on a quiet
+machine, PHYS-04's campaign/Awakening/MP-corpse/moveable coverage, PHYS-05's
+interpolation review, Linux/ARM64 and the default decision. Evidence:
+[physics reference](physics-reference.md#evidence).
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| PHYS-01 — Not started | Proposed workloads and preservation rules specified. | Record legacy CPU distributions, defect reproductions and impulse envelope; set budgets/tolerances and the CVar/localized UI contract. |
-| PHYS-02 — Not started | Legacy rigid-body code available as baseline. | Semi-implicit integration, persistent contacts/warm starting, friction, island sleeping and selective swept collision; prove budgets and stable energy. |
-| PHYS-03 — Not started | Legacy AF code/stock definitions available as baseline. | Warm-started constraint solver, stable limits/penetration recovery, authored self-collision/sleeping and animation-velocity handoff. |
-| PHYS-04 — Not started | No accepted enhanced-mode behavior envelope or runtime evidence. | Executable impulse guards and telemetry; light/heavy hit tests; stock/Awakening actors, moveables and scripted progression without behavior breakage. |
-| PHYS-05 — Not started | Existing save/network/demo/presentation contracts constrain integration. | Cross-mode saves, server-authoritative mode, demo parity, transient/versioned state and dedicated-safe interpolation. |
-| PHYS-06 — Not started | Default remains legacy; no promotion evidence. | Windows/Linux and one ARM64 matched workloads, worst-frame/visual acceptance, explicit default decision and upgrade-preserved fallback. |
+| PHYS-01 — Partial | Contract recorded: one archived option with a localized Settings row on both interfaces (12 languages), committed at map load, servers publish `si_enhancedPhysics`; legacy CPU distributions on six workloads, the legacy impulse envelope per damage path, budgets and tolerances, and reproduced legacy defects (sleep/wake churn, the inverted figure bounce, frictionless impacts, twitching set-piece ragdolls) in the [physics reference](physics-reference.md). | Stage map repros for resting jitter, stuck limbs, joint stretching, sliding corpses and tunnelling (the last is covered only by the native test). |
+| PHYS-02 — Partial | Semi-implicit rigid bodies with persistent warm-started contacts, friction, sleeping and selective sweeps; legacy replay identical; native test: no energy gain, settled stacks, no tunnelling through a 2-unit wall; 23-76 % less physics CPU than legacy on every workload, sloped-stack sleep/wake churn 1,670 to 20. | Worst-frame budget on `sp-explosion` (2.8-7.3 ms enhanced against 2.3-5.9 legacy over three deterministic runs: undecided on a shared machine); by-eye review (the `sp-visual` scene stages only 1 of its 7 bodies since `physicsSpawn` skips blocked placements, so it needs new placements first). |
+| PHYS-03 — Partial | Warm-started PGS on the legacy constraint matrix with an exact-LCP fallback, bounded recovery and joint correction, quiet-figure sleeping, death-pose velocity inheritance, an energy guard that keeps the figure's momentum, impact friction bounded by the resting load and no figure bounce (as legacy); ragdoll and set-piece CPU 56-76 % below legacy. | By-eye review of ragdolls at play distance; fallback rate (53-196 exact solves a workload) as a cost lead. |
+| PHYS-04 — Partial | Impulse guard and telemetry; `physics_envelope.py` passes momentum and all ten light/heavy hit classes (Dark Matter splash median 166 against legacy 247 units, inside 0.4-1.6x). | Player corpses in MP, hanging/constrained bodies, moveables and debris, Awakening `q4xbase`, and Q4-02 campaign progression with the switch on. |
+| PHYS-05 — Partial | `physics_integration.py` passes all seven checks: saves load across modes both ways and in their own mode; clients follow a listen server's mode both ways; an MVD recorded on an enhanced server plays to its end in enhanced mode on a legacy client; a legacy client follows an enhanced dedicated server. Its first run found offline MVD playback failing in 0.14.1 (`spawn_entnum 4095 out of range`), fixed in `RegisterEntity`. | HF ragdoll/debris interpolation review at the new sample cadence; Linux dedicated. |
+| PHYS-06 — Not started | Default remains legacy; Windows x64 measurements only. | Linux x64 and one ARM64 target, quiet-machine worst frames, windowed visual checks, the default decision and upgrade-preserved fallback. |
 
 ### PHYS task evidence and acceptance
 
