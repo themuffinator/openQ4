@@ -155,6 +155,7 @@ struct idAsyncServer {
 	std::vector<Oob> oob;
 	netadr_t rconAddress{};
 	bool noRconOutput = false;
+	bool rconCommandExecuted = false;
 	void PrintOOB( const netadr_t to, int opcode, const char *text ) { oob.push_back( Oob{ to, opcode, text } ); }
 	void ExecuteRemoteConsoleCommand( const netadr_t from, const char *command, bool authenticated );
 };

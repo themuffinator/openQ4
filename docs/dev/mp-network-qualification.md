@@ -1,5 +1,163 @@
 # Multiplayer network qualification
 
+## Netcode audit, 14 November 2026
+
+A read of the whole multiplayer path against the code: the message channel and
+sockets, the server, the client, snapshot replication and the game's prediction
+and lag compensation. Five reviewers read one area each; every finding below was
+then re-read against the source before it was changed, and each fix is pinned by
+a test. None of the fixes changes the wire format, so a fixed build still plays
+with one that lacks them. The findings that need a wire change are listed at
+the end and are not made.
+
+The three MP-07 fixes of 13 November that were still on their own branches
+([the server's aim after a client stall](#the-servers-aim-after-a-client-stall-13-november-2026),
+[a respawn read across a dropped snapshot](#a-respawn-read-across-a-dropped-snapshot-13-november-2026),
+[commands on time through long client frames](#commands-on-time-through-long-client-frames-13-november-2026))
+are merged with this round, so the client holds all three together for the
+first time.
+
+### What was wrong, and what changed
+
+**Client**
+
+| Defect | Effect | Change |
+|---|---|---|
+| A snapshot read on a rendered frame with no tic due was drawn without being replayed. A client polls its socket every rendered frame; the replay ran only inside the tic loop. | The game clock stepped back by the whole prediction lead and every entity, the local player included, sat where the server had it, for a frame or two. The presentation clock re-anchored on the backward step and camera interpolation switched off. Above 60 fps most snapshots land on such a frame. | `idAsyncClient::RunFrame` replays to the client's frame after the tic loop. The frames were due for replay at the next tic, so the work only moves. |
+| After a stall longer than the 100 ms frame clamp, each queued snapshot is a resync and each added a quarter of the target to the catch-up, with no frame run between. | After a 300 ms stall the client predicted 19 frames where 6 were due, sent them with one sample of the player's input, then ran no frame for about 160 ms. | A resync sets the catch-up to the target itself. |
+| A message from the server that could not be read closed the channel but left the map loaded. | The session ran the map as a single-player game on a client game holding one user command, with no message and no menu. | Every such place ends the session and opens the menu (`AsyncClient_StopAfterProtocolError`); the malformed-snapshot path opens the menu as well. |
+| A snapshot's game frame and game time were bounded separately. | A server naming frame 0 beside a current game time made the client replay the whole match's frames on every snapshot. | `AsyncClient_ValidNetworkTiming` requires the time to sit on the frame's tick ladder. |
+| A snapshot, an apply-snapshot message or a game message was accepted in the window after a deferred connect reply, before any map was loaded. | The game read it with no world (a NULL dereference from the wire). | They are ignored until the client has a game. |
+| The server time-out armed only with the first channel packet. | A server that went silent after its connect reply was waited on for good. | The time-out counts from the connect reply. |
+| A voice packet that grew when packed left a fragment unsent. | The next user command ended the session with "called with unsent fragments left". | The voice send flushes, as every other send does. |
+| Five message boxes read the first character of an answer that can be NULL. | A crash when a box was already up or was closed from outside. | The answer is tested first. |
+
+**Server**
+
+| Defect | Effect | Change |
+|---|---|---|
+| A client in the game could report another game (or send a pure message) and be set back to connected; its next ordinary packet began it again. | `ServerClientBegin` spawned a second player over the first, which stayed in the world thinking on the same commands, once per repeat. | The game begins a client once for each connect; a client that asks again is dropped. Game-init resends are paced at 250 ms. |
+| A connect from the address of a client still in its slot took the slot over without the game hearing the old client leave. | The slot's snapshot bases survived, so the new client's first snapshot was a delta against states it never had and ended its session; the old player stayed in the match. | The old client is dropped first. |
+| A joiner dropped by reliable overflow during the join burst was still begun. | A player stayed in the world for a slot the game had been told to disconnect. | The begin is skipped. |
+| User info changes had no limit beyond their size, and each is sent on to every client. | Five 4 KB changes in one packet filled every other client's reliable queue; the server dropped them all, not the sender. | A byte allowance per client (4 KB, refilled at 1 KB a second); a client that overspends is dropped. The user info cap is 2,048 bytes (it was 4,096; a default client sends about 500). |
+| Reliable game messages had no limit. | Thousands fit one packet; each ran game code and several printed a console line. | 60 a second with a burst of 120; the excess is discarded. |
+| `CLIENT_RELIABLE_MESSAGE_PRINT` printed client text to the server console. | About 2,000 arbitrary log lines a packet. No client sends it. | Ignored. |
+| Every remote console packet ended the server frame, accepted or not. | A stream of refused ones kept the server from its game frames. | The frame ends early only when a command ran. |
+| Snapshots were paced by comparing elapsed milliseconds with `net_serverSnapshotDelay`, whose default of 33 sits exactly on two 60 Hz frames. | A pass a millisecond early put the snapshot off a frame: clients got a mix of 33 and 50 ms intervals. | Paced in game frames: the delay rounded to whole frames. |
+| A fragmented message left one fragment a server frame. | A 2.9 KB snapshot reached its client three frames after it was taken; the wait also counted against the next one (20 a second, not 30). | The rest of a message follows at once while its debt stays within 50 ms of the client's rate: four fragments at the default 128,000 B/s, one at 25,600 as before. Every fragment is still charged. |
+| A ping only went out in a pass with no snapshot due; packets were handled with a clock read before the wait for them. | With a snapshot every frame the ping stayed 0, and lag compensation, capped by it, never rewound. On a dedicated server the ping read up to a frame short. | An overdue ping takes the pass; the clock is read before the packet is handled. |
+| A drop for reliable overflow cleared the queue before it queued the disconnect message. | The message restarted the numbering, so the client never read it: it froze for five seconds and then got a disconnect with no reason. | The reason and a disconnect also go outside the channel. |
+| The stats timer was not reset with server time on a map change. | `com_showAsyncStats` printed nothing for as long as the previous map had run. | Reset. |
+
+**Message channel and sockets**
+
+| Defect | Effect | Change |
+|---|---|---|
+| A message was refused once the reliable queue and its data together passed 16,384 bytes. | Above about 15 KiB queued no snapshot could leave; above 16,371 bytes nothing could, not even the empty message that would have delivered the queue, and the connection sat silent until it timed out. | A message carries the longest run of whole reliable messages from the front of the queue that fits; packing growth carries fewer. A single reliable message that fits no packet is refused when it is queued. |
+| A packet's claimed message size was decoded whatever it brought. | Eight bytes claiming 16 KiB cost the receiver about 131,000 bit reads, parsed as an empty message, and never dropped the sender. | A size over four times the packed bytes (the coder's limit) is refused first. |
+| Rate arithmetic in 32 bits; the client's rate taken off the wire unchecked. | A rate over 2,147,483 B/s on both ends stalled the channel; a negative client rate held it to a packet a second. | 64-bit products; a negative rate reads as none given. |
+| `SendMessage` returned the next message's sequence when a fragmented message packed into one short fragment. | A lost game-init was noticed one resend late. | The message's own sequence on every path. |
+| On Windows a connection reset (the ICMP answer to a send to a client that quit) read as "nothing to read". | It ended the frame's drain; on a listen server everything queued behind it waited a rendered frame. | The read continues past up to 16 of them. |
+
+**Game**
+
+| Defect | Effect | Change |
+|---|---|---|
+| A packed entity id was shifted down as a signed int. | From 524,288 entity spawns on one map load (a few hours of projectiles on a busy server that restarts its map without reloading it) every `idEntityPtr` to a newer entity read as invalid, on the server and its clients; at 1,048,576 the session ended with "spawn count overflow". | Ids unpack unsigned and the count wraps, in both game modules. A freed slot no longer matches a made-up id. |
+| A replicated sound's age was taken against the client's predicted clock, which leads the server by the round trip and the prediction lead. | From about 250 ms of ping broadcast sounds began to read as too old, and past 285 ms all of them did. | Aged against the server's clock as the client last read it (`clientSnapshotTime`). |
+| Any gap in a player's snapshots hid a death or a hit it carried. | One missed snapshot, which jitter loses routinely, gave a death with no sound and no falling body, or a hit with no pain, view kick or damage direction. | Only a gap over 150 ms hides them; the weapon logic keeps its own rule. |
+| The client's entity-event drain called through an entity pointer that can be NULL. | A crash from a made-up spawn id. | Tested, as the server's drain does. |
+| The Classic hook's reel sound latched its state on replayed frames, where sounds do not start. | The reel never sounded when the catch was first seen on a replay; a stop first seen on one left it running. | The state changes only on a frame that can make the sound. |
+
+### Evidence
+
+Windows x64, debugoptimized, OpenGL, staged runtime of the integration tree;
+the baseline is the same tree before this round's fixes (main plus the three
+merged MP-07 branches).
+
+- **Static and executed fixtures.** `network_channel_backlog_state.py` (new)
+  runs the production channel functions: the reliable prefix, a 16 KB queue that
+  drains beside a 3 KB payload in three packets, packing growth, the claimed-size
+  bound and the fragment burst at 128,000 and 25,600 B/s; six single-reversal
+  controls fail. `network_security.py` gains
+  `validate_session_lifecycle_and_flood_bounds`, which pins every server, client
+  and game change above. `mp_client_prediction_state.py` (12 controls),
+  `mp_predicted_hitscan_state.py`, `network_fragment_state.py`,
+  `async_client_frame_contract.py`, `async_rcon_verify_contract.py`,
+  `savegame_restore_spawn_refs.py` and the other netcode contracts pass on the
+  changed sources.
+- **Snapshot pacing and frame presentation**, a hidden listen server with five
+  bots on q4dm1 and one hidden remote client at 60 fps behind 40 ms of simulated
+  one-way delay (`net_forceLatency`), two runs each:
+
+  | Build | Snapshots a second in steady play (asked 30) | Drawn frames a second with the camera interpolated (of 60) |
+  |---|---|---|
+  | Before | 24-30, mean 27.3 over the run | 50.2 |
+  | After | 30 (27-31), mean 29.0-29.3 | 60.0 |
+
+  The second column is `g_presentationClockCapture`, which records a sample only
+  for a frame drawn with the interpolated camera: before, one drawn frame in six
+  had lost it. A hidden window presents at no more than 60 fps
+  (`PresentationPacing.h`), so the larger effect above 60 fps is argued from the
+  code, not measured here.
+- **Reconnects.** `mp_lan_reconnect_smoke.py --family ipv4` (a dedicated server,
+  repeated joins and reconnects) passes.
+- **A fragmenting path.** `mp_path_mtu_soak.py --family ipv4 --path fragment`
+  (a pure dedicated server, a 12-player q4ctf1 CTF match held for 120 s over a
+  simulated 1280-byte path) passes: 3,889 datagrams reached the client, 79 of
+  them full fragments, with none refused or malformed.
+- **Shots under delay and jitter.** `mp_firing_view_capture.py --latency 80
+  --jitter 20` passes on a quiet machine: all 151 server shots were predicted on
+  the client's frame with the same direction, through the hitch, respawn and
+  rejoin steps. The machine was shared during this round. Run while other
+  sessions built and captured, the same capture fails on stale commands from
+  long client frames in either build (before: 31 of 175 shots on the frame with
+  209 of 858 frames over 100 ms; after: 161 of 163 and 154 of 154 on the frame,
+  with the directions of the few late ones off), so those runs say nothing
+  either way. `--drop-respawn-snapshot` failed its one run when a natural
+  two-packet loss fell on the probe's dropped snapshot (three missed, 144 ms):
+  a gap the 96 ms rule treats as a catch-up by design.
+- **No false alarms.** No run's server log shows a client dropped or a message
+  discarded by the new limits.
+- **Not covered.** Presentation above 60 fps, real connections, and play by
+  hand; the second and third stay under MP-07 and MP-08.
+
+### Found and not changed
+
+These need a change to the wire format, which openQ4 has not versioned since
+0.14.1, or a decision; they are recorded under MP-08.
+
+- **Channel packets carry no secret.** A sequenced packet is matched on the
+  sender's address without its port and a 15-bit client id, so at most 32,767
+  spoofed packets from a player's address end that player's connection, and one
+  out-of-band "disconnect" from the server's address ends a client's. A keyed
+  tag from the connect challenge in every sequenced packet closes both.
+- **The hit-confirm is one bit in one snapshot** and is lost with that snapshot
+  or when the snapshot is refused; a small wrapping counter in the player state
+  would be repeated until acknowledged.
+- **Velocity, projectile direction and snapshot tags**: every player's velocity
+  goes to every recipient at full float precision (about 2.7 KB/s a client on a
+  16-player server), a projectile's launch direction is cut to 7 bits a
+  component while the server flies the exact one (up to 0.3 degrees off for the
+  whole flight), and `ASYNC_WRITE_TAGS` adds four random bytes to every written
+  entity.
+- **The prediction lead the server reports is whole tics on a dedicated
+  server**, which is why the client holds a two-tic cover; a sub-tic report
+  would let it hold less.
+- **The fragment size is taken from each side's own view of the address
+  family**, which a NAT64 path breaks (the client sees IPv6, the server IPv4).
+  One size for both, or a capability bit, also covers IPv4 over a path that
+  drops IP fragments.
+- **The snapshot base is negotiated by a reliable message for every
+  acknowledged snapshot**; the header could carry it.
+
+Decisions, not defects: jump pads are not predicted for the local player (as in
+Quake 4, so a pad snaps the view onto its arc at any real ping); the hit-scan
+spread seed is public since shots are predicted, which a modified client could
+use to cancel spread; lag compensation keeps no stance and does not interpolate
+between samples (off by default); one host can hold every slot (no per-address
+limit); the target follows a latency step at about 30 ms a second.
+
 ## Connection replies that fit one packet, 13 November 2026
 
 The [path MTU run](#a-1280-byte-path-mtu-13-november-2026) found that a path
@@ -924,6 +1082,8 @@ messages travel in 1,300-byte channel fragments
 ([connection replies](#connection-replies-that-fit-one-packet-13-november-2026)).
 Simulated conditions do not model route changes, cross-traffic sharing a
 bottleneck, or asymmetric links (the rate applies both ways).
+The [netcode audit](#netcode-audit-14-november-2026) lists the findings that
+need a change to the wire format.
 
 ## The firing player's own shots under prediction, 12 November 2026
 

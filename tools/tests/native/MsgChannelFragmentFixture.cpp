@@ -71,6 +71,7 @@ public:
 	std::vector<byte> received;
 	int deliveries = 0;
 	struct { int GetTotalSize() const { return 0; } } reliableSend;
+	int ReliableSendSize( int ) const { return 0; }
 	byte unsentBuffer[MAX_MESSAGE_SIZE] = {};
 	int growthPercent = 0;
 	void SendNextFragment( idPort &port, const int time );

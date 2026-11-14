@@ -59,6 +59,12 @@ All fragments will have the same sequence numbers.
 #define	FRAGMENT_SIZE6			(MAX_PACKETLEN6 - 100)
 #define	FRAGMENT_BIT			(1u<<31)
 
+// openQ4: a reliable message beyond this fits no packet (SendReliableMessage)
+#define	MAX_RELIABLE_MESSAGE_SIZE	( MAX_MESSAGE_SIZE - 64 )
+// the share of a message its sender leaves for queued reliable messages
+// (GetMaxSendMessageSize)
+#define	RELIABLE_SEND_RESERVE		( MAX_MESSAGE_SIZE / 4 )
+
 /*
 ===============
 Net_FragmentSize
@@ -168,7 +174,86 @@ bool idMsgChannel::ReadyToSend( const int time ) const {
 	if ( deltaTime > 1000 ) {
 		return true;
 	}
-	return ( ( lastDataBytes - ( deltaTime * maxRate ) / 1000 ) <= 0 );
+	// openQ4: the rate cvars are unbounded, and above 2,147,483 bytes a second the
+	// product left an int and stalled the channel for up to a second.
+	return ( ( lastDataBytes - ( static_cast<int64>( deltaTime ) * maxRate ) / 1000 ) <= 0 );
+}
+
+/*
+=================
+idMsgChannel::ReadyToSendFragment
+
+openQ4: whether the next fragment of a message already under way may leave now.
+ReadyToSend makes each packet wait until the one before it is paid for, which for
+a fragmented message meant one fragment a server frame: a 2.9 KB snapshot reached
+its client three frames after it was taken, 33 ms late and that much older than
+its header says, and the wait counted against the next snapshot too. The rest of
+a message may follow at once while the debt stays within burstMsec of the rate.
+Every fragment is still charged, so the average rate holds, and a rate too low
+for the burst keeps the old pacing.
+=================
+*/
+bool idMsgChannel::ReadyToSendFragment( const int time, const int burstMsec ) const {
+	if ( !maxRate ) {
+		return true;
+	}
+	const int deltaTime = time - lastSendTime;
+	if ( deltaTime > 1000 || deltaTime < 0 ) {
+		return true;
+	}
+	const int64 debt = Max<int64>( 0, int64( lastDataBytes ) - int64( deltaTime ) * maxRate / 1000 );
+	if ( debt <= 0 ) {
+		return true;
+	}
+	const int64 budget = int64( maxRate ) * idMath::ClampInt( 0, 1000, burstMsec ) / 1000;
+	return debt + Net_FragmentSize( remoteAddress ) + 10 <= budget;
+}
+
+/*
+===============
+idMsgChannel::ReliableSendSize
+
+openQ4: the bytes of queued reliable messages a message with this much data
+carries: all of them when they fit, otherwise the longest run of whole messages
+from the front of the queue. The receiver takes reliable messages in order and
+acknowledges the last one it has, so a front run is delivered and the rest
+follows. SendMessage used to refuse the whole packet once the queue and the data
+together passed MAX_MESSAGE_SIZE: above about 15 KiB queued no snapshot could
+leave, and above 16,371 bytes nothing could, not even the empty message that
+would have delivered the queue, so the connection sat silent until it timed out.
+===============
+*/
+int idMsgChannel::ReliableSendSize( const int dataBytes ) const {
+	return ReliablePrefixSize( MAX_MESSAGE_SIZE - 8 - dataBytes );
+}
+
+/*
+===============
+idMsgChannel::ReliablePrefixSize
+
+Bytes of the whole queued reliable messages, from the front, that fit budget.
+===============
+*/
+int idMsgChannel::ReliablePrefixSize( const int budget ) const {
+	const int total = reliableSend.GetTotalSize();
+	if ( total <= budget ) {
+		return total;
+	}
+	if ( budget < 6 ) {
+		return 0;
+	}
+	// each record is a 16 bit size, a 32 bit sequence and the message (idMsgQueue::Add)
+	byte queued[MAX_MSG_QUEUE_SIZE];
+	reliableSend.CopyToBuffer( queued );
+	int used = 0;
+	while ( used + 6 <= total ) {
+		const int record = 6 + ( queued[used] | ( queued[used + 1] << 8 ) );
+		if ( record <= 6 || record > total - used || record > budget - used ) {
+			break;
+		}
+		used += record;
+	}
+	return used;
 }
 
 /*
@@ -187,31 +272,53 @@ bool idMsgChannel::WriteMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	// client could arrange in a server's queues. Pack here first and refuse
 	// what does not fit.
 	byte packedBuf[MAX_MESSAGE_SIZE * 2 + 64];
+	byte queued[MAX_MSG_QUEUE_SIZE];
 
-	tmp.Init( tmpBuf, sizeof( tmpBuf ) );
-
-	// write acknowledgement of last received reliable message
-	tmp.WriteLong( reliableReceive.GetLast() );
-
-	// write reliable messages
-	reliableSend.CopyToBuffer( tmp.GetData() + tmp.GetSize() );
-	tmp.SetSize( tmp.GetSize() + reliableSend.GetTotalSize() );
-	tmp.WriteShort( 0 );
-
-	// write data
-	tmp.WriteData( msg.GetData(), msg.GetSize() );
-
-	// compress message
-	packed.Init( packedBuf, sizeof( packedBuf ) );
-	idFile_BitMsg file( packed );
-	compressor->Init( &file, true, 3 );
-	compressor->Write( tmp.GetData(), tmp.GetSize() );
-	compressor->FinishCompress();
-	outgoingCompression = compressor->GetCompressionRatio();
-
-	// the receiver reassembles into MAX_MESSAGE_SIZE as well
-	if ( (int)sizeof( short ) + packed.GetSize() > out.GetMaxSize() - out.GetSize() ) {
+	if ( msg.GetSize() > MAX_MESSAGE_SIZE - 8 ) {
 		return false;
+	}
+
+	// openQ4: carry the reliable messages that fit beside the data (ReliableSendSize).
+	// Packing can grow them past the buffer; then carry fewer, down to none, so the
+	// data and whatever of the queue still fits go out and the queue keeps draining.
+	// One refusal here used to stop every later packet as well, with the queue still
+	// in the way.
+	int reliableBytes = ReliableSendSize( msg.GetSize() );
+	if ( reliableBytes > 0 ) {
+		reliableSend.CopyToBuffer( queued );
+	}
+
+	while ( true ) {
+		tmp.Init( tmpBuf, sizeof( tmpBuf ) );
+
+		// write acknowledgement of last received reliable message
+		tmp.WriteLong( reliableReceive.GetLast() );
+
+		// write reliable messages
+		if ( reliableBytes > 0 ) {
+			tmp.WriteData( queued, reliableBytes );
+		}
+		tmp.WriteShort( 0 );
+
+		// write data
+		tmp.WriteData( msg.GetData(), msg.GetSize() );
+
+		// compress message
+		packed.Init( packedBuf, sizeof( packedBuf ) );
+		idFile_BitMsg file( packed );
+		compressor->Init( &file, true, 3 );
+		compressor->Write( tmp.GetData(), tmp.GetSize() );
+		compressor->FinishCompress();
+		outgoingCompression = compressor->GetCompressionRatio();
+
+		// the receiver reassembles into MAX_MESSAGE_SIZE as well
+		if ( !( (int)sizeof( short ) + packed.GetSize() > out.GetMaxSize() - out.GetSize() ) ) {
+			break;
+		}
+		if ( reliableBytes <= 0 ) {
+			return false;
+		}
+		reliableBytes = ReliablePrefixSize( reliableBytes / 2 );
 	}
 
 	// write message size
@@ -232,6 +339,16 @@ bool idMsgChannel::ReadMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	messageSize = msg.ReadShort();
 	if ( messageSize < (int)sizeof( int ) + (int)sizeof( short ) || messageSize > out.GetMaxSize() ) {
 		common->Printf( "%s: bad message size %d\n", Sys_NetAdrToString( remoteAddress ), messageSize );
+		return false;
+	}
+	// openQ4: the zero-run coder turns six bits into at most twenty-four, so a packet
+	// decodes to no more than four times its packed bytes. A size beyond that used to
+	// be decoded anyway, from zero fill: eight bytes claiming a 16 KiB message cost the
+	// receiver about 131,000 bit reads, the result parsed as an empty message, and the
+	// sender was never dropped for it.
+	if ( messageSize > 4 * msg.GetRemaingData() + 8 ) {
+		common->Printf( "%s: message size %d exceeds its %d packed bytes\n", Sys_NetAdrToString( remoteAddress ),
+			messageSize, msg.GetRemaingData() );
 		return false;
 	}
 	out.SetSize( messageSize );
@@ -342,8 +459,10 @@ idMsgChannel::GetMaxSendMessageSize
 ================
 */
 int idMsgChannel::GetMaxSendMessageSize( void ) const {
-	// mirrors the totalLength test in SendMessage below
-	const int overhead = 4 + reliableSend.GetTotalSize() + 4;
+	// mirrors the totalLength test in SendMessage below. openQ4: a message no longer
+	// has to leave room for the whole reliable queue (ReliableSendSize), only for
+	// the queue's next few messages, so the queue still drains under large payloads.
+	const int overhead = 4 + ReliablePrefixSize( RELIABLE_SEND_RESERVE ) + 4;
 	return Max( 0, MAX_MESSAGE_SIZE - overhead );
 }
 
@@ -379,7 +498,13 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 		return -1;
 	}
 
-	totalLength = 4 + reliableSend.GetTotalSize() + 4 + msg.GetSize();
+	// openQ4: the message's own sequence. The fragment paths below returned
+	// outgoingSequence after the send, which is already the next message's when the
+	// packed form fits one short fragment, so a lost game-init was noticed one
+	// resend late.
+	const int sequence = outgoingSequence;
+
+	totalLength = 4 + ReliableSendSize( msg.GetSize() ) + 4 + msg.GetSize();
 
 	if ( totalLength > MAX_MESSAGE_SIZE ) {
 		common->Printf( "idMsgChannel::SendMessage: message too large, length = %i\n", totalLength );
@@ -403,7 +528,7 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 		// send the first fragment now
 		SendNextFragment( port, time );
 
-		return outgoingSequence;
+		return sequence;
 	}
 
 	// write the header
@@ -424,7 +549,7 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 		unsentFragments = true;
 		unsentFragmentStart = 0;
 		SendNextFragment( port, time );
-		return outgoingSequence;
+		return sequence;
 	}
 
 	// send the packet
@@ -439,7 +564,7 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 
 	outgoingSequence++;
 
-	return ( outgoingSequence - 1 );
+	return sequence;
 }
 
 /*
@@ -628,7 +753,11 @@ bool idMsgChannel::SendReliableMessage( const idBitMsg &msg ) {
 	if ( remoteAddress.type == NA_BAD ) {
 		return false;
 	}
-	result = reliableSend.Add( msg.GetData(), msg.GetSize(), true );
+	// openQ4: the queue takes a message of up to 16,375 bytes, but one over
+	// MAX_RELIABLE_MESSAGE_SIZE fits no packet beside its record header and the
+	// smallest payload; it sat at the front of the queue for good, with everything
+	// behind it.
+	result = msg.GetSize() <= MAX_RELIABLE_MESSAGE_SIZE && reliableSend.Add( msg.GetData(), msg.GetSize(), true );
 	if ( !result ) {
 		common->Warning( "idMsgChannel::SendReliableMessage: overflowed" );
 		return false;
@@ -673,17 +802,15 @@ void idMsgChannel::UpdateOutgoingRate( const int time, const int size ) {
 	if ( deltaTime > 1000 ) {
 		lastDataBytes = 0;
 	} else {
-		lastDataBytes -= ( deltaTime * maxRate ) / 1000;
-		if ( lastDataBytes < 0 ) {
-			lastDataBytes = 0;
-		}
+		const int64 remaining = int64( lastDataBytes ) - ( int64( deltaTime ) * maxRate ) / 1000;
+		lastDataBytes = remaining > 0 ? static_cast<int>( remaining ) : 0;
 	}
 	lastDataBytes += size;
 	lastSendTime = time;
 
 	// update outgoing rate variables
 	if ( time - outgoingRateTime > 1000 ) {
-		outgoingRateBytes -= outgoingRateBytes * ( time - outgoingRateTime - 1000 ) / 1000;
+		outgoingRateBytes -= static_cast<int>( int64( outgoingRateBytes ) * Min( time - outgoingRateTime - 1000, 1000 ) / 1000 );
 		if ( outgoingRateBytes < 0 ) {
 			outgoingRateBytes = 0;
 		}
@@ -700,7 +827,7 @@ idMsgChannel::UpdateIncomingRate
 void idMsgChannel::UpdateIncomingRate( const int time, const int size ) {
 	// update incoming rate variables
 	if ( time - incomingRateTime > 1000 ) {
-		incomingRateBytes -= incomingRateBytes * ( time - incomingRateTime - 1000 ) / 1000;
+		incomingRateBytes -= static_cast<int>( int64( incomingRateBytes ) * Min( time - incomingRateTime - 1000, 1000 ) / 1000 );
 		if ( incomingRateBytes < 0 ) {
 			incomingRateBytes = 0;
 		}

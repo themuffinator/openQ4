@@ -118,7 +118,31 @@ static void AsyncServer_ClearChallenges( challenge_t challenges[ MAX_CHALLENGES 
 // dictionary that no longer fits one message is a fatal overflow the next time
 // the server writes it out whole. The game declares 32 user info cvars.
 const int CLIENT_USERINFO_MAX_KEYS		= 128;
-const int CLIENT_USERINFO_MAX_BYTES		= 4096;
+const int CLIENT_USERINFO_MAX_BYTES		= 2048;
+
+// openQ4: what a client may spend on user info changes. Every change is sent on to
+// every other client as a reliable message, so five 4 KB changes in one packet filled
+// each of their 16 KiB reliable queues and the server dropped them all, not the
+// sender. A change costs its size; the allowance refills over time, a whole user
+// info still fits it at once, and a client that overspends is the one dropped. The
+// game's own throttle (ThrottleUserInfo) only binds an unmodified client.
+const int CLIENT_USERINFO_BUDGET_BYTES	= 2 * CLIENT_USERINFO_MAX_BYTES;
+const int CLIENT_USERINFO_BUDGET_RATE	= 1024;		// bytes a second
+
+// openQ4: reliable game messages a client may send (ready, match requests, stats,
+// kill, drop weapon, chat): thousands fit one packet, each runs game code, several
+// print a console line and some are sent on to every client. An unmodified client
+// sends a handful a second; past the allowance they are discarded.
+const int CLIENT_GAME_MESSAGE_BURST		= 120;
+const int CLIENT_GAME_MESSAGE_RATE		= 60;		// messages a second
+
+// openQ4: how long the rest of a fragmented message may run ahead of the rate
+// (idMsgChannel::ReadyToSendFragment): 50 ms of the default 128,000 bytes a second
+// lets a snapshot of up to four fragments leave in the frame it was taken.
+const int SERVER_FRAGMENT_BURST_MSEC	= 50;
+
+// the least time between two game-init messages to one client
+const int GAME_INIT_RESEND_TIME			= 250;
 
 static bool AsyncServer_UserInfoWithinLimits( const idDict &info ) {
 	const int numKeyVals = info.GetNumKeyVals();
@@ -131,6 +155,41 @@ static bool AsyncServer_UserInfoWithinLimits( const idDict &info ) {
 		bytes += keyValue->GetKey().Length() + keyValue->GetValue().Length() + 2;
 	}
 	return bytes <= CLIENT_USERINFO_MAX_BYTES;
+}
+
+/*
+==================
+AsyncServer_SendFragmentBurst
+
+openQ4: sends what the rate allows of the message under way, not one fragment a
+frame (idMsgChannel::ReadyToSendFragment).
+==================
+*/
+static void AsyncServer_SendFragmentBurst( idMsgChannel &channel, idPort &port, const int time ) {
+	while ( channel.UnsentFragmentsLeft() && channel.ReadyToSendFragment( time, SERVER_FRAGMENT_BURST_MSEC ) ) {
+		channel.SendNextFragment( port, time );
+	}
+}
+
+/*
+==================
+AsyncServer_SnapshotFrameInterval
+
+openQ4: net_serverSnapshotDelay in game frames. The delay used to be compared with
+elapsed milliseconds, and its default of 33 sits exactly on two 60 Hz frames (33 or
+34 ms by the frame ladder). A pass that came a millisecond early read 32 and put the
+snapshot off a frame, so clients got a mix of 33 and 50 ms intervals; on a listen
+server, which tests on every rendered frame, a snapshot could also leave up to a
+frame after the game frame it reports.
+==================
+*/
+static int AsyncServer_SnapshotFrameInterval() {
+	const float frameMsec = common->GetUserCmdMsecFloat();
+	if ( frameMsec <= 0.0f ) {
+		return 1;
+	}
+	const int frames = static_cast<int>( idAsyncNetwork::serverSnapshotDelay.GetInteger() / frameMsec + 0.5f );
+	return idMath::ClampInt( 1, 1000, frames );
 }
 
 // openQ4: below this much room in the message channel there is no point building
@@ -189,6 +248,7 @@ idAsyncServer::idAsyncServer( void ) {
 	nextHeartbeatTime = 0;
 	nextAsyncStatsTime = 0;
 	noRconOutput = true;
+	rconCommandExecuted = false;
 	rcon2VerifierInitialized = false;
 	rcon2VerifierValid = false;
 	memset( rcon2Salt, 0, sizeof( rcon2Salt ) );
@@ -524,6 +584,9 @@ void idAsyncServer::ExecuteMapChange( void ) {
 	serverReloadingEngine = false;
 
 	serverTime = 0;
+	// openQ4: server time restarts here; the stats report waited out the whole of
+	// the previous map's time before it printed again.
+	nextAsyncStatsTime = 0;
 
 	// initialize game id and time
 	gameInitId ^= Sys_Milliseconds();	// NOTE: make sure the gameInitId is always a positive number because negative numbers have special meaning
@@ -958,6 +1021,13 @@ void idAsyncServer::ClearClient( int clientNum ) {
 	client.gameFrame = 0;
 	client.gameTime = 0;
 	client.deferredServerInfo = false;
+	client.gameBegun = false;
+	client.lastGameInitTime = 0;
+	client.userInfoBudget = CLIENT_USERINFO_BUDGET_BYTES;
+	client.userInfoBudgetTime = 0;
+	client.gameMessageBudget = CLIENT_GAME_MESSAGE_BURST;
+	client.gameMessageBudgetTime = 0;
+	client.gameMessagesDiscarded = 0;
 	client.channel.Shutdown();
 	client.lastConnectTime = 0;
 	client.lastEmptyTime = 0;
@@ -998,7 +1068,19 @@ void idAsyncServer::InitClient( int clientNum, int clientId, int clientRate ) {
 	client.gameFrame = 0;
 	client.gameTime = 0;
 	client.deferredServerInfo = false;
+	client.gameBegun = false;
+	client.lastGameInitTime = serverTime - GAME_INIT_RESEND_TIME;
+	client.userInfoBudget = CLIENT_USERINFO_BUDGET_BYTES;
+	client.userInfoBudgetTime = serverTime;
+	client.gameMessageBudget = CLIENT_GAME_MESSAGE_BURST;
+	client.gameMessageBudgetTime = serverTime;
+	client.gameMessagesDiscarded = 0;
 	client.channel.ResetRate();
+	// openQ4: the rate comes off the wire. A negative one became the channel's rate
+	// as it stood and held that client to about a packet a second.
+	if ( clientRate < 0 ) {
+		clientRate = 0;
+	}
 	client.clientRate = clientRate ? clientRate : idAsyncNetwork::serverMaxClientRate.GetInteger();
 	client.channel.SetMaxOutgoingRate( Min( idAsyncNetwork::serverMaxClientRate.GetInteger(), client.clientRate ) );
 	client.clientPing = 0;
@@ -1153,6 +1235,22 @@ void idAsyncServer::SendReliableMessage( int clientNum, const idBitMsg &msg ) {
 // jmarshall end
 
 	if ( !clients[ clientNum ].channel.SendReliableMessage( msg ) ) {
+		// openQ4: the queue is cleared to make room for the disconnect message, which
+		// restarts its numbering, and a client that had already taken reliable
+		// messages waits for a later number: it never read the message, sat frozen
+		// until the slot was freed and then got a disconnect with no reason. Tell it
+		// outside the channel as well.
+		if ( clients[ clientNum ].clientState > SCS_ZOMBIE ) {
+			const netadr_t to = clients[ clientNum ].channel.GetRemoteAddress();
+			idBitMsg	outMsg;
+			byte		msgBuf[ 64 ];
+
+			PrintOOB( to, SERVER_PRINT_MISC, "#str_07136" );
+			outMsg.Init( msgBuf, sizeof( msgBuf ) );
+			outMsg.WriteShort( CONNECTIONLESS_MESSAGE_ID );
+			outMsg.WriteString( "disconnect" );
+			serverPort.SendPacket( to, outMsg.GetData(), outMsg.GetSize() );
+		}
 		clients[ clientNum ].channel.ClearReliableMessages();
 		DropClient( clientNum, "#str_07136" );
 	}
@@ -1548,6 +1646,7 @@ void idAsyncServer::SendGameInitToClient( int clientNum ) {
 	msg.WriteLong( gameTime );
 	msg.WriteDeltaDict( sessLocal.mapSpawnData.serverInfo, NULL );
 	client.gameInitSequence = client.channel.SendMessage( serverPort, serverTime, msg );
+	client.lastGameInitTime = serverTime;
 }
 
 /*
@@ -1567,7 +1666,10 @@ bool idAsyncServer::SendSnapshotToClient( int clientNum ) {
 
 	serverClient_t &client = clients[clientNum];
 
-	if ( serverTime - client.lastSnapshotTime < idAsyncNetwork::serverSnapshotDelay.GetInteger() ) {
+	// openQ4: paced in game frames (AsyncServer_SnapshotFrameInterval). A frame number
+	// from before a restart reads as due.
+	const int framesSinceSnapshot = gameFrame - client.lastSnapshotGameFrame;
+	if ( framesSinceSnapshot >= 0 && framesSinceSnapshot < AsyncServer_SnapshotFrameInterval() ) {
 		return false;
 	}
 
@@ -1712,6 +1814,22 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 	// check if the client is in the right game
 	if ( clientGameInitId != gameInitId ) {
 		if ( acknowledgeSequence > client.gameInitSequence ) {
+			// openQ4: a map change puts every client back to SCS_CONNECTED before it
+			// sends the new game-init, so a client the game already holds never
+			// reports another game. One that did was set back to SCS_CONNECTED here,
+			// and its next ordinary packet began it again: ServerClientBegin spawned
+			// a second player over the first, which stayed in the world thinking on
+			// the same commands, once for every repeat.
+			if ( client.clientState == SCS_INGAME || client.gameBegun ) {
+				common->Printf( "client %d reports another game while in this one\n", clientNum );
+				DropClient( clientNum, "#str_07138" );
+				return;
+			}
+			// the acknowledgement is the client's word, so pace the resends
+			if ( serverTime >= client.lastGameInitTime && serverTime - client.lastGameInitTime < GAME_INIT_RESEND_TIME ) {
+				return;
+			}
+
 			// the client is connected but not in the right game
 			client.clientState = SCS_CONNECTED;
 
@@ -1746,6 +1864,14 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 
 	if ( client.clientState == SCS_CONNECTED ) {
 
+		// openQ4: the game begins a client once for each connect (see the wrong-game
+		// branch above; a pure message from a client in the game led here as well)
+		if ( client.gameBegun ) {
+			common->Printf( "client %d asks to enter a game it is already in\n", clientNum );
+			DropClient( clientNum, "#str_07138" );
+			return;
+		}
+
 		// the client is in the right game
 		client.clientState = SCS_INGAME;
 		client.deferredServerInfo = false;
@@ -1762,7 +1888,15 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 
 		SendEnterGameToClient( clientNum );
 
+		// openQ4: any of the sends above drops the client when its reliable queue
+		// overflows, and the game was then told to begin a player it had just been
+		// told to disconnect; that player stayed until the slot was used again.
+		if ( client.clientState != SCS_INGAME ) {
+			return;
+		}
+
 		// get the client running in the game
+		client.gameBegun = true;
 		game->ServerClientBegin( clientNum, false, NULL );
 
 		// write any reliable messages to initialize the client game state
@@ -1906,13 +2040,25 @@ void idAsyncServer::ProcessReliableClientMessages( int clientNum ) {
 					DropClient( clientNum, "#str_07138" );
 					return;
 				}
+				// openQ4: see CLIENT_USERINFO_BUDGET_BYTES
+				{
+					const int elapsed = idMath::ClampInt( 0, 60000, serverTime - client.userInfoBudgetTime );
+					client.userInfoBudgetTime = serverTime;
+					client.userInfoBudget = Min( CLIENT_USERINFO_BUDGET_BYTES,
+						client.userInfoBudget + elapsed * CLIENT_USERINFO_BUDGET_RATE / 1000 );
+					client.userInfoBudget -= msg.GetSize();
+					if ( client.userInfoBudget < 0 ) {
+						common->Printf( "client %d changes its user info too fast\n", clientNum );
+						DropClient( clientNum, "#str_07138" );
+						return;
+					}
+				}
 				SendUserInfoBroadcast( clientNum, info );
 				break;
 			}
 			case CLIENT_RELIABLE_MESSAGE_PRINT: {
-				char string[MAX_STRING_CHARS];
-				msg.ReadString( string, sizeof( string ) );
-				common->Printf( "%s\n", string );
+				// openQ4: no client sends this. It printed whatever a client supplied to
+				// the server console and log, about two thousand lines a packet.
 				break;
 			}
 			case CLIENT_RELIABLE_MESSAGE_DISCONNECT: {
@@ -1925,6 +2071,22 @@ void idAsyncServer::ProcessReliableClientMessages( int clientNum ) {
 				break;
 			}
 			default: {
+				// openQ4: see CLIENT_GAME_MESSAGE_BURST
+				{
+					const int elapsed = idMath::ClampInt( 0, 60000, serverTime - client.gameMessageBudgetTime );
+					const int earned = elapsed * CLIENT_GAME_MESSAGE_RATE / 1000;
+					if ( earned > 0 ) {
+						client.gameMessageBudgetTime = serverTime;
+						client.gameMessageBudget = Min( CLIENT_GAME_MESSAGE_BURST, client.gameMessageBudget + earned );
+					}
+					if ( client.gameMessageBudget <= 0 ) {
+						if ( ( client.gameMessagesDiscarded++ & 1023 ) == 0 ) {
+							common->Printf( "client %d sends reliable game messages too fast; discarding them\n", clientNum );
+						}
+						break;
+					}
+					client.gameMessageBudget--;
+				}
 				// pass reliable message on to game code
 				game->ServerProcessReliableMessage( clientNum, msg );
 				break;
@@ -2671,6 +2833,15 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 		}
 
 		if ( clientNum < MAX_ASYNC_CLIENTS ) {
+			// openQ4: a connect from the address of a client still in its slot (a
+			// reconnect whose disconnect was lost) took the slot over without the
+			// game hearing that the old client left. Its snapshot bases stayed, so
+			// the first snapshot was a delta against states the new client never
+			// had and ended its session as malformed, and the old player was never
+			// removed from the match.
+			if ( clients[ clientNum ].clientState >= SCS_PUREWAIT ) {
+				DropClient( clientNum, "#str_07138" );
+			}
 			// initialize
 			clients[ clientNum ].channel.Init( from, serverId );
 			clients[ clientNum ].OS = OS;
@@ -2837,6 +3008,12 @@ void idAsyncServer::ProcessReliablePure( int clientNum, const idBitMsg &msg ) {
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
 		outMsg.WriteByte( SERVER_RELIABLE_MESSAGE_RELOAD );
 		SendReliableMessage( clientNum, outMsg );
+		// openQ4: a client the game holds must leave it first; asleep in SCS_CONNECTED
+		// its next ordinary packet began it a second time.
+		if ( clients[ clientNum ].clientState == SCS_INGAME || clients[ clientNum ].gameBegun ) {
+			DropClient( clientNum, "#str_07138" );
+			return;
+		}
 		// go back to SCS_CONNECTED to sleep on the client until it goes away for a reconnect
 		clients[ clientNum ].clientState = SCS_CONNECTED;
 		return;
@@ -2893,6 +3070,7 @@ void idAsyncServer::ExecuteRemoteConsoleCommand( const netadr_t from, const char
 
 	rconAddress = from;
 	noRconOutput = true;
+	rconCommandExecuted = true;
 	common->BeginRedirect( (char *)msgBuf, sizeof( msgBuf ), RConRedirect );
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, command );
 	common->EndRedirect();
@@ -3264,17 +3442,22 @@ bool idAsyncServer::ConnectionlessMessage( const netadr_t from, const idBitMsg &
 	}
 
 	// remote console
+	// openQ4: the frame ends early only when a command ran. Every rcon packet used to
+	// end it, accepted or not, so a stream of refused ones kept the server from
+	// reaching its game frames.
 	if ( idStr::Icmp( string, "rcon" ) == 0 ) {
+		rconCommandExecuted = false;
 		ProcessRemoteConsoleMessage( from, msg );
-		return true;
+		return rconCommandExecuted;
 	}
 	if ( idStr::Icmp( string, "rcon2Challenge" ) == 0 ) {
 		ProcessRemoteConsole2ChallengeMessage( from, msg );
 		return false;
 	}
 	if ( idStr::Icmp( string, "rcon2" ) == 0 ) {
+		rconCommandExecuted = false;
 		ProcessRemoteConsole2Message( from, msg );
-		return true;
+		return rconCommandExecuted;
 	}
 
 	if ( !active ) {
@@ -3557,6 +3740,14 @@ void idAsyncServer::RunFrame( bool allowBlocking ) {
 			// Foreground listen-server play polls instead of blocking so the render loop can
 			// present repeated-state frames between authoritative server game ticks.
 			newPacket = serverPort.GetPacketBlocking( from, msgBuf, size, sizeof( msgBuf ), packetTimeout );
+
+			// openQ4: read the clock before the packet is handled. A dedicated server
+			// waits in GetPacketBlocking, and the time it handled the packet with was
+			// from before the wait: a ping reply read up to a frame short, which also
+			// lowers what lag compensation allows that client.
+			msec = UpdateTime( 100 );
+			gameTimeResidual += msec;
+
 			if ( newPacket ) {
 				msg.Init( msgBuf, sizeof( msgBuf ) );
 				msg.SetSize( size );
@@ -3565,9 +3756,6 @@ void idAsyncServer::RunFrame( bool allowBlocking ) {
 					return;	// return because rcon was used
 				}
 			}
-
-			msec = UpdateTime( 100 );
-			gameTimeResidual += msec;
 
 		} while( newPacket );
 
@@ -3666,29 +3854,38 @@ void idAsyncServer::RunFrame( bool allowBlocking ) {
 			client.channel.SetMaxOutgoingRate( Min( client.clientRate, idAsyncNetwork::serverMaxClientRate.GetInteger() ) );
 		}
 
+		// send additional message fragments if the last message was too large to send at once
+		if ( client.channel.UnsentFragmentsLeft() ) {
+			AsyncServer_SendFragmentBurst( client.channel, serverPort, serverTime );
+			continue;
+		}
+
 		// if the channel is not yet ready to send new data
 		if ( !client.channel.ReadyToSend( serverTime ) ) {
 			if ( client.clientState == SCS_INGAME &&
-				 serverTime - client.lastSnapshotTime >= idAsyncNetwork::serverSnapshotDelay.GetInteger() ) {
+				 gameFrame - client.lastSnapshotGameFrame >= AsyncServer_SnapshotFrameInterval() ) {
 				// a snapshot was due and the rate limiter took it
 				client.statsSendsRefusedByRate++;
 			}
 			continue;
 		}
 
-		// send additional message fragments if the last message was too large to send at once
-		if ( client.channel.UnsentFragmentsLeft() ) {
-			client.channel.SendNextFragment( serverPort, serverTime );
-			continue;
-		}
-
 		if ( client.clientState == SCS_INGAME ) {
-			if ( !SendSnapshotToClient( i ) ) {
+			// openQ4: a ping only went out in a pass with no snapshot due, so with a
+			// snapshot every frame (net_serverSnapshotDelay 16 or less) none did: the
+			// ping stayed at 0 and lag compensation, which is capped by it, never
+			// rewound for that server's clients. An overdue ping takes the pass.
+			if ( realTime - client.lastPingTime >= 2 * PING_RESEND_TIME && client.lastPingTime <= realTime ) {
+				SendPingToClient( i );
+			} else if ( !SendSnapshotToClient( i ) ) {
 				SendPingToClient( i );
 			}
 		} else {
 			SendEmptyToClient( i );
 		}
+
+		// the rest of a fragmented message follows at once while the rate allows
+		AsyncServer_SendFragmentBurst( client.channel, serverPort, serverTime );
 	}
 
 	FlushVoiceMessages();

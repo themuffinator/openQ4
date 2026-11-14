@@ -6698,9 +6698,15 @@ bool idEntity::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 		case EVENT_STARTSOUNDSHADER: {
 			// the sound stuff would early out
 			assert( gameLocal.isNewFrame );
-			if ( time < gameLocal.realClientTime - 300 ) {
+			// openQ4: the event's time is the server's, and its age was taken against this
+			// client's predicted clock, which runs ahead of the server by the round trip
+			// and the prediction lead. From about 250 ms of ping every broadcast sound
+			// started to read as more than 300 ms old, and past 285 ms all of them did,
+			// so those players heard none. Age it against the server's clock as this
+			// client last read it, which leaves only a sound that was really delayed.
+			if ( time < gameLocal.clientSnapshotTime - 300 ) {
 				// too old, skip it
-				common->DPrintf( "ent 0x%x: start sound shader too old (%d ms)\n", entityNumber, gameLocal.realClientTime - time );
+				common->DPrintf( "ent 0x%x: start sound shader too old (%d ms)\n", entityNumber, gameLocal.clientSnapshotTime - time );
 				return true;
 			}
 			shader = static_cast< const idSoundShader* >( idGameLocal::ReadDecl( msg, DECL_SOUND ) );

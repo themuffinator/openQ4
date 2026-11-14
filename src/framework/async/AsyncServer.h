@@ -150,6 +150,16 @@ typedef struct serverClient_s {
 	// openQ4: the connect reply left the server info to the game-init message
 	// (OutOfBandReply.h); the client passed the pure checks before connecting.
 	bool				deferredServerInfo;
+	// openQ4: the game has begun this client since it connected; it begins once.
+	bool				gameBegun;
+	int					lastGameInitTime;		// when the last game-init message left
+	// allowances for what a client may make the server send on or run
+	// (CLIENT_USERINFO_BUDGET_BYTES, CLIENT_GAME_MESSAGE_BURST)
+	int					userInfoBudget;
+	int					userInfoBudgetTime;
+	int					gameMessageBudget;
+	int					gameMessageBudgetTime;
+	int					gameMessagesDiscarded;
 
 	idMsgChannel		channel;
 	int					lastConnectTime;
@@ -271,6 +281,7 @@ private:
 	bool				serverReloadingEngine;		// flip-flop to not loop over when net_serverReloadEngine is on
 
 	bool				noRconOutput;				// for default rcon response when command is silent
+	bool				rconCommandExecuted;		// the remote console packet in hand ran a command
 	bool				rcon2VerifierInitialized;
 	bool				rcon2VerifierValid;
 	byte				rcon2Salt[16];

@@ -1159,7 +1159,7 @@ idGameEdit::EntityFromSafeId
 */
 idEntity *idGameEdit::EntityFromSafeId( int safeID ) const {
 	int entityNum = safeID & ( ( 1 << GENTITYNUM_BITS ) - 1 );
-	if ( ( gameLocal.spawnIds[ entityNum ] == ( safeID >> GENTITYNUM_BITS ) ) ) {
+	if ( ( gameLocal.spawnIds[ entityNum ] == UnpackEntitySpawnId( safeID ) ) ) {
 		return gameLocal.entities[ entityNum ];
 	}
 	return NULL;

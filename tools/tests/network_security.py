@@ -1128,6 +1128,122 @@ def validate_network_rate_budget() -> None:
     )
 
 
+def validate_session_lifecycle_and_flood_bounds() -> None:
+    """The 14 November 2026 netcode audit: one begin per connect, bounded client floods,
+    a session that ends when the server cannot be read, and entity ids that survive a
+    long map."""
+    server = read("src/framework/async/AsyncServer.cpp")
+    client = read("src/framework/async/AsyncClient.cpp")
+    channel = read("src/framework/async/MsgChannel.cpp")
+
+    unreliable = function_body(server, "void idAsyncServer::ProcessUnreliableClientMessage(", "client unreliable messages")
+    require_before(unreliable, "if ( client.clientState == SCS_INGAME || client.gameBegun ) {",
+                   "client.clientState = SCS_CONNECTED;", "a client in the game is never set back to connected")
+    require_before(unreliable, "serverTime - client.lastGameInitTime < GAME_INIT_RESEND_TIME",
+                   "SendGameInitToClient( clientNum );", "game-init resends are paced")
+    require_before(unreliable, "if ( client.gameBegun ) {", "client.clientState = SCS_INGAME;", "the game begins a client once")
+    require_before(unreliable, "if ( client.clientState != SCS_INGAME ) {", "client.gameBegun = true;",
+                   "a joiner dropped by the join burst is not begun")
+    require_before(unreliable, "client.gameBegun = true;", "game->ServerClientBegin( clientNum, false, NULL );", "begin is recorded")
+    require(function_body(server, "void idAsyncServer::InitClient(", "client init"), "client.gameBegun = false;", "a connect clears the begin")
+    pure = function_body(server, "void idAsyncServer::ProcessReliablePure(", "reliable pure")
+    require_before(pure, "clients[ clientNum ].clientState == SCS_INGAME || clients[ clientNum ].gameBegun",
+                   "clients[ clientNum ].clientState = SCS_CONNECTED;", "a pure message from a client in the game drops it")
+    connect = function_body(server, "void idAsyncServer::ProcessConnectMessage(", "connect")
+    require_before(connect, "if ( clients[ clientNum ].clientState >= SCS_PUREWAIT ) {",
+                   "clients[ clientNum ].channel.Init( from, serverId );", "a connect onto a live slot drops its old client first")
+
+    reliable = function_body(server, "void idAsyncServer::ProcessReliableClientMessages(", "client reliable messages")
+    require_before(reliable, "client.userInfoBudget -= msg.GetSize();", "SendUserInfoBroadcast( clientNum, info );",
+                   "user info changes are charged before they are sent on")
+    require(reliable, "if ( client.userInfoBudget < 0 ) {", "an overspent user info allowance drops the sender")
+    require_before(reliable, "if ( client.gameMessageBudget <= 0 ) {", "game->ServerProcessReliableMessage( clientNum, msg );",
+                   "reliable game messages are budgeted")
+    print_case = reliable[reliable.index("case CLIENT_RELIABLE_MESSAGE_PRINT:"):reliable.index("case CLIENT_RELIABLE_MESSAGE_DISCONNECT:")]
+    reject(print_case, "common->Printf", "client text printed to the server console")
+    require(server, "const int CLIENT_USERINFO_BUDGET_BYTES\t= 2 * CLIENT_USERINFO_MAX_BYTES;", "a whole user info fits the allowance")
+
+    send_reliable = function_body(server, "void idAsyncServer::SendReliableMessage(", "server reliable send")
+    require_before(send_reliable, 'outMsg.WriteString( "disconnect" );', "clients[ clientNum ].channel.ClearReliableMessages();",
+                   "an overflow drop is announced outside the channel before the queue is cleared")
+    connectionless = function_body(server, "bool idAsyncServer::ConnectionlessMessage(", "connectionless dispatch")
+    if connectionless.count("return rconCommandExecuted;") != 2:
+        raise AssertionError("a remote console packet ends the frame only when a command ran")
+    require(function_body(server, "void idAsyncServer::ExecuteRemoteConsoleCommand(", "rcon execute"),
+            "rconCommandExecuted = true;", "rcon execution is recorded")
+
+    snapshot = function_body(server, "bool idAsyncServer::SendSnapshotToClient(", "snapshot send")
+    require(snapshot, "framesSinceSnapshot < AsyncServer_SnapshotFrameInterval()", "snapshots are paced in game frames")
+    reject(snapshot, "serverTime - client.lastSnapshotTime <", "snapshot pacing by elapsed milliseconds")
+    frame = function_body(server, "void idAsyncServer::RunFrame(", "server frame")
+    if frame.count("AsyncServer_SendFragmentBurst( client.channel, serverPort, serverTime );") != 2:
+        raise AssertionError("the rest of a fragmented message follows within the rate, before and after a new message")
+    require_before(frame, "msec = UpdateTime( 100 );\n\t\t\tgameTimeResidual += msec;\n\n\t\t\tif ( newPacket ) {",
+                   "// send heart beat to master servers", "the clock is read before a packet is handled")
+    require(frame, "realTime - client.lastPingTime >= 2 * PING_RESEND_TIME", "an overdue ping takes the pass")
+
+    require(function_body(channel, "bool idMsgChannel::ReadMessageData(", "channel read"),
+            "if ( messageSize > 4 * msg.GetRemaingData() + 8 ) {", "claimed message size bounded by the packed bytes")
+    require(function_body(channel, "bool idMsgChannel::SendReliableMessage(", "channel reliable send"),
+            "msg.GetSize() <= MAX_RELIABLE_MESSAGE_SIZE &&", "an unsendable reliable message is refused")
+
+    for warning in (
+        "server sent a truncated unreliable message; disconnecting safely",
+        "server sent a truncated ping; disconnecting safely",
+        "server sent a truncated game-init message; disconnecting safely",
+        "server sent invalid game-init timing; disconnecting safely",
+        "server sent a truncated snapshot header; disconnecting safely",
+        "server sent invalid snapshot timing; disconnecting safely",
+        "server sent an empty reliable message; disconnecting safely",
+        "SERVER_RELIABLE_MESSAGE_CLIENTINFO: truncated base flag",
+        "SERVER_RELIABLE_MESSAGE_CLIENTINFO: malformed userinfo dictionary",
+        "SERVER_RELIABLE_MESSAGE_SYNCEDCVARS: malformed CVar dictionary",
+    ):
+        at = client.index(warning)
+        following = client[at:at + 200]
+        require(following, "AsyncClient_StopAfterProtocolError();", f"session teardown after '{warning}'")
+        reject(following, "DisconnectFromServer();", f"channel-only teardown after '{warning}'")
+    for helper in ("static void AsyncClient_StopAfterProtocolError(", "static void AsyncClient_StopAfterMalformedSnapshot("):
+        require_before(function_body(client, helper, helper), "session->Stop();", "session->StartMenu();", "teardown returns to the menu")
+    timing = function_body(client, "static ID_INLINE bool AsyncClient_ValidNetworkTiming", "network timing helper")
+    require(timing, "return gameTime >= earliest && gameTime <= latest;", "a snapshot's game time follows its game frame")
+    client_unreliable = function_body(client, "void idAsyncClient::ProcessUnreliableServerMessage(", "server unreliable messages")
+    require(client_unreliable, "if ( serverGameInitId != gameInitId || gameInitId == GAME_INIT_ID_INVALID ) {",
+            "no snapshot is read without a game")
+    require(client_unreliable, "predictionResynced ? static_cast<std::int64_t>( clientPrediction ) :", "a resync starts from the target")
+    require(function_body(client, "void idAsyncClient::ProcessConnectResponseMessage(", "connect response"),
+            "lastPacketTime = clientTime > 0 ? clientTime : 1;", "the time-out arms with the connection")
+    reject(client, ")[ 0 ]", "message box answers read without a NULL test")
+    run_frame = function_body(client, "void idAsyncClient::RunFrame(", "client frame")
+    require_before(run_frame, "const bool lastReplayFrame = ( snapshotGameFrame + 1 >= gameFrame );", "game->ClientEndFrame();",
+                   "a snapshot read between tics is replayed before the frame is drawn")
+    require_before(function_body(client, "bool idAsyncClient::SendVoiceMessage(", "client voice"),
+                   "channel.SendMessage( clientPort, clientTime, msg )", "while ( channel.UnsentFragmentsLeft() ) {",
+                   "voice never leaves a fragment behind")
+
+    for tree in ("src/mpgame", "src/game"):
+        header = (GAME_LIBS_ROOT / tree / "Game_local.h").read_text(encoding="utf-8", errors="replace")
+        game = (GAME_LIBS_ROOT / tree / "Game_local.cpp").read_text(encoding="utf-8", errors="replace")
+        require(header, "return static_cast<int>( static_cast<unsigned int>( packedId ) >> GENTITYNUM_BITS );",
+                f"{tree}: spawn ids unpack unsigned")
+        reject(header, "( spawnId >> GENTITYNUM_BITS )", f"{tree}: signed spawn id shift")
+        reject(header, "( id >> GENTITYNUM_BITS )", f"{tree}: signed spawn id shift")
+        register = function_body(game, "void idGameLocal::RegisterEntity(", f"{tree}: register entity")
+        require(register, "spawnCount = MAX_GENTITIES;", f"{tree}: the spawn count wraps")
+        reject(register, "spawn count overflow", f"{tree}: fatal spawn count overflow")
+    entity = (GAME_LIBS_ROOT / "src/mpgame/Entity.cpp").read_text(encoding="utf-8", errors="replace")
+    require(function_body(entity, "bool idEntity::ClientReceiveEvent(", "entity client events"),
+            "if ( time < gameLocal.clientSnapshotTime - 300 ) {", "sound events age against the server's clock")
+    network = (GAME_LIBS_ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8", errors="replace")
+    require(function_body(network, "void idGameLocal::ClientProcessEntityNetworkEventQueue(", "client event queue"),
+            "} else if ( ( ent = entPtr.GetEntity() ) == NULL ) {", "client events test the entity for NULL")
+    player = (GAME_LIBS_ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8", errors="replace")
+    require(player, "const bool feedbackHitch = stateHitch && ( snapshotAge <= 0 || snapshotAge > FEEDBACK_HITCH_MSEC );",
+            "one missed snapshot does not hide a death or a hit")
+    for gated in ("if ( !feedbackHitch ) {\n \t\t\tStartSound( \"snd_death\"", "if ( feedbackHitch ) {\n\t\t\tlastDmgTime = gameLocal.time;"):
+        require(player, gated, "death and hit feedback follow the feedback gap, not any gap")
+
+
 def main() -> None:
     validate_crypto_and_native_vectors()
     validate_secure_random_and_connection_challenges()
@@ -1141,6 +1257,7 @@ def main() -> None:
     validate_remote_dictionary_authority()
     validate_network_rate_budget()
     validate_channel_and_message_abuse_bounds()
+    validate_session_lifecycle_and_flood_bounds()
     validate_documentation_and_registration()
     print("network_security: ok")
 

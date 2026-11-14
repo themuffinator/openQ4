@@ -486,6 +486,16 @@ ID_INLINE int PackEntitySpawnId( const int entitySpawnId, const int entityNumber
 	return static_cast<int>( packed );
 }
 
+// openQ4: the spawn count of a packed id. The id is a signed int and was shifted down
+// as one, so from spawn count 2^19 on - 524,288 entities since the map loaded, a few
+// hours of projectiles on a busy server that restarts its map without reloading it -
+// the sign came down with it and the result matched no slot: every idEntityPtr to a
+// newer entity read as invalid, on the server and its clients alike. A freed slot's -1
+// now matches no id either, so an id made up to name one no longer resolves.
+ID_INLINE int UnpackEntitySpawnId( const int packedId ) {
+	return static_cast<int>( static_cast<unsigned int>( packedId ) >> GENTITYNUM_BITS );
+}
+
 ID_INLINE int PackClientEntitySpawnId( const int entitySpawnId, const int entityNumber ) {
 	const unsigned int packed = ( static_cast<unsigned int>( entitySpawnId ) << CENTITYNUM_BITS ) |
 		static_cast<unsigned int>( entityNumber );
@@ -650,6 +660,7 @@ public:
 	int						localClientNum;			// number of the local client. MP: -1 on a dedicated, MAX_CLIENTS when playing a server demo
 	idLinkList<idEntity>	snapshotEntities;		// entities from the last snapshot
 	int						realClientTime;			// real client time
+	int						clientSnapshotTime;		// openQ4: game time of the last snapshot read, the server's clock as this client has it
 	bool					isNewFrame;				// true if this is a new game frame, not a rerun due to prediction
 	// openQ4: replay passes run since the last snapshot, and the count for the chain the last
 	// snapshot closed.  net_mpPredictDebug sets a remote's re-simulated tics against it to report
@@ -1795,7 +1806,7 @@ ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( type *ent ) {
 
 template< class type >
 ID_INLINE bool idEntityPtr<type>::SetSpawnId( int id ) {
-	if ( ( id >> GENTITYNUM_BITS ) == gameLocal.spawnIds[ id & ( ( 1 << GENTITYNUM_BITS ) - 1 ) ] ) {
+	if ( UnpackEntitySpawnId( id ) == gameLocal.spawnIds[ id & ( ( 1 << GENTITYNUM_BITS ) - 1 ) ] ) {
 		spawnId = id;
 		return true;
 	}
@@ -1804,13 +1815,13 @@ ID_INLINE bool idEntityPtr<type>::SetSpawnId( int id ) {
 
 template< class type >
 ID_INLINE bool idEntityPtr<type>::IsValid( void ) const {
-	return ( gameLocal.spawnIds[ spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 ) ] == ( spawnId >> GENTITYNUM_BITS ) );
+	return ( gameLocal.spawnIds[ spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 ) ] == UnpackEntitySpawnId( spawnId ) );
 }
 
 template< class type >
 ID_INLINE type *idEntityPtr<type>::GetEntity( void ) const {
 	int entityNum = spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 );
-	if ( gameLocal.spawnIds[ entityNum ] == ( spawnId >> GENTITYNUM_BITS ) ) {
+	if ( gameLocal.spawnIds[ entityNum ] == UnpackEntitySpawnId( spawnId ) ) {
 		return static_cast<type *>( gameLocal.entities[ entityNum ] );
 	}
 	return NULL;

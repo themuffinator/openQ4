@@ -63,8 +63,20 @@ static ID_INLINE int AsyncClient_MaxNetworkGameFrame() {
 }
 
 static ID_INLINE bool AsyncClient_ValidNetworkTiming( int gameFrame, int gameTime ) {
-	return gameFrame >= 0 && gameFrame <= AsyncClient_MaxNetworkGameFrame() &&
-		gameTime >= 0 && gameTime <= ASYNC_CLIENT_MAX_NETWORK_TIME;
+	if ( gameFrame < 0 || gameFrame > AsyncClient_MaxNetworkGameFrame() ||
+		 gameTime < 0 || gameTime > ASYNC_CLIENT_MAX_NETWORK_TIME ) {
+		return false;
+	}
+	// openQ4: a server's game time is its game frame on the tick ladder: one
+	// GetUserCmdMSec() a frame as openQ4 labels it, or the exact ladder, which gains
+	// under a millisecond a frame on that. The two were only bounded separately, and
+	// the client replays every frame from the snapshot's to its own, so a snapshot
+	// naming frame 0 beside a current game time made it replay the whole match's
+	// frames, each time one came.
+	const std::int64_t frameMsec = common->GetUserCmdMSec();
+	const std::int64_t earliest = static_cast<std::int64_t>( gameFrame ) * frameMsec;
+	const std::int64_t latest = static_cast<std::int64_t>( gameFrame + 1 ) * ( frameMsec + 1 );
+	return gameTime >= earliest && gameTime <= latest;
 }
 
 static void AsyncClient_StopAfterMalformedSnapshot() {
@@ -74,6 +86,31 @@ static void AsyncClient_StopAfterMalformedSnapshot() {
 	// the outer frame, so tear down the loaded session immediately.
 	arenaCampaign.AbortMatch();
 	session->Stop();
+	session->StartMenu();
+}
+
+/*
+==================
+AsyncClient_StopAfterProtocolError
+
+openQ4: a message from the server that cannot be read ends the session. These
+places used to close the channel alone, which left the loaded map in place with no
+connection: the session then ran it as a single-player game, on a client game
+holding one user command for all its players, with nothing on screen to say the
+server was gone.
+==================
+*/
+static void AsyncClient_StopAfterProtocolError() {
+	arenaCampaign.AbortMatch();
+	session->Stop();
+	session->StartMenu();
+}
+
+// openQ4: a message box answers NULL when another is already up or when it is
+// closed from outside (idSessionLocal::StopBox), and its first character was read
+// regardless.
+static ID_INLINE bool AsyncClient_Answered( const char *answer ) {
+	return answer != NULL && answer[0] != '\0';
 }
 
 static idCVar net_clientSnapshotDropProbe( "net_clientSnapshotDropProbe", "0", CVAR_SYSTEM | CVAR_INTEGER | CVAR_CHEAT,
@@ -1370,7 +1407,15 @@ bool idAsyncClient::SendVoiceMessage( const idBitMsg &payload ) {
 	msg.WriteLong( snapshotSequence );
 	msg.WriteByte( CLIENT_UNRELIABLE_MESSAGE_VOICE );
 	msg.WriteData( payload.GetData(), payload.GetSize() );
-	return channel.SendMessage( clientPort, clientTime, msg ) >= 0;
+	const bool sent = channel.SendMessage( clientPort, clientTime, msg ) >= 0;
+	// openQ4: the admission test above counts unpacked bytes. When packing grew the
+	// message past one fragment the channel split it and kept the rest back, and the
+	// next user command then ended the session with "called with unsent fragments
+	// left". Every other send here flushes; so does this one.
+	while ( channel.UnsentFragmentsLeft() ) {
+		channel.SendNextFragment( clientPort, clientTime );
+	}
+	return sent;
 }
 
 /*
@@ -1406,7 +1451,7 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 
 	if ( msg.GetRemainingReadBits() < 32 + 8 ) {
 		common->Warning( "server sent a truncated unreliable message; disconnecting safely" );
-		DisconnectFromServer();
+		AsyncClient_StopAfterProtocolError();
 		return;
 	}
 	serverGameInitId = msg.ReadLong();
@@ -1443,7 +1488,7 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			}
 			if ( msg.GetRemainingReadBits() < 32 ) {
 				common->Warning( "server sent a truncated ping; disconnecting safely" );
-				DisconnectFromServer();
+				AsyncClient_StopAfterProtocolError();
 				return;
 			}
 			SendPingResponseToServer( msg.ReadLong() );
@@ -1452,7 +1497,7 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 		case SERVER_UNRELIABLE_MESSAGE_GAMEINIT: {
 			if ( msg.GetRemainingReadBits() < 32 + 32 ) {
 				common->Warning( "server sent a truncated game-init message; disconnecting safely" );
-				DisconnectFromServer();
+				AsyncClient_StopAfterProtocolError();
 				return;
 			}
 			serverGameFrame = msg.ReadLong();
@@ -1460,7 +1505,7 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			msg.ReadDeltaDict( serverSI, NULL );
 			if ( msg.IsReadOverflowed() || !AsyncClient_ValidNetworkTiming( serverGameFrame, serverGameTime ) ) {
 				common->Warning( "server sent invalid game-init timing; disconnecting safely" );
-				DisconnectFromServer();
+				AsyncClient_StopAfterProtocolError();
 				return;
 			}
 			// openQ4: the game-init message a deferred connect reply promised
@@ -1509,7 +1554,10 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 		}
 		case SERVER_UNRELIABLE_MESSAGE_SNAPSHOT: {
 			// if the snapshot is from a different game
-			if ( serverGameInitId != gameInitId ) {
+			// openQ4: or this client has no game yet. After a deferred connect reply it
+			// reports no game, by the same id a server could put on a snapshot, and the
+			// game then read that snapshot with no map loaded.
+			if ( serverGameInitId != gameInitId || gameInitId == GAME_INIT_ID_INVALID ) {
 				if ( idAsyncNetwork::verbose.GetInteger() ) {
 					common->Printf( "ignoring snapshot with != gameInitId\n" );
 				}
@@ -1521,7 +1569,7 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 
 			if ( msg.GetRemainingReadBits() < 32 + 32 + 32 + 8 + 16 ) {
 				common->Warning( "server sent a truncated snapshot header; disconnecting safely" );
-				DisconnectFromServer();
+				AsyncClient_StopAfterProtocolError();
 				return;
 			}
 			const int receivedSnapshotSequence = msg.ReadLong();
@@ -1532,7 +1580,7 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			if ( msg.IsReadOverflowed() ||
 				 !AsyncClient_ValidNetworkTiming( receivedSnapshotGameFrame, receivedSnapshotGameTime ) ) {
 				common->Warning( "server sent invalid snapshot timing; disconnecting safely" );
-				DisconnectFromServer();
+				AsyncClient_StopAfterProtocolError();
 				return;
 			}
 			snapshotSequence = receivedSnapshotSequence;
@@ -1644,9 +1692,18 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			// reached the server late for good. The server repeated the last one, so its aim stood
 			// still, and after MAX_USERCMD_DUPLICATION repeats it dropped the attack. The residual
 			// now joins the catch-up, which then holds only the time this client still owes.
-			const std::int64_t adjustedPredictTime = static_cast<std::int64_t>( clientPredictTime ) + gameTimeResidual -
+			const std::int64_t caughtUpPredictTime = static_cast<std::int64_t>( clientPredictTime ) + gameTimeResidual -
 				( delta / PREDICTION_FAST_ADJUST ) - deltaStep;
 			gameTimeResidual = 0;
+			// openQ4: a resync has just put this client on the snapshot's frame, so all it
+			// owes is the target itself. The catch-up above adds a quarter of the target
+			// to what was owed before, and after a stall the snapshots that queued up are
+			// read in one go, each a resync: every one added its quarter on top of the
+			// stalled frame's time with no frame run between. After 300 ms the client
+			// predicted 19 frames where 6 were due, sent them all with one sample of the
+			// player's input, then ran no frame for 160 ms while the catch-up unwound.
+			const std::int64_t adjustedPredictTime = predictionResynced ? static_cast<std::int64_t>( clientPrediction ) :
+				caughtUpPredictTime;
 			clientPredictTime = adjustedPredictTime < -maximumPredictionMsec ? -maximumPredictionMsec :
 				( adjustedPredictTime > maximumPredictionMsec ? maximumPredictionMsec :
 					static_cast<int>( adjustedPredictTime ) );
@@ -1773,7 +1830,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 		id = msg.ReadByte();
 		if ( msg.IsReadOverflowed() ) {
 			common->Warning( "server sent an empty reliable message; disconnecting safely" );
-			DisconnectFromServer();
+			AsyncClient_StopAfterProtocolError();
 			return;
 		}
 		switch( id ) {
@@ -1785,7 +1842,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 				// client slot.  userInfo only has MAX_ASYNC_CLIENTS entries.
 				if ( msg.IsReadOverflowed() || clientNum < 0 || clientNum >= MAX_ASYNC_CLIENTS ) {
 					common->Warning( "SERVER_RELIABLE_MESSAGE_CLIENTINFO: bad client number %d, ignored", clientNum );
-					DisconnectFromServer();
+					AsyncClient_StopAfterProtocolError();
 					return;
 				}
 
@@ -1793,7 +1850,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 				bool haveBase = ( msg.ReadBits( 1 ) != 0 );
 				if ( msg.IsReadOverflowed() ) {
 					common->Warning( "SERVER_RELIABLE_MESSAGE_CLIENTINFO: truncated base flag" );
-					DisconnectFromServer();
+					AsyncClient_StopAfterProtocolError();
 					return;
 				}
 
@@ -1815,7 +1872,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 				}
 				if ( msg.IsReadOverflowed() ) {
 					common->Warning( "SERVER_RELIABLE_MESSAGE_CLIENTINFO: malformed userinfo dictionary" );
-					DisconnectFromServer();
+					AsyncClient_StopAfterProtocolError();
 					return;
 				}
 
@@ -1833,7 +1890,7 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 				msg.ReadDeltaDict( info, &info );
 				if ( msg.IsReadOverflowed() ) {
 					common->Warning( "SERVER_RELIABLE_MESSAGE_SYNCEDCVARS: malformed CVar dictionary" );
-					DisconnectFromServer();
+					AsyncClient_StopAfterProtocolError();
 					return;
 				}
 				cvarSystem->SetCVarsFromDictByFlags( info, CVAR_NETWORKSYNC );
@@ -1876,6 +1933,10 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 			case SERVER_RELIABLE_MESSAGE_APPLYSNAPSHOT: {
 				int sequence;
 				sequence = msg.ReadLong();
+				if ( gameInitId == GAME_INIT_ID_INVALID ) {
+					// no game to apply it to (see the snapshot case)
+					break;
+				}
 				if ( !game->ClientApplySnapshot( clientNum, sequence ) ) {
 					session->Stop();
 					common->Error( "couldn't apply snapshot %d", sequence );
@@ -1895,6 +1956,9 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 				break;
 			}
 			case SERVER_RELIABLE_MESSAGE_ENTERGAME: {
+				if ( gameInitId == GAME_INIT_ID_INVALID ) {
+					break;
+				}
 				SendUserInfoToServer();
 				game->SetUserInfo( clientNum, sessLocal.mapSpawnData.userInfo[ clientNum ], true );
 				cvarSystem->ClearModifiedFlags( CVAR_USERINFO );
@@ -1902,7 +1966,9 @@ void idAsyncClient::ProcessReliableServerMessages( void ) {
 			}
 			default: {
 				// pass reliable message on to game code
-				game->ClientProcessReliableMessage( clientNum, msg );
+				if ( gameInitId != GAME_INIT_ID_INVALID ) {
+					game->ClientProcessReliableMessage( clientNum, msg );
+				}
 				break;
 			}
 		}
@@ -2078,7 +2144,10 @@ void idAsyncClient::ProcessConnectResponseMessage( const netadr_t from, const id
 	channel.Init( from, clientId );
 	clientNum = serverClientNum;
 	clientState = CS_CONNECTED;
-	lastPacketTime = -9999;
+	// openQ4: this is the server's answer, so the time-out counts from it. Left at
+	// -9999 until the first channel packet, CheckTimeout never ran for a server
+	// that went silent after this reply, and the client waited on it for good.
+	lastPacketTime = clientTime > 0 ? clientTime : 1;
 
 	if ( serverGameInitId == GAME_INIT_ID_INVALID ) {
 		// openQ4: a deferred reply (OutOfBandReply.h) fits one packet and names
@@ -3052,6 +3121,33 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 			snapshotGameTime = snapshotGameFrame * common->GetUserCmdMSec();
 		}
 	}
+
+	// openQ4: a snapshot read on a frame with no tic due. A client polls its socket on
+	// every rendered frame, and a snapshot puts the game on the server's frame: the
+	// game clock steps back by the whole prediction lead and every entity, the local
+	// player included, sits where the server had it. The replay above runs only when a
+	// tic falls due, so above 60 fps most snapshots (about 58% at 144 fps) left that
+	// state to be drawn for a frame or two: the presentation clock re-anchored on the
+	// backward step and again after the next tic, and camera interpolation switched
+	// off for those frames. Replay to the client's frame now; these frames were due
+	// for replay at the next tic anyway, so the work only moves.
+	while ( snapshotGameFrame < gameFrame ) {
+
+		lastFrameDelta++;
+
+		// duplicate usercmds for clients if no new ones are available
+		DuplicateUsercmds( snapshotGameFrame, snapshotGameTime );
+
+		// the last of them is the frame the render shows
+		const bool lastReplayFrame = ( snapshotGameFrame + 1 >= gameFrame );
+
+		gameReturn_t ret = game->ClientPrediction( clientNum, userCmds[ snapshotGameFrame & ( MAX_USERCMD_BACKUP - 1 ) ], lastReplayFrame );
+
+		idAsyncNetwork::ExecuteSessionCommand( ret.sessionCommand );
+
+		snapshotGameFrame++;
+		snapshotGameTime = snapshotGameFrame * common->GetUserCmdMSec();
+	}
 	game->ClientEndFrame();
 }
 
@@ -3122,8 +3218,8 @@ void idAsyncClient::HandleDownloads( void ) {
 	} else if ( backgroundDownload.completed ) {
 		// only enter these if the download slot is free
 		if ( updateState == UPDATE_READY ) {
-			const bool openReleasePage = session->MessageBox( MSG_YESNO, updateMSG,
-				common->GetLanguageDict()->GetString( "#str_04330" ), true, "yes" )[ 0 ] != '\0';
+			const bool openReleasePage = AsyncClient_Answered( session->MessageBox( MSG_YESNO, updateMSG,
+				common->GetLanguageDict()->GetString( "#str_04330" ), true, "yes" ) );
 			updateState = UPDATE_DONE;
 			showUpdateMessage = false;
 			if ( openReleasePage ) {
@@ -3335,8 +3431,8 @@ void idAsyncClient::ProcessDownloadInfoMessage( const netadr_t from, const idBit
 		}
 		// "You are missing required pak files to connect to this server.\nThe server gave a web page though:\n%s\nDo you want to go there now?"
 		// "Missing required files"
-		if ( session->MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_07217" ), buf ),
-								  common->GetLanguageDict()->GetString( "#str_07218" ), true, "yes" )[ 0 ] ) {
+		if ( AsyncClient_Answered( session->MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_07217" ), buf ),
+								  common->GetLanguageDict()->GetString( "#str_07218" ), true, "yes" ) ) ) {
 			sys->OpenURL( buf, true );
 		}
 	} else if ( infoType == SERVER_DL_LIST ) {
@@ -3426,7 +3522,7 @@ void idAsyncClient::ProcessDownloadInfoMessage( const netadr_t from, const idBit
 			asked = true;
 			// "You need to download game code to connect to this server. Are you sure? You should only answer yes if you trust the server administrators."
 			// "Missing game binaries"
-			if ( !session->MessageBox( MSG_YESNO, common->GetLanguageDict()->GetString( "#str_07220" ), common->GetLanguageDict()->GetString( "#str_07221" ), true, "yes" )[ 0 ] ) {
+			if ( !AsyncClient_Answered( session->MessageBox( MSG_YESNO, common->GetLanguageDict()->GetString( "#str_07220" ), common->GetLanguageDict()->GetString( "#str_07221" ), true, "yes" ) ) ) {
 				dlList.Clear();
 				return;
 			}
@@ -3435,8 +3531,8 @@ void idAsyncClient::ProcessDownloadInfoMessage( const netadr_t from, const idBit
 			asked = true;
 			// "The server only offers to download some of the files required to connect ( %s ). Download anyway?"
 			// "Missing required files"
-			if ( !session->MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_07222" ), sizeStr.c_str() ),
-									   common->GetLanguageDict()->GetString( "#str_07218" ), true, "yes" )[ 0 ] ) {
+			if ( !AsyncClient_Answered( session->MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_07222" ), sizeStr.c_str() ),
+									   common->GetLanguageDict()->GetString( "#str_07218" ), true, "yes" ) ) ) {
 				dlList.Clear();
 				return;
 			}
@@ -3444,8 +3540,8 @@ void idAsyncClient::ProcessDownloadInfoMessage( const netadr_t from, const idBit
 		if ( !asked && idAsyncNetwork::clientDownload.GetInteger() == 1 ) {
 			// "You need to download some files to connect to this server ( %s ), proceed?"
 			// "Missing required files"
-			if ( !session->MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_07224" ), sizeStr.c_str() ),
-									   common->GetLanguageDict()->GetString( "#str_07218" ), true, "yes" )[ 0 ] ) {
+			if ( !AsyncClient_Answered( session->MessageBox( MSG_YESNO, va( common->GetLanguageDict()->GetString( "#str_07224" ), sizeStr.c_str() ),
+									   common->GetLanguageDict()->GetString( "#str_07218" ), true, "yes" ) ) ) {
 				dlList.Clear();
 				return;
 			}

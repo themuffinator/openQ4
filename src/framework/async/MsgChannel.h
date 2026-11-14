@@ -87,6 +87,11 @@ public:
 					// Returns true if the channel is ready to send new data based on the maximum rate.
 	bool			ReadyToSend( const int time ) const;
 
+					// Returns true if the next fragment of the message under way may follow now:
+					// the rest of a message goes out at once while its debt stays within
+					// burstMsec of the outgoing rate.
+	bool			ReadyToSendFragment( const int time, const int burstMsec ) const;
+
 					// Sends an unreliable message, in order and without duplicates.
 	int				SendMessage( idPort &port, const int time, const idBitMsg &msg );
 
@@ -166,6 +171,8 @@ private:
 	idMsgQueue		reliableReceive;
 
 private:
+	int				ReliableSendSize( const int dataBytes ) const;
+	int				ReliablePrefixSize( const int budget ) const;
 	bool			WriteMessageData( idBitMsg &out, const idBitMsg &msg );
 	bool			ReadMessageData( idBitMsg &out, const idBitMsg &msg );
 

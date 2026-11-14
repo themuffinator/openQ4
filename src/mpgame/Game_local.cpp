@@ -439,6 +439,7 @@ void idGameLocal::Clear( void ) {
 	isClient = false;
 	isTVClient = false;
 	realClientTime = 0;
+	clientSnapshotTime = 0;
 	isNewFrame = true;
 	clientReplayTics = 0;
 	lastChainReplayTics = 0;
@@ -5814,8 +5815,12 @@ idGameLocal::RegisterEntity
 void idGameLocal::RegisterEntity( idEntity *ent ) {
 	int spawn_entnum;
 
+	// openQ4: the count shares a packed id with the entity number, and reaching its
+	// 2^20 limit used to end the session. Start again above the numbers the map's own
+	// entities hold, which a map restart hands out afresh from INITIAL_SPAWN_COUNT; an
+	// id only has to tell apart the entities that have used one slot.
 	if ( spawnCount >= ( 1 << ( 32 - GENTITYNUM_BITS ) ) ) {
-		Error( "idGameLocal::RegisterEntity: spawn count overflow" );
+		spawnCount = MAX_GENTITIES;
 	}
 
 	firstFreeIndex = Max( minSpawnIndex, firstFreeIndex );

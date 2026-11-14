@@ -7,6 +7,63 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Smoother, steadier and harder-to-break online play (netcode audit), 14 November 2026
+
+- **Online play is smoother, most of all above 60 fps.** When an update from the
+  server arrived between two game ticks, your game drew the next frame or two
+  from the server's older picture of the world, with your own view pulled back
+  by the whole prediction lead, and camera smoothing switched off for those
+  frames. Your game now catches up to its own time before it draws. Nothing to
+  change in your settings.
+- **Updates arrive evenly.** A server sent its 30 updates a second in an uneven
+  mix of 33 and 50 ms gaps, and a large update (a busy fight, 12 or more
+  players) left the server a piece per frame, so it reached you up to 33 ms
+  late. Updates now leave on an even beat, and a large one leaves at once when
+  your connection's rate allows.
+- **A hitch no longer costs a second one.** After your game stalled for more
+  than a tenth of a second it predicted far ahead in one burst and then stood
+  still while it unwound. It now resumes at its usual lead.
+- **Players with high ping hear the match.** From about 250 ms of ping, sounds
+  the server broadcasts to every player were thrown away as too old. They play
+  now.
+- **A lost update no longer hides a kill or a hit.** When your connection lost
+  the one update that carried a death or a hit, the death was silent with no
+  falling body, and a hit on you gave no pain sound, view kick or damage
+  direction. Those show unless the player was really out of view.
+- **Servers stay up and fair for longer.** A server that kept one map running
+  for hours (restarting it, not reloading it) broke weapons and events for
+  everyone after about half a million spawned entities and stopped at a
+  million; that limit is gone. A modified client can no longer spawn copies of
+  itself, disconnect the other players by flooding name changes, fill the
+  server's log, or hold the server still with remote console packets. A full
+  reliable queue no longer silences a connection until it times out, and a
+  player dropped for it is told why at once.
+- **Clients fail safely.** A server sending unreadable data ends the session
+  and returns to the menu; it used to leave the map running with no connection.
+  A server that goes silent right after accepting a connection now times out.
+- **Classic ruleset:** the grappling hook's reel sound plays for your own hook
+  on a server.
+- **Server operators:** `net_serverSnapshotDelay` now rounds to whole game
+  frames (33 is two frames at 60 Hz, as before; 50 is three). A client's user
+  info may hold 2,048 bytes (it was 4,096; a normal client uses about 500).
+  Clients and servers with and without these fixes play together: the network
+  format is unchanged.
+- Development: five reviewers read the channel, server, client, replication and
+  prediction code; every finding was re-read against the source before it was
+  changed. The three MP-07 fixes of 13 November below, which were still on
+  separate branches, are merged here.
+  `network_channel_backlog_state.py` (new, six failing controls) executes the
+  production channel; `network_security.py` pins the server, client and game
+  changes. On a hidden 60 fps client behind 40 ms of simulated delay, frames
+  drawn with the interpolated camera rose from 50.2 to 60.0 a second and
+  steady-state snapshots from a 24-30 mix to 30 a second. The reconnect smoke,
+  the 12-player fragmenting-path soak and, on a quiet machine, the impaired
+  firing-view capture (151 of 151 shots on the frame) pass
+  ([record](mp-network-qualification.md#netcode-audit-14-november-2026)).
+- Open (MP-08): the findings that need a new network format, chiefly that
+  channel packets carry no secret, so a spoofed packet can end a player's
+  connection; presentation above 60 fps and real connections are not measured.
+
 ## A system check offers the right preset after the presets change, 14 November 2026
 
 - **When an update changes the presets, openQ4 now offers to retune your
@@ -432,9 +489,9 @@ does not restore the withdrawn release. See
   drew 26 shots the server never fired. `mp_predicted_hitscan_state.py` fails
   42 single-reversal controls
   ([record](mp-network-qualification.md#a-respawn-read-across-a-dropped-snapshot-13-november-2026)).
-- Still open (MP-07): a long client frame can still make one command late. A
-  probe run on a busy machine raised its weapon exactly but lost shots in both
-  bursts that way.
+- A probe run on a busy machine raised its weapon exactly but lost shots in
+  both bursts to late commands from long client frames; the entry below fixes
+  that.
 
 ## Your aim and fire reach the server in time after a slow frame, 13 November 2026
 
@@ -471,8 +528,8 @@ does not restore the withdrawn release. See
   `mp_client_prediction_state.py`
   fails all 12 single-reversal controls
   ([record](mp-network-qualification.md#commands-on-time-through-long-client-frames-13-november-2026)).
-- Open (MP-07): a respawn snapshot that follows a dropped snapshot still
-  catches the new weapon up.
+- The respawn snapshot that follows a dropped snapshot, open when this was
+  measured, is fixed in the entry above.
 
 ## Your first hit no longer hitches, and a hitch no longer leaves the server behind your aim, 13 November 2026
 
@@ -506,10 +563,11 @@ does not restore the withdrawn release. See
   adds a hitch loop and two failing controls (six in all);
   `ui_hud_catalog_state.py` fails all 20 single-reversal controls
   ([record](mp-network-qualification.md#the-servers-aim-after-a-client-stall-13-november-2026)).
-- Open (MP-07): under simulated jitter, a respawn snapshot that follows a
-  dropped snapshot still catches the new weapon up (fixed later the same day,
-  above), and a long client frame can still make one command late. Three of the four impaired runs failed on
-  one of these outside the join.
+- Open when this was measured, and both fixed later the same day (above):
+  under simulated jitter, a respawn snapshot that follows a dropped snapshot
+  caught the new weapon up, and a long client frame could make one command
+  late. Three of the four impaired runs failed on one of these outside the
+  join.
 
 ## Your weapon comes up with the server's after a respawn, 13 November 2026
 

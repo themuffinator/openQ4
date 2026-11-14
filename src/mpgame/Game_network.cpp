@@ -89,6 +89,7 @@ void idGameLocal::InitAsyncNetwork( void ) {
 	entityDefBits = idMath::BitsForInteger( declManager->GetNumDecls( DECL_ENTITYDEF ) ) + 1;
 	localClientNum = 0; // on a listen server SetLocalUser will set this right
 	realClientTime = 0;
+	clientSnapshotTime = 0;
 	isNewFrame = true;
 	clientReplayTics = 0;
 	lastChainReplayTics = 0;
@@ -1320,7 +1321,7 @@ void idGameLocal::NetworkEventWarning( const entityNetEvent_t *event, const char
 	va_list argptr;
 
 	int entityNum	= event->spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 );
-	int id			= event->spawnId >> GENTITYNUM_BITS;
+	int id			= UnpackEntitySpawnId( event->spawnId );
 
 	length += idStr::snPrintf( buf+length, sizeof(buf)-1-length, "event %d for entity %d %d: ", event->event, entityNum, id );
 	va_start( argptr, fmt );
@@ -1925,6 +1926,7 @@ bool idGameLocal::ClientReadSnapshot( int clientNum, int snapshotSequence, const
 	framenum = gameFrame;
 	time = gameTime;
 	previousTime = time - GetMSec();
+	clientSnapshotTime = gameTime;
 
 	isNewFrame = true;
 
@@ -2709,10 +2711,11 @@ void idGameLocal::ClientProcessEntityNetworkEventQueue( void ) {
 				// if new entity exists in this position, silently ignore
 				NetworkEventWarning( event, "Entity does not exist any longer, or has not been spawned yet." );
 			}
+		} else if ( ( ent = entPtr.GetEntity() ) == NULL ) {
+			// openQ4: an id can pass SetSpawnId and still name no entity; the server's
+			// queue tests for it, and this one went on to call through the pointer
+			NetworkEventWarning( event, "Entity does not exist any longer, or has not been spawned yet." );
 		} else {
-			ent = entPtr.GetEntity();
-			assert( ent );
-
 			eventMsg.Init( event->paramsBuf, sizeof( event->paramsBuf ) );
 			eventMsg.SetSize( event->paramsSize );
 			eventMsg.BeginReading();

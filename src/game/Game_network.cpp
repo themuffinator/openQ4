@@ -737,7 +737,7 @@ void idGameLocal::NetworkEventWarning( const entityNetEvent_t *event, const char
 	va_list argptr;
 
 	int entityNum	= event->spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 );
-	int id			= event->spawnId >> GENTITYNUM_BITS;
+	int id			= UnpackEntitySpawnId( event->spawnId );
 
 	length += idStr::snPrintf( buf+length, sizeof(buf)-1-length, "event %d for entity %d %d: ", event->event, entityNum, id );
 	va_start( argptr, fmt );

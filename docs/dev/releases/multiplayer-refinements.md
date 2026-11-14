@@ -4,6 +4,22 @@
 
 ## Highlights
 
+- **Smoother online play, most of all above 60 fps.** When a server update
+  arrived between two game ticks, your game drew the next frame or two from the
+  server's older picture of the world and switched camera smoothing off for
+  them. It now catches up to its own time before drawing. Server updates also
+  arrive on an even beat, large ones in one go, and a hitch no longer costs a
+  second stall while your game unwinds.
+- **High ping no longer mutes the match, and a lost update no longer hides a
+  kill.** Above about 250 ms of ping the sounds a server broadcasts were thrown
+  away as too old; they play now. A death or a hit carried by an update your
+  connection lost shows and sounds as it should.
+- **Servers stay up and fair for longer.** A server that kept one map running
+  for hours no longer breaks weapons and events for everyone or stops outright.
+  Modified clients can no longer spawn copies of themselves, flood other
+  players off the server, fill its log or stall it with remote console
+  packets. Server operators: `net_serverSnapshotDelay` now rounds to whole game
+  frames, and a client's user info may hold 2,048 bytes.
 - **Holding fire through a respawn no longer draws shots that never
   happened.** Online, your client used to treat the weapon you respawn with as
   ready at once while the server was still raising it, so a held burst drew

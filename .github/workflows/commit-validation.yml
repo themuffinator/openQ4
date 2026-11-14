@@ -589,6 +589,7 @@ jobs:
             tools/tests/ui_player_identity.py \
             tools/tests/mp_match_artifact_io_state.py \
             tools/tests/network_fragment_state.py \
+            tools/tests/network_channel_backlog_state.py \
             tools/tests/savegame_restore_resources.py \
             tools/tests/renderer_vulkan_material_cache.py \
             tools/tests/renderer_vulkan_presentation.py \
@@ -1102,6 +1103,7 @@ jobs:
           python tools/tests/ui_player_identity.py
           python tools/tests/mp_match_artifact_io_state.py
           python tools/tests/network_fragment_state.py
+          python tools/tests/network_channel_backlog_state.py
           python tools/tests/savegame_restore_resources.py
           python tools/tests/renderer_vulkan_material_cache.py
           python tools/tests/renderer_vulkan_presentation.py --self-test

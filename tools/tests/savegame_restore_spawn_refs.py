@@ -163,7 +163,7 @@ def source(mode):
     local = (ROOT/'src'/mode/'Game_local.h').read_text()
     client = (ROOT/'src'/mode/'client/ClientEntity.h').read_text()
     code = SUPPORT
-    for name in ('PackEntitySpawnId', 'PackClientEntitySpawnId'):
+    for name in ('PackEntitySpawnId', 'UnpackEntitySpawnId', 'PackClientEntitySpawnId'):
         code += '\n'+function_body(local, 'ID_INLINE int '+name+'(')
     for text, pointer in ((local, 'idEntityPtr'), (client, 'rvClientEntityPtr')):
         for result, method in (('void', 'Restore'), ('bool', 'IsValid'), ('int', 'GetEntityNum'), ('type *', 'GetEntity')):

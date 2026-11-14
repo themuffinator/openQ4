@@ -80,6 +80,9 @@ const int SPECTATE_RAISE = 25;
 // frame at a time from the spawn's own frame, so a client reads from what is left how many
 // frames ago the server placed the player (ReadFromSnapshot).
 const int SPAWN_KNOCKBACK_MSEC = 100;
+// openQ4: the longest gap in a player's snapshots that still shows a death or a hit it
+// hid (idPlayer::ReadFromSnapshot): four snapshots at the default 33 ms
+const int FEEDBACK_HITCH_MSEC = 150;
 
 const int	HEALTH_PULSE		= 1000;			// Regen rate and heal leak rate (for health > 100)
 const int	ARMOR_PULSE			= 1000;			// armor ticking down due to being higher than maxarmor
@@ -15715,6 +15718,14 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	const unsigned int missedSnapshots = stateHitch ? static_cast<unsigned int>( snapshotSequence ) - static_cast<unsigned int>( lastSnapshotSequence ) - 1u : 0u;
 	const int snapshotAge = gameLocal.time - lastSnapshotTime;
 	oldHealth = health;
+	// openQ4: what a death or a hit read across a gap shows. A gap in this player's
+	// snapshots once meant it had been out of view, so a death found on its return was
+	// hidden and silent and a hit showed nothing. But a single missed snapshot is a gap
+	// as well, and jitter loses one routinely (above): the death or hit it carried came
+	// with no death sound, the body hidden instead of falling, no pain, no view kick and
+	// no damage direction on the HUD. Only a gap long enough to have been out of view
+	// hides them now.
+	const bool feedbackHitch = stateHitch && ( snapshotAge <= 0 || snapshotAge > FEEDBACK_HITCH_MSEC );
 
 	if ( !physicsObj.DecodeSnapshotState( msg, decodedPhysics ) ) {
 		return;
@@ -15992,7 +16003,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 
 	if ( oldHealth > 0 && health <= 0 ) {
- 		if ( stateHitch ) {
+ 		if ( feedbackHitch ) {
  			// so we just hide and don't show a death skin
  			UpdateDeathSkin( true );
  		}
@@ -16014,7 +16025,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		StartRagdoll();
 		physicsObj.SetMovementType( PM_DEAD );
 
-		if ( !stateHitch ) {
+		if ( !feedbackHitch ) {
  			StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
  		}
 		
@@ -16073,7 +16084,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		physicsObj.EnableClip();
 		SetCombatContents( true );
 	} else if ( oldHealth - health > 2 && health > 0 ) {
- 		if ( stateHitch ) {
+ 		if ( feedbackHitch ) {
 			lastDmgTime = gameLocal.time;
    		} else {
  			// damage feedback
@@ -18349,7 +18360,11 @@ void idPlayer::PresentClassicHook( void ) {
 	}
 
 	const bool reeling = ( classicHookState == CLASSIC_HOOK_ATTACHED );
-	if ( reeling != classicHookReelSound ) {
+	// openQ4: a client starts and stops sounds only on a new frame, and this runs on
+	// replayed ones too. When the hook's catch was first seen on a replay the start was
+	// swallowed but remembered as made, so the reel never sounded; a stop first seen on
+	// one left it running. Wait for a frame that can make the change.
+	if ( reeling != classicHookReelSound && ( !gameLocal.isClient || gameLocal.isNewFrame ) ) {
 		if ( reeling ) {
 			StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_REEL, false ), SND_CHANNEL_HEART, 0, false, NULL );
 		} else {
