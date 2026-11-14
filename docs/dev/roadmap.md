@@ -4832,8 +4832,7 @@ Completion substeps:
   editing them with game-module `idDict` code had corrupted the engine's string
   pool, and the client crashed on quit after every Classic map.
   `mp_classic_grapple_contract.py` pins all of it. Remaining: real-input play
-  and Classic pickup names; a mid-map `si_ruleset` change typed at the console
-  was not seen to restart the map, which needs a look.
+  and Classic pickup names.
 
 ## Audio and voice
 
