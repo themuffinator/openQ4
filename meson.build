@@ -331,6 +331,21 @@ if get_option('build_native_tests')
   )
   test('openq4-crc32', openq4_crc32_test, timeout: 30)
 
+  # PNG/zlib codec: fixtures compressed by CPython's zlib, and the native test's
+  # encoder output decoded again by the script's independent reader
+  openq4_png_fixtures = custom_target(
+    'openq4-png-fixtures', input: files('tools/tests/png_codec.py'),
+    output: 'PngFixtures.inc',
+    command: [py, '@INPUT@', '--generate-native', '@OUTPUT@'],
+  )
+  openq4_png_codec_test = executable(
+    'openq4-png-codec-test', [files('tools/tests/native/PngCodecTest.cpp'), openq4_png_fixtures],
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-png-codec', py,
+    args: [files('tools/tests/png_codec.py'), '--run', openq4_png_codec_test, meson.project_build_root() / 'png-codec-test'],
+    depends: openq4_png_codec_test, timeout: 300)
+
   openq4_save_dict_under_test = custom_target(
     'openq4-save-dict-under-test', input: files('src/game/gamesys/SaveGame.cpp', 'src/mpgame/gamesys/SaveGame.cpp'),
     output: 'SaveDictUnderTest.inc',

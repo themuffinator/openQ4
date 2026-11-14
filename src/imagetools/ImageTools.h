@@ -40,6 +40,13 @@ byte *	R_ResampleTexture( const byte *in, int inwidth, int inheight, int outwidt
 // until the module split completes; callers of this header pass all arguments
 bool	R_WriteTGA( const char *filename, const byte *data, int width, int height, bool flipVertical, const char *basePath );
 
+// PNG at image_pngCompressionLevel; data is width x height pixels of channels
+// (3 = RGB, 4 = RGBA) bytes, top row first unless flipVertical is set
+bool	R_WritePNG( const char *filename, const byte *data, int width, int height, int channels, bool flipVertical, const char *basePath );
+
+// RGBA data as PNG when filename ends in .png, otherwise as TGA
+bool	R_WriteImageFile( const char *filename, const byte *data, int width, int height, bool flipVertical, const char *basePath );
+
 // malloc with error checking; pairs with R_StaticFree
 void *	R_StaticAlloc( size_t bytes );
 void *	R_ClearedStaticAlloc( size_t bytes );

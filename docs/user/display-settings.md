@@ -121,6 +121,7 @@ The classic menus' four quality choices use the same recipes: Low is Low, Medium
   - **Custom FS Width** and **Custom FS Height** set a custom size; editing them selects Custom.
   - **Refresh Rate** offers Auto plus the rates your display reports for that resolution. Auto keeps your desktop's refresh rate, or the nearest rate that resolution offers, and openQ4 picks the same rate every time. Leave it on Auto unless you need a specific rate. On macOS, Auto uses the desktop rate rather than the display's highest; this has not yet been confirmed on a Mac.
 - On Windows, fullscreen minimizes when you switch away, so Alt+Tab and the Snipping Tool can come to the front cleanly. `PrintScreen` opens the Windows snipping tool; press `F12` for an openQ4 screenshot, or set `win_printScreenToSystemTool 0` to bind `PrintScreen` in game.
+- **Not in 0.14.1:** set `r_screenshotFormat 1` to save screenshots as PNG instead of TGA. PNG files open in any image viewer or browser and usually take under a third of the space. `image_pngCompressionLevel` (0 to 9, default 4) trades file size for the time a capture takes: the default takes about a twentieth of a second for a 1280x720 frame, while 9 saves another tenth of the space but can take seconds. `screenshot <name>.png` always writes a PNG, whatever the setting. Screenshots go to `screenshots/` in your openQ4 save folder.
 
 ### Windowed and borderless
 

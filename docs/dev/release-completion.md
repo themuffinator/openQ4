@@ -7,6 +7,53 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## PNG textures and PNG screenshots, 14 November 2026
+
+- **Textures can be PNG files, and screenshots can be saved as PNG.** A
+  material that names a missing `.tga` or `.jpg` now finds a `.png` of the same
+  name, and materials may name `.png` files directly. Every PNG the
+  specification defines loads: greyscale, colour, palette and alpha images at
+  every bit depth, interlaced files and transparency. 16-bit images load at
+  8 bits per channel. `r_screenshotFormat 1` saves screenshots as PNG, usually
+  under a third of the size of TGA, and `screenshot <name>.png` writes PNG
+  whatever the setting.
+- **Nothing to do.** Screenshots stay TGA by default, because capture tools
+  and harnesses read `screenshots/shot<n>.tga`. `image_pngCompressionLevel`
+  (0-9, default 4) sets the trade-off between file size and capture time.
+- How it works: openQ4 has its own PNG reader and writer and its own zlib
+  inflate and deflate, under `src/imagetools/PNG/`, with no new dependency.
+  Inflate decodes straight into the image with table-driven Huffman decoding
+  and 64-bit refills; rows unfilter with SSE2 for 3- and 4-byte pixels, with a
+  portable path elsewhere. The writer picks each row's filter by the
+  minimum-sum heuristic, keeps the smallest lossless colour type, and
+  compresses with 4-byte hash chains, lazy matching and per-block
+  stored/fixed/dynamic choice, directly into the IDAT chunk.
+- Measured with `openq4-png-codec-test --bench` against CPython's zlib 1.2.13
+  on the same filtered rows. On a 1280x720 in-game frame from `game/hangar1`
+  (OpenGL), the default level 4 encodes in 54 ms to 29% of the TGA's size;
+  zlib's level 4 takes 74 ms for a 3% larger file. Level 6 takes 304 ms
+  against 319 ms, and level 9 2.2 s against 2.8 s: dark, noisy frames are slow
+  for both at the top levels. On a synthetic 1920x1080 frame inflate takes
+  6-8 ms against 13-18 ms, and a whole PNG decodes at 110-165 megapixels a
+  second (70-80 on the darker in-game frame).
+- Evidence: `openq4-png-codec` decodes 106 PNG files built with CPython's zlib
+  across every colour type, bit depth, Adam7, tRNS, all five filters, split
+  and empty IDAT chunks and eight zlib strategies, plus damaged files that must
+  fail with the right error. It inflates eight real-zlib streams and rejects
+  every truncation of them, flips bits in every fixture, round-trips 750
+  deflate streams at every level and 1,344 encoded images, and
+  `png_codec.py --verify` decodes 410 of the encoder's outputs with CPython's
+  zlib and an independent reader. The same test passed under ASan and UBSan with
+  clang 18 and gcc 13, on the portable path and as an arm64 build under
+  qemu. In `game/hangar1` on OpenGL and Vulkan (staged client, hidden window,
+  isolated save path), four PNG textures from the save path (8-bit RGBA,
+  interlaced 4-bit palette with tRNS, 16-bit RGB reached through the
+  extensionless-name fallback, interlaced 2-bit greyscale) loaded without a
+  warning and read back from the GPU equal to their source pixels; an
+  automatically named and an explicit PNG screenshot were written; and a PNG
+  and a TGA written from the same image held identical pixels. Not run: Linux,
+  macOS or Android, and a real texture pack.
+
 ## A system check offers the right preset after the presets change, 14 November 2026
 
 - **When an update changes the presets, openQ4 now offers to retune your
