@@ -7,6 +7,35 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Allies fire the gun they carry, 14 November 2026
+
+- **A marine seen holding a hyperblaster now fires one.** Every marine
+  carries all three of its guns in one model, and the level's setup only
+  hides the ones it does not use. The shots came from separate settings, so
+  when a level later handed a marine a hyperblaster he went on firing his old
+  machinegun. Hart, the tech on the second visit to Storage who gives Kane
+  the hyperblaster's bounce mod, was the case in the shipped campaign.
+- Now any allied marine that shows the hyperblaster fires its bolts, at its
+  rate and with its sound and muzzle flash, from the moment it appears. When
+  the hyperblaster is put away again, the marine goes back to its own weapon.
+  Marines already armed with a hyperblaster (Sledge, Rhodes, Voss and
+  Markswell, among others) are unchanged, and so are Strogg.
+- **Nothing to do.** Saves need no new format, and old saves load as before.
+- How it works: `rvAITactical::UpdateShownWeapon` checks the hidden-surface
+  mask whenever it changes. While the `w_hb` surface shows on a marine-team AI
+  whose attack is not a hyperblaster, it takes the weapon keys of the stock
+  `char_marine_hyperblaster` def. The keys it replaces are kept in spawnArgs
+  and put back when the gun is hidden.
+- Evidence: a static audit of every retail and Awakening SP map and entityDef
+  found no other marine whose visible gun and attack disagree. A hidden
+  `game/storage1 second` run logged Hart taking
+  `projectile_marine_hyperblaster` when `cprMessTrig` brings him in, and
+  going back to `hitscan_marine_bullet` after `trigger_relay_38` (the mod
+  hand-over). `game/process1` left Sledge's own hyperblaster untouched.
+- Open: a hyperblaster marine's bolts and muzzle flash still start at the
+  machinegun's muzzle joint. That matches the retail animation frame
+  commands for every hyperblaster marine.
+
 ## The Classic grappling hook grows up, 14 November 2026
 
 - **Bots use the grappling hook.** Under the Classic ruleset, wherever the

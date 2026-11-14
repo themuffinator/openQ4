@@ -68,6 +68,10 @@ protected:
 
 	bool				CheckRelaxed					( void ) const;
 
+	// openQ4: an ally showing the hyperblaster fires the hyperblaster
+	void				UpdateShownWeapon				( void );
+	void				RefreshWeaponSpawnArgs			( void );
+
 	void				InitPostureInfo					( void );
 	bool				UpdatePosture					( void );
 	void				CalculateShots					( const char* fireAnim );
@@ -99,6 +103,12 @@ protected:
 	bool				canThrowGrenades;
 
 	rvAIActionTimer		actionTimerPeek;
+
+	// openQ4: what UpdateShownWeapon last looked at.  The loadout it chose
+	// lives in spawnArgs, so these are not saved and simply re-check after a load
+	const idRenderModel*	shownWeaponModel;
+	int					shownWeaponSuppressMask;
+	int					shownWeaponTeam;
 
 private:
 

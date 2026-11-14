@@ -42,6 +42,9 @@ rvAITactical::rvAITactical ( void ) {
 	nextWallTraceTime = 0;
 	grenadeDelay = 0;
 	canThrowGrenades = false;
+	shownWeaponModel = NULL;
+	shownWeaponSuppressMask = 0;
+	shownWeaponTeam = -1;
 }
 
 /*
@@ -73,6 +76,158 @@ void rvAITactical::InitSpawnArgsVariables ( void )
 
 	healthRegen	= spawnArgs.GetInt( "healthRegen", "2" );
 	healthRegenEnabled	= spawnArgs.GetBool( "healthRegenEnabled", "0" );
+}
+
+/*
+================
+Shown weapon loadout
+
+openQ4: every marine mesh carries all three guns (machinegun, shotgun and
+hyperblaster) and each def hides the ones it does not use, but the shot comes
+from the separate def_attack keys.  Anything that shows a different gun later,
+such as storage1's script handing Hart a hyperblaster in place of his
+machinegun, left the marine firing the old one.  An allied tactical AI that
+shows the hyperblaster now takes the stock char_marine_hyperblaster loadout.
+The keys it replaces are kept in spawnArgs, so saves carry them without a
+format change, and they come back when the hyperblaster is hidden again.
+================
+*/
+namespace {
+
+const char* const TACTICAL_HYPERBLASTER_SURFACE	= "models/weapons/mp_guns/w_hb";
+const char* const TACTICAL_HYPERBLASTER_DEF		= "char_marine_hyperblaster";
+const char* const TACTICAL_LOADOUT_ACTIVE		= "openq4_shownWeapon";
+const char* const TACTICAL_LOADOUT_SAVED		= "openq4_shownWeaponSaved_";
+
+const char* const tacticalLoadoutKeys[] = {
+	"def_attack_base",
+	"def_attack_killswitch",
+	"fireRate",
+	"ammo",
+	"minShots",
+	"maxShots",
+	"snd_base_flash",
+	"fx_base_flash",
+	"joint_flashlight",
+	"weaponPrefix",
+};
+
+const char* const tacticalLoadoutPrefixes[] = {
+	"attack_base_",
+	"attack_killswitch_",
+};
+
+bool IsTacticalLoadoutKey( const char* key ) {
+	for ( int i = 0; i < (int)( sizeof( tacticalLoadoutKeys ) / sizeof( tacticalLoadoutKeys[0] ) ); i++ ) {
+		if ( !idStr::Icmp( key, tacticalLoadoutKeys[i] ) ) {
+			return true;
+		}
+	}
+	for ( int i = 0; i < (int)( sizeof( tacticalLoadoutPrefixes ) / sizeof( tacticalLoadoutPrefixes[0] ) ); i++ ) {
+		const int length = idStr::Length( tacticalLoadoutPrefixes[i] );
+		if ( !idStr::Icmpn( key, tacticalLoadoutPrefixes[i], length ) ) {
+			// the one-shot "missFirstShot" flag is live state, not part of the gun
+			return idStr::Icmp( key + length, "missFirstShot" ) != 0;
+		}
+	}
+	return false;
+}
+
+void CollectTacticalLoadoutKeys( const idDict& dict, idStrList& keys ) {
+	for ( int i = 0; i < dict.GetNumKeyVals(); i++ ) {
+		const idKeyValue* kv = dict.GetKeyVal( i );
+		if ( IsTacticalLoadoutKey( kv->GetKey() ) ) {
+			keys.Append( kv->GetKey() );
+		}
+	}
+}
+
+}
+
+/*
+================
+rvAITactical::RefreshWeaponSpawnArgs
+
+Re-reads the cached members that come from the loadout keys.
+================
+*/
+void rvAITactical::RefreshWeaponSpawnArgs( void ) {
+	maxShots = spawnArgs.GetInt ( "maxShots", "1" );
+	minShots = spawnArgs.GetInt ( "minShots", "1" );
+	fireRate = SEC2MS ( spawnArgs.GetFloat ( "fireRate", "1" ) );
+	ammo	 = spawnArgs.GetInt ( "ammo", "-1" );
+	flashlightJoint = animator.GetJointHandle( spawnArgs.GetString ( "joint_flashlight", "flashlight" ) );
+}
+
+/*
+================
+rvAITactical::UpdateShownWeapon
+================
+*/
+void rvAITactical::UpdateShownWeapon( void ) {
+	const idRenderModel* model = renderEntity.hModel;
+	if ( model == shownWeaponModel && renderEntity.suppressSurfaceMask == shownWeaponSuppressMask && team == shownWeaponTeam ) {
+		return;
+	}
+	shownWeaponModel = model;
+	shownWeaponSuppressMask = renderEntity.suppressSurfaceMask;
+	shownWeaponTeam = team;
+
+	bool showsHyperblaster = false;
+	if ( model != NULL && team == AITEAM_MARINE ) {
+		const int mask = model->GetSurfaceMask( TACTICAL_HYPERBLASTER_SURFACE );
+		showsHyperblaster = ( mask & ~renderEntity.suppressSurfaceMask ) != 0;
+	}
+
+	const bool active = spawnArgs.GetBool( TACTICAL_LOADOUT_ACTIVE, "0" );
+	if ( showsHyperblaster == active ) {
+		return;
+	}
+
+	idStrList keys;
+	if ( showsHyperblaster ) {
+		// Already armed with a hyperblaster of its own (stock, level or mod def)
+		if ( idStr::FindText( spawnArgs.GetString( "def_attack_base" ), "hyperblaster", false ) >= 0 ) {
+			return;
+		}
+		const idDict* hyperblaster = gameLocal.FindEntityDefDict( TACTICAL_HYPERBLASTER_DEF, false );
+		if ( hyperblaster == NULL ) {
+			return;
+		}
+
+		CollectTacticalLoadoutKeys( spawnArgs, keys );
+		for ( int i = 0; i < keys.Num(); i++ ) {
+			spawnArgs.Set( va( "%s%s", TACTICAL_LOADOUT_SAVED, keys[i].c_str() ), spawnArgs.GetString( keys[i] ) );
+			spawnArgs.Delete( keys[i] );
+		}
+		for ( int i = 0; i < hyperblaster->GetNumKeyVals(); i++ ) {
+			const idKeyValue* kv = hyperblaster->GetKeyVal( i );
+			if ( IsTacticalLoadoutKey( kv->GetKey() ) ) {
+				spawnArgs.Set( kv->GetKey(), kv->GetValue() );
+			}
+		}
+		spawnArgs.SetBool( TACTICAL_LOADOUT_ACTIVE, true );
+		gameLocal.DPrintf( "%s shows a hyperblaster, arming it with one (%s)\n", GetName(), spawnArgs.GetString( "def_attack_base" ) );
+	} else {
+		CollectTacticalLoadoutKeys( spawnArgs, keys );
+		for ( int i = 0; i < keys.Num(); i++ ) {
+			spawnArgs.Delete( keys[i] );
+		}
+
+		const int savedLength = idStr::Length( TACTICAL_LOADOUT_SAVED );
+		idStrList saved;
+		for ( const idKeyValue* kv = spawnArgs.MatchPrefix( TACTICAL_LOADOUT_SAVED ); kv; kv = spawnArgs.MatchPrefix( TACTICAL_LOADOUT_SAVED, kv ) ) {
+			saved.Append( kv->GetKey() );
+		}
+		for ( int i = 0; i < saved.Num(); i++ ) {
+			spawnArgs.Set( saved[i].c_str() + savedLength, spawnArgs.GetString( saved[i] ) );
+			spawnArgs.Delete( saved[i] );
+		}
+		spawnArgs.Delete( TACTICAL_LOADOUT_ACTIVE );
+		gameLocal.DPrintf( "%s hid its hyperblaster, restoring its own weapon (%s)\n", GetName(), spawnArgs.GetString( "def_attack_base" ) );
+	}
+
+	RefreshWeaponSpawnArgs();
 }
 
 /*
@@ -125,6 +280,9 @@ rvAITactical::Think
 ================
 */
 void rvAITactical::Think ( void ) {
+	// before the animation frame commands fire this frame's shots
+	UpdateShownWeapon ( );
+
 	idAI::Think ( );
 
 	// If not simple thinking and not in an action, update the posture 
