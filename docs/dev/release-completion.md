@@ -7,6 +7,23 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Multiview demos play again (0.14.1 regression), 14 November 2026
+
+- **Watching a multiview demo from the menu works again.** In 0.14.1, playing
+  a recorded match without being connected to a server stopped at the map
+  load with "idGameLocal::RegisterEntity: spawn_entnum 4095 out of range".
+  A safety check added late in 0.14.1 rejected the slot the game uses for the
+  demo's own viewer.
+- **Nothing to do.** Demos recorded with 0.14.1 are fine; only playback was
+  affected.
+- How it works: `RegisterEntity` now accepts any slot inside the entity
+  table, the viewer's `ENTITYNUM_NONE` included, in both game modules.
+  `mp_match_demo_follow_contract.py` checks both trees.
+- Evidence: found by the PHYS-05 integration run, which plays a demo
+  recorded on a listen server from a freshly started client. On the fixed
+  build the same playback ran its 742 frames to the end of the demo without
+  an error. Not run: playback from the Demos menu by hand, Linux and macOS.
+
 ## Click the key prompts in the new menus, 14 November 2026
 
 - **The key prompts at the bottom of every new menu now work with the

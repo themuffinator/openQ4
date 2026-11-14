@@ -6242,8 +6242,9 @@ void idGameLocal::RegisterEntity( idEntity *ent ) {
 	} else {
 		assert( spawn_entnum < MAX_CLIENTS || spawn_entnum >= minSpawnIndex );
 		// openQ4: the number comes from spawn args, which a map or a script can
-		// set, and it indexes entities[] and spawnIds[] below
-		if ( spawn_entnum < 0 || spawn_entnum >= ENTITYNUM_NONE ) {
+		// set, and it indexes entities[] and spawnIds[] below. ENTITYNUM_NONE is
+		// a real slot: the offline demo viewer is spawned there (InitLocalClient)
+		if ( spawn_entnum < 0 || spawn_entnum >= MAX_GENTITIES ) {
 			Error( "idGameLocal::RegisterEntity: spawn_entnum %d out of range", spawn_entnum );
 		}
 	}
