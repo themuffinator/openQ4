@@ -224,6 +224,7 @@ def validate_presets() -> None:
     add = body(source, "static bool MPPresetAddSetting(")
     require(add, "rvMPPresets::SettingAllowed( key )", "MPPresetAddSetting")
     apply = body(source, "bool rvMPPresets::Apply(")
+    require(apply, "gameLocal.mpGame.InvalidateCasualRulesImport();", "rvMPPresets::Apply (a casual session mirrors its limits back)")
     require(apply, "if ( !Settings( name, settings, reason ) ) {\n\t\treturn false;", "rvMPPresets::Apply")
 
 
@@ -349,6 +350,14 @@ def validate_menu() -> None:
         require(document, f'"{verb}"', "createserver.rui (regenerate with build_retained_screens.py)")
     for state in ("weaponarena", "preset"):
         require(tabs, f'"create-{state}"', "ADVANCED_TABS")
+    # The retained runtime refuses a document that asks for a verb it does not
+    # know, and the stock screen then stays in use: every row's verb is listed.
+    runtime = read(ROOT / "src/ui/UserInterfaceRetained.cpp")
+    known = read(ROOT / "tools/tests/native/UiRetainedScreensTest.cpp")
+    for verb in ("createQuadHog", "createVampiric", "createFrenzy", "createWeaponArena", "createPowerups", "createSelfDamage",
+                 "createKnockback", "createFallDamage", "createWeaponRespawn", "createPreset"):
+        require(runtime, f'"{verb}"', "UserInterfaceRetained.cpp's application operations")
+        require(known, f'"{verb}"', "UiRetainedScreensTest.cpp's session commands")
     # The page shows Custom once a setting the preset vouches for has changed,
     # as the game's rvMPPresets::Matches decides at the next map load.
     value = menu[menu.index("static int Session_RetainedCreatePreset( void ) {"):menu.index("static void Session_SetRetainedCreatePreset(")]
@@ -533,7 +542,8 @@ const mpGameTypeInfo_t *MPGameTypeByName(const char *name) { for(const auto &row
 bool MPGameTypeIsSelectable(int type) { for(const auto &row:gameTypes) if(row.type == type) return row.selectable; return false; }
 bool MPGameTypeHasAny(int type,int mask) { for(const auto &row:gameTypes) if(row.type == type) return (row.flags & mask) != 0; return false; }
 struct MpGame {
-    int latched = 0; bool managed = false; int restarts = 0;
+    int latched = 0; bool managed = false; int restarts = 0, imports = 0;
+    void InvalidateCasualRulesImport() { ++imports; }
     bool HasModifier(int modifier) const { return (latched & BIT(modifier)) != 0; }
     bool RejectManagedLegacyMutation(const char *) { return managed; }
     void QueueRulesRestart() { ++restarts; }
@@ -695,6 +705,8 @@ int main() {
     assert(Refused("text", "si_fragLimit lots\n", "is a whole number"));
     assert(Refused("neg", "si_fragLimit -1\n", "is a whole number"));
     assert(Refused("lone", "si_instagib\n", "expected a setting and its value"));
+    assert(Refused("crlf", "// one\r\nsi_vampiric 1\r\ng_password x\r\n", "presets/crlf.cfg line 3: "));	// CR LF is one line break
+    assert(Refused("lf", "// one\nsi_vampiric 1\ng_password x\n", "presets/lf.cfg line 3: "));
     assert(Refused("empty", "", "empty or longer"));
     assert(Refused("huge", std::string(9000, ' ').c_str(), "empty or longer"));
     assert(cvarLocal.values.at("si_preset") == "friday");		// a refused preset changed nothing
@@ -727,6 +739,7 @@ int main() {
     command.TokenizeString("preset instactf", false); MP_Preset_f(command);
     assert(cvarSystem->GetCVarBool("si_instagib") && !cvarSystem->GetCVarBool("si_vampiric") && gameLocal.mpGame.restarts == 1);
     assert(std::string(cvarSystem->GetCVarString("si_gameType")) == "CTF" && std::string(cvarSystem->GetCVarString("si_captureLimit")) == "8");
+    assert(gameLocal.mpGame.imports > 0);		// the preset's limits are imported at the restart, not mirrored over
     command.TokenizeString("preset nosuch", false); MP_Preset_f(command);
     assert(gameLocal.mpGame.restarts == 1 && std::string(cvarSystem->GetCVarString("si_preset")) == "instactf");
     // before a map is running the settings are written and nothing restarts

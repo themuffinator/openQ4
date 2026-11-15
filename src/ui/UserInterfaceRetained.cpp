@@ -348,6 +348,8 @@ bool SessionMenuValueCommand(const std::string& command) {
 		"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
 		"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 		"createRuleset","createGrapple","createInstagib",
+		"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
+		"createFallDamage","createWeaponRespawn","createPreset",
 		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 		"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};

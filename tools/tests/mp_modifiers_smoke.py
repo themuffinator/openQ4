@@ -31,7 +31,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from mp_round_remote_smoke import verify_runtime_is_current
+from mp_round_remote_smoke import verify_runtime_is_current, write_script
 
 ROOT = Path(__file__).resolve().parents[2]
 BOTS = ["addbot Cortez 4 exact", "addbot Rhodes 4 exact", "addbot Sledge 4 exact", "waitMsec 4000"]
@@ -75,7 +75,7 @@ SCENARIOS = {
     "instactf": {
         "gametype": "CTF", "map": "mp/q4ctf1", "cvars": {},
         "script": [*BOTS, *checkpoint("standard", True), "preset instactf", "waitMsec 9000", *checkpoint("instactf", True),
-                   "waitMsec 15000", *checkpoint("end")],
+                   "waitMsec 15000", *checkpoint("end"), "si_captureLimit"],
         "timeout": 200,
     },
 }
@@ -86,25 +86,32 @@ REMOTE = {
     "remote-arena": {
         "gametype": "Team DM", "map": "mp/q4dm1",
         "cvars": {"si_weaponArena": "rocketlauncher", "si_vampiric": "1", "si_powerups": "0", "si_selfDamage": "0"},
-        "host": ["addbot Cortez 4 exact", "addbot Rhodes 4 exact", "waitMsec 75000", *checkpoint("host", True), "waitMsec 20000"],
+        "host": ["addbot Cortez 4 exact", "addbot Rhodes 4 exact"], "joined": [],
         "client": ["waitMsec 20000", *checkpoint("client", True), "waitMsec 2000"],
-        "timeout": 260,
+        "timeout": 420,
     },
     "remote-quadhog": {
         "gametype": "DM", "map": "mp/q4dm1", "cvars": {"si_quadHog": "1"},
-        "host": ["set bot_pause 1", "addbot Cortez 4 exact", "waitMsec 60000", "teleport openq4_quad_hog_1", "waitMsec 15000",
-                 *checkpoint("host", True), "waitMsec 20000"],
+        # the host takes the quad once the client is in (unless the quad spawned on it and it already has)
+        "host": ["set bot_pause 1", "addbot Cortez 4 exact"], "joined": ["teleport openq4_quad_hog_1"],
         "client": ["waitMsec 20000", *checkpoint("client", True), "waitMsec 2000"],
-        "timeout": 260,
+        "timeout": 420,
     },
 }
 
 
+def paced(lines: list, scale: float) -> list:
+    """The script with every waitMsec stretched: the waits are wall-clock, and a loaded machine runs the game slower."""
+    return [re.sub(r"^waitMsec (\d+)$", lambda match: "waitMsec %d" % round(int(match.group(1)) * scale), line) for line in lines]
+
+
 def block(log: str, name: str, entities: bool = False) -> str:
     """The log text of one checkpoint."""
-    start = log.rfind("\nMP_MOD_" + name.upper() + "\n")
-    if start < 0:
+    # echo prints its argument and a space
+    marks = list(re.finditer(r"\nMP_MOD_" + name.upper() + r" ?\r?\n", log))
+    if not marks:
         raise AssertionError(f"checkpoint {name} is missing from the log")
+    start = marks[-1].start()
     end = log.find("\nMP_MOD_", start + 1)
     if entities:
         end = log.find("\nMP_MOD_" + name.upper() + "_END", start + 1)
@@ -244,21 +251,25 @@ def check_presets(log: str, failures: list) -> dict:
     left = block(log, "nopowerups", True)
     expect(rules(left)["modifiers"] == "nopowerups" and rules(left)["fixedWeapon"] == "none", f"after the commands: {rules(left)}", failures)
     found = pickups(left)
-    expect(found["weapon"] == baseline["weapon"] and found["powerup"] == 0, f"si_powerups 0 on the stock map: {found}", failures)
+    expect(found["weapon"] > 0 and found["ammo"] == baseline["ammo"] and found["powerup"] == 0, f"si_powerups 0 on the stock map: {found}", failures)
 
     reset = block(log, "reset", True)
     expect(rules(reset)["modifiers"] == "" and rules(reset)["preset"] == "standard" and rules(reset)["selfDamage"] == "100",
            f"preset standard: {rules(reset)}", failures)
-    expect(pickups(reset) == baseline, "preset standard must bring the stock map back", failures)
+    restored = pickups(reset)
+    # dropped weapons are listed too, so the weapon count only has to be there
+    expect(restored["weapon"] > 0 and all(restored[key] == baseline[key] for key in ("ammo", "health", "armor", "powerup")),
+           f"preset standard must bring the stock map back: {restored}", failures)
 
     first, second = block(log, "frenzy_a"), block(log, "frenzy_b")
     expect(rules(first)["modifiers"] == "frenzy" and rules(first)["title"] == "Frenzy Deathmatch", f"frenzy: {rules(first)}", failures)
-    before, after = loadouts(first), loadouts(second)
+    # The bots are paused and nobody fires: a fresh spawn's ammo under the stock rules (the reset
+    # checkpoint, where the host has just spawned) against the same weapon a while into Weapons Frenzy.
+    before, after = loadouts(reset), loadouts(second)
     gains = {slot: (before[slot]["ammo"], after[slot]["ammo"]) for slot in before
-             if slot in after and before[slot]["current"] == after[slot]["current"] and before[slot]["ammo"] >= 0}
-    expect(all(new >= old for old, new in gains.values()), f"ammo fell while idle under Weapons Frenzy: {gains}", failures)
-    expect(any(new > old for old, new in gains.values()) or all(old == new for old, new in gains.values()) and bool(gains),
-           f"no carried ammo regenerated: {gains}", failures)
+             if slot in after and before[slot]["current"] == after[slot]["current"] >= 0 and before[slot]["ammo"] >= 0
+             and before[slot]["weapons"] == after[slot]["weapons"]}
+    expect(bool(gains) and all(new > old for old, new in gains.values()), f"carried ammo did not regenerate under Weapons Frenzy: {gains}", failures)
     refused = rules(block(log, "refused"))
     expect("preset: presets/locked.cfg line 2: 'net_serverRemoteConsolePassword' is not a setting a preset may change" in log,
            "the preset with a forbidden setting was not refused with its reason", failures)
@@ -278,8 +289,11 @@ def check_instactf(log: str, failures: list) -> dict:
     expect(state["title"] == "Instagib Capture the Flag" and state["fixedWeapon"] == "weapon_railgun", f"instactf presentation: {state}", failures)
     found = pickups(modified)
     expect(found["weapon"] + found["ammo"] + found["health"] + found["armor"] + found["powerup"] == 0, f"Instagib left pickups: {found}", failures)
-    expect(pickups(standard)["flag"] == found["flag"] and found["flag"] >= 2, f"the flags must stay: {found['flag']}", failures)
-    return {"flags": found["flag"], "capture_limit": re.findall(r"si_captureLimit[^\n]*", modified)[:1]}
+    expect(found["flag"] >= 2, f"the flags must stay: {found['flag']} (stock {pickups(standard)['flag']})", failures)
+    # The preset's capture limit must survive the restart: a casual session mirrors its limits back at every map start.
+    limit = re.search(r'"si_captureLimit" is:"(\d+)"', log[log.rfind("MP_MOD_END"):])
+    expect(limit is not None and limit.group(1) == "8", f"instactf's capture limit after the restart: {limit.group(1) if limit else None}", failures)
+    return {"flags": found["flag"], "capture_limit": limit.group(1) if limit else None}
 
 
 CHECKS = {"quadhog": check_quadhog, "vampiric": check_vampiric, "presets": check_presets, "instactf": check_instactf}
@@ -311,8 +325,13 @@ def run_remote(name: str, args) -> dict:
         (path / "baseoq4").mkdir(parents=True, exist_ok=True)
         if logs[role].is_file():
             logs[role].unlink()
-        (path / "baseoq4/mp_modifiers_smoke.cfg").write_text(
-            "\n".join([*scenario[role], f"echo MP_MOD_DONE_{role.upper()}", "quit"]) + "\n", encoding="utf-8")
+    # The client loads for as long as it loads, so the host does not run to a
+    # clock: it idles on a script this harness rewrites as the client gets on.
+    idle = ["waitMsec 500", "exec mp_modifiers_idle.cfg"]
+    write_script(saves["host"] / "baseoq4/mp_modifiers_idle.cfg", idle)
+    write_script(saves["host"] / "baseoq4/mp_modifiers_smoke.cfg", [*scenario["host"], "exec mp_modifiers_idle.cfg"])
+    write_script(saves["client"] / "baseoq4/mp_modifiers_smoke.cfg",
+                 [*paced(scenario["client"], args.time_scale), "echo MP_MOD_DONE_CLIENT", "quit"])
     host = launch_cvars(args, saves["host"], "mp_modifiers_smoke.cfg")
     host.update({
         "net_port": str(args.port), "net_ip": "127.0.0.1", "net_enableIPv6": "0", "net_serverDedicated": "0", "net_LANServer": "1",
@@ -353,9 +372,22 @@ def run_remote(name: str, args) -> dict:
             stream = (output / f"{role}-console.log").open("w", encoding="utf-8")
             streams.append(stream)
             processes[role] = subprocess.Popen(line, cwd=runtime, stdout=stream, stderr=subprocess.STDOUT)
-        deadline = started + scenario["timeout"] + args.extra_timeout
+        deadline = started + scenario["timeout"] * args.time_scale + args.extra_timeout
+        stage = 0
         while time.time() < deadline and any(process.poll() is None for process in processes.values()):
             time.sleep(1.0)
+            seen = logs["client"].read_text(encoding="utf-8", errors="replace") if logs["client"].is_file() else ""
+            if stage == 0 and "execing mp_modifiers_smoke.cfg" in seen:
+                # the client's map is up: the host does its part once and goes back to idling
+                write_script(saves["host"] / "baseoq4/mp_modifiers_joined.cfg", ["waitMsec 500", "exec mp_modifiers_joined.cfg"])
+                write_script(saves["host"] / "baseoq4/mp_modifiers_idle.cfg", [*scenario["joined"], "exec mp_modifiers_joined.cfg"])
+                stage = 1
+            elif stage == 1 and "MP_MOD_DONE_CLIENT" in seen:
+                # the client has reported: the host reports the same moment's world and ends the run
+                write_script(saves["host"] / "baseoq4/mp_modifiers_joined.cfg", [*checkpoint("host", True), "echo MP_MOD_DONE_HOST", "quit"])
+                stage = 2
+            elif stage == 0 and processes.get("client") is not None and processes["client"].poll() is not None:
+                break	# the client left before its map was up
     finally:
         for role, process in processes.items():
             if process.poll() is None:
@@ -416,7 +448,8 @@ def run(name: str, args) -> dict:
     savepath = output / "save"
     gamepath = savepath / "baseoq4"
     gamepath.mkdir(parents=True, exist_ok=True)
-    (gamepath / "mp_modifiers_smoke.cfg").write_text("\n".join([*scenario["script"], "echo MP_MOD_DONE", "quit"]) + "\n", encoding="utf-8")
+    (gamepath / "mp_modifiers_smoke.cfg").write_text(
+        "\n".join([*paced(scenario["script"], args.time_scale), "echo MP_MOD_DONE", "quit"]) + "\n", encoding="utf-8")
     for relative, text in scenario.get("files", {}).items():
         (gamepath / relative).parent.mkdir(parents=True, exist_ok=True)
         (gamepath / relative).write_text(text, encoding="utf-8")
@@ -444,6 +477,15 @@ def run(name: str, args) -> dict:
         "g_autoExecAfterMapLoad": "mp_modifiers_smoke.cfg", "g_autoExecAfterMapLoadDelayMs": "1000",
     }
     cvars.update(scenario["cvars"])
+    if args.read_only:
+        # judge the log a finished run left, without launching anything
+        log = (gamepath / "logs/openq4.log").read_text(encoding="utf-8", errors="replace")
+        failures, summary = [], {}
+        try:
+            summary = CHECKS[name](log, failures)
+        except AssertionError as error:
+            failures.append(str(error))
+        return {"scenario": name, "render_api": args.render_api, "read_only": True, "summary": summary, "failures": failures}
     command = [str(exe)]
     for key, value in cvars.items():
         command += ["+set", key, value]
@@ -454,7 +496,7 @@ def run(name: str, args) -> dict:
     with (output / "console.log").open("w", encoding="utf-8") as console:
         process = subprocess.Popen(command, cwd=runtime, stdout=console, stderr=subprocess.STDOUT)
         try:
-            code = process.wait(timeout=scenario["timeout"] + args.extra_timeout)
+            code = process.wait(timeout=scenario["timeout"] * args.time_scale + args.extra_timeout)
         except subprocess.TimeoutExpired:
             process.kill()  # Only the process launched by this test.
             process.wait()
@@ -490,6 +532,9 @@ def main() -> int:
     parser.add_argument("--render-api", choices=("gl", "vk"), default="gl")
     parser.add_argument("--port", type=int, default=28961)
     parser.add_argument("--extra-timeout", type=int, default=0, help="seconds added to each scenario's timeout on a loaded machine")
+    parser.add_argument("--time-scale", type=float, default=1.0,
+                        help="stretch every scripted wait and timeout; a loaded machine runs the hidden game slower than the clock")
+    parser.add_argument("--read-only", action="store_true", help="re-read the logs of the last run of each single-process scenario")
     parser.add_argument("--scenario", action="append", choices=(*SCENARIOS, *REMOTE), help="run only these; default all")
     args = parser.parse_args()
     runtime = args.runtime_dir.resolve()

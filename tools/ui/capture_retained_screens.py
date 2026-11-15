@@ -946,6 +946,18 @@ SCENARIOS = {
         'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 400', 'si_instagib',
         'screenshot "screenshots/createserver-instagib.tga"',
         'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 300', 'si_instagib',
+        # Preset: Rocket Arena (the seventh choice) sets the arena, the powerups and the
+        # two percentages and names itself; Standard (the second) puts them all back.
+        'openq4_retainedGui focus "create-preset"', 'waitMsec 100', 'openq4_retainedGui choice open "create-preset"', 'waitMsec 400',
+        'screenshot "screenshots/createserver-presets.tga"',
+        'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 
+        'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 600',
+        'si_preset', 'si_weaponArena', 'si_powerups', 'si_selfDamage', 'si_fallDamage', 'openq4_retainedGui report',
+        'screenshot "screenshots/createserver-rocketarena.tga"',
+        'openq4_retainedGui focus "create-preset"', 'waitMsec 100', 'openq4_retainedGui choice open "create-preset"', 'waitMsec 400',
+        'openq4_retainedGui menu home 1', 'openq4_retainedGui menu home 0', 'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 
+        'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 600',
+        'si_preset', 'si_weaponArena', 'si_powerups', 'si_selfDamage', 'si_fallDamage',
         'openq4_retainedGui event advancedModalHide', 'waitMsec 600',
         'openq4_retainedGui focus create_back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 150', 'screenshot "screenshots/createserver-back.tga"', 'waitMsec 1200', 'openq4_retainedGui report',

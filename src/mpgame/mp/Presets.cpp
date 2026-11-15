@@ -168,7 +168,8 @@ static bool MPPresetReadFile( const char *name, idDict &settings, idStr &reason 
 		}
 		lineNumber++;
 		idStr line = text.Mid( start, end - start );
-		start = end + 1;
+		// a CR LF pair ends one line, not two
+		start = ( end + 1 < length && text[ end ] == '\r' && text[ end + 1 ] == '\n' ) ? end + 2 : end + 1;
 
 		const int comment = line.Find( "//" );
 		if ( comment >= 0 ) {
@@ -330,6 +331,12 @@ bool rvMPPresets::Apply( const char *name, idStr &reason ) {
 	idStr lowered = name;
 	lowered.ToLower();
 	cvarSystem->SetCVarString( "si_preset", lowered.c_str() );
+	// A casual session imports its limits from the settings once and mirrors
+	// them back at every map start. A preset has just changed them, so the
+	// next start must import again or the mirror would put the old ones back.
+	if ( gameLocal.isMultiplayer && !gameLocal.isClient ) {
+		gameLocal.mpGame.InvalidateCasualRulesImport();
+	}
 	return true;
 }
 
