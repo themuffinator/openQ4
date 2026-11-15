@@ -4396,6 +4396,11 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "serverNextMap",			idGameLocal::NextMap_f,		CMD_FL_GAME,				"change to the next map" );
 #endif
 
+	// openQ4: the map database (MP-13)
+	cmdSystem->AddCommand( "mymap",					mpMapDatabaseHost::MyMap_f,		CMD_FL_GAME,	"queue a map for the next map change: mymap [map|clear]", mpMapDatabaseHost::ArgCompletion_Map );
+	cmdSystem->AddCommand( "mappick",				mpMapDatabaseHost::MapPick_f,	CMD_FL_GAME,	"choose a map of the end-of-match pick: mappick <1-3>" );
+	cmdSystem->AddCommand( "mapdb",					mpMapDatabaseHost::MapDb_f,		CMD_FL_GAME,	"the multiplayer map database: mapdb [list|rotation|queue|next|settings|check|reload]" );
+
 	cmdSystem->AddCommand( "CheckTeamBalance", idMultiplayerGame::CheckTeamBalance_f, CMD_FL_GAME, "helper for team switching in the guis - <team to switch to> <named event for yes> <named event for no> <named event for same team>" );
 
 	// openQ4: explicit ready commands.  Quake 4 only exposed ready through

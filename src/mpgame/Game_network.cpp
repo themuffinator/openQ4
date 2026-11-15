@@ -1724,6 +1724,14 @@ void idGameLocal::ServerProcessReliableMessage( int clientNum, const idBitMsg &m
 		case GAME_RELIABLE_MESSAGE_MATCH_REQUEST:
 			mpGame.ServerReceiveMatchOperation( clientNum, msg );
 			break;
+		case GAME_RELIABLE_MESSAGE_MAPDB: {
+			// a queued map is announced to everyone; one request a second is plenty
+			if ( !CheckClientReliableFlood( clientNum, RELIABLE_FLOOD_MAPDB, RELIABLE_FLOOD_MAPDB_DELAY ) ) {
+				break;
+			}
+			mpMapHost.ServerReceiveRequest( clientNum, msg );
+			break;
+		}
 		// openQ4 END
 
 		default: {
@@ -1835,6 +1843,11 @@ void idGameLocal::RepeaterProcessReliableMessage( int clientNum, const idBitMsg 
 
 		// openQ4: viewers have no ready state
 		case GAME_RELIABLE_MESSAGE_READY: {
+			break;
+		}
+
+		// openQ4: viewers neither queue nor pick maps
+		case GAME_RELIABLE_MESSAGE_MAPDB: {
 			break;
 		}
 

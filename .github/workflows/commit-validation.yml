@@ -251,6 +251,7 @@ jobs:
             tools/tests/arena_sound_runtime.py \
             tools/tests/mp_wsl_peer_smoke.py \
             tools/tests/mp_lan_reconnect_smoke.py \
+            tools/tests/mp_map_rotation_smoke.py \
             tools/tests/mp_path_mtu_soak.py \
             tools/tests/content_pack_split_smoke.py \
             tools/tests/content_pack_status_smoke.py \
@@ -390,6 +391,7 @@ jobs:
             tools/tests/mp_bot_server_menu.py \
             tools/tests/mp_instagib_contract.py \
             tools/tests/mp_modifiers_contract.py \
+            tools/tests/mp_map_database_contract.py \
             tools/tests/mp_bot_team_balance.py \
             tools/tests/mp_bot_team_orders.py \
             tools/tests/mp_bot_hazards.py \
@@ -954,6 +956,7 @@ jobs:
           python tools/tests/mp_bot_server_menu.py
           python tools/tests/mp_instagib_contract.py
           python tools/tests/mp_modifiers_contract.py
+          python tools/tests/mp_map_database_contract.py
           python tools/tests/mp_bot_team_balance.py
           python tools/tests/mp_bot_team_orders.py
           python tools/tests/mp_bot_hazards.py

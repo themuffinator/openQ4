@@ -373,8 +373,9 @@ set si_mapCycle "mp/q4dm1;mp/q4dm3;mp/q4dm5;mp/q4dm7;mp/q4dm9"
 ```
 
 The server removes duplicates and checks that each map is installed and suits
-the game type. If the list is empty, it builds a pool from the installed maps
-that suit the game type. Map-cycle scripts in the game folder can include other
+the game type. If the list is empty, it builds a pool from the maps of the
+server's [rotation](server-setup.md#maps-rotation-and-the-map-queue) that suit
+the game type. Map-cycle scripts in the game folder can include other
 scripts by relative path on every platform.
 
 ### Server operator commands

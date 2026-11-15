@@ -806,6 +806,9 @@ void idGameLocal::Shutdown( void ) {
 
 	MapShutdown();
 
+	// openQ4: a map's settings never outlive the module that applied them
+	mpMapHost.Shutdown();
+
 	aasList.DeleteContents( true );
 	aasNames.Clear();
 
@@ -2181,61 +2184,19 @@ bool idGameLocal::NextMap( void ) {
 	idDict				newInfo;
 	const idKeyValue	*keyval, *keyval2;
 	int					i;
-	const char			*mapCycleList, *currentMap;
 
-//RAVEN BEGIN
-//asalmon: pick another map on Xenon
-#ifdef _XENON
-	//Live()->PickMap();
-	return true;
-#endif
-//RAVEN END
-
-// RAVEN BEGIN
-// rjohnson: traditional map cycle
-//		si_mapCycle "mp/q4dm4;mp/q4dm5;mp/q4dm6"
-	mapCycleList = si_mapCycle.GetString();
-	if ( mapCycleList && strlen( mapCycleList ) ) {
-		idLexer src;
-		idToken token, firstFound;
-		int		numMaps = 0;
-		bool	foundMap = false;
-
-		src.FreeSource();
-		src.SetFlags( LEXFL_NOFATALERRORS | LEXFL_ALLOWPATHNAMES | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
-		src.LoadMemory( mapCycleList, idLib::SizeToInt( strlen( mapCycleList ), "idGameLocal::NextMap" ), "idGameLocal::NextMap" );
-		if ( src.IsLoaded() ) {
-
-			currentMap = si_map.GetString();
-			while( src.ReadToken( &token ) ) {
-				if ( token == ";" ) {
-					continue;
-				}
-				numMaps++;
-
-				if ( numMaps == 1 ) {
-					// guarantee that we use a map no matter what ( or when we wrap )
-					firstFound = token;
-				}
-				if ( foundMap ) {
-					firstFound = token;
-					break;
-				}
-				
-				if ( idStr::Icmp( token, currentMap ) == 0 ) {
-					foundMap = true;
-				}
-			}
-
-			if ( firstFound != "" ) {
-				si_map.SetString( firstFound );
-				return true;
-			}
-		}
-
-		return false;
+	// openQ4: the map database chooses the next map: a queued map, then the
+	// end-of-match pick, then the rotation, which respects each map's player
+	// bounds.  A si_mapCycle list is the rotation's order.  The cycle script
+	// below runs only when g_mapRotation asks for it.
+	switch ( mpMapHost.ServerAdvance() ) {
+		case MP_MAP_ADVANCE_CHANGED:
+			return true;
+		case MP_MAP_ADVANCE_STAY:
+			return false;
+		default:
+			break;
 	}
-// RAVEN END
 
 	if ( !g_mapCycle.GetString()[0] ) {
 		Printf( common->GetLocalizedString( "#str_104294" ) );
@@ -2526,6 +2487,13 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 	phaseStartMsec = Sys_Milliseconds();
 
 	mpGame.Reset();
+
+	// openQ4: the map database follows the map that is now loaded
+	if ( this->isMultiplayer && this->isServer ) {
+		mpMapHost.ServerMapStarted( mapName );
+	} else {
+		mpMapHost.NonServerMapStarted();
+	}
 
 	mpGame.Precache();
 	EndMapMediaPrecache();
@@ -3096,6 +3064,11 @@ void idGameLocal::MapShutdown( void ) {
 	Printf( "------------ Game Map Shutdown --------------\n" );
 
 	mpGame.PrepareForMapShutdown();
+	if ( isMultiplayer && isServer ) {
+		// openQ4: a server that stops gives the map's settings back; a change
+		// of map already settled them in ValidateServerSettings
+		mpMapHost.ServerMapShutdown();
+	}
 	gamestate = GAMESTATE_SHUTDOWN;
 	idRestoreGame::PrepareMapShutdown();
 
@@ -9057,6 +9030,11 @@ idGameLocal::ValidateServerSettings
 ============
 */
 bool idGameLocal::ValidateServerSettings( const char* map, const char* gametype ) {
+	// openQ4: the server calls this before it reads the server info for a
+	// change of map.  The settings the map database holds for the map go in
+	// first, and the previous map's go back, so the map starts with them.
+	mpMapHost.ServerPrepareMap( map );
+
 	// PickMap uses si_map directly
 	// PickMap returns wether we would have to change the maps, which means settings are invalid
 	assert( !idStr::Icmp( si_map.GetString(), map ) );

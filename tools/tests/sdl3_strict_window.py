@@ -52,6 +52,7 @@ struct SDL_Window {
     bool haveFullscreenMode=false;
     SDL_DisplayMode fullscreenMode;
 } window,*s_sdlWindow=&window;
+static unsigned pendingDisplay=0; // SDL's pending_displayID, which a later fullscreen entry uses
 static bool wayland=false,emulatedModes=false,s_screenParmTransitionActive=false,s_windowAspectSnapActive=false;
 static float s_windowAspectSnapRatio=0;
 static unsigned viewportDisplay=101;
@@ -148,6 +149,7 @@ static bool SDL_SetWindowFullscreen(SDL_Window* value,bool enable) {
     if(!Mutate(enable?"enter":"leave"))return false;
     if(silentFullscreen)return true;
     if(enable) {
+        if(wayland && pendingDisplay)value->display=pendingDisplay;
         value->flags|=SDL_WINDOW_FULLSCREEN;
         auto mode=value->haveFullscreenMode?value->fullscreenMode:desktopModes.at(value->display);
         // Wayland emulates the mode: the output keeps its desktop mode, and the
@@ -170,6 +172,12 @@ static bool SDL_SetWindowBordered(SDL_Window* value,bool enabled) {
 }
 static bool SDL_SetWindowPosition(SDL_Window* value,int x,int y) {
     if(!Mutate("position"))return false;if(silentMove)return true;
+    // SDL 3.4.18 native Wayland records the display, then refuses to move a
+    // toplevel that is not fullscreen (Wayland_SetWindowPosition).
+    if(wayland && !(value->flags&SDL_WINDOW_FULLSCREEN)) {
+        if(x>=1000000)pendingDisplay=x-1000000;
+        return SDL_SetError("wayland cannot position non-popup windows");
+    }
     if(x>=1000000) { value->display=x-1000000;value->x=displayBounds.at(value->display).x;value->y=displayBounds.at(value->display).y; }
     else {
         value->x=x;value->y=y;
@@ -211,7 +219,7 @@ static void SDL3_ClientOriginToFrameOrigin(int x,int y,int& frameX,int& frameY) 
 
 MAIN = r'''
 static void Reset() {
-    assert(allocations==0);window={};s_sdlWindow=&window;engineWindowState={};win32={};s_windowedPlacement={};
+    assert(allocations==0);window={};s_sdlWindow=&window;pendingDisplay=0;engineWindowState={};win32={};s_windowedPlacement={};
     displayIds={101,202};displayBounds={{101,{0,0,1920,1080}},{202,{1920,0,1920,1080}}};
     desktopModes={{101,{101,1920,1080,1,60}},{202,{202,1920,1080,1,144}}};currentModes=desktopModes;
     modes={{101,1280,720,1,60},{101,1920,1080,1,60},{101,1920,1080,2,59.94f},{101,1920,1080,2,144},{202,1920,1080,1,144}};
@@ -328,7 +336,15 @@ static void Success() {
     Reset();request=Request();request.parms.borderless=true;output=Applied(request);assert(output.borderless && !output.fullscreen && output.logicalWidth==1920 && output.windowX==0);
     Reset();request=Request();request.parms.fullScreen=request.fullscreenDesktop=request.spanDisplays=true;output=Applied(request);
     assert(!output.fullscreen && output.borderless && output.logicalWidth==3840 && output.uiViewportWidth==1920 && win32.cdsFullscreen);
-    Reset();wayland=true;request=Request();request.displayId=202;output=Applied(request);assert(output.displayId==202 && !output.positionValid && output.uiViewportWidth==960);
+    // Native Wayland refuses every toplevel move; the compositor places windows.
+    // Windowed and borderless still apply on the window's display, and
+    // fullscreen reaches another display through the recorded one.
+    Reset();wayland=true;request=Request();output=Applied(request);assert(output.displayId==101 && !output.positionValid && output.uiViewportWidth==960);
+    Reset();wayland=true;request=Request();request.parms.borderless=true;output=Applied(request);
+    assert(output.borderless && !output.fullscreen && output.logicalWidth==1920 && output.logicalHeight==1080 && !output.positionValid);
+    Reset();wayland=true;window.flags|=SDL_WINDOW_BORDERLESS;request=Request();output=Applied(request);assert(!output.borderless && output.logicalWidth==960);
+    Reset();wayland=true;request=Request();request.displayId=202;request.parms.fullScreen=request.fullscreenDesktop=true;output=Applied(request);
+    assert(output.fullscreen && output.displayId==202);
     Reset();request=Request();request.parms.hiddenWindow=true;output=Applied(request);assert(output.hidden && !output.fullscreen);
     Reset();window.flags|=SDL_WINDOW_MAXIMIZED;request=Request();output=Applied(request);assert(!output.maximized && output.logicalWidth==960);
     Reset();request=Request();request.restorePlacement=true;request.windowX=250;request.windowY=180;
@@ -358,6 +374,8 @@ static void Failures() {
     Reset();noBorders=true;request=Request();request.parms.borderless=true;Failed(request);
     Reset();silentFullscreen=true;request=Request();request.parms.fullScreen=request.fullscreenDesktop=true;Failed(request);
     Reset();silentMove=true;request=Request();request.displayId=202;Failed(request);
+    // A Wayland window cannot be moved to another display, so that is refused.
+    Reset();wayland=true;request=Request();request.displayId=202;Failed(request);
     Reset();silentMove=true;request=Request();request.restorePlacement=true;request.windowX=250;request.windowY=180;Failed(request);
     Reset();failQueryAfterMutation=true;Failed(Request());
     Reset();noCurrentMode=true;request=Request();request.parms.fullScreen=request.fullscreenDesktop=true;Failed(request);

@@ -7,6 +7,72 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Borderless and window changes on Wayland no longer stop the game starting, 15 November 2026
+
+- **Linux on Wayland: choosing Borderless Window no longer leaves openQ4
+  unable to start.** The desktop places windows on Wayland, and openQ4 counted
+  its refusal to move a window as a failed display change. Any window change
+  from the Display page failed, undoing it failed the same way, and every
+  later start stopped with "Settings display recovery failed" (reinstalling
+  doesn't help, because the record lives in your save folder). This build
+  undoes the stuck change by itself on the next start and keeps your previous
+  display settings, and Borderless Window, windowed sizes and fullscreen now
+  apply on Wayland. A borderless window on Wayland can also be changed again
+  afterwards, which the Display page used to refuse.
+- **When a display change can't be recovered, the message says what to do.**
+  It now names the `ui-settings-recovery.dat` file to delete; openQ4 then
+  starts with your last saved settings.
+- Windowed and borderless play on Wayland stay on the monitor the desktop
+  chose; picking another monitor there needs fullscreen.
+
+## One list of maps: a rotation that fits the server, a map queue and a pick, 15 November 2026
+
+- **The rotation fits the number of players.** Each map can have a smallest
+  and a largest player count, and the server passes over maps it is too
+  empty or too full for. Out of the box the tourney arenas take two to four
+  players and maps with no free-for-all mode, such as the Capture the Flag
+  maps, need four; everything else plays at any size. If no map fits, the
+  rotation carries on in order rather than stop.
+- **Players can ask for a map.** `mymap q4dm3` in the console queues a map
+  for the next change; `mymap` shows the queue and `mymap clear` gives your
+  place up. Everyone has one place, queued maps are played in order before
+  the rotation continues, and the server tells everyone who queued what.
+- **Or pick from three.** With `g_mapPick 1` the server offers three maps
+  when a match ends. Type `mappick 1`, `2` or `3` while the scoreboard is
+  up; the most picked map is next.
+- **Map packs need no listing.** The server finds every installed
+  multiplayer map by itself. Votes, the in-game Vote and Admin pages and the
+  rotation all read the same list, so a map is either offered everywhere or
+  nowhere.
+- **The server card shows the real next map.** It used to read the next
+  entry of the map list; it now shows what the server will load, counting
+  queued maps, the pick and the player bounds.
+- **Upgrade note for server operators: the default rotation changed.** A
+  server with no `si_mapCycle` list used to run Quake 4's map cycle script.
+  It now plays every installed map that suits the game type, in order. Set
+  `g_mapRotation 3` to keep your script; `0` replays the same map and `2`
+  shuffles. A `si_mapCycle` list works as before, except that a map named
+  twice now takes one place (the second used to trap the rotation between
+  the maps before it) and a map that is not installed is left out with a
+  warning.
+- Server operators: an optional `mapdb.txt` in the server's `baseoq4` folder
+  sets, for each map, its player bounds, the game types it plays, whether it
+  is in the rotation, in votes and in the queue, and settings of its own
+  such as a frag limit. Those settings apply while the map is played and go
+  back afterwards. `mapdb check` reports a mistake by line, and a file with a
+  mistake is ignored whole. `g_mapQueue 0` turns the queue off. See
+  [Maps, rotation and the map queue](../user/server-setup.md#maps-rotation-and-the-map-queue).
+- Not yet: Create Server still lists maps by its own rule and its map cycle
+  field still names the script; the queue and the pick have no menu page.
+- Development: `mp_map_database_contract.py` (static pins and the core
+  compiled alone) and `mp_map_rotation_smoke.py` (a pure dedicated server,
+  two bots and one client over loopback: bounds, per-map settings, a refused
+  vote, the queue, the pick; 44 checks) pass on Windows x64. The first live
+  run found a map's own frag limit overwritten at map start by the casual
+  rules mirror; the rules are now imported again when the database changed a
+  setting. Open under MP-13: the engine-side Create Server catalogue, a
+  retained page, play by people.
+
 ## One network format for what the audit left (protocol 2.42), 15 November 2026
 
 - **Upgrade note: everyone in a match needs this build.** openQ4 now speaks

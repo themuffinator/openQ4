@@ -245,8 +245,13 @@ bool BuildDisplayRestore(const rendererDisplayState_t& captured, const SystemDis
 	r.maximized=w.maximized; r.restorePlacement=w.positionValid && topology.absolutePlacement; r.windowX=w.windowX; r.windowY=w.windowY;
 	plan.checkPixels=plan.checkMode=plan.checkRefresh=true; plan.checkPosition=r.restorePlacement;
 	plan.monitors.push_back(*display);
-	if (r.parms.borderless) {
-		if (!w.positionValid || !topology.absolutePlacement) return Fail(error,"Cannot resolve borderless restore bounds without absolute placement");
+	if (r.parms.borderless && !topology.absolutePlacement) {
+		// Native Wayland reports no window position and never spans: a borderless
+		// window there is its display's size, restored on the same display.
+		if (w.logicalWidth!=display->width || w.logicalHeight!=display->height)
+			return Fail(error,"The captured borderless rectangle is not a supported display or span");
+	} else if (r.parms.borderless) {
+		if (!w.positionValid) return Fail(error,"Cannot resolve borderless restore bounds without absolute placement");
 		if (w.windowX!=display->x || w.windowY!=display->y || w.logicalWidth!=display->width || w.logicalHeight!=display->height) {
 			int x,y,width,height;
 			if (!Bounds(topology.displays,x,y,width,height) || w.windowX!=x || w.windowY!=y || w.logicalWidth!=width || w.logicalHeight!=height)

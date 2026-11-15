@@ -713,6 +713,9 @@ def validate_validation_wiring() -> None:
         # LAN discovery, successive reconnects and retail 2.85 refusal launch a
         # staged dedicated server and client (and the retail Quake4Ded.exe).
         "mp_lan_reconnect_smoke.py",
+        # The map database's rotation, queue and pick on a staged dedicated
+        # server with bots and one client; mp_map_database_contract.py is wired.
+        "mp_map_rotation_smoke.py",
         # A 12-player match over a simulated small path MTU.
         "mp_path_mtu_soak.py",
         "mp_mod_admission_smoke.py",

@@ -6306,6 +6306,24 @@ void idCommonLocal::InitCommands( void ) {
 
 /*
 =================
+Common_SettingsRecoveryFatal
+
+A recovery that cannot finish stops every later start the same way. Name the
+journal so a player can delete it: the configuration it guards keeps the last
+saved settings (an unconfirmed choice never reaches it).
+=================
+*/
+static void Common_SettingsRecoveryFatal( const char *stage, const std::string &reason ) {
+	std::string journal, lock, pathError;
+	if ( Common_SettingsPersistencePaths( journal, lock, pathError ) ) {
+		common->FatalError( "Settings %s recovery failed: %s. Recovery data was retained. Delete %s to start with your last saved settings.",
+			stage, reason.c_str(), journal.c_str() );
+	}
+	common->FatalError( "Settings %s recovery failed: %s. Recovery data was retained.", stage, reason.c_str() );
+}
+
+/*
+=================
 idCommonLocal::InitRenderSystem
 =================
 */
@@ -6317,7 +6335,7 @@ void idCommonLocal::InitRenderSystem( void ) {
 	if ( UI_SettingsStartupActive() ) {
 		std::string recoveryError;
 		if ( !UI_SettingsInitializeDisplay( recoveryError ) ) {
-			FatalError( "Settings display recovery failed: %s. Recovery data was retained.", recoveryError.c_str() );
+			Common_SettingsRecoveryFatal( "display", recoveryError );
 			return;
 		}
 	} else renderSystem->InitOpenGL();
@@ -7948,7 +7966,7 @@ void idCommonLocal::InitGame( void ) {
 	Sys_DoPreferences();
 	std::string settingsRecoveryError;
 	if ( !UI_SettingsStartup( settingsRecoveryError ) ) {
-		FatalError( "Settings startup recovery failed: %s. Recovery data was retained.", settingsRecoveryError.c_str() );
+		Common_SettingsRecoveryFatal( "startup", settingsRecoveryError );
 		return;
 	}
 
