@@ -529,6 +529,8 @@ public:
 	void					ServerSendEvent( int eventId, const idBitMsg *msg, bool saveEvent, int excludeClient ) const;
 	void					ServerSendInstanceEvent( int eventId, const idBitMsg *msg, bool saveEvent, int excludeClient ) const;
 	void					ClientSendEvent( int eventId, const idBitMsg *msg ) const;
+	// openQ4: for a request the player makes once, from the console or a menu
+	void					ClientSendRequestEvent( int eventId, const idBitMsg *msg ) const;
 
 // RAVEN BEGIN
 // bdube: debugging

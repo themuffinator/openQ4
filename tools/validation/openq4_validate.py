@@ -706,6 +706,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "multiview_demo.py",
         root / "tools" / "tests" / "mvd_server_api_contract.py",
         root / "tools" / "tests" / "mvd_navigation_contract.py",
+        root / "tools" / "tests" / "mp_live_event_stream_contract.py",
+        root / "tools" / "tests" / "mp_spectator_casting_contract.py",
         root / "tools" / "tests" / "mvd_recording_failure_contract.py",
         root / "tools" / "tests" / "mvd_recovery_contract.py",
         root / "tools" / "tests" / "mvd_start_state_contract.py",

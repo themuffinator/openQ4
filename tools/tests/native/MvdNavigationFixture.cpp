@@ -323,6 +323,55 @@ static void TestAutoTrack() {
 	// A target who left is replaced at once.
 	players[2].eligible = false;
 	CHECK( killer.Choose( MP_AUTOTRACK_KILLER, -1, 2, players, 12100 ) != 2 );
+	players[2].eligible = true;
+
+	// Leader: the top score, after the dwell; a tie leaves the camera alone.
+	mpDemoAutoTrack leader;
+	CHECK( leader.Choose( MP_AUTOTRACK_LEADER, -1, 2, players, 0 ) == 2 );
+	players[1].score = 9;
+	CHECK( leader.Choose( MP_AUTOTRACK_LEADER, -1, 2, players, 100 ) == 1 );
+	players[3].score = 12;
+	CHECK( leader.Choose( MP_AUTOTRACK_LEADER, -1, 1, players, 100 + MP_AUTOTRACK_DWELL_MS - 1 ) == 1 );
+	CHECK( leader.Choose( MP_AUTOTRACK_LEADER, -1, 1, players, 100 + MP_AUTOTRACK_DWELL_MS ) == 3 );
+	players[0].score = 12;
+	CHECK( leader.Choose( MP_AUTOTRACK_LEADER, -1, 3, players, 60000 ) == 3 );
+	// With a team filter the leader is that team's best.
+	CHECK( leader.Choose( MP_AUTOTRACK_LEADER, 0, 2, players, 120000 ) == 0 );
+	// A leader who may not be followed is passed over.
+	players[3].eligible = false;
+	CHECK( leader.Choose( MP_AUTOTRACK_LEADER, -1, 3, players, 180000 ) == 0 );
+	players[3].eligible = true;
+
+	// Powerup: nobody carries one, so the camera stays; then the most powerups.
+	mpDemoAutoTrack powerup;
+	CHECK( powerup.Choose( MP_AUTOTRACK_POWERUP, -1, 2, players, 0 ) == 2 );
+	players[0].powerups = 1;
+	CHECK( powerup.Choose( MP_AUTOTRACK_POWERUP, -1, 2, players, 5000 ) == 0 );
+	players[1].powerups = 2;
+	CHECK( powerup.Choose( MP_AUTOTRACK_POWERUP, -1, 0, players, 5000 + MP_AUTOTRACK_DWELL_MS ) == 1 );
+	// A dead carrier is not a subject, and the camera does not chase an equal.
+	players[1].alive = false;
+	players[2].powerups = 1;
+	CHECK( powerup.Choose( MP_AUTOTRACK_POWERUP, -1, 1, players, 20000 ) == 0 );
+	CHECK( powerup.Choose( MP_AUTOTRACK_POWERUP, -1, 0, players, 40000 ) == 0 );
+	players[1].alive = true;
+	players[0].powerups = players[1].powerups = players[2].powerups = 0;
+
+	// Flag: follows a carrier, keeps the camera when the flag is home.
+	mpDemoAutoTrack flag;
+	CHECK( flag.Choose( MP_AUTOTRACK_FLAG, -1, 1, players, 0 ) == 1 );
+	players[2].flag = true;
+	CHECK( flag.Choose( MP_AUTOTRACK_FLAG, -1, 1, players, 5000 ) == 2 );
+	players[2].flag = false;
+	CHECK( flag.Choose( MP_AUTOTRACK_FLAG, -1, 2, players, 60000 ) == 2 );
+	// A subject mode drops a pending killer switch, as action mode does.
+	mpDemoAutoTrack mixed;
+	mixed.Choose( MP_AUTOTRACK_KILLER, -1, 1, players, 0 );
+	mixed.NoteKill( 3, 1, 1, 1000 );
+	CHECK( mixed.Choose( MP_AUTOTRACK_FLAG, -1, 1, players, 1000 ) == 1 );
+	CHECK( mixed.Choose( MP_AUTOTRACK_KILLER, -1, 1, players, 2600 ) == 1 );
+	// An unknown mode keeps the camera.
+	CHECK( mixed.Choose( MP_AUTOTRACK_MODE_COUNT, -1, 1, players, 3000 ) == 1 );
 }
 
 int main() {

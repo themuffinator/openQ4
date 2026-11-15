@@ -310,7 +310,9 @@ public:
 		SPECTATOR_FOLLOW_NEXT,
 		SPECTATOR_FOLLOW_PREV,
 		SPECTATOR_FOLLOW_FREE,
-		SPECTATOR_FOLLOW_PLAYER
+		SPECTATOR_FOLLOW_PLAYER,
+		SPECTATOR_FOLLOW_AUTO,		// the slot field carries an MP_AUTOTRACK_* mode
+		SPECTATOR_FOLLOW_CASTER		// the slot field carries 1 to take the caster view, 0 to give it up
 	};
 
 	friend class idThread;
@@ -531,6 +533,7 @@ public:
 	float					buyMenuCash;
 
 	float					handicap; // multiplier for damage/health
+	float					spectatorSpeedScale;	// openQ4: ui_spectatorSpeed, clamped; scales pm_spectatespeed
 
 public:
 	CLASS_PROTOTYPE( idPlayer );
@@ -665,6 +668,16 @@ public:
 	bool					VRRoomScaleStepping( void ) const;
 	void					UpdateEyeHeight( bool snap );
  	void					OffsetThirdPersonView( float angle, float range, float height, bool clip );
+	// openQ4: how the local view shows this player when it is not through their
+	// eyes: a spectator's third-person or chase follow view, or the death camera.
+	enum followCamera_t {
+		FOLLOW_CAMERA_FIRST = 0,
+		FOLLOW_CAMERA_THIRD,
+		FOLLOW_CAMERA_CHASE,
+		FOLLOW_CAMERA_DEATH
+	};
+	followCamera_t			FollowCameraMode( void ) const;
+	void					OffsetChaseCameraView( const idAngles &look, float range, float height );
 	void					OffsetThirdPersonVehicleView( bool clip );
 	bool					OffsetThirdPersonTargetView( void );
 
@@ -787,6 +800,11 @@ public:
 	void					FreeClassicHookPresentation( void );
 	void					SpectateFreeFly( bool force );	// force is also used by offline demo controls
 	void					RequestSpectatorFollow( spectatorFollow_t operation, int targetSlot = -1 );
+	// openQ4: live auto-follow. The server keeps one chooser per spectator and
+	// moves the camera only to players CanSpectatorFollow allows that spectator.
+	int						GetSpectatorAutoFollow( void ) const { return spectatorAutoFollow; }
+	float					GetSpectatorSpeedScale( void ) const { return spectatorSpeedScale; }
+	static void				NoteSpectatorAutoFollowKill( int attackerSlot, int victimSlot );
  	void					ToggleObjectives ( void );
  	void					ToggleScoreboard( void );
 	void					RouteGuiMouse( idUserInterface *gui );
@@ -1176,6 +1194,8 @@ private:
 	// changes, so a reused slot never inherits a follow by number alone.
 	int						spectatorFollowSlot;
 	int						spectatorFollowSpawnId;
+	int						spectatorAutoFollow;		// MP_AUTOTRACK_*; server only
+	mpDemoAutoTrack			spectatorAutoTrack;
  	int						lastTeleFX;
  	unsigned int			lastSnapshotSequence;	// track state hitches on clients
 	// openQ4: client only - the game time of the last snapshot read for this player, which
@@ -1273,6 +1293,8 @@ private:
 	void					SpectateCycle( int direction = 1 );
 	bool					CycleSpectatorFollow( int direction );
 	void					ServerSpectatorFollow( int operation, int targetSlot, int targetSpawnId );
+	void					SetSpectatorAutoFollow( int mode );
+	void					UpdateSpectatorAutoFollow( void );
 	idAngles				GunTurningOffset( void );
 	idVec3					GunAcceleratingOffset( void );
 

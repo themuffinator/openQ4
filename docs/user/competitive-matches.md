@@ -119,6 +119,10 @@ buttons, or use these console commands:
 | `follow prev` or `followprev` | Follow the previous player. |
 | `follow free` or `followfree` | Fly freely, if the server allows it. |
 | `follow <client-slot>` | Follow the player now in that numbered slot. |
+| `follow <name>` | Follow a player by name. Part of a name is enough when only one player matches; colours are ignored. |
+| `followlist` | List the players you can follow, with slot, name, team and score. |
+| `follow auto <mode>` or `followauto <mode>` | Let the server move the camera for you (see below). |
+| `followview <first\|third\|chase\|next>` | Choose how you see the player you follow. |
 
 During a managed match's countdown and live play, ordinary spectators cannot
 follow players. Coaches can follow their own side, and broadcasters and
@@ -126,6 +130,60 @@ referees have their own views. The server checks your permissions each time you
 switch, and never sends information your role may not see. A request to
 follow one player never ends up following someone else who has since taken
 their slot. Bots can be followed. Demo playback has its own camera controls.
+
+On a casual server a spectator is neutral and can follow anyone on either
+team.
+
+#### Auto-follow
+
+`follow auto <mode>` hands the camera to the server, which moves it between the
+players you are allowed to watch:
+
+| Mode | The camera follows |
+| --- | --- |
+| `killer` | Whoever kills the player you are watching, a moment after the kill. |
+| `action` | The most interesting player: a flag carrier first, then powerups, recent kills and the lead. |
+| `leader` | The player with the top score. |
+| `powerup` | The player carrying the most powerups; it stays put while nobody has one. |
+| `flag` | A flag carrier; it stays put while the flags are home. |
+| `off` | Nobody: you choose again. |
+
+`follow auto` on its own means `action`. The camera holds each player for at
+least three seconds so it does not flicker. Choosing a player yourself, or
+pressing attack or jump, turns auto-follow off; the server tells you when it
+does. In Tourney the camera stays in the arena you are watching.
+
+#### Follow views
+
+`followview` changes only how your own screen shows the followed player. The
+setting is `g_spectatorFollowView` and is remembered.
+
+| View | What you see |
+| --- | --- |
+| `first` | Through the player's eyes, with their weapon and crosshair. This is the default. |
+| `third` | From behind the player, turning as they turn. |
+| `chase` | A camera that circles the player as you move your mouse. |
+
+`g_chaseCameraRange` (32 to 256, default 96) and `g_chaseCameraHeight` (-16 to
+96, default 12) set how far back and how high the third-person and chase
+cameras sit. The camera pulls in when a wall is in the way.
+
+Set `g_deathCamera 1` to watch your own death from the same camera, facing
+whoever killed you, instead of the tilted first-person view.
+
+#### Free camera speed
+
+`ui_spectatorSpeed` sets how fast you fly as a percentage of the server's
+speed, from 25 to 300 (default 100). For example, `ui_spectatorSpeed 50` is
+half speed for slow tracking shots. It takes effect within a few seconds of
+changing it.
+
+#### Spectator chat
+
+While a match is live, what a spectator says in all-chat reaches only other
+spectators unless the server sets `g_spectatorChat 1`. The server tells you
+when your line was kept from the players. Team chat from a spectator always
+goes to spectators only.
 
 ### See the result
 
@@ -150,7 +208,7 @@ remote console (rcon), ban-list or file access.
 | Player | Anyone playing | Join a side or the Duel queue, ready up, take Duel timeouts, vote, and forfeit for their own side. |
 | Captain | Assigned to the first roster seat of a team | Everything a player can, plus manage their team's roster, readiness and timeouts. |
 | Coach | An observer assigned to one team | Watch their team, including its health and armour, during live play. |
-| Broadcaster | A neutral observer granted by the host | Watch both teams, with item timers. Cannot change the match. |
+| Broadcaster | A neutral observer granted by the host, or on a casual server one who took the caster view | Watch both teams' health and armour, with item timers in managed matches. Cannot change the match. |
 | Referee | A neutral observer with the referee password | Run the match: force ready, pause, change rules, manage rosters, run series, record forfeits and aborts. |
 | Server operator | Whoever runs the server | Choose the profile, set the referee password and map pool, and use a few server-only commands. |
 
@@ -203,6 +261,59 @@ matchBroadcaster <current-client-slot> <on|off>
 For example, `matchBroadcaster 5 on` makes the person in slot 5 a broadcaster.
 It refuses an active player, bot, roster member, team member, referee, coach or
 an empty slot.
+
+A broadcaster who joins the game stops being one.
+
+#### Cast a casual match
+
+On a server that is not running a managed match, the operator can let
+spectators take the broadcaster's view themselves:
+
+```text
+g_casterAccess 1
+```
+
+A spectator then types `caster on` and sees both sides' health and armour in
+the match panel, updated once a second; `caster off` gives the view up. The
+server answers either command with a notice. The view is for people who have
+not joined the match: it is refused to players, and withdrawn at once if the
+caster joins a team, if the operator sets `g_casterAccess 0`, or when a managed
+match starts. `g_casterAccess` is off by default, because someone watching both
+teams' health could pass it to a player. The operator's `matchBroadcaster`
+command works whatever the setting.
+
+Item timers on a casual server follow the server's
+[`si_itemTimers`](server-setup.md) setting, which by default shows them to
+every spectator, casters included; the caster view adds none of its own.
+
+#### Feed a broadcast overlay
+
+openQ4 can write the match's events to a file as they happen, for overlay and
+statistics tools:
+
+```text
+g_matchEventStream 1
+```
+
+Set it on the server, or on your own client while you spectate: a caster does
+not need to host. The game writes one line of JSON per event (phase changes,
+joins and leaves, scores, kills, flags and powerups) to
+`match-events/live.ndjson` in the game folder under your save path. The file
+starts again with each map. It holds only what the scoreboard and kill feed
+already show; there are no positions, health or timers in it.
+
+A sample overlay ships in the source tree. It needs only Python:
+
+```text
+python tools/overlay/match_overlay.py --file <path to live.ndjson>
+```
+
+Open `http://127.0.0.1:27980/` in a browser, or add that address as a browser
+source in your broadcast software: the page has a transparent background and
+shows the score, the players and a kill feed. `--print` writes a text feed to
+the terminal instead. The page is served to your own computer only unless you
+pass `--host`. The format is described in the
+[live match event stream reference](../dev/mp-live-event-stream.md).
 
 openQ4 does not yet have working Q4TV repeaters, delayed broadcasts or live
 multi-view feeds. To keep a watchable copy of a match, use the server's

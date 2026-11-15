@@ -5178,6 +5178,30 @@ void idGameLocal::ReadNetworkInfo( int gameTime, idFile* file, int clientNum ) {
 
 /*
 ============
+idGameLocal::FillAutoTrackPlayer
+
+openQ4: what an auto-tracking camera weighs about a player it may follow. The
+caller has already decided that it may: a demo's playback camera and a live
+spectator's server camera share this row and the chooser, not their authority.
+============
+*/
+void idGameLocal::FillAutoTrackPlayer( const idPlayer *candidate, int slot, mpAutoTrackPlayer &row ) {
+	row.eligible = true;
+	row.alive = !candidate->spectating && candidate->health > 0;
+	row.team = IsTeamGame() ? candidate->team : -1;
+	row.flag = candidate->PowerUpActive( POWERUP_CTF_MARINEFLAG ) ||
+		candidate->PowerUpActive( POWERUP_CTF_STROGGFLAG ) || candidate->PowerUpActive( POWERUP_CTF_ONEFLAG );
+	static const int timed[] = { POWERUP_QUADDAMAGE, POWERUP_HASTE, POWERUP_REGENERATION, POWERUP_INVISIBILITY,
+		POWERUP_ADRENALINE };
+	row.powerups = 0;
+	for ( int p = 0; p < static_cast<int>( sizeof( timed ) / sizeof( timed[ 0 ] ) ); p++ ) {
+		row.powerups += candidate->PowerUpActive( timed[ p ] ) ? 1 : 0;
+	}
+	row.score = mpGame.GetScore( slot );
+}
+
+/*
+============
 idGameLocal::UpdateDemoAutoTrack
 
 openQ4: moves an auto-tracking playback camera. Attack and jump are the
@@ -5205,19 +5229,7 @@ void idGameLocal::UpdateDemoAutoTrack( idPlayer *viewer, const usercmd_t &cmd ) 
 			 !mpGame.CanSpectatorFollow( viewer->entityNumber, i ) ) {
 			continue;
 		}
-		const idPlayer *candidate = static_cast< const idPlayer * >( entities[ i ] );
-		mpAutoTrackPlayer &player = players[ i ];
-		player.eligible = true;
-		player.alive = !candidate->spectating && candidate->health > 0;
-		player.team = IsTeamGame() ? candidate->team : -1;
-		player.flag = candidate->PowerUpActive( POWERUP_CTF_MARINEFLAG ) ||
-			candidate->PowerUpActive( POWERUP_CTF_STROGGFLAG ) || candidate->PowerUpActive( POWERUP_CTF_ONEFLAG );
-		static const int timed[] = { POWERUP_QUADDAMAGE, POWERUP_HASTE, POWERUP_REGENERATION, POWERUP_INVISIBILITY,
-			POWERUP_ADRENALINE };
-		for ( int p = 0; p < static_cast<int>( sizeof( timed ) / sizeof( timed[ 0 ] ) ); p++ ) {
-			player.powerups += candidate->PowerUpActive( timed[ p ] ) ? 1 : 0;
-		}
-		player.score = mpGame.GetScore( i );
+		FillAutoTrackPlayer( static_cast< const idPlayer * >( entities[ i ] ), i, players[ i ] );
 	}
 
 	const int followed = GetDemoFollowClient();

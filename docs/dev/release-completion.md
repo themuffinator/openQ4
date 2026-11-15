@@ -7,6 +7,53 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Spectating that keeps up with the match, and a feed for broadcast overlays (MP-16), 15 November 2026
+
+- **Follow a player by name.** `follow <name>` takes any part of a name that
+  only one player matches, and `followlist` shows who you can follow with
+  their slot, team and score. Slots still work.
+- **Let the camera find the action.** `follow auto <killer|action|leader|powerup|flag>`
+  hands the camera to the server: it follows whoever killed the player you
+  were watching, the most interesting player, the leader, a powerup carrier or
+  a flag carrier, and holds each for at least three seconds. Picking a player
+  yourself, or pressing attack or jump, takes the camera back. Multi-view demo
+  playback already had the first two modes; live spectators now have all five.
+- **Three ways to watch.** `followview <first|third|chase>` shows the player
+  you follow through their eyes, from behind them, or from a chase camera you
+  circle with the mouse. `g_deathCamera 1` uses the same camera for your own
+  death, facing your killer.
+- **Set your own free-camera speed.** `ui_spectatorSpeed` runs from 25 to 300
+  percent of the server's speed.
+- **Spectators on casual servers can follow both teams.** A spectator used to
+  be held to whichever team their settings last named, so in team modes half
+  the players could not be followed.
+- **Follow commands no longer go missing.** A follow command typed on a remote
+  server was sometimes dropped without a word, depending on what the game
+  happened to be doing that instant. Every request now reaches the server.
+- **Cast a casual match.** With `g_casterAccess 1` on the server, a spectator
+  types `caster on` to see both teams' health and armour in the match panel,
+  without anyone setting up a managed match. It is off by default, is never
+  given to a player, and is withdrawn the moment the caster joins a team.
+- **A broadcaster who joins the game stops being one.** Before, a broadcaster
+  who joined a casual match kept seeing both teams' health while playing.
+- **Feed an overlay.** `g_matchEventStream 1`, on a server or on a spectating
+  client, writes the match's events (scores, kills, flags, powerups, joins and
+  phase changes) to `match-events/live.ndjson` as they happen. A sample overlay
+  in `tools/overlay/match_overlay.py` turns it into a transparent page for
+  broadcast software or a text feed. The stream holds only what the scoreboard
+  and kill feed already show.
+- **Spectators are told when players cannot hear them.** While a match is live
+  and the server keeps spectator chat among spectators, the server now says so.
+- Players: nothing to reinstall or rebind. The new commands are listed in the
+  [competitive matches guide](../user/competitive-matches.md#spectate).
+- Development: `mp_match_spectator_follow_contract.py` runs the production
+  follow, auto-follow and caster request paths against the real disclosure
+  policy; `mp_spectator_casting_contract.py` runs the caster grant and every
+  withdrawal against the real match session with eight failing controls;
+  `mp_live_event_stream_contract.py` validates a sample stream and replays it
+  through the overlay with ten failing controls; `mvd_navigation_contract.py`
+  covers the three new camera modes. `mp_spectator_casting_smoke.py` plays a
+  live team match with a host, three bots and a remote spectator.
 ## Chat tokens, hit tones, a weapon order, item timers and team locations (MP-15), 15 November 2026
 
 - **Say where you are and what you have without typing it.** Write `#h`, `#a`,

@@ -22,6 +22,10 @@ static_assert( MP_MATCH_VIEW_MAX_MESSAGE_BYTES + 1 <= MAX_GAME_MESSAGE_SIZE,
 	"match view plus reliable message tag must fit the game transport buffer" );
 
 idCVar g_spectatorChat( "g_spectatorChat", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "let spectators talk to everyone during game" );
+// openQ4: who may take the caster's view (both sides' health and armour) on a
+// server that is not running a managed match. The operator's matchBroadcaster
+// grant works either way; managed matches never accept a self-service request.
+idCVar g_casterAccess( "g_casterAccess", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "outside managed matches, let any spectator take the caster view for themselves with the caster command (0 = only the server operator grants it with matchBroadcaster)" );
 // Target-bearing requests are safe only when both ends understand the
 // connection identity. Older servers still use slots; never send them one.
 idCVar si_uiTargetProtocol( "si_uiTargetProtocol", "2", CVAR_GAME | CVAR_INTEGER | CVAR_ROM | CVAR_SERVERINFO, "identity-bound UI player requests" );
@@ -2299,6 +2303,129 @@ mpMatchDisclosurePolicy_t idMultiplayerGame::BuildMatchDisclosurePolicy( void ) 
 	// same pause-safe match clock used by the item respawn itself.
 	policy.itemTimingDelayMsec = 0;
 	return policy;
+}
+
+/*
+================
+idMultiplayerGame::SetCasualCasterRole
+
+openQ4: the same session mutation and target rule as the operator's
+MP_MATCH_OP_BROADCASTER_SET: a connected person who is not playing, holds no
+side or roster seat and has no other role. It adds no disclosure rule of its
+own; what a broadcaster may see stays in MPMatchDisclosureBuildGrant.
+================
+*/
+bool idMultiplayerGame::SetCasualCasterRole( int clientNum, bool enabled ) {
+	uint32_t generation = 0;
+	mpParticipantId participant;
+	if ( !gameLocal.isServer || !matchSessionOperational || clientNum < 0 || clientNum >= MAX_CLIENTS ||
+		!matchSession.GetSlotGeneration( clientNum, generation ) ||
+		!matchSession.ResolveSlotBinding( clientNum, generation, participant ) ||
+		!MPOperationBroadcasterTargetIsValid( matchSession, participant ) ) {
+		return false;
+	}
+	const mpMatchMutationResult mutation = matchSession.SetParticipantRoles( participant,
+		MPMatchRoleBit( enabled ? MP_MATCH_ROLE_BROADCASTER : MP_MATCH_ROLE_PLAYER ),
+		matchSession.GetSessionRevision() );
+	if ( mutation.WasRejected() ) {
+		return false;
+	}
+	casualCaster[ clientNum ] = enabled;
+	AdvanceMatchViewRevision( true );
+	SendChangedMatchViews();
+	return true;
+}
+
+/*
+================
+idMultiplayerGame::ReleaseBroadcasterOnJoin
+
+openQ4: a broadcaster who joins a casual game stops being one, whoever granted
+the role. The session refuses to activate a participant without the player
+role, so without this the join was rejected in the session while the player
+entered the game: they played on as an inactive, neutral broadcaster and kept
+both sides' vitals.
+================
+*/
+void idMultiplayerGame::ReleaseBroadcasterOnJoin( int clientNum, mpParticipantId participant ) {
+	const mpMatchParticipantState *state = matchSession.FindParticipant( participant );
+	if ( state == NULL || state->roles != MPMatchRoleBit( MP_MATCH_ROLE_BROADCASTER ) ) {
+		return;
+	}
+	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+		casualCaster[ clientNum ] = false;
+	}
+	matchSession.SetParticipantRoles( participant, MPMatchRoleBit( MP_MATCH_ROLE_PLAYER ),
+		matchSession.GetSessionRevision() );
+}
+
+/*
+================
+idMultiplayerGame::ServerRequestCasterRole
+
+openQ4: a spectator asks for, or gives up, the caster's view. Granted only
+where the server said spectators may (g_casterAccess) and never in a managed
+match, whose broadcasters are the operator's to name.
+================
+*/
+const char *idMultiplayerGame::ServerRequestCasterRole( int clientNum, bool enabled ) {
+	if ( !gameLocal.isServer || clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return NULL;
+	}
+	if ( !enabled ) {
+		// giving the view up is always allowed, but only a view taken this way
+		if ( casualCaster[ clientNum ] ) {
+			SetCasualCasterRole( clientNum, false );
+			casualCaster[ clientNum ] = false;
+		}
+		return "#str_232216";
+	}
+	if ( IsManagedMatch() || !g_casterAccess.GetBool() ) {
+		return "#str_232217";
+	}
+	return SetCasualCasterRole( clientNum, true ) ? "#str_232215" : "#str_232218";
+}
+
+/*
+================
+idMultiplayerGame::UpdateCasualCasters
+
+openQ4: withdraws a self-service caster view the moment its conditions end:
+the policy is switched off, a managed match begins, the spectator joins the
+game or the slot changes hands. Runs after the participants are synchronized,
+so a caster who joins a team is an ordinary player before any view is built.
+================
+*/
+void idMultiplayerGame::UpdateCasualCasters( void ) {
+	const bool allowed = g_casterAccess.GetBool() && !IsManagedMatch();
+	for ( int clientNum = 0; clientNum < MAX_CLIENTS; ++clientNum ) {
+		if ( !casualCaster[ clientNum ] ) {
+			continue;
+		}
+		uint32_t generation = 0;
+		mpParticipantId participant;
+		const mpMatchParticipantState *state = NULL;
+		if ( matchSession.GetSlotGeneration( clientNum, generation ) &&
+			matchSession.ResolveSlotBinding( clientNum, generation, participant ) ) {
+			state = matchSession.FindParticipant( participant );
+		}
+		const mpMatchRoleMask_t broadcasterRole = MPMatchRoleBit( MP_MATCH_ROLE_BROADCASTER );
+		if ( state == NULL || !state->connected || state->roles != broadcasterRole ) {
+			// gone, replaced, or the role was changed by the operator
+			casualCaster[ clientNum ] = false;
+			continue;
+		}
+		if ( allowed && !state->active && state->side == MP_MATCH_SIDE_NONE ) {
+			continue;
+		}
+		casualCaster[ clientNum ] = false;
+		if ( !matchSession.SetParticipantRoles( participant, MPMatchRoleBit( MP_MATCH_ROLE_PLAYER ),
+				matchSession.GetSessionRevision() ).WasRejected() ) {
+			AdvanceMatchViewRevision( true );
+			SendChangedMatchViews();
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232216", "" );
+		}
+	}
 }
 
 /*
@@ -6488,9 +6615,69 @@ void idMultiplayerGame::ProjectClientManagedMatchContext(
 		clientMatchView.publicState.series.present ? "match_context_series" : "match_context_timeouts";
 	gui->SetStateBool( "match_context_compact", compact );
 	gui->SetStateString( "match_context_summary", compact ? gui->GetStateString( summary ) : "" );
+	// openQ4: a caster outside a managed match has no managed record to read;
+	// the panel carries the vitals the server disclosed to them instead. Only
+	// for the broadcaster's role: a player's view holds their own team's vitals
+	// too, and that is not a caster panel.
+	if ( gui->GetStateInt( "match_context_visible" ) == 0 && clientMatchView.teamVitalCount > 0 &&
+		( clientMatchView.publicState.recipient.publicRoleMask &
+			MPMatchViewRoleBit( MP_MATCH_VIEW_ROLE_BROADCASTER ) ) != 0 ) {
+		ProjectCasterVitals( gui );
+	}
 	if ( projectedRevision != NULL ) {
 		*projectedRevision = clientMatchView.publicState.viewRevision;
 	}
+}
+
+/*
+================
+idMultiplayerGame::ProjectCasterVitals
+
+openQ4: both sides' health and armour for a casual caster, from the team-vital
+rows of the accepted match view and nothing else: a client that was not granted
+the broadcaster's audience has no rows and never reaches this. The rows update
+with the view, once a second.
+================
+*/
+void idMultiplayerGame::ProjectCasterVitals( idUserInterface *gui ) {
+	idStr sides[ 2 ];
+	const mpMatchViewPublicState_t &publicState = clientMatchView.publicState;
+	for ( int index = 0; index < clientMatchView.teamVitalCount; ++index ) {
+		const mpMatchViewTeamVital_t &vital = clientMatchView.teamVitals[ index ];
+		int slot = -1;
+		for ( int summary = 0; summary < publicState.participantSummaryCount; ++summary ) {
+			const mpMatchViewParticipantSummary_t &participant = publicState.participantSummaries[ summary ];
+			if ( participant.participantId == vital.participantId && participant.connected && participant.slot < MAX_CLIENTS ) {
+				slot = participant.slot;
+				break;
+			}
+		}
+		if ( slot < 0 ) {
+			continue;
+		}
+		idStr name = gameLocal.userInfo[ slot ].GetString( "ui_name" );
+		name.RemoveEscapes();
+		name.CapLength( 12 );
+		idStr &line = sides[ vital.participantSide == 1 ? 1 : 0 ];
+		if ( line.Length() > 0 ) {
+			line += "   ";
+		}
+		line += vital.alive ? va( "%s %d/%d", name.c_str(), vital.health, vital.armor ) : va( "%s -", name.c_str() );
+	}
+	const bool teamGame = gameLocal.IsTeamGame();
+	gui->SetStateString( "match_context_phase", common->GetLocalizedString( "#str_232219" ) );
+	gui->SetStateString( "match_context_role", "" );
+	gui->SetStateString( "match_context_pause", "" );
+	gui->SetStateString( "match_context_readiness", teamGame ?
+		va( "%s: %s", common->GetLocalizedString( "#str_42631" ), sides[ 0 ].c_str() ) : sides[ 0 ].c_str() );
+	gui->SetStateString( "match_context_timeouts", teamGame ?
+		va( "%s: %s", common->GetLocalizedString( "#str_42632" ), sides[ 1 ].c_str() ) : sides[ 1 ].c_str() );
+	gui->SetStateString( "match_context_proposal", "" );
+	gui->SetStateString( "match_context_series", "" );
+	gui->SetStateString( "match_context_items", "" );
+	gui->SetStateBool( "match_context_compact", false );
+	gui->SetStateString( "match_context_summary", "" );
+	gui->SetStateInt( "match_context_visible", 1 );
 }
 
 void idMultiplayerGame::ClientReceiveMatchView( const idBitMsg &msg ) {
@@ -9409,11 +9596,19 @@ void idMultiplayerGame::SynchronizeMatchParticipant( int clientNum ) {
 		return;
 	}
 
+	if ( active ) {
+		ReleaseBroadcasterOnJoin( clientNum, participant );
+	}
 	if ( matchSession.SetParticipantActive( participant, active,
 		matchSession.GetSessionRevision() ).WasRejected() ) {
 		return;
 	}
-	if ( matchSession.SetParticipantSide( participant, side,
+	// openQ4: as in a managed match, an ordinary spectator is neutral even though
+	// stock gameplay keeps their last ui_team for menu convenience. Mirroring
+	// that team here made a casual spectator a team-affiliated observer: in team
+	// modes they could follow only the side their userinfo happened to name, and
+	// could never hold the neutral broadcaster view.
+	if ( matchSession.SetParticipantSide( participant, active ? side : MP_MATCH_SIDE_NONE,
 		matchSession.GetSessionRevision() ).WasRejected() ) {
 		return;
 	}
@@ -9708,6 +9903,7 @@ void idMultiplayerGame::Shutdown( void ) {
 		gameLocal.Warning( "competitive finalization remains pending at shutdown; "
 			"the durable active-map checkpoint was retained" );
 	}
+	liveEvents.Close();
 	Clear();
 	statManager->Shutdown();
 
@@ -9726,6 +9922,8 @@ void idMultiplayerGame::Reset() {
 	if ( !FinalizeMatchEvidence( true ) ) {
 		gameLocal.Warning( "competitive finalization remains pending across map reset" );
 	}
+	// the next map starts its own event stream
+	liveEvents.Close();
 	Clear();
 	// openQ4 briefly shipped several function-key defaults as GUI command text.
 	// Key bindings execute console/usercmd actions, so preserve the stock Quake 4
@@ -9987,6 +10185,8 @@ void idMultiplayerGame::Clear() {
 	SetArenaCampaignDepthOfField( false );
 	SetJoinScreenSoftFocus( false );
 	joinScreenPending = false;
+	memset( casualCaster, 0, sizeof( casualCaster ) );
+	memset( spectatorChatNoticeTime, 0, sizeof( spectatorChatNoticeTime ) );
 	retainedMenuCovered = false;
 	retainedStatClient = -1;
 	retainedStatIdentity.Clear();
@@ -10452,6 +10652,7 @@ idMultiplayerGame::SendDeathMessage
 */
 void idMultiplayerGame::SendDeathMessage( idPlayer* attacker, idPlayer* victim, int methodOfDeath, bool quadKill ) { 
 	if( !gameLocal.isClient ) {
+		liveEvents.Kill( attacker, victim, methodOfDeath, quadKill );
 		idBitMsg outMsg;
 		byte msgBuf[1024];
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
@@ -10490,6 +10691,11 @@ idMultiplayerGame::ReceiveDeathMessage
 */
 void idMultiplayerGame::ReceiveDeathMessage( idPlayer *attacker, int attackerScore, idPlayer *victim, int victimScore, int methodOfDeath, bool quadKill ) {
 	idUserInterface *hud = gameLocal.GetLocalPlayer() ? gameLocal.GetLocalPlayer()->hud : NULL;
+
+	// openQ4: a server reported this death to its stream when it scored it
+	if ( !gameLocal.isServer ) {
+		liveEvents.Kill( attacker, victim, methodOfDeath, quadKill );
+	}
 
 // RITUAL BEGIN
 // squirrel: force buy menu open when you die
@@ -12386,6 +12592,9 @@ void idMultiplayerGame::PlayerDeath( idPlayer *dead, idPlayer *killer, int metho
 		marker.value1 = methodOfDeath;
 		networkSystem->ServerRecordMVDMarker( marker );
 	}
+	if ( dead != NULL ) {
+		idPlayer::NoteSpectatorAutoFollowKill( killer != NULL ? killer->entityNumber : -1, dead->entityNumber );
+	}
 
 	if ( killer ) {
 		if ( gameLocal.IsTeamGame() ) {
@@ -13809,6 +14018,9 @@ Called once each render frame (client)/once each game frame (server)
 */
 void idMultiplayerGame::CommonRun( void ) {
 	idPlayer* player = gameLocal.GetLocalPlayer();
+
+	// openQ4: servers and clients both publish the match they are in
+	liveEvents.Update();
 
 	// twhitaker r282
 	// TTimo: sure is a nasty way to do it
@@ -16384,6 +16596,7 @@ void idMultiplayerGame::Run( void ) {
 		!IsManagedMatch() ) {
 		SynchronizeAllMatchParticipants();
 	}
+	UpdateCasualCasters();
 	// Participant mutations can cancel the authoritative countdown. Apply that
 	// cancellation before gameState consumes its scheduled GAMEON transition.
 	ReconcileGameplayPhaseAfterMatchMutation();
@@ -25053,6 +25266,12 @@ void idMultiplayerGame::ProcessChatMessage( int clientNum, bool team, const char
 			if ( team || ( !g_spectatorChat.GetBool() && ( gameState->GetMPGameState() == GAMEON || gameState->GetMPGameState() == SUDDENDEATH ) ) ) {
 				// to specs
 				send_to = 1;
+				// openQ4: say so, at most once a minute, or a spectator goes on
+				// talking to players the server is keeping the line from
+				if ( !team && gameLocal.time >= spectatorChatNoticeTime[ clientNum ] ) {
+					spectatorChatNoticeTime[ clientNum ] = gameLocal.time + 60000;
+					gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232220", "" );
+				}
 			} else {
 				// to all
 				send_to = 0;
