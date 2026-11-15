@@ -454,6 +454,14 @@ int main() {
     actual.window.borderless=true;actual.window.windowX=0;actual.window.windowY=0;actual.window.logicalWidth=actual.window.pixelWidth=3840;actual.window.logicalHeight=actual.window.pixelHeight=1080;
     assert(BuildDisplayRestore(actual,topology,plan,error) && plan.request.spanDisplays);Portable(plan,topology);
     actual.window.logicalWidth=3000;assert(!BuildDisplayRestore(actual,topology,plan,error));
+    // Native Wayland reports no position: a display-sized borderless window is
+    // restored on its display without placement, and any other size is refused.
+    {auto positionless=Actual();auto& w=positionless.window;w.borderless=true;w.positionValid=false;w.windowX=w.windowY=0;
+     w.logicalWidth=w.pixelWidth=1920;w.logicalHeight=w.pixelHeight=1080;
+     assert(BuildDisplayRestore(positionless,wayland,plan,error) && plan.request.parms.borderless && !plan.request.spanDisplays &&
+         !plan.checkPosition && !plan.request.restorePlacement && plan.request.displayId==2);
+     Portable(plan,wayland);assert(MatchesDisplay(plan,positionless,error));
+     w.logicalWidth=w.pixelWidth=1280;assert(!BuildDisplayRestore(positionless,wayland,plan,error));}
     assert(writes==0);
 #if defined(USE_SDL3)
     SystemDisplayTopology captured;assert(CaptureDisplayTopology(captured,error) && captured.displays.size()==2 && captured.absolutePlacement);

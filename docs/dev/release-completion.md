@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Borderless and window changes on Wayland no longer stop the game starting, 15 November 2026
+
+- **Linux on Wayland: choosing Borderless Window no longer leaves openQ4
+  unable to start.** The desktop places windows on Wayland, and openQ4 counted
+  its refusal to move a window as a failed display change. Any window change
+  from the Display page failed, undoing it failed the same way, and every
+  later start stopped with "Settings display recovery failed" (reinstalling
+  doesn't help, because the record lives in your save folder). This build
+  undoes the stuck change by itself on the next start and keeps your previous
+  display settings, and Borderless Window, windowed sizes and fullscreen now
+  apply on Wayland. A borderless window on Wayland can also be changed again
+  afterwards, which the Display page used to refuse.
+- **When a display change can't be recovered, the message says what to do.**
+  It now names the `ui-settings-recovery.dat` file to delete; openQ4 then
+  starts with your last saved settings.
+- Windowed and borderless play on Wayland stay on the monitor the desktop
+  chose; picking another monitor there needs fullscreen.
+
 ## One network format for what the audit left (protocol 2.42), 15 November 2026
 
 - **Upgrade note: everyone in a match needs this build.** openQ4 now speaks

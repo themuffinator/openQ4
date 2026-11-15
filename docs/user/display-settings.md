@@ -129,7 +129,7 @@ The classic menus' four quality choices use the same recipes: Low is Low, Medium
 - **Borderless Window** is on by default on Windows, because bordered OpenGL windows can stutter there. Turn it off for a normal, resizable window. Resizing a bordered window updates its saved size; hold `Shift` while resizing to snap to common shapes such as 4:3, 16:9, 16:10 and 21:9.
 - openQ4 remembers the window's position. Leaving fullscreen brings back your window size rather than a fullscreen-sized window, and a window you take out of fullscreen or borderless from the Display page is centred on its display.
 - If you unplug or rearrange monitors and the saved position ends up off-screen, openQ4 moves the whole window back onto a display.
-- On Linux desktops that use Wayland, the desktop decides where windows go, so openQ4 doesn't save a position there.
+- On Linux desktops that use Wayland, the desktop decides where windows go, so openQ4 doesn't save a position there. Windowed and borderless play stay on the monitor the desktop chose; to move the game to another monitor there, use fullscreen.
 
 ### Multiple monitors
 
@@ -433,6 +433,7 @@ Flat styles change only an item's colour layer; its lighting detail, effects and
 - **MSAA seems to do nothing.** Check the note under MSAA on the Display page, or run `gfxInfo` to compare the requested and actual counts. Vulkan draws at most 8x, and on a Mac in OpenGL's 2.1 mode most post-processing effects turn MSAA off.
 - **Post AA turns the 3D view black.** Set `r_postAA 0` and report it with `openq4.log` and the output of `gfxInfo`.
 - **Vulkan won't start.** openQ4 falls back to OpenGL by itself; `gfxInfo` explains why. Update your graphics driver and try again.
+- **The game stops at startup with "Settings display recovery failed" or "Settings startup recovery failed".** A display change didn't finish, and openQ4 keeps trying to undo it at every start. Update openQ4 first: 0.14.1 and earlier hit this after choosing Borderless Window, or any window change, on Linux desktops that use Wayland. If it still stops, delete the `ui-settings-recovery.dat` file the message names (in your `baseoq4` save folder, `~/.local/share/openq4/baseoq4/` on Linux and Steam Deck). openQ4 then starts with your last saved settings.
 - **Stutter or uneven frames.** `com_showFramePacing 1` shows what limits the frame rate. On Windows with OpenGL, a borderless window paces better than a bordered one.
 
 When reporting a display problem, include `openq4.log`, the output of `gfxInfo`, and your graphics card and driver version.
