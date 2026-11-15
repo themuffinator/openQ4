@@ -152,6 +152,9 @@ typedef struct serverClient_s {
 	bool				deferredServerInfo;
 	// openQ4: the game has begun this client since it connected; it begins once.
 	bool				gameBegun;
+	// the least time, in milliseconds, by which a command of this client's arrived before
+	// the server needed it since the last snapshot (COMMAND_SLACK_NONE for none)
+	int					commandSlack;
 	int					lastGameInitTime;		// when the last game-init message left
 	// allowances for what a client may make the server send on or run
 	// (CLIENT_USERINFO_BUDGET_BYTES, CLIENT_GAME_MESSAGE_BURST)

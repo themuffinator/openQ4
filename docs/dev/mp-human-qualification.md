@@ -127,7 +127,7 @@ family joined.
 | 8.1 | Lower one machine's interface MTU to 1280 (or connect over a VPN with a small MTU). Join a 12-player match on q4ctf1. | The client joins and plays for five minutes without a reliable-message overflow or disconnect. |
 | 8.2 | Join the server by a hostname that resolves to two or more addresses, one of them unreachable (for example an A and an AAAA record where IPv6 is blocked). | The client tries the next address after three unanswered challenges and joins. |
 | 8.3 | Run a dedicated server on one machine with 16 bots and two human clients on the other. | Both clients hold the game for ten minutes without resyncs piling up. |
-| 8.4 | The Steam 1.4.2 `Quake4.exe` needs administrator rights, so the harness cannot start it. From an elevated prompt run `python tools/tests/mp_retail_protocol_smoke.py --retail-client-binary --basepath "<Quake 4 folder>" --output-dir .tmp/mp08-retail`. A Quake 4 window opens briefly and the harness closes it. | The report passes and `retail_client.binary.refusal_logged` is true: the retail client logged `server uses protocol 2.41` and never joined. |
+| 8.4 | The Steam 1.4.2 `Quake4.exe` needs administrator rights, so the harness cannot start it. From an elevated prompt run `python tools/tests/mp_retail_protocol_smoke.py --retail-client-binary --basepath "<Quake 4 folder>" --output-dir .tmp/mp08-retail`. A Quake 4 window opens briefly and the harness closes it. | The report passes and `retail_client.binary.refusal_logged` is true: the retail client logged `server uses protocol 2.42` and never joined. |
 
 ## MP-09: bot difficulty against people
 

@@ -20,11 +20,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def fixture(source: str) -> str:
-    definitions = "\n".join(re.findall(r"^#define\s+(?:MAX_PACKETLEN6?|FRAGMENT_SIZE6?|FRAGMENT_BIT)\b.*", source, re.M))
+    definitions = "\n".join(re.findall(r"^#define\s+(?:MAX_PACKETLEN6?|FRAGMENT_SIZE|FRAGMENT_BIT|PACKET_HEADER_SIZE)\b.*", source, re.M))
     header = (ROOT / "src/framework/async/MsgChannel.h").read_text(encoding="utf-8")
     definitions += "\n" + re.search(r"^#define\s+MAX_MESSAGE_SIZE\b.*", header, re.M).group(0)
     bodies = "\n".join(block(source, name) for name in (
-        "static int Net_FragmentSize(", "void idMsgChannel::SendNextFragment(", "int idMsgChannel::SendMessage(",
+        "static int Net_FragmentSize(", "static unsigned short Net_PacketTag(", "void idMsgChannel::SendNextFragment(",
+        "int idMsgChannel::SendMessage(",
         "bool idMsgChannel::Process("))
     harness = (ROOT / "tools/tests/native/MsgChannelFragmentFixture.cpp").read_text(encoding="utf-8")
     return harness.replace("// PRODUCTION_DEFINITIONS", definitions).replace("// PRODUCTION_FUNCTIONS", bodies)
@@ -41,12 +42,18 @@ def main() -> None:
         ("oversized fragment accepted", " || fragLength > Net_FragmentSize( remoteAddress )", ""),
         ("exact multiple lacks final empty fragment",
          " && fragLength != Net_FragmentSize( remoteAddress )", ""),
-        ("IPv6 uses IPv4 fragment size", "adr.type == NA_IP6 ? FRAGMENT_SIZE6 : FRAGMENT_SIZE", "FRAGMENT_SIZE"),
+        ("the families use different fragment sizes (a NAT64 path's two ends disagree)",
+         "\treturn FRAGMENT_SIZE;", "\treturn adr.type == NA_IP6 ? FRAGMENT_SIZE : FRAGMENT_SIZE + 168;"),
+        ("a packet without the connection's tag is accepted",
+         "if ( static_cast<unsigned short>( msg.ReadShort() ) != Net_PacketTag( key, sequence ) ) {",
+         "if ( msg.ReadShort() == 0x12345 ) {"),
+        ("the tag ignores the connection's key",
+         "unsigned int hash = static_cast<unsigned int>( key ) * 0x9E3779B1u;", "unsigned int hash = 0x9E3779B1u;"),
         ("duplicate sequence accepted", "sequence <= incomingSequence", "sequence < incomingSequence"),
         ("fragments must arrive in order", "const unsigned int fragmentBit =", "if ( fragStart != fragmentLength ) { return false; } const unsigned int fragmentBit ="),
         ("duplicates counted twice", "if ( fragmentReceived & fragmentBit ) {", "if ( false ) {"),
         ("packing growth leaves as one oversized datagram",
-         " || unsentMsg.GetSize() - 6 >= Net_FragmentSize( remoteAddress )", ""),
+         " || unsentMsg.GetSize() - PACKET_HEADER_SIZE >= Net_FragmentSize( remoteAddress )", ""),
     )
     output = ROOT / ".tmp"
     output.mkdir(exist_ok=True)

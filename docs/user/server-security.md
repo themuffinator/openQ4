@@ -128,7 +128,7 @@ in the save folder; 0.14.1 no longer uses them, so you can delete that folder.
 ## Retail Quake 4 clients and servers
 
 Retail Quake 4 clients cannot join an openQ4 server, and openQ4 cannot join a
-retail server. openQ4 uses network protocol 2.41 and retail Quake 4 1.4.2 uses
+retail server. openQ4 uses network protocol 2.42 and retail Quake 4 1.4.2 uses
 2.85, and the two differ in more than the version number. Each side is told
 why instead of being left waiting:
 
@@ -137,9 +137,16 @@ why instead of being left waiting:
   openQ4 checks this before following the server into its `q4mp` folder, so you
   see the real reason rather than a missing-mod error.
 - A retail client that tries an openQ4 server is told `server uses protocol
-  2.41`, the same message a retail server sends for a protocol mismatch.
+  2.42`, the same message a retail server sends for a protocol mismatch.
 
 Joining retail servers would need a separate project, not a version change.
+
+openQ4 builds before protocol 2.42 (0.14.1 and earlier) are refused the same
+way, with `server uses protocol 2.42`, so a server and its players need the
+same version ([networking guide](multiplayer-networking.md#older-openq4-versions)).
+Since 2.42 every packet of a connection carries a tag made from a secret both
+ends got at the join, so nobody can end a player's connection by forging
+packets in their name or a "disconnect" in the server's.
 
 ## Download links from servers
 

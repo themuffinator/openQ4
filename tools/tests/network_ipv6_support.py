@@ -488,17 +488,21 @@ def validate_posix_ipv6_specifics() -> None:
 
 
 def validate_ipv6_fragment_size() -> None:
-    """IPv6 forbids router fragmentation and guarantees only a 1280 byte MTU."""
+    """IPv6 forbids router fragmentation and guarantees only a 1280 byte MTU.
+
+    Since network protocol 2.42 both families use the IPv6 size, so the two ends of a
+    connection agree on it whatever family each sees the other by (NAT64)."""
     source = read("src/framework/async/MsgChannel.cpp")
     for token in (
         "#define	MAX_PACKETLEN6			1232",
-        "#define	FRAGMENT_SIZE6			(MAX_PACKETLEN6 - 100)",
+        "#define	FRAGMENT_SIZE			(MAX_PACKETLEN6 - 100)",
         "static int Net_FragmentSize( const netadr_t &adr ) {",
-        "return adr.type == NA_IP6 ? FRAGMENT_SIZE6 : FRAGMENT_SIZE;",
+        "\treturn FRAGMENT_SIZE;",
     ):
         require(source, token, "IPv6 fragment sizing")
+    reject(source, "FRAGMENT_SIZE6", "a second, family-specific fragment size")
 
-    # Every fragment decision must use the family-aware size. The receiver
+    # Every fragment decision must use the one shared size. The receiver
     # detects the final fragment by comparing against it, so a mismatch between
     # the two sides stalls the connection instead of failing loudly.
     for signature, context in (
@@ -1061,15 +1065,15 @@ def validate_critical_mutation_sensitivity() -> None:
             )
 
     channel = read("src/framework/async/MsgChannel.cpp")
-    fragment_anchor = "return adr.type == NA_IP6 ? FRAGMENT_SIZE6 : FRAGMENT_SIZE;"
+    fragment_anchor = "#define	FRAGMENT_SIZE			(MAX_PACKETLEN6 - 100)"
     if channel.count(fragment_anchor) != 1:
         raise AssertionError("IPv6 fragment-size mutation anchor is not unique")
-    # A family-blind fragment size would put 1400 byte datagrams on a path that
-    # only guarantees 1280, where they are dropped rather than fragmented.
+    # A fragment sized for IPv4's 1400 byte packets would put datagrams on a path
+    # that only guarantees 1280, where they are dropped rather than fragmented.
     expect_contract_rejection(
         _validate_fragment_size_body,
-        channel.replace(fragment_anchor, "return FRAGMENT_SIZE;", 1),
-        "the fragment size ignores the address family",
+        channel.replace(fragment_anchor, "#define	FRAGMENT_SIZE			(MAX_PACKETLEN - 100)", 1),
+        "the fragment size exceeds what a 1280-byte path carries",
     )
     # Deriving it once and reusing the IPv4 constant elsewhere would desynchronise
     # the two ends of the fragment protocol.
@@ -1104,7 +1108,7 @@ def _validate_fragment_size_body(candidate: str) -> None:
     require(candidate, "#define	MAX_PACKETLEN6			1232", "IPv6 fragment sizing")
     require(
         candidate,
-        "return adr.type == NA_IP6 ? FRAGMENT_SIZE6 : FRAGMENT_SIZE;",
+        "#define	FRAGMENT_SIZE			(MAX_PACKETLEN6 - 100)",
         "IPv6 fragment sizing",
     )
     for signature, context in (

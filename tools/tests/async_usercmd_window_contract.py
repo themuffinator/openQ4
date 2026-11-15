@@ -34,11 +34,12 @@ struct idAsyncNetwork {
     }
     static bool UsercmdInputChanged(const usercmd_t&,const usercmd_t&){return false;}
 };
-struct Client {int clientPrediction=0,gameFrame=0,gameTime=0,lastInputTime=0;};
+constexpr int COMMAND_SLACK_NONE=32767,COMMAND_SLACK_LIMIT=30000;
+struct Client {int clientPrediction=0,gameFrame=0,gameTime=0,lastInputTime=0,commandSlack=COMMAND_SLACK_NONE;};
 struct Server {
     Client client;
     usercmd_t userCmds[MAX_USERCMD_BACKUP][1]{};
-    int gameFrame=1837,serverTime=29392,clientGameInitId=7,drops=0;
+    int gameFrame=1837,gameTime=1837*16,gameTimeResidual=0,serverTime=29392,clientGameInitId=7,drops=0;
     void DropClient(int,const char*){++drops;}
     void Handle(const idBitMsg &msg) {
         int i,clientGameFrame,numUsercmds,index,clientNum=0;

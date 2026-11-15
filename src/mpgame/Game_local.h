@@ -480,6 +480,11 @@ private:
 
 //============================================================================
 
+// openQ4: the network protocol minor whose snapshot layout this game writes, and the one
+// older layout it still reads from a multiview demo (idGameLocal::LegacySnapshotFormat)
+const int GAME_SNAPSHOT_PROTOCOL			= 42;
+const int GAME_SNAPSHOT_PROTOCOL_LEGACY		= 41;
+
 ID_INLINE int PackEntitySpawnId( const int entitySpawnId, const int entityNumber ) {
 	const unsigned int packed = ( static_cast<unsigned int>( entitySpawnId ) << GENTITYNUM_BITS ) |
 		static_cast<unsigned int>( entityNumber );
@@ -1527,6 +1532,10 @@ public:
 	pvsHandle_t				GetClientPVS( idPlayer *player, pvsType_t type );
 
 	int						GetCurrentDemoProtocol( void ) { return demo_protocol; }
+	// openQ4: the snapshot being read was recorded before network protocol 2.42 (a
+	// multiview demo made with 2.41), so its players, projectiles and entity tags have
+	// the older layout. Nothing is ever written in it.
+	bool					LegacySnapshotFormat( void ) const { return demoState == DEMO_PLAYING && serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY; }
 
 private:
 	char					clientGuids[ MAX_CLIENTS ][ CLIENT_GUID_LENGTH ];

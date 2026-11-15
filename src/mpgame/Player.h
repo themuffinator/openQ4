@@ -416,6 +416,9 @@ public:
 	bool					spectating;
 	int						lastHitFrame;			// game frame of the last hit sound feedback
 	bool					lastHitArmor;
+	int						hitFeedbackCount;		// server: hits that sounded, carried in this player's snapshots
+	int						netHitFeedbackCount;	// client: the last count read, -1 before the first
+	int						netHitFeedbackTime;		// client: game time of that read
 	bool					forcedReady;
 	int						lastArenaChange;
 	

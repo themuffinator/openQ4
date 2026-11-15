@@ -418,8 +418,8 @@ def validate_filesystem_pure_pack_contract() -> None:
     reject(async_server, "forcing si_pure 0", "forced pure-server disable diagnostic")
     require(
         async_network_header,
-        "const int ASYNC_PROTOCOL_MINOR\t\t= 41;",
-        "Quake 4 1.4.2 protocol compatibility",
+        "const int ASYNC_PROTOCOL_MINOR\t\t= 42;",
+        "openQ4 network protocol 2.42",
     )
     require(
         source,

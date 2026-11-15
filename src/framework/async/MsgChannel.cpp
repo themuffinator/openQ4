@@ -37,6 +37,7 @@ packet header
 -------------
 2 bytes		id
 4 bytes		outgoing sequence. high bit will be set if this is a fragmented message.
+2 bytes		tag: the sequence keyed with the connection's challenge (Net_PacketTag).
 2 bytes		optional fragment start byte if fragment bit is set.
 2 bytes		optional fragment length if fragment bit is set. if < FRAGMENT_SIZE, this is the last fragment.
 
@@ -49,14 +50,21 @@ All fragments will have the same sequence numbers.
 
 
 #define	MAX_PACKETLEN			1400		// max size of a network packet
-#define	FRAGMENT_SIZE			(MAX_PACKETLEN - 100)
 // IPv6 guarantees only a 1280 byte path MTU and forbids routers from
 // fragmenting in transit: an oversized datagram is dropped and answered with an
 // ICMPv6 Packet Too Big that a filtering path frequently never delivers. A
 // 1400 byte fragment would then be silently black-holed while small packets
 // kept flowing, which reads as "connects, then hangs awaiting snapshot".
 #define	MAX_PACKETLEN6			1232		// 1280 minus the 40 byte IPv6 and 8 byte UDP headers
-#define	FRAGMENT_SIZE6			(MAX_PACKETLEN6 - 100)
+// openQ4: one fragment size for both families (protocol 2.42). IPv4 used 1,300 bytes, and
+// each end took the size from the family it saw the other end by. Behind NAT64 a client
+// sees an IPv6 address and the server an IPv4 one, so they disagreed on which fragment is
+// the last and no fragmented message arrived; and over IPv4 a path that drops IP fragments
+// (a tunnel, an MTU of 1280 to 1400) lost every full fragment. 1,132 bytes fits 1280 on
+// either family.
+#define	FRAGMENT_SIZE			(MAX_PACKETLEN6 - 100)
+// the bytes ahead of a packet's message: id, sequence and tag
+#define	PACKET_HEADER_SIZE		8
 #define	FRAGMENT_BIT			(1u<<31)
 
 // openQ4: a reliable message beyond this fits no packet (SendReliableMessage)
@@ -69,14 +77,37 @@ All fragments will have the same sequence numbers.
 ===============
 Net_FragmentSize
 
-Both endpoints of a connection see the same remote address family, so they
-agree on the fragment size without negotiating it. That agreement is required:
-the receiver detects the final fragment by comparing its length against this
-value.
+Both endpoints of a connection must agree on the fragment size: the receiver
+detects the final fragment by comparing its length against this value. It is
+the same for every address family.
 ===============
 */
 static int Net_FragmentSize( const netadr_t &adr ) {
-	return adr.type == NA_IP6 ? FRAGMENT_SIZE6 : FRAGMENT_SIZE;
+	return FRAGMENT_SIZE;
+}
+
+/*
+===============
+Net_PacketTag
+
+openQ4: what a channel packet carries beside its sequence to show it comes from the
+other end of this connection: the sequence mixed with the challenge the server
+issued for the connect, which both ends hold and no packet carries in the clear.
+A packet used to be accepted on the sender's address (without its port) and a
+15-bit id, so at most 32,767 packets sent with a player's address and a far-ahead
+sequence made every real packet "out of order" and ended that player's
+connection. It is a keyed mix, not a cipher: it stops a sender who cannot see the
+connection's traffic, which is the one who could do this.
+===============
+*/
+static unsigned short Net_PacketTag( const int key, const int sequenceWord ) {
+	unsigned int hash = static_cast<unsigned int>( key ) * 0x9E3779B1u;
+	hash ^= static_cast<unsigned int>( sequenceWord ) + 0x7F4A7C15u + ( hash << 6 ) + ( hash >> 2 );
+	hash *= 0x85EBCA6Bu;
+	hash ^= hash >> 13;
+	hash *= 0xC2B2AE35u;
+	hash ^= hash >> 16;
+	return static_cast<unsigned short>( hash & 0xFFFFu );
 }
 
 idCVar net_channelShowPackets( "net_channelShowPackets", "0", CVAR_SYSTEM | CVAR_BOOL, "show all packets" );
@@ -89,6 +120,7 @@ idMsgChannel::idMsgChannel
 */
 idMsgChannel::idMsgChannel() {
 	id = -1;
+	key = 0;
 	compressor = NULL;
 }
 
@@ -99,9 +131,10 @@ idMsgChannel::Init
   Opens a channel to a remote system.
 ==============
 */
-void idMsgChannel::Init( const netadr_t adr, const int id ) {
+void idMsgChannel::Init( const netadr_t adr, const int id, const int key ) {
 	this->remoteAddress = adr;
 	this->id = id;
+	this->key = key;
 	this->maxRate = 50000;
 	// openQ4: a channel is opened again without a Shutdown when a client
 	// reconnects onto its old slot, when a listen server changes map and when a
@@ -417,8 +450,10 @@ void idMsgChannel::SendNextFragment( idPort &port, const int time ) {
 
 	// write the packet
 	msg.Init( msgBuf, sizeof( msgBuf ) );
+	const int sequenceWord = static_cast<int>( static_cast<unsigned int>( outgoingSequence ) | FRAGMENT_BIT );
 	msg.WriteShort( id );
-	msg.WriteLong( static_cast<int>( static_cast<unsigned int>( outgoingSequence ) | FRAGMENT_BIT ) );
+	msg.WriteLong( sequenceWord );
+	msg.WriteShort( Net_PacketTag( key, sequenceWord ) );
 
 	fragLength = Net_FragmentSize( remoteAddress );
 	if ( unsentFragmentStart + fragLength > unsentMsg.GetSize() ) {
@@ -534,13 +569,14 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 	// write the header
 	unsentMsg.WriteShort( id );
 	unsentMsg.WriteLong( outgoingSequence );
+	unsentMsg.WriteShort( Net_PacketTag( key, outgoingSequence ) );
 
 	// write out the message data
 	// openQ4: the length test above is taken before packing, and packing can grow
 	// a message (WriteMessageData). One that no longer fits a fragment would leave
 	// as a datagram larger than the family allows, over IPv6's 1232 bytes a size a
 	// 1280-byte path drops. Fragment it instead; receivers assemble either form.
-	if ( !WriteMessageData( unsentMsg, msg ) || unsentMsg.GetSize() - 6 >= Net_FragmentSize( remoteAddress ) ) {
+	if ( !WriteMessageData( unsentMsg, msg ) || unsentMsg.GetSize() - PACKET_HEADER_SIZE >= Net_FragmentSize( remoteAddress ) ) {
 		unsentMsg.BeginWriting();
 		if ( !WriteMessageData( unsentMsg, msg ) ) {
 			common->Printf( "idMsgChannel::SendMessage: message too large once packed, length = %i\n", totalLength );
@@ -582,6 +618,23 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 	bool		fragmented;
 	idBitMsg	fragMsg;
 
+	// get sequence numbers
+	if ( msg.GetRemaingData() < (int)sizeof( int ) + (int)sizeof( short ) ) {
+		common->Printf( "%s: runt packet\n", Sys_NetAdrToString( remoteAddress ) );
+		return false;
+	}
+	sequence = msg.ReadLong();
+
+	// openQ4: a packet without this connection's tag is not from its other end
+	// (Net_PacketTag). Nothing about the channel changes for one: not the port below,
+	// the rates, nor the sequence, which is what such a packet was sent to move.
+	if ( static_cast<unsigned short>( msg.ReadShort() ) != Net_PacketTag( key, sequence ) ) {
+		if ( net_channelShowDrop.GetBool() || net_channelShowPackets.GetBool() ) {
+			common->Printf( "%s: packet without this connection's tag\n", Sys_NetAdrToString( from ) );
+		}
+		return false;
+	}
+
 	// the IP port can't be used to differentiate them, because
 	// some address translating routers periodically change UDP
 	// port assignments
@@ -592,13 +645,6 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 
 	// update incoming rate
 	UpdateIncomingRate( time, msg.GetSize() );
-
-	// get sequence numbers
-	if ( msg.GetRemaingData() < (int)sizeof( int ) ) {
-		common->Printf( "%s: runt packet\n", Sys_NetAdrToString( remoteAddress ) );
-		return false;
-	}
-	sequence = msg.ReadLong();
 
 	// check for fragment information
 	const unsigned int sequenceBits = static_cast<unsigned int>( sequence );

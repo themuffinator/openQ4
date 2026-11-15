@@ -79,17 +79,26 @@ join it with `connect [::1]:<port>`.
 
 ### Retail Quake 4 servers
 
-Retail Quake 4 1.4.2 servers use network protocol 2.85 and openQ4 uses 2.41, so
+Retail Quake 4 1.4.2 servers use network protocol 2.85 and openQ4 uses 2.42, so
 the two cannot play together:
 
 - A LAN scan leaves retail servers out of the list. The console notes each one
   as `ignored - protocol 2.85`.
 - Connecting to one directly shows **Network protocol mismatch** with both
   versions, before openQ4 would switch to the retail server's `q4mp` folder.
-- A retail player who tries an openQ4 server sees `server uses protocol 2.41`.
+- A retail player who tries an openQ4 server sees `server uses protocol 2.42`.
 
 See [server security](server-security.md#retail-quake-4-clients-and-servers)
 for more.
+
+### Older openQ4 versions
+
+Builds after 0.14.1 speak network protocol 2.42; 0.14.1 and earlier speak
+2.41. The two refuse each other the same way: a newer server tells an older
+client `server uses protocol 2.42`, an older server shows a newer client
+**Network protocol mismatch**, and the server list leaves the other version
+out. Everyone in a match needs the same version. Recordings you made with an
+older version still play.
 
 ## Connect by address
 
@@ -163,9 +172,9 @@ IPv6.
 
 Every network carries packets up to a certain size in one piece. IPv6
 guarantees only 1,280 bytes and does not let routers split larger packets on
-the way, so on an IPv6 connection openQ4 sends its game messages in smaller
-pieces than on IPv4. This is automatic. It stops the problem where a player
-connects and then waits forever for a game update that never arrives.
+the way, so openQ4 sends its game messages in pieces that fit 1,280 bytes.
+This is automatic. It stops the problem where a player connects and then
+waits forever for a game update that never arrives.
 
 - **If an IPv6 server never answers when you join, or never appears in the
   list,** your network may be blocking split packets (some VPNs and firewalls
@@ -176,6 +185,9 @@ connects and then waits forever for a game update that never arrives.
   grew when compressed is split like any other, so joining and listing work on
   such networks when you and the server both run the next release. A server
   list reply may then leave out settings the browser never shows.
+- **Not in 0.14.1:** since network protocol 2.42 the pieces are the same size
+  on IPv4 as on IPv6, so a match also holds through a NAT64 gateway and over
+  an IPv4 path that drops split packets. 0.14.1 used larger pieces on IPv4.
 
 ## How other players and your shots are shown
 

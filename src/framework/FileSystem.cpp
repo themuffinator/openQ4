@@ -1414,7 +1414,7 @@ typedef struct searchpath_s {
 #define BINARY_CONFIG "binary.conf"
 #define ADDON_CONFIG "addon.conf"
 
-// Protocol 2.41 identifies compatible game code with the official 1.4.2
+// openQ4's network protocol identifies compatible game code with the official 1.4.2
 // q4base/game300.pk4 checksum. openQ4 never loads executable code from that
 // archive; the unchanged value is a platform-independent wire token for a
 // module that FindDLL resolved from the trusted package/module roots.
@@ -6896,7 +6896,7 @@ bool idFileSystemLocal::UpdateGamePakChecksums( void ) {
 		return false;
 	}
 
-	// Protocol 2.41 defines Windows, Linux and macOS as OS IDs 0..2. The
+	// The network protocol defines Windows, Linux and macOS as OS IDs 0..2. The
 	// compatibility token is deliberately platform-independent; executable
 	// bytes remain outside the downloadable/pure-PK4 path.
 	for ( int os = 0; os <= 2; ++os ) {
@@ -7018,7 +7018,7 @@ can be:
   wrong order - if the pak order doesn't match, means some stuff could have been loaded from somewhere else
 server referenced files are prepended to the list if possible ( that doesn't break pureness )
 Game code:
-  protocol 2.41 carries the official q4base/game300.pk4 checksum as a
+  the network protocol carries the official q4base/game300.pk4 checksum as a
   compatibility token, but openQ4 resolves executable modules only from its
   trusted package/module roots and never from a server-selected PK4
 =====================

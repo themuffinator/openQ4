@@ -1,5 +1,108 @@
 # Multiplayer network qualification
 
+## Network protocol 2.42, 15 November 2026
+
+The user chose on 15 November to make the [audit's](#found-and-not-changed)
+wire-format findings in one new network format. openQ4 now speaks protocol
+2.42. The number had been 41 since the first commit although snapshot formats
+changed, with game compatibility riding on the pure game-pak checksum. A 2.42
+build refuses a 2.41 one the way both refuse retail 2.85: the server answers
+`server uses protocol 2.42`, the client shows the protocol mismatch with both
+numbers, and the LAN scan leaves the other version out. Multiview demos
+recorded with 2.41 play: `idGameLocal::IsDemoProtocolCompatible` accepts 41
+under 42, and the game reads such a recording's players, projectiles and entity
+tags in their old layout (`idGameLocal::LegacySnapshotFormat`, true only while
+a 2.41 demo plays). Nothing is ever written in the old layout.
+
+### What changed
+
+- **Every channel packet carries a tag**, two bytes after the sequence, made
+  from the sequence and the connect challenge, which both ends hold and no
+  packet carries in the clear (`Net_PacketTag`; `idMsgChannel::Init` takes the
+  key). A packet without the right tag changes nothing: not the port the
+  channel follows, not the rates, not the sequence. Before, a packet was
+  matched on the sender's address without its port and a 15-bit id, so at most
+  32,767 packets with a far-ahead sequence sent in a player's name made every
+  real packet "out of order" and ended the connection. The out-of-band
+  `disconnect` the server sends on a reliable overflow now carries the key; a
+  client that still hears the server ignores one without it, and honours one
+  without it only after three seconds of silence (`UNKEYED_DISCONNECT_SILENCE`),
+  which keeps a restarted server's disconnect working. The tag is a keyed mix,
+  not a cipher: it stops a sender who cannot see the connection's traffic,
+  which is the one who could do this.
+- **One fragment size for both address families**, 1,132 bytes
+  (`FRAGMENT_SIZE`, from the 1,232-byte IPv6 payload). IPv4 used 1,300 bytes,
+  and each end took the size from the family it saw the other end by, so behind
+  NAT64 (the client sees IPv6, the server IPv4) the two disagreed on which
+  fragment was the last and no fragmented message arrived, and over IPv4 a path
+  that drops IP fragments lost every full fragment. The packet header is
+  `PACKET_HEADER_SIZE` (8) bytes.
+- **The snapshot header reports the command slack**: the least time, in
+  milliseconds, by which a command of the client's arrived before the server
+  needed it since the last snapshot, 32,767 for none
+  (`serverClient_t::commandSlack`, held to plus or minus 30,000).
+  `clientAheadTime` is taken when a snapshot is built, right after a game frame
+  on a dedicated server, so it only ever reads whole frames, and the client
+  holds two frames of cover against that. The client reads and logs it
+  (`net_verbose 1`, the "received snapshot" line); nothing steers by it yet.
+- **The hit confirm is a four-bit count** (`idPlayer::hitFeedbackCount`,
+  `WritePlayerStateToSnapshot`), not a flag for "one since the last snapshot".
+  The flag was set in one snapshot only, so when that snapshot was lost,
+  refused by the rate or overflowed, the hit made no sound, no crosshair flash
+  and no marker, and nothing sent it again. The client sounds a hit when the
+  count moves from the last one read; after a pause of more than 500 ms in
+  reading this player's state (a first read, a new life, a spectator coming
+  back) it only resumes (`HIT_FEEDBACK_RESUME_MSEC`).
+- **Other players' velocity in 16 bits a component**
+  (`idPhysics_Player::WriteToSnapshot`, `PLAYER_VELOCITY_*_BITS`, about a
+  thousandth of the value) instead of three full floats, 99 bits whenever it
+  moved. The owner, whose prediction starts from it, gets the exact value in
+  the player state beside the hit count; it is read after the physics state,
+  so it wins.
+- **A projectile's launch direction in 16 bits a component**, 48 bits, instead
+  of `WriteDir( 24 )`, which kept 7 bits a component while the server flew the
+  exact one, so a client drew every rocket, nail and bolt up to 0.3 degrees off
+  its real path, about 5 units in 1,000, for the whole flight.
+- **Entity check tags are one byte** (`SNAPSHOT_ENTITY_TAG_BITS`) instead of
+  four: one byte tells a write and a read that fell out of step apart as well
+  as four did. `ASYNC_WRITE_TAGS` stays on in every build. The tag seed no
+  longer comes from the gameplay random stream, which every snapshot written
+  for every client was moving; it has a generator of its own.
+
+### Evidence
+
+- `network_security.py` (`validate_protocol_2_42`) pins the number; the tag
+  test before the port, the rate and the sequence in `idMsgChannel::Process`;
+  the keyed `Init` on both ends; the keyed overflow disconnect and the
+  unkeyed-disconnect silence; one fragment size; the header field; and the
+  game's layout with its 2.41 readers. `openq4_pure_pack.py` and
+  `network_ipv6_support.py` pin the number and the one size, and the mutation
+  that would put 1,400-byte datagrams on a 1,280-byte path is still refused.
+- `network_fragment_state.py` executes the production channel
+  (`MsgChannelFragmentFixture.cpp`): both families give 1,132; a packet without
+  the connection's tag, or tagged for another connection, delivers nothing and
+  moves neither the sequence nor the port, and the same packet reaches the
+  connection it was tagged for. Three new failing controls: family-specific
+  sizes, a tag that ignores the key, an untagged packet accepted.
+  `async_usercmd_window_contract.py` carries the slack fields.
+- Runtime, on the integration build (`.tmp/netcode-audit`): a multiview demo
+  recorded by the 2.41 build plays in the 2.42 build, seeking included, with
+  no decode errors, and a 2.42 recording plays back (`probe_mvd.py`); live play
+  on 2.42 (`probe_clock.py`); the reconnect smoke and the 12-player
+  fragmenting-path soak pass (`run_runtime.py reconnect mtu-fragment`); on a
+  quiet machine the impaired firing-view capture passes, 133 of 133 server
+  shots on the client's frame and no late commands during the measured steps.
+- The CI static list (483 tests) was swept: the five tests with protocol pins
+  were updated and pass.
+
+### Not covered
+
+A real NAT64 or fragment-dropping IPv4 path; real connections and play by hand
+(MP-07/MP-08); the command slack steers nothing yet; the snapshot base is
+still negotiated by a reliable message for every acknowledged snapshot. The
+decisions stand: predicting jump pads, a per-address connection limit, a
+private hit-scan spread salt, lag-compensation stance and interpolation.
+
 ## Netcode audit, 14 November 2026
 
 A read of the whole multiplayer path against the code: the message channel and
@@ -125,7 +228,8 @@ merged MP-07 branches).
 ### Found and not changed
 
 These need a change to the wire format, which openQ4 has not versioned since
-0.14.1, or a decision; they are recorded under MP-08.
+0.14.1, or a decision; they are recorded under MP-08. All but the last were
+made the next day as [protocol 2.42](#network-protocol-242-15-november-2026).
 
 - **Channel packets carry no secret.** A sequenced packet is matched on the
   sender's address without its port and a 15-bit client id, so at most 32,767
@@ -1077,13 +1181,14 @@ LAN discovery across machines and on Linux and macOS, real multi-record DNS,
 and running the retail client binary (its challenge was reproduced instead). The server does not adapt its rate to a congested link
 on its own: a player whose connection is slower than the match needs has to
 lower `net_clientMaxRate`. Whether to adapt automatically is a design decision.
-Over IPv4, a path that drops IP fragments still cannot carry a match: large
-messages travel in 1,300-byte channel fragments
-([connection replies](#connection-replies-that-fit-one-packet-13-november-2026)).
+Since [protocol 2.42](#network-protocol-242-15-november-2026) channel
+fragments fit a 1,280-byte path on IPv4 as well, but no run has crossed a real
+NAT64 or fragment-dropping IPv4 path.
 Simulated conditions do not model route changes, cross-traffic sharing a
 bottleneck, or asymmetric links (the rate applies both ways).
 The [netcode audit](#netcode-audit-14-november-2026) lists the findings that
-need a change to the wire format.
+needed a change to the wire format; protocol 2.42 makes all of them but the
+snapshot base in the header.
 
 ## The firing player's own shots under prediction, 12 November 2026
 

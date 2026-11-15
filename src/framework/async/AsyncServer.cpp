@@ -144,6 +144,11 @@ const int SERVER_FRAGMENT_BURST_MSEC	= 50;
 // the least time between two game-init messages to one client
 const int GAME_INIT_RESEND_TIME			= 250;
 
+// openQ4: a snapshot's report of how early commands arrived (serverClient_t::commandSlack):
+// the value when none came since the last snapshot, and the range it is held to
+const int COMMAND_SLACK_NONE			= 32767;
+const int COMMAND_SLACK_LIMIT			= 30000;
+
 static bool AsyncServer_UserInfoWithinLimits( const idDict &info ) {
 	const int numKeyVals = info.GetNumKeyVals();
 	if ( numKeyVals > CLIENT_USERINFO_MAX_KEYS ) {
@@ -1022,6 +1027,7 @@ void idAsyncServer::ClearClient( int clientNum ) {
 	client.gameTime = 0;
 	client.deferredServerInfo = false;
 	client.gameBegun = false;
+	client.commandSlack = COMMAND_SLACK_NONE;
 	client.lastGameInitTime = 0;
 	client.userInfoBudget = CLIENT_USERINFO_BUDGET_BYTES;
 	client.userInfoBudgetTime = 0;
@@ -1069,6 +1075,7 @@ void idAsyncServer::InitClient( int clientNum, int clientId, int clientRate ) {
 	client.gameTime = 0;
 	client.deferredServerInfo = false;
 	client.gameBegun = false;
+	client.commandSlack = COMMAND_SLACK_NONE;
 	client.lastGameInitTime = serverTime - GAME_INIT_RESEND_TIME;
 	client.userInfoBudget = CLIENT_USERINFO_BUDGET_BYTES;
 	client.userInfoBudgetTime = serverTime;
@@ -1249,6 +1256,9 @@ void idAsyncServer::SendReliableMessage( int clientNum, const idBitMsg &msg ) {
 			outMsg.Init( msgBuf, sizeof( msgBuf ) );
 			outMsg.WriteShort( CONNECTIONLESS_MESSAGE_ID );
 			outMsg.WriteString( "disconnect" );
+			// the connection's key: a client honours this at once only with it
+			// (idAsyncClient::ProcessDisconnectMessage)
+			outMsg.WriteLong( clients[ clientNum ].channel.GetKey() );
 			serverPort.SendPacket( to, outMsg.GetData(), outMsg.GetSize() );
 		}
 		clients[ clientNum ].channel.ClearReliableMessages();
@@ -1712,6 +1722,9 @@ bool idAsyncServer::SendSnapshotToClient( int clientNum ) {
 	msg.WriteLong( gameTime );
 	msg.WriteByte( idMath::ClampChar( client.numDuplicatedUsercmds ) );
 	msg.WriteShort( idMath::ClampShort( client.clientAheadTime ) );
+	// openQ4: how early this client's commands arrived (commandSlack), protocol 2.42
+	msg.WriteShort( client.commandSlack );
+	client.commandSlack = COMMAND_SLACK_NONE;
 
 	// write the game snapshot
 	// openQ4: the game only fills the dwords it needs, so start from a known state rather
@@ -1987,6 +2000,21 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 			if ( last ) {
 				client.gameFrame = last->gameFrame;
 				client.gameTime = last->gameTime;
+
+				// openQ4: how long before the server needs it the newest command arrived,
+				// in milliseconds, at the moment it arrived; the least since the last
+				// snapshot goes out with the next one. clientAheadTime above is taken when
+				// a snapshot is built, right after a game frame on a dedicated server, so
+				// it only ever reads whole frames, and the client holds two frames of cover
+				// against that (PredictionMargin.h). This is the figure a client needs to
+				// hold less; nothing steers by it yet.
+				const std::int64_t slack = static_cast<std::int64_t>( client.gameTime ) -
+					static_cast<std::int64_t>( gameTime ) - static_cast<std::int64_t>( gameTimeResidual );
+				const int clamped = slack < -COMMAND_SLACK_LIMIT ? -COMMAND_SLACK_LIMIT :
+					( slack > COMMAND_SLACK_LIMIT ? COMMAND_SLACK_LIMIT : static_cast<int>( slack ) );
+				if ( client.commandSlack == COMMAND_SLACK_NONE || clamped < client.commandSlack ) {
+					client.commandSlack = clamped;
+				}
 			}
 
 			if ( idAsyncNetwork::verbose.GetInteger() == 2 ) {
@@ -2843,7 +2871,7 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 				DropClient( clientNum, "#str_07138" );
 			}
 			// initialize
-			clients[ clientNum ].channel.Init( from, serverId );
+			clients[ clientNum ].channel.Init( from, serverId, challenge );
 			clients[ clientNum ].OS = OS;
 			idStr::Copynz( clients[ clientNum ].guid, guid, sizeof( clients[ clientNum ].guid ) );
 			break;

@@ -328,7 +328,9 @@ requires:
 - read-only acceptance of the recorded protocol minor by
   `idGame::IsDemoProtocolCompatible` while inspecting the library, followed by
   `idGame::ValidateDemoProtocol` when playback starts and commits the game
-  module's protocol state;
+  module's protocol state (2.42 accepts recordings made with 2.41 and reads
+  their older player, projectile and entity-tag layout; see the
+  [protocol record](mp-network-qualification.md#network-protocol-242-15-november-2026));
 - the legacy game API match for format 1.0/1.1, or acceptance of the packed
   game schema by `idGame::IsMVDSchemaCompatible` for format 1.2+;
 - the same simulation/user-command rate;

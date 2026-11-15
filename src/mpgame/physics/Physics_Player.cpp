@@ -2362,9 +2362,14 @@ void idPhysics_Player::WriteToSnapshot( idBitMsgDelta &msg ) const {
 	msg.WriteFloat( current.origin[0] );
 	msg.WriteFloat( current.origin[1] );
 	msg.WriteFloat( current.origin[2] );
-	msg.WriteDeltaFloat( 0.0f, current.velocity[0] );
-	msg.WriteDeltaFloat( 0.0f, current.velocity[1] );
-	msg.WriteDeltaFloat( 0.0f, current.velocity[2] );
+	// openQ4: 16 bits a component, about a thousandth of the value (protocol 2.42). Every
+	// player's velocity went to every recipient as three full floats, 99 bits whenever it
+	// moved; the players who watch need no more than this to draw one moving, and the
+	// player who owns it, whose prediction starts from it, gets the exact value beside it
+	// (idPlayer::WritePlayerStateToSnapshot).
+	msg.WriteDeltaFloat( 0.0f, current.velocity[0], PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS );
+	msg.WriteDeltaFloat( 0.0f, current.velocity[1], PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS );
+	msg.WriteDeltaFloat( 0.0f, current.velocity[2], PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS );
 
 	msg.WriteDeltaFloat( current.origin[0], current.localOrigin[0] );
 	msg.WriteDeltaFloat( current.origin[1], current.localOrigin[1] );
@@ -2408,9 +2413,15 @@ bool idPhysics_Player::DecodeSnapshotState( const idBitMsgDelta &msg, playerPSta
 	decoded.origin[0] = msg.ReadFloat();
 	decoded.origin[1] = msg.ReadFloat();
 	decoded.origin[2] = msg.ReadFloat();
-	decoded.velocity[0] = msg.ReadDeltaFloat( 0.0f );
-	decoded.velocity[1] = msg.ReadDeltaFloat( 0.0f );
-	decoded.velocity[2] = msg.ReadDeltaFloat( 0.0f );
+	if ( gameLocal.LegacySnapshotFormat() ) {
+		decoded.velocity[0] = msg.ReadDeltaFloat( 0.0f );
+		decoded.velocity[1] = msg.ReadDeltaFloat( 0.0f );
+		decoded.velocity[2] = msg.ReadDeltaFloat( 0.0f );
+	} else {
+		decoded.velocity[0] = msg.ReadDeltaFloat( 0.0f, PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS );
+		decoded.velocity[1] = msg.ReadDeltaFloat( 0.0f, PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS );
+		decoded.velocity[2] = msg.ReadDeltaFloat( 0.0f, PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS );
+	}
 	decoded.localOrigin[0] = msg.ReadDeltaFloat( decoded.origin[0] );
 	decoded.localOrigin[1] = msg.ReadDeltaFloat( decoded.origin[1] );
 	decoded.localOrigin[2] = msg.ReadDeltaFloat( decoded.origin[2] );

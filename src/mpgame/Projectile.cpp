@@ -1896,7 +1896,13 @@ void idProjectile::WriteToSnapshot( idBitMsgDelta &msg ) const {
 		msg.WriteFloat( launchOrig[ 0 ] );
 		msg.WriteFloat( launchOrig[ 1 ] );
 		msg.WriteFloat( launchOrig[ 2 ] );
-		msg.WriteDir( launchDir, 24 );
+		// openQ4: 16 bits a component (protocol 2.42). The 24-bit direction kept 7 bits a
+		// component while the server flies the exact one, so a client drew every rocket,
+		// nail and bolt up to 0.3 degrees off its real path, about 5 units in 1,000, for
+		// the whole flight.
+		msg.WriteShort( idMath::ClampInt( -32767, 32767, idMath::FtoiFast( launchDir[ 0 ] * 32767.0f ) ) );
+		msg.WriteShort( idMath::ClampInt( -32767, 32767, idMath::FtoiFast( launchDir[ 1 ] * 32767.0f ) ) );
+		msg.WriteShort( idMath::ClampInt( -32767, 32767, idMath::FtoiFast( launchDir[ 2 ] * 32767.0f ) ) );
 
 		int ownerNum = (GetOwner() && GetOwner()->entityNumber < MAX_CLIENTS) ? GetOwner()->entityNumber : MAX_CLIENTS;
 		msg.WriteBits( ownerNum, idMath::BitsForInteger(MAX_CLIENTS) );
@@ -1929,7 +1935,16 @@ void idProjectile::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		newLaunchOrig[ 0 ] = msg.ReadFloat();
 		newLaunchOrig[ 1 ] = msg.ReadFloat();
 		newLaunchOrig[ 2 ] = msg.ReadFloat();
-		newLaunchDir = msg.ReadDir( 24 );
+		if ( gameLocal.LegacySnapshotFormat() ) {
+			newLaunchDir = msg.ReadDir( 24 );
+		} else {
+			newLaunchDir[ 0 ] = msg.ReadShort() * ( 1.0f / 32767.0f );
+			newLaunchDir[ 1 ] = msg.ReadShort() * ( 1.0f / 32767.0f );
+			newLaunchDir[ 2 ] = msg.ReadShort() * ( 1.0f / 32767.0f );
+			if ( newLaunchDir.Normalize() == 0.0f ) {
+				newLaunchDir = launchDir;
+			}
+		}
 
 		ownerNum = msg.ReadBits( idMath::BitsForInteger(MAX_CLIENTS) );
 	}

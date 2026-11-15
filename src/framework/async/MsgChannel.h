@@ -56,7 +56,10 @@ class idMsgChannel {
 public:
 					idMsgChannel();
 
-	void			Init( const netadr_t adr, const int id );
+					// key is the connect challenge both ends hold; every packet carries a tag made
+					// with it, and one without the tag is ignored.
+	void			Init( const netadr_t adr, const int id, const int key = 0 );
+	int				GetKey( void ) const { return key; }
 	void			Shutdown( void );
 	void			ResetRate( void );
 
@@ -127,6 +130,7 @@ public:
 private:
 	netadr_t		remoteAddress;	// address of remote host
 	int				id;				// our identification used instead of port number
+	int				key;			// the connect challenge packets are tagged with
 	int				maxRate;		// maximum number of bytes that may go out per second
 	idCompressor *	compressor;		// compressor used for data compression
 

@@ -11,11 +11,11 @@ openQ4 ignores the retail game-binary PK4 archives (`game000.pk4` through `game3
 
 ## Pure multiplayer game-module token
 
-openQ4's network protocol, 2.41, carries a game-code PK4 checksum after the ordered pure asset list. That version number is Doom 3's minor number under Quake 4's major number; no retail Quake 4 release used it. openQ4 fills the field with a fixed token for the Windows, Linux, and macOS OS IDs: `0x68fb90b1`, the engine checksum of the official Quake 4 1.4.2 `q4base/game300.pk4`. The same value is used on every platform, so an openQ4 client and server do not need identical executable formats to complete the asset handshake.
+openQ4's network protocol, 2.42, carries a game-code PK4 checksum after the ordered pure asset list. That number continues Doom 3's minor numbers (1.3.1 was 41) under Quake 4's major number; no retail Quake 4 release used it. openQ4 fills the field with a fixed token for the Windows, Linux, and macOS OS IDs: `0x68fb90b1`, the engine checksum of the official Quake 4 1.4.2 `q4base/game300.pk4`. The same value is used on every platform, so an openQ4 client and server do not need identical executable formats to complete the asset handshake.
 
 The token only works between openQ4 builds. It does not make openQ4 compatible with retail servers, for two reasons:
 
-- Retail 1.4.2 servers speak protocol 2.85 and reject a 2.41 client before the pure check.
+- Retail 1.4.2 servers speak protocol 2.85 and reject an openQ4 client before the pure check.
 - `q4base/game300.pk4` holds the single-player game code. Since 1.4.0, retail multiplayer runs from `q4mp/`, so a retail pure server expects a `q4mp` game pak:
 
 | PK4 | Checksum | Contents |

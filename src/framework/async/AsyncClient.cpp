@@ -287,6 +287,9 @@ const int EMPTY_RESEND_TIME				= 500;
 const int PREDICTION_FAST_ADJUST		= 4;
 // the most UpdateTime gives one frame: a longer stall loses the rest
 const int CLIENT_FRAME_CLAMP_MSEC		= 100;
+// how long the server must have been silent before a disconnect without the
+// connection's key ends the session
+const int UNKEYED_DISCONNECT_SILENCE	= 3000;
 
 
 /*
@@ -1567,7 +1570,7 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 				break;
 			}
 
-			if ( msg.GetRemainingReadBits() < 32 + 32 + 32 + 8 + 16 ) {
+			if ( msg.GetRemainingReadBits() < 32 + 32 + 32 + 8 + 16 + 16 ) {
 				common->Warning( "server sent a truncated snapshot header; disconnecting safely" );
 				AsyncClient_StopAfterProtocolError();
 				return;
@@ -1577,6 +1580,10 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 			const int receivedSnapshotGameTime = msg.ReadLong();
 			numDuplicatedUsercmds = msg.ReadByte();
 			aheadOfServer = msg.ReadShort();
+			// openQ4: the least time by which a command arrived before the server needed
+			// it since the last snapshot, 32767 for none (idAsyncServer, commandSlack);
+			// logged below, not steered by yet
+			const int commandSlack = msg.ReadShort();
 			if ( msg.IsReadOverflowed() ||
 				 !AsyncClient_ValidNetworkTiming( receivedSnapshotGameFrame, receivedSnapshotGameTime ) ) {
 				common->Warning( "server sent invalid snapshot timing; disconnecting safely" );
@@ -1717,9 +1724,9 @@ void idAsyncClient::ProcessUnreliableServerMessage( const idBitMsg &msg ) {
 				// client's commands arrive, and the target and catch-up the controller now holds.
 				common->Printf( "received snapshot, gameInitId = %d, gameFrame = %d, gameTime = %d, snapshotGameTime = %d, "
 					"predictedGameTime = %d%s, aheadOfServer = %d, clientPrediction = %d, clientPredictTime = %d, gameTimeResidual = %d, "
-					"predictionMargin = %d\n",
+					"predictionMargin = %d, commandSlack = %d\n",
 					gameInitId, gameFrame, gameTime, snapshotGameTime, predictedGameTime, predictionResynced ? " (resync)" : "",
-					aheadOfServer, clientPrediction, clientPredictTime, gameTimeResidual, predictionMarginMsec );
+					aheadOfServer, clientPrediction, clientPredictTime, gameTimeResidual, predictionMarginMsec, commandSlack );
 			}
 			if ( predictionMarginRise > 0 && idAsyncNetwork::verbose.GetInteger() ) {
 				common->Printf( "client prediction margin %d ms after a %d ms frame (game time %d)\n", predictionMarginMsec,
@@ -2141,7 +2148,7 @@ void idAsyncClient::ProcessConnectResponseMessage( const netadr_t from, const id
 	sessLocal.ClearRetainedLoadingRoster();
 	AsyncClient_ReadConnectRoster( msg );
 
-	channel.Init( from, clientId );
+	channel.Init( from, clientId, serverChallenge );
 	clientNum = serverClientNum;
 	clientState = CS_CONNECTED;
 	// openQ4: this is the server's answer, so the time-out counts from it. Left at
@@ -2189,6 +2196,19 @@ void idAsyncClient::ProcessDisconnectMessage( const netadr_t from, const idBitMs
 	if ( StaleDisconnectAfterResume() ) {
 		common->Printf( "Network: ignoring the dropped connection's disconnect while reconnecting\n" );
 		return;
+	}
+	// openQ4: this message travels outside the channel, so anyone who can put the
+	// server's address on a packet could end a session with it. A server that still
+	// holds the connection sends its key; one that no longer knows this client (it
+	// restarted, or freed the slot) cannot, and by then it has stopped sending channel
+	// packets. So without the key the message counts only once the server has been
+	// silent for a few seconds.
+	if ( clientState >= CS_CONNECTED ) {
+		const bool keyed = msg.GetRemainingReadBits() >= 32 && msg.ReadLong() == channel.GetKey();
+		if ( !keyed && lastPacketTime > 0 && clientTime - lastPacketTime < UNKEYED_DISCONNECT_SILENCE ) {
+			common->Printf( "Network: ignoring a disconnect without this connection's key\n" );
+			return;
+		}
 	}
 	arenaCampaign.AbortMatch();
 	session->Stop();

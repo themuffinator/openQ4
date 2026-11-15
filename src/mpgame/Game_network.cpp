@@ -22,6 +22,10 @@
 
 // adds tags to the network protocol to detect when things go bad ( internal consistency )
 // NOTE: this changes the network protocol
+// the check tag written after every entity in a snapshot (ASYNC_WRITE_TAGS)
+const int SNAPSHOT_ENTITY_TAG_BITS = 8;
+const int SNAPSHOT_ENTITY_TAG_MASK = ( 1 << SNAPSHOT_ENTITY_TAG_BITS ) - 1;
+
 #ifndef ASYNC_WRITE_TAGS
 	#define ASYNC_WRITE_TAGS 1
 #endif
@@ -971,8 +975,12 @@ void idGameLocal::WriteSnapshot( snapshot_t *&clientSnapshot, entityState_t *ent
 	}
 
 #if ASYNC_WRITE_TAGS
+	// openQ4: the seed came from the gameplay random stream, so every snapshot written
+	// for every client moved the numbers the match itself drew next
+	static unsigned int snapshotTagSeed = 0x2545F491u;
+	snapshotTagSeed = snapshotTagSeed * 1664525u + 1013904223u;
 	idRandom tagRandom;
-	tagRandom.SetSeed( random.RandomInt() );
+	tagRandom.SetSeed( static_cast<int>( snapshotTagSeed >> 1 ) );
 	msg.WriteLong( tagRandom.GetSeed() );
 #endif
 	
@@ -1079,7 +1087,9 @@ void idGameLocal::WriteSnapshot( snapshot_t *&clientSnapshot, entityState_t *ent
 			snapshot->firstEntityState = newBase;
 
 #if ASYNC_WRITE_TAGS
-			msg.WriteLong( tagRandom.RandomInt() );
+			// openQ4: one byte tells a write and a read that fell out of step apart as
+			// well as four did, for every entity written (protocol 2.42)
+			msg.WriteBits( tagRandom.RandomInt() & SNAPSHOT_ENTITY_TAG_MASK, SNAPSHOT_ENTITY_TAG_BITS );
 #endif
 		}
 	}
@@ -2082,7 +2092,9 @@ bool idGameLocal::ClientReadSnapshot( int clientNum, int snapshotSequence, const
 		ent->snapshotBits = msg.GetNumBitsRead() - numBitsRead;
 
 #if ASYNC_WRITE_TAGS
-		if ( msg.ReadLong() != tagRandom.RandomInt() ) {
+		const int entityTag = tagRandom.RandomInt();
+		if ( LegacySnapshotFormat() ? ( msg.ReadLong() != entityTag ) :
+			 ( msg.ReadBits( SNAPSHOT_ENTITY_TAG_BITS ) != ( entityTag & SNAPSHOT_ENTITY_TAG_MASK ) ) ) {
 			//cmdSystem->BufferCommandText( CMD_EXEC_NOW, "writeGameState" );
 			assert( entityDefNumber >= 0 );
 			assert( entityDefNumber < declManager->GetNumDecls( DECL_ENTITYDEF ) );
@@ -5214,17 +5226,11 @@ idGameLocal::IsDemoProtocolCompatible
 ===============
 */
 bool idGameLocal::IsDemoProtocolCompatible( int minor_ref, int minor ) const {
-#if 0
-	// 1.1 beta : 67
-	// 1.1 final: 68
-	// 1.2		: 69
-	// 1.3		: 71
-
-	// let 1.3 play 1.2 demos - keep a careful eye on snapshotting changes
-	return ( minor_ref == minor || ( minor_ref == 71 && minor == 69 ) );
-#else
-	return ( minor_ref == minor );
-#endif
+	// openQ4: protocol 2.42 changed what a snapshot holds for players, projectiles and
+	// entity tags; a demo recorded with 2.41 is read in its own layout
+	// (LegacySnapshotFormat), so recordings made before the change still play.
+	return ( minor_ref == minor ||
+		( minor_ref == GAME_SNAPSHOT_PROTOCOL && minor == GAME_SNAPSHOT_PROTOCOL_LEGACY ) );
 }
 
 /*

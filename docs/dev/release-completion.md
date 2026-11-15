@@ -7,6 +7,50 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## One network format for what the audit left (protocol 2.42), 15 November 2026
+
+- **Upgrade note: everyone in a match needs this build.** openQ4 now speaks
+  network protocol 2.42; 0.14.1 and earlier speak 2.41. A server on this build
+  tells an older client `server uses protocol 2.42`, an older server shows this
+  build's client **Network protocol mismatch**, and the server list leaves the
+  other version out, as it does retail servers. Recordings you made with an
+  older build still play.
+- **Nobody can knock you off a server by forging packets.** Every packet of
+  your connection now carries a tag made from a secret both ends got when you
+  joined. Someone who could put your address on packets used to be able to end
+  your connection with at most 32,767 of them, or with one forged "disconnect"
+  in the server's name. Both are ignored now. A disconnect without the tag
+  counts only once the server has been silent for three seconds, so a server
+  that restarted still sends you back to the menu.
+- **Every hit you land is confirmed.** The hit sound, crosshair flash and hit
+  marker used to ride in a single update; when that one update was lost or
+  refused, the hit stayed silent. Updates now carry a count of your hits,
+  repeated until your game has seen it.
+- **Rockets, nails and bolts fly where the server flies them.** A projectile's
+  launch direction reached you rounded to about 0.3 degrees, so your game drew
+  it up to 5 units off its true path per 1,000 of flight. It now arrives all
+  but exact.
+- **Smaller updates on busy servers.** Other players' speed now takes about
+  half the bytes it did (your own stays exact, since your prediction starts
+  from it), and each entity's consistency check takes one byte instead of
+  four.
+- **Joining through NAT64, and over IPv4 paths that drop large packets.** Both
+  ends now split large messages the same way whatever kind of address each
+  sees. Before, a player who saw the server over IPv6 while the server saw them
+  over IPv4 never got a large message, and an IPv4 path that dropped split
+  packets lost every one.
+- Server operators: nothing to configure. `net_verbose 1` now also logs how
+  early each player's commands arrive (the "received snapshot" line); nothing
+  acts on it yet.
+- Development: `network_security.py` pins the format; `network_fragment_state.py`
+  executes the production channel with the tag and the one fragment size
+  (1,132 bytes), with three new failing controls; a demo recorded with 2.41
+  plays in the 2.42 build; the reconnect smoke, the 12-player fragmenting-path
+  soak and the impaired firing-view capture (133 of 133 shots on the frame)
+  pass ([record](mp-network-qualification.md#network-protocol-242-15-november-2026)).
+  Still open under MP-08: the snapshot base still travels by reliable message,
+  and no real NAT64 or fragment-dropping IPv4 path has been crossed.
+
 ## Recordings less than half the size, that seek in a second and survive a crash, 14 November 2026
 
 - **A recording takes about 40% of the space.** A busy level at 60 frames per
@@ -115,9 +159,9 @@ does not restore the withdrawn release. See
   the 12-player fragmenting-path soak and, on a quiet machine, the impaired
   firing-view capture (151 of 151 shots on the frame) pass
   ([record](mp-network-qualification.md#netcode-audit-14-november-2026)).
-- Open (MP-08): the findings that need a new network format, chiefly that
-  channel packets carry no secret, so a spoofed packet can end a player's
-  connection; presentation above 60 fps and real connections are not measured.
+- The findings that needed a new network format were made the next day as
+  [protocol 2.42](#one-network-format-for-what-the-audit-left-protocol-242-15-november-2026).
+  Open (MP-08): presentation above 60 fps and real connections are not measured.
 
 ## Multiview demos play again (0.14.1 regression), 14 November 2026
 

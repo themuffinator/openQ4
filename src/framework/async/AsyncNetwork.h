@@ -37,7 +37,12 @@ DOOM III gold:	33
 1.3 patch:		40
 1.3.1:			41
 */
-const int ASYNC_PROTOCOL_MINOR		= 41;
+// openQ4: 42 (15 November 2026) keys every channel packet with the connect challenge, uses
+// one fragment size for both address families, reports how early commands arrive, and in
+// the game's snapshots replaces the hit-confirm bit with a counter, sends other players'
+// velocity in 16 bits, a projectile's launch direction in 48 and an entity's check tag in 8.
+// The game reads multiview demos recorded with 41 (idGameLocal::IsDemoProtocolCompatible).
+const int ASYNC_PROTOCOL_MINOR		= 42;
 const int ASYNC_PROTOCOL_VERSION	= ( ASYNC_PROTOCOL_MAJOR << 16 ) + ASYNC_PROTOCOL_MINOR;
 #define MAJOR_VERSION(v) ( v >> 16 )
 

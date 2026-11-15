@@ -1151,7 +1151,7 @@ def validate_session_lifecycle_and_flood_bounds() -> None:
                    "clients[ clientNum ].clientState = SCS_CONNECTED;", "a pure message from a client in the game drops it")
     connect = function_body(server, "void idAsyncServer::ProcessConnectMessage(", "connect")
     require_before(connect, "if ( clients[ clientNum ].clientState >= SCS_PUREWAIT ) {",
-                   "clients[ clientNum ].channel.Init( from, serverId );", "a connect onto a live slot drops its old client first")
+                   "clients[ clientNum ].channel.Init( from, serverId, challenge );", "a connect onto a live slot drops its old client first")
 
     reliable = function_body(server, "void idAsyncServer::ProcessReliableClientMessages(", "client reliable messages")
     require_before(reliable, "client.userInfoBudget -= msg.GetSize();", "SendUserInfoBroadcast( clientNum, info );",
@@ -1244,6 +1244,91 @@ def validate_session_lifecycle_and_flood_bounds() -> None:
         require(player, gated, "death and hit feedback follow the feedback gap, not any gap")
 
 
+def validate_protocol_2_42() -> None:
+    """Network protocol 2.42 (15 November 2026): keyed channel packets, one fragment size,
+    the command-slack report, and the game's snapshot layout with its 2.41 demo reader."""
+    header = read("src/framework/async/AsyncNetwork.h")
+    channel = read("src/framework/async/MsgChannel.cpp")
+    server = read("src/framework/async/AsyncServer.cpp")
+    client = read("src/framework/async/AsyncClient.cpp")
+    require(header, "const int ASYNC_PROTOCOL_MINOR\t\t= 42;", "protocol number")
+
+    process = function_body(channel, "bool idMsgChannel::Process(", "channel receive")
+    tag_test = "if ( static_cast<unsigned short>( msg.ReadShort() ) != Net_PacketTag( key, sequence ) ) {"
+    for later, context in (
+        ("remoteAddress.port = from.port;", "the tag is checked before the port is followed"),
+        ("UpdateIncomingRate( time, msg.GetSize() );", "the tag is checked before the rate is charged"),
+        ("if ( sequence <= incomingSequence ) {", "the tag is checked before the sequence is judged"),
+        ("incomingSequence = sequence;", "the tag is checked before the sequence moves"),
+    ):
+        require_before(process, tag_test, later, context)
+    require(function_body(channel, "void idMsgChannel::SendNextFragment(", "fragment send"),
+            "msg.WriteShort( Net_PacketTag( key, sequenceWord ) );", "fragments carry the tag")
+    require(function_body(channel, "int idMsgChannel::SendMessage(", "message send"),
+            "unsentMsg.WriteShort( Net_PacketTag( key, outgoingSequence ) );", "messages carry the tag")
+    require(function_body(channel, "static unsigned short Net_PacketTag(", "packet tag"),
+            "unsigned int hash = static_cast<unsigned int>( key ) * 0x9E3779B1u;", "the tag is keyed")
+    require(function_body(channel, "void idMsgChannel::Init(", "channel init"), "this->key = key;", "the channel keeps its key")
+    require(function_body(server, "void idAsyncServer::ProcessConnectMessage(", "connect"),
+            "clients[ clientNum ].channel.Init( from, serverId, challenge );", "the server keys the channel with the challenge it issued")
+    require(function_body(client, "void idAsyncClient::ProcessConnectResponseMessage(", "connect response"),
+            "channel.Init( from, clientId, serverChallenge );", "the client keys the channel with the server's challenge")
+    disconnect = function_body(client, "void idAsyncClient::ProcessDisconnectMessage(", "out-of-band disconnect")
+    require_before(disconnect, "msg.ReadLong() == channel.GetKey()", "session->Stop();",
+                   "an out-of-band disconnect needs the key while the server is still heard")
+    require(disconnect, "clientTime - lastPacketTime < UNKEYED_DISCONNECT_SILENCE", "an unkeyed disconnect waits for silence")
+    require(function_body(server, "void idAsyncServer::SendReliableMessage(", "server reliable send"),
+            "outMsg.WriteLong( clients[ clientNum ].channel.GetKey() );", "the overflow disconnect carries the key")
+
+    require(function_body(channel, "static int Net_FragmentSize(", "fragment size"), "\treturn FRAGMENT_SIZE;", "one fragment size")
+    require(channel, "#define\tFRAGMENT_SIZE\t\t\t(MAX_PACKETLEN6 - 100)", "fragments fit a 1280-byte path on either family")
+
+    snapshot = function_body(server, "bool idAsyncServer::SendSnapshotToClient(", "snapshot send")
+    require_before(snapshot, "msg.WriteShort( idMath::ClampShort( client.clientAheadTime ) );",
+                   "msg.WriteShort( client.commandSlack );", "the snapshot header reports the command slack")
+    require(function_body(client, "void idAsyncClient::ProcessUnreliableServerMessage(", "server unreliable messages"),
+            "if ( msg.GetRemainingReadBits() < 32 + 32 + 32 + 8 + 16 + 16 ) {", "the client expects the longer snapshot header")
+
+    game_header = (GAME_LIBS_ROOT / "src/mpgame/Game_local.h").read_text(encoding="utf-8", errors="replace")
+    network = (GAME_LIBS_ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8", errors="replace")
+    player = (GAME_LIBS_ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8", errors="replace")
+    physics = (GAME_LIBS_ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8", errors="replace")
+    projectile = (GAME_LIBS_ROOT / "src/mpgame/Projectile.cpp").read_text(encoding="utf-8", errors="replace")
+    require(game_header, "const int GAME_SNAPSHOT_PROTOCOL\t\t\t= 42;", "the game's snapshot layout number")
+    require(game_header, "demoState == DEMO_PLAYING && serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY",
+            "the older layout is read only from a demo recorded with it")
+    require(function_body(network, "bool idGameLocal::IsDemoProtocolCompatible(", "demo protocol"),
+            "( minor_ref == GAME_SNAPSHOT_PROTOCOL && minor == GAME_SNAPSHOT_PROTOCOL_LEGACY )", "2.41 demos stay playable")
+    write = function_body(player, "void idPlayer::WritePlayerStateToSnapshot(", "player state write")
+    read_state = function_body(player, "void idPlayer::ReadPlayerStateFromSnapshot(", "player state read")
+    require(write, "msg.WriteBits( hitFeedbackCount & HIT_FEEDBACK_COUNT_MASK, HIT_FEEDBACK_COUNT_BITS );", "the hit confirm is a count")
+    reject(write, "lastHitFrame > lastSnapshotFrame", "the one-snapshot hit flag")
+    require_before(write, "msg.WriteBits( lastHitArmor, 1 );", "msg.WriteDeltaFloat( 0.0f, exactVelocity[0] );",
+                   "the owner's exact velocity follows the hit state")
+    require_before(read_state, "if ( gameLocal.LegacySnapshotFormat() ) {", "const int hitCount = msg.ReadBits( HIT_FEEDBACK_COUNT_BITS );",
+                   "the reader keeps the 2.41 layout for demos")
+    require(read_state, "hitCount != netHitFeedbackCount", "a moved count sounds the hit")
+    require(read_state, "physicsObj.SetLinearVelocity( exactVelocity );", "the owner predicts from the exact velocity")
+    physics_write = function_body(physics, "void idPhysics_Player::WriteToSnapshot(", "player physics write")
+    physics_read = function_body(physics, "bool idPhysics_Player::DecodeSnapshotState(", "player physics read")
+    if physics_write.count("PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS") != 3:
+        raise AssertionError("every velocity component is written in 16 bits")
+    if physics_read.count("PLAYER_VELOCITY_EXPONENT_BITS, PLAYER_VELOCITY_MANTISSA_BITS") != 3:
+        raise AssertionError("every velocity component is read in 16 bits")
+    require_before(physics_read, "if ( gameLocal.LegacySnapshotFormat() ) {", "PLAYER_VELOCITY_EXPONENT_BITS",
+                   "the velocity reader keeps the 2.41 layout for demos")
+    projectile_write = function_body(projectile, "void idProjectile::WriteToSnapshot(", "projectile write")
+    projectile_read = function_body(projectile, "void idProjectile::ReadFromSnapshot(", "projectile read")
+    reject(projectile_write, "msg.WriteDir( launchDir, 24 )", "the 24-bit launch direction")
+    if projectile_write.count("* 32767.0f ) ) );") != 3:
+        raise AssertionError("the launch direction is written in 16 bits a component")
+    require_before(projectile_read, "newLaunchDir = msg.ReadDir( 24 );", "newLaunchDir[ 0 ] = msg.ReadShort() * ( 1.0f / 32767.0f );",
+                   "the direction reader keeps the 2.41 layout for demos")
+    require(network, "msg.WriteBits( tagRandom.RandomInt() & SNAPSHOT_ENTITY_TAG_MASK, SNAPSHOT_ENTITY_TAG_BITS );", "entity tags are one byte")
+    require(network, "LegacySnapshotFormat() ? ( msg.ReadLong() != entityTag ) :", "the tag reader keeps the 2.41 layout for demos")
+    reject(network, "tagRandom.SetSeed( random.RandomInt() );", "snapshot tags drawn from the gameplay random stream")
+
+
 def main() -> None:
     validate_crypto_and_native_vectors()
     validate_secure_random_and_connection_challenges()
@@ -1258,6 +1343,7 @@ def main() -> None:
     validate_network_rate_budget()
     validate_channel_and_message_abuse_bounds()
     validate_session_lifecycle_and_flood_bounds()
+    validate_protocol_2_42()
     validate_documentation_and_registration()
     print("network_security: ok")
 

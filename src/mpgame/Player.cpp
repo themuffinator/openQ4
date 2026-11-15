@@ -83,6 +83,11 @@ const int SPAWN_KNOCKBACK_MSEC = 100;
 // openQ4: the longest gap in a player's snapshots that still shows a death or a hit it
 // hid (idPlayer::ReadFromSnapshot): four snapshots at the default 33 ms
 const int FEEDBACK_HITCH_MSEC = 150;
+// openQ4: the hit count a player's snapshots carry (idPlayer::WritePlayerStateToSnapshot),
+// and the longest pause in reading it across which a moved count still sounds a hit
+const int HIT_FEEDBACK_COUNT_BITS = 4;
+const int HIT_FEEDBACK_COUNT_MASK = ( 1 << HIT_FEEDBACK_COUNT_BITS ) - 1;
+const int HIT_FEEDBACK_RESUME_MSEC = 500;
 
 const int	HEALTH_PULSE		= 1000;			// Regen rate and heal leak rate (for health > 100)
 const int	ARMOR_PULSE			= 1000;			// armor ticking down due to being higher than maxarmor
@@ -1458,6 +1463,9 @@ idPlayer::idPlayer() {
 
 	lastHitFrame			= 0;
 	lastHitArmor			= false;
+	hitFeedbackCount		= 0;
+	netHitFeedbackCount		= -1;
+	netHitFeedbackTime		= 0;
 	lastSavingThrowTime		= 0;
 
 	weapon					= NULL;
@@ -1990,6 +1998,7 @@ void idPlayer::Init( void ) {
 
 	lastHitFrame			= 0;
 	lastHitArmor			= false;
+	netHitFeedbackCount		= -1;
 	// openQ4: never carry a live hit marker across a respawn
 	rvHitMarker::Clear();
 
@@ -14323,6 +14332,10 @@ void idPlayer::TriggerHitSound( bool armor ) {
 
 	lastHitFrame = gameLocal.framenum;
 	lastHitArmor = armor;
+	if ( !gameLocal.isClient ) {
+		// what the attacker's snapshots carry (WritePlayerStateToSnapshot)
+		hitFeedbackCount++;
+	}
 
 	idUserInterface *cursor		= idPlayer::cursor;
 	bool spectated = false;
@@ -16117,9 +16130,20 @@ idPlayer::WritePlayerStateToSnapshot
 void idPlayer::WritePlayerStateToSnapshot( int lastSnapshotFrame, idBitMsgDelta &msg ) const {
 	int i;
 
-	// write out a flag if a hit sound was triggered since last snap
-	msg.WriteBits( lastHitFrame > lastSnapshotFrame ? 1 : 0, 1 );
+	// openQ4: a count of the hits that sounded, not a flag for "one since the last
+	// snapshot" (protocol 2.42). The flag was set in one snapshot only, so when that
+	// snapshot was lost, refused by the rate or overflowed, the hit made no sound, no
+	// crosshair flash and no marker, and nothing sent it again. A count that has moved
+	// stays different from the client's until a snapshot that carries it arrives.
+	msg.WriteBits( hitFeedbackCount & HIT_FEEDBACK_COUNT_MASK, HIT_FEEDBACK_COUNT_BITS );
 	msg.WriteBits( lastHitArmor, 1 );
+
+	// the velocity this player's own prediction starts from, exact; the entity state
+	// carries it in 16 bits a component for everyone else (idPhysics_Player::WriteToSnapshot)
+	const idVec3 &exactVelocity = physicsObj.GetLinearVelocity();
+	msg.WriteDeltaFloat( 0.0f, exactVelocity[0] );
+	msg.WriteDeltaFloat( 0.0f, exactVelocity[1] );
+	msg.WriteDeltaFloat( 0.0f, exactVelocity[2] );
 
 	msg.WriteDeltaByte( 0, bobCycle );
 	msg.WriteDeltaLong( 0, stepUpTime );
@@ -16151,10 +16175,32 @@ idPlayer::ReadPlayerStateFromSnapshot
 void idPlayer::ReadPlayerStateFromSnapshot( const idBitMsgDelta &msg ) {
 	int i, ammo;
 
-	bool trigger = ( msg.ReadBits( 1 ) != 0 );
-	bool armor = ( msg.ReadBits( 1 ) != 0 );
-	if ( trigger ) {
-		TriggerHitSound( armor );
+	if ( gameLocal.LegacySnapshotFormat() ) {
+		// a multiview demo recorded before protocol 2.42: the one-snapshot flag
+		bool trigger = ( msg.ReadBits( 1 ) != 0 );
+		bool armor = ( msg.ReadBits( 1 ) != 0 );
+		if ( trigger ) {
+			TriggerHitSound( armor );
+		}
+	} else {
+		const int hitCount = msg.ReadBits( HIT_FEEDBACK_COUNT_BITS );
+		const bool armor = ( msg.ReadBits( 1 ) != 0 );
+		// The count sounds a hit when it moves from the last one read. After a pause in
+		// this player's state (a first read, a new life, a spectator coming back to this
+		// player) the count has moved for hits that are long over, so it only resumes.
+		const int sinceRead = gameLocal.time - netHitFeedbackTime;
+		if ( netHitFeedbackCount >= 0 && sinceRead >= 0 && sinceRead <= HIT_FEEDBACK_RESUME_MSEC &&
+			 hitCount != netHitFeedbackCount ) {
+			TriggerHitSound( armor );
+		}
+		netHitFeedbackCount = hitCount;
+		netHitFeedbackTime = gameLocal.time;
+
+		idVec3 exactVelocity;
+		exactVelocity[0] = msg.ReadDeltaFloat( 0.0f );
+		exactVelocity[1] = msg.ReadDeltaFloat( 0.0f );
+		exactVelocity[2] = msg.ReadDeltaFloat( 0.0f );
+		physicsObj.SetLinearVelocity( exactVelocity );
 	}
 
 	bobCycle = msg.ReadDeltaByte( 0 );
