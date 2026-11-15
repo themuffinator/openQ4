@@ -5,6 +5,7 @@
 #include "../Game_local.h"
 #include "../mp/RoundGameState.h"
 #include "../mp/RoundModes.h"
+#include "../mp/Presets.h"
 // RAVEN BEGIN
 #include "../ai/AI.h"
 #if !defined(__GAME_PROJECTILE_H__)
@@ -3888,12 +3889,29 @@ static void Cmd_OpenQ4ReportMPState_f( const idCmdArgs &args ) {
 			local->IsFakeClient(), local->spectating,
 			mp.CanSpectatorFollow( local->entityNumber, 0 ) );
 	}
+	{
+		// The latched modifier layer (mp/Modifiers.h) and what the match is called under it.
+		idStr modifierTokens;
+		rvMPModifiers::Tokens( mp.Modifiers(), modifierTokens );
+		gameLocal.Printf( "MP_RULES modifiers='%s' fixedWeapon=%s quadHog=%d preset='%s' selfDamage=%d knockback=%d fallDamage=%d weaponRespawn=%d title='%s'\n",
+			modifierTokens.c_str(), mp.FixedLoadoutWeapon() != NULL ? mp.FixedLoadoutWeapon() : "none", mp.QuadHogClient(),
+			gameLocal.serverInfo.GetString( "si_preset" ), gameLocal.serverInfo.GetInt( "si_selfDamage", "100" ),
+			gameLocal.serverInfo.GetInt( "si_knockback", "100" ), gameLocal.serverInfo.GetInt( "si_fallDamage", "100" ),
+			gameLocal.serverInfo.GetInt( "si_weaponRespawn" ), mp.LocalizeGametype() );
+	}
 	for ( int slot = 0; slot < gameLocal.numClients && slot < MAX_CLIENTS; ++slot ) {
 		idEntity *entity = gameLocal.entities[ slot ];
 		if ( entity == NULL || !entity->IsType( idPlayer::GetClassType() ) ) {
 			continue;
 		}
 		idPlayer *player = static_cast< idPlayer * >( entity );
+		{
+			const int currentWeapon = player->GetCurrentWeapon();
+			const int ammoIndex = currentWeapon >= 0 ? player->inventory.AmmoIndexForWeaponIndex( currentWeapon ) : 0;
+			gameLocal.Printf( "MP_LOADOUT slot=%d weapons=0x%x current=%d ammo=%d powerups=0x%x armor=%d\n", slot, player->inventory.weapons,
+				currentWeapon, ( ammoIndex > 0 && ammoIndex < MAX_AMMO ) ? player->inventory.ammo[ ammoIndex ] : 0,
+				player->inventory.powerups, player->inventory.armor );
+		}
 		gameLocal.Printf( "MP_PLAYER slot=%d bot=%d team=%d health=%d spectating=%d wantSpectate=%d ingame=%d score=%d teamScore=%d\n",
 			slot, botManager.IsBot( slot ), player->team, player->health, player->spectating,
 			player->wantSpectate, mp.IsInGame( slot ), mp.GetScore( slot ), mp.GetTeamScore( slot ) );
@@ -4368,6 +4386,11 @@ void idGameLocal::InitConsoleCommands( void ) {
 
 	// multiplayer server commands
 	cmdSystem->AddCommand( "verifyServerSettings",	idGameLocal::VerifyServerSettings_f,	CMD_FL_GAME,	"verifies the game type can be played on the map" );
+	// openQ4 MP-14: the modifier layer and presets (mp/Modifiers.h, mp/Presets.h)
+	cmdSystem->AddCommand( "modifier",				MP_Modifier_f,				CMD_FL_GAME,				"turn a match modifier on or off and restart the match: modifier <name> <0|1>", MP_ArgCompletion_Modifier );
+	cmdSystem->AddCommand( "weaponArena",			MP_WeaponArena_f,			CMD_FL_GAME,				"play a single-weapon arena and restart the match: weaponArena <weapon|none>", MP_ArgCompletion_WeaponArena );
+	cmdSystem->AddCommand( "preset",				MP_Preset_f,				CMD_FL_GAME,				"apply a named preset (game type, ruleset, modifiers and limits) and restart the match", MP_ArgCompletion_Preset );
+	cmdSystem->AddCommand( "listPresets",			MP_ListPresets_f,			CMD_FL_GAME,				"list the built-in presets and presets/*.cfg" );
 	cmdSystem->AddCommand( "serverMapRestart",		idGameLocal::MapRestart_f,	CMD_FL_GAME,				"restart the current game" );
 	cmdSystem->AddCommand( "serverForceReady",		idMultiplayerGame::ForceReady_f,CMD_FL_GAME,				"force all players ready" );
 	cmdSystem->AddCommand( "serverNextMap",			idGameLocal::NextMap_f,		CMD_FL_GAME,				"change to the next map" );

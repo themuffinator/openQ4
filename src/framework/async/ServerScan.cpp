@@ -171,6 +171,115 @@ static const char *ServerBrowserGameType( const char *type ) {
 	return type;
 }
 
+// The modifiers a server latched, as it publishes them in si_modifiers: the
+// name, label and title columns of the game's table (mpModifierTable in
+// src/mpgame/mp/Modifiers.cpp) and its weapon arenas. The text is a remote
+// server's, so it is only ever matched against these tables, never shown.
+typedef struct serverBrowserModifier_s {
+	const char *	name;
+	const char *	label;
+	const char *	title;
+} serverBrowserModifier_t;
+
+static const serverBrowserModifier_t SERVER_BROWSER_MODIFIERS[] = {
+	{ "instagib",	"#str_231960",	"#str_231961" },
+	{ "quadhog",	"#str_231962",	"#str_231963" },
+	{ "vampiric",	"#str_231964",	"#str_231965" },
+	{ "frenzy",		"#str_231966",	"#str_231967" },
+};
+static const int SERVER_BROWSER_MODIFIER_COUNT = static_cast<int>( sizeof( SERVER_BROWSER_MODIFIERS ) / sizeof( SERVER_BROWSER_MODIFIERS[0] ) );
+
+static const serverBrowserModifier_t SERVER_BROWSER_WEAPON_ARENAS[] = {
+	{ "arena:machinegun",		"#str_200106",	NULL },
+	{ "arena:shotgun",			"#str_200105",	NULL },
+	{ "arena:hyperblaster",		"#str_200107",	NULL },
+	{ "arena:grenadelauncher",	"#str_200108",	NULL },
+	{ "arena:nailgun",			"#str_200109",	NULL },
+	{ "arena:rocketlauncher",	"#str_200110",	NULL },
+	{ "arena:railgun",			"#str_200111",	NULL },
+	{ "arena:lightninggun",		"#str_200112",	NULL },
+	{ "arena:dmg",				"#str_200113",	NULL },
+	{ "arena:napalmgun",		"#str_222001",	NULL },
+};
+static const int SERVER_BROWSER_WEAPON_ARENA_COUNT = static_cast<int>( sizeof( SERVER_BROWSER_WEAPON_ARENAS ) / sizeof( SERVER_BROWSER_WEAPON_ARENAS[0] ) );
+
+// True when the space separated list holds the word.
+static bool ServerBrowserHasToken( const char *tokens, const char *word ) {
+	const int length = static_cast<int>( strlen( word ) );
+	for ( const char *at = tokens; *at != '\0'; ) {
+		while ( *at == ' ' ) {
+			++at;
+		}
+		const char *end = at;
+		while ( *end != '\0' && *end != ' ' ) {
+			++end;
+		}
+		if ( end - at == length && !idStr::Icmpn( at, word, length ) ) {
+			return true;
+		}
+		at = end;
+	}
+	return false;
+}
+
+static const char *ServerBrowserWeaponArena( const char *tokens ) {
+	for ( int i = 0; i < SERVER_BROWSER_WEAPON_ARENA_COUNT; ++i ) {
+		if ( ServerBrowserHasToken( tokens, SERVER_BROWSER_WEAPON_ARENAS[i].name ) ) {
+			return SERVER_BROWSER_WEAPON_ARENAS[i].label;
+		}
+	}
+	return NULL;
+}
+
+// "Instagib Deathmatch": the game type's name as the server's modifiers
+// qualify it, the way the match names itself (rvMPModifiers::Title).
+static idStr ServerBrowserMatchType( const idDict &info ) {
+	idStr title = ServerBrowserGameType( info.GetString( "si_gameType" ) );
+	const char *tokens = info.GetString( "si_modifiers" );
+	for ( int i = 0; i < SERVER_BROWSER_MODIFIER_COUNT; ++i ) {
+		if ( ServerBrowserHasToken( tokens, SERVER_BROWSER_MODIFIERS[i].name ) ) {
+			const idStr wrapped = va( common->GetLanguageDict()->GetString( SERVER_BROWSER_MODIFIERS[i].title ), title.c_str() );
+			title = wrapped;
+		}
+	}
+	const char *arena = ServerBrowserWeaponArena( tokens );
+	if ( arena != NULL ) {
+		const idStr weapon = common->GetLanguageDict()->GetString( arena );
+		const idStr wrapped = va( common->GetLanguageDict()->GetString( "#str_231969" ), title.c_str(), weapon.c_str() );
+		title = wrapped;
+	}
+	return title;
+}
+
+// "Instagib, Quad Hog": the modifiers by name, empty for a server with none.
+static idStr ServerBrowserModifierLabels( const idDict &info ) {
+	idStr labels;
+	const char *tokens = info.GetString( "si_modifiers" );
+	for ( int i = 0; i < SERVER_BROWSER_MODIFIER_COUNT; ++i ) {
+		if ( ServerBrowserHasToken( tokens, SERVER_BROWSER_MODIFIERS[i].name ) ) {
+			if ( labels.Length() ) {
+				labels += ", ";
+			}
+			labels += common->GetLanguageDict()->GetString( SERVER_BROWSER_MODIFIERS[i].label );
+		}
+	}
+	const char *arena = ServerBrowserWeaponArena( tokens );
+	if ( arena != NULL ) {
+		const idStr weapon = common->GetLanguageDict()->GetString( arena );
+		if ( labels.Length() ) {
+			labels += ", ";
+		}
+		labels += va( common->GetLanguageDict()->GetString( "#str_231970" ), weapon.c_str() );
+	}
+	if ( ServerBrowserHasToken( tokens, "nopowerups" ) ) {
+		if ( labels.Length() ) {
+			labels += ", ";
+		}
+		labels += common->GetLanguageDict()->GetString( "#str_231987" );
+	}
+	return labels;
+}
+
 const char* l_gameTypes[] = {
 	"DM",
 	"Tourney",
@@ -620,7 +729,7 @@ void idServerScan::GUIUpdateSelected( void ) {
 			fileSystem->FindMapScreenshot( map, levelshot, sizeof( levelshot ) );
 		}
 		m_pGUI->SetStateString( "browser_levelshot", levelshot );
-		m_pGUI->SetStateString( "server_gameType", ServerBrowserText( ServerBrowserGameType( server.serverInfo.GetString( "si_gameType" ) ) ).c_str() );
+		m_pGUI->SetStateString( "server_gameType", ServerBrowserText( ServerBrowserMatchType( server.serverInfo ).c_str() ).c_str() );
 		m_pGUI->SetStateString( "server_passworded", server.serverInfo.GetBool( "si_usePass" ) ? common->GetLanguageDict()->GetString( "#str_200933" ) : "" );
 		m_pGUI->SetStateString( "favoriteStatus", common->GetLanguageDict()->GetString( IsFavorite( server.adr ) ? "#str_200293" : "#str_200292" ) );
 	}
@@ -898,6 +1007,11 @@ bool idServerScan::GetServerDetails( int index, idStr &address, idStrList &playe
 	for ( int i = 0; i < static_cast<int>( sizeof( lines ) / sizeof( lines[0] ) ); ++i ) {
 		settings.Append( va( "%s: %s", common->GetLanguageDict()->GetString( lines[i].label ), lines[i].value.c_str() ) );
 	}
+	// A modified match says how: one more line, only when there is something to say.
+	const idStr modifiers = ServerBrowserModifierLabels( info );
+	if ( modifiers.Length() ) {
+		settings.Append( va( "%s: %s", common->GetLanguageDict()->GetString( "#str_231986" ), modifiers.c_str() ) );
+	}
 	return true;
 }
 
@@ -978,6 +1092,17 @@ const char *idServerScan::GameTypeName( const char *type ) {
 
 /*
 ================
+idServerScan::MatchTypeName
+
+The game type as the server's modifiers qualify it: "Instagib Deathmatch".
+================
+*/
+idStr idServerScan::MatchTypeName( const idDict &serverInfo ) {
+	return ServerBrowserMatchType( serverInfo );
+}
+
+/*
+================
 idServerScan::ValidMapPath
 ================
 */
@@ -993,7 +1118,7 @@ idServerScan::GUIAdd
 void idServerScan::GUIAdd( int id, const networkServer_t &server ) {
 	const idStr name = ServerBrowserText( server.serverInfo.GetString( "si_name" ) );
 	const idStr map = ServerBrowserText( server.serverInfo.GetString( "si_mapName" ), 64 );
-	const idStr type = ServerBrowserText( ServerBrowserGameType( server.serverInfo.GetString( "si_gameType" ) ), 64 );
+	const idStr type = ServerBrowserText( ServerBrowserMatchType( server.serverInfo ).c_str(), 64 );
 	const idStr row = va( "%s\t%s\t%s\t%s\t%s\t%d\t%s\t%d/%d\t%s\t%s",
 		IsFavorite( server.adr ) ? "mtr_favorite" : "",
 		server.serverInfo.GetBool( "si_usePass" ) ? "mtr_locked" : "",

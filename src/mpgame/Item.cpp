@@ -1010,6 +1010,20 @@ bool idItem::Pickup( idPlayer *player ) {
 		}
 	}
 
+	// openQ4: the server's weapon respawn time, and Weapons Frenzy, which brings
+	// weapons and ammo back in a quarter of the time. Decided before the bots
+	// and the item timers hear about the pickup, so they see the real delay.
+	if ( gameLocal.isMultiplayer && respawn > 0.0f && !dropped ) {
+		const bool weaponItem = ( spawnArgs.FindKey( "weaponclass" ) != NULL );
+		const bool ammoItem = ( idStr::FindText( spawnArgs.GetString( "classname" ), "ammo_" ) == 0 );
+		if ( weaponItem && rvMPModifiers::WeaponRespawnSeconds() > 0.0f ) {
+			respawn = rvMPModifiers::WeaponRespawnSeconds();
+		}
+		if ( ( weaponItem || ammoItem ) && gameLocal.mpGame.HasModifier( MPMOD_FRENZY ) ) {
+			respawn = Min( respawn, Max( MP_FRENZY_RESPAWN_FLOOR, respawn * MP_FRENZY_RESPAWN_SCALE ) );
+		}
+	}
+
 	// openQ4: bots time the pickups they witness, the way a player does.
 	if ( gameLocal.isMultiplayer && gameLocal.isServer ) {
 		botManager.OnItemPickup( this, player, ( respawn && !dropped && !no_respawn ) ? respawn : 0.0f );

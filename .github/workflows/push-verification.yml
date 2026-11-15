@@ -135,6 +135,7 @@ jobs:
             tools/tests/mp_duel_queue_smoke.py \
             tools/tests/mp_match_control_team_join_smoke.py \
             tools/tests/mp_match_flow_smoke.py \
+            tools/tests/mp_modifiers_smoke.py \
             tools/tests/mp_bot_gameplay_smoke.py \
             tools/tests/mp_bot_audit.py \
             tools/tests/mp_bot_skill_ladder.py \
@@ -392,6 +393,7 @@ jobs:
             tools/tests/mp_bot_recovery_traffic.py \
             tools/tests/mp_bot_server_menu.py \
             tools/tests/mp_instagib_contract.py \
+            tools/tests/mp_modifiers_contract.py \
             tools/tests/mp_bot_team_balance.py \
             tools/tests/mp_bot_team_orders.py \
             tools/tests/mp_bot_hazards.py \
@@ -955,6 +957,7 @@ jobs:
           python tools/tests/mp_bot_recovery_traffic.py
           python tools/tests/mp_bot_server_menu.py
           python tools/tests/mp_instagib_contract.py
+          python tools/tests/mp_modifiers_contract.py
           python tools/tests/mp_bot_team_balance.py
           python tools/tests/mp_bot_team_orders.py
           python tools/tests/mp_bot_hazards.py

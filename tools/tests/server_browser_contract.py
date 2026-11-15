@@ -190,7 +190,11 @@ struct Language {
         static const std::map<std::string,std::string> details={{"#str_107702","Map"},{"#str_107659","Time Limit"},
             {"#str_107660","Frag Limit"},{"#str_107661","Capture Limit"},{"#str_41404","Round Limit"},{"#str_122008","Control Time"},
             {"#str_107664","Team Damage"},{"#str_107666","Auto Balance Teams"},{"#str_107662","Pure"},{"#str_104254","Allow Spectators"},
-            {"#str_107703","Yes"},{"#str_107704","No"}};
+            {"#str_107703","Yes"},{"#str_107704","No"},
+            {"#str_231960","Instagib"},{"#str_231961","Instagib %s"},{"#str_231962","Quad Hog"},{"#str_231963","Quad Hog %s"},
+            {"#str_231964","Vampiric Damage"},{"#str_231965","Vampiric %s"},{"#str_231966","Weapons Frenzy"},{"#str_231967","Frenzy %s"},
+            {"#str_231969","%s (%s)"},{"#str_231970","%s only"},{"#str_231986","Modifiers"},{"#str_231987","No Powerups"},
+            {"#str_200110","Rocket Launcher"}};
         const auto detail=details.find(token);if(detail!=details.end())return detail->second.c_str();
         return token;
     }
@@ -431,6 +435,27 @@ int main(){
      auto d=server("10.4.0.1",5,"",0);d.challenge=net.GetChallenge();assert(net.InfoResponse(d)>=0);
      assert(!std::strcmp(net.GetLoadNotice(),"Scanning 2/2: 10.4.0.1:28004")&&net.GetLoadProgress()==1.0f);
      net.Shutdown();}
+    // A modified match (roadmap MP-14) says so: the game type as the server's
+    // si_modifiers qualifies it, and one more details line. The text is a
+    // remote server's, so only words the browser knows count.
+    {idUserInterface tip;idServerScan m;m.GUIConfig(&tip,"serverList");m.GUIInit();m.SetupLANScan();
+     auto insta=server("10.6.0.1",5,"Insta",0);insta.challenge=m.GetChallenge();
+     insta.serverInfo.Set("si_modifiers","instagib");assert(m.InfoResponse(insta)==0);
+     auto mixed=server("10.6.0.2",5,"Mixed",0);mixed.challenge=m.GetChallenge();
+     mixed.serverInfo.Set("si_modifiers","quadhog vampiric arena:rocketlauncher nopowerups");assert(m.InfoResponse(mixed)==1);
+     auto hostile=server("10.6.0.3",5,"Hostile",0);hostile.challenge=m.GetChallenge();
+     hostile.serverInfo.Set("si_modifiers","%s%n%s INSTAGIB arena:..\\x arena: unknown instagibx");assert(m.InfoResponse(hostile)==2);
+     auto plain=server("10.6.0.4",5,"Plain",0);plain.challenge=m.GetChallenge();assert(m.InfoResponse(plain)==3);
+     idStr address;idStrList players,settings;
+     assert(m.GetServerDetails(0,address,players,settings)&&settings.Num()==8&&settings[7]==idStr("Modifiers: Instagib"));
+     assert(idServerScan::MatchTypeName(insta.serverInfo)==idStr(va("Instagib %s",idServerScan::GameTypeName("DM"))));
+     assert(m.GetServerDetails(1,address,players,settings)&&settings.Num()==8&&
+            settings[7]==idStr("Modifiers: Quad Hog, Vampiric Damage, Rocket Launcher only, No Powerups"));
+     assert(idServerScan::MatchTypeName(mixed.serverInfo)==idStr(va("Vampiric Quad Hog %s (Rocket Launcher)",idServerScan::GameTypeName("DM"))));
+     assert(m.GetServerDetails(2,address,players,settings)&&settings.Num()==8&&settings[7]==idStr("Modifiers: Instagib"));
+     assert(idServerScan::MatchTypeName(hostile.serverInfo)==idStr(va("Instagib %s",idServerScan::GameTypeName("DM"))));
+     assert(m.GetServerDetails(3,address,players,settings)&&settings.Num()==7);
+     assert(idServerScan::MatchTypeName(plain.serverInfo)==idStr(idServerScan::GameTypeName("DM")));}
     // A server's details, as the stock browser's tooltip shows them: its
     // address, its players' names as the browser reads them, and its settings
     // with the limit its game type ends on. The tooltip follows the hovered

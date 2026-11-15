@@ -46,7 +46,7 @@ static const char *const BROWSER_KEYS[] = {
 	"si_name", "si_map", "si_gameType", "si_maxPlayers", "si_privatePlayers", "si_usePass", "si_pure",
 	"fs_game", "fs_game_base", "net_serverDedicated", "si_repeater", "si_idleServer", "si_mapName",
 	"si_entityFilter", "si_fragLimit", "si_timeLimit", "si_captureLimit", "si_controlTime", "si_roundLimit",
-	"si_spectators", "si_teamDamage", "si_autobalance", "sv_punkbuster", "devmap",
+	"si_modifiers", "si_spectators", "si_teamDamage", "si_autobalance", "sv_punkbuster", "devmap",
 };
 static constexpr int BROWSER_KEY_COUNT = static_cast<int>( sizeof( BROWSER_KEYS ) / sizeof( BROWSER_KEYS[0] ) );
 

@@ -5241,7 +5241,8 @@ void idGameLocal::HandleMainMenuCommands( const char *menuCommand, idUserInterfa
 		// spawns, after the loading screen presents).
 		idDict query;
 		static const char *const keys[] = { "si_gameType", "si_fragLimit", "si_captureLimit", "si_controlTime", "si_roundLimit",
-			"si_scoreLimit", "si_timeLimit", "si_instagib" };
+			"si_scoreLimit", "si_timeLimit", "si_instagib", "si_quadHog", "si_vampiric", "si_weaponsFrenzy", "si_weaponArena",
+			"si_powerups" };
 		for ( int i = 0; i < static_cast<int>( sizeof( keys ) / sizeof( keys[0] ) ); i++ ) {
 			query.Set( keys[ i ], gui->State().GetString( va( "query_%s", keys[ i ] ) ) );
 		}
@@ -5266,12 +5267,15 @@ void idGameLocal::HandleMainMenuCommands( const char *menuCommand, idUserInterfa
 			cvarSystem->GetCVarString( "ui_arenaMatchGameType" ) : "";
 		if ( idStr::Cmpn( arenaGameType, "#str_", 5 ) == 0 ) {
 			gui->SetStateString( "server_gametype", common->GetLocalizedString( arenaGameType ) );
-		} else if ( query.GetBool( "si_instagib" ) ) {
-			// Instagib qualifies the mode, as idMultiplayerGame::LocalizeGametype does in the match.
-			gui->SetStateString( "server_gametype", va( common->GetLocalizedString( "#str_231961" ),
-				common->GetLocalizedString( info->localizedName ) ) );
 		} else {
-			gui->SetStateString( "server_gametype", common->GetLocalizedString( info->localizedName ) );
+			// A modifier qualifies the mode, as idMultiplayerGame::LocalizeGametype does in the
+			// match. Resolved from the server's own switches: this card is drawn before the map
+			// is loaded and anything is latched.
+			mpModifierState_t modifiers;
+			idStr title;
+			rvMPModifiers::Resolve( query, info->type, true, modifiers );
+			rvMPModifiers::Title( modifiers, common->GetLocalizedString( info->localizedName ), title );
+			gui->SetStateString( "server_gametype", title.c_str() );
 		}
 		gui->SetStateString( "server_limit", limits.c_str() );
 		gui->SetStateBool( "server_team_mode", MPGameTypeHasAny( info->type, GTF_TEAM ) );
@@ -6329,8 +6333,11 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 	//
 	// Instagib clears the same spawns, as Quake Live's does: with one shot
 	// killing, armour, health and powerups decide nothing, and a weapon or
-	// ammo pickup would only hand out a gun nobody is meant to carry.
-	if ( isMultiplayer && ( MPGameTypeHasAny( gameType, GTF_FULLARSENAL ) || mpGame.IsInstagib() ) ) {
+	// ammo pickup would only hand out a gun nobody is meant to carry. The
+	// other modifiers each clear their own share: a weapon arena the weapons
+	// and ammo, Vampiric Damage the health, Quad Hog and si_powerups 0 the
+	// powerups (idMultiplayerGame::PickupInhibited).
+	if ( isMultiplayer ) {
 		const char *classname = spawnArgs.GetString( "classname" );
 
 		// An objective is not a pickup.  Attack & Defend also carries
@@ -6342,11 +6349,7 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 			idStr::Icmp( spawnclass, "rvItemCTFFlag" ) == 0 ||
 			idStr::Icmp( spawnclass, "riDeadZonePowerup" ) == 0;
 
-		if ( !objective &&
-			 ( idStr::FindText( classname, "weapon_" ) == 0 ||
-			   idStr::FindText( classname, "ammo_" ) == 0 ||
-			   idStr::FindText( classname, "item_" ) == 0 ||
-			   idStr::FindText( classname, "powerup_" ) == 0 ) ) {
+		if ( !objective && mpGame.PickupInhibited( classname ) ) {
 			return true;
 		}
 	}
@@ -11095,7 +11098,7 @@ idGameLocal::IsTeamPowerups
 ===============
 */
 bool idGameLocal::IsTeamPowerups( void ) {
-	if ( !serverInfo.GetBool( "si_isBuyingEnabled" ) || mpGame.IsInstagib() ) {
+	if ( !serverInfo.GetBool( "si_isBuyingEnabled" ) || mpGame.HasFixedLoadout() ) {
 		return false;
 	}
 	if ( !IsTeamGameType() ) {

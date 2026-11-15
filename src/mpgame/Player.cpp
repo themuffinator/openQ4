@@ -3673,16 +3673,19 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 // RITUAL END
 
 // openQ4 BEGIN
-	// Instagib replaces every other loadout, warmup's included: the match is
-	// fought with exactly this from the first spawn to the last.
+	// A fixed loadout - Instagib's railgun, a weapon arena's weapon - replaces
+	// every other loadout, warmup's included: the match is fought with exactly
+	// this from the first spawn to the last.
+	const char *fixedWeapon = gameLocal.isMultiplayer ? gameLocal.mpGame.FixedLoadoutWeapon() : NULL;
+	const bool fixedLoadout = ( fixedWeapon != NULL );
 	const bool instagib = gameLocal.isMultiplayer && gameLocal.mpGame.IsInstagib();
-	if ( instagib && !spectating ) {
-		GiveInstagibLoadout();
+	if ( fixedLoadout && !spectating ) {
+		GiveFixedLoadout( fixedWeapon );
 	}
 
 	// Warmup is for warming up: Quake Live hands out the full arsenal so the
 	// pre-match period is practice rather than a race for the rocket launcher.
-	if ( gameLocal.isMultiplayer && !spectating && !instagib && gameLocal.serverInfo.GetBool( "si_warmupWeapons" ) ) {
+	if ( gameLocal.isMultiplayer && !spectating && !fixedLoadout && gameLocal.serverInfo.GetBool( "si_warmupWeapons" ) ) {
 		mpGameState_t mpState = gameLocal.mpGame.GetGameState()->GetMPGameState();
 
 		if ( mpState == WARMUP || mpState == COUNTDOWN ) {
@@ -3716,9 +3719,13 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 		// without this a player carries last round's part-empty magazines into
 		// a mode whose whole point is that every round starts identical - and
 		// bots, which are built fresh, would get full ones.
-		memset( inventory.clip, -1, sizeof( inventory.clip ) );
-		GiveStuffToPlayer( this, "weapons", "" );
-		GiveStuffToPlayer( this, "ammo", "" );
+		// A weapon arena played over such a mode keeps its one weapon and
+		// still gets the mode's armour and health.
+		if ( !fixedLoadout ) {
+			memset( inventory.clip, -1, sizeof( inventory.clip ) );
+			GiveStuffToPlayer( this, "weapons", "" );
+			GiveStuffToPlayer( this, "ammo", "" );
+		}
 		GiveStuffToPlayer( this, "armor", "" );
 		GiveStuffToPlayer( this, "health", "" );
 	}
@@ -3752,28 +3759,30 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 
 /*
 ===============
-idPlayer::GiveInstagibLoadout
+idPlayer::GiveFixedLoadout
 
-openQ4: the railgun with unlimited slugs, and the gauntlet as the one other
-way to kill. Runs on every spawn, on the server and on each client alike, and
-replaces whatever Init() handed out from the player def.
+openQ4: one weapon that never runs out, and the gauntlet as the one other way
+to kill: Instagib's railgun, or a weapon arena's weapon
+(idMultiplayerGame::FixedLoadoutWeapon). Runs on every spawn, on the server
+and on each client alike, and replaces whatever Init() handed out from the
+player def.
 ===============
 */
-void idPlayer::GiveInstagibLoadout( void ) {
-	const int railgun = SlotForWeapon( "weapon_railgun" );
+void idPlayer::GiveFixedLoadout( const char *weaponDef ) {
+	const int fixed = SlotForWeapon( weaponDef );
 	const int gauntlet = SlotForWeapon( "weapon_gauntlet" );
-	if ( railgun < 0 ) {
-		gameLocal.Warning( "idPlayer::GiveInstagibLoadout: '%s' has no railgun slot", spawnArgs.GetString( "classname" ) );
+	if ( fixed < 0 ) {
+		gameLocal.Warning( "idPlayer::GiveFixedLoadout: '%s' has no %s slot", spawnArgs.GetString( "classname" ), weaponDef );
 		return;
 	}
 
-	inventory.weapons = ( 1 << railgun ) | ( gauntlet >= 0 ? ( 1 << gauntlet ) : 0 );
+	inventory.weapons = ( 1 << fixed ) | ( gauntlet >= 0 ? ( 1 << gauntlet ) : 0 );
 	// A negative count is unlimited: HasAmmo always answers it, UseAmmo never
 	// spends it, and the snapshot carries -1 as a value of its own.
-	inventory.ammo[ inventory.AmmoIndexForWeaponIndex( railgun ) ] = -1;
-	inventory.clip[ railgun ] = -1;
+	inventory.ammo[ inventory.AmmoIndexForWeaponIndex( fixed ) ] = -1;
+	inventory.clip[ fixed ] = -1;
 	CacheWeapons();
-	idealWeapon = railgun;
+	idealWeapon = fixed;
 }
 
 /*
@@ -6411,6 +6420,27 @@ void idPlayer::UpdatePowerUps( void ) {
 		}
 	}
 
+	// openQ4: Weapons Frenzy brings carried ammo back, a twentieth of the type's
+	// limit a second. Unlimited ammo (a negative count) is left alone.
+	if ( gameLocal.isServer && gameLocal.isMultiplayer && health > 0 && !spectating &&
+		 gameLocal.mpGame.HasModifier( MPMOD_FRENZY ) ) {
+		for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+			if ( !( inventory.weapons & ( 1 << i ) ) ) {
+				continue;
+			}
+			const int ammoIndex = inventory.AmmoIndexForWeaponIndex( i );
+			if ( ammoIndex <= 0 || ammoIndex >= MAX_AMMO || inventory.ammo[ ammoIndex ] < 0 ||
+				 gameLocal.time <= nextAmmoRegenPulse[ ammoIndex ] ) {
+				continue;
+			}
+			const int limit = inventory.MaxAmmoForAmmoClass( this, rvWeapon::GetAmmoNameForIndex( ammoIndex ) );
+			if ( inventory.ammo[ ammoIndex ] < limit ) {
+				inventory.ammo[ ammoIndex ] = Min( inventory.ammo[ ammoIndex ] + Max( 1, limit / MP_FRENZY_REGEN_DIVISOR ), limit );
+			}
+			nextAmmoRegenPulse[ ammoIndex ] = gameLocal.time + MP_FRENZY_REGEN_PULSE_MS;
+		}
+	}
+
 	// Tick armor down if greater than max armor. FC Armor Regen builds it up
 	// instead, FC_ARMOR_REGEN_STEP a pulse, to FC_ARMOR_REGEN_OVER_MAX past max.
 	if ( !gameLocal.isClient && gameLocal.time > nextArmorPulse ) {
@@ -7380,9 +7410,10 @@ void idPlayer::DropWeapon( void ) {
 	// with the whole arsenal and full ammo, so a dropped weapon can only ever be
 	// an ammo resupply - which turns an equal-terms round into a corpse-camping
 	// game and is exactly what the fixed loadout exists to prevent.
-	// Instagib likewise: a dropped railgun would be a pickup nobody needs.
+	// Instagib and the weapon arenas likewise: a dropped copy of the one weapon
+	// everybody carries would be a pickup nobody needs.
 	if ( gameLocal.isMultiplayer &&
-		 ( MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) || gameLocal.mpGame.IsInstagib() ) ) {
+		 ( MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) || gameLocal.mpGame.HasFixedLoadout() ) ) {
 		return;
 	}
 
@@ -9022,6 +9053,12 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		noDamage = true;
 	}
 
+	// openQ4: si_fallDamage scales what a landing costs; at 0 it costs nothing.
+	const float fallDamageScale = rvMPModifiers::FallDamageScale();
+	if ( fallDamageScale <= 0.0f ) {
+		noDamage = true;
+	}
+
 	//jshepard: no falling damage if falling damage is disabled
 	if( pfl.noFallingDamage )	{
 		return;
@@ -9094,7 +9131,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		landTime = gameLocal.time;
  		if ( !noDamage ) {
  			pain_debounce_time = gameLocal.time + pain_delay + 1;  // ignore pain since we'll play our landing anim
- 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_fatalfall", 1.0f, 0 );
+ 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_fatalfall", fallDamageScale, 0 );
  		}
 	} else if ( delta > hardFallDelta && hardFallDelta > 0.0f ) {
 		pfl.hardLanding = true;
@@ -9102,7 +9139,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		landTime	= gameLocal.time;
  		if ( !noDamage ) {
  			pain_debounce_time = gameLocal.time + pain_delay + 1;  // ignore pain since we'll play our landing anim
- 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_hardfall", 1.0f, 0 );
+ 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_hardfall", fallDamageScale, 0 );
  		}
 	} else if ( delta > softFallDelta && softFallDelta > 0.0f ) {
 		pfl.softLanding = true;
@@ -9110,7 +9147,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
  		landTime	= gameLocal.time;
  		if ( !noDamage ) {
  			pain_debounce_time = gameLocal.time + pain_delay + 1;  // ignore pain since we'll play our landing anim
- 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_softfall", 1.0f, 0 );
+ 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_softfall", fallDamageScale, 0 );
 		}
 	} else if ( delta > noFallDelta && noFallDelta > 0.0f ) {
 		pfl.softLanding = true;
@@ -12336,6 +12373,18 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 		armorSave = 0;
 	}
 
+	// openQ4: si_selfDamage scales what a player's own weapons do to them, the
+	// armour's share included. The push is left alone, so a rocket jump at 0
+	// costs nothing and still lifts. A suicide is its own inflictor and is
+	// never scaled.
+	if ( gameLocal.isMultiplayer && attacker == this && inflictor != this && ( damage > 0 || armorSave > 0 ) ) {
+		const float selfDamageScale = rvMPModifiers::SelfDamageScale();
+		if ( selfDamageScale != 1.0f ) {
+			damage = static_cast<int>( damage * selfDamageScale + 0.5f );
+			armorSave = Min( static_cast<int>( armorSave * selfDamageScale + 0.5f ), inventory.armor );
+		}
+	}
+
 	//
 	// determine knockback
 	//
@@ -12362,6 +12411,8 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 
 			kick.Normalize();
  			kick *= g_knockback.GetFloat() * knockback * attackerPushScale / 200.0f;
+			// openQ4: si_knockback, the server's scale over every push a player takes
+			kick *= rvMPModifiers::KnockbackScale();
 			
 			physicsObj.SetLinearVelocity( physicsObj.GetLinearVelocity() + kick );
 			if ( gameLocal.isMultiplayer && botManager.IsBot( entityNumber ) ) {
@@ -12435,6 +12486,11 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 		if ( !gameLocal.isClient && gameLocal.mpGame.GetGameState() != NULL &&
 			 attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
 			gameLocal.mpGame.GetGameState()->PlayerDamage( static_cast< idPlayer * >( attacker ), this, damage, armorSave );
+		}
+
+		// openQ4: Vampiric Damage hands the attacker a share of the health this hit takes
+		if ( attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
+			gameLocal.mpGame.ApplyVampiricDamage( static_cast< idPlayer * >( attacker ), this, damage, preDamageHealth );
 		}
 
 		// openQ4: Classic CTF remembers who has been hurting a flag carrier

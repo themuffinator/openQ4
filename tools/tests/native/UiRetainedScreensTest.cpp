@@ -290,6 +290,8 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit","createUsePass",
 	"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
 	"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
+	"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
+	"createFallDamage","createWeaponRespawn","createPreset",
 	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
@@ -5185,6 +5187,27 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,1.558);
 	Check(text("create-overtime","display") == "block" && text("create-roundlimit","display") == "block" && text("create-bots","display") == "none",
 		"RULES shows the rules' rows");
+	// MODIFIERS holds the preset and the modifier layer. Instagib locks the
+	// rules it overrides, and Quad Hog is a Deathmatch rule (the game type is
+	// Tourney here).
+	Check(text("create-selfdamage","display") == "block" && text("create-instagib","display") == "none","the percentages are rules");
+	Check(runtime.RunEvent("advancedTab3",1.5582,effects,error),"the MODIFIERS tab");
+	runtime.Frame(viewport,1.5584);
+	Check(text("create-preset","display") == "block" && text("create-instagib","display") == "block" &&
+		text("create-weaponarena","display") == "block" && text("create-overtime","display") == "none",
+		"MODIFIERS shows the preset and the modifiers");
+	Check(runtime.GetControlState("create-vampiric") != ControlState::Disabled && runtime.GetControlState("create-frenzy") != ControlState::Disabled &&
+		runtime.GetControlState("create-quadhog") == ControlState::Disabled,"Quad Hog is locked outside Deathmatch");
+	Check(runtime.SetState({{"create.instagib",true}},error,1.5585),"Instagib");
+	runtime.Frame(viewport,1.5586);
+	Check(runtime.GetControlState("create-vampiric") == ControlState::Disabled && runtime.GetControlState("create-frenzy") == ControlState::Disabled &&
+		runtime.GetControlState("create-weaponarena") == ControlState::Disabled && runtime.GetControlState("create-powerups") == ControlState::Disabled,
+		"Instagib locks the rules it overrides");
+	Check(runtime.SetState({{"create.instagib",false},{"create.weaponarena",6.0}},error,1.5587),"a weapon arena");
+	runtime.Frame(viewport,1.5588);
+	Check(runtime.GetControlState("create-frenzy") == ControlState::Disabled && runtime.GetControlState("create-vampiric") != ControlState::Disabled,
+		"a weapon arena locks Weapons Frenzy and nothing else here");
+	Check(runtime.SetState({{"create.weaponarena",0.0}},error,1.5589),"no arena");
 	Check(runtime.RunEvent("advancedTab0",1.559,effects,error),"the SERVER tab");
 	runtime.Frame(viewport,1.5595);
 	Check(runtime.GetControlState("create-password") == ControlState::Disabled && text("create-password-viewport","display") == "none" &&

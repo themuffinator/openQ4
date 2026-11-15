@@ -808,6 +808,7 @@ def validate_validation_wiring() -> None:
         "mp_remote_weapon_capture.py",
         "mp_firing_view_capture.py",
         "mp_match_flow_smoke.py",
+        "mp_modifiers_smoke.py",
         "mp_mvd_smoke.py",
         "mp_pause_lifecycle_smoke.py",
         "mp_pause_world_smoke.py",

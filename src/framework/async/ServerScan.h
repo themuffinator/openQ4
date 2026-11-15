@@ -177,6 +177,7 @@ public:
 	int					GetRevision() const { return revision; }
 	// A server's si_gameType as the browser names it, in the player's language.
 	static const char *	GameTypeName( const char *type );
+	static idStr		MatchTypeName( const idDict &serverInfo );
 	// Whether a server's si_map is a map path the browser may look up (no
 	// parent references, no absolute paths, plain path characters).
 	static bool			ValidMapPath( const char *path );

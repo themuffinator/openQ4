@@ -725,7 +725,7 @@ public:
 	idEntity*				ResetFlag					( const char* itemClass, const idDict& customArgs ) const;
 	void					RespawnFlags				( void );
 	void					DropWeapon					( void );
-	void					GiveInstagibLoadout			( void );
+	void					GiveFixedLoadout			( const char *weaponDef );
 
 	bool					WeaponIsEnabled				( void ) const { return weaponEnabled; }
 	void					ShowCrosshair				( void );

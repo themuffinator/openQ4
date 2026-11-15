@@ -8,6 +8,7 @@
 
 #include "Game_local.h"
 #include "mp/Duel.h"
+#include "mp/Presets.h"
 #include "mp/match/MatchControlProjection.h"
 #include "mp/match/MatchDisclosurePolicy.h"
 #include "mp/match/MatchEvidenceFileSystem.h"
@@ -1173,8 +1174,14 @@ idMultiplayerGame::idMultiplayerGame
 */
 idMultiplayerGame::idMultiplayerGame() {
 	mapRestartCount = 0;
-	instagib = false;
-	instagibRestartPending = false;
+	rvMPModifiers::Clear( modifiers );
+	modifierRestartPending = false;
+	modifierPublishPending = false;
+	quadHogClient = -1;
+	quadHogItem = NULL;
+	quadHogSpawnTime = 0;
+	quadHogLooseTime = 0;
+	quadHogSpawnCount = 0;
 	nextMatchSessionId = 0;
 	matchSeriesId = 0;
 	matchSeriesLinkedSessionId = 0;
@@ -12420,7 +12427,14 @@ void idMultiplayerGame::PlayerDeath( idPlayer *dead, idPlayer *killer, int metho
 		} else {
 			// in tourney mode, we don't award points while in the waiting arena
 			if( gameLocal.gameType != GAME_TOURNEY || ((rvTourneyGameState*)gameState)->GetArena( killer->GetArena() ).GetState() != AS_WARMUP ) {
-				AddPlayerScore( killer, ( killer == dead ) ? -1 : 1 );
+				// openQ4: under Quad Hog only the hog's frags and the frag on the hog score
+				if ( QuadHogFragScores( killer, dead ) ) {
+					AddPlayerScore( killer, ( killer == dead ) ? -1 : 1 );
+				}
+				if ( HasModifier( MPMOD_QUADHOG ) ) {
+					common->DPrintf( "Quad Hog: client %d killed client %d, hog %d: %s\n", killer->entityNumber, dead->entityNumber,
+						quadHogClient, QuadHogFragScores( killer, dead ) ? "scores" : "no score" );
+				}
 			}
 
 			// in tourney mode, frags track performance over the entire level load, team score keeps track of
@@ -16383,7 +16397,8 @@ void idMultiplayerGame::Run( void ) {
 	ReconcileGameplayPhaseAfterMatchMutation();
 
 	CheckVote();
-	CheckInstagibChange();
+	CheckModifierChange();
+	RunQuadHog();
 
 	// The Arena ceremony deliberately freezes the world around its final tableau,
 	// so the result handoff has to run ahead of the frozen-frame return.  Left
@@ -26649,31 +26664,67 @@ void idMultiplayerGame::SetGameType( void ) {
 		cvarSystem->SetCVarString( "si_entityFilter", info->entityFilter );
 	}
 
-	// openQ4: Instagib is latched with the game type. SetGameType runs on the
-	// server and on every client before MapPopulate, both on a map load and on
-	// a map restart, so the pickups each peer leaves out agree and entity
-	// numbering stays in step.
-	instagib = InstagibWanted();
-	instagibRestartPending = false;
+	// openQ4: the modifier switches are latched with the game type. SetGameType
+	// runs on the server and on every client before MapPopulate, both on a map
+	// load and on a map restart, so the pickups each peer leaves out agree and
+	// entity numbering stays in step.
+	LatchModifiers();
 }
 
 /*
 ================
-idMultiplayerGame::InstagibWanted
+idMultiplayerGame::ModifiersWanted
 
-What si_instagib asks for. The single-player Arena campaign hosts its matches
-here too, and a player's archived multiplayer preference must not rewrite them.
+What the server info asks for. The single-player Arena campaign hosts its
+matches here too, and a player's archived multiplayer preferences must not
+rewrite them.
 ================
 */
-bool idMultiplayerGame::InstagibWanted( void ) const {
-	return gameLocal.isMultiplayer && gameLocal.serverInfo.GetBool( "si_instagib" ) && !IsArenaCampaignMatch();
+void idMultiplayerGame::ModifiersWanted( mpModifierState_t &state ) const {
+	rvMPModifiers::Resolve( gameLocal.serverInfo, gameLocal.gameType, gameLocal.isMultiplayer && !IsArenaCampaignMatch(), state );
 }
 
 /*
 ================
-idMultiplayerGame::CheckInstagibChange
+idMultiplayerGame::LatchModifiers
+================
+*/
+void idMultiplayerGame::LatchModifiers( void ) {
+	ModifiersWanted( modifiers );
+	modifierRestartPending = false;
+	ResetQuadHog();
 
-A new si_instagib reaches the server info through rescanSI or a menu, mid
+	if ( gameLocal.isClient || !gameLocal.isMultiplayer ) {
+		return;
+	}
+
+	// si_preset vouches for the composition settings. Once one of them has
+	// been changed by hand it no longer does, and the server says "custom".
+	const idStr preset = gameLocal.serverInfo.GetString( "si_preset" );
+	if ( preset.Length() && !rvMPPresets::Matches( preset.c_str(), gameLocal.serverInfo ) ) {
+		common->Printf( "The settings no longer match preset '%s'; si_preset cleared\n", preset.c_str() );
+		si_preset.SetString( "" );
+		gameLocal.serverInfo.Set( "si_preset", "" );
+		modifierPublishPending = true;
+	}
+
+	// Publish the latched set for the server browser. The engine built the
+	// server info it answers queries from before the game resolved this, so a
+	// changed value needs one rescan to reach it (CheckModifierChange).
+	idStr tokens;
+	rvMPModifiers::Tokens( modifiers, tokens );
+	if ( tokens.Cmp( si_modifiers.GetString() ) != 0 ) {
+		si_modifiers.SetString( tokens.c_str() );
+		modifierPublishPending = true;
+	}
+	gameLocal.serverInfo.Set( "si_modifiers", tokens.c_str() );
+}
+
+/*
+================
+idMultiplayerGame::CheckModifierChange
+
+A new modifier switch reaches the server info through rescanSI or a menu, mid
 match. Applying it in place would hand some players the new loadout and leave
 the old map pickups standing, and a client joining now would populate the map
 for the new rules while everyone else plays the old ones. Restart the match
@@ -26681,15 +26732,313 @@ instead, as a passed game-type vote does: the restart latches the new rules on
 every peer at once.
 ================
 */
-void idMultiplayerGame::CheckInstagibChange( void ) {
-	if ( instagibRestartPending || InstagibWanted() == instagib ) {
+void idMultiplayerGame::CheckModifierChange( void ) {
+	if ( gameLocal.isClient ) {
 		return;
 	}
-	instagibRestartPending = true;
-	common->Printf( "si_instagib changed to %d: restarting the match\n", InstagibWanted() ? 1 : 0 );
+	if ( modifierPublishPending ) {
+		modifierPublishPending = false;
+		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "rescanSI\n" );
+	}
+	if ( modifierRestartPending ) {
+		return;
+	}
+	mpModifierState_t wanted;
+	ModifiersWanted( wanted );
+	if ( wanted == modifiers ) {
+		return;
+	}
+	idStr tokens;
+	rvMPModifiers::Tokens( wanted, tokens );
+	common->Printf( "The match modifiers changed to '%s': restarting the match\n", tokens.c_str() );
+	QueueRulesRestart();
+}
+
+/*
+================
+idMultiplayerGame::QueueRulesRestart
+================
+*/
+void idMultiplayerGame::QueueRulesRestart( void ) {
+	if ( gameLocal.isClient || modifierRestartPending ) {
+		return;
+	}
+	modifierRestartPending = true;
 	// Ahead of anything already queued (an exec'd script, say), so nothing
 	// runs under rules the server info no longer advertises.
 	cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "serverMapRestart\n" );
+}
+
+/*
+================
+idMultiplayerGame::FixedLoadoutWeapon
+================
+*/
+const char *idMultiplayerGame::FixedLoadoutWeapon( void ) const {
+	if ( HasModifier( MPMOD_INSTAGIB ) ) {
+		return "weapon_railgun";
+	}
+	const mpWeaponArenaInfo_t *arena = rvMPModifiers::WeaponArena( modifiers.weaponArena );
+	return arena != NULL ? arena->weaponDef : NULL;
+}
+
+/*
+================
+idMultiplayerGame::PickupInhibited
+
+Which map pickups the latched rules leave out, by the classname prefixes the
+stock content uses: weapon_, ammo_, item_ (health and armour) and powerup_.
+The caller has already set objectives aside.
+
+  A mode that hands out the whole arsenal, and Instagib, clear everything:
+  with one shot killing, or with everyone equal from the first second,
+  armour, health and powerups decide nothing.
+  A weapon arena clears weapons and ammo and keeps the rest of the map.
+  Vampiric Damage clears health: the only way to heal is to hurt someone.
+  Quad Hog clears powerups, because its one quad is the game; si_powerups 0
+  clears them everywhere except Arena CTF, whose runes are the mode.
+================
+*/
+bool idMultiplayerGame::PickupInhibited( const char *classname ) const {
+	const bool weapon = idStr::FindText( classname, "weapon_" ) == 0;
+	const bool ammo = idStr::FindText( classname, "ammo_" ) == 0;
+	const bool item = idStr::FindText( classname, "item_" ) == 0;
+	const bool powerup = idStr::FindText( classname, "powerup_" ) == 0;
+	if ( !weapon && !ammo && !item && !powerup ) {
+		return false;
+	}
+	if ( MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) || IsInstagib() ) {
+		return true;
+	}
+	if ( ( weapon || ammo ) && HasFixedLoadout() ) {
+		return true;
+	}
+	if ( item && HasModifier( MPMOD_VAMPIRIC ) && idStr::FindText( classname, "item_health" ) == 0 ) {
+		return true;
+	}
+	if ( powerup && ( HasModifier( MPMOD_QUADHOG ) ||
+		 ( !modifiers.powerups && !MPGameTypeHasAny( gameLocal.gameType, GTF_ARENA ) ) ) ) {
+		return true;
+	}
+	return false;
+}
+
+/*
+===============================================================================
+
+	Quad Hog
+
+	One Quad Damage is in play. Whoever takes it is the Quad Hog and keeps it
+	until they die; it then lies where they fell for the next player. Only
+	the hog's frags, and the frag on the hog, score. A quad nobody reaches -
+	dropped into a pit, say - is taken back after a while and put somewhere
+	else. The server runs all of it; clients see an ordinary powerup.
+
+===============================================================================
+*/
+
+/*
+================
+idMultiplayerGame::ResetQuadHog
+================
+*/
+void idMultiplayerGame::ResetQuadHog( void ) {
+	quadHogClient = -1;
+	quadHogItem = NULL;
+	quadHogSpawnTime = 0;
+	quadHogLooseTime = 0;
+	quadHogSpawnCount = 0;
+}
+
+/*
+================
+idMultiplayerGame::QuadHogFragScores
+
+Called before the victim's powerups are dropped, so a dying hog still shows
+the quad.
+================
+*/
+bool idMultiplayerGame::QuadHogFragScores( idPlayer *killer, idPlayer *dead ) const {
+	if ( !HasModifier( MPMOD_QUADHOG ) ) {
+		return true;
+	}
+	if ( killer == NULL || dead == NULL || killer == dead ) {
+		return true;	// a suicide costs a point, hog or not
+	}
+	return killer->PowerUpActive( POWERUP_QUADDAMAGE ) || dead->PowerUpActive( POWERUP_QUADDAMAGE );
+}
+
+/*
+================
+idMultiplayerGame::FindLooseQuad
+================
+*/
+idEntity *idMultiplayerGame::FindLooseQuad( void ) const {
+	for ( idEntity *ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+		if ( ent->IsHidden() || !ent->IsType( idItemPowerup::GetClassType() ) ) {
+			continue;
+		}
+		if ( idStr::Icmpn( ent->spawnArgs.GetString( "classname" ), "powerup_quad_damage", 19 ) == 0 ) {
+			return ent;
+		}
+	}
+	return NULL;
+}
+
+/*
+================
+idMultiplayerGame::SpawnQuadHogItem
+
+A fresh quad over a random player spawn: every map has those, and they are
+where players can stand. It is spawned the way a dropped powerup is, so it is
+replicated as one, never respawns in place, and never runs out.
+================
+*/
+bool idMultiplayerGame::SpawnQuadHogItem( void ) {
+	if ( gameLocal.NumSpawnSpots() <= 0 ) {
+		return false;
+	}
+	idPlayerStart *spot = gameLocal.RandomSpawn();
+	if ( spot == NULL ) {
+		return false;
+	}
+	idDict args;
+	idEntity *ent = NULL;
+	args.Set( "classname", "powerup_quad_damage" );
+	// A name of its own each time: the one before may still be fading out.
+	args.Set( "name", va( "openq4_quad_hog_%d", ++quadHogSpawnCount ) );
+	args.SetVector( "origin", spot->GetPhysics()->GetOrigin() + idVec3( 0.0f, 0.0f, 32.0f ) );
+	args.Set( "dropped", "1" );
+	args.Set( "time", "-1" );
+	args.SetInt( "instance", spot->GetInstance() );
+	gameLocal.SpawnEntityDef( args, &ent );
+	if ( ent == NULL ) {
+		return false;
+	}
+	quadHogItem = ent;
+	quadHogLooseTime = gameLocal.time;
+	return true;
+}
+
+/*
+================
+idMultiplayerGame::RunQuadHog
+================
+*/
+void idMultiplayerGame::RunQuadHog( void ) {
+	if ( gameLocal.isClient || !HasModifier( MPMOD_QUADHOG ) || gameState == NULL ) {
+		return;
+	}
+
+	int holder = -1;
+	for ( int i = 0; i < gameLocal.numClients; i++ ) {
+		idEntity *ent = gameLocal.entities[ i ];
+		if ( ent == NULL || !ent->IsType( idPlayer::GetClassType() ) ) {
+			continue;
+		}
+		idPlayer *player = static_cast< idPlayer * >( ent );
+		if ( !player->spectating && player->health > 0 && player->PowerUpActive( POWERUP_QUADDAMAGE ) ) {
+			holder = i;
+			break;
+		}
+	}
+
+	if ( holder != quadHogClient ) {
+		quadHogClient = holder;
+		if ( holder >= 0 ) {
+			// taken: the item removes itself
+			quadHogItem = NULL;
+			CenterPrint( -1, "#str_231978", CPARM_CLIENT, holder );
+			common->DPrintf( "Quad Hog: client %d took the quad at %d\n", holder, gameLocal.time );
+		} else {
+			common->DPrintf( "Quad Hog: the quad is loose at %d\n", gameLocal.time );
+		}
+	}
+	if ( holder >= 0 ) {
+		return;
+	}
+
+	// Nobody holds it. It lies in the world - fresh, or where the hog fell -
+	// or it is gone and the next one is due.
+	idEntity *item = quadHogItem.GetEntity();
+	if ( item != NULL && item->IsHidden() ) {
+		item = NULL;
+		quadHogItem = NULL;
+	}
+	if ( item == NULL ) {
+		item = FindLooseQuad();
+		if ( item != NULL ) {
+			quadHogItem = item;
+			quadHogLooseTime = gameLocal.time;
+		}
+	}
+	if ( item != NULL ) {
+		if ( gameLocal.time - quadHogLooseTime > MP_QUADHOG_LOOSE_MS ) {
+			common->DPrintf( "Quad Hog: nobody reached the quad at %s; taking it back\n", item->GetPhysics()->GetOrigin().ToString( 0 ) );
+			item->PostEventMS( &EV_Remove, 0 );
+			quadHogItem = NULL;
+			quadHogSpawnTime = gameLocal.time + MP_QUADHOG_RESPAWN_MS;
+		}
+		return;
+	}
+
+	const mpGameState_t state = gameState->GetMPGameState();
+	if ( state != GAMEON && state != SUDDENDEATH && state != WARMUP ) {
+		quadHogSpawnTime = 0;
+		return;
+	}
+	if ( quadHogSpawnTime == 0 ) {
+		quadHogSpawnTime = gameLocal.time + MP_QUADHOG_FIRST_SPAWN_MS;
+	}
+	if ( gameLocal.time < quadHogSpawnTime ) {
+		return;
+	}
+	if ( SpawnQuadHogItem() ) {
+		quadHogSpawnTime = 0;
+		CenterPrint( -1, "#str_231979" );
+		common->DPrintf( "Quad Hog: a quad spawned at %s\n", quadHogItem.GetEntity()->GetPhysics()->GetOrigin().ToString( 0 ) );
+	} else {
+		quadHogSpawnTime = gameLocal.time + 1000;
+	}
+}
+
+/*
+================
+idMultiplayerGame::ApplyVampiricDamage
+
+The attacker takes back a share of the health a hit removed: the health that
+was there to take, not the damage the weapon was worth, so a rocket into a
+player on five health is worth five. Enemies only - hurting yourself or a
+team mate feeds nobody. Health over the normal limit drains again the way a
+mega health does, so the cap is twice the limit; the Classic ruleset drains
+only its own mega health, so there the limit is the cap.
+================
+*/
+void idMultiplayerGame::ApplyVampiricDamage( idPlayer *attacker, idPlayer *victim, int damage, int healthBefore ) {
+	if ( gameLocal.isClient || !HasModifier( MPMOD_VAMPIRIC ) ) {
+		return;
+	}
+	if ( attacker == NULL || victim == NULL || attacker == victim || damage <= 0 || healthBefore <= 0 ) {
+		return;
+	}
+	if ( attacker->health <= 0 || attacker->spectating ) {
+		return;
+	}
+	if ( gameLocal.IsTeamGame() && attacker->team == victim->team ) {
+		return;
+	}
+	const int taken = Min( damage, healthBefore );
+	const int percent = idMath::ClampInt( 1, 100, g_vampiricPercent.GetInteger() );
+	const int gain = Max( 1, ( taken * percent + 99 ) / 100 );
+	const int cap = gameLocal.IsClassicRuleset() ? attacker->inventory.maxHealth :
+		attacker->inventory.maxHealth * MP_VAMPIRIC_HEALTH_FACTOR;
+	if ( attacker->health < cap ) {
+		attacker->health = Min( attacker->health + gain, cap );
+	}
+	if ( g_debugDamage.GetInteger() ) {
+		gameLocal.Printf( "vampiric: client %d took %d from client %d, gains %d, health %d of %d\n", attacker->entityNumber, taken,
+			victim->entityNumber, gain, attacker->health, cap );
+	}
 }
 
 //asalmon: need to access total frags for a team and total score for a team
@@ -27050,10 +27399,12 @@ const char *idMultiplayerGame::LocalizeGametype( void ) {
 		localisedGametype = common->GetLocalizedString( info->localizedName );
 	}
 
-	// openQ4: Instagib is a modifier, so it qualifies the game type's name
-	// ("Instagib Deathmatch") wherever the match is named.
-	if ( IsInstagib() ) {
-		localisedGametype = va( common->GetLocalizedString( "#str_231961" ), localisedGametype.c_str() );
+	// openQ4: a modifier qualifies the game type's name ("Instagib Deathmatch",
+	// "Quad Hog Deathmatch") wherever the match is named.
+	if ( modifiers.mask != 0 || modifiers.weaponArena >= 0 ) {
+		idStr title;
+		rvMPModifiers::Title( modifiers, localisedGametype.c_str(), title );
+		localisedGametype = title;
 	}
 
 	return( localisedGametype.c_str() );
@@ -27255,8 +27606,9 @@ bool idMultiplayerGame::IsBuyingAllowedInTheCurrentGameMode( void ) {
 		return false;
 	}
 
-	// Instagib's loadout is the whole point of it; there is nothing to buy.
-	if ( IsInstagib() ) {
+	// A fixed loadout - Instagib's, a weapon arena's - is the whole point of
+	// the rule; there is nothing to buy.
+	if ( HasFixedLoadout() ) {
 		return false;
 	}
 

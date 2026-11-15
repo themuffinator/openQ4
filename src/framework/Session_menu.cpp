@@ -6818,6 +6818,17 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createRuleset",		"ruleset",		"si_ruleset",				0, 1,	false },
 	{ "createGrapple",		"grapple",		"si_classicGrapple",		0, 2,	false },
 	{ "createInstagib",		"instagib",		"si_instagib",				0, 1,	true },
+	// The modifier layer and presets (the game's mp/Modifiers.h and mp/Presets.h)
+	{ "createQuadHog",		"quadhog",		"si_quadHog",				0, 1,	true },
+	{ "createVampiric",		"vampiric",		"si_vampiric",				0, 1,	true },
+	{ "createFrenzy",		"frenzy",		"si_weaponsFrenzy",			0, 1,	true },
+	{ "createWeaponArena",	"weaponarena",	"si_weaponArena",			0, 10,	false },	// Session_RetainedCreateValue
+	{ "createPowerups",		"powerups",		"si_powerups",				0, 1,	true },
+	{ "createSelfDamage",	"selfdamage",	"si_selfDamage",			0, 999,	false },
+	{ "createKnockback",	"knockback",	"si_knockback",				0, 999,	false },
+	{ "createFallDamage",	"falldamage",	"si_fallDamage",			0, 999,	false },
+	{ "createWeaponRespawn",	"weaponrespawn",	"si_weaponRespawn",		0, 999,	false },
+	{ "createPreset",		"preset",		"si_preset",				0, 11,	false },	// Session_RetainedCreateValue
 };
 static const int RETAINED_CREATE_SETTING_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_SETTINGS ) / sizeof( RETAINED_CREATE_SETTINGS[0] ) );
 // The page's text fields: the verb a field asks with once its text is in its
@@ -6846,10 +6857,10 @@ static const int RETAINED_CREATE_BAN_ROWS = 32;
 static const char *const RETAINED_JOIN_GAME_GUI = "guis/menu/joingame.rui";
 static const int RETAINED_JOIN_ROWS = 64;
 // The details card's lines: the stock tooltip's player list holds 11 of its
-// 12 u items, and the scan describes 7 settings (DETAIL_PLAYERS and
-// DETAIL_SETTINGS in the generator).
+// 12 u items, and the scan describes 7 settings and, for a modified match,
+// its modifiers (DETAIL_PLAYERS and DETAIL_SETTINGS in the generator).
 static const int RETAINED_JOIN_DETAIL_PLAYERS = 11;
-static const int RETAINED_JOIN_DETAIL_SETTINGS = 7;
+static const int RETAINED_JOIN_DETAIL_SETTINGS = 8;
 typedef struct retainedJoinSort_s {
 	const char *	verb;
 	serverSort_t	sort;
@@ -9272,12 +9283,126 @@ static int Session_RetainedCreateGameType( void ) {
 	return 0;
 }
 
+// Weapon Arena's choices: si_weaponArena's tokens, "none" and then the game's
+// table in its order (mpWeaponArenaTable in src/mpgame/mp/Modifiers.cpp).
+static const char *const RETAINED_CREATE_WEAPON_ARENAS[] = {
+	"none", "machinegun", "shotgun", "hyperblaster", "grenadelauncher", "nailgun", "rocketlauncher", "railgun",
+	"lightninggun", "dmg", "napalmgun"
+};
+static const int RETAINED_CREATE_WEAPON_ARENA_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_WEAPON_ARENAS ) / sizeof( RETAINED_CREATE_WEAPON_ARENAS[0] ) );
+
+// Preset's choices after Custom: the game's built-in presets, row for row
+// (mpPresetTable in src/mpgame/mp/Presets.cpp). The page is also shown while
+// the single-player module is loaded, so the session applies a preset itself:
+// the standard row's settings and then the chosen row's, and si_preset.
+typedef struct retainedCreatePreset_s {
+	const char *	name;
+	const char *	settings;
+} retainedCreatePreset_t;
+static const retainedCreatePreset_t RETAINED_CREATE_PRESETS[] = {
+	{ "standard",		"si_ruleset 0 si_instagib 0 si_quadHog 0 si_vampiric 0 si_weaponsFrenzy 0 si_weaponArena none si_powerups 1 si_selfDamage 100 si_knockback 100 si_fallDamage 100 si_weaponRespawn 0" },
+	{ "instagib",		"si_instagib 1" },
+	{ "quadhog",		"si_gameType DM si_quadHog 1" },
+	{ "vampiric",		"si_vampiric 1" },
+	{ "frenzy",			"si_weaponsFrenzy 1" },
+	{ "rocketarena",	"si_weaponArena rocketlauncher si_powerups 0 si_selfDamage 0 si_fallDamage 0" },
+	{ "railarena",		"si_weaponArena railgun si_powerups 0" },
+	{ "nadefest",		"si_weaponArena grenadelauncher si_selfDamage 50" },
+	{ "classic",		"si_ruleset 1" },
+	{ "instactf",		"si_gameType CTF si_instagib 1 si_captureLimit 8" },
+	{ "classicctf",		"si_gameType CTF si_ruleset 1 si_classicGrapple 1 si_captureLimit 8" },
+};
+static const int RETAINED_CREATE_PRESET_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_PRESETS ) / sizeof( RETAINED_CREATE_PRESETS[0] ) );
+
+// The settings preset `index` resolves to, the standard row's included.
+static void Session_RetainedCreatePresetSettings( int index, idDict &settings ) {
+	settings.Clear();
+	for ( int pass = 0; pass < 2; ++pass ) {
+		idCmdArgs args;
+		args.TokenizeString( RETAINED_CREATE_PRESETS[ pass == 0 ? 0 : index ].settings, false );
+		for ( int i = 0; i + 1 < args.Argc(); i += 2 ) {
+			settings.Set( args.Argv( i ), args.Argv( i + 1 ) );
+		}
+	}
+}
+
+// The settings si_preset vouches for: the standard row's, and the game type.
+static bool Session_RetainedCreatePresetVouchesFor( const char *key ) {
+	if ( !idStr::Icmp( key, "si_gameType" ) ) {
+		return true;
+	}
+	idCmdArgs args;
+	args.TokenizeString( RETAINED_CREATE_PRESETS[0].settings, false );
+	for ( int i = 0; i + 1 < args.Argc(); i += 2 ) {
+		if ( !idStr::Icmp( args.Argv( i ), key ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// The preset the settings are, one-based, or 0 (Custom): si_preset names it
+// and every setting it vouches for still holds its value, as the game checks
+// when a map loads (rvMPPresets::Matches).
+static int Session_RetainedCreatePreset( void ) {
+	const char *name = cvarSystem->GetCVarString( "si_preset" );
+	for ( int index = 0; index < RETAINED_CREATE_PRESET_COUNT; ++index ) {
+		if ( idStr::Icmp( name, RETAINED_CREATE_PRESETS[ index ].name ) ) {
+			continue;
+		}
+		idDict settings;
+		Session_RetainedCreatePresetSettings( index, settings );
+		for ( int i = 0; i < settings.GetNumKeyVals(); ++i ) {
+			const idKeyValue *kv = settings.GetKeyVal( i );
+			const char *key = kv->GetKey().c_str();
+			if ( !Session_RetainedCreatePresetVouchesFor( key ) ) {
+				continue;
+			}
+			const char *wanted = kv->GetValue().c_str();
+			const char *actual = cvarSystem->GetCVarString( key );
+			const bool text = !idStr::Icmp( key, "si_gameType" ) || !idStr::Icmp( key, "si_weaponArena" );
+			if ( text ? idStr::Icmp( wanted, actual ) != 0 : atoi( wanted ) != atoi( actual ) ) {
+				return 0;
+			}
+		}
+		return index + 1;
+	}
+	return 0;
+}
+
+static void Session_SetRetainedCreatePreset( int value ) {
+	if ( value <= 0 || value > RETAINED_CREATE_PRESET_COUNT ) {
+		// Custom keeps every setting and only stops naming a preset.
+		cvarSystem->SetCVarString( "si_preset", "" );
+		return;
+	}
+	idDict settings;
+	Session_RetainedCreatePresetSettings( value - 1, settings );
+	for ( int i = 0; i < settings.GetNumKeyVals(); ++i ) {
+		const idKeyValue *kv = settings.GetKeyVal( i );
+		cvarSystem->SetCVarString( kv->GetKey().c_str(), kv->GetValue().c_str() );
+	}
+	cvarSystem->SetCVarString( "si_preset", RETAINED_CREATE_PRESETS[ value - 1 ].name );
+}
+
 // A setting's value as the page offers it. Buying is one choice over two
 // CVars: off, or on with Quake 4's rules or The Awakening's (si_buyingRules,
 // the game's mp/Buying.h).
 static int Session_RetainedCreateValue( const retainedCreateSetting_t &setting ) {
 	if ( !idStr::Icmp( setting.verb, "createBuying" ) ) {
 		return !cvarSystem->GetCVarBool( "si_isBuyingEnabled" ) ? 0 : cvarSystem->GetCVarInteger( "si_buyingRules" ) == 1 ? 2 : 1;
+	}
+	if ( !idStr::Icmp( setting.verb, "createWeaponArena" ) ) {
+		const char *arena = cvarSystem->GetCVarString( "si_weaponArena" );
+		for ( int i = 1; i < RETAINED_CREATE_WEAPON_ARENA_COUNT; ++i ) {
+			if ( !idStr::Icmp( arena, RETAINED_CREATE_WEAPON_ARENAS[ i ] ) ) {
+				return i;
+			}
+		}
+		return 0;
+	}
+	if ( !idStr::Icmp( setting.verb, "createPreset" ) ) {
+		return Session_RetainedCreatePreset();
 	}
 	return idMath::ClampInt( setting.minimum, setting.maximum, cvarSystem->GetCVarInteger( setting.cvar ) );
 }
@@ -9289,6 +9414,14 @@ static void Session_SetRetainedCreateValue( const retainedCreateSetting_t &setti
 		if ( value != 0 ) {
 			cvarSystem->SetCVarInteger( "si_buyingRules", value == 2 ? 1 : 0 );
 		}
+		return;
+	}
+	if ( !idStr::Icmp( setting.verb, "createWeaponArena" ) ) {
+		cvarSystem->SetCVarString( "si_weaponArena", RETAINED_CREATE_WEAPON_ARENAS[ idMath::ClampInt( 0, RETAINED_CREATE_WEAPON_ARENA_COUNT - 1, value ) ] );
+		return;
+	}
+	if ( !idStr::Icmp( setting.verb, "createPreset" ) ) {
+		Session_SetRetainedCreatePreset( value );
 		return;
 	}
 	cvarSystem->SetCVarInteger( setting.cvar, value );
@@ -9601,7 +9734,14 @@ void idSessionLocal::HandleRetainedCreateServerRequest( idUserInterface *gui, co
 			common->Warning( "retained UI: Create Server asked for %s %d", setting.cvar, value );
 			return;
 		}
+		// A preset may name a game type, and the maps offered follow it.
+		const idStr gameTypeBefore = cvarSystem->GetCVarString( "si_gameType" );
 		Session_SetRetainedCreateValue( setting, value );
+		if ( gameTypeBefore.Icmp( cvarSystem->GetCVarString( "si_gameType" ) ) != 0 ) {
+			PublishRetainedCreateServer( gui );
+			PublishRetainedCreateMaps( gui, true );
+			return;
+		}
 		if ( !idStr::Icmp( setting.cvar, "si_maxPlayers" ) && cvarSystem->GetCVarInteger( "si_minPlayers" ) > value ) {
 			cvarSystem->SetCVarInteger( "si_minPlayers", value );
 		} else if ( !idStr::Icmp( setting.cvar, "si_minPlayers" ) && cvarSystem->GetCVarInteger( "si_maxPlayers" ) < value ) {
@@ -9793,7 +9933,7 @@ void idSessionLocal::PublishRetainedJoinGame( idUserInterface *gui ) {
 			ping = va( "%d", Max( 0, server->ping ) );
 			players = va( "%d/%d", idMath::ClampInt( 0, MAX_ASYNC_CLIENTS, server->clients ),
 				idMath::ClampInt( 0, MAX_ASYNC_CLIENTS, server->serverInfo.GetInt( "si_maxPlayers" ) ) );
-			type = Session_RetainedPlayerText( idServerScan::GameTypeName( server->serverInfo.GetString( "si_gameType" ) ), 64, 1 );
+			type = Session_RetainedPlayerText( idServerScan::MatchTypeName( server->serverInfo ).c_str(), 64, 1 );
 			map = Session_RetainedPlayerText( server->serverInfo.GetString( "si_mapName" ), 64, 1 );
 		}
 		gui->SetStateBool( va( "join.row%d.fav", row ), server != NULL && servers.IsFavoriteServer( retainedJoinServers[ index ] ) );

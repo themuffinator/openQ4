@@ -425,7 +425,7 @@ def server_row(doc: Document, index: int, row_w: float) -> dict:
 DETAIL = (270.0, 216.0)                    # u: the stock tooltip, and the name's two lines above it
 DETAIL_NAME = 30.0                         # u: the name's two lines, which move the stock layout down
 DETAIL_PLAYERS = 11                        # the stock list's 139 u at 12 u items
-DETAIL_SETTINGS = 7                        # the stock settings (GetServerDetails)
+DETAIL_SETTINGS = 8                        # the stock settings and a modified match's modifiers (GetServerDetails)
 DETAIL_HEADING = 11.0                      # dp: Lowpixel at the stock .16 scale
 DETAIL_TEXT = 13.0                         # dp: Profont (section 7's hover card)
 VIEW_GLYPH = 18.0                          # dp: the View button's glyph on the card

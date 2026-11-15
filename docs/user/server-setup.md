@@ -28,8 +28,12 @@ while it serves the other players.
   from the same computer, start openQ4 again and join from the server browser.
 - **Advanced Server Options** holds the match rules and bots. In the new
   interface its **Match** tab has **Fill With Bots**, **Bot Skill** and
-  **Shuffle Teams**, and its **Rules** tab has **Instagib**, **Overtime**,
-  **Mercy Lead** and **Round Limit**. See [Bots](#bots) and [Instagib](#instagib).
+  **Shuffle Teams**, and its **Rules** tab has **Overtime**, **Mercy Lead**
+  and **Round Limit**. See [Bots](#bots).
+- The **Modifiers** tab (**Not in 0.14.1**) changes how any game type plays:
+  a **Preset**, **Instagib**, **Quad Hog**, **Vampiric Damage**, **Weapons
+  Frenzy**, a **Weapon Arena** and the **Powerups** switch. See
+  [Modifiers and presets](#modifiers-and-presets).
 - **Buying** (**Not in 0.14.1**), on the **Rules** tab, replaces the weapon,
   armour and ammunition pickups with a buy menu: **Off**, **Quake 4**'s rules or
   **The Awakening**'s, with its prices, weapon mods and FC Armor Regen. See
@@ -52,11 +56,104 @@ Flag, Duel, Clan Arena, Freeze Tag and the rest, and with the
 - Buying is off, and team damage still follows the server's **Team Damage**
   setting.
 
-Turn it on with **Instagib** on the **Rules** tab of **Advanced Server
+Turn it on with **Instagib** on the **Modifiers** tab of **Advanced Server
 Options**, or with `si_instagib 1` on a dedicated server. The match name shows
 it, for example "Instagib Deathmatch". If you change `si_instagib` during a
 match, it takes effect at the next map or restart. Run `rescanSI` to restart
 the match with the new setting straight away.
+
+## Modifiers and presets
+
+**Not in 0.14.1.** A modifier changes the rules of whatever game type you are
+playing. Turn them on from the **Modifiers** tab of **Advanced Server
+Options**, with the settings below, or with the `modifier` command on a
+running server. The match name shows what is on, for example "Quad Hog
+Deathmatch" or "Deathmatch (Rocket Launcher)", and so do the server browser
+and its details card.
+
+| Modifier | Setting | How it plays |
+|---|---|---|
+| [Instagib](#instagib) | `si_instagib 1` | Railguns only, and one hit kills |
+| Quad Hog | `si_quadHog 1` | Deathmatch only. One Quad Damage is in play. Whoever takes it is the Quad Hog and keeps it until they die; it then lies where they fell. Only the hog's frags, and the frag on the hog, score. A quad nobody reaches for 20 seconds moves somewhere else. The map's other powerups don't spawn |
+| Vampiric Damage | `si_vampiric 1` | Hurting an enemy heals you by half the health you took, up to 200 (100 under the Classic ruleset). The map's health pickups don't spawn, so damage is the only way to heal. `g_vampiricPercent` changes the share |
+| Weapons Frenzy | `si_weaponsFrenzy 1` | Weapons and ammo come back in a quarter of their usual time, and the ammo you carry regenerates |
+| Weapon Arena | `si_weaponArena <weapon>` | Everyone carries that one weapon, with ammo that never runs out, and the gauntlet. Weapon and ammo pickups don't spawn; health, armour and powerups stay. The weapons are `machinegun`, `shotgun`, `hyperblaster`, `grenadelauncher`, `nailgun`, `rocketlauncher`, `railgun`, `lightninggun`, `dmg` and `napalmgun`; `none` turns it off |
+
+Some combinations cannot both mean something, and the server settles them
+the same way every time:
+
+- Instagib switches off the weapon arena, Quad Hog, Vampiric Damage and
+  Weapons Frenzy.
+- Quad Hog only applies in Deathmatch.
+- Weapons Frenzy stands aside for a weapon arena and for Clan Arena, where
+  nobody picks weapons up.
+- Buying is off under Instagib and in a weapon arena.
+
+These settings adjust the match without being modifiers of their own:
+
+| Setting | What it does |
+|---|---|
+| `si_powerups` | `0` removes the map's powerups (**Powerups**). Arena CTF keeps its runes |
+| `si_selfDamage` | Damage your own weapons do to you, as a percentage: `100` is normal, `0` makes rocket jumps free (**Self Damage**) |
+| `si_knockback` | How hard hits push players, as a percentage (**Knockback**) |
+| `si_fallDamage` | Falling damage, as a percentage; `0` turns it off (**Fall Damage**) |
+| `si_weaponRespawn` | Seconds before a picked-up weapon comes back; `0` keeps each weapon's own time (**Weapon Respawn**) |
+
+The modifiers and `si_powerups` change which pickups are on the map, so a
+change restarts the match. The `modifier` and `weaponArena` commands do that
+at once; after setting one directly, such as `si_quadHog 1`, run `rescanSI`.
+The percentages and the weapon respawn time need no restart: they apply from
+the next map, restart or `rescanSI`.
+
+### Presets
+
+A preset sets a game type, the ruleset, modifiers and limits together. Pick
+one with **Preset** on the **Modifiers** tab, or on a running or dedicated
+server with `preset <name>`, which applies it and restarts the match.
+`listPresets` shows them all.
+
+| Preset | What it sets |
+|---|---|
+| `standard` | Quake 4's rules: every modifier off and every percentage at 100 |
+| `instagib` | Instagib over the current game type |
+| `quadhog` | Deathmatch with Quad Hog |
+| `vampiric` | Vampiric Damage over the current game type |
+| `frenzy` | Weapons Frenzy over the current game type |
+| `rocketarena` | Rocket launchers only, no self or fall damage, no powerups |
+| `railarena` | Railguns only with normal damage, no powerups |
+| `nadefest` | Grenade launchers only, half self damage |
+| `classic` | The [Classic ruleset](classic-ruleset.md) over the current game type |
+| `instactf` | Capture the Flag with Instagib, first to 8 captures |
+| `classicctf` | Capture the Flag under the Classic ruleset with the grappling hook, first to 8 captures |
+
+Every preset starts from `standard`, so choosing one clears whatever the last
+one set. `si_preset` shows the preset in force. If you then change one of its
+settings by hand, the server clears `si_preset` at the next map or restart and
+the menu shows **Custom**; changing a limit such as the frag limit does not.
+
+To add your own, put a text file in a `presets` folder inside `baseoq4`, for
+example `baseoq4/presets/friday.cfg`:
+
+```
+// Friday night
+si_gameType "Team DM"
+si_vampiric 1
+si_weaponArena lightninggun
+si_fragLimit 60
+```
+
+Then run `preset friday`. The file name is the preset's name: lower-case
+letters, digits, `-` and `_`. A preset file is read as a list of settings and
+is never run as a script. It may set the game type, the ruleset and grappling
+hook, the modifiers and settings on this page, the limits (`si_fragLimit`,
+`si_timeLimit`, `si_captureLimit`, `si_roundLimit`, `si_roundTimeLimit`,
+`si_scoreLimit`, `si_tourneyLimit`, `si_controlTime`, `si_overtime`,
+`si_mercyLimit`) and `si_teamDamage`, `si_weaponStay`, `si_warmupWeapons`,
+`si_isBuyingEnabled` and `si_buyingRules`. A line that names anything else
+makes the server refuse the whole preset and change nothing.
+
+Presets and the `modifier` command are refused during a
+[managed competitive match](competitive-matches.md), which owns its rules.
 
 ## Running a dedicated server
 
@@ -213,6 +310,9 @@ address to force IPv6.
 | `si_warmup` | Whether matches start with a warmup |
 | `si_isBuyingEnabled`, `si_buyingRules` | Buying on (`1`) and its rules: `0` Quake 4, `1` The Awakening (**Not in 0.14.1**; see [Buying](buying.md)) |
 | `si_instagib` | `1` plays any game type as [Instagib](#instagib): railguns only, and one hit kills (**Not in 0.14.1**) |
+| `si_quadHog`, `si_vampiric`, `si_weaponsFrenzy`, `si_weaponArena`, `si_powerups` | The other [modifiers](#modifiers-and-presets) (**Not in 0.14.1**) |
+| `si_selfDamage`, `si_knockback`, `si_fallDamage`, `si_weaponRespawn` | Damage and push percentages and the weapon respawn time; see [Modifiers and presets](#modifiers-and-presets) (**Not in 0.14.1**) |
+| `si_preset` | The [preset](#presets) in force, set by the `preset` command (**Not in 0.14.1**) |
 | `si_usePass`, `g_password` | `si_usePass 1` admits only players who give the password set in `g_password` |
 | `g_mapCycle` | Map cycle script |
 
@@ -232,6 +332,10 @@ Bot settings are listed under [Bots](#bots).
 | `removebot` | Removes one bot, optionally by name |
 | `kickbots` | Removes every bot |
 | `botlist` | Lists the bots and their characters |
+| `modifier <name> <0\|1>` | Turns `instagib`, `quadhog`, `vampiric` or `frenzy` on or off and restarts the match; alone, it lists them (**Not in 0.14.1**) |
+| `weaponArena <weapon\|none>` | Starts or ends a [weapon arena](#modifiers-and-presets) and restarts the match (**Not in 0.14.1**) |
+| `preset <name>` | Applies a [preset](#presets) and restarts the match (**Not in 0.14.1**) |
+| `listPresets` | Lists the built-in presets and your own (**Not in 0.14.1**) |
 
 ## Bots
 

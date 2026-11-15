@@ -3127,7 +3127,10 @@ def validate_ceremony_flow() -> None:
         "inventory.weapons |= gameLocal.mpGame.GetMapWeaponMask();",
         "warmup must grant only the weapons the map contains",
     )
-    if 'GiveStuffToPlayer( this, "weapons", "" );\n\t\t\tGiveStuffToPlayer' in player_source:
+    # The fixed-loadout grant below it does hand out every weapon; the warmup block must not.
+    warmup_start = player_source.index('gameLocal.serverInfo.GetBool( "si_warmupWeapons" ) ) {')
+    warmup_block = player_source[warmup_start:player_source.index("// Clan Arena is fought on a fixed loadout", warmup_start)]
+    if 'GiveStuffToPlayer( this, "weapons"' in warmup_block:
         raise AssertionError("warmup must not grant every weapon in the game")
     require(player_source, "void idPlayer::RevokeWarmupArsenal( void )", "warmup arsenal must be revocable")
     require(state, "p->RevokeWarmupArsenal();", "the warmup arsenal must be taken back when the match starts")
@@ -3169,9 +3172,9 @@ def validate_ceremony_flow() -> None:
     )
     require_regex(
         player_source,
-        # Instagib, a fixed loadout too, shares the gate (mp_instagib_contract.py).
+        # Instagib and the weapon arenas, fixed loadouts too, share the gate (mp_instagib_contract.py).
         r"MPGameTypeHasAny\( gameLocal\.gameType, GTF_FULLARSENAL \)"
-        r"(?: \|\| gameLocal\.mpGame\.IsInstagib\(\) \))? \) \{\s*return;",
+        r"(?: \|\| gameLocal\.mpGame\.HasFixedLoadout\(\) \))? \) \{\s*return;",
         "fixed-loadout modes must not drop weapons",
     )
     # Red Rover is a two-sided mode and needs the team panel, not the FFA one.

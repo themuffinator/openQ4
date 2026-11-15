@@ -116,6 +116,21 @@ idCVar si_teamSizeMin(				"si_teamSizeMin",			"1",			CVAR_GAME | CVAR_SERVERINFO
 idCVar si_teamForcePresent(			"si_teamForcePresent",		"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "require both teams to meet si_teamSizeMin, rather than just one" );
 idCVar si_warmupWeapons(			"si_warmupWeapons",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "hand out every weapon on the map during warmup" );
 idCVar si_instagib(					"si_instagib",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Instagib: everyone carries only an unlimited railgun and the gauntlet, any hit from another player kills, falls do no harm and the map's pickups are removed; a change restarts the match" );
+// openQ4 MP-14: the modifier layer (mp/Modifiers.h) and presets (mp/Presets.h).
+// The switches are latched with the game type when a map loads or restarts;
+// the scales and the weapon respawn time are read live on the server.
+idCVar si_quadHog(					"si_quadHog",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Quad Hog, in Deathmatch: one Quad Damage is in play, its carrier keeps it until killed, and only the carrier's frags and the frag on the carrier score; a change restarts the match" );
+idCVar si_vampiric(					"si_vampiric",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Vampiric Damage: damage dealt to an enemy heals the attacker, and the map's health pickups are removed; a change restarts the match" );
+idCVar si_weaponsFrenzy(			"si_weaponsFrenzy",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Weapons Frenzy: weapon and ammo pickups come back in a quarter of their time and carried ammo regenerates; a change restarts the match" );
+idCVar si_weaponArena(				"si_weaponArena",			"none",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "single-weapon arena: none, machinegun, shotgun, hyperblaster, grenadelauncher, nailgun, rocketlauncher, railgun, lightninggun, dmg or napalmgun. Everyone carries that weapon with unlimited ammo and the gauntlet, and weapon and ammo pickups are removed; a change restarts the match" );
+idCVar si_powerups(					"si_powerups",				"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "spawn the map's powerups; a change restarts the match" );
+idCVar si_selfDamage(				"si_selfDamage",			"100",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "damage a player's own weapons do to them, as a percentage of normal", 0, 999 );
+idCVar si_knockback(				"si_knockback",				"100",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "knockback players take, as a percentage of normal", 0, 999 );
+idCVar si_fallDamage(				"si_fallDamage",			"100",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "falling damage, as a percentage of normal; 0 turns it off", 0, 999 );
+idCVar si_weaponRespawn(			"si_weaponRespawn",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds before a picked-up weapon comes back; 0 for each weapon's own time", 0, 999 );
+idCVar si_preset(					"si_preset",				"",				CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "the preset the server last applied with the preset command; cleared at the next map or restart once the settings no longer match it" );
+idCVar si_modifiers(				"si_modifiers",				"",				CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "the modifiers latched for the current map, as the server browser and the loading screen read them" );
+idCVar g_vampiricPercent(			"g_vampiricPercent",		"50",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "share of the damage dealt that heals the attacker under Vampiric Damage, in percent", 1, 100 );
 idCVar si_warmupScoring(			"si_warmupScoring",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "count frags scored during warmup" );
 idCVar si_autoShuffle(				"si_autoShuffle",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "shuffle teams automatically during warmup when they are lopsided" );
 idCVar si_shuffleDelay(				"si_shuffleDelay",			"5",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "countdown before an automatic team shuffle runs, in seconds", 1, 60 );

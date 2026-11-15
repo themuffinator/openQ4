@@ -112,6 +112,18 @@ ADVANCED = (
     ("grapple", "createGrapple", "#str_42222", "choice", 0, 2, None),
     # Instagib (si_instagib): any game type with an unlimited railgun and one-hit kills.
     ("instagib", "createInstagib", "#str_231960", "toggle", 0, 1, None),
+    # The modifier layer and presets (the game's mp/Modifiers.h and mp/Presets.h): the other
+    # modifiers, the single-weapon arenas, the scales in percent and a preset that sets them together.
+    ("quadhog", "createQuadHog", "#str_231962", "toggle", 0, 1, None),
+    ("vampiric", "createVampiric", "#str_231964", "toggle", 0, 1, None),
+    ("frenzy", "createFrenzy", "#str_231966", "toggle", 0, 1, None),
+    ("weaponarena", "createWeaponArena", "#str_231968", "choice", 0, 10, None),
+    ("powerups", "createPowerups", "#str_231971", "toggle", 0, 1, None),
+    ("selfdamage", "createSelfDamage", "#str_231972", "number", 0, 999, "#str_231123"),
+    ("knockback", "createKnockback", "#str_231973", "number", 0, 999, "#str_231123"),
+    ("falldamage", "createFallDamage", "#str_231974", "number", 0, 999, "#str_231123"),
+    ("weaponrespawn", "createWeaponRespawn", "#str_231975", "number", 0, 999, "#str_231123"),
+    ("preset", "createPreset", "#str_231976", "choice", 0, 11, None),
 )
 # The advanced dialog's tabs (user note, 11 November 2026: its sixteen rows
 # outgrew the view): each tab's name and its rows, in order. SERVER holds who
@@ -122,8 +134,10 @@ ADVANCED_TABS = (
                      "create-mapcycle", "create-banlist")),
     ("#str_231004", ("create-ready", "create-warmup", "create-spectators", "create-voice", "create-shuffle", "create-bots",
                      "create-botskill")),
-    ("#str_41704", ("create-ruleset", "create-grapple", "create-instagib", "create-weaponstay", "create-buying", "create-overtime",
-                    "create-mercy", "create-roundlimit")),
+    ("#str_41704", ("create-ruleset", "create-grapple", "create-weaponstay", "create-buying", "create-overtime",
+                    "create-mercy", "create-roundlimit", "create-selfdamage", "create-knockback", "create-falldamage")),
+    ("#str_231986", ("create-preset", "create-instagib", "create-quadhog", "create-vampiric", "create-frenzy",
+                     "create-weaponarena", "create-powerups", "create-weaponrespawn")),
 )
 ADVANCED_TAB_H = 32.0   # u: the tab strip and the gap under it
 # Each choice's stock list and its values.
@@ -136,6 +150,12 @@ CHOICES = {
     "buying": (("#str_41200", "#str_41584", "#str_231900"), (0, 1, 2)),
     "ruleset": ("#str_42221", (0, 1)),
     "grapple": ("#str_42223", (0, 1, 2)),
+    # Off, then Quake 4's own weapon names in the game's arena order (RETAINED_CREATE_WEAPON_ARENAS).
+    "weaponarena": (("#str_41200", "#str_200106", "#str_200105", "#str_200107", "#str_200108", "#str_200109", "#str_200110",
+                     "#str_200111", "#str_200112", "#str_200113", "#str_222001"), tuple(range(11))),
+    # Custom, then the built-in presets in the game's order (RETAINED_CREATE_PRESETS).
+    "preset": (("#str_231977", "#str_231980", "#str_231960", "#str_231962", "#str_231964", "#str_231966", "#str_231981",
+                "#str_231982", "#str_231983", "#str_231988", "#str_231984", "#str_231985"), tuple(range(12))),
 }
 # The game types each row serves, by index: the limit row's three, Tourney's
 # round limit, and the team modes in which Auto Balance and Team Damage apply
@@ -440,11 +460,17 @@ def advanced_dialog(doc: Document) -> dict:
     rows[1:1] = [password_row(doc, *password) for password in PASSWORDS]
     using = {"state": "create.usepass"}
     lock_unless(doc, "create-password", using)
-    # Instagib spawns no pickups and sells nothing, so Weapon Stay and buying
-    # have nothing to act on while it is on.
+    # A fixed loadout (Instagib, a weapon arena) spawns no weapons and sells
+    # nothing, so Weapon Stay, buying and Weapons Frenzy have nothing to act
+    # on while one is on. Instagib also switches off the rules it overrides,
+    # and Quad Hog is a Deathmatch rule (rvMPModifiers::Resolve in the game).
     not_instagib = {"op": "!", "args": [{"state": "create.instagib"}]}
-    lock_unless(doc, "create-weaponstay", not_instagib)
-    lock_unless(doc, "create-buying", not_instagib)
+    free_loadout = {"op": "&&", "args": [not_instagib, {"op": "==", "args": [{"state": "create.weaponarena"}, 0]}]}
+    for ident in ("create-weaponstay", "create-buying", "create-frenzy"):
+        lock_unless(doc, ident, free_loadout)
+    for ident in ("create-vampiric", "create-weaponarena", "create-powerups"):
+        lock_unless(doc, ident, not_instagib)
+    lock_unless(doc, "create-quadhog", {"op": "&&", "args": [not_instagib, {"op": "==", "args": [{"state": "create.gametype"}, 0]}]})
     doc.bind("create-password-viewport.display", "create-password-viewport", "display", {"op": "select", "args": [using, "block", "none"]})
     doc.state["create.mapcycle"] = {"type": "string", "initial": ""}
     doc.session("createMapCycle", "createMapCycle")

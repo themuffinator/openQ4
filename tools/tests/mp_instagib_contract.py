@@ -58,45 +58,58 @@ def validate_cvar() -> None:
 def validate_latch() -> None:
     game = read(MP / "MultiplayerGame.cpp")
     set_type = body(game, "void idMultiplayerGame::SetGameType( void ) {")
-    require(set_type, "instagib = InstagibWanted();", "idMultiplayerGame::SetGameType")
-    wanted = body(game, "bool idMultiplayerGame::InstagibWanted( void ) const {")
+    # Instagib is one row of the modifier layer (mp/Modifiers.cpp, mp_modifiers_contract.py),
+    # latched with the rest of it.
+    require(set_type, "LatchModifiers();", "idMultiplayerGame::SetGameType")
+    wanted = body(game, "void idMultiplayerGame::ModifiersWanted( mpModifierState_t &state ) const {")
     # The Arena campaign is hosted by game_mp; an archived preference must not reach it.
-    require(wanted, "!IsArenaCampaignMatch()", "idMultiplayerGame::InstagibWanted")
-    change = body(game, "void idMultiplayerGame::CheckInstagibChange( void ) {")
-    require(change, "instagibRestartPending", "idMultiplayerGame::CheckInstagibChange")
-    require(change, "serverMapRestart", "idMultiplayerGame::CheckInstagibChange")
+    require(wanted, "!IsArenaCampaignMatch()", "idMultiplayerGame::ModifiersWanted")
+    change = body(game, "void idMultiplayerGame::CheckModifierChange( void ) {")
+    require(change, "modifierRestartPending", "idMultiplayerGame::CheckModifierChange")
+    require(change, "QueueRulesRestart();", "idMultiplayerGame::CheckModifierChange")
+    restart = body(game, "void idMultiplayerGame::QueueRulesRestart( void ) {")
+    require(restart, "serverMapRestart", "idMultiplayerGame::QueueRulesRestart")
     run = body(game, "void idMultiplayerGame::Run( void ) {")
-    require(run, "CheckInstagibChange();", "idMultiplayerGame::Run")
+    require(run, "CheckModifierChange();", "idMultiplayerGame::Run")
     buying = body(game, "bool idMultiplayerGame::IsBuyingAllowedInTheCurrentGameMode( void ) {")
-    require(buying, "IsInstagib()", "idMultiplayerGame::IsBuyingAllowedInTheCurrentGameMode")
+    require(buying, "HasFixedLoadout()", "idMultiplayerGame::IsBuyingAllowedInTheCurrentGameMode")
+    loadout = body(game, "const char *idMultiplayerGame::FixedLoadoutWeapon( void ) const {")
+    require(loadout, 'if ( HasModifier( MPMOD_INSTAGIB ) ) {\n\t\treturn "weapon_railgun";', "idMultiplayerGame::FixedLoadoutWeapon")
     title = body(game, "const char *idMultiplayerGame::LocalizeGametype( void ) {")
-    require(title, '"#str_231961"', "idMultiplayerGame::LocalizeGametype")
+    require(title, "rvMPModifiers::Title( modifiers,", "idMultiplayerGame::LocalizeGametype")
+    table = read(MP / "mp/Modifiers.cpp")
+    require(table, '{ MPMOD_INSTAGIB,\t"instagib",\t\t"si_instagib",\t\t"#str_231960",\t"#str_231961" },', "mpModifierTable")
+    resolve = body(table, "void rvMPModifiers::Resolve(")
+    require(resolve, 'serverInfo.GetBool( "si_instagib" )', "rvMPModifiers::Resolve")
 
 
 def validate_pickups() -> None:
     local = read(MP / "Game_local.cpp")
-    require(local, "MPGameTypeHasAny( gameType, GTF_FULLARSENAL ) || mpGame.IsInstagib()", "InhibitEntitySpawn")
+    require(local, "if ( !objective && mpGame.PickupInhibited( classname ) ) {", "InhibitEntitySpawn")
+    inhibited = body(read(MP / "MultiplayerGame.cpp"), "bool idMultiplayerGame::PickupInhibited( const char *classname ) const {")
+    require(inhibited, "if ( MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) || IsInstagib() ) {\n\t\treturn true;",
+            "idMultiplayerGame::PickupInhibited")
     # DeadZone's token is a powerup by classname and an objective by role.
     require(local, '"riDeadZonePowerup"', "InhibitEntitySpawn objective classes")
-    require(local, '"si_instagib" };', "retainedLoadingServer query keys")
+    require(local, '"si_timeLimit", "si_instagib", "si_quadHog",', "retainedLoadingServer query keys")
     session = read(ROOT / "src/framework/Session.cpp")
-    require(session, '"si_instagib" };', "idSessionLocal::PublishRetainedLoadingServer")
+    require(session, '"si_timeLimit", "si_instagib", "si_quadHog",', "idSessionLocal::PublishRetainedLoadingServer")
 
 
 def validate_player() -> None:
     player = read(MP / "Player.cpp")
     spawn = body(player, "void idPlayer::SpawnToPoint(")
-    grant = require(spawn, "GiveInstagibLoadout();", "idPlayer::SpawnToPoint")
+    grant = require(spawn, "GiveFixedLoadout( fixedWeapon );", "idPlayer::SpawnToPoint")
     # The warmup arsenal and Clan Arena's loadout must stand aside, or they
     # would hand out the arsenal over Instagib's.
-    warmup = require(spawn, '!instagib && gameLocal.serverInfo.GetBool( "si_warmupWeapons" )', "warmup arsenal gate")
+    warmup = require(spawn, '!fixedLoadout && gameLocal.serverInfo.GetBool( "si_warmupWeapons" )', "warmup arsenal gate")
     arsenal = require(spawn, "!instagib &&\n\t\t MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL )", "full arsenal gate")
     if not grant < warmup < arsenal:
         raise AssertionError("Instagib's loadout must be decided before the warmup and full-arsenal grants")
-    loadout = body(player, "void idPlayer::GiveInstagibLoadout( void ) {")
-    for token in ('SlotForWeapon( "weapon_railgun" )', 'SlotForWeapon( "weapon_gauntlet" )',
-                  "inventory.weapons = ", "inventory.AmmoIndexForWeaponIndex( railgun ) ] = -1", "idealWeapon = railgun"):
-        require(loadout, token, "idPlayer::GiveInstagibLoadout")
+    loadout = body(player, "void idPlayer::GiveFixedLoadout( const char *weaponDef ) {")
+    for token in ('SlotForWeapon( weaponDef )', 'SlotForWeapon( "weapon_gauntlet" )',
+                  "inventory.weapons = ", "inventory.AmmoIndexForWeaponIndex( fixed ) ] = -1", "idealWeapon = fixed"):
+        require(loadout, token, "idPlayer::GiveFixedLoadout")
 
     damage = body(player, "void idPlayer::Damage(")
     calc = require(damage, "CalcDamagePoints( inflictor, attacker", "idPlayer::Damage")
@@ -116,7 +129,7 @@ def validate_player() -> None:
     crash = body(player, "void idPlayer::CrashLand(")
     require(crash, "gameLocal.mpGame.IsInstagib()", "idPlayer::CrashLand")
     drop = body(player, "void idPlayer::DropWeapon( void ) {")
-    require(drop, "gameLocal.mpGame.IsInstagib()", "idPlayer::DropWeapon")
+    require(drop, "gameLocal.mpGame.HasFixedLoadout()", "idPlayer::DropWeapon")
 
 
 def validate_menu() -> None:
@@ -124,9 +137,9 @@ def validate_menu() -> None:
     require(menu, '{ "createInstagib",\t\t"instagib",\t\t"si_instagib",', "RETAINED_CREATE_SETTINGS")
     generator = read(ROOT / "tools/ui/retained_create_server.py")
     require(generator, '("instagib", "createInstagib", "#str_231960", "toggle", 0, 1, None)', "create-server ADVANCED rows")
-    rules = re.search(r'\("#str_41704", \((.*?)\)\),', generator, re.S)
-    if rules is None or '"create-instagib"' not in rules.group(1):
-        raise AssertionError("create-server RULES tab must carry create-instagib")
+    modifiers = re.search(r'\("#str_231986", \((.*?)\)\),', generator, re.S)
+    if modifiers is None or '"create-instagib"' not in modifiers.group(1):
+        raise AssertionError("create-server MODIFIERS tab must carry create-instagib")
     document = read(ROOT / "content/baseoq4/pak0/guis/menu/createserver.rui")
     require(document, '"createInstagib"', "createserver.rui (regenerate with build_retained_screens.py)")
 

@@ -1238,6 +1238,7 @@ public:
 	static const idDecl*	ReadDecl( const idBitMsgDelta &msg, declType_t type );
 
 	idPlayerStart			*RandomSpawn( void );
+	int						NumSpawnSpots( void ) const { return spawnSpots.Num(); }	// openQ4: RandomSpawn needs one
 
 	int						GetStartingIndexForInstance( int instanceID );
 	void					ClientSetStartingIndex( int i ) { clientInstanceFirstFreeIndex = i; }

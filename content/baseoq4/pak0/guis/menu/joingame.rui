@@ -760,6 +760,7 @@
   "join.detail.setting4": {"type": "string", "initial": ""},
   "join.detail.setting5": {"type": "string", "initial": ""},
   "join.detail.setting6": {"type": "string", "initial": ""},
+  "join.detail.setting7": {"type": "string", "initial": ""},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
   "join.address": {"type": "string", "initial": ""},
   "join.addressError": {"type": "string", "initial": ""},
@@ -39404,6 +39405,12 @@
    "value": {"state": "join.detail.setting6"}
   },
   {
+   "id": "join-detail-setting7.text",
+   "node": "join-detail-setting7",
+   "property": "text",
+   "value": {"state": "join.detail.setting7"}
+  },
+  {
    "id": "join-detail-view-xbox.display",
    "node": "join-detail-view-xbox",
    "property": "display",
@@ -40317,6 +40324,30 @@
   {
    "id": "text.join-detail-setting6.height",
    "node": "join-detail-setting6",
+   "property": "height",
+   "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join-detail-setting7.left",
+   "node": "join-detail-setting7",
+   "property": "left",
+   "value": {"op": "*", "args": [138.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join-detail-setting7.top",
+   "node": "join-detail-setting7",
+   "property": "top",
+   "value": {"op": "*", "args": [231.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join-detail-setting7.width",
+   "node": "join-detail-setting7",
+   "property": "width",
+   "value": {"op": "*", "args": [258.0, {"state": "view.text"}]}
+  },
+  {
+   "id": "text.join-detail-setting7.height",
+   "node": "join-detail-setting7",
    "property": "height",
    "value": {"op": "*", "args": [18.0, {"state": "view.text"}]}
   },
@@ -170931,6 +170962,24 @@
            "position": {"type": "keyword", "value": "absolute"},
            "left": {"type": "length", "value": 138.0, "unit": "dp"},
            "top": {"type": "length", "value": 213.0, "unit": "dp"},
+           "width": {"type": "length", "value": 258.0, "unit": "dp"},
+           "height": {"type": "length", "value": 18.0, "unit": "dp"},
+           "font-family": {"type": "font", "value": "profont"},
+           "font-size": {"type": "length", "value": 13.0, "unit": "dp"},
+           "line-height": {"type": "length", "value": 18.0, "unit": "dp"},
+           "color": {"type": "color", "value": [1, 1, 1, 0.8]},
+           "white-space": {"type": "keyword", "value": "nowrap"},
+           "overflow": {"type": "keyword", "value": "hidden"}
+          }
+         },
+         {
+          "id": "join-detail-setting7",
+          "type": "text",
+          "properties": {
+           "text": {"type": "text", "value": "#str_230030"},
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 138.0, "unit": "dp"},
+           "top": {"type": "length", "value": 231.0, "unit": "dp"},
            "width": {"type": "length", "value": 258.0, "unit": "dp"},
            "height": {"type": "length", "value": 18.0, "unit": "dp"},
            "font-family": {"type": "font", "value": "profont"},

@@ -16,6 +16,7 @@
 
 #include "mp/GameTypeIds.h"
 #include "mp/Buying.h"
+#include "mp/Modifiers.h"
 #include "mp/HitFeedback.h"
 #include "mp/ObjectiveMarkers.h"
 #include "mp/MvdMarkers.h"
@@ -806,7 +807,28 @@ public:
 	// from another player kills, falls do no harm, and the map's pickups are
 	// not spawned. It is latched with the game type when a map loads or
 	// restarts, on every peer, so a match never changes rules half way.
-	bool			IsInstagib( void ) const { return instagib; }
+	bool			IsInstagib( void ) const { return HasModifier( MPMOD_INSTAGIB ); }
+	// The modifier layer (mp/Modifiers.h, roadmap MP-14). Instagib is one row
+	// of it; Quad Hog, Vampiric Damage, Weapons Frenzy and the single-weapon
+	// arenas are the others, and all of them are latched together.
+	bool			HasModifier( mpModifier_t modifier ) const { return ( modifiers.mask & MPModifierBit( modifier ) ) != 0; }
+	const mpModifierState_t &	Modifiers( void ) const { return modifiers; }
+	// The one weapon a fixed-loadout rule hands out (Instagib's railgun, a
+	// weapon arena's weapon), or NULL when players arm themselves.
+	const char *	FixedLoadoutWeapon( void ) const;
+	bool			HasFixedLoadout( void ) const { return FixedLoadoutWeapon() != NULL; }
+	// True when the latched rules leave this map pickup out. Runs at map
+	// populate on every peer, so it reads nothing but the latch.
+	bool			PickupInhibited( const char *classname ) const;
+	// A caller that has just written new rules queues the restart that
+	// latches them here, so CheckModifierChange does not queue a second one.
+	void			QueueRulesRestart( void );
+	// Quad Hog: the client carrying the quad (-1 for none), and whether a
+	// frag scores under its rule.
+	int				QuadHogClient( void ) const { return quadHogClient; }
+	bool			QuadHogFragScores( idPlayer *killer, idPlayer *dead ) const;
+	// Vampiric Damage: an attacker drains the health a hit took.
+	void			ApplyVampiricDamage( idPlayer *attacker, idPlayer *victim, int damage, int healthBefore );
 	bool			ArenaCampaignLocksPlayers( void ) const;
 	bool			ArenaCampaignAllowsFreeLook( void ) const;
 	// The local view is an Arena presentation shot rather than gameplay: the
@@ -917,10 +939,22 @@ public:
 	static const char*	teamNames[ TEAM_MAX ];
 
 private:
-	bool			instagib;				// si_instagib as latched by SetGameType
-	bool			instagibRestartPending;	// a restart is queued to apply a new si_instagib
-	bool			InstagibWanted( void ) const;
-	void			CheckInstagibChange( void );
+	mpModifierState_t	modifiers;			// the modifier switches as latched by SetGameType
+	bool			modifierRestartPending;	// a restart is queued to latch new modifier switches
+	bool			modifierPublishPending;	// si_modifiers changed and the server info has not been rescanned
+	void			ModifiersWanted( mpModifierState_t &state ) const;
+	void			LatchModifiers( void );
+	void			CheckModifierChange( void );
+
+	int				quadHogClient;			// who carries the quad, -1 for nobody
+	idEntityPtr<idEntity>	quadHogItem;	// the quad while it lies in the world
+	int				quadHogSpawnTime;		// when the next quad is due
+	int				quadHogLooseTime;		// when the quad in the world appeared
+	int				quadHogSpawnCount;		// quads spawned this map; names them openq4_quad_hog_<n>
+	void			ResetQuadHog( void );
+	void			RunQuadHog( void );
+	idEntity *		FindLooseQuad( void ) const;
+	bool			SpawnQuadHogItem( void );
 
 	static const char	*MPGuis[];
 	static const char	*ThrottleVars[];
