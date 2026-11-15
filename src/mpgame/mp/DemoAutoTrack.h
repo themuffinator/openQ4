@@ -2,15 +2,24 @@
 #ifndef OPENQ4_MP_DEMO_AUTO_TRACK_H
 #define OPENQ4_MP_DEMO_AUTO_TRACK_H
 
-// Chooses whom a playback camera follows. Killer mode moves to the player who
-// killed the one being followed, after a beat so the death is seen. Action mode
+// Chooses whom a camera follows: a multi-view demo's playback camera, or a
+// live spectator's on the server. Killer mode moves to the player who killed
+// the one being followed, after a beat so the death is seen. Action mode
 // follows the most interesting player: a flag carrier, then powerups and recent
 // kills. A switch holds for a minimum dwell, and action mode needs a clear lead
 // over the current target, so the camera does not flicker between equals.
+// Leader, powerup and flag modes each follow one subject: the top score, the
+// player carrying the most powerups, or a flag carrier. While nobody qualifies
+// the camera stays where it is, and a subject who only ties the followed
+// player does not take the camera.
 enum {
 	MP_AUTOTRACK_OFF = 0,
 	MP_AUTOTRACK_KILLER,
-	MP_AUTOTRACK_ACTION
+	MP_AUTOTRACK_ACTION,
+	MP_AUTOTRACK_LEADER,
+	MP_AUTOTRACK_POWERUP,
+	MP_AUTOTRACK_FLAG,
+	MP_AUTOTRACK_MODE_COUNT
 };
 
 static const int MP_AUTOTRACK_CLIENTS = 32;
@@ -82,10 +91,24 @@ public:
 		return interest;
 	}
 
+	// How strongly a single-subject mode wants this player; 0 is not at all.
+	static int SubjectRank( int mode, const mpAutoTrackPlayer &player, int leaderScore ) {
+		switch ( mode ) {
+		case MP_AUTOTRACK_LEADER:
+			return player.score == leaderScore ? 1 : 0;
+		case MP_AUTOTRACK_POWERUP:
+			return player.alive ? player.powerups : 0;
+		case MP_AUTOTRACK_FLAG:
+			return player.alive && player.flag ? 1 : 0;
+		default:
+			return 0;
+		}
+	}
+
 	// The client to follow from now, or `followed` to keep the camera, or -1
 	// when nobody eligible matches the team filter (-1 accepts every team).
 	int Choose( int mode, int teamFilter, int followed, const mpAutoTrackPlayer players[MP_AUTOTRACK_CLIENTS], int now ) {
-		if ( mode != MP_AUTOTRACK_KILLER && mode != MP_AUTOTRACK_ACTION ) {
+		if ( mode <= MP_AUTOTRACK_OFF || mode >= MP_AUTOTRACK_MODE_COUNT ) {
 			return followed;
 		}
 		const auto candidate = [&]( int client ) {
@@ -112,6 +135,29 @@ public:
 		if ( best < 0 ) {
 			pendingTarget = -1;
 			return -1;
+		}
+		if ( mode >= MP_AUTOTRACK_LEADER ) {
+			// A kill noted meanwhile must not fire when killer mode returns.
+			pendingTarget = -1;
+			int subject = -1;
+			int subjectRank = 0;
+			for ( int i = 0; i < MP_AUTOTRACK_CLIENTS; i++ ) {
+				if ( !candidate( i ) ) {
+					continue;
+				}
+				const int rank = SubjectRank( mode, players[i], leaderScore );
+				if ( rank > subjectRank || ( rank > 0 && rank == subjectRank && i == followed ) ) {
+					subject = i;
+					subjectRank = rank;
+				}
+			}
+			if ( !candidate( followed ) ) {
+				return Switch( subject >= 0 ? subject : best, now );
+			}
+			if ( subject >= 0 && subject != followed && Settled( now ) ) {
+				return Switch( subject, now );
+			}
+			return followed;
 		}
 		if ( !candidate( followed ) ) {
 			return Switch( best, now );
@@ -146,6 +192,10 @@ private:
 	int Switch( int target, int now ) {
 		lastSwitchTime = now;
 		return target;
+	}
+
+	bool Settled( int now ) const {
+		return now - lastSwitchTime >= MP_AUTOTRACK_DWELL_MS;
 	}
 };
 #endif

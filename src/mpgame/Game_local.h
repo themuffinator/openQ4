@@ -872,6 +872,8 @@ public:
 	virtual void			ClientReadRepeaterSnapshot( int sequence, const int gameFrame, const int gameTime, const int aheadOfServer, const idBitMsg &msg );
 
 	virtual int				GetDemoFollowClient( void ) { return IsServerDemoPlaying() ? followPlayer : -1; }
+	// openQ4: what an auto-tracking camera weighs about a player; shared by demo playback and live spectators
+	void					FillAutoTrackPlayer( const idPlayer *candidate, int slot, mpAutoTrackPlayer &row );
 	virtual bool			SetDemoFollowClient( int clientNum );
 
 	virtual void			GetBotInput( int clientNum, usercmd_t &userCmd ) { Error( "Bot input requested\n" ); };

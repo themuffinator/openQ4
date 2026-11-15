@@ -4000,7 +4000,7 @@ prediction/rewind defaults.
 | MP-13 — Partial | One map database in the game module (`mapdb.txt` over discovered mapDefs): player bounds, modes, per-map settings applied at load and reverted after; the rotation, the player queue (`mymap`), the end-of-match pick (`mappick`), `si_nextMap`; votes, the Vote and Admin pages, the series pool, `PickMap` and the server card read it. Contract, core harness and a dedicated-server smoke with bots pass. | Create Server's catalogue and levelshot list (engine side, still its own mapDef filter) and its map-cycle field; a retained page for the queue and the pick; a browser map filter; play by people; other platforms. |
 | MP-14 — Not started | `si_instagib` over any mode; the Classic ruleset; eight managed profiles. | Modifier layer (Quad Hog, Vampiric, Frenzy, single-weapon arenas, Last Man Standing), scales and switches, named votable presets; OPT-05's reserved modes stay hidden. |
 | MP-15 — Partial | Crosshair options, hit marker and damage numbers, brightskins/outlines/rimlights, forced models, lagometer, speed and input displays, four layouts, awards. Landed 15 November: chat tokens (`#h #a #w #l #n`) expanded on the sender, with place names taken from the map's own landmarks; hit sounds by damage (`hud_hitSound`, two tone sets made from Quake 4's own hit sounds, armour variant kept); a weapon preference order (`ui_weaponOrder`) for pickups and the empty-weapon fallback; ammunition beside the crosshair and a crosshair-name option; team info sent to team mates, so the Competitive team list is right across the map and names where each player is; a server item-timer policy (`si_itemTimers`: nobody, spectators, everyone) enforced where the list is sent, with the timer list and the time of day in all four layouts; `si_maxBrightskin` and `si_forcedModels`. The cores have a native test, the wiring is pinned, and a two-client smoke passes on OpenGL and Vulkan. | A person judging hit tones and tokens in play; Settings and Create Server rows for the new options; UI-11 register rows and visual-spec text for the timer list, crosshair ammunition and team locations; 4:3 captures; a team list outside the Competitive layout and in the stock interface; the empty-weapon fallback in a live match; team info and held-timer states in demo playback; cosmetic limits beyond the player's own game module; editor placement (UI-06). The frag line and match clock were already Quake 4's. |
-| MP-16 — Partial | Follow next/prev/free/slot live; coach, broadcaster and referee views with timers in managed matches; auto-track only in MVD playback. | Named follow list, live auto-follow, chase and death camera, casual caster role, live event stream, spectator chat policy; multi-POV and delay stay OPT-04. |
+| MP-16 — Partial | Follow by slot or name with a named list; live auto-follow in five modes (killer, action, leader, powerup, flag) with manual override; first-person, third-person and chase follow views and a death camera; a free-camera speed setting; a casual caster view (`g_casterAccess`, `caster on`) with both sides' vitals; a typed live event stream on servers and clients (`g_matchEventStream`) with a sample overlay; a notice when spectator chat is kept from players. Casual spectators are neutral, a broadcaster who joins the game loses the role, and follow requests are no longer lost between frames. Three contracts and a two-client live smoke pass on OpenGL and Vulkan. | The `spectatorchat` vote (waits for MP-12's vote set, bit 22 reserved); a caster HUD panel of its own and the named list as a menu page (UI-11); the three new camera modes in MVD playback; play by people with real input; other platforms; multi-POV and delay stay OPT-04. |
 | MP-17 — Not started | The managed roster restores team and score to a reconnecting player; per-weapon stats and awards within a match; schema-v2 reports in managed matches. | Identity decision and key-based implementation, reconnect restoration everywhere, profile and history, per-gametype rating, awards reel, casual exports; nothing uploaded. |
 | MP-18 — Partial | rcon2, the Admin page's kick/ban/switch, PBKDF2 referee, voice mute, `si_motd`. | Bans that work (identity and address), text mute, flood and connection caps, name policy, admin and match logs, an admin role, graceful shutdown. |
 | MP-19 — Not started | Browser with favourites, filters, find player and tiles; LAN scan; the default master is id's host. | A discovery service the project controls with a list fallback, recent servers, region sorting; a fresh install on each platform finds a server. |
@@ -5166,6 +5166,55 @@ Completion substeps:
   smoke on OpenGL and Vulkan, the event stream consumed by a sample overlay in
   `tools/`, and the [competitive matches guide](../user/competitive-matches.md)
   updated.
+  Progress, 15 November: everything but the vote. *Follow:* `follow <name>`
+  resolves a name to a slot on the client (the wire still carries slot and
+  spawn id), `followlist` prints the list, and `follow auto <mode>` asks the
+  server to move the camera. The server keeps one chooser per spectator
+  (`mpDemoAutoTrack`, now shared with MVD playback and extended with leader,
+  powerup and flag modes) and offers it only players `CanSpectatorFollow`
+  allows that spectator that frame, so auto-follow reaches nobody a manual
+  choice could not; a manual choice, attack or jump hands the camera back.
+  *Views:* `g_spectatorFollowView` (first, third, chase), `g_chaseCameraRange`
+  and `g_chaseCameraHeight`, and `g_deathCamera`, are presentation on the
+  client: a following spectator's snapshot is built from the followed
+  player's position whichever view draws it. `ui_spectatorSpeed` (25 to 300
+  percent) travels in userinfo so the predicted free camera and the server's
+  agree. *Caster:* with `g_casterAccess 1` outside a managed match a
+  spectator takes the broadcaster's audience with `caster on`
+  (`ServerRequestCasterRole`, the operator path's own target rule); it is
+  withdrawn when the policy goes off, a managed match begins, the caster
+  joins the game or the slot changes hands. It adds no disclosure rule: the
+  grant is `MPMatchDisclosureBuildGrant`'s broadcaster branch, without item
+  timing outside managed matches (casual spectators, casters included, get
+  item timers from MP-15's `si_itemTimers`). The client shows the disclosed
+  team-vital rows in the match
+  panel. *Stream:* `g_matchEventStream 1` writes one JSON object a line to
+  `match-events/live.ndjson` ([reference](mp-live-event-stream.md)); the match
+  journal is managed-only and has no kill, flag or score events, so the
+  stream is built from scoreboard state on whichever end writes it, and
+  `tools/overlay/match_overlay.py` consumes it. *Chat:* a spectator whose
+  all-chat is kept from players (`g_spectatorChat 0`, live play) is told so,
+  once a minute at most. Three defects found on the way are fixed: a casual
+  spectator carried the side of their last `ui_team`, so in team modes they
+  could follow only that team; a broadcaster who joined a casual game stayed
+  an inactive broadcaster in the session and kept both sides' vitals while
+  playing; and a follow request made between frames was dropped whenever
+  the last prediction pass was a re-run (`idEntity::ClientSendRequestEvent`).
+  Evidence: `mp_match_spectator_follow_contract.py` (production follow,
+  auto-follow and caster request paths against the real disclosure policy),
+  `mp_spectator_casting_contract.py` (grant and every withdrawal against the
+  real session, eight failing controls), `mp_live_event_stream_contract.py`
+  (schema, overlay replay, ten failing controls), `mvd_navigation_contract.py`
+  (the new modes), and `mp_spectator_casting_smoke.py`: a host, three bots
+  and a remote spectator in a live Team DM match, read from both ends, on
+  OpenGL and Vulkan. Recipient filtering is checked on the wire there: the
+  remote client's accepted match view holds no vitals before the grant, four
+  after it and none after withdrawal, and every camera it holds is one the
+  server reports as allowed. Remaining: the `spectatorchat` vote, which
+  waits for MP-12's vote set (bit 22 is reserved for it); a caster HUD panel
+  and a menu page for the named list under UI-11 (the vitals reuse the
+  managed context panel's rows); the three new modes in MVD playback's
+  `demo_autoTrack`; real-input play; other platforms.
 - [ ] **MP-17 — P1, decision and implementation: player identity, persistence
   and ranking.** `com_guid` is read-only and never written, so GUID bans do
   nothing and no feature can recognise a returning player; the archived plan

@@ -24,6 +24,7 @@
 #include "mp/ItemTimers.h"
 #include "mp/ObjectiveMarkers.h"
 #include "mp/MvdMarkers.h"
+#include "mp/LiveEventStream.h"
 #include "../game/gamesys/HudLines.h"
 #include "mp/match/MatchRules.h"
 #include "mp/match/MatchSeries.h"
@@ -436,6 +437,11 @@ public:
 	// Resolve both current slot-generation bindings on every attempt.  This is
 	// the authoritative camera gate; recipient views are discovery data only.
 	bool			CanSpectatorFollow( int observerSlot, int targetSlot ) const;
+	// openQ4: the casual caster role (g_casterAccess). Returns the notice for the requester.
+	const char *	ServerRequestCasterRole( int clientNum, bool enabled );
+	bool			IsCasualCaster( int clientNum ) const { return clientNum >= 0 && clientNum < MAX_CLIENTS && casualCaster[ clientNum ]; }
+	// the team-vital rows the server disclosed to this client's accepted match view
+	int				GetClientTeamVitalCount( void ) const { return clientMatchViewValid ? clientMatchView.teamVitalCount : 0; }
 	// Placed, respawning major items report only authoritative lifecycle
 	// transitions.  The registry derives identity and recipient disclosure;
 	// item code never writes client UI or network state directly.
@@ -1158,6 +1164,15 @@ private:
 	void			MirrorCompetitiveRulesToLegacy( void );
 	void			SynchronizeMatchParticipant( int clientNum );
 	void			SynchronizeAllMatchParticipants( void );
+	// openQ4: slots whose broadcaster role came from their own caster request,
+	// so only those are withdrawn when the policy or their standing changes
+	bool			casualCaster[ MAX_CLIENTS ];
+	// openQ4: when each spectator may next be told their chat is limited to spectators
+	int				spectatorChatNoticeTime[ MAX_CLIENTS ];
+	bool			SetCasualCasterRole( int clientNum, bool enabled );
+	void			ReleaseBroadcasterOnJoin( int clientNum, mpParticipantId participant );
+	void			UpdateCasualCasters( void );
+	void			ProjectCasterVitals( idUserInterface *gui );
 	void			RebaseCompetitivePauseFrame( int deltaMsec );
 	void			AdvanceMatchViewRevision( bool forceClockSample = false );
 	void			InitializeMatchItemTimingObservations( void );
@@ -1640,6 +1655,8 @@ private:
 
 	int				lastReadyToggleTime;
 	bool			pureReady;				// defaults to false, set to true once server game is running with pure checksums
+	// openQ4: typed match events for overlay tools (g_matchEventStream)
+	mpLiveEventStream liveEvents;
 	// openQ4: match state last compared for MVD markers; primed while recording
 	mpMVDMarkerState mvdMarkerState;
 	bool			mvdMarkersPrimed;

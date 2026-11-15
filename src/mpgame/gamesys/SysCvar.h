@@ -311,6 +311,11 @@ extern idCVar	pm_thirdPersonAngle;
 extern idCVar	pm_thirdPersonClip;
 extern idCVar	pm_thirdPerson;
 extern idCVar	pm_thirdPersonDeath;
+extern idCVar	g_spectatorFollowView;
+extern idCVar	g_chaseCameraRange;
+extern idCVar	g_chaseCameraHeight;
+extern idCVar	g_deathCamera;
+extern idCVar	ui_spectatorSpeed;
 extern idCVar	pm_modelView;
 extern idCVar	pm_airTics;
 

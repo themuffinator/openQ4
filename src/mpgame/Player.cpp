@@ -1698,6 +1698,8 @@ idPlayer::idPlayer() {
  	lastSpectateChange		= 0;
 	spectatorFollowSlot		= -1;
 	spectatorFollowSpawnId	= 0;
+	spectatorAutoFollow		= MP_AUTOTRACK_OFF;
+	spectatorSpeedScale		= 1.0f;
 	lastArenaChange			= 0;
  	lastTeleFX				= -9999;
 
@@ -2235,6 +2237,8 @@ void idPlayer::Init( void ) {
 	lastSpectateChange	= 0;
 	spectatorFollowSlot	= -1;
 	spectatorFollowSpawnId = 0;
+	spectatorAutoFollow	= MP_AUTOTRACK_OFF;
+	spectatorAutoTrack.Reset();
 	lastArenaChange		= 0;
  	lastTeleFX			= -9999;
 
@@ -4103,6 +4107,7 @@ bool idPlayer::UserInfoChanged( void ) {
 
 	if ( IsFakeClient() ) {
 		showWeaponViewModel = cvarSystem->GetCVarBool( "ui_showGun" );
+		spectatorSpeedScale = idMath::ClampFloat( 0.25f, 3.0f, ui_spectatorSpeed.GetInteger() * 0.01f );
 		wantSpectate = true;
 		spectator = this->entityNumber;
 		return false;
@@ -4110,6 +4115,9 @@ bool idPlayer::UserInfoChanged( void ) {
  
  	userInfo = GetUserInfo();
  	showWeaponViewModel = userInfo->GetBool( "ui_showGun" );
+	// openQ4: clamped here on both ends, so the predicted free camera and the
+	// server's agree whatever a client puts in its userinfo
+	spectatorSpeedScale = idMath::ClampFloat( 0.25f, 3.0f, userInfo->GetInt( "ui_spectatorSpeed", "100" ) * 0.01f );
 
 	if ( !gameLocal.isMultiplayer ) {
 		handicap = 1.0f;
@@ -5152,8 +5160,9 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 
 	// don't draw main hud in spectator (only mphud)
 	if ( !spectating && !arenaPresentation && !gameDebug.IsHudActive( DBGHUD_ANY ) ) {
-		// weapon targeting crosshair
-		if ( !GuiActive() ) {
+		// weapon targeting crosshair; a third-person, chase or death camera is
+		// not the weapon's line of sight, so it gets neither crosshair nor scope
+		if ( !GuiActive() && FollowCameraMode() == FOLLOW_CAMERA_FIRST ) {
 			// openQ4 VR: the scope picture is head-locked on the HUD, so it would
 			// point where the head looks; while a controller aims, the laser dot
 			// in the magnified eyes is the reticle
@@ -8040,6 +8049,13 @@ void idPlayer::RequestSpectatorFollow( spectatorFollow_t operation, int targetSl
 			return;
 		}
 		targetSpawnId = gameLocal.GetSpawnId( target );
+	} else if ( operation == SPECTATOR_FOLLOW_AUTO &&
+		( targetSlot < MP_AUTOTRACK_OFF || targetSlot >= MP_AUTOTRACK_MODE_COUNT ) ) {
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
+		return;
+	} else if ( operation == SPECTATOR_FOLLOW_CASTER && targetSlot != 0 && targetSlot != 1 ) {
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_232214" ) );
+		return;
 	}
 	if ( gameLocal.isServer ) {
 		ServerSpectatorFollow( operation, targetSlot, targetSpawnId );
@@ -8053,7 +8069,9 @@ void idPlayer::RequestSpectatorFollow( spectatorFollow_t operation, int targetSl
 		request.WriteLong( targetSpawnId );
 		// The existing event envelope proves this player's current spawn and
 		// sender ownership before dispatch. Target identity is checked again.
-		ClientSendEvent( EVENT_SPECTATOR_FOLLOW, &request );
+		// A request, not a simulated event: it must not be lost to the frame
+		// re-run test (idEntity::ClientSendRequestEvent).
+		ClientSendRequestEvent( EVENT_SPECTATOR_FOLLOW, &request );
 	}
 }
 
@@ -8061,9 +8079,12 @@ void idPlayer::ServerSpectatorFollow( int operation, int targetSlot, int targetS
 	if ( !gameLocal.isServer || !gameLocal.isMultiplayer || gameLocal.isRepeater ||
 		SpectatorFollowClient( entityNumber ) != this || botManager.IsBot( entityNumber ) ||
 		!gameLocal.mpGame.IsInGame( entityNumber ) ||
-		operation < SPECTATOR_FOLLOW_NEXT || operation > SPECTATOR_FOLLOW_PLAYER ||
-		( operation != SPECTATOR_FOLLOW_PLAYER && ( targetSlot != -1 || targetSpawnId != 0 ) ) ||
-		( operation == SPECTATOR_FOLLOW_PLAYER && ( targetSlot < 0 || targetSlot >= MAX_CLIENTS ) ) ) {
+		operation < SPECTATOR_FOLLOW_NEXT || operation > SPECTATOR_FOLLOW_CASTER ||
+		( operation < SPECTATOR_FOLLOW_PLAYER && ( targetSlot != -1 || targetSpawnId != 0 ) ) ||
+		( operation == SPECTATOR_FOLLOW_PLAYER && ( targetSlot < 0 || targetSlot >= MAX_CLIENTS ) ) ||
+		( operation == SPECTATOR_FOLLOW_AUTO && ( targetSlot < MP_AUTOTRACK_OFF ||
+			targetSlot >= MP_AUTOTRACK_MODE_COUNT || targetSpawnId != 0 ) ) ||
+		( operation == SPECTATOR_FOLLOW_CASTER && ( ( targetSlot != 0 && targetSlot != 1 ) || targetSpawnId != 0 ) ) ) {
 		return;
 	}
 	// Rate-limit rejected requests as well as successful camera changes.
@@ -8074,6 +8095,22 @@ void idPlayer::ServerSpectatorFollow( int operation, int targetSlot, int targetS
 	if ( !spectating ) {
 		gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42881", "" );
 		return;
+	}
+	if ( operation == SPECTATOR_FOLLOW_CASTER ) {
+		// a view right, not a camera: it moves nothing and leaves auto-follow alone
+		const char *notice = gameLocal.mpGame.ServerRequestCasterRole( entityNumber, targetSlot != 0 );
+		if ( notice != NULL ) {
+			gameLocal.ServerSendChatMessage( entityNumber, "server", notice, "" );
+		}
+		return;
+	}
+	if ( operation == SPECTATOR_FOLLOW_AUTO ) {
+		SetSpectatorAutoFollow( targetSlot );
+		return;
+	}
+	// A camera chosen by hand takes it back from auto-follow.
+	if ( spectatorAutoFollow != MP_AUTOTRACK_OFF ) {
+		SetSpectatorAutoFollow( MP_AUTOTRACK_OFF );
 	}
 	if ( operation == SPECTATOR_FOLLOW_FREE ) {
 		SpectateFreeFly( true );
@@ -8124,6 +8161,90 @@ void idPlayer::ServerSpectatorFollow( int operation, int targetSlot, int targetS
 
 /*
 ===============
+idPlayer::SetSpectatorAutoFollow
+
+openQ4: the mode is the spectator's own request; the server answers with the
+mode it now runs so the client needs no replicated state to show it.
+===============
+*/
+void idPlayer::SetSpectatorAutoFollow( int mode ) {
+	static const char *const notices[ MP_AUTOTRACK_MODE_COUNT ] = {
+		"#str_232200", "#str_232201", "#str_232202", "#str_232203", "#str_232204", "#str_232205"
+	};
+	if ( mode < MP_AUTOTRACK_OFF || mode >= MP_AUTOTRACK_MODE_COUNT ) {
+		return;
+	}
+	if ( mode != spectatorAutoFollow ) {
+		spectatorAutoTrack.Reset();
+	}
+	spectatorAutoFollow = mode;
+	gameLocal.ServerSendChatMessage( entityNumber, "server", notices[ mode ], "" );
+}
+
+/*
+===============
+idPlayer::UpdateSpectatorAutoFollow
+
+openQ4: moves an auto-following spectator's camera. Every candidate passes the
+same fresh CanSpectatorFollow check as a camera chosen by hand, so auto-follow
+can never reach a player this spectator may not watch. Attack and jump are the
+camera's own controls and hand it back.
+===============
+*/
+void idPlayer::UpdateSpectatorAutoFollow( void ) {
+	if ( spectatorAutoFollow == MP_AUTOTRACK_OFF ) {
+		return;
+	}
+	if ( ( usercmd.buttons & BUTTON_ATTACK ) != 0 || usercmd.upmove > 0 ) {
+		SetSpectatorAutoFollow( MP_AUTOTRACK_OFF );
+		return;
+	}
+	mpAutoTrackPlayer players[ MP_AUTOTRACK_CLIENTS ];
+	for ( int slot = 0; slot < MAX_CLIENTS && slot < MP_AUTOTRACK_CLIENTS; ++slot ) {
+		idPlayer *candidate = SpectatorFollowClient( slot );
+		if ( candidate == NULL || candidate == this ||
+			!gameLocal.mpGame.CanSpectatorFollow( entityNumber, slot ) ) {
+			continue;
+		}
+		// Tourney cameras change arena only by the bracket controls.
+		if ( gameLocal.gameType == GAME_TOURNEY && candidate->GetArena() != GetArena() ) {
+			continue;
+		}
+		gameLocal.FillAutoTrackPlayer( candidate, slot, players[ slot ] );
+	}
+	const int followed = spectator != entityNumber ? spectator : -1;
+	const int target = spectatorAutoTrack.Choose( spectatorAutoFollow, -1, followed, players, gameLocal.time );
+	if ( target < 0 || target == followed ) {
+		return;
+	}
+	idPlayer *chosen = SpectatorFollowClient( target );
+	if ( chosen == NULL ) {
+		return;
+	}
+	spectator = target;
+	chosen->UpdateHudWeapon( chosen->currentWeapon );
+}
+
+/*
+===============
+idPlayer::NoteSpectatorAutoFollowKill
+===============
+*/
+void idPlayer::NoteSpectatorAutoFollowKill( int attackerSlot, int victimSlot ) {
+	for ( int slot = 0; slot < MAX_CLIENTS; ++slot ) {
+		idPlayer *observer = SpectatorFollowClient( slot );
+		if ( observer == NULL || !observer->spectating ) {
+			continue;
+		}
+		// Every spectator's chooser remembers kills, so a mode switched on
+		// later already knows who has been fighting.
+		observer->spectatorAutoTrack.NoteKill( attackerSlot, victimSlot,
+			observer->spectator != slot ? observer->spectator : -1, gameLocal.time );
+	}
+}
+
+/*
+===============
 idPlayer::UpdateSpectating
 ===============
 */
@@ -8164,6 +8285,9 @@ void idPlayer::UpdateSpectating( void ) {
 	} else if ( usercmd.buttons & BUTTON_ATTACK && gameLocal.gameType != GAME_TOURNEY ) {
 		// tourney mode uses seperate cycling
 		SpectateCycle();
+	}
+	if ( gameLocal.isServer ) {
+		UpdateSpectatorAutoFollow();
 	}
 }
 
@@ -10782,7 +10906,7 @@ void idPlayer::AdjustSpeed( void ) {
 	float speed;
 
 	if ( spectating ) {
-		speed = pm_spectatespeed.GetFloat();
+		speed = pm_spectatespeed.GetFloat() * spectatorSpeedScale;
 		bobFrac = 0.0f;
 	} else if ( noclip ) {
 		speed = pm_noclipspeed.GetFloat();
@@ -13284,6 +13408,76 @@ void idPlayer::OffsetThirdPersonView( float angle, float range, float height, bo
 
 /*
 ===============
+idPlayer::FollowCameraMode
+
+openQ4: the view the local client draws this player with. First person unless
+the local player is a spectator following them with a third-person or chase
+view selected, or this is the local player's own death with g_deathCamera set.
+All of it is presentation: a following spectator's snapshot is built from the
+followed player's position whichever view draws it, and the cameras stay
+within reach of that position, clipped against the world.
+===============
+*/
+idPlayer::followCamera_t idPlayer::FollowCameraMode( void ) const {
+	if ( !gameLocal.isMultiplayer || spectating || IsInVehicle() ) {
+		return FOLLOW_CAMERA_FIRST;
+	}
+	const idPlayer *local = gameLocal.GetLocalPlayer();
+	if ( local == NULL ) {
+		return FOLLOW_CAMERA_FIRST;
+	}
+	if ( local == this ) {
+		return ( health <= 0 && g_deathCamera.GetBool() ) ? FOLLOW_CAMERA_DEATH : FOLLOW_CAMERA_FIRST;
+	}
+	if ( !local->spectating || local->spectator != entityNumber ) {
+		return FOLLOW_CAMERA_FIRST;
+	}
+	switch ( g_spectatorFollowView.GetInteger() ) {
+		case 1:		return FOLLOW_CAMERA_THIRD;
+		case 2:		return FOLLOW_CAMERA_CHASE;
+		default:	return FOLLOW_CAMERA_FIRST;
+	}
+}
+
+/*
+===============
+idPlayer::OffsetChaseCameraView
+
+openQ4: a camera that looks at this player from `range` away along `look`,
+pulled in where the world is in the way. The chase view passes the spectator's
+own view angles, so the spectator orbits the player they follow.
+===============
+*/
+void idPlayer::OffsetChaseCameraView( const idAngles &look, float range, float height ) {
+	const idMat3 &gravityAxis = physicsObj.GetGravityAxis();
+	idVec3 focus = GetEyePosition();
+	if ( health <= 0 ) {
+		// the dead view height sits on the floor; look at the body instead
+		focus += gravityAxis[2] * 16.0f;
+	}
+	focus += gravityAxis[2] * height;
+
+	idAngles angles = look;
+	angles.roll = 0.0f;
+	angles.pitch = idMath::ClampFloat( -80.0f, 80.0f, angles.pitch );
+	const idMat3 axis = angles.ToMat3() * gravityAxis;
+	idVec3 view = focus - axis[0] * range;
+
+	// an 8 unit box keeps the near plane out of whatever stopped the camera
+	trace_t trace;
+	const idBounds bounds( idVec3( -4.0f, -4.0f, -4.0f ), idVec3( 4.0f, 4.0f, 4.0f ) );
+	gameLocal.TraceBounds( this, trace, focus, view, bounds, MASK_SOLID, this );
+	if ( trace.fraction < 1.0f ) {
+		view = trace.endpos;
+	}
+
+	renderView->vieworg = view;
+	renderView->viewaxis = axis;
+	renderView->viewID = 0;
+}
+
+/*
+===============
 idPlayer::GetEyePosition
 ===============
 */
@@ -14273,6 +14467,7 @@ void idPlayer::CalculateRenderView( void ) {
 		}
 	} else {
 		bool cameraIsSet = false;
+		const followCamera_t followCamera = FollowCameraMode();
 
 		// First try out any camera views that can possibly fail.
 		if( !cameraIsSet ){
@@ -14285,6 +14480,21 @@ void idPlayer::CalculateRenderView( void ) {
 	 				// allow the right player view weapons
 	 				renderView->viewID = entityNumber + 1;
 	 			}
+			} else if ( followCamera == FOLLOW_CAMERA_THIRD ) {
+				// openQ4: behind the followed player, turning with their view
+				OffsetThirdPersonView( 0.0f, g_chaseCameraRange.GetFloat(), g_chaseCameraHeight.GetFloat(), true );
+				SmoothenRenderView( false );
+				altViewKind = PRESENTATION_ALT_VIEW_THIRD_PERSON;
+			} else if ( followCamera == FOLLOW_CAMERA_CHASE ) {
+				// openQ4: orbiting the followed player on the spectator's own look
+				OffsetChaseCameraView( gameLocal.GetLocalPlayer()->viewAngles, g_chaseCameraRange.GetFloat(), g_chaseCameraHeight.GetFloat() );
+				SmoothenRenderView( false );
+				altViewKind = PRESENTATION_ALT_VIEW_THIRD_PERSON;
+			} else if ( followCamera == FOLLOW_CAMERA_DEATH ) {
+				// openQ4: the view yaw already faces the killer (LookAtKiller)
+				OffsetChaseCameraView( idAngles( 20.0f, viewAngles.yaw, 0.0f ), g_chaseCameraRange.GetFloat(), g_chaseCameraHeight.GetFloat() );
+				SmoothenRenderView( false );
+				altViewKind = PRESENTATION_ALT_VIEW_DEATH;
 			} else if ( pm_thirdPerson.GetBool() && IsInVehicle ( ) ) {
 // RAVEN BEGIN
 // jnewquist: option to avoid clipping against world

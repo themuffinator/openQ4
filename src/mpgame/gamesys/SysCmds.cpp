@@ -3998,6 +3998,17 @@ static void Cmd_OpenQ4ReportMPState_f( const idCmdArgs &args ) {
 			gameLocal.IsServerDemoPlaying(), gameLocal.isRepeater, local->spectator,
 			local->IsFakeClient(), local->spectating,
 			mp.CanSpectatorFollow( local->entityNumber, 0 ) );
+		// openQ4: what this client draws: the follow view in use, the vitals the
+		// server disclosed to it and the caster panel they feed
+		const idPlayer *followed = local->spectating && local->spectator != local->entityNumber ?
+			gameLocal.GetClientByNum( local->spectator ) : NULL;
+		gameLocal.Printf( "MP_VIEW followView=%d camera=%d vitals=%d context=%d sideA=\"%s\" sideB=\"%s\"\n",
+			g_spectatorFollowView.GetInteger(),
+			followed != NULL ? static_cast<int>( followed->FollowCameraMode() ) : static_cast<int>( local->FollowCameraMode() ),
+			mp.GetClientTeamVitalCount(),
+			local->mphud != NULL ? local->mphud->GetStateInt( "match_context_visible" ) : -1,
+			local->mphud != NULL ? local->mphud->GetStateString( "match_context_readiness" ) : "",
+			local->mphud != NULL ? local->mphud->GetStateString( "match_context_timeouts" ) : "" );
 	}
 	{
 		// The latched modifier layer (mp/Modifiers.h) and what the match is called under it.
@@ -4033,6 +4044,10 @@ static void Cmd_OpenQ4ReportMPState_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "MP_AIR slot=%d reservoir=%d percent=%d serverTime=%d\n", slot,
 			player->GetAirTics(), player->GetAirReadoutPercent(), player->GetAirReadoutServerTime() );
 		if ( gameLocal.isServer && player->spectating ) {
+			// openQ4: the server's record of each spectator's camera and view rights
+			gameLocal.Printf( "MP_SPECTATE slot=%d following=%d autoFollow=%d speed=%d caster=%d\n",
+				slot, player->spectator != slot ? player->spectator : -1, player->GetSpectatorAutoFollow(),
+				static_cast<int>( player->GetSpectatorSpeedScale() * 100.0f + 0.5f ), mp.IsCasualCaster( slot ) );
 			for ( int target = 0; target < gameLocal.numClients && target < MAX_CLIENTS; ++target ) {
 				// Live follow authority belongs to the server. A remote client's
 				// local permission query intentionally cannot grant a camera.
@@ -4254,23 +4269,93 @@ static void Cmd_ScoreboardScroll_f( const idCmdArgs &args ) {
 	gameLocal.mpGame.ScrollScoreboard( atoi( args.Argv( 1 ) ) );
 }
 
+// openQ4: a player this client could ask to follow. The server decides whether
+// it may; this only keeps spectators and empty slots out of names and lists.
+static const idPlayer *FollowListPlayer( int slot ) {
+	if ( slot < 0 || slot >= MAX_CLIENTS || slot >= gameLocal.numClients || gameLocal.entities[ slot ] == NULL ||
+		!gameLocal.entities[ slot ]->IsType( idPlayer::GetClassType() ) ) {
+		return NULL;
+	}
+	const idPlayer *player = static_cast<const idPlayer *>( gameLocal.entities[ slot ] );
+	if ( player == gameLocal.GetLocalPlayer() || player->IsFakeClient() || player->spectating ||
+		!gameLocal.mpGame.IsInGame( slot ) ) {
+		return NULL;
+	}
+	return player;
+}
+
+// The slot a name selects: -1 when nobody matches, -2 when more than one player
+// does. Colours are ignored and an exact name beats a partial one, so "Kane"
+// still reaches Kane while Kaneda plays.
+static int FollowSlotFromName( const char *name ) {
+	idStr wanted = name;
+	wanted.RemoveColors();
+	if ( wanted.Length() == 0 ) {
+		return -1;
+	}
+	int exact = -1, exactCount = 0, partial = -1, partialCount = 0;
+	for ( int slot = 0; slot < MAX_CLIENTS; ++slot ) {
+		if ( FollowListPlayer( slot ) == NULL ) {
+			continue;
+		}
+		idStr playerName = gameLocal.userInfo[ slot ].GetString( "ui_name" );
+		playerName.RemoveColors();
+		if ( !playerName.Icmp( wanted ) ) {
+			exact = slot;
+			++exactCount;
+		} else if ( idStr::FindText( playerName, wanted, false ) >= 0 ) {
+			partial = slot;
+			++partialCount;
+		}
+	}
+	if ( exactCount != 0 ) {
+		return exactCount == 1 ? exact : -2;
+	}
+	return partialCount == 1 ? partial : ( partialCount == 0 ? -1 : -2 );
+}
+
+// Auto-follow modes by their command words, in MP_AUTOTRACK_* order.
+static const char *const followAutoModes[ MP_AUTOTRACK_MODE_COUNT ] = {
+	"off", "killer", "action", "leader", "powerup", "flag"
+};
+
 // Fixed camera verbs and numeric slots keep the reliable request compact and
-// independent of mutable display names. The server revalidates every target.
+// independent of mutable display names: a name is resolved to a slot here, on
+// the client, and the server revalidates every target.
 static void Cmd_Follow_f( const idCmdArgs &args ) {
 	idPlayer::spectatorFollow_t operation = idPlayer::SPECTATOR_FOLLOW_NEXT;
 	int targetSlot = -1;
 	const char *choice = args.Argv( 1 );
+	const char *autoMode = NULL;
 	if ( !idStr::Icmp( args.Argv( 0 ), "follownext" ) && args.Argc() == 1 ) {
 		choice = "next";
 	} else if ( !idStr::Icmp( args.Argv( 0 ), "followprev" ) && args.Argc() == 1 ) {
 		choice = "prev";
 	} else if ( !idStr::Icmp( args.Argv( 0 ), "followfree" ) && args.Argc() == 1 ) {
 		choice = "free";
+	} else if ( !idStr::Icmp( args.Argv( 0 ), "followauto" ) && args.Argc() <= 2 ) {
+		autoMode = args.Argc() == 2 ? args.Argv( 1 ) : "action";
+	} else if ( !idStr::Icmp( args.Argv( 0 ), "follow" ) && args.Argc() == 3 && !idStr::Icmp( choice, "auto" ) ) {
+		autoMode = args.Argv( 2 );
 	} else if ( idStr::Icmp( args.Argv( 0 ), "follow" ) || args.Argc() != 2 ) {
-		common->Printf( "%s\n", common->GetLocalizedString( "#str_42880" ) );
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
 		return;
 	}
-	if ( !idStr::Icmp( choice, "next" ) ) {
+	if ( autoMode == NULL && !idStr::Icmp( choice, "auto" ) ) {
+		autoMode = "action";
+	}
+	if ( autoMode != NULL ) {
+		operation = idPlayer::SPECTATOR_FOLLOW_AUTO;
+		for ( int mode = 0; mode < MP_AUTOTRACK_MODE_COUNT; ++mode ) {
+			if ( !idStr::Icmp( autoMode, followAutoModes[ mode ] ) ) {
+				targetSlot = mode;
+			}
+		}
+		if ( targetSlot < 0 ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
+			return;
+		}
+	} else if ( !idStr::Icmp( choice, "next" ) ) {
 		operation = idPlayer::SPECTATOR_FOLLOW_NEXT;
 	} else if ( !idStr::Icmp( choice, "prev" ) ) {
 		operation = idPlayer::SPECTATOR_FOLLOW_PREV;
@@ -4278,16 +4363,28 @@ static void Cmd_Follow_f( const idCmdArgs &args ) {
 		operation = idPlayer::SPECTATOR_FOLLOW_FREE;
 	} else {
 		operation = idPlayer::SPECTATOR_FOLLOW_PLAYER;
+		bool digits = choice[0] != '\0';
 		targetSlot = 0;
 		for ( int i = 0; choice[i]; ++i ) {
-			if ( choice[i] < '0' || choice[i] > '9' || targetSlot >= MAX_CLIENTS ) {
+			if ( choice[i] < '0' || choice[i] > '9' ) {
+				digits = false;
+				break;
+			}
+			if ( targetSlot >= MAX_CLIENTS ) {
 				targetSlot = -1;
 				break;
 			}
 			targetSlot = targetSlot * 10 + choice[i] - '0';
 		}
-		if ( !choice[0] || targetSlot < 0 || targetSlot >= MAX_CLIENTS ) {
-			common->Printf( "%s\n", common->GetLocalizedString( "#str_42880" ) );
+		if ( !digits ) {
+			// Anything that is not a slot number is a player's name.
+			targetSlot = FollowSlotFromName( choice );
+			if ( targetSlot < 0 ) {
+				common->Printf( "%s\n", common->GetLocalizedString( targetSlot == -2 ? "#str_232208" : "#str_232207" ) );
+				return;
+			}
+		} else if ( targetSlot < 0 || targetSlot >= MAX_CLIENTS ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
 			return;
 		}
 	}
@@ -4297,6 +4394,63 @@ static void Cmd_Follow_f( const idCmdArgs &args ) {
 		return;
 	}
 	player->RequestSpectatorFollow( operation, targetSlot );
+}
+
+// The named list `follow <name>` and `follow <slot>` choose from.
+static void Cmd_FollowList_f( const idCmdArgs &args ) {
+	common->Printf( "%s\n", common->GetLocalizedString( "#str_232209" ) );
+	for ( int slot = 0; slot < MAX_CLIENTS; ++slot ) {
+		const idPlayer *player = FollowListPlayer( slot );
+		if ( player == NULL ) {
+			continue;
+		}
+		const char *team = "";
+		if ( gameLocal.IsTeamGame() ) {
+			team = common->GetLocalizedString( player->team == TEAM_STROGG ? "#str_42632" : "#str_42631" );
+		}
+		common->Printf( "%2d  %s" S_COLOR_DEFAULT "  %s  %d\n", slot,
+			gameLocal.userInfo[ slot ].GetString( "ui_name" ), team, gameLocal.mpGame.GetScore( slot ) );
+	}
+}
+
+// Asks the server for the caster's view of both sides, or gives it up. The
+// server decides (g_casterAccess); the answer arrives as a server notice.
+static void Cmd_Caster_f( const idCmdArgs &args ) {
+	int enabled = -1;
+	if ( args.Argc() == 2 ) {
+		enabled = !idStr::Icmp( args.Argv( 1 ), "on" ) ? 1 : ( !idStr::Icmp( args.Argv( 1 ), "off" ) ? 0 : -1 );
+	}
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( enabled < 0 || player == NULL ) {
+		common->Printf( "%s\n", common->GetLocalizedString( enabled < 0 ? "#str_232214" : "#str_42881" ) );
+		return;
+	}
+	player->RequestSpectatorFollow( idPlayer::SPECTATOR_FOLLOW_CASTER, enabled );
+}
+
+// How a followed player is shown: through their eyes, from behind them, or
+// from a camera the spectator orbits. A presentation choice of this client's;
+// the server sends the same snapshot for all three.
+static void Cmd_FollowView_f( const idCmdArgs &args ) {
+	static const char *const views[] = { "first", "third", "chase" };
+	static const char *const notices[] = { "#str_232210", "#str_232211", "#str_232212" };
+	int view = idMath::ClampInt( 0, 2, g_spectatorFollowView.GetInteger() );
+	if ( args.Argc() == 1 || ( args.Argc() == 2 && !idStr::Icmp( args.Argv( 1 ), "next" ) ) ) {
+		view = ( view + 1 ) % 3;
+	} else {
+		view = -1;
+		for ( int i = 0; i < 3; ++i ) {
+			if ( !idStr::Icmp( args.Argv( 1 ), views[ i ] ) ) {
+				view = i;
+			}
+		}
+		if ( args.Argc() != 2 || view < 0 ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232213" ) );
+			return;
+		}
+	}
+	g_spectatorFollowView.SetInteger( view );
+	common->Printf( "%s\n", common->GetLocalizedString( notices[ view ] ) );
 }
 
 static void Cmd_TestStatusBar_f( const idCmdArgs &args ) {
@@ -4470,7 +4624,11 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "messagemode", idMultiplayerGame::MessageMode_f, CMD_FL_GAME, "open all-player chat" );
 	cmdSystem->AddCommand( "messagemode2", idMultiplayerGame::MessageMode_f, CMD_FL_GAME, "open team chat" );
 	cmdSystem->AddCommand( "say_team", Cmd_SayTeam_f, CMD_FL_GAME, "team text chat" );
-	cmdSystem->AddCommand( "follow", Cmd_Follow_f, CMD_FL_GAME, "spectator camera: follow <next|prev|free|client slot>" );
+	cmdSystem->AddCommand( "follow", Cmd_Follow_f, CMD_FL_GAME, "spectator camera: follow <next|prev|free|client slot|name>, or follow auto <off|killer|action|leader|powerup|flag>" );
+	cmdSystem->AddCommand( "followauto", Cmd_Follow_f, CMD_FL_GAME, "let the server move the camera: followauto <off|killer|action|leader|powerup|flag>" );
+	cmdSystem->AddCommand( "followlist", Cmd_FollowList_f, CMD_FL_GAME, "lists the players a spectator can follow by slot or name" );
+	cmdSystem->AddCommand( "followview", Cmd_FollowView_f, CMD_FL_GAME, "how a followed player is shown: followview <first|third|chase|next>" );
+	cmdSystem->AddCommand( "caster", Cmd_Caster_f, CMD_FL_GAME, "as a spectator, take or give up the caster view of both sides where the server allows it: caster <on|off>" );
 	cmdSystem->AddCommand( "follownext", Cmd_Follow_f, CMD_FL_GAME, "follow the next authorized player" );
 	cmdSystem->AddCommand( "followprev", Cmd_Follow_f, CMD_FL_GAME, "follow the previous authorized player" );
 	cmdSystem->AddCommand( "followfree", Cmd_Follow_f, CMD_FL_GAME, "leave player follow for a free spectator camera" );

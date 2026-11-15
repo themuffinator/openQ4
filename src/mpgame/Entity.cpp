@@ -6642,15 +6642,29 @@ idEntity::ClientSendEvent
 ================
 */
 void idEntity::ClientSendEvent( int eventId, const idBitMsg *msg ) const {
+	// prevent dupe events caused by frame re-runs
+	if ( !gameLocal.isNewFrame ) {
+		return;
+	}
+	ClientSendRequestEvent( eventId, msg );
+}
+
+/*
+================
+idEntity::ClientSendRequestEvent
+
+openQ4: sends the event whatever the prediction pass last left in isNewFrame.
+ClientSendEvent drops events outside a new frame so that a re-run of a frame
+does not repeat what the simulation already sent. A console command or a menu
+button runs between frames and is made once; held to that test it was dropped
+whenever the last pass happened to be a re-run, with nothing said to the player.
+================
+*/
+void idEntity::ClientSendRequestEvent( int eventId, const idBitMsg *msg ) const {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 
 	if ( !gameLocal.isClient ) {
-		return;
-	}
-
-	// prevent dupe events caused by frame re-runs
-	if ( !gameLocal.isNewFrame ) {
 		return;
 	}
 

@@ -237,6 +237,8 @@ idCVar ui_showGun(					"ui_showGun",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_
 idCVar ui_ready(					"ui_ready",				si_readyArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "player is ready to start playing", idCmdSystem::ArgCompletion_String<si_readyArgs> );
 idCVar ui_spectate(					"ui_spectate",		si_spectateArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "play or spectate", idCmdSystem::ArgCompletion_String<si_spectateArgs> );
 idCVar ui_autoJoin(					"ui_autoJoin",				"0",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "automatically join multiplayer servers instead of opening the initial join screen" );
+// openQ4: the free spectator camera is predicted, so both ends read the speed from userinfo
+idCVar ui_spectatorSpeed(			"ui_spectatorSpeed",		"100",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "free spectator camera speed as a percentage of the server's pm_spectatespeed (25 to 300)", 25, 300 );
 idCVar ui_joined(					"ui_joined",				"0",			CVAR_GAME | CVAR_USERINFO | CVAR_BOOL, "internal multiplayer initial join choice state" );
 idCVar ui_chat(						"ui_chat",					"0",			CVAR_GAME | CVAR_USERINFO | CVAR_BOOL | CVAR_ROM | CVAR_CHEAT, "player is chatting" );
 idCVar ui_handicap(					"ui_handicap",				"100",			CVAR_GAME | CVAR_USERINFO | CVAR_INTEGER | CVAR_ARCHIVE, "player damage output handicap" );
@@ -603,6 +605,12 @@ idCVar pm_thirdPersonAngle(			"pm_thirdPersonAngle",		"0",			CVAR_GAME | CVAR_FL
 idCVar pm_thirdPersonClip(			"pm_thirdPersonClip",		"1",			CVAR_GAME | CVAR_BOOL, "clip third person view into world space" );
 idCVar pm_thirdPerson(				"pm_thirdPerson",			"0",			CVAR_GAME | CVAR_BOOL, "enables third person view" );
 idCVar pm_thirdPersonDeath(			"pm_thirdPersonDeath",		"0",			CVAR_GAME | CVAR_BOOL, "enables third person view when player dies" );
+// openQ4: spectator follow views. Presentation only: the server sends a following
+// spectator the same snapshot whichever view draws it.
+idCVar g_spectatorFollowView(		"g_spectatorFollowView",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NOCHEAT, "how a spectator sees the player they follow (0 = first person, 1 = third person, 2 = chase camera steered by the spectator)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar g_chaseCameraRange(			"g_chaseCameraRange",		"96",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NOCHEAT, "distance of the third-person follow, chase and death cameras from the player", 32.0f, 256.0f );
+idCVar g_chaseCameraHeight(			"g_chaseCameraHeight",		"12",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NOCHEAT, "height of the third-person follow, chase and death cameras above the player's eyes", -16.0f, 96.0f );
+idCVar g_deathCamera(				"g_deathCamera",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NOCHEAT, "in multiplayer, watch your own death from the chase camera, facing your killer" );
 idCVar pm_modelView(				"pm_modelView",				"0",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER, "draws camera from POV of player model (1 = always, 2 = when dead)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar pm_airTics(					"pm_air",					"1800",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER, "how many 60Hz frames the player can spend in a vacuum before taking damage" );
 
