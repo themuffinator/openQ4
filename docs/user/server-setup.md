@@ -320,6 +320,14 @@ address to force IPv6.
 | `g_mapPick` | `1` offers three maps to pick from when a match ends (**Not in 0.14.1**) |
 | `g_mapDatabase` | The file that adjusts the map database, `mapdb.txt` by default (**Not in 0.14.1**) |
 | `g_mapCycle` | Map cycle script. In 0.14.1 it runs whenever `si_mapCycle` is empty; after 0.14.1 only with `g_mapRotation 3` |
+| `si_allowVoting`, `si_voteFlags` | `si_allowVoting 1` lets players call votes; `si_voteFlags` is a bit mask of the votes you forbid (type `si_voteFlags` for the bits) |
+| `g_votePercent` | Percentage of the players eligible when a vote starts that must vote yes for it to pass (default 51, a plain majority). **Not in 0.14.1** |
+| `g_voteLimit` | Most votes one player may call on a map; `0` for no limit. **Not in 0.14.1** |
+| `si_spectatorVote` | `1` lets spectators call and cast votes. **Not in 0.14.1** |
+| `si_timeouts`, `si_timeoutLength` | Team timeouts each side may call in a team match (`0` for none) and how long one lasts, in seconds. See [Timeouts on casual servers](competitive-matches.md#timeouts-on-casual-servers). **Not in 0.14.1** |
+| `si_spectatorLock` | During live play, `1` keeps spectators from joining the game until it ends and `2` keeps players from leaving it too. **Not in 0.14.1** |
+| `g_inactivity` | Seconds a playing human may send no input before being moved to spectators (or dropped when `si_spectators` is off); `0` turns it off. **Not in 0.14.1** |
+| `g_pauseOnDisconnect` | Seconds a live team match pauses when a playing human disconnects, so they can reconnect; `0` turns it off. **Not in 0.14.1** |
 
 Bot settings are listed under [Bots](#bots).
 
@@ -478,6 +486,10 @@ queue and the pick are off and a map's `set` lines are not applied.
 | `removebot` | Removes one bot, optionally by name |
 | `kickbots` | Removes every bot |
 | `botlist` | Lists the bots and their characters |
+| `callvote <vote> [value]`, `cv` | Calls a vote; `vote yes` or `vote no` casts yours. The votes are listed under [Voting on casual servers](competitive-matches.md#voting-on-casual-servers). **Not in 0.14.1** |
+| `timeout [marine\|strogg]` | Calls a team timeout; players call one for their own side, the dedicated console names the side. **Not in 0.14.1** |
+| `timein`, `unpause` | Ends the running timeout or pause early. **Not in 0.14.1** |
+| `pause` | Pauses the match with no timeout charged (host, referee or dedicated console); `timein` resumes. **Not in 0.14.1** |
 | `modifier <name> <0\|1>` | Turns `instagib`, `quadhog`, `vampiric` or `frenzy` on or off and restarts the match; alone, it lists them (**Not in 0.14.1**) |
 | `weaponArena <weapon\|none>` | Starts or ends a [weapon arena](#modifiers-and-presets) and restarts the match (**Not in 0.14.1**) |
 | `preset <name>` | Applies a [preset](#presets) and restarts the match (**Not in 0.14.1**) |

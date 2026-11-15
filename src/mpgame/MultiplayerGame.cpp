@@ -8,6 +8,7 @@
 
 #include "Game_local.h"
 #include "mp/Duel.h"
+#include "mp/match/MatchControlLocalization.h"
 #include "mp/Presets.h"
 #include "mp/match/MatchControlProjection.h"
 #include "mp/match/MatchDisclosurePolicy.h"
@@ -359,7 +360,9 @@ static bool IsEligibleVotePlayerSlot( int clientNum ) {
 
 	idPlayer *player = static_cast< idPlayer * >( gameLocal.entities[ clientNum ] );
 	// IsFakeClient identifies the engine's special view entity, not an AI bot.
-	return !player->spectating && !player->wantSpectate && !player->IsFakeClient() &&
+	// si_spectatorVote admits spectators to the electorate; bots never enter it.
+	const bool spectatorVote = gameLocal.serverInfo.GetBool( "si_spectatorVote" );
+	return ( spectatorVote || ( !player->spectating && !player->wantSpectate ) ) && !player->IsFakeClient() &&
 		!botManager.IsBot( clientNum );
 }
 
@@ -1207,6 +1210,8 @@ idMultiplayerGame::idMultiplayerGame() {
 	clientMatchScoreboardProjectedViewRevision = 0;
 	clientMatchOperationResult.Clear();
 	clientMatchOperationResultValid = false;
+	consoleMatchRequestId = 0;
+	consoleMatchCommand.Clear();
 	clientPendingMatchConfirmation.Clear();
 	clientPendingMatchConfirmationValid = false;
 	matchViewRevision = 0;
@@ -1914,6 +1919,7 @@ void idMultiplayerGame::BeginCompetitiveFrame( void ) {
 		return;
 	}
 	InitializeMatchItemTimingObservations();
+	AnnounceCasualPauseTransitions();
 
 	if ( IsGameplayFrozen() ) {
 		RebaseCompetitivePauseFrame( Max( 0, gameLocal.msec ) );
@@ -2244,6 +2250,14 @@ mpMatchViewAllowedOperationMask_t idMultiplayerGame::AllowedMatchOperationsFor(
 	const bool referee = ( state->roles & MPMatchRoleBit( MP_MATCH_ROLE_REFEREE ) ) != 0;
 	const bool competitionContestant = gameLocal.gameType == GAME_DUEL &&
 		ResolveCompetitionSide( participant ) != MP_SERIES_SIDE_NONE;
+	// openQ4 MP-12: a casual side's own timeouts, when the server has a budget.
+	// The TIMEOUT bit follows the side's remaining budget so a console or card
+	// learns of an exhausted budget before it asks; RESUME stays with the side.
+	const bool casualSide = !IsManagedMatch() && gameLocal.IsTeamGame() &&
+		state->active && state->side >= 0 && state->side < MP_MATCH_SIDE_COUNT &&
+		matchSession.GetTimeoutBudget( state->side ).configured > 0;
+	const bool casualSideTimeout = casualSide &&
+		matchSession.GetTimeoutBudget( state->side ).remaining > 0;
 	mpMatchViewAllowedOperationMask_t allowed = 0;
 	for ( int rawOpcode = MP_MATCH_OP_INVALID + 1; rawOpcode < MP_MATCH_OP_COUNT; ++rawOpcode ) {
 		const mpMatchOperationOpcode_t opcode = static_cast<mpMatchOperationOpcode_t>( rawOpcode );
@@ -2270,7 +2284,9 @@ mpMatchViewAllowedOperationMask_t idMultiplayerGame::AllowedMatchOperationsFor(
 			( referee && policy->refereeGrantAllowed ) ||
 			( competitionContestant && ( opcode == MP_MATCH_OP_VETO_SELECT ||
 				opcode == MP_MATCH_OP_FORFEIT || opcode == MP_MATCH_OP_TIMEOUT_REQUEST ||
-				opcode == MP_MATCH_OP_RESUME_REQUEST ) ) ) ) {
+				opcode == MP_MATCH_OP_RESUME_REQUEST ) ) ||
+			( casualSideTimeout && opcode == MP_MATCH_OP_TIMEOUT_REQUEST ) ||
+			( casualSide && opcode == MP_MATCH_OP_RESUME_REQUEST ) ) ) {
 			allowed |= MPMatchViewOperationBit( opcode );
 		}
 	}
@@ -3566,6 +3582,20 @@ bool idMultiplayerGame::StoreClientMatchOperationResult(
 	clientMatchOperationResultValid = true;
 	clientMatchControlError.Clear();
 	clientMatchControlErrorValid = false;
+	// openQ4 MP-12: a request typed at the console gets its answer there;
+	// the Match Control card shows the same result when it is open.
+	if ( consoleMatchRequestId != 0 && result.requestId == consoleMatchRequestId &&
+		result.status != MP_MATCH_RESULT_PENDING ) {
+		if ( result.status == MP_MATCH_RESULT_REJECTED ) {
+			const char *key = result.localizationId != MP_MATCH_LOCALIZATION_NONE ?
+				MPMatchControlLocalizationKey( result.localizationId ) :
+				MPMatchControlProtocolReasonKey( result.reason );
+			gameLocal.Printf( "%s: %s\n", consoleMatchCommand.c_str(),
+				common->GetLocalizedString( key != NULL && key[ 0 ] != '\0' ? key : "#str_42775" ) );
+		}
+		consoleMatchRequestId = 0;
+		consoleMatchCommand.Clear();
+	}
 	return true;
 }
 
@@ -4867,6 +4897,9 @@ void idMultiplayerGame::BuildMatchOperationContext( int clientNum,
 		// The view's veto decision (PublishMatchView) asks the same resolver.
 		context.actorSeriesSide = competitionSide >= 0 &&
 			competitionSide < MP_SERIES_SIDE_COUNT ? competitionSide : MP_SERIES_SIDE_NONE;
+		// openQ4 MP-12: casual team timeouts belong to the side's active humans
+		context.casualSideTimeout = !IsManagedMatch() && state != NULL && state->human &&
+			gameLocal.IsTeamGame();
 	}
 	const mpMatchOperationDescriptor_t *descriptor =
 		MPMatchOperationDescriptor( opcode );
@@ -7311,8 +7344,15 @@ bool idMultiplayerGame::InitializeCompetitiveRules( void ) {
 		imported = imported && draft.SetBool( MP_RULE_FORFEIT_ON_EMPTY_TEAM, false, failure );
 		imported = imported && draft.SetBool( MP_RULE_BUYING_ENABLED,
 			gameLocal.serverInfo.GetBool( "si_isBuyingEnabled" ), failure );
-		imported = imported && draft.SetInteger( MP_RULE_TEAM_TIMEOUT_COUNT, 0, failure );
-		imported = imported && draft.SetInteger( MP_RULE_TEAM_TIMEOUT_SECONDS, 0, failure );
+		// openQ4 MP-12: casual team timeouts (si_timeouts, si_timeoutLength). The
+		// rules core wants the count and the length together, in a mode with sides.
+		const bool casualTimeoutMode = MPGameTypeHasAny( gameLocal.gameType, GTF_TEAM );
+		const int casualTimeouts = casualTimeoutMode ?
+			idMath::ClampInt( 0, 10, gameLocal.serverInfo.GetInt( "si_timeouts" ) ) : 0;
+		const int casualTimeoutSeconds = casualTimeouts > 0 ?
+			idMath::ClampInt( 10, 600, gameLocal.serverInfo.GetInt( "si_timeoutLength" ) ) : 0;
+		imported = imported && draft.SetInteger( MP_RULE_TEAM_TIMEOUT_COUNT, casualTimeouts, failure );
+		imported = imported && draft.SetInteger( MP_RULE_TEAM_TIMEOUT_SECONDS, casualTimeoutSeconds, failure );
 		imported = imported && draft.SetEnum( MP_RULE_TIMEOUT_REQUEST_WINDOW,
 			MP_TIMEOUT_DURING_LIVE_PLAY, failure );
 		imported = imported && draft.SetEnum( MP_RULE_TIMEOUT_RESUME_POLICY,
@@ -10232,6 +10272,10 @@ void idMultiplayerGame::Clear() {
 	votePacked = false;
 	memset( nextVoteAllowedTime, 0, sizeof( nextVoteAllowedTime ) );
 	memset( nextVoteRejectNoticeTime, 0, sizeof( nextVoteRejectNoticeTime ) );
+	memset( votesCalledThisMap, 0, sizeof( votesCalledThisMap ) );
+	announcedPauseState = MP_MATCH_PAUSE_RUNNING;
+	disconnectPauseSide = MP_MATCH_SIDE_NONE;
+	abortCheckAfterPause = false;
 	clientMatchView.Clear();
 	clientMatchViewValid = false;
 	clientMatchControlModel.Clear();
@@ -12857,6 +12901,10 @@ bool idMultiplayerGame::AbortInheritedVoteForManagedMatch( void ) {
 	currentVoteData.m_buying = 0;
 	currentVoteData.m_teamBalance = 0;
 	currentVoteData.m_controlTime = 0;
+	currentVoteData.m_roundLimit = 0;
+	currentVoteData.m_ruleset = 0;
+	currentVoteData.m_instagib = 0;
+	currentVoteData.m_overtime = 0;
 	for ( int i = 0; i < MAX_CLIENTS; ++i ) {
 		playerState[ i ].vote = PLAYER_VOTE_NONE;
 	}
@@ -12916,12 +12964,16 @@ void idMultiplayerGame::CheckVote( void ) {
 		ClientUpdateVote( VOTE_ABORTED, yesVotes, noVotes, currentVoteData );
 		return;
 	}
-	if ( float(yesVotes) / voteEligibleCount > 0.5f ) {
+	// g_votePercent of the frozen electorate must say yes (51 is the inherited
+	// strict majority); the vote fails as soon as the players who have not
+	// voted could no longer carry it, or when its time runs out.
+	const int passPercent = idMath::ClampInt( 1, 100, g_votePercent.GetInteger() );
+	if ( yesVotes * 100 >= voteEligibleCount * passPercent ) {
 		ClientUpdateVote( VOTE_PASSED, yesVotes, noVotes, currentVoteData );
 		voteExecTime = gameLocal.time + 2000;
 		return;
 	}
-	if ( gameLocal.time > voteTimeOut || float(noVotes) / voteEligibleCount >= 0.5f ) {
+	if ( gameLocal.time > voteTimeOut || ( voteEligibleCount - noVotes ) * 100 < voteEligibleCount * passPercent ) {
 		ClientUpdateVote( VOTE_FAILED, yesVotes, noVotes, currentVoteData );
 		vote = VOTE_NONE;
 		return;
@@ -12963,7 +13015,7 @@ void idMultiplayerGame::ClientCallPackedVote( const voteStruct_t &voteData, int 
 	// send 
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CALLPACKEDVOTE );
-	outMsg.WriteShort( voteData.m_fieldFlags );
+	outMsg.WriteLong( voteData.m_fieldFlags );
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_KICK ) ) {
 		outMsg.WriteByte( idMath::ClampChar( voteData.m_kick ) );	
 	}
@@ -12994,6 +13046,18 @@ void idMultiplayerGame::ClientCallPackedVote( const voteStruct_t &voteData, int 
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_CONTROLTIME ) ) {
 		outMsg.WriteShort( idMath::ClampShort( voteData.m_controlTime ) );
 	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_ROUNDLIMIT ) ) {
+		outMsg.WriteShort( idMath::ClampShort( voteData.m_roundLimit ) );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_RULESET ) ) {
+		outMsg.WriteByte( idMath::ClampChar( voteData.m_ruleset ) );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_INSTAGIB ) ) {
+		outMsg.WriteByte( idMath::ClampChar( voteData.m_instagib ) );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
+		outMsg.WriteShort( idMath::ClampShort( voteData.m_overtime ) );
+	}
 	if ( voteData.m_fieldFlags & VOTEFLAG_KICK ) outMsg.WriteLong( kickIdentity );
 	networkSystem->ClientSendReliableMessage( outMsg );
 }
@@ -13009,10 +13073,15 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 
 	assert( -1 != clientNum );
 	if ( !IsEligibleVotePlayerSlot( clientNum ) ) {
+		if ( IsValidVotePlayerSlot( clientNum ) && IsInGame( clientNum ) && !botManager.IsBot( clientNum ) &&
+			!gameLocal.serverInfo.GetBool( "si_spectatorVote" ) ) {
+			// a spectating human: tell them why, once
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42756" );
+		}
 		common->Warning( "Ignoring packed vote from invalid client slot %d", clientNum );
 		return;
 	}
-	if ( !VoteRateLimitAccepted( clientNum ) ) {
+	if ( !VoteRateLimitAccepted( clientNum ) || !VoteLimitAccepted( clientNum ) ) {
 		return;
 	}
 
@@ -13046,7 +13115,7 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 	// Decode the exact shape declared on the wire before applying policy.  If
 	// policy bits were cleared first, their payload bytes remained unread and
 	// every following field was decoded at the wrong offset.
-	const int wireFieldFlags = msg.ReadShort();
+	const int wireFieldFlags = msg.ReadLong();
 	if ( wireFieldFlags <= 0 || ( wireFieldFlags & ~VOTEFLAG_ALL ) != 0 ) {
 		common->Warning( "Ignoring packed vote from client %d with invalid field flags 0x%x", clientNum, wireFieldFlags );
 		return;
@@ -13251,6 +13320,71 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_122017" );
 			validVote = false;
 			voteData.m_fieldFlags &= ( ~VOTEFLAG_CONTROLTIME );
+		}
+	}
+
+	// openQ4 MP-12: the casual callvote fields, in wire order
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_ROUNDLIMIT ) ) {
+		voteData.m_roundLimit = msg.ReadShort();
+		if ( voteData.m_roundLimit < si_roundLimit.GetMinValue() || voteData.m_roundLimit > si_roundLimit.GetMaxValue() ) {
+			common->DPrintf( "client %d: roundlimit value out of range for vote: %d\n", clientNum, voteData.m_roundLimit );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_ROUNDLIMIT );
+		} else if ( voteData.m_roundLimit == si_roundLimit.GetInteger() ) {
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42752" );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_ROUNDLIMIT );
+		}
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_RULESET ) ) {
+		voteData.m_ruleset = msg.ReadByte();
+		if ( voteData.m_ruleset < 0 || voteData.m_ruleset > 1 ) {
+			common->DPrintf( "client %d: invalid ruleset vote value %d\n", clientNum, voteData.m_ruleset );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_RULESET );
+		} else if ( voteData.m_ruleset == si_ruleset.GetInteger() ) {
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42752" );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_RULESET );
+		}
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_INSTAGIB ) ) {
+		voteData.m_instagib = msg.ReadByte();
+		if ( voteData.m_instagib < 0 || voteData.m_instagib > 1 ) {
+			common->DPrintf( "client %d: invalid instagib vote value %d\n", clientNum, voteData.m_instagib );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_INSTAGIB );
+		} else if ( ( voteData.m_instagib != 0 ) == si_instagib.GetBool() ) {
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42752" );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_INSTAGIB );
+		}
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
+		voteData.m_overtime = msg.ReadShort();
+		if ( voteData.m_overtime < si_overtime.GetMinValue() || voteData.m_overtime > si_overtime.GetMaxValue() ) {
+			common->DPrintf( "client %d: overtime value out of range for vote: %d\n", clientNum, voteData.m_overtime );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_OVERTIME );
+		} else if ( voteData.m_overtime == si_overtime.GetInteger() ) {
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42752" );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_OVERTIME );
+		}
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_READYALL ) && !VoteReadyAllAvailable() ) {
+		// only a warmup that waits for ready players has anyone to force
+		gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42753" );
+		validVote = false;
+		voteData.m_fieldFlags &= ( ~VOTEFLAG_READYALL );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_RANDOMMAP ) ) {
+		// the draw happens when the vote passes; refuse now if nothing could be drawn
+		idStr candidate;
+		if ( !PickRandomMap( si_gameType.GetString(), candidate ) ) {
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42754" );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~VOTEFLAG_RANDOMMAP );
 		}
 	}
 
@@ -13529,6 +13663,20 @@ void idMultiplayerGame::ClientStartPackedVote( int clientNum, const voteStruct_t
 			}
 		}
 
+		// openQ4 MP-12: the casual callvote rows, in the words the Vote page uses
+		idStrList casualLines;
+		CasualVoteLines( currentVoteData, casualLines );
+		for ( int casualLine = 0; casualLine < casualLines.Num(); casualLine++ ) {
+			mpHud->SetStateString( va( "voteInfo_%d", voteLineCount ), casualLines[ casualLine ].c_str() );
+			mainGui->SetStateString( va( "voteData_item_%d", menuVoteLineCount ), casualLines[ casualLine ].c_str() );
+			voteLineCount++;
+			menuVoteLineCount++;
+			if( voteLineCount == 7)	{
+				voteLineCount = 6;
+				maxWindows = true;
+			}
+		}
+
 		//jshep: max of 7 windows and the 7th is always "..."
 		if( maxWindows )	{
 			mpHud->SetStateString( "voteInfo_7", "..." );
@@ -13589,7 +13737,7 @@ void idMultiplayerGame::ServerStartPackedVote( int clientNum, const voteStruct_t
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_STARTPACKEDVOTE );
 	outMsg.WriteByte( clientNum );
-	outMsg.WriteShort( voteData.m_fieldFlags );
+	outMsg.WriteLong( voteData.m_fieldFlags );
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_KICK ) ) {
 		outMsg.WriteByte( idMath::ClampChar( voteData.m_kick ) );
 	}
@@ -13619,6 +13767,18 @@ void idMultiplayerGame::ServerStartPackedVote( int clientNum, const voteStruct_t
 	}
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_CONTROLTIME ) ) {
 		outMsg.WriteShort( idMath::ClampShort( voteData.m_controlTime ) );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_ROUNDLIMIT ) ) {
+		outMsg.WriteShort( idMath::ClampShort( voteData.m_roundLimit ) );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_RULESET ) ) {
+		outMsg.WriteByte( idMath::ClampChar( voteData.m_ruleset ) );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_INSTAGIB ) ) {
+		outMsg.WriteByte( idMath::ClampChar( voteData.m_instagib ) );
+	}
+	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
+		outMsg.WriteShort( idMath::ClampShort( voteData.m_overtime ) );
 	}
 	networkSystem->ServerSendReliableMessage( -1, outMsg );
 }
@@ -13715,12 +13875,57 @@ void idMultiplayerGame::ExecutePackedVote( void ) {
 		si_fragLimit.SetInteger( currentVoteData.m_fragLimit );
 		needRescanSI = true;
 	}
+	// openQ4 MP-12: the casual callvote outcomes
+	bool needServerNextMap = false;
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_ROUNDLIMIT ) ) {
+		si_roundLimit.SetInteger( currentVoteData.m_roundLimit );
+		needRescanSI = true;
+	}
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
+		si_overtime.SetInteger( currentVoteData.m_overtime );
+		needRescanSI = true;
+	}
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_INSTAGIB ) ) {
+		// the rescan publishes it; the modifier change check in Run restarts the match on every peer at once
+		si_instagib.SetBool( currentVoteData.m_instagib != 0 );
+		needRescanSI = true;
+	}
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_RULESET ) ) {
+		// si_ruleset is a full-restart key: the overlay only applies on a map load
+		si_ruleset.SetInteger( currentVoteData.m_ruleset );
+		needRescanSI = true;
+		needRestart = true;
+	}
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_READYALL ) ) {
+		if ( VoteReadyAllAvailable() ) {
+			ForceReady();
+		}
+	}
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_COINTOSS ) ) {
+		gameLocal.ServerSendChatMessage( -1, "server", gameLocal.random.RandomInt( 2 ) ? "#str_42768" : "#str_42769" );
+	}
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_RANDOMMAP ) ) {
+		idStr drawn;
+		if ( PickRandomMap( si_gameType.GetString(), drawn ) ) {
+			si_map.SetString( drawn.c_str() );
+			needNextMap = true;
+		} else {
+			gameLocal.Warning( "random map vote passed but no other map supports %s", si_gameType.GetString() );
+		}
+	}
+	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_NEXTMAP ) ) {
+		needServerNextMap = true;
+	}
 
 	if ( needRescanSI ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "rescanSI" " " __FILE__ " " __LINESTR__ );
 	}
 
-	if ( needNextMap ) {
+	if ( needServerNextMap ) {
+		// the map cycle decides where to go; a drawn or chosen map in the same ballot gives way to it
+		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "serverNextMap\n" );
+	}
+	else if ( needNextMap ) {
 		gameLocal.sessionCommand = "nextMap";
 	}
 	else if ( needRestart || gameLocal.NeedRestart() ) {
@@ -18313,6 +18518,82 @@ void idMultiplayerGame::RetainedVoteLines( const voteStruct_t &data, idStrList &
 	if ( data.m_fieldFlags & VOTEFLAG_FRAGLIMIT ) {
 		lines.Append( va( common->GetLocalizedString( "#str_104434" ), data.m_fragLimit ) );
 	}
+	CasualVoteLines( data, lines );
+}
+
+/*
+================
+idMultiplayerGame::CasualVoteLines
+
+openQ4 MP-12: one line for each casual callvote field, shared by the HUD
+notice, the stock vote menu and the retained Vote page.
+================
+*/
+void idMultiplayerGame::CasualVoteLines( const voteStruct_t &data, idStrList &lines ) const {
+	const char *yes = common->GetLocalizedString( "#str_104341" ), *no = common->GetLocalizedString( "#str_104342" );
+	if ( data.m_fieldFlags & VOTEFLAG_NEXTMAP ) {
+		lines.Append( common->GetLocalizedString( "#str_42757" ) );
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_ROUNDLIMIT ) {
+		lines.Append( va( common->GetLocalizedString( "#str_42758" ), data.m_roundLimit ) );
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_RULESET ) {
+		lines.Append( va( common->GetLocalizedString( "#str_42759" ),
+			common->GetLocalizedString( data.m_ruleset ? "#str_42761" : "#str_42760" ) ) );
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_INSTAGIB ) {
+		lines.Append( va( common->GetLocalizedString( "#str_42762" ), data.m_instagib ? yes : no ) );
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_OVERTIME ) {
+		if ( data.m_overtime > 0 ) {
+			lines.Append( va( common->GetLocalizedString( "#str_42763" ), data.m_overtime ) );
+		} else {
+			lines.Append( common->GetLocalizedString( "#str_42764" ) );
+		}
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_COINTOSS ) {
+		lines.Append( common->GetLocalizedString( "#str_42765" ) );
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_RANDOMMAP ) {
+		lines.Append( common->GetLocalizedString( "#str_42766" ) );
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_READYALL ) {
+		lines.Append( common->GetLocalizedString( "#str_42767" ) );
+	}
+}
+
+/*
+================
+idMultiplayerGame::VoteReadyAllAvailable
+
+A ready-all vote has someone to force only during a warmup that waits for
+players to ready up.
+================
+*/
+bool idMultiplayerGame::VoteReadyAllAvailable( void ) const {
+	return gameState != NULL && gameState->GetMPGameState() == WARMUP &&
+		gameLocal.serverInfo.GetBool( "si_warmup" ) && gameLocal.serverInfo.GetBool( "si_useReady" );
+}
+
+/*
+================
+idMultiplayerGame::VoteLimitAccepted
+
+g_voteLimit caps the votes one connection may start on a map; the count is
+stamped when a vote actually starts and cleared with the connection.
+================
+*/
+bool idMultiplayerGame::VoteLimitAccepted( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return false;
+	}
+	const int limit = g_voteLimit.GetInteger();
+	if ( limit <= 0 || votesCalledThisMap[ clientNum ] < limit ) {
+		return true;
+	}
+	gameLocal.ServerSendChatMessage( clientNum, "server", "#str_42755" );
+	common->DPrintf( "client %d: called vote past g_voteLimit %d - ignored\n", clientNum, limit );
+	return false;
 }
 
 /*
@@ -23571,6 +23852,245 @@ void idMultiplayerGame::SeriesBind_f( const idCmdArgs &args ) {
 
 /*
 ================
+idMultiplayerGame::AnnounceCasualPauseTransitions
+
+openQ4 MP-12: a managed match shows its pause on the Match Control card. A
+casual server tells everyone in the centre of the screen instead: who called
+the timeout, that play resumes, and when it has.
+================
+*/
+void idMultiplayerGame::AnnounceCasualPauseTransitions( void ) {
+	const mpMatchPauseView &pause = matchSession.GetPause();
+	if ( pause.state == announcedPauseState ) {
+		return;
+	}
+	const mpMatchPauseState_t previous = announcedPauseState;
+	announcedPauseState = pause.state;
+	if ( pause.state == MP_MATCH_PAUSE_RUNNING && abortCheckAfterPause ) {
+		// the disconnect pause is over: did anyone come back?
+		abortCheckAfterPause = false;
+		disconnectPauseSide = MP_MATCH_SIDE_NONE;
+		CheckAbortGame();
+	}
+	if ( IsManagedMatch() ) {
+		return;
+	}
+	switch ( pause.state ) {
+		case MP_MATCH_PAUSED:
+			if ( pause.kind == MP_MATCH_PAUSE_KIND_TEAM_TIMEOUT &&
+				pause.ownerSide >= 0 && pause.ownerSide < TEAM_MAX ) {
+				CenterPrint( -1, "#str_42770", CPARM_TEAM, pause.ownerSide );
+			} else if ( pause.kind == MP_MATCH_PAUSE_KIND_TECHNICAL &&
+				pause.reason == MP_MATCH_PAUSE_REASON_PLAYER_DISCONNECT &&
+				disconnectPauseSide >= 0 && disconnectPauseSide < TEAM_MAX ) {
+				CenterPrint( -1, "#str_42780", CPARM_TEAM, disconnectPauseSide );
+			} else {
+				CenterPrint( -1, "#str_42771" );
+			}
+			break;
+		case MP_MATCH_RESUME_COUNTDOWN:
+			CenterPrint( -1, "#str_42772", CPARM_INT, ( matchSession.GetResumeCountdownMsec() + 999 ) / 1000 );
+			break;
+		case MP_MATCH_PAUSE_RUNNING:
+			// a request that never took hold is not a resumption
+			if ( previous != MP_MATCH_PAUSE_PENDING ) {
+				CenterPrint( -1, "#str_42773" );
+			}
+			break;
+		default:
+			break;
+	}
+}
+
+/*
+================
+idMultiplayerGame::BeginDisconnectPause
+
+openQ4 MP-12: g_pauseOnDisconnect. When a playing human leaves a live casual
+team match, pause it for that many seconds so they can reconnect or a
+replacement can join, instead of forfeiting an emptied side at once. The
+pause is technical (no side budget) and expires on its own; the abort check
+that normally follows a disconnect runs when play resumes.
+================
+*/
+bool idMultiplayerGame::BeginDisconnectPause( bool playingHuman, int side ) {
+	const int seconds = g_pauseOnDisconnect.GetInteger();
+	if ( seconds <= 0 || !gameLocal.isServer || !matchSessionOperational || IsManagedMatch() ||
+		!gameLocal.IsTeamGame() || !playingHuman || side < 0 || side >= MP_MATCH_SIDE_COUNT ||
+		gameState == NULL ) {
+		return false;
+	}
+	const mpGameState_t state = gameState->GetMPGameState();
+	if ( state != GAMEON && state != SUDDENDEATH ) {
+		return false;
+	}
+	if ( matchSession.GetPause().state != MP_MATCH_PAUSE_RUNNING ) {
+		return false;
+	}
+	const mpMatchMutationResult result = matchSession.RequestTechnicalPause(
+		MP_MATCH_PAUSE_REASON_PLAYER_DISCONNECT, matchSession.GetSessionRevision(), seconds * 1000 );
+	if ( !result.WasApplied() ) {
+		return false;
+	}
+	disconnectPauseSide = side;
+	abortCheckAfterPause = true;
+	return true;
+}
+
+/*
+================
+idMultiplayerGame::RebaseClientPauseClock
+
+The server moves its match clock origin along with every frozen frame
+(RebaseCompetitivePauseFrame). The client's HUD measures from its own copy of
+that origin, which only the start state ever sent, so a pause read as time
+lost from the clock until the map changed. Move it with the frozen frame.
+================
+*/
+void idMultiplayerGame::RebaseClientPauseClock( int deltaMsec ) {
+	if ( !gameLocal.isClient || deltaMsec <= 0 ) {
+		return;
+	}
+	ShiftCompetitiveDeadline( matchStartedTime, deltaMsec );
+}
+
+/*
+================
+MPConsoleTeamTarget
+
+The side a console timeout is for: the local player's own team on a client or
+listen server, a named side on a dedicated console.
+================
+*/
+static bool MPConsoleTeamTarget( const char *sideName, mpMatchOperationRequest_t &request ) {
+	int side = -1;
+	if ( gameLocal.isClient || gameLocal.isListenServer ) {
+		idPlayer *player = gameLocal.GetLocalPlayer();
+		if ( player == NULL || player->spectating ) {
+			return false;
+		}
+		side = player->team;
+	} else if ( idStr::Icmp( sideName, "marine" ) == 0 || idStr::Cmp( sideName, "0" ) == 0 ) {
+		side = 0;
+	} else if ( idStr::Icmp( sideName, "strogg" ) == 0 || idStr::Cmp( sideName, "1" ) == 0 ) {
+		side = 1;
+	}
+	if ( side != 0 && side != 1 ) {
+		return false;
+	}
+	request.hasTeamTarget = true;
+	request.teamTarget = side == 0 ? MP_MATCH_TEAM_MARINE : MP_MATCH_TEAM_STROGG;
+	return true;
+}
+
+/*
+================
+idMultiplayerGame::SubmitConsoleMatchOperation
+
+A client or listen host submits through its accepted match view; a dedicated
+console is the trusted local operator.
+================
+*/
+bool idMultiplayerGame::SubmitConsoleMatchOperation( mpMatchOperationRequest_t &request, const char *command ) {
+	mpOperationExecutionResult_t execution;
+	const bool viaView = gameLocal.isClient || gameLocal.isListenServer;
+	bool submitted = false;
+	if ( viaView ) {
+		// The accepted view already says what this end may ask for; a request the
+		// server would refuse is answered here, since the server's refusal only
+		// reaches the Match Control card.
+		idMultiplayerGame &mp = gameLocal.mpGame;
+		if ( gameLocal.isServer ) {
+			mp.RefreshLocalClientMatchView();
+		}
+		const bool allowed = mp.clientMatchViewValid &&
+			( mp.clientMatchView.publicState.allowedOperations & MPMatchViewOperationBit( request.opcode ) ) != 0;
+		// An unbound request takes the next request id; a listen host's answer
+		// arrives inside the submit, so the command is registered before it.
+		mp.consoleMatchRequestId = allowed ? mp.nextClientMatchRequestId + 1 : 0;
+		mp.consoleMatchCommand = allowed ? command : "";
+		submitted = allowed && mp.SubmitMatchOperation( request );
+		if ( !submitted || ( mp.consoleMatchRequestId != 0 && request.requestId != mp.consoleMatchRequestId ) ) {
+			mp.consoleMatchRequestId = 0;
+			mp.consoleMatchCommand.Clear();
+		}
+	} else {
+		submitted = gameLocal.mpGame.ExecuteTrustedLocalMatchOperation( request, execution );
+	}
+	if ( !submitted ) {
+		gameLocal.Printf( "%s: %s%s\n", command, common->GetLocalizedString( "#str_42775" ),
+			viaView ? "" : va( " (reason %d)", execution.reason ) );
+	}
+	return submitted;
+}
+
+/*
+================
+idMultiplayerGame::Timeout_f
+
+openQ4 MP-12: timeout [marine|strogg]. A player calls one for their own team;
+a dedicated console names the side. The budget is si_timeouts on a casual
+server or the profile's in a managed match.
+================
+*/
+void idMultiplayerGame::Timeout_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer ) {
+		gameLocal.Printf( "timeout: multiplayer only\n" );
+		return;
+	}
+	mpMatchOperationRequest_t request;
+	request.Clear();
+	request.opcode = MP_MATCH_OP_TIMEOUT_REQUEST;
+	if ( !gameLocal.IsTeamGame() || !MPConsoleTeamTarget( args.Argv( 1 ), request ) ) {
+		gameLocal.Printf( "%s\n", common->GetLocalizedString( "#str_42774" ) );
+		return;
+	}
+	SubmitConsoleMatchOperation( request, "timeout" );
+}
+
+/*
+================
+idMultiplayerGame::TimeIn_f
+
+timein / unpause: end the running pause early. The side that called a timeout
+may end it; the host, a referee or the dedicated console ends any pause.
+================
+*/
+void idMultiplayerGame::TimeIn_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer ) {
+		gameLocal.Printf( "timein: multiplayer only\n" );
+		return;
+	}
+	mpMatchOperationRequest_t request;
+	request.Clear();
+	request.opcode = MP_MATCH_OP_RESUME_REQUEST;
+	SubmitConsoleMatchOperation( request, args.Argv( 0 ) );
+}
+
+/*
+================
+idMultiplayerGame::Pause_f
+
+pause: a technical pause with no budget, for the host, a signed-in referee or
+the dedicated console. It ends with timein.
+================
+*/
+void idMultiplayerGame::Pause_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer ) {
+		gameLocal.Printf( "pause: multiplayer only\n" );
+		return;
+	}
+	mpMatchOperationRequest_t request;
+	request.Clear();
+	request.opcode = MP_MATCH_OP_TECH_PAUSE_REQUEST;
+	request.argumentCount = 1;
+	request.arguments[ 0 ].fieldId = MP_MATCH_ARG_REASON;
+	request.arguments[ 0 ].value.SetString( "console_pause" );
+	SubmitConsoleMatchOperation( request, "pause" );
+}
+
+/*
+================
 idMultiplayerGame::Broadcaster_f
 
 Trusted-local operator adapter for dedicated servers.  It shares the pure
@@ -23975,9 +24495,77 @@ void idMultiplayerGame::CallVote_f( const idCmdArgs &args ) {
 		}
 		voteData.m_fieldFlags |= VOTEFLAG_CONTROLTIME;
 		voteData.m_controlTime = parsedValue;
+	// openQ4 MP-12: the rest of the callvote surface
+	} else if ( 0 == idStr::Icmp( szArg1, "nextmap" ) ) {
+		voteData.m_fieldFlags |= VOTEFLAG_NEXTMAP;
+	} else if ( 0 == idStr::Icmp( szArg1, "shuffle" ) ) {
+		voteData.m_fieldFlags |= VOTEFLAG_SHUFFLE;
+	} else if ( 0 == idStr::Icmp( szArg1, "balance" ) ) {
+		if ( !ParseVoteIntegerRange( szArg2, 0, 1, parsedValue ) ) {
+			common->Printf( "%s", common->GetLocalizedString( "#str_104416" ) );
+			return;
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_TEAMBALANCE;
+		voteData.m_teamBalance = parsedValue;
+	} else if ( 0 == idStr::Icmp( szArg1, "scorelimit" ) ) {
+		// the limit the current game type scores by
+		if ( MPGameTypeHasAny( gameLocal.gameType, GTF_CAPTURELIMIT ) ) {
+			if ( !ParseVoteIntegerRange( szArg2, ( int )si_captureLimit.GetMinValue(), Min( ( int )si_captureLimit.GetMaxValue(), 32767 ), parsedValue ) ) {
+				common->Printf( "%s", common->GetLocalizedString( "#str_104415" ) );
+				return;
+			}
+			voteData.m_fieldFlags |= VOTEFLAG_CAPTURELIMIT;
+			voteData.m_captureLimit = parsedValue;
+		} else {
+			if ( !ParseVoteIntegerRange( szArg2, ( int )si_fragLimit.GetMinValue(), Min( ( int )si_fragLimit.GetMaxValue(), 32767 ), parsedValue ) ) {
+				common->Printf( "%s", common->GetLocalizedString( "#str_104407" ) );
+				return;
+			}
+			voteData.m_fieldFlags |= VOTEFLAG_FRAGLIMIT;
+			voteData.m_fragLimit = parsedValue;
+		}
+	} else if ( 0 == idStr::Icmp( szArg1, "roundlimit" ) ) {
+		if ( !ParseVoteIntegerRange( szArg2, ( int )si_roundLimit.GetMinValue(), Min( ( int )si_roundLimit.GetMaxValue(), 32767 ), parsedValue ) ) {
+			common->Printf( "%s", common->GetLocalizedString( "#str_42751" ) );
+			return;
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_ROUNDLIMIT;
+		voteData.m_roundLimit = parsedValue;
+	} else if ( 0 == idStr::Icmp( szArg1, "ruleset" ) ) {
+		if ( 0 == idStr::Icmp( szArg2, "classic" ) ) {
+			parsedValue = 1;
+		} else if ( 0 == idStr::Icmp( szArg2, "q4" ) || 0 == idStr::Icmp( szArg2, "quake4" ) || 0 == idStr::Icmp( szArg2, "stock" ) ) {
+			parsedValue = 0;
+		} else if ( !ParseVoteIntegerRange( szArg2, 0, 1, parsedValue ) ) {
+			common->Printf( "%s", common->GetLocalizedString( "#str_42751" ) );
+			return;
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_RULESET;
+		voteData.m_ruleset = parsedValue;
+	} else if ( 0 == idStr::Icmp( szArg1, "instagib" ) ) {
+		if ( !ParseVoteIntegerRange( szArg2, 0, 1, parsedValue ) ) {
+			common->Printf( "%s", common->GetLocalizedString( "#str_42751" ) );
+			return;
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_INSTAGIB;
+		voteData.m_instagib = parsedValue;
+	} else if ( 0 == idStr::Icmp( szArg1, "overtime" ) ) {
+		if ( !ParseVoteIntegerRange( szArg2, ( int )si_overtime.GetMinValue(), Min( ( int )si_overtime.GetMaxValue(), 32767 ), parsedValue ) ) {
+			common->Printf( "%s", common->GetLocalizedString( "#str_42751" ) );
+			return;
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_OVERTIME;
+		voteData.m_overtime = parsedValue;
+	} else if ( 0 == idStr::Icmp( szArg1, "cointoss" ) || 0 == idStr::Icmp( szArg1, "coinflip" ) ) {
+		voteData.m_fieldFlags |= VOTEFLAG_COINTOSS;
+	} else if ( 0 == idStr::Icmp( szArg1, "random" ) || 0 == idStr::Icmp( szArg1, "randommap" ) ) {
+		voteData.m_fieldFlags |= VOTEFLAG_RANDOMMAP;
+	} else if ( 0 == idStr::Icmp( szArg1, "readyall" ) ) {
+		voteData.m_fieldFlags |= VOTEFLAG_READYALL;
 	} else {
 		common->Printf( "%s", common->GetLocalizedString( "#str_104404" ) );
 		common->Printf( "%s", common->GetLocalizedString( "#str_104405" ) );
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_42751" ) );
 		return;
 	}
 
@@ -24165,6 +24753,10 @@ void idMultiplayerGame::StampVoteRateLimit( int clientNum ) {
 	}
 	nextVoteAllowedTime[ clientNum ] = voteTimeOut > 0x7fffffff - VOTE_CALL_COOLDOWN_TIME ?
 		0x7fffffff : voteTimeOut + VOTE_CALL_COOLDOWN_TIME;
+	// the g_voteLimit count: a vote that started, whether or not it passes
+	if ( votesCalledThisMap[ clientNum ] < 0x7fffffff ) {
+		votesCalledThisMap[ clientNum ]++;
+	}
 }
 
 /*
@@ -24178,6 +24770,7 @@ void idMultiplayerGame::ResetVoteCooldownSlot( int clientNum ) {
 	}
 	nextVoteAllowedTime[ clientNum ] = 0;
 	nextVoteRejectNoticeTime[ clientNum ] = 0;
+	votesCalledThisMap[ clientNum ] = 0;
 }
 
 /*
@@ -24294,7 +24887,7 @@ void idMultiplayerGame::ClientUpdateVote( vote_result_t status, int yesCount, in
 			outMsg.WriteByte( 0 );
 		} else {
 			outMsg.WriteByte( 1 );
-			outMsg.WriteShort( voteData.m_fieldFlags );
+			outMsg.WriteLong( voteData.m_fieldFlags );
 			outMsg.WriteByte( idMath::ClampChar( voteData.m_kick ) );
 			outMsg.WriteString( voteData.m_map.c_str() );
 			outMsg.WriteByte( idMath::ClampChar( voteData.m_gameType ) );
@@ -24305,6 +24898,10 @@ void idMultiplayerGame::ClientUpdateVote( vote_result_t status, int yesCount, in
 			outMsg.WriteByte( idMath::ClampInt( BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, voteData.m_buying ) );
 			outMsg.WriteByte( idMath::ClampChar( voteData.m_teamBalance ) );
 			outMsg.WriteShort( idMath::ClampShort( voteData.m_controlTime ) );
+			outMsg.WriteShort( idMath::ClampShort( voteData.m_roundLimit ) );
+			outMsg.WriteByte( idMath::ClampChar( voteData.m_ruleset ) );
+			outMsg.WriteByte( idMath::ClampChar( voteData.m_instagib ) );
+			outMsg.WriteShort( idMath::ClampShort( voteData.m_overtime ) );
 		}
 		networkSystem->ServerSendReliableMessage( -1, outMsg );
 	} else {
@@ -24747,6 +25344,7 @@ void idMultiplayerGame::DisconnectClient( int clientNum ) {
 	mpParticipantId disconnectedParticipant = mpParticipantId::Invalid();
 	int disconnectedGameSide = MP_MATCH_SIDE_NONE;
 	int disconnectedCompetitionSide = MP_SERIES_SIDE_NONE;
+	bool disconnectedPlayingHuman = false;
 	if ( gameLocal.isServer && matchSessionOperational &&
 		clientNum >= 0 && clientNum < MAX_CLIENTS &&
 		matchSession.GetSlotGeneration( clientNum, matchSlotGeneration ) ) {
@@ -24756,6 +25354,7 @@ void idMultiplayerGame::DisconnectClient( int clientNum ) {
 			matchSession.FindParticipant( disconnectedParticipant );
 		if ( disconnectedState != NULL ) {
 			disconnectedGameSide = disconnectedState->side;
+			disconnectedPlayingHuman = disconnectedState->human && disconnectedState->active;
 		}
 		disconnectedCompetitionSide = ResolveCompetitionSide(
 			disconnectedParticipant );
@@ -24808,8 +25407,12 @@ void idMultiplayerGame::DisconnectClient( int clientNum ) {
 	delete gameLocal.entities[ clientNum ];
 
 	UpdatePlayerRanks();
-	CheckAbortGame( disconnectedParticipant, disconnectedGameSide,
-		disconnectedCompetitionSide );
+	// openQ4 MP-12: g_pauseOnDisconnect holds a live casual team match while the
+	// player reconnects; the abort check runs when the pause ends
+	if ( !BeginDisconnectPause( disconnectedPlayingHuman, disconnectedGameSide ) ) {
+		CheckAbortGame( disconnectedParticipant, disconnectedGameSide,
+			disconnectedCompetitionSide );
+	}
 
 	if ( clientNum >= 0 && clientNum < 32 ) {
 		privatePlayers &= ~( 1u << clientNum );
@@ -25444,6 +26047,14 @@ void idMultiplayerGame::ToggleSpectate( void ) {
 
  	spectating = ( idStr::Icmp( cvarSystem->GetCVarString( "ui_spectate" ), "Spectate" ) == 0 );
  	if ( spectating ) {
+ 		// openQ4 MP-12: si_spectatorLock keeps spectators out of live play
+ 		const mpGameState_t liveState = gameLocal.mpGame.GetGameState() != NULL ?
+ 			gameLocal.mpGame.GetGameState()->GetMPGameState() : INACTIVE;
+ 		if ( gameLocal.serverInfo.GetInt( "si_spectatorLock" ) >= 1 &&
+ 			( liveState == GAMEON || liveState == SUDDENDEATH ) ) {
+ 			gameLocal.mpGame.AddChatLine( "%s", common->GetLocalizedString( "#str_42776" ) );
+ 			return;
+ 		}
  		// always allow toggling to play
  		cvarSystem->SetCVarString( "ui_spectate", "Play" );
  	} else {
@@ -27370,6 +27981,42 @@ int idMultiplayerGame::GetTeamsTotalScore( int i ) {
 
 	return total;
 
+}
+
+/*
+===============
+idMultiplayerGame::PickRandomMap
+
+openQ4 MP-12: a random installed map, other than the current one, that the
+map database offers to votes for the game type. False when there is none.
+===============
+*/
+bool idMultiplayerGame::PickRandomMap( const char *gameType, idStr &mapName ) const {
+	mapName.Clear();
+	const mpGameTypeInfo_t *info = MPGameTypeByName( gameType );
+	if ( info == NULL ) {
+		return false;
+	}
+	char current[ MP_MAPDB_TOKEN_BYTES ];
+	if ( !mpMapDatabase::NormalizeToken( si_map.GetString(), current ) ) {
+		current[ 0 ] = '\0';
+	}
+	const mpMapDatabase &database = mpMapHost.Database();
+	int indices[ MP_MAPDB_MAX_MAPS ];
+	const int count = database.Collect( info->type, MP_MAPDB_VOTE, indices, MP_MAPDB_MAX_MAPS );
+	idStrList candidates;
+	for ( int i = 0; i < count; i++ ) {
+		const mpMapEntry *entry = database.Entry( indices[ i ] );
+		if ( entry == NULL || idStr::Icmp( entry->token, current ) == 0 ) {
+			continue;
+		}
+		candidates.Append( entry->token );
+	}
+	if ( candidates.Num() == 0 ) {
+		return false;
+	}
+	mapName = candidates[ gameLocal.random.RandomInt( candidates.Num() ) ];
+	return true;
 }
 
 /*

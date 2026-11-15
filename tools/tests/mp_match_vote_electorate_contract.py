@@ -37,7 +37,9 @@ enum { VOTE_RESET, VOTE_ABORTED, VOTE_PASSED, VOTE_FAILED, VOTE_UPDATE };
 enum { GAME_RELIABLE_MESSAGE_STARTPACKEDVOTE, GAME_RELIABLE_MESSAGE_CASTVOTE, MP_RULE_MANAGED_MATCH };
 enum { VOTEFLAG_KICK=1, VOTEFLAG_MAP=2, VOTEFLAG_GAMETYPE=4, VOTEFLAG_TIMELIMIT=8,
        VOTEFLAG_FRAGLIMIT=16, VOTEFLAG_TOURNEYLIMIT=32, VOTEFLAG_CAPTURELIMIT=64,
-       VOTEFLAG_BUYING=128, VOTEFLAG_TEAMBALANCE=256, VOTEFLAG_CONTROLTIME=512 };
+       VOTEFLAG_BUYING=128, VOTEFLAG_TEAMBALANCE=256, VOTEFLAG_CONTROLTIME=512,
+       VOTEFLAG_ROUNDLIMIT=1024, VOTEFLAG_RULESET=2048, VOTEFLAG_INSTAGIB=4096, VOTEFLAG_OVERTIME=8192 };
+struct { int value = 51; int GetInteger() const { return value; } } g_votePercent;
 struct idEntity { bool player = false; int identity = 1; bool IsType(int) const { return player; } };
 struct idPlayer : idEntity {
     idPlayer() { player = true; }
@@ -47,7 +49,7 @@ struct idPlayer : idEntity {
 };
 struct Bots { bool slots[MAX_CLIENTS] = {}; bool IsBot(int slot) { return slots[slot]; } } botManager;
 struct idBitMsg {
-    void Init(byte*, int) {} void WriteByte(int) {} void WriteShort(int) {}
+    void Init(byte*, int) {} void WriteByte(int) {} void WriteShort(int) {} void WriteLong(int) {}
     void WriteString(const char*) {}
 };
 struct idMath { static int ClampChar(int x) { return x; } static int ClampShort(int x) { return x; }
@@ -55,7 +57,8 @@ struct idMath { static int ClampChar(int x) { return x; } static int ClampShort(
 enum { BUYING_MODE_OFF, BUYING_MODE_QUAKE4, BUYING_MODE_AWAKENING, BUYING_MODE_COUNT };
 struct voteStruct_t {
     int m_fieldFlags = 0, m_kick = 0, m_gameType = 0, m_timeLimit = 0, m_fragLimit = 0,
-        m_tourneyLimit = 0, m_captureLimit = 0, m_buying = 0, m_teamBalance = 0, m_controlTime = 0;
+        m_tourneyLimit = 0, m_captureLimit = 0, m_buying = 0, m_teamBalance = 0, m_controlTime = 0,
+        m_roundLimit = 0, m_ruleset = 0, m_instagib = 0, m_overtime = 0;
     std::string m_map;
 };
 struct Common {
@@ -98,6 +101,7 @@ struct Game {
     bool isClient = false, isServer = true;
     int time = 1000, numClients = MAX_CLIENTS, localClientNum = 0;
     idEntity* entities[MAX_CLIENTS] = {};
+    struct { bool spectatorVote = false; bool GetBool(const char*) const { return spectatorVote; } } serverInfo;
     idMultiplayerGame mpGame;
     int GetSpawnId(const idEntity* entity) const { return entity->identity; }
     void ServerSendChatMessage(int, const char*, const char*) {}
@@ -136,6 +140,12 @@ void Eligibility() {
     auto& p = players[1];
     p.spectating = true; CHECK(!IsEligibleVotePlayerSlot(1)); p.spectating = false;
     p.wantSpectate = true; CHECK(!IsEligibleVotePlayerSlot(1)); p.wantSpectate = false;
+    // si_spectatorVote admits spectating humans, never bots
+    gameLocal.serverInfo.spectatorVote = true;
+    p.spectating = true; CHECK(IsEligibleVotePlayerSlot(1)); p.spectating = false;
+    p.wantSpectate = true; CHECK(IsEligibleVotePlayerSlot(1)); p.wantSpectate = false;
+    CHECK(!IsEligibleVotePlayerSlot(2));
+    gameLocal.serverInfo.spectatorVote = false;
     p.fake = true; CHECK(!IsEligibleVotePlayerSlot(1)); p.fake = false;
     gameLocal.mpGame.playerState[1].ingame = false; CHECK(!IsEligibleVotePlayerSlot(1));
     idEntity prop; gameLocal.entities[1] = &prop; CHECK(!IsEligibleVotePlayerSlot(1));
@@ -169,6 +179,16 @@ void Lifecycle(bool packed) {
     mp.CastVote(1, true); mp.CastVote(1, true);
     CHECK(mp.yesVotes == 2);
     mp.CheckVote(); CHECK(mp.lastNotice == VOTE_PASSED);
+
+    // g_votePercent raises the bar: at 100 every eligible player must say yes
+    g_votePercent.value = 100;
+    Reset(3, 0); Start(packed); mp.CastVote(1, true);
+    mp.CheckVote(); CHECK(mp.voteExecTime == 0 && mp.vote != VOTE_NONE);
+    mp.CastVote(2, true); mp.CheckVote(); CHECK(mp.lastNotice == VOTE_PASSED);
+    // and one no can no longer be outvoted, so the vote fails at once
+    Reset(3, 0); Start(packed); mp.CastVote(1, false);
+    mp.CheckVote(); CHECK(mp.lastNotice == VOTE_FAILED && mp.vote == VOTE_NONE);
+    g_votePercent.value = 51;
 
     Reset(4, 20); Start(packed); mp.CastVote(1, true);
     mp.CheckVote(); CHECK(mp.voteExecTime == 0);

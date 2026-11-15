@@ -7,6 +7,37 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Casual servers get the votes, timeouts and policies players expect (MP-12), 15 November 2026
+
+- **Call votes the way Quake players type them.** `callvote` (or `cv`) and
+  `vote yes|no` work on every server with voting on, beside the Vote page.
+  New votes: `nextmap`, `shuffle`, `balance`, `scorelimit`, `roundlimit`,
+  `ruleset q4|classic`, `instagib`, `overtime`, `cointoss`, `random` (a
+  random map for the current game type) and `readyall`.
+- **Operators choose the rules of voting.** `g_votePercent` (51 by default,
+  a plain majority), `g_voteLimit` (votes one player may call on a map) and
+  `si_spectatorVote` (whether spectators vote). A vote now fails as soon as
+  the players who have not voted could no longer carry it.
+- **Team timeouts on casual servers.** Set `si_timeouts` and
+  `si_timeoutLength`; any player on a team types `timeout` to pause the match
+  for their side and `timein` to end it early. Everyone sees who called it
+  and when play resumes. The host, a referee or the dedicated console can
+  `pause` without spending a timeout.
+- **Idle players, spectators and disconnects.** `g_inactivity` moves a player
+  who sends no input to spectators after a warning; `si_spectatorLock` keeps
+  spectators out of a live match (and, at 2, players in); `g_pauseOnDisconnect`
+  pauses a live team match when a player disconnects so they can reconnect.
+  All three are off unless the operator turns them on.
+- **Fix:** the HUD clock on a client no longer runs on through a timeout or
+  pause; it stops with the match, as the host's did.
+- Guides: [competitive matches](../user/competitive-matches.md#voting-on-casual-servers)
+  and [server setup](../user/server-setup.md#server-settings).
+- Evidence: on 15 November (OpenGL, q4dm1, two paused bots) it passed all eleven checkpoints: a coin-toss vote, a team timeout that expired into the resume countdown and back to play, a second ended early by `timein`, a refused third with the server reason printed at the console, a `roundlimit 5` vote once the cooldown (game time, which the pauses hold) had passed, `si_spectatorLock 2` holding the host in play, and `g_inactivity` moving it to spectators, which ended the match as abandoned with no human left. Contracts: `mp_casual_match_flow_contract.py`,
+  `mp_vote_security_contract.py`, `mp_match_vote_electorate_contract.py`,
+  `ui_player_targets.py` and the `mp_match_*` rule, operation, pause and
+  session contracts pass. Not run: Vulkan, a dedicated server, a remote
+  client and real input; managed matches keep their Match Control path.
+
 ## Quad Hog, Vampiric Damage, Weapons Frenzy, weapon arenas and presets (MP-14), 15 November 2026
 
 - **Four more ways to play any map.** Beside Instagib, a server can now run

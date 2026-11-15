@@ -606,8 +606,10 @@ public:
 								mpMatchResumePolicy_t resumePolicy, uint64_t expectedRevision );
 	mpMatchMutationResult	RequestTeamTimeout( int side, mpMatchPauseReason_t reason,
 								uint64_t expectedRevision );
+	// durationMsec > 0 gives the technical pause an expiry (a disconnect pause);
+	// 0 keeps the inherited open-ended pause that only an authority resumes.
 	mpMatchMutationResult	RequestTechnicalPause( mpMatchPauseReason_t reason,
-								uint64_t expectedRevision );
+								uint64_t expectedRevision, int durationMsec = 0 );
 	mpMatchMutationResult	RequestResumeByTeam( int side, uint64_t expectedRevision );
 	mpMatchMutationResult	RequestResumeByAuthority( uint64_t expectedRevision );
 	const mpMatchPauseView &GetPause( void ) const;
@@ -672,6 +674,8 @@ private:
 
 	mpMatchTimeoutBudgetState timeoutBudgets[ MP_MATCH_SIDE_COUNT ];
 	int					timeoutDurationMsec;
+	int					technicalPauseDurationMsec;	// openQ4 MP-12: 0 means open-ended
+	bool				technicalPauseExpires;
 	bool				timeoutAllowedDuringCountdown;
 	int					resumeCountdownMsec;
 	mpMatchResumePolicy_t	resumePolicy;

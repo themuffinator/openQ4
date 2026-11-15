@@ -1397,7 +1397,9 @@ bool mpCompetitiveRules::ValidateDraft( const mpMatchRulesDraft &draft,
 			timeoutCount == 0 ? timeoutSeconds : timeoutCount );
 		return false;
 	}
-	if ( timeoutCount > 0 && ( !managed || !ModeInMask( gameType, MP_RULE_MODES_TIMEOUT ) ) ) {
+	// openQ4 MP-12: a casual server may carry a timeout budget too (si_timeouts);
+	// the mode still has to have sides to charge.
+	if ( timeoutCount > 0 && !ModeInMask( gameType, MP_RULE_MODES_TIMEOUT ) ) {
 		SetFailure( failure, MP_RULE_ERROR_TIMEOUT_POLICY, MP_RULE_TEAM_TIMEOUT_COUNT, timeoutCount );
 		return false;
 	}

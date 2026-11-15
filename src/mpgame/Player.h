@@ -430,6 +430,8 @@ public:
 	int						lastArenaChange;
 	
 	bool					wantSpectate;			// from userInfo
+	int						inactivityLastInputTime;	// openQ4 MP-12 g_inactivity: the last frame with a changed command
+	bool					inactivityWarned;
 	bool					initialJoinPending;		// waiting at the connect-time join screen
 	bool					initialJoinSpectateApplied;
 	bool					initialJoinMenuPending;
@@ -544,6 +546,7 @@ public:
 	void					Spawn( void );
 	void					Think( void );
 	virtual void			ThinkMatchPaused( int deltaMsec );
+	void					CheckInactivity( const usercmd_t &oldCmd );
 
 	// save games
 	void					Save( idSaveGame *savefile ) const;					// archives object for save game file

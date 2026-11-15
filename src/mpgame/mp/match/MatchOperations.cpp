@@ -469,6 +469,14 @@ static bool IsAuthorized( const mpMatchOperationRequest_t &request,
 			request.opcode == MP_MATCH_OP_RESUME_REQUEST ) ) {
 		return true;
 	}
+	// openQ4 MP-12: a casual side's own timeout. The execution still holds the
+	// target to the actor's side (IsOwnSideOrAuthority) and the budget.
+	if ( context.casualSideTimeout && principal.actorState != NULL &&
+		principal.actorState->active && IsPlayableSide( principal.actorState->side ) &&
+		( request.opcode == MP_MATCH_OP_TIMEOUT_REQUEST ||
+			request.opcode == MP_MATCH_OP_RESUME_REQUEST ) ) {
+		return true;
+	}
 
 	if ( ( principal.actorCapabilities & policy->anySessionCapability ) != 0 ) {
 		return true;
@@ -510,6 +518,7 @@ mpOperationAdapterContext_s::mpOperationAdapterContext_s( void ) {
 	actorCompetitionContestant = false;
 	actorCompetitionSide = MP_MATCH_SIDE_NONE;
 	actorSeriesSide = MP_MATCH_SIDE_NONE;
+	casualSideTimeout = false;
 	sessionOperational = false;
 	countdownPrerequisitesSatisfied = false;
 	cooldownPolicyAccepted = false;

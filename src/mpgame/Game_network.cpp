@@ -3151,7 +3151,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			voteStruct_t voteData;
 			memset( &voteData, 0, sizeof( voteData ) );
 			int clientNum = msg.ReadByte();
-			voteData.m_fieldFlags = msg.ReadShort();
+			voteData.m_fieldFlags = msg.ReadLong();
 			if ( voteData.m_fieldFlags <= 0 || ( voteData.m_fieldFlags & ~VOTEFLAG_ALL ) != 0 ) {
 				Warning( "Ignoring packed vote state with invalid field flags 0x%x", voteData.m_fieldFlags );
 				break;
@@ -3192,6 +3192,18 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_CONTROLTIME ) ) {
 				voteData.m_controlTime = msg.ReadShort();
 			}
+			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_ROUNDLIMIT ) ) {
+				voteData.m_roundLimit = msg.ReadShort();
+			}
+			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_RULESET ) ) {
+				voteData.m_ruleset = msg.ReadByte();
+			}
+			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_INSTAGIB ) ) {
+				voteData.m_instagib = msg.ReadByte();
+			}
+			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
+				voteData.m_overtime = msg.ReadShort();
+			}
 			if ( msg.GetRemainingReadBits() != 0 ) {
 				Warning( "Ignoring packed vote state with %d trailing bits", msg.GetRemainingReadBits() );
 				break;
@@ -3214,7 +3226,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			char mapNameBuffer[256] = { '\0' };
 			memset( &voteData, 0, sizeof( voteData ) );
 			if ( multiVote ) {
-				voteData.m_fieldFlags = msg.ReadShort();
+				voteData.m_fieldFlags = msg.ReadLong();
 				if ( voteData.m_fieldFlags <= 0 || ( voteData.m_fieldFlags & ~VOTEFLAG_ALL ) != 0 ) {
 					Warning( "Ignoring vote update with invalid field flags 0x%x", voteData.m_fieldFlags );
 					break;
@@ -3234,6 +3246,14 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 				voteData.m_buying = msg.ReadByte();
 				voteData.m_teamBalance = msg.ReadByte();
 				voteData.m_controlTime = msg.ReadShort();
+				voteData.m_roundLimit = msg.ReadShort();
+				voteData.m_ruleset = msg.ReadByte();
+				voteData.m_instagib = msg.ReadByte();
+				voteData.m_overtime = msg.ReadShort();
+				if ( ( voteData.m_ruleset != 0 && voteData.m_ruleset != 1 ) || ( voteData.m_instagib != 0 && voteData.m_instagib != 1 ) ) {
+					Warning( "Ignoring vote update with invalid casual vote values" );
+					break;
+				}
 				if ( ( ( voteData.m_fieldFlags & VOTEFLAG_KICK ) != 0 && ( voteData.m_kick < 0 || voteData.m_kick >= MAX_CLIENTS ) ) ||
 					( ( voteData.m_fieldFlags & VOTEFLAG_GAMETYPE ) != 0 && ( voteData.m_gameType < 0 || voteData.m_gameType >= MPVoteGameTypeCount() ) ) ||
 					( voteData.m_buying < BUYING_MODE_OFF || voteData.m_buying >= BUYING_MODE_COUNT ) ||
@@ -3537,6 +3557,8 @@ gameReturn_t idGameLocal::ClientPrediction( int clientNum, const usercmd_t *clie
 			// Suppress per-player command presentation during this pass; the view
 			// owner is presented once below after the original command array is
 			// restored.
+			// The HUD clock's origin moves with the frozen frame, as on the server.
+			mpGame.RebaseClientPauseClock( frameMsec );
 			const usercmd_t *savedUsercmds = usercmds;
 			usercmds = NULL;
 			for ( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {

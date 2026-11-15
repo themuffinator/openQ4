@@ -844,7 +844,29 @@ idCVar si_voteFlags(				"si_voteFlags",				"0",			CVAR_GAME | CVAR_SERVERINFO | 
 																	"bit  8 (+256)  tourney limit\n"
 																	"bit  9 (+512)  capture limit\n"
 																	"bit 10 (+1024) frag limit\n"
-																	"bit 11 (+2048) control time" );
+																	"bit 11 (+2048) control time\n"
+																	"bit 12 (+4096) next map\n"
+																	"bit 13 (+8192) round limit\n"
+																	"bit 14 (+16384) ruleset\n"
+																	"bit 15 (+32768) instagib\n"
+																	"bit 16 (+65536) overtime\n"
+																	"bit 17 (+131072) coin toss\n"
+																	"bit 18 (+262144) random map\n"
+																	"bit 19 (+524288) ready all" );
+// openQ4 MP-12: casual vote policy. The defaults reproduce the inherited rule
+// (a strict majority of the frozen electorate, no per-map limit, players only).
+idCVar g_votePercent(				"g_votePercent",			"51",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "percentage of the players eligible when a vote starts that must vote yes for it to pass", 1, 100 );
+idCVar g_voteLimit(					"g_voteLimit",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "most votes one player may call on a map; 0 for no limit", 0, 100 );
+idCVar si_spectatorVote(			"si_spectatorVote",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "let spectators call and cast votes" );
+// openQ4 MP-12: casual team timeouts. A managed profile brings its own budget;
+// these give an ordinary team server one too, called from the console with
+// timeout and ended with timein.
+idCVar si_timeouts(					"si_timeouts",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "team timeouts each side may call in a casual team match; 0 for none", 0, 10 );
+idCVar si_timeoutLength(			"si_timeoutLength",			"60",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "length of a casual team timeout in seconds", 10, 600 );
+// openQ4 MP-12: casual roster and attendance policies
+idCVar si_spectatorLock(			"si_spectatorLock",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "during live play: 1 spectators cannot join the game, 2 players cannot leave it either; 0 off", 0, 2 );
+idCVar g_inactivity(				"g_inactivity",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a playing human may send no input before being moved to spectators (dropped when spectators are off); 0 off", 0, 3600 );
+idCVar g_pauseOnDisconnect(			"g_pauseOnDisconnect",		"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a casual team match pauses when a playing human disconnects, so they can reconnect; 0 off", 0, 300 );
 
 idCVar g_mapCycle(					"g_mapCycle",				"mapcycle",		CVAR_GAME | CVAR_ARCHIVE, "map cycling script for multiplayer games - see mapcycle.scriptcfg" );
 

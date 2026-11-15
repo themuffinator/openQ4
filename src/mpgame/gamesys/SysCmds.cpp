@@ -3985,12 +3985,16 @@ static void Cmd_OpenQ4ReportMPState_f( const idCmdArgs &args ) {
 	}
 	const rvRoundGameState *round = MPGameTypeHasAny( gameLocal.gameType, GTF_ROUND ) ?
 		static_cast< const rvRoundGameState * >( state ) : NULL;
-	gameLocal.Printf( "MP_STATE time=%d gametype=%d phase=%d session_phase=%d round=%d round_number=%d marine=%d strogg=%d timelimit=%d session_round=%d round_remaining=%d\n",
+	gameLocal.Printf( "MP_STATE time=%d gametype=%d phase=%d session_phase=%d round=%d round_number=%d marine=%d strogg=%d timelimit=%d session_round=%d round_remaining=%d pause=%d pause_kind=%d timeouts_marine=%d timeouts_strogg=%d roundlimit=%d\n",
 		gameLocal.time, gameLocal.gameType, state->GetMPGameState(), mp.GetMatchSession().GetPhase(),
 		round != NULL ? round->GetRoundState() : RS_INACTIVE, round != NULL ? round->GetRoundNumber() : 0,
 		mp.GetScoreForTeam( TEAM_MARINE ), mp.GetScoreForTeam( TEAM_STROGG ),
 		gameLocal.serverInfo.GetInt( "si_timeLimit" ), mp.GetMatchSession().GetRoundState(),
-		round != NULL && round->GetRoundStateTime() > 0 ? round->GetRoundStateTime() - gameLocal.time : 0 );
+		round != NULL && round->GetRoundStateTime() > 0 ? round->GetRoundStateTime() - gameLocal.time : 0,
+		// openQ4 MP-12: the pause overlay and the casual timeout budgets
+		mp.GetMatchSession().GetPause().state, mp.GetMatchSession().GetPause().kind,
+		mp.GetMatchSession().GetTimeoutBudget( 0 ).remaining, mp.GetMatchSession().GetTimeoutBudget( 1 ).remaining,
+		gameLocal.serverInfo.GetInt( "si_roundLimit" ) );
 	idPlayer *local = gameLocal.GetLocalPlayer();
 	if ( local != NULL ) {
 		gameLocal.Printf( "MP_LOCAL client=%d entity=%d demo=%d serverDemo=%d repeater=%d spectator=%d fake=%d spectating=%d follow0=%d\n",
@@ -4636,6 +4640,10 @@ void idGameLocal::InitConsoleCommands( void ) {
 	// FIXME: implement
 	cmdSystem->AddCommand( "clientVote",			idMultiplayerGame::Vote_f,	CMD_FL_GAME,				"cast your vote: clientVote yes | no" );
 	cmdSystem->AddCommand( "clientCallVote",		idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: clientCallVote si_.. proposed_value" );
+	// openQ4 MP-12: the names Quake players type. All three reach the same vote.
+	cmdSystem->AddCommand( "callvote",				idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: callvote <vote> [value]" );
+	cmdSystem->AddCommand( "cv",					idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: cv <vote> [value]" );
+	cmdSystem->AddCommand( "vote",					idMultiplayerGame::Vote_f,	CMD_FL_GAME,				"cast your vote: vote yes | no" );
 	cmdSystem->AddCommand( "clientVoiceChat",		idMultiplayerGame::VoiceChat_f,	CMD_FL_GAME,			"voice chats: clientVoiceChat <sound shader>" );
 	cmdSystem->AddCommand( "clientVoiceChatTeam",	idMultiplayerGame::VoiceChatTeam_f,	CMD_FL_GAME,		"team voice chats: clientVoiceChat <sound shader>" );
 	cmdSystem->AddCommand( "serverVoiceMute", idMultiplayerGame::ServerVoiceMute_f, CMD_FL_GAME, "silence a voice sender for this connection: <client slot> <0|1>" );
@@ -4683,6 +4691,11 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "allready",				idMultiplayerGame::ForceReady_f,	CMD_FL_GAME,	"force all players ready" );
 	cmdSystem->AddCommand( "matchSeriesBind",		idMultiplayerGame::SeriesBind_f,	CMD_FL_GAME,	"bind a current Duel connection after series recovery: matchSeriesBind <a|b> <client slot>" );
 	cmdSystem->AddCommand( "matchBroadcaster",		idMultiplayerGame::Broadcaster_f,	CMD_FL_GAME,	"grant or revoke broadcaster observation for a current spectator: matchBroadcaster <client slot> <on|off>" );
+	// openQ4 MP-12: timeouts and pauses from the console, on casual servers too
+	cmdSystem->AddCommand( "timeout",				idMultiplayerGame::Timeout_f,	CMD_FL_GAME,	"call a team timeout for your side (dedicated console: timeout <marine|strogg>)" );
+	cmdSystem->AddCommand( "timein",				idMultiplayerGame::TimeIn_f,	CMD_FL_GAME,	"end the running timeout or pause early" );
+	cmdSystem->AddCommand( "unpause",				idMultiplayerGame::TimeIn_f,	CMD_FL_GAME,	"end the running timeout or pause early" );
+	cmdSystem->AddCommand( "pause",					idMultiplayerGame::Pause_f,		CMD_FL_GAME,	"pause the match (host, referee or dedicated console); timein resumes" );
 	cmdSystem->AddCommand( "openq4_assertMPClientActive", Cmd_OpenQ4AssertMPClientActive_f, CMD_FL_GAME | CMD_FL_CHEAT, "fail validation unless the local multiplayer player is active and not spectating" );
 	cmdSystem->AddCommand( "openq4_reportClientOptions", Cmd_OpenQ4ReportClientOptions_f, CMD_FL_GAME | CMD_FL_CHEAT, "report the local player's competitive client options (weapon order, location, team info, item timers, hit sounds) to the console" );
 	cmdSystem->AddCommand( "openq4_reportMPState", Cmd_OpenQ4ReportMPState_f, CMD_FL_GAME | CMD_FL_CHEAT, "report local multiplayer phases, scores and player state to the console" );

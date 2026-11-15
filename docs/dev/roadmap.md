@@ -3996,7 +3996,7 @@ prediction/rewind defaults.
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
 | MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. Bots use the hook as a route shortcut; the hook rides movers and lets go on teleport. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), Classic pickup names. |
-| MP-12 — Not started | Casual servers have warmup, ready, overtime, mercy, forfeit and twelve console votes with a 30 s cooldown; managed matches have timeouts, pauses, locks and typed proposals. | Casual timeouts, pause and locks; spectator lock, pause on disconnect, inactivity; intermission awards and next map; the full `callvote` set with limits and policies. |
+| MP-12 — Partial | `callvote`/`cv`/`vote` with eleven new vote words, `g_votePercent`, `g_voteLimit` and `si_spectatorVote`; casual team timeouts (`si_timeouts`, `timeout`/`timein`) and a console `pause`; `si_spectatorLock`, `g_inactivity` and `g_pauseOnDisconnect`; contract, electorate harness and a hidden listen-server smoke pass on OpenGL. | Casual team locks, a console forfeit, the intermission awards reel and next-map announcement, `mute`/`modifier`/`preset` votes once MP-18 and MP-14 land, Duel casual timeouts; Vulkan, dedicated, remote-client and real-input runs. |
 | MP-13 — Partial | One map database in the game module (`mapdb.txt` over discovered mapDefs): player bounds, modes, per-map settings applied at load and reverted after; the rotation, the player queue (`mymap`), the end-of-match pick (`mappick`), `si_nextMap`; votes, the Vote and Admin pages, the series pool, `PickMap` and the server card read it. Contract, core harness and a dedicated-server smoke with bots pass. | Create Server's catalogue and levelshot list (engine side, still its own mapDef filter) and its map-cycle field; a retained page for the queue and the pick; a browser map filter; play by people; other platforms. |
 | MP-14 — Partial | One modifier layer latched with the game type on every peer: Instagib, Quad Hog, Vampiric Damage, Weapons Frenzy, ten single-weapon arenas, a powerup switch, self-damage, knockback and fall-damage percentages and a weapon respawn time; eleven built-in presets and server-authored `presets/<name>.cfg` behind an allow list; Create Server's Modifiers tab, the match title, the loading card and the browser's rows and details card show them; contract and scripted bot and remote-client runs pass. | Votes through MP-12's `callvote`; match-rules fields so a managed match's digest records them; Last Man Standing; a hog marker; Vulkan, dedicated-server and real-input passes for each modifier, and the percentages in play; the UI register's record of the Modifiers tab and its caption size. |
 | MP-15 — Partial | Crosshair options, hit marker and damage numbers, brightskins/outlines/rimlights, forced models, lagometer, speed and input displays, four layouts, awards. Landed 15 November: chat tokens (`#h #a #w #l #n`) expanded on the sender, with place names taken from the map's own landmarks; hit sounds by damage (`hud_hitSound`, two tone sets made from Quake 4's own hit sounds, armour variant kept); a weapon preference order (`ui_weaponOrder`) for pickups and the empty-weapon fallback; ammunition beside the crosshair and a crosshair-name option; team info sent to team mates, so the Competitive team list is right across the map and names where each player is; a server item-timer policy (`si_itemTimers`: nobody, spectators, everyone) enforced where the list is sent, with the timer list and the time of day in all four layouts; `si_maxBrightskin` and `si_forcedModels`. The cores have a native test, the wiring is pinned, and a two-client smoke passes on OpenGL and Vulkan. | A person judging hit tones and tokens in play; Settings and Create Server rows for the new options; UI-11 register rows and visual-spec text for the timer list, crosshair ammunition and team locations; 4:3 captures; a team list outside the Competitive layout and in the stock interface; the empty-weapon fallback in a live match; team info and held-timer states in demo playback; cosmetic limits beyond the player's own game module; editor placement (UI-06). The frag line and match clock were already Quake 4's. |
@@ -5042,6 +5042,38 @@ Completion substeps:
   the Create Server and Match Control rows localized in every language, and the
   [competitive matches guide](../user/competitive-matches.md) and
   [server setup guide](../user/server-setup.md) updated.
+  Progress, 15 November: the first implementation round. Votes: `callvote`,
+  `cv` and `vote yes|no` reach the inherited packed vote, which gains
+  `nextmap`, `shuffle`, `balance`, `scorelimit` (the limit the mode scores
+  by), `roundlimit`, `ruleset q4|classic`, `instagib`, `overtime`,
+  `cointoss`, `random` (a map that supports the mode, drawn when the vote
+  passes) and `readyall` (only in a warmup that waits for ready players);
+  the flag word is a long on all three vote messages. `g_votePercent` (51,
+  the inherited majority) decides the pass, and a vote fails as soon as the
+  undecided could not carry it; `g_voteLimit` caps a connection's calls per
+  map; `si_spectatorVote` admits spectators, never bots. Timeouts: the
+  rules core no longer confines a timeout budget to managed matches, the
+  casual import takes `si_timeouts`/`si_timeoutLength` in team modes, an
+  active human on a side may call and end its own timeout through the
+  typed operation path (`timeout`, `timein`), the host, a referee or the
+  dedicated console may `pause`, a casual server announces the pause and
+  the resumption in the centre of the screen, and clients now move their
+  HUD clock origin with a frozen frame, which managed pauses needed too.
+  Policies, all off by default: `si_spectatorLock` (1 keeps spectators out
+  of live play, 2 keeps players in), `g_inactivity` (warn at half time, then
+  spectators, or a drop when the server has none; bots and paused play
+  never count) and `g_pauseOnDisconnect` (a technical pause with an expiry
+  when a playing human leaves a live team match; the abort check runs when
+  it ends). `mp_casual_match_flow_contract.py` pins all of it, the vote
+  security and electorate contracts and the player-targets fixture follow
+  the wider flag word, and `mp_casual_flow_smoke.py` plays it on a hidden
+  listen server: on 15 November (OpenGL, q4dm1, two paused bots) it passed all eleven checkpoints: a coin-toss vote, a team timeout that expired into the resume countdown and back to play, a second ended early by `timein`, a refused third with the server reason printed at the console, a `roundlimit 5` vote once the cooldown (game time, which the pauses hold) had passed, `si_spectatorLock 2` holding the host in play, and `g_inactivity` moving it to spectators, which ended the match as abandoned with no human left. Deferred to the next round: casual team locks
+  (locks are lobby-only and casual servers have no captains), the console
+  forfeit (it needs a side-consent transport), the intermission awards reel
+  and next-map announcement, the `mute` vote (MP-18's text mute) and the
+  `modifier`/`preset`/`arena` votes (MP-14's layer) and MP-16's
+  `spectatorchat` vote (`si_voteFlags` bits from 20 are reserved for them), Duel
+  casual timeouts, and Vulkan, dedicated, remote-client and real-input runs.
 - [ ] **MP-13 — P2, implementation: map pools, rotation and the player queue.**
   Replace the `si_mapCycle` string and `mapcycle.scriptcfg` with one structured
   map database (Muff Mode `mapdb.json`, CPMA `map_cfgdir`): for each stock or

@@ -84,6 +84,18 @@ While the match is paused:
 A timeout is charged once, when the pause starts, however many times it is
 requested. A referee's technical pause does not use either side's timeouts.
 
+#### Timeouts on casual servers
+
+**Not in 0.14.1.** A casual team server can have timeouts too. The operator
+sets `si_timeouts` (how many each side gets, `0` for none) and
+`si_timeoutLength` (seconds). Any player on a team then types `timeout` in
+the console to pause the match for their side, and `timein` to end it early;
+the whole server sees who called it and when play resumes, after a short
+countdown. The host, a signed-in referee or the dedicated console can also
+`pause` the match without spending a timeout, and `timein` or `unpause` ends
+that pause. The clock, the timers and everything else freeze exactly as in a
+managed match. Duel servers keep their timeouts to managed matches for now.
+
 ### Vote on proposals
 
 Managed matches use **proposals** instead of the old console-command votes. A
@@ -382,6 +394,44 @@ seated between maps, and aborting a match keeps both of them and the queue.
 Turn on option voting with `si_allowVoting 1`. Only active human players call
 and cast votes; bots do not, and they do not raise the number needed to pass.
 Who can vote is fixed until the vote ends, even if players disconnect.
+
+**Not in 0.14.1.** Call a vote with `callvote` (or `cv`) and cast yours with
+`vote yes` or `vote no`; the Vote page and the old `clientCallVote` still
+work. The votes are:
+
+| Vote | What passes |
+|---|---|
+| `map <name>`, `nextmap`, `random` | Change to that map, skip to the next map in the cycle, or draw a random installed map that supports the game type |
+| `gametype <type>`, `ruleset q4\|classic`, `instagib 0\|1` | Change the game type, play the [Classic ruleset](classic-ruleset.md) or Quake 4's, or turn [Instagib](server-setup.md#instagib) on or off; each restarts the match |
+| `timelimit <min>`, `fraglimit <n>`, `capturelimit <n>`, `scorelimit <n>`, `roundlimit <n>`, `overtime <sec>` | Change a limit; `scorelimit` is the limit the current game type scores by, and `overtime 0` uses sudden death |
+| `shuffle`, `balance 0\|1`, `autobalance 0\|1` | Shuffle the teams, or turn automatic balancing on or off |
+| `readyall` | Mark everyone ready, during a warmup that waits for ready players |
+| `kick <name>`, `restart`, `buying 0\|1\|2`, `controlTime <sec>` | Kick a player, restart the map, change the buying rules, change DeadZone's control time |
+| `cointoss` | Nothing changes; the server announces heads or tails for everyone |
+
+The operator chooses the rules of voting: `g_votePercent` (the share of the
+eligible players that must say yes, 51 by default, so a plain majority),
+`g_voteLimit` (how many votes one player may call on a map, unlimited by
+default), `si_spectatorVote` (whether spectators may vote, off by default)
+and `si_voteFlags` (which votes are forbidden). A vote fails as soon as the
+players who have not voted could no longer carry it. Each player waits thirty
+seconds after their vote ends before calling another.
+
+### Spectators, idle players and disconnects
+
+**Not in 0.14.1.** Three casual-server policies, all off unless the operator
+turns them on:
+
+- `si_spectatorLock 1` keeps spectators out of a match while it is live; they
+  join when it ends. `2` also keeps players from leaving to spectate.
+- `g_inactivity <seconds>` warns a playing human who has sent no input for
+  that long, then moves them to spectators (or drops them when the server has
+  no spectators). Bots are never counted, and a pause does not count as idle
+  time.
+- `g_pauseOnDisconnect <seconds>` pauses a live team match when a playing human
+  disconnects, so they can reconnect or a replacement can join, instead of
+  forfeiting an emptied side at once. The pause ends on its own, and the usual
+  checks run then.
 
 ### Round modes
 

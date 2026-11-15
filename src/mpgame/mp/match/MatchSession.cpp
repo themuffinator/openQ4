@@ -466,6 +466,8 @@ bool mpMatchSession::Reset( uint64_t newSessionId, mpMatchEngineTime initialEngi
 		timeoutBudgets[ side ].consumed = 0;
 	}
 	timeoutDurationMsec = 0;
+	technicalPauseDurationMsec = 0;
+	technicalPauseExpires = false;
 	timeoutAllowedDuringCountdown = false;
 	resumeCountdownMsec = 0;
 	resumePolicy = MP_MATCH_RESUME_OWNER_OR_AUTHORITY;
@@ -940,8 +942,12 @@ mpMatchMutationResult mpMatchSession::AdvanceFrame( mpMatchEngineTime engineNow 
 	// the post-transition overlay so that the frame which completes a resume -
 	// which is simulated - is also counted.
 	const bool commitPendingPause = pause.state == MP_MATCH_PAUSE_PENDING;
+	// a team timeout always expires; a technical pause only when it was given a
+	// duration (openQ4 MP-12: the disconnect pause)
 	const bool timeoutExpires = pause.state == MP_MATCH_PAUSED &&
-		pause.kind == MP_MATCH_PAUSE_KIND_TEAM_TIMEOUT && engineNow >= pause.pauseExpiry;
+		( pause.kind == MP_MATCH_PAUSE_KIND_TEAM_TIMEOUT ||
+			( pause.kind == MP_MATCH_PAUSE_KIND_TECHNICAL && technicalPauseExpires ) ) &&
+		engineNow >= pause.pauseExpiry;
 	const bool resumeCompletes = pause.state == MP_MATCH_RESUME_COUNTDOWN &&
 		engineNow >= pause.resumeDeadline;
 	const bool semanticMutation = commitPendingPause || timeoutExpires || resumeCompletes;
@@ -973,6 +979,11 @@ mpMatchMutationResult mpMatchSession::AdvanceFrame( mpMatchEngineTime engineNow 
 		!AddEngineDuration( engineNow, timeoutDurationMsec, pendingExpiry ) ) {
 		return Rejected( MP_MATCH_REASON_CLOCK_OVERFLOW );
 	}
+	if ( commitPendingPause && pause.kind == MP_MATCH_PAUSE_KIND_TECHNICAL &&
+		technicalPauseDurationMsec > 0 &&
+		!AddEngineDuration( engineNow, technicalPauseDurationMsec, pendingExpiry ) ) {
+		return Rejected( MP_MATCH_REASON_CLOCK_OVERFLOW );
+	}
 	if ( timeoutExpires && !AddEngineDuration( engineNow, resumeCountdownMsec,
 			automaticResumeDeadline ) ) {
 		return Rejected( MP_MATCH_REASON_CLOCK_OVERFLOW );
@@ -993,6 +1004,9 @@ mpMatchMutationResult mpMatchSession::AdvanceFrame( mpMatchEngineTime engineNow 
 			++budget.consumed;
 			pause.budgetCharged = true;
 			pause.pauseExpiry = pendingExpiry;
+		} else if ( pause.kind == MP_MATCH_PAUSE_KIND_TECHNICAL && technicalPauseDurationMsec > 0 ) {
+			pause.pauseExpiry = pendingExpiry;
+			technicalPauseExpires = true;
 		}
 		pause.state = MP_MATCH_PAUSED;
 		pause.pausedAt = engineNow;
@@ -1984,6 +1998,8 @@ void mpMatchSession::ClearPause( void ) {
 	pause.pausedAt = mpMatchEngineTime::FromMilliseconds( 0 );
 	pause.pauseExpiry = mpMatchEngineTime::FromMilliseconds( 0 );
 	pause.resumeDeadline = mpMatchEngineTime::FromMilliseconds( 0 );
+	technicalPauseDurationMsec = 0;
+	technicalPauseExpires = false;
 }
 
 mpMatchMutationResult mpMatchSession::ConfigureTimeouts( int perSide,
@@ -2071,7 +2087,7 @@ mpMatchMutationResult mpMatchSession::RequestTeamTimeout( int side,
 }
 
 mpMatchMutationResult mpMatchSession::RequestTechnicalPause( mpMatchPauseReason_t reason,
-		uint64_t expectedRevision ) {
+		uint64_t expectedRevision, int durationMsec ) {
 	if ( !IsExpectedRevision( expectedRevision ) ) {
 		return Rejected( MP_MATCH_REASON_STALE_REVISION );
 	}
@@ -2093,6 +2109,7 @@ mpMatchMutationResult mpMatchSession::RequestTechnicalPause( mpMatchPauseReason_
 	pause.kind = MP_MATCH_PAUSE_KIND_TECHNICAL;
 	pause.reason = reason;
 	pause.requestedAt = engineTime;
+	technicalPauseDurationMsec = durationMsec > 0 ? durationMsec : 0;
 	return Applied( previousRevision );
 }
 

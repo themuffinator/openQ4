@@ -453,6 +453,14 @@ extern idCVar	aas_showRevReach;
 extern idCVar	net_clientPredictGUI;
 
 extern idCVar	si_voteFlags;
+extern idCVar	g_votePercent;
+extern idCVar	g_voteLimit;
+extern idCVar	si_spectatorVote;
+extern idCVar	si_timeouts;
+extern idCVar	si_timeoutLength;
+extern idCVar	si_spectatorLock;
+extern idCVar	g_inactivity;
+extern idCVar	g_pauseOnDisconnect;
 extern idCVar	g_mapCycle;
 // RAVEN BEGIN
 // shouchard:  g_balanceTDM->g_balanceTeams so we can also use it for CTF

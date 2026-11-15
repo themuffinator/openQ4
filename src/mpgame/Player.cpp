@@ -2015,6 +2015,8 @@ void idPlayer::Init( void ) {
 	noclip					= false;
 	godmode					= false;
 	godmodeDamage			= 0;
+	inactivityLastInputTime	= gameLocal.time;
+	inactivityWarned		= false;
 	undying					= g_forceUndying.GetBool() ? !gameLocal.isMultiplayer : false;
 
 	oldButtons				= 0;
@@ -4227,9 +4229,17 @@ bool idPlayer::UserInfoChanged( void ) {
 			SetSpectateOrigin();
 		}
 	} else if ( gameLocal.serverInfo.GetBool( "si_spectators" ) ) {
- 		// never let spectators go back to game while sudden death is on
- 		if ( gameLocal.mpGame.GetGameState()->GetMPGameState() == SUDDENDEATH && !spec && wantSpectate == true ) {
+ 		// never let spectators go back to game while sudden death is on;
+ 		// openQ4 MP-12: si_spectatorLock holds the roster through live play too
+ 		// (1: spectators wait for the match to end, 2: players stay in as well)
+ 		const mpGameState_t liveState = gameLocal.mpGame.GetGameState()->GetMPGameState();
+ 		const bool livePlay = liveState == GAMEON || liveState == SUDDENDEATH;
+ 		const int spectatorLock = gameLocal.serverInfo.GetInt( "si_spectatorLock" );
+ 		if ( ( liveState == SUDDENDEATH || ( livePlay && spectatorLock >= 1 ) ) && !spec && wantSpectate == true ) {
  			userInfo->Set( "ui_spectate", "Spectate" );
+ 			modifiedInfo |= true;
+ 		} else if ( livePlay && spectatorLock >= 2 && spec && !wantSpectate ) {
+ 			userInfo->Set( "ui_spectate", "Play" );
  			modifiedInfo |= true;
  		} else {
  			if ( spec != wantSpectate && !spec ) {
@@ -11652,6 +11662,7 @@ void idPlayer::Think( void ) {
 	usercmd.buttons &= ~buttonMask;
 	ApplyWeaponWheelInputMask();
 	ApplyQuickChatInputMask();
+	CheckInactivity( oldCmd );
 
 	// openQ4: attack lockout.  Quake Live freezes weapons while a round is
 	// being set up or has just been decided; this is the equivalent of its
@@ -11981,6 +11992,62 @@ void idPlayer::Think( void ) {
 	}
 }
 
+/*
+==============
+idPlayer::CheckInactivity
+
+openQ4 MP-12: g_inactivity. A playing human whose command has not changed for
+that many seconds is warned ten seconds ahead, then moved to spectators, or
+dropped where the server allows no spectators. Bots, spectators and frozen
+play are never counted; ThinkMatchPaused carries the clock across a pause.
+==============
+*/
+void idPlayer::CheckInactivity( const usercmd_t &oldCmd ) {
+	if ( !gameLocal.isMultiplayer || gameLocal.isClient || IsFakeClient() || spectating || wantSpectate ||
+		botManager.IsBot( entityNumber ) || gameLocal.mpGame.IsArenaCampaignMatch() ) {
+		inactivityLastInputTime = gameLocal.time;
+		inactivityWarned = false;
+		return;
+	}
+	const int limitMsec = g_inactivity.GetInteger() * 1000;
+	const bool changed = usercmd.buttons != oldCmd.buttons || usercmd.forwardmove != oldCmd.forwardmove ||
+		usercmd.rightmove != oldCmd.rightmove || usercmd.upmove != oldCmd.upmove || usercmd.impulse != oldCmd.impulse ||
+		usercmd.angles[ 0 ] != oldCmd.angles[ 0 ] || usercmd.angles[ 1 ] != oldCmd.angles[ 1 ] || usercmd.angles[ 2 ] != oldCmd.angles[ 2 ];
+	if ( limitMsec <= 0 || changed || inactivityLastInputTime <= 0 ) {
+		inactivityLastInputTime = gameLocal.time;
+		inactivityWarned = false;
+		return;
+	}
+	const mpGameState_t state = gameLocal.mpGame.GetGameState() != NULL ?
+		gameLocal.mpGame.GetGameState()->GetMPGameState() : INACTIVE;
+	if ( state == GAMEREVIEW || state == NEXTGAME || state == INACTIVE ) {
+		inactivityLastInputTime = gameLocal.time;
+		return;
+	}
+	const int idleMsec = gameLocal.time - inactivityLastInputTime;
+	const int warnMsec = Max( limitMsec / 2, limitMsec - 10000 );
+	if ( idleMsec >= limitMsec ) {
+		inactivityLastInputTime = gameLocal.time;
+		inactivityWarned = false;
+		if ( gameLocal.serverInfo.GetBool( "si_spectators" ) ) {
+			gameLocal.mpGame.CenterPrint( -1, "#str_42778", idMultiplayerGame::CPARM_CLIENT, entityNumber );
+			// the house idiom for a server-side move: the userinfo path, so
+			// wantSpectate, the team menu and every peer agree
+			GetUserInfo()->Set( "ui_spectate", "Spectate" );
+			wantSpectate = true;
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "updateUI %d\n", entityNumber ) );
+		} else {
+			networkSystem->ServerDropClient( entityNumber, "#str_42779" );
+		}
+		return;
+	}
+	if ( idleMsec >= warnMsec && !inactivityWarned ) {
+		inactivityWarned = true;
+		gameLocal.mpGame.CenterPrint( entityNumber, "#str_42777", idMultiplayerGame::CPARM_INT,
+			( limitMsec - idleMsec + 999 ) / 1000 );
+	}
+}
+
 void idPlayer::ThinkMatchPaused( int deltaMsec ) {
 	idActor::ThinkMatchPaused( deltaMsec );
 	inventory.ShiftMatchTime( deltaMsec );
@@ -12002,6 +12069,7 @@ void idPlayer::ThinkMatchPaused( int deltaMsec ) {
 		SHIFT_PLAYER_TIME( nextArmorPulse );
 		SHIFT_PLAYER_TIME( forceScoreBoardTime );
 		SHIFT_PLAYER_TIME( spawnedTime );
+		SHIFT_PLAYER_TIME( inactivityLastInputTime );
 		SHIFT_PLAYER_TIME( minRespawnTime );
 		SHIFT_PLAYER_TIME( maxRespawnTime );
 		SHIFT_PLAYER_TIME( lastPickupTime );

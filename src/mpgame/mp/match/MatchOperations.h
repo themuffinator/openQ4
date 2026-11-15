@@ -131,6 +131,10 @@ typedef struct mpOperationAdapterContext_s {
 	// gameplay sides between maps, so the gameplay side is not the veto side.
 	// MP_MATCH_SIDE_NONE outside a series.
 	int actorSeriesSide;
+	// openQ4 MP-12: on a casual team server (si_timeouts) an active human on a
+	// side may call and end that side's own timeouts without a captain seat.
+	// Set by the adapter; it grants nothing else.
+	bool casualSideTimeout;
 	// A failed adapter bootstrap leaves the previous aggregate resident only so
 	// its sealed evidence/checkpoint can be retried.  No typed operation may
 	// mutate that aggregate until a complete session is operational again.

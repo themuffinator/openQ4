@@ -78,6 +78,10 @@ struct voteStruct_t {
 	int				m_buying;
 	int				m_teamBalance;
 	int				m_controlTime;
+	int				m_roundLimit;	// openQ4 MP-12 casual callvote fields
+	int				m_ruleset;
+	int				m_instagib;
+	int				m_overtime;
 	// restart is a flag only
 	// nextmap is a flag only but we don't technically support it (but doom had it so it's here)
 };
@@ -95,9 +99,19 @@ typedef enum {
 	VOTEFLAG_CAPTURELIMIT	= 0x0200,
 	VOTEFLAG_FRAGLIMIT		= 0x0400,
 	VOTEFLAG_CONTROLTIME	= 0x0800,
+	// openQ4 MP-12: the casual callvote surface. Payload-free flags act when
+	// the vote passes; the others carry one typed value.
+	VOTEFLAG_NEXTMAP		= 0x1000,
+	VOTEFLAG_ROUNDLIMIT		= 0x2000,
+	VOTEFLAG_RULESET		= 0x4000,
+	VOTEFLAG_INSTAGIB		= 0x8000,
+	VOTEFLAG_OVERTIME		= 0x10000,
+	VOTEFLAG_COINTOSS		= 0x20000,
+	VOTEFLAG_RANDOMMAP		= 0x40000,
+	VOTEFLAG_READYALL		= 0x80000,
 } voteFlag_t;
 
-#define NUM_VOTES			12	// VOTEFLAG_CONTROLTIME is bit 11 and must participate in vote masking
+#define NUM_VOTES			20	// VOTEFLAG_READYALL is bit 19 and must participate in vote masking
 #define VOTEFLAG_ALL			( ( 1 << NUM_VOTES ) - 1 )
 #define MAX_PRINT_LEN 128
 
@@ -380,6 +394,7 @@ public:
 
 // jshepard: selects a map at random that will run with the current game type
 	bool			PickMap( idStr gameType, bool checkOnly = false );
+	bool			PickRandomMap( const char *gameType, idStr &mapName ) const;
 	void			ClearVote( int clientNum = -1 );
 	void			ResetRconGuiStatus( void );
 
@@ -492,6 +507,8 @@ public:
 	void			CenterPrint( int to, const char *strId, centerPrintParm_t type1, int parm1, bool persist = false );
 	void			CenterPrint( int to, const char *strId, centerPrintParm_t type1, int parm1, centerPrintParm_t type2, int parm2, bool persist = false );
 	void			CenterPrintTeam( int team, const char *strId, centerPrintParm_t type1 = CPARM_NONE, int parm1 = 0, bool persist = false );
+	// openQ4 MP-12: the client's HUD clock origin follows a frozen frame (Game_network.cpp)
+	void			RebaseClientPauseClock( int deltaMsec );
 	void			CenterPrintTeam( int team, const char *strId, centerPrintParm_t type1, int parm1, centerPrintParm_t type2, int parm2, bool persist = false );
 	void			ReceiveCenterPrint( const idBitMsg &msg );
 
@@ -529,6 +546,10 @@ public:
 	static void		ForceReady_f( const idCmdArgs &args );
 	static void		SeriesBind_f( const idCmdArgs &args );
 	static void		Broadcaster_f( const idCmdArgs &args );
+	static void		Timeout_f( const idCmdArgs &args );
+	static void		TimeIn_f( const idCmdArgs &args );
+	static void		Pause_f( const idCmdArgs &args );
+	static bool		SubmitConsoleMatchOperation( mpMatchOperationRequest_t &request, const char *command );
 	static void		DropWeapon_f( const idCmdArgs &args );
 	static void		MessageMode_f( const idCmdArgs &args );
 	static void		VoiceChat_f( const idCmdArgs &args );
@@ -1024,6 +1045,10 @@ private:
 	uint64_t		clientMatchScoreboardProjectedViewRevision;
 	mpMatchOperationResult_t clientMatchOperationResult;
 	bool			clientMatchOperationResultValid;
+	// openQ4 MP-12: the console command whose typed request awaits the
+	// server's answer; a refusal is printed where the command was typed
+	unsigned int	consoleMatchRequestId;
+	idStr			consoleMatchCommand;
 	mpMatchOperationRequest_t clientPendingMatchConfirmation;
 	bool			clientPendingMatchConfirmationValid;
 	uint64_t		matchViewRevision;
@@ -1174,6 +1199,8 @@ private:
 	void			UpdateCasualCasters( void );
 	void			ProjectCasterVitals( idUserInterface *gui );
 	void			RebaseCompetitivePauseFrame( int deltaMsec );
+	void			AnnounceCasualPauseTransitions( void );
+	bool			BeginDisconnectPause( bool playingHuman, int side );
 	void			AdvanceMatchViewRevision( bool forceClockSample = false );
 	void			InitializeMatchItemTimingObservations( void );
 	bool			BuildMatchItemTimingIdentity( const idItem *item,
@@ -1210,6 +1237,9 @@ private:
 	bool			VoteRateLimitAccepted( int clientNum );
 	void			StampVoteRateLimit( int clientNum );
 	void			ResetVoteCooldownSlot( int clientNum );
+	bool			VoteLimitAccepted( int clientNum );
+	bool			VoteReadyAllAvailable( void ) const;
+	void			CasualVoteLines( const voteStruct_t &data, idStrList &lines ) const;
 	bool			HasRecoveredCompetitionReview( void ) const;
 	void			BuildMatchOperationContext( int clientNum,
 						mpMatchOperationOpcode_t opcode, bool enforceTransportCooldown,
@@ -1527,6 +1557,10 @@ private:
 	// re-issuing on the frame after its own vote resolves
 	int				nextVoteAllowedTime[ MAX_CLIENTS ];
 	int				nextVoteRejectNoticeTime[ MAX_CLIENTS ];
+	int				votesCalledThisMap[ MAX_CLIENTS ];	// g_voteLimit: votes a connection started on this map
+	mpMatchPauseState_t	announcedPauseState;		// the pause state the casual centre print last described
+	int				disconnectPauseSide;		// g_pauseOnDisconnect: the side that lost a player
+	bool			abortCheckAfterPause;		// run CheckAbortGame when that pause ends
 
 	idStr			localisedGametype;
 
