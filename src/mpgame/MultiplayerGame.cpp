@@ -2005,6 +2005,8 @@ void idMultiplayerGame::RebaseCompetitivePauseFrame( int deltaMsec ) {
 	// so every deadline they hold has to move with the clock exactly as the
 	// players' do.
 	botManager.ShiftMatchTime( deltaMsec );
+	// openQ4 (MP-15): and the casual item timers, which hold the same deadlines
+	itemTimers.ShiftMatchTime( deltaMsec );
 }
 
 /*
@@ -2124,6 +2126,8 @@ void idMultiplayerGame::ObserveCompetitiveItemState( const idItem *item,
 
 void idMultiplayerGame::ObserveCompetitiveItemPickup( const idItem *item,
 		float respawnSeconds ) {
+	// openQ4 (MP-15): the casual timers track every match; the registry below only a managed one
+	itemTimers.OnPickup( item, respawnSeconds );
 	// Reject NaN, zero, negative and unreasonable map-authored intervals before
 	// converting the float to an integer event duration.
 	if ( !( respawnSeconds > 0.0f ) || respawnSeconds > 24.0f * 60.0f * 60.0f ) {
@@ -2134,6 +2138,7 @@ void idMultiplayerGame::ObserveCompetitiveItemPickup( const idItem *item,
 }
 
 void idMultiplayerGame::ObserveCompetitiveItemAvailable( const idItem *item ) {
+	itemTimers.OnAvailable( item );
 	ObserveCompetitiveItemState( item, true, 0 );
 }
 
@@ -10091,6 +10096,13 @@ void idMultiplayerGame::Clear() {
 	memset( &switchThrottle, 0, sizeof( switchThrottle ) );
 	voiceChatThrottle = 0;
 	damageNumbers.Clear();
+	rvHitSounds::Clear();
+	cosmeticForcedModels = -1;
+	clientOptionsGui = NULL;
+	clientOptionsTime = 0;
+	locations.Clear();
+	teamInfo.Clear();
+	itemTimers.Clear();
 	objectiveMarkers.Clear();
 	rvHitMarker::Clear();
 
@@ -13953,6 +13965,13 @@ void idMultiplayerGame::CommonRun( void ) {
 		g_forceStroggModel.ClearModified();
 	}
 
+	// openQ4 (MP-15): the server changed whether forced models are allowed
+	const int forcedModelsAllowed = gameLocal.serverInfo.GetBool( "si_forcedModels", "1" ) ? 1 : 0;
+	if ( forcedModelsAllowed != cosmeticForcedModels ) {
+		updateModels = updateModels || cosmeticForcedModels != -1;
+		cosmeticForcedModels = forcedModelsAllowed;
+	}
+
 	if( updateModels ) {
 		for( int i = 0; i < gameLocal.numClients; i++ ) {
 			idPlayer* player = (idPlayer*)gameLocal.entities[ i ];
@@ -14043,6 +14062,8 @@ void idMultiplayerGame::CommonRun( void ) {
 		}
 		hud_showSpeed.ClearModified();
 	}
+	// openQ4 (MP-15): a hit pulse nothing named an amount for sounds Quake 4's cue
+	rvHitSounds::Frame();
 }
 
 /*
@@ -16384,6 +16405,9 @@ void idMultiplayerGame::Run( void ) {
 	CheckVote();
 	CheckModifierChange();
 	RunQuadHog();
+	// openQ4 (MP-15): team mates beyond a snapshot, and the item timers si_itemTimers admits
+	teamInfo.ServerFrame();
+	itemTimers.ServerFrame();
 
 	// The Arena ceremony deliberately freezes the world around its final tableau,
 	// so the result handoff has to run ahead of the frozen-frame return.  Left
@@ -21520,6 +21544,7 @@ void idMultiplayerGame::UpdateHud( idUserInterface* _mphud ) {
 	// spawn-in and the result ceremony) is a camera, not the player's eyes.
 	// Both match HUDs keep only its letterbox and cards and the centre notice.
 	_mphud->SetStateBool( "arena_hudHidden", ArenaCampaignPresentationActive() );
+	PublishClientOptions( _mphud, localPlayer );
 	PublishRemasteredHud( _mphud, localPlayer );
 	_mphud->StateChanged( gameLocal.time );
 
@@ -21733,6 +21758,7 @@ void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, i
 
 	// Team status: up to eight players a team, best score first.
 	const int maxRows = 8;
+	const bool showLocations = hud_teamLocations.GetBool();
 	for ( int team = 0; team < 2; team++ ) {
 		idStaticList<idPlayer *, MAX_CLIENTS> members;
 		if ( teamGame ) {
@@ -21754,16 +21780,100 @@ void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, i
 		_mphud->SetStateInt( va( "oq4_ts%d_count", team ), count );
 		for ( int i = 0; i < count; i++ ) {
 			idPlayer *player = members[ i ];
-			const bool dead = player->health <= 0 || player->pfl.dead;
+			// openQ4 (MP-15): a team mate out of this client's snapshot is read from
+			// the server's team info, and named by where they stand.
+			mpTeamInfoEntry_t info;
+			teamInfo.Resolve( player, info );
+			const bool dead = info.health <= 0 || ( player == localPlayer && player->pfl.dead );
+			const bool placed = showLocations && !dead && ( localPlayer->spectating || player->team == localPlayer->team );
 			_mphud->SetStateString( va( "oq4_ts%d_%d_name", team, i ), OQ4_HudPlain( player->GetUserInfo()->GetString( "ui_name" ) ).c_str() );
-			_mphud->SetStateInt( va( "oq4_ts%d_%d_weapon", team, i ), player->GetCurrentWeapon() );
-			_mphud->SetStateInt( va( "oq4_ts%d_%d_health", team, i ), Max( 0, player->health ) );
-			_mphud->SetStateInt( va( "oq4_ts%d_%d_armor", team, i ), Max( 0, player->inventory.armor ) );
+			_mphud->SetStateInt( va( "oq4_ts%d_%d_weapon", team, i ), info.weapon );
+			_mphud->SetStateInt( va( "oq4_ts%d_%d_health", team, i ), Max( 0, info.health ) );
+			_mphud->SetStateInt( va( "oq4_ts%d_%d_armor", team, i ), Max( 0, info.armor ) );
+			_mphud->SetStateString( va( "oq4_ts%d_%d_location", team, i ), placed
+				? locations.NameForPoint( idVec3( info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ] ) ) : "" );
 			_mphud->SetStateBool( va( "oq4_ts%d_%d_dead", team, i ), dead );
 			_mphud->SetStateBool( va( "oq4_ts%d_%d_you", team, i ), player == localPlayer );
 			_mphud->SetStateBool( va( "oq4_ts%d_%d_followed", team, i ), player == followed );
 		}
 	}
+}
+
+/*
+================
+idMultiplayerGame::PublishClientOptions
+
+openQ4 (MP-15): the competitive HUD options every layout shows, Classic
+included: the ammunition beside the crosshair, the item timers the server
+admits this client to, and the time of day. Ten times a second is as often
+as any of them changes on screen.
+================
+*/
+void idMultiplayerGame::PublishClientOptions( idUserInterface *_mphud, idPlayer *localPlayer ) {
+	const int now = gameLocal.realClientTime;
+	if ( _mphud == clientOptionsGui && now - clientOptionsTime >= 0 && now - clientOptionsTime < 100 ) {
+		return;
+	}
+	clientOptionsGui = _mphud;
+	clientOptionsTime = now;
+
+	// Ammunition beside the crosshair: the weapon in hand, when it uses any.
+	idStr ammo;
+	if ( hud_crosshairAmmo.GetBool() && !localPlayer->spectating && localPlayer->health > 0 &&
+		 localPlayer->weapon != NULL && !ArenaCampaignPresentationActive() ) {
+		const int available = localPlayer->weapon->AmmoAvailable();
+		if ( available >= 0 ) {
+			ammo = va( "%d", available );
+		}
+	}
+	_mphud->SetStateString( "oq4_xhair_ammo", ammo.c_str() );
+	_mphud->SetStateBool( "oq4_xhair_ammo_low", ammo.Length() > 0 && localPlayer->weapon != NULL &&
+		localPlayer->weapon->AmmoAvailable() <= localPlayer->weapon->LowAmmo() );
+
+	// Item timers: what the server sent, or for a listen server's host what the
+	// same policy lets them read.
+	itemTimerRow_t rows[ MP_ITEMTIMERS_HUD_ROWS ];
+	const int count = hud_itemTimers.GetBool() ? itemTimers.GetRows( rows, MP_ITEMTIMERS_HUD_ROWS ) : 0;
+	_mphud->SetStateInt( "oq4_it_count", count );
+	for ( int i = 0; i < MP_ITEMTIMERS_HUD_ROWS; i++ ) {
+		idStr name;
+		idStr time;
+		bool up = false;
+		if ( i < count ) {
+			const idDeclEntityDef *def = gameLocal.FindEntityDef( rvItemTimers::DefNameForKind( rows[ i ].kind ), false );
+			if ( def != NULL ) {
+				name = common->GetLocalizedString( def->dict.GetString( "inv_name" ) );
+			}
+			if ( rows[ i ].respawnAt < 0 ) {
+				time = "--";
+			} else if ( rows[ i ].respawnAt == 0 || rows[ i ].respawnAt <= now ) {
+				up = true;
+			} else {
+				const int seconds = ( rows[ i ].respawnAt - now + 999 ) / 1000;
+				time = va( "%d:%02d", seconds / 60, seconds % 60 );
+			}
+		}
+		_mphud->SetStateString( va( "oq4_it_%d_name", i ), name.c_str() );
+		_mphud->SetStateString( va( "oq4_it_%d_time", i ), time.c_str() );
+		_mphud->SetStateBool( va( "oq4_it_%d_up", i ), up );
+	}
+
+	// The time of day, for people who play past it.
+	idStr clock;
+	const int clockMode = hud_localClock.GetInteger();
+	if ( clockMode > 0 ) {
+		const time_t wall = time( NULL );
+		const struct tm *local = localtime( &wall );
+		if ( local != NULL ) {
+			if ( clockMode == 2 ) {
+				const int hour = local->tm_hour % 12;
+				clock = va( "%d:%02d %s", hour == 0 ? 12 : hour, local->tm_min, local->tm_hour < 12 ? "AM" : "PM" );
+			} else {
+				clock = va( "%02d:%02d", local->tm_hour, local->tm_min );
+			}
+		}
+	}
+	_mphud->SetStateString( "oq4_local_clock", clock.c_str() );
 }
 
 /*

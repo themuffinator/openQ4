@@ -376,7 +376,13 @@ enum {
 	GAME_UNRELIABLE_MESSAGE_VOICEDATA_SERVER,
 	// openQ4: attacker only hit feedback.  Append only - these ordinals are
 	// the wire format.
-	GAME_UNRELIABLE_MESSAGE_HITINFO
+	GAME_UNRELIABLE_MESSAGE_HITINFO,
+	// openQ4 (MP-15): a team member's team mates (mp/TeamInfo.h) and the item
+	// timers the server's policy admits the recipient to (mp/ItemTimers.h)
+	GAME_UNRELIABLE_MESSAGE_TEAMINFO,
+	GAME_UNRELIABLE_MESSAGE_ITEMTIMERS,
+
+	GAME_UNRELIABLE_MESSAGE_COUNT
 };
 
 enum {
@@ -1218,6 +1224,9 @@ public:
 
 	void					QueueUnreliableMessage( int clientNum, const idBitMsg &msg );
 	void					SendUnreliableMessage( const idBitMsg &msg, const int clientNum );
+	// openQ4: puts a message in a recording (and a repeater's stream) for whoever
+	// plays it back, without sending it to any client now
+	void					RecordUnreliableMessage( const idBitMsg &msg );
 	// note: listen server client is always excluded
 	void					SendUnreliableMessagePVS( const idBitMsg &msg, const idEntity *instanceEnt, int area1 = -1, int area2 = -1 );
 

@@ -1705,4 +1705,6 @@
 	"#str_232113"	"Você escolheu: "
 	"#str_232114"	"Não há escolha de mapa aberta."
 	"#str_232115"	"Este servidor mantém esse mapa fora da fila: "
+	"#str_232300"	"morto"
+	"#str_232301"	"ninguém"
 }

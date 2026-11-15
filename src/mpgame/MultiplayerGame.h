@@ -18,6 +18,10 @@
 #include "mp/Buying.h"
 #include "mp/Modifiers.h"
 #include "mp/HitFeedback.h"
+#include "mp/HitSounds.h"
+#include "mp/Locations.h"
+#include "mp/TeamInfo.h"
+#include "mp/ItemTimers.h"
 #include "mp/ObjectiveMarkers.h"
 #include "mp/MvdMarkers.h"
 #include "../game/gamesys/HudLines.h"
@@ -1594,6 +1598,10 @@ private:
 	void			PublishRemasteredNameTags( idUserInterface *_mphud, idPlayer *localPlayer, bool freeCamera );
 	void			PublishRemasteredCompetitive( idUserInterface *_mphud, idPlayer *localPlayer, idPlayer *followed, int limit );
 	void			PublishRemasteredChat( idUserInterface *_mphud, int now );
+	// openQ4 (MP-15): crosshair ammunition, item timers and the time of day, in every layout
+	void			PublishClientOptions( idUserInterface *_mphud, idPlayer *localPlayer );
+	idUserInterface *clientOptionsGui;
+	int				clientOptionsTime;
 
 	// rcon buffer
 	idStr			rconHistory;
@@ -1617,6 +1625,13 @@ public:
 	// openQ4: live damage numbers for the local view.  Client side only, but
 	// a listen server host stages into the same slab.
 	rvDamageNumbers			damageNumbers;
+	// openQ4 (MP-15): landmark place names, team mates beyond the snapshot and
+	// the item timers the server admits this client to
+	rvMapLocations			locations;
+	rvTeamInfo				teamInfo;
+	rvItemTimers			itemTimers;
+	// si_forcedModels as last applied to the player models, -1 before the first look
+	int						cosmeticForcedModels;
 	rvObjectiveMarkers		objectiveMarkers;
 
 private:

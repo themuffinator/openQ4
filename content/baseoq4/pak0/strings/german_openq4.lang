@@ -1705,4 +1705,6 @@
 	"#str_232113"	"Deine Wahl: "
 	"#str_232114"	"Es läuft keine Kartenwahl."
 	"#str_232115"	"Dieser Server lässt diese Karte nicht in die Warteschlange: "
+	"#str_232300"	"tot"
+	"#str_232301"	"niemand"
 }

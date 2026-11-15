@@ -4529,6 +4529,34 @@ void idGameLocal::SendUnreliableMessage( const idBitMsg &msg, const int clientNu
 
 /*
 ===============
+idGameLocal::RecordUnreliableMessage
+
+openQ4: a message for whoever plays a recording back, or watches through a
+repeater, that no connected client is sent. Routed like a broadcast, so every
+viewer of the recording receives it.
+===============
+*/
+void idGameLocal::RecordUnreliableMessage( const idBitMsg &msg ) {
+	if ( demoState != DEMO_RECORDING && !isRepeater ) {
+		return;
+	}
+
+	idBitMsg	dest;
+	byte		msgBuf[ 16 ];
+
+	dest.Init( msgBuf, sizeof( msgBuf ) );
+	dest.WriteByte( GAME_UNRELIABLE_RECORD_CLIENTNUM );
+	dest.WriteChar( -1 );
+
+	if ( demoState == DEMO_RECORDING ) {
+		unreliableMessages[ MAX_CLIENTS ].AddConcat( dest.GetData(), dest.GetSize(), msg.GetData(), msg.GetSize(), false );
+	}
+
+	RepeaterUnreliableMessage( msg, -1, &dest );
+}
+
+/*
+===============
 idGameLocal::RepeaterUnreliableMessagePVS
 Forwards an unreliable message to viewers based on PVS.
 Concats header and msg in case a header needs to be added.
@@ -4781,7 +4809,7 @@ void idGameLocal::ProcessUnreliableMessage( const idBitMsg &msg ) {
 	}
 	int type = msg.ReadByte();
 	if ( type < GAME_UNRELIABLE_MESSAGE_EVENT ||
-		 type > GAME_UNRELIABLE_MESSAGE_HITINFO ) {
+		 type >= GAME_UNRELIABLE_MESSAGE_COUNT ) {
 		common->Warning( "Ignoring invalid server-demo unreliable message %d", type );
 		return;
 	}
@@ -4848,6 +4876,15 @@ void idGameLocal::ProcessUnreliableMessage( const idBitMsg &msg ) {
 		// openQ4: attacker only hit feedback
 		case GAME_UNRELIABLE_MESSAGE_HITINFO: {
 			mpGame.damageNumbers.ClientReceive( msg );
+			break;
+		}
+		// openQ4 (MP-15): team overlay data and admitted item timers
+		case GAME_UNRELIABLE_MESSAGE_TEAMINFO: {
+			mpGame.teamInfo.ClientReceive( msg );
+			break;
+		}
+		case GAME_UNRELIABLE_MESSAGE_ITEMTIMERS: {
+			mpGame.itemTimers.ClientReceive( msg );
 			break;
 		}
 #ifdef _USE_VOICECHAT

@@ -1705,4 +1705,6 @@
 	"#str_232113"	"You picked: "
 	"#str_232114"	"There is no map pick to vote in."
 	"#str_232115"	"This server keeps that map out of the queue: "
+	"#str_232300"	"dead"
+	"#str_232301"	"nobody"
 }

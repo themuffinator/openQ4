@@ -124,6 +124,7 @@ These guides describe 0.14.1. Anything added since is marked **Not in 0.14.1**; 
 - [Arena Campaign](docs/user/arena-campaign.md) (experimental): tiers, unlocks, maps and bots
 - [Multiplayer Networking](docs/user/multiplayer-networking.md) (experimental) · [Multiplayer Chat](docs/user/multiplayer-chat.md) · [Buying](docs/user/buying.md) · [Competitive Matches](docs/user/competitive-matches.md) (experimental)
 - [Classic Multiplayer Ruleset](docs/user/classic-ruleset.md) (**Not in 0.14.1**): Quake 2-style weapons, tiered armour, double jumps, Threewave CTF scoring and a grappling hook
+- [Multiplayer Client Options](docs/user/multiplayer-client-options.md) (**Not in 0.14.1**): chat tokens, hit sounds by damage, a weapon order, item timers and team locations
 - [Demo Library and Multi-View Demos](docs/user/multiview-demos.md): browse, play back and record full matches
 
 **Look and feel**

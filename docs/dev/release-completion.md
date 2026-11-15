@@ -7,6 +7,81 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Chat tokens, hit tones, a weapon order, item timers and team locations (MP-15), 15 November 2026
+
+- **Say where you are and what you have without typing it.** Write `#h`, `#a`,
+  `#w`, `#l` or `#n` in a chat line and it becomes your health, armour, weapon
+  and ammunition, location or nearby team mates as the line is sent:
+  `say_team need help at #l, #h/#a` reads "need help at Quad Damage, 87/50".
+  It works in the chat box, the console and key bindings, and everyone reads
+  the result whatever they run. Places are named after the nearest weapon,
+  powerup, armour, mega health or flag, because Quake 4's maps name no areas.
+- **Hear how hard you hit.** `hud_hitSound 2` or `3` plays Quake 4's hit sound
+  at one of four pitches by the damage dealt, falling or rising; a hit on
+  armour keeps its armour sound. `1` is Quake 4's single sound and stays the
+  default, `0` is silence.
+- **Keep the weapon you want.** `ui_weaponOrder "rg rl lg hb ng gl sg mg"`
+  lists your weapons best first. Picking one up switches to it only when it
+  ranks above the one in your hands, and an empty weapon falls back to the
+  best one on your list that still has ammunition. Leave it empty for Quake
+  4's behaviour.
+- **See your ammunition at the crosshair** with `hud_crosshairAmmo 1`, and
+  choose whose names appear under it with `hud_crosshairNames` (everyone, team
+  mates only, or nobody).
+- **Know where your team is.** The Competitive layout's team list now names
+  each team mate's location, and its health, armour and weapon are right for
+  team mates on the far side of the map.
+- **Item timers, when the server allows them.** `si_itemTimers` lets a server
+  show the powerup, mega health and armour timers to nobody, to spectators
+  (the default) or to everyone. Allowed players see up to six timers at the
+  right edge of the screen in every HUD layout; `hud_itemTimers 0` hides them.
+  `hud_localClock` adds the time of day.
+- **Servers can limit brightskins and forced models** with `si_maxBrightskin`
+  and `si_forcedModels`.
+- Guide: [Multiplayer Client Options](../user/multiplayer-client-options.md).
+- How it works: each rule is a small engine-free core under `src/mpgame/mp/`
+  (`ChatTokens.h`, `WeaponOrder.h`, `HitSounds.h`, `Locations.h`, `TeamInfo.h`,
+  `ItemTimers.h`) with an adapter beside it. Tokens are expanded in the say
+  command on the sender, so nothing new crosses the network for them. The
+  weapon order travels in the user info, because the server makes both weapon
+  decisions. Two unreliable messages are appended to protocol 2.42, which has
+  not shipped: team info goes to a team member alone, twice a second, with
+  only their own team in it, and is neither forwarded to whoever follows them
+  nor recorded; the item-timer list goes once a second only to the clients
+  the policy admits, and a recording carries one copy for its viewers. A tone
+  is the stock hit sound at a pitch on the one play, since the engine does
+  not apply a sound shader's own frequency shift. The hit pulse in the
+  snapshot waits 60 ms for the message that names the amount and sounds
+  Quake 4's cue when none comes.
+- Evidence: `tools/tests/mp_client_options.py` compiles and runs
+  `MpClientOptionsTest.cpp` over the six cores and pins the call sites and who
+  each message is sent to. `tools/tests/mp_client_options_smoke.py` ran a
+  listen server, a second client on the host's team and a paused bot on the
+  other on `mp/q4dm1`, on OpenGL and on Vulkan, with engine commands only: 19
+  of 19 checks passed on each. The weapon order switched machine gun to
+  rocket launcher to railgun and then kept the railgun over a shotgun; chat
+  lines typed as console words, quoted, and sent by the remote client arrived
+  expanded; the client read the host's health, weapon and position from the
+  team-info record and the bot's from its own snapshot; under `si_itemTimers 1`
+  the client held no timers, under `2` it held the list with the Quad counting
+  down from the host's pickup, and back at `1` the list stopped; the HUD state
+  carried the ammunition, the time of day and the timer rows; and 14 hits
+  through the attack probe played 14 tones on the remote client. Captures
+  show the timer list, crosshair ammunition, time of day and team locations
+  in the Remastered, Minimal, Competitive and Classic layouts at 16:9. The
+  native Remastered HUD checks pass over the regenerated document.
+- Open: nobody has listened to the tones or used the tokens in play. The new
+  options have no Settings or Create Server rows yet. The timer list,
+  crosshair ammunition and team locations have no UI register rows or
+  visual-spec text, and no 4:3 captures. The team list exists only in the
+  Competitive layout of the retained interface. The empty-weapon fallback is
+  covered by the native test and a source pin, not by a live match. The
+  timer list is written into recordings, but no recording was played back.
+  The cosmetic limits are applied by each player's own game module.
+- Noticed while testing, not changed here: with a remote client connected, a
+  developer build logs `idBitMsg::WriteBits: value overflow ... -16` for each
+  channel packet, from the packet tag protocol 2.42 writes as a signed short.
+
 ## Borderless and window changes on Wayland no longer stop the game starting, 15 November 2026
 
 - **Linux on Wayland: choosing Borderless Window no longer leaves openQ4

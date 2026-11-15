@@ -2041,9 +2041,12 @@ def mp_document() -> dict:
     lag = connection_notice(doc)
     arena = arena_presentation(doc)
     tags = name_tags(doc)
-    from remastered_hud_competitive import competitive, match_bar, team_status
+    from remastered_hud_competitive import competitive, crosshair_ammo, item_timers, match_bar, team_status
     matchbar = match_bar(doc)
     leading, trailing = team_status(doc)
+    # The client options (MP-15) show in every layout: each has its own setting.
+    ammo = crosshair_ammo(doc)
+    timers = item_timers(doc)
     doc.on("hudJoin", *doc.joins)
     doc.on("onInit", *doc.joins)
     # Competitive (ui_hudLayout 3) trades the standing or team panels, the
@@ -2067,8 +2070,8 @@ def mp_document() -> dict:
                                                             chrome("banners-shot", [banners])]),
                              chrome("matchbar-shot", [matchbar])]),
         anchor(doc, "tr", [chrome("tr-shot", [beyond_minimal(doc, "tr-full", [feed, ctx, lag])])]),
-        anchor(doc, "cr", [chrome("cr-shot", [trailing, stats])]),
-        anchor(doc, "cc", [chrome("cc-shot", [beyond_minimal(doc, "cc-full", [aim])])]),
+        anchor(doc, "cr", [chrome("cr-shot", [trailing, stats, timers])]),
+        anchor(doc, "cc", [chrome("cc-shot", [beyond_minimal(doc, "cc-full", [aim]), ammo])]),
         anchor(doc, "cl", [chrome("cl-shot", [leading, ballot])]),
         anchor(doc, "bl", [chrome("bl-shot", [chat_box(doc, talkers + lines + [chat_input(doc)])])]),
         anchor(doc, "bc", [chrome("bc-shot", [follow, respawn])], scale="hud.centerScale"),

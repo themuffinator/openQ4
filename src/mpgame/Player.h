@@ -7,6 +7,7 @@
 #define __GAME_PLAYER_H__
 
 #include "PlayerAirReadout.h"
+#include "mp/WeaponOrder.h"
 
 /*
 ===============================================================================
@@ -364,6 +365,10 @@ public:
 	idInventory				inventory;
 
 	rvWeapon*						weapon;
+	// openQ4 (MP-15): ui_weaponOrder as parsed, and the text it was parsed from
+	mpWeaponOrder_t			weaponOrder;
+	idStr					weaponOrderText;
+	bool					weaponOrderParsed;
 	idEntityPtr<rvViewWeapon>		weaponViewModel;
 	idEntityPtr<idAnimatedEntity>	weaponWorldModel;
 	const idDeclEntityDef*			weaponDef;
@@ -892,6 +897,9 @@ public:
 	rvViewWeapon*			GetWeaponViewModel	( void ) const;
 	idAnimatedEntity*		GetWeaponWorldModel ( void ) const;
 	int						GetCurrentWeapon	( void ) const;
+	// openQ4 (MP-15): mp/WeaponOrder.h
+	const mpWeaponOrder_t &	GetWeaponOrder		( void );
+	int						GetIdealWeapon		( void ) const { return idealWeapon; }
 
 	bool					IsGibbed			( void ) const;
 	const idVec3&			GetGibDir			( void ) const;

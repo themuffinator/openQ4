@@ -323,6 +323,12 @@ address to force IPv6.
 
 Bot settings are listed under [Bots](#bots).
 
+### What players may see and show
+
+**Not in 0.14.1.** `si_itemTimers` chooses who sees item respawn timers (`0` nobody, `1` spectators, `2` everyone),
+`si_maxBrightskin` caps brightskins, rimlights and outlines, and `si_forcedModels 0` turns forced player models off.
+See [Multiplayer Client Options](multiplayer-client-options.md#for-server-operators).
+
 ## Maps, rotation and the map queue
 
 **Not in 0.14.1.** openQ4 keeps one list of the multiplayer maps your server

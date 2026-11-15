@@ -189,6 +189,12 @@ extern idCVar	hud_hitMarker;
 extern idCVar	hud_hitMarkerScale;
 extern idCVar	hud_crosshairHitFlash;
 extern idCVar	hud_crosshairAnimated;
+extern idCVar	hud_hitSound;
+extern idCVar	hud_crosshairAmmo;
+extern idCVar	hud_crosshairNames;
+extern idCVar	hud_itemTimers;
+extern idCVar	hud_teamLocations;
+extern idCVar	hud_localClock;
 // openQ4 END
 
 extern idCVar	ik_enable;
@@ -525,6 +531,10 @@ extern idCVar	si_domCaptureTime;
 extern idCVar	si_domScoreRate;
 extern idCVar	si_ruleset;
 extern idCVar	si_classicGrapple;
+extern idCVar	si_itemTimers;
+extern idCVar	si_maxBrightskin;
+extern idCVar	si_forcedModels;
+extern idCVar	ui_weaponOrder;
 extern idCVar	g_hitFeedback;
 // openQ4 END
 
