@@ -7,6 +7,79 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Quad Hog, Vampiric Damage, Weapons Frenzy, weapon arenas and presets (MP-14), 15 November 2026
+
+- **Four more ways to play any map.** Beside Instagib, a server can now run
+  **Quad Hog** (Deathmatch: one Quad Damage is in play, whoever takes it
+  keeps it until they die, and only frags by or on the hog score),
+  **Vampiric Damage** (hurting an enemy heals you, and the map has no health
+  pickups), **Weapons Frenzy** (weapons and ammo come back in a quarter of
+  the time and carried ammo regenerates) and a **Weapon Arena** (everyone
+  carries one weapon of the server's choice with ammo that never runs out,
+  from the machinegun to the Dark Matter Gun). They work over Team
+  Deathmatch, Capture the Flag and the other game types, and the match name
+  says what is on: "Quad Hog Deathmatch", "Deathmatch (Rocket Launcher)".
+- **Presets set a whole match in one step.** **Preset** on Create Server's
+  new **Modifiers** tab, or `preset <name>` on a server, sets the game type,
+  ruleset, modifiers and limits together: `rocketarena`, `railarena`,
+  `nadefest`, `instagib`, `instactf`, `quadhog`, `vampiric`, `frenzy`,
+  `classic`, `classicctf` and `standard`, which puts everything back. A
+  server can add its own as a short text file in `baseoq4/presets`.
+- **Finer control for server operators.** `si_selfDamage`, `si_knockback`
+  and `si_fallDamage` are percentages (self damage 0 makes rocket jumps
+  free), `si_powerups 0` removes the map's powerups, and `si_weaponRespawn`
+  sets how long a picked-up weapon stays gone.
+- **You can see it before you join.** The server browser names a modified
+  match in its list and adds a Modifiers line to the details card; the
+  loading screen, scoreboard and in-game menu use the same name, in all
+  twelve languages.
+- Nothing changes on a server that turns none of this on, and the
+  single-player Arena campaign ignores all of it. **Instagib** moved from
+  the Rules tab to the Modifiers tab. See the
+  [server setup guide](../user/server-setup.md#modifiers-and-presets).
+- How it works: every modifier is a row of one table
+  ([reference](mp-modifiers.md)), resolved from the server info by a pure
+  function and latched with the game type on every peer before the map is
+  populated, so the pickups each peer leaves out agree; a change restarts
+  the match. A preset is a list of allow-listed settings that is parsed and
+  never executed, and `si_preset` is cleared once a setting it vouches for
+  has been changed by hand.
+- Evidence (Windows, OpenGL, hidden listen servers on stock maps with skill-4
+  bots, `mp_modifiers_smoke.py`): Quad Hog on `mp/q4dm1` spawned two quads, bots
+  took the quad five times, once from where the hog fell, and a quad nobody
+  reached was taken back after 20 s; of 23 frags the 12 by or on the hog scored,
+  and the final scores add up to those 12. Vampiric Team Deathmatch: 130 hits
+  healed their attacker for 975 health in all, none across a team, the highest
+  health was 166 of the 200 cap, and the map had no health pickup.
+  `preset rocketarena` restarted the match with all four players holding the
+  rocket launcher and gauntlet with unlimited ammo, no weapon, ammo or powerup
+  pickups and the stock health and armour; `si_instagib 1` set by hand cleared
+  `si_preset`; `preset standard` brought the stock pickups back; under Weapons
+  Frenzy an idle player's machinegun ammo went from 100 to 300; a preset file
+  with a forbidden setting was refused whole with its line number, and
+  `presets/friday.cfg` loaded as "Vampiric Team Deathmatch (Lightning Gun)".
+  `preset instactf` on `mp/q4ctf1` kept both flags, left no pickups and held its
+  capture limit of 8 through the restart. A second client joining a Vampiric
+  rocket arena without powerups, and one joining Quad Hog, latched the same
+  modifiers and title as the host, populated the same pickups, saw every
+  player's loadout and saw the Quad Damage on the hog; neither log reported an
+  entity disagreement. `mp_modifiers_contract.py` runs the shipped
+  `Modifiers.cpp` and `Presets.cpp` against doubles (the resolve rules, token
+  round trips over every combination, preset drift, preset files and the
+  commands), and `server_browser_contract.py` reads a modified server's reply,
+  hostile text included. In a capture of Create Server the Modifiers tab dimmed Quad Hog outside
+  Deathmatch; choosing Rocket Arena set `si_preset`, the arena, `si_powerups 0`
+  and both percentages and dimmed Weapons Frenzy, and Standard put them back;
+  the native retained-screens test passes its multiplayer pages with the tab's
+  checks. Not exercised in play: the three
+  percentages and `si_weaponRespawn` (contract only), Vulkan, a dedicated
+  server, the browser against a live modified server, and real input.
+- Open: no vote yet (`callvote modifier` and `callvote preset` arrive with
+  the casual vote work, MP-12); a managed competitive match does not record
+  the modifiers in its rules digest, and refuses the commands; Last Man
+  Standing is not built; the Modifiers tab's caption is sized to its longest
+  translation and draws smaller than the other tabs.
+
 ## Spectating that keeps up with the match, and a feed for broadcast overlays (MP-16), 15 November 2026
 
 - **Follow a player by name.** `follow <name>` takes any part of a name that

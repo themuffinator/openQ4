@@ -159,4 +159,10 @@ printing, for the vote surface MP-12 builds on them.
 - Last Man Standing on the Clan Arena state is not built.
 - The HUD shows the hog through the stock Quad Damage effect and the centre
   print; there is no dedicated hog marker on the scoreboard.
-- Bots do not seek the hog's quad as an objective.
+- Bots take the quad as they take any powerup (five times in a 150 s test
+  match); they do not hunt the hog as an objective.
+- The Create Server Modifiers tab's caption is sized to its longest
+  translation and draws smaller than its neighbours; the UI register has no
+  record of the tab or of the join card's eighth details line yet.
+- The three percentages and `si_weaponRespawn` are covered by the contract
+  only; no scripted run exercises them in play.

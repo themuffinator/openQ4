@@ -27,6 +27,7 @@ import argparse
 import json
 import os
 import re
+import socket
 import subprocess
 import time
 from pathlib import Path
@@ -92,12 +93,28 @@ REMOTE = {
     },
     "remote-quadhog": {
         "gametype": "DM", "map": "mp/q4dm1", "cvars": {"si_quadHog": "1"},
-        # the host takes the quad once the client is in (unless the quad spawned on it and it already has)
-        "host": ["set bot_pause 1", "addbot Cortez 4 exact"], "joined": ["teleport openq4_quad_hog_1"],
+        # The host takes the quad once the client is in. With the bots paused nobody else does, so the
+        # quad is taken back and respawned under the next name every 25 s: go to whichever is current.
+        "host": ["set bot_pause 1", "addbot Cortez 4 exact"], "joined": "quad",
         "client": ["waitMsec 20000", *checkpoint("client", True), "waitMsec 2000"],
         "timeout": 420,
     },
 }
+
+
+def free_port() -> int:
+    """A loopback UDP port nobody is listening on, with the next one free for the joining client."""
+    for _ in range(64):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as first:
+            first.bind(("127.0.0.1", 0))
+            port = first.getsockname()[1]
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as second:
+                    second.bind(("127.0.0.1", port + 1))
+                    return port
+            except OSError:
+                continue
+    raise RuntimeError("no free loopback port pair")
 
 
 def paced(lines: list, scale: float) -> list:
@@ -373,16 +390,23 @@ def run_remote(name: str, args) -> dict:
             streams.append(stream)
             processes[role] = subprocess.Popen(line, cwd=runtime, stdout=stream, stderr=subprocess.STDOUT)
         deadline = started + scenario["timeout"] * args.time_scale + args.extra_timeout
-        stage = 0
+        stage, hog_step = 0, None
         while time.time() < deadline and any(process.poll() is None for process in processes.values()):
             time.sleep(1.0)
             seen = logs["client"].read_text(encoding="utf-8", errors="replace") if logs["client"].is_file() else ""
             if stage == 0 and "execing mp_modifiers_smoke.cfg" in seen:
-                # the client's map is up: the host does its part once and goes back to idling
+                # the client's map is up: the host moves on to the script it idles on from here
                 write_script(saves["host"] / "baseoq4/mp_modifiers_joined.cfg", ["waitMsec 500", "exec mp_modifiers_joined.cfg"])
-                write_script(saves["host"] / "baseoq4/mp_modifiers_idle.cfg", [*scenario["joined"], "exec mp_modifiers_joined.cfg"])
+                write_script(saves["host"] / "baseoq4/mp_modifiers_idle.cfg", ["exec mp_modifiers_joined.cfg"])
                 stage = 1
-            elif stage == 1 and "MP_MOD_DONE_CLIENT" in seen:
+            if stage == 1 and scenario["joined"] == "quad":
+                served = logs["host"].read_text(encoding="utf-8", errors="replace") if logs["host"].is_file() else ""
+                quad = served.count("Quad Hog: a quad spawned")
+                step = [] if "took the quad" in served or quad == 0 else [f"teleport openq4_quad_hog_{quad}"]
+                if step != hog_step:
+                    hog_step = step
+                    write_script(saves["host"] / "baseoq4/mp_modifiers_joined.cfg", [*step, "waitMsec 1000", "exec mp_modifiers_joined.cfg"])
+            if stage == 1 and "MP_MOD_DONE_CLIENT" in seen:
                 # the client has reported: the host reports the same moment's world and ends the run
                 write_script(saves["host"] / "baseoq4/mp_modifiers_joined.cfg", [*checkpoint("host", True), "echo MP_MOD_DONE_HOST", "quit"])
                 stage = 2
@@ -530,7 +554,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=ROOT / ".tmp/mp-modifiers-smoke")
     parser.add_argument("--basepath", type=Path, default=Path(r"C:\Program Files (x86)\Steam\steamapps\common\Quake 4"))
     parser.add_argument("--render-api", choices=("gl", "vk"), default="gl")
-    parser.add_argument("--port", type=int, default=28961)
+    parser.add_argument("--port", type=int, default=0, help="server port; 0 picks a free loopback port for each scenario")
     parser.add_argument("--extra-timeout", type=int, default=0, help="seconds added to each scenario's timeout on a loaded machine")
     parser.add_argument("--time-scale", type=float, default=1.0,
                         help="stretch every scripted wait and timeout; a loaded machine runs the hidden game slower than the clock")
@@ -543,7 +567,9 @@ def main() -> int:
     if not (runtime / (args.executable_name or f"openQ4-client_x64{suffix}")).is_file() or not args.basepath.is_dir():
         parser.error("the runtime executable and installed Quake 4 assets are required")
     failed = False
+    chosen = args.port
     for name in args.scenario or [*SCENARIOS, *REMOTE]:
+        args.port = chosen or free_port()
         report = run_remote(name, args) if name in REMOTE else run(name, args)
         print(json.dumps(report, indent=2))
         failed = failed or bool(report["failures"])
