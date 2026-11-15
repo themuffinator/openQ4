@@ -1687,4 +1687,6 @@
 	"#str_232113"	"Hai scelto: "
 	"#str_232114"	"Non c'è nessuna scelta della mappa in corso."
 	"#str_232115"	"Questo server esclude questa mappa dalla coda: "
+	"#str_232300"	"morto"
+	"#str_232301"	"nessuno"
 }

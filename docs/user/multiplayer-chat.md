@@ -79,6 +79,11 @@ wide monitor they stay in the corner instead of floating inward. Offsets are
 measured from that edge and kept on screen. The default position clears the
 lower HUD; your own offsets can move chat over other HUD elements.
 
+### Chat tokens
+
+**Not in 0.14.1.** `#h`, `#a`, `#w`, `#l` and `#n` in a chat line become your health, armour, weapon, location and nearby
+team mates as the line is sent. See [Multiplayer Client Options](multiplayer-client-options.md#chat-tokens).
+
 ### Chat console commands
 
 | Command | What it does |

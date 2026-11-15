@@ -1687,4 +1687,6 @@
 	"#str_232113"	"Votre choix : "
 	"#str_232114"	"Aucun choix de carte n'est ouvert."
 	"#str_232115"	"Ce serveur exclut cette carte de la file : "
+	"#str_232300"	"mort"
+	"#str_232301"	"personne"
 }

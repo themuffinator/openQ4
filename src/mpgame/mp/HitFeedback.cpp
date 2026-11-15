@@ -287,6 +287,8 @@ void rvDamageNumbers::ClientReceive( const idBitMsg &msg ) {
 	// is the cue that the shot landed, and it is the same message either way.
 	rvHitMarker::Trigger( ( damage > 0 ) ? damage : HITMARKER_DAMAGE_UNKNOWN,
 						  HitMarkerFlagsForHit( flags ), HITMARKER_PRECISE );
+	// openQ4 (MP-15): the tone for what the hit was worth, when the player asked for tones
+	rvHitSounds::OnHitInfo( gameLocal.GetLocalPlayer(), damage, flags );
 
 	// g_hitFeedback 1 permits the cue but withholds the amount, and the amount
 	// is the whole of this feature
@@ -513,6 +515,7 @@ void rvDamageNumbers::ServerSend( idPlayer *victim, idEntity *attacker, int weap
 
 		rvHitMarker::Trigger( ( reported > 0 ) ? reported : HITMARKER_DAMAGE_UNKNOWN,
 							  HitMarkerFlagsForHit( flags ), HITMARKER_PRECISE );
+		rvHitSounds::OnHitInfo( attackingPlayer, reported, flags );
 		gameLocal.mpGame.damageNumbers.Add( origin, reported, weapon, flags );
 	}
 }

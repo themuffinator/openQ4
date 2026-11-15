@@ -29,6 +29,11 @@ UNDER_Y = BAR_Y + BAR_H + 2
 # Team status (atlas teamList): 138x14.5 u plates on a 16.5 u pitch from y 150.
 LIST_W, LIST_ROW, LIST_PITCH, LIST_Y, LIST_ROWS = 138.0, 14.5, 16.5, 150.0, 8
 TEAM_NAMES = ("#str_200197", "#str_200199")
+# A team mate's location beside their row, and the client options every layout
+# shows (MP-15): item timers on 8.6 u plates trailing at 633 u from y 96, the
+# time of day above them, and the ammunition 13 u right of the crosshair.
+LOCATION_W = 78.0
+ITEM_ROWS, ITEM_W, ITEM_ROW, ITEM_PITCH, ITEM_Y, ITEM_RIGHT = 6, 112.0, 8.6, 9.8, 96.0, 633.0
 AT_BASE, TAKEN, DROPPED = "#str_231251", "#str_231252", "#str_231253"
 
 
@@ -342,8 +347,13 @@ def team_list(doc: HudDocument, ident: str, team, *, trailing: bool) -> dict:
                         right=10 if trailing else LIST_W - 10, extra={"display": ui.keyword("none")})
         doc.bind(rid + "-ar.color", rid + "-ar", "color", colour_of([(op(">", f("armor"), 0), [1, 1, 1, 0.6])], [1, 1, 1, 0.25]))
         doc.show(armor["id"], NOT(dead))
+        # Where the player is (MP-15): beside the row on the view's side, cut at 78 u.
+        place_kw = {"right": -4} if trailing else {"x": LIST_W + 4}
+        place = text_at(doc, rid + "-loc", f("location"), 7.4, [1, 1, 1, 0.72], baseline=10.2,
+                        extra={**ellipsis(LOCATION_W), "display": ui.keyword("none")}, **place_kw)
+        doc.show(place["id"], AND(NOT(dead), op("!=", f("location"), "")))
         row = ui.group(rid, {**ui.absolute(left=u(x), top=u(y), width=u(LIST_W), height=u(LIST_ROW)), "display": ui.keyword("none")},
-                       [plate, band, *lit, mark, *weapons, cross, name, health, armor])
+                       [plate, band, *lit, mark, *weapons, cross, name, health, armor, place])
         doc.show(rid, op(">", count, i))
         rows.append(row)
     return full(ident, rows, display=ui.keyword("none"))
@@ -359,10 +369,53 @@ def team_status(doc: HudDocument) -> tuple:
         for i in range(LIST_ROWS):
             declare(doc, {f"oq4_ts{team}_{i}_name": "", f"oq4_ts{team}_{i}_weapon": -1, f"oq4_ts{team}_{i}_health": 0,
                           f"oq4_ts{team}_{i}_armor": 0, f"oq4_ts{team}_{i}_dead": False, f"oq4_ts{team}_{i}_you": False,
-                          f"oq4_ts{team}_{i}_followed": False})
+                          f"oq4_ts{team}_{i}_followed": False, f"oq4_ts{team}_{i}_location": ""})
     spectating = S("oq4_spectating")
     leading = team_list(doc, "tsl", sel(spectating, 0, S("oq4_my_team")), trailing=False)
     doc.show("tsl", AND(competitive(), team_mode()))
     trailing = team_list(doc, "tst", 1, trailing=True)
     doc.show("tst", AND(competitive(), team_mode(), spectating, op("==", S("stat_visible"), 0)))
     return leading, trailing
+
+
+# ---------------------------------------------------------------- client options
+
+def crosshair_ammo(doc: HudDocument) -> dict:
+    """The ammunition of the weapon in hand 13 u right of the crosshair
+    (hud_crosshairAmmo), in Chain at 0.80, #E46D56 when the weapon is low."""
+    declare(doc, {"oq4_xhair_ammo": "", "oq4_xhair_ammo_low": False})
+    node = text_at(doc, "xammo", S("oq4_xhair_ammo"), 9.6, [1, 1, 1, 0.8], x=333, baseline=244.6, face="chain",
+                   extra={"display": ui.keyword("none")})
+    doc.bind("xammo.color", "xammo", "color", colour_of([(S("oq4_xhair_ammo_low"), rgb(ERR, 0.9))], [1, 1, 1, 0.8]))
+    doc.show("xammo", op("!=", S("oq4_xhair_ammo"), ""))
+    return node
+
+
+def item_timers(doc: HudDocument) -> dict:
+    """The item timers the server admits this player to (si_itemTimers,
+    hud_itemTimers): up to six rows trailing at 633 u from y 96, each a plate
+    at 0.35 with the item's name and the time left in Chain (#FFBE23); an item
+    that is there reads in #B5C784 with no time. The time of day
+    (hud_localClock) sits above them at 0.60."""
+    declare(doc, {"oq4_it_count": 0, "oq4_local_clock": ""})
+    clock = text_at(doc, "localclock", S("oq4_local_clock"), 7.4, [1, 1, 1, 0.6], baseline=ITEM_Y - 4, face="chain",
+                    right=ITEM_RIGHT, extra={"display": ui.keyword("none"), "max-width": ui.length(u(ITEM_W))})
+    doc.show("localclock", op("!=", S("oq4_local_clock"), ""))
+    rows = [clock]
+    x = ITEM_RIGHT - ITEM_W
+    for i in range(ITEM_ROWS):
+        declare(doc, {f"oq4_it_{i}_name": "", f"oq4_it_{i}_time": "", f"oq4_it_{i}_up": False})
+        rid = f"itimer{i}"
+        up = S(f"oq4_it_{i}_up")
+        plate = plate_at(rid + "-plate", 0, 0, ITEM_W, ITEM_ROW, 0.35)
+        # A fixed box: the name is cut only when it would reach the time.
+        name = text_at(doc, rid + "-name", S(f"oq4_it_{i}_name"), 6.8, [1, 1, 1, 0.8], x=5, baseline=6.6,
+                       extra={**ellipsis(ITEM_W - 34), "width": ui.length(u(ITEM_W - 34))})
+        doc.bind(rid + "-name.color", rid + "-name", "color", colour_of([(up, rgb(OK))], [1, 1, 1, 0.8]))
+        time = text_at(doc, rid + "-time", S(f"oq4_it_{i}_time"), 7.6, rgb(VALUE), baseline=6.8, face="chain",
+                       right=ITEM_W - 5, extra={"max-width": ui.length(u(28))})
+        row = ui.group(rid, {**ui.absolute(left=u(x), top=u(ITEM_Y + i * ITEM_PITCH), width=u(ITEM_W), height=u(ITEM_ROW)),
+                             "display": ui.keyword("none")}, [plate, name, time])
+        doc.show(rid, op(">", S("oq4_it_count"), i))
+        rows.append(row)
+    return full("itimers", rows)

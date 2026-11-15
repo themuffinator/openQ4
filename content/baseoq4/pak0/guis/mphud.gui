@@ -4902,6 +4902,199 @@ windowDef Desktop
 			}
 
 		}
+		// openQ4 (MP-15): the competitive client options, in every layout of this
+		// interface: the ammunition of the weapon in hand beside the crosshair
+		// (hud_crosshairAmmo, red when the weapon is low), and at the trailing
+		// edge the item timers the server admits this player to (si_itemTimers,
+		// hud_itemTimers) under the time of day (hud_localClock). An item that
+		// is there reads in #B5C784 with no time.
+		windowDef oq4_xhair_ammo
+		{
+			rect	333,234,80,14
+			screenalignx	middle
+			screenaligny	middle
+			visible	1
+			text	"gui::oq4_xhair_ammo"
+			textscale	0.2
+			textalign	0
+			forecolor	1 - 0.106 * "gui::oq4_xhair_ammo_low",1 - 0.573 * "gui::oq4_xhair_ammo_low",1 - 0.663 * "gui::oq4_xhair_ammo_low",0.8
+			textstyle	1
+			font	"fonts/chain"
+		}
+		windowDef oq4_itimers
+		{
+			rect	0,0,640,480
+			screenalignx	right
+			screenaligny	middle
+			noclip	1
+			visible	1
+			windowDef oq4_localclock
+			{
+				rect	521,82,112,11
+				visible	1
+				text	"gui::oq4_local_clock"
+				textscale	0.155
+				textalign	2
+				forecolor	1,1,1,0.6
+				font	"fonts/chain"
+			}
+			windowDef oq4_it0_plate
+			{
+				rect	521,96,112,8.6
+				backcolor	0,0,0,0.35
+				visible	"gui::oq4_it_count" > 0
+			}
+			windowDef oq4_it0_name
+			{
+				rect	525,94.8,78,11
+				visible	"gui::oq4_it_count" > 0
+				text	"gui::oq4_it_0_name"
+				textscale	0.14
+				textalign	0
+				forecolor	1 - 0.29 * "gui::oq4_it_0_up",1 - 0.22 * "gui::oq4_it_0_up",1 - 0.48 * "gui::oq4_it_0_up",0.8
+				font	"fonts/lowpixel"
+			}
+			windowDef oq4_it0_time
+			{
+				rect	599,94.8,30,11
+				visible	"gui::oq4_it_count" > 0
+				text	"gui::oq4_it_0_time"
+				textscale	0.16
+				textalign	2
+				forecolor	1,0.745,0.137,1
+				font	"fonts/chain"
+			}
+			windowDef oq4_it1_plate
+			{
+				rect	521,105.8,112,8.6
+				backcolor	0,0,0,0.35
+				visible	"gui::oq4_it_count" > 1
+			}
+			windowDef oq4_it1_name
+			{
+				rect	525,104.6,78,11
+				visible	"gui::oq4_it_count" > 1
+				text	"gui::oq4_it_1_name"
+				textscale	0.14
+				textalign	0
+				forecolor	1 - 0.29 * "gui::oq4_it_1_up",1 - 0.22 * "gui::oq4_it_1_up",1 - 0.48 * "gui::oq4_it_1_up",0.8
+				font	"fonts/lowpixel"
+			}
+			windowDef oq4_it1_time
+			{
+				rect	599,104.6,30,11
+				visible	"gui::oq4_it_count" > 1
+				text	"gui::oq4_it_1_time"
+				textscale	0.16
+				textalign	2
+				forecolor	1,0.745,0.137,1
+				font	"fonts/chain"
+			}
+			windowDef oq4_it2_plate
+			{
+				rect	521,115.6,112,8.6
+				backcolor	0,0,0,0.35
+				visible	"gui::oq4_it_count" > 2
+			}
+			windowDef oq4_it2_name
+			{
+				rect	525,114.4,78,11
+				visible	"gui::oq4_it_count" > 2
+				text	"gui::oq4_it_2_name"
+				textscale	0.14
+				textalign	0
+				forecolor	1 - 0.29 * "gui::oq4_it_2_up",1 - 0.22 * "gui::oq4_it_2_up",1 - 0.48 * "gui::oq4_it_2_up",0.8
+				font	"fonts/lowpixel"
+			}
+			windowDef oq4_it2_time
+			{
+				rect	599,114.4,30,11
+				visible	"gui::oq4_it_count" > 2
+				text	"gui::oq4_it_2_time"
+				textscale	0.16
+				textalign	2
+				forecolor	1,0.745,0.137,1
+				font	"fonts/chain"
+			}
+			windowDef oq4_it3_plate
+			{
+				rect	521,125.4,112,8.6
+				backcolor	0,0,0,0.35
+				visible	"gui::oq4_it_count" > 3
+			}
+			windowDef oq4_it3_name
+			{
+				rect	525,124.2,78,11
+				visible	"gui::oq4_it_count" > 3
+				text	"gui::oq4_it_3_name"
+				textscale	0.14
+				textalign	0
+				forecolor	1 - 0.29 * "gui::oq4_it_3_up",1 - 0.22 * "gui::oq4_it_3_up",1 - 0.48 * "gui::oq4_it_3_up",0.8
+				font	"fonts/lowpixel"
+			}
+			windowDef oq4_it3_time
+			{
+				rect	599,124.2,30,11
+				visible	"gui::oq4_it_count" > 3
+				text	"gui::oq4_it_3_time"
+				textscale	0.16
+				textalign	2
+				forecolor	1,0.745,0.137,1
+				font	"fonts/chain"
+			}
+			windowDef oq4_it4_plate
+			{
+				rect	521,135.2,112,8.6
+				backcolor	0,0,0,0.35
+				visible	"gui::oq4_it_count" > 4
+			}
+			windowDef oq4_it4_name
+			{
+				rect	525,134,78,11
+				visible	"gui::oq4_it_count" > 4
+				text	"gui::oq4_it_4_name"
+				textscale	0.14
+				textalign	0
+				forecolor	1 - 0.29 * "gui::oq4_it_4_up",1 - 0.22 * "gui::oq4_it_4_up",1 - 0.48 * "gui::oq4_it_4_up",0.8
+				font	"fonts/lowpixel"
+			}
+			windowDef oq4_it4_time
+			{
+				rect	599,134,30,11
+				visible	"gui::oq4_it_count" > 4
+				text	"gui::oq4_it_4_time"
+				textscale	0.16
+				textalign	2
+				forecolor	1,0.745,0.137,1
+				font	"fonts/chain"
+			}
+			windowDef oq4_it5_plate
+			{
+				rect	521,145,112,8.6
+				backcolor	0,0,0,0.35
+				visible	"gui::oq4_it_count" > 5
+			}
+			windowDef oq4_it5_name
+			{
+				rect	525,143.8,78,11
+				visible	"gui::oq4_it_count" > 5
+				text	"gui::oq4_it_5_name"
+				textscale	0.14
+				textalign	0
+				forecolor	1 - 0.29 * "gui::oq4_it_5_up",1 - 0.22 * "gui::oq4_it_5_up",1 - 0.48 * "gui::oq4_it_5_up",0.8
+				font	"fonts/lowpixel"
+			}
+			windowDef oq4_it5_time
+			{
+				rect	599,143.8,30,11
+				visible	"gui::oq4_it_count" > 5
+				text	"gui::oq4_it_5_time"
+				textscale	0.16
+				textalign	2
+				forecolor	1,0.745,0.137,1
+				font	"fonts/chain"
+			}
+		}
 		// openQ4: the Remastered centre column (14.9): the frag notice, the main
 		// notice and the warm-up reason stack from y 81 and move down for each
 		// other, each on its own plate at 0.35 fitted to its line.

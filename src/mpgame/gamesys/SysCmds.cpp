@@ -5,6 +5,7 @@
 #include "../Game_local.h"
 #include "../mp/RoundGameState.h"
 #include "../mp/RoundModes.h"
+#include "../mp/ChatTokens.h"
 // RAVEN BEGIN
 #include "../ai/AI.h"
 #if !defined(__GAME_PROJECTILE_H__)
@@ -900,6 +901,16 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 	text.Replace( "&bsl;", "\\" );
 	text.Replace( "&amp;", "&" );
 
+	// openQ4 (MP-15): #h #a #w #l #n become the sender's health, armour, weapon,
+	// location and nearby team mates here, before the line leaves this client.
+	// A dedicated server's console has no player to speak for.
+	if ( gameLocal.isClient || cvarSystem->GetCVarInteger( "net_serverDedicated" ) == 0 ) {
+		idStr expanded;
+		if ( MPChatExpandForPlayer( gameLocal.GetLocalPlayer(), text.c_str(), args.Argc() > 2, expanded ) > 0 ) {
+			text = expanded;
+		}
+	}
+
 // asalmon: check to see if the text passes the live decency standard
 #ifdef _XENON
 	if(!Sys_VerifyString(text.c_str()))
@@ -958,6 +969,105 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 		networkSystem->ClientSendReliableMessage( outMsg );
 	} else {
 		gameLocal.mpGame.ProcessChatMessage( gameLocal.localClientNum, team, name, text, NULL, true );
+	}
+}
+
+/*
+==================
+Cmd_ListLocations_f
+
+openQ4 (MP-15): the landmarks this map names its places by, and the name of
+where the local player stands.
+==================
+*/
+static void Cmd_ListLocations_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer ) {
+		gameLocal.Printf( "listLocations can only be used in a multiplayer game\n" );
+		return;
+	}
+	rvMapLocations &locations = gameLocal.mpGame.locations;
+	const int count = locations.NumLandmarks();
+	for ( int i = 0; i < count; i++ ) {
+		idVec3 origin;
+		idStr name;
+		if ( locations.GetLandmark( i, origin, name ) ) {
+			gameLocal.Printf( "%3d  %-28s  %s\n", i, name.c_str(), origin.ToString( 0 ) );
+		}
+	}
+	gameLocal.Printf( "%d landmarks\n", count );
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( player != NULL ) {
+		const char *here = locations.NameForPoint( player->GetPhysics()->GetOrigin() );
+		gameLocal.Printf( "you are at: %s\n", here[ 0 ] ? here : "-" );
+	}
+}
+
+/*
+==================
+Cmd_OpenQ4ReportClientOptions_f
+
+openQ4 (MP-15) validation: what the competitive client options currently hold
+for the local player, one fact a line, so a smoke can read them from the log
+with no input. Cheat protected, like the other report commands.
+==================
+*/
+static void Cmd_OpenQ4ReportClientOptions_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !gameLocal.isMultiplayer || player == NULL ) {
+		gameLocal.Printf( "openq4_reportClientOptions requires multiplayer gameplay\n" );
+		return;
+	}
+	idMultiplayerGame &mp = gameLocal.mpGame;
+	const idVec3 &origin = player->GetPhysics()->GetOrigin();
+	const int weapon = player->GetCurrentWeapon();
+	const mpWeaponOrder_t &order = player->GetWeaponOrder();
+	gameLocal.Printf( "CLIENTOPT player slot=%d team=%d spectating=%d health=%d origin=%.0f,%.0f,%.0f yaw=%.0f\n",
+		player->entityNumber, player->team, player->spectating ? 1 : 0, player->health,
+		origin.x, origin.y, origin.z, player->viewAngles.yaw );
+	gameLocal.Printf( "CLIENTOPT weapon slot=%d def=%s ideal=%d order_listed=%d rank=%d\n", weapon,
+		( weapon >= 0 && weapon < MAX_WEAPONS ) ? player->spawnArgs.GetString( va( "def_weapon%d", weapon ) ) : "",
+		player->GetIdealWeapon(), order.listed, MPWeaponOrderRank( order, weapon ) );
+	gameLocal.Printf( "CLIENTOPT location landmarks=%d name=\"%s\"\n", mp.locations.NumLandmarks(), mp.locations.NameForPoint( origin ) );
+
+	for ( int i = 0; i < Min( gameLocal.numClients, MAX_CLIENTS ); i++ ) {
+		idEntity *ent = gameLocal.entities[ i ];
+		if ( ent == NULL || ent == player || !ent->IsType( idPlayer::GetClassType() ) ) {
+			continue;
+		}
+		idPlayer *other = static_cast< idPlayer * >( ent );
+		if ( other->spectating && other->wantSpectate ) {
+			continue;
+		}
+		mpTeamInfoEntry_t info;
+		mp.teamInfo.Resolve( other, info );
+		gameLocal.Printf( "CLIENTOPT mate slot=%d team=%d source=%s health=%d armor=%d weapon=%d origin=%d,%d,%d location=\"%s\"\n",
+			i, other->team, mp.teamInfo.UsesRecord( other ) ? "record" : "entity", info.health, info.armor, info.weapon,
+			info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ],
+			mp.locations.NameForPoint( idVec3( info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ] ) ) );
+	}
+
+	itemTimerRow_t rows[ MP_ITEMTIMERS_MAX_ROWS ];
+	const int count = mp.itemTimers.GetRows( rows, MP_ITEMTIMERS_MAX_ROWS );
+	gameLocal.Printf( "CLIENTOPT timers policy=%d count=%d\n", gameLocal.serverInfo.GetInt( "si_itemTimers", "1" ), count );
+	for ( int i = 0; i < count; i++ ) {
+		const idEntity *item = gameLocal.entities[ rows[ i ].entityNumber ];
+		const int left = ( rows[ i ].respawnAt > 0 ) ? Max( 0, rows[ i ].respawnAt - gameLocal.realClientTime ) : rows[ i ].respawnAt;
+		gameLocal.Printf( "CLIENTOPT timer row=%d kind=%d entity=%s left_ms=%d\n", i, rows[ i ].kind,
+			item != NULL ? item->name.c_str() : "?", left );
+	}
+
+	int tones = 0;
+	int stock = 0;
+	float pitch = 0.0f;
+	rvHitSounds::GetCounts( tones, stock, pitch );
+	gameLocal.Printf( "CLIENTOPT hitsound set=%d tones=%d stock=%d last_pitch=%.2f\n", hud_hitSound.GetInteger(), tones, stock, pitch );
+
+	if ( player->mphud != NULL ) {
+		gameLocal.Printf( "CLIENTOPT hud xhair_ammo=\"%s\" local_clock=\"%s\" it_count=%d it0=\"%s\"/\"%s\" aim=\"%s\" ts0=\"%s\"@\"%s\"\n",
+			player->mphud->GetStateString( "oq4_xhair_ammo" ), player->mphud->GetStateString( "oq4_local_clock" ),
+			player->mphud->GetStateInt( "oq4_it_count" ), player->mphud->GetStateString( "oq4_it_0_name" ),
+			player->mphud->GetStateString( "oq4_it_0_time" ), idStr( player->mphud->GetStateString( "aim_text" ) ).RemoveEscapes().c_str(),
+			player->mphud->GetStateString( "oq4_ts0_0_name" ), player->mphud->GetStateString( "oq4_ts0_0_location" ) );
 	}
 }
 
@@ -4237,6 +4347,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "listMaps",				Cmd_ListMaps_f,				CMD_FL_GAME,				"list the available maps" );
 	cmdSystem->AddCommand( "say",					Cmd_Say_f,					CMD_FL_GAME,				"text chat" );
 	cmdSystem->AddCommand( "sayTeam",				Cmd_SayTeam_f,				CMD_FL_GAME,				"team text chat" );
+	cmdSystem->AddCommand( "listLocations",			Cmd_ListLocations_f,		CMD_FL_GAME,				"lists the landmarks multiplayer place names come from" );
 	cmdSystem->AddCommand( "addChatLine",			Cmd_AddChatLine_f,			CMD_FL_GAME,				"internal use - core to game chat lines" );
 	cmdSystem->AddCommand( "gameKick",				Cmd_Kick_f,					CMD_FL_GAME,				"same as kick, but recognizes player names" );
 	cmdSystem->AddCommand( "give",					Cmd_Give_f,					CMD_FL_GAME|CMD_FL_CHEAT,	"gives one or more items" );
@@ -4392,6 +4503,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "matchSeriesBind",		idMultiplayerGame::SeriesBind_f,	CMD_FL_GAME,	"bind a current Duel connection after series recovery: matchSeriesBind <a|b> <client slot>" );
 	cmdSystem->AddCommand( "matchBroadcaster",		idMultiplayerGame::Broadcaster_f,	CMD_FL_GAME,	"grant or revoke broadcaster observation for a current spectator: matchBroadcaster <client slot> <on|off>" );
 	cmdSystem->AddCommand( "openq4_assertMPClientActive", Cmd_OpenQ4AssertMPClientActive_f, CMD_FL_GAME | CMD_FL_CHEAT, "fail validation unless the local multiplayer player is active and not spectating" );
+	cmdSystem->AddCommand( "openq4_reportClientOptions", Cmd_OpenQ4ReportClientOptions_f, CMD_FL_GAME | CMD_FL_CHEAT, "report the local player's competitive client options (weapon order, location, team info, item timers, hit sounds) to the console" );
 	cmdSystem->AddCommand( "openq4_reportMPState", Cmd_OpenQ4ReportMPState_f, CMD_FL_GAME | CMD_FL_CHEAT, "report local multiplayer phases, scores and player state to the console" );
 	cmdSystem->AddCommand( "openq4_reportMPWorld", Cmd_OpenQ4ReportMPWorld_f, CMD_FL_GAME | CMD_FL_CHEAT, "report one multiplayer entity's simulation, animation and powerup state" );
 	cmdSystem->AddCommand( "lagCompStatus", Cmd_LagCompStatus_f, CMD_FL_GAME, "report each client's lag-compensation lead, round trip, advertised remote extrapolation and rewind" );

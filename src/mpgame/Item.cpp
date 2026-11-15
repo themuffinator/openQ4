@@ -1021,6 +1021,8 @@ bool idItem::Pickup( idPlayer *player ) {
 		player->StartClassicMegaHealth();
 		classicMegaHolder = player;
 		classicMegaRespawn = respawn;
+		// openQ4 (MP-15): taken, and its timer waits with it
+		gameLocal.mpGame.itemTimers.OnHeld( this );
 		BecomeActive( TH_THINK );
 	} else if ( respawn && !dropped && !no_respawn ) {
 		const char *sfx = spawnArgs.GetString( "fx_Respawn" );

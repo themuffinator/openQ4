@@ -1678,4 +1678,6 @@
 	"#str_232113"	"Has elegido: "
 	"#str_232114"	"No hay ninguna elección de mapa abierta."
 	"#str_232115"	"Este servidor excluye ese mapa de la cola: "
+	"#str_232300"	"muerto"
+	"#str_232301"	"nadie"
 }

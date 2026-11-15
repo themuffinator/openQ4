@@ -144,6 +144,22 @@ static bool Player_UseCorpseSinkNoRagdoll( void ) {
 	return Player_GetCorpseSinkMode() >= 2;
 }
 
+/*
+================
+Player_ServerVisibilityLimit
+
+openQ4 (MP-15): the strongest brightskin, rimlight or outline the server lets a
+player put on another player. Read from the server info, so every client of a
+server draws under the same limit.
+================
+*/
+static float Player_ServerVisibilityLimit( void ) {
+	if ( !gameLocal.isMultiplayer ) {
+		return 1.0f;
+	}
+	return idMath::ClampFloat( 0.0f, 1.0f, gameLocal.serverInfo.GetFloat( "si_maxBrightskin", "1" ) );
+}
+
 static float Player_ClampedVisibilityCVar( const idCVar &cvar ) {
 	return idMath::ClampFloat( 0.0f, 1.0f, cvar.GetFloat() );
 }
@@ -277,7 +293,9 @@ static float Player_VisibilityStrength( const bool spectatorView, const bool tea
 		return Max( teamValue, enemyValue );
 	}
 
-	return teamColor ? teamValue : enemyValue;
+	// openQ4 (MP-15): a server may cap how strongly its players mark each other
+	// (si_maxBrightskin). Someone watching is not playing and keeps their own setting.
+	return Min( teamColor ? teamValue : enemyValue, Player_ServerVisibilityLimit() );
 }
 
 static bool Player_ParseVisibilityColor( const char *text, idVec3 &color ) {
@@ -333,6 +351,10 @@ static idVec4 Player_BrightSkinColor( const bool teammate, const float alpha ) {
 static const char *Player_ForcedModelCVarString( const idCVar &cvar ) {
 	const char *model = cvar.GetString();
 	if ( model == NULL || model[0] == '\0' || idStr::Icmp( model, "_disabled" ) == 0 ) {
+		return "";
+	}
+	// openQ4 (MP-15): a server may ask that every player is drawn as they chose to be
+	if ( gameLocal.isMultiplayer && !gameLocal.serverInfo.GetBool( "si_forcedModels", "1" ) ) {
 		return "";
 	}
 
@@ -1314,7 +1336,14 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
 					{
 						// client prediction should not get here
 						assert( !gameLocal.isClient );
- 						*idealWeapon = i;
+						// openQ4 (MP-15): a player who set ui_weaponOrder switches only to a
+						// weapon they rank above the one in hand. Buying always switches.
+						const mpWeaponOrder_t &order = owner->GetWeaponOrder();
+						if ( !gameLocal.isMultiplayer || !MPWeaponOrderActive( order ) ||
+							 gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ||
+							 MPWeaponOrderSwitchOnPickup( order, *idealWeapon, i ) ) {
+ 							*idealWeapon = i;
+						}
  					} 
  					if ( owner->hud && updateHud && lastGiveTime + 1000 < gameLocal.time && !checkOnly ) {
  						owner->hud->SetStateInt( "newWeapon", i );
@@ -1679,6 +1708,8 @@ idPlayer::idPlayer() {
 	lastSnapshotTime		= 0;
  
  	aimClientNum			= -1;
+	MPWeaponOrderClear( weaponOrder );
+	weaponOrderParsed		= false;
  
  	spawnedTime				= 0;
  
@@ -6957,6 +6988,30 @@ void idPlayer::LastWeapon( void ) {
 
 /*
 ===============
+idPlayer::GetWeaponOrder
+
+openQ4 (MP-15): the player's ui_weaponOrder, parsed against this player's own
+weapon slots and kept until the text changes. A bot and single player have
+none, which leaves every decision to Quake 4's rules.
+===============
+*/
+const mpWeaponOrder_t &idPlayer::GetWeaponOrder( void ) {
+	const idDict *userInfo = ( gameLocal.isMultiplayer && !IsFakeClient() ) ? GetUserInfo() : NULL;
+	const char *text = userInfo ? userInfo->GetString( "ui_weaponOrder" ) : "";
+	if ( !weaponOrderParsed || weaponOrderText.Cmp( text ) != 0 ) {
+		const char *names[ MAX_WEAPONS ];
+		for ( int slot = 0; slot < MAX_WEAPONS; slot++ ) {
+			names[ slot ] = spawnArgs.GetString( va( "def_weapon%d", slot ) );
+		}
+		MPWeaponOrderParse( text, names, MAX_WEAPONS, weaponOrder );
+		weaponOrderText = text;
+		weaponOrderParsed = true;
+	}
+	return weaponOrder;
+}
+
+/*
+===============
 idPlayer::NextBestWeapon
 ===============
 */
@@ -6968,6 +7023,26 @@ void idPlayer::NextBestWeapon( void ) {
  		return;
  	}
  
+	// openQ4 (MP-15): the best weapon the player's own order names that still has
+	// ammunition; Quake 4's choice below when the order names none of them.
+	const mpWeaponOrder_t &order = GetWeaponOrder();
+	if ( MPWeaponOrderActive( order ) ) {
+		unsigned int usable = 0;
+		for ( int slot = 0; slot < MAX_WEAPONS; slot++ ) {
+			weap = spawnArgs.GetString( va( "def_weapon%d", slot ) );
+			if ( weap[ 0 ] && ( inventory.weapons & ( 1 << slot ) ) != 0 && inventory.HasAmmo( weap ) ) {
+				usable |= 1u << slot;
+			}
+		}
+		const int ranked = MPWeaponOrderBest( order, usable );
+		if ( ranked >= 0 ) {
+			idealWeapon = ranked;
+			weaponSwitchTime = gameLocal.time + WEAPON_SWITCH_DELAY;
+			UpdateHudWeapon();
+			return;
+		}
+	}
+
  	while ( w > 0 ) {
 		w--;
 		weap = spawnArgs.GetString( va( "def_weapon%d", w ) );
@@ -8271,7 +8346,13 @@ void idPlayer::UpdateFocus( void ) {
  		idVec3 end = start + viewAngles.ToForward() * 768.0f;
 		gameLocal.TracePoint( this, trace, start, end, MASK_SHOT_BOUNDINGBOX, this );
 		// no aim text if player is invisible
- 		if ( ( trace.fraction < 1.0f ) && ( trace.c.entityNum < MAX_CLIENTS ) && ( !((idPlayer*)gameLocal.entities[ trace.c.entityNum ])->PowerUpActive( POWERUP_INVISIBILITY ) ) ) {
+		// openQ4 (MP-15): hud_crosshairNames 0 names nobody, 2 only team mates
+		bool aimNamed = ( trace.fraction < 1.0f ) && ( trace.c.entityNum < MAX_CLIENTS ) && ( !((idPlayer*)gameLocal.entities[ trace.c.entityNum ])->PowerUpActive( POWERUP_INVISIBILITY ) );
+		if ( aimNamed && hud_crosshairNames.GetInteger() != 1 ) {
+			const idPlayer *aimed = static_cast< const idPlayer * >( gameLocal.entities[ trace.c.entityNum ] );
+			aimNamed = hud_crosshairNames.GetInteger() == 2 && gameLocal.IsTeamGame() && aimed->team == team;
+		}
+ 		if ( aimNamed ) {
 			const char* teammateHealth = "";
 			idPlayer* p = static_cast<idPlayer*>(gameLocal.entities[ trace.c.entityNum ]);			
 			
@@ -14360,17 +14441,10 @@ void idPlayer::TriggerHitSound( bool armor ) {
 		rvHitMarker::Trigger( HITMARKER_DAMAGE_UNKNOWN, armor ? HITMARKER_ARMOR : 0,
 							  HITMARKER_COARSE );
 
-		const char* sound = NULL;
-
-		if ( armor ) {
-			spawnArgs.GetString( "snd_armorHit", "", &sound );
-		}
-		if ( sound == NULL ) {
-			spawnArgs.GetString( "snd_weaponHit", "", &sound );
-		}
-		if ( sound != NULL ) {
-			soundSystem->PlayShaderDirectly( SOUNDWORLD_GAME, sound );
-		}
+		// openQ4 (MP-15): hud_hitSound picks the cue. With a tone set the amount
+		// arrives in the hit-info message, so this pulse waits a moment for it and
+		// sounds Quake 4's cue only when none comes (mp/HitSounds.h).
+		rvHitSounds::OnPulse( this, armor );
 		
 		if ( aimClientNum != -1 ) {
 			if ( mphud ) {

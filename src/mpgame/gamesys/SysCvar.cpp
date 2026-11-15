@@ -140,6 +140,14 @@ idCVar si_domScoreRate(				"si_domScoreRate",			"5",			CVAR_GAME | CVAR_SERVERIN
 // Hit feedback.  Server side permission only - what an attacker actually sees
 // is theirs to choose through the hud_damageNumber* settings below.
 idCVar g_hitFeedback(				"g_hitFeedback",			"2",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "attacker hit feedback permitted by this server: 0 none, 1 announce the hit without the amount, 2 include the damage amount", 0, 2 );
+// openQ4 (MP-15): who may see when the powerups, mega health and armour return on a casual server.
+// Enforced where the list is sent (mp/ItemTimers.cpp); a managed match keeps its own disclosure policy.
+idCVar si_itemTimers(				"si_itemTimers",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "item respawn timers on a casual server: 0 nobody, 1 spectators only, 2 everyone including the players", 0, 2 );
+// openQ4 (MP-15): what a server lets its players do to how others look. Both are read by every
+// client from the server info; cl_player_brightskin_*, cl_player_rimlight_*, cl_player_outline_* and
+// g_force*Model stay the player's choice inside these limits.
+idCVar si_maxBrightskin(			"si_maxBrightskin",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_FLOAT, "strongest brightskin, rimlight and outline a player may put on other players: 0 none, 1 no limit", 0.0f, 1.0f );
+idCVar si_forcedModels(				"si_forcedModels",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "allow players to replace other players' models locally (g_forceModel, g_forceMarineModel, g_forceStroggModel)" );
 // openQ4 END
 idCVar si_fragLimit(				"si_fragLimit",				"10",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "frag limit", 0, MP_PLAYER_MAXFRAGS );
 idCVar si_timeLimit(				"si_timeLimit",				"10",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "time limit in minutes", 0, 60 );
@@ -207,6 +215,8 @@ idCVar ui_clan(						"ui_clan",					"",	CVAR_GAME | CVAR_USERINFO | PC_CVAR_ARCH
 idCVar ui_hitscanTint(				"ui_hitscanTint",			"120.0 0.6 1.0",	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "a tint applied to select hitscan effects.  Specified as a value in HSV color space. Hue [0.0-360.0] Saturation [0.0-1.0] Value [0.75-1.0]" );
 // RAVEN END
 idCVar ui_autoSwitch(				"ui_autoSwitch",			"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "auto switch weapon" );
+// openQ4 (MP-15): mp/WeaponOrder.h. Travels in the user info because the server makes both decisions.
+idCVar ui_weaponOrder(				"ui_weaponOrder",			"",				CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "weapons you would rather hold, best first, by name, short name or slot (\"rg rl lg hb ng gl sg mg\"): a pickup switches only to a weapon ranked above the one in hand, and an empty weapon falls back to the best ranked one with ammunition; blank keeps Quake 4's behaviour" );
 idCVar ui_autoReload(				"ui_autoReload",			"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "auto reload weapon" );
 idCVar ui_showGun(					"ui_showGun",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "show gun" );
 idCVar ui_ready(					"ui_ready",				si_readyArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "player is ready to start playing", idCmdSystem::ArgCompletion_String<si_readyArgs> );
@@ -262,6 +272,13 @@ idCVar hud_crosshairHitFlash(		"hud_crosshairHitFlash",	"0",			CVAR_GAME | CVAR_
 // cycles and stand down while it reloads, and hit feedback docks into the design.
 // Retained interface only: the stock interface keeps the still picture.
 idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "animated crosshair: the weapon's crosshair drawn live, answering shots, charge, reload and hits; needs ui_retained 1" );
+// openQ4 (MP-15): competitive HUD options. Multiplayer only, like the hit feedback above.
+idCVar hud_hitSound(				"hud_hitSound",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "sound on hits you land: 0 off, 1 Quake 4, 2 four tones falling with the damage dealt, 3 four tones rising with it; the tones need a server that reports amounts (g_hitFeedback 2)", 0, 3 );
+idCVar hud_crosshairAmmo(			"hud_crosshairAmmo",		"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show the ammunition of the weapon in hand beside the crosshair" );
+idCVar hud_crosshairNames(			"hud_crosshairNames",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "name the player under the crosshair: 0 off, 1 everyone, 2 team mates only; a team mate also shows health and armour", 0, 2 );
+idCVar hud_itemTimers(				"hud_itemTimers",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show item respawn timers when the server sends them to you (si_itemTimers)" );
+idCVar hud_teamLocations(			"hud_teamLocations",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "name where each team mate is in the team list" );
+idCVar hud_localClock(				"hud_localClock",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "show the time of day beside the match clock: 0 off, 1 24-hour, 2 12-hour", 0, 2 );
 // openQ4 END
 
 // change anytime vars
