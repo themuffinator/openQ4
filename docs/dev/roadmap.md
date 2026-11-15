@@ -20,9 +20,9 @@ multiplayer and audio are furthest along among the unfinished workstreams. Full
 campaign progression, physical-device qualification, rendering performance and the
 UI toolkit/editor/corpus remain major completion gates.
 
-| Progress measure, 8 November 2026 | Current result | Meaning |
+| Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **40 / 125 (32.0%)** | **85 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Formally closed roadmap tasks | **40 / 140 (28.6%)** | **100 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
 | Estimated category progress | **19 categories: 3 at 100%, 15 partial, 1 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -60,7 +60,7 @@ exact; the estimate column is deliberately approximate.
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **45%** | 0 / 6 | Map defect repros, worst-frame and visual review, campaign/MP/moveable coverage, interpolation review, Linux/ARM64 and the default decision. |
-| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **80%** | 3 / 11 | Human play, physical workflows and deferred peer qualification; retain MP-02's accepted timing caveat. |
+| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **55%** | 3 / 24 | Human play, physical workflows and deferred peer qualification; the 15 November reference-parity items (casual match flow, pools, modifiers, HUD, spectating, identity, moderation, discovery, movement) and the demo container, workflow, storage and robustness items; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
@@ -217,9 +217,9 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | Stage | Work to conduct | Exit condition |
 | --- | --- | --- |
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
-| 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
+| 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09, MP-12, MP-17 through MP-22, MP-24 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-09 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items (TOOL-01 through TOOL-04 closed 6 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16 and MP-23 (TOOL-01 through TOOL-04 closed 6 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
@@ -244,6 +244,9 @@ to a final project-wide phase. Important dependencies are:
 | Steam integration (STEAM-02 through STEAM-06) | STEAM-01's app-identity, licence and distribution decision first. Joining and invites use MP-08's interoperability contract and the existing MP join flow. Steam absent or disabled always runs the unchanged path. |
 | iOS and visionOS (IOS-02 through IOS-06) | IOS-01's patch inventory and build, layout and distribution decisions first. Shared fixes land through IOS-02, with regression evidence on the existing platforms, before the Apple targets build on them. visionOS stereo shares the VR stereo front end (VR-01/VR-06). Device qualification needs Apple hardware this project does not have. |
 | Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
+| Casual match flow, moderation and ranking (MP-12, MP-17, MP-18) | MP-17's identity decision before bans keyed to identity, reconnect restoration and ratings; casual timeouts and votes reuse the managed `MatchTime()` pause and proposal pipeline rather than a second one. Address bans, flood control and the inactivity policy need no identity. |
+| Demo container, workflow, storage and robustness (MP-21 through MP-24) | MP-21's container and registry before MP-22's client recording and MP-23's MVD compression; MP-24's fixtures accompany every format change. MP-05 stays closed at its selected scope, and every version a release wrote keeps its reader. |
+| Server discovery (MP-19) | A decision on a project-controlled master or list service before the Internet source can be qualified on a fresh install; Steam lobbies and matchmaking remain STEAM/OPT-09. |
 
 ## Governance and baseline evidence
 
@@ -3960,10 +3963,21 @@ networks and bot difficulty. They follow the
 fixtures never synthesize input. Each such gate stays open until its checklist
 result is recorded.
 
+Reference comparison, 15 November: the multiplayer offering was compared with
+Quake II Rerelease and Muff Mode, CPMA and Q4MAX
+([record](competitive-match-reference-audit.md#reference-comparison-against-quake-ii-rerelease-muff-mode-cpma-and-q4max-15-november-2026)). MP-12 through MP-20 take the
+gaps in features and play experience; MP-21 through MP-24 take the demo
+format's standardization, backward compatibility, robustness and storage
+efficiency. They add scope. They close nothing and reopen nothing that MP-01
+through MP-11 recorded, and casual servers keep their current behaviour until
+an option is turned on.
+
 ### MP completion checkpoints
 
-**Estimate: 80%; 3/11 tasks closed.** Most systems work and have substantial local
-evidence. MP-02's final long-match/catalog safety checks pass, with its timing
+**Estimate: 55%; 3/24 tasks closed.** The eleven original tasks stand where
+they were (80% against their own scope); the 15 November comparison added
+thirteen items that are mostly unstarted. Most shipped systems work and have
+substantial local evidence. MP-02's final long-match/catalog safety checks pass, with its timing
 contention caveat accepted for closeout; controlled timing remains unqualified.
 Simulated networking does not close physical peers. The 28 October
 WAN/cross-architecture deferral remains in effect and does not promote
@@ -3982,6 +3996,19 @@ prediction/rewind defaults.
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
 | MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. Bots use the hook as a route shortcut; the hook rides movers and lets go on teleport. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), Classic pickup names. |
+| MP-12 — Not started | Casual servers have warmup, ready, overtime, mercy, forfeit and twelve console votes with a 30 s cooldown; managed matches have timeouts, pauses, locks and typed proposals. | Casual timeouts, pause and locks; spectator lock, pause on disconnect, inactivity; intermission awards and next map; the full `callvote` set with limits and policies. |
+| MP-13 — Not started | `si_mapCycle` list, `mapcycle.scriptcfg`, the series pool and 128-map catalogs. | One structured map database with bounds and per-map configs; rotation, player queue, next-map pick or vote; every menu and filter reading it. |
+| MP-14 — Not started | `si_instagib` over any mode; the Classic ruleset; eight managed profiles. | Modifier layer (Quad Hog, Vampiric, Frenzy, single-weapon arenas, Last Man Standing), scales and switches, named votable presets; OPT-05's reserved modes stay hidden. |
+| MP-15 — Partial | Crosshair options, hit marker and damage numbers, brightskins/outlines/rimlights, forced models, lagometer, speed and input displays, four layouts, awards. | Chat tokens, damage-bucket hit sounds, weapon preference order, ammo on crosshair, target name/status, team overlay with locations, player timer policy, editor placement, cosmetic parity. |
+| MP-16 — Partial | Follow next/prev/free/slot live; coach, broadcaster and referee views with timers in managed matches; auto-track only in MVD playback. | Named follow list, live auto-follow, chase and death camera, casual caster role, live event stream, spectator chat policy; multi-POV and delay stay OPT-04. |
+| MP-17 — Not started | The managed roster restores team and score to a reconnecting player; per-weapon stats and awards within a match; schema-v2 reports in managed matches. | Identity decision and key-based implementation, reconnect restoration everywhere, profile and history, per-gametype rating, awards reel, casual exports; nothing uploaded. |
+| MP-18 — Partial | rcon2, the Admin page's kick/ban/switch, PBKDF2 referee, voice mute, `si_motd`. | Bans that work (identity and address), text mute, flood and connection caps, name policy, admin and match logs, an admin role, graceful shutdown. |
+| MP-19 — Not started | Browser with favourites, filters, find player and tiles; LAN scan; the default master is id's host. | A discovery service the project controls with a list fallback, recent servers, region sorting; a fresh install on each platform finds a server. |
+| MP-20 — Not started | Stock Quake 4 physics; Classic double jump and hook; `pm_jumpheight`, `pm_slidevelocity` and `pm_powerslide` synced. | Retail 1.4.2 movement parity evidence on the stock maps at 30, 60 and 90 tics; an optional ProMode-style movement ruleset the bots use. |
+| MP-21 — Partial | Render v14 block container with keyframes, 64-bit files and `compressDemo`; MVD 1.3 records with CRCs and readers for 1.0 to 1.2; the update policy. | One container for every stream, `demoConvert`, the format registry, per-version golden fixtures, byte-identical cross-platform reads in CI. |
+| MP-22 — Not started | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
+| MP-23 — Partial | The render container packs its stream 4.78:1; joints are predicted (v12). | MVD compression and field encodings, 2D/sound/effect encodings, `demoStats`, budgets and targets met byte-exact. |
+| MP-24 — Partial | Native codec flips, truncations and hostile payloads; MVD cut points and recovery; damaged render files play on. | One fuzz corpus for every reader; MVD worker-thread, 64-bit and hours-long recordings; cheats-off, under-load, Vulkan/Linux/macOS/ARM64 recording and playback; cross-platform determinism; a listening check. |
 
 Completion substeps:
 
@@ -3991,6 +4018,11 @@ Completion substeps:
   outcomes, including interruption and slot reuse, rather than only command paths.
 - **Peer breadth:** retain current local results; reopen deferred WAN/architecture
   qualification only within selected scope and preserve explicit unsupported cases.
+- **Reference parity:** land the casual match flow, map pools, modifiers, HUD
+  options, live spectating, identity, moderation and discovery items in their
+  dependency order; each keeps casual defaults unchanged until enabled.
+- **Demo format:** one container and its registry first, then client recording
+  and compression, with the robustness fixtures carried through every change.
 
 ### MP task evidence and acceptance
 
@@ -4985,6 +5017,235 @@ Completion substeps:
   no world deaths; q4ctf1 26 pulls (2 rescues, 1 unstick). q4ctf5's open
   walkways give the hook nothing to hold, so it planned two rescues and made
   no pulls there.
+
+- [ ] **MP-12 — P1, implementation: casual match flow and voting parity.** Bring
+  to every server what exists today only inside a managed match, or not at all,
+  measured against Muff Mode, CPMA and Q4MAX
+  ([comparison](competitive-match-reference-audit.md#reference-comparison-against-quake-ii-rerelease-muff-mode-cpma-and-q4max-15-november-2026)).
+  Team timeouts and a technical pause on casual Duel, Team DM, CTF and round
+  servers through the managed `MatchTime()` primitive, with a per-side budget
+  and a resume countdown; captain and operator team locks; a spectator lock
+  (`g_spectatorLock`); pause on a player's disconnect (`g_pauseOnDisconnect`);
+  an inactivity policy that warns, moves to spectators and then drops, and
+  never fires in a paused match; an intermission that shows the final
+  scoreboard, an awards reel and the next map before the cycle advances; and a
+  forfeit from the console. One vote surface with the names Quake players type
+  (`callvote`/`cv`): `map`, `nextmap`, `restart`, `gametype`, `ruleset`,
+  `modifier`, `preset`, `timelimit`, `scorelimit`, `roundlimit`, `overtime`,
+  `shuffle`, `balance`, `cointoss`, `random`, `kick`, `mute`, `readyall` and
+  `timeout`, each a typed operation through the managed pipeline's validation,
+  with a pass percentage, a per-map vote limit, a spectator-vote policy and the
+  existing cooldown, each disableable from `si_voteFlags`. Casual behaviour is
+  unchanged until a server turns an option on. Gates: asset-free contracts for
+  every new operation and vote, a live smoke with three humans on OpenGL and
+  Vulkan (timeout, pause on disconnect, inactivity, intermission, each vote),
+  the Create Server and Match Control rows localized in every language, and the
+  [competitive matches guide](../user/competitive-matches.md) and
+  [server setup guide](../user/server-setup.md) updated.
+- [ ] **MP-13 — P2, implementation: map pools, rotation and the player queue.**
+  Replace the `si_mapCycle` string and `mapcycle.scriptcfg` with one structured
+  map database (Muff Mode `mapdb.json`, CPMA `map_cfgdir`): for each stock or
+  installed map, the modes it supports, its player-count bounds and an optional
+  per-map configuration applied at load and reverted at unload; maps discovered
+  rather than listed. A rotation that respects the bounds and the current
+  player count; a player queue (`mymap`, one entry a player, consumed at the
+  next change); an end-of-match pick from three candidates or a next-map vote;
+  and the series pool, the Create Server catalogue, the Vote and Admin pages,
+  the browser filters and the bots' map checks read the same database. Gates:
+  a contract that every menu, filter and vote enumerates the database and
+  nothing else; a dedicated-server rotation smoke over bounds, queue and pick
+  with bots; the [server setup guide](../user/server-setup.md) updated.
+- [ ] **MP-14 — P2, decision and implementation: rulesets, modifiers and presets.**
+  Muff Mode layers Instagib, Quad Hog, Vampiric Damage, Weapons Frenzy and
+  NadeFest over any mode and names 58 presets; CPMA composes modes from
+  `modes/*.cfg`. openQ4 has `si_instagib` over any mode, `si_ruleset` (stock or
+  Classic) and eight managed profiles. Define one modifier layer in the rules
+  core, each modifier a replicated flag with its own HUD and browser label:
+  Quad Hog (one quad, the carrier scores), Vampiric Damage, Weapons Frenzy
+  (fast respawns and regenerating ammo), a single-weapon arena family built
+  from Quake 4's own weapons, a Last Man Standing round mode on the Clan Arena
+  state, and self-damage, knockback and fall-damage scales with weapon-respawn
+  and powerup switches. Named presets (`si_preset`: a compiled table plus
+  `presets/<name>.cfg`) set gametype, ruleset, modifiers and limits atomically
+  at a match boundary, votable and selectable in Create Server. OPT-05 kept
+  factories and rulesets outside scope; MP-11 has since shipped a ruleset, so
+  this item records the decision in its place. Overload, Harvester, Domination
+  and Attack & Defend stay reserved under OPT-05. Gates: each modifier has a
+  contract, a bot run and a predicted remote-client run on OpenGL and Vulkan;
+  presets round-trip through vote, Create Server and `si_matchRules`; the
+  browser and join card show the active modifiers; a person plays each
+  modifier once with real input.
+- [ ] **MP-15 — P2, implementation: competitive HUD and client options.** CPMA's
+  SuperHUD, Q4MAX's HUD scripts and Muff Mode's client commands set the
+  expectation. openQ4 already has crosshair size, colour, custom art, animation
+  and hit flash, the hit marker and damage numbers under `g_hitFeedback`,
+  brightskins with outlines and rimlights, forced models, the lagometer, the
+  speed and input displays, four HUD layouts and the stock awards. Add: chat
+  tokens expanded on the sender (`#h`, `#a`, `#w`, `#l`, `#n`: health, armour,
+  weapon and ammo, location, nearby teammates); hit sounds by damage bucket
+  from a selectable set, with the armour variant kept; a weapon preference
+  order for auto-switch and empty-weapon fallback; the ammo count beside the
+  crosshair; the target's name and status under the crosshair for teammates; a
+  team overlay with location names and the weapon carried (the Competitive
+  layout shows health and armour only); a server item-timer policy with a
+  third state that lets players see the timers; a frag line and match/local
+  clocks; and a cosmetic-parity policy for what a server may restrict
+  (brightskin intensity, forced models), enforced where the snapshot is
+  written. Element placement goes through the retained HUD and its editor
+  (UI-06), not a second scripting format. Gates: every element in the
+  Remastered, Minimal, Competitive and Classic layouts with register rows under
+  UI-11, captures on OpenGL and Vulkan at 4:3 and 16:9, localization, and a
+  person judging hit sounds and tokens in play.
+- [ ] **MP-16 — P2, implementation: live spectating and casting.** Give live
+  spectators what MVD playback already has: follow by name from a named list,
+  auto-follow of the killer, the leader, a powerup carrier or a flag carrier
+  with manual override, first- and third-person follow views and a chase camera
+  (also offered as the death camera), and a free-camera speed setting; a
+  casual broadcaster role (both teams' vitals and timers) without a managed
+  profile; a typed live event stream (the match journal's events as they
+  happen) for overlay tools; and a votable spectator chat policy
+  (`g_spectatorChat`, mute spectators). Multi-POV live views, delayed
+  broadcast and relay transport remain OPT-04 decisions. Gates: recipient
+  filtering holds for every new camera (byte-level checks as in MP-01), a live
+  smoke on OpenGL and Vulkan, the event stream consumed by a sample overlay in
+  `tools/`, and the [competitive matches guide](../user/competitive-matches.md)
+  updated.
+- [ ] **MP-17 — P1, decision and implementation: player identity, persistence
+  and ranking.** `com_guid` is read-only and never written, so GUID bans do
+  nothing and no feature can recognise a returning player; the archived plan
+  rejected counterfeit identity from names or addresses. Decide and build an
+  opt-in identity: a client-generated key pair whose public key signs a server
+  challenge, no account and no network service, optionally bound to a Steam
+  identity under STEAM-02; the server stores a hash and a player can reset the
+  key. On it: reconnect restoration on every server (team, score, seat, Duel
+  queue place and, in round modes, the round's inventory; Muff Mode restores by
+  social id and offers `ghost <code>` as the fallback); working bans (MP-18); a
+  local player profile with match history; a per-gametype skill rating (Muff
+  Mode uses Elo with K 48 for a player's first 20 rated matches, then 32); an
+  awards reel and a `stats` command with accuracy at the end of any match;
+  casual-server match exports in the managed schema-v2 JSON plus a readable
+  summary and a catalogue; and an opt-in local ranking table on the server.
+  Nothing is uploaded. Gates: the key protocol reviewed against replay and
+  slot-reuse (the MP-01 identity guards), rating fixtures against a known
+  sequence, reconnect smokes across every mode, privacy notes in the
+  [server security guide](../user/server-security.md).
+- [ ] **MP-18 — P1, implementation: server administration and moderation.**
+  openQ4 has rcon2, the Admin page's kick, ban and team switch, the PBKDF2
+  referee, voice mute and `si_motd`; its bans are keyed to a GUID that is never
+  sent, and there is no address ban, text mute, flood control, inactivity
+  policy or admin log. Add: bans by identity (MP-17) and by address with prefix
+  lengths for IPv4 and IPv6, with expiry and reasons, migrating `banlist.txt`;
+  text-chat mute by slot and by vote; chat and command flood protection; the
+  per-address connection cap left open by the netcode audit; a name policy
+  (reserved names, length, control characters, a name already in use by a
+  connected player); a kick/ban log and an NDJSON match log for casual
+  servers; an admin role between referee and rcon for a listen host or a
+  trusted admin (Muff Mode `admin <password>`), using the match pipeline's
+  capabilities and never the file system; graceful shutdown (announce, finish
+  the match, stop); and `status` output that shows identity and address.
+  Gates: `network_security.py` pins the caps and policies, an asset-free
+  contract per command, a dedicated smoke over ban, mute, flood and shutdown,
+  and the [server security guide](../user/server-security.md) updated.
+- [ ] **MP-19 — P1, decision and implementation: server discovery.** `net_master0`
+  defaults to id's `q4master.idsoftware.com:27650`; the name resolves today,
+  but no openQ4 evidence shows it listing openQ4 servers and the project does
+  not control it. Decide and provide a discovery path the project controls: an
+  openQ4 master (heartbeat and query protocol documented, IPv4 and IPv6,
+  several masters, operator-run instances) with an HTTPS server-list fallback
+  the browser can read; the browser adds recent servers, region/ping sorting
+  and persistence; friends and recent-player lists stay local. Steam lobbies
+  remain STEAM/OPT-09. Gates: a fresh install on Windows, Linux and macOS lists
+  a test server from the Internet source; a master outage falls back and says
+  so; `server-setup.md` and `multiplayer-networking.md` updated.
+- [ ] **MP-20 — P1, qualification and implementation: movement parity and a
+  ProMode-style option.** Qualify openQ4's player movement against retail 1.4.2
+  on the stock multiplayer maps (strafe jumps, crouch slides, ramp and jump-pad
+  flights, stairs and the known trick jumps), frame-exact at `si_fps 30` and
+  bounded at 60 and 90 with HF-01's clocks, through `in_movementProbe` scripts
+  and the retail binary on the same inputs
+  (the [retail baseline ledger](retail-baseline-ledger.md) records the retail runs). Then an optional
+  movement ruleset in the MP-14 layer: air control, double jumps everywhere,
+  ramp-jump boost, faster weapon switches and an armour-system choice (CPMA's
+  CPM lineage), as `pm_` server cvars the bots read (MP-09). Gates: a recorded
+  parity table per map and tick rate with any divergence named and fixed or
+  accepted; the option's physics predicted on a remote client without
+  corrections; a person plays both rulesets with real input.
+- [ ] **MP-21 — P1, decision and implementation: one demo container and a
+  compatibility registry.** Two streams, two containers today: MVD 1.3 writes
+  CRC-checked records with no compression and its own index and keyframe
+  directory; render demos v14 write the `OQ4B` block container (long-range
+  matches and DEFLATE, a CRC per block, a timeline from headers alone, 64-bit
+  files; [design](multiview-demos.md#block-container-keyframes-and-large-files-v14-14-november-2026)).
+  Standardize on the block container for every stream (MVD, render and
+  MP-22's client network demo) with one header, trailer, timeline and keyframe
+  directory; one `demoConvert` that turns any readable historical file into the
+  current container without changing its playback, replacing `compressDemo`;
+  and one format registry document listing every version a release has
+  written with its reader status. Backward compatibility: every version a
+  shipped release wrote keeps its reader and golden fixtures (complete,
+  interrupted, truncated, corrupt, unknown optional, unknown required, older
+  and newer minor), forward compatibility by optional records, and the
+  [update policy](multiview-demos.md#update-policy) as written; MVD 1.0 to 1.3
+  stay readable. Cross-platform byte-identical reads of every fixture on
+  Windows, Linux, macOS and ARM64 in CI. MP-05 stays closed at its selected
+  scope. Gates: the registry, the fixtures in `tools/tests`, the converter
+  round-tripping each fixture, and a play-through of a converted file of each
+  kind on OpenGL and Vulkan.
+- [ ] **MP-22 — P1, implementation: the player's demo workflow.** A player who
+  is not hosting cannot record a match today; only the server writes an MVD,
+  and a render demo keeps the local view at ten times the size. Add
+  client-side recording on any server: a network demo (received snapshots and
+  the player's own commands) in the MP-21 container, started by `record`, by
+  autoaction (`ui_autoAction demo ss stats`, driven by the countdown-to-live
+  edge, stopped at the result) or by a server's `si_autoAction`, named by
+  `MPBuildMatchBasename`; playback from the recorded point of view with the
+  same deck as MVD and follow of what the recording carried. Complete the
+  deck: a named player list, reverse scrubbing from keyframes, frame-accurate
+  stepping, `timeDemo` for MVD and network demos (benchmark and determinism
+  checks the FPS items can use), video and image export (a PNG sequence with
+  WAV, optional pipe to an external encoder) in place of the unfinished AVI
+  path, generated thumbnails and library metadata (players, map, mode, result,
+  markers; searchable), and a content-mismatch message that names the pak.
+  Retail `.demo` and `.netdemo` files stay Legacy unless a reader is decided
+  here. Gates: a client records on a cheats-off dedicated server and plays it
+  back on OpenGL and Vulkan, the deck features each have a fixture, export
+  verified frame-exact against captures, and the
+  [demos guide](../user/multiview-demos.md) updated.
+- [ ] **MP-23 — P2, measured optimization: demo storage efficiency.** MVD is
+  written uncompressed; the render container reaches 4.78:1 on its stream and
+  the v12 joint predictor cut 24.5%. Budgets first: MVD bytes a minute for a
+  12-player CTF match and a Duel, render demo MB/s at 60 frames a second on a
+  busy and a quiet level, with a `demoStats` command reporting the split by
+  record category. Then MVD through the block codec; field encodings in the
+  snapshot (varint and zigzag deltas against the baseline as v12 does for
+  joints, packed PVS words); keyframe cost held under 2% of the file; render
+  demo 2D, sound and effect encodings (28%, 21% and 13% of the uncompressed
+  stream); window and anchor tuning; ratios compared with xz as the ceiling;
+  and the recording thread's CPU per block held so that recording adds no
+  measurable frame time (HF-02's budget). Targets: MVD at least 3:1 against
+  today's 1.3 bytes, render demos at most 0.5 MB/s on the busy level at 60
+  frames a second, both byte-exact against uncompressed playback. Gates: the
+  measurements recorded in [multiview demos](multiview-demos.md), the native
+  codec test extended to each encoding, and `compressDemo`/`demoConvert`
+  reproducing the ratios on the fixtures.
+- [ ] **MP-24 — P1, qualification: demo robustness and platform breadth.** The
+  render container has native coverage of 416 header flips, 2,264 truncations
+  and hostile payloads; MVD has 2,032 cut points through `mvdRecover` and a
+  CRC per record. Close the gaps with one fuzz and mutation harness for every
+  reader (both containers, every record type, hostile lengths, duplicate and
+  out-of-order records, directories that lie about offsets) under time and
+  memory bounds: playback never crashes or fatals, always reports the offset,
+  and keeps a hostile-file corpus under `tools/tests`. Give MVD what render
+  demos have: worker-thread writing with at most half a second lost to a
+  crash, 64-bit files past 2 GiB (revisit the 1,024 MB default), and a real
+  hours-long recording of each kind. Qualify recording and playback on a
+  cheats-off dedicated server, under CPU load with no frame-time hitch
+  (measured), on Vulkan, Linux, macOS and ARM64 for both kinds, the same file
+  played on two platforms giving identical state checksums (the float-text and
+  FP-flag traps), and a person listening to a recorded demo once. Gates: the
+  harness in CI, the recordings and checksums recorded in
+  [multiview demos](multiview-demos.md), and the platform rows in the
+  [capability matrix](engine-capability-matrix.md).
 
 ## Audio and voice
 
@@ -6001,8 +6262,8 @@ do not establish an accepted delivery scope for these ambitions. To advance one:
 | OPT-01 | Higher authoritative simulation rates: separate physics/script/prediction/demo/content design after HF-01 through HF-07; do not change tick rate to claim higher FPS. |
 | OPT-02 | GPU skinning promotion for animation-heavy content: batch GL dispatches/persist source buffers and prove benefit. Current stock workloads did not justify default promotion. |
 | OPT-03 | True HDR10/scRGB output, sparse/virtual textures, broad GPU-driven/async-compute work, background shader compilation, shadowed light-injected volumetrics and world-space GI: require measured need, target content/hardware and classic rollback. |
-| OPT-04 | Live relay/delayed broadcast, multi-POV/multi-window audio, compression/export, persistent competitive identity/web/brackets: separate security, capacity, backpressure and reconnect designs. Forced client screenshots remain rejected. |
-| OPT-05 | Overload/Harvester/Domination/Attack and Defend: keep unavailable until authoritative objectives/scoring, networking, bots and UI exist. Race/factories/rulesets remain outside accepted current scope. |
+| OPT-04 | Live relay/delayed broadcast, multi-POV/multi-window audio and web/brackets: separate security, capacity, backpressure and reconnect designs. Forced client screenshots remain rejected. Demo compression and export moved to MP-23/MP-22 and persistent identity to MP-17 on 15 November 2026. |
+| OPT-05 | Overload/Harvester/Domination/Attack and Defend: keep unavailable until authoritative objectives/scoring, networking, bots and UI exist. Race remains outside accepted scope; rulesets, modifiers and presets moved to MP-11/MP-14 on 15 November 2026. |
 | OPT-06 | Awakening's unreachable grapple/concussion/tether/gravgun/compass content: explicit content-completion project, not a blocker for the integrated SP campaign. No expansion multiplayer module. |
 | OPT-07 | HDR audio, ducking, geometric obstruction and reverb editing: optional authored-mix changes after retail audio qualification. |
 | OPT-08 | Additional idTech titles, wholesale SP/MP source unification, broad third-party feature ports and extra cosmetic color syntax: require a product/maintenance decision, source/license review and concrete benefit; the old TODO is not an implementation mandate. |

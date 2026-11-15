@@ -1367,3 +1367,75 @@ the OpenGL run.
 These do not close MP-01: physical localized keyboard and controller workflows
 remain (see the [human qualification checklists](mp-human-qualification.md)),
 along with other platforms.
+
+## Reference comparison against Quake II Rerelease, Muff Mode, CPMA and Q4MAX (15 November 2026)
+
+A fresh comparison of the whole multiplayer offering, requested 15 November,
+against the competitive offerings players measure a Quake game by: the Quake II
+Rerelease and its Muff Mode (`DarkMatter-Productions/MuffMode`, 0.85.1 with
+unreleased rows above it), CPMA for Quake 3 and Q4MAX for Quake 4. It adds
+roadmap items MP-12 through MP-24; it changes no earlier conclusion in this
+document, and the two matrix rows it supersedes (persistent identity, which
+moves from rejected/deferred to the MP-17 decision, and delayed live broadcast,
+which keeps its OPT-04 boundary) are noted below.
+
+**Sources and their limits.** Muff Mode: the repository README and its player
+guide, gameplay reference, rulesets, configuration reference and changelog,
+read on the day. Quake II Rerelease: id's game-module README (40 Hz logic,
+protocol 2023, split-screen userinfo suffixes, anti-lag hitscan carried by a
+per-command server frame, full-float movement, trick jumps as a movement type,
+instanced items); its product pages were unreadable, so lobby, crossplay and
+bot claims rest on the module README alone. CPMA: `playmorepromode.com` and its
+custom-modes, SuperHUD, server-settings, demo-playback and client-settings
+guides. Q4MAX: no documentation was reachable (`q4max.com` is now unrelated
+content, the archive and Mod DB refused fetches), so its rows rest on this
+project's archived recon in
+[the competitive plan](archive/2026-10-18/plans/2026-07-28-competitive-multiplayer.md)
+(`g_allowMultipov`, `maplist`, `g_crosshairblink` with hit beeps, pause outside
+Tourney) and on the community's documented feature set; they are marked
+*recalled* and were not verified against a Q4MAX source this round. openQ4's
+column was read from the source (game module under `src/mpgame/`, engine under
+`src/framework/`), not from this document's earlier claims.
+
+| Concern | References | openQ4 today | Gap | Owner |
+| --- | --- | --- | --- | --- |
+| Gametypes | Muff Mode: FFA, Duel, TDM, CTF, Clan Arena, Arena Rooms, Freeze Tag, Capture Strike, Red Rover, Last Man Standing, Horde. CPMA: 1v1, FFA, TDM, CTF, CA, Freeze Tag, Capture Strike, NTF, Hoony Mode. Q4MAX (recalled): DM, Tourney, TDM, CTF, Arena CTF, Clan Arena. | Twelve public modes: DM, Tourney, Team DM, CTF, One Flag, Arena CTF, Arena One Flag, DeadZone, Duel, Clan Arena, Freeze Tag, Red Rover (`src/mpgame/mp/GameTypes.cpp`); Overload, Harvester, Domination and Attack & Defend reserved and hidden. | Last Man Standing, Capture Strike and single-weapon arena rounds; Race and Horde absent. | MP-14 (modifiers and round variants); OPT-05 (reserved modes, Race). |
+| Rulesets, modifiers, presets | Muff Mode: six rulesets, Instagib, NadeFest, Vampiric Damage, Weapons Frenzy and Quad Hog over any mode, 58 named presets, all votable. CPMA: CPM/PMC/CQ3/VQ3 gameplay and `modes/*.cfg` composition. | `si_instagib` over any mode, `si_ruleset` 0/1 (stock, Classic), eight managed `g_matchProfile` profiles. | A modifier layer, named presets, votable composition, self-damage/knockback/fall-damage scales. | MP-14. |
+| Movement | CPMA: air control, double and ramp jumps, armour systems, weapon-switch timing, four gameplay models. Quake II Rerelease: full-float movement, trick jumps as a type. | Stock Quake 4 physics with a fixed air acceleration (`Physics_Player.cpp`), Classic double jump and hook, three synced `pm_` cvars; no parity evidence against retail 1.4.2. | Retail movement parity on the stock maps; an optional ProMode-style ruleset. | MP-20. |
+| Casual match flow | Muff Mode: timeouts, match lock, overtime, mercy, forfeit, awards reel and a three-map pick after the match. CPMA: timeouts for every captain, overtime modes, `match_maxsuicides`. Q4MAX (recalled): ready, timeouts, referee. | Warmup, ready percentage, overtime and sudden death, mercy and forfeit on every server; timeouts, technical pause and team locks only in managed matches (`mp/match/MatchProtocol.h`); no intermission beyond the scoreboard. | Casual timeouts, pause and locks; spectator lock, pause on disconnect, inactivity; awards and next map at intermission. | MP-12. |
+| Voting | Muff Mode: about twenty `callvote` options including shuffle, balance, cointoss, random, ruleset, factory, ready-all and handicap, with flags and a spectator policy. CPMA: about forty votable settings, `vote_limit`, `vote_percent`, `map_delay`, referee votes. | Twelve console votes plus a packed ballot (shuffle, tourney limit), `si_voteFlags`, a 30 s per-player cooldown, humans only (`MultiplayerGame.h`); managed matches use typed proposals. | Cointoss, random map, ruleset/modifier/preset, ready-all, mute, timeout and overtime votes; pass percentage, per-map limit and spectator policy; `cv` aliases. | MP-12. |
+| Map pool and rotation | Muff Mode: `mapdb.json`, a pool file, a cycle, a `mymap` queue, end-of-match pick. CPMA: `map_cfgdir`, `map_rotate`, `map_delay`, multi-arena maps. Q4MAX (recalled): `maplist`. | `si_mapCycle` string, `mapcycle.scriptcfg`, the series pool, 128-map menu catalogs. | One structured map database with bounds and per-map configs, a player queue, a next-map pick or vote. | MP-13. |
+| Administration | Muff Mode: `admin <password>` with about twenty commands, `boot`, graceful shutdown, a match log. CPMA: `ref_password`, kick/remove votes, flood protection, `g_inactivity`, MOTD lines. | rcon2, the Admin page's kick/ban/switch, PBKDF2 referee, `serverVoiceMute`, `si_motd`; GUID bans keyed to a GUID the client never sends (`com_guid` is read-only, `Session.cpp`), no address bans (`mpBanInfo_t`), no text mute, flood control, inactivity policy or admin log. | Bans that work, text mute, flood and connection caps, name policy, logs, an admin role, graceful shutdown. | MP-18; MP-17 for identity. |
+| Spectating and casting | CPMA: multi-view, coach view, auto-follow of killer and powerups, mute specs. Muff Mode: follow killer/leader/powerup, first/third follow view, spectator votes, coach. Q4MAX (recalled): multi-POV behind `g_allowMultipov`. | Follow next/prev/free/slot live; coach, broadcaster and referee audiences with item timers in managed matches; `g_spectatorChat`; auto-tracking only in MVD playback. | Named list, live auto-follow, chase and death camera, a casual caster role, a live event stream; multi-POV and delay stay OPT-04. | MP-16. |
+| HUD and client options | CPMA: SuperHUD, crosshair styles, colours and pulse, team and enemy colours, bright weapons, chat tokens. Q4MAX (recalled): HUD scripts with an editor, forced models and bright skins, item timers, `g_crosshairblink`, ammo on the crosshair. Muff Mode: kill beeps, hand, enemy and team skins, location macros, weapon preference. | Crosshair size/colour/custom/animation/hit flash, hit marker and damage numbers under `g_hitFeedback`, brightskins with outlines and rimlights, forced models, lagometer, speed and input displays, four HUD layouts, awards (`src/mpgame/Player.cpp`, `mp/HitFeedback.cpp`). | Chat tokens, hit sounds by damage, weapon preference, ammo on crosshair, target name/status, team overlay with locations, player timer policy, cosmetic parity. | MP-15; UI-06 for placement. |
+| Statistics and ranking | Muff Mode: per-gametype Elo (K 48 then 32), profiles, JSON/HTML match exports with a catalogue, awards reel, `stats`. CPMA: a stats file and weapon stats at the end. Q4MAX (recalled): weapon statistics. | Per-weapon shots, hits and kills, damage and awards within a match (`mp/stats/StatManager.h`); schema-v2 JSON reports and a series report in managed matches only. | Identity, persistent history, rating, awards reel, casual exports. | MP-17. |
+| Reconnect | Muff Mode: automatic restore on the same social id, `ghost <code>`. | Managed roster restores team and score; nothing on casual servers. | Restoration everywhere, inventory in round modes. | MP-17. |
+| Discovery and social | Quake II Rerelease: platform lobbies and crossplay. Muff Mode: in-game updater, Discord. CPMA: Discord. | Browser with favourites, filters, find player/clan, tiles and a hover card; LAN scan over both families; `net_master0` is id's `q4master.idsoftware.com:27650` (`licensee.h`), which resolves but is not under the project's control or covered by evidence. | A discovery service the project controls, recent servers, region sorting. Steam remains STEAM/OPT-09. | MP-19. |
+| Netcode | Quake II Rerelease: 40 Hz, anti-lag hitscan, full-float movement. CPMA: `cg_lagHax`, prediction and nudge cvars, server caps on rate and packets. | `si_fps` 30 to 90, prediction and lag compensation present but off by default, the 14 November audit landed; wire-format findings await one protocol bump. | Default promotion and the protocol bump; client net-setting enforcement stays excluded. | MP-07, MP-08 (unchanged). |
+| Bots | Quake II Rerelease: bots in the platform. Muff Mode: bot support files. CPMA: none. | Sixteen characters, five skills, orders, chat, the Classic hook. | Difficulty against people (MP-09); objective play in reserved modes (OPT-05). | MP-09 (unchanged). |
+| Demos | CPMA: client and server recording, autoaction, multi-view demos, GTV, 0.125x to 32x, view cameras. Q4MAX (recalled): client demos and multi-POV. Quake II Rerelease and Muff Mode: none documented. | Server MVD 1.3 (markers, keyframes, auto-tracking, recovery) and render demos v14 (block container, keyframes, crash tolerance, files past 2 GiB); no recording by a player who is not hosting; MVD uncompressed and in a different container; reverse scrub, timedemo for MVD, video export, thumbnails and a named list deferred; retail demos unsupported. | One container and registry; client recording and the deck's remaining features; compression; robustness and platform breadth. | MP-21 through MP-24. |
+
+**Demo format findings.** The two writers share nothing below the library.
+`src/framework/async/MultiViewDemo.cpp` writes length-delimited records, each
+with a payload CRC-32 and a header CRC-32, a snapshot every `mvd_snapshotDelay`
+milliseconds delta-encoded against the recorder's baseline, a keyframe every
+`mvd_keyframeInterval` seconds, an index and marker directories, and no
+entropy coding at all: "uncompressed" appears only in a cvar description.
+`src/framework/DemoBlockCodec.*` and `DemoFile.cpp` write render demos as
+`OQ4B` blocks with their own CRCs, long-range matching plus DEFLATE, a timeline
+readable from headers alone and 64-bit offsets. The
+[update policy](multiview-demos.md#update-policy) already states the rules
+both must follow (optional records, feature bits, a reader per supported major,
+golden fixtures per version), and the render reader accepts streams 1 to 14
+while the MVD reader accepts 1.0 to 1.3. MP-21 puts both streams, and the
+client network demo MP-22 adds, in one container with one registry and one
+fixture set; MP-23 measures and closes the storage gap; MP-24 brings the MVD
+writer to the render writer's crash tolerance and takes both to every platform
+and to hostile input.
+
+**Supersessions in the matrix above.** *Persistent identity* moves from
+rejected/deferred to a decision under MP-17: the rejection of identity
+counterfeited from names, addresses or an unwritten GUID stands, and the
+decision is whether an opt-in key pair the player controls is acceptable.
+*Delayed live broadcast* keeps its deferral, now stated as OPT-04 with MP-16
+taking the live follow and caster features that need no relay.
