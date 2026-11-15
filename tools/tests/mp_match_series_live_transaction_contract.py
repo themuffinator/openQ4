@@ -528,6 +528,8 @@ struct idRestoreGame { static void PrepareMapShutdown(){} static void DeleteOrph
 struct idSaveGame { static void ClearDictionaryCache(){} };
 // The Classic ruleset's definition overlay comes off at teardown (ClassicRules.cpp).
 struct rvClassicRules { static void RevertDefinitions(){} };
+// A multiplayer server that stops gives its map's database settings back (MapDatabaseHost.cpp).
+struct MapDatabaseHost { int shutdowns=0; void ServerMapShutdown(){++shutdowns;} } mpMapHost;
 struct MapName : std::string { using std::string::operator=; void Clear(){clear();} };
 struct idMultiplayerGame {
     int seals=0; bool succeeds=true;
@@ -563,8 +565,10 @@ int main() {
         if(mask&4) gameLocal.mapFileName="mp/q4dm5";
         gameLocal.mpGame.succeeds=(mask&8)!=0;
         const int expected=(mask&7)==7 ? 1:0;
+        const int databaseShutdowns=mpMapHost.shutdowns;
         gameLocal.MapShutdown();
         assert(gameLocal.mpGame.seals==expected);
+        assert(mpMapHost.shutdowns==databaseShutdowns+((mask&3)==3 ? 1:0));
         assert(gameLocal.warnings==((mask==7) ? 1:0));
         assert(!gameLocal.entitiesAlive && gameLocal.mapFileName.empty());
         assert(gameLocal.gamestate==GAMESTATE_NOMAP);

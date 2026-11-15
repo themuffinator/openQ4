@@ -362,6 +362,9 @@ enum {
 	// Round turnover resets world entities while retaining the live match state.
 	// Keep distinct from RESTART, which may change the gametype and session.
 	GAME_RELIABLE_MESSAGE_ROUNDRESTART,
+	// openQ4: a player's request to the map database, client to server: the
+	// map queue (mymap) and the end-of-match pick (mappick).
+	GAME_RELIABLE_MESSAGE_MAPDB,
 	// Insert future wire messages before this sentinel; never serialize COUNT.
 	GAME_RELIABLE_MESSAGE_COUNT,
 };
@@ -401,6 +404,8 @@ typedef enum {
 	RELIABLE_FLOOD_EVENT,
 	// emotes are forwarded to every client in the sender's instance
 	RELIABLE_FLOOD_EMOTE,
+	// a queued map is announced to every client
+	RELIABLE_FLOOD_MAPDB,
 
 	RELIABLE_FLOOD_NUM
 } reliableFloodClass_t;
@@ -412,6 +417,7 @@ const int RELIABLE_FLOOD_VCHAT_DELAY	= 500;
 const int RELIABLE_FLOOD_VOTEMAPS_DELAY	= 2000;
 const int RELIABLE_FLOOD_EVENT_DELAY	= 5000;
 const int RELIABLE_FLOOD_EMOTE_DELAY	= 500;
+const int RELIABLE_FLOOD_MAPDB_DELAY	= 1000;
 
 // "has never sent one of these".  It cannot be 0: gameLocal.time starts at 0 on
 // every map load, so a zero stamp reads as "sent just now" and swallows each
@@ -550,6 +556,9 @@ class rvGravityArea;
 #include "MultiplayerGame.h"
 // openQ4: gametype descriptor table; drives the IsTeamGame/IsFlagGameType family below
 #include "mp/GameTypes.h"
+// openQ4: the multiplayer map database: every list of maps, the rotation, the
+// player queue and the end-of-match pick
+#include "mp/MapDatabaseHost.h"
 
 //============================================================================
 

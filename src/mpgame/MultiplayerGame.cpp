@@ -539,25 +539,9 @@ const idDict *MultiplayerResolveMapDecl( const char *mapPath ) {
 		return &mapDef->dict;
 	}
 
-	const int numMaps = fileSystem->GetNumMaps();
-	for ( int i = 0; i < numMaps; ++i ) {
-		const idDict *candidate = fileSystem->GetMapDecl( i );
-		if ( candidate == NULL ) {
-			continue;
-		}
-
-		idStr candidatePath;
-		NormalizeMapDeclPath( candidate->GetString( "path" ), candidatePath );
-		if ( candidatePath.Length() == 0 ) {
-			continue;
-		}
-
-		if ( !idStr::Icmp( normalizedPath.c_str(), candidatePath.c_str() ) ) {
-			return candidate;
-		}
-	}
-
-	return NULL;
+	// openQ4: a map with no mapDef of that name (an addon pack's map) is found
+	// in the map database, which holds every multiplayer map
+	return mpMapHost.DeclForPath( normalizedPath.c_str() );
 }
 
 /*
@@ -597,23 +581,10 @@ static const idDict *ResolveScoreboardMapDecl( const char *mapPath, idDict &mapD
 		return &mapDeclOut;
 	}
 
-	const int numMaps = fileSystem->GetNumMaps();
-	for ( int i = 0; i < numMaps; ++i ) {
-		const idDict *candidate = fileSystem->GetMapDecl( i );
-		if ( candidate == NULL ) {
-			continue;
-		}
-
-		idStr candidatePath;
-		NormalizeScoreboardMapDeclPath( candidate->GetString( "path" ), candidatePath );
-		if ( candidatePath.Length() == 0 ) {
-			continue;
-		}
-
-		if ( !idStr::Icmp( normalizedPath.c_str(), candidatePath.c_str() ) ) {
-			mapDeclOut = *candidate;
-			return &mapDeclOut;
-		}
+	const idDict *candidate = mpMapHost.DeclForPath( normalizedPath.c_str() );
+	if ( candidate != NULL ) {
+		mapDeclOut = *candidate;
+		return &mapDeclOut;
 	}
 
 	return NULL;
@@ -3877,16 +3848,16 @@ bool idMultiplayerGame::BuildCompetitionSeriesMapPool(
 	} else {
 		const int implicitCapacity = Min( profile.maximumMapPool,
 			Max( profile.minimumMapPool, 7 ) );
-		for ( int index = 0; index < fileSystem->GetNumMaps(); ++index ) {
-			const idDict *mapDecl = fileSystem->GetMapDecl( index );
-			if ( mapDecl == NULL ||
-				!MPMapSupportsGameType( mapDecl, gameLocal.gameType ) ) {
+		// openQ4: without a list, the pool is the map database's rotation for
+		// the gametype
+		const mpMapDatabase &mapDatabase = mpMapHost.Database();
+		for ( int position = 0; position < mapDatabase.RotationNum(); ++position ) {
+			const int entryIndex = mapDatabase.RotationEntry( position );
+			if ( !mapDatabase.Supports( entryIndex, gameLocal.gameType ) ) {
 				continue;
 			}
-			idStr normalized;
-			NormalizeMapDeclPath( mapDecl->GetString( "path" ), normalized );
 			CompetitionSeriesInsertSortedToken( storage, count, implicitCapacity,
-				normalized.c_str() );
+				mapDatabase.Entry( entryIndex )->token );
 		}
 	}
 
@@ -7173,6 +7144,25 @@ bool idMultiplayerGame::InitializeCompetitiveRules( void ) {
 	MirrorCompetitiveRulesToLegacy();
 	PublishCompetitiveRulesIdentity();
 	return true;
+}
+
+/*
+================
+idMultiplayerGame::InvalidateCasualRulesImport
+
+A casual session imports the server's settings into its rules once and
+mirrors them back at every map start, so a setting changed between maps would
+be overwritten by the mirror.  The map database changes settings exactly
+there: a map's own frag or time limit goes in before the map loads and comes
+out after it.  It calls this, and the next InitializeCompetitiveRules imports
+again.  A managed profile is typed data and keeps its snapshot.
+================
+*/
+void idMultiplayerGame::InvalidateCasualRulesImport( void ) {
+	if ( competitiveRulesInitialized && !matchRules.Committed().GetBool( MP_RULE_MANAGED_MATCH ) &&
+		matchRules.Committed().SourceProfile() == MP_MATCH_PROFILE_CASUAL ) {
+		competitiveRulesInitialized = false;
+	}
 }
 
 /*
@@ -12866,8 +12856,10 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 		}
 
 		// because of addon pk4's clients may submit votes for maps the server doesn't have - audit here
-		const idDict *mapDict = MultiplayerResolveMapDecl( voteData.m_map.c_str() );
-		if( !mapDict ) {
+		// openQ4: the map database says which maps take votes
+		const mpMapDatabase &mapDatabase = mpMapHost.Database();
+		const mpMapEntry *votedMap = mapDatabase.Entry( mapDatabase.Find( voteData.m_map.c_str() ) );
+		if( votedMap == NULL || ( votedMap->flags & MP_MAPDB_VOTE ) == 0 ) {
 			validVote = false;
 			voteData.m_fieldFlags &= ( ~VOTEFLAG_MAP );
 			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_41800" );
@@ -13509,8 +13501,10 @@ idMultiplayerGame::SendMapList
 ================
 */
 void idMultiplayerGame::SendMapList( int clientNum ) {
-	int numMaps = fileSystem->GetNumMaps();
-	const idDict *dict;
+	// openQ4: the maps the map database lets players vote for
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
+	int votable[ MP_MAPDB_MAX_MAPS ];
+	const int numMaps = mapDatabase.Collect( -1, MP_MAPDB_VOTE, votable, MP_MAPDB_MAX_MAPS );
 	int i;
 
 	idBitMsg outMsg;
@@ -13525,12 +13519,7 @@ void idMultiplayerGame::SendMapList( int clientNum ) {
 	// Reserve room for the terminating empty string and stop cleanly instead.
 	bool truncated = false;
 	for ( i = 0; i < numMaps; i++ ) {
-		dict = fileSystem->GetMapDecl( i );
-
-		const char *mapName = dict->GetString( "path" );
-		if ( mapName == NULL || mapName[ 0 ] == '\0' ) {
-			continue;
-		}
+		const char *mapName = mapDatabase.Entry( votable[ i ] )->token;
 		// WriteString emits the bytes plus a terminator, and one more byte has
 		// to survive for the empty string which ends the list
 		if ( outMsg.GetRemainingSpace() < idStr::Length( mapName ) + 2 ) {
@@ -13562,28 +13551,21 @@ idMultiplayerGame::ReadMapList
 ================
 */
 void idMultiplayerGame::ReadMapList( const idBitMsg &msg ) {
-	int numMaps = fileSystem->GetNumMaps();
-	const idDict *dict;
 	char path[ MAX_STRING_CHARS ];
-	int i;
 
 	voteMapDecls.Clear();
 
+	// openQ4: the server's votable maps, as far as this client's own map
+	// database has them
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
 	while ( msg.ReadString( path, MAX_STRING_CHARS ) > 0 ) {
-		// find the local decl for the path
-		for ( i = 0; i < numMaps; i++ ) {
-			dict = fileSystem->GetMapDecl( i );
-
-			if ( !idStr::Icmp( path, dict->GetString( "path" ) ) ) {
-				break;
-			}
-		}
-		if ( i >= numMaps ) {
+		const mpMapEntry *entry = mapDatabase.Entry( mapDatabase.Find( path ) );
+		if ( entry == NULL ) {
 			// ignore maps we don't already have
 			continue;
 		}
 
-		voteMapDecls.Append( i );
+		voteMapDecls.AddUnique( entry->hostIndex );
 	}
 
 	// update any map requests that triggered this
@@ -13610,18 +13592,14 @@ idMultiplayerGame::RequestVoteMaps
 ================
 */
 bool idMultiplayerGame::RequestVoteMaps( int flags ) {
-	if ( voteMapDecls.Num() > 0 ) {
+	if ( gameLocal.isServer || !gameLocal.isClient ) {
+		// openQ4: the server's own list is its map database's votable maps,
+		// read each time so a reloaded database shows at once
+		mpMapHost.CollectDecls( -1, MP_MAPDB_VOTE, voteMapDecls );
 		return true;
 	}
 
-	if ( gameLocal.isServer || !gameLocal.isClient ) {
-		int i;
-		int numMaps = fileSystem->GetNumMaps();
-
-		voteMapDecls.Clear();
-		for (i = 0; i < numMaps; i++) {
-			voteMapDecls.Append( i );
-		}
+	if ( voteMapDecls.Num() > 0 ) {
 		return true;
 	}
 
@@ -13656,7 +13634,7 @@ void idMultiplayerGame::ListMaps( void ) {
 	int numMaps = voteMapDecls.Num();
 
 	for (i = 0; i < numMaps; i++) {
-		const idDict *dict = fileSystem->GetMapDecl( voteMapDecls[ i ] );
+		const idDict *dict = MPMapDecl( voteMapDecls[ i ] );
 		gameLocal.Printf( "%s", dict->GetBool( "DM" ) ? "DM " : "   " );
 		gameLocal.Printf( "%s", dict->GetBool( "Team DM" ) ? "TDM " : "    " );
 		gameLocal.Printf( "%s", dict->GetBool( "CTF" ) ? "CTF " : "    " );
@@ -13689,23 +13667,28 @@ void idMultiplayerGame::SetMapList( const char *listName, const char *mapName, i
 	bool foundOriginalMap = false;
 	int originalMapIndex = -1;
 
+	// openQ4: the map database says which gametypes a map plays
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
+	const mpGameTypeInfo_t *listType = MPGameTypeByName( gameType );
+
 	for ( i = 0; i < numMaps; i++ ) {
-		dict = fileSystem->GetMapDecl( voteMapDecls[ i ] );
+		const int entryIndex = mapDatabase.FindHostIndex( voteMapDecls[ i ] );
+		dict = MPMapDecl( voteMapDecls[ i ] );
 
 		bool mapOk = false;
 		//if the gametype is DM, check for any of these types...
 		if( !(strcmp( gameType, "DM")) || !(strcmp( gameType, "Team DM")) ) {
 			if ( dict && (
-				dict->GetBool( "DM" ) ||
-				dict->GetBool( "Team DM" ) ||
-				dict->GetBool( "CTF" ) ||
-				dict->GetBool( "Tourney" ) ||
-				dict->GetBool( "Arena CTF" ))
+				mapDatabase.Supports( entryIndex, GAME_DM ) ||
+				mapDatabase.Supports( entryIndex, GAME_TDM ) ||
+				mapDatabase.Supports( entryIndex, GAME_CTF ) ||
+				mapDatabase.Supports( entryIndex, GAME_TOURNEY ) ||
+				mapDatabase.Supports( entryIndex, GAME_ARENA_CTF ))
 				) {
 			mapOk = true;
 			}
 		//but if not, match the gametype.
-		} else if ( MPMapSupportsGameTypeName( dict, gameType ) ) {
+		} else if ( dict && listType != NULL && mapDatabase.Supports( entryIndex, listType->type ) ) {
 			mapOk = true;
 		}
 		if( mapOk ) {
@@ -16368,6 +16351,8 @@ void idMultiplayerGame::Run( void ) {
 
 	CommonRun();
 	PublishMVDMarkers();
+	// openQ4: the map database publishes the map it would load next
+	mpMapHost.ServerThink();
 	// openQ4: a casual session has no roster transactions, so it mirrors every
 	// join, spectate and leave in every phase.  Syncing only in warmup and
 	// countdown left anyone who entered or changed sides during live play with
@@ -16991,29 +16976,17 @@ int idMultiplayerGame::AutoJoinTeam( void ) {
 ================
 idMultiplayerGame::PredictNextMap
 
-The map after the current one in si_mapCycle, wrapping, as
-idGameLocal::NextMap picks it; "" without a cycle.
+The map the server loads after this one, "" when it stays.  The server's map
+database decides it from the player queue, the end-of-match pick, the
+rotation and each map's player bounds, and publishes its answer to clients
+as si_nextMap.
 ================
 */
 idStr idMultiplayerGame::PredictNextMap( void ) const {
-	idStrList maps;
-	idStr cycle = gameLocal.serverInfo.GetString( "si_mapCycle" );
-	cycle.Replace( ";", " " );
-	idLexer src( cycle.c_str(), cycle.Length(), "PredictNextMap", LEXFL_NOFATALERRORS | LEXFL_ALLOWPATHNAMES | LEXFL_NOERRORS );
-	idToken token;
-	while ( src.ReadToken( &token ) ) {
-		maps.Append( token );
+	if ( gameLocal.isServer ) {
+		return mpMapHost.ServerPredictNext();
 	}
-	if ( maps.Num() == 0 ) {
-		return "";
-	}
-	const char *current = gameLocal.serverInfo.GetString( "si_map" );
-	for ( int i = 0; i < maps.Num(); i++ ) {
-		if ( maps[ i ].Icmp( current ) == 0 ) {
-			return maps[ ( i + 1 ) % maps.Num() ];
-		}
-	}
-	return maps[ 0 ];
+	return gameLocal.serverInfo.GetString( "si_nextMap" );
 }
 
 /*
@@ -17783,19 +17756,20 @@ void idMultiplayerGame::RetainedVoteChoices( void ) {
 		RequestVoteMaps( VOTEMAPS_WAITING_RETAINED );
 	}
 	const char *gameType = VoteGameTypeToString( retainedVoteDraft[ RVF_GAMETYPE ] );
+	// openQ4: the map database says which gametypes a map plays
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
+	const mpGameTypeInfo_t *draftedType = MPGameTypeByName( gameType );
 	bool drafted = false;
 	for ( int i = 0; i < voteMapDecls.Num() && retainedVoteMaps.Num() < RETAINED_VOTE_MAPS; i++ ) {
-		const idDict *dict = fileSystem->GetMapDecl( voteMapDecls[ i ] );
-		if ( dict == NULL || !MPMapSupportsGameTypeName( dict, gameType ) ) {
+		const int entryIndex = mapDatabase.FindHostIndex( voteMapDecls[ i ] );
+		if ( draftedType == NULL || !mapDatabase.Supports( entryIndex, draftedType->type ) ) {
 			continue;
 		}
-		idStr path;
-		NormalizeMapDeclPath( dict->GetString( "path" ), path );
-		drafted |= path.Icmp( retainedVoteMap ) == 0;
+		drafted |= idStr::Icmp( mapDatabase.Entry( entryIndex )->token, retainedVoteMap ) == 0;
 		retainedVoteMaps.Append( voteMapDecls[ i ] );
 	}
 	if ( !drafted && retainedVoteMaps.Num() > 0 ) {
-		NormalizeMapDeclPath( fileSystem->GetMapDecl( retainedVoteMaps[ 0 ] )->GetString( "path" ), retainedVoteMap );
+		NormalizeMapDeclPath( MPMapDecl( retainedVoteMaps[ 0 ] )->GetString( "path" ), retainedVoteMap );
 	}
 	retainedVoteKick.Clear();
 	retainedVoteKickCatalog = "0";
@@ -17997,7 +17971,7 @@ bool idMultiplayerGame::SetRetainedVoteField( int field, int value ) {
 			if ( value < 0 || value >= retainedVoteMaps.Num() ) {
 				return false;
 			}
-			NormalizeMapDeclPath( fileSystem->GetMapDecl( retainedVoteMaps[ value ] )->GetString( "path" ), retainedVoteMap );
+			NormalizeMapDeclPath( MPMapDecl( retainedVoteMaps[ value ] )->GetString( "path" ), retainedVoteMap );
 			return true;
 		case RVF_GAMETYPE:
 			if ( value < 0 || value >= MPVoteGameTypeCount() || !MPGameTypeIsSelectable( MPVoteGameTypeToGameType( value ) ) ) {
@@ -18165,7 +18139,7 @@ void idMultiplayerGame::PublishRetainedVote( idUserInterface *card, bool &change
 	for ( int i = 0; i < RETAINED_VOTE_MAPS; i++ ) {
 		idStr name, path, resolved;
 		if ( i < retainedVoteMaps.Num() ) {
-			const idDict *dict = fileSystem->GetMapDecl( retainedVoteMaps[ i ] );
+			const idDict *dict = MPMapDecl( retainedVoteMaps[ i ] );
 			NormalizeMapDeclPath( dict->GetString( "path" ), path );
 			name = MPRetainedPlainText( ResolveScoreboardMapName( dict->GetString( "path" ), resolved ), 64, 1 );
 			if ( path.Icmp( retainedVoteMap ) == 0 ) {
@@ -18259,19 +18233,20 @@ void idMultiplayerGame::RetainedAdminChoices( void ) {
 		RequestVoteMaps( VOTEMAPS_WAITING_RETAINED );
 	}
 	const char *gameType = VoteGameTypeToString( retainedAdminDraft[ RVF_GAMETYPE ] );
+	// openQ4: the map database says which gametypes a map plays
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
+	const mpGameTypeInfo_t *draftedType = MPGameTypeByName( gameType );
 	bool drafted = false;
 	for ( int i = 0; i < voteMapDecls.Num() && retainedAdminMaps.Num() < RETAINED_VOTE_MAPS; i++ ) {
-		const idDict *dict = fileSystem->GetMapDecl( voteMapDecls[ i ] );
-		if ( dict == NULL || !MPMapSupportsGameTypeName( dict, gameType ) ) {
+		const int entryIndex = mapDatabase.FindHostIndex( voteMapDecls[ i ] );
+		if ( draftedType == NULL || !mapDatabase.Supports( entryIndex, draftedType->type ) ) {
 			continue;
 		}
-		idStr path;
-		NormalizeMapDeclPath( dict->GetString( "path" ), path );
-		drafted |= path.Icmp( retainedAdminMap ) == 0;
+		drafted |= idStr::Icmp( mapDatabase.Entry( entryIndex )->token, retainedAdminMap ) == 0;
 		retainedAdminMaps.Append( voteMapDecls[ i ] );
 	}
 	if ( !drafted && retainedAdminMaps.Num() > 0 ) {
-		NormalizeMapDeclPath( fileSystem->GetMapDecl( retainedAdminMaps[ 0 ] )->GetString( "path" ), retainedAdminMap );
+		NormalizeMapDeclPath( MPMapDecl( retainedAdminMaps[ 0 ] )->GetString( "path" ), retainedAdminMap );
 	}
 }
 
@@ -18300,7 +18275,7 @@ bool idMultiplayerGame::SetRetainedAdminField( int field, int value ) {
 			if ( value < 0 || value >= retainedAdminMaps.Num() ) {
 				return false;
 			}
-			NormalizeMapDeclPath( fileSystem->GetMapDecl( retainedAdminMaps[ value ] )->GetString( "path" ), retainedAdminMap );
+			NormalizeMapDeclPath( MPMapDecl( retainedAdminMaps[ value ] )->GetString( "path" ), retainedAdminMap );
 			return true;
 		case RVF_GAMETYPE:
 			if ( value < 0 || value >= MPVoteGameTypeCount() || !MPGameTypeIsSelectable( MPVoteGameTypeToGameType( value ) ) ) {
@@ -18514,7 +18489,7 @@ void idMultiplayerGame::PublishRetainedAdmin( idUserInterface *card, bool &chang
 	for ( int i = 0; i < RETAINED_VOTE_MAPS; i++ ) {
 		idStr name, path, resolved;
 		if ( i < retainedAdminMaps.Num() ) {
-			const idDict *dict = fileSystem->GetMapDecl( retainedAdminMaps[ i ] );
+			const idDict *dict = MPMapDecl( retainedAdminMaps[ i ] );
 			NormalizeMapDeclPath( dict->GetString( "path" ), path );
 			name = MPRetainedPlainText( ResolveScoreboardMapName( dict->GetString( "path" ), resolved ), 64, 1 );
 			if ( path.Icmp( retainedAdminMap ) == 0 ) {
@@ -19404,17 +19379,19 @@ void idMultiplayerGame::PublishRetainedMenu( idUserInterface *card ) {
 	publish( "mp.rule4", si.GetBool( "si_teamDamage" ) ? on : off );
 	publish( "mp.rule5", si.GetBool( "si_autobalance" ) ? on : off );
 	publish( "mp.rule6", nextTitle.Length() ? nextTitle.c_str() : "-" );
-	idStr cycle = si.GetString( "si_mapCycle" );
-	cycle.Replace( ";", " " );
-	idLexer src( cycle.c_str(), cycle.Length(), "PublishRetainedMenu", LEXFL_NOFATALERRORS | LEXFL_ALLOWPATHNAMES | LEXFL_NOERRORS );
-	idToken token;
+	// openQ4: the rotation a server lists in si_mapCycle, as the map database
+	// holds it: installed maps only, each once.  Host and clients see the same.
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
+	const int currentMap = mapDatabase.Find( si.GetString( "si_map" ) );
+	const bool listed = si.GetString( "si_mapCycle" )[ 0 ] != '\0' && mapDatabase.HasExplicitRotation();
 	int rotation = 0, current = -1;
-	while ( rotation < 16 && src.ReadToken( &token ) ) {
+	for ( int position = 0; listed && rotation < 16 && position < mapDatabase.RotationNum(); position++ ) {
+		const int entryIndex = mapDatabase.RotationEntry( position );
 		idStr name;
-		if ( token.Icmp( si.GetString( "si_map" ) ) == 0 ) {
+		if ( entryIndex == currentMap ) {
 			current = rotation;
 		}
-		publish( va( "mp.rotation%d", rotation++ ), ResolveScoreboardMapName( token.c_str(), name ) );
+		publish( va( "mp.rotation%d", rotation++ ), ResolveScoreboardMapName( mapDatabase.Entry( entryIndex )->token, name ) );
 	}
 	for ( int i = rotation; i < 16; i++ ) {
 		publish( va( "mp.rotation%d", i ), "" );
@@ -20043,7 +20020,7 @@ static bool GetSelectedMapDeclFromList( idUserInterface *gui, const char *listNa
 		return false;
 	}
 
-	const idDict *dict = fileSystem->GetMapDecl( mapNum );
+	const idDict *dict = MPMapDecl( mapNum );
 	if ( !dict ) {
 		return false;
 	}
@@ -20353,7 +20330,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 // rjohnson: code commented out below would get the text friendly name of the map and not the file name
 				int mapNum = mainGui->State().GetInt( va( "mapList_item_%d_id", uiMapSelection ) );
 				if ( mapNum >= 0 ) {
-					const idDict *dict = fileSystem->GetMapDecl( mapNum );
+					const idDict *dict = MPMapDecl( mapNum );
 					voteData.m_map = dict->GetString( "path" );
 					voteData.m_fieldFlags |= VOTEFLAG_MAP;
 				}
@@ -20445,7 +20422,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 			if ( voteIndex == VOTE_MAP ) {
 				int mapNum = mapList->GetSelection( NULL, 0 );
 				if ( mapNum >= 0 ) {
-					const idDict *dict = fileSystem->GetMapDecl( mapNum );
+					const idDict *dict = MPMapDecl( mapNum );
 					if ( dict ) {
 						ClientCallVote( VOTE_MAP, dict->GetString( "path" ) );
 					}
@@ -20628,7 +20605,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 			} else {
 				int mapNum = mainGui->State().GetInt( va( "sa_mapList_item_%d_id", mapSelection ) );
 				if ( mapNum >= 0 ) {
-					const idDict *dict = fileSystem->GetMapDecl( mapNum );
+					const idDict *dict = MPMapDecl( mapNum );
 					mainGui->SetStateString( "sa_mapName", common->GetLocalizedString( dict->GetString( "name" )) );
 				}
 			}
@@ -20656,7 +20633,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 			if (-1 != uiMapSelection ) {
 				int mapNum = mainGui->State().GetInt( va( "sa_mapList_item_%d_id", uiMapSelection ) );
 				if ( mapNum >= 0 ) {
-					const idDict *dict = fileSystem->GetMapDecl( mapNum );
+					const idDict *dict = MPMapDecl( mapNum );
 					data.mapName = common->GetLocalizedString( dict->GetString( "path" ));
 				} else { 
 					data.mapName = gameLocal.serverInfo.GetString( "si_map" );
@@ -20781,20 +20758,14 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 //             listDef through gui state vars like SetMapList does.
 			int numMapsAdded = 0;
 			int selectedIndex = -1;
-			num = fileSystem->GetNumMaps();
-			for ( i = 0; i < num; i++ ) {
-				dict = fileSystem->GetMapDecl( i );
+			// openQ4: every map of the map database is a multiplayer map
+			const mpMapDatabase &mapDatabase = mpMapHost.Database();
+			num = mapDatabase.Num();
+			for ( int entryIndex = 0; entryIndex < num; entryIndex++ ) {
+				i = mapDatabase.Entry( entryIndex )->hostIndex;
+				dict = MPMapDecl( i );
 				if ( dict ) {
-					// any MP gametype supported
-					bool isMP = false;
-					int igt = GAME_SP + 1;
-					while ( si_gameTypeArgs[ igt ] ) {
-						if ( dict->GetBool( si_gameTypeArgs[ igt ] ) ) {
-							isMP = true;
-							break;
-						}
-						igt++;
-					}
+					const bool isMP = true;
 					if ( isMP ) {
 						const char *mapName = dict->GetString( "name" );
 						if ( mapName[0] == '\0' ) {
@@ -24320,21 +24291,11 @@ void idMultiplayerGame::ServerCallVote( int clientNum, const idBitMsg &msg ) {
 				common->DPrintf( "client %d: already running the voted map: %s\n", clientNum, value );
 				return;
 			}
-			int				num = fileSystem->GetNumMaps();
-			int				i;
-			const idDict	*dict = NULL;
-			bool			haveMap = false;
-			for ( i = 0; i < num; i++ ) {
-				dict = fileSystem->GetMapDecl( i );
-				if( !dict ) {
-					gameLocal.Warning( "idMultiplayerGame::ServerCallVote() - bad map decl index on vote\n"	);
-					break;
-				}
-				if ( dict && !idStr::Icmp( dict->GetString( "path" ), value ) ) {
-					haveMap = true;
-					break;
-				}
-			}
+			// openQ4: a vote names a map the map database lets players vote for
+			const mpMapDatabase &mapDatabase = mpMapHost.Database();
+			const mpMapEntry *votedMap = mapDatabase.Entry( mapDatabase.Find( value ) );
+			const bool		haveMap = votedMap != NULL && ( votedMap->flags & MP_MAPDB_VOTE ) != 0;
+			const idDict	*dict = haveMap ? MPMapDecl( votedMap->hostIndex ) : NULL;
 			if ( !haveMap ) {
 				gameLocal.ServerSendChatMessage( clientNum, "server", "#str_104296", value );
 				common->Printf( "client %d: map not found: %s\n", clientNum, value );
@@ -24440,6 +24401,10 @@ idMultiplayerGame::DisconnectClient
 ================
 */
 void idMultiplayerGame::DisconnectClient( int clientNum ) {
+	if ( gameLocal.isServer ) {
+		// openQ4: a player who leaves takes their queued map and their pick along
+		mpMapHost.ServerClientDisconnect( clientNum );
+	}
 	uint32_t matchSlotGeneration = 0;
 	mpParticipantId disconnectedParticipant = mpParticipantId::Invalid();
 	int disconnectedGameSide = MP_MATCH_SIDE_NONE;
@@ -26736,7 +26701,6 @@ idMultiplayerGame::PickMap
 */
 bool idMultiplayerGame::PickMap( idStr gameType, bool checkOnly ) {
 	
-	idStrList maps;
 	int miss = 0;
 	const idDict *mapDict;
 	int index = 0;
@@ -26750,8 +26714,11 @@ bool idMultiplayerGame::PickMap( idStr gameType, bool checkOnly ) {
 	}
 
 	// if we're playing a map of this gametype, don't change.
+	// openQ4: the map database says what a map plays; a gametype it does not
+	// know is looked up in the mapDef as before
+	const mpGameTypeInfo_t *wanted = MPGameTypeByName( gameType );
 	mapDict = MultiplayerResolveMapDecl( mapName );
-	if ( MPMapSupportsGameTypeName( mapDict, gameType ) ) {
+	if ( wanted != NULL ? mpMapHost.Supports( mapName, wanted->type ) : MPMapSupportsGameTypeName( mapDict, gameType ) ) {
 		// ( not sure what the gloubi boulga is about re-setting si_map two ways after reading it at the start of the function already )
 		cvarSystem->SetCVarString( "si_map", mapName );
 		si_map.SetString( mapName );
@@ -26767,56 +26734,24 @@ bool idMultiplayerGame::PickMap( idStr gameType, bool checkOnly ) {
 		return true;
 	}
 
-	int i;
-	idFileList *files;
-	idStrList fileList;
-	
-	int count = 0;
-
-	files = fileSystem->ListFiles( "maps/mp", ".map" );
-	for ( i = 0; i < files->GetList().Num(); i++, count++ ) {
-		fileList.AddUnique( va( "mp/%s", files->GetList()[i].c_str() ) );
-	}
-	fileSystem->FreeFileList( files );
-
-	files = fileSystem->ListFiles( "maps/mp", ".mapc" );
-	for ( i = 0; i < files->GetList().Num(); i++, count++ ) {
-		idStr fixedExtension(files->GetList()[i]);
-		fixedExtension.SetFileExtension("map");
-		fileList.AddUnique( va( "mp/%s", fixedExtension.c_str() ) );
-	}
-	fileSystem->FreeFileList( files );
-
-	fileList.Sort();
-
-	idStr name;
-	idStr cycle;
-
-	//Populate the map list
-	for ( i = 0; i < fileList.Num(); i++) {
-		//Add only MP maps.
-		if(!idStr::FindText(fileList[i].c_str(), "mp/"))
-		{
-			maps.AddUnique(fileList[i].c_str());
-		}
-	}
-	maps.Sort();
-
-	// openQ4: look at every map once, from a random place. This drew a hundred
-	// maps at random and raised an error when none of the draws supported the
-	// game type - with few such maps among many, or none, a passed game type
-	// vote ended the server's session. The callers handle "no map".
-	if(maps.Num() > 0)
-	{
-		index = gameLocal.random.RandomInt( maps.Num() );
-		for ( miss = 0; miss < maps.Num(); miss++ )
-		{
-			mapName = maps[ ( index + miss ) % maps.Num() ].c_str();
-
-			mapDict = MultiplayerResolveMapDecl( mapName );
-			if ( MPMapSupportsGameTypeName( mapDict, gameType ) ) {
-				cvarSystem->SetCVarString("si_map",mapName);
-				si_map.SetString( mapName );
+	// openQ4: the map database lists the maps; this scanned maps/mp for files.
+	// Look at every map once, from a random place, the rotation's maps first:
+	// drawing a hundred at random raised an error when none supported the game
+	// type, and a passed game type vote ended the server's session.  The
+	// callers handle "no map".
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
+	if ( wanted != NULL && mapDatabase.Num() > 0 ) {
+		index = gameLocal.random.RandomInt( mapDatabase.Num() );
+		for ( int pass = 0; pass < 2; pass++ ) {
+			for ( miss = 0; miss < mapDatabase.Num(); miss++ ) {
+				const int entryIndex = ( index + miss ) % mapDatabase.Num();
+				const mpMapEntry *entry = mapDatabase.Entry( entryIndex );
+				if ( !mapDatabase.Supports( entryIndex, wanted->type ) ||
+					( pass == 0 && ( entry->flags & MP_MAPDB_ROTATION ) == 0 ) ) {
+					continue;
+				}
+				cvarSystem->SetCVarString( "si_map", entry->token );
+				si_map.SetString( entry->token );
 				return true;
 			}
 		}

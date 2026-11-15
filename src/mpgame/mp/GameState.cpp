@@ -823,6 +823,9 @@ bool rvGameState::NewState( mpGameState_t newState ) {
 				gameLocal.mpGame.OnMatchEnded();
 			}
 			statManager->EndGame();
+			// openQ4: the map database offers the end-of-match pick, if the
+			// server wants one, while the scoreboard is up
+			mpMapHost.ServerMatchEnded();
 
 			//statManager->DebugPrint();
 			nextState = INACTIVE;	// used to abort a game. cancel out any upcoming state change

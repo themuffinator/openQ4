@@ -214,9 +214,146 @@ address to force IPv6.
 | `si_isBuyingEnabled`, `si_buyingRules` | Buying on (`1`) and its rules: `0` Quake 4, `1` The Awakening (**Not in 0.14.1**; see [Buying](buying.md)) |
 | `si_instagib` | `1` plays any game type as [Instagib](#instagib): railguns only, and one hit kills (**Not in 0.14.1**) |
 | `si_usePass`, `g_password` | `si_usePass 1` admits only players who give the password set in `g_password` |
-| `g_mapCycle` | Map cycle script |
+| `si_mapCycle` | The rotation's maps, in order, separated by semicolons; see [Maps, rotation and the map queue](#maps-rotation-and-the-map-queue) |
+| `g_mapRotation` | What follows a match: `0` the same map, `1` the rotation (default), `2` a shuffled rotation, `3` the `g_mapCycle` script (**Not in 0.14.1**) |
+| `g_mapQueue` | `1` lets players queue maps with `mymap` (default); `0` turns the queue off (**Not in 0.14.1**) |
+| `g_mapPick` | `1` offers three maps to pick from when a match ends (**Not in 0.14.1**) |
+| `g_mapDatabase` | The file that adjusts the map database, `mapdb.txt` by default (**Not in 0.14.1**) |
+| `g_mapCycle` | Map cycle script. In 0.14.1 it runs whenever `si_mapCycle` is empty; after 0.14.1 only with `g_mapRotation 3` |
 
 Bot settings are listed under [Bots](#bots).
+
+## Maps, rotation and the map queue
+
+**Not in 0.14.1.** openQ4 keeps one list of the multiplayer maps your server
+can play: the map database. It finds every installed map by itself, so a map
+pack you add needs no listing. The rotation, map votes, the in-game Vote and
+Admin pages, the map queue and the pick at the end of a match all read it.
+
+### What follows a match
+
+`g_mapRotation` decides what the server loads when a match ends:
+
+| Value | What happens |
+|---|---|
+| `0` | The same map again |
+| `1` | The next map of the rotation that suits the game type and the number of players (default) |
+| `2` | A random map of the rotation that suits them, avoiding the maps played most recently |
+| `3` | Quake 4's map cycle script, named by `g_mapCycle` |
+
+Before this, a server with no `si_mapCycle` list ran the map cycle script. If
+you depend on your own script, set `g_mapRotation 3`.
+
+A map a player queued comes first, then the map players picked at the end of
+the match, then the rotation. `serverNextMap` follows the same order.
+
+### The rotation's order
+
+The server takes the first of these that you have set:
+
+1. `si_mapCycle`, a list such as `"mp/q4dm1;mp/q4dm3;mp/q4ctf1"`.
+2. The `rotation` block of `mapdb.txt` (below).
+3. Every installed map, in the order `mapdb list` prints.
+
+Maps that cannot play the current game type are passed over. A listed map
+that is not installed is left out with a warning, and a map listed twice
+takes one place.
+
+### Player bounds
+
+Each map can have a smallest and a largest number of players. The rotation
+passes over a map the server is too empty or too full for. Everyone connected
+counts, bots included. If no map fits, the rotation carries on in order
+rather than stop.
+
+Without anything from you, the tourney arenas (and the `v1` duel cut of a
+larger map) take two to four players, and a map with no free-for-all mode,
+such as a Capture the Flag map, needs four. Every other map has no bounds. A
+map's author can set `minPlayers` and `maxPlayers` in its `mapDef`; your
+`mapdb.txt` overrides both.
+
+### mapdb.txt
+
+Put a text file named `mapdb.txt` in the server's `baseoq4` folder to change
+what the database holds. `g_mapDatabase` names a different file. For example:
+
+```text
+defaults { players 2 12 }
+
+map mp/q4dm1 {
+	players 2 8
+	set si_fragLimit 30
+}
+map mp/q4dm11 {
+	modes "DM, Team DM"
+	vote 0
+}
+map mp/q4tourney1 { queue 0 rotation 0 }
+
+rotation { mp/q4dm1 mp/q4dm2 mp/q4dm3 mp/q4ctf1 }
+```
+
+| Statement | Where | What it does |
+|---|---|---|
+| `players <least> <most>` | `map`, `defaults` | Player bounds, `0` for no bound |
+| `rotation 0` or `1` | `map`, `defaults` | Whether the map takes part when the rotation is every installed map |
+| `vote 0` or `1` | `map`, `defaults` | Whether players may call a vote for the map, and whether the pick offers it |
+| `queue 0` or `1` | `map`, `defaults` | Whether players may queue the map |
+| `modes "<game types>"` | `map` | The game types the map plays, replacing what the map itself says. Use `si_gameType` names, separated by commas |
+| `name "<text>"` | `map` | The name shown in the database's own messages |
+| `set <setting> <value>` | `map` | A setting applied while this map is played (below) |
+| `rotation { ... }` | file | The rotation's maps, in order |
+
+Statements apply in the order you write them, and `defaults` reaches every
+installed map, so put it first. `//` starts a comment.
+
+The server reads the file when it starts and at every change of map, so an
+edit takes effect at the next map. `mapdb check` reads it at once and reports
+without changing anything; `mapdb reload` applies it now. If the file has a
+mistake, the console names the line and the server ignores the whole file
+until you fix it.
+
+### Settings for one map
+
+A `set` line gives a map its own value for a setting. The server applies it
+just before the map loads and puts the old value back when the map ends, so
+it never leaks into the next map. If you change the setting by hand while the
+map is running, your value stays.
+
+A map can set game rules: `si_` and `g_` settings such as `si_fragLimit`,
+`si_timeLimit` or `si_instagib`. It cannot change the map, the game type, the
+rotation, `si_pure`, `si_maxPlayers`, the server's name or any password, and
+it cannot set read-only or cheat settings. `mapdb settings` lists each map's
+settings and says which ones are refused.
+
+### The map queue
+
+Any player can ask for a map with `mymap <map>`, for example `mymap q4dm3`.
+The server plays queued maps in the order they were asked for, before the
+rotation continues. Each player has one place in the queue: asking again
+replaces their map and keeps the place. `mymap` on its own shows the queue
+and `mymap clear` gives the place up. A player who leaves takes their map
+out of the queue.
+
+The map must suit the current game type, and it cannot be the map being
+played or one another player has already queued. Queued maps ignore the
+player bounds: a player asked for them. `g_mapQueue 0` turns the queue off.
+
+### Picking the next map
+
+With `g_mapPick 1`, the server offers three maps in chat when a match ends.
+Players choose with `mappick 1`, `mappick 2` or `mappick 3` while the
+scoreboard is up, and can change their mind. The most picked map is next; a
+tie is settled at random between the leaders, and if nobody picks, the first
+map, which is the rotation's own, is played. Give players time with
+`g_gameReviewPause` (seconds).
+
+The pick is not offered when a map is queued, in Tourney, or when fewer than
+two maps can be offered.
+
+Managed matches and series choose their maps and set their own rules; see
+the [competitive matches guide](competitive-matches.md). While one runs, the
+queue and the pick are off and a map's `set` lines are not applied.
 
 ## Console commands
 
@@ -226,6 +363,9 @@ Bot settings are listed under [Bots](#bots).
 | `disconnect` | Shuts the server down |
 | `serverMapRestart` | Restarts the current map |
 | `serverNextMap` | Moves to the next map |
+| `mapdb` | Lists the map database: `mapdb list`, `rotation`, `queue`, `next`, `settings`, `check`, `reload` (**Not in 0.14.1**) |
+| `mymap` | Queues a map for the next change, for the player who types it: `mymap <map>`, `mymap`, `mymap clear` (**Not in 0.14.1**) |
+| `mappick` | Chooses a map of the end-of-match pick: `mappick <1-3>` (**Not in 0.14.1**) |
 | `kick` | Kicks a player by slot number |
 | `gameKick` | Kicks a player by name |
 | `addbot` | Adds one bot, optionally by name and skill |

@@ -3997,7 +3997,7 @@ prediction/rewind defaults.
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
 | MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. Bots use the hook as a route shortcut; the hook rides movers and lets go on teleport. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), Classic pickup names. |
 | MP-12 — Not started | Casual servers have warmup, ready, overtime, mercy, forfeit and twelve console votes with a 30 s cooldown; managed matches have timeouts, pauses, locks and typed proposals. | Casual timeouts, pause and locks; spectator lock, pause on disconnect, inactivity; intermission awards and next map; the full `callvote` set with limits and policies. |
-| MP-13 — Not started | `si_mapCycle` list, `mapcycle.scriptcfg`, the series pool and 128-map catalogs. | One structured map database with bounds and per-map configs; rotation, player queue, next-map pick or vote; every menu and filter reading it. |
+| MP-13 — Partial | One map database in the game module (`mapdb.txt` over discovered mapDefs): player bounds, modes, per-map settings applied at load and reverted after; the rotation, the player queue (`mymap`), the end-of-match pick (`mappick`), `si_nextMap`; votes, the Vote and Admin pages, the series pool, `PickMap` and the server card read it. Contract, core harness and a dedicated-server smoke with bots pass. | Create Server's catalogue and levelshot list (engine side, still its own mapDef filter) and its map-cycle field; a retained page for the queue and the pick; a browser map filter; play by people; other platforms. |
 | MP-14 — Not started | `si_instagib` over any mode; the Classic ruleset; eight managed profiles. | Modifier layer (Quad Hog, Vampiric, Frenzy, single-weapon arenas, Last Man Standing), scales and switches, named votable presets; OPT-05's reserved modes stay hidden. |
 | MP-15 — Partial | Crosshair options, hit marker and damage numbers, brightskins/outlines/rimlights, forced models, lagometer, speed and input displays, four layouts, awards. | Chat tokens, damage-bucket hit sounds, weapon preference order, ammo on crosshair, target name/status, team overlay with locations, player timer policy, editor placement, cosmetic parity. |
 | MP-16 — Partial | Follow next/prev/free/slot live; coach, broadcaster and referee views with timers in managed matches; auto-track only in MVD playback. | Named follow list, live auto-follow, chase and death camera, casual caster role, live event stream, spectator chat policy; multi-POV and delay stay OPT-04. |
@@ -5055,6 +5055,51 @@ Completion substeps:
   a contract that every menu, filter and vote enumerates the database and
   nothing else; a dedicated-server rotation smoke over bounds, queue and pick
   with bots; the [server setup guide](../user/server-setup.md) updated.
+  Progress, 15 November: the database and everything in the game module that
+  lists maps. `mpMapDatabase` (`src/mpgame/mp/MapDatabase.*`) is a bounded core
+  with no engine dependency: entries discovered from mapDefs (none listed),
+  gametype masks, player bounds (a mapDef's `minPlayers`/`maxPlayers`, else
+  two to four for tourney arenas and four or more for maps with no
+  free-for-all mode), rotation/vote/queue flags and up to sixteen settings a
+  map. The server's `mapdb.txt` (`g_mapDatabase`) overrides them and may list
+  the rotation; a file with an error is refused whole, by line. The rotation
+  (`g_mapRotation`: stay, in order, shuffled, or the legacy `g_mapCycle`
+  script) passes over maps outside their bounds and ignores the bounds rather
+  than stall; `si_mapCycle` remains the rotation's list. The queue (`mymap`,
+  one entry a player, `g_mapQueue`) is played first, then the end-of-match
+  pick from three candidates (`mappick`, `g_mapPick`), then the rotation. The
+  engine asks the game before it reads the server info for a map change
+  (`idGame::ValidateServerSettings`, unused until now), so a map's settings
+  are in force from its first frame and the previous map's are back; a map
+  may not set the map, gametype, pool, purity, slots, name or a password. A
+  casual session imports its rules from the settings once and mirrors them
+  back at every map start, which overwrote a map's own frag limit in the
+  first live run; the database now has that import repeated whenever it
+  changed a setting (`InvalidateCasualRulesImport`), and managed matches take
+  no per-map settings. The
+  server publishes `si_nextMap` and `si_mapPick`. Map votes (both forms), the
+  retained Vote and Admin pages, the stock map lists, the implicit series
+  pool, `PickMap`, the server card's next map and rotation and
+  `MultiplayerResolveMapDecl` read the database; nothing in `src/mpgame`
+  enumerates map decls outside it except the developer levelshot helper.
+  `GAME_RELIABLE_MESSAGE_MAPDB` carries the two player requests, flood-gated
+  to one a second. `mp_map_database_contract.py` pins all of it and executes
+  the core alone (tokens, bounds, rotation, shuffle, queue, pick, nineteen
+  malformed override files, a full database); `mp_map_rotation_smoke.py`
+  runs a pure dedicated server with two bots and one client through bounds,
+  per-map settings, a refused vote, the queue and the pick (44 checks, pass
+  on Windows x64)
+  ([release record](release-completion.md#one-list-of-maps-a-rotation-that-fits-the-server-a-map-queue-and-a-pick-15-november-2026)).
+  Bots have no per-map list to convert: the navmesh is built from collision
+  on any map. Remaining: the Create Server catalogue, its levelshot list and
+  its map-cycle field are engine code with their own mapDef filter
+  (`Session_menu.cpp`), and the gametype table they would need lives in the
+  game module; the queue and the pick are chat and console only, with no
+  retained page and no row in the UI register; the server card's wording in
+  the hash-bound menus specification still says `si_mapCycle`; the browser
+  has no map filter to convert; shuffle and the legacy script mode are
+  covered by the core harness and by reading, not by a live run; nobody has
+  played it, and only Windows x64 has run the smoke.
 - [ ] **MP-14 — P2, decision and implementation: rulesets, modifiers and presets.**
   Muff Mode layers Instagib, Quad Hog, Vampiric Damage, Weapons Frenzy and
   NadeFest over any mode and names 58 presets; CPMA composes modes from

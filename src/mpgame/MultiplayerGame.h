@@ -495,6 +495,9 @@ public:
 	// authoritative ready state, set from the client's reliable ready message
 	void			ServerSetPlayerReady( int clientNum, bool ready );
 	bool			IsManagedMatch( void ) const;
+	// openQ4: the map database changed settings for the map about to load; a
+	// casual session imports its rules from them again when that map starts.
+	void			InvalidateCasualRulesImport( void );
 	bool			RotateManagedDuelQueue( int firstSlot, int secondSlot, int losingSlot );
 	void			RecordManagedDuelResult( mpMatchTransitionReason_t reason,
 						int forfeitingSide, mpParticipantId authorizer );

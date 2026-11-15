@@ -537,6 +537,13 @@ void idAsyncServer::ExecuteMapChange( void ) {
 	//game->GetBestGameType( cvarSystem->GetCVarString("si_map"), cvarSystem->GetCVarString("si_gametype"), bestGameType );
 	//cvarSystem->SetCVarString("si_gametype", bestGameType );
 
+	// openQ4: the game settles the settings of the map about to load before the
+	// server info is read from them: its map database gives the previous map's
+	// settings back and applies this map's (MP-13).
+	if ( game != NULL ) {
+		game->ValidateServerSettings( cvarSystem->GetCVarString( "si_map" ), cvarSystem->GetCVarString( "si_gameType" ) );
+	}
+
 	// initialize map settings
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, "rescanSI" );
 
