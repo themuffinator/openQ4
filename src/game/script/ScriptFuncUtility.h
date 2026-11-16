@@ -36,6 +36,7 @@ public:
 	const char*				GetFuncName() const;
 	const function_t*		GetFunc() const { return func; }
 	const char*				GetParm( int index ) const;
+	int						NumSuppliedParms() const { return parms.Num(); }
 	const char*				GetReturnKey() const { return returnKey.c_str(); }
 
 	void					InsertInt( int parm, int index );

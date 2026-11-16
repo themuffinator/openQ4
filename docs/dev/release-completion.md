@@ -7,6 +7,27 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's Falcon defence ends its waves again (#230), 16 November 2026
+
+- **The gunship fight in the Falcon mission (m03) can be won.** Each fighter
+  wave ends once you have shot down enough of its ships from the turrets, but
+  openQ4 never counted your kills, so the waves kept coming until the Falcon was
+  destroyed. This affected every earlier openQ4 release. Your kills now count,
+  and each wave moves on to the next stage of the mission.
+- Development: the mission's ship death callback takes the killer as a second
+  entity, which the stock SDK never passed, so every call was refused. With The
+  Awakening active, `idAI::OnDeath` now hands the attacker to a death callback
+  that declares exactly that parameter. `awakening_gameplay_contract.py` pins it.
+- Evidence (16 November, `game/m03_airassault`, input-free probe firing from
+  the bottom gun through `openq4_testInput`): before, every ship death logged
+  `Parm '' doesn't match expected type 'entity'`, the player's wave-1 kills
+  stayed at 0 and the live-ship count only grew (11, 24, 31). After, no call was
+  refused, the live count rose and fell (9, 7, 5), and the turret's kills
+  counted (7 in one run). Starting wave 1 at 11 counted kills, one turret kill
+  made 12, the remaining ships drained to 0, the neighbouring dropship went down
+  and wave 2 began. Sound was off in the probe, so the report's silent guns and
+  looping lock alarm were not checked.
+
 ## Vulkan copes with texture packs bigger than video memory (#217, #231), 16 November 2026
 
 - **High-resolution texture packs no longer freeze Vulkan at the end of a map

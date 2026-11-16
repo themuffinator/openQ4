@@ -26,6 +26,10 @@ const char* aiTalkMessageString [ ] = {
 	"loop"
 };
 
+// The attacker of the AI whose Killed() is running OnDeath(); NULL otherwise.
+// Never saved: it is set and restored around that one call.
+static idEntity *aiDeathKiller = NULL;
+
 static const float AI_SIGHTDELAYSCALE	= 5000.0f;			// Full sight delay at 5 seconds or more of not seeing enemy
 
 
@@ -2253,7 +2257,13 @@ void idAI::Killed( idEntity *inflictor, idEntity *attacker, int damage, const id
 	RemoveProjectile();
 	StopMove( MOVE_STATUS_DONE );
 
+	// OnDeath takes no arguments, and subclasses override it; the killer is
+	// handed to its death callback through this, only while it runs (a death
+	// script can kill another AI, so the outer killer is restored).
+	idEntity *outerDeathKiller = aiDeathKiller;
+	aiDeathKiller = attacker;
 	OnDeath();
+	aiDeathKiller = outerDeathKiller;
 	CheckDeathObjectives();
 
 	ClearEnemy();
@@ -4295,7 +4305,22 @@ void idAI::OnDeath( void ){
 
 	aiManager.RemoveTeammate ( this );
 
-	ExecScriptFunction( funcs.death );
+	// The Awakening alpha's death callbacks may take the killer after the
+	// dying AI: m03's stroggKilledFeedback( entity self, entity killer ) counts
+	// the player's kills by it, and each wave waits for those kills and for
+	// every ship's callback. The stock SDK passes only the dying AI, so the
+	// call was refused for its missing parameter and the waves never ended
+	// (#230). A killer that is gone or unnamed is reported as the world.
+	if ( FS_AwakeningActive() && funcs.death.GetFunc() != NULL && funcs.death.NumSuppliedParms() == 0
+			&& funcs.death.NumParms() == 2 && funcs.death.GetParmType( 1 ) != NULL
+			&& funcs.death.GetParmType( 1 )->Type() == ev_entity ) {
+		idEntity *killer = aiDeathKiller != NULL && aiDeathKiller->name.Length() ? aiDeathKiller : gameLocal.world;
+		funcs.death.InsertEntity( killer, 0 );
+		ExecScriptFunction( funcs.death, this );
+		funcs.death.RemoveIndex( 0 );
+	} else {
+		ExecScriptFunction( funcs.death );
+	}
 
 /* DONT DROP ANYTHING FOR NOW
 	float rVal = gameLocal.random.RandomInt( 100 );

@@ -335,7 +335,25 @@ def check_test_tools() -> None:
         raise AssertionError("The vampiric gauntlet is multiplayer content; the SP module does not read it")
 
 
+def check_death_callback_killer() -> None:
+    """m03's waves count the player's kills through stroggKilledFeedback( self, killer ) (#230)."""
+    source = read("src/game/ai/AI.cpp")
+    killed = function_body(source, "void idAI::Killed(", "AI.cpp")
+    require_order(killed, ("aiDeathKiller = attacker;", "OnDeath();", "aiDeathKiller = outerDeathKiller;"),
+                  "idAI::Killed")
+    on_death = function_body(source, "void idAI::OnDeath(", "AI.cpp")
+    require_order(on_death, ("FS_AwakeningActive()", "funcs.death.NumSuppliedParms() == 0",
+                             "funcs.death.NumParms() == 2", "->Type() == ev_entity",
+                             "funcs.death.InsertEntity( killer, 0 );", "ExecScriptFunction( funcs.death, this );",
+                             "funcs.death.RemoveIndex( 0 );", "ExecScriptFunction( funcs.death );"),
+                  "idAI::OnDeath")
+    require(on_death, ": gameLocal.world;", "idAI::OnDeath")
+    require(read("src/game/script/ScriptFuncUtility.h"), "int						NumSuppliedParms() const { return parms.Num(); }",
+            "ScriptFuncUtility.h")
+
+
 def main() -> int:
+    check_death_callback_killer()
     check_valkaryne()
     check_target_filter()
     check_pain_lord()

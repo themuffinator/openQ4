@@ -22,6 +22,18 @@ encounter activation are part of that choreography, not decorative markers.
 
 ### Corrections
 
+- 16 November (#230): no fighter wave could end. Every Strogg ship gets the
+  death callback `stroggKilledFeedback( entity self, entity killer )`, which
+  counts kills where `killer == $player1` and decrements the live-ship count
+  each wave waits on. The stock SDK's `idAI::OnDeath` passes only the dying
+  AI, so every call was refused (`Parm '' doesn't match expected type
+  'entity'`): the player's kills stayed at zero and the live count only grew.
+  The alpha's own game code evidently passed the killer too. With The Awakening
+  active, a death callback that declares exactly a second entity parameter and
+  was given none now receives the attacker from `idAI::Killed`, or the world
+  when there is none. No other Awakening death callback (map `script_death`
+  keys or script `setScript( "death" )`) declares one.
+
 - Both M03 cockpit screens had shared GUI instances. The idle turret could
   overwrite the active one's heat, weapon selection and rocket status. Each
   cockpit now owns unique, normally serialized screens. Event-only screen
