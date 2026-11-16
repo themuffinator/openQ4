@@ -23,6 +23,6 @@ version.
 // Empty means this build trusts no manifest signature: the update check still
 // reports a newer release, but the game opens the release page instead of
 // installing it in place.
-#define OPENQ4_UPDATE_SIGNING_PUBLIC_KEY ""
+#define OPENQ4_UPDATE_SIGNING_PUBLIC_KEY "4cbb9d74ebdd3e2600e6d1019e06eca10ebea563637d8df56bcde0f8531c042b"
 
 #endif /* !__OPENQ4_UPDATE_SIGNING_KEY_H__ */
