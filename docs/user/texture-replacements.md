@@ -172,6 +172,11 @@ no DDS replacement for 'textures/stone/wall01':
   handling, if you suspect the engine rather than your pack.
 - If nothing is replaced at all, check `gfxInfo` for BC7 support and that
   `image_usePrecompressedTextures` is not `0`.
+- If a map takes minutes to load, or Vulkan warns that textures are being
+  reduced to fit video memory, the pack is probably loading uncompressed:
+  `image_usePrecompressedTextures` is `0`, or the pack has no DDS files.
+  Uncompressed textures need four or more times the memory. See
+  [when textures don't fit](display-settings.md#when-textures-dont-fit-in-video-memory).
 - If menus show raw `#str_` codes while the pack is loaded, the pack carries a
   copy of one of openQ4's own string tables (`strings/*_openq4.lang`) from an
   older build. Remove it: a texture pack doesn't need openQ4's files. Releases

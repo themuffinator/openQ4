@@ -41,6 +41,8 @@ struct vkDeviceSelection_t {
 	// VK_KHR_present_id and VK_KHR_present_wait (r_vkPresentTiming)
 	bool hasPresentId;
 	bool hasPresentWait;
+	// VK_EXT_memory_budget: the driver's per-heap budget and process usage
+	bool hasMemoryBudget;
 };
 
 typedef void (*vkDeviceRejection_t)( uint32_t index, const VkPhysicalDeviceProperties &properties,

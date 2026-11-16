@@ -1273,6 +1273,10 @@ void VK_Device_PrintMemoryInfo( void ) {
 			budget.statistics.blockCount, (double)budget.statistics.blockBytes * mib,
 			budget.statistics.allocationCount, (double)budget.statistics.allocationBytes * mib );
 	}
+	common->Printf( "Vulkan memory: heap budgets %s\n", vkCtx.memoryBudgetEnabled
+			? "from the driver (VK_EXT_memory_budget)" : "estimated as 80% of each heap" );
+	extern void VK_Image_PrintTextureBudget( void );
+	VK_Image_PrintTextureBudget();
 }
 
 /*
@@ -1915,9 +1919,15 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 	// enabled when they advertise it, and their optional subset features read
 	// back through the chained feature struct. Native drivers advertise neither,
 	// and every portability capability then stays at its permissive default.
-	const char *deviceExtensions[ 6 ];
+	const char *deviceExtensions[ 7 ];
 	uint32_t deviceExtensionCount = 0;
 	deviceExtensions[ deviceExtensionCount++ ] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+	// The driver's real heap budgets, so textures are reduced before video
+	// memory runs out rather than after (vk_Image.cpp, #217/#231).
+	vkCtx.memoryBudgetEnabled = selected.hasMemoryBudget;
+	if ( vkCtx.memoryBudgetEnabled ) {
+		deviceExtensions[ deviceExtensionCount++ ] = VK_EXT_MEMORY_BUDGET_EXTENSION_NAME;
+	}
 	if ( r_vkSampleLocations.GetBool() && vkGetPhysicalDeviceMultisamplePropertiesEXT != NULL
 			&& selected.hasSampleLocations ) {
 		VkPhysicalDeviceSampleLocationsPropertiesEXT locations = {};
@@ -2140,6 +2150,9 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 		aci.instance = vkCtx.instance;
 		aci.pVulkanFunctions = &vmaFunctions;
 		aci.vulkanApiVersion = VK_API_VERSION_1_3;
+		if ( vkCtx.memoryBudgetEnabled ) {
+			aci.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+		}
 		if ( vmaCreateAllocator( &aci, &vkCtx.allocator ) != VK_SUCCESS ) {
 			common->Warning( "Vulkan: VMA allocator creation failed" );
 			VK_Device_Shutdown();

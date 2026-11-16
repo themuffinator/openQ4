@@ -280,6 +280,12 @@ image_picmipFilter 3
 
 [Texture replacement packs](texture-replacements.md) in DDS format can only shrink by dropping detail levels the file already contains, so a `.dds` saved without a full set of smaller versions stays larger than requested. `image_showPrecompressedTextures 1` names any replacement that couldn't reach the requested size.
 
+### When textures don't fit in video memory
+
+An OpenGL driver quietly moves textures that don't fit on the graphics card into system memory. Vulkan leaves that to the game, so the Vulkan renderer watches how full the card's memory is while textures load. Once it passes 80% of the space it allows itself, new textures load at a lower resolution, a step at a time as the card fills up, rather than overfilling the card until the driver resets. The console then shows one warning saying so, and `rendererVulkanMemoryInfo` counts the reduced textures. Menus, fonts, the HUD and any material marked `nopicmip` are never reduced.
+
+You'd normally only see this with a high-resolution texture pack loaded uncompressed. Usually the cause is `image_usePrecompressedTextures 0`, or a pack that ships only `.tga` files. A pack's DDS files take about a quarter of the memory, so set `image_usePrecompressedTextures 1` (the default). Otherwise lower texture sizes yourself with `image_downSize` or `image_picmip`. `r_vkTextureMemoryLimit` changes how much video memory Vulkan lets itself fill, in MiB. At `0`, the default, that's 90% of what the driver says the game may use.
+
 ### Texture filtering
 
 `image_filter` controls how textures are smoothed. Changes apply to loaded textures at once, on OpenGL and Vulkan, and are saved. Materials that ask for a particular filter, such as fonts, HUD elements and the renderer's own textures, keep it.
@@ -518,6 +524,7 @@ Settings ("console variables") can be typed in the console or added to your conf
 | `r_actualRenderApi` | (read-only) | The renderer that actually started; `gl` after a fallback from Vulkan. |
 | `r_vkDevice` | | A temporary graphics card number for testing. Remove it before using the menu's card choice. |
 | `r_vkPresentationRecoveries` | `3` | How many times a session Vulkan restarts itself after a driver reset. |
+| `r_vkTextureMemoryLimit` | `0` | MiB of video memory Vulkan fills before it loads textures at a lower resolution. `0` uses 90% of the driver's budget. See [when textures don't fit](#when-textures-dont-fit-in-video-memory). |
 | `r_vkRenderThread` | `0` | Experimental Vulkan render thread mode (`0` to `2`). |
 | `rendererDevices` | | Lists graphics cards and their IDs. |
 | `gfxInfo` | | Prints the renderer, graphics card, anti-aliasing state and any fallback reason. |

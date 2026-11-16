@@ -119,6 +119,7 @@ VkResult CheckCandidate( const vkDeviceSelectionApi_t &api, VkSurfaceKHR surface
 		if ( std::strcmp( extension.extensionName, VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME ) == 0 ) { candidate.hasDepthClipControl = true; }
 		if ( std::strcmp( extension.extensionName, VK_KHR_PRESENT_ID_EXTENSION_NAME ) == 0 ) { candidate.hasPresentId = true; }
 		if ( std::strcmp( extension.extensionName, VK_KHR_PRESENT_WAIT_EXTENSION_NAME ) == 0 ) { candidate.hasPresentWait = true; }
+		if ( std::strcmp( extension.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME ) == 0 ) { candidate.hasMemoryBudget = true; }
 	}
 	reason = "VK_KHR_swapchain unsupported";
 	if ( !swapchain ) { return VK_ERROR_EXTENSION_NOT_PRESENT; }

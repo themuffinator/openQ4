@@ -38,6 +38,10 @@ typedef struct vkImageEntry_s {
 	int				width;
 	int				height;
 	int				numMips;
+	// Top levels AllocImage left out to fit video memory: width, height and
+	// numMips describe the smaller image, and SubImageUpload drops the uploads
+	// of the missing levels and stores the rest this many levels higher.
+	int				droppedLevels;
 	int				numLayers;		// 6 for cube maps
 	bool			isCube;
 	bool			everUploaded;	// first upload transitions from UNDEFINED
@@ -93,5 +97,7 @@ vkImageEntry_t *VK_Image_AcquireResolveScratch( int width, int height,
 vkImageEntry_t *VK_Image_AcquireDepthResolveScratch( int width, int height,
 			VkFormat format );
 void	VK_Image_ShutdownAll( void );
+// rendererVulkanMemoryInfo: textures reduced to fit video memory, and the limit.
+void	VK_Image_PrintTextureBudget( void );
 
 #endif /* !__VK_IMAGE_H__ */

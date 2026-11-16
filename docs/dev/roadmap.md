@@ -660,6 +660,18 @@ and untested drivers remain open, with no tolerance or support-tier change.
   layers logged nothing in any of the 102 Vulkan runs. This does not cover
   later Vulkan back-end commits on main, AMD, VK-02 pacing or the VK-04 image
   gates.
+  Progress, 16 November: device loss under video-memory pressure (#217, #231:
+  an uncompressed 16 GB texture pack on a 12 GB NVIDIA card) now degrades
+  instead of wedging. Mipmapped material textures give up top levels as the
+  device-local heap passes 80/90/97% of `r_vkTextureMemoryLimit` (default 90%
+  of the `VK_EXT_memory_budget` budget), and retry one level smaller on an
+  out-of-memory result. A blocked device takes no new images or staging,
+  refused staging is freed at once, and a level load stops decoding until the
+  queued restart. Verified on the RTX 4060 laptop with a 7.8 GB test pack under
+  `r_vkTextureMemoryLimit 2500` and with the presentation-failure drill during
+  a load, through to the next-launch OpenGL fallback. The NVIDIA desktop loss
+  itself and an unlimited oversubscription run were not reproduced; reporter
+  confirmation on the original hardware remains open.
 - [ ] **VK-02 — P1, investigation and qualification: visible presentation pacing.**
   Reproduce the hybrid-adapter/power-state conditions using current foreground
   windowed workloads and unchanged budgets. Separate host scheduling, fence waits,

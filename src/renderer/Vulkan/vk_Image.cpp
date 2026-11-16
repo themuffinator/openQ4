@@ -709,6 +709,16 @@ bool VK_Image_GetRenderTargetAttachments( const idRenderTexture *target, int cub
 	return true;
 }
 
+// Textures reduced to fit video memory on this device (see AllocImage).
+typedef struct vkTextureBudgetStats_s {
+	int			reducedImages;
+	uint64_t	requestedBytes;		// what the reduced textures would have used
+	uint64_t	allocatedBytes;		// what they use
+	bool		warned;				// once per device
+} vkTextureBudgetStats_t;
+
+static vkTextureBudgetStats_t vkTextureBudgetStats;
+
 void VK_Image_ShutdownAll( void ) {
 	R_RenderThread_Sync( "image" );
 	for ( int i = 0; i < VK_MAX_IMAGES; i++ ) {
@@ -730,6 +740,8 @@ void VK_Image_ShutdownAll( void ) {
 	}
 	VK_Image_ReleaseResolveScratch( false );
 	VK_Image_ReleaseDepthResolveScratch( false );
+	// the next device counts its own reductions and warns once again
+	memset( &vkTextureBudgetStats, 0, sizeof( vkTextureBudgetStats ) );
 	for ( int i = 0; i < vkNumSamplers; i++ ) {
 		vkDestroySampler( vkCtx.device, vkSamplers[ i ], NULL );
 	}
@@ -822,6 +834,140 @@ static int VK_Image_SampleCountInteger( VkSampleCountFlagBits samples ) {
 
 /*
 ====================
+Texture video-memory budget (#217, #231)
+
+An OpenGL driver quietly moves textures that do not fit in video memory to
+system memory. Vulkan leaves that to the application: past the device-local
+budget, allocations fail or land in memory the driver must keep paging, and
+an uncompressed high-resolution texture pack (16 GB of textures on a 12 GB
+NVIDIA card) lost the device in the upload batch that followed. So a
+file-backed, mipmapped material texture is allocated without its top levels
+once the device-local heap fills up. The levels it keeps are the lower mips
+the loader decoded anyway, so it is the same texture at a lower resolution;
+SubImageUpload drops the uploads of the levels the image does not hold.
+
+The reduction ramps up with pressure instead of waiting for a full heap. A
+level load allocates hundreds of textures in name order, and leaving the first
+ones whole while cutting the last ones to a few texels would look far worse
+than taking a level or two off many of them.
+====================
+*/
+static idCVar r_vkTextureMemoryLimit( "r_vkTextureMemoryLimit", "0", CVAR_RENDERER | CVAR_INTEGER,
+	"MiB of device-local video memory Vulkan fills before it loads textures at reduced resolution; "
+	"0 uses 90% of the driver's budget", 0, 1048576 );
+
+static VkDeviceSize VK_Image_EstimateBytes( const vkFormatInfo_t &info, int width, int height, int levels, int layers ) {
+	VkDeviceSize bytes = 0;
+	for ( int level = 0; level < levels; level++ ) {
+		const VkDeviceSize blocksWide = (VkDeviceSize)( ( Max( 1, width >> level ) + info.blockDim - 1 ) / info.blockDim );
+		const VkDeviceSize blocksHigh = (VkDeviceSize)( ( Max( 1, height >> level ) + info.blockDim - 1 ) / info.blockDim );
+		bytes += blocksWide * blocksHigh * (VkDeviceSize)info.bytesPerBlock;
+	}
+	return bytes * (VkDeviceSize)layers;
+}
+
+// Top levels to leave out of a texture, given the device-local heap's usage and
+// the limit textures may fill it to. From 80% of the limit a texture loses one
+// level, from 90% two and from 97% three, while it stays at least 256 texels on
+// its longer side; one that would still not fit loses more, down to 64 texels.
+// The last level always stays.
+static int VK_Image_ChooseDroppedLevels( VkDeviceSize usage, VkDeviceSize limit, const vkFormatInfo_t &info,
+		int width, int height, int levels, int layers ) {
+	const int pressureFloor = 256;
+	const int fitFloor = 64;
+	if ( limit == 0 || levels <= 1 ) {
+		return 0;
+	}
+	const double pressure = (double)usage / (double)limit;
+	const int wanted = pressure < 0.80 ? 0 : pressure < 0.90 ? 1 : pressure < 0.97 ? 2 : 3;
+	int dropped = 0;
+	while ( dropped + 1 < levels ) {
+		const int nextDimension = Max( width, height ) >> ( dropped + 1 );
+		const bool fits = usage + VK_Image_EstimateBytes( info, Max( 1, width >> dropped ), Max( 1, height >> dropped ),
+				levels - dropped, layers ) <= limit;
+		if ( !( ( dropped < wanted && nextDimension >= pressureFloor ) || ( !fits && nextDimension >= fitFloor ) ) ) {
+			break;
+		}
+		dropped++;
+	}
+	return dropped;
+}
+
+// The largest device-local heap, which is where VMA places sampled images.
+// With VK_EXT_memory_budget the usage and budget come from the driver and
+// count every allocation the process made; without it VMA reports its own
+// allocations against 80% of the heap.
+static bool VK_Image_DeviceLocalBudget( VkDeviceSize &usage, VkDeviceSize &limit, VkDeviceSize &budget ) {
+	const VkPhysicalDeviceMemoryProperties *properties = NULL;
+	if ( vkCtx.allocator == NULL ) {
+		return false;
+	}
+	vmaGetMemoryProperties( vkCtx.allocator, &properties );
+	if ( properties == NULL ) {
+		return false;
+	}
+	VmaBudget budgets[ VK_MAX_MEMORY_HEAPS ];
+	memset( budgets, 0, sizeof( budgets ) );
+	vmaGetHeapBudgets( vkCtx.allocator, budgets );
+	int heap = -1;
+	for ( uint32_t i = 0; i < properties->memoryHeapCount && i < VK_MAX_MEMORY_HEAPS; i++ ) {
+		if ( ( properties->memoryHeaps[ i ].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) != 0
+				&& ( heap < 0 || properties->memoryHeaps[ i ].size > properties->memoryHeaps[ heap ].size ) ) {
+			heap = (int)i;
+		}
+	}
+	if ( heap < 0 ) {
+		return false;
+	}
+	usage = budgets[ heap ].usage;
+	budget = budgets[ heap ].budget;
+	const int limitMiB = r_vkTextureMemoryLimit.GetInteger();
+	limit = limitMiB > 0 ? (VkDeviceSize)limitMiB << 20 : budget / 10 * 9;
+	return true;
+}
+
+static int VK_Image_BudgetDroppedLevels( const vkFormatInfo_t &info, int width, int height, int levels, int layers ) {
+	VkDeviceSize usage = 0, limit = 0, budget = 0;
+	if ( !VK_Image_DeviceLocalBudget( usage, limit, budget ) ) {
+		return 0;
+	}
+	return VK_Image_ChooseDroppedLevels( usage, limit, info, width, height, levels, layers );
+}
+
+static void VK_Image_NoteBudgetReduction( const vkFormatInfo_t &info, int width, int height, int levels,
+		int layers, int droppedLevels ) {
+	vkTextureBudgetStats.reducedImages++;
+	vkTextureBudgetStats.requestedBytes += VK_Image_EstimateBytes( info, width, height, levels, layers );
+	vkTextureBudgetStats.allocatedBytes += VK_Image_EstimateBytes( info, Max( 1, width >> droppedLevels ),
+			Max( 1, height >> droppedLevels ), levels - droppedLevels, layers );
+	if ( vkTextureBudgetStats.warned ) {
+		return;
+	}
+	vkTextureBudgetStats.warned = true;
+	VkDeviceSize usage = 0, limit = 0, budget = 0;
+	VK_Image_DeviceLocalBudget( usage, limit, budget );
+	common->Warning( "Vulkan: textures do not fit in video memory (%u of %u MiB in use); loading them at reduced "
+			"resolution to fit. Compressed textures (image_usePrecompressedTextures 1) or image_downSize avoid this; "
+			"rendererVulkanMemoryInfo counts the reduced textures",
+			(unsigned int)( usage >> 20 ), (unsigned int)( limit >> 20 ) );
+}
+
+void VK_Image_PrintTextureBudget( void ) {
+	VkDeviceSize usage = 0, limit = 0, budget = 0;
+	if ( !VK_Image_DeviceLocalBudget( usage, limit, budget ) ) {
+		return;
+	}
+	common->Printf( "Vulkan textures: device-local %.1f of %.1f MiB limit (%s, budget %.1f MiB); %d reduced to fit "
+			"video memory (%.1f MiB instead of %.1f MiB)\n",
+			(double)usage / ( 1024.0 * 1024.0 ), (double)limit / ( 1024.0 * 1024.0 ),
+			r_vkTextureMemoryLimit.GetInteger() > 0 ? "r_vkTextureMemoryLimit" : "90% of budget",
+			(double)budget / ( 1024.0 * 1024.0 ), vkTextureBudgetStats.reducedImages,
+			(double)vkTextureBudgetStats.allocatedBytes / ( 1024.0 * 1024.0 ),
+			(double)vkTextureBudgetStats.requestedBytes / ( 1024.0 * 1024.0 ) );
+}
+
+/*
+====================
 idImage::AllocImage
 
 Creates the VkImage + view + sampler from opts. Before the device exists
@@ -838,6 +984,15 @@ void idImage::AllocImage( void ) {
 	storageGeneration++;
 
 	if ( !vkCtx.initialized ) {
+		return;
+	}
+	// A device that failed and waits for its queued renderer restart takes no
+	// new file textures: nothing will draw them, and the restart reloads every
+	// image. A level load that went on for minutes after the device was lost
+	// (#231) otherwise kept filling both heaps until even 4-byte staging failed.
+	// Render targets are few and small, and refusing them only made their
+	// owners report a failed creation the restart then repaired.
+	if ( vkCtx.presentationBlocked && IsFileBacked() ) {
 		return;
 	}
 	if ( opts.width <= 0 || opts.height <= 0 ) {
@@ -883,6 +1038,18 @@ void idImage::AllocImage( void ) {
 	opts.numMSAASamples = VK_Image_SampleCountInteger( samples );
 	const int numMips = samples == VK_SAMPLE_COUNT_1_BIT
 			? ( opts.numLevels > 0 ? opts.numLevels : 1 ) : 1;
+	const int numLayers = isCube ? 6 : 1;
+
+	// A mipmapped material texture loaded from a file may give up its top
+	// levels to fit video memory (see VK_Image_ChooseDroppedLevels). Fonts,
+	// lookup tables, lighting data, render targets and anything that opts out
+	// of downsizing (nopicmip, the GUI and font namespaces) keep their size.
+	const bool budgetReducible = IsFileBacked() && allowDownSize && !isDepth && samples == VK_SAMPLE_COUNT_1_BIT
+			&& numMips > 1 && ( opts.textureType == TT_2D || opts.textureType == TT_CUBIC )
+			&& ( usage == TD_DIFFUSE || usage == TD_SPECULAR || usage == TD_BUMP || usage == TD_DEFAULT
+				|| usage == TD_HIGH_QUALITY || usage == TD_PBR_COLOR || usage == TD_MATERIAL_DATA );
+	int droppedLevels = budgetReducible
+			? VK_Image_BudgetDroppedLevels( info, opts.width, opts.height, numMips, numLayers ) : 0;
 
 	VkImageCreateInfo ici;
 	memset( &ici, 0, sizeof( ici ) );
@@ -911,7 +1078,24 @@ void idImage::AllocImage( void ) {
 	vkImageEntry_t &entry = vkImages[ slot ];
 	memset( &entry, 0, sizeof( entry ) );
 
-	const VkResult imageResult = vmaCreateImage( vkCtx.allocator, &ici, &vaci, &entry.image, &entry.allocation, NULL );
+	VkResult imageResult;
+	while ( true ) {
+		if ( droppedLevels > 0 ) {
+			// A reduced texture is only ever sampled: it is never a render
+			// target, and a readback of it would not match its declared size.
+			ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			ici.extent.width = (uint32_t)Max( 1, opts.width >> droppedLevels );
+			ici.extent.height = (uint32_t)Max( 1, opts.height >> droppedLevels );
+			ici.mipLevels = (uint32_t)( numMips - droppedLevels );
+		}
+		imageResult = vmaCreateImage( vkCtx.allocator, &ici, &vaci, &entry.image, &entry.allocation, NULL );
+		// Out of memory: a reducible texture tries again one level smaller.
+		if ( imageResult == VK_SUCCESS || !budgetReducible || droppedLevels + 1 >= numMips
+				|| ( imageResult != VK_ERROR_OUT_OF_DEVICE_MEMORY && imageResult != VK_ERROR_OUT_OF_HOST_MEMORY ) ) {
+			break;
+		}
+		droppedLevels++;
+	}
 	if ( imageResult != VK_SUCCESS ) {
 		R_ImagePolicyObserveError( "Vulkan image resource creation failed", imageResult );
 		common->Warning( "Vulkan: image creation failed (%dx%d fmt %d)", opts.width, opts.height, (int)opts.format );
@@ -926,7 +1110,7 @@ void idImage::AllocImage( void ) {
 	ivci.format = info.format;
 	ivci.components = info.swizzle;
 	ivci.subresourceRange.aspectMask = sampledAspect;
-	ivci.subresourceRange.levelCount = (uint32_t)numMips;
+	ivci.subresourceRange.levelCount = ici.mipLevels;
 	ivci.subresourceRange.layerCount = isCube ? 6 : 1;
 	const VkResult viewResult = vkCreateImageView( vkCtx.device, &ivci, NULL, &entry.view );
 	if ( viewResult != VK_SUCCESS ) {
@@ -956,15 +1140,19 @@ void idImage::AllocImage( void ) {
 	entry.aspectMask = attachmentAspect;
 	entry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	entry.samples = samples;
-	entry.width = opts.width;
-	entry.height = opts.height;
-	entry.numMips = numMips;
-	entry.numLayers = isCube ? 6 : 1;
+	entry.width = (int)ici.extent.width;
+	entry.height = (int)ici.extent.height;
+	entry.numMips = (int)ici.mipLevels;
+	entry.droppedLevels = droppedLevels;
+	entry.numLayers = numLayers;
 	entry.isCube = isCube;
 	entry.everUploaded = false;
 	entry.generation = vkImageGenerationCounter++;
-	entry.sampler = VK_Image_GetSampler( filter, repeat, numMips > 1 );
+	entry.sampler = VK_Image_GetSampler( filter, repeat, entry.numMips > 1 );
 	if ( entry.sampler == VK_NULL_HANDLE ) R_ImagePolicyObserveError( "Vulkan image sampler creation failed" );
+	if ( droppedLevels > 0 ) {
+		VK_Image_NoteBudgetReduction( info, opts.width, opts.height, numMips, numLayers, droppedLevels );
+	}
 
 	texnum = (unsigned int)slot;
 
@@ -1180,6 +1368,15 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 			|| ( entry->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT ) == 0 ) {
 		return;
 	}
+	// A device awaiting its restart takes no uploads (see AllocImage), so no
+	// staging buffer is made for a copy that can never run.
+	if ( vkCtx.presentationBlocked ) return;
+	// Levels AllocImage left out to fit video memory are not stored, and the
+	// kept ones sit that many levels higher in the smaller image.
+	if ( mipLevel < entry->droppedLevels ) {
+		return;
+	}
+	mipLevel -= entry->droppedLevels;
 	// Reject malformed regions before allocating or recording a GPU copy.
 	// In particular, a sixth-face admission bit must never come from a copy
 	// to a nonexistent layer, mip, or a region outside that mip's storage.
@@ -1319,9 +1516,11 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		}
 		entry->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	} else {
-		// nothing recorded: release the staging buffer through the normal
-		// deferred path, matching the old no-device fallback
-		VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );
+		// Nothing recorded a copy from it, so nothing on the GPU can use it:
+		// release it now. The deferred queue only drains when a frame slot
+		// retires, and none does while presentation is blocked, so every
+		// refused upload's staging buffer used to stay until the restart.
+		vmaDestroyBuffer( vkCtx.allocator, staging, stagingAlloc );
 		return;
 	}
 

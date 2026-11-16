@@ -7,6 +7,45 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Vulkan copes with texture packs bigger than video memory (#217, #231), 16 November 2026
+
+- **High-resolution texture packs no longer freeze Vulkan at the end of a map
+  load.** A pack loaded uncompressed (here 16 GB of textures on a 12 GB card)
+  used to overfill video memory until the driver reset, after which the game
+  kept loading for minutes and could not recover. Vulkan now watches how full
+  the card is while textures load and, once it passes 80% of the memory it
+  allows itself, loads new world and model textures at a lower resolution, a
+  step at a time. The console prints one warning when that starts. Menus, the
+  HUD, fonts and `nopicmip` materials keep their full size.
+- **A driver reset during a load is shorter and recovers.** Once the device is
+  lost, the load stops decoding and uploading textures. The automatic renderer
+  restart loads them instead. Before, every refused upload kept its staging
+  memory until that restart, so a long load filled system memory too, down to
+  4-byte allocations.
+- Players with a texture pack: keep `image_usePrecompressedTextures 1` (the
+  default) so the pack's DDS files are used. They take a quarter of the memory
+  and load far faster. `r_vkTextureMemoryLimit` sets how much video memory
+  Vulkan fills before it reduces textures. See
+  [when textures don't fit](../user/display-settings.md#when-textures-dont-fit-in-video-memory).
+- Development: Vulkan now enables `VK_EXT_memory_budget` where the driver has
+  it, so the limit follows the driver's real budget. `rendererVulkanMemoryInfo`
+  reports which budget is in use and how many textures were reduced.
+  `renderer_image_policy_boundaries.py` covers the reduction, the retry after an
+  out-of-memory result and the blocked-device refusals.
+- Evidence (16 November, RTX 4060 Laptop, driver 591.74, `game/airdefense1`
+  with 1,103 stock textures replaced by 2048x2048 TGAs, 7.8 GB requested): under
+  `r_vkTextureMemoryLimit 2500` the map loaded into play with one warning at
+  2,005 MiB and 716 textures reduced (6,311 MiB requested, 223 MiB stored).
+  With the presentation-failure drill latched during a level load
+  (`game/airdefense2`), the old module still decoded and uploaded all 1,385
+  images into the dead device (peak 5.05 GB private). The new one deferred them
+  (`1385 level images left for the renderer restart to load`, peak 4.3 GB), and
+  the restart reloaded them into play. With `r_vkPresentationRecoveries 1`, a
+  second failure reached the fatal error in 28 s, reset `r_renderApi` to `gl`,
+  and the next launch started OpenGL. Not reproduced: the NVIDIA desktop device
+  loss itself, and an unlimited oversubscription run (the shared machine had no
+  commit headroom for one).
+
 ## A mod's old copy of openQ4's text no longer blanks the new menus, 16 November 2026
 
 - **Menus keep their words under texture and content mods.** A mod that

@@ -138,6 +138,10 @@ typedef struct vkDeviceContext_s {
 	bool				portabilityImageViewFormatSwizzle;
 	bool				portabilityMutableComparisonSamplers;
 	bool				textureCompressionBCSupported;
+	// VK_EXT_memory_budget is enabled and VMA reads the driver's heap budgets
+	// (the texture video-memory budget in vk_Image.cpp); otherwise VMA
+	// estimates 80% of each heap against its own allocations.
+	bool				memoryBudgetEnabled;
 	// VK_FORMAT_R5G6B5_UNORM_PACK16 backs the light projection/falloff cookies.
 	// Metal only exposes the packed 16-bit formats on Apple GPUs, so this is
 	// probed and the image path widens to RGBA8 when it is missing.

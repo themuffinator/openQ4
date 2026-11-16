@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 #include "RendererResourceSettings.h"
+#include "DisplayPresentation.h"
 #include "../imagetools/LegacyScopeMask.h"
 
 #include <condition_variable>
@@ -1648,6 +1649,16 @@ bool idImageManager::ExcludePreloadImage( const char *name ) {
 idImageManager::LoadLevelImages
 ===============
 */
+// A renderer device that failed and waits for the restart its backend queued
+// (a lost Vulkan device) presents nothing until then. A device that is simply
+// not up yet (startup, a dedicated server) reports a pending or unavailable
+// outcome instead of a failure.
+static bool R_RendererDeviceAwaitsRestart() {
+	renderDisplayPresentation_t presentation{};
+	R_GetDisplayPresentation( &presentation );
+	return presentation.available == 0 && presentation.outcome >= RDP_INIT_FAILED;
+}
+
 int idImageManager::LoadLevelImages( bool pacifier ) {
 	R_RenderThread_Sync( "image registry" );
 	idList<sortedImage_t> pendingImages;
@@ -1690,9 +1701,17 @@ int idImageManager::LoadLevelImages( bool pacifier ) {
 		prefetch.Begin( pendingImages );
 	}
 
+	int deferredToRestart = 0;
 	for ( int i = 0; i < pendingImages.Num(); i++ ) {
 		if ( pacifier ) {
 			//common->UpdateLevelLoadPacifier();
+		}
+		// The restart that recovers a failed device reloads every level image,
+		// so decoding the rest now only spends minutes on textures nothing can
+		// hold (#231: a device lost early in a 300-second texture load).
+		if ( R_RendererDeviceAwaitsRestart() ) {
+			deferredToRestart = pendingImages.Num() - i;
+			break;
 		}
 
 		idTimer loadTimer;
@@ -1716,6 +1735,9 @@ int idImageManager::LoadLevelImages( bool pacifier ) {
 		session->AdvanceLoadingAssetQueue( 1 );
 	}
 
+	if ( deferredToRestart > 0 ) {
+		common->Printf( "%d level images left for the renderer restart to load\n", deferredToRestart );
+	}
 	if ( prefetching ) {
 		prefetch.End();
 		if ( profileLevelLoad ) {
@@ -1752,7 +1774,7 @@ int idImageManager::LoadLevelImages( bool pacifier ) {
 		}
 	}
 
-	return pendingImages.Num();
+	return pendingImages.Num() - deferredToRestart;
 }
 
 /*

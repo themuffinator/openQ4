@@ -37,7 +37,8 @@ VK_SUPPORT = r'''
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
-static int checks=0,errors=0,started=0,succeeded=0,refused=0,native=0,destroyed=0,deferred=0;
+static int checks=0,errors=0,started=0,succeeded=0,refused=0,native=0,destroyed=0,deferred=0,reductions=0,budgetDrop=0;
+static unsigned oomAbove=0; // vmaCreateImage refuses images wider than this
 #define TEST(x) do{++checks;if(!(x))throw std::runtime_error(#x);}while(0)
 static bool allowed=true,formatOK=true,batchOK=true;
 static int fail=0;
@@ -53,6 +54,7 @@ enum textureFilter_t {TF_DEFAULT,TF_LINEAR,TF_NEAREST};
 enum textureRepeat_t {TR_REPEAT,TR_CLAMP,TR_CLAMP_TO_BORDER,TR_CLAMP_TO_ZERO,TR_CLAMP_TO_ZERO_ALPHA,TR_MIRRORED_REPEAT};
 enum {TT_2D,TT_CUBIC,FMT_DEPTH,FMT_DEPTH_STENCIL,FMT_RGB565};
 using textureUsage_t=int;
+enum {TD_SPECULAR,TD_DIFFUSE,TD_DEFAULT,TD_BUMP,TD_FONT,TD_HIGH_QUALITY=15,TD_PBR_COLOR,TD_MATERIAL_DATA};
 struct idImageOpts {int width=8,height=8,textureType=TT_2D,format=100,numLevels=4,numMSAASamples=0;};
 struct idImage;
 struct renderImageOperation_t {
@@ -61,13 +63,13 @@ struct renderImageOperation_t {
  ~renderImageOperation_t(){if(permit){if(done)++succeeded;else ++refused;}}
  bool Allowed()const{return permit;}void Succeeded(uint64_t=0){done=true;}
 };
-struct idImage {idImageOpts opts;int usage=0;textureFilter_t filter=TF_DEFAULT;textureRepeat_t repeat=TR_REPEAT;unsigned texnum=99;uint64_t storageGeneration=0;
+struct idImage {idImageOpts opts;int usage=0;bool allowDownSize=true;textureFilter_t filter=TF_DEFAULT;textureRepeat_t repeat=TR_REPEAT;unsigned texnum=99;uint64_t storageGeneration=0;
  bool IsFileBacked()const{return true;}void PurgeImage(){++native;texnum=99;}void AllocImage();void SubImageUpload(int,int,int,int,int,int,const void*,int)const;};
 struct VmaAllocation_T{};using VmaAllocation=VmaAllocation_T*;
 struct VmaAllocationCreateInfo{int usage=0,flags=0;};
 struct VmaAllocationInfo{void* pMappedData=nullptr;};
 enum{VMA_MEMORY_USAGE_AUTO=1,VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT=1,VMA_ALLOCATION_CREATE_MAPPED_BIT=2};
-struct {bool initialized=true;VkPhysicalDevice physicalDevice{};VkDevice device{};int allocator=0;VkSampleCountFlags sampleLocationCounts=0;struct{struct{float maxSamplerAnisotropy=16;}limits;}deviceProperties;}vkCtx;
+struct {bool initialized=true,presentationBlocked=false;VkPhysicalDevice physicalDevice{};VkDevice device{};int allocator=0;VkSampleCountFlags sampleLocationCounts=0;struct{struct{float maxSamplerAnisotropy=16;}limits;}deviceProperties;}vkCtx;
 struct{int GetInteger()const{return 1;}}image_anisotropy;
 struct imageFilterState_t {int mode=0;bool usesMipmaps=true,minLinear=true,magLinear=true,mipLinear=true;};
 imageFilterState_t R_GetDefaultImageFilterState(){return {};}
@@ -76,7 +78,7 @@ static constexpr int VK_MAX_SAMPLERS=4;
 static vkSamplerKey_t vkSamplerKeys[VK_MAX_SAMPLERS]{};
 static VkSampler vkSamplers[VK_MAX_SAMPLERS]{};static int vkNumSamplers=0;
 VkResult vkCreateSampler(VkDevice,const VkSamplerCreateInfo*,const VkAllocationCallbacks*,VkSampler* out){++native;*out=(VkSampler)(uintptr_t)1;return fail==1?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
-VkResult vmaCreateImage(int,const VkImageCreateInfo*,const VmaAllocationCreateInfo*,VkImage* out,VmaAllocation* a,void*){++native;*out=(VkImage)(uintptr_t)1;*a=(VmaAllocation)(uintptr_t)1;return fail==2?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
+VkResult vmaCreateImage(int,const VkImageCreateInfo* ici,const VmaAllocationCreateInfo*,VkImage* out,VmaAllocation* a,void*){++native;if(oomAbove&&ici->extent.width>oomAbove){*out=VK_NULL_HANDLE;return VK_ERROR_OUT_OF_DEVICE_MEMORY;}*out=(VkImage)(uintptr_t)1;*a=(VmaAllocation)(uintptr_t)1;return fail==2?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
 static int views=0;
 VkResult vkCreateImageView(VkDevice,const VkImageViewCreateInfo*,const VkAllocationCallbacks*,VkImageView* out){++native;++views;*out=(VkImageView)(uintptr_t)1;return fail==(views==1?3:4)?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
 void vmaDestroyImage(int,VkImage,VmaAllocation){++destroyed;}
@@ -86,8 +88,12 @@ static unsigned char mapped[1024]{};
 VkResult vmaCreateBuffer(int,const VkBufferCreateInfo*,const VmaAllocationCreateInfo*,VkBuffer* b,VmaAllocation* a,VmaAllocationInfo* info){++native;*b=(VkBuffer)(uintptr_t)1;*a=(VmaAllocation)(uintptr_t)1;info->pMappedData=mapped;return fail==5?VK_ERROR_OUT_OF_HOST_MEMORY:VK_SUCCESS;}
 VkResult vmaFlushAllocation(int,VmaAllocation,VkDeviceSize,VkDeviceSize){++native;return fail==6?VK_ERROR_MEMORY_MAP_FAILED:VK_SUCCESS;}
 void VK_Device_DeferDestroy(VkImage,VkImageView,VkBuffer,VmaAllocation){++deferred;}
+void vmaDestroyBuffer(int,VkBuffer,VmaAllocation){++destroyed;}
 struct vkFormatInfo_t{VkFormat format=VK_FORMAT_R8G8B8A8_UNORM;int bytesPerBlock=4,blockDim=1;VkComponentMapping swizzle{};bool expandRgb565=false;};
 bool VK_Image_GetFormatInfo(const idImageOpts&,textureUsage_t,vkFormatInfo_t&){++native;return formatOK;}
+// The heap query is counted out; VK_Image_ChooseDroppedLevels itself is compiled below.
+int VK_Image_BudgetDroppedLevels(const vkFormatInfo_t&,int,int,int,int){return budgetDrop;}
+void VK_Image_NoteBudgetReduction(const vkFormatInfo_t&,int,int,int,int,int){++reductions;}
 VkSampleCountFlagBits VK_Image_SelectSampleCount(const idImageOpts&,VkFormat,VkImageAspectFlags,VkImageUsageFlags,VkImageCreateFlags,bool){return VK_SAMPLE_COUNT_1_BIT;}
 int VK_Image_SampleCountInteger(VkSampleCountFlagBits){return 0;}
 static int slot=0;int VK_Image_AllocSlot(){return slot;}
@@ -101,7 +107,7 @@ bool VK_Device_BatchedUpload(void(*)(VkCommandBuffer,void*),void*,VkBuffer,VmaAl
 '''
 
 VK_MAIN = r'''
-static void Reset(){errors=started=succeeded=refused=native=destroyed=deferred=views=0;allowed=formatOK=batchOK=true;fail=0;slot=0;vkCtx.initialized=true;vkNumSamplers=0;std::memset(vkImages,0,sizeof(vkImages));}
+static void Reset(){errors=started=succeeded=refused=native=destroyed=deferred=views=reductions=budgetDrop=0;oomAbove=0;allowed=formatOK=batchOK=true;fail=0;slot=0;vkCtx.initialized=true;vkCtx.presentationBlocked=false;vkNumSamplers=0;std::memset(vkImages,0,sizeof(vkImages));}
 int main(){try{
  Reset();{idImage i;i.AllocImage();TEST(succeeded==1&&refused==0&&errors==0);TEST(i.texnum==0);}
  for(int refusal=0;refusal<7;++refusal){Reset();idImage i;
@@ -123,10 +129,40 @@ int main(){try{
   if(refusal==3)vkImages[0].samples=VK_SAMPLE_COUNT_4_BIT;if(refusal==4)vkImages[0].aspectMask=VK_IMAGE_ASPECT_DEPTH_BIT;
   if(refusal==5)formatOK=false;if(refusal==6)fail=5;if(refusal==7)fail=6;if(refusal==8)batchOK=false;
   i.SubImageUpload(0,0,0,0,width,8,data,0);TEST(refused==1&&succeeded==0);TEST(!vkImages[0].everUploaded);
-  if(refusal>=7)TEST(deferred==1);
+  if(refusal==7)TEST(deferred==1&&destroyed==0);
+  // never recorded, so released at once: the deferred queue waits for a frame
+  if(refusal==8)TEST(deferred==0&&destroyed==1);
  }
  Reset();{idImage i;i.AllocImage();started=succeeded=refused=0;i.SubImageUpload(0,0,0,0,8,8,mapped,0);TEST(succeeded==1&&refused==0&&vkImages[0].everUploaded);}
  Reset();allowed=false;{idImage i;i.SubImageUpload(0,0,0,0,8,8,mapped,0);TEST(native==0);}
+ // A device awaiting its restart takes no new images or staging buffers.
+ Reset();{idImage i;i.AllocImage();vkCtx.presentationBlocked=true;started=succeeded=refused=native=0;
+  i.SubImageUpload(0,0,0,0,8,8,mapped,0);TEST(refused==1&&!vkImages[0].everUploaded);
+  vkImages[0]={};i.AllocImage();TEST(refused==2&&i.texnum==99&&!vkImages[0].inUse&&vkImages[0].image==VK_NULL_HANDLE);}
+ // Over budget: the top levels are left out and their uploads dropped; the
+ // kept levels land that many levels higher in the smaller image.
+ Reset();budgetDrop=2;{idImage i;i.AllocImage();const vkImageEntry_t& e=vkImages[0];
+  TEST(succeeded==1&&reductions==1&&e.width==2&&e.height==2&&e.numMips==2&&e.droppedLevels==2);
+  TEST((e.usage&(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT))==0);
+  started=succeeded=refused=0;i.SubImageUpload(0,0,0,0,8,8,mapped,0);i.SubImageUpload(1,0,0,0,4,4,mapped,0);
+  TEST(refused==2&&!e.everUploaded);i.SubImageUpload(2,0,0,0,2,2,mapped,0);i.SubImageUpload(3,0,0,0,1,1,mapped,0);
+  TEST(succeeded==2&&e.everUploaded);i.SubImageUpload(4,0,0,0,1,1,mapped,0);TEST(refused==3);}
+ Reset();{idImage i;i.AllocImage();TEST(vkImages[0].droppedLevels==0&&(vkImages[0].usage&VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)!=0&&reductions==0);}
+ // Out of memory: a reducible texture retries a level smaller; others fail as before.
+ Reset();oomAbove=4;{idImage i;i.AllocImage();TEST(succeeded==1&&errors==0&&vkImages[0].droppedLevels==1&&vkImages[0].width==4&&reductions==1);}
+ Reset();oomAbove=4;{idImage i;i.allowDownSize=false;i.AllocImage();TEST(refused==1&&errors==1&&reductions==0);}
+ Reset();oomAbove=4;{idImage i;i.usage=TD_FONT;i.AllocImage();TEST(refused==1&&reductions==0);}
+ Reset();oomAbove=4;budgetDrop=3;{idImage i;i.opts.numLevels=1;i.AllocImage();TEST(refused==1&&reductions==0);}
+ Reset();budgetDrop=3;{idImage i;i.opts.textureType=TT_CUBIC;i.AllocImage();TEST(vkImages[0].droppedLevels==3&&vkImages[0].numMips==1&&vkImages[0].numLayers==6);}
+ // The pressure ramp itself (RGBA8, MiB units).
+ {const vkFormatInfo_t rgba{};const VkDeviceSize M=1u<<20,L=1000*M;
+  TEST(VK_Image_EstimateBytes(rgba,2048,2048,12,1)==22369620ull&&VK_Image_EstimateBytes(rgba,4,4,3,6)==(16+4+1)*4*6);
+  TEST(VK_Image_ChooseDroppedLevels(0,L,rgba,2048,2048,12,1)==0);
+  TEST(VK_Image_ChooseDroppedLevels(790*M,L,rgba,2048,2048,12,1)==0&&VK_Image_ChooseDroppedLevels(800*M,L,rgba,2048,2048,12,1)==1);
+  TEST(VK_Image_ChooseDroppedLevels(900*M,L,rgba,2048,2048,12,1)==2&&VK_Image_ChooseDroppedLevels(970*M,L,rgba,2048,2048,12,1)==3);
+  TEST(VK_Image_ChooseDroppedLevels(970*M,L,rgba,512,512,10,1)==1&&VK_Image_ChooseDroppedLevels(970*M,L,rgba,256,256,9,1)==0);
+  TEST(VK_Image_ChooseDroppedLevels(L-50000,L,rgba,2048,2048,12,1)==5&&VK_Image_ChooseDroppedLevels(L,L,rgba,64,64,7,1)==0);
+  TEST(VK_Image_ChooseDroppedLevels(999*M,L,rgba,2048,2048,1,1)==0&&VK_Image_ChooseDroppedLevels(999*M,0,rgba,2048,2048,12,1)==0);}
  std::printf("actual Vulkan image boundaries: %d checks passed\n",checks);return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"FAIL: %s\n",e.what());return 1;}}
 '''
@@ -248,7 +284,8 @@ def build_units(repository, headers):
     entry = entry_header[entry_header.index('typedef struct vkImageEntry_s'):entry_header.index('} vkImageEntry_t;') + len('} vkImageEntry_t;')]
     context = vk[vk.index('typedef struct vkUploadContext_s'):vk.index('} vkUploadContext_t;') + len('} vkUploadContext_t;')]
     vulkan = VK_SUPPORT + entry + VK_AFTER_ENTRY + context + '\n'.join(method(vk, name) for name in (
-        'static VkSampler VK_Image_GetSampler(', 'void idImage::AllocImage(', 'void idImage::SubImageUpload(')) + VK_MAIN
+        'static VkSampler VK_Image_GetSampler(', 'static VkDeviceSize VK_Image_EstimateBytes(',
+        'static int VK_Image_ChooseDroppedLevels(', 'void idImage::AllocImage(', 'void idImage::SubImageUpload(')) + VK_MAIN
     entries = []
     for file, signature in [('Image_load.cpp', 'void idImage::ActuallyLoadImage('), ('Image_load.cpp', 'void idImage::Reload('), ('ImageManager.cpp', 'void idImageManager::ReloadImages(')]:
         body = method((renderer / file).read_text(encoding='utf-8'), signature)
@@ -335,7 +372,12 @@ def main():
         changes = [
             ('sampler-refusal', 'R_ImagePolicyObserveError( "Vulkan sampler creation failed", samplerResult );', '(void)samplerResult;'),
             ('sampler-capacity', 'R_ImagePolicyObserveError( "Vulkan sampler cache exhausted" );', '(void)0;'),
-            ('batch-refusal', 'VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );\n\t\treturn;\n\t}\n\n\timageOperation.Succeeded(consumedBatch);', 'VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, staging, stagingAlloc );\n\t}\n\n\timageOperation.Succeeded(consumedBatch);'),
+            ('batch-refusal', 'vmaDestroyBuffer( vkCtx.allocator, staging, stagingAlloc );\n\t\treturn;\n\t}\n\n\timageOperation.Succeeded(consumedBatch);', 'vmaDestroyBuffer( vkCtx.allocator, staging, stagingAlloc );\n\t}\n\n\timageOperation.Succeeded(consumedBatch);'),
+            ('blocked-upload', '\tif ( vkCtx.presentationBlocked ) return;\n\t// Levels', '\t// Levels'),
+            ('blocked-alloc', 'if ( vkCtx.presentationBlocked && IsFileBacked() ) {\n\t\treturn;', 'if ( false ) {\n\t\treturn;'),
+            ('dropped-level-shift', 'mipLevel -= entry->droppedLevels;', '(void)0;'),
+            ('budget-retry', 'droppedLevels++;', 'break;'),
+            ('budget-usage', 'ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;', '(void)0;'),
         ]
         cases += [('vulkan', name, mutate(vk, old, new)) for name, old, new in changes]
         entries = units['entries']
