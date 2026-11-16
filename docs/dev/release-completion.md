@@ -48,11 +48,11 @@ does not restore the withdrawn release. See
   redirect, refused plain HTTP and enforced the size cap. `openq4-update-core`
   and `openq4-updater-helper-apply` pass with MSVC, clang and Linux g++; the
   engine files pass a Linux g++ and an Android API 24 compile check.
-- Open: the signing key was generated on 16 November and its public half is
-  compiled in. Until the `OPENQ4_UPDATE_SIGNING_KEY` secret is set, the release
-  job publishes an unsigned manifest and games open the release page rather
-  than installing. An in-place update from a published release cannot be run
-  before a signed release exists. Not run: a full Linux engine build and runtime, macOS.
+- Open: the signing key was generated on 16 November, its public half is
+  compiled in, and the `OPENQ4_UPDATE_SIGNING_KEY` secret is set, so the next
+  release publishes a signed manifest. Only builds that carry the key trust
+  it, so the first in-place update is from that release to the one after. It
+  cannot be run before then. Not run: a full Linux engine build and runtime, macOS.
 
 ## The Awakening's Falcon defence ends its waves again (#230), 16 November 2026
 

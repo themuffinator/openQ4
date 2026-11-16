@@ -5952,8 +5952,8 @@ remain narrower than final-package physical-device signoff.
 **Estimate: 92%; 4/6 tasks closed (16 November 2026).** PKG-01 to PKG-04 are
 implemented and proven on local candidates; their release-workflow steps first
 run with the next release. PKG-05 needs that release's measurements; PKG-06's
-updater is implemented (#227) and its key generated; it waits for the signing
-secret and a first signed release. Evidence:
+updater is implemented (#227), its key generated and the signing secret set;
+it waits for an in-place update between two signed releases. Evidence:
 [implementation status](content-pack-distribution.md#implementation-status-6-november-2026),
 [updater](content-pack-distribution.md#implementation-16-november-2026).
 
@@ -5964,7 +5964,7 @@ secret and a first signed release. Evidence:
 | PKG-03 — Complete | Software DXT decode for renderers without S3TC; 51/51 packs accepted with every area resident on GL, GL software decode and Vulkan; atlases and `core2` metadata trimmed (pak1 267.5 → 96.4 MB); `waste` re-baked; loadscreen format decided: keep TGA + DDS. | None. |
 | PKG-04 — Complete | Content generations, overlays pak3–pak9 rebuilt from changed files with the base kept byte-identical from the generation's blobs, size budget, generation bump folding; one-file fix shipped as a verified 153 KB overlay. | None. |
 | PKG-05 — Implemented, measurement open | Installer downloads only missing or different bulk packs, SHA-256 and release URL compiled in; AppImages embed `gh-releases-zsync` information and publish `.zsync`; itch.io declined. | Measure update downloads for each channel on the next release (maintainer decision, 6 November). |
-| PKG-06 — Implemented, secret and first release open | In-game updater under the recorded constraints (#227): Ed25519-signed `openq4-update.json` with the key compiled in, compiled release URL, WinHTTP / system libcurl, staged `.update/` swapped by `openQ4-updater` after exit with backup and rollback, per-user installs only; macOS, AppImage, Flatpak, Snap, Android and development builds get the release page. Native, helper and manifest-tool tests. | Set the `OPENQ4_UPDATE_SIGNING_KEY` secret to the key generated on 16 November (public half compiled in); on the first signed release, update an installed previous release in place on Windows and Linux. |
+| PKG-06 — Implemented, first in-place update open | In-game updater under the recorded constraints (#227): Ed25519-signed `openq4-update.json` with the key compiled in, compiled release URL, WinHTTP / system libcurl, staged `.update/` swapped by `openQ4-updater` after exit with backup and rollback, per-user installs only; macOS, AppImage, Flatpak, Snap, Android and development builds get the release page. Native, helper and manifest-tool tests. | Key generated and `OPENQ4_UPDATE_SIGNING_KEY` set (16 November). Update the first signed release in place to the next one on Windows and Linux (only builds carrying the key trust it). |
 
 ### PKG task evidence and acceptance
 
@@ -6020,9 +6020,10 @@ secret and a first signed release. Evidence:
   the Updates button and a startup check in release builds read the latest
   release's signed manifest; Windows and Linux installs download, verify, stage
   and hand over to `openQ4-updater`, which swaps the files after the game exits
-  and restarts it. The key was generated on 16 November. Remaining exit: its
-  workflow secret, then an in-place update from the previous release on Windows and Linux with
-  the first signed release.
+  and restarts it. The key was generated and its workflow secret set on
+  16 November. Remaining exit: updating the first signed release in place to
+  the next one on Windows and Linux, since only builds carrying the key trust
+  its signatures.
 
 ## Steam integration
 
