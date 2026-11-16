@@ -4207,6 +4207,16 @@ void idFuncRadioChatter::Event_Activate( idEntity *activator ) {
 		player = gameLocal.GetLocalPlayer();
 	}
 
+	// openQ4: the Awakening's scripts name some radio lines by numbers their
+	// recordings no longer carry
+	sound = Awakening_RecordedLine( spawnArgs.GetString( "snd_radiochatter", "" ) );
+	if ( Awakening_UnwrittenLine( sound ) ) {
+		// nothing to say: no radio icon and no missing-sample tone; a script
+		// waiting on the line goes on at once, and the targets still fire
+		ActivateTargets( player );
+		return;
+	}
+
 // RAVEN BEGIN
 // bdube: replaced named event with method
 	player->StartRadioChatter();
@@ -4214,9 +4224,6 @@ void idFuncRadioChatter::Event_Activate( idEntity *activator ) {
 	isActive = true;
 // RAVEN END
 
-	// openQ4: the Awakening's scripts name some radio lines by numbers their
-	// recordings no longer carry
-	sound = Awakening_RecordedLine( spawnArgs.GetString( "snd_radiochatter", "" ) );
 	if ( sound && *sound ) {
 		shader = declManager->FindSound( sound );
 		if ( shader && shader->IsVO_ForPlayer()){

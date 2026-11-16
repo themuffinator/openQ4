@@ -28,6 +28,10 @@ bool Awakening_SpeechNames( const char *speech, const char *&lipSync, const char
 // The recorded line a stale radio sound name refers to, or the name itself.
 const char *Awakening_RecordedLine( const char *sound );
 
+// True for a radio line named by a script but declared nowhere. The radio then
+// stays silent instead of sounding the engine's missing-sample tone.
+bool Awakening_UnwrittenLine( const char *sound );
+
 // The joint a missing joint name plainly meant, or INVALID_JOINT.
 jointHandle_t Awakening_IntendedJoint( const idAnimator *animator, const char *name );
 

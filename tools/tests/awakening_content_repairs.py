@@ -29,7 +29,11 @@ really present, so a table row cannot rot into a guess:
   recording and its lip-sync declaration are, and a speaker really holds it;
 - each reply the Cryofac script revision adds has one anchor in the installed
   script, directly follows that anchor's line in the writers' own order, and is
-  a key its speaker has, with its recording.
+  a key its speaker has, with its recording;
+- the m01 battle radio (M01Radio.inl, scripts/openq4/awakening/m01_radio.script)
+  hooks only scenes the maps call, wraps each scene in the function it hooks,
+  and says only draft lines: names the unloaded draft VO script holds, whose
+  draft scene calls them over the radio or tags them "Over Radio".
 """
 
 from __future__ import annotations
@@ -58,6 +62,11 @@ CRYOFAC_REPLIES = (
     ("nava_sorryserg", "tak", "tak_darnman"),
     ("tak_die", "navajas", "nava_takthatbitch"),
 )
+M01_RADIO = "src/game/awakening/M01Radio.inl"
+M01_RADIO_SCRIPT = "content/baseoq4/pak0/scripts/openq4/awakening/m01_radio.script"
+M01_DRAFT_SCRIPT = "scripts/maps/m04_stranarus_trench_intro.script"
+M01_DRAFT_VO = "scripts/maps/m04_stranarus_trench_vo.script"
+
 JOINT_MODELS = {
     # written joint -> (entityDef or model that names it, the key or command that does)
     "rt_up_lid": ("monster_q4x_tank", "joint_eyeOffset"),
@@ -126,7 +135,7 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     require(source, "return !gameLocal.isMultiplayer && g_awakeningContentRepairs.GetBool() && FS_AwakeningActive();", SOURCE)
     for function in ("Awakening_RestoreDialogueKeys", "Awakening_RecordedLine", "Awakening_IntendedJoint",
                      "Awakening_IntendedEffectJoint", "Awakening_IntendedEffect", "Awakening_PrecacheContentRepairs",
-                     "Awakening_CorrectEntitySounds", "Awakening_SpeechNames"):
+                     "Awakening_CorrectEntitySounds", "Awakening_SpeechNames", "Awakening_UnwrittenLine"):
         body = source[source.find(f"{function}("):]     # its definition comes before any use
         body = body[:body.find("\n}\n")]
         require(body, "Awakening_ContentRepairsActive()", function)
@@ -164,6 +173,9 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
         require(late, f'aiSpeakWait( ${speaker}, \\"lipsync_{reply}\\" );', "LateMissions.inl v4 edits")
     require(read(ROOT / "src/game/Misc.cpp"),
             'sound = Awakening_RecordedLine( spawnArgs.GetString( "snd_radiochatter", "" ) );', "idFuncRadioChatter")
+    # a radio line nothing declares stays silent instead of sounding the missing-sample tone
+    require(read(ROOT / "src/game/Misc.cpp"), "if ( Awakening_UnwrittenLine( sound ) ) {", "idFuncRadioChatter")
+    require(source, "if ( Awakening_SoundDeclared( sound ) ) {", "Awakening_UnwrittenLine")
     actor = read(ROOT / "src/game/Actor.cpp")
     require(actor, "eyeOffsetJoint = Awakening_IntendedJoint( headAnimator, jointname );", "idActor eye joint")
     require(actor, 'eyeOffsetJoint = Awakening_IntendedJoint( &animator, spawnArgs.GetString( "joint_eyeOffset" ) );',
@@ -180,6 +192,29 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     commands = read(ROOT / "src/game/gamesys/SysCmds.cpp")
     require(commands, 'cmdSystem->AddCommand( "openq4_testSpeak"', "SysCmds.cpp")
     require(commands, "eyeHeight=%.1f", "aiDumpState")
+
+    # The m01 battle radio: every hook wraps the scene it names, and the script
+    # is compiled only for the two trench maps, beside the map's own program.
+    radio = read(ROOT / M01_RADIO)
+    hooks = re.findall(r'\{\s*"(maps/game/[^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*"oq4_m01_radio::(\w+)"\s*\}', radio)
+    if len(hooks) != 11:
+        raise AssertionError(f"{M01_RADIO}: expected 11 scene hooks, found {len(hooks)}")
+    placement = read(ROOT / M01_RADIO_SCRIPT)
+    for map_name, entity, call, placed in hooks:
+        body = re.search(r"void\s+" + placed + r"\s*\(\s*\)\s*\{(.*?)\n\}", placement, re.S)
+        if not body:
+            raise AssertionError(f"{M01_RADIO_SCRIPT}: no function '{placed}'")
+        if not re.search(r"m04_stranarus_trench::" + re.escape(call) + r"\s*\(\s*\)", body.group(1)):
+            raise AssertionError(f"{M01_RADIO_SCRIPT}: '{placed}' does not run the scene '{call}'")
+    require(radio, 'Awakening_SoundDeclared( "vo_4_2_2_1" )', M01_RADIO)
+    require(radio, "anchors != expected", M01_RADIO)
+    require(radio, "gameLocal.program.CompileFile( awakeningM01RadioScript );", M01_RADIO)
+    require(game_local, '#include "awakening/M01Radio.inl"', "Game_local.cpp")
+    require(game_local, "Awakening_DirectM01Radio( args );", "Game_local.cpp")
+    tables["m01radio"] = [tuple(hook) for hook in hooks]
+    tables["m01lines"] = [(line,) for line in re.findall(r'oq4Radio\(\s*"(vo_4_[0-9_]+)"', placement)]
+    if len(tables["m01lines"]) != len(set(tables["m01lines"])):
+        raise AssertionError(f"{M01_RADIO_SCRIPT}: a draft line is placed twice")
 
     # The Awakening is single player only.
     for path in (ROOT / "src/mpgame").rglob("*"):
@@ -404,6 +439,25 @@ def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, ret
         recorded = keys.get(f"lipsync_{reply}")
         if not recorded or not content.has_sample(recorded):
             raise AssertionError(f"m08: ${speaker} cannot speak 'lipsync_{reply}'")
+
+    # Each m01 hook names a trigger the map has, still calling its scene, and each
+    # placed line is a draft radio line nothing declares or a declared one with
+    # its sample (once the audio ships, every placed line must reach a sample).
+    for map_name, entity, call, _ in tables["m01radio"]:
+        if content.map_entity(map_name, entity).get("call") != call:
+            raise AssertionError(f"{map_name}: '{entity}' no longer calls '{call}'")
+    draft = read(awakening / M01_DRAFT_SCRIPT)
+    vo = read(awakening / M01_DRAFT_VO)
+    texts = {name.lower(): text for name, text in re.findall(r"void\s+VO_(\w+)\s*\([^)]*\)\s*\{\s*//([^\n]*)", vo)}
+    for (line,) in tables["m01lines"]:
+        stem = line.lower()[3:]
+        if stem not in texts:
+            raise AssertionError(f"m01 radio: '{line}' is not a line of the draft VO script")
+        radio_call = re.search(r"^\s*radioChatterPlay\w*\s*\([^,]+,\s*\"" + re.escape(line) + r"\"", draft, re.M | re.I)
+        if not radio_call and "over radio" not in texts[stem].lower():
+            raise AssertionError(f"m01 radio: '{line}' is neither a draft radio call nor an over-the-radio line")
+        if line.lower() in content.sounds and not content.has_sample(line):
+            raise AssertionError(f"m01 radio: '{line}' is declared without its sample; it would play the missing-sample tone")
 
     for written, counterpart, pair_left, pair_right in tables["mirrored"]:
         owner, user = JOINT_MODELS[written]

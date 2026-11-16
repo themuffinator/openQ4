@@ -1,0 +1,135 @@
+// openQ4's placement of The Awakening's unrecorded m01 battle radio.
+// The words are the writers' own, from an early draft of the mission
+// (scripts/maps/m04_stranarus_trench_intro.script, which no map runs). This
+// file places each draft scene's radio traffic at the matching beat of the
+// battle that ships. See docs/dev/awakening-missing-voice-lines.md.
+// Revision 1. Loaded as a map script, so a save keeps the program it was
+// made with; a later change gets a new file.
+#include "scripts/doom_defs.script"
+
+namespace oq4_m01_radio {
+
+float metMarkswell;
+float ranInside;
+
+// Background traffic waits for the shared radio to fall quiet, so the
+// story's own calls are never talked over. A story call that starts during
+// a background line takes the radio, as a new call always does.
+void oq4Radio( string line, float quiet ) {
+	entity radio = sys.getEntity( "uni_radiochatter" );
+	if ( !radio ) { return; }
+	float quietSince = sys.getTime();
+	while ( 1 ) {
+		if ( radio.isActive() ) {
+			quietSince = sys.getTime();
+		} else if ( sys.getTime() - quietSince >= quiet ) {
+			break;
+		}
+		sys.wait( 0.1 );
+	}
+	sys.println( "oq4_m01_radio: " + line + " @ " + sys.getTime() );
+	radioChatterPlayWait( radio, line );
+}
+
+// ---- m01_stranarus_trench1 -------------------------------------------------
+
+// The landing zone (Darnell: "We landed in a real mess"). The draft's second
+// wave on the beach: squads across the line lose their objectives.
+void landingZone() {
+	m04_stranarus_trench::m04_trench_unit1_seq_2();
+	oq4Radio( "vo_4_2_2_3", 3 );		// "Objective is lost, Command, please advise!"
+	oq4Radio( "vo_4_2_2_4", 1 );		// "Oh fuck! They're already here!"
+	oq4Radio( "vo_4_2_2_5", 8 );		// "I need an evac now. Now, dammit, now!"
+	oq4Radio( "vo_4_2_2_6", 2 );		// "We've lost contact with Raptor and Venom squads."
+	oq4Radio( "vo_4_2_2_1", 4 );		// "They're all over us! Oh god - (Static)"
+	oq4Radio( "vo_4_2_2_2", 2 );		// "It's no good, Command. We're gonna have to take the alternate route."
+}
+
+// The Harvester falls and Razor 16 goes down: another dropship is hit.
+void harvesterDown() {
+	m04_stranarus_trench::m04_trench_unit1_seq_3();
+	oq4Radio( "vo_4_1_10", 2 );		// "We're taking heavy fire, we've lost two port thrusters, and."
+	oq4Radio( "vo_4_2_2_13", 6 );	// "This isn't an assault, Command. It's a fucking massacre."
+	oq4Radio( "vo_4_2_2_12", 4 );	// "They won't stop coming! We've killed hundreds, they keep coming!"
+}
+
+// The walkers break for the tunnels and the squad moves up. The draft's
+// Tiger squad ambush, then Raptor squad's last survivor.
+void squadMovesUp() {
+	m04_stranarus_trench::m04_trench_unit1_seq_4();
+	oq4Radio( "vo_4_5_1", 3 );		// "Tiger squad!"
+	oq4Radio( "vo_4_5_2", 0.5 );		// "They were waiting for us!"
+	oq4Radio( "vo_4_5_3", 0.5 );		// "Tiger squad, fall back. Fall back!"
+	oq4Radio( "vo_4_2_2_7", 6 );		// "Raptor squad is down. They ambushed us. ..."
+	oq4Radio( "vo_4_2_2_8", 0.5 );	// "Command, where is our fucking support?"
+}
+
+// The push on the turret bunkers, before the player reaches Markswell. His
+// calls stop once the player is with him.
+void turretBunkers() {
+	thread m04_stranarus_trench::m04_trench_unit1_seq_7();
+	sys.wait( 6 );
+	if ( !metMarkswell ) { oq4Radio( "vo_4_2_11", 2 ); }		// Markswell: "Get moving, Marine."
+	oq4Radio( "vo_4_2_2_11", 4 );							// "Watch the turrets! Watch the--"
+	sys.wait( 15 );
+	if ( !metMarkswell ) { oq4Radio( "vo_4_2_12", 2 ); }		// Markswell: "Breach those bunkers, Sergeant."
+}
+
+// Hades squad points Falcon to the rest of the squad, past a cleared bunker.
+void bunkerClear() {
+	m04_stranarus_trench::m04_trench_unit1_seq_7_disable_turrets();
+	oq4Radio( "vo_4_2_2_14", 4 );	// "Bunker eight-nine-bravo is clear!"
+}
+
+// Markswell's orders: breach the supply tunnels, the only way past the
+// turrets. If the player has not gone in a while later, he repeats them.
+void markswellOrders() {
+	metMarkswell = 1;
+	m04_stranarus_trench::m04_trench_unit1_seq_9();
+	sys.wait( 60 );
+	if ( !ranInside ) {
+		oq4Radio( "vo_4_2_13", 2 );	// "You have your orders, Sergeant. Find a way behind those turrets."
+	}
+}
+
+// The cave mouth comes down behind the squad: the draft's avalanche.
+void caveCollapse() {
+	ranInside = 1;
+	thread m04_stranarus_trench::m04_trench_unit1_seq_10_begin_run_inside();
+	sys.wait( 2.5 );
+	oq4Radio( "vo_4_5_4", 0 );		// "What the hell is that?"
+	oq4Radio( "vo_4_5_5", 0 );		// "Oh shit!"
+	sys.wait( 8 );
+	oq4Radio( "vo_4_2_2_9", 2 );		// "Eastern approach is stalled. They've got us pinned in. ..."
+}
+
+// ---- m01_stranarus_trench2 -------------------------------------------------
+
+// Out of the building and on to the supply tunnels: the assault elsewhere.
+void supplyTunnels() {
+	m04_stranarus_trench::m04_building_unit2_seq_1();
+	oq4Radio( "vo_4_2_2_15", 4 );	// "We've breached the Northern wall. We're 'go' for infiltration."
+	oq4Radio( "vo_4_2_2_16", 6 );	// "Mongoose squad is in position, awaiting further orders, Command."
+}
+
+// The damaged walkers found.
+void walkersFound() {
+	m04_stranarus_trench::m04_maint_tunnel_unit1_seq_1();
+	oq4Radio( "vo_4_2_2_17", 4 );	// "(Cough) Command (Cough) Sector two-four-nine is lost."
+	oq4Radio( "vo_4_2_2_18", 6 );	// "It's a clusterfuck, Command, two squads killed right in front of me. ..."
+}
+
+// The first tunnel cleared and its charges set: the draft's last Strogg down.
+void tunnelCleared() {
+	m04_stranarus_trench::m04_maint_tunnel_unit1_seq_4_area_clear_and_charges_set();
+	oq4Radio( "vo_4_2_2_10", 4 );	// "Objective secure."
+}
+
+// Back in the trench for the last turrets.
+void lastTrench() {
+	m04_stranarus_trench::m04_trench_unit2_seq_1();
+	oq4Radio( "vo_4_2_2_19", 4 );	// "They're all dead! All of'em. ... They won't take me! (Gunshot)"
+	oq4Radio( "vo_4_2_2_20", 8 );	// "Oh shit! They're taking us apart. Twelfth mobile division ..."
+}
+
+}

@@ -1,0 +1,1509 @@
+{
+ "schema": 1,
+ "lines": [
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_3",
+   "voice": "marine9",
+   "text": "Objective is lost, Command, please advise!",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_4",
+   "voice": "marine9",
+   "text": "Oh fuck!  They're already here!",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_5",
+   "voice": "marine8",
+   "text": "I need an evac now.  Now, dammit, now!",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_6",
+   "voice": "marine8",
+   "text": "We've lost contact with Raptor and Venom squads.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_1",
+   "voice": "marine10",
+   "text": "They're all over us!  Oh god - (Static)",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_2",
+   "voice": "marine10",
+   "text": "It's no good, Command.  We're gonna have to take the alternate route.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_1_10",
+   "voice": "marine7",
+   "text": "We're taking heavy fire, we've lost two port thrusters, and.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_13",
+   "voice": "marine4",
+   "text": "This isn't an assault, Command.  It's a fucking massacre.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_12",
+   "voice": "marine5",
+   "text": "They won't stop coming!  We've killed hundreds, they keep coming!",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_5_1",
+   "voice": "marine3",
+   "text": "Tiger squad!",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_5_2",
+   "voice": "marine9",
+   "text": "They were waiting for us!",
+   "tier": "required",
+   "notes": "m04_stranarus_trench/4_5_2.wav may already be this line: listen first"
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_5_3",
+   "voice": "marine4",
+   "text": "Tiger squad, fall back.  Fall back!",
+   "tier": "required",
+   "notes": "m04_stranarus_trench/4_5_3.wav may already be this line: listen first"
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_7",
+   "voice": "marine7",
+   "text": "Raptor squad is down.  They ambushed us.  I'm the only one left, the entire squad was wiped out.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_8",
+   "voice": "marine7",
+   "text": "Command, where is our fucking support?",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_11",
+   "voice": "Markswell",
+   "text": "Get moving, Marine.",
+   "tier": "required",
+   "notes": "recorded take vo_marks_getmov has the same words"
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_11",
+   "voice": "marine5",
+   "text": "Watch the turrets!  Watch the--",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_12",
+   "voice": "Markswell",
+   "text": "Breach those bunkers, Sergeant.",
+   "tier": "required",
+   "notes": "no recorded take: needs his voice"
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_14",
+   "voice": "marine4",
+   "text": "Bunker eight-nine-bravo is clear!",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_13",
+   "voice": "Markswell",
+   "text": "You have your orders, Sergeant.  Find a way behind those turrets.",
+   "tier": "required",
+   "notes": "recorded take vo_marks_youhaveords is close"
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_5_4",
+   "voice": "marine12",
+   "text": "What the hell is that?",
+   "tier": "required",
+   "notes": "m04_stranarus_trench/4_5_4.wav may already be this line: listen first"
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_5_5",
+   "voice": "marine12",
+   "text": "Oh shit!",
+   "tier": "required",
+   "notes": "m04_stranarus_trench/4_5_5.wav may already be this line: listen first"
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_9",
+   "voice": "marine6",
+   "text": "Eastern approach is stalled.  They've got us pinned in.  We're not gonna last long.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_15",
+   "voice": "marine3",
+   "text": "We've breached the Northern wall.  We're 'go' for infiltration.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_16",
+   "voice": "marine3",
+   "text": "Mongoose squad is in position, awaiting further orders, Command.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_17",
+   "voice": "marine2",
+   "text": "(Cough) Command (Cough) Sector two-four-nine is lost.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_18",
+   "voice": "marine2",
+   "text": "It's a clusterfuck, Command, two squads killed right in front of me.  We need an updated sitrep.  Now!",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_10",
+   "voice": "marine6",
+   "text": "Objective secure.",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_19",
+   "voice": "marine1",
+   "text": "They're all dead!  All of'em.  I'm not letting'em take me, Command.  You hear me?  They won't take me! (Gunshot)",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Awakening m01 battle radio",
+   "id": "vo_4_2_2_20",
+   "voice": "marine1",
+   "text": "Oh shit!  They're taking us apart.  Twelfth mobile division was just fucking incinerated. You copy, Command?",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "round_1..round_20",
+   "voice": "announcer",
+   "text": "Round one ... Round twenty",
+   "tier": "required",
+   "notes": "20 clips; Clan Arena/Freeze Tag first-to-8 can reach round 15, si_roundLimit allows 99"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "round_final",
+   "voice": "announcer",
+   "text": "Final round",
+   "tier": "required",
+   "notes": "fallback past round twenty, and the deciding round"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "match_point",
+   "voice": "announcer",
+   "text": "Match point",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "round_won",
+   "voice": "announcer",
+   "text": "Round won",
+   "tier": "required",
+   "notes": "replaces the 'You score' alias (RoundGameState.cpp:927)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "round_lost",
+   "voice": "announcer",
+   "text": "Round lost",
+   "tier": "required",
+   "notes": "replaces the 'Enemy scores' alias (:929)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "round_draw",
+   "voice": "announcer",
+   "text": "Round draw",
+   "tier": "required",
+   "notes": "replaces the 'Teams are tied' alias (:925)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "round_marines_win",
+   "voice": "announcer",
+   "text": "Marines win the round",
+   "tier": "required",
+   "notes": "spectators and casters"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "round_strogg_win",
+   "voice": "announcer",
+   "text": "Strogg win the round",
+   "tier": "required",
+   "notes": "spectators and casters"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "last_standing",
+   "voice": "announcer",
+   "text": "Last one standing",
+   "tier": "required",
+   "notes": "replaces the 'One frag left' alias (RoundGameState.cpp:784, RoundModes.cpp:817)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "one_enemy_left",
+   "voice": "announcer",
+   "text": "One enemy remaining",
+   "tier": "required",
+   "notes": "the other side's view of the same event"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "overtime",
+   "voice": "announcer",
+   "text": "Overtime!",
+   "tier": "required",
+   "notes": "timed overtime is text only today (GameState.cpp:121)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "match_marines_win",
+   "voice": "announcer",
+   "text": "Marines win the match",
+   "tier": "required",
+   "notes": "managed match end is silent for teams (MultiplayerGame.cpp:11656)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "match_strogg_win",
+   "voice": "announcer",
+   "text": "Strogg win the match",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "match_draw",
+   "voice": "announcer",
+   "text": "Match drawn",
+   "tier": "required",
+   "notes": "a tie plays 'You win' to Strogg today (MultiplayerGame.cpp:20382, a bug)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "match_aborted",
+   "voice": "announcer",
+   "text": "Match aborted",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "forfeit",
+   "voice": "announcer",
+   "text": "Forfeit",
+   "tier": "required",
+   "notes": "text only today"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "mercy_rule",
+   "voice": "announcer",
+   "text": "Mercy rule",
+   "tier": "required",
+   "notes": "text only today"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "timeout",
+   "voice": "announcer",
+   "text": "Timeout",
+   "tier": "required",
+   "notes": "MP-12 timeouts are text only (MultiplayerGame.cpp:23882)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "match_paused",
+   "voice": "announcer",
+   "text": "Match paused",
+   "tier": "required",
+   "notes": ""
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "match_resumed",
+   "voice": "announcer",
+   "text": "Match resumed",
+   "tier": "required",
+   "notes": "'Time in' (MultiplayerGame.cpp:23897); the resume countdown reuses three/two/one"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "player_disconnected",
+   "voice": "announcer",
+   "text": "Player disconnected",
+   "tier": "required",
+   "notes": "disconnect pause (MultiplayerGame.cpp:23886)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "flag_marines_have",
+   "voice": "announcer",
+   "text": "Marines have the flag",
+   "tier": "required",
+   "notes": "CTF caster set: spectators hear nothing today (GameState.cpp:1557-1640)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "flag_strogg_have",
+   "voice": "announcer",
+   "text": "Strogg have the flag",
+   "tier": "required",
+   "notes": "CTF caster set"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "flag_marines_dropped",
+   "voice": "announcer",
+   "text": "Marine flag dropped",
+   "tier": "required",
+   "notes": "CTF caster set"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "flag_strogg_dropped",
+   "voice": "announcer",
+   "text": "Strogg flag dropped",
+   "tier": "required",
+   "notes": "CTF caster set"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "flag_marines_returned",
+   "voice": "announcer",
+   "text": "Marine flag returned",
+   "tier": "required",
+   "notes": "CTF caster set"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "flag_strogg_returned",
+   "voice": "announcer",
+   "text": "Strogg flag returned",
+   "tier": "required",
+   "notes": "CTF caster set"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "marines_score",
+   "voice": "announcer",
+   "text": "Marines score",
+   "tier": "required",
+   "notes": "CTF caster set"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "strogg_score",
+   "voice": "announcer",
+   "text": "Strogg score",
+   "tier": "required",
+   "notes": "CTF caster set"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "armor_regeneration",
+   "voice": "announcer",
+   "text": "Armor regeneration",
+   "tier": "required",
+   "notes": "Awakening armour regen powerup plays 'Regeneration' (Player.cpp:6247)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "quad_loose",
+   "voice": "announcer",
+   "text": "Quad Damage is loose",
+   "tier": "required",
+   "notes": "Quad Hog modifier, text only (MultiplayerGame.cpp:27903)"
+  },
+  {
+   "group": "Multiplayer announcer: missing events",
+   "id": "quad_hog",
+   "voice": "announcer",
+   "text": "You are the Quad Hog",
+   "tier": "required",
+   "notes": "Quad Hog modifier (MultiplayerGame.cpp:27856)"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "thirty_seconds",
+   "voice": "announcer",
+   "text": "Thirty seconds",
+   "tier": "optional",
+   "notes": "clock and round timer"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "ten_seconds",
+   "voice": "announcer",
+   "text": "Ten seconds",
+   "tier": "optional",
+   "notes": ""
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "overtime_2",
+   "voice": "announcer",
+   "text": "Second overtime",
+   "tier": "optional",
+   "notes": "periods are unlimited (MultiplayerGame.cpp:7335)"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "overtime_3",
+   "voice": "announcer",
+   "text": "Third overtime",
+   "tier": "optional",
+   "notes": ""
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "one_capture_left",
+   "voice": "announcer",
+   "text": "One capture remaining",
+   "tier": "optional",
+   "notes": "CTF limit warning"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "vote_next_map",
+   "voice": "announcer",
+   "text": "Vote for the next map",
+   "tier": "optional",
+   "notes": "MP-13 end-of-match map pick is silent"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "you_are_frozen",
+   "voice": "announcer",
+   "text": "You've been frozen",
+   "tier": "optional",
+   "notes": "Freeze Tag, text only (RoundModes.cpp:286)"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "thawed",
+   "voice": "announcer",
+   "text": "Thawed",
+   "tier": "optional",
+   "notes": "Freeze Tag"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "teammate_frozen",
+   "voice": "announcer",
+   "text": "Teammate frozen",
+   "tier": "optional",
+   "notes": "Freeze Tag"
+  },
+  {
+   "group": "Multiplayer announcer: optional calls",
+   "id": "adrenaline",
+   "voice": "announcer",
+   "text": "Adrenaline",
+   "tier": "optional",
+   "notes": "silent pickup (Player.cpp:6234)"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_deathmatch",
+   "voice": "announcer",
+   "text": "Deathmatch",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_team_deathmatch",
+   "voice": "announcer",
+   "text": "Team Deathmatch",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_tourney",
+   "voice": "announcer",
+   "text": "Tourney",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_duel",
+   "voice": "announcer",
+   "text": "Duel",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_capture_the_flag",
+   "voice": "announcer",
+   "text": "Capture the Flag",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_one_flag_ctf",
+   "voice": "announcer",
+   "text": "One Flag CTF",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_arena_ctf",
+   "voice": "announcer",
+   "text": "Arena CTF",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_deadzone",
+   "voice": "announcer",
+   "text": "DeadZone",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_clan_arena",
+   "voice": "announcer",
+   "text": "Clan Arena",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_freeze_tag",
+   "voice": "announcer",
+   "text": "Freeze Tag",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_red_rover",
+   "voice": "announcer",
+   "text": "Red Rover",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_instagib",
+   "voice": "announcer",
+   "text": "Instagib",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_quad_hog",
+   "voice": "announcer",
+   "text": "Quad Hog",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_vampiric_damage",
+   "voice": "announcer",
+   "text": "Vampiric Damage",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_weapons_frenzy",
+   "voice": "announcer",
+   "text": "Weapons Frenzy",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_rocket_arena",
+   "voice": "announcer",
+   "text": "Rocket Arena",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_rail_arena",
+   "voice": "announcer",
+   "text": "Rail Arena",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_nadefest",
+   "voice": "announcer",
+   "text": "NadeFest",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_classic",
+   "voice": "announcer",
+   "text": "Classic",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_instagib_ctf",
+   "voice": "announcer",
+   "text": "Instagib CTF",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: mode and modifier names",
+   "id": "name_classic_ctf",
+   "voice": "announcer",
+   "text": "Classic CTF",
+   "tier": "optional",
+   "notes": "no code announces a mode today; needs a match-start intro"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_lemming",
+   "voice": "announcer",
+   "text": "Lemming",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_rail_master",
+   "voice": "announcer",
+   "text": "Rail Master",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_rocket_sauce",
+   "voice": "announcer",
+   "text": "Rocket Sauce",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_brawler",
+   "voice": "announcer",
+   "text": "Brawler",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_sniper",
+   "voice": "announcer",
+   "text": "Sniper",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_critical_failure",
+   "voice": "announcer",
+   "text": "Critical Failure",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_team_player",
+   "voice": "announcer",
+   "text": "Team Player",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_accuracy",
+   "voice": "announcer",
+   "text": "Accuracy",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_frags",
+   "voice": "announcer",
+   "text": "Frags",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer announcer: end-game award names",
+   "id": "award_perfect",
+   "voice": "announcer",
+   "text": "Perfect",
+   "tier": "optional",
+   "notes": "text only in retail too; for an intermission awards reel (MP-12/MP-17)"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_attack",
+   "voice": "Marine player",
+   "text": "Attack!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_defend",
+   "voice": "Marine player",
+   "text": "Defend!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_need_backup",
+   "voice": "Marine player",
+   "text": "Need backup!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_enemy_incoming",
+   "voice": "Marine player",
+   "text": "Enemy incoming!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_on_my_way",
+   "voice": "Marine player",
+   "text": "On my way.",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_thanks",
+   "voice": "Marine player",
+   "text": "Thanks!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_nice_shot",
+   "voice": "Marine player",
+   "text": "Nice shot!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_marine_good_game",
+   "voice": "Marine player",
+   "text": "Good game.",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_attack",
+   "voice": "Strogg player",
+   "text": "Attack!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_defend",
+   "voice": "Strogg player",
+   "text": "Defend!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_need_backup",
+   "voice": "Strogg player",
+   "text": "Need backup!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_enemy_incoming",
+   "voice": "Strogg player",
+   "text": "Enemy incoming!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_on_my_way",
+   "voice": "Strogg player",
+   "text": "On my way.",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_thanks",
+   "voice": "Strogg player",
+   "text": "Thanks!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_nice_shot",
+   "voice": "Strogg player",
+   "text": "Nice shot!",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer quick chat",
+   "id": "chat_strogg_good_game",
+   "voice": "Strogg player",
+   "text": "Good game.",
+   "tier": "optional",
+   "notes": "the quick-chat wheel is text only (QuickChat.inl:140-152); clientVoiceChat has no snd_voc_* lines"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_three",
+   "voice": "announcer",
+   "text": "Three",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_two",
+   "voice": "announcer",
+   "text": "Two",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_one",
+   "voice": "announcer",
+   "text": "One",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_you_win",
+   "voice": "announcer",
+   "text": "You win",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_you_lose",
+   "voice": "announcer",
+   "text": "You lose",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_fight",
+   "voice": "announcer",
+   "text": "Fight!",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_sudden_death",
+   "voice": "announcer",
+   "text": "Sudden death",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_vote_failed",
+   "voice": "announcer",
+   "text": "Vote failed",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_vote_now",
+   "voice": "announcer",
+   "text": "Vote now",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_vote_passed",
+   "voice": "announcer",
+   "text": "Vote passed",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_one_frag",
+   "voice": "announcer",
+   "text": "One frag left",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_two_frags",
+   "voice": "announcer",
+   "text": "Two frags left",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_three_frags",
+   "voice": "announcer",
+   "text": "Three frags left",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_one_minute",
+   "voice": "announcer",
+   "text": "One minute remaining",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_five_minute",
+   "voice": "announcer",
+   "text": "Five minutes remaining",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_prepare_to_fight",
+   "voice": "announcer",
+   "text": "Prepare to fight",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_quad_damage",
+   "voice": "announcer",
+   "text": "Quad Damage",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_regeneration",
+   "voice": "announcer",
+   "text": "Regeneration",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_haste",
+   "voice": "announcer",
+   "text": "Haste",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_invisibility",
+   "voice": "announcer",
+   "text": "Invisibility",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tied_lead",
+   "voice": "announcer",
+   "text": "You are tied for the lead",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_taken_lead",
+   "voice": "announcer",
+   "text": "You have taken the lead",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_lost_lead",
+   "voice": "announcer",
+   "text": "You have lost the lead",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_enemy_score",
+   "voice": "announcer",
+   "text": "The enemy scores",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_you_score",
+   "voice": "announcer",
+   "text": "You score",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_teams_tied",
+   "voice": "announcer",
+   "text": "Teams are tied",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_strogg_lead",
+   "voice": "announcer",
+   "text": "Strogg lead",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_marines_lead",
+   "voice": "announcer",
+   "text": "Marines lead",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_join_marine",
+   "voice": "announcer",
+   "text": "You are on the Marines",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_join_strogg",
+   "voice": "announcer",
+   "text": "You are on the Strogg",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ctf_you_have_flag",
+   "voice": "announcer",
+   "text": "You have the flag",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ctf_team_has_flag",
+   "voice": "announcer",
+   "text": "Your team has the flag",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ctf_enemy_has_flag",
+   "voice": "announcer",
+   "text": "The enemy has your flag",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ctf_team_drops",
+   "voice": "announcer",
+   "text": "Your team dropped the flag",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ctf_enemy_drops",
+   "voice": "announcer",
+   "text": "The enemy dropped your flag",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ctf_flag_returned",
+   "voice": "announcer",
+   "text": "Your flag was returned",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ctf_enemy_returns",
+   "voice": "announcer",
+   "text": "The enemy flag was returned",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_capture",
+   "voice": "announcer",
+   "text": "Capture",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_humiliation",
+   "voice": "announcer",
+   "text": "Humiliation",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_impressive",
+   "voice": "announcer",
+   "text": "Impressive",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_excellent",
+   "voice": "announcer",
+   "text": "Excellent",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_assist",
+   "voice": "announcer",
+   "text": "Assist",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_defense",
+   "voice": "announcer",
+   "text": "Defense",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_combo_kill",
+   "voice": "announcer",
+   "text": "Combo kill",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_rampage",
+   "voice": "announcer",
+   "text": "Rampage",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_award_holy_shit",
+   "voice": "announcer",
+   "text": "Holy shit!",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_advance",
+   "voice": "announcer",
+   "text": "You advance",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_start",
+   "voice": "announcer",
+   "text": "The tournament begins",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_done",
+   "voice": "announcer",
+   "text": "The tournament is over",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_eliminated",
+   "voice": "announcer",
+   "text": "You have been eliminated",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_won",
+   "voice": "announcer",
+   "text": "You won the tournament",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_prelims",
+   "voice": "announcer",
+   "text": "Preliminaries",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_quarter_finals",
+   "voice": "announcer",
+   "text": "Quarter finals",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_semi_finals",
+   "voice": "announcer",
+   "text": "Semi finals",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_final_match",
+   "voice": "announcer",
+   "text": "Final match",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_waiting",
+   "voice": "announcer",
+   "text": "Waiting for an arena",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_team_ammo_regen",
+   "voice": "announcer",
+   "text": "Team ammo regeneration",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_team_doubler",
+   "voice": "announcer",
+   "text": "Team doubler",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_guard",
+   "voice": "announcer",
+   "text": "Guard",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_scout",
+   "voice": "announcer",
+   "text": "Scout",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_doubler",
+   "voice": "announcer",
+   "text": "Doubler",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_ammo_regen",
+   "voice": "announcer",
+   "text": "Ammo regeneration",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_1",
+   "voice": "announcer",
+   "text": "Join arena one",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_2",
+   "voice": "announcer",
+   "text": "Join arena two",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_3",
+   "voice": "announcer",
+   "text": "Join arena three",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_4",
+   "voice": "announcer",
+   "text": "Join arena four",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_5",
+   "voice": "announcer",
+   "text": "Join arena five",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_6",
+   "voice": "announcer",
+   "text": "Join arena six",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_7",
+   "voice": "announcer",
+   "text": "Join arena seven",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  },
+  {
+   "group": "Multiplayer announcer: stock set re-voiced (only for a new announcer voice)",
+   "id": "stock_tourney_arena_8",
+   "voice": "announcer",
+   "text": "Join arena eight",
+   "tier": "conditional",
+   "notes": "exact retail words unconfirmed: no transcripts ship; listen before recording"
+  }
+ ]
+}

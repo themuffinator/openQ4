@@ -154,6 +154,22 @@ const char *Awakening_RecordedLine( const char *sound ) {
 	return sound;
 }
 
+// A radio line a script names but nothing declares, such as Cryofac's
+// vo_darn_dntwrryct (m08), recorded without a declaration. The sound system
+// fills a missing sound with a 186 ms tone, so the alpha beeps over the radio
+// there. A sample named by its path is left to the sound system, which
+// reports it.
+bool Awakening_UnwrittenLine( const char *sound ) {
+	if ( !sound || !sound[ 0 ] || !Awakening_ContentRepairsActive() || idStr::FindChar( sound, '/' ) >= 0 ) {
+		return false;
+	}
+	if ( Awakening_SoundDeclared( sound ) ) {
+		return false;
+	}
+	gameLocal.DPrintf( "Awakening: radio line '%s' is not declared; the radio stays silent\n", sound );
+	return true;
+}
+
 /*
 ===============================================================================
 
@@ -249,6 +265,15 @@ static const awakeningSpeech_t awakeningSpeech[] = {
 	// definitions name vo_fox3_prismed; the line was generated as vo_fox_prismed
 	// over fox_prismed.wav, and recorded as fox3_prismed.wav.
 	{ "maps/game/m04_prison",	"vo_fox3_prismed",			"vo_fox_prismed",			"sound/vo/M04_Prison/fox_prismed.wav",			"sound/vo/m04_prison/fox3_prismed.wav" },
+	// The Pain Lord's three tube marines scream as the machine processes each
+	// one (m05). Their lines are declared, keyed and captioned "(Screams of
+	// agony)", but no take was ever recorded. These are stand-in screams with
+	// no words: the expansion's unused take of a screaming marine for the
+	// first, and two of retail Quake 4's Stroggification screams (medlabs) for
+	// the others, so the three men do not share one voice.
+	{ "maps/game/m05_bio",		"vo_marine1_agony1",		"vo_marine1_agony1",		"sound/vo/M05_Bio/marine1_agony1.wav",			"sound/vo/m05_bio/scrmar4_pain.wav" },
+	{ "maps/game/m05_bio",		"vo_marine2_agony1",		"vo_marine2_agony1",		"sound/vo/M05_Bio/marine2_agony1.wav",			"sound/vo/medlabs_1/2_1_1_01_5.ogg" },
+	{ "maps/game/m05_bio",		"vo_marine3_agony1",		"vo_marine3_agony1",		"sound/vo/M05_Bio/marine3_agony1.wav",			"sound/vo/medlabs_1/2_1_1_01_7.ogg" },
 };
 
 // Whether each row applies to the installed content: 0 not yet asked, 1 yes,

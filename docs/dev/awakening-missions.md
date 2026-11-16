@@ -1111,12 +1111,18 @@ Dialogue keys are added to the speaker's spawn arguments when the map spawns
 are translated when the radio entity plays (`Awakening_RecordedLine`). A key or
 sound the content does supply is never replaced.
 
-**Left alone: never recorded.** Twenty `vo_4_*` radio calls in m01's opening
-battle (the numbering dates from when the trench was mission 4) and two m08
-lines (`lipsync_nava_herightsrg`, `vo_darn_dntwrryct`) have no recording under
-any name. One m01 call has the same words as Markswell's later `vo_marks_getmov`
-talk line; a line recorded for a face-to-face reply was not moved onto the radio
-on that evidence. About 250 recorded lines are also named by no script or map
+**Never recorded (16 November).** Twenty `vo_4_*` radio calls with no
+recording sit in `m04_stranarus_trench_intro.script`, a draft whose namespace
+no map calls: neither m01 map has its radio entity or the marines it directs.
+Their words are known: openQ4 places them, with nine more of the draft's
+radio lines, at the matching scenes of the shipped battle, and they play once
+they are voiced (`scripts/openq4/awakening/m01_radio.script`). The two m08 names (`lipsync_nava_herightsrg`,
+`vo_darn_dntwrryct`) are absent from the writers' dialogue list, which holds the
+rest of that exchange, but both are recorded (`sound/vo_english/m08_cryo/`)
+without declarations. Darnell's played the missing-sample tone over the radio;
+it is now silent. The
+[missing voice lines register](awakening-missing-voice-lines.md) lists every
+line with the pieces it lacks and its resolution. About 250 recorded lines are also named by no script or map
 (race chatter, further squad conversation). The
 [second pass](#replies-the-scenes-stop-short-of--14-november-2026) counts them
 strictly, sorts them by kind and places the seven whose scene is provable.
@@ -1280,9 +1286,15 @@ carries its mouth shapes and plays the recording by its path, so the lip
 movement is kept. The recordings are preloaded with their map, and a
 declaration that does reach a sample is left alone.
 
-Ten declarations have no recording under any name: the Pain Lord's three tube
+Ten declarations have no recording under any name. The Pain Lord's three tube
 marines' screams (`vo_marine1_agony1` to `vo_marine3_agony1`, spoken by
-m05's script), two unused m01 lines and five empty generated entries in m06.
+m05's script) now play stand-in screams through the same table (16 November):
+the expansion's unused `scrmar4_pain` take for the first, and two of retail
+Quake 4's medical-lab Stroggification screams for the others, so the three men
+do not share one voice. The screams have no words, and each line keeps its own
+caption. The other seven are two m01 lines nothing calls and five empty
+generated entries in m06, duplicates of the recorded `vo_7_6_2` to `vo_7_6_5`.
+See the [register](awakening-missing-voice-lines.md).
 
 ### Three replies in Cryofac
 
