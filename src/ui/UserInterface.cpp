@@ -2355,7 +2355,12 @@ void idUserInterfaceLocal::ClampCursor( void ) {
 	// Retail clamps the cursor to the virtual screen, and the game's in-world
 	// GUI interaction depends on it: idPlayer::UpdateFocus parks the cursor at
 	// the corner before every absolute reposition. Menu GUIs may extend past
-	// the 4:3 canvas, so retain their aspect-corrected bounds.
+	// the 4:3 canvas, so retain their aspect-corrected bounds. A menu always
+	// draws aspect corrected while ui_aspectCorrection is on, so its bounds
+	// follow that rule directly. The shared device context's mode belongs to
+	// whichever GUI drew last, which can be a world-surface GUI drawn
+	// uncorrected; reading it could wall the cursor in at the 4:3 edges
+	// (reported on macOS in PR #173).
 	float minX = 0.0f;
 	float minY = 0.0f;
 	float maxX = static_cast<float>( VIRTUAL_WIDTH );
@@ -2370,7 +2375,7 @@ void idUserInterfaceLocal::ClampCursor( void ) {
 		if ( ( desktop->GetFlags() & WIN_MENUGUI ) && ui_aspectCorrection.GetBool() ) {
 			float xExpand = 0.0f;
 			float yExpand = 0.0f;
-			uiManagerLocal.dc.GetVirtualScreenExpansion( maxX, maxY, xExpand, yExpand );
+			uiManagerLocal.dc.GetAspectCorrectedScreenExpansion( maxX, maxY, xExpand, yExpand );
 			if ( std::isfinite( xExpand ) && xExpand >= 0.0f ) {
 				minX -= xExpand;
 				maxX += xExpand;
