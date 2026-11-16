@@ -318,15 +318,17 @@ falling bound and the stretch rule date from 16 November.
 
 ## Evidence
 
-Windows x64, RTX 4060 Laptop, debugoptimized build of worktree snapshot
-`48730095e` (the PHYS line merged with `main` at `f28e8ced0`; the binaries
-report `0.14.1-dev+gd522613e`, the commit they were configured at), hidden
-window, silent, OpenGL, one tic per frame. The machine is shared and was at
+Windows x64, RTX 4060 Laptop, debugoptimized build of the sources that landed
+on `main` as `3f44d3684` (measured before landing, as a snapshot on top of
+`f28e8ced0` that this document calls `48730095e`; the binaries report
+`0.14.1-dev+gd522613e`, the commit they were configured at), hidden window,
+silent, OpenGL, one tic per frame. The machine is shared and was at
 full load throughout, with three of these clients running at once from
 separate copies of the staged runtime; CPU figures use the noise floor.
 Linux and ARM64 figures are in their own section. Everything here is from 16
-November 2026 unless a date says otherwise. Raw outputs are under
-`.tmp/phys/` in the build worktree and are not kept in the repository.
+November 2026 unless a date says otherwise. Raw harness outputs were local
+scratch and are not kept in the repository; every harness named here
+reproduces its table.
 
 ### Legacy replay
 
