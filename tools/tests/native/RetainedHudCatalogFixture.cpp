@@ -125,12 +125,19 @@ static void UI_RetainedPrefetchDocuments( const char *const *paths, int count ) 
 		prefetched.push_back( { paths[i], file->second, ParseArtwork( file->second, diagnostics ) } );
 	}
 }
-static bool UI_RetainedTakePrefetched( const std::string &path, const std::string &source, openq4::ui::Document &document ) {
+// The production take compares the length and content stamp of the file as it
+// is now; the fixture compares the file's current text.
+typedef long ID_TIME_T;
+static const ID_TIME_T FILE_NOT_FOUND_TIMESTAMP = -1;
+static bool UI_RetainedTakePrefetched( const std::string &path, int size, std::string &source, ID_TIME_T &stamp, openq4::ui::Document &document ) {
 	for ( size_t i = 0; i < prefetched.size(); i++ ) {
 		if ( prefetched[i].path != path ) continue;
 		const Prefetched entry = prefetched[i];
 		prefetched.erase( prefetched.begin() + i );
-		if ( !entry.parse || entry.source != source ) return false;
+		const auto file = files.find( path );
+		if ( !entry.parse || file == files.end() || static_cast<int>( entry.source.size() ) != size || entry.source != file->second ) return false;
+		source = entry.source;
+		stamp = 0;
 		document.impl = entry.parse;
 		return true;
 	}

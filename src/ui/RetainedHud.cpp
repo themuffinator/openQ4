@@ -27,7 +27,7 @@ extern idCVar r_skipGuiShaders;
 
 // The parse UI_RetainedPrefetchDocuments made of this source, if it made one
 // (UserInterfaceRetained.cpp).
-bool UI_RetainedTakePrefetched(const std::string& path, const std::string& source, openq4::ui::Document& document);
+bool UI_RetainedTakePrefetched(const std::string& path, int size, std::string& source, ID_TIME_T& stamp, openq4::ui::Document& document);
 
 namespace {
 constexpr const char* Artwork="guis/hud/artwork.rui";
@@ -87,7 +87,8 @@ std::shared_ptr<const Catalog> SharedCatalog() {
 	if (!Read(Registry,registry) || !Read(Artwork,artwork)) loaded->error="missing retained artwork catalog";
 	else if (ReadRegistry(registry,*loaded)) {
 		std::vector<openq4::ui::Diagnostic> diagnostics;
-		loaded->prefetched=UI_RetainedTakePrefetched(Artwork,artwork,loaded->artwork);
+		std::string prefetchedSource; ID_TIME_T prefetchedStamp=FILE_NOT_FOUND_TIMESTAMP;
+		loaded->prefetched=UI_RetainedTakePrefetched(Artwork,static_cast<int>(artwork.size()),prefetchedSource,prefetchedStamp,loaded->artwork);
 		if (!loaded->prefetched && !loaded->artwork.Load(artwork,diagnostics))
 			loaded->error=diagnostics.empty()?"retained HUD view unavailable":diagnostics.front().message;
 	}

@@ -46,7 +46,7 @@ STATE_MUTATIONS = (
      "if (cvarSystem->GetCVarBool(\"ui_retained\")) UI_RetainedPrefetchDocuments(&Artwork,1);",
      "UI_RetainedPrefetchDocuments(&Artwork,1);"),
     ("a worker's parse is ignored", "hud",
-     "loaded->prefetched=UI_RetainedTakePrefetched(Artwork,artwork,loaded->artwork);", "loaded->prefetched=false;"),
+     "loaded->prefetched=UI_RetainedTakePrefetched(Artwork,static_cast<int>(artwork.size()),prefetchedSource,prefetchedStamp,loaded->artwork);", "loaded->prefetched=false;"),
     ("a failed catalog is read again by each HUD", "hud", "\tcatalog=loaded;\n\treturn catalog;\n",
      "\tif (loaded->error.empty()) catalog=loaded;\n\treturn loaded;\n"),
     ("a prepared HUD builds another view", "hud", "if (impl->attempted) return impl->view!=nullptr;",
