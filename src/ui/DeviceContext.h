@@ -92,6 +92,10 @@ public:
 	void				SetKeyBindingWideLabels( bool wide ) { keyBindingWideLabels = wide; }
 	float				GetCanvasAspect() const;
 	void				GetVirtualScreenExpansion( float width, float height, float &xExpand, float &yExpand ) const;
+	// The expansion an aspect-corrected canvas gets, whatever aspect mode
+	// the shared context was last drawn with (a world-surface GUI draws
+	// uncorrected). For callers that run outside their own GUI's draw.
+	void				GetAspectCorrectedScreenExpansion( float width, float height, float &xExpand, float &yExpand ) const;
 	void				GetCinematic16x9Bars( float width, float height, idRectangle &topBar, idRectangle &bottomBar, idRectangle &leftBar, idRectangle &rightBar, idRectangle &visibleArea ) const;
 
 	const idMaterial	*GetScrollBarImage(int index);

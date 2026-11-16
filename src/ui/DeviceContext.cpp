@@ -2699,6 +2699,13 @@ void idDeviceContext::GetVirtualScreenExpansion( float width, float height, floa
 	openQ4_CalcVirtualScreenExpansion( width, height, windowWidth, windowHeight, aspectCorrect, xExpand, yExpand );
 }
 
+void idDeviceContext::GetAspectCorrectedScreenExpansion( float width, float height, float &xExpand, float &yExpand ) const {
+	float windowWidth = 0.0f;
+	float windowHeight = 0.0f;
+	openQ4_GetCurrentViewportSize( windowWidth, windowHeight );
+	openQ4_CalcVirtualScreenExpansion( width, height, windowWidth, windowHeight, true, xExpand, yExpand );
+}
+
 void idDeviceContext::GetCinematic16x9Bars( float width, float height, idRectangle &topBar, idRectangle &bottomBar, idRectangle &leftBar, idRectangle &rightBar, idRectangle &visibleArea ) const {
 	float windowWidth = 0.0f;
 	float windowHeight = 0.0f;

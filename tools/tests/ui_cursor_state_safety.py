@@ -50,6 +50,14 @@ def main() -> None:
         "idMath::ClampFloat( minY, maxY, cursorY )",
     ):
         require(clamp_cursor, token, "GUI cursor normalization")
+    # A menu's widescreen bounds must not depend on the aspect mode the shared
+    # device context was last drawn with (PR #173).
+    require(clamp_cursor, "dc.GetAspectCorrectedScreenExpansion( maxX, maxY, xExpand, yExpand )", "menu cursor widescreen bounds")
+    if "dc.GetVirtualScreenExpansion(" in clamp_cursor:
+        raise AssertionError("menu cursor bounds read the shared device context's last-drawn aspect mode")
+    device_context = read("src/ui/DeviceContext.cpp")
+    corrected = between(device_context, "void idDeviceContext::GetAspectCorrectedScreenExpansion", "\n}\n")
+    require(corrected, "windowWidth, windowHeight, true, xExpand, yExpand", "aspect-corrected expansion helper")
 
     demo_restore = between(source, "void idUserInterfaceLocal::ReadFromDemoFile", "void idUserInterfaceLocal::WriteToDemoFile")
     require(demo_restore, "SetCursor( restoredCursorX, restoredCursorY );", "GUI demo cursor restore")

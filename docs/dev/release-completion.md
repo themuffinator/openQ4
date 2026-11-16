@@ -58,6 +58,14 @@ does not restore the withdrawn release. See
 - Mod authors: there's no need to ship openQ4's own `*_openq4.lang` files.
   Ship only the strings your mod adds or changes.
 
+## The menu cursor reaches the edges of a widescreen menu, 16 November 2026
+
+- **On a widescreen display, the cursor in the classic menus now reaches all
+  the way to the sides.** It could stop at the edge of the old 4:3 area,
+  leaving controls on the outer edges of the screen out of reach. This was
+  reported on macOS. Thanks to John-Michael Mulesa (jm2), who found and fixed
+  it in [#173](https://github.com/themuffinator/openQ4/pull/173).
+
 ## Casual servers get the votes, timeouts and policies players expect (MP-12), 15 November 2026
 
 - **Call votes the way Quake players type them.** `callvote` (or `cv`) and
