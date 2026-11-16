@@ -17,6 +17,7 @@ The withdrawn 0.14.0 release is not a supported download; see
 - [Code of Conduct](#code-of-conduct)
 - [How to Contribute](#how-to-contribute)
   - [Reporting Bugs](#reporting-bugs)
+  - [When an Issue Waits for Your Reply](#when-an-issue-waits-for-your-reply)
   - [Reporting Compatibility Issues](#reporting-compatibility-issues)
   - [Suggesting Features or Improvements](#suggesting-features-or-improvements)
   - [Contributing Code](#contributing-code)
@@ -62,6 +63,23 @@ If your report is for a preview or experimental platform (Linux ARM64 and macOS
 are previews; Windows ARM64 is experimental), please use the corresponding issue
 template so the right context is captured up front. A report that everything
 worked is useful evidence for those platforms, not only bug reports.
+
+### When an Issue Waits for Your Reply
+
+If we need more from you, such as a log, a retest or an answer, the issue is
+labelled `status: awaiting reporter`. If six weeks pass without a reply from
+you, and at least one new release has come out since we asked, we close the
+issue. By then the problem may already be fixed, and a report against an old
+version can't tell us either way.
+
+That isn't a judgement on the report. If the problem still happens in the
+current release, please open a new issue, link the old one, and attach a log
+from the current version.
+
+Maintainers can list the issues this applies to with
+`python .github/scripts/stale-issues.py`. The script only reads; each issue is
+checked by hand before it is closed. One that other players have since
+confirmed, for example, stays open.
 
 ### Reporting Compatibility Issues
 
