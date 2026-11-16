@@ -45,6 +45,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "RenderDoc.h"
 #include "ParallelJobSystem.h"
 #include "LevelEditor.h"
+#include "Updater.h"
 #include "DurableFile.h"
 #include "SettingsPersistence.h"
 #include "PerformancePreset.h"
@@ -6836,6 +6837,8 @@ void idCommonLocal::Frame( void ) {
 		// its listen server is active, idSessionLocal::Frame is intentionally not
 		// called by the ordinary multiplayer branch below.
 		arenaCampaign.Frame();
+		// Report a finished update check or install once the title is idle.
+		Updater_Frame();
 #endif
 		Common_MarkFrameWork(openq4::FrameWorkPhase::Commands);
 
@@ -8046,6 +8049,7 @@ void idCommonLocal::InitGame( void ) {
 
 	// init async network
 	idAsyncNetwork::Init();
+	Updater_Init();
 
 #ifdef	ID_DEDICATED
 	idAsyncNetwork::server.InitPort();

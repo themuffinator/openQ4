@@ -110,7 +110,8 @@ Two of these rows are mostly duplicates:
   only ever opens the compile-time `PROJECT_RELEASES_URL`; network-supplied URLs are
   inert by design. Any update path must keep that rule: what to download, and the
   digest it must have, comes from the binary or a signed manifest, never from a
-  datagram.
+  datagram. (As measured on 1 November; the updater now exists, see
+  [PKG-06](#implementation-16-november-2026).)
 
 ## Strategy
 
@@ -320,8 +321,9 @@ alone into a 153 KB `pak3.pk4`; the client verified pak3 at startup and read
 
 ## In-game updater and content storage (PKG-06)
 
-> **Decided 6 November 2026 by the maintainer: plan an in-game updater.** It
-> stays a future implementation item (P3), built under the constraints below.
+> **Decided 6 November 2026 by the maintainer: plan an in-game updater;
+> implemented 16 November 2026** (see [implementation](#implementation-16-november-2026)).
+> It was built under the constraints below.
 > The recommendation put to the maintainer was to defer it, since the update
 > archives, the installer's selective pack download and the AppImage's zsync
 > information already reduce a typical update to the binaries and any changed
@@ -337,6 +339,47 @@ The updater must meet these constraints:
 | Elevation | The installer defaults to a per-user install (`PrivilegesRequired=lowest`), which needs none. A system-wide install under Program Files would need an elevated helper; leave those to the installer instead. |
 | macOS | The packs live inside the signed app, so any change replaces the bundle. Sparkle with binary deltas is the native route once Developer ID signing and notarization are routine; moving the packs out of the bundle would break the self-contained app and need a first-run download. |
 | Android | The APK carries every pack and updates as a whole through whatever store or sideload delivers it; Play Asset Delivery applies only to Play distribution, which openQ4 does not use. |
+
+### Implementation, 16 November 2026
+
+Built for issue #227, whose report showed the old check could never find an
+openQ4 release: it asked id Software's UDP master server and read two seconds
+of silence as "up to date". Every constraint above holds; how each is met:
+
+| Constraint | How it is met |
+| --- | --- |
+| What may be downloaded | Each release publishes `openq4-update.json` (schema 1: version, tag, each platform's update archive with size and SHA-256, and the content packs) and `openq4-update.json.sig`, an Ed25519 signature over its exact bytes. The game fetches the manifest from `PROJECT_REPO/releases/latest/download/` and the signature from the manifest's own tag, so a release published between the two requests cannot pair mismatched files. The public key is compiled from `src/updater/UpdateSigningKey.h`; verification is `idCrypto::Ed25519Verify` (`src/idlib/Ed25519.cpp`, TweetNaCl arithmetic, verify only, rejects non-canonical `S`). Download URLs are the compiled repository, the manifest's tag and an asset name matching `[A-Za-z0-9][A-Za-z0-9._+-]*` with no `..`; every downloaded byte is hashed as it arrives and compared with the signed SHA-256. The master-server query is gone; a stray legacy reply is still read and ignored. |
+| HTTPS client | `src/sys/sys_update.h`: WinHTTP on Windows (`win_update.cpp`); on Linux and macOS the system libcurl, opened with `dlopen` on first use (`posix_update.cpp`), so nothing new is linked or shipped and a system without libcurl just cannot check. GET only, HTTPS only including redirects, TLS 1.2 or later, certificate and host checks on, a size cap per request. Client builds only; the dedicated server has none of it. |
+| Replacing files | The game stages the release in `<install>/.update/stage/`, writes `.update/plan.txt` last (a plan without its `end` line is never applied), starts a copy of the new release's `openQ4-updater_<arch>` from `.update/` and quits. The helper (`src/updater/UpdateHelper.cpp`; no network, no engine code) waits for the game's process, moves each replaced file to `.update/backup/` before its new copy moves in, undoes every step in reverse if one fails, retries moves an antivirus scanner holds, writes `.update/result.txt` and starts the game with its original arguments and working directory. The game reports the result in the player's language and removes `.update/`. Bulk packs are downloaded only when the release's MD5 differs from the one this build was made with or the file is missing; numbered packs the release no longer lists are retired. |
+| Elevation | None. Before offering to install, the game writes a probe file in `.update/`; a folder it cannot write to gets the release page instead. |
+| macOS, Android, AppImage, Flatpak, Snap | `Sys_UpdateManagedBy` names the packaging that owns the files, and the game offers the release page. The macOS and Android packages carry no helper. |
+| Development builds | Only a `version_track=stable`, non-dirty build installs in place, so a `.install/` tree is never replaced by a release. Other builds report whether a newer release exists, and never check at startup. |
+
+Player flow: release builds check once when the title screen is first idle
+(`com_updateCheck`, default 1) and say nothing unless a newer release exists;
+declining that prompt sets `com_updateSkipVersion` so the startup check stays
+quiet about that version. The **Updates** button and the `updateCheck`
+command always answer, including "up to date" and "could not check".
+Downloads run on a worker behind the stock download progress box, whose
+Cancel stops them and leaves the install untouched. Messages are
+`#str_232501` to `#str_232512` in all twelve languages.
+
+Release side: `tools/build/update_manifest.py build` writes the manifest
+from the verified release artifacts and refuses a published bulk pack whose
+bytes differ from `content-packs.json`. `sign` runs only when the
+`OPENQ4_UPDATE_SIGNING_KEY` secret is set, and first checks that the key's
+public half is the one compiled into the release; without the secret the
+manifest ships unsigned, and games report the release and open its page
+instead of installing. `keygen` creates a key outside the repository and
+writes its public half to `UpdateSigningKey.h`.
+
+Tests: `openq4-update-core` (native: versions, manifest validation and
+signature, names, plan and result files, streaming SHA-256, zip extraction
+into a non-ASCII path, traversal, absolute, reserved and damaged members),
+`openq4-updater-helper-apply` (`updater_helper_apply.py`: complete swap,
+rollback leaving the install byte-identical, unfinished and foreign plans,
+relaunch), `update_manifest_tool.py` (build, keygen, sign, verify and their
+refusals) and `openq4_pure_pack.py` (the master-server query stays gone).
 
 **Bulk sources: no change with this decision.** `content/baseoq4/pak1` (1.4 GB of loose
 sources, of which the packs ship about a tenth) and `pak2` (1.5 GB) live in the

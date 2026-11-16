@@ -63,6 +63,18 @@ Point it at the folder above `q4base`, never at `q4base` or `baseoq4` themselves
 
 ## Updating openQ4
 
+### From the game
+
+openQ4 looks for a new release when it starts and whenever you choose **Updates** on the main menu. If one is out, it tells you the version and how much it needs to download, and asks first.
+
+- **Windows (the `.zip`, or the installer in its default per-user folder) and Linux (the `.tar.xz`)**: choose **Yes**. openQ4 downloads the update, checks it against the release's signature, closes, installs it and starts again. Usually only the update archive is downloaded, about 60 MB; a release that changed the light grids or loading screens adds that pack. If anything goes wrong, your installed version stays exactly as it was, and openQ4 tells you when it next starts.
+- **macOS, the AppImage, Android, and copies in a folder you cannot write to** (such as one under Program Files): openQ4 offers to open the release page so you can download the update yourself. The AppImage can also update itself with AppImageUpdate.
+- **Development builds** never replace themselves. They only tell you whether a newer release exists.
+
+To stop the check at startup, enter `com_updateCheck 0` in the console; the **Updates** button keeps working. The check is an ordinary web request to github.com for the release information; it sends nothing about you, your settings or your game.
+
+### By hand
+
 openQ4's own content comes in three packs in `baseoq4/`:
 
 | Pack | What's in it | Size |

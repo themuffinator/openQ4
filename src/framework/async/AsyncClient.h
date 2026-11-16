@@ -77,12 +77,6 @@ typedef enum {
 	AUTHKEY_BAD_MSG
 } authBadKeyStatus_t;
 
-typedef enum {
-	UPDATE_NONE,
-	UPDATE_SENT,
-	UPDATE_READY,
-	UPDATE_DONE
-} clientUpdateState_t;
 
 typedef struct {
 	idStr	url;
@@ -205,10 +199,6 @@ private:
 
 	idUserInterface *	guiNetMenu;
 
-	clientUpdateState_t updateState;
-	int					updateSentTime;
-	idStr				updateMSG;
-	bool				showUpdateMessage;
 
 	backgroundDownload_t	backgroundDownload;
 

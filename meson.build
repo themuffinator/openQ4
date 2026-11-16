@@ -1231,6 +1231,15 @@ if build_engine or get_option('build_native_tests')
     endif
   endif
   if get_option('build_native_tests')
+    # The in-game updater's core: versions, the signed manifest, asset names,
+    # the plan hand-off, hashing and zip extraction (fixtures from
+    # tools/tests/update_core_fixtures.py).
+    openq4_update_core_test = executable('openq4-update-core-test',
+      files('tools/tests/native/UpdateCoreTest.cpp'),
+      include_directories: root_include_dir,
+      dependencies: jsoncpp_project.get_variable('jsoncpp_dep'), install: false)
+    test('openq4-update-core', openq4_update_core_test,
+      args: [meson.project_build_root() / 'update-core-test'], timeout: 60)
     openq4_ui_scroll_geometry_test = executable('openq4-ui-scroll-geometry-test',
       files('tools/tests/native/UiScrollGeometryTest.cpp'),
       dependencies: openq4_retained_dep, install: false)
@@ -2640,6 +2649,8 @@ if build_engine
   client_deps += jsoncpp_project.get_variable('jsoncpp_dep')
   if host_system == 'windows'
     client_deps += openq4_windows_text_store_dep
+    # The updater's HTTPS transport (sys/win32/win_update.cpp).
+    client_deps += cc.find_library('winhttp', required: true)
   endif
 endif
 
@@ -3138,6 +3149,14 @@ if build_engine
     client_engine_cpp_args += ['-DOPENQ4_OPENXR=1']
   endif
 
+  # The in-game updater (manifest, verification, staging and its HTTPS
+  # transport) is client-only too; win_update.cpp, globbed for both, compiles
+  # to nothing in the dedicated server.
+  openq4_engine_sources += files('src/updater/UpdateCore.cpp')
+  if host_system != 'windows'
+    openq4_engine_sources += files('src/sys/posix/posix_update.cpp')
+  endif
+
   bse_library = static_library(
     'openq4_bse',
     bse_sources,
@@ -3292,6 +3311,40 @@ if build_engine
       install: true,
       install_dir: install_root_dir,
     )
+  endif
+
+  # openQ4-updater swaps in an update the client downloaded and staged, once
+  # the client has exited (Windows cannot replace a running program), then
+  # starts the client again. It has no network access and links nothing from
+  # the engine. macOS and Android packages are updated as a whole instead.
+  if host_system in ['windows', 'linux']
+    updater_helper_deps = []
+    updater_helper_cpp_args = []
+    updater_helper_link_args = []
+    if host_system == 'windows'
+      updater_helper_deps += windows_shell_dep
+    else
+      # The same hardening the release verifier requires of every shipped binary.
+      updater_helper_cpp_args += linux_compile_hardening_args
+      updater_helper_link_args += linux_link_hardening_args
+    endif
+    updater_helper_exe = executable(
+      meson.project_name() + '-updater_' + binary_arch,
+      files('src/updater/UpdateHelper.cpp'),
+      dependencies: updater_helper_deps,
+      cpp_args: updater_helper_cpp_args,
+      link_args: updater_helper_link_args,
+      pie: linux_executable_pie,
+      win_subsystem: 'windows',
+      install: true,
+      install_dir: install_root_dir,
+    )
+    if get_option('build_native_tests')
+      test('openq4-updater-helper-apply', py,
+        args: [files('tools/tests/updater_helper_apply.py'), '--helper', updater_helper_exe,
+          '--scratch', meson.project_build_root() / 'updater-helper-test'],
+        depends: updater_helper_exe, timeout: 300)
+    endif
   endif
 
   dedicated_engine_cpp_args = engine_cpp_args

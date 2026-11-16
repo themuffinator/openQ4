@@ -36,6 +36,23 @@ void SHA256Portable( const void *data, std::size_t dataBytes,
 // compression SHA256 runs on this machine.
 const char *SHA256Implementation( void );
 
+// The same digest over data that arrives in pieces, such as a download or a
+// file too large to hold in memory.
+class SHA256Stream {
+public:
+				SHA256Stream( void );
+				~SHA256Stream( void );
+				SHA256Stream( const SHA256Stream & ) = delete;
+	SHA256Stream &	operator=( const SHA256Stream & ) = delete;
+
+	void		Update( const void *data, std::size_t dataBytes );
+	// Writes the digest; the stream starts over afterwards.
+	void		Final( std::uint8_t digest[ SHA256_DIGEST_BYTES ] );
+
+private:
+	alignas( 8 ) std::uint8_t	context[ 128 ];
+};
+
 void HMACSHA256( const void *key, std::size_t keyBytes,
 	const void *data, std::size_t dataBytes,
 	std::uint8_t digest[ SHA256_DIGEST_BYTES ] );

@@ -163,6 +163,7 @@ def validate_package_dir(package_dir: Path, arch: str) -> None:
     required_paths = [
         package_dir / f"{PRODUCT_NAME}-client_{arch}.exe",
         package_dir / f"{PRODUCT_NAME}-ded_{arch}.exe",
+        package_dir / f"{PRODUCT_NAME}-updater_{arch}.exe",
         package_dir / "OpenAL32.dll",
         package_dir / "README.html",
         package_dir / "LICENSE",

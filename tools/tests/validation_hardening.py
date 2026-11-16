@@ -695,6 +695,10 @@ def validate_validation_wiring() -> None:
         "generate_checkpoint_storage_test.py",
         "generate_dict_identity_test.py",
         "generate_save_dict_test.py",
+        # The update core's committed fixtures, and the helper test the
+        # openq4-updater-helper-apply Meson test runs against the built helper.
+        "update_core_fixtures.py",
+        "updater_helper_apply.py",
         "mp_bot_walk_replay.py",
         "mp_liquid_air_smoke.py",
         "mp_mvd_quota_smoke.py",

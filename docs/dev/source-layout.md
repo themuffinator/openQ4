@@ -44,6 +44,7 @@ are local and untracked.
 | `sys` | Platform layer: `sdl3`, `posix`, `win32`, `linux`, `macos`, `android`, `openxr`, `stub` |
 | `tools` | dmap and AAS compilers, the level editor, and the legacy MFC editors |
 | `ui` | GUI system, the `retained` RmlUi interface and its `application` layer |
+| `updater` | The in-game updater's manifest, verification and staging core, and `openQ4-updater`, the helper that installs a staged update after the game exits |
 
 ## Path Rules (Checked)
 

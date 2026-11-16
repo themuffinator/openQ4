@@ -109,6 +109,8 @@ def expected_runtime_binaries(runtime_root: Path, arch: str) -> list[tuple[Path,
     for name in packaged_layer_dirs(runtime_root):
         expected.append((runtime_root / name / f"game-sp_{arch}.so", "game-sp", True))
         expected.append((runtime_root / name / f"game-mp_{arch}.so", "game-mp", True))
+    # the in-game updater's file-swapping helper ships hardened like the engine
+    expected.append((runtime_root / f"openQ4-updater_{arch}", "openQ4-updater", False))
     return expected
 
 

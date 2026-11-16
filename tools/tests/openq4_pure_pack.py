@@ -771,38 +771,28 @@ def validate_filesystem_pure_pack_contract() -> None:
     )
     require(
         version_message,
-        'updateMSG = common->GetLanguageDict()->GetString( "#str_104330" );',
-        "fixed localized update notification",
-    )
-    require(
-        version_message,
         "ignoredNetworkField",
         "legacy update fields are consumed without storage or display",
     )
     if version_message.count("msg.ReadString(") != 3 or version_message.count("msg.ReadByte()") != 2:
         raise AssertionError("Legacy update reply fields must remain wire-compatible and inert")
-    reject(version_message, "updateMSG = ignoredNetworkField", "network-controlled update instructions")
-    require(version_check, 'msg.WriteString( "" );', "empty legacy update identity field")
-    reject(version_check, 'GetCVarString( "com_guid" )', "update-check persistent GUID disclosure")
-    update_prompt = download_handler[
-        download_handler.find("if ( updateState == UPDATE_READY )") :
-        download_handler.find("} else if ( dlList.Num() )")
-    ]
-    require(update_prompt, "sys->OpenURL( PROJECT_RELEASES_URL, false );", "fixed update information page")
-    require(update_prompt, "updateState = UPDATE_DONE;", "update notification terminal state")
-    require(update_prompt, "showUpdateMessage = false;", "update notification prompt cleanup")
-    for forbidden in (
-        "BackgroundDownload",
-        "OpenFileWrite",
-        "StartProcess",
-        "DLTYPE_URL",
-        "file://",
-        "expectedSize",
-        "RemoveFile",
-    ):
-        reject(update_prompt, forbidden, "notification-only updater")
+    for forbidden in ("updateMSG", "updateState", "OpenURL", "MessageBox"):
+        reject(version_message, forbidden, "a master-server reply that drives the update prompt")
+    # #227: the Updates button asks the signed GitHub release manifest
+    # (src/framework/Updater.cpp), not id's master server, whose silence used
+    # to read as "up to date".
+    require(version_check, "Updater_Check( fromMenu );", "update check delegated to the release updater")
+    for forbidden in ("SendPacket", "versionCheck", "GetMasterAddress", 'GetCVarString( "com_guid" )'):
+        reject(version_check, forbidden, "legacy master-server update query")
+    for forbidden in ("updateState", "showUpdateMessage", "#str_104839", "PROJECT_RELEASES_URL"):
+        reject(download_handler, forbidden, "legacy update prompt in the pak download handler")
     for removed_member in (
         "UPDATE_DLING",
+        "UPDATE_SENT",
+        "clientUpdateState_t",
+        "updateSentTime",
+        "showUpdateMessage",
+        "updateMSG",
         "updateDirectDownload",
         "updateURL",
         "updateFile",

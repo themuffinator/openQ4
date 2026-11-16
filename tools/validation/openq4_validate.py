@@ -723,6 +723,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "untrusted_file_bounds.py",
         root / "tools" / "tests" / "openurl_security.py",
         root / "tools" / "tests" / "openq4_pure_pack.py",
+        root / "tools" / "tests" / "update_manifest_tool.py",
         root / "tools" / "tests" / "p0_governance_evidence.py",
         root / "tools" / "tests" / "packaging_safety.py",
         root / "tools" / "tests" / "content_pack_release_tests.py",

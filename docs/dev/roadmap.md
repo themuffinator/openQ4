@@ -5949,11 +5949,13 @@ remain narrower than final-package physical-device signoff.
 
 ### PKG completion checkpoints
 
-**Estimate: 85%; 4/6 tasks closed (6 November 2026).** PKG-01 to PKG-04 are
+**Estimate: 92%; 4/6 tasks closed (16 November 2026).** PKG-01 to PKG-04 are
 implemented and proven on local candidates; their release-workflow steps first
-run with the next release. PKG-05 needs that release's measurements; PKG-06 is
-decided as a planned updater not yet started. Evidence:
-[implementation status](content-pack-distribution.md#implementation-status-6-november-2026).
+run with the next release. PKG-05 needs that release's measurements; PKG-06's
+updater is implemented (#227) and waits for its signing key and a first signed
+release. Evidence:
+[implementation status](content-pack-distribution.md#implementation-status-6-november-2026),
+[updater](content-pack-distribution.md#implementation-16-november-2026).
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
@@ -5962,7 +5964,7 @@ decided as a planned updater not yet started. Evidence:
 | PKG-03 — Complete | Software DXT decode for renderers without S3TC; 51/51 packs accepted with every area resident on GL, GL software decode and Vulkan; atlases and `core2` metadata trimmed (pak1 267.5 → 96.4 MB); `waste` re-baked; loadscreen format decided: keep TGA + DDS. | None. |
 | PKG-04 — Complete | Content generations, overlays pak3–pak9 rebuilt from changed files with the base kept byte-identical from the generation's blobs, size budget, generation bump folding; one-file fix shipped as a verified 153 KB overlay. | None. |
 | PKG-05 — Implemented, measurement open | Installer downloads only missing or different bulk packs, SHA-256 and release URL compiled in; AppImages embed `gh-releases-zsync` information and publish `.zsync`; itch.io declined. | Measure update downloads for each channel on the next release (maintainer decision, 6 November). |
-| PKG-06 — Decided: plan an updater; optional P3 | Constraints recorded: signed manifest, compiled release URL, platform HTTPS client, helper-process replacement, per-user installs, Sparkle for macOS, whole-APK Android. | Implement the updater under those constraints. |
+| PKG-06 — Implemented, key and first release open | In-game updater under the recorded constraints (#227): Ed25519-signed `openq4-update.json` with the key compiled in, compiled release URL, WinHTTP / system libcurl, staged `.update/` swapped by `openQ4-updater` after exit with backup and rollback, per-user installs only; macOS, AppImage, Flatpak, Snap, Android and development builds get the release page. Native, helper and manifest-tool tests. | Generate the signing key (`update_manifest.py keygen`) and set `OPENQ4_UPDATE_SIGNING_KEY`; on the first signed release, update an installed previous release in place on Windows and Linux. |
 
 ### PKG task evidence and acceptance
 
@@ -6013,8 +6015,14 @@ decided as a planned updater not yet started. Evidence:
   6 November 2026: plan an in-game updater, built under the recorded
   constraints (signed manifest and compiled release URL, platform HTTPS client,
   helper-process replacement, per-user installs, Sparkle deltas on macOS,
-  whole-APK Android). Bulk sources stay in Git with this decision. Remaining:
-  the updater implementation.
+  whole-APK Android). Bulk sources stay in Git with this decision. Implemented
+  16 November 2026 for #227 ([design](content-pack-distribution.md#implementation-16-november-2026)):
+  the Updates button and a startup check in release builds read the latest
+  release's signed manifest; Windows and Linux installs download, verify, stage
+  and hand over to `openQ4-updater`, which swaps the files after the game exits
+  and restarts it. Remaining exit: the signing key and its workflow secret,
+  then an in-place update from the previous release on Windows and Linux with
+  the first signed release.
 
 ## Steam integration
 

@@ -426,6 +426,29 @@ void SHA256( const void *data, std::size_t dataBytes,
 	SHA256Final( context, digest );
 }
 
+static_assert( sizeof( sha256Context_t ) <= 128, "SHA256Stream storage is too small" );
+static_assert( alignof( sha256Context_t ) <= 8, "SHA256Stream storage is under-aligned" );
+
+SHA256Stream::SHA256Stream( void ) {
+	SHA256Init( *reinterpret_cast<sha256Context_t *>( context ) );
+}
+
+SHA256Stream::~SHA256Stream( void ) {
+	SecureZero( context, sizeof( context ) );
+}
+
+void SHA256Stream::Update( const void *data, std::size_t dataBytes ) {
+	if ( dataBytes != 0 ) {
+		SHA256Update( *reinterpret_cast<sha256Context_t *>( context ), data, dataBytes );
+	}
+}
+
+void SHA256Stream::Final( std::uint8_t digest[ SHA256_DIGEST_BYTES ] ) {
+	sha256Context_t &state = *reinterpret_cast<sha256Context_t *>( context );
+	SHA256Final( state, digest );
+	SHA256Init( state );
+}
+
 void SHA256Portable( const void *data, std::size_t dataBytes,
 		std::uint8_t digest[ SHA256_DIGEST_BYTES ] ) {
 	sha256Context_t context;

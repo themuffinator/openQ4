@@ -7,6 +7,52 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Updates are found, and install from the game (#227), 16 November 2026
+
+- **The Updates button finds openQ4 releases.** It used to ask Quake 4's old
+  id Software master server, which knows nothing about openQ4, and said "up to
+  date" whenever that server stayed silent, so it never reported 0.14.1. It now
+  reads the latest openQ4 release on GitHub and says which version is current,
+  or that it could not check.
+- **Update without leaving the game.** On Windows (the `.zip`, or the
+  installer's default per-user folder) and Linux (the `.tar.xz`), openQ4 offers
+  to download the new release, checks it against the release's signature,
+  closes, installs it and starts again. A release that keeps the light grids
+  and loading screens downloads only its update archive, about 60 MB. If
+  anything fails, the installed version stays exactly as it was and openQ4 says
+  so when it next starts. macOS, the AppImage, Android and copies in a folder
+  you cannot write to get a link to the release page instead. Release builds
+  also check once at startup; `com_updateCheck 0` turns that off.
+- **What to do.** Nothing. This release installs the way you install now; the
+  ones after it can be installed from the game.
+- Development: see [PKG-06](content-pack-distribution.md#implementation-16-november-2026).
+  The release publishes `openq4-update.json` (each platform's update archive
+  and the content packs, with SHA-256) and, when the `OPENQ4_UPDATE_SIGNING_KEY`
+  secret is set, its Ed25519 signature; the public key is compiled from
+  `src/updater/UpdateSigningKey.h`. HTTPS goes through WinHTTP, or the system
+  libcurl loaded at run time on Linux and macOS. The game stages the update in
+  `<install>/.update/` and hands it to the new `openQ4-updater_<arch>` helper,
+  which swaps the files after the game exits, keeps backups until every move
+  succeeds, undoes them otherwise, and restarts the game. Messages are new in
+  all twelve languages (`#str_232501` to `#str_232512`). The master-server
+  version query is removed.
+- Evidence (16 November, Windows x64, main `ab98696da` plus this change built
+  in a clean worktree): `updateCheck` in the game reached GitHub through
+  WinHTTP and, as no release has a manifest yet, got HTTP 404 and showed the
+  localised "could not check" box instead of "up to date". Planted helper
+  results showed the "updated to 0.15.0" and "could not be installed" boxes,
+  and `.update/` was gone before the next start. The real helper swapped the
+  runtime's binaries, retired a stray `pak7.pk4` and restarted the real client
+  with its original command line, which reported the update. WinHTTP and the
+  system libcurl (WSL Ubuntu) both followed the `releases/latest/download/`
+  redirect, refused plain HTTP and enforced the size cap. `openq4-update-core`
+  and `openq4-updater-helper-apply` pass with MSVC, clang and Linux g++; the
+  engine files pass a Linux g++ and an Android API 24 compile check.
+- Open: no signing key exists yet, so until it does every release ships an
+  unsigned manifest and games open the release page rather than installing. An
+  in-place update from a published release cannot be run before a signed
+  release exists. Not run: a full Linux engine build and runtime, macOS.
+
 ## The Awakening's Falcon defence ends its waves again (#230), 16 November 2026
 
 - **The gunship fight in the Falcon mission (m03) can be won.** Each fighter

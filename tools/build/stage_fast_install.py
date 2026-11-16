@@ -18,6 +18,7 @@ ROOT_RUNTIME_PATTERNS = (
     "openQ4-client_*.pdb",
     "openQ4-ded_*.exe",
     "openQ4-ded_*.pdb",
+    "openQ4-updater_*.exe",
     "renderer-gl_*.dll",
     "renderer-gl_*.pdb",
     "renderer-vk_*.dll",
@@ -30,6 +31,7 @@ POSIX_ENGINE_RUNTIME_PATTERNS = (
 )
 LINUX_ROOT_RUNTIME_PATTERNS = (
     *POSIX_ENGINE_RUNTIME_PATTERNS,
+    "openQ4-updater_*",
     "renderer-gl_*.so",
     "renderer-vk_*.so",
 )

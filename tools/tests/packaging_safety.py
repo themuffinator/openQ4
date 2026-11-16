@@ -874,10 +874,15 @@ def validate_renderer_module_staging() -> None:
     package_root = WORK / "renderer-module-staging" / "package"
     required_files = (
         *PACKAGE.get_required_root_binaries("linux", "x64"),
+        *PACKAGE.get_required_updater_binaries("linux", "x64"),
         *PACKAGE.get_required_renderer_module_binaries("linux", "x64"),
     )
     for filename in required_files:
         write_file(install_dir / filename, filename.encode("utf-8"))
+    if PACKAGE.get_required_updater_binaries("linux", "x64") != ("openQ4-updater_x64",) or \
+            PACKAGE.get_required_updater_binaries("windows", "arm64") != ("openQ4-updater_arm64.exe",) or \
+            PACKAGE.get_required_updater_binaries("macos", "arm64") != ():
+        raise AssertionError("openQ4-updater ships with the Windows and Linux packages only")
 
     missing = PACKAGE.copy_required_binaries(
         "linux",

@@ -2417,6 +2417,44 @@ jobs:
             rm -f "${previous_full[0]}"
           done
 
+      - name: Build and sign the in-game update manifest
+        env:
+          OPENQ4_UPDATE_SIGNING_KEY: ${{ secrets.OPENQ4_UPDATE_SIGNING_KEY }}
+          RELEASE_ASSET_MANIFEST: ${{ steps.release_assets.outputs.asset_manifest }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # openq4-update.json names each platform's update archive and the
+          # content packs with their SHA-256; games fetch it from
+          # releases/latest/download/ and install in place only when its
+          # signature verifies against the key compiled from
+          # src/updater/UpdateSigningKey.h.
+          artifact_dir="${RUNNER_TEMP}/release-artifacts"
+          version="${{ needs.metadata.outputs.version_tag }}"
+          python tools/build/update_manifest.py build \
+            --version "${version}" \
+            --tag "${RELEASE_TAG}" \
+            --artifact-dir "${artifact_dir}" \
+            --content-packs "${artifact_dir}/openq4-${version}-content-packs.json" \
+            --require windows-x64 --require windows-arm64 --require linux-x64 \
+            --out "${artifact_dir}/openq4-update.json"
+          echo "openq4-update.json" >> "${RELEASE_ASSET_MANIFEST}"
+
+          if [ -z "${OPENQ4_UPDATE_SIGNING_KEY}" ]; then
+            echo "::warning::OPENQ4_UPDATE_SIGNING_KEY is not set: the update manifest is unsigned, so games will point players at the release page instead of installing in place."
+            exit 0
+          fi
+          python -m pip install --quiet "cryptography>=42"
+          python tools/build/update_manifest.py sign \
+            --manifest "${artifact_dir}/openq4-update.json" \
+            --key-env OPENQ4_UPDATE_SIGNING_KEY \
+            --check-header src/updater/UpdateSigningKey.h
+          python tools/build/update_manifest.py verify \
+            --manifest "${artifact_dir}/openq4-update.json" \
+            --header src/updater/UpdateSigningKey.h
+          echo "openq4-update.json.sig" >> "${RELEASE_ASSET_MANIFEST}"
+
       - name: Revalidate accepted Linux ARM64 archive after artifact download
         if: needs.metadata.outputs.linux_arm64_support_tier == 'first-class'
         env:

@@ -50,6 +50,7 @@ WINDOWS_EMPTY_STAGE_DIRECTORY_MANIFEST = (
 RUNTIME_BINARY_PATTERNS = (
     f"{PRODUCT_NAME}-client_*.exe",
     f"{PRODUCT_NAME}-ded_*.exe",
+    f"{PRODUCT_NAME}-updater_*.exe",
     # Renderer modules are shipped package members and are loaded into the
     # client process, so they belong under the same static-CRT enforcement and
     # mixed-architecture guard as everything else. Without them a stale

@@ -36,6 +36,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../ArenaCampaign.h"
 #include "../Session_local.h"
+#include "../Updater.h"
 #include "../../sys/NetworkEndpoint.h"
 #include "../../sys/URLPolicy.h"
 
@@ -299,7 +300,6 @@ idAsyncClient::idAsyncClient
 */
 idAsyncClient::idAsyncClient( void ) {
 	guiNetMenu = NULL;
-	updateState = UPDATE_NONE;
 	resumeReconnectTime = 0;
 	Clear();
 }
@@ -433,7 +433,6 @@ void idAsyncClient::Clear( void ) {
 	rconVerifyRefused = false;
 	memset( &rconVerifyAddress, 0, sizeof( rconVerifyAddress ) );
 	rconVerifyTime = 0;
-	showUpdateMessage = false;
 	lastFrameDelta = 0;
 
 	dlRequest = -1;
@@ -450,7 +449,6 @@ idAsyncClient::Shutdown
 */
 void idAsyncClient::Shutdown( void ) {
 	guiNetMenu = NULL;
-	updateMSG.Clear();
 	backgroundDownload.url.url.Clear();
 	dlList.Clear();
 }
@@ -2481,25 +2479,17 @@ void idAsyncClient::ProcessVersionMessage( const netadr_t from, const idBitMsg &
 	char ignoredNetworkField[ MAX_STRING_CHARS ];
 	(void)from;
 
-	if ( updateState != UPDATE_SENT ) {
-		common->Printf( "ProcessVersionMessage: version reply, != UPDATE_SENT\n" );
-		return;
-	}
-
-	// Consume the complete legacy payload so old master servers remain wire
-	// compatible. The message, direct-download flag, URL, MIME action, and
-	// fallback URL are intentionally ignored: an unauthenticated datagram must
-	// never supply instructions or choose what the client downloads, opens, or
-	// executes.
+	// openQ4 no longer asks a master server for updates (Updater.cpp reads the
+	// signed GitHub release manifest instead). Consume the complete legacy
+	// payload so a stray reply stays wire compatible, and ignore it: an
+	// unauthenticated datagram must never supply instructions or choose what
+	// the client downloads, opens, or executes.
 	msg.ReadString( ignoredNetworkField, sizeof( ignoredNetworkField ) );
 	(void)msg.ReadByte();
 	msg.ReadString( ignoredNetworkField, sizeof( ignoredNetworkField ) );
 	(void)msg.ReadByte();
 	msg.ReadString( ignoredNetworkField, sizeof( ignoredNetworkField ) );
-
-	updateMSG = common->GetLanguageDict()->GetString( "#str_104330" );
-	common->Printf( "A new version is available\n" );
-	updateState = UPDATE_READY;
+	common->DPrintf( "ignoring a legacy version reply\n" );
 }
 
 /*
@@ -3193,31 +3183,10 @@ idAsyncClient::SendVersionCheck
 ==================
 */
 void idAsyncClient::SendVersionCheck( bool fromMenu ) {
-	idBitMsg	msg;
-	byte		msgBuf[MAX_MESSAGE_SIZE];
-
-	if ( updateState != UPDATE_NONE && !fromMenu ) {
-		common->DPrintf( "up-to-date check was already performed\n" );
-		return;
-	}
-
-	InitPort();
-	msg.Init( msgBuf, sizeof( msgBuf ) );
-	msg.WriteShort( CONNECTIONLESS_MESSAGE_ID );
-	msg.WriteString( "versionCheck" );
-	msg.WriteLong( ASYNC_PROTOCOL_VERSION );
-	msg.WriteShort( BUILD_OS_ID );
-	msg.WriteString( cvarSystem->GetCVarString( "si_version" ) );
-	// Retain the legacy field position without leaking the persistent client
-	// identifier to the unauthenticated UDP update service.
-	msg.WriteString( "" );
-	clientPort.SendPacket( idAsyncNetwork::GetMasterAddress(), msg.GetData(), msg.GetSize() );
-
-	common->DPrintf( "sent a version check request\n" );
-
-	updateState = UPDATE_SENT;
-	updateSentTime = clientTime;
-	showUpdateMessage = fromMenu;
+	// The Quake 4 master-server query never knew about openQ4 releases and
+	// reported "up to date" whenever id's server stayed silent (#227). The
+	// updater checks the signed manifest of the latest GitHub release.
+	Updater_Check( fromMenu );
 }
 
 /*
@@ -3227,27 +3196,9 @@ idAsyncClient::HandleDownloads
 */
 void idAsyncClient::HandleDownloads( void ) {
 
-	if ( updateState == UPDATE_SENT && clientTime > updateSentTime + 2000 ) {
-		// timing out on no reply
-		updateState = UPDATE_DONE;
-		if ( showUpdateMessage ) {
-			session->MessageBox( MSG_OK, common->GetLanguageDict()->GetString ( "#str_104839" ), common->GetLanguageDict()->GetString ( "#str_104837" ), true );
-			showUpdateMessage = false;
-		}
-		common->DPrintf( "No update available\n" );
-	} else if ( backgroundDownload.completed ) {
+	if ( backgroundDownload.completed ) {
 		// only enter these if the download slot is free
-		if ( updateState == UPDATE_READY ) {
-			const bool openReleasePage = AsyncClient_Answered( session->MessageBox( MSG_YESNO, updateMSG,
-				common->GetLanguageDict()->GetString( "#str_04330" ), true, "yes" ) );
-			updateState = UPDATE_DONE;
-			showUpdateMessage = false;
-			if ( openReleasePage ) {
-				// This compile-time HTTPS destination is the only action a legacy
-				// version reply may trigger. The network-provided URLs are inert.
-				sys->OpenURL( PROJECT_RELEASES_URL, false );
-			}
-		} else if ( dlList.Num() ) {
+		if ( dlList.Num() ) {
 
 			int numPaks = dlList.Num();
 			int pakCount = 1;

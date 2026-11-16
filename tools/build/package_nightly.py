@@ -598,6 +598,14 @@ def get_required_root_binaries(platform: str, arch: str) -> tuple[str, str]:
     )
 
 
+def get_required_updater_binaries(platform: str, arch: str) -> tuple[str, ...]:
+    """openQ4-updater, which swaps in an update the client staged. macOS app
+    bundles and Android packages are replaced as a whole, so they carry none."""
+    if platform not in ("windows", "linux"):
+        return ()
+    return (f"{PRODUCT_NAME}-updater_{arch}{PLATFORM_EXECUTABLE_EXT[platform]}",)
+
+
 def get_required_renderer_module_binaries(platform: str, arch: str) -> tuple[str, ...]:
     if platform == "macos":
         # darwin builds only the Vulkan renderer module: build_renderer_gl stays
@@ -2308,6 +2316,7 @@ def copy_required_binaries(
 
     runtime_binaries = (
         *get_required_root_binaries(platform, arch),
+        *get_required_updater_binaries(platform, arch),
         *get_required_renderer_module_binaries(platform, arch),
     )
     for filename in runtime_binaries:
@@ -2701,6 +2710,7 @@ def get_package_executable_archive_paths(
     executable_paths = {Path(filename) for filename in get_required_root_binaries(platform, arch)}
     if platform == "linux":
         executable_paths.update(Path(filename) for filename in copied_linux_launchers)
+        executable_paths.update(Path(filename) for filename in get_required_updater_binaries(platform, arch))
     elif platform == "macos":
         executable_paths.add(Path("openQ4.app") / "Contents" / "MacOS" / "openQ4")
         executable_paths.add(Path(MACOS_SUPPORT_INFO_SCRIPT_NAME))

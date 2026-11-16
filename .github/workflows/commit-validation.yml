@@ -426,6 +426,10 @@ jobs:
             tools/tests/untrusted_file_bounds.py \
             tools/tests/openurl_security.py \
             tools/tests/openq4_pure_pack.py \
+            tools/tests/update_manifest_tool.py \
+            tools/tests/update_core_fixtures.py \
+            tools/tests/updater_helper_apply.py \
+            tools/build/update_manifest.py \
             tools/tests/p0_governance_evidence.py \
             tools/tests/packaging_safety.py \
             tools/tests/content_pack_release_tests.py \
@@ -998,6 +1002,7 @@ jobs:
           python tools/tests/untrusted_file_bounds.py
           python tools/tests/openurl_security.py
           python tools/tests/openq4_pure_pack.py
+          python tools/tests/update_manifest_tool.py
           python tools/tests/p0_governance_evidence.py
           python tools/tests/packaging_safety.py
           python tools/tests/content_pack_release_tests.py
