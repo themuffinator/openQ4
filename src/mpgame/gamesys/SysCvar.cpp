@@ -527,6 +527,7 @@ idCVar rb_enhancedPersistFrames(	"rb_enhancedPersistFrames",	"8",			CVAR_GAME | 
 idCVar rb_enhancedSleepSpeed(		"rb_enhancedSleepSpeed",	"3",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: linear speed below which a supported body counts as quiet" );
 idCVar rb_enhancedSleepAngularSpeed("rb_enhancedSleepAngularSpeed","0.15",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: angular speed below which a supported body counts as quiet" );
 idCVar rb_enhancedSleepFrames(		"rb_enhancedSleepFrames",	"20",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: quiet steps before a rigid body sleeps", 1, 600 );
+idCVar rb_enhancedRestTest(		"rb_enhancedRestTest",		"1",			CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enhanced physics: a rigid body that has not moved since it was created comes to rest by the original test (three contacts around its centre of mass, almost no motion), as a placed body does on its first step" );
 idCVar rb_enhancedDebug(			"rb_enhancedDebug",			"",				CVAR_GAME | CVAR_CHEAT, "enhanced physics: name of a rigid body whose steps are printed" );
 idCVar af_enhancedIterations(		"af_enhancedIterations",	"12",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: Gauss-Seidel iterations over an articulated figure's auxiliary rows", 1, 200 );
 idCVar af_enhancedTolerance(		"af_enhancedTolerance",		"0.0001",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: relative change that ends the articulated-figure iterations early" );
@@ -536,18 +537,23 @@ idCVar af_enhancedMargin(			"af_enhancedMargin",		"1",			CVAR_GAME | CVAR_FLOAT 
 idCVar af_enhancedSlop(				"af_enhancedSlop",			"0.25",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: overlap or gap treated as touching (units)" );
 idCVar af_enhancedRecoveryRate(		"af_enhancedRecoveryRate",	"0.4",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: fraction of an overlap removed per step" );
 idCVar af_enhancedMaxRecovery(		"af_enhancedMaxRecovery",	"60",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on position-only recovery speed for overlap and violated limits" );
-idCVar af_enhancedMaxJointCorrection("af_enhancedMaxJointCorrection","32",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on joint error correction speed (legacy allows 256)" );
+idCVar af_enhancedMaxJointCorrection("af_enhancedMaxJointCorrection","32",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on the joint error correction applied as velocity (legacy allows 256)" );
+idCVar af_enhancedMaxJointRecovery(	"af_enhancedMaxJointRecovery","1024",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on joint error correction in all; what exceeds af_enhancedMaxJointCorrection moves bodies by position only" );
+idCVar af_enhancedJointStretch(		"af_enhancedJointStretch",	"8",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: units a joint is pulled apart before its velocity correction reaches legacy's 256 (rising from a quarter of this)" );
+idCVar af_enhancedCollisionContacts(	"af_enhancedCollisionContacts","1",		CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enhanced physics: the surface that stops a swept body of a figure is solved as a contact in the next step" );
+idCVar af_enhancedRecoverySweep(	"af_enhancedRecoverySweep",	"0.1",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: position-only recovery that moves a body of a figure by more than this many units in a step is swept on its own (0 = never)" );
+idCVar af_enhancedImpactFrictionScale(	"af_enhancedImpactFrictionScale","0",	CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: share of the resting load that bounds the friction of a fast new touch (0 = frictionless impacts, as legacy)" );
 idCVar af_enhancedRotationSweep(	"af_enhancedRotationSweep",	"2",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: a body that turns its extent by more than this in a step is swept" );
 idCVar af_enhancedPersistFrames(	"af_enhancedPersistFrames",	"8",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: steps a static contact stays in a figure's manifold without being swept again", 0, 64 );
 idCVar af_enhancedSleepSpeed(		"af_enhancedSleepSpeed",	"4",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: linear speed below which every body of a figure counts as quiet" );
 idCVar af_enhancedSleepAngularSpeed("af_enhancedSleepAngularSpeed","0.2",		CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: angular speed below which every body of a figure counts as quiet" );
 idCVar af_enhancedSleepFrames(		"af_enhancedSleepFrames",	"30",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: quiet steps before a figure that may rest goes to sleep", 1, 600 );
 idCVar af_enhancedImpulseGuard(		"af_enhancedImpulseGuard",	"300",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: largest velocity change one hit gives the struck body before the rest of its momentum is spread over the figure" );
-idCVar af_enhancedImpactFriction(	"af_enhancedImpactFriction",	"1",			CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enhanced physics: limit the friction of a fast new touch to the body's resting load, as legacy figures resolve impacts without friction" );
+idCVar af_enhancedImpactFriction(	"af_enhancedImpactFriction",	"1",			CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enhanced physics: bound the friction of a fast new touch by a share of the body's resting load instead of by the impact force (legacy resolves impacts without friction)" );
 idCVar af_enhancedBounce(			"af_enhancedBounce",		"0",			CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "enhanced physics: let a fast new touch bounce an articulated figure by its bouncyness (legacy figures never bounce)" );
 idCVar af_enhancedInheritTime(		"af_enhancedInheritTime",	"32",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: ms of animation a new ragdoll takes its joint velocities from (when its def sets no velocityTime)", 0, 500 );
 idCVar af_enhancedMaxInheritSpeed(	"af_enhancedMaxInheritSpeed","400",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on the speed a new ragdoll body inherits" );
-idCVar af_enhancedDebug(			"af_enhancedDebug",			"0",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: articulated-figure diagnostics (1 print the energy guard, 2 also disable it, 8 print every contact after the solve)" );
+idCVar af_enhancedDebug(			"af_enhancedDebug",			"0",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: articulated-figure diagnostics (1 print the energy guard, 2 also disable it, 4 print exact-solver fallbacks, 8 print every contact after the solve)" );
 idCVar si_enhancedPhysics(			"si_enhancedPhysics",		"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM | CVAR_BOOL, "physics mode the server committed for the current map; clients and demo playback follow it" );
 
 idCVar rb_showTimings(				"rb_showTimings",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid body cpu usage" );

@@ -182,6 +182,7 @@ private:
 	static const int		ENHANCED_CACHE_SIZE = 16;
 	mutable int				enhancedEligibility;		// -1 not yet known, 0 legacy only, 1 enhanced when the map uses it
 	int						enhancedQuietFrames;		// consecutive quiet steps toward sleep
+	bool					enhancedUndisturbed;		// has not moved faster than the sleep speeds since it was created
 	int						enhancedNumCached;
 	OpenQ4Physics::cachedContact_t enhancedCache[ENHANCED_CACHE_SIZE];	// last step's contacts and impulses
 // openQ4 END

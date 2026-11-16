@@ -845,6 +845,15 @@ def validate_validation_wiring() -> None:
         # Vulkan support evidence runs need a staged client, a GPU and retail
         # assets.
         "renderer_vulkan_qualification.py",
+        # Enhanced-physics qualification (PHYS): each launches the staged client
+        # or dedicated server on retail assets; physics_enhanced_solver.py runs
+        # the solver kernels natively in CI and the workflows py_compile these.
+        "physics_workloads.py",
+        "physics_envelope.py",
+        "physics_integration.py",
+        "physics_defects.py",
+        "physics_coverage.py",
+        "physics_campaign.py",
         # Campaign runtime checks require user-supplied retail/expansion assets.
         "campaign_runtime.py",
         "campaign_selection_runtime.py",

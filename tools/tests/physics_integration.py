@@ -227,6 +227,8 @@ def main() -> int:
     parser.add_argument("--checks", default="saves,client,mvd,dedicated")
     parser.add_argument("--min-free-gb", type=float, default=5.0)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--cache-root", type=Path,
+                        help="generated-image cache shared by every run (default: one per run, regenerated each time)")
     args = parser.parse_args()
     args.set = []
     args.verbose_digest = False

@@ -485,6 +485,9 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 	sleep.angularSpeed = rb_enhancedSleepAngularSpeed.GetFloat();
 	sleep.quietFrames = Max( 1, rb_enhancedSleepFrames.GetInteger() );
 	bool cameToRest = false;
+	if ( linearVelocity.LengthSqr() > Square( sleep.linearSpeed ) || angularVelocity.LengthSqr() > Square( sleep.angularSpeed ) ) {
+		enhancedUndisturbed = false;
+	}
 	if ( rb_enhancedDebug.GetString()[0] && self && !idStr::Icmp( self->name.c_str(), rb_enhancedDebug.GetString() ) ) {
 		gameLocal.Printf( "RB_ENHANCED %s t=%d swept=%d contacts=%d supported=%d v=%.3f w=%.3f quiet=%d fraction=%.3f pos=%s\n",
 			self->name.c_str(), gameLocal.time, numSwept, count, supported ? 1 : 0, linearVelocity.Length(), angularVelocity.Length(),
@@ -498,6 +501,17 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 		current.atRest = gameLocal.time;
 		cameToRest = true;
 	} else if ( OpenQ4Physics::UpdateSleep( enhancedQuietFrames, linearVelocity.Length(), angularVelocity.Length(), supported, sleep ) ) {
+		Rest();
+		cameToRest = true;
+	} else if ( enhancedUndisturbed && rb_enhancedRestTest.GetBool() && supported && TestIfAtRest() ) {
+		// Legacy's own test: three contacts around the centre of mass and almost
+		// no motion. A body placed in a map passes it on its first step and never
+		// simulates, in either mode. Waiting for the quiet window instead let a
+		// pickup balanced on its perch lose the support contacts its sweep no
+		// longer reported, tip over and fall out of reach. Only a body that has
+		// not moved since it was created rests this way: one that has been
+		// knocked about waits for the quiet window, or a settling pile would put
+		// its members to rest and wake them again every few steps, as legacy does.
 		Rest();
 		cameToRest = true;
 	}

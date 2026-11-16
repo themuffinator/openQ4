@@ -474,23 +474,35 @@ does not restore the withdrawn release. See
 
 ## An Enhanced Physics option for ragdolls, debris and moveables (PHYS), 14 November 2026
 
+Updated 16 November 2026 after a second round of fixes and wider testing.
+
 - **New option: Settings > Game Options > Gameplay > Enhanced Physics.** It
   switches corpses, crates, barrels, debris and other loose objects to a new
   simulation. Stacks stand and settle instead of jittering, bodies come to
   rest instead of waking and settling over and over, and a ragdoll falls on
-  from its last motion instead of stopping dead. It also costs less: from a
-  quarter to three quarters less physics time than the original simulation
-  on every scene measured.
-- **It is off by default.** With the option off, the game runs the original
-  physics code unchanged, and saves and demos are byte for byte what they
-  were. A change applies from the next map or loaded save, never under
-  bodies in mid-air. In multiplayer everyone follows the server's choice, so
-  a client's own setting never changes what it sees in an online match, and
-  a multiview demo plays back with the setting it was recorded with.
-- Hits still move bodies the way they used to: every shot, blast and death
-  push delivers the momentum it always did. A light hit can no longer fling a
-  limb across the room, and a heavy blast still throws corpses about as far
-  as before.
+  from its last motion instead of stopping dead. A blast no longer leaves a
+  corpse with a limb stretched out for a second or more: where the original
+  showed a stretched limb for 42 frames after a Dark Matter blast, the option
+  shows one for 18.
+- **It is off by default, and stays off for now.** With the option off, the
+  game runs the original physics code unchanged, and saves and demos are byte
+  for byte what they were. A change applies from the next map or loaded save,
+  never under bodies in mid-air. In multiplayer everyone follows the server's
+  choice, so a client's own setting never changes what it sees in an online
+  match, and a multiview demo plays back with the setting it was recorded
+  with.
+- **What to expect with it on.** Every shot, blast and death push delivers
+  the momentum it always did, and a light hit can no longer fling a limb
+  across the room. Known shortfalls: crates and barrels thrown by a blast
+  land about a third as far away as before, and corpses thrown off the ground
+  about two thirds as far; a body lying across the edge of a ledge can sink
+  onto it or slide off; and on Linux two of the five scenes measured cost
+  more physics time with the option on, where on Windows every scene costs a
+  third to seven eighths less. These are why it is not the default yet.
+- **Fixed since the first version of the option (16 November):** corpses
+  killed against a wall no longer come to rest with an elbow or knee inside
+  it, and ammunition placed on ledges in Network 1 and Core 2 no longer tips
+  off before you get there.
 - **Nothing to do.** Existing settings and saves are untouched, and a save
   loads whichever way the option is set. The row is in both the new and the
   classic interface, in all twelve languages.
@@ -498,23 +510,29 @@ does not restore the withdrawn release. See
   a map loads; servers publish it as `si_enhancedPhysics`. Rigid bodies get a
   semi-implicit step with persistent, warm-started contacts, friction,
   sleeping and swept motion only where needed; articulated figures get a
-  warm-started iterative constraint solve with bounded recovery, an energy
-  guard that keeps the figure's momentum, and an impulse guard that spreads a
-  hit on a light limb over the figure. See the
-  [physics reference](physics-reference.md).
-- Evidence (Windows x64, hidden-window runs): with the option off, five
-  single-player scenes repeat the pre-solver build's body states exactly. The
-  hit test drives machinegun, gauntlet, small and large splash, rockets,
+  warm-started iterative constraint solve with bounded recovery, joints that
+  close by position without adding energy, an energy guard that keeps the
+  figure's momentum, and an impulse guard that spreads a hit on a light limb
+  over the figure. See the [physics reference](physics-reference.md).
+- Evidence (hidden-window runs; Windows x64 unless said): with the option
+  off, five single-player scenes repeat the pre-solver build's body states
+  exactly. The stock campaign's 31 maps were walked in order in both modes,
+  with a save and a load on each, and six scripted set pieces (a thrown
+  marine, falling barrels, knocked grates) end as they do in the original.
+  The hit test drives machinegun, gauntlet, small and large splash, rockets,
   grenades, Dark Matter and a vehicle-sized bump into resting and falling
-  corpses in both modes, and every class stays within the legacy envelope;
-  the Dark Matter splash, which first left corpses at an eighth of their
-  legacy travel, now reaches two thirds of it. Physics time fell 23-76 % on
-  six scenes, including a seven-bot deathmatch. Saves made in either mode
-  load in the other, and clients took the server's mode both ways round.
-  Details: [physics reference](physics-reference.md#evidence).
-- Open: the campaign, The Awakening, multiplayer corpses and moveables with
-  the option on; a dedicated-server join and a full demo playback; Linux and
-  ARM64; a by-eye review; and the decision on turning it on by default.
+  corpses: every class stays within the legacy envelope for Strogg marines
+  and for player corpses in multiplayer. Saves made in either mode load in
+  the other; clients took the server's mode both ways round; a demo recorded
+  on a server with the option on plays to its end; a client joined a
+  dedicated server with the option on, on Windows and on Linux; ragdolls and
+  debris stay smooth at 240 Hz in both modes. On Linux x64 the same seven save, client, demo and dedicated-server checks pass and the hit test passes for Strogg marines, and an ARM64 dedicated server ran a bot match in both modes under emulation. Details:
+  [physics reference](physics-reference.md#evidence).
+- Open: crates and barrels after a blast, bodies on ledge edges, three hit
+  classes on The Awakening's terrain, the hanging lights in Putra after a
+  hard push, cost on Linux, a review in motion by eye (this round compared
+  stills), and with those the decision on turning it on by default. Tracked
+  as PHYS-02 to PHYS-04 and PHYS-06 in the [roadmap](roadmap.md#rigid-body-and-ragdoll-physics).
 
 ## Click the key prompts in the new menus, 14 November 2026
 

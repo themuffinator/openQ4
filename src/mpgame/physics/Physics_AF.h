@@ -163,6 +163,7 @@ public:
 							~idAFConstraint_BallAndSocketJoint( void );
 	void					SetAnchor( const idVec3 &worldPosition );
 	idVec3					GetAnchor( void ) const;
+	idVec3					GetAnchorOffset( void ) const;		// openQ4: from body1's anchor to body2's, in world space
 	void					SetNoLimit( void );
 	void					SetConeLimit( const idVec3 &coneAxis, const float coneAngle, const idVec3 &body1Axis );
 	void					SetPyramidLimit( const idVec3 &pyramidAxis, const idVec3 &baseAxis,
@@ -218,6 +219,7 @@ public:
 							~idAFConstraint_UniversalJoint( void );
 	void					SetAnchor( const idVec3 &worldPosition );
 	idVec3					GetAnchor( void ) const;
+	idVec3					GetAnchorOffset( void ) const;		// openQ4: from body1's anchor to body2's, in world space
 	void					SetShafts( const idVec3 &cardanShaft1, const idVec3 &cardanShaft2 );
 	void					GetShafts( idVec3 &cardanShaft1, idVec3 &cardanShaft2 ) { cardanShaft1 = shaft1; cardanShaft2 = shaft2; }
 	void					SetNoLimit( void );
@@ -296,6 +298,7 @@ public:
 							~idAFConstraint_Hinge( void );
 	void					SetAnchor( const idVec3 &worldPosition );
 	idVec3					GetAnchor( void ) const;
+	idVec3					GetAnchorOffset( void ) const;		// openQ4: from body1's anchor to body2's, in world space
 	void					SetAxis( const idVec3 &axis );
 	void					GetAxis( idVec3 &a1, idVec3 &a2 ) const { a1 = axis1; a2 = axis2; }
 	idVec3					GetAxis( void ) const;
@@ -1001,11 +1004,13 @@ private:
 	bool					EvaluateContactsEnhanced( float timeStep );
 	void					SetupContactConstraintsEnhanced( float timeStep );
 	void					AuxiliaryForcesEnhanced( float timeStep );
+	void					EnhancedJointRecovery( float timeStep, const float *jointExcess );
 	void					EvolveEnhanced( float timeStep, float energyBefore );
 	void					CheckForCollisionsEnhanced( float timeStep );
 	void					CacheEnhancedContacts( void );
 	void					ApplyImpulseEnhanced( const int id, const idVec3 &point, const idVec3 &impulse );
 	float					EnhancedKineticEnergy( const bool next ) const;
+	float					MaxJointStretch( void ) const;
 
 	// transient enhanced state: never saved or networked; rebuilt in one step
 	idList<float>			enhancedSeparation;			// gap of each contact this step

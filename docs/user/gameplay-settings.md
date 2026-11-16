@@ -258,7 +258,7 @@ seta g_corpseRemoveDelayMP -1
 
 ### Enhanced physics
 
-**Settings → Game Options → General → Enhanced Physics** (`g_enhancedPhysics 1`) switches corpses, crates, barrels, debris and other loose objects to a newer simulation. Stacks settle and stay put, ragdolls fall on from the motion they had instead of dropping dead on the spot, and it costs less processor time than the original. Hits still push bodies about as hard as before.
+**Settings → Game Options → General → Enhanced Physics** (`g_enhancedPhysics 1`) switches corpses, crates, barrels, debris and other loose objects to a newer simulation. Stacks settle and stay put, ragdolls fall on from the motion they had instead of dropping dead on the spot, limbs no longer stay stretched after a blast, and on Windows it costs less processor time than the original (on Linux some scenes cost more). Hits push bodies with the same force as before, though a blast carries them less far than with the option off: corpses lying on the ground about two thirds as far, crates and barrels about a third. A body lying across the edge of a ledge can also sink onto it or slide off. These are known shortfalls and the reason the option is not on by default.
 
 It is off by default; off runs the original physics exactly. A change takes effect from the next map or loaded save. In multiplayer the server's setting applies to everyone, and a demo plays back with the setting it was recorded with.
 

@@ -6,6 +6,9 @@
 //   physicsStats start [label]   begin a per-frame capture
 //   physicsStats stop            end the capture and print PHYSICS_STATS
 //   physicsStats report          print PHYSICS_STATS for the capture so far
+//   physicsStats frames          print every captured frame's physics time
+//   physicsQuality <prefix>      print PHYSICS_QUALITY: joint stretch, joints
+//                                pierced by geometry and embedded bodies
 //   physicsDigest [verbose]      print PHYSICS_DIGEST: a hash of every rigid
 //                                body and articulated figure state, and a
 //                                separate hash of the workload's own phys_*
@@ -29,8 +32,10 @@ static void Cmd_PhysicsStats_f( const idCmdArgs &args ) {
 		telemetry.Report( OpenQ4Physics_PrintLine, mode );
 	} else if ( !idStr::Icmp( action, "report" ) ) {
 		telemetry.Report( OpenQ4Physics_PrintLine, mode );
+	} else if ( !idStr::Icmp( action, "frames" ) ) {
+		telemetry.ReportFrames( OpenQ4Physics_PrintLine, mode );
 	} else {
-		gameLocal.Printf( "usage: physicsStats start [label] | stop | report\n" );
+		gameLocal.Printf( "usage: physicsStats start [label] | stop | report | frames\n" );
 	}
 }
 
@@ -119,8 +124,23 @@ static void Cmd_PhysicsDigest_f( const idCmdArgs &args ) {
 // these before and after a hit in both physics modes.
 static void Cmd_PhysicsReport_f( const idCmdArgs &args ) {
 	const char *prefix = args.Argc() > 1 ? args.Argv( 1 ) : "phys_";
-	const int prefixLength = idStr::Length( prefix );
+	const int prefixLength = idStr::Cmp( prefix, "*" ) ? idStr::Length( prefix ) : 0;	// "*": every entity
 	gameLocal.Printf( "PHYSICS_REPORT prefix=%s time=%d\n", prefix, gameLocal.time );
+	if ( !idStr::Icmp( prefix, "@debris" ) ) {
+		// client-side debris and corpses (brass, gibs, chunks): named by slot
+		for ( int i = 0; i < MAX_CENTITIES; i++ ) {
+			rvClientEntity *cent = gameLocal.clientEntities[i];
+			const idPhysics *physics = cent ? cent->GetPhysics() : NULL;
+			if ( !OpenQ4Physics_IsSimulated( physics ) ) {
+				continue;
+			}
+			const float mass = physics->GetMass();
+			gameLocal.Printf( "PHYSICS_BODY debris_%d class=%s bodies=1 mass=%.2f centre=%s momentum=%s peak=%.2f rest=%d time=%d\n",
+				i, physics->GetClassname(), mass, physics->GetOrigin().ToString( 2 ), ( mass * physics->GetLinearVelocity() ).ToString( 1 ),
+				physics->GetLinearVelocity().Length(), physics->IsAtRest() ? 1 : 0, gameLocal.time );
+		}
+		return;
+	}
 	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
 		idEntity *ent = gameLocal.entities[i];
 		if ( !ent || idStr::Cmpn( ent->name.c_str(), prefix, prefixLength ) ) {
@@ -151,17 +171,159 @@ static void Cmd_PhysicsReport_f( const idCmdArgs &args ) {
 	}
 }
 
+// True when a trace or contents test stopped at geometry that never moves by
+// physics: the world, or an entity on static or scripted (mover) physics.
+static bool OpenQ4Physics_IsStaticEntity( int entityNum ) {
+	if ( entityNum == ENTITYNUM_WORLD ) {
+		return true;
+	}
+	if ( entityNum < 0 || entityNum >= MAX_GENTITIES ) {
+		return false;
+	}
+	const idEntity *hit = gameLocal.entities[entityNum];
+	const idPhysics *hitPhysics = hit ? hit->GetPhysics() : NULL;
+	return hitPhysics && ( hitPhysics->IsType( idPhysics_Static::GetClassType() ) ||
+			hitPhysics->IsType( idPhysics_StaticMulti::GetClassType() ) || hitPhysics->IsType( idPhysics_Parametric::GetClassType() ) );
+}
+
+// static geometry between two points, ignoring a hit within `tolerance` units of the end
+static bool OpenQ4Physics_StaticBetween( const idEntity *self, const idVec3 &start, const idVec3 &end, float tolerance ) {
+	const float length = ( end - start ).Length();
+	if ( length <= tolerance ) {
+		return false;
+	}
+	trace_t tr;
+	gameLocal.TracePoint( self, tr, start, end, MASK_SOLID, self );
+	return tr.fraction < 1.0f && tr.fraction * length < length - tolerance && OpenQ4Physics_IsStaticEntity( tr.c.entityNum );
+}
+
+static bool OpenQ4Physics_PointEmbedded( const idEntity *self, const idVec3 &point ) {
+	idEntity *touched = NULL;
+	if ( !( gameLocal.Contents( self, point, NULL, mat3_identity, CONTENTS_SOLID, self, &touched ) & CONTENTS_SOLID ) ) {
+		return false;
+	}
+	return !touched || OpenQ4Physics_IsStaticEntity( touched->entityNumber );
+}
+
+// physicsQuality <namePrefix>: one PHYSICS_QUALITY line per matching entity with
+// rigid-body or articulated physics. The defect repros (PHYS-01) read these in
+// both modes:
+//   stretch    largest distance between the two anchors of a joint
+//   pierced    joints with static geometry between a body's centre and the
+//              joint (a limb through a wall or floor); a hit within one unit
+//              of the joint does not count
+//   embedded   bodies whose centre is inside solid static geometry
+//   awake      1 while the physics object is not at rest
+//   speed      linear speed of the fastest body
+//   hidden     with a second argument "eye": 1 when static geometry lies
+//              between the local player's eyes and the object (a body that
+//              ended up behind a wall it was fired at)
+static void Cmd_PhysicsQuality_f( const idCmdArgs &args ) {
+	const idPlayer *viewer = ( args.Argc() > 2 && !idStr::Icmp( args.Argv( 2 ), "eye" ) ) ? gameLocal.GetLocalPlayer() : NULL;
+	const char *prefix = args.Argc() > 1 ? args.Argv( 1 ) : "phys_";
+	const int prefixLength = idStr::Cmp( prefix, "*" ) ? idStr::Length( prefix ) : 0;	// "*": every entity
+	gameLocal.Printf( "PHYSICS_QUALITY_REPORT prefix=%s time=%d mode=%s\n", prefix, gameLocal.time, gameLocal.enhancedPhysics ? "enhanced" : "legacy" );
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		idEntity *ent = gameLocal.entities[i];
+		if ( !ent || idStr::Cmpn( ent->name.c_str(), prefix, prefixLength ) ) {
+			continue;
+		}
+		idPhysics *physics = ent->GetPhysics();
+		if ( !OpenQ4Physics_IsSimulated( physics ) ) {
+			continue;
+		}
+		const int count = Max( 1, physics->GetNumClipModels() );
+		float speed = 0.0f;
+		float stretch = 0.0f;
+		int pierced = 0;
+		int embedded = 0;
+		int joints = 0;
+		idVec3 lowest = physics->GetOrigin();
+		for ( int id = 0; id < count; id++ ) {
+			speed = Max( speed, physics->GetLinearVelocity( id ).Length() );
+			const idClipModel *clip = physics->GetClipModel( id );
+			const idVec3 centre = clip ? clip->GetAbsBounds().GetCenter() : physics->GetOrigin( id );
+			if ( centre.z < lowest.z ) {
+				lowest = centre;
+			}
+			if ( OpenQ4Physics_PointEmbedded( ent, centre ) ) {
+				embedded++;
+			}
+		}
+		if ( physics->IsType( idPhysics_AF::GetClassType() ) ) {
+			idPhysics_AF *af = static_cast<idPhysics_AF *>( physics );
+			for ( int c = 0; c < af->GetNumConstraints(); c++ ) {
+				idAFConstraint *constraint = af->GetConstraint( c );
+				if ( !constraint || !constraint->GetBody1() ) {
+					continue;
+				}
+				float separation;
+				switch ( constraint->GetType() ) {
+					case CONSTRAINT_BALLANDSOCKETJOINT:
+						separation = static_cast<idAFConstraint_BallAndSocketJoint *>( constraint )->GetAnchorOffset().Length();
+						break;
+					case CONSTRAINT_UNIVERSALJOINT:
+						separation = static_cast<idAFConstraint_UniversalJoint *>( constraint )->GetAnchorOffset().Length();
+						break;
+					case CONSTRAINT_HINGE:
+						separation = static_cast<idAFConstraint_Hinge *>( constraint )->GetAnchorOffset().Length();
+						break;
+					default:
+						continue;
+				}
+				joints++;
+				stretch = Max( stretch, separation );
+				idVec3 anchor;
+				constraint->GetCenter( anchor );
+				bool blocked = false;
+				idAFBody *pair[2] = { constraint->GetBody1(), constraint->GetBody2() };
+				for ( int b = 0; b < 2 && !blocked; b++ ) {
+					if ( pair[b] && pair[b]->GetClipModel() ) {
+						const idVec3 centre = pair[b]->GetClipModel()->GetAbsBounds().GetCenter();
+						blocked = OpenQ4Physics_StaticBetween( ent, centre, anchor, 1.0f );
+						if ( blocked ) {
+							// which joint, and how far along the line from the body's centre to
+							// the joint the surface is met from each end
+							trace_t tr, back;
+							gameLocal.TracePoint( ent, tr, centre, anchor, MASK_SOLID, ent );
+							gameLocal.TracePoint( ent, back, anchor, centre, MASK_SOLID, ent );
+							const float length = ( anchor - centre ).Length();
+							gameLocal.Printf( "PHYSICS_PIERCED %s joint=%s body=%s length=%.2f fromCentre=%.2f fromJoint=%.2f normal=%s\n", ent->name.c_str(),
+								constraint->GetName().c_str(), pair[b]->GetName().c_str(), length, tr.fraction * length, back.fraction * length,
+								tr.c.normal.ToString( 2 ) );
+						}
+					}
+				}
+				if ( blocked ) {
+					pierced++;
+				}
+			}
+		}
+		const idClipModel *firstClip = physics->GetClipModel( 0 );
+		const idVec3 firstCentre = firstClip ? firstClip->GetAbsBounds().GetCenter() : physics->GetOrigin();
+		const int hidden = ( viewer && OpenQ4Physics_StaticBetween( viewer, viewer->GetEyePosition(), firstCentre, 1.0f ) ) ? 1 : 0;
+		gameLocal.Printf( "PHYSICS_QUALITY %s class=%s bodies=%d joints=%d stretch=%.3f pierced=%d embedded=%d awake=%d speed=%.2f origin=%s lowest=%s hidden=%d time=%d\n",
+			ent->name.c_str(), physics->GetClassname(), count, joints, stretch, pierced, embedded, physics->IsAtRest() ? 0 : 1, speed,
+			firstCentre.ToString( 2 ), lowest.ToString( 2 ), hidden, gameLocal.time );
+	}
+}
+
 // Workload tools for the physics harness (cheats): they stage repeatable scenes
 // without any player input.
 //
-//   physicsSpawn <entityDef> <count> <ring|line|grid|stack> <distance> [height] [step] [key value]...
+//   physicsSpawn <entityDef> <count> <ring|line|grid|stack|wall> <distance> [height] [step] [key value]...
 //       spawns entities named phys_<n> around or ahead of the local player
+//       ("wall": <distance> short of the surface ahead, <step> degrees apart)
+//   physicsLaunch <entityDef> <speed> [yaw] [pitch] [key value]...
+//       spawns one entity ahead of the player's eyes and launches it
 //   physicsRadiusDamage <damageDef> <forward> [up] [power]
 //       radius damage and push at a point ahead of the local player
-//   physicsImpulse <entity> <x> <y> <z> [clipModelId]
+//   physicsImpulse <entity|prefix*> <x> <y> <z> [clipModelId]
 //       applies an impulse at the centre of an entity's clip model
 
 static int openq4PhysicsSpawnSerial = 0;
+
+static bool OpenQ4Physics_WallAhead( const idEntity *pass, const idVec3 &start, const idVec3 &dir, float &distance, float &thickness, idVec3 &normal );
 
 static void Cmd_PhysicsSpawn_f( const idCmdArgs &args ) {
 	idPlayer *player = gameLocal.GetLocalPlayer();
@@ -169,7 +331,7 @@ static void Cmd_PhysicsSpawn_f( const idCmdArgs &args ) {
 		return;
 	}
 	if ( args.Argc() < 5 ) {
-		gameLocal.Printf( "usage: physicsSpawn <entityDef> <count> <ring|line|grid|stack> <distance> [height] [step]\n" );
+		gameLocal.Printf( "usage: physicsSpawn <entityDef> <count> <ring|line|grid|stack|wall> <distance> [height] [step]\n" );
 		return;
 	}
 	const char *defName = args.Argv( 1 );
@@ -205,6 +367,19 @@ static void Cmd_PhysicsSpawn_f( const idCmdArgs &args ) {
 			origin = base + ( distance + step * (float)row ) * forward + step * ( (float)column - 0.5f * (float)( side - 1 ) ) * right + height * up;
 		} else if ( !idStr::Icmp( layout, "stack" ) ) {
 			origin = base + distance * forward + ( height + step * (float)i ) * up;
+		} else if ( !idStr::Icmp( layout, "wall" ) ) {
+			// <distance> units short of the first static surface ahead, each body
+			// <step> degrees of yaw from the next, its back to the wall
+			const float turn = step * ( (float)i - 0.5f * (float)( count - 1 ) );
+			const idVec3 toward = idAngles( 0.0f, yaw + turn, 0.0f ).ToForward();
+			float wallDistance, thickness;
+			idVec3 wallNormal;
+			if ( !OpenQ4Physics_WallAhead( player, base + idVec3( 0.0f, 0.0f, Max( height, 24.0f ) ), toward, wallDistance, thickness, wallNormal ) ) {
+				gameLocal.Printf( "PHYSICS_SPAWN_SKIPPED %s yaw=%.1f no wall\n", defName, turn );
+				continue;
+			}
+			origin = base + ( wallDistance - distance ) * toward + height * up;
+			facing = yaw + turn + 180.0f;
 		} else {
 			gameLocal.Printf( "unknown layout '%s'\n", layout );
 			return;
@@ -247,6 +422,101 @@ static void Cmd_PhysicsSpawn_f( const idCmdArgs &args ) {
 			gameLocal.Printf( "PHYSICS_SPAWN %s %s %s\n", name.c_str(), defName, origin.ToString( 1 ) );
 		}
 	}
+}
+
+// Where static geometry first blocks a line from `start` along `dir`, its
+// surface normal there and how thick it is (sampled a unit at a time, up to
+// 64 units; a surface with no solid brush behind it reads 1).
+static bool OpenQ4Physics_WallAhead( const idEntity *pass, const idVec3 &start, const idVec3 &dir, float &distance, float &thickness, idVec3 &normal ) {
+	const float range = 4096.0f;
+	trace_t tr;
+	gameLocal.TracePoint( pass, tr, start, start + range * dir, MASK_SOLID, pass );
+	distance = tr.fraction * range;
+	thickness = 0.0f;
+	normal = tr.fraction < 1.0f ? tr.c.normal : -dir;
+	if ( tr.fraction >= 1.0f || !OpenQ4Physics_IsStaticEntity( tr.c.entityNum ) ) {
+		return false;
+	}
+	for ( thickness = 1.0f; thickness < 64.0f; thickness += 1.0f ) {
+		if ( !OpenQ4Physics_PointEmbedded( pass, start + ( distance + thickness ) * dir ) ) {
+			break;
+		}
+	}
+	return true;
+}
+
+// physicsWallProbe <yawFrom> <yawTo> <step> [pitch]: for each view yaw offset,
+// prints how far the first static surface is from the player's eyes and how
+// thick it is, so a tunnelling repro can be aimed at a thin wall. Reads only.
+static void Cmd_PhysicsWallProbe_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player || args.Argc() < 4 ) {
+		gameLocal.Printf( "usage: physicsWallProbe <yawFrom> <yawTo> <step> [pitch]\n" );
+		return;
+	}
+	const float from = atof( args.Argv( 1 ) );
+	const float to = atof( args.Argv( 2 ) );
+	const float step = Max( 0.5f, (float)atof( args.Argv( 3 ) ) );
+	const float pitch = args.Argc() > 4 ? atof( args.Argv( 4 ) ) : 0.0f;
+	const idVec3 eye = player->GetEyePosition();
+	for ( float yaw = from; yaw <= to; yaw += step ) {
+		const idVec3 dir = idAngles( pitch, player->viewAngles.yaw + yaw, 0.0f ).ToForward();
+		float distance, thickness;
+		idVec3 normal;
+		const bool wall = OpenQ4Physics_WallAhead( player, eye, dir, distance, thickness, normal );
+		// incidence: 0 degrees is a line straight into the surface
+		gameLocal.Printf( "PHYSICS_WALL yaw=%.1f pitch=%.1f static=%d distance=%.1f thickness=%.0f incidence=%.0f\n", yaw, pitch, wall ? 1 : 0, distance, thickness,
+			RAD2DEG( idMath::ACos( idMath::ClampFloat( -1.0f, 1.0f, -( dir * normal ) ) ) ) );
+	}
+}
+
+// physicsLaunch <entityDef> <speed> [yaw] [pitch] [key value]...: spawns one
+// entity named phys_<n> 40 units ahead of the player's eyes and sends it off
+// at <speed> units/s along the view direction turned by yaw and pitch degrees.
+// Prints where static geometry first blocks that line and how thick it is, so a
+// test can tell a body that stopped at the wall from one that ended beyond it.
+static void Cmd_PhysicsLaunch_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	if ( args.Argc() < 3 ) {
+		gameLocal.Printf( "usage: physicsLaunch <entityDef> <speed> [yaw] [pitch] [key value]...\n" );
+		return;
+	}
+	const char *defName = args.Argv( 1 );
+	if ( !gameLocal.FindEntityDef( defName, false ) ) {
+		gameLocal.Printf( "entityDef '%s' not found\n", defName );
+		return;
+	}
+	const float speed = atof( args.Argv( 2 ) );
+	const float yaw = args.Argc() > 3 ? atof( args.Argv( 3 ) ) : 0.0f;
+	const float pitch = args.Argc() > 4 ? atof( args.Argv( 4 ) ) : 0.0f;
+	const idVec3 dir = idAngles( pitch, player->viewAngles.yaw + yaw, 0.0f ).ToForward();
+	const idVec3 origin = player->GetEyePosition() + 40.0f * dir;
+
+	float distance, thickness;
+	idVec3 normal;
+	const bool wall = OpenQ4Physics_WallAhead( player, origin, dir, distance, thickness, normal );
+
+	idDict dict;
+	const idStr name = va( "phys_%d", openq4PhysicsSpawnSerial++ );
+	dict.Set( "classname", defName );
+	dict.Set( "name", name.c_str() );
+	dict.Set( "origin", origin.ToString() );
+	dict.Set( "nodrop", "1" );
+	for ( int arg = 5; arg + 1 < args.Argc(); arg += 2 ) {
+		dict.Set( args.Argv( arg ), args.Argv( arg + 1 ) );
+	}
+	idEntity *ent = NULL;
+	if ( !gameLocal.SpawnEntityDef( dict, &ent ) || !ent || !ent->GetPhysics() ) {
+		gameLocal.Printf( "PHYSICS_LAUNCH_FAILED %s\n", defName );
+		return;
+	}
+	ent->GetPhysics()->SetLinearVelocity( speed * dir );
+	ent->GetPhysics()->Activate();
+	gameLocal.Printf( "PHYSICS_LAUNCH %s %s origin=%s dir=%s speed=%.0f static=%d wall=%.1f thickness=%.0f normal=%s time=%d\n", name.c_str(), defName,
+		origin.ToString( 2 ), dir.ToString( 4 ), speed, wall ? 1 : 0, distance, thickness, normal.ToString( 4 ), gameLocal.time );
 }
 
 static void Cmd_PhysicsRadiusDamage_f( const idCmdArgs &args ) {
@@ -315,18 +585,48 @@ static void Cmd_PhysicsImpulse_f( const idCmdArgs &args ) {
 		return;
 	}
 	if ( args.Argc() < 5 ) {
-		gameLocal.Printf( "usage: physicsImpulse <entity> <x> <y> <z> [clipModelId]\n" );
+		gameLocal.Printf( "usage: physicsImpulse <entity|prefix*> <x> <y> <z> [clipModelId]\n" );
 		return;
 	}
-	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
-	if ( !ent || !ent->GetPhysics() ) {
+	// a name followed by '*' is a prefix: every simulated entity it matches takes the
+	// impulse. The console splits "name*" into two arguments, so the star is its own.
+	idStr name = args.Argv( 1 );
+	bool byPrefix = name.Length() > 0 && name[name.Length() - 1] == '*';
+	if ( byPrefix ) {
+		name.CapLength( name.Length() - 1 );
+	}
+	int first = 2;
+	if ( !idStr::Cmp( args.Argv( 2 ), "*" ) ) {
+		byPrefix = true;
+		first = 3;
+	}
+	if ( args.Argc() < first + 3 ) {
+		gameLocal.Printf( "usage: physicsImpulse <entity|prefix*> <x> <y> <z> [clipModelId]\n" );
+		return;
+	}
+	const idVec3 impulse( atof( args.Argv( first ) ), atof( args.Argv( first + 1 ) ), atof( args.Argv( first + 2 ) ) );
+	const int wantedId = args.Argc() > first + 3 ? atoi( args.Argv( first + 3 ) ) : 0;
+	int count = 0;
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		idEntity *ent = gameLocal.entities[i];
+		if ( !ent || !ent->GetPhysics() ) {
+			continue;
+		}
+		if ( byPrefix ? ( idStr::Cmpn( ent->name.c_str(), name.c_str(), name.Length() ) != 0 || !OpenQ4Physics_IsSimulated( ent->GetPhysics() ) )
+					  : ( idStr::Icmp( ent->name.c_str(), name.c_str() ) != 0 ) ) {
+			continue;
+		}
+		const int id = idMath::ClampInt( 0, Max( 1, ent->GetPhysics()->GetNumClipModels() ) - 1, wantedId );
+		const idClipModel *clip = ent->GetPhysics()->GetClipModel( id );
+		const idVec3 point = clip ? clip->GetAbsBounds().GetCenter() : ent->GetPhysics()->GetOrigin( id );
+		ent->ApplyImpulse( gameLocal.world, id, point, impulse );
+		gameLocal.Printf( "PHYSICS_IMPULSE %s id=%d impulse=%s time=%d\n", ent->name.c_str(), id, impulse.ToString( 1 ), gameLocal.time );
+		count++;
+		if ( !byPrefix ) {
+			break;
+		}
+	}
+	if ( !count ) {
 		gameLocal.Printf( "entity not found\n" );
-		return;
 	}
-	const idVec3 impulse( atof( args.Argv( 2 ) ), atof( args.Argv( 3 ) ), atof( args.Argv( 4 ) ) );
-	const int id = args.Argc() > 5 ? atoi( args.Argv( 5 ) ) : 0;
-	const idClipModel *clip = ent->GetPhysics()->GetClipModel( id );
-	const idVec3 point = clip ? clip->GetAbsBounds().GetCenter() : ent->GetPhysics()->GetOrigin( id );
-	ent->ApplyImpulse( gameLocal.world, id, point, impulse );
-	gameLocal.Printf( "PHYSICS_IMPULSE %s id=%d impulse=%s time=%d\n", ent->name.c_str(), id, impulse.ToString( 1 ), gameLocal.time );
 }

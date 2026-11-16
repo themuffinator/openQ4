@@ -509,6 +509,7 @@ idPhysics_RigidBody::idPhysics_RigidBody( void ) {
 
 	enhancedEligibility = -1;
 	enhancedQuietFrames = 0;
+	enhancedUndisturbed = true;
 	enhancedNumCached = 0;
 
 #ifdef RB_TIMINGS

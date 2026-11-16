@@ -40,12 +40,16 @@ enum counter_t {
 	COUNTER_COUNT
 };
 
+// a joint whose anchors are further apart than this shows as a stretched limb
+const float VISIBLE_JOINT_STRETCH = 8.0f;
+
 struct frameSample_t {
 	int			frame;
 	float		ms[EVAL_KIND_COUNT];
 	int			evaluations[EVAL_KIND_COUNT];
 	int			moved[EVAL_KIND_COUNT];
 	float		peakLinearSpeed;
+	float		peakJointStretch;	// largest joint anchor separation of any figure that moved this frame
 	int			counters[COUNTER_COUNT];
 };
 
@@ -111,6 +115,7 @@ public:
 		label[0] = '\0';
 		peakImpulseDeltaV = 0.0f;
 		maxImpulse = 0.0f;
+		fallbackMs = 0.0;
 	}
 
 	void		Start( const char *name ) {
@@ -160,6 +165,12 @@ public:
 		}
 	}
 
+	void		NoteJointStretch( float stretch ) {
+		if ( recording && frameOpen && stretch > current.peakJointStretch ) {
+			current.peakJointStretch = stretch;
+		}
+	}
+
 	void		NoteCounter( counter_t counter, int amount = 1 ) {
 		if ( recording && frameOpen && counter >= 0 && counter < COUNTER_COUNT ) {
 			current.counters[counter] += amount;
@@ -180,6 +191,14 @@ public:
 		}
 		if ( deltaV > peakImpulseDeltaV ) {
 			peakImpulseDeltaV = deltaV;
+		}
+	}
+
+	// time the enhanced articulated step spent in an exact LCP solve after its
+	// iterations did not settle (already part of that evaluation's time)
+	void		NoteFallbackMs( double ms ) {
+		if ( recording ) {
+			fallbackMs += ms;
 		}
 	}
 
@@ -214,6 +233,8 @@ public:
 		long long moved[EVAL_KIND_COUNT] = { 0, 0 };
 		long long counters[COUNTER_COUNT];
 		float peakSpeed = 0.0f;
+		float peakStretch = 0.0f;
+		int stretchedFrames = 0;
 		std::memset( counters, 0, sizeof( counters ) );
 		for ( size_t i = 0; i < samples.size(); i++ ) {
 			for ( int k = 0; k < EVAL_KIND_COUNT; k++ ) {
@@ -224,6 +245,10 @@ public:
 				counters[c] += samples[i].counters[c];
 			}
 			peakSpeed = (std::max)( peakSpeed, samples[i].peakLinearSpeed );
+			peakStretch = (std::max)( peakStretch, samples[i].peakJointStretch );
+			if ( samples[i].peakJointStretch > VISIBLE_JOINT_STRETCH ) {
+				stretchedFrames++;
+			}
 		}
 		char line[2048];
 		std::snprintf( line, sizeof( line ),
@@ -232,15 +257,37 @@ public:
 			"\"rigid\":{\"total_ms\":%.4f,\"p50_ms\":%.5f,\"p95_ms\":%.5f,\"p99_ms\":%.5f,\"max_ms\":%.5f,\"evaluations\":%lld,\"moved\":%lld},"
 			"\"af\":{\"total_ms\":%.4f,\"p50_ms\":%.5f,\"p95_ms\":%.5f,\"p99_ms\":%.5f,\"max_ms\":%.5f,\"evaluations\":%lld,\"moved\":%lld},"
 			"\"peak_speed\":%.2f,\"impulses\":%lld,\"impulse_clamps\":%lld,\"max_impulse\":%.1f,\"peak_impulse_dv\":%.2f,"
-			"\"sleeps\":%lld,\"wakes\":%lld,\"swept\":%lld,\"energy_clamps\":%lld,\"solver_fallbacks\":%lld,\"client_rigid\":%lld}\n",
+			"\"sleeps\":%lld,\"wakes\":%lld,\"swept\":%lld,\"energy_clamps\":%lld,\"solver_fallbacks\":%lld,\"client_rigid\":%lld,"
+			"\"fallback_ms\":%.4f,\"peak_joint_stretch\":%.2f,\"stretched_frames\":%d}\n",
 			label, mode ? mode : "", all.frames,
 			all.totalMs, all.meanMs, all.p50Ms, all.p95Ms, all.p99Ms, all.maxMs, all.maxFrame,
 			rb.totalMs, rb.p50Ms, rb.p95Ms, rb.p99Ms, rb.maxMs, evaluations[EVAL_RIGID_BODY], moved[EVAL_RIGID_BODY],
 			af.totalMs, af.p50Ms, af.p95Ms, af.p99Ms, af.maxMs, evaluations[EVAL_ARTICULATED], moved[EVAL_ARTICULATED],
 			peakSpeed, counters[COUNTER_IMPULSES], counters[COUNTER_IMPULSE_CLAMPS], maxImpulse, peakImpulseDeltaV,
 			counters[COUNTER_SLEEPS], counters[COUNTER_WAKES], counters[COUNTER_SWEPT], counters[COUNTER_ENERGY_CLAMPS],
-			counters[COUNTER_SOLVER_FALLBACKS], counters[COUNTER_CLIENT_RIGID] );
+			counters[COUNTER_SOLVER_FALLBACKS], counters[COUNTER_CLIENT_RIGID], fallbackMs, peakStretch, stretchedFrames );
 		print( line );
+	}
+
+	// Every frame's physics time, in capture order: PHYSICS_FRAMES <label> <mode>
+	// <first sample> <count>, then one value per frame (ms, both kinds together).
+	// A deterministic workload does the same work in the same frame of every
+	// run, so the smallest value a frame shows over repeated runs is what that
+	// frame costs without the machine's noise.
+	template< typename printFunc_t >
+	void		ReportFrames( printFunc_t print, const char *mode ) const {
+		const size_t perLine = 32;
+		for ( size_t first = 0; first < samples.size(); first += perLine ) {
+			const size_t count = (std::min)( perLine, samples.size() - first );
+			char line[1024];
+			int length = std::snprintf( line, sizeof( line ), "PHYSICS_FRAMES %s %s %d %d", label, mode ? mode : "", (int)first, (int)count );
+			for ( size_t i = 0; i < count && length < (int)sizeof( line ) - 16; i++ ) {
+				const frameSample_t &sample = samples[first + i];
+				length += std::snprintf( line + length, sizeof( line ) - length, " %.4f", sample.ms[EVAL_RIGID_BODY] + sample.ms[EVAL_ARTICULATED] );
+			}
+			std::snprintf( line + length, sizeof( line ) - length, "\n" );
+			print( line );
+		}
 	}
 
 private:
@@ -258,6 +305,7 @@ private:
 	char						label[64];
 	float						peakImpulseDeltaV;
 	float						maxImpulse;
+	double						fallbackMs;
 };
 
 // One instance per game module: the SP and MP libraries each record their own frames.

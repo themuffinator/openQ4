@@ -581,8 +581,13 @@ static void TestTelemetry() {
 		t.FrameTick( frame );
 		t.AddEvaluation( EVAL_RIGID_BODY, frame * 0.01, true );
 		if ( frame % 2 == 0 ) t.AddEvaluation( EVAL_ARTICULATED, 0.5, false );
+		// joints apart by more than the visible stretch on ten frames, at most 20 units
+		t.NoteJointStretch( frame <= 10 ? 10.0f + frame : 2.0f );
+		t.NoteJointStretch( 1.0f );
+		if ( frame == 7 ) t.NoteFallbackMs( 0.25 );
 	}
 	t.Stop();
+	t.NoteFallbackMs( 9.0 );	// not recording: ignored
 	CHECK( t.Samples().size() == 100, "telemetry kept %d samples", (int)t.Samples().size() );
 	const distribution_t rb = t.Distribution( EVAL_RIGID_BODY );
 	CHECK( std::fabs( rb.p50Ms - 0.50 ) < 1e-6 && std::fabs( rb.p95Ms - 0.95 ) < 1e-6 && std::fabs( rb.p99Ms - 0.99 ) < 1e-6, "percentiles %.3f %.3f %.3f", rb.p50Ms, rb.p95Ms, rb.p99Ms );
@@ -592,6 +597,13 @@ static void TestTelemetry() {
 	std::string line;
 	t.Report( [&line]( const char *s ) { line += s; }, "legacy" );
 	CHECK( line.find( "PHYSICS_STATS {\"label\":\"unit\",\"mode\":\"legacy\",\"frames\":100," ) == 0, "report: %s", line.c_str() );
+	CHECK( line.find( "\"fallback_ms\":0.2500,\"peak_joint_stretch\":20.00,\"stretched_frames\":10}" ) != std::string::npos, "report tail: %s", line.c_str() );
+	// every frame's cost, in capture order, 32 to a line
+	std::vector<std::string> frames;
+	t.ReportFrames( [&frames]( const char *s ) { frames.push_back( s ); }, "legacy" );
+	CHECK( frames.size() == 4, "%d frame lines", (int)frames.size() );
+	CHECK( !frames.empty() && frames[0].find( "PHYSICS_FRAMES unit legacy 0 32 0.0100 0.5200 0.0300" ) == 0, "frame line: %s", frames.empty() ? "" : frames[0].c_str() );
+	CHECK( frames.size() == 4 && frames[3].find( "PHYSICS_FRAMES unit legacy 96 4 0.9700 1.4800 0.9900 1.5000" ) == 0, "last frame line: %s", frames.size() == 4 ? frames[3].c_str() : "" );
 	StateDigest a, b;
 	const float values[3] = { 1.0f, -0.0f, 2.5f };
 	const float same[3] = { 1.0f, 0.0f, 2.5f };

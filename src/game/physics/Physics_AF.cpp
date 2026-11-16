@@ -6507,6 +6507,9 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec ) {
 			peak = Max( peak, bodies[i]->current->spatialVelocity.SubVec3( 0 ).Length() );
 		}
 		OpenQ4Physics::GetTelemetry().NoteLinearSpeed( peak );
+		if ( moved ) {
+			OpenQ4Physics::GetTelemetry().NoteJointStretch( MaxJointStretch() );
+		}
 		if ( !wasAtRest && current.atRest >= 0 ) {
 			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SLEEPS );
 		}

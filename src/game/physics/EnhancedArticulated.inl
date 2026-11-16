@@ -18,8 +18,12 @@
 //   - overlap with the world or between bodies, and violated cone and pyramid
 //     limits, are removed by a pseudo velocity that moves bodies without
 //     accelerating them, with a bounded speed
-//   - joint error correction is bounded far below legacy's 256 units/s
-//   - only bodies that move further than their speculative reach are swept
+//   - joint error correction as velocity is bounded far below legacy's 256
+//     units/s while a joint holds, and rises to legacy's bound once the joint
+//     is visibly stretched; the rest of a stretched joint's error is closed by
+//     position only, through the same tree solve, so it adds no kinetic energy
+//   - only bodies that move further than their speculative reach are swept,
+//     and the surface that stops a swept body joins the manifold
 //   - an energy guard keeps the solve from adding kinetic energy beyond the
 //     work of gravity and external forces
 //   - quiet figures sleep, and a quiet figure does not keep waking neighbours
@@ -285,10 +289,6 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 	idMatX jmk;
 	idVecX rhs, lm, lo, hi;
 
-	for ( i = 0; i < bodies.Num(); i++ ) {
-		bodies[i]->enhancedPseudoVelocity.Zero();
-	}
-
 	for ( numAuxConstraints = 0, i = 0; i < auxiliaryConstraints.Num(); i++ ) {
 		numAuxConstraints += auxiliaryConstraints[i]->J1.GetNumRows();
 	}
@@ -383,7 +383,9 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 	lm.SetData( numAuxConstraints, VECX_ALLOCA( numAuxConstraints ) );
 	boxIndex = (int *) _alloca16( numAuxConstraints * sizeof( int ) );
 	float *pseudoTarget = (float *) _alloca16( numAuxConstraints * sizeof( float ) );
+	bool *pseudoGuard = (bool *) _alloca16( numAuxConstraints * sizeof( bool ) );
 	bool anyPseudo = false;
+	bool anyGuard = false;
 
 	for ( k = 0, i = 0; i < auxiliaryConstraints.Num(); i++ ) {
 		auxiliaryConstraints[i]->firstIndex = k;
@@ -395,6 +397,7 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 	const float warmStart = af_enhancedWarmStart.GetFloat();
 	const int previousFrame = gameLocal.framenum - 1;
 	const bool impactFriction = af_enhancedImpactFriction.GetBool();
+	const float impactFrictionScale = Max( 0.0f, af_enhancedImpactFrictionScale.GetFloat() );
 
 	for ( k = 0, i = 0; i < auxiliaryConstraints.Num(); i++ ) {
 		constraint = auxiliaryConstraints[i];
@@ -421,11 +424,20 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 			// a violated limit's error correction moves bodies by position only
 			float c1 = constraint->c1[j];
 			pseudoTarget[k] = 0.0f;
+			pseudoGuard[k] = false;
 			if ( isLimit ) {
 				pseudoTarget[k] = Min( Max( 0.0f, -c1 ), maxRecovery );
 				c1 = Max( c1, 0.0f );
-			} else if ( contactIndex >= 0 && contactIndex < enhancedSeparation.Num() && enhancedSeparation[contactIndex] < -slop ) {
-				pseudoTarget[k] = Min( af_enhancedRecoveryRate.GetFloat() * ( -enhancedSeparation[contactIndex] - slop ) * invStep, maxRecovery );
+			} else if ( contactIndex >= 0 && contactIndex < enhancedSeparation.Num() ) {
+				if ( enhancedSeparation[contactIndex] < -slop ) {
+					pseudoTarget[k] = Min( af_enhancedRecoveryRate.GetFloat() * ( -enhancedSeparation[contactIndex] - slop ) * invStep, maxRecovery );
+				} else {
+					// a contact that needs no recovery still holds position-only
+					// motion back: a gap may close to the slop, never past it
+					pseudoGuard[k] = true;
+					pseudoTarget[k] = -Max( 0.0f, enhancedSeparation[contactIndex] - slop ) * invStep;
+					anyGuard = true;
+				}
 			}
 			anyPseudo |= pseudoTarget[k] > 0.0f;
 			rhs[k] += c1 * invStep;
@@ -446,14 +458,15 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 					gameLocal.Error( "cannot reference primary constraints for the box index" );
 				}
 				boxIndex[k] = constraint->boxConstraint->firstIndex + constraint->boxIndex[j];
-				// a fast new touch: friction bounded by the resting load, not by the
-				// impact force (legacy resolves impacts without friction)
+				// A fast new touch slides: its friction is bounded by a share of the
+				// body's resting load, none of it by default, and never by the
+				// impact force. Legacy resolves impacts without friction.
 				if ( impactFriction && constraint->boxConstraint->GetType() == CONSTRAINT_CONTACT ) {
 					for ( int c = 0; c < contactConstraints.Num() && c < enhancedImpact.Num(); c++ ) {
 						if ( contactConstraints[c] == constraint->boxConstraint ) {
 							if ( enhancedImpact[c] ) {
 								const idVec3 &normal = contactConstraints[c]->GetContact().normal;
-								const float load = OpenQ4Physics::ImpactFrictionLoad( constraint->body1->mass, gravityVector.Length(), -( normal * gravityNormal ) );
+								const float load = impactFrictionScale * OpenQ4Physics::ImpactFrictionLoad( constraint->body1->mass, gravityVector.Length(), -( normal * gravityNormal ) );
 								lo[k] = constraint->lo[j] * load;
 								hi[k] = constraint->hi[j] * load;
 								boxIndex[k] = -1;
@@ -485,27 +498,65 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 										lo.ToFloatPtr(), hi.ToFloatPtr(), boxIndex, numAuxConstraints );
 		if ( error > af_enhancedFallbackError.GetFloat() * scale ) {
 			// an ill-conditioned set the iterations could not settle: solve it exactly
-			OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SOLVER_FALLBACKS );
+			OpenQ4Physics::Telemetry &telemetry = OpenQ4Physics::GetTelemetry();
+			telemetry.NoteCounter( OpenQ4Physics::COUNTER_SOLVER_FALLBACKS );
+			const bool timed = telemetry.IsRecording();
+			std::chrono::steady_clock::time_point started;
+			if ( timed ) {
+				started = std::chrono::steady_clock::now();
+			}
 			if ( !lcp->Solve( jmk, lm, rhs, lo, hi, boxIndex ) ) {
 				lm.Zero();
+			}
+			if ( timed ) {
+				const std::chrono::duration<double, std::milli> elapsed = std::chrono::steady_clock::now() - started;
+				telemetry.NoteFallbackMs( elapsed.count() );
+			}
+			if ( af_enhancedDebug.GetInteger() & 4 ) {
+				gameLocal.Printf( "AF_FALLBACK %s f=%d rows=%d contacts=%d error=%.4f scale=%.1f\n", self ? self->name.c_str() : "?",
+					gameLocal.framenum, numAuxConstraints, contactConstraints.Num(), error, scale );
 			}
 		}
 	}
 
 	// position-only recovery: overlap and violated limits are removed by a pseudo
-	// velocity integrated into the positions this step and then discarded
-	if ( anyPseudo ) {
+	// velocity integrated into the positions this step and then discarded. The
+	// joint recovery has already given the bodies a pseudo velocity, solved in
+	// the tree alone; every contact takes part here, so neither that motion nor
+	// a limit's can carry a body into a surface the step knows about.
+	bool jointPseudo = false;
+	for ( i = 0; i < bodies.Num() && !jointPseudo; i++ ) {
+		jointPseudo = bodies[i]->enhancedPseudoVelocity.SubVec3( 0 ).LengthSqr() + bodies[i]->enhancedPseudoVelocity.SubVec3( 1 ).LengthSqr() > 1e-8f;
+	}
+	if ( anyPseudo || ( jointPseudo && anyGuard ) ) {
 		idVecX pseudoRhs, pseudoLo, pseudoHi, pseudoLm;
 		pseudoRhs.SetData( numAuxConstraints, VECX_ALLOCA( numAuxConstraints ) );
 		pseudoLo.SetData( numAuxConstraints, VECX_ALLOCA( numAuxConstraints ) );
 		pseudoHi.SetData( numAuxConstraints, VECX_ALLOCA( numAuxConstraints ) );
 		pseudoLm.SetData( numAuxConstraints, VECX_ALLOCA( numAuxConstraints ) );
-		for ( k = 0; k < numAuxConstraints; k++ ) {
-			// J v_pseudo = dt * ( jmk lambda ) must reach the target speed
-			pseudoRhs[k] = pseudoTarget[k] * invStep;
-			pseudoLo[k] = 0.0f;
-			pseudoHi[k] = pseudoTarget[k] > 0.0f ? idMath::INFINITY : 0.0f;
-			pseudoLm[k] = 0.0f;
+		for ( k = 0, i = 0; i < auxiliaryConstraints.Num(); i++ ) {
+			constraint = auxiliaryConstraints[i];
+			for ( j = 0; j < constraint->J1.GetNumRows(); j++, k++ ) {
+				pseudoLo[k] = 0.0f;
+				pseudoLm[k] = 0.0f;
+				if ( pseudoTarget[k] <= 0.0f && !pseudoGuard[k] ) {
+					pseudoRhs[k] = 0.0f;
+					pseudoHi[k] = 0.0f;
+					continue;
+				}
+				// what the joint recovery already moves this row by
+				j1 = constraint->J1[j];
+				ptr = constraint->body1->enhancedPseudoVelocity.ToFloatPtr();
+				float bias = j1[0] * ptr[0] + j1[1] * ptr[1] + j1[2] * ptr[2] + j1[3] * ptr[3] + j1[4] * ptr[4] + j1[5] * ptr[5];
+				if ( constraint->body2 ) {
+					j2 = constraint->J2[j];
+					ptr = constraint->body2->enhancedPseudoVelocity.ToFloatPtr();
+					bias += j2[0] * ptr[0] + j2[1] * ptr[1] + j2[2] * ptr[2] + j2[3] * ptr[3] + j2[4] * ptr[4] + j2[5] * ptr[5];
+				}
+				// J v_pseudo = bias + dt * ( jmk lambda ) must reach the target speed
+				pseudoRhs[k] = ( pseudoTarget[k] - bias ) * invStep;
+				pseudoHi[k] = idMath::INFINITY;
+			}
 		}
 		OpenQ4Physics::SolveBoxedPGS( jmk.ToFloatPtr(), jmk.GetNumColumns(), pseudoLm.ToFloatPtr(), pseudoRhs.ToFloatPtr(),
 							pseudoLo.ToFloatPtr(), pseudoHi.ToFloatPtr(), NULL, numAuxConstraints,
@@ -524,7 +575,7 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 				}
 			}
 			body->InverseWorldSpatialInertiaMultiply( velocity, force.ToFloatPtr() );
-			body->enhancedPseudoVelocity = timeStep * velocity.SubVec6( 0 );
+			body->enhancedPseudoVelocity += timeStep * velocity.SubVec6( 0 );
 		}
 	}
 
@@ -556,6 +607,81 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 		body = bodies[i];
 		body->response = NULL;
 		body->responseIndex = NULL;
+	}
+}
+
+/*
+================
+idPhysics_AF::EnhancedJointRecovery
+
+  Closes the part of each tree joint's error that the velocity-level
+  correction leaves, by position only. A corpse thrown into geometry has its
+  bodies stopped one by one where each hits, which pulls its joints apart by
+  up to a step's travel. Legacy pulls them back at up to 256 units/s of real
+  velocity, which is what makes a stuck limb fling its figure; a 32 units/s cap
+  alone leaves the figure visibly stretched for a second.
+
+  The tree is solved once more with no forces and no velocities, only the
+  excess correction as the constraint target. The result is a pseudo velocity
+  that moves the bodies back together this step and is then discarded, so the
+  recovery cannot add kinetic energy. Runs after PrimaryFactor and before the
+  real solves, which rebuild every temporary this pass uses.
+================
+*/
+void idPhysics_AF::EnhancedJointRecovery( float timeStep, const float *jointExcess ) {
+	const float invStep = 1.0f / timeStep;
+	idVecX force( 6, VECX_ALLOCA( 6 ) );
+	idVecX velocity( 6, VECX_ALLOCA( 6 ) );
+
+	for ( int t = 0; t < trees.Num(); t++ ) {
+		const idAFTree *tree = trees[t];
+		if ( tree->sortedBodies.Num() < 2 ) {
+			continue;
+		}
+
+		bool any = false;
+		for ( int i = 0; i < tree->sortedBodies.Num(); i++ ) {
+			idAFBody *body = tree->sortedBodies[i];
+			body->s.Zero();
+			body->fl.isZero = true;
+			idAFConstraint *c = body->primaryConstraint;
+			if ( !c ) {
+				continue;
+			}
+			const int index = primaryConstraints.FindIndex( c );
+			c->s.Zero();
+			c->fl.isZero = true;
+			if ( index < 0 ) {
+				continue;
+			}
+			for ( int j = 0; j < c->s.GetSize() && j < 6; j++ ) {
+				const float excess = jointExcess[index * 6 + j];
+				if ( excess != 0.0f ) {
+					c->s[j] = invStep * excess;
+					c->fl.isZero = false;
+					any = true;
+				}
+			}
+		}
+		if ( !any ) {
+			continue;
+		}
+
+		tree->Solve();
+
+		for ( int i = 0; i < tree->sortedBodies.Num(); i++ ) {
+			idAFBody *body = tree->sortedBodies[i];
+			force.Zero();
+			if ( body->primaryConstraint ) {
+				body->primaryConstraint->J1.TransposeMultiplyAdd( force, body->primaryConstraint->lm );
+			}
+			for ( int j = 0; j < body->children.Num(); j++ ) {
+				idAFConstraint *child = body->children[j]->primaryConstraint;
+				child->J2.TransposeMultiplyAdd( force, child->lm );
+			}
+			body->InverseWorldSpatialInertiaMultiply( velocity, force.ToFloatPtr() );
+			body->enhancedPseudoVelocity += timeStep * velocity.SubVec6( 0 );
+		}
 	}
 }
 
@@ -649,6 +775,27 @@ void idPhysics_AF::EvolveEnhanced( float timeStep, float energyBefore ) {
 		}
 	}
 
+	// Position-only motion may not carry a body into a surface it already
+	// touches: the joint recovery is solved without the contact rows.
+	for ( int i = 0; i < contactConstraints.Num(); i++ ) {
+		if ( i < enhancedSeparation.Num() && enhancedSeparation[i] > slop ) {
+			continue;
+		}
+		const idVec3 normal = contactConstraints[i]->GetContact().normal;
+		idAFBody *touching = contactConstraints[i]->body1;
+		float into = normal * touching->enhancedPseudoVelocity.SubVec3( 0 );
+		if ( into < 0.0f ) {
+			touching->enhancedPseudoVelocity.SubVec3( 0 ) -= into * normal;
+		}
+		touching = contactConstraints[i]->body2;
+		if ( touching ) {
+			into = -( normal * touching->enhancedPseudoVelocity.SubVec3( 0 ) );
+			if ( into < 0.0f ) {
+				touching->enhancedPseudoVelocity.SubVec3( 0 ) += into * normal;
+			}
+		}
+	}
+
 	for ( int i = 0; i < bodies.Num(); i++ ) {
 		idAFBody *body = bodies[i];
 		const idVec6 motion = body->next->spatialVelocity + body->enhancedPseudoVelocity;
@@ -673,7 +820,8 @@ idPhysics_AF::CheckForCollisionsEnhanced
 
   Legacy sweeps every body every step. The enhanced step's contacts already
   reach along each body's motion, so only a body that moved or turned further
-  than that reach is swept.
+  than that reach is swept. The part of a body's motion that position-only
+  recovery added is swept separately.
 ================
 */
 void idPhysics_AF::CheckForCollisionsEnhanced( float timeStep ) {
@@ -687,29 +835,81 @@ void idPhysics_AF::CheckForCollisionsEnhanced( float timeStep ) {
 		return;
 	}
 
+	const float slop = af_enhancedSlop.GetFloat();
+	const float recoveryStep = af_enhancedRecoverySweep.GetFloat();
+
 	for ( int i = 0; i < bodies.Num(); i++ ) {
 		idAFBody *body = bodies[i];
 
 		if ( body->clipMask != 0 && !fastEval ) {
+			// Position-only recovery of limits and joints is solved against the
+			// contacts the step knows about, but a surface the contact query did
+			// not report holds nothing back, and a unit a step is enough to walk a
+			// limb into a wall. That part of the motion is therefore swept on its
+			// own, after the real motion, so stopping it never stops the body's
+			// real motion. A body being pushed out of an overlap is left alone: a
+			// sweep that starts inside a surface cannot move.
+			idVec3 recovery = timeStep * body->enhancedPseudoVelocity.SubVec3( 0 );
+			bool sweepRecovery = recoveryStep > 0.0f && recovery.LengthSqr() > Square( recoveryStep );
+			for ( int c = 0; sweepRecovery && c < contactBodies.Num() && c < enhancedSeparation.Num(); c++ ) {
+				sweepRecovery = !( contactBodies[c] == i && enhancedSeparation[c] < -slop );
+			}
+			if ( sweepRecovery ) {
+				body->next->worldOrigin -= recovery;
+			}
+
 			const float displacement = ( body->next->worldOrigin - body->current->worldOrigin ).Length();
 			TransposeMultiply( body->current->worldAxis, body->next->worldAxis, axis );
 			rotation = axis.ToRotation();
 			const float turn = DEG2RAD( idMath::Fabs( rotation.GetAngle() ) ) * body->clipModel->GetBounds().GetRadius();
 			const float reach = i < enhancedReach.Num() ? enhancedReach[i] : 0.0f;
+			idEntity *passEntity = NULL;
+			bool stopped = false;
 
 			if ( displacement > reach - af_enhancedMargin.GetFloat() * 0.5f || turn > af_enhancedRotationSweep.GetFloat() ) {
-				idEntity *passEntity = SetupCollisionForBody( body );
+				passEntity = SetupCollisionForBody( body );
 				rotation.SetOrigin( body->current->worldOrigin );
 				OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SWEPT );
 				if ( gameLocal.Motion( self, collision, body->current->worldOrigin, body->next->worldOrigin, rotation,
 										body->clipModel, body->current->worldAxis, body->clipMask, passEntity ) ) {
+					stopped = true;
 					body->next->worldOrigin = collision.endpos;
 					body->next->worldAxis = collision.endAxis;
 					const int index = collisions.Num();
 					collisions.SetNum( index + 1, false );
 					collisions[index].trace = collision;
 					collisions[index].body = body;
+
+					// The surface that stopped the body goes into the manifold, so the
+					// next step solves against it even when the contact query does not
+					// report it (an edge, or a surface off the body's line of motion).
+					// Without the row the body keeps its velocity into the surface, is
+					// stopped again every step, and its figure pulls away from it.
+					if ( af_enhancedCollisionContacts.GetBool() ) {
+						OpenQ4Physics::cachedContact_t cached;
+						memset( &cached, 0, sizeof( cached ) );
+						cached.point = OpenQ4Physics::Vec3( collision.c.point.ToFloatPtr() );
+						cached.normal = OpenQ4Physics::Vec3( collision.c.normal.ToFloatPtr() );
+						cached.localPoint = cached.point;
+						cached.localNormal = cached.normal;
+						cached.entityNum = collision.c.entityNum;
+						cached.id = collision.c.id;
+						cached.body = i;
+						enhancedCache.Append( cached );
+					}
 				}
+			}
+
+			// a body its real motion left against a surface takes no recovery this step
+			if ( sweepRecovery && !stopped ) {
+				if ( !passEntity ) {
+					passEntity = SetupCollisionForBody( body );
+				}
+				trace_t recoveryTrace;
+				OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SWEPT );
+				gameLocal.Translation( self, recoveryTrace, body->next->worldOrigin, body->next->worldOrigin + recovery,
+										body->clipModel, body->next->worldAxis, body->clipMask, passEntity );
+				body->next->worldOrigin = recoveryTrace.endpos;
 			}
 		}
 
@@ -806,12 +1006,68 @@ bool idPhysics_AF::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) {
 
 	EvaluateConstraints( timeStep );
 
-	// bounded joint error correction: legacy allows 256 units/s, which turns a
-	// limb stuck in a wall into a figure that flies apart
+	// Bounded joint error correction. Legacy corrects every joint at up to 256
+	// units/s of real velocity, which turns a limb stuck in a wall into a figure
+	// that flies apart. Here a joint that holds is corrected at no more than
+	// af_enhancedMaxJointCorrection. A joint pulled visibly apart (a body
+	// stopped by geometry while the rest of its figure moved on) gets legacy's
+	// bound back, rising between a quarter of af_enhancedJointStretch and the
+	// whole of it: that velocity is what slows the figure when the stopped body
+	// cannot follow. The energy guard still limits what it can add. What the
+	// joint needs beyond the velocity is closed by position only
+	// (EnhancedJointRecovery).
+	float *jointExcess = (float *) _alloca16( Max( 1, primaryConstraints.Num() ) * 6 * sizeof( float ) );
+	bool anyJointExcess = false;
 	{
 		const float maxCorrection = af_enhancedMaxJointCorrection.GetFloat();
+		const float maxRecovery = Max( maxCorrection, af_enhancedMaxJointRecovery.GetFloat() );
+		const float stretched = Max( 0.1f, af_enhancedJointStretch.GetFloat() );
+		const float invTimeStep = 1.0f / timeStep;
 		for ( int i = 0; i < primaryConstraints.Num(); i++ ) {
-			primaryConstraints[i]->c1.Clamp( -maxCorrection, maxCorrection );
+			idAFConstraint *constraint = primaryConstraints[i];
+			idVecX &c1 = constraint->c1;
+			// The joint's own error term stops at legacy's 256 units/s. The first
+			// three rows of an anchored joint are its anchor error, so the whole of
+			// it is read from the anchors again: half the gap per step, by position.
+			idVec3 anchorError;
+			bool anchored = true;
+			switch ( constraint->GetType() ) {
+				case CONSTRAINT_BALLANDSOCKETJOINT:
+					anchorError = static_cast<idAFConstraint_BallAndSocketJoint *>( constraint )->GetAnchorOffset();
+					break;
+				case CONSTRAINT_UNIVERSALJOINT:
+					anchorError = static_cast<idAFConstraint_UniversalJoint *>( constraint )->GetAnchorOffset();
+					break;
+				case CONSTRAINT_HINGE:
+					anchorError = static_cast<idAFConstraint_Hinge *>( constraint )->GetAnchorOffset();
+					break;
+				default:
+					anchored = false;
+					break;
+			}
+			// A joint that is less than a quarter of the visible stretch apart is
+			// left to the bounded velocity alone, as before: position-only motion
+			// is not resisted by contact friction, so using it on the small errors
+			// every sliding or settling figure carries would let it creep.
+			const bool apart = !anchored || anchorError.Length() > 0.25f * stretched;
+			float velocityCap = maxCorrection;
+			if ( anchored && maxCorrection < ERROR_REDUCTION_MAX ) {
+				const float ramp = idMath::ClampFloat( 0.0f, 1.0f, ( anchorError.Length() - 0.25f * stretched ) / ( 0.75f * stretched ) );
+				velocityCap += ramp * ( ERROR_REDUCTION_MAX - maxCorrection );
+			}
+			for ( int j = 0; j < 6; j++ ) {
+				float excess = 0.0f;
+				if ( j < c1.GetSize() ) {
+					const float full = ( anchored && j < 3 ) ? -( invTimeStep * ERROR_REDUCTION ) * anchorError[j] : c1[j];
+					const float kept = idMath::ClampFloat( -velocityCap, velocityCap, c1[j] );
+					if ( apart ) {
+						excess = idMath::ClampFloat( -maxRecovery, maxRecovery, full ) - kept;
+					}
+					c1[j] = kept;
+				}
+				jointExcess[i * 6 + j] = excess;
+				anyJointExcess |= idMath::Fabs( excess ) > 1e-3f;
+			}
 		}
 	}
 
@@ -828,6 +1084,12 @@ bool idPhysics_AF::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) {
 
 	AddFrameConstraints();
 	PrimaryFactor();
+	for ( int i = 0; i < bodies.Num(); i++ ) {
+		bodies[i]->enhancedPseudoVelocity.Zero();
+	}
+	if ( anyJointExcess ) {
+		EnhancedJointRecovery( timeStep, jointExcess );
+	}
 	PrimaryForces( timeStep );
 	AuxiliaryForcesEnhanced( timeStep );
 	EvolveEnhanced( timeStep, energyBefore );
@@ -922,4 +1184,60 @@ void idPhysics_AF::ApplyImpulseEnhanced( const int id, const idVec3 &point, cons
 	if ( OpenQ4Physics::GetTelemetry().IsRecording() ) {
 		OpenQ4Physics::GetTelemetry().NoteImpulse( magnitude, split.struckDeltaV, split.clamped );
 	}
+}
+
+/*
+================
+Joint anchor offset
+
+  From body1's anchor to body2's, in world space: zero for a joint that holds,
+  the stretch of one that does not. Read by the joint recovery and, in either
+  mode, by physicsQuality.
+================
+*/
+static idVec3 OpenQ4Physics_AnchorOffset( const idAFBody *body1, const idVec3 &anchor1, const idAFBody *master, const idVec3 &anchor2 ) {
+	const idVec3 a1 = body1->GetWorldOrigin() + anchor1 * body1->GetWorldAxis();
+	const idVec3 a2 = master ? master->GetWorldOrigin() + anchor2 * master->GetWorldAxis() : anchor2;
+	return a2 - a1;
+}
+
+idVec3 idAFConstraint_BallAndSocketJoint::GetAnchorOffset( void ) const {
+	return OpenQ4Physics_AnchorOffset( body1, anchor1, body2 ? body2 : physics->GetMasterBody(), anchor2 );
+}
+
+idVec3 idAFConstraint_UniversalJoint::GetAnchorOffset( void ) const {
+	return OpenQ4Physics_AnchorOffset( body1, anchor1, body2 ? body2 : physics->GetMasterBody(), anchor2 );
+}
+
+idVec3 idAFConstraint_Hinge::GetAnchorOffset( void ) const {
+	return OpenQ4Physics_AnchorOffset( body1, anchor1, body2 ? body2 : physics->GetMasterBody(), anchor2 );
+}
+
+/*
+================
+idPhysics_AF::MaxJointStretch
+
+  The largest anchor separation over the figure's ball, universal and hinge
+  joints. Telemetry records it per frame in either mode.
+================
+*/
+float idPhysics_AF::MaxJointStretch( void ) const {
+	float stretch = 0.0f;
+	for ( int i = 0; i < constraints.Num(); i++ ) {
+		idAFConstraint *constraint = constraints[i];
+		switch ( constraint->GetType() ) {
+			case CONSTRAINT_BALLANDSOCKETJOINT:
+				stretch = Max( stretch, static_cast<idAFConstraint_BallAndSocketJoint *>( constraint )->GetAnchorOffset().Length() );
+				break;
+			case CONSTRAINT_UNIVERSALJOINT:
+				stretch = Max( stretch, static_cast<idAFConstraint_UniversalJoint *>( constraint )->GetAnchorOffset().Length() );
+				break;
+			case CONSTRAINT_HINGE:
+				stretch = Max( stretch, static_cast<idAFConstraint_Hinge *>( constraint )->GetAnchorOffset().Length() );
+				break;
+			default:
+				break;
+		}
+	}
+	return stretch;
 }
