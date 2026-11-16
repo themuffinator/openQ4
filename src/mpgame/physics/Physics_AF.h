@@ -1010,13 +1010,19 @@ private:
 	void					CacheEnhancedContacts( void );
 	void					ApplyImpulseEnhanced( const int id, const idVec3 &point, const idVec3 &impulse );
 	float					EnhancedKineticEnergy( const bool next ) const;
+	bool					EnhancedBodyEmbedded( idAFBody *body ) const;
 	float					MaxJointStretch( void ) const;
 
 	// transient enhanced state: never saved or networked; rebuilt in one step
 	idList<float>			enhancedSeparation;			// gap of each contact this step
 	idList<bool>			enhancedImpact;				// contact is a fast new touch this step (friction limited to the resting load)
 	idList<int>				enhancedContactAge;			// 0 when swept this step, else steps carried in the manifold
+	idList<int>				enhancedContactType;		// the collision model's contact type, 0 when unknown
+	idList<int>				enhancedContactFeature;		// the body feature that made each contact, -1 when unknown
 	idList<float>			enhancedReach;				// speculative contact reach of each body this step
+	idList<idVec3>			enhancedVerifiedOrigin;		// pose each body was last swept to (the audit sweeps from it)
+	idList<idMat3>			enhancedVerifiedAxis;
+	idList<bool>			enhancedEmbedded;			// body was inside static geometry when the figure woke: swept every step
 	idList<OpenQ4Physics::cachedContact_t> enhancedCache;	// last step's contacts and multipliers
 	int						enhancedQuietFrames;		// consecutive quiet steps toward sleep
 // openQ4 END

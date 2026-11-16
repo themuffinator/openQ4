@@ -205,13 +205,66 @@ static bool OpenQ4Physics_PointEmbedded( const idEntity *self, const idVec3 &poi
 	return !touched || OpenQ4Physics_IsStaticEntity( touched->entityNumber );
 }
 
+// Whether static geometry between a body's centre and one of its joints is a
+// limb through a wall or floor. A joint often lies outside the boxes it joins:
+// a strogg marine's neck joint is 10.6 units from the centre of a head whose box
+// reaches 7.6 at most. A surface in that gap touches neither body, and a ridge
+// of terrain that pokes a unit into it under a corpse lying face down is not a
+// defect. Such a surface counts only when it separates the two bodies (the
+// other body's centre is behind it) or reaches more than two units past the
+// joint. A surface inside the body's own box always counts.
+static bool OpenQ4Physics_JointPierced( const idEntity *self, const idAFBody *body, const idAFBody *other, const idVec3 &centre, const idVec3 &anchor ) {
+	trace_t tr;
+	gameLocal.TracePoint( self, tr, centre, anchor, MASK_SOLID, self );
+	if ( tr.fraction >= 1.0f ) {
+		return false;
+	}
+	idVec3 dir = anchor - centre;
+	const float length = dir.Normalize();
+	const float hit = tr.fraction * length;
+
+	// where the line leaves the body's own trace model
+	const idClipModel *clip = body->GetClipModel();
+	const idTraceModel *trm = clip ? clip->GetTraceModel() : NULL;
+	if ( trm ) {
+		const idMat3 toLocal = clip->GetAxis().Transpose();
+		const idVec3 localCentre = ( centre - clip->GetOrigin() ) * toLocal;
+		const idVec3 localDir = dir * toLocal;
+		float exit = idMath::INFINITY;
+		for ( int i = 0; i < trm->numPolys; i++ ) {
+			const float along = trm->polys[i].normal * localDir;
+			if ( along > 1e-6f ) {
+				exit = Min( exit, ( trm->polys[i].dist - trm->polys[i].normal * localCentre ) / along );
+			}
+		}
+		if ( hit <= exit ) {
+			return true;
+		}
+	} else {
+		return true;
+	}
+
+	// in the gap between the body and the joint
+	const float anchorBehind = -( tr.c.normal * ( anchor - tr.c.point ) );
+	if ( anchorBehind > 2.0f ) {
+		return true;
+	}
+	if ( other && other->GetClipModel() ) {
+		const idVec3 otherCentre = other->GetClipModel()->GetAbsBounds().GetCenter();
+		return tr.c.normal * ( otherCentre - tr.c.point ) < 0.0f;
+	}
+	return false;
+}
+
 // physicsQuality <namePrefix>: one PHYSICS_QUALITY line per matching entity with
 // rigid-body or articulated physics. The defect repros (PHYS-01) read these in
 // both modes:
 //   stretch    largest distance between the two anchors of a joint
 //   pierced    joints with static geometry between a body's centre and the
 //              joint (a limb through a wall or floor); a hit within one unit
-//              of the joint does not count
+//              of the joint does not count, and a surface in the gap between
+//              the body's box and the joint counts only when it separates the
+//              two bodies or reaches more than two units past the joint
 //   embedded   bodies whose centre is inside solid static geometry
 //   awake      1 while the physics object is not at rest
 //   speed      linear speed of the fastest body
@@ -280,7 +333,8 @@ static void Cmd_PhysicsQuality_f( const idCmdArgs &args ) {
 				for ( int b = 0; b < 2 && !blocked; b++ ) {
 					if ( pair[b] && pair[b]->GetClipModel() ) {
 						const idVec3 centre = pair[b]->GetClipModel()->GetAbsBounds().GetCenter();
-						blocked = OpenQ4Physics_StaticBetween( ent, centre, anchor, 1.0f );
+						blocked = OpenQ4Physics_StaticBetween( ent, centre, anchor, 1.0f ) &&
+									OpenQ4Physics_JointPierced( ent, pair[b], pair[1 - b], centre, anchor );
 						if ( blocked ) {
 							// which joint, and how far along the line from the body's centre to
 							// the joint the surface is met from each end
@@ -443,6 +497,35 @@ static bool OpenQ4Physics_WallAhead( const idEntity *pass, const idVec3 &start, 
 		}
 	}
 	return true;
+}
+
+// physicsRest <namePrefix>: puts every simulated entity the prefix names to
+// rest where it is. A map's own figures settle from the pose the map gave them
+// when it starts, for a time that differs by compiler in either mode (Air
+// Defense 1's nine: 131 moving steps in legacy on Linux, about 900 on Windows);
+// a workload that is to measure only what it stages rests them first.
+static void Cmd_PhysicsRest_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	if ( args.Argc() < 2 ) {
+		gameLocal.Printf( "usage: physicsRest <namePrefix>\n" );
+		return;
+	}
+	const char *prefix = args.Argv( 1 );
+	const int prefixLength = idStr::Length( prefix );
+	int count = 0;
+	for ( int i = 0; i < MAX_GENTITIES; i++ ) {
+		idEntity *ent = gameLocal.entities[i];
+		if ( !ent || idStr::Cmpn( ent->name.c_str(), prefix, prefixLength ) || !OpenQ4Physics_IsSimulated( ent->GetPhysics() ) ) {
+			continue;
+		}
+		if ( !ent->GetPhysics()->IsAtRest() ) {
+			ent->GetPhysics()->PutToRest();
+			count++;
+		}
+	}
+	gameLocal.Printf( "PHYSICS_REST prefix=%s rested=%d time=%d\n", prefix, count, gameLocal.time );
 }
 
 // physicsWallProbe <yawFrom> <yawTo> <step> [pitch]: for each view yaw offset,

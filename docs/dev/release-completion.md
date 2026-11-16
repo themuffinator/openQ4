@@ -601,7 +601,8 @@ does not restore the withdrawn release. See
 
 ## An Enhanced Physics option for ragdolls, debris and moveables (PHYS), 14 November 2026
 
-Updated 16 November 2026 after a second round of fixes and wider testing.
+Updated 16 November 2026 after a second and a third round of fixes and wider
+testing.
 
 - **New option: Settings > Game Options > Gameplay > Enhanced Physics.** It
   switches corpses, crates, barrels, debris and other loose objects to a new
@@ -610,8 +611,10 @@ Updated 16 November 2026 after a second round of fixes and wider testing.
   from its last motion instead of stopping dead. A blast no longer leaves a
   corpse with a limb stretched out for a second or more: where the original
   showed a stretched limb for 42 frames after a Dark Matter blast, the option
-  shows one for 18.
-- **It is off by default, and stays off for now.** With the option off, the
+  shows one for 22, stretched less than half as far.
+- **It is off by default, and stays off for now.** On Windows it now passes
+  nearly all of its measured tests. On Linux a few still fail (see Open
+  below), and nobody has yet watched it in play. With the option off, the
   game runs the original physics code unchanged, and saves and demos are byte
   for byte what they were. A change applies from the next map or loaded save,
   never under bodies in mid-air. In multiplayer everyone follows the server's
@@ -620,16 +623,23 @@ Updated 16 November 2026 after a second round of fixes and wider testing.
   with.
 - **What to expect with it on.** Every shot, blast and death push delivers
   the momentum it always did, and a light hit can no longer fling a limb
-  across the room. Known shortfalls: crates and barrels thrown by a blast
-  land about a third as far away as before, and corpses thrown off the ground
-  about two thirds as far; a body lying across the edge of a ledge can sink
-  onto it or slide off; and on Linux two of the five scenes measured cost
-  more physics time with the option on, where on Windows every scene costs a
-  third to seven eighths less. These are why it is not the default yet.
+  across the room. A blast throws corpses, crates and barrels about as far
+  as the original does; a crate or barrel shoved across a flat floor ends
+  within about a quarter of the original's distance. On a slope a loose
+  crate or barrel comes to rest about half as far away, because the original
+  cannot stop a body on a slope and the option can, and a few corpses slide
+  further down one than any did before. Cost: a fifth of the original's
+  where piles of objects used to keep waking each other, about the same
+  elsewhere, and in two of the five scenes measured on each system a few
+  milliseconds more over the whole scene.
 - **Fixed since the first version of the option (16 November):** corpses
   killed against a wall no longer come to rest with an elbow or knee inside
-  it, and ammunition placed on ledges in Network 1 and Core 2 no longer tips
-  off before you get there.
+  it, and ammunition placed on ledges in Network 1, Core 2 and Storage 2 no
+  longer tips off before you get there. Crates and barrels thrown by a blast
+  no longer stop at a third of the distance, and corpses thrown off the
+  ground no longer land short on Windows. A body lying across the edge of a
+  ledge no longer sinks into it. The hanging lights in Putra no longer swing
+  loose after a hard push.
 - **Nothing to do.** Existing settings and saves are untouched, and a save
   loads whichever way the option is set. The row is in both the new and the
   classic interface, in all twelve languages.
@@ -637,7 +647,8 @@ Updated 16 November 2026 after a second round of fixes and wider testing.
   a map loads; servers publish it as `si_enhancedPhysics`. Rigid bodies get a
   semi-implicit step with persistent, warm-started contacts, friction,
   sleeping and swept motion only where needed; articulated figures get a
-  warm-started iterative constraint solve with bounded recovery, joints that
+  warm-started iterative constraint solve with bounded recovery, contact
+  distances taken from the collision model's own contact features, joints that
   close by position without adding energy, an energy guard that keeps the
   figure's momentum, and an impulse guard that spreads a hit on a light limb
   over the figure. See the [physics reference](physics-reference.md).
@@ -648,18 +659,23 @@ Updated 16 November 2026 after a second round of fixes and wider testing.
   marine, falling barrels, knocked grates) end as they do in the original.
   The hit test drives machinegun, gauntlet, small and large splash, rockets,
   grenades, Dark Matter and a vehicle-sized bump into resting and falling
-  corpses: every class stays within the legacy envelope for Strogg marines
-  and for player corpses in multiplayer. Saves made in either mode load in
+  corpses: every class stays within the legacy envelope for Strogg marines,
+  player corpses in multiplayer, crates and barrels on a slope and on a flat
+  floor, and The Awakening's grunts. The hanging lights of Air Defense 1 and
+  Putra move as the original's do. Saves made in either mode load in
   the other; clients took the server's mode both ways round; a demo recorded
   on a server with the option on plays to its end; a client joined a
   dedicated server with the option on, on Windows and on Linux; ragdolls and
-  debris stay smooth at 240 Hz in both modes. On Linux x64 the same seven save, client, demo and dedicated-server checks pass and the hit test passes for Strogg marines, and an ARM64 dedicated server ran a bot match in both modes under emulation. Details:
+  debris stay smooth at 240 Hz in both modes. On Linux x64 the same seven save, client, demo and dedicated-server checks pass, the hit test passes for crates and barrels and for nine of its eleven classes on Strogg marines, and an ARM64 dedicated server ran a bot match in both modes under emulation. Details:
   [physics reference](physics-reference.md#evidence).
-- Open: crates and barrels after a blast, bodies on ledge edges, three hit
-  classes on The Awakening's terrain, the hanging lights in Putra after a
-  hard push, cost on Linux, a review in motion by eye (this round compared
-  stills), and with those the decision on turning it on by default. Tracked
-  as PHYS-02 to PHYS-04 and PHYS-06 in the [roadmap](roadmap.md#rigid-body-and-ragdoll-physics).
+- Open: on Linux, corpses lying on the ground move less far from a rocket or
+  grenade blast than the original's (about a quarter as far at the median),
+  and one body the Air Defense map lays across a ledge slides off it; on both
+  systems two of five measured scenes cost a few milliseconds more than the
+  original over the whole scene; a review in motion by eye (every round so
+  far compared stills); and with those the decision on turning the option on
+  by default. Tracked as PHYS-02 to PHYS-04 and PHYS-06 in the
+  [roadmap](roadmap.md#rigid-body-and-ragdoll-physics).
 
 ## Click the key prompts in the new menus, 14 November 2026
 

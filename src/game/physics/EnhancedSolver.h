@@ -204,6 +204,18 @@ struct rigidSolverSettings_t {
 	float	maxRecoverySpeed;	// cap on the correction speed (units per second)
 	float	deepPenetration;	// overlap beyond this is corrected by position only (units)
 	float	warmStart;			// fraction of last step's impulses applied up front
+	// An impact is a contact the body approaches faster than the bounce threshold
+	// and reaches within the step. impactFriction scales the friction (and the
+	// rolling and spinning resistance) of such a contact: 1 is full Coulomb
+	// friction on the impact's impulse, 0 a frictionless impact. bounceResting
+	// lets an impact bounce on a contact the body already had, not only on a new
+	// touch: a resting body shoved into its support rebounds off it. That holds
+	// for fixed supports only (the world, scenery). Between two moving bodies a
+	// kept contact never bounces: in a stack each rebound is handed to the next
+	// body as a reaction and comes back as another impact, and the stack hops
+	// for as long as it is awake.
+	float	impactFriction = 1.0f;
+	bool	bounceResting = false;
 };
 
 struct rigidBody_t {
@@ -240,6 +252,8 @@ struct rigidContact_t {
 	float	approachSpeed;		// normal speed before the solve (negative when closing)
 	bool	sharesMass;			// solved as a two-body contact: the caller must apply the reaction
 	bool	velocityRows;		// false for deep overlap: position recovery only
+	bool	impact;				// approached above the bounce threshold and reached within the step
+	float	grip;				// share of the Coulomb coefficient this contact has in this step
 };
 
 inline float EffectiveMass( const rigidBody_t &body, const rigidContact_t &c, const Vec3 &direction, bool withOther ) {
@@ -306,7 +320,9 @@ inline void SolveRigidContacts( rigidBody_t &body, rigidContact_t *contacts, int
 		c.angularMass[0] = AngularMass( body, c.tangent[0] );
 		c.angularMass[1] = AngularMass( body, c.tangent[1] );
 		c.angularMass[2] = AngularMass( body, c.normal );
-		if ( impact && c.newContact && s.restitution > 0.0f ) {
+		c.impact = impact;
+		c.grip = impact ? s.impactFriction : 1.0f;
+		if ( impact && ( c.newContact || ( s.bounceResting && c.otherInvMass <= 0.0f ) ) && s.restitution > 0.0f ) {
 			c.velocityBias = -s.restitution * c.approachSpeed;
 		} else if ( c.separation > s.slop ) {
 			// close the gap down to the slop; a body resting within the slop does not
@@ -343,8 +359,8 @@ inline void SolveRigidContacts( rigidBody_t &body, rigidContact_t *contacts, int
 			// rolling and spinning resistance, bounded by the normal impulse
 			{
 				const float lever = MaxF( c.r.Length(), 1.0f );
-				const float rollLimit = s.rollingFriction * lever * c.impulse[0];
-				const float spinLimit = s.spinningFriction * lever * c.impulse[0];
+				const float rollLimit = c.grip * s.rollingFriction * lever * c.impulse[0];
+				const float spinLimit = c.grip * s.spinningFriction * lever * c.impulse[0];
 				const Vec3 axes[3] = { c.tangent[0], c.tangent[1], c.normal };
 				for ( int k = 0; k < 3; k++ ) {
 					if ( c.angularMass[k] <= 0.0f ) {
@@ -360,7 +376,7 @@ inline void SolveRigidContacts( rigidBody_t &body, rigidContact_t *contacts, int
 			}
 
 			// friction, bounded by the normal impulse
-			const float frictionLimit = s.friction * c.impulse[0];
+			const float frictionLimit = c.grip * s.friction * c.impulse[0];
 			for ( int k = 0; k < 2; k++ ) {
 				if ( c.tangentMass[k] <= 0.0f ) {
 					continue;
@@ -478,6 +494,8 @@ struct cachedContact_t {
 	int		id;
 	int		body;				// articulated figure body index (0 for rigid bodies)
 	int		age;				// steps since a sweep last reported it (persistent manifold)
+	int		type;				// the collision model's contact type, 0 when unknown
+	int		feature;			// the body feature that made the contact (vertex, edge or polygon), -1 when unknown
 	float	impulse[6];
 };
 

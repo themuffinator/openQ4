@@ -441,6 +441,70 @@ static void TestSolverNeverAddsEnergy() {
 	std::printf( "20000 random contact solves: worst relative energy change %+.6f\n", worstGain );
 }
 
+// An impact (a contact reached within the step above the bounce speed) slides
+// and bounces as the original collision impulse did: no friction, and a
+// rebound by the body's bouncyness even off a surface it already rested on. A
+// slower touch keeps full Coulomb friction and does not bounce.
+static void TestImpactsSlideAndBounce() {
+	rigidSolverSettings_t s;
+	s.timeStep = 0.016f; s.iterations = 8; s.friction = 0.6f; s.rollingFriction = 0.0f; s.spinningFriction = 0.0f;
+	s.restitution = 0.2f; s.bounceThreshold = 35.0f; s.slop = 0.1f; s.recoveryRate = 0.4f; s.maxRecoverySpeed = 40.0f; s.deepPenetration = 4.0f; s.warmStart = 0.0f;
+	struct Case { float approach; float impactFriction; bool bounceResting; float wantX; float wantZ; const char *what; };
+	const Case cases[] = {
+		{ 100.0f, 1.0f, false, 300.0f - 0.6f * 100.0f, 0.0f, "impact with full friction on a kept contact" },
+		{ 100.0f, 0.0f, true, 300.0f, 20.0f, "frictionless impact that bounces on a kept contact" },
+		{ 100.0f, 0.0f, false, 300.0f, 0.0f, "frictionless impact that only bounces on a new touch" },
+		{ 20.0f, 0.0f, true, 300.0f - 0.6f * 20.0f, 0.0f, "slow touch: full friction, no bounce" },
+	};
+	for ( const Case &k : cases ) {
+		s.impactFriction = k.impactFriction;
+		s.bounceResting = k.bounceResting;
+		rigidBody_t rb;
+		rb.invMass = 1.0f / 30.0f;
+		rb.invInertia = Mat3::Zero();		// translation only: the row is not coupled into spin
+		rb.centerOfMass = Vec3();
+		rb.linearVelocity = Vec3( 300.0f, 0.0f, -k.approach );
+		rb.angularVelocity = Vec3();
+		rigidContact_t c;
+		std::memset( &c, 0, sizeof( c ) );
+		c.normal = Vec3( 0.0f, 0.0f, 1.0f );
+		c.point = Vec3( 0.0f, 0.0f, -8.0f );
+		c.separation = 0.0f;
+		c.newContact = false;
+		SolveRigidContacts( rb, &c, 1, s );
+		CHECK( std::fabs( rb.linearVelocity.x - k.wantX ) < 0.5f && std::fabs( rb.linearVelocity.z - k.wantZ ) < 0.5f,
+			"%s: velocity %.2f %.2f, want %.2f %.2f", k.what, rb.linearVelocity.x, rb.linearVelocity.z, k.wantX, k.wantZ );
+		CHECK( c.impact == ( k.approach > s.bounceThreshold ), "%s: impact flag", k.what );
+	}
+	{
+		// a kept contact with another moving body never bounces: stacks would hop
+		s.impactFriction = 0.0f;
+		s.bounceResting = true;
+		rigidBody_t rb;
+		rb.invMass = 1.0f / 30.0f;
+		rb.invInertia = Mat3::Zero();
+		rb.centerOfMass = Vec3();
+		rb.linearVelocity = Vec3( 0.0f, 0.0f, -100.0f );
+		rb.angularVelocity = Vec3();
+		rigidContact_t c;
+		std::memset( &c, 0, sizeof( c ) );
+		c.normal = Vec3( 0.0f, 0.0f, 1.0f );
+		c.point = Vec3( 0.0f, 0.0f, -8.0f );
+		c.otherInvMass = 1.0f / 30.0f;
+		c.otherInvInertia = Mat3::Zero();
+		c.newContact = false;
+		SolveRigidContacts( rb, &c, 1, s );
+		CHECK( rb.linearVelocity.z <= 0.5f && rb.linearVelocity.z > -100.0f, "kept contact between two bodies: velocity %.2f, want it stopped with no rebound", rb.linearVelocity.z );
+		// the same contact against a fixed support does rebound
+		rb.linearVelocity = Vec3( 0.0f, 0.0f, -100.0f );
+		std::memset( c.impulse, 0, sizeof( c.impulse ) );
+		c.otherInvMass = 0.0f;
+		SolveRigidContacts( rb, &c, 1, s );
+		CHECK( std::fabs( rb.linearVelocity.z - 20.0f ) < 0.5f, "kept contact with a fixed support: velocity %.2f, want 20", rb.linearVelocity.z );
+	}
+	std::printf( "impacts: frictionless and bouncing on kept contacts, slow touches keep friction\n" );
+}
+
 static void TestBoxedPGS() {
 	std::mt19937 rng( 99 );
 	std::uniform_real_distribution<float> u( -1.0f, 1.0f );
@@ -620,6 +684,7 @@ int main() {
 	TestEnergyGuardKeepsMomentum();
 	TestBoxedPGS();
 	TestSolverNeverAddsEnergy();
+	TestImpactsSlideAndBounce();
 	TestDroppedBoxSettles();
 	TestStackStaysStacked();
 	TestNoTunnelling();

@@ -4836,6 +4836,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "physicsReport",			Cmd_PhysicsReport_f,		CMD_FL_GAME,				"prints mass, centre, momentum and peak speed of entities by name prefix" );
 	cmdSystem->AddCommand( "physicsQuality",		Cmd_PhysicsQuality_f,		CMD_FL_GAME,				"prints joint stretch, pierced joints and embedded bodies of entities by name prefix" );
 	cmdSystem->AddCommand( "physicsWallProbe",		Cmd_PhysicsWallProbe_f,		CMD_FL_GAME,				"prints the distance and thickness of the static surface ahead over a range of yaws" );
+	cmdSystem->AddCommand( "physicsRest",			Cmd_PhysicsRest_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"puts simulated entities to rest by name prefix" );
 	cmdSystem->AddCommand( "physicsLaunch",			Cmd_PhysicsLaunch_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"spawns one entity ahead of the player and launches it along the view" );
 	cmdSystem->AddCommand( "physicsSpawn",			Cmd_PhysicsSpawn_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"spawns physics workload entities around the player" );
 	cmdSystem->AddCommand( "physicsRadiusDamage",	Cmd_PhysicsRadiusDamage_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"radius damage and push ahead of the player" );

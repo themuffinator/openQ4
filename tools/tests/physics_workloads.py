@@ -243,9 +243,15 @@ def task_path(path: Path) -> Path:
     return absolute
 
 
-def build_cfg(workload: dict, verbose_digest: bool = False, frames: bool = False) -> list[str]:
+def build_cfg(workload: dict, verbose_digest: bool = False, frames: bool = False, rest: tuple = ()) -> list[str]:
     lines: list[str] = []
+    rested = False
     for step in workload["steps"]:
+        if rest and not rested and step.startswith("physicsStats start"):
+            # the map's own bodies settle from the map's pose for a time that differs by
+            # compiler in either mode: rest them, so the workload measures what it stages
+            lines += [f"physicsRest {prefix}" for prefix in rest] + ["wait 2"]
+            rested = True
         if step == "physicsStats stop" and frames:
             # every frame's cost, so repeated runs can be reduced to a noise floor
             lines += [step, "physicsStats frames"]
@@ -311,7 +317,8 @@ def run_workload(args: argparse.Namespace, name: str, mode: str, run_index: int,
     game_root.mkdir(parents=True, exist_ok=True)
     cfg_name = "physics_workload.cfg"
     # "cfg" gives the console lines verbatim (a chain of cfgs that ends the run itself)
-    cfg_lines = workload.get("cfg") or build_cfg(workload, args.verbose_digest, getattr(args, "frames", False))
+    cfg_lines = workload.get("cfg") or build_cfg(workload, args.verbose_digest, getattr(args, "frames", False),
+                                                 tuple(getattr(args, "rest", None) or ()))
     (game_root / cfg_name).write_text("\n".join(cfg_lines) + "\n", encoding="ascii")
     log_relative = "logs/physics.log"
     log_path = game_root / log_relative
@@ -479,6 +486,9 @@ def main() -> int:
     parser.add_argument("--min-free-gb", type=float, default=5.0, help="wait for this much free commit before a launch")
     parser.add_argument("--set", action="append", help="extra cvar KEY=VALUE for every run")
     parser.add_argument("--verbose-digest", action="store_true", help="also print per-entity digests")
+    parser.add_argument("--rest", action="append", metavar="PREFIX",
+                        help="put the map's own bodies with this name prefix to rest before a workload starts measuring "
+                             "(repeatable; e.g. env_ragdoll on Air Defense 1)")
     parser.add_argument("--frames", action="store_true",
                         help="record every frame's physics time and reduce repeats to a per-frame noise floor")
     parser.add_argument("--output", type=Path, help="write the JSON results here (under .tmp)")

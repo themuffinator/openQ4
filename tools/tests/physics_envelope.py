@@ -22,7 +22,8 @@ Checks, per hit class:
              displacement bound is the largest legacy displacement plus a
              half, or plus 48 units, over the pooled stagings
   heavy      rockets, grenades and the Dark Matter Gun's splash: the median
-             displacement stays within 0.4x to 1.6x of legacy, or both stay
+             displacement of the bodies the hit reached (those whose velocity
+             it changed) stays within 0.4x to 1.6x of legacy, or both stay
              under 32 units, and no corpse leaves the map
   gibbing    a hit that gibs every corpse in both modes passes: there is no
              motion left to compare, and both modes treated the hit alike
@@ -42,6 +43,11 @@ Scenes (--scene):
   ai          strogg marine corpses on Air Defense 1 (the default)
   moveables   crates and barrels on Air Defense 1: rigid bodies take the same
               hits, with no kill and no falling variants
+  moveables-flat  the same crates and barrels on Hangar Perimeter's flat floor:
+              Air Defense 1's crater slopes, and a body knocked loose there
+              travels mostly by running downhill
+  crates-flat, barrels-flat  the friction calibration: one kind of body on the
+              flat floor, shoved along it at three speeds (no splash, no slope)
   mp          player corpses on a loopback listen server: six paused bots on
               q4dm1 are killed and hit where they spawned. Spawn points are
               drawn at random, so the scene differs between runs and the
@@ -81,6 +87,14 @@ HITS = (
     ("grenade-splash-falling", "heavy", ["{splash} damage_grenadeSplash"], True),
     ("dmg-splash", "heavy", ["{splash} damage_dmg_splash"], False),
 )
+# Clean horizontal shoves for the friction calibration scenes: every body gets
+# the same impulse along +x and slides to a stop on a flat floor. A crate (mass
+# 33) leaves at 122, 214 and 305 units/s for 4,000, 7,000 and 10,000; a barrel
+# (mass 89) at 112, 224 and 447 for 10,000, 20,000 and 40,000. Faster crates
+# reach the room's walls and steps, which then decide where they stop. Judged
+# like a heavy hit. These run only in the scenes that list them.
+PUSHES = tuple((f"push-{impulse}", "heavy", [f"physicsImpulse {{each}} {impulse} 0 0"], False)
+               for impulse in (4000, 7000, 10000, 20000, 40000))
 MOMENTUM_IMPULSE = (0.0, 9000.0, 3000.0)
 
 # What each scene stages before the hit. "kill" leaves corpses at rest with no
@@ -106,6 +120,37 @@ SCENES = {
         "splash": "physicsRadiusDamage {def} 0 16",
         "stagings": [{" ring 96 ": " ring 88 ", " ring 150 ": " ring 140 "}, {}, {" ring 96 ": " ring 104 ", " ring 150 ": " ring 160 "}],
     },
+    "moveables-flat": {
+        "map": "game/hangar1",
+        "cheats": ["god", "notarget", "killMonsters"],
+        # the barrels stand inside the crates' ring: a splash throws the lighter crates clear of them
+        "spawn": ["physicsSpawn moveable_crate1_small 4 ring 110 8", "physicsSpawn moveable_barrel_medium1a 4 ring 60 8",
+                  "@wait 120"],
+        "kill": None,
+        "prefix": "phys_", "targets": [f"phys_{i}" for i in range(8)],
+        "splash": "physicsRadiusDamage {def} 0 16",
+        "stagings": [{" ring 110 ": " ring 100 ", " ring 60 ": " ring 54 "}, {}, {" ring 110 ": " ring 120 ", " ring 60 ": " ring 66 "}],
+    },
+    "crates-flat": {
+        "map": "game/hangar1",
+        "cheats": ["god", "notarget", "killMonsters"],
+        "spawn": ["physicsSpawn moveable_crate1_small 4 ring 96 8", "@wait 120"],
+        "kill": None,
+        "prefix": "phys_", "targets": [f"phys_{i}" for i in range(4)],
+        "splash": "physicsRadiusDamage {def} 0 16",
+        "stagings": [{" ring 96 ": " ring 88 "}, {}, {" ring 96 ": " ring 104 "}],
+        "hits": ["push-4000", "push-7000", "push-10000"],
+    },
+    "barrels-flat": {
+        "map": "game/hangar1",
+        "cheats": ["god", "notarget", "killMonsters"],
+        "spawn": ["physicsSpawn moveable_barrel_medium1a 4 ring 96 8", "@wait 120"],
+        "kill": None,
+        "prefix": "phys_", "targets": [f"phys_{i}" for i in range(4)],
+        "splash": "physicsRadiusDamage {def} 0 16",
+        "stagings": [{" ring 96 ": " ring 88 "}, {}, {" ring 96 ": " ring 104 "}],
+        "hits": ["push-10000", "push-20000", "push-40000"],
+    },
     "mp": {
         "map": "mp/q4dm1", "multiplayer": True,
         "cheats": ["god", "notarget"],
@@ -117,8 +162,10 @@ SCENES = {
         # the bots stand at spawn points all over the map: the same radius damage def,
         # delivered to each of them as a hit pushing away from the server's player
         "splash": "physicsDamage player {def} 1",
-        # every run draws its own spawn points
-        "stagings": [{}, {}, {}],
+        # every run draws its own spawn points, and about one corpse in twenty lies where it
+        # tumbles 350 to 500 units down the map in either mode: --stagings 6 pools enough
+        # repeats for the falling classes to meet one in both modes
+        "stagings": [{}, {}, {}, {}, {}, {}],
     },
     "awakening": {
         "map": "game/m01_stranarus_trench2", "game_dir": "q4xbase",
@@ -126,6 +173,13 @@ SCENES = {
                    "@wait 60", "killMonsters"],
         "spawn": ["physicsSpawn monster_q4x_grunt 8 ring 104 16", "@wait 90"],
         "kill": "physicsDamage phys_ damage_triggerhurt_1000 1",
+        # one grunt of the ring dies on the trench's edge and falls down it: four
+        # seconds after the kill it is still moving in both modes (22 units/s in
+        # legacy, 63 in enhanced), and a hit then measures the fall, not the hit.
+        # Ten seconds is when the game removes a corpse, so the scene keeps them
+        # for thirty with the player's own setting.
+        "settle": 600,
+        "set": ["g_corpseRemoveDelaySP=30"],
         "prefix": "phys_", "targets": [f"phys_{i}" for i in range(8)],
         "splash": "physicsRadiusDamage {def} 0 16",
         "stagings": [{" ring 104 ": " ring 96 "}, {}, {" ring 104 ": " ring 112 "}],
@@ -155,7 +209,7 @@ def scene_workload(steps: list[str]) -> dict:
 
 def workload(hit: tuple) -> dict:
     _name, _kind, commands, falling = hit
-    settle = [] if falling else ["@wait 240"]
+    settle = [] if falling else [f"@wait {SCENE.get('settle', 240)}"]
     # quiet kill: no push, so every corpse starts the hit from the same rest
     kill = [SCENE["kill"], "@wait 8" if falling else "@wait 1"] if SCENE["kill"] else []
     report = f"physicsReport {SCENE['prefix']}"
@@ -250,7 +304,7 @@ def analyse_hit(hit: tuple, legacy: list[dict], enhanced: list[dict]) -> dict:
     out = {"hit": name, "kind": kind, "passed": True, "notes": [], "stagings": len(legacy)}
     per_mode = {}
     for mode, results in (("legacy", legacy), ("enhanced", enhanced)):
-        pooled = {"corpses": 0, "gibbed": 0, "displacement": [], "peak": 0.0, "clamps": 0, "peak_dv": 0.0,
+        pooled = {"corpses": 0, "gibbed": 0, "displacement": [], "reached": [], "peak": 0.0, "clamps": 0, "peak_dv": 0.0,
                   "peak_joint_stretch": 0.0, "stretched_frames": 0}
         for result in results:
             blocks = result["reports"]
@@ -258,12 +312,15 @@ def analyse_hit(hit: tuple, legacy: list[dict], enhanced: list[dict]) -> dict:
                 out["passed"] = False
                 out["notes"].append(f"{mode}: {len(blocks)} report blocks, want 4")
                 return out
-            before, _now, early, after = blocks[0], blocks[1], blocks[2], blocks[3]
+            before, now, early, after = blocks[0], blocks[1], blocks[2], blocks[3]
             names = sorted(set(before) & set(after))
             stats = result.get("stats") or {}
             pooled["corpses"] += len(names)
             pooled["gibbed"] += len(set(before) - set(after))
             pooled["displacement"] += [distance(before[n]["centre"], after[n]["centre"]) for n in names]
+            # the bodies the hit reached: those whose velocity it changed by more than a unit a second
+            pooled["reached"] += [distance(before[n]["centre"], after[n]["centre"]) for n in names
+                                  if n in now and distance(now[n]["momentum"], before[n]["momentum"]) > max(1.0, before[n]["mass"])]
             pooled["peak"] = max([pooled["peak"]] + [early[n]["peak"] for n in names if n in early])
             pooled["clamps"] += stats.get("impulse_clamps", 0)
             pooled["peak_dv"] = max(pooled["peak_dv"], stats.get("peak_impulse_dv", 0.0))
@@ -294,9 +351,16 @@ def analyse_hit(hit: tuple, legacy: list[dict], enhanced: list[dict]) -> dict:
             out["passed"] = False
             out["notes"].append(f"enhanced peak body speed {en['peak']:.0f} > legacy envelope {peak_bound:.0f}")
     else:
+        # A blast that reaches half the bodies leaves the median of all of them on a
+        # knife edge between one that moved and one that did not, in either mode. The
+        # response to a hit is read from the bodies it reached.
+        if len(lg["reached"]) >= 3 and len(en["reached"]) >= 3:
+            lmed, emed = statistics.median(lg["reached"]), statistics.median(en["reached"])
+            out["judged_on"] = f"{len(lg['reached'])}/{len(en['reached'])} bodies the hit reached"
         if not ( lmed < 32.0 and emed < 32.0 ) and not ( 0.4 * lmed <= emed <= 1.6 * lmed ):
             out["passed"] = False
             out["notes"].append(f"median displacement {emed:.1f} outside 0.4-1.6x legacy {lmed:.1f}")
+        out["median"] = [round(lmed, 1), round(emed, 1)]
     return out
 
 
@@ -330,14 +394,14 @@ def main() -> int:
     parser.add_argument("--save-root", type=Path, default=pw.ROOT / ".tmp/physics-envelope")
     parser.add_argument("--renderer", choices=("gl", "vulkan"), default="gl")
     parser.add_argument("--timeout", type=int, default=300)
-    parser.add_argument("--hits", default=",".join(h[0] for h in HITS) + ",momentum")
+    parser.add_argument("--hits", help="hit classes to run (default: the scene's own, or every hit and momentum)")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--cache-root", type=Path,
                         help="generated-image cache shared by every run (default: one per run, regenerated each time)")
     parser.add_argument("--min-free-gb", type=float, default=5.0)
     parser.add_argument("--scene", choices=tuple(SCENES), default="ai")
     parser.add_argument("--stagings", type=int, default=3,
-                        help="stagings pooled for the heavy and falling classes (1 to 3)")
+                        help="stagings pooled for the heavy and falling classes (1 to 3; the mp scene has 6 repeats)")
     parser.add_argument("--awakening-path", type=Path, help="fs_awakeningpath holding q4xbase (scene awakening)")
     parser.add_argument("--set", action="append", default=[], help="extra cvar KEY=VALUE for every run")
     args = parser.parse_args()
@@ -354,8 +418,9 @@ def main() -> int:
         args.set += ["fs_game=q4xbase", f"fs_awakeningpath={args.awakening_path.resolve(strict=True)}"]
     if args.scene != "ai":
         args.save_root = args.save_root.with_name(f"{args.save_root.name}-{args.scene}")
+    args.set += SCENE.get("set", [])
 
-    wanted = set(args.hits.split(","))
+    wanted = set(args.hits.split(",")) if args.hits else set(SCENE.get("hits") or [h[0] for h in HITS] + ["momentum"])
     if not SCENE["kill"]:
         # nothing falls before the hit: the falling variants would repeat the resting ones
         wanted -= {hit[0] for hit in HITS if hit[3]}
@@ -363,7 +428,7 @@ def main() -> int:
     if "momentum" in wanted:
         wl = momentum_workload()
         results.append(analyse_momentum(run(args, "env-momentum", wl, "legacy"), run(args, "env-momentum", wl, "enhanced")))
-    for hit in HITS:
+    for hit in HITS + PUSHES:
         if hit[0] not in wanted:
             continue
         wl = workload(hit)
@@ -379,6 +444,8 @@ def main() -> int:
         if lg and en and lg.get("displacement") and en.get("displacement"):
             summary = (f"corpses {lg['corpses']}/{en['corpses']} gibbed {lg['gibbed']}/{en['gibbed']} disp max {max(lg['displacement']):.0f}/{max(en['displacement']):.0f} "
                        f"median {statistics.median(lg['displacement']):.0f}/{statistics.median(en['displacement']):.0f} "
+                       f"reached {len(lg['reached'])}/{len(en['reached'])} "
+                       + (f"their median {r['median'][0]:.0f}/{r['median'][1]:.0f} " if r.get("median") else "") +
                        f"peak {lg['peak']:.0f}/{en['peak']:.0f} clamps {en['clamps']} dv {lg['peak_dv']:.0f}/{en['peak_dv']:.0f} "
                        f"stretch {lg['peak_joint_stretch']:.0f}/{en['peak_joint_stretch']:.0f} "
                        f"for {lg['stretched_frames']}/{en['stretched_frames']} frames")

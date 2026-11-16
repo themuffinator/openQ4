@@ -30,6 +30,8 @@
 // External impulses keep their linear momentum but a hit on a light limb is
 // spread over the figure by mass (the impulse guard, PHYS-04).
 
+#include "EnhancedContacts.h"
+
 /*
 ================
 idPhysics_AF::EnhancedKineticEnergy
@@ -45,6 +47,60 @@ float idPhysics_AF::EnhancedKineticEnergy( const bool next ) const {
 		energy += 0.5f * body->mass * v.SubVec3( 0 ).LengthSqr() + 0.5f * ( v.SubVec3( 1 ) * ( inertia * v.SubVec3( 1 ) ) );
 	}
 	return energy;
+}
+
+/*
+================
+idPhysics_AF::EnhancedBodyEmbedded
+
+  True when the body intersects the world or scenery that never moves. A
+  figure is often authored or animated into geometry: a hanging light with
+  chain links inside a beam, a monster whose arm is in a wall when it dies. A
+  contact query reports nothing for a surface the body is already behind, so
+  such a body would pass on through. Legacy sweeps every body every step, and a
+  sweep that starts in a surface cannot move further into it: that is what
+  holds Putra's lights where the map hung them.
+================
+*/
+bool idPhysics_AF::EnhancedBodyEmbedded( idAFBody *body ) const {
+	if ( body->clipMask == 0 || !body->clipModel ) {
+		return false;
+	}
+	idClip *clip = gameLocal.GetEntityClipWorld( self );
+	if ( !clip ) {
+		return false;
+	}
+	const idVec3 &origin = body->current->worldOrigin;
+	const idMat3 &axis = body->current->worldAxis;
+
+	// a body attached to the world does not collide with it (SetupCollisionForBody)
+	bool world = clip->GetWorldCollisionModel() != NULL;
+	for ( int i = 0; i < body->constraints.Num() && world; i++ ) {
+		world = !( body->constraints[i]->fl.noCollision && body->constraints[i]->body2 == NULL );
+	}
+	if ( world && clip->ContentsModel( origin, body->clipModel, axis, body->clipMask, clip->GetWorldCollisionModel(), vec3_origin, mat3_identity ) != 0 ) {
+		return true;
+	}
+
+	idClipModel *touching[64];
+	idBounds bounds;
+	bounds.FromTransformedBounds( body->clipModel->GetBounds(), origin, axis );
+	const int num = clip->ClipModelsTouchingBounds( bounds, body->clipMask, touching, 64 );
+	for ( int i = 0; i < num; i++ ) {
+		const idClipModel *other = touching[i];
+		const idEntity *owner = other ? other->GetEntity() : NULL;
+		if ( !owner || owner == self || other->IsRenderModel() || !other->GetCollisionModel() ) {
+			continue;
+		}
+		const idPhysics *physics = owner->GetPhysics();
+		if ( !physics || !( physics->IsType( idPhysics_Static::GetClassType() ) || physics->IsType( idPhysics_StaticMulti::GetClassType() ) ) ) {
+			continue;
+		}
+		if ( clip->ContentsModel( origin, body->clipModel, axis, body->clipMask, other->GetCollisionModel(), other->GetOrigin(), other->GetAxis() ) != 0 ) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /*
@@ -65,6 +121,8 @@ bool idPhysics_AF::EvaluateContactsEnhanced( float timeStep ) {
 	contactBodies.SetNum( 0, false );
 	enhancedSeparation.SetNum( 0, false );
 	enhancedContactAge.SetNum( 0, false );
+	enhancedContactType.SetNum( 0, false );
+	enhancedContactFeature.SetNum( 0, false );
 	enhancedReach.SetNum( bodies.Num(), false );
 
 	if ( !enableCollision ) {
@@ -97,19 +155,8 @@ bool idPhysics_AF::EvaluateContactsEnhanced( float timeStep ) {
 							body->clipModel, body->current->worldAxis, body->clipMask, passEntity );
 
 		// world-space vertices of the body for the contact gaps
-		float vertices[MAX_TRACEMODEL_VERTS * 3];
-		int numVertices = 0;
-		const idTraceModel *trm = body->clipModel->GetTraceModel();
-		if ( trm ) {
-			numVertices = Min( trm->numVerts, MAX_TRACEMODEL_VERTS );
-			for ( int v = 0; v < numVertices; v++ ) {
-				const idVec3 world = body->current->worldOrigin + trm->verts[v] * body->current->worldAxis;
-				vertices[v * 3 + 0] = world.x;
-				vertices[v * 3 + 1] = world.y;
-				vertices[v * 3 + 2] = world.z;
-			}
-		}
-		const float reach = body->clipModel->GetBounds().GetRadius();
+		enhancedShape_t shape;
+		shape.Set( body->clipModel, body->current->worldOrigin, body->current->worldAxis );
 
 		const int firstForBody = contacts.Num();
 		for ( int j = 0; j < numContacts; j++ ) {
@@ -134,17 +181,19 @@ bool idPhysics_AF::EvaluateContactsEnhanced( float timeStep ) {
 				// the row goes where the body is now, not where the sweep met the surface
 				contactInfo_t info = contactInfo[j];
 				float separation = 0.0f;
-				if ( numVertices ) {
-					const OpenQ4Physics::Vec3 now = OpenQ4Physics::ContactPointNow( vertices, numVertices,
-						OpenQ4Physics::Vec3( info.normal.ToFloatPtr() ), OpenQ4Physics::Vec3( info.point.ToFloatPtr() ),
-						OpenQ4Physics::Vec3( dir.SubVec3( 0 ).ToFloatPtr() ), reach, separation );
-					info.point.Set( now.x, now.y, now.z );
+				int feature = -1;
+				if ( shape.numVertices ) {
+					idVec3 pointNow;
+					separation = EnhancedContactGap( self, info, shape, dir.SubVec3( 0 ), af_enhancedFeatureGaps.GetBool(), pointNow, feature );
+					info.point = pointNow;
 					info.dist = info.normal * info.point;
 				}
 				contacts.Append( info );
 				contactBodies.Append( i );
 				enhancedSeparation.Append( separation );
 				enhancedContactAge.Append( 0 );
+				enhancedContactType.Append( feature >= 0 ? (int)contactInfo[j].type : 0 );
+				enhancedContactFeature.Append( feature );
 			}
 		}
 
@@ -174,15 +223,15 @@ bool idPhysics_AF::EvaluateContactsEnhanced( float timeStep ) {
 			if ( reported || contacts.Num() - firstForBody >= 10 ) {
 				continue;
 			}
-			OpenQ4Physics::Vec3 point;
+			idVec3 point;
 			float separation;
-			if ( !OpenQ4Physics::RenewPersistentContact( vertices, numVertices, cached.normal, cached.point, margin, 8.0f, point, separation ) ) {
+			if ( !EnhancedRenewContact( shape, cached.type, cached.feature, cachedPoint, cachedNormal, margin, 8.0f, point, separation ) ) {
 				continue;
 			}
 			contactInfo_t info;
 			memset( &info, 0, sizeof( info ) );
 			info.type = CONTACT_TRMVERTEX;
-			info.point.Set( point.x, point.y, point.z );
+			info.point = point;
 			info.normal = cachedNormal;
 			info.dist = info.normal * info.point;
 			info.entityNum = cached.entityNum;
@@ -191,6 +240,8 @@ bool idPhysics_AF::EvaluateContactsEnhanced( float timeStep ) {
 			contactBodies.Append( i );
 			enhancedSeparation.Append( separation );
 			enhancedContactAge.Append( cached.age + 1 );
+			enhancedContactType.Append( cached.type );
+			enhancedContactFeature.Append( cached.feature );
 		}
 	}
 
@@ -429,7 +480,11 @@ void idPhysics_AF::AuxiliaryForcesEnhanced( float timeStep ) {
 				pseudoTarget[k] = Min( Max( 0.0f, -c1 ), maxRecovery );
 				c1 = Max( c1, 0.0f );
 			} else if ( contactIndex >= 0 && contactIndex < enhancedSeparation.Num() ) {
-				if ( enhancedSeparation[contactIndex] < -slop ) {
+				// a body that was inside geometry when the figure woke is not pushed
+				// out of it: the map or the animation put it there
+				const int contactBody = contactIndex < contactBodies.Num() ? contactBodies[contactIndex] : -1;
+				const bool placedInside = contactBody >= 0 && contactBody < enhancedEmbedded.Num() && enhancedEmbedded[contactBody];
+				if ( enhancedSeparation[contactIndex] < -slop && !placedInside ) {
 					pseudoTarget[k] = Min( af_enhancedRecoveryRate.GetFloat() * ( -enhancedSeparation[contactIndex] - slop ) * invStep, maxRecovery );
 				} else {
 					// a contact that needs no recovery still holds position-only
@@ -837,6 +892,17 @@ void idPhysics_AF::CheckForCollisionsEnhanced( float timeStep ) {
 
 	const float slop = af_enhancedSlop.GetFloat();
 	const float recoveryStep = af_enhancedRecoverySweep.GetFloat();
+	const int auditFrames = af_enhancedAuditFrames.GetInteger();
+
+	// the poses the audit sweeps start from: where each body was when the figure woke
+	if ( enhancedVerifiedOrigin.Num() != bodies.Num() ) {
+		enhancedVerifiedOrigin.SetNum( bodies.Num(), false );
+		enhancedVerifiedAxis.SetNum( bodies.Num(), false );
+		for ( int i = 0; i < bodies.Num(); i++ ) {
+			enhancedVerifiedOrigin[i] = bodies[i]->current->worldOrigin;
+			enhancedVerifiedAxis[i] = bodies[i]->current->worldAxis;
+		}
+	}
 
 	for ( int i = 0; i < bodies.Num(); i++ ) {
 		idAFBody *body = bodies[i];
@@ -866,19 +932,65 @@ void idPhysics_AF::CheckForCollisionsEnhanced( float timeStep ) {
 			idEntity *passEntity = NULL;
 			bool stopped = false;
 
-			if ( displacement > reach - af_enhancedMargin.GetFloat() * 0.5f || turn > af_enhancedRotationSweep.GetFloat() ) {
+			const bool embedded = af_enhancedEmbeddedSweep.GetInteger() >= 2 && i < enhancedEmbedded.Num() && enhancedEmbedded[i];
+			const bool fast = embedded || displacement > reach - af_enhancedMargin.GetFloat() * 0.5f || turn > af_enhancedRotationSweep.GetFloat();
+
+			// The audit. A body's contact query is one sweep along the velocity the
+			// step started with; the solve can turn the body another way, and a
+			// small move off that line goes through space the query never covered.
+			// A corpse jittering at a few units a second walked its torso through
+			// a thin sheet that way, a tenth of a unit a step. Legacy sweeps every
+			// move of every body, which is most of what it costs; sweeping every
+			// stray move here quadrupled the sweeps and stopped limbs in flight.
+			// Instead a body that only creeps is swept every few steps along the
+			// chord from the pose it was last verified at to where it is now (two
+			// units at most: a tumbling limb goes round a bump that a longer chord
+			// would cut through). A crossing in between is on that chord, and the
+			// body is put back at it.
+			//
+			// A body at rest sits a slop from its support, which is as close as a
+			// sweep lets anything come, so the audit acts only when the body is
+			// more than that slop past where the sweep stops it; until then the
+			// body keeps the pose it was verified at. A chord that starts in a
+			// surface proves nothing and is taken as it is. An audit is not an
+			// impact: nothing is called back and nothing is pushed.
+			bool audit = false;
+			bool verified = false;
+			if ( !fast && auditFrames > 0 && i < enhancedVerifiedOrigin.Num() && ( ( gameLocal.framenum + i ) % auditFrames ) == 0 ) {
+				const float chord = ( body->next->worldOrigin - enhancedVerifiedOrigin[i] ).Length();
+				audit = chord <= 2.0f && ( chord > 1e-3f || enhancedVerifiedAxis[i] != body->next->worldAxis );
+				verified = chord > 2.0f;		// moving, not creeping: the audit starts again from here
+			}
+
+			if ( fast || audit ) {
+				const idVec3 from = audit ? enhancedVerifiedOrigin[i] : body->current->worldOrigin;
+				const idMat3 fromAxis = audit ? enhancedVerifiedAxis[i] : body->current->worldAxis;
+				if ( audit ) {
+					TransposeMultiply( fromAxis, body->next->worldAxis, axis );
+					rotation = axis.ToRotation();
+				}
 				passEntity = SetupCollisionForBody( body );
-				rotation.SetOrigin( body->current->worldOrigin );
+				rotation.SetOrigin( from );
 				OpenQ4Physics::GetTelemetry().NoteCounter( OpenQ4Physics::COUNTER_SWEPT );
-				if ( gameLocal.Motion( self, collision, body->current->worldOrigin, body->next->worldOrigin, rotation,
-										body->clipModel, body->current->worldAxis, body->clipMask, passEntity ) ) {
+				const bool hit = gameLocal.Motion( self, collision, from, body->next->worldOrigin, rotation,
+										body->clipModel, fromAxis, body->clipMask, passEntity );
+				bool act = hit;
+				if ( audit ) {
+					const float past = ( body->next->worldOrigin - collision.endpos ).Length() +
+										DEG2RAD( idMath::Fabs( rotation.GetAngle() ) ) * ( 1.0f - collision.fraction ) * body->clipModel->GetBounds().GetRadius();
+					act = hit && collision.fraction > 1e-4f && past > slop;
+				}
+				verified = !hit || act || ( audit && collision.fraction <= 1e-4f );		// (a fast sweep is always one or the other)
+				if ( act ) {
 					stopped = true;
 					body->next->worldOrigin = collision.endpos;
 					body->next->worldAxis = collision.endAxis;
-					const int index = collisions.Num();
-					collisions.SetNum( index + 1, false );
-					collisions[index].trace = collision;
-					collisions[index].body = body;
+					if ( !audit ) {
+						const int index = collisions.Num();
+						collisions.SetNum( index + 1, false );
+						collisions[index].trace = collision;
+						collisions[index].body = body;
+					}
 
 					// The surface that stopped the body goes into the manifold, so the
 					// next step solves against it even when the contact query does not
@@ -895,6 +1007,7 @@ void idPhysics_AF::CheckForCollisionsEnhanced( float timeStep ) {
 						cached.entityNum = collision.c.entityNum;
 						cached.id = collision.c.id;
 						cached.body = i;
+						cached.feature = -1;
 						enhancedCache.Append( cached );
 					}
 				}
@@ -910,6 +1023,12 @@ void idPhysics_AF::CheckForCollisionsEnhanced( float timeStep ) {
 				gameLocal.Translation( self, recoveryTrace, body->next->worldOrigin, body->next->worldOrigin + recovery,
 										body->clipModel, body->next->worldAxis, body->clipMask, passEntity );
 				body->next->worldOrigin = recoveryTrace.endpos;
+			}
+
+			// a body whose sweep came out clear, or was put back, is verified where it ends this step
+			if ( ( verified || auditFrames <= 0 ) && i < enhancedVerifiedOrigin.Num() ) {
+				enhancedVerifiedOrigin[i] = body->next->worldOrigin;
+				enhancedVerifiedAxis[i] = body->next->worldAxis;
 			}
 		}
 
@@ -937,6 +1056,8 @@ void idPhysics_AF::CacheEnhancedContacts( void ) {
 		cached.id = contacts[i].id;
 		cached.body = contactBodies[i];
 		cached.age = i < enhancedContactAge.Num() ? enhancedContactAge[i] : 0;
+		cached.type = i < enhancedContactType.Num() ? enhancedContactType[i] : 0;
+		cached.feature = i < enhancedContactFeature.Num() ? enhancedContactFeature[i] : -1;
 		cached.impulse[0] = c->lm.GetSize() > 0 ? c->lm[0] : 0.0f;
 		idAFConstraint_ContactFriction *fc = cc->GetFrictionConstraint();
 		if ( fc ) {
@@ -950,9 +1071,9 @@ void idPhysics_AF::CacheEnhancedContacts( void ) {
 		if ( af_enhancedDebug.GetInteger() & 8 ) {
 			float pre = c->J1.SubVec6( 0 ) * c->body1->current->spatialVelocity;
 			float post = c->J1.SubVec6( 0 ) * c->body1->next->spatialVelocity;
-			gameLocal.Printf( "AF_CONTACT %s imp=%d f=%d b=%d ent=%d n=(%.2f %.2f %.2f) sep=%.2f age=%d pre=%.0f post=%.0f lm=%.0f fr=(%.0f %.0f) v=(%.0f %.0f %.0f)\n",
+			gameLocal.Printf( "AF_CONTACT %s imp=%d f=%d b=%d ent=%d n=(%.2f %.2f %.2f) sep=%.2f age=%d type=%d feature=%d p=(%.1f %.1f %.1f) pre=%.0f post=%.0f lm=%.0f fr=(%.0f %.0f) v=(%.0f %.0f %.0f)\n",
 				self ? self->name.c_str() : "?", i < enhancedImpact.Num() && enhancedImpact[i] ? 1 : 0, gameLocal.framenum, contactBodies[i], contacts[i].entityNum, contacts[i].normal.x, contacts[i].normal.y, contacts[i].normal.z,
-				i < enhancedSeparation.Num() ? enhancedSeparation[i] : 0.0f, cached.age, pre, post, cached.impulse[0], cached.impulse[1], cached.impulse[2],
+				i < enhancedSeparation.Num() ? enhancedSeparation[i] : 0.0f, cached.age, cached.type, cached.feature, contacts[i].point.x, contacts[i].point.y, contacts[i].point.z, pre, post, cached.impulse[0], cached.impulse[1], cached.impulse[2],
 				c->body1->current->spatialVelocity.SubVec3( 0 ).x, c->body1->current->spatialVelocity.SubVec3( 0 ).y, c->body1->current->spatialVelocity.SubVec3( 0 ).z );
 		}
 	}
@@ -993,8 +1114,36 @@ bool idPhysics_AF::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) {
 	}
 
 	if ( current.atRest >= 0 || timeStep <= 0.0f ) {
+		// the bodies are tested for geometry again when the figure wakes, and the
+		// audit starts again from where they are then
+		enhancedEmbedded.SetNum( 0, false );
+		enhancedVerifiedOrigin.SetNum( 0, false );
+		enhancedVerifiedAxis.SetNum( 0, false );
 		DebugDraw();
 		return false;
+	}
+
+	// Bodies that start inside static geometry are swept every step, as legacy
+	// sweeps every body: tested when the figure wakes, and again every half
+	// second while any is still inside.
+	if ( af_enhancedEmbeddedSweep.GetInteger() > 0 ) {
+		const bool woke = enhancedEmbedded.Num() != bodies.Num();
+		bool any = false;
+		for ( int i = 0; i < enhancedEmbedded.Num() && !any; i++ ) {
+			any = enhancedEmbedded[i];
+		}
+		if ( woke || ( any && ( ( gameLocal.framenum + ( self ? self->entityNumber : 0 ) ) & 31 ) == 0 ) ) {
+			enhancedEmbedded.SetNum( bodies.Num(), false );
+			for ( int i = 0; i < bodies.Num(); i++ ) {
+				enhancedEmbedded[i] = ( woke || enhancedEmbedded[i] ) && !fastEval && EnhancedBodyEmbedded( bodies[i] );
+				if ( enhancedEmbedded[i] && ( af_enhancedDebug.GetInteger() & 16 ) ) {
+					gameLocal.Printf( "AF_EMBEDDED %s f=%d body=%d %s woke=%d\n", self ? self->name.c_str() : "?", gameLocal.framenum, i,
+						bodies[i]->GetName().c_str(), woke ? 1 : 0 );
+				}
+			}
+		}
+	} else {
+		enhancedEmbedded.SetNum( 0, false );
 	}
 
 	AddPushVelocity( -current.pushVelocity );

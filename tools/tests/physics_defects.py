@@ -413,9 +413,44 @@ def verdict(name: str, legacy: dict, enhanced: dict) -> dict:
     return {"legacy_shows_defect": shows, "enhanced_ok": not why, "why": "; ".join(why)}
 
 
-def run(args: argparse.Namespace, name: str, workload: dict, mode: str) -> dict:
+# A corpse thrown into geometry tumbles chaotically, and a count of limbs left
+# inside walls over six corpses is a draw as much as a measure. These repros run
+# on several stagings (the same scene with the spawn moved) and judge the sums.
+STAGINGS = {
+    "stuck-limbs": [{" wall 20 ": " wall 16 "}, {}, {" wall 20 ": " wall 24 "}],
+}
+
+
+def staged(workload: dict, swaps: dict) -> dict:
+    out = dict(workload)
+    steps = []
+    for step in workload["steps"]:
+        for old, new in swaps.items():
+            step = step.replace(old, new)
+        steps.append(step)
+    out["steps"] = steps
+    return out
+
+
+def pooled(metrics: list[dict]) -> dict:
+    """Counts add up over stagings; a measured largest value stays the largest."""
+    if any("error" in m for m in metrics):
+        return next(m for m in metrics if "error" in m)
+    out: dict = {}
+    for m in metrics:
+        for key, value in m.items():
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                out.setdefault(key, value)
+            elif isinstance(value, float):
+                out[key] = max(out.get(key, 0.0), value)
+            else:
+                out[key] = out.get(key, 0) + value
+    return out
+
+
+def run(args: argparse.Namespace, name: str, workload: dict, mode: str, staging: int = 0) -> dict:
     pw.WORKLOADS["defect-" + name] = workload
-    result = pw.run_workload(args, "defect-" + name, mode, 0)
+    result = pw.run_workload(args, "defect-" + name, mode, staging)
     log = Path(result["log"]).read_text(encoding="latin-1") if Path(result["log"]).exists() else ""
     result["quality"] = quality_blocks(log)
     result["outside_world"] = len(OUTSIDE.findall(log))
@@ -463,6 +498,7 @@ def main() -> int:
                         help="generated-image cache shared by every run (default: one per run, regenerated each time)")
     parser.add_argument("--min-free-gb", type=float, default=5.0)
     parser.add_argument("--set", action="append", help="extra cvar KEY=VALUE for every run")
+    parser.add_argument("--stagings", type=int, default=3, help="stagings pooled for the repros that have them (1 to 3)")
     parser.add_argument("--probe", action="store_true", help="list thin walls around --tunnel-view and exit")
     parser.add_argument("--tunnel-map", default="game/airdefense1")
     parser.add_argument("--tunnel-view", type=float, nargs=4, metavar=("X", "Y", "Z", "YAW"),
@@ -487,10 +523,13 @@ def main() -> int:
     for name in names:
         build, analyse = SCENARIOS[name]
         workload = build(args)
-        runs = {mode: run(args, name, workload, mode) for mode in ("legacy", "enhanced")}
-        metrics = {mode: analyse(result) for mode, result in runs.items()}
-        entry = {"repro": name, "legacy": metrics["legacy"], "enhanced": metrics["enhanced"],
-                 "ran": {mode: result["passed"] for mode, result in runs.items()},
+        stagings = STAGINGS.get(name, [{}])[:max(1, args.stagings)] if args.stagings > 1 else [{}]
+        metrics, ran = {}, {}
+        for mode in ("legacy", "enhanced"):
+            runs = [run(args, name, staged(workload, swaps), mode, index) for index, swaps in enumerate(stagings)]
+            metrics[mode] = pooled([analyse(result) for result in runs])
+            ran[mode] = all(result["passed"] for result in runs)
+        entry = {"repro": name, "stagings": len(stagings), "legacy": metrics["legacy"], "enhanced": metrics["enhanced"], "ran": ran,
                  **verdict(name, metrics["legacy"], metrics["enhanced"])}
         entry["passed"] = bool(entry["enhanced_ok"] and all(entry["ran"].values()))
         report.append(entry)

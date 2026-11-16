@@ -19,6 +19,8 @@
 //      script move (Activate), and an energy guard
 // Everything enhanced-only is transient: nothing new is saved or networked.
 
+#include "EnhancedContacts.h"
+
 /*
 ================
 idPhysics_RigidBody::UsesEnhancedPhysics
@@ -114,18 +116,11 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 	const idVec3 preSolveAngularVelocity = angularVelocity;
 
 	// ---- 2. contacts: one sweep along the motion, plus the persistent manifold ----
-	const idTraceModel *trm = clipModel->GetTraceModel();
-	float vertices[MAX_TRACEMODEL_VERTS * 3];
-	int numVertices = 0;
-	if ( trm ) {
-		numVertices = Min( trm->numVerts, MAX_TRACEMODEL_VERTS );
-		for ( int i = 0; i < numVertices; i++ ) {
-			const idVec3 world = current.i.position + trm->verts[i] * current.i.orientation;
-			vertices[i * 3 + 0] = world.x;
-			vertices[i * 3 + 1] = world.y;
-			vertices[i * 3 + 2] = world.z;
-		}
-	}
+	enhancedShape_t shape;
+	shape.Set( clipModel, current.i.position, current.i.orientation );
+	const idTraceModel *trm = shape.trm;
+	float *vertices = shape.vertices;
+	const int numVertices = shape.numVertices;
 
 	const float speed = linearVelocity.Length();
 	idVec6 dir;
@@ -144,6 +139,9 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 	OpenQ4Physics::rigidContact_t solve[RB_CONTACTS_MAX];
 	contactInfo_t infos[RB_CONTACTS_MAX];
 	int ages[RB_CONTACTS_MAX];
+	int types[RB_CONTACTS_MAX];			// the collision model's contact type and the body
+	int features[RB_CONTACTS_MAX];		// feature that made each contact (EnhancedContacts.h)
+	float gaps[RB_CONTACTS_MAX];
 	int count = 0;
 
 	for ( int i = 0; i < numSwept && count < RB_CONTACTS_MAX; i++ ) {
@@ -163,6 +161,9 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 		}
 		infos[count] = info;
 		ages[count] = 0;
+		types[count] = info.type;
+		features[count] = -1;
+		gaps[count] = 0.0f;
 		count++;
 	}
 
@@ -199,22 +200,25 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 		if ( reported ) {
 			continue;
 		}
-		OpenQ4Physics::Vec3 point;
+		idVec3 point;
 		float separation;
-		if ( !OpenQ4Physics::RenewPersistentContact( vertices, numVertices, OpenQ4Physics::Vec3( cachedNormal.ToFloatPtr() ),
-				OpenQ4Physics::Vec3( cachedPoint.ToFloatPtr() ), rb_enhancedMargin.GetFloat(), 8.0f, point, separation ) ) {
+		if ( !EnhancedRenewContact( shape, cached.type, cached.feature, cachedPoint, cachedNormal, rb_enhancedMargin.GetFloat(), 8.0f,
+				point, separation ) ) {
 			continue;
 		}
 		contactInfo_t &info = infos[count];
 		memset( &info, 0, sizeof( info ) );
 		info.type = CONTACT_TRMVERTEX;
-		info.point.Set( point.x, point.y, point.z );
+		info.point = point;
 		info.normal = cachedNormal;
 		info.dist = info.normal * info.point;
 		info.entityNum = cached.entityNum;
 		info.id = cached.id;
 		info.material = NULL;
 		ages[count] = cached.age + 1;
+		types[count] = cached.type;
+		features[count] = cached.feature;
+		gaps[count] = separation;
 		count++;
 	}
 
@@ -230,12 +234,13 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 		if ( !numVertices ) {
 			c.separation = 0.0f;
 		} else if ( ages[i] > 0 ) {
-			c.separation = OpenQ4Physics::PlaneSeparation( vertices, numVertices, c.normal, c.point );	// renewed: measured at its own vertex
+			c.separation = gaps[i];		// renewed: measured on the feature that made it
 		} else {
 			// the row goes where the body is now, not where the sweep met the surface
-			c.point = OpenQ4Physics::ContactPointNow( vertices, numVertices, c.normal, c.point,
-								OpenQ4Physics::Vec3( dir.SubVec3( 0 ).ToFloatPtr() ), clipModel->GetBounds().GetRadius(), c.separation );
-			infos[i].point.Set( c.point.x, c.point.y, c.point.z );
+			idVec3 pointNow;
+			c.separation = gaps[i] = EnhancedContactGap( self, infos[i], shape, dir.SubVec3( 0 ), rb_enhancedFeatureGaps.GetBool(), pointNow, features[i] );
+			c.point = OpenQ4Physics::Vec3( pointNow.ToFloatPtr() );
+			infos[i].point = pointNow;
 			infos[i].dist = infos[i].normal * infos[i].point;
 		}
 		idEntity *other = gameLocal.entities[infos[i].entityNum];
@@ -281,6 +286,8 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 				solve[kept] = solve[i];
 				infos[kept] = infos[i];
 				ages[kept] = ages[i];
+				types[kept] = types[i];
+				features[kept] = features[i];
 				kept++;
 			}
 		}
@@ -317,6 +324,16 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 	settings.maxRecoverySpeed = 40.0f;
 	settings.deepPenetration = 4.0f;
 	settings.warmStart = 0.85f;
+	settings.impactFriction = idMath::ClampFloat( 0.0f, 1.0f, rb_enhancedImpactFrictionScale.GetFloat() );
+	// A body that touches another moving body does not rebound off its own
+	// support either: the weight of a stack reaches the body under it as
+	// reactions, which arrive as impacts on the floor, and a stack that bounced
+	// on them never came to rest.
+	bool touchesMoving = false;
+	for ( int i = 0; i < allCount && !touchesMoving; i++ ) {
+		touchesMoving = all[i].otherInvMass > 0.0f;
+	}
+	settings.bounceResting = rb_enhancedBounceResting.GetBool() && !touchesMoving;
 
 	OpenQ4Physics::rigidBody_t body;
 	body.invMass = inverseMass;
@@ -448,6 +465,8 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 		cached.id = infos[i].id;
 		cached.body = 0;
 		cached.age = ages[i];
+		cached.type = features[i] >= 0 ? types[i] : 0;
+		cached.feature = features[i];
 		memcpy( cached.impulse, solve[i].impulse, sizeof( cached.impulse ) );
 		StoreEnhancedContactFrame( cached );
 	}
@@ -458,6 +477,7 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 		cached.normal = OpenQ4Physics::Vec3( rotationCollision.c.normal.ToFloatPtr() );
 		cached.entityNum = rotationCollision.c.entityNum;
 		cached.id = rotationCollision.c.id;
+		cached.feature = -1;
 		StoreEnhancedContactFrame( cached );
 	}
 
@@ -493,8 +513,8 @@ bool idPhysics_RigidBody::EvaluateEnhanced( int timeStepMSec, int endTimeMSec ) 
 			self->name.c_str(), gameLocal.time, numSwept, count, supported ? 1 : 0, linearVelocity.Length(), angularVelocity.Length(),
 			enhancedQuietFrames, fraction, current.i.position.ToString( 2 ) );
 		for ( int i = 0; i < count; i++ ) {
-			gameLocal.Printf( "  c%d ent=%d n=%s sep=%.3f appr=%.2f imp=%.3f age=%d\n", i, infos[i].entityNum, infos[i].normal.ToString( 2 ),
-				solve[i].separation, solve[i].approachSpeed, solve[i].impulse[0], ages[i] );
+			gameLocal.Printf( "  c%d ent=%d n=%s sep=%.3f appr=%.2f imp=%.3f age=%d type=%d feature=%d\n", i, infos[i].entityNum, infos[i].normal.ToString( 2 ),
+				solve[i].separation, solve[i].approachSpeed, solve[i].impulse[0], ages[i], types[i], features[i] );
 		}
 	}
 	if ( stoppedByCallback ) {

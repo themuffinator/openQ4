@@ -60,18 +60,49 @@ the legacy path in both modes.
    buoyancy, with the authored linear and angular friction as implicit decay.
 2. One translation sweep along the motion (`idClip::Contacts` with the step's
    travel plus `rb_enhancedMargin`) is both the collision test and the contact
-   query. Each contact's gap is measured from the body vertex the sweep
-   followed into it, not from the lowest vertex overall, which is wrong for a
-   long body on a curved support.
+   query. Each contact's gap is exact. The collision model names the pair of
+   features that would meet (a vertex of the body on a polygon, an edge on an
+   edge, or a vertex of the obstacle on a polygon of the body), and the gap is
+   measured between those features where the body is now
+   (`EnhancedContacts.h`, shared with figures; `rb_enhancedFeatureGaps 0`
+   restores the old estimate for comparison). Until 16 November the gap was
+   estimated from the body vertex nearest the sweep's line, which on faceted
+   ground picked the wrong vertex (see
+   [Contact gaps](#contact-gaps-from-the-collision-models-features)).
 3. A persistent manifold keeps surfaces from recent steps that the sweep no
    longer reports. Planes are stored in the touched body's frame, so a body
    resting on a jostled neighbour cannot fall through it once their sweeps
-   start inside each other.
-4. Warm-started sequential impulses with Coulomb friction (μ = 12 × the
-   body's contact friction, clamped to 0.05..1.2, so the stock 0.05 is 0.6),
-   rolling and spinning resistance, restitution by the body's bouncyness only
-   for a new touch above max(20, 2 g dt) units/s, and speculative gaps (a gap
-   closes to the slop within a step, never past it).
+   start inside each other. A kept contact is measured again on the feature
+   that made it; when that feature has left the plane, on the lowest vertex
+   near the contact point.
+4. Warm-started sequential impulses with Coulomb friction, rolling and
+   spinning resistance, and speculative gaps (a gap closes to the slop within
+   a step, never past it).
+   - **Friction is μ = 3 × the body's authored contact friction**, clamped to
+     0.05..1.2 (`rb_enhancedFrictionScale`): the stock 0.05 is 0.15 and a
+     crate's 0.2 is 0.6. Legacy's contact friction is not a coefficient: each
+     contact removes that fraction of the sliding velocity every step, so a
+     body knocked loose slides a distance that grows with its speed, not its
+     speed squared. The factor is the one at which pushed crates and barrels
+     slide as far as legacy's on a flat floor (see
+     [Friction calibration](#friction-calibration)). Until 16 November it was
+     12, which stopped them in a third of the distance.
+   - **An impact slides and bounces.** A contact the body approaches faster
+     than max(20, 2 g dt) units/s and reaches within the step is an impact. It
+     has no friction (`rb_enhancedImpactFrictionScale` 0) and rebounds by the
+     body's bouncyness. That is legacy's collision impulse: along the normal
+     only, with the authored bounce. A new touch always rebounds. A contact
+     the body already had rebounds too (`rb_enhancedBounceResting` 1) when it
+     is with fixed geometry and the body touches no other moving body: a
+     splash shoves a resting crate into the slope it stands on, and with full
+     friction on that impact, and no bounce because the contact was not new,
+     the crate lost its speed where legacy's skipped up the slope. In a stack
+     that rule does not apply. The weight of the bodies above reaches the one
+     below as reactions, which arrive as impacts on its support; rebounding
+     off them kept the flat-floor stacks hopping for as long as they were
+     awake (325 ms of physics against legacy's 88, and still moving after 19
+     seconds). Slower touches keep full friction and do not bounce, so
+     resting and sliding bodies stop as before.
 5. Overlap is removed by a pseudo velocity that moves but never accelerates
    the body (bounded to 40 units/s); overlap deeper than 4 units is removed by
    position only.
@@ -84,7 +115,18 @@ the legacy path in both modes.
    body's extent by more than `rb_enhancedRotationSweep` is swept.
 8. An energy guard limits any kinetic energy gain to the work gravity and
    external forces did over the step.
-9. Bodies sleep after `rb_enhancedSleepFrames` quiet supported steps. A body
+9. Bodies sleep after `rb_enhancedSleepFrames` (10) supported steps below
+   `rb_enhancedSleepSpeed` (1.5 units/s) and `rb_enhancedSleepAngularSpeed`.
+   Until the third round the window was 20 steps at 3 units/s. The sloped
+   stacks then took 1,988 body steps to settle against 879, and a crate or
+   barrel creeping down the crater at 2 to 3 units/s was put to sleep
+   part-way: at 3 units/s with the short window the Dark Matter splash's
+   median travel there fell to 38 units against legacy's 133. Two other rules
+   were measured and dropped: letting a body woken by a neighbour sleep again
+   after two quiet steps (432 sleep and wake cycles in the explosion scene,
+   and 40 % more body steps, because a sleeping neighbour takes a push as a
+   fixed wall), and restarting the window whenever a body had crept a tenth
+   of a unit (46 % more body steps in the same scene). A body
    that has not moved since it was created also rests as soon as it passes
    legacy's own test: three contacts around the centre of mass and almost no
    motion (`rb_enhancedRestTest`). A body placed in a map passes that test on
@@ -111,8 +153,11 @@ figures, chains and lights. Stock AF defs are read as authored. Tree joints
 are still solved exactly by `idAFTree` in linear time.
 
 1. Speculative contacts per body (reach = the body's travel plus
-   `af_enhancedMargin`, at least legacy's 2 units), with gaps and the
-   persistent manifold as above.
+   `af_enhancedMargin`, at least legacy's 2 units), with exact gaps
+   (`af_enhancedFeatureGaps`) and the persistent manifold as above. An edge of
+   a body lying across an edge of the world is held at the world's edge:
+   until 16 November the row acted at the nearest vertex of the body, which
+   for a limb across a ledge is its end, out over the drop.
 2. The dense LCP over auxiliary rows (limits, contacts, joint and contact
    friction, loop joints) becomes a warm-started projected Gauss-Seidel solve
    on the same constraint matrix. Contact multipliers are matched to last
@@ -188,7 +233,31 @@ are still solved exactly by `idAFTree` in linear time.
    legacy's 247, and 165 without the bounce. `af_enhancedBounce 1` restores it
    for experiments.
 9. Only bodies that move or turn beyond their speculative reach are swept;
-   legacy sweeps every body every step.
+   legacy sweeps every body every step, which is most of what it costs. Two
+   things that legacy's sweeps did are kept another way:
+   - **A body placed inside geometry stays there.** Maps hang lights with
+     chain links inside beams, and monsters die with an arm in a wall. A
+     contact query reports nothing for a surface the body is already behind;
+     legacy's sweep, starting in the surface, cannot move further into it,
+     which is what makes Putra's lights stiff. When a figure wakes, each body
+     is tested against the world and scenery that never moves
+     (`EnhancedBodyEmbedded`); one that starts inside is not pushed out by
+     overlap recovery (`af_enhancedEmbeddedSweep` 1; 2 also sweeps it every
+     step). Before 16 November recovery pushed such links out of their beam
+     and two of Putra's lights came loose.
+   - **A creeping body is audited.** The contact query is one sweep along the
+     velocity the step started with; the solve can turn the body another way,
+     and a small move off that line goes through space nothing looked at. A
+     corpse jittering at a few units a second walked its torso through a thin
+     sheet that way, a tenth of a unit a step. Every `af_enhancedAuditFrames`
+     (8) steps a body that was not swept is swept once along the chord from
+     the pose it was last verified at to where it is now, if that chord is two
+     units or less, and put back where the chord meets a surface. The audit
+     acts only when the body is more than the slop past that point (a resting
+     body sits a slop from its support, as close as a sweep lets anything
+     come) and is not an impact: nothing is called back and nothing is
+     pushed. Sweeping every stray move instead was measured and dropped: it
+     quadrupled the sweeps and stopped limbs in flight (see Known defects).
 10. The energy guard limits kinetic energy as for rigid bodies, but takes the
    excess from the motion relative to the figure's centre of mass first,
    which joint and contact forces can change; only an excess larger than
@@ -218,13 +287,14 @@ struck-body change (`peak_impulse_dv`) and peak body speeds.
 | `physicsStats start [label] \| stop \| report \| frames` | Per-frame CPU samples for rigid bodies and figures; prints one `PHYSICS_STATS {json}` line with totals, median, P95, P99, the worst frame, evaluation and motion counts, sleeps, wakes, sweeps, energy clamps, solver fallbacks and the time spent in them, impulse clamps and peaks, the largest joint stretch and the frames in which any joint was more than 8 units apart. `frames` prints every captured frame's cost (`PHYSICS_FRAMES`). Evaluations over 10 ms print `PHYSICS_SLOW`; rigid bodies over 2000 units/s print `PHYSICS_FAST`. |
 | `physicsDigest [verbose]` | FNV-1a hash of every rigid-body and figure state, and separately of the workload's own `phys_*` entities (map AI and scripts can move map-placed bodies differently between runs). |
 | `physicsReport <prefix \| * \| @debris>` | Mass, mass-weighted centre, momentum and peak body speed per entity; `*` is every entity, `@debris` the client-side debris. |
-| `physicsQuality <prefix \| *> [eye]` | Per entity: the largest joint anchor separation (stretch), the joints with static geometry between a body's centre and the joint (pierced: a limb through a wall or floor, with a `PHYSICS_PIERCED` line naming the joint), the bodies whose centre is inside a solid brush (embedded), whether it is awake and its fastest body. With `eye`, also whether static geometry hides it from the player's eyes. |
+| `physicsQuality <prefix \| *> [eye]` | Per entity: the largest joint anchor separation (stretch), the joints with static geometry between a body's centre and the joint (pierced: a limb through a wall or floor, with a `PHYSICS_PIERCED` line naming the joint; a surface in the gap between a body's box and its joint counts only when it separates the two bodies or reaches more than two units past the joint), the bodies whose centre is inside a solid brush (embedded), whether it is awake and its fastest body. With `eye`, also whether static geometry hides it from the player's eyes. |
 | `physicsWallProbe <yawFrom> <yawTo> <step> [pitch]` | Distance, thickness and incidence of the first static surface along each direction from the player's eyes: where to aim a tunnelling repro. |
+| `physicsRest <prefix>` | Cheat: puts every rigid body and figure whose name starts with the prefix to rest where it is and prints `PHYSICS_REST` with the count. The workloads use it on Air Defense 1's placed ragdolls (see [Budgets](#budgets-and-tolerances)). |
 | `physicsSpawn`, `physicsLaunch`, `physicsDamage`, `physicsRadiusDamage`, `physicsImpulse` | Cheats that stage scenes from the console. `physicsSpawn` places entities in a ring, line, grid or stack, or with their backs to the wall ahead (`wall`), and skips a placement the static world blocks instead of moving it onto its neighbours. `physicsLaunch` fires one entity along the view at a given speed and prints the surface it is aimed at. `physicsImpulse <prefix> * ...` reaches every body a prefix names. |
-| `tools/tests/physics_workloads.py` | Hidden, silent, one tic per frame (`com_fixedTic 1`), console-driven reference workloads in either or both modes. `--frames` records every frame's cost and reduces repeats to a per-frame noise floor; `--cache-root` shares the generated-image cache between runs. |
+| `tools/tests/physics_workloads.py` | Hidden, silent, one tic per frame (`com_fixedTic 1`), console-driven reference workloads in either or both modes. `--frames` records every frame's cost and reduces repeats to a per-frame noise floor; `--rest PREFIX` rests the map's own bodies of that name before measuring; `--cache-root` shares the generated-image cache between runs. |
 | `tools/tests/physics_enhanced_solver.py` | Native test of the production kernels and telemetry (CI). |
-| `tools/tests/physics_defects.py` | PHYS-01 defect repros in stock maps, both modes. |
-| `tools/tests/physics_envelope.py` | PHYS-04 behaviour envelope: `--scene ai`, `moveables`, `mp` or `awakening`. |
+| `tools/tests/physics_defects.py` | PHYS-01 defect repros in stock maps, both modes. The stuck-limb repro pools three stagings (`--stagings`). |
+| `tools/tests/physics_envelope.py` | PHYS-04 behaviour envelope: `--scene ai`, `moveables`, `moveables-flat`, `crates-flat`, `barrels-flat`, `mp` or `awakening`. |
 | `tools/tests/physics_coverage.py` | PHYS-04 for bodies held by the world and for client debris. |
 | `tools/tests/physics_campaign.py` | PHYS-04 for the stock campaign: the 31-stage level chain and the scripted set pieces, both modes. |
 | `tools/tests/physics_integration.py` | PHYS-05 saves, client, MVD and dedicated checks. |
@@ -278,6 +348,39 @@ every one of them.
   [noise floor](#noise-floor) of repeated runs; multiplayer workloads on the
   median of repeated runs. Any exception is declared here with its bound
   before promotion.
+- **The map's own ragdolls rest first.** From 16 November the Air Defense 1
+  workloads are judged with the map's nine placed ragdolls put to rest before
+  the measurement starts (`--rest env_ragdoll`). Left alone they settle during
+  the measurement for a time that depends on the compiler in both modes, and
+  that time was most of every Air Defense 1 total: a figure moved in about 900
+  steps of a legacy workload on Windows and 131 on Linux, and in 50 and 413 of
+  an enhanced one. It decided the comparison in opposite directions on the two
+  platforms and said nothing about the bodies each workload stages. The
+  unrested runs are still made and recorded.
+- **Proposed CPU exceptions (16 November 2026; not accepted).** Four measured
+  overruns remain after the third round. The budget lets an exception be
+  declared with its bound before promotion; these are the bounds that would
+  cover what was measured, written down for the project owner to accept or
+  reject. Until one of those happens the CPU budget counts as not met on the
+  workloads named. The measurements are in
+  [CPU on the reference workloads](#cpu-on-the-reference-workloads-phys-02-phys-03-phys-06).
+  1. `sp-flatstacks`, total: up to 10 ms above legacy over the workload
+     (measured 2.8 ms on Windows and 8.2 ms on Linux, on totals of 12 and 10
+     ms). Legacy rests a placed stack on its first step; enhanced keeps each
+     body awake for its quiet window and re-wakes neighbours, so the nine
+     bodies take 425 to 538 steps against 145 to 164. The stack stands in
+     both.
+  2. `sp-ragdolls` on Linux x64, total: up to 25 % above legacy (measured
+     21 %, 16.6 ms; 15 % below legacy on Windows). The three staged corpses
+     take 461 moving steps to settle against 339 with GCC, and 340 against 332
+     with MSVC; a step costs the same in both modes.
+  3. `sp-explosion` on Windows, total: up to 5 % above legacy (measured 3 %,
+     2.2 ms; 26 % below on Linux), and worst frame up to 1 ms above (measured
+     2.68 ms against 1.80, the frame in which the 13 staged bodies take their
+     first step and enhanced builds their contact manifolds).
+  4. Worst frame on any workload: up to 0.05 ms above legacy where both are
+     under half a millisecond (measured 0.41 against 0.37 on `sp-setpiece`
+     and 0.14 against 0.12 on `sp-flatstacks`, both on Linux).
 - **Replay.** Legacy mode must reproduce the pre-change binary's workload
   digests exactly. Each mode must reproduce its own digests between runs on
   single-player workloads (multiplayer bots are not deterministic).
@@ -294,7 +397,11 @@ every one of them.
   median travel of one staging of six corpses moved by up to 40 % with no
   change in the mean. The heavy and falling classes are therefore judged on
   three stagings pooled (ring radius 96, 104 and 112: 17 or 18 bodies). A
-  resting corpse that a light hit does not move is judged on one.
+  resting corpse that a light hit does not move is judged on one. The
+  multiplayer scene cannot be staged: each run draws its own spawn points,
+  and about one corpse in twenty tumbles 200 to 500 units down the map in
+  either mode. From the third round its falling classes are pooled over six
+  repeats, after a run of three failed one of them on that draw alone.
 - **Falling light hits.** A corpse hit while it is still falling travels
   mostly by its own collapse down the slope, not by the hit. The largest of
   those collapses is a poor yardstick: legacy's own largest grows from 69
@@ -308,27 +415,49 @@ every one of them.
   caught limb sets the peak in either mode.
 - **Defect repros.** Enhanced mode must be no worse than legacy on every
   repro measure, and may never leave a body behind the surface it was fired
-  at or outside the world.
+  at or outside the world. Limbs left in geometry are counted over three
+  stagings of six corpses each: one staging is a draw.
+- **Pierced joints.** A joint counts as pierced when static geometry lies
+  between a body's centre and the joint, more than a unit from the joint.
+  From 16 November a surface that lies outside the body's own box, in the gap
+  before the joint, counts only when it separates the two bodies or reaches
+  more than two units past the joint. A strogg marine's neck joint is 10.6
+  units from the centre of a head whose box reaches 7.6 at most, and a ridge
+  of terrain that pokes 1.1 units into that gap under a corpse lying face
+  down touches neither body: it was counted in three of this round's first
+  runs, in two different corpses.
+- **Settled before a hit.** A hit on a resting corpse is staged four seconds
+  after the kill. On The Awakening's trench one grunt of the ring dies on the
+  edge and is still falling then in both modes (22 units/s in legacy, 63 in
+  enhanced), so that scene waits ten seconds.
 
 History of the tolerances: the light-hit speed bound was "never above
 legacy" until 14 November (a corpse still falling when it is hit, or one that
 rolls once on a weak bump, peaked at 122 and 42 units/s against legacy's 103
 and 26, which is noise at those speeds, not a flung body). Stagings, the
-falling bound and the stretch rule date from 16 November.
+falling bound and the stretch rule date from 16 November, as do judging a
+heavy hit on the bodies it reached, the six multiplayer repeats and resting
+the map's ragdolls before a CPU measurement.
 
 ## Evidence
 
-Windows x64, RTX 4060 Laptop, debugoptimized build of the sources that landed
-on `main` as `3f44d3684` (measured before landing, as a snapshot on top of
-`f28e8ced0` that this document calls `48730095e`; the binaries report
-`0.14.1-dev+gd522613e`, the commit they were configured at), hidden window,
-silent, OpenGL, one tic per frame. The machine is shared and was at
-full load throughout, with three of these clients running at once from
-separate copies of the staged runtime; CPU figures use the noise floor.
-Linux and ARM64 figures are in their own section. Everything here is from 16
-November 2026 unless a date says otherwise. Raw harness outputs were local
-scratch and are not kept in the repository; every harness named here
-reproduces its table.
+Three rounds. The first (14 November 2026) built the enhanced step; the
+second (15 and 16 November) widened the testing and fixed what it found in
+figures and placed pickups; the third (16 November) fixed the defects the
+second left open, as measured on Windows, and then found three checks
+failing on Linux x64 that pass on Windows (a splash class on resting corpses,
+a placed figure on a ledge and, by 0.09 units, a joint-stretch bound on
+Putra's lights). The tables are the third round's unless a line
+says otherwise.
+
+Windows x64, RTX 4060 Laptop, debugoptimized build of the third round's
+sources, measured before they landed as snapshot `c45be1f81` on top of
+`1a60c6c80` (the binaries report the commit they were configured at),
+hidden window, silent, OpenGL, one tic per frame. The machine is shared;
+most runs had two or three of these clients going at once, and CPU figures
+use the noise floor. Linux and ARM64 figures are in their own section. Raw
+harness outputs were local scratch and are not kept in the repository; every
+harness named here reproduces its table.
 
 ### Legacy replay
 
@@ -340,11 +469,14 @@ were identical at every checkpoint. The all-bodies digest also covers
 map-placed bodies that map AI and scripts move; it differs between two runs
 of the same binary too, so it is not evidence either way.
 
-On 16 November the final build's legacy digests were compared with the ones
-recorded on 14 November: identical on all five workloads at every checkpoint.
-This round's solver changes are all inside the enhanced branches; the shared
-wrappers gained only telemetry. Each mode repeats its own digests over five
-runs on Windows and three on Linux x64. Windows and Linux digests differ from
+After each round the build's legacy digests were compared with the ones
+recorded on 14 November: identical on all five workloads at every checkpoint,
+the third round's included. Every solver change is inside the enhanced
+branches; the shared wrappers gained only telemetry. Each mode repeats its own digests over five
+runs on Windows and three on Linux x64 with the map's ragdolls at rest. Of
+the three unrested Windows runs one enhanced `sp-explosion` run started two
+game frames earlier than the others and differs from them (see the CPU
+section). Windows and Linux digests differ from
 each other in both modes, legacy included (MSVC and GCC do not round the same
 way), so no digest is claimed across platforms.
 
@@ -362,16 +494,26 @@ burnt away by then. The replay evidence is the first two checkpoints of
 
 | Repro | Legacy | Enhanced | Verdict |
 | --- | --- | --- | --- |
-| Resting jitter: crate and barrel stacks on the sloped crater floor, nudged, read from 12 to 20 seconds | 1,767 sleeps and 1,757 wakes; one body still awake | 20 sleeps and 8 wakes; none awake; no drift | Legacy shows it; enhanced does not |
+| Resting jitter: crate and barrel stacks on the sloped crater floor, nudged, read from 12 to 20 seconds | 1,767 sleeps and 1,757 wakes; one body still awake | 22 sleeps and 11 wakes; none awake; no drift | Legacy shows it; enhanced does not |
 | Twitching: the eight placed marine ragdolls, nudged on the chest | One still awake after 10 seconds, all at rest after 30 | All at rest after 10 seconds | Not reproduced as endless; enhanced settles sooner |
 | Sliding corpses: six fresh corpses on the crater slope, read from 4 to 8 seconds (the game removes them at about 10) | No drift | No drift | Not reproduced |
-| Stuck limbs: six marines killed with their backs to a wall, then thrown by a Dark Matter splash | No pierced joints, no embedded bodies | None | Not reproduced in legacy; enhanced equal |
-| Joint stretch: six resting corpses thrown by a Dark Matter splash, read every second frame | Largest 85 units; more than 8 units apart for 42 frames | Largest 106 units; more than 8 units apart for 18 frames | Legacy shows it; enhanced is shorter, not gone |
+| Stuck limbs: marines killed with their backs to a wall, then thrown by a Dark Matter splash; 18 corpses over three stagings | No pierced joints, no embedded bodies | None | Not reproduced in legacy; enhanced equal |
+| Joint stretch: six resting corpses thrown by a Dark Matter splash, read every second frame | Largest 85 units; more than 8 units apart for 42 frames | Largest 37 units; more than 8 units apart for 22 frames | Legacy shows it; enhanced is smaller and shorter, not gone |
 | Tunnelling: a marine helmet fired at the terrain at 600 to 9,000 units/s, straight on to 30 degrees off, 18 launches | None behind the surface | None | Not reproduced; the native test covers the kernel |
-| Placed ragdolls: the eight placed marines settling from the map's pose | No pierced joints; none sinks | `env_ragdoll_marine_fullgear_6` sinks 7.9 units and ends with two joints pierced | **Enhanced is worse** (open, see Known defects) |
+| Placed ragdolls: the eight placed marines settling from the map's pose | No pierced joints; none sinks | No pierced joints; the largest sink is 1.0 unit | Not reproduced in legacy; enhanced within the 2-unit tolerance |
 
-How three of these got there:
+All seven pass on Windows; on Linux x64 `placed-ragdolls` fails (see
+[Linux x64 and ARM64](#linux-x64-and-arm64-phys-05-phys-06)). How four of
+these got there:
 
+- **Placed ragdolls.** Until the third round `env_ragdoll_marine_fullgear_6`,
+  which the map lays across the lip of a ledge, sank 7.9 units and came to
+  rest with two joints pierced. Its limbs meet the ledge edge on edge, and
+  the contact row acted at the nearest vertex of the limb, its end out over
+  the drop, instead of at the ledge. With the gap measured on the features
+  the collision model reports, the row acts at the ledge's edge and the
+  figure stays (see
+  [Contact gaps](#contact-gaps-from-the-collision-models-features)).
 - **Stuck limbs.** Until 16 November about one corpse in six in this repro
   came to rest in enhanced mode with a shoulder, elbow or knee a few units
   inside the wall or floor (one to four pierced joints over five settings
@@ -385,6 +527,13 @@ How three of these got there:
   rocket-splashed corpses then moved less than 32 units, against 7 before
   and 3 in legacy). Sweeping only the recovery's own share of the motion
   removed the pierced joints in all five settings and left real motion alone.
+  The third round found one more path, over 18 corpses instead of six: a
+  corpse jittering at about 5 units/s after the splash walked the corner of
+  its torso 3.5 units through a thin sheet of scenery by the crashed dropship
+  (`func_static_54069`) over some forty steps, each move too small to be swept and off the line
+  its contact query had covered. The creep audit (figures, point 9) puts
+  such a body back: 0 of 18 corpses with it, 1 of 18 without, the same build
+  otherwise.
 - **Joint stretch.** With the 32 units/s correction alone (the 14 November
   solver) enhanced corpses stayed visibly stretched longer than legacy's on
   every hit: 21, 45, 89 and 76 frames against legacy's 3, 13, 34 and 46 for a
@@ -401,42 +550,159 @@ How three of these got there:
   away behind a rise. The repro now reads each body ten frames after its
   launch. Legacy sweeps every body every step and does not tunnel here.
 
+### Contact gaps from the collision model's features
+
+A contact query (`idClip::Contacts`) sweeps a body along its motion and
+returns every pair of features that would meet, each with the point where
+they would meet, the contact normal, its type and the two features. The
+enhanced step needs one more thing the query does not give: how far apart the
+pair is now. Until the third round that gap was estimated from the body
+vertex nearest the line back along the sweep. Three traces on Air Defense 1
+showed the estimate failing on faceted ground:
+
+| Case | Estimated | What happened |
+| --- | --- | --- |
+| A crate flying at the crater wall at 296 units/s; the sweep reached 5.9 units | The wall was measured 33.5 units away (the far side of the crate) | Nothing held the crate back and it ended 3 units inside the wall |
+| A barrel knocked along the concave crater floor; a contact kept from the previous step was measured against every vertex of the barrel | 5.9 units of overlap with a facet the barrel was 0.8 units above | The contact counted as deep overlap, and one step moved the barrel 21 % of its distance |
+| A limb of `env_ragdoll_marine_fullgear_6` lying across the lip of a ledge, edge on edge | The contact row acted at the nearest vertex of the limb: its end, out over the drop | The figure sank 7.9 units and rested with two joints pierced |
+
+The collision model already says which features meet, so the gap is now
+measured on them (`EnhancedContacts.h`): a body vertex above the polygon's
+plane; a body edge above the obstacle's point, with the row at the
+obstacle's edge; an obstacle vertex below the body polygon's plane, with the
+row at the obstacle's vertex. A kept contact remembers its feature. The
+effect is in the tables that follow: the placed ragdoll stays on its ledge,
+joints after a Dark Matter splash stay visibly apart for fewer frames than
+before, and mean corpse travel after a splash is at legacy's.
+
+### Friction calibration
+
+Legacy's contact friction is not a coefficient. Every step each contact
+takes that fraction of the body's sliding velocity (0.05 for a stock
+moveable, 0.2 for a crate), so a sliding body slows in proportion to its
+speed, a body on a slope creeps at a steady speed instead of stopping, and
+with its collisions bouncing it off the floor it spends much of a slide not
+touching anything. No single coefficient reproduces that, but one factor
+between the authored value and the coefficient can match how far a shoved
+body slides, and that is what was fitted: one kind of body on Hangar
+Perimeter's flat floor, every body shoved along the floor with the same
+impulse, three stagings pooled (six bodies). Median travel in units:
+
+| Body, shove (launch speed) | Legacy | Factor 12 | Factor 6 | Factor 3 | Factor 2 |
+| --- | --- | --- | --- | --- | --- |
+| Crate, 4,000 (122 units/s) | 13 | 10 | 10 | 13 | |
+| Crate, 10,000 (305 units/s) | 51 | 31 | 31 | 51 | |
+| Barrel, 10,000 (112 units/s) | 26 | 8 | 16 | 29 | 31 |
+| Barrel, 20,000 (224 units/s) | 60 | 32 | 47 | 44 | 50 |
+| Barrel, 40,000 (447 units/s) | 70 | 60 | 60 | 63 | 62 |
+
+A crate's coefficient is clamped at 1.2 for both 12 and 6, so those columns
+agree for crates. At 12 a barrel stops in a third of legacy's distance at the
+lowest speed and a crate in 0.6 to 0.8 of it; at 3 crates match legacy and
+barrels are within about a quarter of it; 2 is no better for barrels and was
+not measured for crates. The factor is 3: 0.15 for the stock 0.05, 0.6 for a
+crate. These columns are from ad hoc traces of this round's work, with the
+impact rules already as shipped. The shipped factor is kept honest by two
+harness scenes, `physics_envelope.py --scene crates-flat` and `--scene
+barrels-flat`, judged like heavy hits (legacy / enhanced):
+
+| Body, shove | Result | Bodies | Median travel | Mean travel | Largest travel |
+| --- | --- | --- | --- | --- | --- |
+| Crate, 4,000 | PASS | 6 / 6 | 13 / 13 | 19 / 18 | 54 / 36 |
+| Crate, 7,000 | PASS | 6 / 6 | 25 / 30 | 32 / 35 | 59 / 55 |
+| Crate, 10,000 | PASS | 6 / 6 | 50 / 51 | 52 / 52 | 63 / 105 |
+| Barrel, 10,000 | PASS | 6 / 6 | 26 / 29 | 37 / 25 | 64 / 47 |
+| Barrel, 20,000 | PASS | 6 / 6 | 60 / 44 | 68 / 54 | 144 / 127 |
+| Barrel, 40,000 | PASS | 6 / 6 | 70 / 63 | 87 / 72 | 166 / 138 |
+
+Faster crates reach the room's walls and steps, which then decide where they
+stop: at 20,000 legacy's travel 139 units at the median and end 17 units
+higher than they started, enhanced's travel 47 and stay on the floor. The
+crate scene therefore ends at 10,000.
+
 ### Behaviour envelope (PHYS-04)
 
 `tools/tests/physics_envelope.py`. Legacy / enhanced; travel in units from
 the report before the hit to the one six seconds later; heavy and falling
-classes pooled over three stagings.
+classes pooled over three stagings. A heavy hit is judged on the bodies it
+reached, those whose velocity it changed: on the scenes below that is every
+body, on The Awakening's trench about half.
 
 **Strogg marine corpses on Air Defense 1's crater floor (`--scene ai`): all
-classes pass.**
+classes pass on Windows; the rocket and grenade splash fail on Linux (below
+the table).**
 
-| Hit | Class | Result | Corpses | Median travel | Largest travel | Peak speed | Largest stretch, frames visible |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| raw impulse | momentum | PASS | 6 / 6 | momentum change within 2 % in both modes | | | |
-| machinegun | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 13 for 3 / 11 for 5 |
-| machinegun, still falling | light | PASS | 17 / 17 | 60 / 56 | 91 / 119 | 125 / 161 | 25 for 14 / 20 for 13 |
-| gauntlet | light | PASS | gibs every corpse in both modes | | | | |
-| hyperblaster splash | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 13 for 3 / 11 for 5 |
-| weak vehicle-sized bump | light | PASS | 6 / 6 | 1 / 1 | 1 / 17 | 26 / 41 | 13 for 3 / 11 for 5 |
-| rocket direct | heavy | PASS | gibs every corpse in both modes | | | | |
-| rocket splash | heavy | PASS | 17 / 17 | 110 / 63 | 233 / 156 | 864 / 897 | 34 for 158 / 28 for 30 |
-| grenade splash | heavy | PASS | 17 / 17 | 110 / 63 | 233 / 156 | 864 / 897 | 34 for 158 / 28 for 30 |
-| grenade splash, still falling | heavy | PASS | 17 / 17 | 274 / 241 | 461 / 457 | 1,156 / 1,066 | 37 for 87 / 118 for 50 |
-| Dark Matter splash | heavy | PASS | 17 / 17 | 231 / 139 | 472 / 492 | 1,754 / 1,579 | 88 for 113 / 116 for 59 |
+| Hit | Class | Result | Corpses | Median travel | Mean travel | Largest travel | Peak speed | Largest stretch, frames visible |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| raw impulse | momentum | PASS | 6 / 6 | momentum change within 2 % in both modes | | | | |
+| machinegun | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 13 for 3 / 11 for 5 |
+| machinegun, still falling | light | PASS | 17 / 17 | 60 / 51 | 56 / 64 | 91 / 117 | 125 / 158 | 25 for 14 / 20 for 13 |
+| gauntlet | light | PASS | gibs every corpse in both modes | | | | | |
+| hyperblaster splash | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 13 for 3 / 11 for 5 |
+| weak vehicle-sized bump | light | PASS | 6 / 6 | 1 / 1 | 1 / 1 | 1 / 2 | 26 / 15 | 13 for 3 / 11 for 5 |
+| rocket direct | heavy | PASS | gibs every corpse in both modes | | | | | |
+| rocket splash | heavy | PASS | 17 / 17 | 110 / 71 | 117 / 113 | 233 / 441 | 864 / 915 | 34 for 158 / 31 for 37 |
+| grenade splash | heavy | PASS | 17 / 17 | 110 / 71 | 117 / 113 | 233 / 441 | 864 / 915 | 34 for 158 / 31 for 37 |
+| grenade splash, still falling | heavy | PASS | 17 / 17 | 274 / 280 | 217 / 227 | 461 / 445 | 1,156 / 972 | 37 for 87 / 20 for 14 |
+| Dark Matter splash | heavy | PASS | 17 / 17 | 231 / 227 | 224 / 292 | 472 / 836 | 1,754 / 1,746 | 88 for 113 / 44 for 78 |
 
 The stretch columns include the quiet kill that stages each scene (13 units
 for 3 frames in legacy). Every enhanced splash spread the push of a light limb
 over its figure (193 or 194 impulse clamps over three stagings), so no struck
 body changed speed by more than 300 units/s against legacy's 1,058 to 2,116.
+On every splash enhanced joints are visibly apart for fewer frames than
+legacy's, and by less.
+
+After a Dark Matter splash four of 17 enhanced corpses end further away than
+any legacy one (501, 667, 690 and 836 units against legacy's largest of 472),
+and one after a rocket splash (441 against 233). They leave no faster than
+legacy's (peak body speed 1,746 against 1,754) and stop in the map: they slide
+on down the crater instead of catching on it. The heavy classes have no bound
+on the largest travel, so this passes; it is recorded under Known defects.
+
+**The rocket and grenade splash pass on a knife edge, and fail on Linux.**
+Resting corpses hit by a 10,000-unit splash fall into two groups in both
+modes: those the blast lifts off the ground, which travel 90 to 440 units,
+and those that slide and stop within about 65. Legacy leaves 4 of 17 in the
+second group. Enhanced leaves 8 on Windows and 9 on Linux, so its median,
+the ninth of 17, is the first corpse of the far group on Windows (71 units
+against legacy's 110, 0.65x) and the last of the near group on Linux (39
+against 144, 0.27x, a **FAIL** against the 0.4x bound). Sorted travel on
+Windows, legacy then enhanced:
+
+    12 12 32 37 | 96 97 101 104 110 114 139 149 164 179 191 223 233
+    14 16 19 20 36 37 53 53 | 71 90 145 158 177 189 192 214 441
+
+and on Linux:
+
+     8 16 32 59 | 96 101 135 141 144 145 146 151 159 177 189 229 416
+     6 10 12 14 16 31 32 38 39 | 62 104 116 125 146 164 169 439
+
+Four settings were switched on the Windows build without rebuilding, three
+stagings each, to find what holds the near group down. None does:
+
+| Enhanced variant | Corpses within 65 units | Median | Mean | Largest stretch, frames visible |
+| --- | --- | --- | --- | --- |
+| Shipped | 8 of 17 | 71 | 113 | 31 for 37 |
+| Impulse guard at 600 units/s instead of 300 | 7 | 111 | 130 | 40 for 34 |
+| No impulse guard | 7 | 85 | 114 | 40 for 47 |
+| No creep audit | 9 | 47 | 98 | 23 for 34 |
+| Stopping surface not added to the contacts | 6 | 112 | 118 | 28 for 283 |
+| Joint correction as velocity up to legacy's 256 units/s | 10 | 39 | 72 | 23 for 40 |
+| Legacy | 4 | 110 | 117 | 34 for 158 |
+
+The median moves between 39 and 112 with changes that leave the grouping as
+it is, which is what a median in the gap between two groups does. The cause
+of the larger near group is not found.
 
 **Where a thrown corpse loses its speed.** Right after a splash both modes
 carry the same momentum: a rocket splash leaves each resting corpse's centre
 of mass at about 800 units/s, a Dark Matter splash at about 1,600. Six frames
 later legacy still has roughly 60 % of it; enhanced, with impact friction
-bounded by the resting load as it was until 16 November, had 30 %. A corpse hit in the air lands as far in either mode (0.97x to
-1.02x of legacy's mean travel in every variant measured), so the loss is in
-the launch off the ground. Measured over three stagings, as enhanced mean
-travel over legacy's:
+bounded by the resting load as it was until the second round, had 30 %. A
+corpse hit in the air lands as far in either mode, so the loss was in the
+launch off the ground. Measured over three stagings, as enhanced mean travel
+over legacy's:
 
 | Enhanced variant | Rocket splash | Dark Matter splash | Grenade splash, falling | Machinegun, falling |
 | --- | --- | --- | --- | --- |
@@ -444,78 +710,141 @@ travel over legacy's:
 | The same with fast-sliding contacts keeping half their friction | 0.55 | 0.58 | 1.04 | 1.13 |
 | The same with a quarter | 0.55 | 0.56 | 1.03 | 1.11 |
 | Frictionless impacts | 0.50 | 0.71 | 0.99 | 1.12 |
-| Frictionless impacts, recovery swept on its own (shipped) | 0.65 | 0.71 | 1.02 | 1.16 |
+| Frictionless impacts, recovery swept on its own (second round) | 0.65 | 0.71 | 1.02 | 1.16 |
+| The same with contact gaps measured on the collision model's features, and the creep audit (third round, shipped) | 0.97 | 1.30 | 1.04 | 1.15 |
 
 Sliding friction does not decide it, so the sliding factor was dropped.
 Friction on the landing contacts does for the faster hit: a thrown corpse
 touches down on several bodies at once with up to three contacts each, and
-one resting load of friction on each is far more than legacy's none. What
-remains is momentum legacy keeps because its 256 units/s joint correction
-adds energy while its stopped limbs catch up, which the product rules do not
-allow enhanced mode to copy. Corpses launched off the ground therefore travel
-about two thirds as far as in legacy, inside the 0.4x gate.
+one resting load of friction on each is far more than legacy's none. The
+second round put the remaining third down to momentum legacy keeps through
+its 256 units/s joint correction. That was wrong. It was the contact gaps: a
+limb's gap to faceted ground was misjudged, which held limbs back or let them
+into the ground, and each one stopped that way pulled on its figure. With the
+gaps measured exactly, mean travel after a rocket splash is at legacy's and
+the median at 0.64x; after a Dark Matter splash the median is at legacy's
+and the mean above it, because of the four corpses that slide on.
 
-**Crates and barrels on the same floor (`--scene moveables`): the splash
-classes fail.**
+**Crates and barrels on the same crater floor (`--scene moveables`): all
+classes pass.**
 
-| Hit | Class | Result | Bodies | Median travel | Largest travel | Peak speed |
-| --- | --- | --- | --- | --- | --- | --- |
-| raw impulse | momentum | PASS | 6 / 6 | momentum change within 2 % in both modes | | |
-| machinegun, gauntlet, hyperblaster splash, rocket direct | light and heavy | PASS | 6 / 6 or 18 / 18 | 0 / 0 (damage does not push these bodies in either mode) | | |
-| weak vehicle-sized bump | light | PASS | 6 / 6 | 38 / 11 | 208 / 152 | 128 / 128 |
-| rocket splash | heavy | **FAIL** | 18 / 18 | 57 / 22 | 222 / 143 | 297 / 296 |
-| grenade splash | heavy | **FAIL** | 18 / 18 | 57 / 22 | 222 / 143 | 297 / 296 |
-| Dark Matter splash | heavy | **FAIL** | 18 / 18 | 133 / 40 | 263 / 140 | 341 / 419 |
-
-Enhanced crates and barrels start as fast as legacy's and stop in a third of
-the distance (0.38x and 0.30x of legacy's median). This is the rigid-body
-step, which this round did not change apart from the rest test. See Known
-defects for what was tried.
-
-**The Awakening's grunts on `m01_stranarus_trench2` (`--scene awakening`,
-`fs_game q4xbase`): seven of ten classes pass.**
-
-| Hit | Class | Result | Corpses | Median travel | Largest travel | Peak speed | Largest stretch, frames visible |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| raw impulse | momentum | PASS | 7 / 7 | momentum change within 2 % in both modes | | | |
-| machinegun | light | PASS | 7 / 7 | 0 / 0 | 0 / 1 | 4 / 8 | 37 for 47 / 8 for 0 |
-| machinegun, still falling | light | PASS | 22 / 22 | 39 / 36 | 256 / 266 | 168 / 182 | 37 for 54 / 18 for 14 |
-| gauntlet | light | PASS | 7 / 7 | 0 / 0 | 0 / 1 | 4 / 8 | 37 for 47 / 8 for 0 |
-| hyperblaster splash | light | PASS | 7 / 7 | 0 / 0 | 0 / 1 | 4 / 8 | 37 for 47 / 8 for 0 |
-| weak vehicle-sized bump | light | **FAIL** | 7 / 7 | 0 / 1 | 1 / 223 | 7 / 17 | 37 for 47 / 8 for 0 |
-| rocket direct | heavy | PASS | 22 / 22 | 0 / 0 | 0 / 5 | 4 / 11 | 37 for 54 / 18 for 14 |
-| rocket splash | heavy | **FAIL** | 22 / 22 | 41 / 66 | 345 / 287 | 556 / 587 | 37 for 89 / 20 for 32 |
-| grenade splash | heavy | **FAIL** | 22 / 22 | 41 / 73 | 345 / 278 | 556 / 605 | 37 for 89 / 20 for 52 |
-| grenade splash, still falling | heavy | PASS | 22 / 22 | 145 / 159 | 331 / 330 | 652 / 644 | 37 for 96 / 113 for 98 |
-| Dark Matter splash | heavy | PASS | 22 / 22 | 144 / 143 | 489 / 406 | 1,068 / 1,082 | 37 for 173 / 34 for 64 |
-
-On this terrain the splash medians are above legacy's, 1.6x and 1.8x against
-a 1.6x bound, and one of seven bumped corpses left its spot: it moved further
-than legacy's (legacy's largest is 1 unit) and went over the trench's edge.
-Legacy's quiet kill alone stretches a grunt by 37 units for 47 frames;
-enhanced by 8 for none.
-
-**Player corpses on `mp/q4dm1` (`--scene mp`, a listen server with six
-paused bots, three stagings): all classes pass.**
-
-| Hit | Class | Result | Corpses | Median travel | Largest travel | Peak speed | Largest stretch, frames visible |
+| Hit | Class | Result | Bodies | Median travel | Mean travel | Largest travel | Peak speed |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | raw impulse | momentum | PASS | 6 / 6 | momentum change within 2 % in both modes | | | |
-| machinegun | light | PASS | 18 / 18 | 0 / 0 | 0 / 1 | 0 / 6 | 21 for 9 / 6 for 0 |
-| machinegun, still falling | light | PASS | 18 / 18 | 55 / 55 | 375 / 481 | 761 / 226 | 87 for 45 / 13 for 5 |
-| gauntlet | light | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 0 | 21 for 8 / 6 for 0 |
-| hyperblaster splash | light | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 0 | 95 for 23 / 7 for 0 |
-| weak vehicle-sized bump | light | PASS | 18 / 18 | 3 / 2 | 4 / 4 | 69 / 33 | 27 for 39 / 20 for 15 |
-| rocket direct | heavy | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 0 | 13 for 3 / 10 for 2 |
-| rocket splash | heavy | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 5 / 0 | 21 for 104 / 12 for 8 |
-| grenade splash | heavy | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 0 | 80 for 25 / 13 for 20 |
-| grenade splash, still falling | heavy | PASS | 18 / 18 | 55 / 55 | 348 / 76 | 189 / 116 | 37 for 31 / 9 for 2 |
-| Dark Matter splash | heavy | PASS | 18 / 18 | 0 / 0 | 25 / 1 | 28 / 25 | 80 for 31 / 14 for 15 |
+| machinegun, gauntlet, hyperblaster splash, rocket direct | light and heavy | PASS | 6 / 6 or 18 / 18 | 0 / 0 (damage does not push these bodies in either mode) | | | |
+| weak vehicle-sized bump | light | PASS | 6 / 6 | 38 / 29 | 80 / 69 | 208 / 165 | 128 / 128 |
+| rocket splash | heavy | PASS | 18 / 18 | 57 / 32 | 91 / 51 | 222 / 141 | 297 / 296 |
+| grenade splash | heavy | PASS | 18 / 18 | 57 / 32 | 91 / 51 | 222 / 141 | 297 / 296 |
+| Dark Matter splash | heavy | PASS | 18 / 18 | 133 / 58 | 135 / 64 | 263 / 142 | 341 / 345 |
 
-A player's corpse at rest is not moved by a later hit in either mode; what
-moves is the collapse itself, with the same median in both. Legacy stretches
-a player corpse by 13 to 95 units for 3 to 104 frames over these hits;
-enhanced by 6 to 20 units for at most 20 frames.
+Until the third round the three splash classes failed at 0.38x, 0.38x and
+0.30x of legacy's median. They pass now at 0.57x and 0.44x, with the mean at
+0.56x and 0.47x. Three things were wrong, found by tracing one crate and one
+barrel step by step in both modes:
+
+- **Friction.** Enhanced crates and barrels left as fast as legacy's and lost
+  their speed in a third of the distance: a barrel lost 10 units/s a step
+  where legacy's lost 2. The mapping from the authored friction was four
+  times too strong (see [Friction calibration](#friction-calibration)).
+- **Impacts.** A splash drives a resting body into the slope it stands on.
+  Legacy answers with a frictionless rebound and the body skips up the slope
+  at nearly its full speed; enhanced took the normal part of the speed with
+  no rebound, because the contact was not a new one, and friction on that
+  impact took most of the rest.
+- **Contact gaps.** On the crater's faceted floor the estimated gaps were
+  wrong often enough to stall bodies (see
+  [Contact gaps](#contact-gaps-from-the-collision-models-features)).
+
+What is left is the slope. Legacy's contact friction cannot hold a body on a
+slope: once knocked loose, a barrel (authored friction 0.05) slides down
+anything steeper than about 7 degrees and does not come to rest until the
+ground flattens, so on the crater half of legacy's bodies run on to its
+floor, 130 to 260 units away. Enhanced bodies have a coefficient of friction
+and stop on the slope when they have slowed enough (a barrel on up to about
+8 degrees, a crate on up to about 30). Four of 18 travel 130 units or more
+after a rocket splash and three after a Dark Matter splash, against seven
+and nine in legacy. On a flat floor most of that difference is gone:
+
+**The same crates and barrels on Hangar Perimeter's flat floor (`--scene
+moveables-flat`): all classes pass.**
+
+| Hit | Class | Result | Bodies | Median travel | Mean travel | Largest travel | Peak speed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| raw impulse | momentum | PASS | 5 / 5 | momentum change within 2 % in both modes | | | |
+| machinegun, gauntlet, hyperblaster splash, rocket direct | light and heavy | PASS | 5 / 5 or 13 / 13 | 0 / 0 | | | |
+| weak vehicle-sized bump | light | PASS | 5 / 5 | 15 / 15 | 16 / 12 | 21 / 17 | 128 / 118 |
+| rocket splash | heavy | PASS | 13 / 13 | 24 / 19 | 32 / 23 | 147 / 50 | 303 / 287 |
+| grenade splash | heavy | PASS | 13 / 13 | 24 / 19 | 32 / 23 | 147 / 50 | 303 / 287 |
+| Dark Matter splash | heavy | PASS | 13 / 13 | 38 / 24 | 102 / 84 | 335 / 284 | 596 / 575 |
+
+**The Awakening's grunts on `m01_stranarus_trench2` (`--scene awakening`,
+`fs_game q4xbase`): all classes pass.**
+
+| Hit | Class | Result | Corpses | Median travel | Mean travel | Largest travel | Peak speed | Largest stretch, frames visible |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| raw impulse | momentum | PASS | 7 / 7 | momentum change within 2 % in both modes | | | | |
+| machinegun | light | PASS | 7 / 7 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 37 for 47 / 10 for 3 |
+| machinegun, still falling | light | PASS | 22 / 22 | 39 / 42 | 88 / 94 | 256 / 265 | 168 / 182 | 37 for 54 / 10 for 7 |
+| gauntlet | light | PASS | 7 / 7 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 37 for 47 / 10 for 3 |
+| hyperblaster splash | light | PASS | 7 / 7 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 37 for 47 / 10 for 3 |
+| weak vehicle-sized bump | light | PASS | 7 / 7 | 0 / 0 | 0 / 2 | 1 / 9 | 7 / 27 | 37 for 47 / 10 for 3 |
+| rocket direct | heavy | PASS | 22 / 22 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 37 for 54 / 10 for 7 |
+| rocket splash | heavy | PASS | 22 / 22 (reached 12 / 11) | 41 / 10; reached 95 / 87 | 78 / 66 | 345 / 297 | 556 / 449 | 37 for 89 / 16 for 12 |
+| grenade splash | heavy | PASS | 22 / 22 (reached 12 / 11) | 41 / 19; reached 95 / 87 | 78 / 68 | 345 / 300 | 556 / 449 | 37 for 89 / 10 for 10 |
+| grenade splash, still falling | heavy | PASS | 22 / 22 (reached 16 / 16) | 145 / 154; reached 243 / 201 | 188 / 169 | 331 / 328 | 652 / 643 | 37 for 96 / 13 for 23 |
+| Dark Matter splash | heavy | PASS | 22 / 22 (reached 12 / 11) | 144 / 44; reached 312 / 344 | 162 / 136 | 489 / 407 | 1,068 / 970 | 37 for 173 / 40 for 62 |
+
+This scene is why a heavy hit is judged on the bodies it reached. The ring
+stands on the lip of a trench, and by the time the corpses have settled about
+half of them lie down in it, out of the blast's reach: ten of 22 in legacy and
+eleven in enhanced do not move at all. The median of all 22 then sits between
+the last corpse that stayed and the first that moved, 41 against 10 units
+for a rocket splash, although the corpses the blast did reach travelled alike
+(95 against 87 at the median, 144 against 131 at the mean). Two earlier
+failures on this scene were staging as well. The splash medians of 1.6x and
+1.8x in the second round, and a bumped corpse that moved 223 units, came from
+one grunt that dies on the trench's edge and is still falling four seconds
+after the kill in both modes (22 units/s in legacy, 63 in enhanced): the
+scene now waits ten seconds, and keeps the corpses for thirty with the
+player's own corpse setting (`g_corpseRemoveDelaySP`), since the game removes
+them at ten. Legacy's quiet kill alone stretches a grunt by 37 units for 47
+frames; enhanced by 10 for three.
+
+**Player corpses on `mp/q4dm1` (`--scene mp`, a listen server with six
+paused bots): ten of eleven classes pass at three repeats; the eleventh
+passes at six.**
+
+| Hit | Class | Result | Corpses | Median travel | Mean travel | Largest travel | Peak speed | Largest stretch, frames visible |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| raw impulse | momentum | PASS | 6 / 6 | momentum change within 2 % in both modes | | | | |
+| machinegun | light | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 86 for 33 / 14 for 10 |
+| machinegun, still falling | light | **FAIL** | 18 / 18 | 51 / 59 | 48 / 61 | 66 / 198 | 173 / 132 | 10 for 2 / 31 for 11 |
+| the same, six repeats | light | PASS | 36 / 36 | 56 / 59 | 76 / 56 | 503 / 90 | 652 / 243 | 84 for 57 / 10 for 3 |
+| gauntlet | light | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 0 | 7 / 0 | 92 for 62 / 17 for 30 |
+| hyperblaster splash | light | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 7 / 0 | 10 / 0 | 16 for 7 / 11 for 3 |
+| weak vehicle-sized bump | light | PASS | 18 / 18 | 2 / 1 | 2 / 1 | 6 / 2 | 41 / 28 | 20 for 7 / 11 for 7 |
+| rocket direct | heavy | PASS | 12 / 18 (legacy gibs six) | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 21 for 11 / 16 for 13 |
+| rocket splash | heavy | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 8 | 0 / 159 | 19 for 8 / 7 for 0 |
+| grenade splash | heavy | PASS | 18 / 18 | 0 / 0 | 0 / 2 | 0 / 33 | 0 / 156 | 34 for 23 / 12 for 4 |
+| grenade splash, still falling | heavy | PASS | 18 / 18 | 55 / 57 | 50 / 76 | 65 / 476 | 362 / 287 | 57 for 25 / 11 for 8 |
+| the same, six repeats | heavy | PASS | 36 / 36 | 58 / 54 | 77 / 51 | 430 / 76 | 170 / 367 | 13 for 29 / 23 for 8 |
+| Dark Matter splash | heavy | PASS | 18 / 18 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 84 for 63 / 13 for 7 |
+
+Every run of this scene draws its own spawn points, and about one corpse in
+twenty lies where its collapse carries it 200 to 500 units down the map, in
+either mode. At three repeats the still-falling machinegun class failed
+because enhanced drew one (198 units) and legacy none (largest 66, bound
+114). At six repeats legacy drew two (338 and 503) and enhanced none
+(largest 90). Over the second and third rounds' runs of the two falling
+classes legacy shows nine corpses beyond 200 units (278 to 503) and enhanced
+four (470 to 508), plus that 198. The falling classes of this scene are
+therefore pooled over six repeats (`--stagings 6`); three measure the draw.
+
+A player's corpse at rest is not moved by a later hit in legacy. In enhanced
+one of 18 moved 8 units after a rocket splash and one 33 after a grenade
+splash, at up to 159 units/s; why those two moved was not looked into, and
+both are inside the heavy bound. Legacy stretches a player corpse by 10 to 92 units for 2 to 63
+frames over these hits; enhanced by 7 to 31 units for at most 30 frames.
 
 **Bodies held by the world and client debris
 (`tools/tests/physics_coverage.py`).** The stock maps' hanging corpses
@@ -529,10 +858,25 @@ moves one by half a unit in legacy.
 | Air Defense 1's six lights, light impulse | PASS | swing 0.01 | swing 0.05 |
 | Air Defense 1's six lights, heavy impulse | PASS | swing 0.56, stretch 0.13 | swing 0.95, stretch 0.14 |
 | Air Defense 1's six lights, machinegun, rocket splash | PASS | no motion (damage does not push them) | no motion |
-| Putra's 21 lights, light impulse | PASS | swing 0.02 | swing 0.05 |
-| Putra's 21 lights, heavy impulse | **FAIL** | swing 0.55, all at rest after 15 seconds | swing 4.3 on one light, two still awake after 15 seconds |
+| Putra's 21 lights, light impulse | PASS | swing 0.02 | swing 0.04 |
+| Putra's 21 lights, heavy impulse | PASS | swing 0.55, ends 0.53 from where it hung, stretch 0.8, all at rest after 15 seconds | swing 0.97, ends 0.55 away, stretch 1.3, all at rest |
 | Putra's 21 lights, machinegun, rocket splash | PASS | no motion | no motion |
-| Debris from four launching barrels | PASS | 1 piece, 220 units from the blast, 619 units/s | 1 piece, 210 units, 576 units/s |
+| Debris from four launching barrels | PASS | 1 piece, 232 units from the blast, 683 units/s | 1 piece, 241 units, 734 units/s |
+
+Putra's heavy impulse failed until the third round: one light swung 4.3
+units and two of the 21 were still awake after 15 seconds. Those two
+(`env_swinging_light_16` and `_17`) hang with every body below the top link
+inside geometry, the lamp included; two more have three and five links
+inside it. Legacy sweeps
+every body every step, and a sweep that starts inside a surface cannot move,
+so the map's own geometry pins them: that is why a 12,000-unit impulse moves
+a light half a unit. Enhanced does not sweep slow bodies, and its overlap
+recovery pushed the links out of the beam, after which the chain lay draped
+over it and never settled. A body that is inside static geometry when its
+figure wakes is now left where the map put it (figures, point 9). Sweeping
+those bodies every step as well, without that rule, made it worse (a swing of
+31 units and joints 9 units apart), because recovery pushed while the sweep
+held.
 
 The debris sample is one piece: stock single-player explosions throw little
 client debris, and the multiplayer workload's gibs and brass are measured for
@@ -548,15 +892,17 @@ cost only.
 the game is saved and that save loaded, and the map's own end-level target
 performs the level change. Both modes pass: 62 loads of 62 in order, each in
 the mode asked for, the game ends at `core2`, no errors (397 warnings in
-legacy, 400 in enhanced; the retail maps' own, as recorded in the
+legacy, 396 in enhanced; the retail maps' own, as recorded in the
 [retail baseline ledger](retail-baseline-ledger.md)). The maps hold 1,675
-simulated bodies between them. Over the 31 settle windows legacy spent 1,387
-ms on physics and enhanced 359 ms. Bodies that left the world: 3 in legacy, 2
-in enhanced. Joints pierced by geometry after settling: 11 in legacy, 13 in
-enhanced; the two extra are Air Defense 1's placed marine (see Known
-defects), and Putra's nine, Hub 1's one and Medical Labs' one are the same in
-both. Waste is the one map where enhanced cost more (160 ms against 78, worst
-frame 6.6 ms against 0.7, one run each on a loaded machine).
+simulated bodies between them. Over the 31 settle windows legacy spent 1,742
+ms on physics and enhanced 355 ms, a fifth. Bodies that left the world: 3 in
+legacy, 2 in enhanced. Joints pierced by geometry after settling: 11 in each
+mode, on the same maps (Putra's lights, and one each in Hub 1 and Medical
+Labs); the two extra that enhanced showed in the second round, Air Defense
+1's placed marine, are gone. Four maps cost more in enhanced mode, one run
+each: Waste (142 ms against 101, worst frame 5.9 ms against 1.2), Convoy 2
+(17 ms against 2, with one frame of 14.9 ms), Convoy 2b (10 against 8) and
+Hangar Perimeter (3.5 against 1.4).
 
 The first enhanced walk found two pickups out of place, which legacy leaves
 where the map puts them: Network 1's `ammo_railgun_moveable_1` ended 822
@@ -565,18 +911,22 @@ units away and Core 2's `ammo_shotgun_14` 740. Enhanced rigid bodies waited
 step; in that window the pickup's support contacts aged out of the manifold
 and it tipped off its perch. The rest test for bodies that have not moved
 since they were created fixed both (Network 1: no motion in either mode;
-Core 2: the same one ammo box settles 14 units against legacy's 17). Storage
-2's `ammo_railgun_1` still settles 20 units from its spot in enhanced mode
-and stays put in legacy.
+Core 2: the same one ammo box settles 14 units against legacy's 17). Two
+placed bodies were still out of place after that round: Storage 2's
+`ammo_railgun_1` settled 20 units from its spot and Air Defense 2's
+`env_ragdoll_marine_fullgear_7` fell 134 units from where legacy leaves it.
+Both rest on an edge, and both stay where the map puts them now that edge
+contacts are held at the edge (no body on Storage 2, Network 1 or Air
+Defense 2 moves more than 8 units in the first six seconds in either mode).
 
 **Set pieces.** Each is driven by the map's own trigger or script function,
 in both modes; travel is each driven body's displacement after ten seconds.
 
 | Set piece | Result | Legacy | Enhanced |
 | --- | --- | --- | --- |
-| Air Defense 1: the blasted grunt (`gruntBlasted`) | PASS | peak 1,041 units/s; the script freezes the body half a second later | peak 1,020 units/s; frozen the same way |
-| Building B: the marine thrown at the wall (`ChuckBody1`, impulse 200,000) | PASS | travels 265 units, at rest | travels 247 units, at rest; four impulse clamps |
-| Building B: the falling barrels (`Weld_guard`) | PASS | fall 266 and 216 units, at rest | fall 278 and 265 units, at rest |
+| Air Defense 1: the blasted grunt (`gruntBlasted`) | PASS | peak 937 units/s; the script freezes the body half a second later | peak 973 units/s; frozen the same way; two impulse clamps |
+| Building B: the marine thrown at the wall (`ChuckBody1`, impulse 200,000) | PASS | travels 265 units, at rest; peak 2,492 units/s | travels 207 units, at rest; peak 1,543 units/s; twelve impulse clamps |
+| Building B: the falling barrels (`Weld_guard`) | PASS | fall 266 and 216 units, at rest | fall 278 and 269 units, at rest |
 | Process 1: the knocked-down grate (`knockdownGrate`, impulse 50,000,000) | PASS | falls 135.8 units, at rest | falls 135.7 units, at rest |
 | Storage 2: the falling panel (`panel_fall`) | PASS | already on the floor when shown; no motion | the same |
 | Hub 1: the grate (`grate`) | PASS | falls 215 units, travels 243, at rest | falls 200 units, at rest |
@@ -589,7 +939,8 @@ step in both modes by design, so the chain exercises them unchanged.
 `sp-visual` and `sp-visual-rigid`: 17 moments, three view directions, both
 modes, 102 frames read side by side as contact sheets. They are hidden-window
 captures at 100 degrees field of view with the weapon hidden and brightness
-raised, not a windowed session watched in motion.
+raised, not a windowed session watched in motion. The sheets were made again
+on the third round's build and read the same way as the second round's.
 
 - Marines killed by machinegun and rocket-splash hits, 0.2 to 5 seconds
   after death: in both modes the splashed ones are airborne at half a second
@@ -619,12 +970,12 @@ each of the 31 stock maps in each mode.
 Interpolation at high refresh
 (`tools/tests/presentation_look_runtime.py --scenario ragdoll debris death`
 at 240 Hz, `--cvar g_enhancedPhysics 0` and `1`): all three scenarios pass in
-both modes with no gameplay inside a draw. Posed figure frames were blended
-between simulation steps 432 times of 464 in enhanced mode for the falling
-ragdoll, 239 of 245 with debris flying and 598 of 641 for the death camera
-(93 to 98 %); legacy 1,868 of 1,956, 2,157 of 2,206 and 1,759 of 1,853 (95 to
-98 %). Enhanced poses a quarter as many figure frames over the same capture
-because the map's other figures are asleep. Both steps run once per game tic,
+both modes on the third round's build, with no gameplay inside a draw. Posed
+figure frames were blended between simulation steps 326 times of 337 in
+enhanced mode for the falling ragdoll, 189 of 189 with debris flying and 306
+of 311 for the death camera (97 to 100 %); legacy 1,882 of 1,963, 1,319 of
+1,375 and 1,479 of 1,576 (94 to 96 %). Enhanced poses a fifth as many figure
+frames over the same capture because the map's other figures are asleep. Both steps run once per game tic,
 so the sample cadence the presentation layer sees is unchanged.
 
 The first integration run on 14 November failed two checks for reasons
@@ -637,126 +988,221 @@ was broken in 0.14.1. The check now admits every slot of the entity table.
 
 ### CPU on the reference workloads (PHYS-02, PHYS-03, PHYS-06)
 
-`physics_workloads.py --mode both --frames`, legacy / enhanced. Totals are
-aggregate physics milliseconds over the workload (rigid bodies plus figures);
-p99 and worst are per frame. `sp-ragdolls` stages three of its eight marines
-and `sp-explosion` 13 of its 16 bodies: `physicsSpawn` skips placements the
-static world blocks.
+`physics_workloads.py --mode both --frames --rest env_ragdoll`, legacy /
+enhanced. Totals are aggregate physics milliseconds over the workload (rigid
+bodies plus figures); p99 and worst are per frame. `sp-ragdolls` stages three
+of its eight marines and `sp-explosion` 13 of its 16 bodies: `physicsSpawn`
+skips placements the static world blocks. The step columns count the steps in
+which a rigid body or a figure moved; they are the same in every run of a
+mode on one platform.
 
-**Windows x64, five runs each.**
+**Windows x64, five runs each, the map's ragdolls at rest.** All 50 runs
+pass and each mode repeats its digests.
 
-| Workload | Total, floor | p99, floor | Worst frame, floor | Total, median | Worst frame, median (range) | Sleeps, wakes | Enhanced LCP fallbacks |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| sp-ragdolls | 267 / 83 | 1.07 / 0.60 | 1.32 / 0.76 | 365 / 107 | 7.20 / 5.75 (6.2-8.2 / 3.7-6.0) | 5, 0 / 6, 3 | 53 (2.8 ms) |
-| sp-explosion | 264 / 46 | 0.80 / 0.59 | 2.40 / 2.45 | 328 / 60 | 5.49 / 4.09 (4.8-7.5 / 2.5-7.1) | 42, 27 / 28, 12 | 25 (1.2 ms) |
-| sp-setpiece | 208 / 27 | 0.53 / 0.62 | 0.74 / 0.73 | 270 / 35 | 6.37 / 1.94 (3.4-8.8 / 0.8-9.0) | 3, 1 / 3, 1 | 25 (1.1 ms) |
-| sp-stacks | 310 / 69 | 0.62 / 0.59 | 1.20 / 1.44 | 398 / 86 | 6.33 / 2.24 (5.0-8.8 / 1.5-3.1) | 1,677, 1,667 / 20, 8 | 25 (1.2 ms) |
-| sp-flatstacks | 13 / 9 | 0.05 / 0.07 | 3.52 / 2.70 | 17 / 13 | 4.89 / 5.20 (3.5-9.5 / 2.7-7.9) | 12, 3 / 13, 4 | 0 |
+| Workload | Total, floor | p99, floor | Worst frame, floor | Total, median | Rigid-body steps | Figure steps | Sleeps, wakes | Enhanced LCP fallbacks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| sp-ragdolls | 67.9 / 57.6 | 0.64 / 0.54 | 0.69 / 0.68 | 106 / 82 | 0 / 0 | 332 / 340 | 3, 0 / 3, 3 | 15 (0.6 ms) |
+| sp-explosion | 65.9 / 68.1 | 0.36 / 0.23 | 1.80 / 2.68 | 97 / 101 | 2,260 / 2,710 | 0 / 0 | 39, 26 / 105, 93 | 0 |
+| sp-setpiece | 9.8 / 8.8 | 0.06 / 0.05 | 0.38 / 0.38 | 13 / 18 | 732 / 732 | 1 / 1 | 0, 1 / 0, 1 | 0 |
+| sp-stacks | 118.0 / 26.1 | 0.15 / 0.14 | 0.90 / 0.83 | 195 / 35 | 3,434 / 876 | 0 / 0 | 1,675, 1,667 / 20, 11 | 0 |
+| sp-flatstacks | 11.7 / 14.5 | 0.06 / 0.10 | 0.81 / 0.81 | 22 / 25 | 164 / 425 | 0 / 0 | 12, 3 / 16, 7 | 0 |
 
-- **Total.** Enhanced costs less on all five (31 to 87 % less on the floor).
-  Most of that on the Air Defense 1 workloads is the map's own placed
-  ragdolls: in legacy a figure moves in about 900 of the workload's steps, in
-  enhanced in 97. Rigid bodies alone cost 68 ms against 27 on `sp-explosion`
-  and 124 against 50 on `sp-stacks` (first run of each).
-- **Worst frame.** Single runs spread from 0.8 to 9.5 ms for identical work,
-  which is why the floor is used. On the floor enhanced is lower on three
-  workloads, 0.05 ms higher on `sp-explosion` (the legacy floor there is one
-  reading of five, between 2.4 and 6.7 ms; enhanced's five lie between 2.45
-  and 3.9) and 0.24 ms higher on `sp-stacks` (legacy's five readings of its
-  worst frame are 1.2 to 1.8 ms, enhanced's 1.44 to 2.05). The worst-frame
-  budget is therefore met on three workloads, undecided on one and missed by
-  a quarter of a millisecond on one.
-- **Fallbacks.** The exact LCP solved 25 to 53 steps per workload instead of
-  the iterative solve, for 1.1 to 2.8 ms: under 4 % of enhanced's time, so
-  not where its cost is.
+- **Total.** Enhanced costs less on three workloads (15 % on `sp-ragdolls`,
+  10 % on `sp-setpiece`, 78 % on `sp-stacks`) and more on two: 3 % on
+  `sp-explosion` and 24 % on `sp-flatstacks`, 2.2 and 2.8 ms over the whole
+  workload. Both miss the budget; bounds that would cover them are among the
+  [proposed exceptions](#budgets-and-tolerances).
+- **Totals follow step counts.** A step costs about the same in either mode
+  (0.03 ms for a rigid body, 0.2 ms for a figure), so each total is the
+  number of steps bodies take before they rest. On the sloped stacks legacy's
+  bodies wake each other 1,667 times and take 3,434 steps where enhanced's
+  take 876. In the explosion scene enhanced's take a fifth more steps than
+  legacy's, because each body is held awake for a ten-step quiet window
+  before it may rest and neighbours wake it 93 times. On the flat stacks,
+  which only have to stand, legacy rests each placed body on its first quiet
+  step and enhanced does not.
+- **What the third round cost.** After the second round the explosion scene
+  measured 46 ms against 264. Most of that gap was the map's placed ragdolls
+  settling inside the measurement (see below), and part was crates and
+  barrels that stopped at a third of legacy's travel. With their travel
+  restored they take as many steps as legacy's, and the rigid-body saving
+  that is left is the sleep and wake churn on slopes.
+- **Worst frame.** Single runs spread from 0.4 to 113 ms for identical work,
+  which is why the floor is used. On the floor enhanced is lower or equal on
+  four workloads and 0.9 ms higher on `sp-explosion`, in the frame in which
+  the 13 staged bodies take their first step (five legacy readings of that
+  frame lie between 1.8 and 4.6 ms, five enhanced between 2.7 and 7.5):
+  proposed exception 3.
+- **Fallbacks.** The exact LCP solved 15 steps of `sp-ragdolls` instead of
+  the iterative solve, for 0.6 ms, and none elsewhere.
 
-`mp-frags`, three runs (bots are not deterministic, so medians and ranges):
+**Windows x64, three runs each, as the workloads ran before** (the map's
+nine placed ragdolls settling inside the measurement). All 30 runs pass.
+
+| Workload | Total, floor | p99, floor | Worst frame, floor | Total, median | Rigid-body steps | Figure steps | Sleeps, wakes | Enhanced LCP fallbacks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| sp-ragdolls | 291.1 / 84.3 | 1.13 / 0.70 | 1.24 / 0.89 | 328 / 117 | 0 / 0 | 1,264 / 414 | 5, 0 / 5, 3 | 32 (1.9 ms) |
+| sp-explosion | 351.9 / 79.8 | 1.31 / 0.33 | 2.94 / 3.22 | 543 / 116 | 2,322 / 2,706 | 901 / 49 | 42, 27 / 107, 93 | 8 (0.7 ms) |
+| sp-setpiece | 232.7 / 22.3 | 0.65 / 0.44 | 0.77 / 0.71 | 292 / 30 | 738 / 738 | 902 / 50 | 2, 1 / 2, 1 | 8 (1.0 ms) |
+| sp-stacks | 362.9 / 37.4 | 0.81 / 0.29 | 1.83 / 1.20 | 479 / 45 | 3,434 / 876 | 901 / 49 | 1,677, 1,667 / 22, 11 | 8 (0.7 ms) |
+| sp-flatstacks | 18.4 / 15.1 | 0.06 / 0.10 | 6.81 / 1.22 | 30 / 24 | 164 / 425 | 0 / 0 | 12, 3 / 16, 7 | 0 |
+
+Run this way enhanced costs 71 to 90 % less than legacy on the four Air
+Defense 1 workloads on Windows, and nearly all of that is the figure-steps
+column: the map's placed ragdolls move in about 900 steps of a legacy
+workload and 49 of an enhanced one. On Linux the same column reads the other
+way round (below). That is why the budget is judged with those ragdolls at
+rest. `sp-flatstacks` runs on Hangar Perimeter, which has none, so its two
+tables measure the same thing: three runs put legacy's floor at 18.4 ms and
+five at 11.7, which is the size of the noise on a workload this small. Its
+step counts (164 against 425) are exact, and they say enhanced does more
+work there.
+
+Legacy's digests in these runs are the ones recorded on 14 November on all
+five workloads. Each mode repeats its own digests, with one exception: one of
+the three enhanced `sp-explosion` runs started two game frames earlier than
+the other two by the game clock, for a reason not looked into, and its digests differ
+from the second checkpoint on, with the same step, sleep and wake counts. The
+other two match each other, and all five rested runs match.
+
+`mp-frags` on Windows, three runs (bots are not deterministic, so medians and
+ranges):
 
 | | Legacy | Enhanced |
 | --- | --- | --- |
-| Total ms, median (runs) | 635 (383, 635, 699) | 569 (569, 590, 393) |
-| p99 ms | 0.66 | 0.62 |
-| Worst frame ms, median (range) | 3.30 (1.6-4.7) | 6.18 (1.5-9.2) |
-| Sleeps, wakes (median run) | 16,025, 16,072 | 623, 804 |
-| Largest joint stretch, frames visible (per run) | 18 for 41; 70 for 222; 50 for 128 | 12 for 9; 11 for 10; 14 for 17 |
-| LCP fallbacks | | 162 (9.0 ms) |
+| Total ms, median (runs) | 629 (629, 755, 577) | 658 (935, 658, 559) |
+| p99 ms, median | 1.27 | 1.15 |
+| Worst frame ms, median (range) | 5.67 (5.4-5.9) | 6.11 (6.0-7.2) |
+| Rigid-body steps (runs) | 15,120; 24,966; 6,768 | 24,229; 12,754; 12,718 |
+| Steps that moved a figure (runs) | 1,880; 1,994; 2,178 | 2,766; 2,286; 1,857 |
+| Sleeps, wakes (median run) | 9,511, 9,638 | 1,101, 1,326 |
+| Largest joint stretch, frames visible (per run) | 90 for 118; 54 for 113; 28 for 46 | 14 for 26; 23 for 38; 24 for 17 |
+| LCP fallbacks | | 153 to 220 (11.7 to 13.0 ms) |
 
-The runs differ from each other by more than the modes do (one run's bots
-throw ten times the debris of another's), so this shows no cost difference in
-either direction and does not decide the worst-frame budget. What it does
-show in every run is the sleep and wake churn and the stretched player
-corpses of legacy, and neither in enhanced.
+By the letter of the budget (medians of three runs) enhanced is 5 % and
+0.4 ms above legacy here. The runs differ from each other by far more than
+that (one run's bots throw three and a half times the debris of another's),
+so three runs decide nothing in either direction, and the budget is not
+shown to be met on this workload. What every run does show is the sleep and
+wake churn and the stretched player corpses of legacy, and neither in
+enhanced.
 
 ### Linux x64 and ARM64 (PHYS-05, PHYS-06)
 
 **Linux x64.** WSL2, Ubuntu 24.04.3, GCC 13.3, debugoptimized, built from an
-export of `48730095e`; the client runs under Xvfb on Mesa's software
-renderer. Three runs each, legacy / enhanced; all 30 runs pass without
-errors and each mode repeats its digests.
+export of the third round's snapshot (`c45be1f81`); the client runs under
+Xvfb on Mesa's software renderer. Three runs each with the map's ragdolls at
+rest, legacy / enhanced; all 30 runs pass without errors and each mode
+repeats its digests.
 
-| Workload | Total, floor | p99, floor | Worst frame, floor | Figure steps that moved a figure | Sleeps, wakes | Enhanced LCP fallbacks |
-| --- | --- | --- | --- | --- | --- | --- |
-| sp-ragdolls | 112 / 133 | 1.04 / 1.23 | 1.09 / 1.42 | 504 / 707 | 7, 0 / 9, 3 | 50 (2.3 ms) |
-| sp-explosion | 87 / 88 | 1.04 / 1.21 | 1.20 / 1.46 | 131 / 289 | 39, 22 / 31, 12 | 34 (1.8 ms) |
-| sp-setpiece | 43 / 71 | 1.07 / 1.23 | 1.16 / 1.41 | 132 / 290 | 4, 1 / 6, 1 | 34 (1.8 ms) |
-| sp-stacks | 138 / 98 | 1.02 / 1.22 | 1.26 / 1.44 | 131 / 289 | 2,199, 2,187 / 22, 7 | 34 (1.8 ms) |
-| sp-flatstacks | 8.4 / 6.1 | 0.05 / 0.07 | 0.10 / 0.11 | 0 / 0 | 12, 3 / 13, 4 | 0 |
+| Workload | Total, floor | p99, floor | Worst frame, floor | Total, median | Rigid-body steps | Figure steps | Sleeps, wakes | Enhanced LCP fallbacks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| sp-ragdolls | 79.3 / 95.9 | 0.76 / 0.70 | 1.00 / 0.97 | 102 / 113 | 0 / 0 | 339 / 461 | 3, 0 / 3, 3 | 18 (0.7 ms) |
+| sp-explosion | 91.9 / 68.1 | 0.34 / 0.22 | 0.37 / 0.26 | 109 / 82 | 3,007 / 2,708 | 0 / 0 | 461, 448 / 105, 93 | 0 |
+| sp-setpiece | 11.0 / 9.0 | 0.06 / 0.05 | 0.37 / 0.41 | 14 / 12 | 732 / 732 | 1 / 1 | 0, 1 / 0, 1 | 0 |
+| sp-stacks | 124.8 / 27.4 | 0.15 / 0.15 | 0.19 / 0.17 | 153 / 34 | 3,434 / 872 | 0 / 0 | 2,195, 2,187 / 17, 8 | 0 |
+| sp-flatstacks | 10.1 / 18.3 | 0.06 / 0.10 | 0.12 / 0.14 | 13 / 24 | 145 / 538 | 0 / 0 | 12, 3 / 19, 10 | 0 |
 
-**The CPU budget is not met on Linux.** Enhanced costs 19 % more than legacy
-on `sp-ragdolls` and 66 % more on `sp-setpiece`, the same on `sp-explosion`
-and 28 to 29 % less on the two stack workloads; its p99 and worst frame are
-about 0.2 ms higher on every Air Defense 1 workload. The figure-steps column
-is why. Air Defense 1's own figures (eight placed marines and the grunt)
-come to rest after 131 moving steps in legacy and 289 in enhanced on Linux;
-on Windows they take about 900 in legacy and 97 in enhanced. A step that
-moves a figure costs about the same in both modes on both platforms (0.26 to
-0.34 ms), so each total follows how long the map's placed ragdolls take to
-settle, and that differs by compiler in both modes. Rigid bodies alone cost
-less in enhanced mode on Linux as on Windows (59 ms against 23 on
-`sp-explosion`, 118 against 35 on `sp-stacks`, first run of each).
+Enhanced costs less on three workloads (26 % on `sp-explosion`, 18 % on
+`sp-setpiece`, 78 % on `sp-stacks`) and more on two: 21 % on `sp-ragdolls`
+(16.6 ms) and 80 % on `sp-flatstacks` (8.2 ms on a 10 ms total). Its worst
+frame is lower on three and higher by 0.04 ms on `sp-setpiece` and 0.02 ms on
+`sp-flatstacks`. All four miss the budget and are covered only by the
+[proposed exceptions](#budgets-and-tolerances). The step columns explain the totals
+here as on Windows: the three staged corpses take 461 moving steps to settle
+in enhanced mode with GCC against legacy's 339, and 340 against 332 with
+MSVC. Enhanced's rigid-body step counts are the same on both compilers to
+within one per cent (2,708 and 2,710 in the explosion scene, 872 and 876 on
+the sloped stacks) where legacy's differ by a third in the explosion scene
+(3,007 and 2,260): which platform shows an overrun on that scene is legacy's
+variation, not enhanced's.
+
+**As the workloads ran before, one run each** (the map's placed ragdolls
+settling inside the measurement; run beside another client, so the step
+counts are exact and the milliseconds are not a floor):
+
+| Workload | Total | Rigid-body steps | Figure steps | Sleeps, wakes | Enhanced LCP fallbacks |
+| --- | --- | --- | --- | --- | --- |
+| sp-ragdolls | 122 / 202 | 0 / 0 | 504 / 842 | 7, 0 / 9, 3 | 64 (3.1 ms) |
+| sp-explosion | 102 / 191 | 2,210 / 2,710 | 131 / 413 | 39, 22 / 112, 94 | 47 (2.7 ms) |
+| sp-setpiece | 51 / 122 | 792 / 738 | 132 / 414 | 6, 2 / 6, 1 | 47 (2.9 ms) |
+| sp-stacks | 163 / 154 | 3,434 / 872 | 131 / 413 | 2,199, 2,187 / 23, 8 | 47 (3.5 ms) |
+| sp-flatstacks | 10 / 18 | 145 / 538 | 0 / 0 | 12, 3 / 19, 10 | 0 |
+
+Here the map's placed ragdolls move in 131 steps of a legacy workload and
+413 of an enhanced one, where on Windows they move in 901 and 49. Unrested,
+enhanced therefore costs up to 2.4 times legacy on the Air Defense 1
+workloads on Linux and a tenth to a third of legacy on Windows, for the same
+staged bodies. Neither says anything about the staged bodies, which is why
+the budget rests the map's ragdolls first; but it is what a player on that
+map gets, and on Linux enhanced takes three times as many steps to settle
+the nine placed ragdolls as legacy does.
 
 Bot rounds on Linux x64, three runs each (medians; bots are not
 deterministic):
 
 | | Legacy | Enhanced |
 | --- | --- | --- |
-| `mp-frags` (listen server) total ms, median (runs) | 1,770 (1,770, 1,889, 1,613) | 1,764 (1,764, 1,879, 1,613) |
-| `mp-frags` p99, worst frame median (range) | 0.57, 1.21 (1.0-3.9) | 0.61, 1.76 (1.5-1.8) |
-| `mp-frags` sleeps, wakes | 55,094, 55,288 | 3,143, 3,656 |
-| `mp-frags` largest stretch, frames visible | 85-91 for 613-746 | 16-24 for 74-99 |
-| `ded-frags` (dedicated server) total ms, median (runs) | 1,449 (661, 1,449, 1,610) | 1,673 (568, 2,088, 1,673) |
-| `ded-frags` p99, worst frame median (range) | 1.87, 2.63 (1.5-3.4) | 2.40, 4.32 (1.2-6.9) |
-| `ded-frags` largest stretch, frames visible | 50-68 for 118-326 | 19-49 for 50-72 |
+| `mp-frags` (listen server) total ms, median (runs) | 1,424 (1,424, 1,277, 1,984) | 1,761 (1,761, 1,703, 2,005) |
+| `mp-frags` p99, worst frame median (range) | 0.49, 1.01 (0.8-2.2) | 0.56, 1.30 (1.2-2.3) |
+| `mp-frags` steps that moved a figure, rigid-body steps (runs) | 7,029 to 9,026; 42,012 to 96,723 | 8,066 to 8,460; 65,398 to 87,452 |
+| `mp-frags` sleeps, wakes (median run) | 38,243, 38,546 | 5,275, 5,810 |
+| `mp-frags` largest stretch, frames visible | 78-101 for 349-577 | 20-27 for 103-147 |
+| `mp-frags` LCP fallbacks | | 704 to 836 (30 to 39 ms) |
+| `ded-frags` (dedicated server) total ms, median (runs) | 757 (882, 757, 701) | 671 (670, 782, 671) |
+| `ded-frags` p99, worst frame median (range) | 0.88, 1.30 (1.1-10.6) | 0.94, 8.54 (3.1-8.7) |
+| `ded-frags` largest stretch, frames visible | 50-74 for 163-237 | 19-32 for 31-62 |
+
+On the listen-server round enhanced is above legacy on the medians of three
+runs, by 24 % in total and 0.3 ms in the worst frame, and its three totals
+rank above legacy's three one for one: the budget is missed on `mp-frags` on
+Linux. Of enhanced's time 30 to 39 ms a run is the exact solver taking over
+700 to 840 steps; the rest of the difference is not explained. Legacy's sleep and
+wake churn (38,000 against 5,300) and its stretched player corpses show here
+as on Windows.
 
 The dedicated server runs the round in both modes with no renderer and no
-errors. Its three runs differ by a factor of two and a half in both modes
-for similar work (5,300 to 6,400 figure evaluations a run), so they show no
-cost difference.
+errors, at about the same total (2,700 to 4,200 figure steps a run in legacy,
+3,100 to 3,400 in enhanced; 190 to 210 LCP fallbacks for 10 to 12 ms). Its
+worst frame is one reading per run on a machine that was running two other
+clients at the time, and legacy shows a 10.6 ms frame too: three runs do not
+decide it either way.
 
-**Other Linux x64 checks.** `physics_integration.py` passes all seven
-checks: saves made in either mode load in the other and in their own, clients
-follow a listen server's mode both ways, an MVD recorded on an enhanced
-server plays to its end, and a legacy client joins an enhanced dedicated
-server. The save checks first failed for a reason outside physics: the test
-tree was an export with five commits of history, a build stamps its save
-with the commit count, and the save validator rejects a build number below
-640, so that build could not restore its own saves. With the history padded
-to the real count the same sources pass.
+**Other Linux x64 checks.** `physics_integration.py` passes all seven checks
+on the final build: saves made in either mode load in the other and in their
+own, clients follow a listen server's mode both ways, an MVD recorded on an
+enhanced server plays to its end, and a legacy client joins an enhanced
+dedicated server. (The test tree is an export; its history is padded to the
+real commit count, because a build stamps its saves with that count and the
+save validator rejects a build number below 640.)
 
-`physics_envelope.py --scene ai` on six classes, three stagings: all pass.
-The two heavy classes are close to the bound on Linux, with a rocket splash
-median of 144 / 61 units and a Dark Matter splash median of 205 / 84 (0.42x
-and 0.41x of legacy against a 0.4x bound; 0.57x and 0.60x on Windows).
-Machinegun into falling corpses 64 / 64, largest 106 / 124. Stretch after the
-Dark Matter splash: 72 units for 198 frames in legacy, 54 for 95 in enhanced.
-The moveables, multiplayer and Awakening scenes, the coverage and campaign
-harnesses and the defect repros were not run on Linux.
+**The qualification harnesses on a Linux client** (final build, one pass):
+
+| Harness | Result | Legacy / enhanced |
+| --- | --- | --- |
+| `physics_defects.py` | **6 of 7 pass** | Resting jitter 2,319 sleeps and 2,307 wakes / 23 and 8. Joint stretch 69 units for 28 frames / 21 for 8. No joint pierced in 18 corpses killed against a wall in either mode; nothing beyond a wall in 18 launches. `placed-ragdolls` **fails** (below). |
+| `physics_envelope.py --scene ai` | **9 of 11 classes pass** | Rocket and grenade splash on resting corpses **fail**: median 144 / 39 units (0.27x; bound 0.4x), mean 138 / 90. Machinegun into falling corpses 64 / 55, largest 106 / 113. Grenade splash into falling corpses 279 / 274. Dark Matter splash 205 / 151, joints apart for 198 frames at up to 72 units / 54 frames at up to 34. |
+| `physics_envelope.py --scene moveables` | 9 of 9 pass | Rocket and grenade splash median 56 / 32 units, Dark Matter splash 129 / 58, a weak bump 38 / 29 (largest 208 / 209). |
+| `physics_envelope.py --scene moveables-flat` | 9 of 9 pass | Rocket and grenade splash median 24 / 19 units, Dark Matter splash 42 / 24, a weak bump 15 / 15. |
+| `physics_coverage.py` | **8 of 9 pass** | Air Defense 1's six lights swing 0.57 / 0.94 units after a heavy impulse and rest. Putra's 21 lights after a heavy impulse **fail** on joint stretch by 0.09 units: 2.18 against legacy's 1.10, bound 2.10 (swing 0.55 / 0.96, both end 0.54 from where they hung, all at rest; on Windows 1.3 against 0.8, which passes). Debris 213 / 228 units from the blast. |
+
+`placed-ragdolls` on Linux: Air Defense 1's `env_ragdoll_marine_fullgear_6`,
+the marine lying across a ledge edge, ends 25.9 units lower in enhanced mode,
+at rest on the floor beside the ledge with no joint pierced. Legacy keeps it
+on the ledge (it shifts 9 units along it), and its own largest drop over the
+same ten seconds is another marine's 14.7 units. On Windows legacy drops none
+and enhanced 1.0. The first sample is taken while the map's ragdolls are
+still settling, at up to 390 units/s in legacy and 121 in enhanced.
+
+Not run on Linux on the final build: the Awakening and multiplayer envelope
+scenes, the flat-floor shove scenes and the campaign harness (chain and set
+pieces).
 
 **ARM64.** The AArch64 cross build (GCC, the CI options) of the dedicated
 server and multiplayer game module runs `ded-frags` in both modes under
-`qemu-aarch64` 8.2.2 user-mode emulation, without errors: 523 LCP fallbacks
-in enhanced mode, largest stretch 70 units for 446 frames in legacy and 28
-for 126 in enhanced. Emulated timings are not hardware performance and are
+`qemu-aarch64` 8.2.2 user-mode emulation, without errors: 1,255 LCP fallbacks
+in enhanced mode, largest stretch 77 units for 1,152 frames in legacy and 50
+for 486 in enhanced. Emulated timings are not hardware performance and are
 not recorded. The native solver test passes on six builds (x64 with g++ and
 clang++, AArch64 with clang++ with and without floating-point contraction,
 AArch64 with g++), printing the same values on all of them. No ARM64 client
@@ -764,51 +1210,123 @@ was run, and nothing ran on ARM64 hardware.
 
 ### Known defects and what was tried
 
-Open in enhanced mode on the final build; each is why an item below is not
-closed.
+**Fixed in the third round** (each was open after the second, and is why an
+item was not closed then):
 
-1. **Blasted crates and barrels stop short.** After a rocket, grenade or Dark
-   Matter splash they leave as fast as legacy's and travel 0.3x to 0.4x as far
-   (moveables envelope). Crates and barrels map to a friction coefficient of
-   1.2 (twelve times the authored 0.2, clamped). Tried and not kept: other
-   friction scales (3, 4 and 6: weak and inside the staging noise); bounding
-   impact friction by the resting load as figures did until 16 November (the
-   sloped-floor stacks then creep); bouncing on every impact (no effect).
-2. **A figure lying across a ledge edge sinks.** Air Defense 1's
-   `env_ragdoll_marine_fullgear_6` sinks 7.9 units from the map's pose and
-   rests with two joints pierced; Air Defense 2's
-   `env_ragdoll_marine_fullgear_7` falls 134 units from where legacy leaves
-   it. Contact rows are a vertex against a plane and cannot hold an edge on an
-   edge. Tried and not kept: sweeping bodies that move less than their
-   reach (it did not hold the edge), and sweeping the whole body whenever
-   recovery moves it (more corpses stuck on uneven ground, see Defect
-   repros).
-3. **The Awakening's terrain.** Rocket and grenade splashes throw grunts 1.6x
-   and 1.8x as far as legacy at the median (bound 1.6x), and a weak bump moved
-   one corpse of seven 223 units over the trench's edge.
-4. **Putra's lights after a heavy push.** One light swings 4.3 units against
-   legacy's half a unit, and two of 21 are still awake after 15 seconds.
-5. **A placed pickup still settles off its spot.** Storage 2's
-   `ammo_railgun_1` ends 20 units away; legacy leaves it in place.
-6. **CPU on Linux, and worst frames.** On Linux x64 enhanced costs more than
-   legacy on two workloads and its heaviest frames cost about 0.2 ms more;
-   on Windows its worst frame is 0.24 ms above legacy's on `sp-stacks`; Waste
-   costs twice legacy's physics time in the campaign walk. The multiplayer
-   workloads decide nothing either way.
-7. **Corpses launched off the ground travel about two thirds as far** as in
-   legacy (inside the gate; see the envelope).
-8. **Which stack survives a knock differs** between the modes on the sloped
+| Defect | Cause | Now |
+| --- | --- | --- |
+| Blasted crates and barrels stopped at 0.3x to 0.4x of legacy's travel | Friction four times too strong; impacts kept friction and did not rebound off a kept contact; estimated contact gaps | 0.44x to 0.57x on the crater, 0.63x to 0.76x on a flat floor; every class passes |
+| A figure lying across a ledge edge sank (Air Defense 1's placed marine by 7.9 units with two joints pierced; Air Defense 2's fell 134 units) | An edge-on-edge contact acted at the limb's end, not at the ledge | On Windows sinks 1.0 unit, no joint pierced, and Air Defense 2's stays; on Linux Air Defense 1's slides off its ledge instead (open, 3) |
+| The Awakening: splash medians 1.6x and 1.8x of legacy, one bumped corpse moved 223 units | A grunt still falling into the trench when the hit was staged; and a median over bodies half of which the blast never reached | All eleven classes pass; the bodies a splash reaches travel 0.83x to 1.10x as far |
+| Putra's lights: one swung 4.3 units, two of 21 never slept | Overlap recovery pushed chain links out of the beam the map hangs them in | Swing 0.97 units, all asleep |
+| Storage 2's `ammo_railgun_1` settled 20 units off its spot | The same edge contact as the ledge | Stays put |
+| Corpses launched off the ground travelled two thirds as far as legacy's | Estimated contact gaps, not the joint correction it was put down to | Mean 0.97x after a rocket splash, 1.30x after a Dark Matter splash on Windows; the median of resting corpses is still open (2) |
+
+**Open on the final build.**
+
+1. **Processor time on two workloads per platform.** With the map's own
+   ragdolls at rest enhanced costs more than legacy on `sp-explosion` (3 %)
+   and `sp-flatstacks` (24 %) on Windows and on `sp-ragdolls` (21 %) and
+   `sp-flatstacks` (80 %) on Linux: 2.2 to 16.6 ms over a workload. A step
+   costs the same in both modes; enhanced bodies take more steps to rest
+   there. Bounds that would cover them are written down as [proposed
+   exceptions](#budgets-and-tolerances); they are not accepted, and not
+   fixes. What was tried against them is in the list below (the sleep
+   window, the rest tests, the wake rules): each cut steps on one scene and
+   broke another. Without resting them first, Air Defense 1's nine placed
+   ragdolls take 413 moving steps to settle in enhanced mode on Linux
+   against legacy's 131 (49 against 901 on Windows), so on Linux the
+   unrested Air Defense 1 workloads cost up to 2.4 times legacy. The
+   multiplayer bot round costs 24 % more than legacy on Linux on the medians
+   of three runs (5 % on Windows, inside the spread of its runs); no
+   exception is proposed for it.
+2. **Resting corpses under a rocket or grenade splash.** Enhanced leaves 8
+   or 9 of 17 within 65 units of where they lay and legacy 4, so the class
+   median sits in the gap between two groups: 71 units against 110 on Windows
+   (passes) and 39 against 144 on Linux (0.27x against a 0.4x bound, fails).
+   The cause is not found; what was switched is in the
+   [envelope section](#behaviour-envelope-phys-04).
+3. **The placed marine slides off its ledge on Linux.** Air Defense 1's
+   `env_ragdoll_marine_fullgear_6` ends 25.9 units lower in enhanced mode
+   there, at rest on the floor below its ledge with no joint pierced. Legacy
+   keeps it on the ledge on Linux (it shifts 9 units along it), and both
+   modes keep it there on Windows, where enhanced sinks 1.0 unit. The map's
+   placed ragdolls settle differently by compiler in both modes (legacy's
+   `_3` drops 14.7 units on Linux and none on Windows), but the repro
+   compares the modes on one platform and this fails it.
+4. **Corpses that slide on.** After a Dark Matter splash on the crater four of
+   17 corpses end further away than any legacy corpse (501 to 836 units
+   against 472), and one after a rocket splash (441 against 233). They leave
+   no faster than legacy's and stay in the map. The heavy classes bound the
+   median, not the largest travel, so this passes its gate.
+5. **Crates and barrels on a slope.** A body knocked loose on the crater
+   travels about half as far as legacy's at the median, because legacy's
+   bodies cannot stop on a slope and enhanced's can. Inside the gate, and
+   visible.
+6. **Four maps cost more in the campaign walk** (one run each): Waste 142 ms
+   against 101, Convoy 2 17 against 2 with one 14.9 ms frame, Convoy 2b 10
+   against 8, Hangar Perimeter 3.5 against 1.4. The other 27 cost less or the
+   same, and the walk as a whole a fifth of legacy's.
+7. **Which stack survives a knock differs** between the modes on the sloped
    floor (see Visual review). Not a defect by any gate, but a visible
    difference.
+8. **The multiplayer envelope needs an idle machine.** In multiplayer the
+   game clock runs on wall time while the harness waits in frames; on a
+   loaded machine the corpses expire before the hit in both modes and the
+   classes report no corpses to compare. Its falling classes also need six
+   repeats before they measure the modes and not the draw of spawn points.
+   Both are limits of the harness, not of either mode.
+9. **Putra's lights on Linux.** After a heavy impulse the largest joint
+   stretch among the 21 lights is 2.18 units in enhanced mode against
+   legacy's 1.10, 0.09 over the coverage bound (a quarter more, or one unit
+   more). It is far below what shows (8 units), every light comes to rest,
+   and on Windows the same case passes at 1.3 against 0.8.
 
-Solver experiments of this round that were measured and reverted, beyond the
-ones above: a slide move when a sweep is stopped (with strong joint recovery
-it stretched a figure by 129 units); a friction factor for fast-sliding
-contacts (no effect on mean travel); sweeping bodies that already touch a
-surface, and sweeping off the line of motion (travel collapsed to 27 units);
-resting any quiet rigid body with legacy's test, not only undisturbed ones
-(293 sleep and wake cycles on the sloped-floor stacks).
+**Measured and not kept in the third round.** Each of these was built, run
+and reverted; the numbers are why.
+
+- *Solving small figures exactly* (the legacy solver for systems under 48
+  rows): Putra's lights swung 13.7 units instead of 8. The fault there was
+  the recovery, not the iterations.
+- *More iterations* (40 and 100 instead of 12): the staged corpses took 372
+  and 368 moving steps to settle instead of 414.
+- *Sweeping every move off the line a contact query covered*: 6,147 sweeps
+  against 1,575 on the ragdoll workload and 580 ms against 103, and limbs
+  stopped in flight.
+- *Auditing with a long chord* (any body, every 8, 16 or 30 steps): no limb
+  left in geometry, but joints stayed visibly apart for 40 to 46 frames, at up
+  to 79 units, after a Dark Matter splash, as long as legacy's 42, because the
+  straight chord between two poses of a tumbling limb cuts through bumps the
+  limb went round. The shipped audit is limited to a chord of two units.
+- *Sweeping bodies that start inside geometry every step*, without stopping
+  their overlap recovery: Putra's lights swung 31 units.
+- *Recovering a contact that has dipped behind its surface to just in front
+  of it*: resting corpses drifted 12 to 16 units in the sliding-corpse repro,
+  because position-only motion is not resisted by friction.
+- *A lower friction for contacts that are already sliding*: the friction
+  factor does not move mean travel on the crater once impacts slide (51 to
+  53 units at factors 12, 6 and 3), so it was dropped before it was built
+  into a default.
+- *Rebounding off a kept contact between two moving bodies, or under a
+  stack*: the flat-floor stacks never settled (325 ms of physics against
+  legacy's 88).
+- *Letting a rigid body woken by a neighbour sleep again after two quiet
+  steps*: 432 sleep and wake cycles in the explosion scene and 40 % more body
+  steps.
+- *Not letting a rigid body sleep while it has crept a tenth of a unit*: 46 %
+  more body steps in the explosion scene.
+- *Resting a quiet rigid body by legacy's test after a few quiet steps*: 236
+  to 448 sleep and wake cycles in the explosion scene.
+- *A 10-step sleep window at 3 units/s*: fewer steps than the shipped 1.5
+  units/s on the flat stacks, but bodies creeping down the crater fell
+  asleep part-way and the Dark Matter splash failed at 0.29x.
+
+From the second round, still true: a slide move when a sweep is stopped
+stretched a figure by 129 units; sweeping bodies that already touch a
+surface, and sweeping off the line of motion, collapsed corpse travel to 27
+units; resting any quiet rigid body with legacy's test gave 293 sleep and
+wake cycles on the sloped stacks.
 
 Not done at all: a windowed session watched in motion by a person (the
-visual review above is stills); a Linux or ARM64 client run of the envelope,
-coverage and campaign harnesses; anything on ARM64 hardware.
+visual review above is stills); anything on ARM64 hardware, or an ARM64
+client.
