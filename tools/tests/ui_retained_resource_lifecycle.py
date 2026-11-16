@@ -62,6 +62,10 @@ public:
     int begins=0,ends=0;
     void BeginRoot(){++begins;Record("root-begin");}
     void EndRoot(){++ends;Record("root-end");}
+    bool warming=false,warmOk=true;int warmBegins=0,warmEnds=0;
+    bool BeginWarm(int width,int height){assert(width>0 && height>0);++warmBegins;warming=warmOk;return warmOk;}
+    void EndWarm(){assert(warming);warming=false;++warmEnds;}
+    bool Warming() const { return warming; }
     std::uint64_t frame=1;
     std::uint64_t RenderFrame() const { return frame; }
     void Reset();
@@ -143,7 +147,7 @@ struct CVar {
     float value;
     float GetFloat() const { return value; }
     bool GetBool() const { return value!=0; }
-} ui_retainedDensity{0},ui_retainedScale{1.5f},ui_retainedTextScale{1.75f},ui_retainedReducedMotion{0};
+} ui_retainedDensity{0},ui_retainedScale{1.5f},ui_retainedTextScale{1.75f},ui_retainedReducedMotion{0},ui_retainedWarm{1};
 struct StringCVar {
     std::string value;
     const char* GetString() const { return value.c_str(); }
@@ -291,6 +295,14 @@ int main() {
     assert(host.begins==4 && host.ends==4 && !host.timingRequested);
     assert(host.viewportWidth==777 && host.viewportHeight==333 && host.viewportX==7 && host.viewportY==3 && !renderer.uiViewport);
     left.runtime->failFrame=false;
+    // A page drawn out of sight is a real root frame on the host's hidden
+    // target, never a profiled one; it needs the warm-up on and the target.
+    rootProfileFrames=1; const int profiled=rootProfileRecords;
+    assert(RetainedUI_WarmViewRoot(a,viewport) && rootProfileRecords==profiled);
+    assert(host.warmBegins==1 && host.warmEnds==1 && !host.warming && host.begins==5 && host.ends==5);
+    rootProfileFrames=0;
+    ui_retainedWarm.value=0; assert(!RetainedUI_WarmViewRoot(a,viewport) && host.warmBegins==1); ui_retainedWarm.value=1;
+    host.warmOk=false; assert(!RetainedUI_WarmViewRoot(a,viewport) && host.warmEnds==1 && host.begins==5); host.warmOk=true;
 
     // A dirty resource generation cannot invalidate geometry already queued
     // for this front-end frame. Unchanged-generation peers still prepare.
@@ -349,7 +361,9 @@ def main():
         'bool RetainedUI_DefaultViewport(',
         'double RetainedUI_PresentationTime()',
         'void RetainedUI_FrameSubmitted()',
+        'bool DrawRoot(',
         'bool RetainedUI_DrawViewRoot(',
+        'bool RetainedUI_WarmViewRoot(',
         'void RetainedUI_Shutdown()',
     )
     code = SUPPORT + header.replace('#pragma once', '').replace('#include "retained/DocumentEdit.h"', '') + view + globals_source + HELPERS

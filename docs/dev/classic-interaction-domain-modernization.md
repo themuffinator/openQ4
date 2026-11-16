@@ -325,9 +325,11 @@ spawned crate as dynamic receivers and casters under a projected test light
 and point-cube maps. Every frame is byte-identical to the classic one;
 `r_skipInteractions 1` is the visible control, and the first-person weapon's
 depth hack is the natural zero-commit rollback (a named fallback, nothing
-owned, the classic frame). The stencil-only view is not compared on OpenGL
-with 4x MSAA: there, classic frames flip isolated pixels between identical
-frozen frames with every domain off.
+owned, the classic frame). OpenGL runs serialize classic draws
+(`r_glSerializeDraws 1`, validation only): NVIDIA's OpenGL driver shades
+overlapping draws into a 4x multisampled target slightly differently from
+frame to frame, which had kept the stencil-only view out of the 4x MSAA
+comparison until 14 November 2026.
 
 These fixes made this possible:
 

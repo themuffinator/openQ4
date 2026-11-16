@@ -56,6 +56,24 @@ static ID_INLINE void R_SetGuiDrawVert( idDrawVert *vert, float x, float y, floa
 	R_SetGuiDrawVertPayload( vert );
 }
 
+/*
+================
+R_ReserveGuiModelList
+
+The model's lists keep their allocation from frame to frame. Grown a
+granularity (1,000 elements) at a time, the first frame that drew more than
+any before it copied every element again at each step: a retained menu page
+drawn for the first time over the title spent tens of milliseconds there.
+They grow by half again instead.
+================
+*/
+template< class type >
+static void R_ReserveGuiModelList( idList<type> &list, int count ) {
+	if ( count > list.NumAllocated() ) {
+		list.Resize( Max( count, list.NumAllocated() + list.NumAllocated() / 2 ) );
+	}
+}
+
 static bool R_IsFiniteGuiDemoDrawVert( const idDrawVert &vert ) {
 	for ( int component = 0; component < 3; component++ ) {
 		if ( !std::isfinite( vert.xyz[component] ) || !std::isfinite( vert.normal[component] ) ||
@@ -1064,6 +1082,8 @@ void idGuiModel::DrawStretchPic( const idDrawVert *dverts, const glIndex_t *dind
 			}
 			const idDrawVert *sourceVert = &dverts[dindexes[i]];
 			int	numVerts = verts.Num();
+			R_ReserveGuiModelList( verts, numVerts + windingPointCount );
+			R_ReserveGuiModelList( indexes, indexes.Num() + ( windingPointCount - 2 ) * 3 );
 			verts.SetNum( numVerts + windingPointCount, false );
 			for ( j = 0 ; j < windingPointCount ; j++ ) {
 				idDrawVert *dv = &verts[numVerts+j];
@@ -1084,6 +1104,8 @@ void idGuiModel::DrawStretchPic( const idDrawVert *dverts, const glIndex_t *dind
 		int numVerts = verts.Num();
 		int numIndexes = indexes.Num();
 
+		R_ReserveGuiModelList( verts, numVerts + vertCount );
+		R_ReserveGuiModelList( indexes, numIndexes + indexCount );
 		verts.AssureSize( numVerts + vertCount );
 		indexes.AssureSize( numIndexes + indexCount );
 
@@ -1197,6 +1219,8 @@ void idGuiModel::DrawStretchTri( idVec2 p1, idVec2 p2, idVec2 p3, idVec2 t1, idV
 	int numVerts = verts.Num();
 	int numIndexes = indexes.Num();
 
+	R_ReserveGuiModelList( verts, numVerts + vertCount );
+	R_ReserveGuiModelList( indexes, numIndexes + indexCount );
 	verts.AssureSize( numVerts + vertCount );
 	indexes.AssureSize( numIndexes + indexCount );
 

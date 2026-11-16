@@ -2842,7 +2842,6 @@ MENU_BACKGROUNDS = ["gfx/guis/mainmenu/level_mcc.dds", "gfx/guis/mainmenu/level_
 
 
 BACKDROP_DIM = 0.3         # black over the title's pictures, under their light (user note, 13 November 2026)
-SIGNAL_DITHER = 0.6        # the backdrop's ordered dither (backdrop-dither)
 SIGNAL_LEAD = 150          # ms: a picture change's place in its 5000 ms slot, so the loop's wrap has its lead-in too
 SIGNAL_STEP = 55.0         # ms: how long one arrangement of a fault stands
 # A picture change's fault about the change: (ms, strength). It leads the
@@ -3169,13 +3168,10 @@ def title_document() -> dict:
         # The pictures, dimmed a little so the menu leads, and their light
         # reach the view through a signal: faulting as the picture changes
         # (field-signal) and as the menu opens, leaves for a page and comes
-        # home (field-burst), then an ordered dither over all of it
-        # (field-dither), so a torn row keeps crisp dots. The reticle grid
-        # stays over it, undithered.
+        # home (field-burst). The reticle grid stays over it.
         group("depth-light", {**FULL, "pointer-events": keyword("none")}, [
             group("field-dim", {**FULL, "background-color": colour([0, 0, 0, BACKDROP_DIM])}),
-            *field[:2], signal_layer(doc, "field-signal"), signal_layer(doc, "field-burst"),
-            signal_layer(doc, "field-dither", SIGNAL_DITHER), *field[2:]]),
+            *field[:2], signal_layer(doc, "field-signal"), signal_layer(doc, "field-burst"), *field[2:]]),
         stage,
         group("depth-frame", {**FULL, "pointer-events": keyword("none")}, framing_bands("band")),
         content,

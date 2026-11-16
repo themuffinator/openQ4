@@ -1200,11 +1200,14 @@ Render configurations: `default` is the machine's own preset (Enhanced on the
 reference RTX 4060 Laptop: HDR scene target, SSAO, bloom, SMAA high, mapped
 projected shadows); `plain` turns the post chain off so the scene draws
 straight into the window; `msaa` adds 4x MSAA to the default. Captures are
-1280x720 in a bordered window.
+1280x720 in a bordered window. OpenGL runs set `r_glSerializeDraws 1`, which
+waits for each classic draw to finish before the next: NVIDIA's OpenGL driver
+otherwise shades overlapping draws into a 4x multisampled target slightly
+differently from frame to frame (see the MSAA follow-up below).
 
 | Scene | Content | Domains |
 | --- | --- | --- |
-| `ad1`, `ad1stencil`, `ad1mapped` | `game/airdefense1` outdoor gameplay view: default (no projected light in view, so every light stencil-shadowed) / stencil only (not compared on OpenGL with 4x MSAA, where classic frames themselves flicker) / every light mapped, point cubes, a distant point light's projected map and hybrid supplements, static shadow cache on (off until 14 November 2026) | interaction, root authored post |
+| `ad1`, `ad1stencil`, `ad1mapped` | `game/airdefense1` outdoor gameplay view: default (no projected light in view, so every light stencil-shadowed) / stencil only / every light mapped, point cubes, a distant point light's projected map and hybrid supplements, static shadow cache on (off until 14 November 2026) | interaction, root authored post |
 | `mv2casters` | a CPU-skinned stock character (`char_doctor`) and a spawned crate as dynamic receivers and casters under a projected test light and point-cube maps on `maps/tools/mv2` | interaction |
 | `mv2amb`, `mv2lit` | the stock mv2 floor with every light suppressed, and under its own lights | world ambient |
 | `mv2deform` | the same view with the stock `shaderDemos/move` deforming material | material deform (consumed by ambient) |
@@ -1264,8 +1267,9 @@ runs. Each cell gives passing checks and, in parentheses, owned views:
 - `ad1stencil` on OpenGL with 4x MSAA owned its view, but its two classic
   references differed at four isolated pixels and its rollback pair at three
   others. Two reruns showed the same flicker at different pixels with every
-  domain off: classic OpenGL stencil shadows under MSAA are not reproducible to
-  the byte, so that combination is now excluded.
+  domain off: classic OpenGL stencil shadows under MSAA were not reproducible
+  to the byte, so that combination was excluded until the MSAA follow-up
+  below.
 - `mv2demo` on Vulkan under the default preset passed its domain check, but one
   pixel differed between its two classic references; two reruns passed in full.
 - The interaction records show stencil shadows (`ad1`, `ad1stencil`) and hybrid
@@ -1298,6 +1302,37 @@ backends under the default preset, with 4x MSAA and with the post chain off:
 six runs, one owned view each, identical classic references, a visible
 `r_skipAmbient` control and a named rollback. Package: client `c278976d…`,
 `renderer-gl_x64.dll` `b1225463…`, `renderer-vk_x64.dll` `e5dca690…`.
+
+**Follow-up, classic OpenGL with 4x MSAA (14 November 2026).** `ad1stencil`'s
+classic OpenGL frames with 4x MSAA were not reproducible because NVIDIA's
+OpenGL driver is not: given a byte-identical command stream, it shades
+consecutive draws that cover the same pixels of a 4x or 8x multisampled
+target slightly differently from frame to frame. An instrumented build found
+every interaction draw's inputs (camera, program parameters, vertices,
+indices, images, scissors) identical across frozen frames and the depth
+prepass identical sample for sample; after the interaction pass, every sample
+of a few pixels along triangle edges moved by one or two levels. A constant
+interaction colour never varied, while a program writing out only the
+interpolated texture coordinate did: coverage, depth and blending are
+reproducible, attribute interpolation is not. Stencil shadows and SSAO are
+not needed (with the post chain off it shows in most frames); single-sample
+and 2x targets and Vulkan are unaffected, and NVIDIA's forum carries the same
+report for D3D9 and D3D11
+([MSAA rendering bug](https://forums.developer.nvidia.com/t/msaa-rendering-bug/205029)).
+Waiting for each classic draw to finish before the next removes it; a
+per-draw texture barrier does not, and a per-draw flush hides it only on a
+quiet machine. The harness therefore sets `r_glSerializeDraws 1` on every
+OpenGL run. It is validation only and off by default: a one-level difference
+nobody sees does not justify the stall for players. With the exclusion
+removed, `ad1stencil` passed ten of ten runs on OpenGL with 4x MSAA,
+including runs beside parallel probe clients, and the full OpenGL set passed
+53 of 54 runs (every scene, all three configurations). The failure was `ad1`
+with 4x MSAA: its first classic reference differed from every later capture
+at two sky pixels beside the left tower, and four reruns passed. That
+settle-after-load difference also appeared without serialization and is not
+yet explained. Package: client `a3894b51…`, `renderer-gl_x64.dll`
+`6533b134…`, `renderer-vk_x64.dll` `55f79152…` (build `g25ba79ad.dirty`, with
+other sessions' uncommitted work in the tree).
 
 Human appearance review of these captures and the non-Windows platforms
 belong to platform qualification.

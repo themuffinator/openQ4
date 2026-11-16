@@ -720,7 +720,7 @@ openq4::ui::Runtime* RetainedUI_ViewRuntime(retainedUIView_t* view) { return vie
 bool RetainedUI_PrepareView(retainedUIView_t* view) { return view && view->runtime.loaded; }
 bool RetainedUI_LoadView(retainedUIView_t*,const std::string&,const std::string&,std::vector<openq4::ui::Diagnostic>&) { return !rejectLoad; }
 bool RetainedUI_LoadParsedView(retainedUIView_t*,const openq4::ui::Document&,const std::string&,std::vector<openq4::ui::Diagnostic>&) { return !rejectLoad; }
-bool UI_RetainedTakePrefetched(const std::string&,const std::string&,openq4::ui::Document&) { return false; }
+bool UI_RetainedTakePrefetched(const std::string&,int,std::string&,ID_TIME_T&,openq4::ui::Document&) { return false; }
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport& result) { result=viewport; return viewport.width>0 && viewport.height>0; }
 double RetainedUI_PresentationTime() { return presentationTime; }
 int promptGlyphsValue=0;

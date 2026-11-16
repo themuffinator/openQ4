@@ -14437,12 +14437,6 @@
    }
   },
   {
-   "id": "field-dither.display",
-   "node": "field-dither",
-   "property": "display",
-   "value": {"op": "select", "args": [{"state": "soft_focus"}, "block", "none"]}
-  },
-  {
    "id": "prompt-231042-cap.display",
    "node": "prompt-231042-cap",
    "property": "display",
@@ -27277,22 +27271,6 @@
        "display": {"type": "keyword", "value": "none"},
        "pointer-events": {"type": "keyword", "value": "none"},
        "backdrop-dither": {"type": "number", "value": 0.0},
-       "backdrop-glitch": {"type": "number", "value": 0},
-       "backdrop-glitch-phase": {"type": "number", "value": 0}
-      }
-     },
-     {
-      "id": "field-dither",
-      "type": "group",
-      "properties": {
-       "position": {"type": "keyword", "value": "absolute"},
-       "left": {"type": "length", "value": 0, "unit": "dp"},
-       "top": {"type": "length", "value": 0, "unit": "dp"},
-       "width": {"type": "length", "value": 100, "unit": "%"},
-       "height": {"type": "length", "value": 100, "unit": "%"},
-       "display": {"type": "keyword", "value": "none"},
-       "pointer-events": {"type": "keyword", "value": "none"},
-       "backdrop-dither": {"type": "number", "value": 0.6},
        "backdrop-glitch": {"type": "number", "value": 0},
        "backdrop-glitch-phase": {"type": "number", "value": 0}
       }

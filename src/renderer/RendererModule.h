@@ -162,6 +162,9 @@ void	R_RendererModule_PublishLightGridLoadReceipt( const renderLightGridLoadRece
 bool	R_RendererModule_QueryRendererSelection( renderRendererSelection_t &selection, uint64_t &serial, uint64_t &epoch );
 struct renderDeviceCatalog_t;
 bool R_RendererModule_QueryRenderingDevices(renderDeviceCatalog_t& output);
+// The last probed inventory where no Vulkan module is live, else a query: what
+// a settings page shows. A choice is applied against a fresh query.
+bool R_RendererModule_RecentRenderingDevices(renderDeviceCatalog_t& output);
 void R_RendererModule_SyncConfiguration();
 bool R_RendererModule_RenderSelectionPending(const char* api, const char* device);
 // After checked menu persistence, supersede the original launch preferences

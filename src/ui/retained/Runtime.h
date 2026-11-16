@@ -479,6 +479,9 @@ public:
 	bool SetProperty(const std::string& id, const std::string& property, const std::string& value);
 	bool SetText(const std::string& id, const std::string& text);
 	bool IsLoaded() const;
+	// The next frame paints afresh rather than replaying the last one: a frame
+	// drawn out of sight without its artwork (a warm pass) must never replay.
+	void InvalidatePaint();
 	RuntimeStatistics Statistics() const;
 private:
     struct Canvas;

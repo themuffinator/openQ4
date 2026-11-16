@@ -2135,7 +2135,7 @@ const Json::Value* detail::ResolveDocumentSource(const Json::Value& root, const 
 // The parsed tree is a load-time intermediate: the model copies what it keeps,
 // and a tree of a large document costs several times its source. An edit
 // parses the retained source again to find the span it replaces.
-struct Document::Impl { std::string source; DocumentModel model; };
+struct Document::Impl { std::string source; DocumentModel model; std::string identityPath, identity; };
 Document::Document() : impl(std::make_unique<Impl>()) {}
 Document::~Document() = default;
 Document::Document(Document&&) noexcept = default;
@@ -2159,6 +2159,17 @@ bool Document::Load(const std::string& source, std::vector<Diagnostic>& diagnost
 	}
 	impl = std::move(candidate);
 	return true;
+}
+const std::string& Document::SnapshotIdentity(const std::string& sourcePath) const {
+	if (impl->identity.empty() || impl->identityPath != sourcePath) {
+		Json::Value identity(Json::objectValue);
+		identity["version"] = 1; identity["id"] = impl->model.id;
+		identity["path"] = sourcePath; identity["source"] = impl->source;
+		Json::StreamWriterBuilder writer; writer["indentation"] = ""; writer["precision"] = 17;
+		impl->identity = Json::writeString(writer,identity);
+		impl->identityPath = sourcePath;
+	}
+	return impl->identity;
 }
 bool Document::ReplaceValue(const std::string& pointer, const std::string& replacement, std::vector<Diagnostic>& diagnostics) {
 	diagnostics.clear();

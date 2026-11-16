@@ -705,7 +705,6 @@ testing.
   pointer`, and the new `click`), not a physical mouse. Not run: Vulkan,
   Linux, macOS, Android touch, or a real mouse.
 
-
 ## The Awakening: lost dialogue, enemies that see, two missing effects, 14 November 2026
 
 - **Thirty lines of The Awakening's dialogue play for the first time.**
@@ -762,6 +761,33 @@ testing.
   scripted lines were never recorded. About 350 recorded lines are still
   played by nothing: most are earlier takes of lines that do play, and the
   races' radio chatter has no placement the content can prove.
+
+## The Awakening: the Pain Lord's captives scream, 16 November 2026
+
+- **The three marines in the Pain Lord's machine (m05) scream as it takes
+  them.** Their screams were declared and captioned but never recorded, so the
+  scene was silent. openQ4 plays screams the installed content already has:
+  the expansion's unused take of a screaming marine for the first, and two of
+  Quake 4's medical-lab Stroggification screams for the others.
+- **What to do.** Replace the single-player game module. The screams play on a
+  fresh start of the map; `g_awakeningContentRepairs 0` keeps the silence.
+- **No beep at the end of Darnell's radio intro (m08).** The script calls a
+  radio line that has a recording but no sound definition, and the engine
+  sounds a short tone for a missing sound. The radio now stays silent there
+  until the line is restored.
+- **The opening battle's draft radio traffic is placed (m01).** An early
+  draft of the trench mission wrote 29 radio calls from the squads around
+  Falcon and from Markswell, none recorded, in a script no map runs. openQ4
+  places each at the matching scene of the shipped battle: the landing zone,
+  the Harvester and Razor 16 going down, the push on the turret bunkers, the
+  cave collapse, the supply tunnels and the last trench. The lines wait for the
+  radio to fall quiet, so the story's own calls are never talked over.
+- **Nothing changes yet.** The placement switches on only once the lines have
+  audio (`g_awakeningM01Radio 1`); `g_awakeningM01Radio 2` runs it silently to
+  test the timing. The 100 other draft lines belong to scenes the shipped maps
+  do not have. The
+  [missing voice lines register](awakening-missing-voice-lines.md) lists every
+  line, the pieces it lacks and its resolution.
 
 ## PNG textures and PNG screenshots, 14 November 2026
 
@@ -1014,29 +1040,6 @@ testing.
   in CTF all behave; the stock ruleset still spawns with the machinegun. The
   Create Server Rules tab sets both settings. Bots do not use the hook.
 
-## The weapon strip moves, and the Strogg one has its own feel, 13 November 2026
-
-- **The new interface's weapon strip opens and closes smoothly.** It rises
-  into place as you change weapons and sinks away a second later, or fades
-  out quickly as soon as you fire, instead of popping in and out.
-- **The ring follows your choice.** One ring glides from the weapon you had
-  to the one you picked, the gun settles into it and its name slides in from
-  the same side, so scrolling through weapons reads at a glance.
-- **A refused choice now tells you so.** Pressing the key for a weapon you
-  don't carry or that is out of ammunition, or scrolling when there is
-  nothing else to switch to, shakes the ring and flashes it red; an empty
-  gun's crossed-out sign pulses to show why.
-- **A small tick marks your quick-switch weapon,** the one you return to
-  after a change.
-- **After Kane's transformation the Strogg strip has its own character.** It
-  tunes in like a neural link with a scan line, its ring stretches as it
-  travels and sends out a pulse when it lands, and a refusal glitches in hard
-  steps. The Awakening's strips and the multiplayer strip move too.
-- Reduced Motion keeps the strip still apart from short fades, while the red
-  refusal, the empty sign and the tick stay. The classic HUD (`ui_retained 0`)
-  is unchanged. Replace both game modules: they send the new refusal to the
-  HUD.
-
 ## Retail distance comparison (AUD-01), 13 November 2026
 
 - [ ] AUD-01: `sound_distance_retail_compare.py` compares the levels that retail
@@ -1077,6 +1080,29 @@ testing.
   or `none`), and the speech audit counts authored text as transcribed.
 - Ordered human play and physical stereo-HUD placement remain open under
   AUD-07.
+
+## The weapon strip moves, and the Strogg one has its own feel, 13 November 2026
+
+- **The new interface's weapon strip opens and closes smoothly.** It rises
+  into place as you change weapons and sinks away a second later, or fades
+  out quickly as soon as you fire, instead of popping in and out.
+- **The ring follows your choice.** One ring glides from the weapon you had
+  to the one you picked, the gun settles into it and its name slides in from
+  the same side, so scrolling through weapons reads at a glance.
+- **A refused choice now tells you so.** Pressing the key for a weapon you
+  don't carry or that is out of ammunition, or scrolling when there is
+  nothing else to switch to, shakes the ring and flashes it red; an empty
+  gun's crossed-out sign pulses to show why.
+- **A small tick marks your quick-switch weapon,** the one you return to
+  after a change.
+- **After Kane's transformation the Strogg strip has its own character.** It
+  tunes in like a neural link with a scan line, its ring stretches as it
+  travels and sends out a pulse when it lands, and a refusal glitches in hard
+  steps. The Awakening's strips and the multiplayer strip move too.
+- Reduced Motion keeps the strip still apart from short fades, while the red
+  refusal, the empty sign and the tick stay. The classic HUD (`ui_retained 0`)
+  is unchanged. Replace both game modules: they send the new refusal to the
+  HUD.
 
 ## Buying by Quake 4's or The Awakening's rules, with a new buy menu, 13 November 2026
 

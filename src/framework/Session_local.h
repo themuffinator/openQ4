@@ -356,6 +356,10 @@ public:
 	// workers, while the stock menus load.
 	void				PrefetchRetainedScreens();
 	void				PrefetchRetainedNextPages();
+	// Out of sight, while the page on screen rests: loads the pages it leads
+	// to whose parse has finished, then prepares each that has never
+	// presented (UI_RetainedWarm), one step a frame, before the page draws.
+	void				WarmRetainedPages();
 	void				PrepareRetainedLevel( const char *mapPath, bool multiplayer );
 	// As a map change begins, starts parsing the level's retained documents on
 	// the job system's workers: the pages PrepareRetainedLevel loads, and the
@@ -755,6 +759,12 @@ public:
 	int                     wipeFadeStarted = 0, wipeFadeDuration = 0;
 	retainedSubpage_t	retainedSubpageKind;	// the sub-page the change goes to or comes back from
 	bool				retainedHomeReturning;
+	// WarmRetainedPages: the page on screen and its focused control when they
+	// last changed, when it counts as resting, and whether its leads are done.
+	const idUserInterface *retainedWarmShown;
+	idStr				retainedWarmFocus;
+	int					retainedWarmFrom;
+	bool				retainedWarmDone;
 	bool				retainedHomeUnderMessage;	// a stock message box covers the presented home
 	bool				retainedJoinReturn;		// a join from Join Game is under way: a return finds its list
 	// The Load Game page: its document (NULL until it first loads), the home

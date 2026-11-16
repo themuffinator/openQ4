@@ -2518,6 +2518,43 @@ bool idRenderSystemLocal::UploadImage( const char *imageName, const byte *data, 
 	return true;
 }
 
+/*
+===============
+idRenderSystemLocal::UploadImageRegion
+===============
+*/
+bool idRenderSystemLocal::UploadImageRegion( const char *imageName, const byte *data, int x, int y, int width, int height, int rowPitch ) {
+	R_RenderThread_Sync( "image" );
+	idImage *image = globalImages->GetImage( imageName );
+	if ( image == NULL || data == NULL || !image->IsLoaded() ) {
+		return false;
+	}
+	// Only single-level RGBA8 2D storage that runtime uploads own: what
+	// CreateImage allocated (a scratch image), or what a whole UploadImage
+	// shaped (UploadScratch's lookup image). Any other image is uploaded whole.
+	const idImageOpts &opts = image->GetOpts();
+	if ( opts.textureType != TT_2D || opts.format != FMT_RGBA8 || opts.numLevels != 1 ||
+			( !image->IsScratchImage() && image->GetUsage() != TD_LOOKUP_TABLE_RGBA ) ) {
+		return false;
+	}
+	if ( x < 0 || y < 0 || width <= 0 || height <= 0 || width > opts.width - x || height > opts.height - y ||
+			rowPitch < 0 || ( rowPitch != 0 && rowPitch < width ) ) {
+		return false;
+	}
+	// A rectangle of a wider image is packed first: its rows are small, and no
+	// backend then depends on a row pitch (OpenGL ES 2 has no unpack row length).
+	if ( rowPitch != 0 && rowPitch != width ) {
+		idTempArray<byte> packed( width * height * 4 );
+		for ( int row = 0; row < height; row++ ) {
+			memcpy( packed.Ptr() + row * width * 4, data + row * rowPitch * 4, width * 4 );
+		}
+		image->SubImageUpload( 0, x, y, 0, width, height, packed.Ptr() );
+		return true;
+	}
+	image->SubImageUpload( 0, x, y, 0, width, height, data );
+	return true;
+}
+
 
 /*
 ===============

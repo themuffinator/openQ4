@@ -395,8 +395,6 @@ SCENES = [
         checks=[
             Check("interaction", control={"r_skipInteractions": "1"}, rollback={"ui_showGun": "1"}),
         ],
-        skip={"msaa-gl": "classic OpenGL stencil shadows with 4x MSAA flip isolated pixels between "
-                         "identical frozen frames, with every domain off"},
     ),
     # Every light shadow-mapped, as the Quality and higher presets do, with
     # the static shadow cache on (the shipped default). The distant point
@@ -940,6 +938,12 @@ def run_scene(runtime: Path, output: Path, scene: Scene, backend: str, config: s
         setv(name, value)
     for name, value in CONFIGS[config].items():
         setv(name, value)
+    # NVIDIA's OpenGL driver shades consecutive draws that cover the same
+    # pixels of a 4x or 8x multisampled target differently from frame to
+    # frame, by a level at a few pixels. Serialize classic draws so frozen
+    # frames stay byte-identical (r_glSerializeDraws, tr_render.cpp).
+    if backend == "gl":
+        setv("r_glSerializeDraws", 1)
     for name, value in scene.launch.items():
         setv(name, value)
     for cvar in DOMAIN_CVARS.values():

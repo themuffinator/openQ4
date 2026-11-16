@@ -105,7 +105,11 @@
 // 34 - renderExport_t appends TryDisplayTransition: a strict display request
 //      applied to the running device, without the teardown TryDeviceRestart
 //      performs.
-#define RENDER_API_VERSION			34
+// 35 - idRenderSystem appends UploadImageRegion: one rectangle of a
+//      single-level RGBA8 image that CreateImage allocated or UploadImage
+//      shaped (the retained interface's coverage atlas uploads only the tiles
+//      it placed).
+#define RENDER_API_VERSION			35
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;

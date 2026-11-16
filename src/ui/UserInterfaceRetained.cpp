@@ -17,9 +17,11 @@
 #include "../sys/KeyEventMetadata.h"
 #include "application/SettingsTransaction.h"
 #include "../framework/ParallelJobSystem.h"
+#include "retained/VectorCompile.h"
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -856,6 +858,9 @@ struct idUserInterfaceRetained::Impl {
 	bool unavailable = false;
 	bool drawSucceeded = false;
 	bool initialized = false;
+	// Drawn for presentation at least once; prepared ahead of that, out of
+	// sight (UI_RetainedWarm), and how far: compilations gathered, installed.
+	bool presented = false, warmed = false, warmGathered = false, warmInstalled = false;
 	bool settingsFields = false, settingsClosePending = false;
 	std::uint64_t settingsOwner = UI_SettingsCreateOwner();
 	float cursorX = 320, cursorY = 240;
@@ -1062,6 +1067,28 @@ struct idUserInterfaceRetained::Impl {
 			else text.data[0] = std::get<double>(value);
 			state.Set(id.c_str(),FormatPresentationValue(text).c_str());
 			if (promptApplication.contains(id)) DirtyApplication(id.c_str());
+		}
+	}
+	// The viewport the document draws in. A view-height canvas (title, pause
+	// and loading screens) follows the view height instead of display density;
+	// the safety fit is irrelevant to it.
+	bool DocumentViewport(Viewport& viewport) const {
+		if (!RetainedUI_DefaultViewport(viewport)) return false;
+		if (document.Model().canvasHeight > 0) {
+			viewport.canvasHeight = static_cast<float>(document.Model().canvasHeight); viewport.fitScale = 1;
+			viewport.canvasMinWidth = static_cast<float>(document.Model().canvasMinWidth);
+		}
+		return true;
+	}
+	// After a frame: the writes of the timeline completion programs it ran,
+	// and the detail subject it settled on, for the session to describe.
+	void PublishFrame() {
+		auto* runtime = RuntimeView();
+		if (!runtime) return;
+		PublishWrites(runtime->TakeCompletionWrites());
+		if (document.Model().detail) {
+			StateValue subject;
+			if (runtime->GetStateValue(document.Model().detail->state,subject)) PublishWrites({{document.Model().detail->state,subject}});
 		}
 	}
 	bool RunEvent(const std::string& name) {
@@ -1286,23 +1313,30 @@ size_t idUserInterfaceRetained::Size() { return sizeof(*this)+sizeof(Impl)+impl-
 int idUserInterfaceRetained::NumTransitions() { return static_cast<int>(impl->document.Model().timelines.size()); }
 
 // The parse UI_RetainedPrefetchDocuments made of this source, if it made one.
-bool UI_RetainedTakePrefetched(const std::string& path, const std::string& source, Document& document);
+bool UI_RetainedTakePrefetched(const std::string& path, int size, std::string& source, ID_TIME_T& stamp, Document& document);
 
 bool idUserInterfaceRetained::InitFromFile(const char* qpath, bool rebuild, bool cache) {
 	if (!UI_IsRetainedPath(qpath)) return false;
 	const std::string path(qpath);
 	if (path.find("..") != std::string::npos || path.find(':') != std::string::npos || path[0] == '/' || path[0] == '\\') return false;
-	void* data = nullptr; ID_TIME_T stamp = 0;
+	ID_TIME_T stamp = 0;
 	const int expectedSize = fileSystem->ReadFile(path.c_str(),nullptr);
 	if (expectedSize <= 0 || expectedSize > 16*1024*1024) return false;
-	const int size = fileSystem->ReadFile(path.c_str(),&data,&stamp);
-	if (size < 0 || !data) return false;
-	if (size > 16*1024*1024) { fileSystem->FreeFile(data); return false; }
-	const std::string source(static_cast<const char*>(data),static_cast<size_t>(size));
-	fileSystem->FreeFile(data);
 	Document candidate; std::vector<Diagnostic> diagnostics; std::string error;
 	const int loadStarted = Sys_Milliseconds();
-	const bool prefetched = UI_RetainedTakePrefetched(path,source,candidate);
+	// A worker that parsed the document read it too, from the file as it is now
+	// (UI_RetainedTakePrefetched): the load takes its bytes rather than
+	// inflating the whole document again on this thread.
+	std::string source;
+	const bool prefetched = UI_RetainedTakePrefetched(path,expectedSize,source,stamp,candidate);
+	if (!prefetched) {
+		void* data = nullptr;
+		const int size = fileSystem->ReadFile(path.c_str(),&data,&stamp);
+		if (size < 0 || !data) return false;
+		if (size > 16*1024*1024) { fileSystem->FreeFile(data); return false; }
+		source.assign(static_cast<const char*>(data),static_cast<size_t>(size));
+		fileSystem->FreeFile(data);
+	}
 	if (!prefetched && !candidate.Load(source,diagnostics)) {
 		for (const auto& diagnostic : diagnostics) common->Warning("retained GUI %s:%u:%u %s: %s",path.c_str(),
 			static_cast<unsigned>(diagnostic.line),static_cast<unsigned>(diagnostic.column),diagnostic.pointer.c_str(),diagnostic.message.c_str());
@@ -1687,13 +1721,7 @@ void idUserInterfaceRetained::Redraw(int time, bool useAspectCorrection) {
 		return;
 	}
 	Viewport viewport;
-	if (!RetainedUI_DefaultViewport(viewport) || !impl->Prepare()) return;
-	// A view-height canvas (title, pause and loading screens) follows the view
-	// height instead of display density; the safety fit is irrelevant to it.
-	if (impl->document.Model().canvasHeight > 0) {
-		viewport.canvasHeight = static_cast<float>(impl->document.Model().canvasHeight); viewport.fitScale = 1;
-		viewport.canvasMinWidth = static_cast<float>(impl->document.Model().canvasMinWidth);
-	}
+	if (!impl->DocumentViewport(viewport) || !impl->Prepare()) return;
 	if (!impl->initialized) {
 		if (!impl->RuntimeView()->HasEvent("onInit") || impl->RunEvent("onInit")) impl->initialized = true;
 	}
@@ -1701,14 +1729,8 @@ void idUserInterfaceRetained::Redraw(int time, bool useAspectCorrection) {
 	impl->PublishPromptGlyphs();
 	const bool drawn = RetainedUI_DrawViewRoot(impl->view,viewport);
 	impl->drawSucceeded = drawn;
-	// Timeline completion programs run inside the frame; publish their writes.
-	if (auto* runtime = impl->RuntimeView()) impl->PublishWrites(runtime->TakeCompletionWrites());
-	// The detail subject the frame settled on, for the session to describe.
-	if (auto* runtime = impl->RuntimeView(); runtime && impl->document.Model().detail) {
-		StateValue subject;
-		if (runtime->GetStateValue(impl->document.Model().detail->state,subject))
-			impl->PublishWrites({{impl->document.Model().detail->state,subject}});
-	}
+	impl->presented = true;
+	impl->PublishFrame();
 	// The frame read the bound state back; settle the number fields it answers.
 	impl->SettleSessionNumbers();
 	if (drawn && impl->active && impl->interactive) {
@@ -2423,20 +2445,158 @@ int UI_RetainedStateNames(idUserInterface* gui, const char* prefix, std::vector<
 }
 
 namespace {
-// A document a load will ask for, parsed on a worker meanwhile. The job reads
-// only its entry, and the entry's job is its last member, so destroying an
-// entry first cancels or waits for the parse.
+// One page's gathered vector compilations, compiled on the job workers in
+// interleaved slices. The job list is the last member: destroying the batch
+// cancels or waits for its slices first, and each slice writes only its own
+// requests. Install, on this thread, then hands the meshes over.
+struct WarmCompile {
+	idUserInterface* gui = nullptr; // Compared only: the page may have gone.
+	std::string path;
+	openq4::ui::VectorCompileBatch batch;
+	struct Slice { openq4::ui::VectorCompileBatch* batch; size_t first, stride; };
+	std::vector<Slice> slices;
+	std::chrono::steady_clock::time_point started;
+	std::unique_ptr<idJobList> job;
+};
+std::unique_ptr<WarmCompile> warmCompile;
+void CompileWarmSlice(const idJobContext& context) {
+	const auto& slice = *static_cast<const WarmCompile::Slice*>(context.data);
+	for (size_t i = slice.first; i < slice.batch->Size(); i += slice.stride) {
+		if (context.IsCancellationRequested()) return;
+		slice.batch->Run(i);
+	}
+}
+double WarmMilliseconds(std::chrono::steady_clock::time_point started) {
+	return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
+}
+}
+
+bool UI_RetainedWarm(idUserInterface* gui, bool& finished) {
+	finished = false;
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end() || !cvarSystem->GetCVarBool("ui_retainedWarm")) { finished = true; return false; }
+	auto& impl = *(*found)->impl;
+	// A page that is up, already drew, or has an onInit program still to run
+	// (its first presented frame runs it) is left alone.
+	if (impl.active || impl.presented || impl.warmed || !impl.Prepare() ||
+		(!impl.initialized && impl.RuntimeView()->HasEvent("onInit"))) {
+		if (warmCompile && warmCompile->gui == gui) {
+			// Presented while it compiled: the page made its own; the slices end.
+			warmCompile.reset();
+		}
+		finished = true; return false;
+	}
+	// One page's compilations at a time. Another page's still compiling (the
+	// session moved on before they finished) are installed first; that page,
+	// if it went, takes nothing.
+	if (warmCompile && warmCompile->gui != gui) {
+		if (!warmCompile->job->TryWait()) return true;
+		warmCompile->job->Wait();
+		const auto installed = warmCompile->batch.Install();
+		common->DPrintf("retained GUI %s preparing: installed %u compilations after the page it rested on changed\n",warmCompile->path.c_str(),
+			static_cast<unsigned>(installed));
+		warmCompile.reset();
+		return true;
+	}
+	Viewport viewport;
+	if (!impl.DocumentViewport(viewport)) { finished = true; return false; }
+	if (!impl.warmGathered) {
+		// A hidden frame tessellates nothing: it queues what the page's first
+		// presented frame would compile, for the workers.
+		impl.warmGathered = true;
+		auto compile = std::make_unique<WarmCompile>();
+		compile->gui = gui; compile->path = impl.path; compile->started = std::chrono::steady_clock::now();
+		impl.PublishPromptGlyphs();
+		const bool gathered = RetainedUI_GatherViewCompilations(impl.view,viewport,compile->batch);
+		impl.PublishFrame();
+		const double gatherMs = WarmMilliseconds(compile->started);
+		const size_t requests = compile->batch.Size();
+		if (!gathered || requests == 0) { impl.warmInstalled = true; return true; }
+		// Interleaved slices, so each worker gets a share of large and small
+		// elements alike.
+		const size_t slices = requests < 16 ? requests : 16;
+		compile->slices.resize(slices);
+		compile->job = jobSystem.CreateJobList("retained-vector-compile",static_cast<int>(slices));
+		bool added = compile->job != nullptr;
+		for (size_t i = 0; i < slices && added; ++i) {
+			compile->slices[i] = {&compile->batch,i,slices};
+			added = compile->job->AddJob(CompileWarmSlice,&compile->slices[i]);
+		}
+		const idJobSubmitResult submitted = added ? compile->job->Submit() : idJobSubmitResult::INVALID_STATE;
+		if (submitted != idJobSubmitResult::ACCEPTED && submitted != idJobSubmitResult::EXECUTED_SYNCHRONOUSLY) {
+			// No workers: nothing gained over the page's own first frame.
+			impl.warmInstalled = true; return true;
+		}
+		common->DPrintf("retained GUI %s preparing: gathered %u compilations (%u paths) in %.1f ms\n",impl.path.c_str(),
+			static_cast<unsigned>(requests),static_cast<unsigned>(compile->batch.Paths()),gatherMs);
+		warmCompile = std::move(compile);
+		return true;
+	}
+	if (!impl.warmInstalled) {
+		if (!warmCompile || warmCompile->gui != gui) { impl.warmInstalled = true; return true; }
+		if (!warmCompile->job->TryWait()) return true;
+		warmCompile->job->Wait();
+		const auto started = std::chrono::steady_clock::now();
+		const auto installed = warmCompile->batch.Install();
+		common->DPrintf("retained GUI %s preparing: compiled on the workers within %.1f ms, installed %u in %.1f ms\n",impl.path.c_str(),
+			WarmMilliseconds(warmCompile->started),static_cast<unsigned>(installed),WarmMilliseconds(started));
+		warmCompile.reset();
+		impl.warmInstalled = true;
+		return true;
+	}
+	// The compiled artwork converted, its layers drawn, all out of sight: the
+	// frame that presents the page finds them made.
+	impl.warmed = true;
+	const auto started = std::chrono::steady_clock::now();
+	impl.PublishPromptGlyphs();
+	const bool drawn = RetainedUI_WarmViewRoot(impl.view,viewport);
+	impl.PublishFrame();
+	common->DPrintf("retained GUI %s prepared: hidden frame in %.1f ms\n",impl.path.c_str(),WarmMilliseconds(started));
+	finished = true;
+	return drawn;
+}
+
+bool UI_RetainedEndWarm() {
+	return !warmCompile && RetainedUI_EndWarm();
+}
+
+idUserInterface* UI_RetainedLoaded(const char* path) {
+	if (path == nullptr) return nullptr;
+	for (auto* view : diagnosticViews)
+		if (!view->IsUniqued() && !idStr::Icmp(view->impl->path.c_str(),path) && view->impl->Prepare()) return view;
+	return nullptr;
+}
+
+namespace {
+// A document a load will ask for, read and parsed on a worker meanwhile. The
+// file opens here, on the main thread: the open walks the shared search paths
+// and pak handles. Reading the opened file (a pk4 member inflates as it reads)
+// touches only its own handle, as a streamed sound's decode does, so the
+// worker reads it. The job reads only its entry, and the entry's job is its
+// last member, so destroying an entry first cancels or waits for the work;
+// the file closes after it, back on the main thread.
 struct PrefetchedDocument {
+	~PrefetchedDocument() { job.reset(); if (file != nullptr) fileSystem->CloseFile(file); }
 	std::string path, source;
+	// What the file was when it opened: its length and content stamp, which a
+	// load compares before it takes the source in place of reading it.
+	int size = 0;
+	ID_TIME_T contentStamp = FILE_NOT_FOUND_TIMESTAMP;
+	idFile* file = nullptr;
 	Document document;
 	std::vector<Diagnostic> diagnostics;
-	bool loaded = false;
+	bool read = false, loaded = false;
 	std::unique_ptr<idJobList> job;
 };
 std::vector<std::unique_ptr<PrefetchedDocument>> prefetchedDocuments;
 void ParsePrefetchedDocument(const idJobContext& context) {
 	auto& entry = *static_cast<PrefetchedDocument*>(context.data);
-	if (!context.IsCancellationRequested()) entry.loaded = entry.document.Load(entry.source,entry.diagnostics);
+	if (context.IsCancellationRequested()) return;
+	entry.source.resize(static_cast<size_t>(entry.size));
+	entry.read = entry.file->Read(entry.source.data(),entry.size) == entry.size;
+	if (entry.read && !context.IsCancellationRequested()) entry.loaded = entry.document.Load(entry.source,entry.diagnostics);
+	// What the view's load would otherwise encode on the main thread.
+	if (entry.loaded && !context.IsCancellationRequested()) entry.document.SnapshotIdentity(entry.path);
 }
 }
 
@@ -2449,17 +2609,20 @@ void UI_RetainedPrefetchDocuments( const char *const *paths, int count ) {
 				std::any_of( prefetchedDocuments.begin(), prefetchedDocuments.end(), [&]( const auto &entry ) { return entry->path == path; } ) ) {
 			continue;
 		}
-		// The file system stays on this thread; the worker gets the bytes.
-		void *data = nullptr;
-		const int size = fileSystem->ReadFile( path, &data );
-		if ( size <= 0 || data == nullptr || size > 16 * 1024 * 1024 ) {
-			if ( data != nullptr ) fileSystem->FreeFile( data );
+		// The open stays on this thread; the worker reads the opened file. A
+		// frame that starts several parses (SETTINGS leads to four pages, 13 MB
+		// of documents) no longer inflates them all before it draws.
+		ID_TIME_T contentStamp = FILE_NOT_FOUND_TIMESTAMP;
+		const int size = fileSystem->ReadFileContentStamp( path, nullptr, &contentStamp );
+		if ( size <= 0 || size > 16 * 1024 * 1024 ) {
 			continue;
 		}
 		auto entry = std::make_unique<PrefetchedDocument>();
 		entry->path = path;
-		entry->source.assign( static_cast<const char *>( data ), static_cast<size_t>( size ) );
-		fileSystem->FreeFile( data );
+		entry->size = size;
+		entry->contentStamp = contentStamp;
+		entry->file = fileSystem->OpenFileRead( path );
+		if ( entry->file == nullptr || entry->file->Length() != size ) continue;
 		entry->job = jobSystem.CreateJobList( "retained-document-parse", 1 );
 		if ( !entry->job || !entry->job->AddJob( ParsePrefetchedDocument, entry.get() ) ) continue;
 		const idJobSubmitResult submitted = entry->job->Submit();
@@ -2468,20 +2631,29 @@ void UI_RetainedPrefetchDocuments( const char *const *paths, int count ) {
 	}
 }
 
-bool UI_RetainedTakePrefetched(const std::string& path, const std::string& source, Document& document) {
+bool UI_RetainedTakePrefetched(const std::string& path, int size, std::string& source, ID_TIME_T& stamp, Document& document) {
 	const auto found = std::find_if(prefetchedDocuments.begin(),prefetchedDocuments.end(),[&](const auto& entry) { return entry->path == path; });
 	if (found == prefetchedDocuments.end()) return false;
 	const auto entry = std::move(*found);
 	prefetchedDocuments.erase(found);
-	// A parse that failed, or of a source that has changed since, is made again
-	// by the load, which reports its diagnostics.
-	if (!entry->job->Wait() || !entry->loaded || entry->source != source) return false;
+	// A parse that failed, or of a source that has changed since (another
+	// length or content stamp: a pk4 member's CRC, a loose file's time), is
+	// made again by the load from the file as it is, which reports its
+	// diagnostics.
+	ID_TIME_T contentStamp = FILE_NOT_FOUND_TIMESTAMP;
+	if (!entry->job->Wait() || !entry->read || !entry->loaded || size != entry->size ||
+		fileSystem->ReadFileContentStamp(path.c_str(),nullptr,&contentStamp) != size ||
+		contentStamp == FILE_NOT_FOUND_TIMESTAMP || contentStamp != entry->contentStamp) return false;
+	fileSystem->ReadFile(path.c_str(),nullptr,&stamp);
+	source = std::move(entry->source);
 	document = std::move(entry->document);
 	return true;
 }
 
 void UI_RetainedPrefetchClear() {
 	prefetchedDocuments.clear();
+	// A page's compilations still held go with them: its page may go too.
+	warmCompile.reset();
 }
 
 namespace {
@@ -2522,6 +2694,12 @@ std::vector<const char*> GameplayDocuments(bool multiplayer) {
 }
 }
 
+bool UI_RetainedPrefetchReady( const char *path ) {
+	if (path == nullptr) return false;
+	const auto found = std::find_if(prefetchedDocuments.begin(),prefetchedDocuments.end(),[&](const auto& entry) { return entry->path == path; });
+	return found != prefetchedDocuments.end() && (*found)->job->TryWait();
+}
+
 bool UI_RetainedPrefetched( const char *path ) {
 	return path != nullptr && std::any_of(prefetchedDocuments.begin(),prefetchedDocuments.end(),[&](const auto& entry) { return entry->path == path; });
 }
@@ -2542,6 +2720,7 @@ void UI_RetainedSettleGameplayDocuments( bool multiplayer ) {
 
 #else
 void UI_RetainedPrefetchDocuments( const char *const *, int ) {}
+bool UI_RetainedPrefetchReady( const char * ) { return false; }
 void UI_RetainedPrefetchClear() {}
 void UI_RetainedPrefetchGameplayDocuments( bool ) {}
 void UI_RetainedSettleGameplayDocuments( bool ) {}

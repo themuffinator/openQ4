@@ -22,6 +22,21 @@ const openq4::ui::DocumentModel* UI_RetainedDocumentModel(idUserInterface* gui);
 // The names of a retained GUI's declared state that start with `prefix`, in
 // order: how a session finds the application lines a document shows.
 int UI_RetainedStateNames(idUserInterface* gui, const char* prefix, std::vector<std::string>& names);
+// One step of preparing a loaded page that has never presented, out of sight
+// (ui_retainedWarm): a hidden frame gathers the vector compilations its first
+// presented frame would make, the job workers compile them, this thread
+// installs them, then a hidden frame converts its meshes and draws its layers.
+// True when this frame did a step or waits on the workers, so the caller does
+// nothing else this frame; `finished` once the page needs nothing more (it is
+// prepared, presented, active, or not a retained page). EndWarm releases the
+// hidden target when no page is left, from a later frame; false until it can.
+bool UI_RetainedWarm(idUserInterface* gui, bool& finished);
+bool UI_RetainedEndWarm();
+// A retained page the session loaded to share (not a unique instance), or
+// nullptr; it takes no reference. And whether a parse the page shown started
+// for `path` has finished, so a load would not wait for it.
+idUserInterface* UI_RetainedLoaded(const char* path);
+bool UI_RetainedPrefetchReady(const char* path);
 // Read semantic focus so a refreshed catalog can follow the same entry.
 std::string UI_RetainedFocusedControl(idUserInterface* gui);
 // The right stick's vertical deflection in a retained menu (section 13.5),
@@ -38,6 +53,8 @@ class idUserInterfaceRetained final : public idUserInterfaceManaged {
 	friend bool UI_RetainedViewFailed(idUserInterface*);
 	friend const openq4::ui::DocumentModel* UI_RetainedDocumentModel(idUserInterface*);
 	friend int UI_RetainedStateNames(idUserInterface*, const char*, std::vector<std::string>&);
+	friend bool UI_RetainedWarm(idUserInterface*, bool&);
+	friend idUserInterface* UI_RetainedLoaded(const char*);
 	friend std::string UI_RetainedFocusedControl(idUserInterface*);
 	friend bool UI_RetainedDetailStick(idUserInterface*, float, float);
 public:

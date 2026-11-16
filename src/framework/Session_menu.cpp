@@ -10871,6 +10871,88 @@ void idSessionLocal::PrefetchRetainedNextPages() {
 #endif
 }
 
+/*
+===============
+idSessionLocal::WarmRetainedPages
+
+A page's first presented frame compiled every vector path it draws (40 to
+140 ms of one frame on a laptop), and a page loaded when first opened also
+built its view then. Once the page on screen has rested (the page and its
+focused control unchanged) for RETAINED_WARM_DELAY_MSEC, each frame takes
+one step for the pages it leads to, before the page draws: a page whose
+parse the shown page started (PrefetchRetainedNextPages) and that has
+finished is loaded, the slower part of opening it; a loaded page that has
+never presented is prepared out of sight, its compilations on the job
+workers (UI_RetainedWarm). Nothing runs during a change of page, under a
+message box or a multiplayer game. Any navigation restarts the wait; a
+compilation in flight is still installed meanwhile. The SYSTEM page is a
+unique instance each open and is left alone.
+===============
+*/
+static const int RETAINED_WARM_DELAY_MSEC = 500;
+void idSessionLocal::WarmRetainedPages() {
+#ifndef ID_DEDICATED
+	static const char *const leads[][5] = {
+		{ RETAINED_TITLE_GUI, RETAINED_SINGLEPLAYER_GUI, RETAINED_SETTINGSPAGE_GUI, RETAINED_MPPAGE_GUI, RETAINED_LOADGAME_GUI },
+		{ RETAINED_PAUSE_GUI, RETAINED_SETTINGSPAGE_GUI, RETAINED_LOADGAME_GUI, NULL, NULL },
+		{ RETAINED_PAUSE_STROGG_GUI, RETAINED_SETTINGSPAGE_GUI, NULL, NULL, NULL },
+		{ RETAINED_SINGLEPLAYER_GUI, RETAINED_CAMPAIGNS_GUI, RETAINED_ARENA_GUI, NULL, NULL },
+		{ RETAINED_CAMPAIGNS_GUI, RETAINED_SKILL_GUI, RETAINED_CHAPTERS_GUI, NULL, NULL },
+		{ RETAINED_SETTINGSPAGE_GUI, RETAINED_CONTROLS_GUI, RETAINED_GAME_GUI, RETAINED_AUDIO_GUI, NULL },
+		{ RETAINED_MPPAGE_GUI, RETAINED_CREATE_SERVER_GUI, RETAINED_JOIN_GAME_GUI, RETAINED_DEMOS_GUI, NULL }
+	};
+	if ( !Session_RetainedScreensEnabled() || guiActive == NULL || guiTest != NULL || insideExecuteMapChange ) {
+		return;
+	}
+	const idUserInterface *shown = guiRetainedHome != NULL && guiActive == guiMainMenu ? guiRetainedHome : guiActive;
+	const int now = Sys_Milliseconds();
+	const idStr focus = UI_RetainedFocusedControl( const_cast<idUserInterface *>( shown ) ).c_str();
+	if ( shown != retainedWarmShown || focus != retainedWarmFocus ) {
+		retainedWarmShown = shown;
+		retainedWarmFocus = focus;
+		retainedWarmFrom = now + RETAINED_WARM_DELAY_MSEC;
+		retainedWarmDone = false;
+	}
+	if ( retainedWarmDone ) {
+		UI_RetainedEndWarm();
+		return;
+	}
+	if ( now < retainedWarmFrom || guiActive == guiMsg || retainedSubpageFrom != NULL || retainedHomeReturning ||
+			common->GetPresentationTime() < retainedHandoffUntil || ( mapSpawned && IsMultiplayer() ) ) {
+		return;
+	}
+	for ( int i = 0; i < static_cast<int>( sizeof( leads ) / sizeof( leads[0] ) ); ++i ) {
+		if ( idStr::Icmp( shown->Name(), leads[ i ][ 0 ] ) != 0 ) {
+			continue;
+		}
+		for ( int next = 1; next < 5; ++next ) {
+			const char *page = leads[ i ][ next ];
+			if ( page == NULL || retainedStock.FindIndex( page ) >= 0 ) {
+				continue;
+			}
+			idUserInterface *gui = UI_RetainedLoaded( page );
+			if ( gui == NULL ) {
+				// Its parse is done: build its view now, rather than in the
+				// frame that opens it. One a frame.
+				if ( UI_RetainedPrefetchReady( page ) ) {
+					const int started = Sys_Milliseconds();
+					FindRetainedGui( page, true, false );
+					common->DPrintf( "retained GUI %s loaded ahead, while %s rested (%d ms)\n", page, shown->Name(), Sys_Milliseconds() - started );
+					return;
+				}
+				continue;
+			}
+			bool finished = false;
+			if ( UI_RetainedWarm( gui, finished ) ) {
+				return;
+			}
+		}
+		break;
+	}
+	retainedWarmDone = true;
+#endif
+}
+
 void idSessionLocal::PreloadRetainedScreens() {
 #ifndef ID_DEDICATED
 	// Loaded with the stock menus, so a document's own pictures resolve

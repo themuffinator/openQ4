@@ -9,6 +9,15 @@ adds partial evidence for `FLOW-024`, `FLOW-047`, `FLOW-048`, `ART-030` and
 `REN-014` in the [requirement register](product-requirements.md); the
 remaining screen migrations and the final gates stay open.
 
+## 14 November 2026: the title drops its dither
+
+At the user's request the title's backdrop no longer passes through the
+ordered dither: `field-dither` is gone from `title.rui`, so the dimmed
+pictures and their light reach the view as drawn. The dimming, the picture-change
+faults, the menu-move faults and the slips are unchanged, and a settled frame
+now runs no backdrop pass at all. The 13 November entry below records the
+dither as it was. The `backdrop-dither` property stays in the format.
+
 ## 13 November 2026: the title's signal
 
 The title's backdrop now reaches the player as a display signal (user request:
@@ -418,8 +427,7 @@ after editing the script; `--check` fails when an output is stale.
   stays put. Reduced motion (`ui_retainedReducedMotion`) hides the glint and
   keeps the rim. The backdrop, the light and grid, and the framing bands lean
   up to 6 dp away from the pointer, deeper layers further, while the content
-  stays fixed (section 13.8 depth). The pictures are dimmed and reach the
-  view through an ordered dither, and each picture change and each of the
+  stays fixed (section 13.8 depth). The pictures are dimmed, and each picture change and each of the
   menu's moves is a brief signal fault ([the title's signal](#13-november-2026-the-titles-signal)).
   The session publishes the pointer's
   place, or a held look stick's deflection while it leads (menu focus moves

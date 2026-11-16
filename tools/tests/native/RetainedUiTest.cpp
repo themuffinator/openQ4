@@ -1,6 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "src/ui/retained/Runtime.h"
 #include "src/ui/retained/CoverageRaster.h"
+#include "src/ui/retained/VectorCompile.h"
 #include "src/ui/GuiStateNumber.h"
 #include <algorithm>
 #include <cmath>
@@ -1535,6 +1536,45 @@ int main(int argc, char** argv) {
 	  {"id":"move","durationMs":1000,"tracks":[{"node":"shape","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"px","value":[0,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"px","value":[10,0,1,1,0]}}]}]},
 	  {"id":"fractional","durationMs":1000,"tracks":[{"node":"shape","property":"transform","keys":[{"atMs":0,"value":{"type":"transform","unit":"px","value":[10,0,1,1,0]}},{"atMs":1000,"value":{"type":"transform","unit":"px","value":[10.5,0,1,1,0]}}]}]}
 	 ]})json";
+	{
+		// A frame drawn out of sight defers the vector compilations a page's
+		// first presented frame makes (the menus' warm pass); compiled apart
+		// and installed, they serve that frame exactly as compiling it would.
+		Check(runtime.LoadDocument(vectorDocument,"vector-direct.rui",diagnostics),"load the direct-compilation reference");
+		host.drawn.clear(); runtime.Frame(viewport,8);
+		const auto directDraw = host.drawn;
+		Check(!directDraw.empty() && runtime.Statistics().vectorPathsCompiled > 0,"the reference frame compiles its vectors");
+		Check(runtime.LoadDocument(vectorDocument,"vector-deferred.rui",diagnostics),"load the deferred-compilation copy");
+		VectorCompileBatch batch;
+		DeferVectorCompilations(&batch); host.drawn.clear(); runtime.Frame(viewport,8); DeferVectorCompilations(nullptr);
+		Check(batch.Size() == 1 && batch.Paths() == 1 && host.drawn.empty() && runtime.Statistics().vectorPathsCompiled == 0,
+			"a deferred frame queues each compilation and submits no vector");
+		for (size_t i = 0; i < batch.Size(); ++i) batch.Run(i);
+		Check(batch.Install() == 1 && batch.Size() == 0,"each compiled request is installed once");
+		runtime.InvalidatePaint(); host.drawn.clear(); runtime.Frame(viewport,8);
+		Check(runtime.Statistics().vectorPathsCompiled == 0,"the installed compilation serves the first presented frame");
+		bool same = host.drawn.size() == directDraw.size();
+		for (size_t i = 0; same && i < directDraw.size(); ++i) {
+			const auto& a = host.drawn[i]; const auto& b = directDraw[i];
+			same = a.x == b.x && a.y == b.y && a.u == b.u && a.v == b.v && a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+		}
+		Check(same,"installed geometry matches a direct compilation vertex for vertex");
+		// An element that drew in the meantime keeps its own compilation.
+		Check(runtime.LoadDocument(vectorDocument,"vector-raced.rui",diagnostics),"load a copy that draws before installation");
+		VectorCompileBatch raced;
+		DeferVectorCompilations(&raced); runtime.Frame(viewport,8); DeferVectorCompilations(nullptr);
+		runtime.InvalidatePaint(); runtime.Frame(viewport,8);
+		Check(runtime.Statistics().vectorPathsCompiled == 1,"a presented frame compiles what was not yet installed");
+		for (size_t i = 0; i < raced.Size(); ++i) raced.Run(i);
+		Check(raced.Install() == 0,"an element that has drawn takes no deferred compilation");
+		// A reloaded document leaves no element to install into.
+		Check(runtime.LoadDocument(vectorDocument,"vector-gone.rui",diagnostics),"load a copy replaced before installation");
+		VectorCompileBatch gone;
+		DeferVectorCompilations(&gone); runtime.Frame(viewport,8); DeferVectorCompilations(nullptr);
+		Check(runtime.LoadDocument(vectorDocument,"vector-replacement.rui",diagnostics),"replace it while its compilations run");
+		for (size_t i = 0; i < gone.Size(); ++i) gone.Run(i);
+		Check(gone.Size() == 1 && gone.Install() == 0,"a replaced document's elements take nothing");
+	}
 	Check(runtime.LoadDocument(vectorDocument,"vector.rui",diagnostics),"load native vector element into retained tree");
 	for (int density : {1,2}) {
 		viewport.displayScale = static_cast<float>(density);

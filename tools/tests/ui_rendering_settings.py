@@ -53,6 +53,8 @@ const Status& R_RendererModule_GetStatus() {return status;}
 bool R_RendererModule_QueryRenderingDevices(renderDeviceCatalog_t& output) {
  ++captures;output=inventoryAvailable?inventory:renderDeviceCatalog_t{};return inventoryAvailable;
 }
+// The page reads the recent inventory; a choice checks a fresh one. Both are live here.
+bool R_RendererModule_RecentRenderingDevices(renderDeviceCatalog_t& output) { return R_RendererModule_QueryRenderingDevices(output); }
 bool R_RendererModule_RenderSelectionPending(const char* api,const char* device) { return api!=bootApi || device!=bootDevice; }
 void R_RendererModule_UseSavedSelectionOnReload() { CHECK(persist && persists>=2);++reloads; }
 bool Common_WriteSettingsConfiguration(bool locked,std::string& error) {

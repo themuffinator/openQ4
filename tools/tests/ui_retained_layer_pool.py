@@ -56,6 +56,7 @@ struct Host {
     struct Layer {idRenderTexture* target=nullptr;const idMaterial* material=nullptr;const idMaterial* maskMaterial=nullptr;int width=0,height=0;};
     std::vector<Layer> layers;
     idRenderTexture* boundTarget=nullptr;
+    idRenderTexture* warmTarget=nullptr;bool warming=false;
     int viewportWidth=1280,viewportHeight=720;
     std::vector<openq4::ui::Vertex> drawn;std::uintptr_t drawnMaterial=0;
     void Draw(const std::vector<openq4::ui::Vertex>& vertices,const std::vector<int>& indices,std::uintptr_t material){
@@ -112,7 +113,15 @@ int main(){
         assert(near(v.x,mask[i].x) && near(v.y,mask[i].y) && near(v.u,mask[i].x/1280) && near(v.v,1-mask[i].y/720));
         assert(near(v.r,mask[i].a*.5f) && near(v.g,v.r) && near(v.b,v.r) && near(v.a,v.r));
     }
-    std::puts("retained layer pool: mixed viewport preservation, exact shared byte budget, failure isolation and GL-order composites passed");
+    // A page drawn out of sight: its view's target (null) is the hidden one,
+    // composites included, and the view's own again once it is done.
+    idRenderTexture hidden;const int viewBinds=renderer.defaultBinds;
+    host.warmTarget=&hidden;host.warming=true;
+    host.BindTarget(nullptr,true);assert(renderer.bound==&hidden && renderer.defaultBinds==viewBinds);
+    host.CompositeLayer(2,0,.5f,{100,200,300,50});assert(renderer.bound==&hidden && renderer.defaultBinds==viewBinds);
+    host.EndLayer(0);assert(renderer.bound==&hidden);
+    host.warming=false;host.BindTarget(nullptr);assert(renderer.bound==nullptr && renderer.defaultBinds==viewBinds+1);
+    std::puts("retained layer pool: mixed viewport preservation, exact shared byte budget, failure isolation, GL-order composites and out-of-sight warm targets passed");
 }
 '''
 
@@ -162,11 +171,12 @@ static bool RetainedAtlasActive(){return ui_retainedAtlas.GetBool();}
 struct Host {
     int viewportWidth=1280,viewportHeight=720;
     bool rasterNewMeshes=true;
+    bool warming=false;
     struct AtlasPage {bool dirty=false;const idMaterial* material=nullptr;const idMaterial* multiplyMaterial=nullptr;std::uint64_t lastFrame=0;int references=0;};
     std::vector<AtlasPage> atlasPages;
     unsigned rasterDraws=0,rasterSavedVertices=0;
     std::uint64_t RenderFrame()const{return 1;}
-    template<class... T>void CacheRaster(T&&...){assert(false && "atlas disabled in indexed mesh fixture");}
+    template<class... T>void QueueRaster(T&&...){assert(false && "atlas disabled in indexed mesh fixture");}
 '''
 DRAW_MAIN = r'''
 };
@@ -296,7 +306,9 @@ struct Host {
     struct Layer {idRenderTexture* target=nullptr;int width=0,height=0;};
     std::vector<Layer> layers;
     idRenderTexture* boundTarget=nullptr;
-    std::vector<int> atlasPages;
+    std::vector<int> atlasPages,atlasImages,rasterBatches,queuedRasters,finishedRasters;
+    unsigned long long lastAtlasUpload=0;
+    idRenderTexture* warmTarget=nullptr;int warmWidth=0,warmHeight=0;bool warming=false;
     int viewportWidth=1600,viewportHeight=900;
     float viewportX=160,viewportY=90;
     int captureWidth=1920,captureHeight=1080;
@@ -526,7 +538,8 @@ def main():
     source=(ROOT/'src/ui/RetainedUI.cpp').read_text()
     source_text=source
     bodies=[function_body(source,signature).replace(' override','') for signature in (
-        'void BindTarget(','bool BeginLayer(','void CompositeLayer(','void CompositeMaskedLayer(','void MaskLayer(','void DrawLayer(')]
+        'void BindTarget(','bool BeginLayer(','void CompositeLayer(','void CompositeMaskedLayer(','void MaskLayer(','void DrawLayer(',
+        'void EndLayer(')]
     # The Vulkan executor's side of the row-order contract the composites rely on.
     executor=(ROOT/'src/renderer/Vulkan/vk_GuiExecutor.cpp').read_text(encoding='utf-8')
     assert 'vkExec.activePipelineTarget.lowerOrigin = true;' in function_body(executor,'bool VK_Exec_SetRenderTarget('),\

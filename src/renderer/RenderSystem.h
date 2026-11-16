@@ -871,6 +871,15 @@ public:
 	// when any such image still holds its pixels: the caller must then restart
 	// the engine instead.
 	virtual bool ReloadGeneratedCacheImages() = 0;
+
+	// Appended slot, render API 35. Uploads one rectangle of RGBA8 pixels into
+	// a single-level RGBA8 2D image that CreateImage allocated or a whole
+	// UploadImage shaped, leaving the rest of its storage and its sampler as
+	// they are. data is the rectangle's first pixel; rowPitch counts pixels
+	// from one of its rows to the next (0 when the rows are packed). False,
+	// with nothing uploaded, for any other image or a rectangle outside it;
+	// the caller then uploads the image whole.
+	virtual bool UploadImageRegion( const char *imageName, const byte *data, int x, int y, int width, int height, int rowPitch ) = 0;
 };
 
 extern idRenderSystem *		renderSystem;

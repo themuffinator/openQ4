@@ -135,6 +135,9 @@ static const float RB_ARB2_MD5RVertexColorModulate[4] = { 1.0f, 0.0f, 0.0f, 0.0f
 static const float RB_ARB2_MD5RVertexColorInverseModulate[4] = { -1.0f, 1.0f, 0.0f, 0.0f };
 static const int ARB2_MD5R_INTERACTION_PARAM_BASE = ARB2_MD5R_MVP_ROW_0;
 
+// tr_render.cpp: r_glSerializeDraws, a validation-only barrier after each classic draw
+void RB_SerializeDrawForValidation( void );
+
 // Value cache for ARB program env parameters set by the interaction loop.
 // Light projection planes, light/view origins, and stage matrices are
 // per-(light, entity) or per-stage constants that the classic loop re-sends
@@ -763,6 +766,7 @@ bool RB_ARB2_DrawPreparedPackedMD5RStageBatches( const srfTriangles_t *tri ) {
 			r_singleTriangle.GetBool() ? 3 : primBatchIndexCount,
 			GL_INDEX_TYPE,
 			drawIndexBuffer->indices.Ptr() + primBatch.drawGeoSpec.indexStart );
+		RB_SerializeDrawForValidation();
 
 		transformBase += primBatchTransformCount;
 	}
@@ -808,6 +812,7 @@ bool RB_ARB2_DrawPreparedPackedMD5RDirectBatches( const srfTriangles_t *tri ) {
 			r_singleTriangle.GetBool() ? 3 : primBatchIndexCount,
 			GL_INDEX_TYPE,
 			drawIndexBuffer->indices.Ptr() + primBatch.drawGeoSpec.indexStart );
+		RB_SerializeDrawForValidation();
 
 		transformBase += primBatchTransformCount;
 	}
@@ -892,6 +897,7 @@ static bool RB_ARB2_DrawPackedMD5RInteractionBatches( const drawInteraction_t *d
 					r_singleTriangle.GetBool() ? 3 : batchIndexCount,
 					GL_INDEX_TYPE,
 					batchIndices );
+				RB_SerializeDrawForValidation();
 			}
 
 			batchIndices += batchIndexCount;
@@ -973,6 +979,7 @@ static bool RB_ARB2_DrawPackedMD5RInteractionBatches( const drawInteraction_t *d
 				r_singleTriangle.GetBool() ? 3 : batchIndexCount,
 				GL_INDEX_TYPE,
 				batchIndexes );
+			RB_SerializeDrawForValidation();
 		}
 
 		destVertexBase += primBatch.drawGeoSpec.vertexCount;
@@ -1510,6 +1517,7 @@ static bool RB_ARB2_DrawPackedMD5RShadowBatches( const drawSurf_t *surf, int num
 				r_singleTriangle.GetBool() ? 3 : shadowIndexCount,
 				GL_INDEX_TYPE,
 				indexSource );
+			RB_SerializeDrawForValidation();
 			drewAnything = true;
 		}
 
@@ -1564,6 +1572,7 @@ void RB_ARB2_MD5R_DrawShadowElements( const drawSurf_t *surf, int numIndexes ) {
 			r_singleTriangle.GetBool() ? 3 : numIndexes,
 			GL_INDEX_TYPE,
 			(int *)vertexCache.Position( tri->indexCache ) );
+		RB_SerializeDrawForValidation();
 		backEnd.pc.c_vboIndexes += numIndexes;
 	} else {
 		if ( r_useIndexBuffers.GetBool() ) {
@@ -1573,6 +1582,7 @@ void RB_ARB2_MD5R_DrawShadowElements( const drawSurf_t *surf, int numIndexes ) {
 			r_singleTriangle.GetBool() ? 3 : numIndexes,
 			GL_INDEX_TYPE,
 			tri->indexes );
+		RB_SerializeDrawForValidation();
 	}
 
 	if ( vertexProgramWasEnabled ) {
@@ -16242,6 +16252,7 @@ static void RB_SharedWorldInteractionGLDrawPrimitive(
 	}
 	glDrawElements( GL_TRIANGLES, preparedPrimitive.indexCount,
 		GL_INDEX_TYPE, preparedPrimitive.indexPointer );
+	RB_SerializeDrawForValidation();
 	if ( primitive.polygonOffsetEnabled ) {
 		glDisable( GL_POLYGON_OFFSET_FILL );
 	}
@@ -16604,6 +16615,7 @@ static void RB_SharedWorldInteractionGLDrawMappedPrimitive(
 	}
 	glDrawElements( GL_TRIANGLES, preparedPrimitive.indexCount,
 		GL_INDEX_TYPE, preparedPrimitive.indexPointer );
+	RB_SerializeDrawForValidation();
 	if ( primitive.polygonOffsetEnabled ) {
 		glDisable( GL_POLYGON_OFFSET_FILL );
 	}
@@ -16691,6 +16703,7 @@ static void RB_SharedWorldInteractionGLSubmitShadowElements(
 	}
 	glDrawElements( GL_TRIANGLES, preparedCaster.indexCount, GL_INDEX_TYPE,
 		preparedCaster.indexPointer );
+	RB_SerializeDrawForValidation();
 }
 
 static void RB_SharedWorldInteractionGLDrawShadowCaster(

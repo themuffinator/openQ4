@@ -394,6 +394,12 @@ public:
 	// shared by copies: a runtime starts from a copy of it instead of
 	// evaluating every binding again. Empty for a document never loaded.
 	const State& InitialState() const;
+	// The document as an instance snapshot names it, for one source path: a
+	// compact JSON object of its version, id, path and whole source. Encoded
+	// once and shared by copies, so the worker that parses a prefetched
+	// document encodes it too: escaping a 5 MB source took the main thread
+	// several milliseconds of every page load. Not for concurrent callers.
+	const std::string& SnapshotIdentity(const std::string& sourcePath) const;
 	// Derived layout only. Text is inserted via Runtime's escaped/localized
 	// text API; neither translation strings nor extensions become markup.
 	std::string BuildMarkup() const;

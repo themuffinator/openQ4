@@ -1008,6 +1008,7 @@ public:
 	virtual void			UnCrop();
 	virtual void			GetCardCaps( bool &oldCard, bool &nv10or20 );
 	virtual bool			UploadImage( const char *imageName, const byte *data, int width, int height );
+	virtual bool			UploadImageRegion( const char *imageName, const byte *data, int x, int y, int width, int height, int rowPitch );
 
 
 	virtual idImage*		CreateImage(const char* name, idImageOpts* opts, textureFilter_t textureFilter);

@@ -12,9 +12,11 @@ extern idUserInterfaceManagerLocal uiManagerLocal;
 #include "UserInterfaceManaged.h"
 #include "retained/Runtime.h"
 #include "retained/CoverageRaster.h"
+#include "retained/VectorCompile.h"
 #include "retained/GeneratedImagePool.h"
 #include "retained/Input.h"
 #include "../renderer/RendererModule.h"
+#include "../framework/ParallelJobSystem.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -90,6 +92,8 @@ idCVar ui_retainedLinearMasks("ui_retainedLinearMasks", "1", CVAR_GUI | CVAR_BOO
 	"evaluate moving convex linear-alpha vector masks in the material shader");
 idCVar ui_retainedReplay("ui_retainedReplay", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
 	"replay settled presentation geometry while preserving live image sampling");
+idCVar ui_retainedWarm("ui_retainedWarm", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
+	"prepare the pages a resting menu leads to, out of sight, before they first present");
 idCVar ui_retainedDirectBackdrop("ui_retainedDirectBackdrop", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
 	"finish settled opaque full-view soft focus directly on the base surface");
 idCVar ui_retainedHalfBlur("ui_retainedHalfBlur", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
@@ -112,7 +116,44 @@ public:
 		CollectModels();
 		renderSystem->BeginGuiRoot(); boundTarget=nullptr;
 		rasterDraws=rasterSavedVertices=0;
+		if (warming) { BindTarget(nullptr,true); renderSystem->ClearRenderTarget(true,false,1,0,0,0,0); }
 	}
+	// A page drawn before it first presents (RetainedUI_WarmViewRoot) draws its
+	// root into a hidden target the size of the view, never into the view: its
+	// layers, caches and recorded frame are those of a real frame, unseen.
+	bool BeginWarm(int width, int height) {
+		if (width <= 0 || height <= 0) return false;
+		if (warmTarget && (warmWidth != width || warmHeight != height)) { renderSystem->DestroyRenderTexture(warmTarget); warmTarget = nullptr; }
+		if (!warmTarget) {
+			idImageOpts options;
+			options.width = width; options.height = height; options.format = FMT_RGBA8;
+			options.numLevels = 1; options.isPersistant = true;
+			idImage* image = renderSystem->CreateImage("_retainedWarmImage",&options,TF_NEAREST);
+			if (!image || !(warmTarget = renderSystem->CreateRenderTexture(image,nullptr))) return false;
+			warmWidth = width; warmHeight = height;
+		}
+		warming = true; warmFrame = RenderFrame();
+		return true;
+	}
+	void EndWarm() {
+		warming = false;
+		renderSystem->BindRenderTexture(nullptr,nullptr); boundTarget = nullptr;
+	}
+	// Once the pages are drawn the target goes, its image shrunk as a trimmed
+	// layer's is; never in the frame that drew into it, which a deferred
+	// submission may still hold.
+	bool ReleaseWarm() {
+		if (!warmTarget) return true;
+		if (warming || RenderFrame() == warmFrame) return false;
+		renderSystem->DestroyRenderTexture(warmTarget); warmTarget = nullptr;
+		idImageOpts options;
+		options.width = options.height = 1; options.format = FMT_RGBA8;
+		options.numLevels = 1; options.isPersistant = true;
+		renderSystem->CreateImage("_retainedWarmImage",&options,TF_NEAREST);
+		warmWidth = warmHeight = 0;
+		return true;
+	}
+	bool Warming() const { return warming; }
 	unsigned long long rasterDraws=0,rasterSavedVertices=0;
 	size_t RasterPages() const { return atlasPages.size(); }
 	void DumpGeometry() const {
@@ -123,32 +164,39 @@ public:
 		for (const auto& [id,mesh]:active) common->Printf("Retained mesh %llu: verts=%u revision=%llu stable=%u tiles=%u material=%s\n",
 			static_cast<unsigned long long>(id),unsigned(mesh->vertices.size()),static_cast<unsigned long long>(mesh->revision),
 			mesh->stableFrames,unsigned(mesh->rasterTiles.size()),Material(mesh->handle)->GetName());
+		unsigned used=0,waiting=0;
+		for (const auto& page:atlasPages) used+=page.references>0;
+		for (const auto& batch:rasterBatches) waiting+=unsigned(batch->jobs.size());
+		common->Printf("Retained atlas: pages=%u/%u in use=%u rasters queued=%u running=%u finished=%u retired meshes=%llu\n",
+			unsigned(atlasPages.size()),unsigned(AtlasPages),used,unsigned(queuedRasters.size()),waiting,unsigned(finishedRasters.size()),retiredMeshes);
 	}
 	void EndRoot() {
-		std::vector<byte> upload;
-		for (size_t first=0;first<atlasPages.size();first+=AtlasGroup) {
-			const size_t end=(std::min)(first+AtlasGroup,atlasPages.size());
-			if (std::none_of(atlasPages.begin()+first,atlasPages.begin()+end,[](const auto& page){return page.dirty;})) continue;
-			// Allocation and retirement still operate on independent 512-square
-			// pages. Sharing an image only lets adjacent draws batch. Reassemble
-			// unchanged neighbours too; never clear a live page during upload.
-			upload.assign(AtlasImageSize*AtlasImageSize*4,0);
-			for (size_t i=first;i<end;++i) {
-				const int x=int((i-first)%AtlasGrid)*AtlasSize,y=int((i-first)/AtlasGrid)*AtlasSize;
-				for (int row=0;row<AtlasSize;++row)
-					std::memcpy(upload.data()+((y+row)*AtlasImageSize+x)*4,atlasPages[i].pixels.data()+row*AtlasSize*4,AtlasSize*4);
+		// A print below (a material or image load, a warning) can redraw the
+		// loading screen inside a map change (PacifierUpdate), a retained root
+		// of its own: its EndRoot leaves the atlas to this one, whose loops
+		// and plans it would otherwise change underneath.
+		if (atlasBusy) return;
+		struct Busy { bool& flag; explicit Busy(bool& value):flag(value) { flag=true; } ~Busy() { flag=false; } } busy(atlasBusy);
+		const auto frame=RenderFrame();
+		for (auto batch=rasterBatches.begin();batch!=rasterBatches.end();) {
+			if (!(*batch)->list->TryWait()) { ++batch; continue; }
+			const bool completed=(*batch)->list->Wait();
+			for (auto& job:(*batch)->jobs) {
+				if (completed) finishedRasters.push_back(std::move(job));
+				else if (const auto found=meshes.find(job->mesh); found!=meshes.end() && found->second.rasterTicket==job->ticket)
+					found->second.rasterTicket=0;
 			}
-			const bool ok=renderSystem->UploadImage(va("_retainedAtlasImage%u",unsigned(first/AtlasGroup)),upload.data(),AtlasImageSize,AtlasImageSize);
-			for (size_t i=first;i<end;++i) if (atlasPages[i].dirty) {
-				auto& page=atlasPages[i];
-				if (ok) { page.dirty=false; page.uploadFailed=false; }
-				else if (!page.uploadFailed) {
-					page.uploadFailed=true; common->Warning("retained UI: coverage upload unavailable; using original geometry");
-				}
-			}
+			batch=rasterBatches.erase(batch);
 		}
+		// Uploads in successive frames stall Vulkan: the second waits for the
+		// first's copy on the GPU. Rasters finished in the frame after an
+		// upload wait one more; any number land together in one frame.
+		if (!finishedRasters.empty() && (lastAtlasUpload==frame || frame>lastAtlasUpload+1)) PlaceRasters();
+		SubmitRasters();
+		UploadAtlas(frame);
 	}
 	void BindTarget(idRenderTexture* target, bool flush=false) {
+		if (!target && warming) target=warmTarget;
 		if (flush || target!=boundTarget) { renderSystem->BindRenderTexture(target,nullptr); boundTarget=target; }
 	}
 	bool ReadFile(const std::string& path, std::string& contents) override {
@@ -401,15 +449,19 @@ public:
 			DropRaster(cached);
 			Convert(vertices,indices,material,handle,cached);
 			cached.revision = revision; cached.handle = handle; cached.width = viewportWidth; cached.height = viewportHeight;
-			cached.stableFrames=0; cached.rasterTried=false;
-		} else if (cached.lastFrame!=frame) {
+			cached.stableFrames=0; cached.rasterTried=false; cached.rasterTicket=0;
+		} else if (cached.lastFrame!=frame && !warming && !cached.warmed) {
 			++cached.stableFrames;
 		}
+		// A frame drawn out of sight is not one shown at rest: the page's first
+		// presented frame starts the count, so its meshes still reach the atlas
+		// together, and a page that is never shown takes no atlas space.
+		cached.warmed=warming;
 		cached.lastFrame=frame;
 		if (RetainedAtlasActive() && rasterNewMeshes && (!handle || idStr::Icmp(material->GetName(),"_retainedMultiply")==0) &&
 			!cached.rasterTried && cached.stableFrames>=2 && vertices.size()>=64) {
 			cached.rasterTried=true;
-			CacheRaster(cached,vertices,indices);
+			QueueRaster(mesh,cached,vertices,indices);
 		}
 		if (RetainedAtlasActive() && !cached.rasterTiles.empty() &&
 			std::none_of(cached.rasterTiles.begin(),cached.rasterTiles.end(),[&](const auto& tile){return atlasPages[tile.page].dirty;})) {
@@ -657,7 +709,7 @@ public:
 		return DrawGlitchedBackdrop(layers[destination-1].target,dither,strength,phase,region);
 	}
 	bool CanGlitchBackdropDirect(const openq4::ui::Bounds& region) const override {
-		return ui_retainedDirectBackdrop.GetBool() && softFocus && blurScratch && backdropCreated && blurGlitchMaterial &&
+		return ui_retainedDirectBackdrop.GetBool() && softFocus && !warming && blurScratch && backdropCreated && blurGlitchMaterial &&
 			blurGlitchWindowMaterial && blurWidth==viewportWidth && blurHeight==viewportHeight &&
 			viewportWidth>0 && viewportHeight>0 && captureWidth>0 && captureHeight>0 &&
 			region.x<=0 && region.y<=0 && region.x+region.width>=viewportWidth && region.y+region.height>=viewportHeight;
@@ -667,7 +719,8 @@ public:
 		return DrawGlitchedBackdrop(nullptr,dither,strength,phase,region);
 	}
 	bool DrawGlitchedBackdrop(idRenderTexture* destination, float dither, float strength, float phase, const openq4::ui::Bounds& region) {
-		if (!softFocus || !(dither>=0 && dither<=1) || !(strength>=0 && strength<=1) || !(phase>=0 && phase<=65536) ||
+		// A page drawn before it first presents has no window beneath it to read.
+		if (!softFocus || warming || !(dither>=0 && dither<=1) || !(strength>=0 && strength<=1) || !(phase>=0 && phase<=65536) ||
 			!(dither>0 || strength>0)) return false;
 		const float right = static_cast<float>(viewportWidth), bottom = static_cast<float>(viewportHeight);
 		const float x0 = Max(region.x,0.f), x1 = Min(region.x+region.width,right);
@@ -810,6 +863,9 @@ public:
 	// loads, so there may be no renderer: its font cache and targets are then
 	// gone with it, and only the handles are dropped.
 	void Reset() {
+		// Destroying a batch cancels or waits for its rasters first.
+		rasterBatches.clear(); queuedRasters.clear(); finishedRasters.clear();
+		lastAtlasUpload=0;
 		meshes.clear();
 		for (unsigned i=0;i<ModelCapacity;++i) FreeModel(i);
 		generatedImages.Reset([this](unsigned slot){ return ShrinkGeneratedImage(slot); });
@@ -820,7 +876,7 @@ public:
 			options.numLevels=1; options.isPersistant=true;
 			renderSystem->CreateImage(va("_retainedAtlasImage%u",unsigned(i/AtlasGroup)),&options,TF_NEAREST);
 		}
-		atlasPages.clear();
+		atlasPages.clear(); atlasImages.clear();
 		if (renderSystem) renderSystem->ResetRetainedFontCache();
 		scalableFaces.clear(); fontFallbackReported = false;
 		fonts.clear();
@@ -832,7 +888,9 @@ public:
 			renderSystem->DestroyRenderTexture(blurScratch);
 			renderSystem->DestroyRenderTexture(reducedBlurScratch);
 			renderSystem->DestroyRenderTexture(reducedBlurResult);
+			renderSystem->DestroyRenderTexture(warmTarget);
 		}
+		warmTarget = nullptr; warmWidth = warmHeight = 0; warming = false;
 		layers.clear(); blurScratch = nullptr;
 		blurBackdropMaterial = blurScratchMaterial = blurStreakMaterial = nullptr;
 		blurGlitchMaterial = blurGlitchWindowMaterial = nullptr;
@@ -914,22 +972,40 @@ private:
 		std::vector<RasterTile> rasterTiles;
 		unsigned stableFrames=0;
 		std::uint64_t lastFrame=0;
-		bool rasterTried=false;
+		// The raster this mesh waits for; zero once placed, dropped or stale.
+		std::uint64_t rasterTicket=0;
+		bool rasterTried=false, warmed=false;
 	};
 	// Fixed-size pages keep CPU/GPU storage bounded at 32 MiB each. Append-only
 	// packing never changes a live mesh's pixels, including queued SMP draws.
 	// Only an entirely unused page, retired for four frames, can be recycled.
 	static constexpr int AtlasSize=512, AtlasPages=32;
 	static constexpr int AtlasGrid=4, AtlasGroup=AtlasGrid*AtlasGrid, AtlasImageSize=AtlasGrid*AtlasSize;
+	// A full atlas takes back the tiles of meshes not drawn for this many
+	// frames, the pages left behind, so that the page in front can use it.
+	static constexpr std::uint64_t RetireFrames=60;
+	// Each group's image, as its upload sends it: its pages' pixels in place,
+	// and zero where no page is yet. Assembling a fresh 16 MiB copy for every
+	// upload cost several milliseconds, when the coverage itself was often a
+	// few hundred vertices.
+	std::vector<std::vector<byte>> atlasImages;
+	byte* PagePixel(size_t page,int x,int y) {
+		const int column=int(page%AtlasGrid)*AtlasSize,row=int((page%AtlasGroup)/AtlasGrid)*AtlasSize;
+		return atlasImages[page/AtlasGroup].data()+((size_t(row)+y)*AtlasImageSize+column+x)*4;
+	}
 	struct AtlasPage {
-		std::vector<byte> pixels;
 		const idMaterial* material=nullptr;
 		const idMaterial* multiplyMaterial=nullptr;
 		int x=0,y=0,rowHeight=0,references=0;
+		// The rectangle of the page its new tiles cover, which its next upload sends.
+		int dirtyLeft=AtlasSize,dirtyTop=AtlasSize,dirtyRight=0,dirtyBottom=0;
 		std::uint64_t lastFrame=0;
 		bool dirty=false,uploadFailed=false;
 	};
 	std::vector<AtlasPage> atlasPages;
+	static bool Recyclable(const AtlasPage& page,std::uint64_t frame) {
+		return !page.references && frame>page.lastFrame && frame-page.lastFrame>4;
+	}
 	void DrawRaster(HostMesh& mesh,float opacity) {
 		renderSystem->SetColor4(1,1,1,1);
 		++rasterDraws; rasterSavedVertices+=mesh.vertices.size()-mesh.rasterTiles.size()*4;
@@ -957,88 +1033,266 @@ private:
 		}
 		mesh.rasterTiles.clear();
 	}
-	void CacheRaster(HostMesh& mesh,const std::vector<openq4::ui::Vertex>& vertices,const std::vector<int>& indices) {
+	// One mesh's coverage, rasterized away from the atlas: its exact pixels
+	// and the trimmed tiles it would occupy, in bitmap coordinates.
+	struct RasterRect { int x,y,width,height; };
+	struct RasterJob {
+		std::uint64_t mesh=0,ticket=0;
+		bool multiply=false,rasterized=false;
+		std::vector<openq4::ui::Vertex> vertices;
+		std::vector<int> indices;
 		openq4::ui::CoverageBitmap bitmap;
-		if (!openq4::ui::RasterizeCoverage(vertices,indices,bitmap,8192,mesh.handle!=0)) return;
+		std::vector<RasterRect> tiles;
+	};
+	// One frame's queued meshes, a job each. The job list is the last member:
+	// destroying a batch first cancels or waits for its rasters, and each
+	// raster reads and writes only its own entry.
+	struct RasterBatch {
+		std::vector<std::unique_ptr<RasterJob>> jobs;
+		std::unique_ptr<idJobList> list;
+	};
+	std::vector<std::unique_ptr<RasterJob>> queuedRasters, finishedRasters;
+	std::vector<std::unique_ptr<RasterBatch>> rasterBatches;
+	std::uint64_t rasterTickets=0,lastAtlasUpload=0;
+	unsigned long long retiredMeshes=0;
+	bool atlasBusy=false;
+	// Pure, so a worker can run it: no host, atlas or engine state.
+	static bool RasterTiles(const std::vector<openq4::ui::Vertex>& vertices,const std::vector<int>& indices,bool multiply,
+		openq4::ui::CoverageBitmap& bitmap,std::vector<RasterRect>& tiles) {
+		if (!openq4::ui::RasterizeCoverage(vertices,indices,bitmap,8192,multiply)) return false;
 		// Wide frames and tall rails keep the same exact pixel coverage, split
 		// across the existing bounded pages. Never publish a partial mesh or a
 		// tile whose page upload has not succeeded.
 		constexpr int extent=AtlasSize-2;
-		if (size_t((bitmap.width+extent-1)/extent)*((bitmap.height+extent-1)/extent)*4>=vertices.size()) return;
+		if (size_t((bitmap.width+extent-1)/extent)*((bitmap.height+extent-1)/extent)*4>=vertices.size()) return false;
 		for (int y=0;y<bitmap.height;y+=extent) for (int x=0;x<bitmap.width;x+=extent) {
-			const int width=Min(extent,bitmap.width-x),height=Min(extent,bitmap.height-y);
+			const int width=(std::min)(extent,bitmap.width-x),height=(std::min)(extent,bitmap.height-y);
 			// Rails and disconnected shapes often touch only a small part of
 			// a tile. Trim identity borders before packing: transparent for
 			// premultiplied blending, white RGBA for multiplication. Preserve
 			// additive colour with zero alpha and multiplication of alpha itself.
 			int left=width,top=height,right=0,bottom=0;
 			for (int row=0;row<height;++row) {
-				const byte* pixels=bitmap.pixels.data()+((y+row)*bitmap.width+x)*4;
+				const unsigned char* pixels=bitmap.pixels.data()+(size_t(y+row)*bitmap.width+x)*4;
 				for (int column=0;column<width;++column) {
-					const byte* pixel=pixels+column*4;
-					if (mesh.handle ? (pixel[0]&pixel[1]&pixel[2]&pixel[3])==255 : !(pixel[0]|pixel[1]|pixel[2]|pixel[3])) continue;
-					left=Min(left,column);right=Max(right,column+1);
-					top=Min(top,row);bottom=Max(bottom,row+1);
+					const unsigned char* pixel=pixels+column*4;
+					if (multiply ? (pixel[0]&pixel[1]&pixel[2]&pixel[3])==255 : !(pixel[0]|pixel[1]|pixel[2]|pixel[3])) continue;
+					left=(std::min)(left,column);right=(std::max)(right,column+1);
+					top=(std::min)(top,row);bottom=(std::max)(bottom,row+1);
 				}
 			}
-			if (left<right && top<bottom && !CacheRasterTile(mesh,bitmap,x+left,y+top,right-left,bottom-top)) {
-				DropRaster(mesh); return;
-			}
+			if (left<right && top<bottom) tiles.push_back({x+left,y+top,right-left,bottom-top});
+		}
+		return true;
+	}
+	static void RasterJobMain(const idJobContext& context) {
+		auto& job=*static_cast<RasterJob*>(context.data);
+		if (!context.IsCancellationRequested()) job.rasterized=RasterTiles(job.vertices,job.indices,job.multiply,job.bitmap,job.tiles);
+		// The copy has served: it is freed here rather than in the frame that places the tiles.
+		std::vector<openq4::ui::Vertex>().swap(job.vertices); std::vector<int>().swap(job.indices);
+	}
+	// A mesh that has rested two frames rasterizes on the job system's
+	// workers, from a copy of its vertices; a later frame's EndRoot places and
+	// uploads its tiles. Until then it draws as geometry, as it did while it
+	// settled. Without workers it rasterizes here and now, as it always did.
+	void QueueRaster(std::uint64_t id,HostMesh& mesh,const std::vector<openq4::ui::Vertex>& vertices,const std::vector<int>& indices) {
+		auto job=std::make_unique<RasterJob>();
+		job->mesh=id; job->ticket=mesh.rasterTicket=++rasterTickets; job->multiply=mesh.handle!=0;
+		if (jobSystem.IsInitialized() && !jobSystem.IsSynchronous()) {
+			job->vertices=vertices; job->indices=indices;
+			queuedRasters.push_back(std::move(job));
+			return;
+		}
+		job->rasterized=RasterTiles(vertices,indices,job->multiply,job->bitmap,job->tiles);
+		finishedRasters.push_back(std::move(job));
+		// Inside a busy EndRoot (a root redrawn by its print), it waits for the next.
+		if (atlasBusy) return;
+		struct Busy { bool& flag; explicit Busy(bool& value):flag(value) { flag=true; } ~Busy() { flag=false; } } busy(atlasBusy);
+		PlaceRasters();
+	}
+	// The frame's queued meshes go to the workers as one job list; a refused
+	// submission rasterizes them here, to be placed by the next frame.
+	void SubmitRasters() {
+		if (queuedRasters.empty()) return;
+		auto batch=std::make_unique<RasterBatch>();
+		batch->jobs=std::move(queuedRasters); queuedRasters.clear();
+		batch->list=jobSystem.CreateJobList("retained-coverage-raster",batch->jobs.size());
+		bool added=batch->list!=nullptr;
+		for (auto& job:batch->jobs) added=added && batch->list->AddJob(RasterJobMain,job.get());
+		const idJobSubmitResult submitted=added ? batch->list->Submit() : idJobSubmitResult::INVALID_STATE;
+		if (submitted==idJobSubmitResult::ACCEPTED || submitted==idJobSubmitResult::EXECUTED_SYNCHRONOUSLY) {
+			rasterBatches.push_back(std::move(batch));
+			return;
+		}
+		batch->list.reset();
+		for (auto& job:batch->jobs) {
+			job->rasterized=RasterTiles(job->vertices,job->indices,job->multiply,job->bitmap,job->tiles);
+			finishedRasters.push_back(std::move(job));
 		}
 	}
-	bool CacheRasterTile(HostMesh& mesh,const openq4::ui::CoverageBitmap& bitmap,int tileX,int tileY,int width,int height) {
-		const int w=width+2,h=height+2;
-		int chosen=-1,x=0,y=0;
+	// Finished rasters take their tiles, all of a mesh's or none. One with no
+	// room waits while its mesh is still drawn: the meshes not drawn for a
+	// while give theirs back, and their pages recycle four frames later.
+	void PlaceRasters() {
 		const auto frame=RenderFrame();
-		for (int i=0;i<=int(atlasPages.size()) && i<AtlasPages;++i) {
-			if (i==int(atlasPages.size())) {
-				if (i%AtlasGroup==0) {
-					idImageOpts options; options.width=options.height=AtlasImageSize; options.format=FMT_RGBA8;
-					options.numLevels=1; options.isPersistant=true;
-					if (!renderSystem->CreateImage(va("_retainedAtlasImage%u",unsigned(i/AtlasGroup)),&options,TF_NEAREST)) return false;
+		bool retired=false;
+		// Placement can print, and a root redrawn by the print can finish a
+		// raster of its own: this pass works on its own list.
+		std::vector<std::unique_ptr<RasterJob>> rasters,waiting;
+		rasters.swap(finishedRasters);
+		for (auto& job:rasters) {
+			const auto found=meshes.find(job->mesh);
+			// A mesh that changed or went while it rasterized takes nothing.
+			if (found==meshes.end() || found->second.rasterTicket!=job->ticket) continue;
+			auto& mesh=found->second;
+			if (job->rasterized && frame<=mesh.lastFrame+RetireFrames) {
+				const Placement placed=PlaceRaster(mesh,job->bitmap,job->tiles);
+				if (placed==Placement::NoRoom) {
+					if (!retired) { RetireIdle(frame); retired=true; }
+					waiting.push_back(std::move(job)); continue;
 				}
-				AtlasPage page; page.pixels.resize(AtlasSize*AtlasSize*4);
-				page.material=declManager->FindMaterial(va("_retainedAtlas/%u",unsigned(i/AtlasGroup)));
-				if (!page.material || page.material->GetState()==DS_DEFAULTED) return false;
-				atlasPages.push_back(std::move(page));
+			} else if (job->rasterized) {
+				// Its page went out of sight while it waited: drawn again, it
+				// rasterizes again once it rests.
+				mesh.rasterTried=false; mesh.stableFrames=0;
 			}
-			auto& page=atlasPages[i];
-			if (!page.references && frame>page.lastFrame && frame-page.lastFrame>4) {
-				std::fill(page.pixels.begin(),page.pixels.end(),0); page.x=page.y=page.rowHeight=0; page.dirty=true;
+			mesh.rasterTicket=0;
+		}
+		for (auto& job:finishedRasters) waiting.push_back(std::move(job));
+		finishedRasters.swap(waiting);
+	}
+	bool RetireIdle(std::uint64_t frame) {
+		bool retired=false;
+		for (auto& [id,mesh]:meshes) if (!mesh.rasterTiles.empty() && frame>mesh.lastFrame+RetireFrames) {
+			DropRaster(mesh); mesh.rasterTried=false; mesh.stableFrames=0;
+			++retiredMeshes; retired=true;
+		}
+		return retired;
+	}
+	enum class Placement { Placed, NoRoom, Failed };
+	// First fit across the pages, as tiles always packed, planned on copies of
+	// the pages' shelves before a page, material or pixel changes, so a mesh
+	// that does not fit leaves no partial allocation behind.
+	Placement PlaceRaster(HostMesh& mesh,const openq4::ui::CoverageBitmap& bitmap,const std::vector<RasterRect>& tiles) {
+		const auto frame=RenderFrame();
+		struct Shelf { int x=0,y=0,rowHeight=0; };
+		struct Spot { int page,x,y; };
+		std::array<Shelf,AtlasPages> shelves;
+		for (size_t i=0;i<atlasPages.size();++i) {
+			const auto& page=atlasPages[i];
+			if (!Recyclable(page,frame)) shelves[i]={page.x,page.y,page.rowHeight};
+		}
+		std::vector<Spot> spots;
+		int pages=int(atlasPages.size());
+		for (const auto& tile:tiles) {
+			const int w=tile.width+2,h=tile.height+2;
+			int chosen=-1,x=0,y=0;
+			for (int i=0;i<=pages && i<AtlasPages;++i) {
+				auto& shelf=shelves[i];
+				x=shelf.x; y=shelf.y;
+				if (x+w>AtlasSize) { x=0; y+=shelf.rowHeight; }
+				if (y+h>AtlasSize) continue;
+				if (y!=shelf.y) shelf.rowHeight=0;
+				shelf.x=x+w; shelf.y=y; shelf.rowHeight=(std::max)(shelf.rowHeight,h);
+				chosen=i; break;
 			}
-			x=page.x; y=page.y;
-			if (x+w>AtlasSize) { x=0; y+=page.rowHeight; }
-			if (y+h>AtlasSize) continue;
-			if (mesh.handle && !page.multiplyMaterial) {
-				page.multiplyMaterial=declManager->FindMaterial(va("_retainedMultiplyAtlas/%u",unsigned(i/AtlasGroup)));
-				if (!page.multiplyMaterial || page.multiplyMaterial->GetState()==DS_DEFAULTED) return false;
+			if (chosen<0) return Placement::NoRoom;
+			if (chosen==pages) ++pages;
+			spots.push_back({chosen,x,y});
+		}
+		while (int(atlasPages.size())<pages) {
+			const size_t i=atlasPages.size();
+			if (i%AtlasGroup==0) {
+				idImageOpts options; options.width=options.height=AtlasImageSize; options.format=FMT_RGBA8;
+				options.numLevels=1; options.isPersistant=true;
+				if (!renderSystem->CreateImage(va("_retainedAtlasImage%u",unsigned(i/AtlasGroup)),&options,TF_NEAREST)) return Placement::Failed;
+				if (atlasImages.size()<=i/AtlasGroup) atlasImages.emplace_back(size_t(AtlasImageSize)*AtlasImageSize*4,byte(0));
 			}
-			chosen=i;
-			if (y!=page.y) page.rowHeight=0;
-			page.x=x+w; page.y=y; page.rowHeight=(std::max)(page.rowHeight,h);
+			AtlasPage page;
+			page.material=declManager->FindMaterial(va("_retainedAtlas/%u",unsigned(i/AtlasGroup)));
+			if (!page.material || page.material->GetState()==DS_DEFAULTED) return Placement::Failed;
+			atlasPages.push_back(std::move(page));
+		}
+		if (mesh.handle) for (const auto& spot:spots) {
+			auto& page=atlasPages[spot.page];
+			if (page.multiplyMaterial) continue;
+			page.multiplyMaterial=declManager->FindMaterial(va("_retainedMultiplyAtlas/%u",unsigned(spot.page/AtlasGroup)));
+			if (!page.multiplyMaterial || page.multiplyMaterial->GetState()==DS_DEFAULTED) { page.multiplyMaterial=nullptr; return Placement::Failed; }
+		}
+		// A recycled page keeps its old pixels: only its tiles' rectangles,
+		// padding included, are ever sampled, and each is written whole.
+		for (size_t i=0;i<spots.size();++i) {
+			const auto& spot=spots[i]; const auto& tile=tiles[i];
+			auto& page=atlasPages[spot.page];
+			const auto& shelf=shelves[spot.page];
+			page.x=shelf.x; page.y=shelf.y; page.rowHeight=shelf.rowHeight;
 			++page.references; page.lastFrame=frame; page.dirty=true;
+			const int w=tile.width+2,h=tile.height+2;
+			page.dirtyLeft=(std::min)(page.dirtyLeft,spot.x); page.dirtyTop=(std::min)(page.dirtyTop,spot.y);
+			page.dirtyRight=(std::max)(page.dirtyRight,spot.x+w); page.dirtyBottom=(std::max)(page.dirtyBottom,spot.y+h);
 			// Atlas pages can contain both blend modes. The padding must use
 			// this tile's identity even when its neighbours use another mode.
-			for (int row=0;row<h;++row)
-				std::memset(page.pixels.data()+((y+row)*AtlasSize+x)*4,mesh.handle ? 255 : 0,w*4);
-			for (int row=0;row<height;++row)
-				std::memcpy(page.pixels.data()+((y+1+row)*AtlasSize+x+1)*4,bitmap.pixels.data()+((tileY+row)*bitmap.width+tileX)*4,width*4);
-			break;
+			// Each pixel is written once: the padding ring, then the coverage.
+			const byte identity=mesh.handle ? 255 : 0;
+			std::memset(PagePixel(spot.page,spot.x,spot.y),identity,w*4);
+			std::memset(PagePixel(spot.page,spot.x,spot.y+h-1),identity,w*4);
+			for (int row=0;row<tile.height;++row) {
+				byte* line=PagePixel(spot.page,spot.x,spot.y+1+row);
+				std::memset(line,identity,4); std::memset(line+(w-1)*4,identity,4);
+				std::memcpy(line+4,bitmap.pixels.data()+(size_t(tile.y+row)*bitmap.width+tile.x)*4,tile.width*4);
+			}
+			HostMesh::RasterTile raster; raster.page=spot.page;
+			const float sx=640.f/mesh.width,sy=480.f/mesh.height;
+			for (int corner=0;corner<4;++corner) {
+				const bool right=corner==1 || corner==2,bottom=corner>=2;
+				auto& vertex=raster.quad[corner]; vertex.Clear();
+				vertex.xyz.Set((bitmap.x+tile.x+(right?tile.width:0))*sx,(bitmap.y+tile.y+(bottom?tile.height:0))*sy,0);
+				vertex.st.Set(float((spot.page%AtlasGrid)*AtlasSize+spot.x+1+(right?tile.width:0))/AtlasImageSize,
+					float(((spot.page%AtlasGroup)/AtlasGrid)*AtlasSize+spot.y+1+(bottom?tile.height:0))/AtlasImageSize);
+				vertex.normal.Set(0,0,1); vertex.tangents[0].Set(1,0,0); vertex.tangents[1].Set(0,1,0);
+				for (int channel=0;channel<4;++channel) vertex.color[channel]=vertex.color2[channel]=255;
+			}
+			mesh.rasterTiles.push_back(std::move(raster));
 		}
-		if (chosen<0) return false;
-		HostMesh::RasterTile tile; tile.page=chosen;
-		const float sx=640.f/viewportWidth,sy=480.f/viewportHeight;
-		for (int i=0;i<4;++i) {
-			const bool right=i==1 || i==2,bottom=i>=2;
-			auto& vertex=tile.quad[i]; vertex.Clear();
-			vertex.xyz.Set((bitmap.x+tileX+(right?width:0))*sx,(bitmap.y+tileY+(bottom?height:0))*sy,0);
-			vertex.st.Set(float((chosen%AtlasGrid)*AtlasSize+x+1+(right?width:0))/AtlasImageSize,
-				float(((chosen%AtlasGroup)/AtlasGrid)*AtlasSize+y+1+(bottom?height:0))/AtlasImageSize);
-			vertex.normal.Set(0,0,1); vertex.tangents[0].Set(1,0,0); vertex.tangents[1].Set(0,1,0);
-			for (int channel=0;channel<4;++channel) vertex.color[channel]=vertex.color2[channel]=255;
+		return Placement::Placed;
+	}
+	// Each dirty page sends the rectangle its new tiles cover, into the
+	// storage CreateImage allocated; the rest of its image, live tiles
+	// included, stays as uploaded, and nothing outside a tile is ever sampled.
+	// A renderer that refuses the rectangle gets the image whole: its pages
+	// live in its pixels, so it sends them as they stand.
+	void UploadAtlas(std::uint64_t frame) {
+		bool uploaded=false;
+		for (size_t first=0;first<atlasPages.size();first+=AtlasGroup) {
+			const size_t end=(std::min)(first+AtlasGroup,atlasPages.size());
+			if (std::none_of(atlasPages.begin()+first,atlasPages.begin()+end,[](const auto& page){return page.dirty;})) continue;
+			const std::string name=va("_retainedAtlasImage%u",unsigned(first/AtlasGroup));
+			bool whole=false;
+			for (size_t i=first;i<end && !whole;++i) {
+				auto& page=atlasPages[i];
+				if (!page.dirty) continue;
+				const int column=int(i%AtlasGrid)*AtlasSize,row=int((i%AtlasGroup)/AtlasGrid)*AtlasSize;
+				if (renderSystem->UploadImageRegion(name.c_str(),PagePixel(i,page.dirtyLeft,page.dirtyTop),column+page.dirtyLeft,row+page.dirtyTop,
+						page.dirtyRight-page.dirtyLeft,page.dirtyBottom-page.dirtyTop,AtlasImageSize)) {
+					Uploaded(page); uploaded=true;
+				} else whole=true;
+			}
+			if (!whole) continue;
+			const bool ok=renderSystem->UploadImage(name.c_str(),atlasImages[first/AtlasGroup].data(),AtlasImageSize,AtlasImageSize);
+			uploaded=uploaded || ok;
+			for (size_t i=first;i<end;++i) if (atlasPages[i].dirty) {
+				auto& page=atlasPages[i];
+				if (ok) Uploaded(page);
+				else if (!page.uploadFailed) {
+					page.uploadFailed=true; common->Warning("retained UI: coverage upload unavailable; using original geometry");
+				}
+			}
 		}
-		mesh.rasterTiles.push_back(std::move(tile));
-		return true;
+		if (uploaded) lastAtlasUpload=frame;
+	}
+	static void Uploaded(AtlasPage& page) {
+		page.dirty=page.uploadFailed=false;
+		page.dirtyLeft=page.dirtyTop=AtlasSize; page.dirtyRight=page.dirtyBottom=0;
 	}
 	HostMesh scratchMesh;
 	std::unordered_map<std::uint64_t,HostMesh> meshes;
@@ -1120,6 +1374,10 @@ private:
 	const idMaterial* linearMaskMaterial=nullptr;
 	std::vector<Layer> layers;
 	idRenderTexture* boundTarget=nullptr;
+	idRenderTexture* warmTarget=nullptr;
+	int warmWidth=0, warmHeight=0;
+	std::uint64_t warmFrame=0;
+	bool warming=false;
 	idRenderTexture* blurScratch = nullptr;
 	const idMaterial* blurBackdropMaterial = nullptr;
 	const idMaterial* blurGlitchMaterial = nullptr;
@@ -1969,10 +2227,9 @@ bool RetainedUI_DrawInitialization(const char* message) {
 	}
 	return drawn;
 }
-bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport) {
+namespace {
+bool DrawRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport) {
 	const auto started = std::chrono::steady_clock::now();
-    EditCall call;
-	if (!renderSystem || !renderSystem->IsOpenGLRunning() || viewport.width <= 0 || viewport.height <= 0 || !RetainedUI_PrepareView(view)) return false;
 	const int oldWidth = host.viewportWidth, oldHeight = host.viewportHeight;
 	const float oldX = host.viewportX, oldY = host.viewportY;
 	const bool oldViewport = renderSystem->GetUseUIViewportFor2D();
@@ -1992,9 +2249,39 @@ bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport&
 	renderSystem->SetColor4(1,1,1,1);
 	host.viewportWidth = oldWidth; host.viewportHeight = oldHeight;
 	host.viewportX = oldX; host.viewportY = oldY;
-	if (rootProfileFrames && view != previewView)
+	if (rootProfileFrames && view != previewView && !host.Warming())
 		RecordRootProfile(submittedFrames,started,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count(),
 			view->runtime->Statistics(),view->path);
+	return drawn;
+}
+}
+bool RetainedUI_DrawViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport) {
+    EditCall call;
+	if (!renderSystem || !renderSystem->IsOpenGLRunning() || viewport.width <= 0 || viewport.height <= 0 || !RetainedUI_PrepareView(view)) return false;
+	return DrawRoot(view,viewport);
+}
+// A page's first frame converts its compiled artwork into meshes and draws
+// its layers. Drawn here first, out of sight, the frame that presents it
+// finds them cached, as long as nothing moved it since.
+bool RetainedUI_WarmViewRoot(retainedUIView_t* view, const openq4::ui::Viewport& viewport) {
+    EditCall call;
+	if (!ui_retainedWarm.GetBool() || !renderSystem || !renderSystem->IsOpenGLRunning() || viewport.width <= 0 || viewport.height <= 0 ||
+		!RetainedUI_PrepareView(view) || !host.BeginWarm(viewport.width,viewport.height)) return false;
+	const bool drawn = DrawRoot(view,viewport);
+	host.EndWarm();
+	return drawn;
+}
+bool RetainedUI_EndWarm() { return host.ReleaseWarm(); }
+bool RetainedUI_GatherViewCompilations(retainedUIView_t* view, const openq4::ui::Viewport& viewport, openq4::ui::VectorCompileBatch& batch) {
+    EditCall call;
+	if (!ui_retainedWarm.GetBool() || !renderSystem || !renderSystem->IsOpenGLRunning() || viewport.width <= 0 || viewport.height <= 0 ||
+		!RetainedUI_PrepareView(view) || !host.BeginWarm(viewport.width,viewport.height)) return false;
+	openq4::ui::DeferVectorCompilations(&batch);
+	const bool drawn = DrawRoot(view,viewport);
+	openq4::ui::DeferVectorCompilations(nullptr);
+	host.EndWarm();
+	// That frame lacked its artwork: never replay it.
+	view->runtime->InvalidatePaint();
 	return drawn;
 }
 
@@ -2212,6 +2499,9 @@ bool RetainedUI_LoadView(retainedUIView_t*,const std::string&,const std::string&
 bool RetainedUI_LoadParsedView(retainedUIView_t*,const openq4::ui::Document&,const std::string&,std::vector<openq4::ui::Diagnostic>&) { return false; }
 bool RetainedUI_PrepareView(retainedUIView_t*) { return false; }
 bool RetainedUI_DrawViewRoot(retainedUIView_t*,const openq4::ui::Viewport&) { return false; }
+bool RetainedUI_WarmViewRoot(retainedUIView_t*,const openq4::ui::Viewport&) { return false; }
+bool RetainedUI_EndWarm() { return true; }
+bool RetainedUI_GatherViewCompilations(retainedUIView_t*,const openq4::ui::Viewport&,openq4::ui::VectorCompileBatch&) { return false; }
 bool RetainedUI_QueryEditIdentity(retainedUIView_t*,retainedUIEditIdentity_t&) noexcept{return false;}
 retainedUIPreparedEdit_t* RetainedUI_PrepareEdit(retainedUIView_t*,retainedUIEditIdentity_t,openq4::ui::DocumentEdit&,openq4::ui::DocumentEditIdentity,std::span<const openq4::ui::DocumentEditOperation>,const openq4::ui::RuntimeDocumentOptions&,std::vector<openq4::ui::Diagnostic>&){return nullptr;}
 retainedUIPreparedEdit_t* RetainedUI_PrepareHistory(retainedUIView_t*,retainedUIEditIdentity_t,openq4::ui::DocumentEdit&,openq4::ui::DocumentEditIdentity,bool,const openq4::ui::RuntimeDocumentOptions&,std::vector<openq4::ui::Diagnostic>&){return nullptr;}

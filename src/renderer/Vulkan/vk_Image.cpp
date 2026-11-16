@@ -1416,17 +1416,18 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		return;
 	}
 
-	// data size: compressed rows are block rows padded to block alignment
+	// data size: compressed rows are block rows padded to block alignment.
+	// A pitched source (a rectangle of a larger image) stages only its own
+	// rows, packed: the staging holds width x height texels, and no read
+	// reaches past the rectangle's last pixel.
 	size_t dataBytes;
-	uint32_t rowLengthTexels = 0;
+	const uint32_t rowLengthTexels = 0;
 	if ( info.blockDim > 1 ) {
 		const int blocksWide = ( width + info.blockDim - 1 ) / info.blockDim;
 		const int blocksHigh = ( height + info.blockDim - 1 ) / info.blockDim;
 		dataBytes = (size_t)blocksWide * blocksHigh * info.bytesPerBlock;
 	} else {
-		const int rowTexels = pixelPitch > 0 ? pixelPitch : width;
-		rowLengthTexels = pixelPitch > 0 ? (uint32_t)pixelPitch : 0;
-		dataBytes = (size_t)rowTexels * height * info.bytesPerBlock;
+		dataBytes = (size_t)width * height * info.bytesPerBlock;
 	}
 
 	// transient staging buffer; on success the upload batch takes ownership
@@ -1449,36 +1450,42 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		common->Warning( "Vulkan: staging buffer creation failed (%d bytes)", (int)dataBytes );
 		return;
 	}
-	if ( opts.format == FMT_RGB565 && info.expandRgb565 ) {
-		// No packed 16-bit format on this implementation: widen to RGBA8 with
-		// the same big-endian source unpacking, replicating the high bits into
-		// the low ones so full-scale values stay full-scale.
-		const uint8_t *src = (const uint8_t *)pic;
-		uint8_t *dst = (uint8_t *)stagingInfo.pMappedData;
-		const size_t texels = dataBytes / 4;
-		for ( size_t i = 0; i < texels; i++ ) {
-			const uint16_t packed = (uint16_t)( ( (uint16_t)src[ i * 2 + 0 ] << 8 ) | src[ i * 2 + 1 ] );
-			const uint8_t r5 = (uint8_t)( ( packed >> 11 ) & 0x1f );
-			const uint8_t g6 = (uint8_t)( ( packed >> 5 ) & 0x3f );
-			const uint8_t b5 = (uint8_t)( packed & 0x1f );
-			dst[ i * 4 + 0 ] = (uint8_t)( ( r5 << 3 ) | ( r5 >> 2 ) );
-			dst[ i * 4 + 1 ] = (uint8_t)( ( g6 << 2 ) | ( g6 >> 4 ) );
-			dst[ i * 4 + 2 ] = (uint8_t)( ( b5 << 3 ) | ( b5 >> 2 ) );
-			dst[ i * 4 + 3 ] = 0xff;
+	// Uncompressed sources are read row by row at their pitch; compressed ones
+	// (never pitched) are one run of whole blocks.
+	const size_t sourceTexelBytes = opts.format == FMT_RGB565 ? 2 : (size_t)info.bytesPerBlock;
+	const size_t sourcePitch = (size_t)( pixelPitch > 0 ? pixelPitch : width ) * sourceTexelBytes;
+	const int stagedRows = info.blockDim > 1 ? 1 : height;
+	const size_t stagedRowBytes = dataBytes / (size_t)stagedRows;
+	for ( int row = 0; row < stagedRows; row++ ) {
+		const uint8_t *src = (const uint8_t *)pic + row * sourcePitch;
+		uint8_t *dst = (uint8_t *)stagingInfo.pMappedData + row * stagedRowBytes;
+		if ( opts.format == FMT_RGB565 && info.expandRgb565 ) {
+			// No packed 16-bit format on this implementation: widen to RGBA8 with
+			// the same big-endian source unpacking, replicating the high bits into
+			// the low ones so full-scale values stay full-scale.
+			const size_t texels = stagedRowBytes / 4;
+			for ( size_t i = 0; i < texels; i++ ) {
+				const uint16_t packed = (uint16_t)( ( (uint16_t)src[ i * 2 + 0 ] << 8 ) | src[ i * 2 + 1 ] );
+				const uint8_t r5 = (uint8_t)( ( packed >> 11 ) & 0x1f );
+				const uint8_t g6 = (uint8_t)( ( packed >> 5 ) & 0x3f );
+				const uint8_t b5 = (uint8_t)( packed & 0x1f );
+				dst[ i * 4 + 0 ] = (uint8_t)( ( r5 << 3 ) | ( r5 >> 2 ) );
+				dst[ i * 4 + 1 ] = (uint8_t)( ( g6 << 2 ) | ( g6 >> 4 ) );
+				dst[ i * 4 + 2 ] = (uint8_t)( ( b5 << 3 ) | ( b5 >> 2 ) );
+				dst[ i * 4 + 3 ] = 0xff;
+			}
+		} else if ( opts.format == FMT_RGB565 ) {
+			// The CPU-side image path stores RGB565 as big-endian byte pairs;
+			// OpenGL uses GL_UNPACK_SWAP_BYTES. Vulkan has no pixel-store
+			// equivalent, so feed PACK16 native-endian values explicitly.
+			const size_t texels = stagedRowBytes / 2;
+			for ( size_t i = 0; i < texels; i++ ) {
+				dst[ i * 2 + 0 ] = src[ i * 2 + 1 ];
+				dst[ i * 2 + 1 ] = src[ i * 2 + 0 ];
+			}
+		} else {
+			memcpy( dst, src, stagedRowBytes );
 		}
-	} else if ( opts.format == FMT_RGB565 ) {
-		// The CPU-side image path stores RGB565 as big-endian byte pairs;
-		// OpenGL uses GL_UNPACK_SWAP_BYTES. Vulkan has no pixel-store
-		// equivalent, so feed PACK16 native-endian values explicitly.
-		const uint8_t *src = (const uint8_t *)pic;
-		uint8_t *dst = (uint8_t *)stagingInfo.pMappedData;
-		const size_t texels = dataBytes / 2;
-		for ( size_t i = 0; i < texels; i++ ) {
-			dst[ i * 2 + 0 ] = src[ i * 2 + 1 ];
-			dst[ i * 2 + 1 ] = src[ i * 2 + 0 ];
-		}
-	} else {
-		memcpy( stagingInfo.pMappedData, pic, dataBytes );
 	}
 	const VkResult flushResult = vmaFlushAllocation(
 			vkCtx.allocator, stagingAlloc, 0, (VkDeviceSize)dataBytes );

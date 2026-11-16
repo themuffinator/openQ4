@@ -6438,7 +6438,7 @@ int main(int argc, char** argv) {
 			runtime.Frame(viewport,18.8); host.glitched.clear();
 			runtime.Frame(viewport,18.85);
 			bool absent = true;
-			for (const char* layer : {"field-signal","field-burst","field-dither"}) {
+			for (const char* layer : {"field-signal","field-burst"}) {
 				const auto display = runtime.PresentedValue(layer,"display");
 				absent = absent && display && display->text == "none";
 			}
@@ -6466,10 +6466,9 @@ int main(int argc, char** argv) {
 				const auto strength = runtime.PresentedValue("field-signal","backdrop-glitch");
 				const auto phase = runtime.PresentedValue("field-signal","backdrop-glitch-phase");
 				const auto found = passes();
-				if (!strength || !phase || !found.dither || !found.ordered || found.faults.size() > 1) { counted = false; break; }
-				dithered = dithered && Near(found.dither->dither,.6f,.001f);
-				for (const auto* drawn : {found.dither}) whole = whole && drawn->region.x <= 0 && drawn->region.y <= 0 &&
-					drawn->region.x+drawn->region.width >= 1920 && drawn->region.y+drawn->region.height >= 1080;
+				if (!strength || !phase || found.dither || !found.ordered || found.faults.size() > 1) { counted = false; break; }
+				dithered = dithered && !found.dither;
+				whole = whole && !runtime.PresentedValue("field-dither","display");
 				const float value = static_cast<float>(strength->data[0]);
 				live = live && (value > 0 ? found.faults.size() == 1 && Near(found.faults[0]->strength,value,.001f) &&
 					Near(found.faults[0]->phase,static_cast<float>(phase->data[0]),.001f) : found.faults.empty());
@@ -6478,7 +6477,7 @@ int main(int argc, char** argv) {
 				if (value > 0) { ++faulting; arrangements.insert(static_cast<int>(phase->data[0])); if (value < .31f) slip = std::max(slip,value); }
 				else ++resting;
 			}
-			Check(counted && dithered && whole,"the dither covers the whole view at 0.60, once a frame and last");
+			Check(counted && dithered && whole,"the title draws no dither pass");
 			Check(live,"a fault draws beneath it at its live strength and phase, and a resting one draws nothing");
 			Check(peak > .8f && peak <= .851f && arrangements.size() >= 40,"each picture change faults to 0.85 through its arrangements");
 			Check(faulting >= 100 && faulting <= 180 && resting >= 800 && slip > .1f,"between changes the signal rests, but for a slip");
@@ -6525,7 +6524,7 @@ int main(int argc, char** argv) {
 				const auto found = passes(); faults += found.faults.size(); dithers += found.dither != nullptr;
 			}
 			const auto gone = runtime.PresentedValue("field-signal","display");
-			Check(faults == 0 && dithers == 220 && gone && gone->text == "none","reduced flashing keeps the dither and draws no fault");
+			Check(faults == 0 && dithers == 0 && gone && gone->text == "none","reduced flashing draws no fault");
 			host.cvars["ui_reducedFlashing"] = false;
 			// Reduced motion holds no fault either.
 			host.reducedMotion = true; runtime.SetReducedMotion(true,52.6);
@@ -6536,7 +6535,7 @@ int main(int argc, char** argv) {
 				runtime.Frame(viewport,53.0+frame*.025);
 				const auto found = passes(); faults += found.faults.size(); dithers += found.dither != nullptr;
 			}
-			Check(faults == 0 && dithers == 220,"reduced motion keeps the dither and draws no fault");
+			Check(faults == 0 && dithers == 0,"reduced motion draws no fault");
 			host.reducedMotion = false; runtime.SetReducedMotion(false,58.6);
 			host.softFocus = false;
 		}

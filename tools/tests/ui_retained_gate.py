@@ -5764,9 +5764,17 @@ def main() -> int:
     # parses them on workers as a map change begins; their loads stay in
     # PrepareRetainedLevel. The title and the pauses are named once more by
     # PrefetchRetainedNextPages, which loads nothing: it starts the parses of
-    # the pages each leads to and that load when first opened.
-    assert menu.count('RETAINED_TITLE_GUI') == 5 and menu.count('RETAINED_PAUSE_GUI') == 5 and menu.count('RETAINED_LOADING_GUI') == 2
-    assert menu.count('RETAINED_PAUSE_STROGG_GUI') == 5
+    # the pages each leads to and that load when first opened. WarmRetainedPages
+    # names them once more: while one rests, it loads the pages it leads to
+    # whose parse has finished and prepares them out of sight.
+    assert menu.count('RETAINED_TITLE_GUI') == 6 and menu.count('RETAINED_PAUSE_GUI') == 6 and menu.count('RETAINED_LOADING_GUI') == 2
+    assert menu.count('RETAINED_PAUSE_STROGG_GUI') == 6
+    warm = function_body(menu, 'void idSessionLocal::WarmRetainedPages(')
+    # It loads only a page whose parse is ready, one a frame, never the unique
+    # SYSTEM page, and prepares a loaded page through the adapter.
+    assert 'if ( UI_RetainedPrefetchReady( page ) ) {' in warm and 'FindRetainedGui( page, true, false );' in warm
+    assert 'RETAINED_SYSTEM_GUI' not in warm and 'UI_RetainedWarm( gui, finished )' in warm
+    assert 'retainedSubpageFrom != NULL' in warm and '( mapSpawned && IsMultiplayer() )' in warm
     next_pages = function_body(menu, 'void idSessionLocal::PrefetchRetainedNextPages(')
     assert 'FindRetainedGui' not in next_pages and 'UI_RetainedPrefetchDocuments( pages, 4 );' in next_pages
     assert 'retainedStock.FindIndex( page ) >= 0 || uiManager->FindGui( page, false, false, false ) != NULL' in next_pages

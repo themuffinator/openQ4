@@ -4289,6 +4289,10 @@ void idSessionLocal::Clear() {
 	guiRetainedCreate = NULL;
 	retainedLevelshots.Clear();
 	retainedLevelshotsFrom = 0;
+	retainedWarmShown = NULL;
+	retainedWarmFocus.Clear();
+	retainedWarmFrom = 0;
+	retainedWarmDone = false;
 	retainedCreateMaps.Clear();
 	retainedCreateMapFirst = 0;
 	retainedCreateMapSelected = -1;
@@ -10337,6 +10341,8 @@ void idSessionLocal::Draw() {
 			}
 		}
 
+		// Out of sight, before the page on screen draws: the pages it leads to.
+		WarmRetainedPages();
 		if ( RetainedPageActive() ) {
 			// A retained page over the home that handed off to it.
 			DrawRetainedPageHome( presentationTime );

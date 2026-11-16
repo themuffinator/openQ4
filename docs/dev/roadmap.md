@@ -22,8 +22,8 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **40 / 140 (28.6%)** | **100 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
-| Estimated category progress | **19 categories: 3 at 100%, 15 partial, 1 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
+| Formally closed roadmap tasks | **40 / 149 (26.8%)** | **109 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Estimated category progress | **20 categories: 3 at 100%, 15 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
@@ -52,6 +52,7 @@ exact; the estimate column is deliberately approximate.
 | [Governance and baseline evidence](#governance-and-baseline-evidence) — GOV | **100%** | 3 / 3 | Maintain evidence/default alignment as later changes land. |
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
+| [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **60%** | 2 / 8 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05). |
@@ -60,7 +61,7 @@ exact; the estimate column is deliberately approximate.
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
 | [Retail compatibility and campaigns](#retail-quake-4-compatibility-and-campaigns) — Q4 | **75%** | 1 / 9 | Full playthroughs, effect parity, broader restore graphs, platform/save evidence and campaign-demo breadth. |
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **85%** | 2 / 6 | On Linux x64, resting corpses under a rocket or grenade splash and a placed figure on a ledge edge; CPU overruns of 2 to 17 ms on two of five single-player workloads per platform (bounds proposed as exceptions, not accepted) and 24 % on the Linux bot round; a windowed review in motion and the default decision once those pass. |
-| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **55%** | 3 / 24 | Human play, physical workflows and deferred peer qualification; the 15 November reference-parity items (casual match flow, pools, modifiers, HUD, spectating, identity, moderation, discovery, movement) and the demo container, workflow, storage and robustness items; retain MP-02's accepted timing caveat. |
+| [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **55%** | 3 / 26 | Human play, physical workflows and deferred peer qualification; the 15 November reference-parity items (casual match flow, pools, modifiers, HUD, spectating, identity, moderation, discovery, movement), the demo container, workflow, storage and robustness items, MP-25 splitscreen and MP-26 Horde; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
@@ -219,8 +220,8 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09, MP-12, MP-17 through MP-22, MP-24 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-09 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16 and MP-23 (TOOL-01 through TOOL-04 closed 6 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
-| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, RT-07, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
 the current timing and workload baseline; UI cutover depends on its complete
@@ -246,6 +247,9 @@ to a final project-wide phase. Important dependencies are:
 | Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 | Casual match flow, moderation and ranking (MP-12, MP-17, MP-18) | MP-17's identity decision before bans keyed to identity, reconnect restoration and ratings; casual timeouts and votes reuse the managed `MatchTime()` pause and proposal pipeline rather than a second one. Address bans, flood control and the inactivity policy need no identity. |
 | Demo container, workflow, storage and robustness (MP-21 through MP-24) | MP-21's container and registry before MP-22's client recording and MP-23's MVD compression; MP-24's fixtures accompany every format change. MP-05 stays closed at its selected scope, and every version a release wrote keeps its reader. |
+| Multiplayer splitscreen (MP-25) | Multiplayer only: the single-player game and the Awakening campaign never gain local players. Each local player is an ordinary client on the wire, so MP-08's protocol, MP-17's identity, MP-18's per-client caps and MP-22's client recording apply per player without a second path. Per-viewport HUD and menus build on the retained interface (UI-03/UI-04/UI-09); per-viewport cost is measured against FPS-01's budgets before any preset enables effects in splitscreen. |
+| Horde (MP-26) | Monster snapshot state is a protocol change: it follows MP-08's packet budget and MP-21's registry and keeps every older demo playable. Wildcard waves reuse MP-14's modifier layer, maps and presets go through MP-13 and MP-14, bots as fighters build on MP-09, and Horde stays unranked under MP-17. The stock Quake 4 roster only; Awakening content stays scoped to its campaign. |
+| Vulkan ray tracing (RT-02 through RT-07) | RT-01's hardware, budget, licence and translation decisions first. Ray tracing builds on VK-03 admission, VK-06 resource counters and the existing TAAU, motion vectors and GPU skinning paths; RT-06 follows the VK-05/VK-07 capture and HDR work and VR-01 stereo. `r_rayTracing 0` always runs the unchanged Vulkan path, and no other renderer depends on it. |
 | Server discovery (MP-19) | A decision on a project-controlled master or list service before the Internet source can be qualified on a fresh install; Steam lobbies and matchmaking remain STEAM/OPT-09. |
 
 ## Governance and baseline evidence
@@ -916,6 +920,144 @@ and untested drivers remain open, with no tolerance or support-tier change.
   4x, and the weapon depth hack's depth view is within one level. At 4x, lit
   geometry edges still differ in up to 20 pixels, by up to 8 levels.
 
+## Vulkan ray tracing
+
+Sources: [Vulkan device selection](vulkan-device-selection.md),
+[authored programs](vulkan-material-programs.md), [HDR](vulkan-hdr.md),
+[GPU skinning](gpu-skinning-modernization.md), [capability matrix](engine-capability-matrix.md),
+`src/renderer/Vulkan/` (`VulkanBringup.cpp`, `vk_Backend.cpp`, `vk_Interactions.cpp`,
+`vk_ShadowMap.cpp`, `vk_PostProcess.cpp`) and the Quake II RTX (Q2RTX) renderer as
+the external design reference.
+
+Requested 15 November 2026. Quake II RTX showed that a classic id Tech game can be
+rendered with real-time ray-traced lighting, shadows, reflections, refraction and
+indirect light from its original assets. This work brings that class of rendering
+to openQ4's Vulkan renderer: first ray-traced effects on top of the existing
+rasterized frame, then a full path-traced mode. The current Vulkan baseline
+(Vulkan 1.3 with dynamic rendering, synchronization2, timeline semaphores,
+descriptor indexing, buffer device addresses and VMA) already provides most of the
+device features ray tracing builds on. Every item honors five product rules:
+
+1. **Opt-in and isolated.** An archived CVar (proposed `r_rayTracing`: `0` off,
+   `1` hybrid effects, `2` path tracing; default `0`) with localized Settings rows
+   in the retained and stock interfaces selects the mode. Value `0` runs the
+   current Vulkan renderer unchanged, with byte-identical captures. OpenGL, GLES,
+   dedicated servers and devices without the required extensions are never
+   affected; they show the rows as unavailable instead of failing.
+2. **Stock assets only.** The ray tracer reads shipped Quake 4 materials, lights,
+   models and maps as authored. Emitters, roughness and translucency are derived
+   from existing material stages, light shaders and textures by engine rules, not
+   from replacement or per-map content. Authored PBR materials keep their
+   meaning. Any table of derived material properties ships with the executable.
+3. **Presentation only.** Ray tracing never changes simulation, collision,
+   network protocol, pure checks, saves or demos. Multiplayer clients may use it
+   freely; a server never needs it, and render demos replay identically with it
+   on or off apart from the image.
+4. **Capability-gated and recoverable.** Ray tracing requires
+   `VK_KHR_acceleration_structure` with `VK_KHR_ray_query` (hybrid) and, where
+   chosen, `VK_KHR_ray_tracing_pipeline`. Missing extensions, allocation
+   failure, device loss or a driver refusal fall back to the rasterized path for
+   that session with one log line, following VK-03's bounded admission and
+   cleanup rules. Platforms whose drivers lack these extensions (current
+   MoltenVK, most Android GPUs) are out of scope until they gain them.
+5. **Measured and licensed.** Each mode declares its reference hardware and
+   frame-time budget before promotion, using the FPS suite. Q2RTX and any
+   NVIDIA, AMD or Intel denoiser, light-sampling or upscaling SDK are reviewed
+   file by file for GPLv3 compatibility before code is ported; incompatible code
+   is reimplemented from published techniques, and proprietary SDKs stay
+   optional decisions. Credits follow the attribution rules.
+
+### RT completion checkpoints
+
+**Estimate: 0%; 0/7 tasks closed (15 November 2026).** Scope only; no ray-tracing
+code exists. The Vulkan 1.3 device baseline, motion vectors, TAAU, HDR scene
+targets and GPU skinning compute paths are existing dependencies, not credited
+RT progress.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| RT-01 — Decision pending | Product rules, mode CVar and capability gate proposed. | Reference hardware and budgets, Q2RTX/SDK licence review, material/light translation rules, Settings contract and reference scenes. |
+| RT-02 — Not started | Vulkan 1.3 baseline with buffer device addresses and VMA exists. | Extension admission and fallback; BLAS/TLAS for world, entities, skinned and deformed surfaces; memory budgets and lifetime across map change, restart and device loss. |
+| RT-03 — Not started | Shadow maps, stencil shadows and SSAO provide the rasterized references. | Ray-traced shadows for interaction lights, ambient occlusion and reflections on the raster frame, each with its own fallback. |
+| RT-04 — Not started | Specified only. | Path-traced mode: id Tech 4 lights and derived emitters, sky, indirect bounces, translucency, water and glass, with raster overlays for GUIs, particles and the view weapon. |
+| RT-05 — Not started | TAAU, motion vectors and reactive coverage exist. | Light sampling, temporal and spatial denoising, reconstruction with TAAU and dynamic resolution, and an open upscaler. |
+| RT-06 — Not started | Specified only. | Captures, HDR, subviews and mirrors, VR stereo, render demos, BSE, MP and the Settings UI in all language tables. |
+| RT-07 — Not started | Specified only. | Budgets on reference hardware from at least two vendors, image review against classic, SP/Awakening/MP coverage, Linux, soaks and the availability decision. |
+
+### RT task evidence and acceptance
+
+- [ ] **RT-01 — P2, decision: scope, budgets and translation contract.** Choose
+  the reference ray-tracing hardware (at least one NVIDIA RTX device and one AMD
+  RDNA 2 or later or Intel Arc device), the reference SP and MP scenes and the
+  frame-time budget for each mode at declared resolutions. Record the minimum
+  extension and feature set. Review Q2RTX and every candidate SDK for licence
+  compatibility and record what may be ported, what must be reimplemented and
+  the credits owed. Define the rules that translate stock content: interaction
+  stages (diffuse, bump, specular) to a physically based approximation, light
+  shaders with projection and falloff images, fog and blend lights, `noShadows`
+  and suppression flags, alpha-tested and translucent stages, additive and glow
+  stages as emitters, and the sky. Define the CVar and Settings contract and
+  where hybrid effects replace rather than add to raster ones. Close when the
+  contract is recorded in a ray-tracing reference doc and the reference scenes
+  have classic captures.
+- [ ] **RT-02 — P2, implementation: device admission and acceleration
+  structures.** Admit the RT-01 extensions without changing device choice for
+  `r_rayTracing 0`, and fall back cleanly when any step fails. Build bottom-level
+  structures for the world (per area or per model), static and moving entities,
+  skinned meshes (reusing the GPU skinning compute output, or CPU-skinned
+  vertices when it refuses) and deformed or animated surfaces, with refit or
+  rebuild chosen per surface, and a top-level structure per view. Bound memory
+  with compaction and budgets reported through VK-06's resource counters.
+  Structures survive or rebuild correctly across map change, `vid_restart`,
+  renderer reload and device loss. Gate: the stock maps build without failures
+  or leaks across a five-cycle soak, and `r_rayTracing 0` captures stay
+  byte-identical.
+- [ ] **RT-03 — P2, implementation: hybrid ray-traced effects.** In mode `1`,
+  using ray queries from the rasterized frame: ray-traced shadows for
+  interaction lights that honor light projection, falloff, shadow flags and
+  alpha-tested casters; ray-traced ambient occlusion; and reflections on
+  surfaces the RT-01 rules mark reflective, including authored PBR materials.
+  Each effect has a developer CVar and falls back to its raster equivalent.
+  Gate: the reference scenes show no missing, detached or light-leaking shadows
+  against the classic reference, view-weapon and subview cases included, within
+  the RT-01 budget.
+- [ ] **RT-04 — P3, implementation: path-traced mode.** In mode `2`, replace
+  rasterized lighting with a path tracer in the manner of Q2RTX: primary
+  visibility, direct light from every id Tech 4 light type and from derived
+  emissive surfaces, sky and environment light, a bounded number of indirect
+  bounces, and refraction and reflection through glass, water and other
+  translucent materials. Material expressions, scrolling and animated stages
+  and remote-camera textures evaluate as in the raster path. GUIs, BSE
+  particles, decals, the view weapon's depth hack and post effects that the
+  path tracer cannot own are composited from the raster path with correct
+  depth. Gate: every stock SP and MP map renders without missing surfaces,
+  black materials or uncovered pixels on the reference hardware.
+- [ ] **RT-05 — P2, implementation: sampling, denoising and reconstruction.**
+  Importance sampling for many lights and emitters (for example a ReSTIR-style
+  reservoir scheme), a temporal and spatial denoiser that separates direct,
+  indirect and specular signals, and reconstruction through the existing TAAU,
+  motion vectors and dynamic resolution. Provide at least one upscaler with a
+  GPLv3-compatible licence; vendor upscalers remain optional decisions. Gate:
+  the reference scenes meet the RT-01 budget without visible smearing, ghosting
+  on moving actors and the view weapon, or fireflies, in windowed review at play
+  speed.
+- [ ] **RT-06 — P2, integration: the rest of the renderer and the product.**
+  Screenshots, `envshot`, tiled and multisampled captures (VK-07), HDR output
+  and exposure (VK-05), mirrors and remote cameras, VR stereo with per-eye cost
+  (VR-01), render demos and capture determinism, BSE effects, light-grid packs
+  and multiplayer views work in each mode or fall back explicitly. Settings rows
+  follow the [UI visual design](ui-visual-design.md), use `#str_*` entries in
+  every language table and report why a mode is unavailable. The capability
+  matrix and player documentation describe the modes and their requirements.
+- [ ] **RT-07 — P2, qualification and decision: availability.** On the RT-01
+  reference hardware, under Windows x64 and Linux x64, run the FPS suite, the
+  reference scenes, stock SP progression samples including Awakening `q4xbase`,
+  MP with bots, and a long-session soak in each mode. Review images against
+  classic at play speed. Decide whether each mode is offered as experimental or
+  supported, and whether any preset enables mode `1`; `0` stays the default and
+  a supported fallback. Update the capability matrix, platform support and
+  release notes with the decision.
+
 ## Modern rendering engine
 
 Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadmap.md),
@@ -961,9 +1103,13 @@ diagnostics establish whole-frame ownership or production performance.
   byte-identical to classic (alone and with every domain on), a visible
   content control and a named zero-commit rollback. The final run, from a
   fresh package built from the change set, passed 98 of 99 domain checks in 87
-  runs (RTX 4060 Laptop GPU). The one failure is classic flicker: OpenGL
-  stencil shadows under 4x MSAA flip isolated pixels between two classic
-  frames, so that combination is excluded. OpenGL render-demo playback under
+  runs (RTX 4060 Laptop GPU). The one failure was classic flicker: OpenGL
+  stencil shadows under 4x MSAA flipped isolated pixels between two classic
+  frames. The cause is NVIDIA's OpenGL driver, which shades overlapping draws
+  into a 4x or 8x multisampled target slightly differently from frame to
+  frame with an identical command stream; the harness now serializes classic
+  OpenGL draws (`r_glSerializeDraws`, validation only) and the combination
+  passes. OpenGL render-demo playback under
   the default preset, left out of that run, now passes: the renderer's scene
   target starts every frame cleared, so uncovered pixels no longer carry the
   last frame's bloom.
@@ -3413,6 +3559,15 @@ Completion substeps must keep three forms of evidence distinct:
   M06's Renner scene, three more replies from M04's Fox marines, and three
   replies in Cryofac through script revision 4. The races' unused chatter has
   no recoverable placement and stays out. See [the second pass](awakening-missions.md#replies-the-scenes-stop-short-of--14-november-2026).
+  Missing voice lines, 16 November: the Pain Lord's three tube marines play
+  stand-in screams from installed recordings, and Darnell's undeclared m08 radio
+  line no longer beeps (both m08 lines are recorded and still to be restored, as
+  are m01's 23 "+use" replies a key slip turns into beeps). m01's 29 draft radio calls (words known, no audio,
+  draft script runs nowhere) are placed at the shipped battle's scenes through
+  `m01_radio.script`, gated on their content. Open: voicing them (25 anonymous
+  squad lines, 3 Markswell), and the 100 draft lines whose scenes the shipped
+  maps lack. See the [register](awakening-missing-voice-lines.md) and the
+  [voice generation breakdown](voice-generation-breakdown.md).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
@@ -4008,9 +4163,10 @@ an option is turned on.
 
 ### MP completion checkpoints
 
-**Estimate: 55%; 3/24 tasks closed.** The eleven original tasks stand where
+**Estimate: 55%; 3/26 tasks closed.** The eleven original tasks stand where
 they were (80% against their own scope); the 15 November comparison added
-thirteen items that are mostly unstarted. Most shipped systems work and have
+thirteen items that are mostly unstarted, MP-25 (splitscreen, added the
+same day) and MP-26 (Horde, added the same day) are not started. Most shipped systems work and have
 substantial local evidence. MP-02's final long-match/catalog safety checks pass, with its timing
 contention caveat accepted for closeout; controlled timing remains unqualified.
 Simulated networking does not close physical peers. The 28 October
@@ -4043,6 +4199,8 @@ prediction/rewind defaults.
 | MP-22 — Not started | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
 | MP-23 — Partial | The render container packs its stream 4.78:1; joints are predicted (v12). | MVD compression and field encodings, 2D/sound/effect encodings, `demoStats`, budgets and targets met byte-exact. |
 | MP-24 — Partial | Native codec flips, truncations and hostile payloads; MVD cut points and recovery; damaged render files play on. | One fuzz corpus for every reader; MVD worker-thread, 64-bit and hours-long recordings; cheats-off, under-load, Vulkan/Linux/macOS/ARM64 recording and playback; cross-platform determinism; a listening check. |
+| MP-25 — Not started | One local client per game (`idAsyncServer::localClientNum`); the SDL3 backend opens one gamepad at a time; the sound world already takes a listener id; render views, subviews and the post chain draw one full-screen player view. | Two to four local players on a listen server or joining a remote server: per-player commands, devices and profiles; viewport layouts; per-viewport rendering, HUD, menus and sound; the join/leave flow; budgets per layout; play by people with real controllers. |
+| MP-26 — Not started | The multiplayer module compiles Quake 4's AI, AAS and monster classes; `idAI` and `idActor` write no snapshot state and no mode spawns monsters. | Monsters networked within MP-08's budget; a wave director with scaling, champions, themes and boss waves; spawn anchors and the map decision; crowd targeting and pursuit; lives, rallies and rewards; HUD, Create Server and localized text; demo playback; play by people together. |
 
 Completion substeps:
 
@@ -5466,6 +5624,127 @@ Completion substeps:
   harness in CI, the recordings and checksums recorded in
   [multiview demos](multiview-demos.md), and the platform rows in the
   [capability matrix](engine-capability-matrix.md).
+- [ ] **MP-25 — P2, implementation: multiplayer splitscreen for up to four
+  local players.** Multiplayer only; the single-player game, the Awakening
+  campaign and SP Arena gain no local players. Today a game has one local
+  client (`idAsyncServer::localClientNum`), the SDL3 backend opens one gamepad
+  and replaces it when another connects, and the renderer, HUD and sound
+  listener assume one full-screen player view. Deliver a splitscreen that
+  plays as well as a single view:
+  - **Session and network:** one to four local players, each an ordinary
+    client with its own client number, user info, name, model, team and
+    usercmd stream, on a listen server, against bots, or joining a remote or
+    dedicated server (one connection carrying every local player or one
+    each, decided and documented against MP-08's packet budget; per-address
+    server limits count them correctly). Prediction, rewind and snapshots
+    per local player; a server option to refuse or cap guests; scoreboards,
+    votes, chat and team balance treat each as a player; a guest's identity
+    and stats follow MP-17.
+  - **Input and profiles:** every connected gamepad open at once (SDL3
+    instance ids, hot-plug and reconnect without reassigning a seat),
+    keyboard and mouse as one seat, a press-a-button-to-join lobby that binds
+    a device to a seat, per-seat bindings, sensitivity, inversion, aim assist
+    and rumble, guest profiles saved with the host's, and menu ownership (a
+    player's pause menu opens for their seat only).
+  - **Layouts and rendering:** full, two-way (horizontal or vertical, chosen
+    by aspect and resolution), three-way and four-way grids, a safe area per
+    viewport, field of view corrected for each viewport's aspect; one render
+    view per seat with its own subviews (mirrors, remote cameras), weapon
+    model, view effects, damage and death views, and screen-space post
+    effects confined to its rectangle on OpenGL and Vulkan; culling, shadow
+    and light caches shared across seats where it is safe; per-layout
+    resolution scale and effect presets so four seats hold the refresh class
+    FPS-02 sets for the active tier, measured, not assumed.
+  - **HUD, menus and text:** the retained HUD laid out per viewport at a
+    readable scale (crosshair, ammunition, chat, centerprints, kill feed, hit
+    markers, item timers, follow and spectator panels), a shared scoreboard
+    and intermission, per-seat notices, localized strings for every new
+    label, and the stock interface either supported or explicitly refused
+    while splitscreen is active.
+  - **Audio:** one listener per seat mixed into the output (nearest listener
+    or summed with gain limits, decided here), per-seat announcer and hit
+    tones without doubling shared world sounds, and voice chat routed per
+    seat.
+  - **Spectating and demos:** a local player can spectate or follow while the
+    others play; MVD and MP-22 client demos record each seat and play back one
+    viewport or the whole layout.
+  Gates: an asset-free contract for seat assignment, hot-plug and layout
+  selection; a native test for per-viewport views and listener mixing; two-,
+  three- and four-seat smokes against bots on a listen server and joining a
+  dedicated server on OpenGL and Vulkan, with captures of each layout at
+  16:9, 21:9 and 4:3; per-layout frame-time budgets recorded against FPS-01;
+  Windows, Linux and Steam Deck runs; people playing each layout with real
+  controllers through a [human qualification checklist](mp-human-qualification.md)
+  entry; and a splitscreen player guide in `docs/user/`.
+- [ ] **MP-26 — P2, implementation: Horde, a co-operative wave mode against
+  Quake 4's Strogg.** Reference: Muff Mode's Horde for the Quake II Rerelease
+  (MMREX, `DarkMatter-Productions/MuffMode`: `mm_horde*`, the
+  configuration reference's Horde sections, the level design guide's spawn
+  anchors and `horde-nav-format-design.md`), adapted to Quake 4 rather than
+  copied. Today the multiplayer module compiles Quake 4's AI, AAS and monster
+  classes (`src/mpgame/ai/`, registered in `Class.cpp`), but `idAI` and
+  `idActor` write no snapshot state, so a client never sees a monster, and no
+  multiplayer mode spawns one. Deliver Horde as a new multiplayer mode in
+  `game_mp`, not a single-player co-op path:
+  - **Monsters on the wire:** decide and implement how a monster reaches a
+    client (snapshot state for position, animation, health, attachments,
+    effects and death; ragdolls and gibs as client-side presentation; monster
+    projectiles through the existing projectile path), within MP-08's packet
+    budget and a protocol bump that keeps older demos playable. Derive the
+    live-monster cap from a measured snapshot cost instead of a guess (Muff
+    Mode caps its alive count to keep client buffers from overflowing).
+    Monsters need lag compensation for hit-scan (MP-07's rewind) and stay out
+    of client prediction.
+  - **Wave director:** a point budget per wave that grows, then tapers past a
+    content peak; scaling by fighter count and map size; spawn pacing with
+    bursts and rests; an alive cap; unlock waves for each Strogg type with
+    featured first spawns; roster variety that widens over the run;
+    champions (health, damage and speed multipliers with a visible marker);
+    themed waves; scheduled boss waves from named profiles (Quake 4's large
+    Strogg: Gladiator, Heavy Hover Tank, Harvester, Network Guardian and the
+    like, chosen for what fits a multiplayer arena); optional wildcard waves
+    that reuse MP-14's modifier layer where they overlap; finite runs set by
+    the round limit and an endless run.
+  - **Where monsters come from:** typed spawn anchors (`info_horde_spawn`,
+    flying and boss variants) with wave range, weight, cooldown and an
+    optional class key, a minimum distance from fighters, and fallbacks to
+    player spawns; a decision, made here with a measured check, on whether
+    single-player maps can host Horde (their monster placements reused as
+    anchors, as Muff Mode does) or Horde stays on multiplayer maps and
+    community maps. Every map the mode lists has the AAS sizes its roster
+    needs; a map without them is refused or limited to the types it can
+    path, never run with monsters stuck in place.
+  - **AI for a crowd of players:** target choice spread across fighters
+    (load, threat, finishability and reachability), periodic retargeting,
+    pursuit that does not give up when sight is lost, stall recovery that
+    retargets and then relocates a stranded monster, medics and other
+    support roles kept, and per-frame budgets for path and reachability
+    queries.
+  - **Players, lives and rewards:** lives per wave, eliminated players
+    spectating until a rally (kills earn a team mate back with brief
+    protection) or the next wave; defeat when every fighter is down or the
+    server empties; drops from kills with richer drops from champions and
+    bosses; kill-streak momentum and a flawless-wave bonus; slower non-weapon
+    item respawns; powerup timers paused between waves; bots (MP-09) as
+    fighters that target monsters and survive waves.
+  - **Presentation and hosting:** a wave and remaining-monster readout and
+    end-of-wave notices in the retained HUD and the stock HUD, a marker on
+    the last few monsters, a Horde scoreboard and intermission, the mode in
+    Create Server with its options, localized strings for every new label,
+    and announcer lines. Horde is unranked (no MP-17 rating, no awards reel)
+    and gets its own MP-13 map-database entries and an MP-14 preset; the
+    managed competitive pipeline does not offer it.
+  - **Demos:** MVD and MP-22 client demos record and play back waves,
+    monsters and bosses, with MP-24 fixtures for the new records.
+  Gates: an asset-free contract for the director (budgets, unlocks, scaling,
+  boss schedule, endless taper) with fixed seeds; a native test of monster
+  snapshot encoding and the alive cap against MP-08's budget; a dedicated
+  smoke where bots clear a finite run and lose an endless one on two stock
+  maps, with a remote client seeing every monster, on OpenGL and Vulkan; a
+  measured frame-time and bandwidth record at the alive cap; MVD playback of
+  a boss wave; Windows and Linux runs; people playing a run together with
+  real input through a [human qualification checklist](mp-human-qualification.md)
+  entry; and a Horde section in a player guide and the server setup guide.
 
 ## Audio and voice
 
@@ -6490,7 +6769,7 @@ do not establish an accepted delivery scope for these ambitions. To advance one:
 | --- | --- |
 | OPT-01 | Higher authoritative simulation rates: separate physics/script/prediction/demo/content design after HF-01 through HF-07; do not change tick rate to claim higher FPS. |
 | OPT-02 | GPU skinning promotion for animation-heavy content: batch GL dispatches/persist source buffers and prove benefit. Current stock workloads did not justify default promotion. |
-| OPT-03 | True HDR10/scRGB output, sparse/virtual textures, broad GPU-driven/async-compute work, background shader compilation, shadowed light-injected volumetrics and world-space GI: require measured need, target content/hardware and classic rollback. |
+| OPT-03 | True HDR10/scRGB output, sparse/virtual textures, broad GPU-driven/async-compute work, background shader compilation, shadowed light-injected volumetrics and raster world-space GI: require measured need, target content/hardware and classic rollback. Ray-traced shadows, reflections, indirect light and path tracing moved to RT-01 through RT-07 on 15 November 2026. |
 | OPT-04 | Live relay/delayed broadcast, multi-POV/multi-window audio and web/brackets: separate security, capacity, backpressure and reconnect designs. Forced client screenshots remain rejected. Demo compression and export moved to MP-23/MP-22 and persistent identity to MP-17 on 15 November 2026. |
 | OPT-05 | Overload/Harvester/Domination/Attack and Defend: keep unavailable until authoritative objectives/scoring, networking, bots and UI exist. Race remains outside accepted scope; rulesets, modifiers and presets moved to MP-11/MP-14 on 15 November 2026. |
 | OPT-06 | Awakening's unreachable grapple/concussion/tether/gravgun/compass content: explicit content-completion project, not a blocker for the integrated SP campaign. No expansion multiplayer module. |

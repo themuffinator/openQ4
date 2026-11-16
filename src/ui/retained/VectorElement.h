@@ -2,10 +2,13 @@
 #pragma once
 #include "Vector.h"
 #include "Hud.h"
+#include "VectorCompile.h"
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/Geometry.h>
 #include <RmlUi/Core/Decorator.h>
 #include <RmlUi/Core/Texture.h>
+#include <cstdint>
+#include <memory>
 
 namespace openq4::ui {
 class Host;
@@ -47,7 +50,13 @@ public:
 	bool HitTest(Rml::Element& element, Rml::Vector2f outputPoint);
 	bool HasHitArea(Rml::Element& element);
 private:
+	friend class VectorCompileBatch;
 	bool PrepareHitGeometry(Rml::Element& element, Rml::Vector2f& origin);
+	// What a deferred compilation names: this geometry while it lives, its
+	// paths as they were, and their generation (a reconfiguration drops it).
+	std::shared_ptr<VectorGeometry*> self;
+	std::shared_ptr<const std::vector<VectorPath>> sharedPaths;
+	std::uint64_t compileGeneration = 0;
 	std::vector<VectorMesh> hitGeometry;
 	std::array<double,6> hitSignature{};
 	bool hitPrepared = false, hitValid = false, hitArea = false;

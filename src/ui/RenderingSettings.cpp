@@ -46,7 +46,10 @@ const std::map<std::string,size_t>& RenderingSettings::Schema() {
 }
 void RenderingSettings::Capture() {
 	if (captured) return;
-	available=R_RendererModule_QueryRenderingDevices(catalog);
+	// The inventory the last probe took: opening the page on OpenGL no longer
+	// loads the Vulkan module across every GPU each time. Select checks a
+	// fresh probe before it applies a choice.
+	available=R_RendererModule_RecentRenderingDevices(catalog);
 	captured=true;
 	if (catalogSerial!=(std::numeric_limits<std::uint64_t>::max)()) token=++catalogSerial;
 	else { token=0; available=false; }
