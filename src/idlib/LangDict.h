@@ -118,7 +118,9 @@ public:
 							~idLangDict( void );
 
 	void					Clear( void );
-	bool					Load( const char *fileName, bool clear = true );
+							// gameDir reads that directory's copy of the file rather than the
+							// search path's first one (layering a mod's table over the copies it shadows)
+	bool					Load( const char *fileName, bool clear = true, const char *gameDir = NULL );
 	void					Save( const char *fileName );
 
 	const char *			AddString( const char *str );

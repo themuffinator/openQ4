@@ -7,6 +7,18 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A mod's old copy of openQ4's text no longer blanks the new menus, 16 November 2026
+
+- **Menus keep their words under texture and content mods.** A mod that
+  carries its own copy of one of openQ4's string tables, such as
+  `strings/english_openq4.lang` copied from an older build, used to replace
+  openQ4's table entirely. Every string added since that copy was made then
+  showed as a raw `#str_` code (#219). openQ4 now reads the mod's table on top
+  of its own, so the mod's text still wins wherever it has a string, and
+  everything else comes from openQ4 and Quake 4 as usual.
+- Mod authors: there's no need to ship openQ4's own `*_openq4.lang` files.
+  Ship only the strings your mod adds or changes.
+
 ## Casual servers get the votes, timeouts and policies players expect (MP-12), 15 November 2026
 
 - **Call votes the way Quake players type them.** `callvote` (or `cv`) and

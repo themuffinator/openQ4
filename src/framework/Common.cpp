@@ -5429,6 +5429,71 @@ static bool Common_ResolveLanguageSelection( const idStr &requestedLanguage, con
 idCommonLocal::InitLanguageDict
 ===============
 */
+/*
+===============
+Common_LoadLanguageFileLayers
+
+A mod that ships a string table under the same name as one beneath it (a copy of
+english_openq4.lang taken from an older openQ4, say) replaces that whole file in
+the search path, and every string its copy leaves out disappears: newer menus
+then show raw #str_ ids. As idDeclManagerLocal::LoadDeclFileLayers does for decl
+files, the copies the mod shadows are read first, from their own directories
+(retail, the openQ4 runtime, then fs_game_base), and the mod's copy last, so its
+strings win and only the ones it lacks come from below. A table no mod
+directory holds loads as before.
+===============
+*/
+static bool Common_IsLanguageModDir( const char *gameDir ) {
+	return gameDir != NULL && gameDir[0] != '\0' && idStr::Icmp( gameDir, BASE_GAMEDIR ) && idStr::Icmp( gameDir, OPENQ4_GAMEDIR );
+}
+
+static bool Common_DirHoldsLanguageFile( const char *fileName, const char *gameDir ) {
+	idFile *copy = fileSystem->OpenFileRead( fileName, false, gameDir );
+	if ( copy == NULL ) {
+		return false;
+	}
+	fileSystem->CloseFile( copy );
+	return true;
+}
+
+static void Common_LoadLanguageFileLayers( idLangDict &dict, const char *fileName ) {
+	const char *topGameDir = cvarSystem->GetCVarString( "fs_game" );
+	const char *modBaseDir = cvarSystem->GetCVarString( "fs_game_base" );
+	const char *modDir = NULL;
+	if ( Common_IsLanguageModDir( topGameDir ) && Common_DirHoldsLanguageFile( fileName, topGameDir ) ) {
+		modDir = topGameDir;
+	} else if ( Common_IsLanguageModDir( modBaseDir ) && idStr::Icmp( modBaseDir, topGameDir ) &&
+			Common_DirHoldsLanguageFile( fileName, modBaseDir ) ) {
+		// the mod leaves the table to its base; layer beneath the base's copy
+		modDir = modBaseDir;
+		modBaseDir = "";
+	}
+
+	if ( modDir != NULL ) {
+		// lowest first: each later copy's strings take precedence
+		const char *lowerDirs[] = { BASE_GAMEDIR, OPENQ4_GAMEDIR, modBaseDir };
+		const int numLowerDirs = (int)( sizeof( lowerDirs ) / sizeof( lowerDirs[0] ) );
+		for ( int i = 0; i < numLowerDirs; i++ ) {
+			const char *gameDir = lowerDirs[i];
+			if ( gameDir[0] == '\0' || !idStr::Icmp( gameDir, modDir ) ) {
+				continue;
+			}
+			// fs_game_base may name the runtime or retail directory itself
+			bool alreadyLayered = false;
+			for ( int j = 0; j < i; j++ ) {
+				if ( !idStr::Icmp( lowerDirs[j], gameDir ) ) {
+					alreadyLayered = true;
+				}
+			}
+			if ( !alreadyLayered && Common_DirHoldsLanguageFile( fileName, gameDir ) ) {
+				dict.Load( fileName, false, gameDir );
+			}
+		}
+	}
+
+	dict.Load( fileName, false );
+}
+
 void idCommonLocal::InitLanguageDict( bool applyStartupSysLang, bool allowAutoLanguageSelect ) {
 	idStr fileName;
 	languageDict.Clear();
@@ -5509,13 +5574,12 @@ void idCommonLocal::InitLanguageDict( bool applyStartupSysLang, bool allowAutoLa
 		idStrList englishLangList = langList;
 		FilterLangList( &englishLangList, "english" );
 		for ( int i = 0; i < englishLangList.Num(); i++ ) {
-			languageDict.Load( englishLangList[i], false );
+			Common_LoadLanguageFileLayers( languageDict, englishLangList[i] );
 		}
 	}
 
 	for( int i = 0; i < currentLangList.Num(); i++ ) {
-		//common->Printf("%s\n", currentLangList[i].c_str());
-		languageDict.Load( currentLangList[i], false );
+		Common_LoadLanguageFileLayers( languageDict, currentLangList[i] );
 	}
 
 	fileSystem->FreeFileList(langFiles);

@@ -621,7 +621,7 @@ static bool LangDict_ConvertCodePageToUtf8( const char *buffer, int length, idSt
 idLangDict::Load
 ============
 */
-bool idLangDict::Load( const char *fileName, bool clear ) {
+bool idLangDict::Load( const char *fileName, bool clear, const char *gameDir ) {
 	if ( clear ) {
 		Clear();
 	}
@@ -632,7 +632,25 @@ bool idLangDict::Load( const char *fileName, bool clear ) {
 	idStr transcoded;
 	idLexer src( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
 
-	int len = idLib::fileSystem->ReadFile( fileName, (void**)&buffer );
+	// One directory's copy: read it whole, NUL-terminated as ReadFile's buffer is.
+	idList<char> dirCopy;
+	int len;
+	if ( gameDir != NULL && gameDir[0] != '\0' ) {
+		idFile *f = idLib::fileSystem->OpenFileRead( fileName, false, gameDir );
+		if ( f == NULL ) {
+			return false;
+		}
+		len = f->Length();
+		if ( len > 0 ) {
+			dirCopy.SetNum( len + 1 );
+			len = f->Read( dirCopy.Ptr(), len );
+			dirCopy[ len > 0 ? len : 0 ] = '\0';
+			buffer = dirCopy.Ptr();
+		}
+		idLib::fileSystem->CloseFile( f );
+	} else {
+		len = idLib::fileSystem->ReadFile( fileName, (void**)&buffer );
+	}
 	if ( len <= 0 ) {
 		// let whoever called us deal with the failure (so sys_lang can be reset)
 		return false;
@@ -680,8 +698,12 @@ bool idLangDict::Load( const char *fileName, bool clear ) {
 // RAVEN END
 		}
 	}
-	idLib::common->Printf( "%i strings read from %s\n", args.Num(), fileName );
-	idLib::fileSystem->FreeFile( (void*)buffer );
+	if ( gameDir != NULL && gameDir[0] != '\0' ) {
+		idLib::common->Printf( "%i strings read from %s (%s)\n", args.Num(), fileName, gameDir );
+	} else {
+		idLib::common->Printf( "%i strings read from %s\n", args.Num(), fileName );
+		idLib::fileSystem->FreeFile( (void*)buffer );
+	}
 	
 	return true;
 }

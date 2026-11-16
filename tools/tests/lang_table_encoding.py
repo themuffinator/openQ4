@@ -474,12 +474,21 @@ def validate_codepage_selection() -> None:
         "LangDict_SetActiveCodePage( LangDict_CodePageForLanguage( langName.c_str() ) )",
         "idCommonLocal::InitLanguageDict (codepage must follow sys_lang)",
     )
-    select = common.index("LangDict_SetActiveCodePage")
-    first_load = common.index("languageDict.Load(")
+    init = common[common.index("void idCommonLocal::InitLanguageDict(") :]
+    init = init[: init.index("\n}\n")]
+    select = init.index("LangDict_SetActiveCodePage")
+    # Tables load through Common_LoadLanguageFileLayers, which layers a mod's
+    # copy over the copies it shadows.
+    first_load = init.index("Common_LoadLanguageFileLayers( languageDict,")
     if select > first_load:
         raise AssertionError(
             "src/framework/Common.cpp: the active codepage must be selected before the "
-            "first languageDict.Load() - one dictionary cannot hold two codepages"
+            "first string table is loaded - one dictionary cannot hold two codepages"
+        )
+    if "languageDict.Load(" in init:
+        raise AssertionError(
+            "src/framework/Common.cpp: InitLanguageDict must load tables through "
+            "Common_LoadLanguageFileLayers, or a mod's stale copy hides newer strings"
         )
 
     # The renderer is a module with its own copy of idlib, so the codepage the
