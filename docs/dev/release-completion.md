@@ -7,6 +7,14 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The menu cursor reaches the edges of a widescreen menu, 16 November 2026
+
+- **On a widescreen display, the cursor in the classic menus now reaches all
+  the way to the sides.** It could stop at the edge of the old 4:3 area,
+  leaving controls on the outer edges of the screen out of reach. This was
+  reported on macOS. Thanks to John-Michael Mulesa (jm2), who found and fixed
+  it in [#173](https://github.com/themuffinator/openQ4/pull/173).
+
 ## Recordings less than half the size, that seek in a second and survive a crash, 14 November 2026
 
 - **A recording takes about 40% of the space.** A busy level at 60 frames per
