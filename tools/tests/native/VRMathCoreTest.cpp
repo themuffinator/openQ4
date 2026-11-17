@@ -227,7 +227,8 @@ static void TestPlaySpace( void ) {
 	Check( VR_StandingReference( false, 1.15f, 1.7f, learned ) == 1.15f && !learned, "seated play takes the head at the recentre" );
 	Check( VR_StandingReference( true, 1.15f, 1.7f, learned ) == 1.7f && !learned, "a calibrated standing height outlives a seated recentre" );
 	Check( VR_StandingReference( true, 1.62f, 0.0f, learned ) == 1.62f && learned, "an uncalibrated standing height is learned from the head" );
-	Check( VR_StandingReference( true, 0.3f, 0.0f, learned ) == VR_STANDING_HEIGHT_MIN && learned, "a head on the floor learns no implausible height" );
+	Check( VR_StandingReference( true, 0.75f, 0.0f, learned ) == 0.75f && !learned, "a headset on a desk stands where it is and teaches no height" );
+	Check( VR_StandingReference( true, 1.0f, 0.0f, learned ) == 1.0f && learned, "a metre is the lowest standing eye learned" );
 	Check( VR_StandingReference( true, 2.9f, 5.0f, learned ) == VR_STANDING_HEIGHT_MAX && learned, "an implausible calibration is learned again, clamped" );
 }
 
@@ -337,6 +338,74 @@ static void TestHeadsetServices( void ) {
 	Check( VR_PerformanceSettingsLevel( 4 ) == -1 && VR_PerformanceSettingsLevel( -2 ) == -1, "boost or nonsense is never held" );
 }
 
+static void TestBody( void ) {
+	// an arm of 14 and 11 units reaching a hand 20 units ahead, elbow down
+	const vrVec3_t shoulder = VR_Vec3( 0.0f, 0.0f, 0.0f );
+	vrTwoBone_t arm = VR_SolveTwoBone( shoulder, VR_Vec3( 20.0f, 0.0f, 0.0f ), VR_Vec3( 0.0f, 0.0f, -1.0f ), 14.0f, 11.0f );
+	Check( arm.reached, "a hand within reach is reached" );
+	Check( Near( VR_Length( VR_Sub( arm.joint, shoulder ) ), 14.0f, 0.001f ), "the upper arm keeps its length" );
+	Check( Near( VR_Length( VR_Sub( VR_Vec3( 20.0f, 0.0f, 0.0f ), arm.joint ) ), 11.0f, 0.001f ), "the forearm keeps its length" );
+	Check( arm.joint.z < -1.0f && Near( arm.joint.y, 0.0f ), "the elbow bends towards the pole" );
+	// the pole's part along the limb is ignored
+	vrTwoBone_t skewed = VR_SolveTwoBone( shoulder, VR_Vec3( 20.0f, 0.0f, 0.0f ), VR_Vec3( 5.0f, 0.0f, -1.0f ), 14.0f, 11.0f );
+	Check( NearVec( skewed.joint, arm.joint, 0.001f ), "only the pole's sideways part bends the limb" );
+	// out of reach: the forearm stays whole at the hand and the upper arm stretches
+	arm = VR_SolveTwoBone( shoulder, VR_Vec3( 40.0f, 0.0f, 0.0f ), VR_Vec3( 0.0f, 0.0f, -1.0f ), 14.0f, 11.0f );
+	Check( !arm.reached && NearVec( arm.joint, VR_Vec3( 29.0f, 0.0f, 0.0f ), 0.001f ), "a hand out of reach keeps its forearm" );
+	// too near to fold: the forearm still ends at the hand
+	arm = VR_SolveTwoBone( shoulder, VR_Vec3( 1.0f, 0.0f, 0.0f ), VR_Vec3( 0.0f, 0.0f, -1.0f ), 14.0f, 11.0f );
+	Check( !arm.reached && Near( VR_Length( VR_Sub( VR_Vec3( 1.0f, 0.0f, 0.0f ), arm.joint ) ), 11.0f, 0.01f ), "a hand at the shoulder keeps its forearm" );
+	// a pole along the limb, and coinciding ends, still give a finite joint
+	arm = VR_SolveTwoBone( shoulder, VR_Vec3( 0.0f, 0.0f, -20.0f ), VR_Vec3( 0.0f, 0.0f, -1.0f ), 14.0f, 11.0f );
+	Check( VR_IsFinite( arm.joint ) && Near( VR_Length( VR_Sub( arm.joint, shoulder ) ), 14.0f, 0.001f ), "a pole along the limb still bends it" );
+	arm = VR_SolveTwoBone( shoulder, shoulder, VR_Vec3( 0.0f, 0.0f, 0.0f ), 14.0f, 11.0f );
+	Check( VR_IsFinite( arm.joint ) && !arm.reached, "coinciding ends give a finite joint" );
+
+	// the torso leaves the neck free and follows beyond it
+	Check( Near( VR_BodyYawFollow( 0.0f, 30.0f, 50.0f, 0.0f, 0.011f ), 0.0f ), "a glance leaves the torso alone" );
+	Check( Near( VR_BodyYawFollow( 0.0f, 80.0f, 50.0f, 0.0f, 0.011f ), 30.0f ), "past the neck's turn the torso follows" );
+	Check( Near( VR_BodyYawFollow( 0.0f, -80.0f, 50.0f, 0.0f, 0.011f ), -30.0f ), "to either side" );
+	Check( Near( VR_BodyYawFollow( 170.0f, -170.0f, 50.0f, 0.0f, 0.011f ), 170.0f ), "across the wrap a glance is still a glance" );
+	Check( Near( VR_BodyYawFollow( 0.0f, 30.0f, 50.0f, 300.0f, 0.05f ), 15.0f ), "walking lines the torso up at its rate" );
+	Check( Near( VR_BodyYawFollow( 0.0f, 10.0f, 50.0f, 300.0f, 0.05f ), 10.0f ), "and stops on the head's heading" );
+	Check( VR_BodyYawFollow( std::nanf( "" ), 10.0f, 50.0f, 0.0f, 0.0f ) == 0.0f, "a broken heading resets" );
+
+	// level, the neck is behind and below the eyes; looking straight down it is behind and above
+	const float upm = 39.37f;
+	vrVec3_t neck = VR_NeckFromHead( VR_Vec3( 0.0f, 0.0f, 68.0f ), VR_Vec3( 1.0f, 0.0f, 0.0f ), VR_Vec3( 0.0f, 0.0f, 1.0f ), upm );
+	Check( neck.x < -3.0f && neck.z < 68.0f - 2.9f, "the neck sits behind and below level eyes" );
+	neck = VR_NeckFromHead( VR_Vec3( 0.0f, 0.0f, 68.0f ), VR_Vec3( 0.0f, 0.0f, -1.0f ), VR_Vec3( 1.0f, 0.0f, 0.0f ), upm );
+	Check( neck.x < -2.9f && neck.z > 68.0f + 3.0f, "eyes looking straight down swing ahead of and below the neck" );
+
+	Check( Near( VR_BodyScale( 68.0f, 77.5f ), 68.0f / 77.5f ), "the model shrinks to the game's eye height" );
+
+	// the body stands a little back, and further back under a head that looks down at it
+	Check( Near( VR_BodySetback( VR_Vec3( 1.0f, 0.0f, 0.0f ) ), VR_BODY_SETBACK_METRES ), "a level head keeps the body close" );
+	Check( Near( VR_BodySetback( VR_Vec3( 0.0f, 0.0f, 1.0f ) ), VR_BODY_SETBACK_METRES ), "so does a head that looks up" );
+	Check( Near( VR_BodySetback( VR_Vec3( 0.0f, 0.0f, -1.0f ) ), VR_BODY_SETBACK_DOWN_METRES ), "a head that looks down sees past its chest" );
+	float lastSetback = VR_BODY_SETBACK_METRES;
+	for ( int pitch = 0; pitch <= 90; pitch++ ) {
+		const float setback = VR_BodySetback( VR_Vec3( std::cos( pitch * VR_DEG2RAD ), 0.0f, -std::sin( pitch * VR_DEG2RAD ) ) );
+		Check( setback >= lastSetback && setback - lastSetback < 0.012f, "the body eases back as the head tips down, never jumping" );
+		lastSetback = setback;
+	}
+	Check( Near( VR_BodySetback( VR_Vec3( 0.0f, 0.0f, std::nanf( "" ) ) ), VR_BODY_SETBACK_METRES ), "a broken axis keeps the body close" );
+
+	// a heading holds through the vertical, where a forward axis alone has none
+	Check( Near( VR_HeadingDegrees( VR_Vec3( 1.0f, 0.0f, 0.0f ), VR_Vec3( 0.0f, 0.0f, 1.0f ) ), 0.0f ), "a level head heads where it faces" );
+	Check( Near( VR_HeadingDegrees( VR_Vec3( 0.0f, 1.0f, 0.0f ), VR_Vec3( 0.0f, 0.0f, 1.0f ) ), 90.0f ), "to the left is a quarter turn" );
+	Check( Near( VR_HeadingDegrees( VR_Vec3( 0.0f, 1.0f, 0.0f ), VR_Vec3( 1.0f, 0.0f, 0.0f ) ), 90.0f ), "a rolled head still heads where it faces" );
+	Check( Near( VR_HeadingDegrees( VR_Vec3( 0.0f, 0.0f, -1.0f ), VR_Vec3( 0.0f, 1.0f, 0.0f ) ), 90.0f ), "looking straight down, the heading is where the top of the head points" );
+	Check( Near( VR_HeadingDegrees( VR_Vec3( 0.0f, 0.0f, 1.0f ), VR_Vec3( 0.0f, -1.0f, 0.0f ) ), 90.0f ), "looking straight up, where the chin points" );
+	for ( int pitch = -90; pitch <= 90; pitch++ ) {
+		// a head nodding from straight up, through level, to straight down
+		const float c = std::cos( pitch * VR_DEG2RAD ), s = std::sin( pitch * VR_DEG2RAD );
+		Check( Near( VR_HeadingDegrees( VR_Vec3( c, 0.0f, -s ), VR_Vec3( s, 0.0f, c ) ), 0.0f, 0.01f ), "a nod keeps its heading all the way up and down" );
+	}
+	Check( VR_HeadingDegrees( VR_Vec3( 0.0f, 0.0f, -1.0f ), VR_Vec3( 0.0f, 0.0f, 1.0f ) ) == 0.0f, "nonsense axes still give a heading" );
+	Check( VR_BodyScale( 68.0f, 0.0f ) == 1.0f && VR_BodyScale( 10.0f, 77.5f ) == 0.6f && VR_BodyScale( 200.0f, 77.5f ) == 1.2f, "a nonsense height stays within bounds" );
+}
+
 int main() {
 	TestBasis();
 	TestOrientation();
@@ -353,6 +422,7 @@ int main() {
 	TestOffsets();
 	TestQuad();
 	TestHeadsetServices();
+	TestBody();
 	std::printf( "VR math core: all checks passed\n" );
 	return 0;
 }

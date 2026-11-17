@@ -203,7 +203,7 @@ static const int VR_MAX_REFRESH_RATES = 32;
 
 idCVar vr_refreshRate( "vr_refreshRate", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"headset refresh rate in Hz, on headsets that let a game choose it (Meta Quest): the fastest offered rate up to this; "
-	"0 keeps the headset's own" );
+	"0 keeps the headset's own", 0.0f, 360.0f );
 idCVar vr_performanceLevel( "vr_performanceLevel", "3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
 	"CPU and GPU clocks the headset holds, on headsets that let a game choose them (Meta Quest): 0 the headset decides, "
 	"1 power savings, 2 sustained low, 3 sustained high (0 applies from the next vr_restart)", 0, 3 );
@@ -306,7 +306,10 @@ static const vrBinding_t vrIndexBindings[] = {
 	VR_BOTH_HANDS( VR_ACTION_AIM_POSE, "input/aim/pose" ),
 	VR_BOTH_HANDS( VR_ACTION_GRIP_POSE, "input/grip/pose" ),
 	VR_BOTH_HANDS( VR_ACTION_TRIGGER, "input/trigger/value" ),
-	VR_BOTH_HANDS( VR_ACTION_SQUEEZE, "input/squeeze/value" ),
+	// squeeze/value reads the fingers wrapped round the grip and is full before
+	// anyone squeezes: merely holding the controllers would switch weapons and
+	// hold the weapon wheel open. The force is the squeeze itself.
+	VR_BOTH_HANDS( VR_ACTION_SQUEEZE, "input/squeeze/force" ),
 	VR_BOTH_HANDS( VR_ACTION_THUMBSTICK, "input/thumbstick" ),
 	VR_BOTH_HANDS( VR_ACTION_THUMBSTICK_CLICK, "input/thumbstick/click" ),
 	VR_BOTH_HANDS( VR_ACTION_PRIMARY, "input/a/click" ),
@@ -566,7 +569,13 @@ private:
 	handInput_t				hands[VR_NUM_HANDS];
 	bool					inputValid;
 	bool					bodyYawValid;
+	// The next usercmd takes the body's yaw afresh. From a view that was not
+	// tracked (a new map, a loaded save, the mouse) the head takes its facing;
+	// after a recentre nothing moved, so the aim keeps its own.
+	bool					bodyYawFromHead;
+	bool					bodyYawResetPending;	// a recentre: taken up with the poses it changed (SyncInput)
 	float					bodyYaw;
+	float					headLocalYaw;
 	float					aimLocalYaw;
 	float					aimLocalPitch;
 	float					moveForward;
@@ -578,6 +587,14 @@ private:
 	int						roomScaleWalkMsec;	// when the head last walked the body through the usercmd
 	bool					roomScaleWalking;	// a usercmd walk is under way (VR_RoomScaleWalkInput)
 	bool					physicalCrouch;		// the tracked head crouched (VR_PhysicalCrouch)
+	int						recenterHoldMsec;	// when the weapon-hand stick was pressed in, 0 while it is up
+	bool					recenterHeld;		// that press already recentred
+	bool					focusedOnce;		// this session has had the controllers
+	XrVector3f				lastHeadPosition;	// where the head last was, for a runtime that loses its position
+	bool					lastHeadPositionValid;
+
+	void					ReleaseInput( void );
+	void					ShiftOrigin( const idVec3 &horizontal );
 };
 
 static idVRSystemOpenXR *	vrOpenXR = NULL;
@@ -744,8 +761,16 @@ idVRSystemOpenXR::idVRSystemOpenXR( void ) {
 	memset( hands, 0, sizeof( hands ) );
 	inputValid = false;
 	bodyYawValid = false;
+	bodyYawFromHead = true;
+	bodyYawResetPending = false;
 	bodyYaw = 0.0f;
+	headLocalYaw = 0.0f;
 	aimLocalYaw = aimLocalPitch = 0.0f;
+	recenterHoldMsec = 0;
+	recenterHeld = false;
+	focusedOnce = false;
+	memset( &lastHeadPosition, 0, sizeof( lastHeadPosition ) );
+	lastHeadPositionValid = false;
 	moveForward = moveRight = 0.0f;
 	snapTurn.latched = false;
 	memset( heldKeys, 0, sizeof( heldKeys ) );
@@ -1752,7 +1777,13 @@ bool idVRSystemOpenXR::CreateSession( void ) {
 
 	recenterRequested = true;
 	screenAnchored = false;
+	Sys_EnterCriticalSection( VR_INPUT_CRITICAL_SECTION );
 	bodyYawValid = false;
+	bodyYawFromHead = true;
+	bodyYawResetPending = false;
+	Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
+	focusedOnce = false;
+	lastHeadPositionValid = false;
 	common->Printf( "OpenXR: session created, eyes %dx%d (recommended %dx%d), virtual screen %dx%d\n",
 		eyeWidth, eyeHeight, recommendedEyeWidth, recommendedEyeHeight, screenWidth, screenHeight );
 	return true;
@@ -1764,21 +1795,14 @@ void idVRSystemOpenXR::DestroySession( void ) {
 	// release failure must not recursively enter teardown.
 	frameOpen = false;
 	frameShouldRender = false;
+	ReleaseInput();
 	Sys_EnterCriticalSection( VR_INPUT_CRITICAL_SECTION );
-	inputValid = false;
 	bodyYawValid = false;
-	moveForward = moveRight = 0.0f;
-	physicalCrouch = false;
-	roomScaleWalking = false;
-	roomScaleStickIdle = true;
-	memset( hands, 0, sizeof( hands ) );
+	bodyYawFromHead = true;
+	bodyYawResetPending = false;
 	memset( &frame, 0, sizeof( frame ) );
 	Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
 	memset( aimLocalValid, 0, sizeof( aimLocalValid ) );
-	if ( pointerOnScreen ) {
-		pointerOnScreen = false;
-		Sys_PostVRPointer( false, 0.0f, 0.0f );
-	}
 	ReleaseRendererImages();
 	DestroyActions();
 	for ( int i = 0; i < VR_NUM_EYES; i++ ) {
@@ -1810,11 +1834,36 @@ void idVRSystemOpenXR::DestroySession( void ) {
 	refreshRate = 0.0f;
 	refreshRateRequested = false;
 	thermalLevel[0] = thermalLevel[1] = XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT;
+}
 
+/*
+====================
+idVRSystemOpenXR::ReleaseInput
+
+The controllers no longer drive anything: the stick's movement stops, every
+key they hold is released and the menu pointer goes. A session that ends, or
+that the runtime stops, must not leave the player running and firing.
+====================
+*/
+void idVRSystemOpenXR::ReleaseInput( void ) {
+	Sys_EnterCriticalSection( VR_INPUT_CRITICAL_SECTION );
+	inputValid = false;
+	moveForward = moveRight = 0.0f;
+	physicalCrouch = false;
+	roomScaleWalking = false;
+	roomScaleStickIdle = true;
+	memset( hands, 0, sizeof( hands ) );
+	Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
+	if ( pointerOnScreen ) {
+		pointerOnScreen = false;
+		Sys_PostVRPointer( false, 0.0f, 0.0f );
+	}
 	for ( int i = 0; i < 16; i++ ) {
 		UpdateKey( i, heldKeys[i], false );
 	}
 	twoHanded = false;
+	recenterHoldMsec = 0;
+	recenterHeld = false;
 }
 
 /*
@@ -2444,6 +2493,13 @@ void idVRSystemOpenXR::HandleSessionState( XrSessionState state ) {
 		}
 		case XR_SESSION_STATE_FOCUSED:
 			sessionFocused = true;
+			// The session's first recentre is taken from the first tracked frame,
+			// which a headset still lying on a desk can supply. The first time the
+			// runtime hands over the controllers, recentre again.
+			if ( !focusedOnce ) {
+				focusedOnce = true;
+				recenterRequested = true;
+			}
 			break;
 		case XR_SESSION_STATE_VISIBLE:
 		case XR_SESSION_STATE_SYNCHRONIZED:
@@ -2454,6 +2510,9 @@ void idVRSystemOpenXR::HandleSessionState( XrSessionState state ) {
 		case XR_SESSION_STATE_STOPPING:
 			focusLost = focusLost || sessionFocused;
 			sessionFocused = false;
+			// no frame follows to release what the controllers hold: a runtime
+			// that takes focus and stops in one batch left it all held
+			ReleaseInput();
 			if ( sessionRunning ) {
 				Check( xrEndSession( session ), "xrEndSession" );
 				sessionRunning = false;
@@ -2545,11 +2604,15 @@ void idVRSystemOpenXR::LocateFrame( XrTime time ) {
 	if ( viewCount == VR_NUM_EYES && ( viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT ) != 0 ) {
 		viewsValid = true;
 		if ( ( viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT ) == 0 ) {
-			// orientation-only tracking: keep the eyes on a fixed head position
+			// Orientation-only tracking: the eyes stay where the head last was,
+			// half an eye distance to either side of it along the head's own
+			// right. Along the play space's, the eyes swapped as the head turned
+			// round, and a head placed at the space's origin stood on the floor.
+			const XrVector3f centre = lastHeadPositionValid ? lastHeadPosition : recenterPose.position;
 			for ( int i = 0; i < VR_NUM_EYES; i++ ) {
-				views[i].pose.position.x = ( i == 0 ? -0.032f : 0.032f );
-				views[i].pose.position.y = 0.0f;
-				views[i].pose.position.z = 0.0f;
+				const vrVec3_t side = VR_RotateVector( VR_QuatNormalize( VR_FromXrQuat( views[i].pose.orientation ) ),
+					VR_Vec3( i == 0 ? -0.032f : 0.032f, 0.0f, 0.0f ) );
+				views[i].pose.position = VR_ToXrVec( VR_Add( VR_FromXrVec( centre ), side ) );
 			}
 		}
 	}
@@ -2562,7 +2625,10 @@ void idVRSystemOpenXR::LocateFrame( XrTime time ) {
 	}
 	const bool headValid = ( head.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT ) != 0;
 	if ( headValid && ( head.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT ) == 0 ) {
-		head.pose.position.x = head.pose.position.y = head.pose.position.z = 0.0f;
+		head.pose.position = lastHeadPositionValid ? lastHeadPosition : recenterPose.position;
+	} else if ( headValid ) {
+		lastHeadPosition = head.pose.position;
+		lastHeadPositionValid = true;
 	}
 
 	if ( ( recenterRequested || calibrateRequested ) && headValid ) {
@@ -2590,9 +2656,11 @@ void idVRSystemOpenXR::LocateFrame( XrTime time ) {
 		recenterRequested = false;
 		calibrateRequested = false;
 		screenAnchored = false;
-		Sys_EnterCriticalSection( VR_INPUT_CRITICAL_SECTION );
-		bodyYawValid = false;
-		Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
+		// The body's yaw is taken again so that the aim stays where it was, but
+		// only once this frame's aim is known in the recentred space: a usercmd
+		// built in between would take it from the old aim and turn the world by
+		// the recentre (SyncInput).
+		bodyYawResetPending = true;
 		if ( vr_debug.GetInteger() > 0 ) {
 			common->Printf( "OpenXR: recentred at ( %.2f %.2f %.2f ), origin height %.2f m\n", head.pose.position.x, head.pose.position.y,
 				head.pose.position.z, recenterPose.position.y );
@@ -2858,6 +2926,23 @@ void idVRSystemOpenXR::SyncInput( float frameSeconds ) {
 	UpdateKey( VR_SLOT_LEFT_SECONDARY, K_JOY5, hands[VR_HAND_LEFT].secondary );
 	UpdateKey( VR_SLOT_MENU, K_JOY7, hands[VR_HAND_LEFT].menu || hands[VR_HAND_RIGHT].menu );
 	UpdateKey( VR_SLOT_WEAPON_STICK_CLICK, K_JOY14, weapon.stickClick );
+	// The weapon-hand stick held in for a second recentres: the only way to do
+	// it without a keyboard, which a player in a headset cannot see.
+	if ( !weapon.stickClick || menu ) {
+		recenterHoldMsec = 0;
+		recenterHeld = false;
+	} else if ( recenterHoldMsec == 0 ) {
+		recenterHoldMsec = Sys_Milliseconds();
+	} else if ( !recenterHeld && Sys_Milliseconds() - recenterHoldMsec >= 1000 ) {
+		recenterHeld = true;
+		recenterRequested = true;
+		Vibrate( VR_HAND_LEFT, 0.5f, 60 );
+		Vibrate( VR_HAND_RIGHT, 0.5f, 60 );
+		if ( recovery != RECOVERY_NONE ) {
+			return;
+		}
+		common->Printf( "OpenXR: recentred from the controller\n" );
+	}
 	UpdateKey( VR_SLOT_OFF_STICK_CLICK, K_JOY13, off.stickClick );
 
 	float turn = 0.0f;
@@ -2946,15 +3031,36 @@ void idVRSystemOpenXR::SyncInput( float frameSeconds ) {
 	Sys_EnterCriticalSection( VR_INPUT_CRITICAL_SECTION );
 	inputValid = sessionRunning && sessionFocused;
 	physicalCrouch = crouching;
+	if ( bodyYawResetPending ) {
+		bodyYawResetPending = false;
+		// a yaw still waiting to be taken from the head (a new level, which
+		// recentres too) keeps waiting for the head
+		if ( bodyYawValid ) {
+			bodyYawValid = false;
+			bodyYawFromHead = false;
+		}
+	}
+	const bool turned = bodyYawValid && turn != 0.0f;
 	if ( bodyYawValid ) {
 		bodyYaw = VR_NormalizeDegrees180( bodyYaw + turn );
 	}
+	headLocalYaw = frame.head.valid ? VR_PoseHeading( frame.head ) : localYaw;
 	aimLocalYaw = localYaw;
 	aimLocalPitch = localPitch;
 	moveForward = forwardMove;
 	moveRight = rightMove;
 	frame.bodyYaw = bodyYaw;
 	Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
+
+	// A turn of the stick turns the tracking space, and the space turns about
+	// its origin, the body. A head that stands off it (a lean, a step the body
+	// has not followed) swung round that origin with every turn: a 45 degree
+	// snap moved the view sideways by three quarters of the offset. Move the
+	// origin with the turn so that the head is the pivot.
+	if ( turned && frame.head.valid ) {
+		const idVec3 head( frame.head.origin.x, frame.head.origin.y, 0.0f );
+		ShiftOrigin( head - head * idAngles( 0.0f, -turn, 0.0f ).ToMat3() );
+	}
 }
 
 bool idVRSystemOpenXR::GetUsercmdInput( float otherYawDelta, float currentYaw, vrUsercmdInput_t &input ) {
@@ -2965,8 +3071,13 @@ bool idVRSystemOpenXR::GetUsercmdInput( float otherYawDelta, float currentYaw, v
 		return false;
 	}
 	if ( !bodyYawValid ) {
-		// keep the current aim continuous when VR takes over
-		bodyYaw = VR_NormalizeDegrees180( currentYaw - aimLocalYaw );
+		// When VR takes over a view that was not tracked, that view is where the
+		// player was facing, and the head takes it: taken by the aim, a gun
+		// hanging at the player's side started the level pointing down the
+		// corridor with the player facing the wall. After a recentre nothing
+		// in the world moved, and the aim keeps its own yaw.
+		bodyYaw = VR_NormalizeDegrees180( currentYaw - ( bodyYawFromHead ? headLocalYaw : aimLocalYaw ) );
+		bodyYawFromHead = false;
 		bodyYawValid = true;
 	} else {
 		// the mouse, keys or a gamepad turned this tic: that turns the body
@@ -2994,7 +3105,13 @@ takes the yaw again from the zeroed angles, as when VR first took over input.
 void idVRSystemOpenXR::ResetBodyYaw( void ) {
 	Sys_EnterCriticalSection( VR_INPUT_CRITICAL_SECTION );
 	bodyYawValid = false;
+	bodyYawFromHead = true;
+	bodyYawResetPending = false;
 	Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
+	// A level starts from where the player stands and faces now: the front
+	// they recentred to a level ago, and the steps they have taken since,
+	// are the last level's.
+	recenterRequested = true;
 }
 
 /*
@@ -3198,7 +3315,17 @@ bool idVRSystemOpenXR::ShiftTrackingOrigin( const idVec3 &trackingDelta ) {
 	if ( idAsyncNetwork::IsActive() && ( !roomScaleStickIdle || Sys_Milliseconds() - roomScaleWalkMsec > 400 ) ) {
 		return false;
 	}
-	const idVec3 horizontal( trackingDelta.x, trackingDelta.y, 0.0f );
+	ShiftOrigin( idVec3( trackingDelta.x, trackingDelta.y, 0.0f ) );
+	return true;
+}
+
+// The tracking origin moves by this much of the tracking space (engine axes,
+// game units), and every pose already located this frame with it.
+void idVRSystemOpenXR::ShiftOrigin( const idVec3 &horizontal ) {
+	const float unitsPerMetre = vr_worldScale.GetFloat();
+	if ( unitsPerMetre <= 0.0f || !VR_IsFinite( VR_Vec3( horizontal.x, horizontal.y, 0.0f ) ) ) {
+		return;
+	}
 	const vrVec3_t xr = VR_Scale( VR_EngineToXrDirection( VR_Vec3( horizontal.x, horizontal.y, 0.0f ) ), 1.0f / unitsPerMetre );
 	const vrVec3_t local = VR_RotateVector( VR_QuatNormalize( VR_FromXrQuat( recenterPose.orientation ) ), xr );
 	recenterPose.position.x += local.x;
@@ -3214,7 +3341,6 @@ bool idVRSystemOpenXR::ShiftTrackingOrigin( const idVec3 &trackingDelta ) {
 		frame.aim[i].origin -= horizontal;
 	}
 	Sys_LeaveCriticalSection( VR_INPUT_CRITICAL_SECTION );
-	return true;
 }
 
 /*
@@ -3376,6 +3502,8 @@ void idVRSystemOpenXR::BeginFrame( void ) {
 	frame.weaponPitch = vr_weaponPitch.GetFloat();
 	frame.aimLaser = idMath::ClampInt( VR_AIM_LASER_OFF, VR_AIM_LASER_BEAM, vr_aimLaser.GetInteger() );
 	frame.roomScale = vr_roomScale.GetBool();
+	frame.twoHanded = twoHanded;
+	frame.body = idMath::ClampInt( VR_BODY_OFF, VR_BODY_FULL, vr_body.GetInteger() );
 
 	if ( !frameShouldRender || !ResizeScreenSwapchain() || !AcquireImages() ) {
 		RecoverIfNeeded();

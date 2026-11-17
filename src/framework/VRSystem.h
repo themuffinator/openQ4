@@ -85,6 +85,8 @@ typedef struct vrFrameState_s {
 
 	int						aimLaser;		// vrAimLaser_t
 	bool					roomScale;		// the body walks after the head (vr_roomScale)
+	bool					twoHanded;		// the off hand holds the gun's foregrip (vr_twoHanded)
+	int						body;			// vrBody_t: the player's own body in the eyes (vr_body)
 } vrFrameState_t;
 
 // What the usercmd generator applies for one tic while VR drives input.
@@ -165,6 +167,12 @@ bool						VR_HasInputFocus( void );
 
 ===============================================================================
 */
+
+// The heading of a tracked pose in its own space, in degrees: where a head or
+// a body faces, steady even while it points at the floor (VR_HeadingDegrees).
+ID_INLINE float VR_PoseHeading( const vrPose_t &pose ) {
+	return VR_HeadingDegrees( VR_Vec3( pose.axis[0].x, pose.axis[0].y, pose.axis[0].z ), VR_Vec3( pose.axis[2].x, pose.axis[2].y, pose.axis[2].z ) );
+}
 
 ID_INLINE idMat3 VR_TrackingAxis( float trackingYaw ) {
 	return idAngles( 0.0f, trackingYaw, 0.0f ).ToMat3();
@@ -423,5 +431,7 @@ ID_INLINE void VR_DrawComfortVignette( const renderView_t &view, float strength,
 	}
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 }
+
+#include "VRBody.h"
 
 #endif /* !__VRSYSTEM_H__ */

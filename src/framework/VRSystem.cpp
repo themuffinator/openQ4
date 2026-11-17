@@ -21,9 +21,9 @@
 #include "VRSystemLocal.h"
 
 idCVar vr_enable( "vr_enable", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
-	"play in virtual reality through the system's OpenXR runtime (OpenGL or Vulkan renderer); applies on vr_restart" );
+	"play in virtual reality through the system's OpenXR runtime (OpenGL or Vulkan renderer); takes effect at once" );
 idCVar vr_renderScale( "vr_renderScale", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
-	"multiplier on the headset's recommended per-eye resolution; applies on vr_restart", 0.5f, 2.0f );
+	"multiplier on the headset's recommended per-eye resolution; the headset session restarts to apply it", 0.5f, 2.0f );
 idCVar vr_worldScale( "vr_worldScale", "39.37", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"game units per real-world metre", 20.0f, 80.0f );
 idCVar vr_aimMode( "vr_aimMode", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
@@ -55,11 +55,11 @@ idCVar vr_screenWidth( "vr_screenWidth", "3.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVA
 idCVar vr_mirror( "vr_mirror", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
 	"desktop window while in VR: 0 = black, 1 = left eye, 2 = virtual screen", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar vr_weaponOffsetX( "vr_weaponOffsetX", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
-	"moves the held view weapon along the controller's aim, in game units (0 holds it by its own grip)" );
+	"moves the held view weapon along the controller's aim, in game units (0 holds it by its own grip)", -40.0f, 40.0f );
 idCVar vr_weaponOffsetY( "vr_weaponOffsetY", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
-	"moves the held view weapon to the controller's left, in game units" );
+	"moves the held view weapon to the controller's left, in game units", -40.0f, 40.0f );
 idCVar vr_weaponOffsetZ( "vr_weaponOffsetZ", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
-	"moves the held view weapon up, in game units" );
+	"moves the held view weapon up, in game units", -40.0f, 40.0f );
 idCVar vr_weaponPitch( "vr_weaponPitch", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"view weapon pitch relative to the controller's aim, in degrees (positive tilts down)", -60.0f, 60.0f );
 idCVar vr_comfortVignette( "vr_comfortVignette", "0.5", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
@@ -78,6 +78,10 @@ idCVar vr_hapticStrength( "vr_hapticStrength", "1", CVAR_SYSTEM | CVAR_ARCHIVE |
 	"controller vibration strength, from 0 (off) to 1", 0.0f, 1.0f );
 idCVar vr_aimLaser( "vr_aimLaser", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
 	"while aiming with the controller: 0 = no marker, 1 = a dot where the shot lands, 2 = the dot and a laser beam", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar vr_body( "vr_body", "2", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
+	"your own body in the headset: 0 none, 1 legs and torso, 2 legs, torso and arms that reach your hands", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar vr_bodyAhead( "vr_bodyAhead", "0", CVAR_SYSTEM | CVAR_FLOAT,
+	"developer aid: draws your body this many game units ahead of you instead of under you, so its pose can be looked at", 0.0f, 400.0f );
 idCVar vr_playSpace( "vr_playSpace", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
 	"0 = standing when the headset knows your floor, else seated; 1 = seated, heights from where you recentred; "
 	"2 = standing, heights from the floor (seated when the runtime knows no floor)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );

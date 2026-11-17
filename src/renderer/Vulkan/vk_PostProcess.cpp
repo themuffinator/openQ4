@@ -2351,6 +2351,12 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 		VK_Post_ResetMotionBlurHistory();
 		return false;
 	}
+	// A headset's eyes are two views a frame with one camera history between
+	// them, and a head turn smeared across a lens is what no headset wants.
+	if ( viewDef != NULL && viewDef->renderView.asymmetricFov ) {
+		VK_Post_ResetMotionBlurHistory();
+		return false;
+	}
 	if ( r_skipPostProcess.GetBool() ) {
 		if ( VK_Post_IsMainMotionBlurView( viewDef ) ) {
 			VK_Post_MotionBlurRecordDisabled( "r_skipPostProcess" );

@@ -53,6 +53,7 @@ idPlayerView::idPlayerView() {
 
 // openQ4 BEGIN
 	liquidViewAmount = 0.0f;
+	liquidWashAmount = 0.0f;
 	liquidViewContents = 0;
 	vrComfort = 0.0f;
 	vrComfortYaw = 0.0f;
@@ -909,7 +910,7 @@ A full screen tint in the colour of whatever the player is swimming in, the way 
 games shade the view underwater. Drawn over the world but under the HUD.
 ===================
 */
-void idPlayerView::LiquidOverlay( int liquidContents ) {
+void idPlayerView::LiquidOverlay( int liquidContents, bool drawWash ) {
 	// Ease in and out rather than snapping. Breaking the surface is fast in life but a hard cut
 	// between two very different images reads as a glitch, so give it about a sixth of a second.
 	const float target = liquidContents ? 1.0f : 0.0f;
@@ -949,10 +950,26 @@ void idPlayerView::LiquidOverlay( int liquidContents ) {
 	// Hand the state to the renderer. It answers false when it cannot draw the effect - the Vulkan
 	// module has no arbitrary GLSL, and the pass can be switched off with r_underwater - in which
 	// case fall back to a flat wash so the player still knows they are under something.
+	liquidWashAmount = 0.0f;
 	if ( renderSystem->SetUnderwaterView( amount, filterTint, fogDistance ) ) {
 		return;
 	}
+	liquidWashAmount = amount;
+	if ( drawWash ) {
+		LiquidWash();
+	}
+}
 
+/*
+===================
+idPlayerView::LiquidWash
+
+The flat wash that stands in for the underwater pass, over whatever is being
+drawn: the window, or each of a headset's eyes in turn.
+===================
+*/
+void idPlayerView::LiquidWash( void ) {
+	const float amount = liquidWashAmount;
 	if ( amount <= 0.0f ) {
 		return;
 	}
@@ -1100,6 +1117,8 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 		}
 		renderView_t eyeView = *view;
 		VR_BuildEyeView( vrFrame, eye, eyeOrigin, trackingYaw, eyeView );
+		// the eye as the lens shows it, whatever a weapon's zoom magnifies
+		const renderView_t lensView = eyeView;
 		if ( zoomScale < 1.0f ) {
 			eyeView.fovTanLeft *= zoomScale;
 			eyeView.fovTanRight *= zoomScale;
@@ -1112,7 +1131,9 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 		gameLocal.SelectTemporalHistorySlot( eye );
 		SingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );
 		gameLocal.SelectTemporalHistorySlot( 0 );
-		VR_DrawComfortVignette( eyeView, vignette, vignetteMaterial );
+		// the flat wash that stands in for the underwater pass belongs in the eyes
+		LiquidWash();
+		VR_DrawComfortVignette( lensView, vignette, vignetteMaterial );
 		if ( drawAimMarker ) {
 			VR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );
 		}
@@ -1151,7 +1172,8 @@ float idPlayerView::VRComfortVignette( const vrFrameState_t &vrFrame, float trac
 	vrComfortTime = now;
 	const rvVehicle *vehicle = player->IsInVehicle() ? player->GetVehicleController().GetVehicle() : NULL;
 	const idPhysics *motion = vehicle != NULL ? vehicle->GetPhysics() : player->GetPhysics();
-	const float target = setting > 0.0f ? VR_ComfortMotion( motion->GetLinearVelocity().Length(), turnRate ) : 0.0f;
+	// a paused game moves nobody: the speed it stopped at would hold the edges dark
+	const float target = ( setting > 0.0f && !gameLocal.IsPresentationMenuPaused() ) ? VR_ComfortMotion( motion->GetLinearVelocity().Length(), turnRate ) : 0.0f;
 	vrComfort = VR_ComfortEase( vrComfort, target, seconds );
 	return vrComfort * setting;
 }
@@ -1256,14 +1278,20 @@ void idPlayerView::RenderPlayerView( idUserInterface *hud, bool menuPaused ) {
 	soundSystem->PlaceListener( view->vieworg, view->viewaxis, player->entityNumber + 1, gameLocal.time, "Undefined" );
 
 // openQ4 BEGIN
-	const int eyeLiquidContents = LiquidAtEye( view );
-
 	// a headset presents first-person gameplay in stereo
 	vrFrameState_t vrFrame;
 	float vrTrackingYaw = 0.0f;
-	if ( player->GetVRView( vrFrame, vrTrackingYaw ) && vrFrame.stereo ) {
+	const bool vrStereo = player->GetVRView( vrFrame, vrTrackingYaw ) && vrFrame.stereo;
+	// the eye that is under water is the tracked head, wherever the body's own eye is
+	renderView_t liquidView = *view;
+	if ( vrStereo ) {
+		player->GetVRHeadOrigin( liquidView.vieworg );
+	}
+	const int eyeLiquidContents = LiquidAtEye( &liquidView );
+
+	if ( vrStereo ) {
 		pauseSceneValid = false;
-		LiquidOverlay( eyeLiquidContents );
+		LiquidOverlay( eyeLiquidContents, false );
 		VRView( hud, view, vrFrame, vrTrackingYaw );
 		return;
 	}

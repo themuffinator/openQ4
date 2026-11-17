@@ -314,6 +314,10 @@ public:
 	// openQ4 VR: how the view model holds its gun at true scale: the barrel's
 	// direction and the point the right hand grips, in model space.
 	void				GetVRHold					( idVec3 &barrel, idVec3 &grip ) const;
+	// openQ4 VR: this draw's view model joints with its arms meeting the
+	// body the headset shows (vr_body); NULL to draw the model as it is.
+	const idJointMat *	PoseVRArms					( const idJointMat *joints, int numJoints, const idVec3 &origin, const idMat3 &axis, int &hideSurfaces );
+	bool				VROffHandBusy				( void ) const;
 
 	// Script state management
 	struct weaponStateFlags_s {
@@ -478,6 +482,18 @@ protected:
 	mutable bool					vrHoldKnown;
 	mutable idVec3					vrHoldBarrel;
 	mutable idVec3					vrHoldGrip;
+	// openQ4 VR: the view model's own arms, measured with the hold (VRBody.h):
+	// the support hand's and the weapon hand's, the weapon hand's wrist in the
+	// hold, and the surfaces the arms are drawn by
+	mutable bool					vrArmsValid;
+	mutable vrViewArm_t				vrArms[ 2 ];
+	mutable idVec3					vrHoldWristOrigin;
+	mutable idMat3					vrHoldWristAxis;
+	mutable int						vrArmSurfaces;
+	idJointMat *					vrArmJoints;		// this draw's posed joints
+	int								vrArmJointCount;
+	float							vrOffHandFree;		// 0 on the gun as animated, 1 with its controller
+	int								vrOffHandTime;
 
 	rvStateThread					stateThread;
 	int								animDoneTime[ANIM_NumAnimChannels];

@@ -208,6 +208,9 @@ rvWeaponGauntlet::Attack
 ================
 */
 void rvWeaponGauntlet::Attack ( void ) {
+	// openQ4 VR: the blade buzzes in the weapon hand while it spins
+	owner->VRVibrate( true, false, 0.3f, 50 );
+
 	trace_t		tr;
 	idEntity*	ent;
 	// openQ4: the gauntlet traces itself instead of going through idGameLocal::HitScan, so it

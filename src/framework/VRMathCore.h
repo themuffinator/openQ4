@@ -177,6 +177,46 @@ inline float VR_PitchDegrees( const vrVec3_t &forward ) {
 	return -std::atan2( forward.z, horizontal ) * VR_RAD2DEG;
 }
 
+// The heading of a tracked head or controller, from its forward and up axes.
+// A forward axis gives it while it has a horizontal part to speak of. Near
+// the vertical that part shrinks to nothing and its yaw to noise, flipping
+// half a turn as the axis crosses the vertical, so there the up axis takes
+// over: a controller pointing at the floor heads where its top faces, and
+// one pointing at the sky where its underside does. Between about 65 and 85
+// degrees of pitch the two blend, so the heading never jumps. It is where a
+// body faces, not where a shot goes: an aim keeps its forward axis's own yaw.
+inline float VR_HeadingDegrees( const vrVec3_t &forward, const vrVec3_t &up ) {
+	const float steep = std::fabs( forward.z );
+	float blend = ( steep - 0.906f ) / ( 0.996f - 0.906f );
+	blend = blend < 0.0f ? 0.0f : ( blend > 1.0f ? 1.0f : blend );
+	blend = blend * blend * ( 3.0f - 2.0f * blend );
+	float fx = forward.x, fy = forward.y;
+	const float flat = std::sqrt( fx * fx + fy * fy );
+	if ( flat > 1e-5f ) {
+		fx /= flat;
+		fy /= flat;
+	} else {
+		fx = fy = 0.0f;
+		blend = 1.0f;
+	}
+	const float sign = forward.z < 0.0f ? 1.0f : -1.0f;
+	float ux = up.x * sign, uy = up.y * sign;
+	const float upFlat = std::sqrt( ux * ux + uy * uy );
+	if ( upFlat > 1e-5f ) {
+		ux /= upFlat;
+		uy /= upFlat;
+	} else {
+		ux = uy = 0.0f;
+		blend = 0.0f;
+	}
+	const float x = fx * ( 1.0f - blend ) + ux * blend;
+	const float y = fy * ( 1.0f - blend ) + uy * blend;
+	if ( x == 0.0f && y == 0.0f ) {
+		return 0.0f;
+	}
+	return std::atan2( y, x ) * VR_RAD2DEG;
+}
+
 // Yaw of the direction an orientation faces, in engine degrees.
 inline float VR_QuatYawDegrees( const vrQuat_t &engineOrientation ) {
 	return VR_YawDegrees( VR_RotateVector( engineOrientation, VR_Vec3( 1.0f, 0.0f, 0.0f ) ) );
@@ -474,6 +514,8 @@ inline vrPlaySpaceChoice_t VR_ChoosePlaySpace( int mode, bool haveStage, bool ha
 // The plausible range of a standing eye height, in metres.
 static const float VR_STANDING_HEIGHT_MIN = 0.8f;
 static const float VR_STANDING_HEIGHT_MAX = 2.3f;
+// The lowest head a standing eye height is learned from.
+static const float VR_STANDING_LEARN_MIN = 1.0f;
 
 /*
 ====================
@@ -483,8 +525,10 @@ The height, in the base space's metres, that the game's standing eye stands
 for. Head-relative play (no floor) takes the head's height at the recentre.
 Standing play takes the calibrated standing eye height (vr_standingHeight);
 an uncalibrated one (outside the plausible range, 0 by default) is learned
-from the head at this recentre, clamped to the plausible range, and *learned
-reports that the caller should store it.
+from the head at this recentre, and *learned reports that the caller should
+store it. A head below a metre is nobody standing: a headset on a desk, or
+a player still sitting down. That recentre stands where the head is, as
+seated play does, and leaves the height to be learned by a later one.
 ====================
 */
 inline float VR_StandingReference( bool standing, float headHeight, float calibrated, bool &learned ) {
@@ -495,9 +539,11 @@ inline float VR_StandingReference( bool standing, float headHeight, float calibr
 	if ( calibrated >= VR_STANDING_HEIGHT_MIN && calibrated <= VR_STANDING_HEIGHT_MAX ) {
 		return calibrated;
 	}
+	if ( !( headHeight >= VR_STANDING_LEARN_MIN ) ) {
+		return headHeight;
+	}
 	learned = true;
-	return headHeight < VR_STANDING_HEIGHT_MIN ? VR_STANDING_HEIGHT_MIN
-		: headHeight > VR_STANDING_HEIGHT_MAX ? VR_STANDING_HEIGHT_MAX : headHeight;
+	return headHeight > VR_STANDING_HEIGHT_MAX ? VR_STANDING_HEIGHT_MAX : headHeight;
 }
 
 /*
@@ -728,6 +774,148 @@ inline int VR_PerformanceSettingsLevel( int choice ) {
 		case 3: return 50;
 		default: return -1;
 	}
+}
+
+/*
+====================
+The player's own body (vr_body)
+
+The headset shows the player a body under the tracked head: a torso that
+hangs from the neck, legs that reach the floor and arms that reach the hands.
+The pieces below are the geometry of it, free of any model.
+====================
+*/
+
+// How a limb of two bones reaches from start to end. joint is where the
+// bones meet (the elbow or knee), on the side pole points to. A target
+// farther than both bones stretches the first one: the joint stays the second
+// bone's length from the end, so whatever is fixed to the end (a hand on a
+// gun, a foot on the floor) keeps its place. A target nearer than the bones'
+// difference folds the limb as far as it goes.
+struct vrTwoBone_t {
+	vrVec3_t joint;
+	bool reached;		// false when the limb had to stretch or could not fold
+};
+
+inline vrTwoBone_t VR_SolveTwoBone( const vrVec3_t &start, const vrVec3_t &end, const vrVec3_t &pole, float length0, float length1 ) {
+	vrTwoBone_t result;
+	result.reached = true;
+	vrVec3_t along = VR_Sub( end, start );
+	float distance = VR_Length( along );
+	if ( !( distance > 1e-4f ) || !std::isfinite( distance ) ) {
+		// start and end coincide: fold along the pole
+		const float poleLength = VR_Length( pole );
+		const vrVec3_t direction = poleLength > 1e-6f ? VR_Scale( pole, 1.0f / poleLength ) : VR_Vec3( 0.0f, 0.0f, -1.0f );
+		result.joint = VR_Add( end, VR_Scale( direction, length1 ) );
+		result.reached = false;
+		return result;
+	}
+	along = VR_Scale( along, 1.0f / distance );
+	if ( distance >= length0 + length1 ) {
+		result.joint = VR_Sub( end, VR_Scale( along, length1 ) );
+		result.reached = distance <= length0 + length1 + 1e-3f;
+		return result;
+	}
+	const float folded = std::fabs( length0 - length1 );
+	float reach = distance;
+	if ( reach < folded + 1e-3f ) {
+		reach = folded + 1e-3f;
+		result.reached = false;
+	}
+	// the joint lies on the circle both bones' spheres share
+	const float a = ( length0 * length0 - length1 * length1 + reach * reach ) / ( 2.0f * reach );
+	const float heightSquared = length0 * length0 - a * a;
+	const float height = heightSquared > 0.0f ? std::sqrt( heightSquared ) : 0.0f;
+	vrVec3_t bend = VR_Sub( pole, VR_Scale( along, VR_Dot( pole, along ) ) );
+	float bendLength = VR_Length( bend );
+	if ( bendLength < 1e-4f ) {
+		// the pole runs along the limb: any side will do, so take the one nearest straight down
+		bend = VR_Sub( VR_Vec3( 0.0f, 0.0f, -1.0f ), VR_Scale( along, -along.z ) );
+		bendLength = VR_Length( bend );
+		if ( bendLength < 1e-4f ) {
+			bend = VR_Vec3( 1.0f, 0.0f, 0.0f );
+			bendLength = 1.0f;
+		}
+	}
+	bend = VR_Scale( bend, 1.0f / bendLength );
+	// measured from the end when the limb could not fold far enough, so the end keeps its place
+	if ( result.reached ) {
+		result.joint = VR_Add( VR_Add( start, VR_Scale( along, a ) ), VR_Scale( bend, height ) );
+	} else {
+		result.joint = VR_Add( VR_Sub( end, VR_Scale( along, reach - a ) ), VR_Scale( bend, height ) );
+	}
+	return result;
+}
+
+// The torso's heading after the head's. A neck turns freely to either side;
+// beyond freeDegrees the torso comes round with the head. While the player
+// walks, the torso lines up with the head at alignDegreesPerSecond, as a
+// walking body faces where it goes.
+inline float VR_BodyYawFollow( float bodyYaw, float headYaw, float freeDegrees, float alignDegreesPerSecond, float seconds ) {
+	if ( !std::isfinite( bodyYaw ) || !std::isfinite( headYaw ) ) {
+		return 0.0f;
+	}
+	float delta = VR_NormalizeDegrees180( headYaw - bodyYaw );
+	if ( delta > freeDegrees ) {
+		bodyYaw += delta - freeDegrees;
+		delta = freeDegrees;
+	} else if ( delta < -freeDegrees ) {
+		bodyYaw += delta + freeDegrees;
+		delta = -freeDegrees;
+	}
+	if ( alignDegreesPerSecond > 0.0f && seconds > 0.0f ) {
+		const float step = alignDegreesPerSecond * seconds;
+		if ( std::fabs( delta ) <= step ) {
+			bodyYaw += delta;
+		} else {
+			bodyYaw += delta > 0.0f ? step : -step;
+		}
+	}
+	return VR_NormalizeDegrees180( bodyYaw );
+}
+
+// Where the neck turns, from the tracked head (the point between the eyes
+// and its forward and up axes): the eyes sit ahead of and above the top of
+// the spine, so a head that looks down swings forward over a chest that
+// stays where it was.
+const float VR_NECK_BEHIND_EYES_METRES = 0.08f;
+const float VR_NECK_BELOW_EYES_METRES = 0.075f;
+// How far behind the neck it hangs from the body is drawn, in metres, from
+// the head's forward axis. Without a head on its shoulders, a body exactly
+// under the eyes shows the player the inside of its own collar, and a chest
+// in armour reaches further forward than the eyes above it, so a look
+// straight down met the chest plate and never the feet. The body therefore
+// stands a little back, and eases further back as the head tips from about
+// 25 to 65 degrees down, where a look down finds a chest, a belt and feet.
+const float VR_BODY_SETBACK_METRES = 0.10f;
+const float VR_BODY_SETBACK_DOWN_METRES = 0.26f;
+
+inline float VR_BodySetback( const vrVec3_t &headForward ) {
+	float down = ( -headForward.z - 0.42f ) / ( 0.90f - 0.42f );
+	if ( !std::isfinite( down ) || down < 0.0f ) {
+		down = 0.0f;
+	} else if ( down > 1.0f ) {
+		down = 1.0f;
+	}
+	down = down * down * ( 3.0f - 2.0f * down );
+	return VR_BODY_SETBACK_METRES + ( VR_BODY_SETBACK_DOWN_METRES - VR_BODY_SETBACK_METRES ) * down;
+}
+
+inline vrVec3_t VR_NeckFromHead( const vrVec3_t &head, const vrVec3_t &forward, const vrVec3_t &up, float unitsPerMetre ) {
+	return VR_Sub( VR_Sub( head, VR_Scale( forward, VR_NECK_BEHIND_EYES_METRES * unitsPerMetre ) ),
+		VR_Scale( up, VR_NECK_BELOW_EYES_METRES * unitsPerMetre ) );
+}
+
+// The scale that brings a character model's eyes to the game's eye height.
+// Quake 4's marine stands taller than the camera that plays him; drawn full
+// size under a headset he would have to squat to fit beneath the player's
+// eyes. modelEyeHeight is the model's own eye height above its feet.
+inline float VR_BodyScale( float eyeHeight, float modelEyeHeight ) {
+	if ( !( eyeHeight > 0.0f ) || !( modelEyeHeight > 0.0f ) ) {
+		return 1.0f;
+	}
+	const float scale = eyeHeight / modelEyeHeight;
+	return scale < 0.6f ? 0.6f : ( scale > 1.2f ? 1.2f : scale );
 }
 
 #endif /* !__VR_MATH_CORE_H__ */

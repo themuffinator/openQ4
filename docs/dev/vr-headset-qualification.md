@@ -68,6 +68,12 @@ here: it waits on the AND-05 distribution decision.
 | 3.6 | Cycle every weapon, including the Awakening weapons in `q4xbase`. | Every gun sits in the hand at full size, gripped where its own model holds it. |
 | 3.7 | Aim at a mark with the controller tilted well down, then in turn: click the weapon-hand stick, load a quick save, leave a vehicle, and sit through a cutscene. Fire at the mark after each. In multiplayer, repeat after a respawn and a teleporter. | Shots keep landing on the laser dot; it never ends up a fixed angle above or below them. |
 | 3.8 | Squeeze the off-hand grip away from the gun, turn the weapon hand towards a weapon on the wheel and let go. | The wheel highlights the weapon you point towards and switches to it. |
+| 3.9 | Hold the gun close to your chest, at arm's length, overhead and across your body. Watch the weapon arm. | A forearm and an upper arm join your shoulder to the hand on the grip at every reach, bending at the elbow; no gap, kink or stray second forearm. |
+| 3.10 | Move the off hand about freely, then squeeze its grip on the foregrip, release, and reload. | The off hand follows its controller; it goes to the gun for the two-handed grip and for the reload, and comes back without a snap. |
+| 3.11 | Cycle every weapon, including the Awakening weapons in `q4xbase`, looking at both arms. | Every gun keeps both arms attached; a gun whose model has no arms of its own shows the character's own hands instead. |
+| 3.12 | Switch **Weapon Hand** to left and look at both hands. | The character's own (simpler) hands hold the gun and follow the right controller; no modelled right hand sits on a left arm. |
+| 3.13 | Put the gun hand behind a door frame, a crate and a wall corner. | The gun is hidden by what the hand is behind, at the depth both eyes agree on. |
+| 3.14 | On Valve Index controllers, hold both controllers normally without squeezing. | No weapon switch, no weapon wheel and no two-handed grip until you squeeze. |
 
 ## 4. Body, space and movement (VR-02, VR-03)
 
@@ -81,6 +87,12 @@ here: it waits on the AND-05 distribution decision.
 | 4.6 | Walk with the stick (both **Walk Direction** settings), snap-turn and smooth-turn. | Movement follows the chosen direction; turning is comfortable; the comfort vignette darkens only while the stick moves or turns you. |
 | 4.7 | In multiplayer, walk in the room and around the arena with a flat client watching. | The flat client sees you move once (no doubled movement) and your own view does not correct back. |
 | 4.8 | With room scale on, take a few slow steps about the room, in single player and in multiplayer, watching a nearby edge. | The view glides with your head while the character follows: no shimmer or step back each moment, and in multiplayer the comfort vignette stays open. |
+| 4.9 | Look down at yourself standing, then at your feet. | A chest, belt, legs and feet stand under you at your own size, feet on the floor where yours are; looking down does not show the inside of the collar. |
+| 4.10 | Glance left and right, then turn your whole body, then walk with the stick while looking sideways. | The body stays put for a glance, comes round when you turn, and faces the way you walk; it never follows the gun hand. |
+| 4.11 | Bend your knees slowly into a full crouch and stand again. | The knees bend with you and the feet stay planted; the chest never rises into view or sinks through the floor. |
+| 4.12 | Stand 30 cm to one side of where you recentred and snap-turn several times; repeat with smooth turning. | The world turns about your head: no sideways slide with each turn. |
+| 4.13 | Start VR with the headset lying on the desk, then put it on and hold the weapon-hand stick in for a second. | The view is at your character's height and facing forwards after the hold (the controllers buzz); `vr_standingHeight` did not take a height from the desk. |
+| 4.14 | With the gun hanging at your side pointing well off to one side, start a level, load a save and step through a teleporter. | You face the way the level intends each time, whatever the hand does. |
 
 ## 5. Vehicles, cinematics and transitions (VR-02)
 

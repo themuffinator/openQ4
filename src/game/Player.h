@@ -441,6 +441,26 @@ public:
 	// sample carries what it has not covered yet. Draw-only: never saved.
 	idVec3					vrRoomScaleStep;
 	int						vrRoomScaleStepTime;
+	// openQ4 VR: the body the player sees in the headset (vr_body, VRBody.h): a
+	// second render entity of the player model, drawn in the player's own view
+	// only and posed on every draw from the tracked head and hands
+	vrBodyRig_t				vrBodyRig;
+	const idRenderModel *	vrBodyRigModel;		// the model the rig and rest pose were read from
+	idJointMat *			vrBodyRest;			// its rest pose
+	idJointMat *			vrBodyJoints;		// this draw's pose
+	int						vrBodyDefHandle;
+	float					vrBodyYaw;			// the torso's heading in the tracking space
+	int						vrBodyYawTime;		// when it last followed the head, -1 before
+	// this draw
+	bool					vrBodyPosed;		// BeginVRBody posed the trunk
+	int						vrBodyMode;			// vrBody_t
+	float					vrBodyScale;
+	idVec3					vrBodyOrigin;
+	idMat3					vrBodyAxis;
+	bool					vrBodyViewArm[ VR_NUM_HANDS ];	// the view weapon draws this arm's forearm and hand
+	idVec3					vrBodyElbow[ VR_NUM_HANDS ];	// in the body's own space
+	idVec3					vrBodyWrist[ VR_NUM_HANDS ];
+
 	bool					presentationCanInterpolate;
 	idVec3					presentationPrevViewOrigin;
 	idMat3					presentationPrevViewAxis;
@@ -643,6 +663,21 @@ public:
 	float					VRZoomScale( void );
 	// A pulse in the local player's weapon hand, other hand, or both.
 	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const;
+	// The body in the headset (vr_body). BeginVRBody poses the trunk and legs
+	// for this draw; the view weapon then asks where each of its forearms
+	// meets the body (SolveVRViewArm); FinishVRBody poses the arms and submits
+	// the body. All three run on every draw, never in a tic.
+	void					BeginVRBody( void );
+	bool					SolveVRViewArm( int hand, const idVec3 &wrist, float forearmLength, idVec3 &elbow );
+	void					FinishVRBody( void );
+	void					FreeVRBody( void );
+	// True while this draw's body has arms for the view weapon to meet.
+	bool					VRBodyHasArms( void ) const { return vrBodyPosed && vrBodyMode == VR_BODY_FULL; }
+	// A controller in the world as this draw shows it: the palm, and the axes
+	// it aims along. False when it is not tracked.
+	bool					GetVRHandPose( int hand, idVec3 &palm, idMat3 &aimAxis ) const;
+	// The tracked head in the world this tic. False outside a headset view.
+	bool					GetVRHeadOrigin( idVec3 &origin ) const;
  	void					OffsetThirdPersonView( float angle, float range, float height, bool clip );
 // RAVEN BEGIN
 // jnewquist: option to avoid clipping against world

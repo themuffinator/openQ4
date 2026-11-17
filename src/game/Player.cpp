@@ -1258,6 +1258,23 @@ idPlayer::idPlayer() {
 	vrVehicleSeatPending = false;
 	vrRoomScaleStep.Zero();
 	vrRoomScaleStepTime = -1;
+	memset( &vrBodyRig, 0, sizeof( vrBodyRig ) );
+	vrBodyRigModel = NULL;
+	vrBodyRest = NULL;
+	vrBodyJoints = NULL;
+	vrBodyDefHandle = -1;
+	vrBodyYaw = 0.0f;
+	vrBodyYawTime = -1;
+	vrBodyPosed = false;
+	vrBodyMode = VR_BODY_OFF;
+	vrBodyScale = 1.0f;
+	vrBodyOrigin.Zero();
+	vrBodyAxis.Identity();
+	for ( int vrHand = 0; vrHand < VR_NUM_HANDS; vrHand++ ) {
+		vrBodyViewArm[ vrHand ] = false;
+		vrBodyElbow[ vrHand ].Zero();
+		vrBodyWrist[ vrHand ].Zero();
+	}
 	memset( &usercmd, 0, sizeof( usercmd ) );
 
 	alreadyDidTeamAnnouncerSound = false;
@@ -2416,6 +2433,13 @@ Release any resources used by the player.
 ==============
 */
 idPlayer::~idPlayer() {
+	FreeVRBody();
+	if ( vrBodyRest != NULL ) {
+		Mem_Free16( vrBodyRest );
+	}
+	if ( vrBodyJoints != NULL ) {
+		Mem_Free16( vrBodyJoints );
+	}
 	FreeWeaponWheelGui();
 	FreeStatusBar();
 	if( gameLocal.mpGame.GetGameState() ) {
@@ -2751,6 +2775,8 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->ReadAngles( cmdAngles );
 
  	memset( usercmd.angles, 0, sizeof( usercmd.angles ) );
+	// openQ4 VR: with its angles cleared the saved command aims nothing, tracked or not
+	usercmd.buttons &= ~BUTTON_VRAIM;
 	SetViewAngles( viewAngles );
 	spawnAnglesSet = true;
 	// openQ4 VR: a restored seat faces the vehicle's eye, as boarding does
@@ -7686,8 +7712,11 @@ void idPlayer::UpdateFocus( void ) {
 	// openQ4 VR: the weapon hand points at world GUIs, characters and usable
 	// things from where it aims, so a GUI's cursor lands where the laser does
 	// rather than a forearm away from it (single player; multiplayer keeps the
-	// eye, which the server can trace)
-	GetVRAimOrigin( start );
+	// eye, which the server can trace). Aimed by the head, they answer the
+	// tracked head, where the crosshair is drawn from.
+	if ( !GetVRAimOrigin( start ) ) {
+		GetVRHeadOrigin( start );
+	}
 	end = start + viewAngles.ToForward() * 768.0f;
 
  	// player identification -> names to the hud
@@ -8771,6 +8800,23 @@ idPlayer::SetViewAngles
 void idPlayer::SetViewAngles( const idAngles &angles ) {
 	UpdateDeltaViewAngles(angles);
 	viewAngles = angles;
+	// openQ4 VR: a facing is the head's. The usercmd turns with the weapon hand,
+	// so the facing above points the gun where the player was meant to look,
+	// wherever the hand happens to hang: a teleporter could leave the player
+	// facing a wall with the gun at their side. Turn the tracking space by the
+	// angle between hand and head as well, and the head faces there.
+	if ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 && vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) {
+		vrFrameState_t frame;
+		vrSystem->GetFrameState( frame );
+		const vrPose_t &aim = frame.aim[ frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT ];
+		if ( frame.active && frame.aimMode == VR_AIM_HAND && frame.head.valid && aim.valid ) {
+			const float handFromHead = idMath::AngleNormalize180( aim.axis[0].ToYaw() - VR_PoseHeading( frame.head ) );
+			idAngles delta = deltaViewAngles;
+			delta.yaw = idMath::AngleNormalize180( delta.yaw + handFromHead );
+			SetDeltaViewAngles( delta );
+			viewAngles.yaw = idMath::AngleNormalize180( viewAngles.yaw + handFromHead );
+		}
+	}
 }
 
 /*
@@ -8863,7 +8909,12 @@ void idPlayer::UpdateViewAngles( void ) {
 	if ( !noclip && ( gameLocal.inCinematic || privateCameraView || gameLocal.GetCamera() || influenceActive == INFLUENCE_LEVEL2 ) ) {
 		// no view changes at all, but we still want to update the deltas or else when
 		// we get out of this mode, our view will snap to a kind of random angle
-		UpdateDeltaViewAngles( viewAngles );
+		// openQ4 VR: a headset's view is where the head is. Holding the delta
+		// against the weapon hand would turn the tracked world by however far
+		// the hand moved meanwhile, so it stays as it is.
+		if ( !( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) ) {
+			UpdateDeltaViewAngles( viewAngles );
+		}
 		return;
 	}
 
@@ -12784,7 +12835,8 @@ bool idPlayer::GetVRView( vrFrameState_t &frame, float &trackingYaw ) const {
 	// cinematics, cameras and third person play flat on the virtual screen,
 	// and so do vehicles while vr_vehicleStereo is off
 	if ( gameLocal.inCinematic || gameLocal.GetCamera() != NULL || privateCameraView != NULL
-			|| pm_thirdPerson.GetBool() || ( IsInVehicle() && !cvarSystem->GetCVarBool( "vr_vehicleStereo" ) ) ) {
+			|| pm_thirdPerson.GetBool() || ( health <= 0 && pm_thirdPersonDeath.GetBool() )
+			|| ( IsInVehicle() && !cvarSystem->GetCVarBool( "vr_vehicleStereo" ) ) ) {
 		return false;
 	}
 	vrSystem->GetFrameState( frame );
@@ -12906,8 +12958,11 @@ bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 			marker.muzzle = start;
 		}
 	} else {
-		// a holstered or hidden weapon has nothing to aim, and a focused world GUI shows its own cursor
-		if ( weapon == NULL || weapon->IsHidden() || !weapon->ShowCrosshair() || focusType == FOCUS_GUI ) {
+		// A focused world GUI shows its own cursor, and a weapon without a
+		// crosshair marks nothing. With the weapon away the hand still
+		// points, at who to talk to and what to use, so its mark stays.
+		const bool armed = weapon != NULL && !weapon->IsHidden();
+		if ( focusType == FOCUS_GUI || ( armed && !weapon->ShowCrosshair() ) ) {
 			return false;
 		}
 		vrPose_t pose = aim;
@@ -12920,7 +12975,7 @@ bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 		const idVec3 start = trace.fraction < 1.0f ? eyeOrigin + ( trace.endpos - eyeOrigin ) * 0.9f : handOrigin;
 		gameLocal.TracePoint( this, trace, start, start + handAxis[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, this );
 		// a beam leaves the drawn weapon's muzzle, or the hand without one
-		if ( !weapon->GetVRMuzzle( marker.muzzle ) ) {
+		if ( !armed || !weapon->GetVRMuzzle( marker.muzzle ) ) {
 			marker.muzzle = handOrigin;
 		}
 	}
@@ -13184,7 +13239,9 @@ made lowers the view as on a flat screen, until the body stands again.
 ===============
 */
 float idPlayer::VRCrouchLift( const vrFrameState_t &frame ) const {
-	if ( usercmd.upmove < 0 ) {
+	// a button pressed while the head itself is down changes nothing the player
+	// sees; latching it dropped the view a second time until they stood up
+	if ( usercmd.upmove < 0 && ( usercmd.buttons & BUTTON_VRCROUCH ) == 0 ) {
 		vrButtonCrouch = true;
 	} else if ( EyeHeight() >= pm_normalviewheight.GetFloat() - 0.5f ) {
 		vrButtonCrouch = false;
@@ -13220,6 +13277,312 @@ void idPlayer::VRVibrate( bool weaponHand, bool otherHand, float amplitude, int 
 	}
 	if ( otherHand ) {
 		vrSystem->Vibrate( hand == VR_HAND_LEFT ? VR_HAND_RIGHT : VR_HAND_LEFT, amplitude, durationMsec );
+	}
+}
+
+/*
+===============
+idPlayer::GetVRHeadOrigin
+
+openQ4 VR: where the tracked head is in the world this tic, the point the
+eyes are drawn about. The body's own eye stays under the tracking origin; a
+head that leans, ducks or crouches is somewhere else, and whatever belongs
+to the eyes (a shot aimed by the head, the water line) belongs there.
+False, and origin untouched, outside a headset view.
+===============
+*/
+bool idPlayer::GetVRHeadOrigin( idVec3 &origin ) const {
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( !GetVRView( frame, trackingYaw ) || !frame.head.valid ) {
+		return false;
+	}
+	idVec3 eyeOrigin = firstPersonViewOrigin;
+	eyeOrigin.z += VRCrouchLift( frame );
+	vrPose_t head = frame.head;
+	head.origin += VR_HeadOffsetCorrection( frame );
+	idMat3 headAxis;
+	VR_PoseToWorld( head, eyeOrigin, trackingYaw, origin, headAxis );
+	return true;
+}
+
+/*
+===============
+idPlayer::GetVRHandPose
+
+openQ4 VR: a controller placed in the world the way this draw places the view
+weapon (GetVRWeaponTransform), so whatever is drawn in a hand meets the gun.
+===============
+*/
+bool idPlayer::GetVRHandPose( int hand, idVec3 &palm, idMat3 &aimAxis ) const {
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( hand < 0 || hand >= VR_NUM_HANDS || !GetVRView( frame, trackingYaw ) || !frame.aim[ hand ].valid ) {
+		return false;
+	}
+	idVec3 eyeOrigin;
+	idMat3 eyeAxis;
+	GetPresentationViewPos( eyeOrigin, eyeAxis );
+	eyeOrigin.z += VRCrouchLift( frame );
+	const idVec3 correction = VR_HeadOffsetCorrection( frame );
+	vrPose_t pose = frame.aim[ hand ];
+	pose.origin += correction;
+	VR_PoseToWorld( pose, eyeOrigin, trackingYaw, palm, aimAxis );
+	if ( frame.grip[ hand ].valid ) {
+		pose = frame.grip[ hand ];
+		pose.origin += correction;
+		idMat3 gripAxis;
+		VR_PoseToWorld( pose, eyeOrigin, trackingYaw, palm, gripAxis );
+	}
+	return true;
+}
+
+/*
+===============
+idPlayer::FreeVRBody
+===============
+*/
+void idPlayer::FreeVRBody( void ) {
+	vrBodyPosed = false;
+	if ( vrBodyDefHandle != -1 ) {
+		if ( gameRenderWorld != NULL ) {
+			gameRenderWorld->FreeEntityDef( vrBodyDefHandle );
+		}
+		vrBodyDefHandle = -1;
+	}
+}
+
+/*
+===============
+idPlayer::BeginVRBody
+
+openQ4 VR: the trunk and legs of the body the headset shows the player
+(vr_body, VRBody.h), posed for this draw. The body stands on the floor under
+the tracked head, its neck where the head's own neck would be, and faces
+where the torso does: after the head, as far as a neck turns freely, and
+round with the tracking space when the stick turns the player.
+===============
+*/
+void idPlayer::BeginVRBody( void ) {
+	vrBodyPosed = false;
+	vrBodyViewArm[ VR_HAND_LEFT ] = vrBodyViewArm[ VR_HAND_RIGHT ] = false;
+
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( !GetVRView( frame, trackingYaw ) || !frame.stereo || frame.body == VR_BODY_OFF || !frame.head.valid
+			|| health <= 0 || spectating || IsInVehicle() || IsHidden() || renderEntity.hModel == NULL ) {
+		FreeVRBody();
+		vrBodyYawTime = -1;
+		return;
+	}
+
+	// the joints the body is posed by, and the model's rest pose
+	const idRenderModel *model = animator.ModelHandle();
+	const idDeclModelDef *modelDef = animator.ModelDef();
+	const int numJoints = animator.NumJoints();
+	if ( model == NULL || modelDef == NULL || numJoints <= 0 ) {
+		FreeVRBody();
+		return;
+	}
+	if ( model != vrBodyRigModel ) {
+		vrBodyRigModel = model;
+		if ( vrBodyRest != NULL ) {
+			Mem_Free16( vrBodyRest );
+			vrBodyRest = NULL;
+		}
+		if ( vrBodyJoints != NULL ) {
+			Mem_Free16( vrBodyJoints );
+			vrBodyJoints = NULL;
+		}
+		memset( &vrBodyRig, 0, sizeof( vrBodyRig ) );
+		vrBodyRig.pelvis = animator.GetJointHandle( "body" );
+		vrBodyRig.neck = animator.GetJointHandle( "head_channel" );
+		static const char *sides[ VR_NUM_HANDS ] = { "l", "r" };
+		for ( int side = 0; side < VR_NUM_HANDS; side++ ) {
+			vrBodyRig.upperArm[ side ] = animator.GetJointHandle( va( "%s_up_arm", sides[ side ] ) );
+			vrBodyRig.elbow[ side ] = animator.GetJointHandle( va( "%s_elbo", sides[ side ] ) );
+			vrBodyRig.forearm[ side ] = animator.GetJointHandle( va( "%s_forarm", sides[ side ] ) );
+			vrBodyRig.wrist[ side ] = animator.GetJointHandle( va( "%s_wrist", sides[ side ] ) );
+			vrBodyRig.index[ side ] = animator.GetJointHandle( va( "%s_index_01", sides[ side ] ) );
+			vrBodyRig.ring[ side ] = animator.GetJointHandle( va( "%s_ring_01", sides[ side ] ) );
+			vrBodyRig.upperLeg[ side ] = animator.GetJointHandle( va( "%s_upleg", sides[ side ] ) );
+			vrBodyRig.lowerLeg[ side ] = animator.GetJointHandle( va( "%s_loleg", sides[ side ] ) );
+			vrBodyRig.ankle[ side ] = animator.GetJointHandle( va( "%s_ankle", sides[ side ] ) );
+		}
+		const int restAnim = animator.GetAnim( "af_pose" );
+		const idAnim *rest = restAnim ? animator.GetAnim( restAnim ) : NULL;
+		const idMD5Anim *md5 = rest != NULL ? rest->MD5Anim( 0 ) : NULL;
+		if ( md5 != NULL && numJoints == model->NumJoints() && numJoints == md5->NumJoints() ) {
+			vrBodyRig.numJoints = numJoints;
+			vrBodyRest = ( idJointMat * )Mem_Alloc16( numJoints * sizeof( vrBodyRest[0] ), MA_ANIM );
+			vrBodyJoints = ( idJointMat * )Mem_Alloc16( numJoints * sizeof( vrBodyJoints[0] ), MA_ANIM );
+			gameEdit->ANIM_CreateAnimFrame( model, md5, numJoints, vrBodyRest, 0, modelDef->GetVisualOffset(), animator.RemoveOrigin() );
+		}
+		if ( !VRBody_RigValid( vrBodyRig ) ) {
+			gameLocal.DPrintf( "VR body: '%s' lacks the joints or the rest pose it is posed by; none is drawn\n", modelDef->GetName() );
+		}
+	}
+	if ( !VRBody_RigValid( vrBodyRig ) || vrBodyRig.numJoints != numJoints || vrBodyRest == NULL || vrBodyJoints == NULL ) {
+		FreeVRBody();
+		return;
+	}
+
+	// this tic's animation carries the feet
+	animator.CreateFrame( gameLocal.time, false );
+	int animatedCount = 0;
+	idJointMat *animated = NULL;
+	animator.GetJoints( &animatedCount, &animated );
+	if ( animated == NULL || animatedCount != numJoints ) {
+		FreeVRBody();
+		return;
+	}
+
+	// the head as this draw's eyes show it
+	idVec3 eyeOrigin;
+	idMat3 eyeAxis;
+	GetPresentationViewPos( eyeOrigin, eyeAxis );
+	const float floorHeight = eyeOrigin.z - EyeHeight();
+	eyeOrigin.z += VRCrouchLift( frame );
+	vrPose_t head = frame.head;
+	head.origin += VR_HeadOffsetCorrection( frame );
+	idVec3 headOrigin;
+	idMat3 headAxis;
+	VR_PoseToWorld( head, eyeOrigin, trackingYaw, headOrigin, headAxis );
+	const vrVec3_t neckPoint = VR_NeckFromHead( VR_Vec3( headOrigin.x, headOrigin.y, headOrigin.z ),
+		VR_Vec3( headAxis[0].x, headAxis[0].y, headAxis[0].z ), VR_Vec3( headAxis[2].x, headAxis[2].y, headAxis[2].z ), frame.unitsPerMetre );
+
+	// The torso's heading is kept in the tracking space, which the stick's
+	// turns carry round with the player. The head's heading is taken from its
+	// forward and up together, so it holds while the player looks at their feet.
+	const float headYaw = VR_PoseHeading( frame.head );
+	const int now = Sys_Milliseconds();
+	if ( vrBodyYawTime < 0 || now - vrBodyYawTime > 500 ) {
+		vrBodyYaw = headYaw;
+	} else {
+		const idVec3 &velocity = physicsObj.GetLinearVelocity();
+		const bool walking = velocity.ToVec2().LengthSqr() > Square( 20.0f );
+		vrBodyYaw = VR_BodyYawFollow( vrBodyYaw, headYaw, 55.0f, walking ? 240.0f : 0.0f, ( now - vrBodyYawTime ) * 0.001f );
+	}
+	vrBodyYawTime = now;
+
+	// The arms reach for hands that hold something: aimed by the head, the gun
+	// rides with the view as on a flat screen, foreshortened and nowhere near
+	// a controller, and keeps the forearms it has there.
+	vrBodyMode = ( frame.body == VR_BODY_FULL && frame.aimMode != VR_AIM_HAND ) ? VR_BODY_TORSO : frame.body;
+	vrBodyScale = VR_BodyScale( pm_normalviewheight.GetFloat() - VR_NECK_BELOW_EYES_METRES * frame.unitsPerMetre,
+		vrBodyRest[ vrBodyRig.neck ].ToVec3().z );
+	vrBodyAxis = VR_TrackingAxis( trackingYaw + vrBodyYaw );
+	const idVec3 restNeck = vrBodyRest[ vrBodyRig.neck ].ToVec3() * vrBodyScale;
+	vrBodyOrigin.Set( neckPoint.x, neckPoint.y, floorHeight );
+	const float setback = VR_BodySetback( VR_Vec3( headAxis[0].x, headAxis[0].y, headAxis[0].z ) ) * frame.unitsPerMetre;
+	vrBodyOrigin -= idVec3( restNeck.x + setback, restNeck.y, 0.0f ) * vrBodyAxis;
+
+	VRBody_PoseTrunk( vrBodyRig, modelDef->JointParents(), vrBodyRest, animated, vrBodyScale, neckPoint.z - floorHeight, vrBodyJoints );
+	vrBodyPosed = true;
+}
+
+/*
+===============
+idPlayer::SolveVRViewArm
+
+openQ4 VR: the view weapon draws this arm's forearm and hand, with its wrist
+at the given place in the world and a forearm of the given length. Returns
+where the body's elbow meets it. hand is the body's arm (vrHand_t).
+===============
+*/
+bool idPlayer::SolveVRViewArm( int hand, const idVec3 &wrist, float forearmLength, idVec3 &elbow ) {
+	if ( !VRBodyHasArms() || hand < 0 || hand >= VR_NUM_HANDS ) {
+		return false;
+	}
+	const idMat3 toBody = vrBodyAxis.Transpose();
+	vrBodyWrist[ hand ] = ( wrist - vrBodyOrigin ) * toBody;
+	vrBodyElbow[ hand ] = VRBody_Elbow( vrBodyRig, vrBodyRest, vrBodyJoints, vrBodyScale, hand, vrBodyWrist[ hand ], forearmLength );
+	vrBodyViewArm[ hand ] = true;
+	elbow = vrBodyOrigin + vrBodyElbow[ hand ] * vrBodyAxis;
+	return true;
+}
+
+/*
+===============
+idPlayer::FinishVRBody
+
+openQ4 VR: the body's arms, and the body itself into the scene. An arm whose
+forearm the view weapon draws ends at its elbow; any other reaches for its
+controller with the model's own forearm and hand, or hangs at the side while
+the controller is not tracked.
+===============
+*/
+void idPlayer::FinishVRBody( void ) {
+	if ( !vrBodyPosed ) {
+		return;
+	}
+	const int *parents = animator.ModelDef()->JointParents();
+	const idMat3 toBody = vrBodyAxis.Transpose();
+	for ( int hand = 0; hand < VR_NUM_HANDS; hand++ ) {
+		if ( vrBodyMode != VR_BODY_FULL ) {
+			VRBody_FoldArm( vrBodyRig, parents, hand, vrBodyJoints );
+			continue;
+		}
+		if ( vrBodyViewArm[ hand ] ) {
+			VRBody_PoseUpperArm( vrBodyRig, parents, vrBodyRest, vrBodyScale, hand, vrBodyElbow[ hand ], vrBodyWrist[ hand ], true, vrBodyJoints );
+			continue;
+		}
+		const float forearmLength = VRBody_ForearmLength( vrBodyRig, vrBodyRest, vrBodyScale, hand );
+		idVec3 palm;
+		idMat3 aimAxis;
+		idVec3 fingers, thumbSide, wrist;
+		if ( GetVRHandPose( hand, palm, aimAxis ) ) {
+			fingers = aimAxis[0] * toBody;
+			thumbSide = aimAxis[2] * toBody;
+			wrist = ( palm - vrBodyOrigin ) * toBody - fingers * VRBody_PalmFromWrist( vrBodyRig, vrBodyRest, vrBodyScale, hand );
+		} else {
+			// at the side, palm in, a little short of straight
+			const idVec3 shoulder = vrBodyJoints[ vrBodyRig.upperArm[ hand ] ].ToVec3();
+			const float upperLength = ( vrBodyRest[ vrBodyRig.elbow[ hand ] ].ToVec3() - vrBodyRest[ vrBodyRig.upperArm[ hand ] ].ToVec3() ).Length() * vrBodyScale;
+			fingers.Set( 0.25f, 0.0f, -1.0f );
+			fingers.Normalize();
+			thumbSide.Set( 1.0f, 0.0f, 0.0f );
+			wrist = shoulder + fingers * ( ( upperLength + forearmLength ) * 0.96f ) + idVec3( 0.0f, hand == VR_HAND_LEFT ? 1.5f : -1.5f, 0.0f );
+		}
+		const idVec3 elbow = VRBody_Elbow( vrBodyRig, vrBodyRest, vrBodyJoints, vrBodyScale, hand, wrist, forearmLength );
+		// a hand out of reach stays on its arm
+		idVec3 along = wrist - elbow;
+		along.Normalize();
+		wrist = elbow + along * forearmLength;
+		VRBody_PoseUpperArm( vrBodyRig, parents, vrBodyRest, vrBodyScale, hand, elbow, wrist, false, vrBodyJoints );
+		VRBody_PoseHand( vrBodyRig, parents, vrBodyRest, vrBodyScale, hand, wrist, fingers, thumbSide, vrBodyJoints );
+	}
+
+	// the player's own view only; the model everyone else sees, mirrors
+	// included, still casts the shadow
+	renderEntity_t body = renderEntity;
+	body.callback = NULL;
+	body.joints = vrBodyJoints;
+	body.numJoints = vrBodyRig.numJoints;
+	body.origin = vrBodyOrigin;
+	body.axis = vrBodyAxis;
+	// vr_bodyAhead stands the body a few steps ahead, to look its pose over
+	body.origin += vrBodyAxis[0] * cvarSystem->GetCVarFloat( "vr_bodyAhead" );
+	body.suppressSurfaceInViewID = 0;
+	body.allowSurfaceInViewID = entityNumber + 1;
+	body.suppressShadowInViewID = 0;
+	body.noShadow = true;
+	body.noSelfShadow = true;
+	body.weaponDepthHackInViewID = 0;
+	body.overlayShader = NULL;
+	if ( !body.hModel->BoundsFromJoints( vrBodyJoints, body.bounds ) ) {
+		body.bounds = renderEntity.bounds;
+	}
+	if ( vrBodyDefHandle == -1 ) {
+		vrBodyDefHandle = gameRenderWorld->AddEntityDef( &body );
+	} else {
+		gameRenderWorld->UpdateEntityDef( vrBodyDefHandle, &body );
+	}
+
+	if ( cvarSystem->GetCVarInteger( "vr_debug" ) >= 2 ) {
+		const idVec3 neck = vrBodyOrigin + vrBodyJoints[ vrBodyRig.neck ].ToVec3() * vrBodyAxis;
+		common->Printf( "VR body neck (%s) yaw %.1f scale %.3f arms %d %d\n", neck.ToString( 2 ), vrBodyAxis[0].ToYaw(), vrBodyScale,
+			vrBodyViewArm[ VR_HAND_LEFT ] ? 1 : 0, vrBodyViewArm[ VR_HAND_RIGHT ] ? 1 : 0 );
 	}
 }
 

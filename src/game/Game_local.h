@@ -859,6 +859,8 @@ public:
 	void					RecordPresentationClockSample( void );
 	int						GetPresentationTimeMsec( void ) const;
 	int						GetPresentationAnimationTimeMsec( void ) const { return presentationAnimationTime; }
+	// True while this draw shows a single-player game stopped behind a menu.
+	bool					IsPresentationMenuPaused( void ) const { return presentationMenuPaused; }
 	bool					IsPresentationSceneActive( void ) const { return presentationClockSample >= 0.0f; }
 	void					NotePresentationGameplay( const char *what );
 	void					NotePresentationEffect( void );

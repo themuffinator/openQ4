@@ -4142,6 +4142,13 @@ static void RB_STD_MotionBlur( void ) {
 		RB_ResetMotionBlurHistory();
 		return;
 	}
+	// A headset's eyes are two views a frame with one camera history between
+	// them: an eye would blur by the distance to the other one, and a head
+	// turn smeared across a lens is the last thing a headset wants.
+	if ( backEnd.viewDef != NULL && backEnd.viewDef->renderView.asymmetricFov ) {
+		RB_ResetMotionBlurHistory();
+		return;
+	}
 	if ( r_skipPostProcess.GetBool() || !glConfig.GLSLProgramAvailable ) {
 		if ( RB_IsMainMotionBlurView() ) {
 			RB_MotionBlurRecordDisabled( r_skipPostProcess.GetBool() ? "r_skipPostProcess" : "no GLSL programs" );

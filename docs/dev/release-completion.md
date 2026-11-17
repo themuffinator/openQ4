@@ -7,6 +7,39 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Your own body in VR, and a headset audit, 17 November 2026
+
+- **Look down and you are there.** In the headset you now have a chest, legs
+  and feet standing where you stand, and arms from your shoulders to your
+  hands. The body turns with your torso instead of your gun, and its knees
+  bend when you duck or crouch.
+- **Hands that do what yours do.** Your weapon hand stays on the gun's grip
+  with the arm bending to reach it. Your other hand follows its controller,
+  and returns to the gun for the two-handed grip and for reloads.
+- **A gun that sits in the world.** A gun in your hand is hidden by whatever
+  your hand is behind, instead of always being drawn on top.
+- **Easier to get comfortable.** Hold the weapon-hand stick in for a second to
+  recentre. openQ4 also recentres when your headset first hands it the
+  controllers and at the start of each level, and no longer learns your height
+  from a headset lying on the desk. Turns pivot about your head.
+- **Facing the right way.** Levels, loaded saves and teleporters leave you
+  facing where the game intends, wherever your gun hand hangs, and a cinematic
+  no longer leaves the world turned.
+- **Valve Index.** Holding the controllers no longer switches weapons or opens
+  the weapon wheel; the grip takes a squeeze.
+- **Also fixed.** Head-aimed shots leave from your head; the comfort vignette
+  holds while zoomed and clears when paused; the lightning gun and gauntlet
+  vibrate; the flashlight keeps up with the gun; controls let go when the
+  headset's software stops the session.
+- **What to do.** Replace the client and both game modules together (game
+  module API 59). `vr_body 1` shows legs and torso only, `vr_body 0` none; the
+  setting is console-only for now. Everything here has been checked on
+  openQ4's simulated headset only: please report how it sits on a real one.
+- Details: [VR guide](../user/vr.md#your-body),
+  [design and evidence](platform-recovery-review.md#the-players-own-body-in-the-headset-17-november-2026),
+  [headset checklist](vr-headset-qualification.md) rows 3.9-3.14 and 4.9-4.14,
+  and the roadmap's VR-02 entry for the audit leads left open.
+
 ## The Awakening's Trianthinide facility squad scenes, 17 November 2026
 
 - **Gray dies where the Retch lands.** After the generator lift, Corporal Gray

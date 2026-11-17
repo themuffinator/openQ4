@@ -379,7 +379,8 @@ void rvViewWeapon::PresentWeapon( bool showViewModel ) {
 	renderEntity.allowSurfaceInViewID = weapon->GetOwner()->entityNumber + 1;
 
 	// crunch the depth range so it never pokes into walls this breaks the machine gun gui
-	renderEntity.weaponDepthHackInViewID = weapon->GetOwner()->entityNumber + 1;
+	// openQ4 VR: a gun in the hand is where the hand is, behind what the hand is behind
+	renderEntity.weaponDepthHackInViewID = weapon->GetOwner()->IsVRHandAiming() ? 0 : weapon->GetOwner()->entityNumber + 1;
 
 	weapon->Think();
 
@@ -425,7 +426,7 @@ void rvViewWeapon::UpdatePresentationWeapon( bool showViewModel ) {
 	}
 
 	renderEntity.allowSurfaceInViewID = owner->entityNumber + 1;
-	renderEntity.weaponDepthHackInViewID = owner->entityNumber + 1;
+	renderEntity.weaponDepthHackInViewID = owner->IsVRHandAiming() ? 0 : owner->entityNumber + 1;
 
 	const idVec3 authoritativeOrigin = GetPhysics()->GetOrigin();
 	const idMat3 authoritativeAxis = GetPhysics()->GetAxis();
@@ -475,6 +476,25 @@ void rvViewWeapon::UpdatePresentationModel( void ) {
 	} else {
 		presentationRenderEntity.axis = weapon->ForeshortenAxis( GetPhysics()->GetAxis() );
 		presentationRenderEntity.origin = GetPhysics()->GetOrigin();
+	}
+
+	// openQ4 VR: the arms meet the body the headset shows (vr_body)
+	if ( presentationAnimator != NULL && weapon->GetOwner() != NULL && weapon->GetOwner()->VRBodyHasArms() ) {
+		int armJointCount = presentationRenderEntity.numJoints;
+		idJointMat *armJoints = hasPresentationJoints ? presentationRenderEntity.joints : NULL;
+		if ( armJoints == NULL ) {
+			presentationAnimator->CreateFrame( gameLocal.time, false );
+			presentationAnimator->GetJoints( &armJointCount, &armJoints );
+		}
+		int hideSurfaces = 0;
+		const idJointMat *posed = weapon->PoseVRArms( armJoints, armJointCount, presentationRenderEntity.origin, presentationRenderEntity.axis, hideSurfaces );
+		presentationRenderEntity.suppressSurfaceMask |= hideSurfaces;
+		if ( posed != NULL ) {
+			presentationRenderEntity.callback = NULL;
+			presentationRenderEntity.numJoints = armJointCount;
+			presentationRenderEntity.joints = const_cast<idJointMat *>( posed );
+			presentationRenderEntity.hModel->BoundsFromJoints( posed, presentationRenderEntity.bounds );
+		}
 	}
 
 	presentationPoseHeld = true;
@@ -665,6 +685,12 @@ rvWeapon::rvWeapon ( void ) {
 	
 	forceGUIReload = false;
 	vrHoldKnown = false;
+	vrArmsValid = false;
+	vrArmSurfaces = 0;
+	vrArmJoints = NULL;
+	vrArmJointCount = 0;
+	vrOffHandFree = 0.0f;
+	vrOffHandTime = 0;
 	ResetPresentationViewModelState();
 }
 
@@ -674,6 +700,10 @@ rvWeapon::~rvWeapon
 ================
 */
 rvWeapon::~rvWeapon( void ) {
+	if ( vrArmJoints != NULL ) {
+		Mem_Free16( vrArmJoints );
+		vrArmJoints = NULL;
+	}
 	if ( zoomGui && zoomGui->IsUniqued() ) uiManager->DeAlloc( zoomGui );
 	int i;
 	
@@ -1431,6 +1461,8 @@ void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip ) const {
 		vrHoldKnown = true;
 		vrHoldBarrel = barrel;
 		vrHoldGrip = grip;
+		vrArmsValid = false;
+		vrArmSurfaces = 0;
 		const idRenderModel *model = viewAnimator->ModelHandle();
 		const int idleAnim = viewAnimator->GetAnim( "idle" );
 		const idAnim *idle = idleAnim ? viewAnimator->GetAnim( idleAnim ) : NULL;
@@ -1445,6 +1477,50 @@ void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip ) const {
 			gameEdit->ANIM_CreateAnimFrame( model, md5, numJoints, joints, 0,
 				viewAnimator->ModelDef()->GetVisualOffset(), viewAnimator->RemoveOrigin() );
 			vrHoldGrip = ( joints[ wrist ].ToVec3() + joints[ knuckle ].ToVec3() ) * 0.5f;
+			vrHoldWristOrigin = joints[ wrist ].ToVec3();
+			vrHoldWristAxis = joints[ wrist ].ToMat3();
+			// The arms every stock view model carries: the left forearm hangs from
+			// its elbow end ("lft_shldr") by a joint halfway ("lft_elbo"); the right
+			// is its mirror image on "rt_elbo" alone, its joints' first axis reversed.
+			const jointHandle_t leftWrist = viewAnimator->GetJointHandle( "lft_wrst" );
+			const jointHandle_t leftForearm = viewAnimator->GetJointHandle( "lft_elbo" );
+			const jointHandle_t leftElbow = viewAnimator->GetJointHandle( "lft_shldr" );
+			const jointHandle_t rightForearm = viewAnimator->GetJointHandle( "rt_elbo" );
+			const int *parents = viewAnimator->ModelDef()->JointParents();
+			const idJointQuat *pose = model->GetDefaultPose();
+			if ( pose != NULL && parents != NULL && leftWrist != INVALID_JOINT && leftForearm != INVALID_JOINT && leftElbow != INVALID_JOINT
+					&& rightForearm != INVALID_JOINT && parents[ leftForearm ] == leftElbow ) {
+				// The model's rest pose in its own space. Some guns hang the left wrist
+				// on the gun itself and let the forearm follow it, so nothing is read
+				// from one arm joint's place under another.
+				idMat3 restAxis[ 3 ];
+				idVec3 restOrigin[ 3 ];
+				const int restJoints[ 3 ] = { leftForearm, leftElbow, leftWrist };
+				for ( int i = 0; i < 3; i++ ) {
+					restAxis[ i ] = pose[ restJoints[ i ] ].q.ToMat3();
+					restOrigin[ i ] = pose[ restJoints[ i ] ].t;
+					for ( int parent = parents[ restJoints[ i ] ]; parent >= 0; parent = parents[ parent ] ) {
+						const idMat3 parentAxis = pose[ parent ].q.ToMat3();
+						restOrigin[ i ] = pose[ parent ].t + restOrigin[ i ] * parentAxis;
+						restAxis[ i ] = restAxis[ i ] * parentAxis;
+					}
+				}
+				const idMat3 fromForearm = restAxis[ 0 ].Transpose();
+				vrArms[ 0 ].wrist = leftWrist;
+				vrArms[ 0 ].forearm = leftForearm;
+				vrArms[ 0 ].elbow = leftElbow;
+				vrArms[ 0 ].elbowAxisLocal = restAxis[ 1 ] * fromForearm;
+				vrArms[ 0 ].elbowLocal = ( restOrigin[ 1 ] - restOrigin[ 0 ] ) * fromForearm;
+				vrArms[ 0 ].length = ( restOrigin[ 2 ] - restOrigin[ 1 ] ).Length();
+				vrArms[ 1 ] = vrArms[ 0 ];
+				vrArms[ 1 ].wrist = wrist;
+				vrArms[ 1 ].forearm = rightForearm;
+				vrArms[ 1 ].elbow = INVALID_JOINT;
+				vrArms[ 1 ].elbowLocal.x = -vrArms[ 0 ].elbowLocal.x;
+				vrArmsValid = true;
+			}
+			vrArmSurfaces = model->GetSurfaceMask( "models/characters/marine/inview_arms" )
+				| model->GetSurfaceMask( "models/characters/marine/inview_arms_strogg" );
 			if ( flashJointView != INVALID_JOINT && flashJointView < numJoints ) {
 				idVec3 forward = joints[ flashJointView ].ToMat3()[ 0 ];
 				// a flash joint turned well away from the model's forward axis is no barrel
@@ -1458,6 +1534,129 @@ void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip ) const {
 	}
 	barrel = vrHoldBarrel;
 	grip = vrHoldGrip;
+}
+
+/*
+================
+rvWeapon::VROffHandBusy
+
+openQ4 VR: the support hand has work on the gun that the animation shows: a
+reload, drawing the gun or putting it away. It then stays where the animation
+puts it instead of following its controller.
+================
+*/
+bool rvWeapon::VROffHandBusy( void ) const {
+	return status != WP_READY && status != WP_OUTOFAMMO;
+}
+
+/*
+================
+rvWeapon::PoseVRArms
+
+openQ4 VR: this draw's view model joints with its arms meeting the body the
+headset shows (vr_body, VRBody.h). The weapon hand stays on the grip as
+animated; its forearm swings to the body's elbow. The support hand follows
+the other controller, held the way the weapon hand holds its own, and
+returns to the gun for the two-handed grip and for whatever the animation
+has it do. joints are the model's joints for this draw and origin and axis
+where it is drawn.
+
+Returns the joints to draw, or NULL to draw the model as it is; hideSurfaces
+gains the arm surfaces when the body's own arms take their place.
+================
+*/
+const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints, const idVec3 &origin, const idMat3 &axis, int &hideSurfaces ) {
+	if ( owner == NULL || joints == NULL || viewAnimator == NULL || !owner->VRBodyHasArms() ) {
+		return NULL;
+	}
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( !owner->GetVRView( frame, trackingYaw ) ) {
+		return NULL;
+	}
+	// the hold measures the arms with it
+	idVec3 barrel;
+	idVec3 grip;
+	GetVRHold( barrel, grip );
+	const int weaponHand = frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT;
+	const int offHand = weaponHand == VR_HAND_LEFT ? VR_HAND_RIGHT : VR_HAND_LEFT;
+	// The view model's arms are a right hand on the grip and a left hand in
+	// support. Held in the left hand they would be the wrong hands on the
+	// wrong arms, so there the body's own arms reach the controllers.
+	if ( weaponHand != VR_HAND_RIGHT ) {
+		hideSurfaces |= vrArmSurfaces;
+		return NULL;
+	}
+	if ( !vrArmsValid || numJoints != viewAnimator->NumJoints() ) {
+		return NULL;
+	}
+	if ( vrArmJoints == NULL || vrArmJointCount != numJoints ) {
+		if ( vrArmJoints != NULL ) {
+			Mem_Free16( vrArmJoints );
+		}
+		vrArmJoints = ( idJointMat * )Mem_Alloc16( numJoints * sizeof( vrArmJoints[0] ), MA_ANIM );
+		vrArmJointCount = numJoints;
+	}
+	memcpy( vrArmJoints, joints, numJoints * sizeof( vrArmJoints[0] ) );
+	const idMat3 toModel = axis.Transpose();
+	const int *parents = viewAnimator->ModelDef()->JointParents();
+
+	// the weapon hand
+	{
+		const vrViewArm_t &arm = vrArms[ 1 ];
+		idVec3 elbow;
+		if ( owner->SolveVRViewArm( weaponHand, origin + vrArmJoints[ arm.wrist ].ToVec3() * axis, arm.length, elbow ) ) {
+			VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );
+		}
+	}
+
+	// the support hand: on the gun, or with its controller
+	{
+		const vrViewArm_t &arm = vrArms[ 0 ];
+		idVec3 palm;
+		idMat3 aimAxis;
+		const bool tracked = owner->GetVRHandPose( offHand, palm, aimAxis );
+		const int now = Sys_Milliseconds();
+		const float seconds = vrOffHandTime > 0 ? idMath::ClampFloat( 0.0f, 0.1f, ( now - vrOffHandTime ) * 0.001f ) : 0.0f;
+		vrOffHandTime = now;
+		const float target = ( tracked && !frame.twoHanded && !VROffHandBusy() ) ? 1.0f : 0.0f;
+		vrOffHandFree += idMath::ClampFloat( -seconds * 6.0f, seconds * 6.0f, target - vrOffHandFree );
+		const float blend = vrOffHandFree * vrOffHandFree * ( 3.0f - 2.0f * vrOffHandFree );
+		if ( tracked && blend > 0.0f ) {
+			// The weapon hand's wrist against its own controller in the hold,
+			// mirrored left for right: the model turns onto the controller's
+			// axes by the turn that lays the barrel along the aim, and the left
+			// arm's joints are the right arm's with their first axis reversed.
+			const idMat3 toController = VRBody_Swing( barrel, idVec3( 1.0f, 0.0f, 0.0f ) );
+			idVec3 held = ( vrHoldWristOrigin - grip ) * toController;
+			idMat3 heldAxis = vrHoldWristAxis * toController;
+			held.y = -held.y;
+			for ( int i = 0; i < 3; i++ ) {
+				heldAxis[i].y = -heldAxis[i].y;
+			}
+			heldAxis[0] = -heldAxis[0];
+			const idVec3 freeOrigin = ( palm + held * aimAxis - origin ) * toModel;
+			const idMat3 freeAxis = heldAxis * aimAxis * toModel;
+
+			const idVec3 animatedOrigin = vrArmJoints[ arm.wrist ].ToVec3();
+			const idMat3 animatedAxis = vrArmJoints[ arm.wrist ].ToMat3();
+			idQuat turned;
+			turned.Slerp( animatedAxis.ToQuat(), freeAxis.ToQuat(), blend );
+			const idMat3 turn = animatedAxis.Transpose() * turned.ToMat3();
+			const idVec3 moved = animatedOrigin + ( freeOrigin - animatedOrigin ) * blend;
+			for ( int i = 0; i < numJoints; i++ ) {
+				if ( i == arm.wrist || i == arm.forearm || i == arm.elbow || VRBody_IsDescendant( parents, i, arm.wrist ) ) {
+					const idJointMat before = vrArmJoints[ i ];
+					VRBody_Carry( vrArmJoints[ i ], before, turn, animatedOrigin, moved );
+				}
+			}
+		}
+		idVec3 elbow;
+		if ( owner->SolveVRViewArm( offHand, origin + vrArmJoints[ arm.wrist ].ToVec3() * axis, arm.length, elbow ) ) {
+			VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );
+		}
+	}
+	return vrArmJoints;
 }
 
 /*
@@ -1509,10 +1708,8 @@ void rvWeapon::UpdatePresentationEffects( void ) {
 	// its tracked placement.
 	idVec3 vrOrigin;
 	idMat3 vrAxis;
-	if ( owner->GetVRWeaponTransform( vrOrigin, vrAxis, true ) ) {
-		return;
-	}
-	if ( lightHandles[ WPLIGHT_MUZZLEFLASH ] != -1 ) {
+	const bool vrHeld = owner->GetVRWeaponTransform( vrOrigin, vrAxis, true );
+	if ( !vrHeld && lightHandles[ WPLIGHT_MUZZLEFLASH ] != -1 ) {
 		idVec3 eyeOrigin;
 		idMat3 eyeAxis;
 		GetPresentationEye( eyeOrigin, eyeAxis );
@@ -1566,8 +1763,12 @@ void rvWeapon::Think ( void ) {
 		playerViewOrigin = owner->firstPersonViewOrigin;
 		playerViewAxis = owner->firstPersonViewAxis;
 		// openQ4 VR: shots leave the tracked weapon hand along its aim, which
-		// the usercmd angles already carry
-		owner->GetVRAimOrigin( playerViewOrigin );
+		// the usercmd angles already carry. Aimed by the head, they leave the
+		// tracked head, where the crosshair is drawn from: from the body's own
+		// eye a shot over cover the player had ducked behind hit the cover.
+		if ( !owner->GetVRAimOrigin( playerViewOrigin ) ) {
+			owner->GetVRHeadOrigin( playerViewOrigin );
+		}
 		CalculateViewModelTransform( playerViewOrigin, playerViewAxis, viewModelOrigin, viewModelAxis );
 		owner->GetVRWeaponTransform( viewModelOrigin, viewModelAxis, false );
 		UpdatePresentationViewModelState( playerViewOrigin, playerViewAxis, viewModelOrigin, viewModelAxis );

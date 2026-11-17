@@ -737,7 +737,9 @@ extern rvGameLog *				gameLog;
 // 57: idDict carries a mutation observer; rebuild all modules sharing dictionaries.
 // 58: idGame server-demo baselines for MVD keyframes; idNetworkSystem appends
 //     structured MVD markers.
-const int GAME_API_VERSION		= 58;
+// 59: vrFrameState_t appends twoHanded and body (the player's own body in a
+//     headset, vr_body); idVRSystem::GetFrameState fills the caller's copy.
+const int GAME_API_VERSION		= 59;
 
 struct gameImport_t {
 

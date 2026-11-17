@@ -170,6 +170,8 @@ public:
     bool focusLost=false,spaceChangePending=true;
     XrDuration frameDisplayPeriod=11111111;
     bool inputValid=true,bodyYawValid=true,twoHanded=true,runtimeStopped=false;
+    bool bodyYawFromHead=false,bodyYawResetPending=true,recenterHeld=true;
+    int recenterHoldMsec=1;
     bool pointerOnScreen=false,physicalCrouch=false,roomScaleWalking=false,roomScaleStickIdle=true;
     bool aimLocalValid[2]={};
     int hands[2]={};
@@ -184,7 +186,7 @@ public:
     bool Check(XrResult,const char*);
     bool CheckFrame(XrResult,const char*);
     bool RecoverIfNeeded();
-    void DestroySession(); void DestroyInstance(); void ReleaseRendererImages();
+    void DestroySession(); void DestroyInstance(); void ReleaseRendererImages(); void ReleaseInput();
     bool CreateSwapchain(swapchain_t&,int,int);
     void DestroySwapchain(swapchain_t&);
     bool ResizeScreenSwapchain(); bool AcquireImages(); void ReleaseImages();
@@ -228,6 +230,9 @@ void run(const std::string& test) {
         app.heldKeys[0]=4;app.heldKeys[5]=7;
         app.DestroySession(); app.DestroySession();
         assert(!app.pointerOnScreen && !app.physicalCrouch && !app.roomScaleWalking);
+        // a closed session leaves nothing held and takes its next facing from the head
+        assert(!app.inputValid && !app.twoHanded && !app.recenterHeld && app.recenterHoldMsec==0);
+        assert(!app.bodyYawValid && app.bodyYawFromHead && !app.bodyYawResetPending);
         assert(app.moveForward==0 && app.moveRight==0 && app.hands[0]==0 && !app.aimLocalValid[0]);
         assert(pointerLeaves==1 && keyReleases==2);
     } else if(test=="wait_loss" || test=="wait_timeout" || test=="wait_error") {
@@ -315,7 +320,7 @@ CASES = ("normal", "teardown", "input_teardown", "partial_acquire", "wait_loss",
 
 def source() -> str:
     code = (ROOT / "src/sys/openxr/OpenXRSystem.cpp").read_text(encoding="utf-8")
-    methods = ["bool Check", "void DestroySession", "void ReleaseRendererImages", "void DestroyInstance", "bool CreateSwapchain",
+    methods = ["bool Check", "void DestroySession", "void ReleaseInput", "void ReleaseRendererImages", "void DestroyInstance", "bool CreateSwapchain",
                "void DestroySwapchain", "bool ResizeScreenSwapchain", "bool AcquireImages", "void ReleaseImages"]
     result = SUPPORT
     for method in methods:

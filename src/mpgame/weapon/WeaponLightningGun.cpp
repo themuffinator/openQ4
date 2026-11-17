@@ -367,6 +367,9 @@ void rvWeaponLightningGun::Think ( void ) {
 	
 	MuzzleFlash();
 
+	// openQ4 VR: the beam hums in the weapon hand while it burns
+	owner->VRVibrate( true, false, 0.35f, 50 );
+
 	// Inflict damage on all targets being attacked
 	if ( !gameLocal.isClient && gameLocal.time >= nextAttackTime ) {
 		int    i;

@@ -92,6 +92,7 @@ you can rebind them in **Settings → Controls** like any gamepad button.
 | Off-hand grip | Weapon wheel, or hold the gun in both hands | Previous tab |
 | Weapon-hand grip | Last weapon | Next tab |
 | Off-hand stick click | Run / walk | - |
+| Weapon-hand stick click, held for a second | Recentre (**not in 0.14.1**) | - |
 | Menu button | Menu | Close menu |
 
 The weapon hand is the right hand. Set `vr_leftHanded 1` to hold the weapon in
@@ -116,6 +117,18 @@ pointing at, so it stays sharp near or far. It dims when something between you
 and the target hides it. Set `vr_aimMode 0` to aim with your head instead; the
 HUD crosshair only shows when you aim with your head.
 
+**Not in 0.14.1:**
+
+- The gun is where your hand is: put your hand behind a door frame or a crate
+  and the gun is hidden behind it, instead of being drawn over everything.
+- In single player the dot stays while your weapon is put away, as a pointer
+  for the people you can talk to and the things you can use.
+- Aimed by your head, shots leave from where your head really is, so you can
+  duck behind cover and shoot over it the way it looks.
+- A level, a loaded save or a teleporter leaves you *facing* the way the game
+  intends, wherever your gun hand hangs; they used to point the gun that way
+  instead, which could start you facing a wall.
+
 To steady a gun, hold it in both hands: put your off hand in front of your
 weapon hand, where a rifle's foregrip would be, and squeeze its grip. The
 off-hand controller buzzes briefly, and the gun then points from your rear hand
@@ -128,7 +141,8 @@ railgun: your whole view magnifies as the scope would, and the laser dot is
 your crosshair. Keep zooming short if magnified head movement makes you uneasy.
 
 The controllers vibrate: your weapon hand with every shot, and both hands when
-you are hit, harder for bigger hits.
+you are hit, harder for bigger hits. **Not in 0.14.1:** the lightning gun's
+beam and the gauntlet's blade hum in your hand too.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -138,12 +152,52 @@ you are hit, harder for bigger hits.
 | `vr_hapticStrength` | 1 | vibration strength, from 0 (off) to 1 (full) |
 | `vr_leftHanded` | 0 | 1 holds the weapon in your left hand |
 
+### Your body
+
+> **Not in 0.14.1.** It arrives in the next release.
+
+Look down and you see yourself: a chest, legs and feet standing where you
+stand, and arms that run from your shoulders to your hands.
+
+- Your body turns with your torso, not with your gun. Glance over your
+  shoulder and it stays put; turn further, or walk, and it comes round with
+  you.
+- Duck, lean or crouch in your room and your knees bend to follow, with your
+  feet on the floor.
+- Your weapon hand stays on the gun's grip, and your arm bends at the elbow to
+  reach it wherever you hold it.
+- Your other hand follows its own controller. It goes back to the gun when you
+  take the two-handed grip, and while the gun needs it: to reload, and to draw
+  a weapon or put it away.
+- With no weapon in your hands, both hands follow their controllers.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `vr_body` | 2 | 2 legs, torso and arms that reach your hands; 1 legs and torso only, with the gun's forearms floating as before; 0 no body |
+
+Good to know:
+
+- The arms need controller aiming (`vr_aimMode 1`). When you aim with your head
+  the gun rides with your view as on a flat screen, and you get the legs and
+  torso only.
+- The guns are modelled for a right hand on the grip. If you hold the weapon in
+  your left hand (`vr_leftHanded 1`), your character's own simpler hands hold
+  it and the gun's modelled hands are hidden.
+- You have no body in a vehicle or turret seat, or while a cinematic plays.
+- Only you see this body. Mirrors, your shadow and other players show your
+  character as before.
+- The body has only been checked with openQ4's simulated headset. If it sits
+  wrongly on a real one, please report it; `vr_body 0` turns it off.
+
 ## Comfort
 
 openQ4 avoids moving your view in ways your body doesn't feel:
 
 - there is no view bob, weapon kick or screen shake in VR;
-- turning is done in steps (snap turn) by default;
+- turning is done in steps (snap turn) by default, and a turn pivots about
+  your head, so it never slides your view sideways (**not in 0.14.1**, where a
+  turn pivoted about your character and shifted the view if you stood off
+  centre);
 - while the stick moves you or turns you smoothly, the edges of your view
   darken around a clear centre (the comfort vignette); walking about your room
   never triggers it;
@@ -176,10 +230,15 @@ handy when seated.
 | `vr_physicalCrouch` | 1 | 1 crouching in your room crouches your character, 0 only the button does |
 | `vr_headOffsetLimit` | 16 | how far you can lean from your character before the view stops (game units) |
 
-Enter `vr_recenter` to make your current position and direction the front. It
-helps to bind it to a key, for example `bind F12 vr_recenter`. Your headset's
-own recenter (for example holding the Oculus button) does the same, at the
-moment the headset applies it, so the view doesn't jump.
+To make your current position and direction the front, recentre: **hold the
+weapon-hand stick in for a second** (the controllers buzz when it is done), or
+enter `vr_recenter`. Your headset's own recenter (for example holding the
+Oculus button) does the same, at the moment the headset applies it, so the
+view doesn't jump. openQ4 also recentres by itself the first time your headset
+hands it the controllers and at the start of every level, so a level begins
+facing the way you face. **Not in 0.14.1:** the stick hold and the automatic
+recentre; there, use `vr_recenter` (it helps to bind it to a key, for example
+`bind F12 vr_recenter`).
 
 ### Seated or standing
 
@@ -189,9 +248,12 @@ height is measured from:
 - **Standing** measures your height from the floor your headset knows. Your
   character's eyes match yours when you stand up straight, so recentring while
   you crouch, sit or lean only turns and moves the front; it never moves the
-  floor. openQ4 learns your standing eye height the first time it recentres. To
-  measure it again, stand up straight and enter `vr_calibrateHeight`, or set it
-  in metres with `vr_standingHeight`.
+  floor. openQ4 learns your standing eye height the first time it recentres
+  with your head at least a metre above the floor, so a headset still lying on
+  the desk teaches it nothing (**not in 0.14.1**, which could learn a height
+  from the desk; if your view sits too high there, use `vr_calibrateHeight`).
+  To measure it again, stand up straight and enter `vr_calibrateHeight`, or set
+  it in metres with `vr_standingHeight`.
 - **Seated** measures your height from where you recentred: wherever your head
   is then becomes standing height, which suits playing in a chair.
 - **Automatic**, the default, plays standing when your headset knows where the
@@ -210,7 +272,7 @@ and the size of your play area.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `vr_renderScale` | 1.0 | multiplies the headset's recommended resolution (0.5-2.0; apply with `vr_restart`) |
+| `vr_renderScale` | 1.0 | multiplies the headset's recommended resolution (0.5-2.0); VR restarts by itself to apply it |
 | `vr_worldScale` | 39.37 | game units per metre; lower makes the world feel bigger |
 | `vr_hudDistance` | 1.4 | HUD distance in metres |
 | `vr_hudWidth` | 1.2 | HUD width in metres |
@@ -325,6 +387,12 @@ resolution and refresh rate openQ4 is using. `vr_debug 1` logs session events.
   again.
 - **The image looks washed out**: the runtime didn't offer the colour format
   openQ4 needs (sRGB). Report your headset and runtime.
+- **Valve Index: weapons switch or the weapon wheel opens while you only hold
+  the controllers** (0.14.1): the grip there answered your fingers resting on
+  it. **Not in 0.14.1:** it now takes a real squeeze.
+- **Everything is too high, too low or off to one side**: recentre by holding
+  the weapon-hand stick in for a second, standing where and facing how you
+  want to play.
 
 Screenshots, saves and demos:
 

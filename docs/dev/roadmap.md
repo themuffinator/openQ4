@@ -2176,10 +2176,10 @@ and AND-05.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | VR-01 — Closed (PC scope) | Vulkan (runtime-created device), desktop-independent submission, Wayland EGL and SP world-GUI pointing integrated at render API 32 with VR-06's guarantees; GL/Vulkan SP/MP/menu smokes, the Vulkan fault matrix and Linux Wayland/X11 bindings pass on the simulated runtime. | Quest standalone moved to AND-05 by decision; physical headsets are VR-02. |
-| VR-02 — Partial | GL and Vulkan stereo, tracking/input, room scale, play spaces, aiming, haptics, world GUIs, per-eye TAA and comfort controls provide the testable implementation; the [headset checklist](vr-headset-qualification.md) is ready to run. | Run the checklist on each available PC runtime/headset: combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery. |
+| VR-02 — Partial | GL and Vulkan stereo, tracking/input, room scale, play spaces, aiming, haptics, world GUIs, per-eye TAA, comfort controls and (17 November) the player's own body with arms that reach the hands (`vr_body`) provide the testable implementation; the [headset checklist](vr-headset-qualification.md) is ready to run. | Run the checklist on each available PC runtime/headset: combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery. |
 | VR-03 — Closed | STAGE/LOCAL_FLOOR/LOCAL selection with warned fallback, floor-referenced standing height, recentering, calibration and live seated/standing changes pass natively and on the simulated runtime (GL/Vulkan). | Physical body alignment is checklist section 4 (VR-02). |
 | VR-04 — Partial | `openxr_vr_stereo_cost.py` records flat/stereo/warm-stereo CPU, build, submit and GPU tails, now at a chosen preset (`--preset quality`); the simulated baselines on this GPU are recorded below. Uploads, dynamic geometry, remote cameras, cached static shadow maps and (8 November) world-GUI quads are shared between the eyes; culling, lights, draws, mirror/reflection/refraction/x-ray maps and dynamic shadow composition stay per eye. `openxr_vr_stereo_share_smoke.py` proves both by work count on OpenGL and Vulkan. | Headset tails against the refresh budgets (checklist 2.2), and sharing work where those tails show a view-independent cost. |
-| VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7; hand presence and physical-object interaction need their own designs. |
+| VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7. Hand presence arrived with the body (VR-02, 17 November); physical-object interaction needs its own design. |
 | VR-06 — Closed | Active GL teardown/ownership repair passes native failure cases and simulated-runtime SP/MP gameplay. | Carry guarantees into VR-01 backends; physical controller/headset validation remains VR-02. |
 
 ### VR task evidence and acceptance
@@ -2251,6 +2251,44 @@ and AND-05.
   layer, as Vulkan; the test runtime's `imageFill:<n>:unbound` fault breaks
   the screen's images for `openxr_lifecycle_runtime.py`, which failed before
   the fix.
+  17 November: the player's own body in the headset, and a third audit
+  ([release record](release-completion.md#your-own-body-in-vr-and-a-headset-audit-17-november-2026)).
+  `vr_body` (default 2) draws a second render entity of the player model in
+  the player's own view only, posed on every draw by `src/framework/VRBody.h`
+  in both game modules: the model's rest-pose trunk, scaled to the game's eye
+  height, hangs from the neck under the tracked head and turns after the
+  head's heading in the tracking space; the legs keep the animation's feet
+  and bend to the pelvis; each arm meets the view weapon's own forearm at an
+  elbow solved from shoulder to wrist, so the gun keeps Raven's hands, and the
+  support hand follows its controller except in the two-handed grip and while
+  the weapon is busy. The stock view models and The Awakening's two new ones
+  share one arm rig (checked by reading every model's joints; the expansion's
+  were not probed in game). The audit, three independent readings of the
+  engine, game and renderer sides, led to these fixes: a held gun no longer
+  depth-hacked over the world; facing resets and VR's takeover of an untracked
+  view face the head, not the weapon hand; frozen views no longer re-anchor
+  the world to the hand; turns pivot about the head; input released when the
+  runtime stops a session; Valve Index grip bound to its force; recentre from
+  the controller, on first focus and at each level, with no standing height
+  learned below a metre; head-aimed shots and the water line taken at the
+  tracked head; a comfort vignette fixed to the lens under zoom and open
+  while paused; the fallback liquid wash drawn into the eyes; motion blur off
+  in eye views; per-frame flashlight placement in the hand; and haptics for
+  the lightning gun and gauntlet. `vr_bodyAhead` stands the body ahead of the
+  player for inspection. Audit leads left open, none blocking the checklist:
+  missing buttons on Vive wand, Index and WMR profiles (no flashlight or
+  jump on some); the comfort vignette centred on each eye's own axis, which
+  canted displays would not fuse; one 100 ms swapchain wait ending the
+  session, and any `XR_ERROR_RUNTIME_FAILURE` from an optional call stopping
+  VR until `vr_restart` (both pinned by the fault matrix); the third-person
+  model's yaw spinning while the gun points near the vertical (mirrors and
+  shadows only, now that the body in the eyes has its own heading); the
+  projectile launch clearance assuming a muzzle inside the body's box; a
+  room-scale catch-up walked in one tic after a pause; multiplayer facing
+  resets, which the server sets from the hand's usercmd; no body in vehicle
+  seats; a left-handed hold that uses the model's simpler hands; and a
+  Settings row for `vr_body`, which is console-only until its strings exist
+  in all twelve language tables.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and

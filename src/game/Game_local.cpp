@@ -5182,9 +5182,13 @@ void idGameLocal::PreparePlayerSceneForRender( idPlayer *player, bool menuPaused
 
 	RecordPresentationClockSample();
 
+	// openQ4 VR: the body the headset shows the player (vr_body) is posed with
+	// the view weapon, whose arms reach it
+	player->BeginVRBody();
 	if ( player->weaponViewModel.GetEntity() != NULL ) {
 		player->weaponViewModel->UpdatePresentationWeapon( player->CanShowWeaponViewmodel() );
 	}
+	player->FinishVRBody();
 }
 
 void idGameLocal::EndPresentationSceneForRender( void ) {

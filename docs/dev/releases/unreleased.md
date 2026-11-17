@@ -621,6 +621,45 @@ the [development roadmap](../roadmap.md) for current scope.
   and a count shows how many players are further down. Weapon changes while
   you hold it work as before when everyone fits.
 
+- **Your own body in VR.** Look down in the headset and you see a chest, legs
+  and feet standing where you stand, and arms that run from your shoulders to
+  your hands. Your body turns with your torso rather than your gun, and your
+  knees bend when you duck or crouch. Your weapon hand stays on the gun's
+  grip; your other hand follows its controller and goes back to the gun for
+  the two-handed grip and for reloads. `vr_body 1` shows legs and torso only
+  and `vr_body 0` none. See the [VR guide](../../user/vr.md#your-body). It has
+  only been checked on openQ4's simulated headset so far.
+
+- VR: a gun in your hand is now hidden by whatever your hand is behind, such
+  as a door frame, instead of being drawn over everything.
+
+- VR: hold the weapon-hand stick in for a second to recentre, without a
+  keyboard. openQ4 also recentres the first time your headset hands it the
+  controllers and at the start of each level, and no longer learns your
+  standing height from a headset that is still lying on the desk.
+
+- VR: a level, a loaded save or a teleporter now leaves you facing the way
+  the game intends. They used to point your gun that way instead, so a gun
+  held at your side could start you facing a wall. A cinematic no longer
+  leaves the world turned by however far your hand moved while it played.
+
+- VR: snap and smooth turns pivot about your head, so a turn no longer slides
+  your view sideways when you stand off centre.
+
+- VR, Valve Index: weapons no longer switch, and the weapon wheel no longer
+  opens, from simply holding the controllers; the grip now takes a squeeze.
+
+- VR: when you aim with your head, shots leave from where your head is, so you
+  can shoot over cover you have ducked behind. The comfort vignette stays in
+  view while you zoom and no longer stays dark through a pause, the lightning
+  gun and the gauntlet vibrate in your hand, the flashlight follows the gun
+  smoothly at high refresh rates, and in single player the laser dot stays as
+  a pointer while your weapon is put away.
+
+- VR: the controllers no longer stay "held" if the headset's software stops
+  the session in the same moment it takes them away, which could leave you
+  running or firing.
+
 - VR now runs on the Vulkan renderer too. The OpenXR runtime creates the
   renderer's device on the GPU your headset uses, and the headset keeps
   rendering while the desktop window is minimized or covered. On a Linux
