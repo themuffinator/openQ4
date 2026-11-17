@@ -7,6 +7,20 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's prison alarm is easy to hear again, 17 November 2026
+
+- **The alarm sounds like an alarm.** In the prison mission, the security
+  alarm Tak keeps telling you to shut off now sounds a siren pulse every five
+  to six seconds, loud enough to follow through the security wing. The
+  earlier quiet pass left one faint pulse every 12 to 16 seconds, which was
+  easy to miss. It is still well below the alpha's constant full-volume loop,
+  with gaps between pulses so dialogue stays clear. The computer alarms nearby
+  sound more often and carry a little farther, staying below the siren.
+- **What to do.** Replace the single-player game module. Existing saves pick
+  up the new pacing when loaded; the security console still switches the
+  alarm off.
+- Details: [prison alarm pacing](awakening-missions.md#corrections).
+
 ## Busy battles spend less time on collision checks, 17 November 2026
 
 - **Smoother big fights.** Each frame of a large battle does less collision

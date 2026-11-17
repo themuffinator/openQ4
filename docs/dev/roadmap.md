@@ -3515,6 +3515,8 @@ Completion substeps must keep three forms of evidence distinct:
   occupied marine cover. Script checks now report failures in release builds.
   A third pass replaces M04's constant global siren and computer alarm loops
   with quieter, localized reminders, preserving console shutoff and old saves.
+  Its pacing revision 2 (17 November) restores a steady siren rhythm after
+  playtesting found the reminders too sparse and faint.
   A fourth pass makes the security override one-time and prevents late camera
   destruction from starting an early or duplicate turret-room door hack.
   Fitted camera bounds remove the upper cell door overlap that blocked startup.

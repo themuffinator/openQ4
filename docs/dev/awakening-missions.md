@@ -85,16 +85,26 @@ encounter activation are part of that choreography, not decorative markers.
   upgrade is not granted in its place.
 - The security alarm's 1.5-second recording was both global and looping,
   repeating at full gain throughout the prison. It now plays locally at
-  -12 dB, immediately on activation and then every 12–16 seconds. Its 96/1400
-  unit distance range keeps the alert around the security encounter. The
-  flashing lights and original objective/console callbacks remain intact.
-  A pulse finishes naturally when disabled; no new pulse starts afterward,
-  including when the console is used during a quiet interval.
-- Three computer alarms also looped four-second recordings continuously.
-  They now play the same installed samples at -18 dB within 360 units,
-  every 19–29 seconds. They remain local machinery ambience rather than an
-  additional level-wide security warning. These timings and levels are an
-  editorial refinement inferred from the security sequence and dialogue.
+  -6 dB, immediately on activation and then every 5–6 seconds. Its 320/2000
+  unit distance range holds full level across the security room and its
+  approach and keeps the alert around the security encounter. The flashing
+  lights and original objective/console callbacks remain intact. A pulse
+  finishes naturally when disabled; no new pulse starts afterward, including
+  when the console is used during a quiet interval.
+- Three computer alarms also looped four-second recordings continuously at
+  -7/-9 dB within 140/612 units. They now play the same installed samples at
+  -12 dB within 96/560 units, every 9–15 seconds. They remain local machinery
+  ambience below the siren rather than an additional level-wide security
+  warning. These timings and levels are an editorial refinement inferred from
+  the security sequence and dialogue.
+- Pacing revision 1 (4 November) used a -12 dB siren every 12–16 seconds with
+  a 96/1400 range, and -18 dB computers within 40/360 units every 19–29
+  seconds. Playtesting found it too sparse and barely audible: with linear
+  falloff the siren was near -17 dB a corridor away, before occlusion, and
+  sounded for about a tenth of the time. Revision 2 (17 November) doubles the
+  siren's amplitude, widens its full-level radius and gives it a steady
+  alarm rhythm of about one pulse in four, while staying well below the
+  alpha's constant full-gain loop.
 - The security override console now completes once and then becomes
   noninteractive. Its reusable relay previously moved both shutters another
   120 units and toggled the disabled alarm back on with every additional press.
@@ -136,8 +146,11 @@ changes or expansion multiplayer module are introduced.
 Alarm pacing also applies when loading an existing M04 save. The migration
 matches the exact map, original console function, speaker names and shaders,
 and leaves custom pacing alone. It replaces the old emitter and preserves
-whether it was on or off. Revised saves keep the existing speaker timer,
-including its pending reminder during a quiet interval. No script statements
+whether it was on or off. The speaker's `oq4_prisonAlarm` spawn arg records
+the pacing revision, so a save made under revision 1 (whose computers already
+use the one-shot samples) is re-paced the same way; a revision-1 alarm that
+was on starts a pulse at load. Saves at the current revision keep the existing
+speaker timer, including its pending reminder during a quiet interval. No script statements
 or serialized fields are added for this change. Computer samples use implicit
 one-shot declarations: setting `s_looping 0` alone cannot clear a loop flag
 inside the original sound declaration.
@@ -229,6 +242,25 @@ headphone listening assessment. Early alarm probes contain diagnostic failures
 from declaration-name filtering, inaudible distant one-shots, and placing the
 listener inside console dressing. Their reports are not acceptance results;
 the saved gap/off checkpoints used by restore probes remain regression fixtures.
+
+Pacing revision 2 (17 November) was qualified the same way, from the fixed
+`.tmp/runtime/awakening-alarm/` runtime because other tests held `.install`.
+The probe now follows the 5–6 second cadence, shuts the siren off both at an
+arbitrary point and inside a guaranteed gap, and adds a listener about 620
+units out in the approach corridor. Evidence is under `.tmp/awakening-alarm/`:
+
+| Evidence directory | Result |
+| --- | --- |
+| `rev1-baseline/` | Revision-1 binary writes active/off regression saves. |
+| `rev2-fresh/` | Siren mixer gain 0.325 at the speaker and 0.238 in the corridor, silent gaps, a reminder 5–6 s later, console shutoff, silence at the bridge; all three computers play at 0.16 and finish their one-shots. |
+| `rev2-rev1-active/`, `rev2-rev1-off/` | Revision-1 saves re-pace to revision 2 and keep their on/off state. |
+| `rev2-gap/`, `rev2-new-off/` | Revision-2 saves keep a pending reminder through a quiet gap, and keep an inactive alarm off. |
+
+At the same mixer scaling, revision 1 would have given about 0.16 at the
+speaker and 0.10 in the corridor (derived from its -12 dB gain and 96/1400
+falloff, not measured), so the corridor level is about 2.4 times higher and
+the siren sounds for about a quarter of the time instead of a tenth. As
+before, these checks establish gain, timing and state, not a listening test.
 
 `round3-lock-gl/` passes M03 acquisition, locked save/load, five/one-rocket
 volleys, empty-magazine rejection and lock clearing on the new build. A custom

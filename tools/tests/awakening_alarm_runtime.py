@@ -38,6 +38,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--mode', choices=('baseline', 'fresh', 'active', 'gap', 'off'), required=True)
     parser.add_argument('--source', type=Path)
+    parser.add_argument('--runtime', type=Path, default=ROOT/'.install',
+                        help='staged runtime folder (a fixed .tmp/runtime/ location when .install is busy)')
     parser.add_argument('--timeout', type=float, default=300)
     args = parser.parse_args()
     home = task_path(args.output)
@@ -60,24 +62,32 @@ def main():
             lines += ['trigger security_alarm_1', 'waitMsec 350']
         elif args.mode == 'off':
             lines += sample('RESTORED_OFF')
-            lines += ['waitMsec 17000', *sample('STILL_OFF'),
+            lines += ['waitMsec 7000', *sample('STILL_OFF'),
                       'trigger security_alarm_1', 'waitMsec 350']
-        lines += sample('RESTORED_GAP' if args.mode == 'gap' else 'ON')
-        lines += ['waitMsec 2200', *sample('GAP'), 'saveGame alarm_gap',
-                  # A restored gap already consumed part of its interval.
-                  f'waitMsec {6000 if args.mode == "gap" else 8250}']
-        repeat_count = 33 if args.mode == 'gap' else 24
-        for i in range(repeat_count):
+        # A 1.5-second pulse begins every 5-6 seconds.
+        if args.mode == 'gap':
+            # The gap save was written 2.55 s into a cycle.
+            lines += [*sample('RESTORED_GAP'), 'waitMsec 1500']
+        else:
+            lines += [*sample('ON'), 'waitMsec 2200', *sample('GAP'), 'saveGame alarm_gap',
+                      'waitMsec 2000']
+        for i in range(24):
             lines += ['waitMsec 250', *sample(f'REPEAT_{i}')]
-        # Stop in a guaranteed gap: the last possible repeat ends by 17.5 s.
-        lines += ['waitMsec 2000', 'trigger security_alarm_1', 'waitMsec 2000',
-                  *sample('STOP'), 'saveGame alarm_off',
-                  'waitMsec 17000', *sample('STOP_PERSISTS')]
-        # The authored terminal must still own shutoff and objective completion.
+        # Off at an arbitrary point: a pulse in progress finishes within 1.5 s.
+        lines += ['trigger security_alarm_1', 'waitMsec 2000', *sample('OFF_ANYWHERE')]
+        # Restart, then switch off inside the guaranteed gap after its pulse.
         lines += ['trigger security_alarm_1', 'waitMsec 350', *sample('RESTART'),
+                  'waitMsec 1850', 'trigger security_alarm_1', 'waitMsec 350', *sample('STOP'),
+                  'saveGame alarm_off', 'waitMsec 7000', *sample('STOP_PERSISTS')]
+        # The authored terminal must still own shutoff and objective completion.
+        lines += ['trigger security_alarm_1', 'waitMsec 350', *sample('CONSOLE_PULSE'),
                   'testMission call unlockSecRoomDoors', 'waitMsec 2200',
-                  *sample('CONSOLE_OFF'), 'waitMsec 17000', *sample('CONSOLE_STAYS_OFF')]
-        # Positional falloff is tested with the same source at a distant listener.
+                  *sample('CONSOLE_OFF'), 'waitMsec 7000', *sample('CONSOLE_STAYS_OFF')]
+        # Positional falloff: still clearly present ~620 units out in the
+        # approach corridor, silent at the distant bridge.
+        lines += ['setviewpos 1724 -2568 496 0 0 0', 'waitMsec 100',
+                  'trigger security_alarm_1', 'waitMsec 350', *sample('NEARBY'),
+                  'trigger security_alarm_1', 'waitMsec 2000']
         lines += ['setviewpos 978 660 320 0 0 0', 'waitMsec 100',
                   'trigger security_alarm_1', 'waitMsec 350', *sample('DISTANT')]
         if args.mode == 'fresh':
@@ -101,11 +111,12 @@ def main():
             ('sys_consoleWindow', '0'), ('r_fullscreenDesktop', '0'),
             ('com_fixedTic', '0'), ('s_noSound', '0'), ('s_muteUnfocused', '0'),
             ('s_useOcclusion', '1'), ('s_volume', '1'), ('s_volume_dB', '0'), ('ai_disable', '1')])
-    runtime = ROOT/'.install'
+    runtime = args.runtime.resolve(strict=True)
     exe = runtime/'openQ4-client_x64.exe'
     identity = {name: sha256(runtime/name) for name in
                 ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll', 'baseoq4/pak0.pk4')}
-    for name in ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll'):
+    # Baseline deliberately runs the previous build to write regression saves.
+    for name in (('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll') if args.mode != 'baseline' else ()):
         assert identity[name] == sha256(ROOT/'builddir'/name), 'stage the current build first'
     command = launch_command(options, exe, home)
     (home/'plan.json').write_text(json.dumps(dict(command=command, identity=identity,
@@ -142,22 +153,24 @@ def main():
         if not audible('BASELINE'):
             failures.append('baseline alarm is not actually playing')
     else:
-        for label in (('RESTART',) if args.mode == 'gap' else ('ON', 'RESTART')):
+        for label in (('RESTART', 'CONSOLE_PULSE', 'NEARBY') if args.mode == 'gap' else
+                      ('ON', 'RESTART', 'CONSOLE_PULSE', 'NEARBY')):
             if not audible(label):
                 failures.append(label+' is not actually playing')
-        for label in ('INITIAL_OFF', 'RESTORED_OFF', 'STILL_OFF', 'RESTORED_GAP', 'GAP', 'STOP',
-                      'STOP_PERSISTS', 'CONSOLE_OFF', 'CONSOLE_STAYS_OFF', 'DISTANT'):
+        for label in ('INITIAL_OFF', 'RESTORED_OFF', 'STILL_OFF', 'RESTORED_GAP', 'GAP', 'OFF_ANYWHERE',
+                      'STOP', 'STOP_PERSISTS', 'CONSOLE_OFF', 'CONSOLE_STAYS_OFF', 'DISTANT'):
             if label in samples and audible(label):
                 failures.append(label+' should be silent')
         if not any(audible(label) for label in samples if label.startswith('REPEAT_')):
             failures.append('no reminder pulse')
         computer_labels = ['COMPUTER_'+name for name, _, _ in COMPUTERS] if args.mode == 'fresh' else []
-        for label in ('ON', 'RESTART', 'DISTANT', *computer_labels):
+        for label in ('ON', 'RESTART', 'NEARBY', 'DISTANT', *computer_labels):
             for row in samples.get(label, {}).get('channels', []):
                 # LOOPING=32 and GLOBAL=8 in the engine's sound.h.
                 if int(row['flags']) & (8 | 32):
                     failures.append(label+' is global or looping')
-                expected_gain = .125 if label.startswith('COMPUTER') else .25
+                # Gain is 2^(dB/6): -6 dB siren, -12 dB computers.
+                expected_gain = .25 if label.startswith('COMPUTER') else .5
                 if abs(float(row['authoredGain']) - expected_gain) > .0001:
                     failures.append(label+' has the wrong authored gain')
         if args.mode == 'fresh':
@@ -166,8 +179,8 @@ def main():
                     failures.append(name+' does not play nearby')
                 if audible('COMPUTER_GAP_'+name):
                     failures.append(name+' should have finished its one-shot')
-        if '"oq4_prisonAlarm"' not in log:
-            failures.append('repaired speaker args missing')
+        if not re.search(r'"oq4_prisonAlarm"\s+(?:\^\d)?"2"', log):
+            failures.append('speaker args not at pacing revision 2')
     if any(sha256(runtime/name) != value for name, value in identity.items()):
         failures.append('runtime replaced during probe')
     result = dict(passed=not failures, failures=failures, mode=args.mode,
