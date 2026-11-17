@@ -278,7 +278,7 @@ Shadow artifacts usually come in two kinds: speckles or stripes on a lit surface
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
-| `g_dynamicLightShadows` | `-1` | `-1..1` | Shadows from weapon lights: your flashlight, muzzle flashes (yours and enemies'), glowing projectiles and explosion flashes. `-1` follows the preset (the flashlight wherever shadows are drawn, the rest on Quality and up), `0` never, `1` always. **Not in 0.14.1:** muzzle flashes, enemy weapon effects and explosion flashes; 0.14.1 covers the flashlight and projectile lights only. A flashlight picks up the change when the weapon is next drawn or a save is loaded; the other lights pick it up with the next shot. |
+| `g_dynamicLightShadows` | `-1` | `-1..1` | Shadows from weapon lights: your flashlight, muzzle flashes (yours and enemies'), glowing projectiles and explosion flashes. `-1` follows the preset (the flashlight wherever shadows are drawn, the rest on Quality and up), `0` never, `1` always. **Not in 0.14.1:** in 0.14.1 only the flashlight, and projectile lights a mod authors, cast these shadows; the stock game's glowing projectiles, muzzle flashes and explosions do not. A flashlight picks up the change when the weapon is next drawn or a save is loaded; the other lights pick it up with the next shot. |
 
 ### Troubleshooting and diagnostics
 
