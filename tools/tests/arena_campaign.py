@@ -2165,12 +2165,17 @@ def validate_game_hooks() -> None:
 CANVAS_WIDTH = 640.0
 CANVAS_HEIGHT = 480.0
 CANVAS_ASPECT = CANVAS_WIDTH / CANVAS_HEIGHT
-# Mirrors guis/mphud.gui: crop toward 16:9, floored at the authored 34/480 bar
-# and capped so the frame can never reach the stock HUD row at canvas y=57.
+# Mirrors guis/mphud.gui: the framing bands' reference lines crop toward 16:9,
+# floored at 34/480 (the main menu's page dock) and capped so the top band's
+# deepest flat can never reach the stock HUD row at canvas y=57.
 LETTERBOX_TARGET_RECIPROCAL = 0.5625
 LETTERBOX_MIN_FRACTION = 0.0708333
-LETTERBOX_MAX_FRACTION = 0.11
+LETTERBOX_MAX_FRACTION = 0.09625
 STOCK_HUD_TOP_ROW = 57.0
+# Appendix B.2 at the page dock (top -77,-63; bottom -26,386): how far each
+# band's inner edge reaches past its reference line at its deepest.
+TOP_BAND_DEEPEST_BELOW_LINE = (103.8 - 63) - 34.0
+BOTTOM_BAND_DEEPEST_ABOVE_LINE = 446.0 - (386 + 49.4)
 
 
 def match_block(haystack: str, pattern: str, context: str) -> str:
@@ -2248,55 +2253,73 @@ def validate_letterbox() -> None:
         '( 0 - "gui::virtual_screen_x_expand" )',
         '( 640 + ( "gui::virtual_screen_x_expand" * 2 ) )',
     )
-    for window_name in (
-        "oq4_arena_present_shade",
-        "oq4_arena_letterbox_top",
-        "oq4_arena_letterbox_bottom",
-    ):
+    block = match_block(
+        mp_hud,
+        r"windowDef\s+oq4_arena_present_shade\s*\{.*?\n\t\}",
+        "oq4_arena_present_shade definition",
+    )
+    for needle in full_bleed_x:
+        require(block, needle, "oq4_arena_present_shade must span the expanded canvas")
+
+    # The frame is the main menu's own framing bands, not flat bars: the stock
+    # band art with its tiles carrying the flat spans past any screen width, and
+    # a fill past the outer edge for a tall screen.
+    for band, art in (("top", "topbar"), ("bottom", "btmbar")):
         block = match_block(
             mp_hud,
-            rf"windowDef\s+{window_name}\s*\{{.*?\n\t\}}",
-            f"{window_name} definition",
+            rf"windowDef\s+oq4_arena_band_{band}\s*\{{.*?\n\t\}}",
+            f"oq4_arena_band_{band} definition",
         )
-        for needle in full_bleed_x:
-            require(block, needle, f"{window_name} must span the expanded canvas")
+        for needle in (
+            f'background\t"gfx/guis/mainmenu/{art}"',
+            f'background\t"gfx/guis/mainmenu/{art}_tile_left"',
+            f'background\t"gfx/guis/mainmenu/{art}_tile_right"',
+            "rect\t-4096,0,4097,129",
+            "rect\t1044,0,4097,129",
+            f"windowDef oq4_arena_band_{band}_fill",
+            f"windowDef oq4_arena_band_{band}_accent",
+            'visible\t"Desktop::arena_presentVisible"',
+        ):
+            require(block, needle, f"Arena {band} framing band")
 
-    # The bars have to hang off the physical screen edges, and the animation has
-    # to run through the shared reveal scalar instead of hard-coded rects.
+    # The bands hang off the aspect-driven reference lines at the menu's page
+    # dock, and move only through the shared scalars, never by rect transitions.
     require(
         mp_hud,
-        '( "oq4_arena_frame::bar" * "oq4_arena_frame::open" )',
-        "Arena letterbox height driven by the animated frame",
+        'rect\t( "oq4_arena_band_pose::slide_x" - 77 ),( ( "oq4_arena_frame::top" - 97 ) - "oq4_arena_band_pose::slide_y" ),1045,129',
+        "Arena top band at the page dock, hung off the top reference line",
     )
     require(
         mp_hud,
-        '( ( 480 + "gui::virtual_screen_y_expand" ) - ( "oq4_arena_frame::bar" * "oq4_arena_frame::open" ) )',
-        "Arena bottom bar anchored to the physical screen edge",
+        'rect\t( "oq4_arena_band_pose::slide_x" - 26 ),( ( "oq4_arena_frame::bottom" - 60 ) + "oq4_arena_band_pose::slide_y" ),1045,129',
+        "Arena bottom band at the page dock, hung off the bottom reference line",
     )
-    if re.search(r'transition\s+"oq4_arena_letterbox_(top|bottom)::rect"', mp_hud):
-        raise AssertionError(
-            "Arena letterbox bars must not transition literal canvas rects"
-        )
+    for scalar in ("open", "leave", "scan"):
+        require(mp_hud, f'float\t"{scalar}"', "Arena frame animation scalar")
+    if re.search(r'transition\s+"oq4_arena_band_[a-z_]*::rect"', mp_hud):
+        raise AssertionError("Arena framing bands must not transition literal rects")
 
-    # Content that can collide with a thicker bar hangs off the frame edges.
+    # Content that can collide with a deeper frame hangs off the reference lines,
+    # and the lower copy stays above the bottom band's raised section.
     for needle in (
-        '( "oq4_arena_frame::top" + 6 )',
-        '( "oq4_arena_frame::bottom" - 7 )',
         '( "oq4_arena_frame::top" + 32 )',
         '( "oq4_arena_frame::top" + 60 )',
         '( "oq4_arena_frame::top" + 119 )',
-        '( "oq4_arena_frame::bottom" - 118 )',
-        '( "oq4_arena_frame::bottom" - 107 )',
-        '( "oq4_arena_frame::bottom" - 84 )',
-        '( "oq4_arena_frame::bottom" - 31 )',
+        '( "oq4_arena_frame::bottom" - 128 )',
+        '( "oq4_arena_frame::bottom" - 117 )',
+        '( "oq4_arena_frame::bottom" - 94 )',
+        '( "oq4_arena_frame::bottom" - 46 )',
     ):
         require(mp_hud, needle, "Arena tableau anchored to the cinematic frame")
+    recording_bottom = 46 - 18
+    if recording_bottom <= BOTTOM_BAND_DEEPEST_ABOVE_LINE + 5:
+        raise AssertionError("the recording line must clear the bottom band's accent")
 
     # Numeric contract for the authored policy.
     wide = letterbox_metrics(16.0 / 9.0)
     if abs(wide["bar"] - 34.0) > 0.05 or abs(wide["top"] - 34.0) > 0.05:
         raise AssertionError(
-            f"16:9 must reproduce the authored 34-unit bar, got {wide['bar']:.3f}"
+            f"16:9 must put the bands at the menu's page dock, got {wide['bar']:.3f}"
         )
 
     aspects = (32 / 9, 21 / 9, 16 / 9, 1.6, 1.5, 4 / 3, 1.25, 1.0, 0.75, 9 / 16)
@@ -2305,45 +2328,64 @@ def validate_letterbox() -> None:
             m = letterbox_metrics(aspect, correction)
             if m["bar"] <= 0.0:
                 raise AssertionError(
-                    f"aspect {aspect:.3f} would draw no letterbox at all"
+                    f"aspect {aspect:.3f} would draw no frame at all"
                 )
-            # Bars always reach both horizontal screen edges.
+            # Bands always reach both horizontal screen edges.
             if m["screen_left"] > 0.0 or m["screen_right"] < CANVAS_WIDTH:
                 raise AssertionError(f"aspect {aspect:.3f} leaves an uncovered edge")
-            # Bars always sit on the physical top and bottom of the screen.
+            # Reference lines always hang off the physical top of the screen.
             if abs((m["top"] - m["bar"]) - (-m["y_expand"])) > 1e-6:
                 raise AssertionError(
-                    f"aspect {aspect:.3f} top bar is not anchored to the screen edge"
+                    f"aspect {aspect:.3f} top band is not anchored to the screen edge"
                 )
-            # And they never swallow the authored 4:3 content.
-            if m["top"] > STOCK_HUD_TOP_ROW - 4.0:
+            # The band's deepest flat never swallows the authored 4:3 content.
+            if m["top"] + TOP_BAND_DEEPEST_BELOW_LINE > STOCK_HUD_TOP_ROW - 4.0 + 1e-6:
                 raise AssertionError(
-                    f"aspect {aspect:.3f} letterbox reaches the stock HUD row "
-                    f"(inner edge {m['top']:.2f})"
+                    f"aspect {aspect:.3f} top band reaches the stock HUD row "
+                    f"(deepest edge {m['top'] + TOP_BAND_DEEPEST_BELOW_LINE:.2f})"
                 )
             if m["bottom"] < CANVAS_HEIGHT - (STOCK_HUD_TOP_ROW - 4.0):
                 raise AssertionError(
-                    f"aspect {aspect:.3f} bottom letterbox intrudes too far"
+                    f"aspect {aspect:.3f} bottom band intrudes too far"
+                )
+            # The 160 u travel clears the deepest edge and its 19 u rim light.
+            if m["bar"] + max(TOP_BAND_DEEPEST_BELOW_LINE, BOTTOM_BAND_DEEPEST_ABOVE_LINE) + 19.0 > 160.0:
+                raise AssertionError(
+                    f"aspect {aspect:.3f}: the bands' 160 u travel no longer clears the screen"
                 )
 
-    # Narrower than 16:9 must actually thicken the frame, not stay put.
+    # Narrower than 16:9 must actually deepen the frame, not stay put.
     if not (
         letterbox_metrics(4 / 3)["fraction"]
         > letterbox_metrics(1.5)["fraction"]
         > letterbox_metrics(16 / 9)["fraction"]
     ):
-        raise AssertionError("Arena letterbox must thicken as the display narrows")
+        raise AssertionError("Arena frame must deepen as the display narrows")
 
-    # A "$window::var" transition source resolves once at parse time, so it
-    # carries the authored value and silently turns a fade into a snap.
+    # A non-rect "$window::var" transition source is read when the transition
+    # starts (GuiScript_ReadTransitionOperand), but the Arena fades are authored
+    # with literals so each card's look is explicit.  Only the clear may start
+    # the frame's own scalars from where an interrupted card left them.
     for gui_path in (ARENA_MENU, ROOT / "content" / "baseoq4" / "pak0" / "guis" / "mphud.gui"):
         text = read(gui_path)
-        for match in re.finditer(r'transition\s+"(oq4_arena|arena)[^"]*"\s+"\$', text):
+        for match in re.finditer(r'transition\s+"(oq4_arena|arena)[^"]*"\s+"\$([^"]*)"', text):
+            if match.group(2) in ("oq4_arena_frame::leave", "oq4_arena_frame::scan"):
+                continue
             raise AssertionError(
-                f"{gui_path.name}: Arena transition sources a parse-time snapshot "
+                f"{gui_path.name}: Arena transition sources a live value "
                 f"near offset {match.start()}"
             )
-
+    clear = match_block(mp_hud, r"windowDef\s+oq4_arena_present_clear\s*\{.*?\n\t\}", "Arena clear timeline")
+    require(clear, 'transition "oq4_arena_frame::leave" "$oq4_arena_frame::leave" "1"',
+            "the clear sends the bands out from wherever they are")
+    # The warmup edge sends a clear and then the first introduction in one
+    # frame; the clear's opening script runs after the introduction's, so it
+    # must not start unless the clear is still wanted, or it sends the
+    # introduction's freshly docked bands straight back out.
+    opening_script = clear[clear.find("onTime 0 {"): clear.find("onTime 400 {")]
+    guard = opening_script.find('if ( "Desktop::arena_presentClearing" == 1 ) {')
+    if guard < 0 or guard > opening_script.find('transition "oq4_arena_frame::leave"'):
+        raise AssertionError("the Arena clear must only start while the clear is still wanted")
 
 def validate_transition_ownership() -> None:
     """stopTransitions only reaches the calling window's own subtree.

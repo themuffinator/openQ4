@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Arena introductions and results framed by the menu's bands, 17 November 2026
+
+- **The Arena ceremony now wears the main menu's frame.** The fighter
+  introductions, the countdown card and the final tableau are framed by the
+  same notched top and bottom bands as the menus, with their rim light, in
+  place of plain black letterbox bars. This applies to both the Classic and
+  the Remastered HUD.
+- **The frame moves.** The bands sweep in diagonally from the leading side,
+  orange accents draw along their edges as each card appears (again for every
+  fighter introduced), and when the countdown ends the accents draw back and
+  the bands sweep out across the shot toward the other side, just as Fight
+  sounds.
+- **Every screen shape.** Widescreen and wider displays show the bands exactly
+  as the menus dock them; narrower and tall screens push them in toward a
+  16:9 picture without covering the match card's text.
+- **What to do.** Nothing.
+- Details: [Arena ceremony design, framing bands](arena-campaign-ceremony.md#framing-bands-17-november-2026).
+
 ## Better first-launch settings on ARM boards, and a lighter Low Power (#233), 17 November 2026
 
 - **ARM boards other than the Raspberry Pi start on sensible settings.**

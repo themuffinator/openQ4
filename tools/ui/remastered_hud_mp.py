@@ -1806,39 +1806,62 @@ def statistics(doc: HudDocument) -> dict:
 
 def arena_presentation(doc: HudDocument) -> dict:
     """The single-player Arena campaign's introduction, entrance and victory
-    presentation (mphud.gui): letterbox bars sized from the view's aspect
-    toward a 16:9 frame, orange rules, and the cards with the stock timings;
-    it covers the whole view, not one anchor. oq4.arena is 1 for the countdown
-    entrance, 2 for the victory tableau and 3 for an opponent introduction."""
+    presentation (mphud.gui): the main menu's framing bands at their page
+    dock, hung off reference lines sized from the view's aspect toward a 16:9
+    frame, orange accents along the bands' flats, and the cards with the stock
+    timings; it covers the whole view, not one anchor. oq4.arena is 1 for the
+    countdown entrance, 2 for the victory tableau and 3 for an opponent
+    introduction."""
     declare(doc, {"arena_presentKicker": "", "arena_presentTitle": "", "arena_presentSubtitle": "", "arena_presentScore": "",
                   "arena_presentVictor": "", "arena_presentHasVictor": False, "oq4.arena": 0})
-    # Bar height: clamp((1 - aspect * 9/16) / 2, 34/480, 0.11) of the view height (canvas dp).
-    frac = op("clamp", op("*", op("-", 1, op("*", op("/", S("hud.width"), S("hud.height")), 0.5625)), 0.5), 0.0708333, 0.11)
+    # Reference depth: clamp((1 - aspect * 9/16) / 2, 34/480, 0.09625) of the
+    # view height (canvas dp). The ceiling keeps the top band's deepest flat,
+    # 6.8 u below its line, 4 u clear of the stock HUD row at 57 u on 4:3.
+    frac = op("clamp", op("*", op("-", 1, op("*", op("/", S("hud.width"), S("hud.height")), 0.5625)), 0.5), 0.0708333, 0.09625)
     bar_h = op("*", frac, S("hud.height"))
-    dark = [0.005, 0.008, 0.005, 0.98]
-    slide = 0.11 * 720 + 1
-    top = ui.group("arena-top", {**ui.absolute(left=0, top=0), "width": ui.length(100, "%"), "height": ui.length(51),
-                                 "overflow": ui.keyword("hidden"), "display": ui.keyword("block")},
-                   [ui.group("arena-top-bar", {**ui.absolute(left=0, bottom=0), "width": ui.length(100, "%"), "height": ui.length(slide),
-                                               "display": ui.keyword("block"), "background-color": ui.colour(dark), "transform": ui.transform()})])
-    bottom = ui.group("arena-bottom", {**ui.absolute(left=0, bottom=0), "width": ui.length(100, "%"), "height": ui.length(51),
-                                       "overflow": ui.keyword("hidden"), "display": ui.keyword("block")},
-                      [ui.group("arena-bottom-bar", {**ui.absolute(left=0, top=0), "width": ui.length(100, "%"), "height": ui.length(slide),
-                                                     "display": ui.keyword("block"), "background-color": ui.colour(dark),
-                                                     "transform": ui.transform()})])
-    doc.bind("arena-top.height", "arena-top", "height", bar_h)
-    doc.bind("arena-bottom.height", "arena-bottom", "height", bar_h)
     shade = ui.group("arena-shade", {**ui.FULL, "display": ui.keyword("block"), "background-color": ui.colour([0, 0, 0, 1]), "opacity": num(0)})
-    # Rules 6 u inside each bar's inner edge across the 4:3 canvas (64-576 u).
-    rules = []
-    for name in ("top", "bottom"):
-        rule = ui.group(f"arena-rule-{name}", {**ui.absolute(left=u(64), top=0), "width": ui.length(u(512)), "height": ui.length(u(1)),
-                                               "display": ui.keyword("block"), "background-color": ui.colour(rgb("#F27D0F", 0.9)),
-                                               "opacity": num(0)})
-        doc.bind(f"arena-rule-{name}.top", rule["id"], "top", op("+", bar_h, u(6)) if name == "top" else op("-", op("-", S("hud.height"), bar_h), u(7)))
-        rules.append(rule)
-    canvas = ui.group("arena-canvas", {"position": ui.keyword("absolute"), "left": ui.length(50, "%"), "margin-left": ui.length(-480), "top": ui.length(0),
-                                       "width": ui.length(960), "height": ui.length(100, "%"), "display": ui.keyword("block")}, rules)
+
+    # The bands: Appendix B.2's silhouettes at the page dock (top -77,-63;
+    # bottom -26,386), each moved by its reference line's depth past 34 u, so
+    # 16:9 and wider rest exactly at the menu's dock. The fills reach past the
+    # view's edges for tall views and for the bands' travel.
+    top_edge = ui.band_edge([(x + 323, y - 63) for x, y in ui.TOP_HOME], 89.7 - 63, 68.5 - 63)
+    bottom_edge = ui.band_edge([(x + 373, y - 351) for x, y in ui.BOTTOM_HOME], 70.5, 83.6)
+    reach = 2400
+
+    def accent(ident: str, left_u: float, top_u: float, width_u: float, head_left_u: float) -> dict:
+        """An orange accent 4 u inside a band's flat: a clip whose run slides
+        in to draw the line, with a bright head at its leading tip."""
+        run = ui.group(f"{ident}-run", {**ui.absolute(left=0, top=0), "width": ui.length(100, "%"), "height": ui.length(100, "%"),
+                                         "display": ui.keyword("block"), "transform": ui.transform()}, [
+            ui.group(f"{ident}-line", {**ui.absolute(left=0, top=u(0.5)), "width": ui.length(100, "%"), "height": ui.length(u(1)),
+                                       "display": ui.keyword("block"), "background-color": ui.colour(rgb("#F27D0F", 0.9))}),
+            ui.group(f"{ident}-head", {**ui.absolute(left=u(head_left_u), top=0), "width": ui.length(u(12)), "height": ui.length(u(2)),
+                                       "display": ui.keyword("block"), "background-color": ui.colour([1, 0.86, 0.55, 1]),
+                                       "opacity": num(0)})])
+        return ui.group(ident, {"position": ui.keyword("absolute"), "left": ui.length(50, "%"),
+                                "margin-left": ui.length(round(-480 + u(left_u), 3)), "top": ui.length(u(top_u)),
+                                "width": ui.length(u(width_u)), "height": ui.length(u(2)), "overflow": ui.keyword("hidden"),
+                                "display": ui.keyword("block"), "opacity": num(0)}, [run])
+
+    top_width, bottom_width = 591.1, 334.8
+    band_top = ui.group("arena-band-top", {**ui.absolute(left=0, top=0), "width": ui.length(100, "%"), "height": ui.length(u(129)),
+                                           "display": ui.keyword("block"), "transform": ui.transform()}, [
+        ui.vector("arena-band-top-art", dict(ui.FULL),
+                  ui.rim(top_edge) + [ui.path("band", [(ui.edge(1), -reach), (ui.edge(0), -reach)] + top_edge,
+                                              fill=ui.solid([0, 0, 0, 1]))]),
+        # From the first flank to the riser's foot, under all three notches;
+        # it draws from the leading side.
+        accent("arena-accent-top", 120.3 - 77, 107.3 - 63, top_width, top_width - 12)])
+    doc.bind("arena-band-top.top", "arena-band-top", "top", op("-", bar_h, u(34)))
+    band_bottom = ui.group("arena-band-bottom", {**ui.absolute(left=0, top=0), "width": ui.length(100, "%"), "height": ui.length(u(129)),
+                                                 "display": ui.keyword("block"), "transform": ui.transform()}, [
+        ui.vector("arena-band-bottom-art", dict(ui.FULL),
+                  ui.rim(bottom_edge) + [ui.path("band", bottom_edge + [(ui.edge(1), reach), (ui.edge(0), reach)],
+                                                 fill=ui.solid([0, 0, 0, 1]))]),
+        # Along the raised section's flat, drawing from the trailing side.
+        accent("arena-accent-bottom", 739.9 - 26 - bottom_width, 43.9, bottom_width, 0)])
+    doc.bind("arena-band-bottom.top", "arena-band-bottom", "top", op("-", op("-", S("hud.height"), bar_h), u(60)))
 
     def card_text(ident, key, expr, size, colour, face, baseline, **kw):
         node = text_at(doc, ident, expr, size, colour, center=320, baseline=baseline, width=544, face=face,
@@ -1871,10 +1894,11 @@ def arena_presentation(doc: HudDocument) -> dict:
                   **{"left": ui.length(u(-112)), "opacity": num(1)}),
         card_text("arena-victor-name", None, S("arena_presentVictor"), 22.3, rgb("#FFF0C2"), "marine", 52,
                   **{"left": ui.length(u(-112)), "opacity": num(1)})])
-    doc.bind("arena-victor.top", "arena-victor", "top", op("-", op("-", S("hud.height"), bar_h), u(118)))
+    # The lower copy clears the bottom band's raised section and its accent.
+    doc.bind("arena-victor.top", "arena-victor", "top", op("-", op("-", S("hud.height"), bar_h), u(128)))
     doc.show("arena-victor", S("arena_presentHasVictor"))
     recording = card_text("arena-v-rec", "#str_42087", None, 10.8, rgb("#ABBF8F"), FACE, 0)
-    doc.bind("arena-v-rec.top", "arena-v-rec", "top", op("-", op("-", S("hud.height"), bar_h), u(31)))
+    doc.bind("arena-v-rec.top", "arena-v-rec", "top", op("-", op("-", S("hud.height"), bar_h), u(46)))
     victory = ui.group("arena-victory", {"position": ui.keyword("absolute"), "left": ui.length(50, "%"), "margin-left": ui.length(-480),
                                          "top": ui.length(0), "width": ui.length(960), "height": ui.length(100, "%"),
                                          "display": ui.keyword("none")}, [victory_top, victor, recording])
@@ -1882,57 +1906,113 @@ def arena_presentation(doc: HudDocument) -> dict:
     entrance_canvas = ui.group("arena-e-canvas", {"position": ui.keyword("absolute"), "left": ui.length(50, "%"), "margin-left": ui.length(-480),
                                                   "top": ui.length(50, "%"), "margin-top": ui.length(-360), "width": ui.length(960),
                                                   "height": ui.length(720), "display": ui.keyword("block")}, [entrance])
-    layer = full("arena", [shade, top, bottom, canvas, entrance_canvas, victory], display=ui.keyword("none"))
+    layer = full("arena", [shade, band_top, band_bottom, entrance_canvas, victory], display=ui.keyword("none"))
     doc.show("arena", op("!=", S("oq4.arena"), 0))
 
     def fade(node, keys):
         return tr(node, "opacity", [(at, num(v)) for at, v in keys])
 
-    def bars(keys):
-        return [tr("arena-top-bar", "transform", [(at, transform_value(0, 0 if v else -slide)) for at, v in keys]),
-                tr("arena-bottom-bar", "transform", [(at, transform_value(0, 0 if v else slide)) for at, v in keys])]
+    # The bands travel on the menu's 45-degree motif: they dock in from the
+    # leading side, the top band from above and the bottom band from below,
+    # with the menu's frame.dock acceleration, and leave toward the trailing
+    # side the same way, accelerating out, so the frame sweeps across the shot
+    # instead of collapsing back on itself. 160 u clears the deepest band edge
+    # and its rim light off any view up to 9:16.
+    travel = u(160)
+    ease_out, ease_in = [0.333, 0.667, 0.667, 1], [0.333, 0, 0.667, 0.333]
+    poses = {"closed": (-travel, -1), "docked": (0, 0), "gone": (travel, -1)}
+
+    def keyed(at, value, key):
+        return (at, value, key[2]) if len(key) > 2 else (at, value)
+
+    def bands(keys):
+        """keys: (ms, pose[, easing of the interval starting here])."""
+        tracks = []
+        for node, sign in (("arena-band-top", 1), ("arena-band-bottom", -1)):
+            values = []
+            for key in keys:
+                dx, lift = poses[key[1]]
+                values.append(keyed(key[0], transform_value(dx, lift * sign * travel), key))
+            tracks.append(tr(node, "transform", values))
+        return tracks
+
+    def scan(keys):
+        """The accents draw along the flats: keys (ms, drawn 0 or 1[, easing]).
+        The top run slides in from the leading side, the bottom one from the
+        trailing side."""
+        tracks = []
+        for node, width, sign in (("arena-accent-top", top_width, -1), ("arena-accent-bottom", bottom_width, 1)):
+            values = [keyed(key[0], transform_value(0 if key[1] else sign * u(width), 0), key) for key in keys]
+            tracks.append(tr(f"{node}-run", "transform", values))
+        return tracks
+
+    def heads(keys):
+        # Each head shows while its line travels.
+        return [fade("arena-accent-top-head", keys), fade("arena-accent-bottom-head", keys)]
+
+    def accents(keys):
+        return [fade("arena-accent-top", keys), fade("arena-accent-bottom", keys)]
+
+    def draw_accents(at: int) -> list:
+        return [*scan([(0, 0), (at, 0, ease_out), (at + 450, 1)]),
+                *heads([(0, 0), (at, 0), (at + 1, 1), (at + 390, 1), (at + 450, 0)])]
+
     def entrance_copy():
         return [fade("arena-e-kicker", [(0, 0), (220, 0), (540, 1), (3100, 1), (3450, 0)]),
                 fade("arena-e-title", [(0, 0), (520, 0), (940, 1), (3100, 1), (3450, 0)]),
                 fade("arena-e-sub", [(0, 0), (520, 0), (940, 1), (3100, 1), (3450, 0)]),
                 fade("arena-e-ready", [(0, 0), (1050, 0), (1300, 1), (3100, 1), (3450, 0)])]
+
+    def entrance_exit():
+        """The copy fades, the accents draw back into the bands, then the bands
+        sweep out on the countdown's last beat."""
+        return [*scan([(0, 0), (250, 0, ease_out), (700, 1), (3150, 1, ease_in), (3450, 0)]),
+                *heads([(0, 0), (250, 0), (251, 1), (640, 1), (700, 0), (3150, 0), (3151, 1), (3420, 1), (3450, 0)]),
+                *accents([(0, 1), (3500, 1), (3800, 0)]),
+                *entrance_copy()]
     doc.timeline("arena-entrance-run", 4000, [
-        fade("arena-shade", [(0, 0), (400, 0.42), (3500, 0.42), (3950, 0)]), *bars([(0, 0), (400, 1), (3500, 1), (3950, 0)]),
-        fade("arena-rule-top", [(0, 0), (500, 0.9), (3500, 0.9), (3850, 0)]),
-        fade("arena-rule-bottom", [(0, 0), (500, 0.9), (3500, 0.9), (3850, 0)]),
-        *entrance_copy()], complete="arenaEntranceDone", essential=True)
-    # The entrance over a frame the introductions left open: every track starts
-    # at its first key, so the open frame must be authored open or it would
-    # snap shut and reopen.
+        fade("arena-shade", [(0, 0), (400, 0.42), (3500, 0.42), (3950, 0)]),
+        *bands([(0, "closed", ui.ACCEL), (500, "docked"), (3500, "docked", ease_in), (3950, "gone")]),
+        *entrance_exit()], complete="arenaEntranceDone", essential=True)
+    # The entrance over bands the introductions left docked: every track starts
+    # at its first key, so the docked frame must be authored docked or it would
+    # snap out and dock again.
     doc.timeline("arena-entrance-held-run", 4000, [
-        fade("arena-shade", [(0, 0.3), (400, 0.42), (3500, 0.42), (3950, 0)]), *bars([(0, 1), (3500, 1), (3950, 0)]),
-        fade("arena-rule-top", [(0, 0.9), (3500, 0.9), (3850, 0)]),
-        fade("arena-rule-bottom", [(0, 0.9), (3500, 0.9), (3850, 0)]),
-        *entrance_copy()], complete="arenaEntranceDone", essential=True)
-    # An introduction: the first combatant opens the frame at a lighter shade
+        fade("arena-shade", [(0, 0.3), (400, 0.42), (3500, 0.42), (3950, 0)]),
+        *bands([(0, "docked"), (3500, "docked", ease_in), (3950, "gone")]),
+        *entrance_exit()], complete="arenaEntranceDone", essential=True)
+    # An introduction: the first combatant docks the bands at a lighter shade
     # than the entrance so the fighter reads clearly; every combatant fades its
-    # own copy in. Nothing closes the frame - the entrance takes it over.
+    # own copy in and draws the accents again. Nothing sends the bands out - the
+    # entrance takes them over. A later combatant settles an interrupted move.
     doc.timeline("arena-intro-open", 500, [
-        fade("arena-shade", [(0, 0), (400, 0.3)]), *bars([(0, 0), (400, 1)]),
-        fade("arena-rule-top", [(0, 0), (500, 0.9)]), fade("arena-rule-bottom", [(0, 0), (500, 0.9)])], essential=True)
-    doc.timeline("arena-intro-card", 460, [
+        fade("arena-shade", [(0, 0), (400, 0.3)]), *bands([(0, "closed", ui.ACCEL), (500, "docked")])], essential=True)
+    doc.timeline("arena-intro-hold", 10, [
+        fade("arena-shade", [(0, 0.3), (10, 0.3)]), *bands([(0, "docked"), (10, "docked")])], essential=True)
+    doc.timeline("arena-intro-card", 700, [
         fade("arena-e-kicker", [(0, 0), (60, 0), (320, 1)]),
         fade("arena-e-title", [(0, 0), (140, 0), (460, 1)]),
-        fade("arena-e-sub", [(0, 0), (140, 0), (460, 1)])], essential=True)
+        fade("arena-e-sub", [(0, 0), (140, 0), (460, 1)]),
+        *accents([(0, 1), (700, 1)]), *draw_accents(250)], essential=True)
+
+    def clear_frame(shade_from: float) -> list:
+        return [fade("arena-shade", [(0, shade_from), (350, 0), (400, 0)]),
+                *bands([(0, "docked", ease_in), (350, "gone"), (400, "gone")]),
+                *scan([(0, 1, ease_in), (200, 0), (400, 0)]),
+                *accents([(0, 1), (300, 0), (400, 0)])]
     doc.timeline("arena-intro-clear-run", 400, [
-        fade("arena-shade", [(0, 0.3), (350, 0), (400, 0)]), *bars([(0, 1), (350, 0), (400, 0)]),
-        fade("arena-rule-top", [(0, 0.9), (300, 0), (400, 0)]), fade("arena-rule-bottom", [(0, 0.9), (300, 0), (400, 0)]),
+        *clear_frame(0.3),
         fade("arena-e-kicker", [(0, 1), (250, 0), (400, 0)]), fade("arena-e-title", [(0, 1), (250, 0), (400, 0)]),
         fade("arena-e-sub", [(0, 1), (250, 0), (400, 0)])], complete="arenaClearDone", essential=True)
     doc.timeline("arena-victory-run", 2950, [
-        fade("arena-shade", [(0, 0), (500, 0.18), (2950, 0.18)]), *bars([(0, 0), (450, 1), (2950, 1)]),
-        fade("arena-rule-top", [(0, 0), (550, 0.9), (2950, 0.9)]), fade("arena-rule-bottom", [(0, 0), (550, 0.9), (2950, 0.9)]),
+        fade("arena-shade", [(0, 0), (500, 0.18), (2950, 0.18)]),
+        *bands([(0, "closed", ui.ACCEL), (500, "docked"), (2950, "docked")]),
+        *accents([(0, 1), (2950, 1)]), *draw_accents(250),
         fade("arena-v-kicker", [(0, 0), (220, 0), (520, 1), (2950, 1)]), fade("arena-v-title", [(0, 0), (220, 0), (640, 1), (2950, 1)]),
         fade("arena-v-score", [(0, 0), (620, 0), (920, 1), (2950, 1)]), fade("arena-victor", [(0, 0), (900, 0), (1350, 1), (2950, 1)]),
         fade("arena-v-rec", [(0, 0), (2600, 0), (2950, 0.9)])], essential=True)
     doc.timeline("arena-clear-run", 400, [
-        fade("arena-shade", [(0, 0.42), (350, 0), (400, 0)]), *bars([(0, 1), (350, 0), (400, 0)]),
-        fade("arena-rule-top", [(0, 0.9), (300, 0), (400, 0)]), fade("arena-rule-bottom", [(0, 0.9), (300, 0), (400, 0)]),
+        *clear_frame(0.42),
         fade("arena-v-kicker", [(0, 1), (250, 0), (400, 0)]), fade("arena-v-title", [(0, 1), (250, 0), (400, 0)]),
         fade("arena-v-score", [(0, 1), (250, 0), (400, 0)]), fade("arena-victor", [(0, 1), (250, 0), (400, 0)]),
         fade("arena-v-rec", [(0, 0.9), (250, 0), (400, 0)])], complete="arenaClearDone", essential=True)
@@ -1940,17 +2020,18 @@ def arena_presentation(doc: HudDocument) -> dict:
     # run move to it, then cancels the older runs: a clear still fading out
     # would otherwise complete underneath the new card and hide the layer.
     introducing = op("==", S("oq4.arena"), 3)
-    doc.on("arenaCampaignIntroduce", when(op("!=", S("oq4.arena"), 3), [play("arena-intro-open")]),
+    doc.on("arenaCampaignIntroduce", when(op("!=", S("oq4.arena"), 3), [play("arena-intro-open")], [play("arena-intro-hold")]),
            {"op": "setState", "values": {"oq4.arena": 3}}, play("arena-intro-card"),
            cancel("arena-entrance-run"), cancel("arena-entrance-held-run"), cancel("arena-clear-run"), cancel("arena-intro-clear-run"))
     doc.on("arenaCampaignEntrance", when(introducing, [play("arena-entrance-held-run")], [play("arena-entrance-run")]),
            {"op": "setState", "values": {"oq4.arena": 1}},
-           cancel("arena-intro-open"), cancel("arena-intro-card"), cancel("arena-clear-run"), cancel("arena-intro-clear-run"))
+           cancel("arena-intro-open"), cancel("arena-intro-hold"), cancel("arena-intro-card"), cancel("arena-clear-run"),
+           cancel("arena-intro-clear-run"))
     doc.on("arenaCampaignVictory", {"op": "setState", "values": {"oq4.arena": 2}}, play("arena-victory-run"),
-           cancel("arena-intro-open"), cancel("arena-intro-card"), cancel("arena-entrance-run"), cancel("arena-entrance-held-run"),
-           cancel("arena-clear-run"), cancel("arena-intro-clear-run"))
+           cancel("arena-intro-open"), cancel("arena-intro-hold"), cancel("arena-intro-card"), cancel("arena-entrance-run"),
+           cancel("arena-entrance-held-run"), cancel("arena-clear-run"), cancel("arena-intro-clear-run"))
     doc.on("arenaCampaignPresentationClear", when(introducing, [play("arena-intro-clear-run")], [play("arena-clear-run")]),
-           cancel("arena-intro-open"), cancel("arena-intro-card"))
+           cancel("arena-intro-open"), cancel("arena-intro-hold"), cancel("arena-intro-card"))
     doc.on("arenaEntranceDone", {"op": "setState", "values": {"oq4.arena": 0}})
     doc.on("arenaClearDone", {"op": "setState", "values": {"oq4.arena": 0}})
     return layer

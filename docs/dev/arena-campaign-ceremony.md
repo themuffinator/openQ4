@@ -44,9 +44,9 @@ still steer the orbit.
 
 `ArenaCampaignPresentationActive()` hides the crosshair, weapon zoom and status
 bar (`idPlayer::DrawHUD`) for every presentation shot; the match HUD still draws
-because it carries the letterbox and cards. The game also publishes it to the
+because it carries the framing bands and cards. The game also publishes it to the
 match HUD as `arena_hudHidden` every frame, and both HUDs then keep only the
-letterbox, its cards and the centre notice: `mphud.gui` wraps every other
+framing bands, the cards and the centre notice: `mphud.gui` wraps every other
 window in `oq4_match_hud`, and the Remastered document gates every group but
 its Arena layer and the main notice. The overlay HUD is skipped as well, and
 the passive chat panel the engine installs over the classic match HUD
@@ -65,10 +65,42 @@ named events and `arena_present*` state:
 | `arenaCampaignVictory` | 2 | title, score, victor |
 | `arenaCampaignPresentationClear` | → 0 | |
 
-The first introduction opens the letterbox; later introductions and the
-entrance take over the open frame instead of collapsing and reopening it
-(`arena_presentHold` in the stock GUI, `arena-intro-open` / `arena-entrance-held-run`
-in the Remastered document). A clear that is still fading must not hide a card
+### Framing bands (17 November 2026)
+
+The presentation is framed by the main menu's own top and bottom bands
+(Appendix B.2 of `ui-visual-design.md`) at their page dock, not by flat
+letterbox bars. The stock GUI draws the band art (`gfx/guis/mainmenu/topbar`,
+`btmbar` and their tiles) with a fill past the outer edge for tall screens;
+the Remastered document draws the same silhouettes as vectors with their
+`marine.rim` light. Both hang each band off an aspect-driven reference line:
+`clamp((1 - aspect × 9/16) / 2, 34/480, 0.09625)` of the screen height from
+each edge. At 16:9 and wider the lines sit 34 u in and the bands rest exactly
+at the menu's dock; narrower screens push them in, capped so the top band's
+deepest flat (6.8 u below its line) stays 4 u clear of the stock HUD row at
+57 u. The tableau's lower copy (victor card, recording line) sits above the
+bottom band's raised section, which reaches 10.6 u above its line.
+
+| Beat | Motion |
+| --- | --- |
+| Dock in (first introduction, entrance, tableau) | 500 ms with the menu's `frame.dock` acceleration; each band travels 160 u on the 45-degree motif, the top band from upper-leading, the bottom band from lower-leading |
+| Accents | 1 u orange (`#F27D0F` 0.9) lines 4 u inside the top band's lower flat (under all three notches) and the bottom band's raised flat. Every card draws them over 450 ms from 250 ms, ease-out, with a bright head at the tip; the top one runs from the leading side, the bottom one from the trailing side. A later introduction redraws them over the held frame |
+| Entrance exit | Copy fades at 3100 ms, accents draw back into the bands from 3150 ms (300 ms, ease-in), then the bands leave 160 u toward upper-trailing and lower-trailing from 3500 ms (450 ms, ease-in), so the frame sweeps across the shot instead of closing on itself |
+| Clear | Accents retract over 200 ms and the bands leave the same way over 350 ms |
+
+The stock GUI drives everything through three scalars on `oq4_arena_frame`:
+`open` (dock), `leave` (exit) and `scan` (accents), with the band rects built
+from them in `oq4_arena_band_pose`, never by rect transitions. The clear
+starts `leave` and `scan` from their live values (a non-rect `$` transition
+source is read when the transition starts), so an interrupted card's bands
+leave from where they were. The Remastered document animates the band and
+accent-run transforms; `arena-intro-hold` settles a held frame when a later
+introduction arrives. `tools/tests/arena_campaign.py` (`validate_letterbox`)
+pins the geometry and the reference-line policy.
+
+The first introduction docks the bands; later introductions and the
+entrance take over the docked frame instead of sending it out and docking it again
+(`arena_presentHold` in the stock GUI, `arena-intro-open` / `arena-intro-hold` /
+`arena-entrance-held-run` in the Remastered document). A clear that is still fading must not hide a card
 armed after it: the stock GUI's clear only hides the frame while
 `arena_presentClearing` is still set, the Remastered events cancel the clear
 timelines after playing their own, and `ClearArenaCampaignPresentation` only
