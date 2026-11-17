@@ -2120,6 +2120,38 @@ static bool R_PotentiallyInsideInfiniteShadow( const srfTriangles_t *occluder,
 
 /*
 ==================
+R_InteractionMaterialNoSelfShadow
+
+Whether a surface keeps its material's noSelfShadow ownership in this light:
+a noSelfShadow receiver catches no shadow from noSelfShadow casters, and a
+noSelfShadow caster's shadow reaches only ordinary receivers.  Quake 4 marks
+its characters this way so the original stencil shadows never drew faceted
+self-shadows across their low-polygon bodies.
+
+openQ4 (#238): with r_shadowMapCharacterSelfShadow, a skinned model (a
+character, creature or animated machine) is treated as an ordinary caster and
+receiver under a light drawn with shadow maps, whose filtered edges hold up on
+those bodies.  It then shadows itself, other characters and noSelfShadow
+props.  Stencil-shadowed lights keep the original rule, and so does an entity
+that asks for noSelfShadow itself: the players' bodies and their view and
+world weapons, whose shadows would otherwise fall on the view weapon.
+==================
+*/
+static bool R_InteractionMaterialNoSelfShadow( const idRenderEntityLocal *entityDef, const idMaterial *material,
+		bool shadowMapped ) {
+	if ( !material->TestMaterialFlag( MF_NOSELFSHADOW ) ) {
+		return false;
+	}
+	if ( shadowMapped && r_shadowMapCharacterSelfShadow.GetBool() &&
+		 entityDef->parms.joints != NULL && entityDef->parms.numJoints > 0 &&
+		 !entityDef->parms.noSelfShadow ) {
+		return false;
+	}
+	return true;
+}
+
+/*
+==================
 idInteraction::AddActiveInteraction
 
 Create and add any necessary light and shadow triangles
@@ -2417,7 +2449,8 @@ void idInteraction::AddActiveInteraction( void ) {
 					}
 
 					const idMaterial *surfaceShader = sint->shader;
-					const bool materialNoSelfShadow = surfaceShader->TestMaterialFlag( MF_NOSELFSHADOW );
+					const bool materialNoSelfShadow = R_InteractionMaterialNoSelfShadow(
+						entityDef, surfaceShader, shadowMapCasterPolicyActive );
 					const materialCoverage_t surfaceCoverage = surfaceShader->Coverage();
 					const idMaterial *shader = surfaceShader;
 					R_GlobalShaderOverride( &shader );
@@ -2472,7 +2505,7 @@ void idInteraction::AddActiveInteraction( void ) {
 		// whether a surface casts or locally routes its shadows. The static world
 		// under a prelit light is the exception retail makes: global ownership.
 		const bool materialNoSelfShadow = !prelightOwnsShadows
-			&& shadowShader->TestMaterialFlag( MF_NOSELFSHADOW );
+			&& R_InteractionMaterialNoSelfShadow( entityDef, shadowShader, shadowMapCasterPolicyActive );
 		const int shadowReceiverMask = materialNoSelfShadow
 			? SHADOWMAP_RECEIVER_MASK_GLOBAL
 			: ( SHADOWMAP_RECEIVER_MASK_LOCAL | SHADOWMAP_RECEIVER_MASK_GLOBAL );

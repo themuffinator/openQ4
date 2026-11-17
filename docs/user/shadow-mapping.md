@@ -109,6 +109,12 @@ seta r_shadowMapFilterMode 1
 seta r_shadowMapPointFilterMode 1
 ```
 
+## Character self-shadows
+
+**Not in 0.14.1.** In the original game, characters never cast shadows on themselves or on each other. Raven marked their materials to stay out of those shadows, because the original hard-edged shadows drew jagged, faceted bands across their low-polygon bodies. openQ4 keeps that look by default.
+
+Set `r_shadowMapCharacterSelfShadow 1` to let monsters, marines and other animated characters shadow themselves under lights drawn with shadow maps: an arm darkens the chest it hangs in front of, and the underside of a shoulder pad falls into shade. They also shadow each other and the props and machines that used to stay clear of their shadows. It changes nothing under the original stencil shadows, and nothing for the players' own bodies and weapons. It needs shadow maps, so it does nothing below the Enhanced preset; on Enhanced, the point lights still use the original shadows. It can be switched on or off at any time and takes effect at once.
+
 ## Shadows through see-through surfaces
 
 ### Grates, fences and foliage
@@ -167,7 +173,7 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 - **Speckles or stripes on surfaces (shadow acne).** Raise the matching bias a very little. If it only happens with a wide soft edge, raise the shadow resolution or narrow `r_shadowMapFilterRadius` first.
 - **Outdoor sunlight shadows look too soft or too sharp.** Distant lights use a tighter edge (`r_shadowMapDistantFilterScale 0.35`). Lower it toward `0` for sharper shadows, or set `1` for the same softness as other lights.
 - **Character shadows outdoors look blocky.** Quake 4 lights its outdoor areas with a few very large lights, and without cascades each of them gets one shadow map stretched over the whole area: 2048 pixels across on Quality, 4096 on Ultra. Turn on cascades with `r_shadowMapCSM 1` (Maximum already does), which spends the sharpest map on the area around you. Raising `r_shadowMapSize` helps less and costs more memory. If you prefer the original hard-edged look, `r_useShadowMap 0` brings back the stencil shadows.
-- **Characters don't shadow some objects, or themselves.** That is how Quake 4 was made. Characters and many props, consoles and machines use materials marked to keep out of each other's shadows, so the original stencil shadows looked clean on their low-polygon models. Characters still shadow most of the level, and the level still shadows them. openQ4 keeps the original rule.
+- **Characters don't shadow some objects, or themselves.** That is how Quake 4 was made. Characters and many props, consoles and machines use materials marked to keep out of each other's shadows, so the original stencil shadows looked clean on their low-polygon models. Characters still shadow most of the level, and the level still shadows them. openQ4 keeps the original rule unless you turn on [character self-shadows](#character-self-shadows).
 - **Soft edges don't change with distance.** Check `r_shadowMapFilterMode 2`.
 - **A fence or grate casts a solid shadow.** Its material's holes come from something shadow maps can't trace (a video, a generated texture or unusual texture coordinates). `r_shadowMapHashedAlpha` can't change that.
 - **Glass casts no shadow, or too much.** Glass shadows need `r_shadowMapTranslucentMoments 1`, and only common blended materials are supported. Lower `r_shadowMapTranslucentDensity` if they're too strong.
@@ -188,6 +194,7 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 | `r_shadowMapCSM` | `0` | `0..1` | Cascades for spotlights and sunlight: several shadow maps per light, sharpest nearest you. Maximum sets `1`. |
 | `r_shadowMapProjectedCSM` | `1` | `0..1` | Lets ordinary spotlights use cascades when `r_shadowMapCSM` is on. Sunlight and other parallel lights keep their own wide coverage either way. |
 | `r_shadowMapHashedAlpha` | `1` | `0..1` | Steadier shadows from grates, fences and foliage. `0` gives harder, cleaner cutout edges. |
+| `r_shadowMapCharacterSelfShadow` | `0` | `0..1` | Character self-shadows: under shadow-mapped lights, animated characters shadow themselves, each other and props. `0` keeps the original rule. **Not in 0.14.1.** |
 | `r_shadowMapStableAlphaHash` | `1` | `0..1` | Keeps that cutout pattern fixed to the world, so it doesn't crawl as the camera moves. |
 | `r_shadowMapTranslucentReceivers` | `1` | `0..1` | Lets see-through surfaces receive shadows like solid ones, as `r_stencilTranslucentShadows` does for the original shadows. |
 | `r_shadowMapCasterCulling` | `2` | `0..4` | Which side of an object's surfaces the shadow records. `2` (automatic) matches the original shadows: a lamp behind a one-sided panel shines through it, and solid props keep a grounded contact shadow. `0` records both sides, `1` the side facing the light, `3` the side facing away for every object, and `4` is the earlier automatic mode, kept for comparison. |

@@ -45,6 +45,33 @@ does not restore the withdrawn release. See
   Weapon X Offset's. Strings `#str_231773` and `#str_231774` in all twelve
   languages.
 
+## Characters can shadow themselves (#238), 17 November 2026
+
+- **Optional character self-shadows.** With `r_shadowMapCharacterSelfShadow 1`,
+  monsters, marines and other animated characters shadow themselves under
+  lights drawn with shadow maps: an arm shades the chest behind it, a shoulder
+  pad's underside falls into shade. They also shadow each other and the props
+  that used to stay clear of their shadows (#237). Quake 4 marked these
+  materials to keep out of each other's shadows, because its stencil shadows
+  drew faceted bands across low-polygon bodies; shadow maps' filtered edges
+  don't.
+- **What to do.** Nothing; it is off by default, so the game looks as it always
+  did. It needs shadow maps (Enhanced and up), leaves the original stencil
+  shadows and the players' own bodies and weapons alone, and takes effect at
+  once.
+- Development: `R_InteractionMaterialNoSelfShadow` in `Interaction.cpp`
+  decides both ownership sites of `idInteraction::AddActiveInteraction`, the
+  receiver list (local or global interactions) and the caster chain (shadow
+  receiver mask), so stencil, OpenGL and Vulkan read one decision. A skinned
+  entity (`parms.joints`) without the entity-level `noSelfShadow` is treated as
+  ordinary under a light with `shadowMapCasterPolicyActive`.
+- Evidence (17 November, Windows x64, hub2, a posed Strogg marine under a
+  `testLight` spotlight, viewed from the side, no OS input): on Quality the
+  light's noSelfShadow casters/receivers fall from 43/37 to 11/9 with the cvar
+  on and return with it off, in two cycles; OpenGL and Vulkan frames show the
+  marine's soft self-shadow with no acne; Balanced (stencil) frames are
+  unchanged. No errors in the logs.
+
 ## Weapon fire and explosions cast shadows (#235, #236), 17 November 2026
 
 - **Gunfire throws shadows.** On Quality, Ultra and Maximum, muzzle flashes

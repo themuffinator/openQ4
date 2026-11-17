@@ -1221,8 +1221,12 @@ diagnostics establish whole-frame ownership or production performance.
   of those shadows. A storage2 probe shows them mapped on both backends and
   drawn by the stencil path on Balanced, with no self-occlusion. See
   [weapon-light shadows](release-completion.md#weapon-fire-and-explosions-cast-shadows-235-236-17-november-2026).
+  Character self-shadows, 17 November (#238): `r_shadowMapCharacterSelfShadow`
+  (off by default) lets skinned models ignore noSelfShadow ownership under
+  shadow-mapped lights; verified on both backends, stencil unchanged. See
+  [character self-shadows](release-completion.md#characters-can-shadow-themselves-238-17-november-2026).
   Remaining: physical-platform breadth; combat-crowd cost of weapon-light
-  shadows on Quality (FPS-03).
+  shadows on Quality (FPS-03); a settings row for character self-shadows.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
