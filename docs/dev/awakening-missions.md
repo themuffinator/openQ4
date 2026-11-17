@@ -309,6 +309,17 @@ be invented or re-enabled.
   Damage contribution is capped at remaining health and the radius is clamped
   without per-hit integer rounding. Shared lights retain their `fireCount`
   contribution. Each stage also reapplies its authored `fxtarget` direction.
+- **Heat-exchanger jets (17 November 2026):** M04's four `func_fire_volume`
+  vents are the only fires that set `fxtarget`, and none of their flames could
+  be seen. `riFireFX::Event_LookAtTarget` built the effect axis from the raw
+  vector to the target; `idVec3::ToMat3()` keeps that vector's length, so the
+  roughly 100-unit aim scaled each jet about a hundredfold and scattered its
+  particles outside the tunnel. The direction is now normalised, and a target
+  at the vent's own origin is skipped. Each pair of jets now meets under its
+  ceiling grate, and the small-flame and smoke stages follow the same aim.
+  Damage, collision and lights were unaffected. Loading a save re-aims the
+  running effect, so existing saves show the jets too.
+  `awakening_chapter_behavior.py` checks the axis is unit length.
 - **M02 repair bots:** all six threads attempted to bind the nonexistent
   `repbot_1`. Each now binds its own bot to its own repair station.
 - **M02 generator defence:** the six-bot death counter points at deleted

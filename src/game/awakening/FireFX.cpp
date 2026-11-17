@@ -331,6 +331,11 @@ void riFireFX::Event_Activate( idEntity *activator ) {
 riFireFX::Event_LookAtTarget
 
 Aims the running effect at the first fxtarget.
+
+idVec3::ToMat3() keeps the vector's length in the forward and up rows, so the
+direction must be unit length. m04's heat-exchanger jets aim at targets about
+100 units away; an unnormalised axis scaled them a hundredfold and scattered
+the flames far outside the tunnel, leaving the vents with no visible effect.
 ================
 */
 void riFireFX::Event_LookAtTarget( void ) {
@@ -343,7 +348,10 @@ void riFireFX::Event_LookAtTarget( void ) {
 		if ( target == NULL ) {
 			continue;
 		}
-		const idVec3 dir = target->GetPhysics()->GetOrigin() - GetPhysics()->GetOrigin();
+		idVec3 dir = target->GetPhysics()->GetOrigin() - GetPhysics()->GetOrigin();
+		if ( dir.Normalize() < idMath::FLOAT_EPSILON ) {
+			continue;
+		}
 		fx->SetEndOrigin( target->GetPhysics()->GetOrigin() );
 		fx->SetAxis( dir.ToMat3() );
 		return;

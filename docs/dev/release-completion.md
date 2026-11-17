@@ -7,6 +7,16 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's prison heat exhausts burn again, 17 November 2026
+
+- **You can see what the cold cannon is for.** In the prison mission, the
+  high-temperature exhausts in the heat-exchanger tunnel Darnell warns you
+  about now shoot visible jets of flame. Before, the vents still burned you,
+  but nothing showed. Freezing a jet shrinks it, then leaves smoke.
+- **What to do.** Replace the single-player game module. Existing saves show
+  the jets once loaded.
+- Details: [heat-exchanger jets](awakening-missions.md#corrections).
+
 ## Markswell's briefing in The Awakening's opening, 17 November 2026
 
 - **The lieutenant's briefing plays as one performance.** In the first

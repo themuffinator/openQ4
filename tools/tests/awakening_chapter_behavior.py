@@ -23,7 +23,7 @@ def main():
     source = ROOT/'src/game/awakening/FireFX.cpp'
     text = source.read_text()
     methods = []
-    for name in ('Damage', 'UpdateContents', 'ShrinkTargetLights'):
+    for name in ('Damage', 'UpdateContents', 'ShrinkTargetLights', 'Event_LookAtTarget'):
         signature = f'void riFireFX::{name}('
         start = text.index(signature)
         opening = text.index('{', start)
