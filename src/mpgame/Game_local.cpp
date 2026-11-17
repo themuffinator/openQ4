@@ -85,6 +85,31 @@ static bool rvProjectedLightVecUsable( const idVec3 &value ) {
 	return rvProjectedLightVecFinite( value ) && value.LengthSqr() > VECTOR_EPSILON_SQR;
 }
 
+/*
+================
+rvKeepCarriedLightOnHolderSide
+
+openQ4: a light carried on a gun (a flashlight) is placed at a joint that can
+reach through a wall the holder's eye is still in front of. A light placed past
+that wall lights the room behind it and leaves the wall in front dark. Trace
+from the eye to just past the desired origin along the beam: if anything is in
+the way, the light goes back along that line to `clearance` short of it, which
+also keeps it off a surface right in front of it. Never further back than the
+eye. One point trace.
+================
+*/
+idVec3 rvKeepCarriedLightOnHolderSide( const idEntity *holder, const idVec3 &eye, const idVec3 &desired, const idVec3 &forward, float clearance, int contentMask ) {
+	const idVec3 probe = desired + forward * clearance;
+	trace_t tr;
+	gameLocal.TracePoint( holder, tr, eye, probe, contentMask, holder );
+	if ( tr.fraction >= 1.0f ) {
+		return desired;
+	}
+	idVec3 dir = probe - eye;
+	const float length = dir.Normalize();
+	return eye + dir * Max( 0.0f, length * tr.fraction - clearance );
+}
+
 void rvNormalizeProjectedRenderLight( renderLight_t &light, const char *ownerName, const char *lightName ) {
 	if ( light.pointLight ) {
 		return;

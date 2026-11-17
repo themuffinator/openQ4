@@ -362,6 +362,7 @@ extern idCVar	g_showPlayerShadow;
 extern idCVar	g_showPresentationPose;
 extern idCVar	g_presentationClockCapture;
 extern idCVar	g_dynamicLightShadows;
+extern idCVar	g_flashlightBeam;
 
 // projectile light shadow gate (SysCvar.cpp)
 bool G_DynamicLightShadowsEnabled( void );

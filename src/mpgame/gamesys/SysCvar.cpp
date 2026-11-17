@@ -707,6 +707,7 @@ idCVar pm_vehicleSoundLerpScale(	"pm_vehicleSoundLerpScale",		"10",		CVAR_GAME |
 idCVar g_showPlayerShadow(			"g_showPlayerShadow",		"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "enables shadow of player model" );
 idCVar g_showPresentationPose(		"g_showPresentationPose",	"0",			CVAR_GAME | CVAR_BOOL, "report whether the local player's body reaches the presentation clock" );
 idCVar g_presentationClockCapture(	"g_presentationClockCapture",	"0",		CVAR_GAME | CVAR_INTEGER, "capture this many presentation-clock samples, then dump them once" );
+idCVar g_flashlightBeam(			"g_flashlightBeam",			"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "visible flashlight beams on characters' guns: 1 = a beam that widens to the flashlight's reach and stops at the first surface in its way, 0 = the original thin effect, which passes through walls" );
 idCVar g_dynamicLightShadows(		"g_dynamicLightShadows",	"-1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_INTEGER, "weapon lights request shadows (gun flashlight, muzzle flashes, projectile and explosion lights, and the lights in weapon and monster effects): -1 = auto (the flashlight wherever shadows are drawn, the rest at the highest machine spec: Quality, Ultra and Maximum), 0 = never, 1 = always", -1, 1 );
 
 // Mirrors the single-player gate in src/game/gamesys/SysCvar.cpp.

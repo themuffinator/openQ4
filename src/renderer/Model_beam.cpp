@@ -220,3 +220,197 @@ idBounds idRenderModelBeam::Bounds( const struct renderEntity_s *renderEntity ) 
 	}
 	return b;
 }
+
+/*
+===============================================================================
+
+	openQ4 cone beam
+
+A light beam drawn as a sheet that always faces the view: narrow at the apex
+(the renderEntity origin) and widening to the end point, like the cone of
+lit air in front of a flashlight. It is several rows long and three columns
+wide, so the texture keeps its shape across a strongly tapered sheet instead of
+shearing along one diagonal.
+
+The texture runs from its centre (s = 0.5) at the apex towards its trailing
+edge, scaled by SHADERPARM_CONEBEAM_REACH, so a beam cut short by a wall stops
+at the brightness it had there rather than fading out early. The sheet fades
+where it would be seen end on (looking down the beam) and where it passes
+through the camera, the two places a flat sheet cannot pass for a volume.
+
+===============================================================================
+*/
+
+static const char *coneBeam_SnapshotName = "_coneBeam_Snapshot_";
+static const int CONEBEAM_ROWS = 6;
+static const int CONEBEAM_COLUMNS = 3;
+static const int CONEBEAM_VERTS = CONEBEAM_ROWS * CONEBEAM_COLUMNS;
+static const int CONEBEAM_INDEXES = ( CONEBEAM_ROWS - 1 ) * ( CONEBEAM_COLUMNS - 1 ) * 6;
+
+static float R_ConeBeamWidth( const struct renderEntity_s *renderEntity, const float fraction ) {
+	const float startWidth = Max( 0.0f, renderEntity->shaderParms[SHADERPARM_CONEBEAM_START_WIDTH] );
+	const float endWidth = Max( 0.0f, renderEntity->shaderParms[SHADERPARM_BEAM_WIDTH] );
+	return startWidth + ( endWidth - startWidth ) * fraction;
+}
+
+static byte R_ConeBeamColorByte( const float value ) {
+	return static_cast<byte>( idMath::ClampInt( 0, 255, idMath::FtoiFast( value * 255.0f ) ) );
+}
+
+/*
+===============
+idRenderModelConeBeam::IsDynamicModel
+===============
+*/
+dynamicModel_t idRenderModelConeBeam::IsDynamicModel() const {
+	return DM_CONTINUOUS;	// regenerate for every view
+}
+
+/*
+===============
+idRenderModelConeBeam::IsLoaded
+===============
+*/
+bool idRenderModelConeBeam::IsLoaded() {
+	return true;
+}
+
+/*
+===============
+idRenderModelConeBeam::InstantiateDynamicModel
+===============
+*/
+idRenderModel *idRenderModelConeBeam::InstantiateDynamicModel( const struct renderEntity_s *renderEntity, const struct viewDef_s *viewDef, idRenderModel *cachedModel ) {
+	if ( cachedModel && !r_useCachedDynamicModels.GetBool() ) {
+		delete cachedModel;
+		cachedModel = NULL;
+	}
+	if ( renderEntity == NULL || viewDef == NULL ) {
+		delete cachedModel;
+		return NULL;
+	}
+
+	idRenderModelStatic *staticModel;
+	srfTriangles_t *tri;
+	if ( cachedModel != NULL ) {
+		assert( dynamic_cast<idRenderModelStatic *>( cachedModel ) != NULL );
+		assert( idStr::Icmp( cachedModel->Name(), coneBeam_SnapshotName ) == 0 );
+		staticModel = static_cast<idRenderModelStatic *>( cachedModel );
+		tri = staticModel->Surface( 0 )->geometry;
+	} else {
+		staticModel = new idRenderModelStatic;
+		staticModel->InitEmpty( coneBeam_SnapshotName );
+
+		tri = R_AllocStaticTriSurf();
+		R_AllocStaticTriSurfVerts( tri, CONEBEAM_VERTS );
+		R_AllocStaticTriSurfIndexes( tri, CONEBEAM_INDEXES );
+		for ( int i = 0; i < CONEBEAM_VERTS; i++ ) {
+			tri->verts[i].Clear();
+		}
+		int numIndexes = 0;
+		for ( int row = 0; row < CONEBEAM_ROWS - 1; row++ ) {
+			for ( int column = 0; column < CONEBEAM_COLUMNS - 1; column++ ) {
+				const int a = row * CONEBEAM_COLUMNS + column;
+				const int b = a + 1;
+				const int c = a + CONEBEAM_COLUMNS;
+				const int d = c + 1;
+				tri->indexes[numIndexes++] = a;
+				tri->indexes[numIndexes++] = c;
+				tri->indexes[numIndexes++] = b;
+				tri->indexes[numIndexes++] = c;
+				tri->indexes[numIndexes++] = d;
+				tri->indexes[numIndexes++] = b;
+			}
+		}
+		tri->numVerts = CONEBEAM_VERTS;
+		tri->numIndexes = CONEBEAM_INDEXES;
+
+		modelSurface_t surf = {};
+		surf.geometry = tri;
+		surf.id = 0;
+		surf.shader = tr.defaultMaterial;
+		staticModel->AddSurface( surf );
+	}
+
+	const idVec3 target = *reinterpret_cast<const idVec3 *>( &renderEntity->shaderParms[SHADERPARM_BEAM_END_X] );
+	idVec3 localView, localTarget;
+	float modelMatrix[16];
+	R_AxisToModelMatrix( renderEntity->axis, renderEntity->origin, modelMatrix );
+	R_GlobalPointToLocal( modelMatrix, viewDef->renderView.vieworg, localView );
+	R_GlobalPointToLocal( modelMatrix, target, localTarget );
+
+	idVec3 majorDir = localTarget;
+	const float length = majorDir.Normalize();
+	const float reach = idMath::ClampFloat( 0.0f, 1.0f, renderEntity->shaderParms[SHADERPARM_CONEBEAM_REACH] );
+	const float alpha = renderEntity->shaderParms[SHADERPARM_ALPHA];
+
+	for ( int row = 0; row < CONEBEAM_ROWS; row++ ) {
+		const float fraction = static_cast<float>( row ) / static_cast<float>( CONEBEAM_ROWS - 1 );
+		const idVec3 centre = localTarget * fraction;
+		const float halfWidth = 0.5f * R_ConeBeamWidth( renderEntity, fraction );
+
+		idVec3 toCentre = centre - localView;
+		const float distance = toCentre.Normalize();
+		// each row faces the view on its own, so a long beam near the camera
+		// keeps its width along its whole length
+		idVec3 minor;
+		minor.Cross( majorDir, toCentre );
+		const float minorLength = minor.Normalize();
+		if ( length <= 0.0f || minorLength <= 1.0e-4f ) {
+			minor.Zero();
+		}
+
+		// fade out where the sheet is seen end on, and where it reaches the eye
+		const float endOn = idMath::Fabs( toCentre * majorDir );
+		const float facingFade = idMath::ClampFloat( 0.0f, 1.0f, ( 0.985f - endOn ) / ( 0.985f - 0.85f ) );
+		const float nearFade = idMath::ClampFloat( 0.0f, 1.0f, ( distance - halfWidth ) / 48.0f );
+
+		byte color[4];
+		color[0] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_RED] );
+		color[1] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_GREEN] );
+		color[2] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_BLUE] );
+		color[3] = R_ConeBeamColorByte( alpha * facingFade * nearFade );
+
+		const float s = 0.5f + 0.5f * reach * fraction;
+		for ( int column = 0; column < CONEBEAM_COLUMNS; column++ ) {
+			idDrawVert &vert = tri->verts[row * CONEBEAM_COLUMNS + column];
+			const float side = 1.0f - static_cast<float>( column );	// +1, 0, -1
+			vert.xyz = centre + minor * ( halfWidth * side );
+			vert.st[0] = s;
+			vert.st[1] = 0.5f * static_cast<float>( column );
+			vert.color[0] = color[0];
+			vert.color[1] = color[1];
+			vert.color[2] = color[2];
+			vert.color[3] = color[3];
+		}
+	}
+
+	R_BoundTriSurf( tri );
+	// the verts change every view, but a reused snapshot keeps its static
+	// ambient cache; free it so they re-upload (see idRenderModelBeam)
+	R_FreeStaticTriSurfVertexCaches( tri );
+	staticModel->bounds = tri->bounds;
+	return staticModel;
+}
+
+/*
+===============
+idRenderModelConeBeam::Bounds
+===============
+*/
+idBounds idRenderModelConeBeam::Bounds( const struct renderEntity_s *renderEntity ) const {
+	idBounds b;
+	b.Zero();
+	if ( renderEntity == NULL ) {
+		b.ExpandSelf( 8.0f );
+		return b;
+	}
+	const idVec3 target = *reinterpret_cast<const idVec3 *>( &renderEntity->shaderParms[SHADERPARM_BEAM_END_X] );
+	idVec3 localTarget;
+	float modelMatrix[16];
+	R_AxisToModelMatrix( renderEntity->axis, renderEntity->origin, modelMatrix );
+	R_GlobalPointToLocal( modelMatrix, target, localTarget );
+	b.AddPoint( localTarget );
+	b.ExpandSelf( 0.5f * Max( R_ConeBeamWidth( renderEntity, 0.0f ), R_ConeBeamWidth( renderEntity, 1.0f ) ) );
+	return b;
+}

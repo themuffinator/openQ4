@@ -352,6 +352,20 @@ protected:
 	int						flashlightHandle;
 	jointHandle_t			flashlightJoint;
 	idVec3					flashlightOffset;
+// openQ4: the light kept on this side of walls, and the visible beam
+	idVec3					flashlightBackoff;		// joint to light, from the last trace
+	int						flashlightTraceTime;	// game time of the last placement and beam trace
+	renderEntity_t			flashlightBeam;			// fx_flashlight drawn as a _CONEBEAM sheet
+	int						flashlightBeamHandle;
+	int						flashlightBeamMode;		// FLASHLIGHT_BEAM_*: which beam this actor shows
+	float					flashlightBeamLength;	// to the first surface in the beam's way
+	float					flashlightBeamReach;	// flashlightRadius
+	float					flashlightBeamSpread;	// tangent of the beam's half angle
+	enum {
+		FLASHLIGHT_BEAM_NONE,
+		FLASHLIGHT_BEAM_EFFECT,	// the retail fx_flashlight effect
+		FLASHLIGHT_BEAM_CONE	// g_flashlightBeam
+	};
 
 // bdube: death force
 	int						deathPushTime;
@@ -359,6 +373,8 @@ protected:
 	jointHandle_t			deathPushJoint;
 
 	void					FlashlightUpdate	( bool forceOn = false );
+	void					FlashlightBeamUpdate	( bool firstOn, bool traced );
+	void					FreeFlashlightBeam	( void );
 	void					InitDeathPush		( const idVec3& dir, int location, const idDict* damageDict, float pushScale = 1.0f );
 	void					DeathPush			( void );
 

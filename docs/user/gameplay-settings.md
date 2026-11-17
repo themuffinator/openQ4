@@ -284,6 +284,10 @@ It is off by default; off runs the original physics exactly. A change takes effe
 
 `g_classicDynamicLights` (on by default) brings back the Quake II and Quake III habit of lighting the world from the action: muzzle flashes throw a short, wide pool of light, bright projectiles carry their own glow, and explosions flash the surrounding walls. The colours come from the shipped Quake 4 assets. `g_classicDynamicLightScale` scales the radius of all of them from `0.25` to `4`; try lowering it before turning the feature off. See [Classic dynamic lights](classic-dynamic-lights.md) for the per-weapon colours.
 
+### Flashlights
+
+**Not in 0.14.1.** Your flashlight stays on your side of the wall. Held hard against a wall, a door or a thin panel, the gun used to reach through it, so the flashlight lit the room behind and left the wall in front of you dark. The marines' flashlight beams now widen from the gun out to the flashlight's reach and stop at the first wall or person in the way; the original thin beam passed straight through walls. `g_flashlightBeam 0` brings the original beam back.
+
 ## Settings reference
 
 All of these are saved automatically. Type them in the console, or put them in a config file as described in [Input settings](input-settings.md#config-files).
@@ -339,6 +343,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `g_enhancedPhysics` | `0` | `1` uses the enhanced ragdoll and object physics from the next map; multiplayer follows the server. |
 | `g_classicDynamicLights` | `1` | Dynamic lights on muzzle flashes, bright projectiles and explosions. |
 | `g_classicDynamicLightScale` | `1` | Radius of those lights, `0.25` to `4`. |
+| `g_flashlightBeam` | `1` | Characters' visible flashlight beams: `1` widen to the light's reach and stop at walls, `0` the original thin beam. **Not in 0.14.1.** |
 
 ### Sound and subtitles
 

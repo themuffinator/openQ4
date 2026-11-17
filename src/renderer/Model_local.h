@@ -810,6 +810,23 @@ public:
 /*
 ===============================================================================
 
+	Cone beam model (openQ4): a view-facing sheet that widens from the apex to
+	the end, for light beams. See SHADERPARM_CONEBEAM_* in RenderWorld.h.
+
+===============================================================================
+*/
+
+class idRenderModelConeBeam : public idRenderModelStatic {
+public:
+	virtual dynamicModel_t		IsDynamicModel() const;
+	virtual bool				IsLoaded();
+	virtual idRenderModel *		InstantiateDynamicModel( const struct renderEntity_s *ent, const struct viewDef_s *view, idRenderModel *cachedModel );
+	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
+};
+
+/*
+===============================================================================
+
 	Beam model
 
 ===============================================================================

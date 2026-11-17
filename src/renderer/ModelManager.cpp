@@ -62,6 +62,7 @@ private:
 	idHashIndex				hash;
 	idRenderModel *			defaultModel;
 	idRenderModel *			beamModel;
+	idRenderModel *			coneBeamModel;
 	idRenderModel *			spriteModel;
 	idRenderModel *			trailModel;
 	bool					insideLevelLoad;		// don't actually load now
@@ -227,6 +228,7 @@ idRenderModelManagerLocal::idRenderModelManagerLocal
 idRenderModelManagerLocal::idRenderModelManagerLocal() {
 	defaultModel = NULL;
 	beamModel = NULL;
+	coneBeamModel = NULL;
 	spriteModel = NULL;
 	insideLevelLoad = false;
 	trailModel = NULL;
@@ -371,6 +373,13 @@ void idRenderModelManagerLocal::Init() {
 	beam->SetLevelLoadReferenced( true );
 	beamModel = beam;
 	AddModel( beam );
+
+	// openQ4: the widening light-beam sheet
+	idRenderModelStatic *coneBeam = new idRenderModelConeBeam;
+	coneBeam->InitEmpty( "_CONEBEAM" );
+	coneBeam->SetLevelLoadReferenced( true );
+	coneBeamModel = coneBeam;
+	AddModel( coneBeam );
 
 	idRenderModelStatic *sprite = new idRenderModelSprite;
 	sprite->InitEmpty( "_SPRITE" );
@@ -542,7 +551,7 @@ void idRenderModelManagerLocal::FreeModel( idRenderModel *model ) {
 		common->Error( "idRenderModelManager::FreeModel: can't free the default model" );
 		return;
 	}
-	if ( model == beamModel ) {
+	if ( model == beamModel || model == coneBeamModel ) {
 		common->Error( "idRenderModelManager::FreeModel: can't free the beam model" );
 		return;
 	}

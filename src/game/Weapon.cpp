@@ -3063,22 +3063,24 @@ void rvWeapon::UpdateFlashlight ( void ) {
 
 	renderLight_t& light	  = lights[WPLIGHT_FLASHLIGHT];
 	renderLight_t& lightWorld = lights[WPLIGHT_FLASHLIGHT_WORLD];
-	trace_t	tr;
 
 	// the flash has an explicit joint for locating it
 	GetGlobalJointTransform( true, flashlightJointView, light.origin, light.axis, flashlightViewOffset );
 	const idVec3 jointOrigin = light.origin;
 
-	// if the desired point is inside or very close to a wall, back it up until it is clear
-	gameLocal.TracePoint( owner, tr, light.origin - playerViewAxis[0] * 8.0f, light.origin, MASK_SHOT_BOUNDINGBOX, owner );
-
-	// be at least 8 units away from a solid
-	light.origin = tr.endpos - (tr.fraction < 1.0f ? (playerViewAxis[0] * 8) : vec3_origin);
+	// openQ4: be at least 8 units in front of a solid, and never past one. Retail
+	// only looked 8 units back from the joint along the view, so a gun held into
+	// a wall, or a thin door or panel beside it, put the light behind the
+	// surface: the far side lit up and the wall in front stayed dark. Trace from
+	// the eye instead, which the player's bounds keep clear of walls.
+	light.origin = rvKeepCarriedLightOnHolderSide( owner, playerViewOrigin, jointOrigin, light.axis[0], 8.0f, MASK_SHOT_BOUNDINGBOX );
 	presentationFlashlightBackoff = light.origin - jointOrigin;
 
-	// put the world muzzle flash on the end of the joint, no matter what
+	// put the world flashlight on the end of the world joint, kept on the same
+	// side of the wall as the player's eye
 	if ( flashlightJointWorld != INVALID_JOINT ) {
 		GetGlobalJointTransform( false, flashlightJointWorld, lightWorld.origin, lightWorld.axis );
+		lightWorld.origin = rvKeepCarriedLightOnHolderSide( owner, playerViewOrigin, lightWorld.origin, lightWorld.axis[0], 8.0f, MASK_SHOT_BOUNDINGBOX );
 	} else {
 		lightWorld.origin = playerViewOrigin + playerViewAxis[0] * 20.0f;
 		lightWorld.axis = playerViewAxis;

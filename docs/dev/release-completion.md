@@ -7,6 +7,25 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Flashlights that stop at walls, 17 November 2026
+
+- **Your flashlight lights the wall in front of you.** Held against a wall, a
+  door or a thin panel, the gun reached through it and the flashlight was placed
+  on the far side: the room behind lit up and the wall you faced stayed dark.
+  The light is now kept on your side of anything between your eyes and the gun,
+  and at least 8 units from it. The same applies to the flashlight other views
+  see and to the marines' flashlights. It costs no more than before: one point
+  trace per light per game frame.
+- **Marines' flashlight beams cone out and stop at walls.** The original beam
+  was a thin bundle of lines about 100 units long that went straight through
+  any wall in front of it. It now widens from the gun at the flashlight's
+  authored angle (`flashlightAngle`) out to its reach (`flashlightRadius`),
+  fades with distance like the light, and ends at the first wall or character
+  in its way. It uses Quake 4's own beam texture. `g_flashlightBeam 0` brings
+  back the original effect.
+- **What to do.** Nothing. Replace the client, both renderers and both game
+  modules together.
+
 ## VR: the gun's own hands in your left hand, 17 November 2026
 
 - **Left-handed players see real hands on the gun.** With **Weapon Hand** set to

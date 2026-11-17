@@ -153,6 +153,7 @@ const int MAX_SAVEGAME_ANIMATED_ANIMS					= 256;
 
 void gameError( const char *fmt, ... );
 void rvNormalizeProjectedRenderLight( renderLight_t &light, const char *ownerName, const char *lightName );
+idVec3 rvKeepCarriedLightOnHolderSide( const idEntity *holder, const idVec3 &eye, const idVec3 &desired, const idVec3 &forward, float clearance, int contentMask );
 void gameDebugLogDamage( const char *source, idEntity *victim, idEntity *inflictor, idEntity *attacker,
 	const idDict *damageDef, const char *damageDefName, const idVec3 &dir, float damageScale, int location,
 	int damage, int armorSave, int healthBefore, int healthAfter, int methodOfDeath );

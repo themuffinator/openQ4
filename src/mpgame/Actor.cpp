@@ -475,6 +475,14 @@ idActor::idActor( void )
 
 	memset( &flashlight, 0, sizeof( flashlight ) );
 	flashlightHandle = -1;
+	flashlightBackoff.Zero();
+	flashlightTraceTime = -1;
+	memset( &flashlightBeam, 0, sizeof( flashlightBeam ) );
+	flashlightBeamHandle = -1;
+	flashlightBeamMode = FLASHLIGHT_BEAM_NONE;
+	flashlightBeamLength = 0.0f;
+	flashlightBeamReach = 0.0f;
+	flashlightBeamSpread = 0.0f;
 
 	deathPushTime	= 0;
 	deathPushForce.Zero();
@@ -496,6 +504,7 @@ idActor::~idActor( void ) {
 		gameRenderWorld->FreeLightDef( flashlightHandle );
 		flashlightHandle = -1;
 	}
+	FreeFlashlightBeam();
 // RAVEN END
 
 	int i;
@@ -659,6 +668,20 @@ void idActor::Spawn( void ) {
 	}
 	
 	spawnArgs.GetVector ( "flashlightOffset", "0 0 0", flashlightOffset );
+
+	// openQ4: the visible beam reaches flashlightRadius and opens at
+	// flashlightAngle (degrees from its axis). Retail authored both for every
+	// marine flashlight but read neither for a projected light; without an
+	// angle the beam follows the light's own projection.
+	flashlightBeamReach = Max( 0.0f, spawnArgs.GetFloat( "flashlightRadius", "0" ) );
+	const float beamAngle = spawnArgs.GetFloat( "flashlightAngle", "0" );
+	if ( beamAngle > 0.0f ) {
+		flashlightBeamSpread = idMath::Tan( DEG2RAD( idMath::ClampFloat( 1.0f, 60.0f, beamAngle ) ) );
+	} else if ( !flashlight.pointLight && flashlight.target.LengthSqr() > 0.0f ) {
+		flashlightBeamSpread = Max( flashlight.up.Length(), flashlight.right.Length() ) / flashlight.target.Length();
+	} else {
+		flashlightBeamSpread = idMath::Tan( DEG2RAD( 15.0f ) );
+	}
 
 	if ( spawnArgs.GetString( "flashlight_flaresurf", NULL ) ) {
 		HideSurface( spawnArgs.GetString( "flashlight_flaresurf", NULL ) );
@@ -1579,6 +1602,8 @@ void idActor::Event_Flashlight( bool on ) {
 		if ( spawnArgs.GetString( "fx_flashlight", NULL ) ) {
 			StopEffect( "fx_flashlight", true );
 		}
+		FreeFlashlightBeam();
+		flashlightBeamMode = FLASHLIGHT_BEAM_NONE;
 	}
 }
 
@@ -1598,26 +1623,134 @@ void idActor::FlashlightUpdate ( bool forceOn ) {
 		return;
 	}
 
-	if ( forceOn && flashlightHandle == -1 ) {
+	const bool firstOn = forceOn && flashlightHandle == -1;
+	if ( firstOn ) {
 		//first time turning it on
 		if ( spawnArgs.GetString( "flashlight_flaresurf", NULL ) ) {
 			ShowSurface( spawnArgs.GetString( "flashlight_flaresurf", NULL ) );
-		}
-		if ( spawnArgs.GetString( "fx_flashlight", NULL ) ) {
-			PlayEffect( "fx_flashlight", flashlightJoint, true );
 		}
 	}
 
 	// the flash has an explicit joint for locating it
 	GetJointWorldTransform ( flashlightJoint, gameLocal.time, flashlight.origin, flashlight.axis );
 	flashlight.origin += flashlightOffset * flashlight.axis;
-	
+
+	// openQ4: a gun held against a wall reaches through it; keep the light on
+	// this side, as the player's flashlight does. Trace once per game frame and
+	// carry that frame's back-off on any other presentation of it.
+	const bool traced = firstOn || flashlightTraceTime != gameLocal.time;
+	if ( traced ) {
+		flashlightTraceTime = gameLocal.time;
+		const idVec3 jointOrigin = flashlight.origin;
+		flashlight.origin = rvKeepCarriedLightOnHolderSide( this, GetEyePosition(), jointOrigin, flashlight.axis[0], 4.0f, CONTENTS_OPAQUE );
+		flashlightBackoff = flashlight.origin - jointOrigin;
+	} else {
+		flashlight.origin += flashlightBackoff;
+	}
+
 	if ( flashlightHandle != -1 ) {
 		gameRenderWorld->UpdateLightDef( flashlightHandle, &flashlight );
 	} else {
 		flashlightHandle = gameRenderWorld->AddLightDef( &flashlight );
 	}
 
+	FlashlightBeamUpdate( firstOn, traced );
+}
+
+/*
+=====================
+idActor::FlashlightBeamUpdate
+
+openQ4: the visible beam (fx_flashlight). Retail drew a fixed bundle of lines
+about a hundred units long, as thin as a gun barrel, through any wall in front
+of it. With g_flashlightBeam on it is a sheet from the light that widens at the
+flashlight's angle out to its reach and stops at the first opaque surface or
+character in its way, one point trace per game frame. Off keeps the retail
+effect.
+=====================
+*/
+void idActor::FlashlightBeamUpdate( bool firstOn, bool traced ) {
+	const char *beamEffect = spawnArgs.GetString( "fx_flashlight", "" );
+	if ( !beamEffect[0] ) {
+		return;
+	}
+
+	const int wanted = ( g_flashlightBeam.GetBool() && flashlightBeamReach > 0.0f ) ? FLASHLIGHT_BEAM_CONE : FLASHLIGHT_BEAM_EFFECT;
+	if ( wanted != flashlightBeamMode ) {
+		if ( wanted == FLASHLIGHT_BEAM_CONE ) {
+			// also stops a retail beam a saved game brought back
+			StopEffect( "fx_flashlight", true );
+			traced = true;
+		} else {
+			FreeFlashlightBeam();
+			// a restored game brings its own playing effect back
+			if ( firstOn || flashlightBeamMode == FLASHLIGHT_BEAM_CONE ) {
+				PlayEffect( "fx_flashlight", flashlightJoint, true );
+			}
+		}
+		flashlightBeamMode = wanted;
+	}
+	if ( flashlightBeamMode != FLASHLIGHT_BEAM_CONE ) {
+		return;
+	}
+
+	const idVec3 direction = flashlight.axis[0];
+	if ( traced ) {
+		trace_t tr;
+		gameLocal.TracePoint( this, tr, flashlight.origin, flashlight.origin + direction * flashlightBeamReach, CONTENTS_OPAQUE | CONTENTS_RENDERMODEL, this );
+		flashlightBeamLength = flashlightBeamReach * tr.fraction;
+	}
+	if ( flashlightBeamLength < 1.0f ) {
+		FreeFlashlightBeam();
+		return;
+	}
+
+	if ( flashlightBeamHandle == -1 ) {
+		memset( &flashlightBeam, 0, sizeof( flashlightBeam ) );
+		flashlightBeam.hModel = renderModelManager->FindModel( "_CONEBEAM" );
+		if ( flashlightBeam.hModel == NULL ) {
+			return;
+		}
+		flashlightBeam.customShader = declManager->FindMaterial( "gfx/effects/particles_shapes/lightbeam" );
+		flashlightBeam.axis = mat3_identity;
+		flashlightBeam.noShadow = true;
+		flashlightBeam.noSelfShadow = true;
+		flashlightBeam.entityNum = entityNumber;
+	}
+
+	static const float FLASHLIGHT_BEAM_APEX_WIDTH = 2.0f;
+	static const float FLASHLIGHT_BEAM_ALPHA = 0.55f;
+	const idVec3 end = flashlight.origin + direction * flashlightBeamLength;
+	flashlightBeam.origin = flashlight.origin;
+	flashlightBeam.shaderParms[ SHADERPARM_RED ] = flashlight.shaderParms[ SHADERPARM_RED ];
+	flashlightBeam.shaderParms[ SHADERPARM_GREEN ] = flashlight.shaderParms[ SHADERPARM_GREEN ];
+	flashlightBeam.shaderParms[ SHADERPARM_BLUE ] = flashlight.shaderParms[ SHADERPARM_BLUE ];
+	flashlightBeam.shaderParms[ SHADERPARM_ALPHA ] = FLASHLIGHT_BEAM_ALPHA;
+	flashlightBeam.shaderParms[ SHADERPARM_CONEBEAM_START_WIDTH ] = FLASHLIGHT_BEAM_APEX_WIDTH;
+	flashlightBeam.shaderParms[ SHADERPARM_CONEBEAM_REACH ] = flashlightBeamLength / flashlightBeamReach;
+	flashlightBeam.shaderParms[ SHADERPARM_BEAM_END_X ] = end.x;
+	flashlightBeam.shaderParms[ SHADERPARM_BEAM_END_Y ] = end.y;
+	flashlightBeam.shaderParms[ SHADERPARM_BEAM_END_Z ] = end.z;
+	flashlightBeam.shaderParms[ SHADERPARM_BEAM_WIDTH ] = FLASHLIGHT_BEAM_APEX_WIDTH + 2.0f * flashlightBeamLength * flashlightBeamSpread;
+	flashlightBeam.bounds = flashlightBeam.hModel->Bounds( &flashlightBeam );
+
+	if ( flashlightBeamHandle != -1 ) {
+		gameRenderWorld->UpdateEntityDef( flashlightBeamHandle, &flashlightBeam );
+	} else {
+		flashlightBeamHandle = gameRenderWorld->AddEntityDef( &flashlightBeam );
+	}
+}
+
+/*
+=====================
+idActor::FreeFlashlightBeam
+=====================
+*/
+void idActor::FreeFlashlightBeam( void ) {
+	if ( flashlightBeamHandle != -1 ) {
+		gameRenderWorld->FreeEntityDef( flashlightBeamHandle );
+		flashlightBeamHandle = -1;
+	}
 }
 
 // RAVEN END
