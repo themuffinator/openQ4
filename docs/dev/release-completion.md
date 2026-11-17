@@ -7,6 +7,30 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Screenshots from the pause menu, and tidier emotion cues in subtitles (#224, #225), 17 November 2026
+
+- **F12 takes a screenshot from the pause menu and the title screen again.**
+  The original menus let F1 to F12 run their key bindings, and the new
+  interface's title and pause screens took every key themselves. A function
+  key either screen does not use now runs its binding, as over the classic
+  menus and the multiplayer card (#224).
+- **Subtitles show the actors' emotion cues as stage directions.** Quake 4's
+  dialogue text carries the facial-animation cues its lip-sync system reads,
+  about 690 lines of them, some mid-sentence, and subtitles printed them raw:
+  `{furrow}Shit. Okay, let's...`. They now read `(Furrow) Shit. Okay,
+  let's...`; the neutral `{idle}` cue is left out and the stock lines' double
+  spaces close up (#225). The cue words are the game's own English names, as
+  the stock dialogue text is English.
+- Evidence: `audio_subtitles.py` (cue formatting cases in
+  `SubtitlePagingTest`; all 688 tagged stock lines formatted with no brace
+  left) pass, and `native_input_driver.py --mutations` passes the new
+  title/pause function-key case on both platform projections and rejects
+  its mutation. Hidden OpenGL client in
+  `game/airdefense1`, private save path, no OS input: radio line
+  `vo_1_1_2_12_1` captioned `(Furrow) Let's not lose focus here...`, a
+  fixture line showed mid-sentence cues with `{idle}` dropped, and
+  `screenshot` over the retained pause screen captured it.
+
 ## A copy of openQ4's own pack in a mod's folder no longer hides the new menus (#219), 17 November 2026
 
 - **Menus stay current when openQ4's pack was copied into a mod's folder.** A

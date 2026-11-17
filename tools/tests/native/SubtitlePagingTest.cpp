@@ -84,5 +84,27 @@ int main() {
 	assert(pages.back().end == 4096 && pages.size() < 256);
 	pages = Paginate("abcdef", 2, 1, [](const char*,int,float& w) { w=1;return 0; });
 	assert(pages.size() == 3); // Malformed input cannot stall pagination.
-	std::puts("Subtitle pagination: wrapping, timing, overlap rows, UTF-8, bounds and cinematic placement passed");
+	// Stock lip-sync text: facial-animation cues read as stage directions (#225),
+	// {idle} drops out, and the stock lines' runs of spaces close up.
+	const auto cues = [](const char* text) { return FormatCues(text); };
+	assert(cues("{furrow}Shit. Okay, let's...") == "(Furrow) Shit. Okay, let's...");
+	assert(cues("{puzzled}You're Kane, right? {idle}I'm Anderson.") == "(Puzzled) You're Kane, right? I'm Anderson.");
+	assert(cues("What the hell?  {scared}They got the main power!") == "What the hell? (Scared) They got the main power!");
+	assert(cues("Hey, {puzzled}didn't I see you?") == "Hey, (Puzzled) didn't I see you?");
+	assert(cues("You are{confused}... Corporal Kane") == "You are (Confused)... Corporal Kane");
+	assert(cues("{Puzzled}What?") == "(Puzzled) What?" && cues("{PAIN}Ugh") == "(Pain) Ugh");
+	assert(cues("{idle}Hello {idle}") == "Hello" && cues("word{idle}word") == "word word" && cues("Wait{idle}.") == "Wait.");
+	assert(cues("{happy}{idle}Done") == "(Happy) Done" && cues("Fine {happy}") == "Fine (Happy)");
+	assert(cues("{wry_smile}Sure") == "(Wry smile) Sure");
+	assert(cues("Okay . . .  so") == "Okay . . . so" && cues("  padded  ") == "padded");
+	// Only a short run of letters is a cue; other brace text and line breaks stay.
+	assert(cues("{} {1} {two words} {a-b}") == "{} {1} {two words} {a-b}");
+	assert(cues("{abcdefghijklmnopqrstuvwxyz}") == "{abcdefghijklmnopqrstuvwxyz}");
+	assert(cues("{abcdefghijklmnopqrstuvwx}") == "(Abcdefghijklmnopqrstuvwx)");
+	assert(cues("{furrow") == "{furrow" && cues("{") == "{");
+	assert(cues("one  \ntwo {scared}three") == "one\ntwo (Scared) three");
+	assert(cues("caf\xc3\xa9 {happy}ol\xc3\xa9") == "caf\xc3\xa9 (Happy) ol\xc3\xa9");
+	assert(cues(nullptr).empty() && cues("").empty() && cues("{idle}").empty());
+	assert(cues(std::string(10000, 'x').c_str()).size() == 4096);
+	std::puts("Subtitle pagination: wrapping, timing, overlap rows, UTF-8, bounds, cue formatting and cinematic placement passed");
 }

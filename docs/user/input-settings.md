@@ -86,6 +86,8 @@ The mouse controls are on **Settings → Game Options → Mouse Input**. **Free 
 | Quick save / quick load | `F5` / `F9` |
 | Screenshot | `F12` |
 
+`F1` to `F12` keep their bindings while a menu is open, so `F12` also takes a screenshot of a menu. **Not in 0.14.1:** 0.14.1's new title and pause screens ignore them.
+
 ## Controllers
 
 openQ4 supports Xbox, PlayStation, Nintendo Switch, Steam Deck and other controllers out of the box, and you can plug them in or unplug them at any time. Standard gamepads need no axis setup.

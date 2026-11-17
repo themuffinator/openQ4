@@ -6032,9 +6032,13 @@ void idSessionLocal::MenuEvent( const sysEvent_t *event ) {
 		if ( RetainedHomeInputBlocked() ) {
 			return;
 		}
+		// A function key the screen leaves alone runs its binding, as over the
+		// stock menu: F12 takes a screenshot of the title or pause menu (#224).
 		menuCommand = guiRetainedHome->HandleEvent( event, common->GetPresentationTime() );
 		if ( menuCommand && menuCommand[0] ) {
 			DispatchCommand( guiRetainedHome, menuCommand );
+		} else if ( event->evType == SE_KEY && event->evValue2 == 1 && event->evValue >= K_F1 && event->evValue <= K_F12 ) {
+			idKeyInput::ExecKeyBinding( event->evValue );
 		}
 		return;
 	}

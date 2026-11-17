@@ -44,7 +44,7 @@ struct ConsoleEndpoint {
 class idSessionLocal {
 public:
     idUserInterface* guiActive=&guiEndpoint;idUserInterface* guiTest=nullptr;
-    // ui_retained home screens never present here; MenuEvent keeps its legacy route.
+    // ui_retained home screens present only in RetainedHomeFunctionKeys; elsewhere MenuEvent keeps its legacy route.
     idUserInterface* guiRetainedHome=nullptr;idUserInterface* guiMainMenu=nullptr;
     bool RetainedHomeInputBlocked() const{return false;}
     // The Single Player sub-page change is covered by the retained screens suite.
