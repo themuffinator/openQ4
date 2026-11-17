@@ -1687,6 +1687,49 @@ lever above that.
   time; Ultra uses 4x with SMAA; Vulkan draws at most 8x) and, where the renderer draws fewer
   samples than applied, a line naming the count it draws, in all twelve languages.
 
+## 14. The Awakening's outdoor battle (FPS-08 evidence), 17 November 2026
+
+The first Awakening mission's landing-zone battle (`m01_stranarus_trench1`,
+reached with `g_autoSkipCinematics 1` and a teleport to 160 160) was reported as
+very slow. Hidden-window probes on the reference laptop, `.tmp/m01-polish/`:
+
+- **Ultra, 2560x1440, GL:** about 27 ms a frame (frame interval 29-47 ms,
+  spikes near 90 ms): about 7 ms game, 20 ms drawing (`profileFrameWork`,
+  developer off). Ultra's class (75/45) is not met; this scene is not in the suite.
+- **With the AI frozen** (`ai_freeze 1`) the same view takes about 16 ms with
+  shadows on or off, and the point-cube cache size makes no measurable
+  difference: the battle, not the map, costs the frame. 476 light definitions
+  and 44,259 interactions; 80-90 lights in view in the open trench. The share
+  of shadow-casting lights matches retail outdoor maps (35% `noshadows` against
+  22-44% in airdefense1, convoy1, mcc_landing and hub1).
+- **Shadows are not the battle's cost:** about 35 shadowed lights a view,
+  about 26 of them cache hits; about ten fresh passes at 0.1-0.15 ms of GPU each.
+- **CPU samples** (Visual Studio collector, xperf): drawing about 33% of the
+  process, game 22%, the OpenGL driver 17%. In the game module,
+  `idClip::ClipModelsTouchingBounds` and `idClipModel::Unlink` took about 48%.
+  Interaction creation for animated models (`R_CreateLightTris`,
+  `R_CalcInteractionCullBits`) took about 12% of the process.
+
+Two clip-world changes, the same results, `g_clipFastQueries 0` to compare:
+
+1. `idClip::Contents` gathered every clip model (`-1`) and filtered by its
+   content mask afterwards, defeating the sector contents test for every point
+   query: openQ4's liquid probes for each projectile, physics particle and AI,
+   every frame. It now gathers by the mask. Its share of trace gathering fell
+   from about 58% to 8%.
+2. `idClipModel::Unlink` rescanned every link in a sector for each sector a
+   moving model left. It now marks the sector's contents summary stale (still a
+   superset), and a query that would scan the sector refreshes it first.
+   `Unlink` fell from about 516k samples to 13k (plus 86k of refreshes).
+
+Together about 10% of game-module time in the battle. Wall-clock A/B windows
+were not usable: with `notarget` the spawners keep adding enemies nobody kills,
+and other sessions loaded the machine to 100%, so the evidence is CPU-sample
+shares from two runs. The remaining clip cost is ordinary movement traces
+(projectile and monster slide moves, ground contacts). Not done: per-frame
+interaction rebuilding for animated models (a six-plane pass per vertex for
+each light), the driver's submission cost, and the 4-5% spent in OpenAL mixing.
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;

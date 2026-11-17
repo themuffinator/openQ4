@@ -7,6 +7,18 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Busy battles spend less time on collision checks, 17 November 2026
+
+- **Smoother big fights.** Each frame of a large battle does less collision
+  bookkeeping: the game no longer re-checks a whole area of the world every
+  time something moves out of it, and its liquid checks for every projectile
+  and piece of debris skip everything that cannot be water. In The Awakening's
+  first battle this cuts about a tenth of the game's own work per frame. What
+  happens in the game is unchanged.
+- **What to do.** Replace the game modules. `g_clipFastQueries 0` restores the
+  previous behaviour for comparison.
+- Details: [performance report, section 14](performance-report.md#14-the-awakenings-outdoor-battle-fps-08-evidence-17-november-2026).
+
 ## The Awakening's prison heat exhausts burn again, 17 November 2026
 
 - **You can see what the cold cannon is for.** In the prison mission, the

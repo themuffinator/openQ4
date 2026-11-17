@@ -257,6 +257,7 @@ idCVar g_showEnemies(				"g_showEnemies",			"0",			CVAR_GAME | CVAR_BOOL, "draws
 idCVar g_presentationInterpolation(	"g_presentationInterpolation",	"1",		CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "draw movers and everything riding them at the same interpolated presentation time as the first-person camera; 0 puts them back on the 60 Hz simulation clock" );
 
 idCVar g_frametime(					"g_frametime",				"0",			CVAR_GAME | CVAR_BOOL, "displays timing information for each game frame" );
+idCVar g_clipFastQueries(			"g_clipFastQueries",		"1",			CVAR_GAME | CVAR_BOOL, "openQ4: contents queries gather only clip models with the requested contents, and unlinking marks a clip sector's contents for refresh instead of rescanning it; 0 restores the original per-unlink rescan and full gather, for comparison (same results either way)" );
 idCVar g_timeentities(				"g_timeEntities",			"0",			CVAR_GAME | CVAR_FLOAT, "when non-zero, shows entities whose think functions exceeded the # of milliseconds specified" );
 
 // RAVEN BEGIN

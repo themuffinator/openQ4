@@ -12,7 +12,10 @@ static const int MAX_SAVEGAME_TRACE_MODELS = MAX_GENTITIES + MAX_CENTITIES + 409
 // ddynerman: SD's clip sector code
 typedef struct clipSector_s {
 	int						contents;
+	// openQ4: a superset of the contents linked here. Unlinking only marks it
+	// stale; a query that would scan the sector anyway refreshes it first.
 	int						dynamicContents;
+	bool					dynamicContentsStale;
 	struct clipLink_s *		clipLinks;
 } clipSector_t;
 // RAVEN END
@@ -767,7 +770,14 @@ void idClipModel::Unlink( void ) {
 		}
 // RAVEN BEGIN
 // ddynerman: SD's clip sector code
-		idClip::UpdateDynamicContents( link->sector );
+		// openQ4: rescanning the sector for every link a moving model leaves cost
+		// a crowded battle more than its queries did. A stale superset only makes
+		// a query scan a sector it could have skipped, and the scan refreshes it.
+		if ( g_clipFastQueries.GetBool() ) {
+			link->sector->dynamicContentsStale = true;
+		} else {
+			idClip::UpdateDynamicContents( link->sector );
+		}
 // RAVEN END
 
 		clipLinkAllocator.Free( link );
@@ -1063,6 +1073,12 @@ int idClip::ClipModelsTouchingBounds( const idBounds &bounds, int contentMask, i
 
 			if( !( sector->dynamicContents & contentMask ) ) {
 				continue;
+			}
+			if( sector->dynamicContentsStale ) {
+				UpdateDynamicContents( sector );
+				if( !( sector->dynamicContents & contentMask ) ) {
+					continue;
+				}
 			}
 
 			for ( clipLink_t* link = sector->clipLinks; link && clipCount < MAX_GENTITIES; link = link->nextInSector ) {
@@ -2040,7 +2056,11 @@ int idClip::Contents( const idVec3 &start, const idClipModel *mdl, const idMat3 
 		traceBounds[1] = trm->bounds[1] + start;
 	}
 
-	num = GetTraceClipModels( traceBounds, -1, passEntity, clipModelList );
+	// openQ4: id gathered every model (-1) and filtered by contentMask below, which
+	// defeated the sectors' contents test for every point query (liquid probes for
+	// each projectile, particle and AI). The models skipped here never pass that
+	// filter, so the result is the same.
+	num = GetTraceClipModels( traceBounds, g_clipFastQueries.GetBool() ? contentMask : -1, passEntity, clipModelList );
 
 	for ( i = 0; i < num; i++ ) {
 		touch = clipModelList[i];
@@ -2306,6 +2326,7 @@ idClip::UpdateDynamicContents
 */
 void idClip::UpdateDynamicContents( clipSector_t* sector ) {
 	sector->dynamicContents = 0;
+	sector->dynamicContentsStale = false;
 
 	clipLink_t* link;
 	for( link = sector->clipLinks; link; link = link->nextInSector ) {

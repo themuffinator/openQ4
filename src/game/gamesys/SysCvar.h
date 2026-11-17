@@ -94,6 +94,7 @@ extern idCVar	g_showActiveEntities;
 extern idCVar	g_showEnemies;
 extern idCVar	g_presentationInterpolation;
 extern idCVar	g_frametime;
+extern idCVar	g_clipFastQueries;
 extern idCVar	g_timeentities;
 
 // RAVEN BEGIN
