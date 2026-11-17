@@ -123,6 +123,7 @@ class xhCanvas {
 public:
 	void				Begin( float size, const idVec4 &tint );
 	void				End( void ) { prims.Draw( "native/crosshair" ); }
+	int					Quads( void ) const { return prims.Num(); }
 
 	idVec4				Ink( float alpha ) const { return idVec4( tint.x, tint.y, tint.z, tint.w * alpha ); }
 	idVec4				Shade( float alpha ) const { return idVec4( 0.0f, 0.0f, 0.0f, tint.w * alpha ); }
@@ -148,7 +149,7 @@ private:
 	float				unit;			// virtual units to one master unit
 	float				xScale;
 	float				yScale;
-	const idMaterial *	white;
+	const idMaterial *	white = NULL;
 };
 
 /*
@@ -164,7 +165,11 @@ void xhCanvas::Begin( float size, const idVec4 &crosshairColor ) {
 	const float screenHeight = Max( 1.0f, (float)renderSystem->GetScreenHeight() );
 	pixel = (float)SCREEN_HEIGHT / ( screenHeight * unit * yScale );
 
-	white = declManager->FindMaterial( "_white" );
+	if ( white == NULL ) {
+		white = declManager->FindMaterial( "_white" );
+	}
+	prims.Clear();
+	prims.Reserve( 256 );
 }
 
 /*
@@ -362,6 +367,57 @@ static bool			xhToggled = false;
 static idDict		xhTest;					// testCrosshair overrides
 static int			xhTestShot = 0;
 
+// testCrosshair profile: what a drawn frame costs on the CPU, the game's
+// part and the interface's (DrawHudPrimitives: compile, upload, submit)
+typedef struct xhProfile_s {
+	int				frames;				// still to measure
+	int				measured;
+	idList<double>	total;
+	idList<double>	submit;
+	int				quads;
+} xhProfile_t;
+static xhProfile_t	xhProfile;
+
+// idList's own comparison subtracts and truncates to int, which leaves a
+// list of fractions of a millisecond unsorted
+static int XH_CompareMilliseconds( const double *a, const double *b ) {
+	return ( *a < *b ) ? -1 : ( ( *a > *b ) ? 1 : 0 );
+}
+
+static double XH_Percentile( idList<double> &values, float fraction ) {
+	values.Sort( XH_CompareMilliseconds );
+	const int index = idMath::ClampInt( 0, values.Num() - 1, (int)idMath::Ceil( fraction * values.Num() ) - 1 );
+	return values[ index ];
+}
+
+static void XH_ProfileFrame( double total, double submit, int quads ) {
+	xhProfile_t &p = xhProfile;
+	if ( p.frames <= 0 ) {
+		return;
+	}
+	p.total.Append( total );
+	p.submit.Append( submit );
+	p.quads += quads;
+	p.measured++;
+	if ( --p.frames > 0 ) {
+		return;
+	}
+	double sumTotal = 0.0, sumSubmit = 0.0;
+	for ( int i = 0; i < p.measured; i++ ) {
+		sumTotal += p.total[ i ];
+		sumSubmit += p.submit[ i ];
+	}
+	gameLocal.Printf( "XH_PROFILE frames=%d quads_mean=%.1f total_mean_ms=%.4f total_p50_ms=%.4f total_p95_ms=%.4f total_max_ms=%.4f "
+					  "submit_mean_ms=%.4f game_mean_ms=%.4f\n",
+					  p.measured, (float)p.quads / p.measured, sumTotal / p.measured,
+					  XH_Percentile( p.total, 0.5f ), XH_Percentile( p.total, 0.95f ), XH_Percentile( p.total, 1.0f ),
+					  sumSubmit / p.measured, ( sumTotal - sumSubmit ) / p.measured );
+	p.total.Clear();
+	p.submit.Clear();
+	p.measured = 0;
+	p.quads = 0;
+}
+
 /*
 ================
 Easing
@@ -412,7 +468,7 @@ static float XH_Flicker( int slot, int time ) {
 XH_DesignForMaterial
 ================
 */
-static xhDesign_t XH_DesignForMaterial( const char *name ) {
+static xhDesign_t XH_ClassifyMaterial( const char *name ) {
 	static const struct {
 		const char *	suffix;
 		xhDesign_t		design;
@@ -452,6 +508,61 @@ static xhDesign_t XH_DesignForMaterial( const char *name ) {
 		return XH_GENERIC;
 	}
 	return XH_NONE;
+}
+
+/*
+================
+XH_DesignForMaterial
+
+The weapon in hand names the same design frame after frame, so the last
+answer is kept with its material: the lookup costs a compare, not a string.
+================
+*/
+typedef struct xhDesignCache_s {
+	idStr				name;
+	xhDesign_t			design;
+	const idMaterial *	material;
+	bool				valid;
+} xhDesignCache_t;
+static xhDesignCache_t xhDesignCache;
+
+static const xhDesignCache_t &XH_LookupDesign( const char *name ) {
+	xhDesignCache_t &cache = xhDesignCache;
+	if ( name == NULL ) {
+		name = "";
+	}
+	if ( !cache.valid || cache.name.Icmp( name ) != 0 ) {
+		cache.name = name;
+		cache.design = XH_ClassifyMaterial( name );
+		cache.material = ( cache.design != XH_NONE ) ? declManager->FindMaterial( name ) : NULL;
+		cache.valid = true;
+	}
+	return cache;
+}
+
+static xhDesign_t XH_DesignForMaterial( const char *name ) {
+	return XH_LookupDesign( name ).design;
+}
+
+/*
+================
+XH_CrosshairColor
+
+g_crosshairColor, parsed again only when its text changes.
+================
+*/
+static const idVec4 &XH_CrosshairColor( void ) {
+	static idStr	text;
+	static idVec4	color( 1.0f, 1.0f, 1.0f, 1.0f );
+	static bool		parsed = false;
+	const char *current = g_crosshairColor.GetString();
+	if ( !parsed || text.Cmp( current ) != 0 ) {
+		text = current;
+		color.Set( 1.0f, 1.0f, 1.0f, 1.0f );
+		sscanf( current, "%f %f %f %f", &color.x, &color.y, &color.z, &color.w );
+		parsed = true;
+	}
+	return color;
 }
 
 /*
@@ -1311,6 +1422,7 @@ void rvAnimatedCrosshair::Clear( void ) {
 	memset( &xhState, 0, sizeof( xhState ) );
 	xhOwnsMarker = false;
 	xhTestShot = 0;
+	xhDesignCache.valid = false;
 }
 
 /*
@@ -1322,8 +1434,7 @@ const char *rvAnimatedCrosshair::CursorColor( const char *design ) {
 	if ( !Enabled() || XH_DesignForMaterial( design ) == XH_NONE ) {
 		return g_crosshairColor.GetString();
 	}
-	idVec4 color( 1.0f, 1.0f, 1.0f, 1.0f );
-	sscanf( g_crosshairColor.GetString(), "%f %f %f %f", &color.x, &color.y, &color.z, &color.w );
+	const idVec4 &color = XH_CrosshairColor();
 	return va( "%g %g %g 0", color.x, color.y, color.z );
 }
 
@@ -1349,6 +1460,10 @@ rvAnimatedCrosshair::Draw
 ================
 */
 void rvAnimatedCrosshair::Draw( idUserInterface *cursor, const rvWeapon *weapon, const rvVehicleWeapon *vehicleWeapon ) {
+	idTimer totalTimer;
+	if ( xhProfile.frames > 0 ) {
+		totalTimer.Start();
+	}
 	xhOwnsMarker = false;
 	if ( !Enabled() || cursor == NULL ) {
 		if ( xhState.design != XH_NONE ) {
@@ -1360,8 +1475,9 @@ void rvAnimatedCrosshair::Draw( idUserInterface *cursor, const rvWeapon *weapon,
 	crosshairSignals_t signals;
 	XH_ReadSignals( weapon, vehicleWeapon, signals );
 
-	const xhDesign_t wanted = XH_DesignForMaterial( signals.design );
-	const idMaterial *material = ( wanted != XH_NONE ) ? declManager->FindMaterial( signals.design ) : NULL;
+	const xhDesignCache_t &lookup = XH_LookupDesign( signals.design );
+	const xhDesign_t wanted = lookup.design;
+	const idMaterial *material = lookup.material;
 
 	// The cursor GUI still decides which cursor is showing: the combat
 	// crosshair gives way to the use hand, the talk frame and the rest.
@@ -1387,11 +1503,9 @@ void rvAnimatedCrosshair::Draw( idUserInterface *cursor, const rvWeapon *weapon,
 		return;
 	}
 
-	idVec4 color( 1.0f, 1.0f, 1.0f, 1.0f );
-	sscanf( g_crosshairColor.GetString(), "%f %f %f %f", &color.x, &color.y, &color.z, &color.w );
-
-	xhCanvas canvas;
-	canvas.Begin( (float)idMath::ClampInt( 16, 48, cvarSystem->GetCVarInteger( "g_crosshairSize" ) ), color );
+	// one canvas, so its list keeps the storage of the frames before
+	static xhCanvas canvas;
+	canvas.Begin( (float)idMath::ClampInt( 16, 48, cvarSystem->GetCVarInteger( "g_crosshairSize" ) ), XH_CrosshairColor() );
 
 	const xhStyle_t &style = xhStyles[ st.design ];
 	XH_DrawAimPoint( canvas, f );
@@ -1418,7 +1532,16 @@ void rvAnimatedCrosshair::Draw( idUserInterface *cursor, const rvWeapon *weapon,
 	}
 	XH_DrawHit( canvas, f, style );
 
+	if ( xhProfile.frames <= 0 ) {
+		canvas.End();
+		return;
+	}
+	idTimer submitTimer;
+	submitTimer.Start();
 	canvas.End();
+	submitTimer.Stop();
+	totalTimer.Stop();
+	XH_ProfileFrame( totalTimer.Milliseconds(), submitTimer.Milliseconds(), canvas.Quads() );
 }
 
 /*
@@ -1435,7 +1558,17 @@ void rvAnimatedCrosshair::Test( const idCmdArgs &args ) {
 		xhTestShot = 0;
 		gameLocal.Printf( "testCrosshair: released\n"
 						  "usage: testCrosshair [design <material>] [raised|rising|fire|reload|empty|zoom 0/1] [clip n] [clipsize n]\n"
-						  "       [progress|charge|spin|lock 0..1] [shot <ms>]\n" );
+						  "       [progress|charge|spin|lock 0..1] [shot <ms>]\n"
+						  "       testCrosshair profile [frames]: CPU cost of the drawn frames\n" );
+		return;
+	}
+	if ( !idStr::Icmp( args.Argv( 1 ), "profile" ) ) {
+		xhProfile.total.Clear();
+		xhProfile.submit.Clear();
+		xhProfile.measured = 0;
+		xhProfile.quads = 0;
+		xhProfile.frames = ( args.Argc() > 2 ) ? idMath::ClampInt( 1, 100000, atoi( args.Argv( 2 ) ) ) : 600;
+		gameLocal.Printf( "testCrosshair: profiling the next %d drawn frames\n", xhProfile.frames );
 		return;
 	}
 	for ( int i = 1; i < args.Argc(); i++ ) {

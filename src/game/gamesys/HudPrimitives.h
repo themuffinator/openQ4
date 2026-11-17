@@ -27,6 +27,11 @@ public:
 		}
 		renderSystem->SetColor(colorWhite);
 	}
+	int Num() const { return items.Num(); }
+	// A producer that draws every frame keeps one list, so its storage is
+	// reused rather than grown again from nothing.
+	void Clear() { items.SetNum(0,false); }
+	void Reserve(int count) { if (items.NumAllocated()<count) items.Resize(count); }
 private:
 	idList<uiHudPrimitive_t> items;
 };

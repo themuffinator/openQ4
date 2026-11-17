@@ -610,6 +610,42 @@ bool TessellatePath(const VectorPath& path, const VectorOptions& requested, Vect
 	catch (const std::bad_alloc&) { diagnostic = path.id+": vector allocation failed"; }
 	return false;
 }
+bool CoverConvexPolygon(const VectorPoint* points, size_t count, const VectorColour& colour,
+	const VectorOptions& requested, VectorMesh& output, std::string& diagnostic) {
+	diagnostic.clear();
+	// Four corners turning one way are a simple convex shape; more could wind twice.
+	if (!points || count < 3 || count > 4) return false;
+	double area = 0, turn = 0;
+	for (size_t i = 0; i < count; ++i) {
+		const auto a = points[i], b = points[(i+1)%count], c = points[(i+2)%count];
+		if (!Finite(a) || std::abs(a.x) > 1000000 || std::abs(a.y) > 1000000) return false;
+		area += Cross(a,b);
+		const double bend = Cross(b-a,c-b);
+		if (std::abs(bend) <= 1e-12) continue; // collinear corners are still convex
+		if (turn != 0 && (bend > 0) != (turn > 0)) return false;
+		turn = bend;
+	}
+	if (turn == 0 || std::abs(area) <= 1e-12) { output = {}; return true; }
+	try {
+		Validate(requested);
+		VectorOptions options = requested;
+		options.transform = {}; // the points are output pixels already
+		VectorPaint paint; paint.type = PaintType::Solid; paint.colour = colour;
+		const Paint evaluator(paint,options);
+		Coverage coverage(options);
+		// Coverage counts the cells left of a boundary running down the screen,
+		// so the inside is +1 when the shoelace area is positive (y down).
+		for (size_t i = 0; i < count; ++i) {
+			const auto& a = points[i]; const auto& b = points[(i+1)%count];
+			if (area > 0) coverage.Edge(a,b); else coverage.Edge(b,a);
+		}
+		VectorMesh candidate;
+		coverage.Emit(evaluator,candidate);
+		output = std::move(candidate); return true;
+	} catch (const Failure& error) { diagnostic = "convex polygon: "+error.message; }
+	catch (const std::bad_alloc&) { diagnostic = "convex polygon: vector allocation failed"; }
+	return false;
+}
 bool ResolveLinearMask(const VectorPath& path, const VectorOptions& options, LinearMask& result) {
 	if (!path.antialias || !options.antialias || path.blend!=PathBlend::Normal ||
 		path.stroke.paint.type!=PaintType::None || path.fill.type!=PaintType::Linear || path.fill.stops.size()!=3 ||

@@ -96,6 +96,14 @@ bool ResolveLinearMask(const VectorPath& path, const VectorOptions& options, Lin
 // Failure leaves the previous mesh intact and reports the offending path.
 bool TessellatePath(const VectorPath& path, const VectorOptions& options,
 	VectorMesh& output, std::string& diagnostic);
+// One convex triangle or quadrilateral of one solid colour, already in output pixels, with the
+// same exact pixel coverage TessellatePath gives it but without the general
+// path compiler: a convex polygon is its own boundary. Either winding. Leaves
+// the output empty for a degenerate polygon. False with the output untouched:
+// with no diagnostic for a polygon that is not convex or not finite, which the
+// caller compiles as a path instead; with one when coverage itself failed.
+bool CoverConvexPolygon(const VectorPoint* points, size_t count, const VectorColour& colour,
+	const VectorOptions& options, VectorMesh& output, std::string& diagnostic);
 bool HitTestPath(const VectorPath& path, const VectorOptions& options,
 	VectorPoint outputPoint, bool& hit, std::string& diagnostic);
 // Sample geometric paint coverage, excluding transparent paint and degenerate

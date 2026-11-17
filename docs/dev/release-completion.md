@@ -67,6 +67,37 @@ does not restore the withdrawn release. See
   screen, and item timers, bot definition lookups and resting items cost the
   server less each frame.
 
+## Animated crosshairs cost a fraction of what they did, 17 November 2026
+
+- **Less frame time while the crosshair moves.** A moving animated crosshair
+  used to take 1.2 to 4 ms of CPU every frame it changed, which is every frame
+  you fire, spin up or reload. It now takes 0.25 to 1.2 ms. Measured at
+  1920x1080 per drawn frame, before and after (mean of two runs each): spinning
+  hyperblaster 2.62 to 1.08 ms, lightning gun firing 3.65 to 0.25 ms, nailgun
+  spinning 1.42 to 0.36 ms, rocket launcher reloading 2.46 to 1.20 ms,
+  machinegun reloading 2.24 to 1.06 ms, grenade launcher reloading 1.72 to
+  0.95 ms, gauntlet 0.88 to 0.30 ms. A still crosshair drops from 0.12 to
+  0.07 ms.
+- **Smoother edges on the crosshair's strokes.** Arcs, ticks, bars and dots now
+  keep their edge pixels, so rings read rounder and thin strokes no longer lose
+  their soft edge at an angle. The pieces cut from the original art (grenade
+  launcher, nailgun, lightning gun, napalm launcher, vehicle cannon) draw
+  exactly as before.
+- **How.** The game's moving pieces are covered directly instead of going
+  through the general path compiler and a clip; a piece cut from a design
+  compiles only the paths it can show; a piece that only moved reuses its
+  compiled coverage at a whole-pixel offset (placed to a quarter pixel); and
+  the pieces draw as a few batched geometries, settled ones apart from moving
+  ones, instead of one geometry each. The stock HUD's own drawing is unchanged.
+- **For developers.** `testCrosshair profile [frames]` prints the CPU cost of
+  the next drawn frames (`XH_PROFILE`, game part and interface part). Replace
+  the client and both game modules together.
+- Evidence: `openq4-ui-vector` (`CoverConvexPolygon` matches the path compiler
+  per pixel in both windings), `crosshair_cvar_refresh_contract.py`,
+  `ui_hud_catalog_state.py`, `ui_manager_lifecycle.py`; nine held crosshair
+  states profiled with `testCrosshair profile 360` on `game/airdefense1`, and
+  thirteen held states captured before and after.
+
 ## VR: controllers with fewer buttons, steadier sessions, and the audit's other leads, 17 November 2026
 
 - **Every action on every controller.** Valve Index gets the flashlight:

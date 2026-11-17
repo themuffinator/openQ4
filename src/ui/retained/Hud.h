@@ -15,6 +15,11 @@ struct HudPrimitive {
 	std::array<float,8> quad{};
 	std::array<float,4> uv{0,0,1,1}, colour{1,1,1,1};
 	bool glyph = false;
+	// Drawn by the game (DrawHudPrimitives) rather than captured from a GUI.
+	// A solid one covers exactly its quad, which may be any convex shape, with
+	// exact pixel coverage on every edge; a captured solid keeps the stock
+	// fill's edges.
+	bool generated = false;
 };
 
 // Compare the displayed values, rather than the inventory pickup pulse:

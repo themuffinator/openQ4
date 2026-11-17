@@ -232,6 +232,36 @@ static void DocumentGeometryBudget(const Node& node) {
 	for (const auto& child : node.children) DocumentGeometryBudget(child);
 }
 
+// The game's moving HUD quads skip the path compiler: a convex polygon gives
+// the same pixel coverage either way, in either winding, at any angle.
+static void ConvexCoverageChecks() {
+	const VectorColour colour{.9,.6,.3,.75};
+	const std::vector<std::vector<VectorPoint>> shapes={
+		{{10.3,4.6},{31.7,9.2},{29.1,14.9},{7.7,10.3}},		// a rotated stroke
+		{{40.5,40.5},{52.25,40.5},{52.25,47.75},{40.5,47.75}},	// axis aligned, fractional
+		{{20,20},{26,21.5},{27,30},{19.5,28}},					// any convex quad
+	};
+	for (auto points:shapes) for (int winding=0;winding<2;++winding) {
+		if (winding) std::reverse(points.begin(),points.end());
+		VectorPath path; path.id="convex"; path.fill.type=PaintType::Solid; path.fill.colour=colour;
+		std::vector<PathPoint> resolved;
+		for (const auto& p:points) resolved.push_back(P(p.x,p.y));
+		Polygon(path,resolved);
+		VectorOptions options; options.widthDp=64; options.heightDp=64; options.pixelBounds=VectorPixelBounds{0,0,64,64};
+		VectorMesh compiled,direct; std::string error;
+		Check(TessellatePath(path,options,compiled,error),"compile the reference polygon");
+		Check(CoverConvexPolygon(points.data(),points.size(),colour,options,direct,error),"cover a convex polygon directly");
+		Check(Near(AlphaMass(direct),AlphaMass(compiled),1e-6),"direct coverage keeps the compiled alpha mass");
+		for (int y=0;y<64;++y) for (int x=0;x<64;++x)
+			Check(Near(SampleAlpha(direct,x+.5,y+.5),SampleAlpha(compiled,x+.5,y+.5),1e-6),"direct coverage matches the compiled coverage per pixel");
+	}
+	const VectorPoint bowtie[4]={{0,0},{10,10},{10,0},{0,10}};
+	VectorMesh untouched; untouched.indices={7}; std::string error;
+	Check(!CoverConvexPolygon(bowtie,4,colour,VectorOptions{},untouched,error) && error.empty() && untouched.indices.size()==1,
+		"a polygon that is not convex is left to the path compiler");
+	const VectorPoint flat[4]={{0,0},{10,0},{20,0},{5,0}};
+	Check(CoverConvexPolygon(flat,4,colour,VectorOptions{},untouched,error) && untouched.indices.empty(),"a degenerate polygon draws nothing");
+}
 int main(int argc, char** argv) {
 	if (argc > 1) {
 		std::ifstream file(argv[1]);
@@ -351,6 +381,6 @@ int main(int argc, char** argv) {
 	Check(document.ReplaceValue("/root/paths/0/commands/0/points/0/0","16",diagnostics),"path control point shares transactional source editing");
 	Check(!document.ReplaceValue("/root/paths/0/commands/1/id","\"start\"",diagnostics),"reject duplicate editable command IDs");
 	Check(!document.ReplaceValue("/root/paths/0/commands/1/op","\"arc\"",diagnostics),"unsupported path operations fail explicitly");
-	CoverageChecks(); LinearMaskChecks();
+	CoverageChecks(); LinearMaskChecks(); ConvexCoverageChecks();
 	std::puts("UI vector: fill rules, holes/intersections, adaptive curves, transforms, strokes/joins/caps, gradients, hit geometry, budgets and editable responsive paths passed");
 }

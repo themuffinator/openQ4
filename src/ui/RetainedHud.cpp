@@ -1094,7 +1094,7 @@ bool idUserInterfaceManagerLocal::DrawHudPrimitives(const char* source,const idL
 	items.reserve(packet.Num());
 	for (int i=0;i<packet.Num();++i) {
 		const auto& p=packet[i]; if (!p.material) return false;
-		openq4::ui::HudPrimitive item;item.material=p.material->GetName();item.glyph=p.glyph;
+		openq4::ui::HudPrimitive item;item.material=p.material->GetName();item.glyph=p.glyph;item.generated=true;
 		for (int n=0;n<4;++n) {
 			item.quad[2*n]=p.points[n].x;item.quad[2*n+1]=p.points[n].y;
 			item.colour[n]=p.color[n];item.uv[n]=p.uv[n];
