@@ -157,9 +157,13 @@ void rvIconManager::UpdateChatIcons( void ) {
 		if ( gameLocal.entities[ i ] && gameLocal.entities[ i ]->IsType( idPlayer::GetClassType() ) && !gameLocal.entities[ i ]->fl.networkStale ) {
 			idPlayer *player = static_cast< idPlayer* >( gameLocal.entities[ i ] );
 
-			if ( player->isChatting && 
-				!player->IsHidden() && 
-				!( ( idPhysics_Player* )player->GetPhysics() )->IsDead() && 
+			// openQ4: ask the player's own movement physics whether it is dead.
+			// GetPhysics() is the ragdoll once a player dies, and reading it as
+			// idPhysics_Player made IsDead() come out at random, so the bubble
+			// blinked over the corpse of a bot still typing its death line.
+			if ( player->isChatting &&
+				!player->IsHidden() &&
+				!static_cast< idPhysics_Player * >( player->GetPlayerPhysics() )->IsDead() &&
 				gameLocal.mpGame.IsInGame( i ) 
 				&& (localInst == player->GetInstance())) {
 				if ( chatIcons[ i ].GetHandle() < 0 ) {

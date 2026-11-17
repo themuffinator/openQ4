@@ -7,6 +7,22 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The chat bubble stays off dead players, 17 November 2026
+
+- **No more chat bubble blinking over a body.** Multiplayer hides the
+  "typing" bubble while a player is dead, but the check read the ragdoll as
+  if it were the player's movement and came out at random. A bot killed while
+  it was still typing its line flashed the bubble over its corpse until it
+  respawned. The bubble now stays off until the player is back on their feet.
+- **What to do.** Nothing.
+- Evidence (17 November, listen server, six bots at `bot_chat 2`, `mp/q4dm1`,
+  traced and since removed): before the fix, icons over dead bots were created
+  and freed dozens of times per death; after it, none in 19 icons. The same
+  traces found no delay in turning the bubble off: on the host, on a second
+  client, in the stock and retained HUDs, and in what OpenGL and Vulkan drew,
+  every bubble went off within one frame of its line being sent. The fix is
+  in `IconManager.cpp`, in both game trees.
+
 ## Helmets and masked reflections keep their colour, 17 November 2026
 
 - **The bright marine's helmet matches its suit again.** In multiplayer the
