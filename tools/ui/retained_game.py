@@ -1,50 +1,33 @@
 """The retained GAME OPTIONS settings page (docs/dev/ui-visual-design.md
 sections 7, 9 and 13.7; UI-01): the stock page's rows
 (guis/menu/settings/game.gui) in the settings sub-page
-(retained_settings_rows), its eight sections on five tabs of at most two
-columns: GENERAL (general | gameplay and view weapon), MOUSE INPUT,
-CONTROLLER, HUD (HUD | crosshair) and VIRTUAL REALITY.
+(retained_settings_rows), its six sections on three tabs of at most two
+columns: GENERAL (general | gameplay), HUD (HUD | crosshair and view weapon)
+and VIRTUAL REALITY. The stock page's mouse and controller sections, with
+Free Look, Toggle Zoom and Scope Sensitivity, are the CONTROLS page's MOUSE
+and CONTROLLER tabs (retained_controls, issue #220).
 
 Each row applies at once, as the stock page's controls do. A row that names
 a CVar reads it back through the page's CVar state and sets it with the
-adapter's allowlisted settings.player.set (UserInterfaceRetained.cpp
-FindPlayerSetting, which takes each stock control's range or values). The
-rows the stock page computes go through the session
+adapter's allowlisted settings.player.set (retained_settings_rows.cvar_row).
+The rows the stock page computes go through the session
 (idSessionLocal::HandleRetainedGameRequest): the gun position, the forced
 pro skins, the custom crosshair, the corpse time and the language, which
 reloads the language and the menus. A slider with more than a hundred steps
-(the mouse's sensitivity, CPI, acceleration and cap, the gyro and touchpad
-sensitivities, the gun's field of view and offsets) takes the value typed as
-well, in a number after it to the slider's places (retained_settings_rows.
-entry_row); the adapter acknowledges it once the CVar reads it back. BACK, or
-the back input, returns to the settings screen that opened the page."""
+(the gun's field of view) takes the value typed as well. BACK, or the back
+input, returns to the settings screen that opened the page."""
 from __future__ import annotations
 
 from build_retained_screens import U, Document, absolute, image, keyword, length, number
 from retained_mp_menus import value_row
-from retained_settings_rows import COLUMN_W, ROW_PITCH, entry_row, heading, setting_row, settings_subpage, show_tab, value_column
+from retained_settings_rows import (COLUMN_W, ROW_PITCH, choice, cvar_row, cvar_settings, heading, rows_value_column, setting_row,
+                                    settings_subpage, show_tab, slider, toggle)
 
 PREFIX = "game"
 CROSSHAIRS = 20                            # the custom crosshairs (player_marine_mp_ui's mtr_crosshair keys)
 # The crosshair colours the stock page offers (#str_229942), as g_crosshairColor.
 CROSSHAIR_COLORS = ("1 1 1 1", "1 0 0 1", "1 0.5 0 1", "1 1 0 1", "0 1 0 1", "0 1 1 1", "0 0 1 1", "1 0 0.5 1")
 LANGUAGES = 12                             # #str_229908, in sys_lang's order (RETAINED_GAME_LANGUAGES)
-FINE_STEPS = 100                           # a slider with more steps than this takes a typed number too
-
-
-def toggle(ident: str, label: str, cvar: str) -> tuple:
-    return ("toggle", ident, label, cvar, None)
-
-
-def slider(ident: str, label: str, cvar: str, minimum: float, maximum: float, step: float, decimals: int = 0) -> tuple:
-    return ("slider", ident, label, cvar, (minimum, maximum, step, decimals))
-
-
-def choice(ident: str, label: str, cvar: str, key: str, values: tuple) -> tuple:
-    """A list whose values are numbers, or text where a value has a fraction:
-    a float CVar reads back inexactly (0.022 as 0.0219999...), its text
-    exactly, as the stock list compares it."""
-    return ("choice", ident, label, cvar, (key, values))
 
 
 def verb_choice(ident: str, label: str, verb: str, key: str, count: int, enabled: int | None = None) -> tuple:
@@ -55,11 +38,8 @@ def verb_choice(ident: str, label: str, verb: str, key: str, count: int, enabled
 # Each section: its id, heading and rows, in the stock page's order.
 SECTIONS = (
     ("general", "#str_231542", (
-        toggle("game_freelook", "#str_200133", "in_freeLook"),
         toggle("game_autoreload", "#str_200134", "ui_autoReload"),
         toggle("game_autoswitch", "#str_200135", "ui_autoSwitch"),
-        toggle("game_togglezoom", "#str_41108", "in_toggleZoom"),
-        slider("game_scopesensitivity", "#str_229972", "pm_zoomedSlow", 1, 100, 1),
         toggle("game_decals", "#str_200136", "g_decals"),
         toggle("game_showgun", "#str_200138", "ui_showGun"),
         verb_choice("game_gunposition", "#str_223007", "gameGunPosition", "#str_223008", 3),
@@ -68,39 +48,6 @@ SECTIONS = (
         ("verb_toggle", "game_forcemodel", "#str_223006", "gameForceModel", None),
         slider("game_viewkick", "#str_231773", "g_viewKick", 0, 1, 0.1, 1),
         slider("game_screenshake", "#str_231774", "g_screenShake", 0, 1, 0.1, 1),
-    )),
-    ("mouse", "#str_229935", (
-        choice("game_invertmouse", "#str_200139", "m_pitch", "#str_200059", ("0.022", "-0.022")),
-        slider("game_msmooth", "#str_200140", "m_smooth", 1, 8, 1),
-        slider("game_msensitivity", "#str_200141", "sensitivity", 0.01, 30, 0.01, 2),
-        slider("game_mcpi", "#str_229936", "m_cpi", 0, 32000, 50),
-        slider("game_mfilter", "#str_229937", "m_filter", 0, 31, 1),
-        slider("game_maccel", "#str_229938", "cl_mouseAccel", -5, 5, 0.01, 2),
-        slider("game_macceloffset", "#str_229939", "cl_mouseAccelOffset", 0, 50, 0.1, 1),
-        slider("game_maccelpower", "#str_229940", "cl_mouseAccelPower", 1, 8, 0.05, 2),
-        slider("game_msenscap", "#str_229941", "cl_mouseSensCap", 0, 100, 0.1, 1),
-    )),
-    ("controller", "#str_229924", (
-        toggle("game_controller", "#str_229925", "in_joystick"),
-        choice("game_southpaw", "#str_229930", "in_joystickSouthpaw", "#str_229934", (0, 1)),
-        slider("game_deadzone", "#str_229926", "in_joystickDeadZone", 0, 0.95, 0.01, 2),
-        slider("game_looksensitivity", "#str_229931", "in_joystickLookSensitivity", 0.1, 4, 0.05, 2),
-        slider("game_wheelsensitivity", "#str_42840", "in_weaponWheelSensitivity", 0.25, 16, 0.25, 2),
-        slider("game_wheeloffset", "#str_230140", "ui_weaponWheelOffset", -40, 40, 1),
-        slider("game_lookcurve", "#str_229932", "in_joystickLookCurve", 1, 3, 0.05, 2),
-        toggle("game_invertlook", "#str_229933", "in_joystickInvertLook"),
-        slider("game_trigger", "#str_229927", "in_joystickTriggerThreshold", 0, 1, 0.01, 2),
-        toggle("game_rumble", "#str_229928", "in_joystickRumble"),
-        slider("game_rumblescale", "#str_229929", "in_joystickRumbleScale", 0, 2, 0.05, 2),
-        toggle("game_gyro", "#str_229964", "in_gyro"),
-        slider("game_gyrosensitivity", "#str_229965", "in_gyroSensitivity", 0, 8, 0.05, 2),
-        choice("game_touchpad", "#str_229966", "in_touchpadMode", "#str_229967", (0, 1, 2, 3)),
-        slider("game_touchpadsensitivity", "#str_229968", "in_touchpadSensitivity", 0, 8, 0.05, 2),
-        toggle("game_touchscreen", "#str_229969", "in_touchscreen"),
-        slider("game_batterythreshold", "#str_229970", "in_joystickLowBatteryRumbleThreshold", 0, 100, 1),
-        slider("game_batteryscale", "#str_229971", "in_joystickLowBatteryRumbleScale", 0, 2, 0.05, 2),
-        choice("game_promptstyle", "#str_231526", "in_promptStyle", "#str_231527", (0, 1, 2, 3, 4, 5)),
-        choice("game_swapconfirm", "#str_231528", "in_swapConfirmBack", "#str_231529", (0, 1, 2)),
     )),
     ("crosshair", "#str_231543", (
         choice("game_customcrosshair", "#str_200307", "g_crosshairCustom", "#str_200296", ("0", "1")),
@@ -128,6 +75,7 @@ SECTIONS = (
         verb_choice("game_corpsetime", "#str_229918", "gameCorpseTime", "#str_229919", 8, enabled=7),
         verb_choice("game_language", "#str_229907", "gameLanguage", "#str_229908", LANGUAGES),
         choice("game_console", "#str_229922", "con_allowConsole", "#str_229923", (0, 1)),
+        choice("game_screenshotformat", "#str_231775", "r_screenshotFormat", "#str_231776", (0, 1)),
         toggle("game_skipcinematics", "#str_229951", "g_autoSkipCinematics"),
         slider("game_cinematicshake", "#str_230157", "ui_cinematicShake", 0, 1, 0.1, 1),
         toggle("game_enhancedphysics", "#str_231720", "g_enhancedPhysics"),
@@ -162,35 +110,15 @@ VERBS = ("gameGunPosition", "gameForceModel", "gameCrosshair", "gameCorpseTime",
 
 def setting_rows() -> list:
     """Every row that sets a CVar: (cvar, kind, values or range)."""
-    rows = []
-    for _section, _heading, section_rows in SECTIONS:
-        for kind, _ident, _label, binding, extra in section_rows:
-            if kind in ("toggle", "slider", "choice"):
-                rows.append((binding, kind, extra))
-    return rows
-
-
-def cvar_state(doc: Document, cvar: str, kind: str) -> dict:
-    """A setting the page reads back from its CVar."""
-    key = f"cvar.{cvar}"
-    doc.state[key] = {"type": kind, "initial": {"string": "", "number": 0, "boolean": False}[kind], "cvar": cvar}
-    return {"state": key}
-
-
-def setting_action(doc: Document, cvar: str, kind: str) -> str:
-    action = f"set.{cvar}"
-    doc.actions[action] = {"operation": "settings.player.set", "input": kind, "arguments": {"cvar": cvar, "value": {"input": "value"}}}
-    return action
+    return cvar_settings(row for _section, _heading, rows in SECTIONS for row in rows)
 
 
 # The tabs (section 13.7): each its id, label and two columns, a column
 # whole sections under their headings, or a run of one section's rows
 # (section, first, end) where the tab is that section alone.
 TABS = (
-    ("general", "#str_231542", (("general",), ("gameplay", "viewweapon"))),
-    ("mouse", "#str_229935", (("mouse", 0, 5), ("mouse", 5, None))),
-    ("controller", "#str_229924", (("controller", 0, 9), ("controller", 9, None))),
-    ("hud", "#str_231235", (("hud",), ("crosshair",))),
+    ("general", "#str_231542", (("general",), ("gameplay",))),
+    ("hud", "#str_231235", (("hud",), ("crosshair", "viewweapon"))),
     ("vr", "#str_230120", (("vr", 0, 6), ("vr", 6, None))),
 )
 
@@ -217,29 +145,6 @@ def crosshair_row(doc: Document, ident: str, label: str, verb: str, value_x: flo
 def game_row(doc: Document, row: tuple, value_x: float) -> dict:
     """One of SECTIONS' rows as a setting row."""
     kind, ident, label, binding, extra = row
-    if kind == "toggle":
-        return setting_row(doc, ident, label, "toggle", value_x, value=cvar_state(doc, binding, "boolean"),
-                           action=setting_action(doc, binding, "boolean"))
-    if kind == "slider":
-        minimum, maximum, step, decimals = extra
-        shown = cvar_state(doc, binding, "number")
-        if decimals:
-            # A float CVar reads back inexactly (5.01 as 5.010000228): the
-            # slider shows it to the row's places.
-            scale = 10 ** decimals
-            shown = {"op": "/", "args": [{"op": "round", "args": [{"op": "*", "args": [shown, scale]}]}, scale]}
-        if (maximum - minimum) / step > FINE_STEPS:
-            # Too many steps to reach a value by stepping: the row takes the
-            # value typed as well, to the slider's places.
-            return entry_row(doc, ident, label, value_x, shown, setting_action(doc, binding, "number"), (minimum, maximum, step, decimals))
-        return setting_row(doc, ident, label, "slider", value_x, value=shown, action=setting_action(doc, binding, "number"),
-                           slider=(minimum, maximum, step, decimals))
-    if kind == "choice":
-        key, values = extra
-        kind_of = "string" if isinstance(values[0], str) else "number"
-        return setting_row(doc, ident, label, "choice", value_x, value=cvar_state(doc, binding, kind_of),
-                           action=setting_action(doc, binding, kind_of),
-                           entries=[((key, index), value) for index, value in enumerate(values)])
     if kind == "verb_choice":
         key, count, enabled = extra
         state = {"gameGunPosition": "game.gunPosition", "gameCorpseTime": "game.corpseTime", "gameLanguage": "game.language"}[binding]
@@ -247,7 +152,9 @@ def game_row(doc: Document, row: tuple, value_x: float) -> dict:
         return setting_row(doc, ident, label, "choice", value_x, value={"state": state}, action=binding, entries=entries)
     if kind == "verb_toggle":
         return setting_row(doc, ident, label, "toggle", value_x, value={"state": "game.forceModel"}, action=binding)
-    return crosshair_row(doc, ident, label, binding, value_x)
+    if kind == "crosshair":
+        return crosshair_row(doc, ident, label, binding, value_x)
+    return cvar_row(doc, row, value_x)
 
 
 def game_document() -> dict:
@@ -262,7 +169,7 @@ def game_document() -> dict:
         doc.actions[verb] = {"operation": "session.menuValue", "input": "boolean" if verb == "gameForceModel" else "number",
                              "arguments": {"command": verb, "value": {"input": "value"}}}
     sections = {section: (heading_key, rows) for section, heading_key, rows in SECTIONS}
-    value_x = value_column([row[2] for _section, _heading, rows in SECTIONS for row in rows])
+    value_x = rows_value_column(row for _section, _heading, rows in SECTIONS for row in rows)
     built = {row[1]: game_row(doc, row, value_x) for _section, _heading, rows in SECTIONS for row in rows}
     tabs = []
     for ident, key, columns in TABS:

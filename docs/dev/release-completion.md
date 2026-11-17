@@ -7,24 +7,6 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
-## Radio chatter and helmet-radio squad lines have subtitles (#221, AUD-07), 17 November 2026
-
-- **Radio transmissions are captioned.** 249 of the 333 radio lines the stock
-  maps play, and about 390 other campaign lines, have no lip-sync transcript.
-  Each of them carries its line as written in the game's script, in its sound
-  shader's description, and subtitles now show that instead of
-  **[untranscribed speech]**. Stage directions, speaker tags and notes are left
-  out; the text is converted from Windows-1252, so apostrophes and dashes draw
-  correctly in every menu language. A recorded take is sometimes shorter than
-  the script line.
-- **Helmet-radio squad lines share their transcript.** The 692 marine lines
-  heard over the helmet radio are processed copies of lines that do have a
-  transcript; each now shows its dry line's text.
-- Installed lip-sync text and caption packs still come first. Only screams,
-  laughter, pain sounds and multiplayer announcers keep the marker.
-- `listSubtitles` reports script-line captions as `script`, and the speech
-  audit's `transcript=` status adds `script` and `helmet`.
-
 ## Screenshots from the pause menu, and tidier emotion cues in subtitles (#224, #225), 17 November 2026
 
 - **F12 takes a screenshot from the pause menu and the title screen again.**
@@ -48,6 +30,48 @@ does not restore the withdrawn release. See
   `vo_1_1_2_12_1` captioned `(Furrow) Let's not lose focus here...`, a
   fixture line showed mid-sentence cues with `{idle}` dropped, and
   `screenshot` over the retained pause screen captured it.
+
+## Mouse and controller settings are under Controls (#220), 17 November 2026
+
+- **Find your mouse and controller settings with your key bindings.**
+  **Settings > Controls** gains **Mouse** and **Controller** tabs after the
+  binding tabs. Mouse starts with **Free Look**, **Toggle Zoom** and **Scope
+  Sensitivity**, followed by every mouse setting; Controller holds the stick,
+  rumble, gyro, touchpad and prompt settings. **Game Options** keeps General,
+  HUD and Virtual Reality, and its **View Weapon** settings move to the HUD
+  tab beside the crosshair.
+- **Nothing to do.** Your settings carry over; only their place in the menu
+  changes. The classic menus (`ui_retained 0`) keep the original layout.
+- Typing a value into a mouse or controller number field on Controls accepts
+  Delete and Backspace as text. On a key-binding row they still clear the
+  binding.
+- How it works:
+  [MOUSE and CONTROLLER on CONTROLS](ui/retained-screens.md#mouse-and-controller-on-controls-17-november-2026).
+  New string `#str_231777` (MOUSE) in all twelve languages.
+- Evidence: `openq4-ui-retained-controls` and `openq4-ui-retained-game` pass.
+  The CONTROLS test was failing before this change: it named OTHER's rows 36
+  to 48 after the Classic ruleset's hook moved them to 37 to 49.
+  `ui_retained_gate.py` passes its settings-page assertions, then stops on a
+  later failure this change does not touch: its Create Server doubles do not
+  compile against MP-14's weapon-arena presets.
+
+## Radio chatter and helmet-radio squad lines have subtitles (#221, AUD-07), 17 November 2026
+
+- **Radio transmissions are captioned.** 249 of the 333 radio lines the stock
+  maps play, and about 390 other campaign lines, have no lip-sync transcript.
+  Each of them carries its line as written in the game's script, in its sound
+  shader's description, and subtitles now show that instead of
+  **[untranscribed speech]**. Stage directions, speaker tags and notes are left
+  out; the text is converted from Windows-1252, so apostrophes and dashes draw
+  correctly in every menu language. A recorded take is sometimes shorter than
+  the script line.
+- **Helmet-radio squad lines share their transcript.** The 692 marine lines
+  heard over the helmet radio are processed copies of lines that do have a
+  transcript; each now shows its dry line's text.
+- Installed lip-sync text and caption packs still come first. Only screams,
+  laughter, pain sounds and multiplayer announcers keep the marker.
+- `listSubtitles` reports script-line captions as `script`, and the speech
+  audit's `transcript=` status adds `script` and `helmet`.
 
 ## A copy of openQ4's own pack in a mod's folder no longer hides the new menus (#219), 17 November 2026
 

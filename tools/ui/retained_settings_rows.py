@@ -28,6 +28,8 @@ on every length in the tab's rows make the switch; their vector art is drawn
 in fractions of its box so it scales with them."""
 from __future__ import annotations
 
+import math
+
 from build_retained_screens import (CANVAS_W, FULL, ORANGE, OLIVE, TEXT_LENGTHS, TEXT_STATE, U, VALUE, Document, absolute, colour,
                                     fixed_text, group, keyword, label, length, linear, number, page_prompts, path, rgb, solid, stroke,
                                     text_width, track, typeface, vector)
@@ -194,7 +196,94 @@ def button_row(doc: Document, ident: str, label_key: str, value_x: float, value:
                  control={"role": "button", "label": label_key, **control, "states": row_states(doc, ident)})
 
 
-def check_settings_text(tabs: list, note: str | None) -> None:
+# A row that sets a CVar, as the stock settings pages' controls do: (kind,
+# id, label, CVar, extra), extra a slider's (minimum, maximum, step, places)
+# or a list's (values' text key, values). cvar_row builds one; the page
+# reads the CVar back and sets it with the adapter's allowlisted
+# settings.player.set (UserInterfaceRetained.cpp FindPlayerSetting, which
+# takes each stock control's range or values).
+def toggle(ident: str, label_key: str, cvar: str) -> tuple:
+    return ("toggle", ident, label_key, cvar, None)
+
+
+def slider(ident: str, label_key: str, cvar: str, minimum: float, maximum: float, step: float, decimals: int = 0) -> tuple:
+    return ("slider", ident, label_key, cvar, (minimum, maximum, step, decimals))
+
+
+def choice(ident: str, label_key: str, cvar: str, key: str, values: tuple) -> tuple:
+    """A list whose values are numbers, or text where a value has a fraction:
+    a float CVar reads back inexactly (0.022 as 0.0219999...), its text
+    exactly, as the stock list compares it."""
+    return ("choice", ident, label_key, cvar, (key, values))
+
+
+CVAR_KINDS = ("toggle", "slider", "choice")
+FINE_STEPS = 100                          # a slider with more steps than this takes a typed number too
+
+
+def cvar_settings(rows) -> list:
+    """Every row of `rows` that sets a CVar: (cvar, kind, values or range)."""
+    return [(cvar, kind, extra) for kind, _ident, _label, cvar, extra in rows if kind in CVAR_KINDS]
+
+
+def rows_value_column(rows) -> float:
+    """value_column for rows of (kind, id, label, binding, extra): every label
+    in two lines, and every fine slider's range message, which covers its
+    label (entry_row), in the label's two lines too."""
+    rows = list(rows)
+    needed = value_column([row[2] for row in rows])
+    for kind, _ident, _label, _binding, extra in rows:
+        if kind == "slider" and (extra[1] - extra[0]) / extra[2] > FINE_STEPS:
+            widest = max(wrapped_width(message) for message in range_text(RANGE_MESSAGE, extra[0], extra[1], extra[3]).values())
+            needed = max(needed, math.ceil(widest) + 29)
+    return needed
+
+
+def cvar_state(doc: Document, cvar: str, kind: str) -> dict:
+    """A setting the page reads back from its CVar."""
+    key = f"cvar.{cvar}"
+    doc.state[key] = {"type": kind, "initial": {"string": "", "number": 0, "boolean": False}[kind], "cvar": cvar}
+    return {"state": key}
+
+
+def setting_action(doc: Document, cvar: str, kind: str) -> str:
+    action = f"set.{cvar}"
+    doc.actions[action] = {"operation": "settings.player.set", "input": kind, "arguments": {"cvar": cvar, "value": {"input": "value"}}}
+    return action
+
+
+def cvar_row(doc: Document, row: tuple, value_x: float) -> dict:
+    """A CVar row as a setting row. A slider with more than FINE_STEPS steps
+    takes the value typed as well, in a number after it to the slider's
+    places (entry_row)."""
+    kind, ident, label_key, cvar, extra = row
+    if kind == "toggle":
+        return setting_row(doc, ident, label_key, "toggle", value_x, value=cvar_state(doc, cvar, "boolean"),
+                           action=setting_action(doc, cvar, "boolean"))
+    if kind == "slider":
+        minimum, maximum, step, decimals = extra
+        shown = cvar_state(doc, cvar, "number")
+        if decimals:
+            # A float CVar reads back inexactly (5.01 as 5.010000228): the
+            # slider shows it to the row's places.
+            scale = 10 ** decimals
+            shown = {"op": "/", "args": [{"op": "round", "args": [{"op": "*", "args": [shown, scale]}]}, scale]}
+        if (maximum - minimum) / step > FINE_STEPS:
+            # Too many steps to reach a value by stepping: the row takes the
+            # value typed as well, to the slider's places.
+            return entry_row(doc, ident, label_key, value_x, shown, setting_action(doc, cvar, "number"), extra)
+        return setting_row(doc, ident, label_key, "slider", value_x, value=shown, action=setting_action(doc, cvar, "number"),
+                           slider=extra)
+    if kind == "choice":
+        key, values = extra
+        kind_of = "string" if isinstance(values[0], str) else "number"
+        return setting_row(doc, ident, label_key, "choice", value_x, value=cvar_state(doc, cvar, kind_of),
+                           action=setting_action(doc, cvar, kind_of),
+                           entries=[((key, index), value) for index, value in enumerate(values)])
+    raise SystemExit(f"{ident}: a {kind} row names no CVar")
+
+
+def check_settings_text(tabs: list, note: str | dict | None) -> None:
     """Every shipped language's text fits: the tabs in the strip between its
     keycaps, each heading in its column, the note on the heading line, and
     each label in two lines in its row's label box (before its value
@@ -221,10 +310,10 @@ def check_settings_text(tabs: list, note: str | None) -> None:
                     for language, text in any_text(key).items():
                         if wrapped_width(text) > head["properties"]["width"]["value"]:
                             over[(key, language)] = round(wrapped_width(text))
-    if note is not None:
-        for language, text in any_text(note).items():
+    for key in ({note} if isinstance(note, str) else set((note or {}).values())):
+        for language, text in any_text(key).items():
             if text_width(face, text, size) > U * CONTENT_W - NOTE_INSET:
-                over[(note, language)] = round(text_width(face, text, size))
+                over[(key, language)] = round(text_width(face, text, size))
     if over:
         raise SystemExit(f"settings page text past its room: {over}")
 
@@ -376,14 +465,15 @@ def _note_line(ident: str, key: str, lead: float) -> dict:
                               "white-space": keyword("normal"), "pointer-events": keyword("none")})
 
 
-def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, note: str | None = None,
+def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, note: str | dict | None = None,
                      activate=None, overlays: list = (), back_event: str | None = None, back_id: str | None = None,
                      slots: int = COLUMN_SLOTS, footer: list = (), body: str | None = None,
                      first_focus: dict | None = None, portrait: bool = True, prompts: dict | None = None) -> dict:
     """The page: `tabs` holds each tab's (id, label, columns), a column a list
     of rows, notes and headings (heading()), at most two columns a tab. One
     tab shows no strip: its columns' first headings stand in the header band.
-    `note` is a line on the heading line, for tabs without headings. A page
+    `note` is a line on the heading line, for tabs without headings: on
+    every tab, or by tab id (a dict) on the tabs it names. A page
     whose Back is its own event (`back_event`, the button `back_id`) keeps
     its onBack; `slots` caps a column shorter where `footer` parts stand
     under the columns; `body` names a group around the pages, the bounds
@@ -428,6 +518,8 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
     if portrait:
         doc.state[VIEW_STATE] = {"type": "number", "initial": round(4 / 3, 4), "view": "aspect"}
         doc.state[TEXT_STATE] = {"type": "number", "initial": 1, "view": "text"}
+    elif isinstance(note, dict):
+        raise SystemExit(f"{prefix}: a note by tab needs the portrait layout")
     elif note is not None:
         chrome.append(heading_label(f"{prefix}-note", note, U * CONTENT_LEFT, U * HEAD_TOP, width, U * HEAD_H))
     # Each tab's rows scroll in one area from its heading line to the bottom
@@ -442,7 +534,8 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
         headed = [bool(column) and isinstance(column[0], tuple) for column in columns]
         if any(headed) and not all(headed):
             raise SystemExit(f"{prefix}'s {ident} tab heads one column and not the other")
-        lines = [_note_line(f"{prefix}-{ident}-note", note, lead)] if note is not None and portrait else []
+        noted = note.get(ident) if isinstance(note, dict) else note
+        lines = [_note_line(f"{prefix}-{ident}-note", noted, lead)] if noted is not None and portrait else []
         laid, parts, order = [], [], []
         for side, column in enumerate(columns):
             left = U * (CONTENT_LEFT + side * (COLUMN_W + COLUMN_GAP))

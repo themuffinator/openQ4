@@ -359,8 +359,10 @@ bool SessionMenuValueCommand(const std::string& command) {
 }
 
 // The player settings a retained page may change ("settings.player.set"):
-// the multiplayer card's Settings and Voice pages and the GAME OPTIONS page
-// (tools/ui/retained_game.py). Each takes what its stock control offers: a
+// the multiplayer card's Settings and Voice pages, the GAME OPTIONS page
+// (tools/ui/retained_game.py) and the CONTROLS page's MOUSE and
+// CONTROLLER tabs (tools/ui/retained_controls.py), whose rows the stock GAME
+// OPTIONS page held. Each takes what its stock control offers: a
 // slider's range (whole numbers for an integer setting), a Boolean, or one
 // of a list's values, as text (which pages read back as the setting's text,
 // so a float list matches exactly) or as numbers.
@@ -386,7 +388,8 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"s_voiceChatSend",{1}},{"s_voiceChatReceive",{1}},{"s_voiceChatEcho",{1}},
 		{"s_voiceChatCapture",{1}},{"s_voiceChatTest",{1}},
 		{"s_voiceVolume",{0,0,1}},{"s_micInputLevel",{0,0,10}},
-		// The GAME OPTIONS page, in its order.
+		// The stock GAME OPTIONS page, in its order (mouse and controller
+		// now on CONTROLS).
 		{"in_freeLook",{1}},{"ui_autoReload",{1}},{"ui_autoSwitch",{1}},{"in_toggleZoom",{1}},{"pm_zoomedSlow",{0,1,100,true}},
 		{"g_decals",{1}},{"ui_showGun",{1}},{"g_simpleItems",{0,0,3,true,{},{0,1,2,3}}},
 		{"g_mpFlatOpponentWeapons",{0,0,1,true,{},{0,1}}},{"m_pitch",{2,0,0,false,{"0.022","-0.022"}}},{"m_smooth",{0,1,8,true}},

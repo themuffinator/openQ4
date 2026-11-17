@@ -12,7 +12,7 @@ This guide covers how the game plays, looks and sounds: difficulty and Turbo Mod
 | HUD layout, size and opacity | **Settings → Game Options → HUD** | Game Options, **HUD** section |
 | Crosshair, hit marker, animated crosshair | **Settings → Game Options → HUD** | Game Options, **Crosshair** section (no animated crosshair) |
 | Skip cinematics, corpses, enhanced physics, language, console access | **Settings → Game Options → General** | Game Options, **Gameplay** section |
-| Weapon field of view and position | **Settings → Game Options → General** | Game Options, **View Weapon** section |
+| Weapon field of view and position | **Settings → Game Options → HUD** (**General** in 0.14.1) | Game Options, **View Weapon** section |
 | Volume, room reverb, speakers, subtitles | **Settings → Audio** | **Settings → Audio** |
 
 The classic Game Options page has a **Section** chooser at the top that jumps between its groups. Settings you change are saved automatically.

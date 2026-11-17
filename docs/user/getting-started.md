@@ -115,7 +115,7 @@ The Windows installer and the Linux AppImage always update as whole downloads. W
 
 - Launch `openQ4-steamdeck` from the Linux archive. It turns on the Deck's controls and settings (it sets `OPENQ4_STEAMDECK=1`).
 - Direct launches of `openQ4-client_x64` on a Steam Deck or SteamOS also auto-select the Deck profile, unless you've already chosen another one.
-- Tune the controls under **Settings → Game Options → Controller**: gyro, touchpad, touchscreen and the low-battery rumble limit.
+- Tune the controls under **Settings → Controls → Controller** (in 0.14.1, **Settings → Game Options → Controller**): gyro, touchpad, touchscreen and the low-battery rumble limit.
 - If the game window has trouble starting, set `OPENQ4_FORCE_X11=1` to run it through the older X11 display system instead of Wayland.
 - When reporting a controller problem, run `listControllers` in the console and include what it prints.
 - The [Steam Deck guide](steam-deck.md) has the details.

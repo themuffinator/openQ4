@@ -51,7 +51,7 @@ In the menus, the D-pad and left stick move the selection (the D-pad always does
 
 ## Tuning the controls
 
-All the controller settings are on **Settings → Game Options → Controller**: stick layout, dead zone, look sensitivity, look curve, invert look, trigger press, rumble, gyro, trackpad mode, touchscreen and the low-battery rumble limit.
+All the controller settings are on **Settings → Controls → Controller** (in 0.14.1, **Settings → Game Options → Controller**): stick layout, dead zone, look sensitivity, look curve, invert look, trigger press, rumble, gyro, trackpad mode, touchscreen and the low-battery rumble limit.
 
 - **Gyro aim too slow or too fast:** change **Gyro Sensitivity** (`in_gyroSensitivity`). Turn **Gyro** off (`in_gyro 0`) to aim with the sticks only.
 - **Trackpads:** **Touchpad Mode** (`in_touchpadMode`) is **Menu Cursor** on the Deck. Choose **Mouse Look** to aim with a trackpad during play, **Off** to ignore trackpad movement, or **Button Only** to ignore movement but keep trackpad clicks.

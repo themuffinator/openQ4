@@ -3199,7 +3199,8 @@ While the CONTROLS page waits for a key it takes the next key pressed, as
 the stock binding field does: Escape, Start or Back cancel, Backspace or
 Delete clear the row, any other key joins its keys (at most two of each device
 family, idKeyInput::BindForMenu). The key's release and characters are its own. Out of
-a wait, Delete or Backspace on a row clears it.
+a wait, Delete or Backspace on a binding row clears it; on the device tabs'
+rows they reach the page.
 ===============
 */
 bool idSessionLocal::RetainedControlsKey( const sysEvent_t *event ) {
@@ -3214,12 +3215,13 @@ bool idSessionLocal::RetainedControlsKey( const sysEvent_t *event ) {
 		return true;
 	}
 	if ( retainedControlsCapture < 0 ) {
-		if ( event->evType == SE_KEY && event->evValue2 && ( event->evValue == K_DEL || event->evValue == K_BACKSPACE ) ) {
+		// Only a binding row's: the MOUSE and CONTROLLER rows' typed
+		// numbers take Delete and Backspace as text.
+		if ( event->evType == SE_KEY && event->evValue2 && ( event->evValue == K_DEL || event->evValue == K_BACKSPACE ) &&
+			Session_RetainedControlsRow( guiRetainedControls ) >= 0 ) {
 			// The page never sees this key, so the clear sounds here; the
 			// page sounds its own presses, the controller's clear included.
-			if ( Session_RetainedControlsRow( guiRetainedControls ) >= 0 ) {
-				HandleMainMenuCommands( "play main_menu_selection" );
-			}
+			HandleMainMenuCommands( "play main_menu_selection" );
 			HandleRetainedControlsRequest( guiRetainedControls, "controlsClear" );
 			return true;
 		}
