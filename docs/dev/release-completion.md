@@ -7,6 +7,29 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Helmets and masked reflections keep their colour, 17 November 2026
+
+- **The bright marine's helmet matches its suit again.** In multiplayer the
+  bright helmeted marine's helmet looked washed out and paler than the body.
+  It now has the same strong colour, and the visor keeps its reflection.
+- **The same fix reaches every surface with a masked reflection.** Helmets,
+  glass, items, vehicles and some walls use the same reflection trick, and all
+  of them were washed out wherever the map's baked lighting reached them.
+  This applies to the OpenGL and Vulkan renderers.
+- **What to do.** Nothing.
+- How it works: the baked light-grid pass lights each surface by every opaque
+  ambient stage it takes for albedo. A `maskcolor` stage writes only
+  destination alpha for a later `GL_DST_ALPHA` reflection, and its
+  `makealpha(...)` texture is white RGB. It was being taken as a second,
+  white albedo, which added a white indirect layer. Stages that mask colour
+  writes are no longer albedo sources, in the GL backend, the scene-packet
+  planner and the Vulkan light-grid pass alike.
+- Evidence: third-person captures of `model_player_marine_helmeted_bright` on
+  stock `mp/q4dm1`. An all-black mask still washed the helmet out, which
+  ruled out the reflection, and `r_useLightGrid 0` restored the colour. With
+  the fix, GL and Vulkan both show a saturated helmet with the visor
+  reflection intact, and the logs gain no new warnings.
+
 ## Loading screens scroll their frame into view, 17 November 2026
 
 - **The loading screen opens with a quick scroll.** In the new interface each

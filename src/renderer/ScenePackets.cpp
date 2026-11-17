@@ -1963,6 +1963,10 @@ static bool R_ScenePackets_LightGridAmbientStageCanProvideAlbedo( const idMateri
 	if ( stage->texture.texgen != TG_EXPLICIT && stage->texture.texgen != TG_POT_CORRECTION ) {
 		return false;
 	}
+	// alpha-only maskcolor stages carry no albedo (RB_LightGridAmbientStageCanProvideAlbedo)
+	if ( ( stage->drawStateBits & GLS_COLORMASK ) != 0 ) {
+		return false;
+	}
 	return R_ScenePackets_LightGridStageBlendBits( stage ) == 0;
 }
 

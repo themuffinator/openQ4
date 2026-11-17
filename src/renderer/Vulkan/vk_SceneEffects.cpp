@@ -552,6 +552,10 @@ static bool VK_LightGrid_StageCanProvideAlbedo( const idMaterial *shader, const 
 	if ( stage->texture.texgen != TG_EXPLICIT && stage->texture.texgen != TG_POT_CORRECTION ) {
 		return false;
 	}
+	// alpha-only maskcolor stages carry no albedo (RB_LightGridAmbientStageCanProvideAlbedo)
+	if ( ( stage->drawStateBits & GLS_COLORMASK ) != 0 ) {
+		return false;
+	}
 	return ( stage->drawStateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS ) ) == 0;
 }
 

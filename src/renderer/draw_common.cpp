@@ -14952,6 +14952,13 @@ static bool RB_LightGridAmbientStageCanProvideAlbedo( const idMaterial *shader, 
 	if ( stage->texture.texgen != TG_EXPLICIT && stage->texture.texgen != TG_POT_CORRECTION ) {
 		return false;
 	}
+	// A `maskcolor` stage writes only destination alpha for a later
+	// GL_DST_ALPHA stage. Its texture is usually makealpha(...), which is
+	// white RGB, so taking it as albedo adds a white indirect layer that
+	// washes out the surface (the bright MP marine's helmet).
+	if ( ( stage->drawStateBits & GLS_COLORMASK ) != 0 ) {
+		return false;
+	}
 	return RB_LightGridStageBlendBits( stage ) == 0;
 }
 
