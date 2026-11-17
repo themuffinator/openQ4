@@ -37,12 +37,13 @@
 #endif
 
 // jscott: uncomment this to use id's sqrt and trig approximations
-#if defined( __linux__ ) || defined( MACOS_X )
-	// TTimo - enabling for OSes I'm covering
-	// (14:34:20) mrelusive: in the general case we don't use those functions
-	// (14:34:28) mrelusive: they are only for specific cases where they are faster
-	#define _FAST_MATH
-#endif
+// openQ4: _FAST_MATH stays off on every platform. The Linux and macOS ports
+// used to turn it on, which made idMath::Sqrt and InvSqrt table approximations
+// there and exact sqrtf on Windows, where the retail game and its content were
+// made. The results differ in the last bit, and that is enough to change
+// behaviour: a ragdoll's bone frame is chosen by whether two joints share a
+// coordinate exactly (idAF::LoadBody), so the knee limits of the authored
+// ragdoll poses pointed sideways on Linux and the figures blew apart.
 // RAVEN END
 
 #define DEG2RAD(a)				( (a) * idMath::M_DEG2RAD )

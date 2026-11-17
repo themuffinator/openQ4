@@ -357,7 +357,10 @@ every one of them.
   an enhanced one. It decided the comparison in opposite directions on the two
   platforms and said nothing about the bodies each workload stages. The
   unrested runs are still made and recorded.
-- **Proposed CPU exceptions (16 November 2026; not accepted).** Four measured
+- **Proposed CPU exceptions (16 November 2026; not accepted; out of date for
+  Linux).** On the Linux build with exact math (17 November) `sp-ragdolls`
+  costs 65 % more than legacy, past the 25 % proposed below, and
+  `sp-flatstacks` 4.1 ms more instead of 8.2. Four measured
   overruns remain after the third round. The budget lets an exception be
   declared with its bound before promotion; these are the bounds that would
   cover what was measured, written down for the project owner to accept or
@@ -402,6 +405,19 @@ every one of them.
   and about one corpse in twenty tumbles 200 to 500 units down the map in
   either mode. From the third round its falling classes are pooled over six
   repeats, after a run of three failed one of them on that draw alone.
+- **One start for both modes.** A hit on resting corpses is only the same
+  hit if the corpses lie in the same place. From 17 November the Strogg
+  scene is staged once, in legacy mode: the ring is killed and
+  left to settle, the game is saved, and that save is loaded and hit in each
+  mode. Before that each mode killed and settled its own ring, and enhanced
+  corpses, which fall on from the motion they had, ended closer to the
+  player: four of seventeen lay 20 to 27 units from the blast against
+  legacy's nearest at 31, and a corpse that close is pushed into the ground
+  in either mode. The still-falling classes cannot share a start and are
+  staged as before; so are the multiplayer scene, which cannot be saved, the
+  crate and barrel scenes, where nothing moves before the hit, and The
+  Awakening's scene, which is judged on the bodies the blast reached.
+  `--own-start` runs the old way.
 - **Falling light hits.** A corpse hit while it is still falling travels
   mostly by its own collapse down the slope, not by the hit. The largest of
   those collapses is a poor yardstick: legacy's own largest grows from 69
@@ -437,7 +453,8 @@ rolls once on a weak bump, peaked at 122 and 42 units/s against legacy's 103
 and 26, which is noise at those speeds, not a flung body). Stagings, the
 falling bound and the stretch rule date from 16 November, as do judging a
 heavy hit on the bodies it reached, the six multiplayer repeats and resting
-the map's ragdolls before a CPU measurement.
+the map's ragdolls before a CPU measurement. The common start for hits on
+resting corpses dates from 17 November.
 
 ## Evidence
 
@@ -447,8 +464,11 @@ figures and placed pickups; the third (16 November) fixed the defects the
 second left open, as measured on Windows, and then found three checks
 failing on Linux x64 that pass on Windows (a splash class on resting corpses,
 a placed figure on a ledge and, by 0.09 units, a joint-stretch bound on
-Putra's lights). The tables are the third round's unless a line
-says otherwise.
+Putra's lights). The fourth (17 November) traced those three to the Linux
+build itself, which compiled approximate square roots where Windows compiles
+exact ones, and to how the envelope staged its corpses; see [the Linux build
+was running on approximate math](#the-linux-build-was-running-on-approximate-math-fourth-round).
+The tables are the third round's unless a line says otherwise.
 
 Windows x64, RTX 4060 Laptop, debugoptimized build of the third round's
 sources, measured before they landed as snapshot `c45be1f81` on top of
@@ -629,71 +649,50 @@ reached, those whose velocity it changed: on the scenes below that is every
 body, on The Awakening's trench about half.
 
 **Strogg marine corpses on Air Defense 1's crater floor (`--scene ai`): all
-classes pass on Windows; the rocket and grenade splash fail on Linux (below
-the table).**
+classes pass.** Fourth round, both modes hit from one saved start.
 
 | Hit | Class | Result | Corpses | Median travel | Mean travel | Largest travel | Peak speed | Largest stretch, frames visible |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | raw impulse | momentum | PASS | 6 / 6 | momentum change within 2 % in both modes | | | | |
-| machinegun | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 13 for 3 / 11 for 5 |
+| machinegun | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 3 for 0 / 1 for 0 |
 | machinegun, still falling | light | PASS | 17 / 17 | 60 / 51 | 56 / 64 | 91 / 117 | 125 / 158 | 25 for 14 / 20 for 13 |
 | gauntlet | light | PASS | gibs every corpse in both modes | | | | | |
-| hyperblaster splash | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 13 for 3 / 11 for 5 |
-| weak vehicle-sized bump | light | PASS | 6 / 6 | 1 / 1 | 1 / 1 | 1 / 2 | 26 / 15 | 13 for 3 / 11 for 5 |
+| hyperblaster splash | light | PASS | 6 / 6 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 3 for 0 / 1 for 0 |
+| weak vehicle-sized bump | light | PASS | 6 / 6 | 1 / 1 | 1 / 1 | 3 / 2 | 40 / 27 | 3 for 0 / 2 for 0 |
 | rocket direct | heavy | PASS | gibs every corpse in both modes | | | | | |
-| rocket splash | heavy | PASS | 17 / 17 | 110 / 71 | 117 / 113 | 233 / 441 | 864 / 915 | 34 for 158 / 31 for 37 |
-| grenade splash | heavy | PASS | 17 / 17 | 110 / 71 | 117 / 113 | 233 / 441 | 864 / 915 | 34 for 158 / 31 for 37 |
+| rocket splash | heavy | PASS | 17 / 17 | 141 / 110 | 129 / 113 | 262 / 250 | 993 / 905 | 37 for 212 / 16 for 16 |
+| grenade splash | heavy | PASS | 17 / 17 | 141 / 110 | 129 / 113 | 262 / 250 | 993 / 905 | 37 for 212 / 16 for 16 |
 | grenade splash, still falling | heavy | PASS | 17 / 17 | 274 / 280 | 217 / 227 | 461 / 445 | 1,156 / 972 | 37 for 87 / 20 for 14 |
-| Dark Matter splash | heavy | PASS | 17 / 17 | 231 / 227 | 224 / 292 | 472 / 836 | 1,754 / 1,746 | 88 for 113 / 44 for 78 |
+| Dark Matter splash | heavy | PASS | 17 / 17 | 211 / 183 | 231 / 198 | 526 / 525 | 1,737 / 1,631 | 103 for 118 / 67 for 55 |
 
-The stretch columns include the quiet kill that stages each scene (13 units
-for 3 frames in legacy). Every enhanced splash spread the push of a light limb
-over its figure (193 or 194 impulse clamps over three stagings), so no struck
-body changed speed by more than 300 units/s against legacy's 1,058 to 2,116.
-On every splash enhanced joints are visibly apart for fewer frames than
-legacy's, and by less.
+Every enhanced splash spreads the push of a light limb over its figure, so no
+struck body changes speed by more than 300 units/s against legacy's 1,058 to
+2,116. On every splash enhanced joints are visibly apart for fewer frames
+than legacy's, and by less. The stretch columns of the resting classes start
+at the loaded save; those of the falling classes include the kill.
 
-After a Dark Matter splash four of 17 enhanced corpses end further away than
-any legacy one (501, 667, 690 and 836 units against legacy's largest of 472),
-and one after a rocket splash (441 against 233). They leave no faster than
-legacy's (peak body speed 1,746 against 1,754) and stop in the map: they slide
-on down the crater instead of catching on it. The heavy classes have no bound
-on the largest travel, so this passes; it is recorded under Known defects.
+**What the common start changed.** With each mode killing and settling its
+own ring (rounds two and three) the rocket and grenade splash read 110 / 71
+units at the median on Windows and 144 / 39 on Linux, a **FAIL** there
+against the 0.4x bound, and after a Dark Matter splash four of seventeen
+enhanced corpses ended further away than any legacy one (up to 836 units
+against 472). Both were the staging. Traced corpse by corpse, travel follows
+the distance from the blast in either mode:
 
-**The rocket and grenade splash pass on a knife edge, and fail on Linux.**
-Resting corpses hit by a 10,000-unit splash fall into two groups in both
-modes: those the blast lifts off the ground, which travel 90 to 440 units,
-and those that slide and stop within about 65. Legacy leaves 4 of 17 in the
-second group. Enhanced leaves 8 on Windows and 9 on Linux, so its median,
-the ninth of 17, is the first corpse of the far group on Windows (71 units
-against legacy's 110, 0.65x) and the last of the near group on Linux (39
-against 144, 0.27x, a **FAIL** against the 0.4x bound). Sorted travel on
-Windows, legacy then enhanced:
-
-    12 12 32 37 | 96 97 101 104 110 114 139 149 164 179 191 223 233
-    14 16 19 20 36 37 53 53 | 71 90 145 158 177 189 192 214 441
-
-and on Linux:
-
-     8 16 32 59 | 96 101 135 141 144 145 146 151 159 177 189 229 416
-     6 10 12 14 16 31 32 38 39 | 62 104 116 125 146 164 169 439
-
-Four settings were switched on the Windows build without rebuilding, three
-stagings each, to find what holds the near group down. None does:
-
-| Enhanced variant | Corpses within 65 units | Median | Mean | Largest stretch, frames visible |
+| Mode | Corpses within 30 units of the blast | Their travel 0.7 s after the hit | Corpses 60 to 100 units away | Their travel |
 | --- | --- | --- | --- | --- |
-| Shipped | 8 of 17 | 71 | 113 | 31 for 37 |
-| Impulse guard at 600 units/s instead of 300 | 7 | 111 | 130 | 40 for 34 |
-| No impulse guard | 7 | 85 | 114 | 40 for 47 |
-| No creep audit | 9 | 47 | 98 | 23 for 34 |
-| Stopping surface not added to the contacts | 6 | 112 | 118 | 28 for 283 |
-| Joint correction as velocity up to legacy's 256 units/s | 10 | 39 | 72 | 23 for 40 |
-| Legacy | 4 | 110 | 117 | 34 for 158 |
+| Legacy | none (the nearest lies 31 away) | 13 | 11 | 101 to 210, and one at 12 |
+| Enhanced | 4 (20 to 27 away) | 14 to 53 | 10 | 93 to 365, and two at 20 |
 
-The median moves between 39 and 112 with changes that leave the grouping as
-it is, which is what a median in the gap between two groups does. The cause
-of the larger near group is not found.
+A corpse that close gets the push from above: it leaves at 570 to 650
+units/s sideways and 180 to 370 downwards where the others leave at 800
+sideways, and is driven into the ground. Enhanced corpses lay closer because
+a ragdoll that falls on from the motion it had ends nearer the middle of the
+crater, where the player stands. From one saved start the largest travel
+after a Dark Matter splash is 526 / 525. Loosening or removing the impulse
+guard, the creep audit, the stop contacts and the joint-correction cap had
+all been tried against the old result on 16 November; none changed it,
+because none of them was the cause.
 
 **Where a thrown corpse loses its speed.** Right after a splash both modes
 carry the same momentum: a rocket splash leaves each resting corpse's centre
@@ -1089,7 +1088,64 @@ enhanced.
 
 ### Linux x64 and ARM64 (PHYS-05, PHYS-06)
 
-**Linux x64.** WSL2, Ubuntu 24.04.3, GCC 13.3, debugoptimized, built from an
+**Fourth round: Linux x64 on exact math (17 November).** The same sources
+as Windows, built after `_FAST_MATH` was removed (see [the Linux build was
+running on approximate
+math](#the-linux-build-was-running-on-approximate-math-fourth-round)). The
+round was wrapped up before the full pass could be repeated, so this is what
+ran: the rested CPU workloads and the three checks that had failed. Everything
+below this block is the third round's pass on the build with approximate math
+and is kept as the record of what that build did.
+
+| Workload | Total, floor | p99, floor | Worst frame, floor | Total, median | Rigid-body steps | Figure steps | Sleeps, wakes | Enhanced LCP fallbacks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| sp-ragdolls | 82.8 / 136.9 | 0.81 / 0.96 | 0.97 / 1.17 | 102 / 197 | 0 / 0 | 336 / 534 | 3, 0 / 5, 5 | 18 (1.0 ms) |
+| sp-explosion | 65.6 / 65.8 | 0.37 / 0.21 | 0.55 / 0.26 | 80 / 85 | 2,198 / 2,709 | 0 / 0 | 36, 23 / 105, 93 | 0 |
+| sp-setpiece | 11.2 / 9.9 | 0.07 / 0.06 | 0.35 / 0.44 | 15 / 15 | 732 / 732 | 1 / 1 | 0, 1 / 0, 1 | 0 |
+| sp-stacks | 131.9 / 32.9 | 0.18 / 0.17 | 0.24 / 0.21 | 185 / 45 | 3,434 / 876 | 0 / 0 | 1,675, 1,667 / 20, 11 | 0 |
+| sp-flatstacks | 11.8 / 15.9 | 0.07 / 0.12 | 0.13 / 0.18 | 19 / 24 | 164 / 425 | 0 / 0 | 12, 3 / 16, 7 | 0 |
+
+Three runs each with the map's ragdolls at rest, legacy / enhanced, while
+three Windows clients ran beside them; all 30 pass and each mode repeats its
+digests.
+
+- **The two platforms now agree.** `sp-stacks`, `sp-flatstacks` and
+  `sp-setpiece` produce the same state digests on Linux as on Windows in both
+  modes, with the same step, sleep and wake counts (3,434 / 876 and 164 / 425
+  moving steps, 1,675 sleeps and 1,667 wakes against 20 and 11). Legacy's
+  ragdoll workload takes 336 moving steps here and 332 on Windows, and its
+  explosion scene 2,198 against 2,260 (3,007 on the approximate build).
+  `sp-ragdolls` and
+  `sp-explosion` still differ in digest, because they spawn their bodies in
+  a ring and the ring's sines and cosines come from glibc here and the UCRT
+  there.
+- **The CPU budget is still missed on two workloads.** `sp-ragdolls` costs
+  65 % more in enhanced mode (54 ms over the workload, worst frame 0.20 ms
+  higher): the three staged corpses take 534 moving steps to settle against
+  legacy's 336, where on Windows they take 340 against 332. That gap is
+  larger than on the approximate build (21 %) and is not explained.
+  `sp-flatstacks` costs 34 % more (4.1 ms, worst frame 0.04 ms higher), for
+  the same 425 steps against 164 as on Windows. `sp-setpiece`'s worst frame
+  is 0.09 ms higher. `sp-explosion` costs the same and `sp-stacks` 75 % less.
+
+The three checks that failed on the approximate build, on this one:
+
+| Check | Result | Legacy / enhanced |
+| --- | --- | --- |
+| `physics_defects.py --repros placed-ragdolls` | PASS | Largest sink 0.0 / 1.0 unit, no joint pierced: the ledge marine stays on its ledge in both modes, as on Windows (0.0 / 1.0). Before: 14.7 / 25.9, with the marine on the floor. |
+| the same, `joint-stretch` and `resting-jitter` | PASS | Joints 58 units apart for 28 frames / 33 for 12. 1,768 sleeps and 1,757 wakes / 22 and 11, Windows's counts to within one. |
+| `physics_envelope.py --hits rocket-splash,dmg-splash` (one saved start) | PASS | Rocket splash median 150 / 125 units (0.83x), mean 126 / 121, largest 225 / 276. Dark Matter splash 222 / 293 (1.32x), largest 562 / 539. Before, with each mode's own start: 144 / 39. |
+| `physics_coverage.py`, Putra's lights, heavy impulse | PASS | Joint stretch 0.81 / 1.32 units, swing 0.55 / 0.97: Windows's numbers to the digit. Before: 1.10 / 2.18. |
+
+Not repeated on the exact build: the unrested workloads, `mp-frags` (24 %
+above legacy on the approximate build), the dedicated server, the
+integration checks, the other four defect repros, the rest of the envelope
+(light and falling classes, crates and barrels, The Awakening, multiplayer),
+the rest of coverage, and the ARM64 dedicated server.
+
+**Third round: Linux x64 on approximate math (16 November).**
+
+WSL2, Ubuntu 24.04.3, GCC 13.3, debugoptimized, built from an
 export of the third round's snapshot (`c45be1f81`); the client runs under
 Xvfb on Mesa's software renderer. Three runs each with the map's ragdolls at
 rest, legacy / enhanced; all 30 runs pass without errors and each mode
@@ -1208,6 +1264,93 @@ clang++, AArch64 with clang++ with and without floating-point contraction,
 AArch64 with g++), printing the same values on all of them. No ARM64 client
 was run, and nothing ran on ARM64 hardware.
 
+### The Linux build was running on approximate math (fourth round)
+
+The third round ended with the same build passing its gates on Windows and
+failing three checks on Linux, and with step counts that "differed by
+compiler in both modes". The fourth round found why. It was neither the
+enhanced solver nor rounding chaos: the Linux and macOS ports of idlib
+compiled different math from Windows.
+
+**Symptom.** On the Linux build the stock maps' placed ragdolls blew apart
+when a level started, in legacy mode as well. Sampled on every frame from the
+moment Air Defense 1's intro ends, legacy's eight placed marines reached 835
+units/s with joints up to 21 units apart on Linux and 14 to 27 units/s with
+joints under one unit apart on Windows. Gravity nudged to four values between
+1,064 and 1,068 left every Windows ragdoll where it lay; nudged to 1,065,
+1,067 and 1,070 it left Linux violent every time (up to 1,664 units/s, joints
+11 to 28 units apart), and the ledge marine fell off its ledge in legacy mode
+too in two of the three. A difference that survives every
+perturbation is a defect, not chaos. On Air Defense 2, which has no intro, a
+Linux legacy ragdoll's fastest body went from 13 to 138 units/s in its first
+thirteen frames; the Windows one stayed between 1 and 16.
+
+**Cause, traced step by step** with a temporary per-phase trace of the legacy
+figure step built on both platforms:
+
+1. On the first step both builds agree to the printed digit through contact
+   setup and the primary (joint) solve. In the auxiliary constraints Linux has
+   26 rows where Windows has 25, and applies accelerations of up to 9,250
+   where Windows applies none.
+2. The extra row is the right knee's cone limit, with an error term of -201
+   where the other limits have -0.3 to -0.6: Linux judges the knee about 20
+   degrees outside its limit in the pose the map authored.
+3. The bodies' orientations are identical. The limit's axis, stored in the
+   thigh body's frame, is (-0.574, 0, 0.819) on Windows and (0, -0.574, 0.819)
+   on Linux: rotated a quarter turn about the thigh.
+4. The thigh is a bone-shaped body between the hip and knee joints.
+   `idAF::LoadBody` builds its frame with `idVec3::NormalVectors`, which
+   takes a fallback frame only when the bone's direction has x and y exactly
+   zero. On Windows the right hip and knee have identical x, so the direction
+   is exactly (0, 0, -1). On Linux the knee's x is 5.4e-7 off, the direction
+   is (3.0e-8, 0, -1) and the frame comes out a quarter turn away. Every
+   ragdoll pose stored in a map assumes the Windows frame.
+5. The joints come from an animation frame whose quaternion w is
+   `idMath::Sqrt( 1 - x*x - y*y - z*z )`. For the right knee Windows gets
+   0.994754314 and Linux 0.994754255: one unit in the last place.
+6. `src/idlib/math/Math.h` defined `_FAST_MATH` under
+   `#if defined( __linux__ ) || defined( MACOS_X )`. With it `idMath::Sqrt`
+   is `x * InvSqrt( x )` from a lookup table and two Newton steps, and
+   `Sin16`, `Cos16`, `Tan16` and `ATan16` are polynomials; without it they
+   are `sqrtf` and the other exact library calls, as on Windows and in the
+   retail game. Replaying both forms in float32 reproduces the two values
+   above for every joint checked.
+
+**Fix.** `_FAST_MATH` is no longer defined on any platform, and
+`tools/tests/physics_enhanced_solver.py`, which CI runs on every platform,
+fails if a define of it comes back. On the rebuilt Linux tree the right thigh
+bone is exactly vertical again, Air Defense 2's ragdoll reads 12.9 units/s
+with joints 0.50 apart on its first sampled frame (Windows 13.1 and 0.51), and
+Air Defense 1's read 16.4 and 0.90 (Windows 13.6 and 0.93).
+
+**What this changes beyond physics.** Every user of `idMath::Sqrt`,
+`InvSqrt` and the 16-bit trigonometry on Linux, macOS and Android now gets
+the Windows results: animation, collision, AAS and rendering math included.
+The rigid-body stack workloads (`sp-stacks` and `sp-flatstacks`) now produce the
+same state digests on Linux as on Windows, in both modes; workloads that
+spawn a ring of bodies still differ, because the ring's sines and cosines
+come from two different C libraries. macOS and Android took the same switch and have not
+been run since the change.
+
+**Two findings about the evidence itself came out of the same hunt.**
+
+- *Corpses were not hit from the same place in both modes.* The third
+  round's failing class, a rocket or grenade splash on resting corpses, was
+  the staging: enhanced corpses collapse closer to the player, so four of
+  seventeen lay 20 to 27 units from the blast where legacy's nearest lay 31
+  away, and in both modes a corpse that close is pushed into the ground and
+  travels 13 to 53 units where the others travel 100 to 200. The envelope now stages each scene once, in legacy
+  mode, saves it, and hits that save in both modes (see
+  [Budgets](#budgets-and-tolerances)). `--own-start` runs the old way.
+- *This machine's "retail" maps were not all retail.* The Steam folder used
+  for the Windows runs holds loose, locally recompiled map, proc and
+  collision files for Air Defense 1 and every multiplayer map, dated March
+  2026, which override the packs (38,107 collision polygons for Air Defense
+  1 against the pack's 46,640). Linux always ran on a copy of the packs
+  alone. From the fourth round the Windows runs use a packs-only view of the
+  same install (`--retail`), as Linux does. The placed ragdolls' first
+  frames on Air Defense 1 are identical to the digit either way.
+
 ### Known defects and what was tried
 
 **Fixed in the third round** (each was open after the second, and is why an
@@ -1222,7 +1365,39 @@ item was not closed then):
 | Storage 2's `ammo_railgun_1` settled 20 units off its spot | The same edge contact as the ledge | Stays put |
 | Corpses launched off the ground travelled two thirds as far as legacy's | Estimated contact gaps, not the joint correction it was put down to | Mean 0.97x after a rocket splash, 1.30x after a Dark Matter splash on Windows; the median of resting corpses is still open (2) |
 
-**Open on the final build.**
+**Fourth round (17 November).** Of the open items below, 2, 3 and 9 were the
+Linux build's approximate math and 4 was the envelope's staging; all four are
+closed, with the evidence in [the Linux build was running on approximate
+math](#the-linux-build-was-running-on-approximate-math-fourth-round) and the
+[Linux section](#linux-x64-and-arm64-phys-05-phys-06). Item 1 stands, with
+Linux figures of 65 % on `sp-ragdolls` and 34 % on `sp-flatstacks`. New and
+open after the fourth round:
+
+- **Enhanced corpses settle differently on the two platforms.** The three
+  staged corpses of `sp-ragdolls` take 534 moving steps on Linux and 340 on
+  Windows in enhanced mode, where legacy takes 336 and 332. Not explained.
+- **The full Linux pass has not been repeated on the exact build.** The round
+  was wrapped up at the user's request after the rested CPU workloads and the
+  three failed checks.
+- **The Windows CPU tables are the third round's build.** The sources have
+  moved (about forty commits by other work) and the Windows runs now use the
+  retail packs alone; the tables were not re-measured. Legacy's digests on
+  current sources still match 14 November's.
+- **The campaign walk's timings of 17 November are not usable.** The walk
+  passes in both modes on the retail packs (62 of 62 loads, 1,675 bodies, 11
+  pierced joints in each mode), but it ran on a machine also running two more
+  of these queues, a Linux pass and another session's clients. Waste read
+  1,654 ms in enhanced mode against 93 with an 83 ms frame, for 11,896
+  rigid-body steps against legacy's 12,757, and legacy shows single
+  evaluations of 27 to 54 ms in the same walk. The third round's 142 ms
+  against 101 stands until it is measured again on a quiet machine.
+- **macOS and Android** share the math change and have not been run.
+- **The cross-mode save checks** (`physics_integration.py`) were not repeated
+  on current sources; the common-start envelope loads a legacy save in both
+  modes on every run and passes.
+
+**Open after the third round** (see the note above for what the fourth
+closed).
 
 1. **Processor time on two workloads per platform.** With the map's own
    ragdolls at rest enhanced costs more than legacy on `sp-explosion` (3 %)

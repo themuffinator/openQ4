@@ -7,6 +7,37 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Bodies lying in levels no longer blow apart on Linux, 17 November 2026
+
+- **Corpses and wounded marines that a level places for you to find now lie
+  still when it starts on Linux.** Before, they could jerk violently, with
+  limbs pulled apart, and end up somewhere else: in Air Defense Bunker the
+  marine lying across a ledge often fell off it. Windows was never affected.
+- **Linux now does its arithmetic the way Windows does.** The Linux and macOS
+  builds used faster, slightly less exact square roots and trigonometry than
+  the Windows build, which the game was made on. The answers differed only in
+  the last digit, but that was enough to turn a ragdoll's knee the wrong way
+  for the pose its level stored. Animation, collision and bot navigation on
+  Linux now get the same results as on Windows too, and stacks of crates
+  simulate identically, step for step, on both.
+- **macOS and Android** take the same change. It has not been run there yet.
+- **Nothing to do.** Saves load as before. A body that had already been thrown
+  out of place in a save stays where that save has it.
+- How it works: `src/idlib/math/Math.h` no longer defines `_FAST_MATH` on any
+  platform, so `idMath::Sqrt`, `InvSqrt` and the 16-bit trigonometry are the
+  exact library calls everywhere. A ragdoll's thigh bone gets its frame from
+  whether the hip and knee joints share a coordinate exactly; with the table
+  square root the knee was off by 5e-7 on Linux and the frame turned a quarter
+  turn. `tools/tests/physics_enhanced_solver.py` fails if the define returns.
+  Details and the trace that found it:
+  [physics reference](physics-reference.md#the-linux-build-was-running-on-approximate-math-fourth-round).
+- Evidence: on the Linux build the placed ragdolls of Air Defense Bunker and
+  Air Defense Trenches read 16 and 13 units/s with joints under one unit apart
+  on their first frames after the change (up to 835 units/s and 21 units
+  before; 14 and 13 units/s on Windows), and the rigid-body stack workloads produce the same
+  state hashes as Windows in both physics modes. The three physics checks that failed on Linux the day before pass (the ledge marine stays put, a rocket blast throws resting corpses 0.83x as far as the original's at the median, the hanging lights in Putra match Windows to the digit).
+  Not run: macOS, Android, ARM64 Linux, and a full Linux play session.
+
 ## Multiplayer: servers that keep your settings, fairer rounds and fewer hitches, 17 November 2026
 
 - **A server keeps the limits you set.** A frag, time or capture limit changed
@@ -1226,9 +1257,11 @@ testing.
   corpse with a limb stretched out for a second or more: where the original
   showed a stretched limb for 42 frames after a Dark Matter blast, the option
   shows one for 22, stretched less than half as far.
-- **It is off by default, and stays off for now.** On Windows it now passes
-  nearly all of its measured tests. On Linux a few still fail (see Open
-  below), and nobody has yet watched it in play. With the option off, the
+- **It is off by default, and stays off for now.** It passes its behaviour
+  tests on Windows, and the ones that failed on Linux pass there now that
+  Linux does its arithmetic as Windows does (17 November), but in a few
+  scenes it costs more than the original and nobody has yet watched it in
+  play. With the option off, the
   game runs the original physics code unchanged, and saves and demos are byte
   for byte what they were. A change applies from the next map or loaded save,
   never under bodies in mid-air. In multiplayer everyone follows the server's
@@ -1282,13 +1315,13 @@ testing.
   dedicated server with the option on, on Windows and on Linux; ragdolls and
   debris stay smooth at 240 Hz in both modes. On Linux x64 the same seven save, client, demo and dedicated-server checks pass, the hit test passes for crates and barrels and for nine of its eleven classes on Strogg marines, and an ARM64 dedicated server ran a bot match in both modes under emulation. Details:
   [physics reference](physics-reference.md#evidence).
-- Open: on Linux, corpses lying on the ground move less far from a rocket or
-  grenade blast than the original's (about a quarter as far at the median),
-  and one body the Air Defense map lays across a ledge slides off it; on both
-  systems two of five measured scenes cost a few milliseconds more than the
-  original over the whole scene; a review in motion by eye (every round so
-  far compared stills); and with those the decision on turning the option on
-  by default. Tracked as PHYS-02 to PHYS-04 and PHYS-06 in the
+- Open: on both systems two of five measured scenes cost more than the
+  original over the whole scene (a few milliseconds on Windows; on Linux a
+  ring of three ragdolls takes 65 % longer to come to rest); the full Linux
+  test pass has to be repeated on the corrected build; a review in motion by
+  eye (every round so far compared stills); and with those the decision on
+  turning the option on by default. Tracked as PHYS-02, PHYS-03 and PHYS-06
+  in the
   [roadmap](roadmap.md#rigid-body-and-ragdoll-physics).
 
 ## Click the key prompts in the new menus, 14 November 2026

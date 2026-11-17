@@ -109,6 +109,7 @@ SCENES = {
         "prefix": "phys_", "targets": [f"phys_{i}" for i in range(8)],
         "splash": "physicsRadiusDamage {def} 0 16",
         "stagings": [{" ring 104 ": " ring 96 "}, {}, {" ring 104 ": " ring 112 "}],
+        "common_start": True,
     },
     "moveables": {
         "map": "game/airdefense1",
@@ -227,6 +228,40 @@ def workload(hit: tuple) -> dict:
     ])
 
 
+STAGE_SLOT = "physics_envelope_stage"
+
+
+def stage_workload() -> dict:
+    """Stage, kill and settle the scene in legacy mode and save it: the common start of both modes."""
+    kill = [SCENE["kill"], "@wait 1"] if SCENE["kill"] else []
+    wl = scene_workload([
+        *SCENE["spawn"],
+        *kill,
+        f"@wait {SCENE.get('settle', 240)}",
+        f"physicsReport {SCENE['prefix']}",
+        f"saveGame {STAGE_SLOT}",
+        "@wait 30",
+    ])
+    wl["needs_stats"] = False
+    return wl
+
+
+def loaded_workload(hit: tuple) -> dict:
+    """The hit on the saved scene: every body starts where the staging run left it, in either mode."""
+    _name, _kind, commands, _falling = hit
+    report = f"physicsReport {SCENE['prefix']}"
+    return {"map": SCENE["map"], "steps": [
+        "@wait 10", f"loadGame {STAGE_SLOT}", "@wait 2",
+        "physicsStats start envelope",
+        report,
+        *expand(commands),
+        report,
+        "@wait 6", report,
+        "@wait 360", report,
+        "physicsStats stop",
+    ]}
+
+
 def momentum_workload() -> dict:
     x, y, z = MOMENTUM_IMPULSE
     kill = [SCENE["kill"]] if SCENE["kill"] else []
@@ -291,12 +326,38 @@ def staged(wl: dict, swaps: dict) -> dict:
     return out
 
 
-def run_stagings(args: argparse.Namespace, name: str, wl: dict, mode: str, pooled: bool) -> list[dict]:
+def chosen_stagings(args: argparse.Namespace, pooled: bool) -> list[tuple[int, dict]]:
     stagings = SCENE.get("stagings", [{}])
     count = max(1, min(args.stagings, len(stagings))) if pooled else 1
     # the unmoved staging is the middle one: a single-staging run uses it
-    chosen = stagings[len(stagings) // 2:len(stagings) // 2 + 1] if count == 1 else stagings[:count]
-    return [run(args, name, staged(wl, swaps), mode, index) for index, swaps in enumerate(chosen)]
+    middle = len(stagings) // 2
+    return [(middle, stagings[middle])] if count == 1 else list(enumerate(stagings[:count]))
+
+
+def run_stagings(args: argparse.Namespace, name: str, wl: dict, mode: str, pooled: bool) -> list[dict]:
+    return [run(args, name, staged(wl, swaps), mode, index) for index, swaps in chosen_stagings(args, pooled)]
+
+
+STAGED: dict[int, dict] = {}
+
+
+def run_common(args: argparse.Namespace, name: str, hit: tuple, mode: str, pooled: bool) -> list[dict]:
+    """The hit in one mode on scenes staged once, in legacy mode, and saved (see "common start" above)."""
+    out = []
+    for index, swaps in chosen_stagings(args, pooled):
+        root = pw.task_path(args.save_root) / f"stage-{index}"
+        if index not in STAGED:
+            pw.WORKLOADS["env-stage"] = staged(stage_workload(), swaps)
+            STAGED[index] = pw.run_workload(args, "env-stage", "legacy", index, save_root=root)
+        pw.WORKLOADS[name] = loaded_workload(hit)
+        result = pw.run_workload(args, name, mode, index, save_root=root)
+        log = Path(result["log"]).read_text(encoding="latin-1") if Path(result["log"]).exists() else ""
+        result["reports"] = reports(log)
+        if not STAGED[index]["passed"]:
+            result["passed"] = False
+            result["errors"] = list(result.get("errors") or []) + ["the staging run failed"]
+        out.append(result)
+    return out
 
 
 def analyse_hit(hit: tuple, legacy: list[dict], enhanced: list[dict]) -> dict:
@@ -404,6 +465,9 @@ def main() -> int:
                         help="stagings pooled for the heavy and falling classes (1 to 3; the mp scene has 6 repeats)")
     parser.add_argument("--awakening-path", type=Path, help="fs_awakeningpath holding q4xbase (scene awakening)")
     parser.add_argument("--set", action="append", default=[], help="extra cvar KEY=VALUE for every run")
+    parser.add_argument("--own-start", action="store_true",
+                        help="let each mode kill and settle its own corpses before a hit on resting bodies, as before "
+                             "17 November 2026 (default: both modes are hit from one saved scene)")
     args = parser.parse_args()
     args.verbose_digest = False
     args.map = None
@@ -435,8 +499,12 @@ def main() -> int:
         name = "env-" + hit[0]
         # a thrown or falling figure is chaotic: pool stagings. A resting corpse under a light hit is not.
         pooled = hit[1] == "heavy" or hit[3] or SCENE.get("multiplayer", False)
-        results.append(analyse_hit(hit, run_stagings(args, name, wl, "legacy", pooled),
-                                   run_stagings(args, name, wl, "enhanced", pooled)))
+        if SCENE.get("common_start") and not hit[3] and not args.own_start:
+            results.append(analyse_hit(hit, run_common(args, name, hit, "legacy", pooled),
+                                       run_common(args, name, hit, "enhanced", pooled)))
+        else:
+            results.append(analyse_hit(hit, run_stagings(args, name, wl, "legacy", pooled),
+                                       run_stagings(args, name, wl, "enhanced", pooled)))
 
     for r in results:
         lg, en = r.get("legacy", {}), r.get("enhanced", {})
