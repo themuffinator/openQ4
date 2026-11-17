@@ -99,6 +99,7 @@ def main():
      ('payload-abort','catch (...) { NativeInput_AbortDelivery(); (void)NativeInput_CompleteSession(); throw; }','catch (...) { (void)NativeInput_CompleteSession(); throw; }',2),
      ('inhibit-session','// Deliberately preserve inhibitCommands, including INHIBIT_SESSION.','inhibitCommands=0;',1),
      ('source-window','event.key.windowID!=original.window.window','false',1),
+     ('retained-home-function-keys','DispatchCommand( guiRetainedHome, menuCommand );\n\t\t} else if ( event->evType == SE_KEY','DispatchCommand( guiRetainedHome, menuCommand );\n\t\t} else if ( false && event->evType == SE_KEY',1),
     ]
     for label,old,new,count in mutations:
      if body.count(old)!=count:raise RuntimeError('mutation anchor mismatch: '+label+' '+str(body.count(old)))

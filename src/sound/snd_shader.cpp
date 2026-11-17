@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #include "snd_local.h"
+#include "SoundDialogue.h"
 
 extern idCVar s_maxSoundsPerShader;
 
@@ -111,6 +112,7 @@ idSoundShader::Init
 void idSoundShader::Init()
 {
 	desc = SOUND_SHADER_DEFAULT_DESCRIPTION;
+	scriptCaption.Clear();
 	minFrequencyShift = SOUND_SHADER_DEFAULT_FREQUENCY_SHIFT;
 	maxFrequencyShift = SOUND_SHADER_DEFAULT_FREQUENCY_SHIFT;
 	noShakes = false;
@@ -148,7 +150,7 @@ idSoundShader::Size
 */
 size_t idSoundShader::Size() const
 {
-	size_t bytes = sizeof( idSoundShader ) + desc.Allocated() + leadins.Allocated() + entries.Allocated() + shakes.Allocated();
+	size_t bytes = sizeof( idSoundShader ) + desc.Allocated() + scriptCaption.Allocated() + leadins.Allocated() + entries.Allocated() + shakes.Allocated();
 	for ( int i = 0; i < shakes.Num(); i++ ) {
 		bytes += shakes[i].Allocated();
 	}
@@ -163,6 +165,7 @@ idSoundShader::idSoundShader::FreeData
 void idSoundShader::FreeData()
 {
 	desc = SOUND_SHADER_DEFAULT_DESCRIPTION;
+	scriptCaption.Clear();
 	minFrequencyShift = SOUND_SHADER_DEFAULT_FREQUENCY_SHIFT;
 	maxFrequencyShift = SOUND_SHADER_DEFAULT_FREQUENCY_SHIFT;
 	noShakes = false;
@@ -718,7 +721,33 @@ bool idSoundShader::ParseShader( idLexer& src )
 		//}
 	}
 
+	UpdateScriptCaption();
 	return true;
+}
+
+/*
+===============
+idSoundShader::UpdateScriptCaption
+
+The stock voice shaders' descriptions are English script lines in Windows-1252,
+whatever the menu language, so they are re-encoded from that codepage rather
+than the active one.
+===============
+*/
+void idSoundShader::UpdateScriptCaption()
+{
+	scriptCaption.Clear();
+	if( desc.Icmp( SOUND_SHADER_DEFAULT_DESCRIPTION ) == 0 || desc.Length() == 0 )
+	{
+		return;
+	}
+	idStr utf8;
+	const char* source = LangDict_ConvertCodePageToUtf8( desc.c_str(), desc.Length(), LANGCP_WESTERN, utf8 ) ? utf8.c_str() : desc.c_str();
+	std::string caption;
+	if( SoundScriptCaption( source, caption ) )
+	{
+		scriptCaption = caption.c_str();
+	}
 }
 
 /*

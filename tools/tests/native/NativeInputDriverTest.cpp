@@ -273,4 +273,14 @@ static void CancelledPhysicalRelease() {
  {DriverFixture f;f.Install();idKeyInput::down[K_CTRL]=true;localUsercmdGen.nativeHeldSources[0]={f.facts.id,6,2,SDL_SCANCODE_LCTRL,K_CTRL,true};
   Usercmd_NativeInputSource(f.facts.id,6,2,SDL_SCANCODE_LCTRL,K_CTRL,false);CHECK(idKeyInput::IsDown(K_CTRL));}
 }
-int main(){NaturalSinks();PollFirstAndPrefix();Replacement();PrefixAndSuffix();ConsoleReplacement();BetweenSinkRetirement();MultiCallbackReplacement();PayloadAndReentry();OwnershipFailures();AfterTakeAndWindow();FenceFailures();BudgetAndPasses();CancelledPhysicalRelease();Turnover();std::printf("Native input driver: %u checks\n",checks);}
+// Over the retained title or pause screen, as over the stock menu, a function key
+// the screen leaves alone runs its binding (F12 screenshots, #224); its release and
+// other keys stay the screen's.
+static void RetainedHomeFunctionKeys() {
+ idUserInterface home;sessionObject.guiActive=sessionObject.guiMainMenu=&guiEndpoint;sessionObject.guiRetainedHome=&home;effects.clear();
+ sysEvent_t press{SE_KEY,K_F12,1,0,nullptr},release{SE_KEY,K_F12,0,0,nullptr},letter{SE_KEY,'a',1,0,nullptr};
+ sessionObject.MenuEvent(&press);sessionObject.MenuEvent(&release);sessionObject.MenuEvent(&letter);
+ const std::vector<std::string> expected{"session-"+std::to_string(K_F12),"binding","session-"+std::to_string(K_F12),"session-97"};CHECK(effects==expected);
+ sessionObject.guiRetainedHome=sessionObject.guiMainMenu=nullptr;effects.clear();
+}
+int main(){NaturalSinks();PollFirstAndPrefix();Replacement();PrefixAndSuffix();ConsoleReplacement();BetweenSinkRetirement();MultiCallbackReplacement();PayloadAndReentry();OwnershipFailures();AfterTakeAndWindow();FenceFailures();BudgetAndPasses();CancelledPhysicalRelease();Turnover();RetainedHomeFunctionKeys();std::printf("Native input driver: %u checks\n",checks);}

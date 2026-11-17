@@ -52,7 +52,9 @@ void idPlayerView::DrawSubtitles() {
 		// Speech the installed game (and any caption pack) has no transcript for is
 		// marked rather than left blank, so missing coverage stays visible.
 		const bool marker = cue.text == NULL;
-		const char* text = marker ? common->GetLocalizedString("#str_231314") : cue.text;
+		// The line's facial-animation cues read as stage directions: "(Furrow) Okay."
+		const std::string spoken = marker ? std::string() : OpenQ4Subtitles::FormatCues(cue.text);
+		const char* text = marker ? common->GetLocalizedString("#str_231314") : spoken.c_str();
 		idStr speaker;
 		if (cvarSystem->GetCVarBool("ui_subtitleSpeakers")) {
 			const int entity = cue.speakerId - 1;

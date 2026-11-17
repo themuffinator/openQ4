@@ -22,6 +22,12 @@ PACK = 'This caption comes from an authored pack.'
 GAP = 'An authored pack can caption a line the game has no text for.'
 # An installed single-sample line without a lip-sync transcript, in each campaign.
 GAP_SHADERS = {False: 'vo_1_1_1_140_1', True: 'vo_7_6_2'}
+# Installed radio lines without a lip-sync transcript whose shader's script line
+# captions them: the stock one is written in Windows-1252, the Awakening one opens
+# with a speaker tag.
+SCRIPT_SHADERS = {False: 'vo_1_1_5_100_1', True: 'vo_7_6_4'}
+# A marine's helmet-radio copy of a line whose dry recording has a transcript.
+HELMET_SHADER = 'vo_9_10_150_11_h'
 
 
 def main():
@@ -52,8 +58,11 @@ def main():
     # A short line that ends on its own, for the held tail.
     tone(game / 'sound/vo/subtitle_test/short.wav', 330, seconds=0.4)
     fixtures = ('a', 'b', 'missing', 'pack', 'short')
+    # The untranscribed fixture's description is only a stage direction, which is
+    # never a caption.
     (game / 'sound/subtitle_test.sndshd').write_text('\n'.join(
-        f'oq4_subtitle_{name}\n{{\n sound/vo/subtitle_test/{name}.wav\n}}' for name in fixtures))
+        f'oq4_subtitle_{name}\n{{\n' + (' description "(radio static)"\n' if name == 'missing' else '') +
+        f' sound/vo/subtitle_test/{name}.wav\n}}' for name in fixtures))
     gap = GAP_SHADERS[bool(args.awakening)]
     # The pack fixtures are authored subtitle/ declarations: one by sample path for a
     # shader with no same-name lipSync, one by shader name for the installed line.
@@ -114,6 +123,9 @@ def main():
     # Caption-pack declarations: a new line, then an installed one with no transcript.
     steps += ['testRadioChatter oq4_subtitle_pack', 'waitMsec 100']; probe('PACK')
     steps += [f'testRadioChatter {gap}', 'waitMsec 100']; probe('GAP')
+    script = SCRIPT_SHADERS[bool(args.awakening)]
+    steps += [f'testRadioChatter {script}', 'waitMsec 100']; probe('SCRIPT'); capture('script')
+    steps += [f'testRadioChatter {HELMET_SHADER}', 'waitMsec 100']; probe('HELMET')
     # A 0.4 s line that ends on its own stays up 1.5 s from its start, then clears.
     steps += ['testRadioChatter oq4_subtitle_short', 'waitMsec 800']; probe('TAIL_HELD')
     steps += ['waitMsec 1200']; probe('TAIL_GONE')
@@ -210,6 +222,12 @@ def main():
               'authored_pack_line': cue('PACK', 'pack').get('source') == 'authored' and cue('PACK', 'pack').get('bytes') == len(PACK.encode()),
               'authored_pack_fills_installed_gap': phases.get('GAP', {}).get(gap, {}).get('source') == 'authored' and
                   phases.get('GAP', {}).get(gap, {}).get('bytes') == len(GAP.encode()),
+              # A radio line with no lip-sync text shows its shader's script line.
+              'script_line_fills_radio_gap': phases.get('SCRIPT', {}).get(script, {}).get('source') == 'script' and
+                  phases.get('SCRIPT', {}).get(script, {}).get('bytes', 0) > 0,
+              # A helmet-radio copy shows its dry line's installed transcript.
+              'helmet_line_shares_transcript': phases.get('HELMET', {}).get(HELMET_SHADER, {}).get('source') == 'installed' and
+                  phases.get('HELMET', {}).get(HELMET_SHADER, {}).get('bytes', 0) > 0,
               # Held on its last words after the line ended, then cleared.
               'tail_held_then_cleared': bool(cue('TAIL_HELD', 'short')) and
                   cue('TAIL_HELD', 'short').get('time') == cue('TAIL_HELD', 'short').get('duration', 0) - 1 and
@@ -223,7 +241,7 @@ def main():
                                      [('ui_subtitles','1'), ('ui_subtitleScale','1.6'), ('ui_subtitleBackground','0.8'), ('ui_subtitleSpeakers','0'),
                                       ('ui_subtitleUntranscribed','0')])
     captures = list((game / 'screenshots').glob('subtitles-*.tga'))
-    checks['engine_captures'] = len(captures) == 12
+    checks['engine_captures'] = len(captures) == 13
     from PIL import Image
     for path in captures:
         with Image.open(path) as im: im.save(path.with_suffix('.png'))

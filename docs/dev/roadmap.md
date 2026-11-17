@@ -5774,9 +5774,10 @@ Sources: [audio implementation and remaining limits](audio-modernization.md),
 **Estimate: 80%; 0/7 tasks closed.** Open checkboxes here predominantly reflect
 qualification debt rather than missing core implementations. However, mobile
 memory bounds are substantive outstanding scope, not automatically satisfied by
-a listening pass. Subtitle coverage beyond the installed transcripts depends on
-caption packs, which openQ4 supports but does not ship; untranscribed speech is
-marked for players rather than counted as covered.
+a listening pass. Subtitles now cover nearly every campaign line from installed data
+(lip-sync transcripts, helmet-radio copies and shader script lines); caption
+packs, which openQ4 supports but does not ship, correct or translate them, and
+the non-verbal remainder is marked for players rather than counted as covered.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
@@ -5786,7 +5787,7 @@ marked for players rather than counted as covered.
 | AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio; real-device harness passes on real stereo endpoints, including a forced layout and a mid-line device switch. | Run `audio_surround_endpoint.py` on a real 5.1/7.1 endpoint and listen on speakers; preserve positional mix and stock zero-rolloff behavior. |
 | AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
 | AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit, extensive scripted-scene mute/save checks and a 42-map progression sweep with fights (1,052 kills, no mute leak) exist. | Ordered human play, including `walker` past the step where the probe player dies, and physical listening/device checks; retain effects/music separation. |
-| AUD-07 — Partial | Implementation complete: playback-driven captions, fallback/mapping policy, authored caption-pack declarations, an optional marker for untranscribed speech, a reading hold after a line ends, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue). | Qualification only: ordered human play and physical stereo-HUD readability. Installed transcripts are English only and cover about seven lines in ten; the rest show the marker unless a caption pack supplies text. |
+| AUD-07 — Partial | Implementation complete: playback-driven captions, fallback/mapping policy, authored caption-pack declarations, an optional marker for untranscribed speech, a reading hold after a line ends, portrait overlap, real save/load checks and the fight-gated scene corpus (1,546 distinct lines across retained reports, no untranscribed cue). | Qualification only: ordered human play and physical stereo-HUD readability. Installed text is English only. Lines without a lip-sync transcript show their shader's script line, and helmet-radio copies their dry line's transcript (#221); only non-verbal sounds and multiplayer announcers show the marker unless a caption pack supplies text. |
 
 ### AUD task evidence and acceptance
 
@@ -6205,6 +6206,16 @@ marked for players rather than counted as covered.
   pass. Ordered human play and physical stereo-HUD placement remain the only
   open AUD-07 work.
   [Caption-pack evidence](audio-voice-evidence.md#caption-packs-untranscribed-speech-and-held-captions-13-november-2026).
+  November 17 (#221): the 13 November inventory missed two installed sources.
+  Every stock voice shader without lip-sync text carries its script line as its
+  description, and every one of the 692 helmet-radio `_h` copies replays a dry
+  recording that has a transcript. Lines without lip-sync text of their own now
+  take the dry transcript, then the cleaned script line (`source=script`),
+  after caption packs and installed text. 1,329 of the 1,340 campaign gaps,
+  including all 249 untranscribed radio lines, now show text; the eleven left
+  are screams, laughter and pain, and the 64 multiplayer announcers stay
+  uncaptioned.
+  [Script-line evidence](audio-voice-evidence.md#script-lines-and-helmet-radio-captions-17-november-2026).
 
 ## Desktop platforms and packaging
 

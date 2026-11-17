@@ -47,6 +47,78 @@ does not restore the withdrawn release. See
   Not run: any ARM board, Pi or Asahi machine. What the light grid and
   temporal AA cost on a Pi is not measured.
 
+## Screenshots from the pause menu, and tidier emotion cues in subtitles (#224, #225), 17 November 2026
+
+- **F12 takes a screenshot from the pause menu and the title screen again.**
+  The original menus let F1 to F12 run their key bindings, and the new
+  interface's title and pause screens took every key themselves. A function
+  key either screen does not use now runs its binding, as over the classic
+  menus and the multiplayer card (#224).
+- **Subtitles show the actors' emotion cues as stage directions.** Quake 4's
+  dialogue text carries the facial-animation cues its lip-sync system reads,
+  about 690 lines of them, some mid-sentence, and subtitles printed them raw:
+  `{furrow}Shit. Okay, let's...`. They now read `(Furrow) Shit. Okay,
+  let's...`; the neutral `{idle}` cue is left out and the stock lines' double
+  spaces close up (#225). The cue words are the game's own English names, as
+  the stock dialogue text is English.
+- Evidence: `audio_subtitles.py` (cue formatting cases in
+  `SubtitlePagingTest`; all 688 tagged stock lines formatted with no brace
+  left) pass, and `native_input_driver.py --mutations` passes the new
+  title/pause function-key case on both platform projections and rejects
+  its mutation. Hidden OpenGL client in
+  `game/airdefense1`, private save path, no OS input: radio line
+  `vo_1_1_2_12_1` captioned `(Furrow) Let's not lose focus here...`, a
+  fixture line showed mid-sentence cues with `{idle}` dropped, and
+  `screenshot` over the retained pause screen captured it.
+
+## Mouse and controller settings are under Controls (#220), 17 November 2026
+
+- **Find your mouse and controller settings with your key bindings.**
+  **Settings > Controls** gains **Mouse** and **Controller** tabs after the
+  binding tabs. Mouse starts with **Free Look**, **Toggle Zoom** and **Scope
+  Sensitivity**, followed by every mouse setting; Controller holds the stick,
+  rumble, gyro, touchpad and prompt settings. **Game Options** keeps General,
+  HUD and Virtual Reality, and its **View Weapon** settings move to the HUD
+  tab beside the crosshair.
+- **Nothing to do.** Your settings carry over; only their place in the menu
+  changes. The classic menus (`ui_retained 0`) keep the original layout.
+- Typing a value into a mouse or controller number field on Controls accepts
+  Delete and Backspace as text. On a key-binding row they still clear the
+  binding.
+- How it works:
+  [MOUSE and CONTROLLER on CONTROLS](ui/retained-screens.md#mouse-and-controller-on-controls-17-november-2026).
+  New string `#str_231777` (MOUSE) in all twelve languages.
+- Evidence: `openq4-ui-retained-controls` and `openq4-ui-retained-game` pass.
+  The CONTROLS test was failing before this change: it named OTHER's rows 36
+  to 48 after the Classic ruleset's hook moved them to 37 to 49.
+  `ui_retained_gate.py` passes its settings-page assertions, then stops on a
+  later failure this change does not touch: its Create Server doubles do not
+  compile against MP-14's weapon-arena presets. In the staged client over a
+  paused `game/airdefense1` (capture scenario `controls-pause`, no OS input),
+  CONTROLS opened from the pause menu's SETTINGS, the Mouse tab's sensitivity
+  stepped from 5 to 5.01 through `settings.player.set`, and Back returned to
+  SETTINGS. From the title (`settings-subpages`), the Mouse tab's typed
+  number showed its range message for 7.255, and Game Options showed its
+  three tabs with View Weapon under Crosshair.
+
+## Radio chatter and helmet-radio squad lines have subtitles (#221, AUD-07), 17 November 2026
+
+- **Radio transmissions are captioned.** 249 of the 333 radio lines the stock
+  maps play, and about 390 other campaign lines, have no lip-sync transcript.
+  Each of them carries its line as written in the game's script, in its sound
+  shader's description, and subtitles now show that instead of
+  **[untranscribed speech]**. Stage directions, speaker tags and notes are left
+  out; the text is converted from Windows-1252, so apostrophes and dashes draw
+  correctly in every menu language. A recorded take is sometimes shorter than
+  the script line.
+- **Helmet-radio squad lines share their transcript.** The 692 marine lines
+  heard over the helmet radio are processed copies of lines that do have a
+  transcript; each now shows its dry line's text.
+- Installed lip-sync text and caption packs still come first. Only screams,
+  laughter, pain sounds and multiplayer announcers keep the marker.
+- `listSubtitles` reports script-line captions as `script`, and the speech
+  audit's `transcript=` status adds `script` and `helmet`.
+
 ## A copy of openQ4's own pack in a mod's folder no longer hides the new menus (#219), 17 November 2026
 
 - **Menus stay current when openQ4's pack was copied into a mod's folder.** A

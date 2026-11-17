@@ -2015,7 +2015,8 @@ CONTROLS page built like the other settings pages
 carries the stock page's 49 bindings in its order, its four tabs as the
 page's tabs (MOVEMENT, WEAPONS, ATTACK/LOOK and OTHER); see
 [the settings sub-pages](#the-settings-sub-pages-31-october-2026) for its
-layout. Each row names the action over
+layout. Since 17 November it also holds the mouse and controller settings
+([MOUSE and CONTROLLER on CONTROLS](#mouse-and-controller-on-controls-17-november-2026)). Each row names the action over
 the keys bound to it, which the session publishes as the language names the
 keys and joins a list (`Session_RetainedList`), or the stock page's word for
 none. A hint on the heading line (`#str_231545`, in every language) says
@@ -2062,7 +2063,10 @@ CROSSHAIR, HUD, GAMEPLAY, VIEW WEAPON and VIRTUAL REALITY. The three headings
 the stock page lacked (`#str_231542` to `#str_231544`) are each language's
 own section names from its Section list, in capitals. The sections stand on
 five tabs, which took the place of the Section row on 31 October; see
-[the settings sub-pages](#the-settings-sub-pages-31-october-2026).
+[the settings sub-pages](#the-settings-sub-pages-31-october-2026). On 17
+November MOUSE INPUT, CONTROLLER and the aim rows moved to CONTROLS, leaving
+three tabs
+([MOUSE and CONTROLLER on CONTROLS](#mouse-and-controller-on-controls-17-november-2026)).
 
 The 73 rows that name a CVar read it back through the page's CVar state and
 set it with `settings.player.set`, which the adapter allows for exactly what
@@ -2100,6 +2104,51 @@ pins each computed row to its stock choice, the language list to the stock
 one and every CVar row to a stock control and an adapter rule. Captured at
 16:9 in English and Russian and at 9:16, with the fallback; each run switches
 the language to German on the way.
+
+## MOUSE and CONTROLLER on CONTROLS (17 November 2026)
+
+Issue #220: players look for the mouse and controller settings under
+CONTROLS, not GAME OPTIONS, where the stock settings menu kept them beside
+the gameplay options. The retained CONTROLS page now ends with two tabs after
+its four binding tabs:
+
+- **MOUSE** (`#str_231777`, a new string in every shipped language, so that
+  six tabs fit the strip in German) leads with the aim settings that were on
+  GAME OPTIONS' GENERAL tab: Free Look, Toggle Zoom and Scope Sensitivity.
+  Scope Sensitivity and Toggle Zoom act on every device's look, but Free Look
+  is the mouse's, so the three open this tab. The stock MOUSE INPUT rows
+  follow, six rows to a column.
+- **CONTROLLER** is the stock CONTROLLER section, nine rows and eleven.
+
+The rows are the GAME OPTIONS page's, renamed `controls_*`, and still set
+their CVars with `settings.player.set`; the allowlist and its stock ranges
+are unchanged. Their builders moved from `retained_game.py` to
+`retained_settings_rows.py` (`toggle`, `slider`, `choice`, `cvar_row`), which
+both pages share. `rows_value_column` places a page's value column so that
+every label and every fine slider's range message fits in two lines. GAME
+OPTIONS had relied on the long mouse labels for that room, and without them
+German's range message on the gun offsets overflowed.
+
+The key hint (`#str_231545`) stands only on the binding tabs: a settings
+sub-page's `note` may now name its tabs. The session clears a row on Delete
+or Backspace only when the row is a binding
+(`idSessionLocal::RetainedControlsKey`), so the device tabs' typed numbers
+edit as text; the west face button's clear does nothing on them.
+
+GAME OPTIONS keeps GENERAL (general / gameplay), HUD (HUD / crosshair and
+view weapon) and VIRTUAL REALITY. View Weapon moved beside Crosshair because
+Screenshot Format (#223) filled GENERAL's second column past fourteen rows.
+The classic menus (`ui_retained 0`) keep the stock layout. GAME OPTIONS now
+has 49 CVar rows and CONTROLS 32.
+
+`openq4-ui-retained-controls` checks the device tabs: their CVar rows, the
+hint on the binding tabs alone, Free Look's Accept, the sensitivity's step
+and typed value, the columns, and the tabs' wrap. Its OTHER checks now use
+rows 37 to 49: the Classic ruleset's hook (2a36515de) moved them, and the
+test still named 36 to 48. `openq4-ui-retained-game` checks that the moved
+rows and their settings are gone, and that View Weapon stands under Crosshair.
+The gate keeps each stock GAME OPTIONS setting on one page and pins the
+binding-row-only Delete.
 
 ## The AUDIO page (25 October 2026)
 
@@ -2303,8 +2352,8 @@ as Create Server is, and no page shows more than two columns of rows.
 
 | Page | Tabs and columns |
 | --- | --- |
-| CONTROLS | MOVEMENT, WEAPONS, ATTACK/LOOK, OTHER; each tab's bindings split over two columns, the key hint on the heading line |
-| GAME OPTIONS | GENERAL (general / gameplay and view weapon), MOUSE INPUT, CONTROLLER (sticks and look / rumble, gyro, touch and prompts), HUD (HUD / crosshair), VIRTUAL REALITY |
+| CONTROLS | MOVEMENT, WEAPONS, ATTACK/LOOK, OTHER, each tab's bindings split over two columns with the key hint on the heading line; MOUSE (aim / mouse), CONTROLLER (sticks and look / rumble, gyro, touch and prompts) |
+| GAME OPTIONS | GENERAL (general / gameplay), HUD (HUD / crosshair and view weapon), VIRTUAL REALITY |
 | AUDIO | No tabs: LEVELS and DEVICES / EFFECTS |
 
 GAME OPTIONS lost its Section row: the tabs do its job. After a language

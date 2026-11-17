@@ -17,6 +17,8 @@ struct idStr:std::string {
 	void StripFileExtension(){auto at=find_last_of('.');if(at!=npos)resize(at);}
 	static int Icmpn(const char*a,const char*b,int n){return strncmp(a,b,n);}
 	static int Icmp(const char*a,const char*b){return strcmp(a,b);}
+	static int Length(const char*s){return int(strlen(s));}
+	void CapLength(int n){if(n<int(size()))resize(n);}
 };
 template<class T> struct List:std::vector<T>{int Num()const{return int(this->size());}};
 struct Vec {float x=0;Vec operator-(Vec v)const{return {x-v.x};}float Length()const{return std::abs(x);}};
@@ -27,16 +29,16 @@ constexpr float SOUND_WORLD_VOLUME_EPSILON=.00001f;
 struct Cvar{bool value=true;bool GetBool()const{return value;}}s_useOcclusion,ui_subtitleUntranscribed;
 struct Parms{int soundShaderFlags=0,soundClass=0;float volume=1,minDistance=1,maxDistance=100;};
 struct idSoundSample {const char*name="sound/vo/test.wav";int length=1000;bool fallback=false;const char*GetName()const{return name;}int LengthInMsec()const{return length;}bool IsDefault()const{return fallback;}};
-struct Shader{const char*name="dialogue";int entries=1;int GetNumEntries()const{return entries;}const char*GetName()const{return name;}};
+struct Shader{const char*name="dialogue";int entries=1;const char*script="";int GetNumEntries()const{return entries;}const char*GetName()const{return name;}const char*GetScriptCaption()const{return script;}};
 using idSoundShader=Shader;
 struct idSoundChannel{Shader*soundShader=nullptr;idSoundSample*leadinSample=nullptr,*loopingSample=nullptr;int startTime=0,cursor=100,logicalChannel=1;void*hardwareVoice=nullptr;bool stopped=false,radio=false;Parms parms;Fade volumeFade;};
 struct idSoundEmitterLocal {List<idSoundChannel*>channels;int emitterId=5,index=2;Vec origin;float spatializedDistance=1;int Index()const{return index;}};
 struct rvDeclLipSync {const char*raw="text",*text="caption";bool implicit=false;const char*GetRawTranscribeText()const{return raw;}const char*GetSubtitleText()const{return text;}bool IsImplicit()const{return implicit;}};
 struct DeclManager{std::map<std::string,rvDeclLipSync>decls;const rvDeclLipSync*FindType(int,const char*n,bool){auto i=decls.find(n);return i==decls.end()?nullptr:&i->second;}}manager;
 auto*declManager=&manager;
-struct soundSubtitle_t {const char*text,*shader;int emitterIndex,speakerId,startTime,timeMsec,durationMsec;bool radio,transcribed,authored;};
+struct soundSubtitle_t {const char*text,*shader;int emitterIndex,speakerId,startTime,timeMsec,durationMsec;bool radio,transcribed,authored,script;};
 constexpr int SCHANNEL_ANY=0,SOUND_SUBTITLE_TAILS=4,SOUND_SUBTITLE_TAIL_MSEC=500,SOUND_SUBTITLE_MIN_DISPLAY_MSEC=1500;
-struct soundSubtitleTail_t{idStr text;const idSoundShader*shader;int emitterIndex,logicalChannel,speakerId,startTime,durationMsec,until;bool radio,transcribed,authored;};
+struct soundSubtitleTail_t{idStr text;const idSoundShader*shader;int emitterIndex,logicalChannel,speakerId,startTime,durationMsec,until;bool radio,transcribed,authored,script;};
 struct idSoundWorldLocal {List<idSoundEmitterLocal*>emitters;struct {int id=5;Vec pos;}listener;Fade soundClassFade[4];int now=100;int GetSoundTime(){return now;}int GetSubtitles(soundSubtitle_t*,int);
 	soundSubtitleTail_t subtitleTails[SOUND_SUBTITLE_TAILS];int numSubtitleTails=0;void RememberSubtitleTail(idSoundEmitterLocal*,idSoundChannel*,int);void ForgetSubtitleTails(int,int=SCHANNEL_ANY);};
 static bool SoundChannelHasCompleted(idSoundChannel*c,int){return c->stopped;}
@@ -185,6 +187,50 @@ int main(){
 		assert(!SoundTranscriptText(&single,&line,true,&status)&&status==SoundTranscript::Undeclared);
 		single.entries=1;
 		assert(std::string(SoundTranscriptName(SoundTranscript::Variant))=="variant");
+		// With no usable lip-sync text, a single-sample shader's script line is the
+		// last resort, for its leadin only; installed and authored text come first.
+		manager.decls.clear();single.script="Script line.";
+		assert(std::string(SoundTranscriptText(&single,&line,true,&status))=="Script line."&&status==SoundTranscript::Script);
+		assert(std::string(SoundTranscriptName(SoundTranscript::Script))=="script");
+		assert(!SoundTranscriptText(&single,&line,false,&status)&&status==SoundTranscript::Undeclared);
+		single.entries=3;assert(!SoundTranscriptText(&single,&line,true,&status)&&status==SoundTranscript::Undeclared);single.entries=1;
+		manager.decls["dialogue"]={"",""};
+		assert(std::string(SoundTranscriptText(&single,&line,true,&status))=="Script line."&&status==SoundTranscript::Script);
+		manager.decls["dialogue"]={"raw","#str_100"};
+		assert(std::string(SoundTranscriptText(&single,&line,true,&status))=="Script line."&&status==SoundTranscript::Script);
+		manager.decls["dialogue"]={};
+		assert(std::string(SoundTranscriptText(&single,&line,true,&status))=="caption"&&status==SoundTranscript::Text);
+		manager.decls["subtitle/dialogue"]={"raw","pack"};
+		assert(std::string(SoundTranscriptText(&single,&line,true,&status))=="pack"&&status==SoundTranscript::Authored);
+		manager.decls.clear();
+		// The cue reports it as transcribed script text, and a held tail keeps that.
+		idSoundChannel radio;radio.soundShader=&single;radio.leadinSample=&line;radio.radio=true;
+		idSoundEmitterLocal voice;voice.index=9;voice.channels.push_back(&radio);
+		idSoundWorldLocal scene;scene.emitters.push_back(&voice);soundSubtitle_t out[2];
+		assert(scene.GetSubtitles(out,2)==1&&std::string(out[0].text)=="Script line."&&out[0].transcribed&&out[0].script&&!out[0].authored&&out[0].radio);
+		radio.cursor=1000;scene.now=1000;scene.RememberSubtitleTail(&voice,&radio,scene.now);voice.channels.clear();
+		assert(scene.GetSubtitles(out,2)==1&&std::string(out[0].text)=="Script line."&&out[0].script);
+		single.script="";
+		// A helmet-radio copy shares its dry line's transcript, before any script line.
+		Shader helmet;helmet.name="vo_9_10_150_11_h";helmet.script="Longer script line.";
+		idSoundSample wet;wet.name="sound/vo/ai/marine_1/helmet/9_10_150_11.wav";
+		manager.decls["vo_9_10_150_11"]={"raw","Dry transcript."};
+		assert(std::string(SoundTranscriptText(&helmet,&wet,true,&status))=="Dry transcript."&&status==SoundTranscript::Helmet);
+		assert(std::string(SoundTranscriptName(SoundTranscript::Helmet))=="helmet");
+		// Its own transcript or a pack still comes first; no helmet/ path, no _h name or no dry text, no share.
+		manager.decls["vo_9_10_150_11_h"]={"raw","Own transcript."};
+		assert(std::string(SoundTranscriptText(&helmet,&wet,true,&status))=="Own transcript."&&status==SoundTranscript::Text);
+		manager.decls.erase("vo_9_10_150_11_h");
+		wet.name="sound/vo/ai/marine_1/9_10_150_11.wav";
+		assert(std::string(SoundTranscriptText(&helmet,&wet,true,&status))=="Longer script line."&&status==SoundTranscript::Script);
+		wet.name="sound/vo/ai/marine_1/helmet/9_10_150_11.wav";helmet.name="vo_9_10_150_11";helmet.script="";
+		manager.decls.clear();assert(!SoundTranscriptText(&helmet,&wet,true,&status)&&status==SoundTranscript::Undeclared);
+		helmet.name="vo_9_10_150_11_h";manager.decls["vo_9_10_150_11"]={"",""};
+		assert(!SoundTranscriptText(&helmet,&wet,true,&status)&&status==SoundTranscript::Undeclared);
+		manager.decls["vo_9_10_150_11"]={"raw","Dry transcript."};
+		assert(!SoundTranscriptText(&helmet,&wet,false,&status));
+		helmet.entries=2;assert(!SoundTranscriptText(&helmet,&wet,true,&status));
+		manager.decls.clear();
 	}
 	// The audit must classify a current channel, not every use of a sample.
 	{

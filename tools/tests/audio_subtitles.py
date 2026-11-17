@@ -16,6 +16,7 @@ def main():
     # with authored captions, untranscribed markers and held tails.
     (target / 'SoundSubtitlesUnderTest.inc').write_text('\n'.join(body(source, signature) for signature in (
         'static const rvDeclLipSync* SoundDeclaredLipSync(', 'static bool SoundSubtitleTextUsable(',
+        'static const rvDeclLipSync* SoundHelmetLipSync(',
         'static const char* SoundTranscriptText(', 'static bool SoundChannelSubtitle(', 'static void SoundKeepNewestSubtitle(',
         'void idSoundWorldLocal::RememberSubtitleTail(', 'void idSoundWorldLocal::ForgetSubtitleTails(',
         'int idSoundWorldLocal::GetSubtitles(', 'void SoundDialogueVoices_f(')))

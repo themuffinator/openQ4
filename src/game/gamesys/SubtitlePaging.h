@@ -44,6 +44,59 @@ inline float SpeakerIndent(float label, float width) {
 	if (!std::isfinite(label) || !std::isfinite(width) || label <= 0.0f || label > width * 0.5f) return 0.0f;
 	return label;
 }
+// Quake 4's dialogue text carries the facial-animation cues its lip-sync
+// system reads, such as "{furrow}" or "{scared}", sometimes mid-sentence. A
+// caption shows each as a capitalised stage direction, "(Furrow)", set off by
+// one space, drops the neutral "{idle}" (it only returns the face to rest),
+// and collapses the runs of spaces the stock lines carry (#225). Only a
+// brace pair around 1-24 ASCII letters or underscores is a cue; any other
+// brace text is kept as written, and so are line breaks.
+inline std::string FormatCues(const char* text) {
+	std::string out;
+	if (!text) return out;
+	const auto letter = [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; };
+	const auto closing = [](char c) { return c == '.' || c == ',' || c == '!' || c == '?' || c == ';' || c == ':' || c == ')'; };
+	// Whether the text so far ends a word, rather than at its start, a space or a line break.
+	const auto afterWord = [&out]() { return !out.empty() && out.back() != ' ' && out.back() != '\n' && out.back() != '\r'; };
+	bool spaceBefore = false; // the next word after a cue keeps its distance from it
+	for (std::size_t i = 0; i < 4096 && text[i];) {
+		const char c = text[i];
+		if (c == '{') {
+			std::size_t letters = 0;
+			while (letters < 25 && letter(text[i + 1 + letters])) ++letters;
+			if (letters >= 1 && letters <= 24 && text[i + 1 + letters] == '}') {
+				std::string cue(text + i + 1, letters);
+				for (char& ch : cue) ch = ch == '_' ? ' ' : (ch >= 'A' && ch <= 'Z') ? static_cast<char>(ch - 'A' + 'a') : ch;
+				i += letters + 2;
+				if (cue == "idle") { spaceBefore = spaceBefore || afterWord(); continue; }
+				if (afterWord()) out += ' ';
+				out += '(';
+				out += static_cast<char>(cue[0] >= 'a' && cue[0] <= 'z' ? cue[0] - 'a' + 'A' : cue[0]);
+				out.append(cue, 1, std::string::npos);
+				out += ')';
+				spaceBefore = true;
+				continue;
+			}
+		}
+		++i;
+		if (c == ' ' || c == '\t') {
+			if (afterWord()) out += ' ';
+			spaceBefore = false;
+			continue;
+		}
+		if (c == '\n' || c == '\r') {
+			while (!out.empty() && out.back() == ' ') out.pop_back();
+			out += c;
+			spaceBefore = false;
+			continue;
+		}
+		if (spaceBefore && !closing(c) && afterWord()) out += ' ';
+		spaceBefore = false;
+		out += c;
+	}
+	while (!out.empty() && out.back() == ' ') out.pop_back();
+	return out;
+}
 struct Page { std::string lines[2]; int end = 0; };
 template<class Glyph> std::vector<Page> Paginate(const char* text, float width, int rows, Glyph glyph) {
 	std::vector<Page> pages;

@@ -363,7 +363,7 @@ seta gui_textBackgroundPadding 2
 
 ## View weapon position and field of view
 
-These settings move and frame the weapon you hold on screen. They only change what you see, never gameplay. They are on **Settings → Game Options → General**, under **View Weapon**.
+These settings move and frame the weapon you hold on screen. They only change what you see, never gameplay. They are on **Settings → Game Options → HUD**, under **View Weapon** (in 0.14.1, on the **General** tab).
 
 | Setting | Default | What it does |
 |---|---:|---|

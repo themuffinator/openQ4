@@ -5639,11 +5639,20 @@ def main() -> int:
         gated = (ROOT / source).read_text(encoding='utf-8', errors='replace')
         assert gate in gated and 'cvarSystem->Find( "ui_retained" )' in gated, f'{cvar} is not gated on ui_retained'
         assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} has a stock row: drop its exemption'
-    for cvar, kind, extra in retained_game.setting_rows():
-        action = game_document['actions'][f'set.{cvar}']
-        assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
-        assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
-        assert cvar in RETAINED_ONLY_GAME_SETTINGS or re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
+    import retained_controls
+    controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.rui').read_text(encoding='utf-8'), flags=re.M))
+    # The stock page's mouse and controller rows, with Free Look, Toggle Zoom
+    # and Scope Sensitivity, stand on the CONTROLS page's device tabs (issue
+    # #220); each stock setting stands on one page only.
+    game_cvars = [cvar for cvar, _kind, _extra in retained_game.setting_rows()]
+    controls_cvars = [cvar for cvar, _kind, _extra in retained_controls.setting_rows()]
+    assert not set(game_cvars) & set(controls_cvars) and {'in_freeLook', 'pm_zoomedSlow', 'sensitivity', 'in_joystick'} <= set(controls_cvars)
+    for document, settings in ((game_document, retained_game.setting_rows()), (controls_document, retained_controls.setting_rows())):
+        for cvar, kind, extra in settings:
+            action = document['actions'][f'set.{cvar}']
+            assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
+            assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
+            assert cvar in RETAINED_ONLY_GAME_SETTINGS or re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
     # The CONTROLS page: the button's and the multiplayer menu's routes as
     # GAME OPTIONS'; its rows are the stock page's bindings in its order, the
     # session's table follows them; a binding keeps at most two keys, as the
@@ -5667,16 +5676,15 @@ def main() -> int:
                      r'set "t_settings_title::text" "#str_200009" ;', arrival)
     assert re.search(r'if \( "gui::retainedControls" == 1 \) \{\s*set "set_b_controls::visible" "1" ;\s*'
                      r'namedevent "p_btns::hideSetControls" ;', arrival)
-    import retained_controls
     stock_controls = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.gui').read_text(encoding='utf-8', errors='replace')
     stock_bindings = [binding.strip('"') for binding in re.findall(r'bindDef\s+\w+\s*\{[^}]*?\bbind\s+("[^"]+"|\S+)', stock_controls)]
     session_bindings = re.findall(r'"([^"]+)"', re.search(r'RETAINED_CONTROLS_BINDINGS\[\] = \{([^}]*)\};', menu).group(1))
     assert list(retained_controls.BINDINGS) == stock_bindings == session_bindings and len(stock_bindings) == 50
-    controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.rui').read_text(encoding='utf-8'), flags=re.M))
     assert [controls_document['state'][f'controls.{row}.keys']['keyBinding'] for row in range(50)] == session_bindings
     controls_publish = function_body(menu, 'void idSessionLocal::PublishRetainedControls(')
     assert controls_publish.index('gui->SetKeyBindingNames();') < controls_publish.index('retainedControlsCapture >= 0') < controls_publish.index('gui->StateChanged(')
-    assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()} == \
+    assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()
+            if action['operation'] != 'settings.player.set'} == \
         {'controlsBind': 'controlsBind', 'controlsClear': 'controlsClear', 'controlsTouchLayout': 'controlsTouchLayout',
          'back': 'controlsBack'}
     # A new key joins its action's keys through the menus' shared rule, two
@@ -5685,6 +5693,10 @@ def main() -> int:
     # same way.
     controls_key = function_body(menu, 'bool idSessionLocal::RetainedControlsKey(')
     assert 'idKeyInput::BindForMenu( key, binding );' in controls_key and 'NumBinds' not in controls_key
+    # Delete and Backspace clear a binding row only: the device tabs' typed
+    # numbers take them as text.
+    assert re.search(r'\( event->evValue == K_DEL \|\| event->evValue == K_BACKSPACE \) &&\s*'
+                     r'Session_RetainedControlsRow\( guiRetainedControls \) >= 0 \)', controls_key)
     assert 'key != K_ESCAPE && key != K_JOY7 && key != K_JOY8' in controls_key and 'idKeyInput::UnbindBinding( binding );' in controls_key
     key_input = (ROOT / 'src/framework/KeyInput.cpp').read_text(encoding='utf-8')
     bind_for_menu = function_body(key_input, 'void idKeyInput::BindForMenu(')

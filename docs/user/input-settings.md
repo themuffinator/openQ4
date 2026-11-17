@@ -7,10 +7,12 @@ This guide shows how to set up your keyboard, mouse and controller in openQ4: ch
 ## Quick start
 
 - To change what a key or button does, open **Settings → Controls**.
-- To tune the mouse, open **Settings → Game Options → Mouse Input**.
-- To tune a controller, open **Settings → Game Options → Controller**. Start with **Stick Dead Zone** and **Look Sensitivity** before changing anything else.
+- To tune the mouse, open **Settings → Controls → Mouse**.
+- To tune a controller, open **Settings → Controls → Controller**. Start with **Stick Dead Zone** and **Look Sensitivity** before changing anything else.
 - Press `` ` `` or `~` to open the console.
 - If your controls get into a mess, choose **Load Defaults** on the Settings page. This also resets your custom bindings, so back them up first with `writeConfig my-input-backup.cfg`.
+
+**Not in 0.14.1:** the mouse and controller settings, with **Free Look**, **Toggle Zoom** and **Scope Sensitivity**, are on the **Mouse** and **Controller** tabs of **Settings → Controls**, beside the key bindings. In 0.14.1 they are on **Settings → Game Options**: its **Mouse Input** and **Controller** tabs, and the three aim settings on **General**.
 
 The classic menus (`ui_retained 0`) have the same settings: their Game Options page has **General**, **Mouse** and **Controller** sections in its **Section** chooser.
 
@@ -24,6 +26,8 @@ Open **Settings → Controls**. Its tabs group the actions:
 | **Weapons** | One key per weapon, the multiplayer buy menu and the quick-chat wheel. |
 | **Attack/Look** | Attack, previous and next weapon, reload, look up and down, mouse look, centre view, zoom, objectives and scores, flashlight, screenshot, weapon wheel. |
 | **Other** | Quick save and load, chat and team chat, voting, multiplayer statistics, ready status, emotes and voice chat. |
+| **Mouse** | Not bindings: the [mouse settings](#mouse-settings), led by Free Look, Toggle Zoom and Scope Sensitivity. **Not in 0.14.1.** |
+| **Controller** | Not bindings: the [controller settings](#controller-settings). **Not in 0.14.1.** |
 
 To bind an action, select its row and press the key, mouse button or controller button you want. Analogue sticks are set up in the controller settings rather than bound as buttons.
 
@@ -35,7 +39,7 @@ To bind from the console or a config file, see [Console commands for bindings](#
 
 ### Mouse settings
 
-The mouse controls are on **Settings → Game Options → Mouse Input**. **Free Look**, **Toggle Zoom**, **Scope Sensitivity** and **Console Access** are on the **General** tab of the same page.
+The mouse controls are on **Settings → Controls → Mouse**, which starts with **Free Look**, **Toggle Zoom** and **Scope Sensitivity**. **Console Access** stays on **Settings → Game Options → General**.
 
 | Menu setting | Console setting | Default | What it does |
 |---|---|---:|---|
@@ -86,13 +90,15 @@ The mouse controls are on **Settings → Game Options → Mouse Input**. **Free 
 | Quick save / quick load | `F5` / `F9` |
 | Screenshot | `F12` |
 
+`F1` to `F12` keep their bindings while a menu is open, so `F12` also takes a screenshot of a menu. **Not in 0.14.1:** 0.14.1's new title and pause screens ignore them.
+
 ## Controllers
 
 openQ4 supports Xbox, PlayStation, Nintendo Switch, Steam Deck and other controllers out of the box, and you can plug them in or unplug them at any time. Standard gamepads need no axis setup.
 
 ### Controller settings
 
-Tune your controller on **Settings → Game Options → Controller**.
+Tune your controller on **Settings → Controls → Controller**.
 
 | Menu setting | Console setting | Default | What it does |
 |---|---|---:|---|
@@ -167,7 +173,7 @@ Extra buttons on some controllers (`JOY23` to `JOY32`, and `AUX1` to `AUX16` on 
 
 On a Nintendo-layout controller, menus confirm with A (the right button) and go back with B (the bottom button), as Switch games do. Other controllers confirm with the bottom button. Choosing Nintendo prompts with **Prompt Style** counts as a Nintendo layout.
 
-To choose for any controller, set **Settings → Game Options → Controller → Swap Confirm and Back**. The menu prompts follow your choice; in-game bindings are not affected.
+To choose for any controller, set **Settings → Controls → Controller → Swap Confirm and Back**. The menu prompts follow your choice; in-game bindings are not affected.
 
 | Menu choice | `in_swapConfirmBack` | Menus confirm with |
 | --- | --- | --- |
@@ -187,7 +193,7 @@ Once you use a controller, the menus and the new HUD's prompts (such as Exit, Re
 
 Using the keyboard or mouse switches the prompts back to keys.
 
-If Steam Input or another remapping tool hides your real controller, choose the prompts yourself with **Settings → Game Options → Controller → Prompt Style**. It covers the menus and the HUD.
+If Steam Input or another remapping tool hides your real controller, choose the prompts yourself with **Settings → Controls → Controller → Prompt Style**. It covers the menus and the HUD.
 
 | Menu choice | `in_promptStyle` | Prompts shown |
 | --- | --- | --- |
@@ -213,7 +219,7 @@ Flight sticks and other devices that are not standard gamepads use raw axes. ope
 
 ## Gyro, touchpad and touchscreen
 
-Controllers with motion sensors or a touchpad (PlayStation controllers, Switch Pro controllers, the Steam Deck and others) can aim with gyro and use the touchpad. Set them up on **Settings → Game Options → Controller** with the **Gyro**, **Gyro Sensitivity**, **Touchpad Mode**, **Touchpad Sensitivity** and **Touchscreen** rows. The Steam Deck profile turns gyro aiming and the touchpad menu cursor on for you.
+Controllers with motion sensors or a touchpad (PlayStation controllers, Switch Pro controllers, the Steam Deck and others) can aim with gyro and use the touchpad. Set them up on **Settings → Controls → Controller** with the **Gyro**, **Gyro Sensitivity**, **Touchpad Mode**, **Touchpad Sensitivity** and **Touchscreen** rows. The Steam Deck profile turns gyro aiming and the touchpad menu cursor on for you.
 
 | Console setting | Default | What it does |
 |---|---:|---|

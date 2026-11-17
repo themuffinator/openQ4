@@ -1165,7 +1165,7 @@ SCENARIOS = {
     ]),
     # The retained GAME OPTIONS page (UI-01): the GAME OPTIONS button opens it
     # on GENERAL's first row; the HUD tab's custom crosshair turns on and steps
-    # to the next one; the gun position and a mouse row apply; the language
+    # to the next one; the gun position applies; the language
     # list switches to German, which reloads the language and the menus; Back
     # returns to the settings screen.
     'game': (None, [
@@ -1177,10 +1177,6 @@ SCENARIOS = {
         'g_crosshairCustomFile', 'waitMsec 400', 'screenshot "screenshots/game-crosshair.tga"',
         'openq4_retainedGui event tab_general', 'waitMsec 400',
         'openq4_retainedGui focus game_gunposition', *menu_step('accept'), *menu_step('down'), *menu_step('accept'), 'g_gunY',
-        'openq4_retainedGui event tab_mouse', 'waitMsec 400',
-        'sensitivity', 'openq4_retainedGui focus game_msensitivity', *menu_step('right'), 'sensitivity',
-        'screenshot "screenshots/game-mouse.tga"',
-        'openq4_retainedGui event tab_general', 'waitMsec 400',
         'openq4_retainedGui focus game_language', *menu_step('accept'), *[step for _ in range(6) for step in menu_step('down')],
         *menu_step('accept'), 'waitMsec 3000', 'sys_lang', 'openq4_retainedGui report', 'ui_retainedStatus',
         'screenshot "screenshots/game-language.tga"',
@@ -1208,7 +1204,8 @@ SCENARIOS = {
     # The retained CONTROLS page (UI-01): the CONTROLS button opens the page on Move
     # Forward; Accept waits for a key and testControlsKey stands in for F,
     # which joins the row's keys; a second wait ends with Escape, binding
-    # nothing; Delete clears the row; Back returns to the settings screen.
+    # nothing; Delete clears the row. MOUSE (issue #220) steps the sensitivity
+    # and CONTROLLER shows; Back returns to the settings screen.
     'controls': (None, [
         'waitMsec 4000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_controls',
         'waitMsec 1500', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/controls.tga"',
@@ -1217,7 +1214,11 @@ SCENARIOS = {
         *menu_step('accept'), 'testControlsKey ESCAPE', 'waitMsec 300', 'bind ESCAPE', 'bind f',
         'testControlsKey DEL', 'waitMsec 400', 'bind f', 'bind w', 'screenshot "screenshots/controls-cleared.tga"',
         'openq4_retainedGui event tab_other', 'waitMsec 400',
-        'openq4_retainedGui focus controls_bind_48', 'waitMsec 400', 'screenshot "screenshots/controls-other.tga"',
+        'openq4_retainedGui focus controls_bind_49', 'waitMsec 400', 'screenshot "screenshots/controls-other.tga"',
+        'openq4_retainedGui event tab_mouse', 'waitMsec 400',
+        'sensitivity', 'openq4_retainedGui focus controls_msensitivity', *menu_step('right'), 'sensitivity',
+        'screenshot "screenshots/controls-mouse.tga"',
+        'openq4_retainedGui event tab_controller', 'waitMsec 400', 'screenshot "screenshots/controls-controller.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 1500', 'ui_retainedStatus', 'openq4_guiGet p_settings_ctrls::visible',
         'screenshot "screenshots/controls-back.tga"',
     ]),
@@ -1251,24 +1252,25 @@ SCENARIOS = {
         'openq4_retainedGui focus game', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 175', 'screenshot "screenshots/subpages-game-change.tga"', 'waitMsec 1200', 'ui_retainedStatus',
         'openq4_retainedGui report', 'screenshot "screenshots/subpages-game.tga"',
-        *[step for name in ('mouse', 'controller', 'hud', 'vr') for step in (
+        *[step for name in ('hud', 'vr') for step in (
             'openq4_retainedGui event onTabNext', 'waitMsec 400', 'openq4_retainedGui report',
             f'screenshot "screenshots/subpages-game-{name}.tga"')],
         'openq4_retainedGui focus game_vrsnap', 'waitMsec 100', 'openq4_retainedGui choice open game_vrsnap', 'waitMsec 400',
         'screenshot "screenshots/subpages-game-list.tga"', *menu_step('back'),
-        # A typed sensitivity with a third decimal place shows the field's own
-        # range over the row's label; the controller tab's last row scrolls
-        # into a tall view's single column.
-        'openq4_retainedGui event tab_mouse', 'waitMsec 400', 'openq4_retainedGui focus game_msensitivity_number',
-        'openq4_retainedGui number begin game_msensitivity_number', 'openq4_retainedGui number replace game_msensitivity_number "7.255"',
-        'waitMsec 300', 'openq4_retainedGui report', 'screenshot "screenshots/subpages-game-entry.tga"',
-        'openq4_retainedGui number cancel game_msensitivity_number', 'openq4_retainedGui event tab_controller', 'waitMsec 400',
-        'openq4_retainedGui focus game_swapconfirm', 'waitMsec 300', 'screenshot "screenshots/subpages-game-last.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 150', 'screenshot "screenshots/subpages-game-back.tga"', 'waitMsec 1200',
         'openq4_retainedGui report', 'screenshot "screenshots/subpages-returned.tga"',
         'openq4_retainedGui focus controls', *menu_step('accept'), 'waitMsec 1500', 'openq4_retainedGui report',
         'screenshot "screenshots/subpages-controls.tga"',
         'openq4_retainedGui event onTabNext', 'waitMsec 400', 'screenshot "screenshots/subpages-controls-weapons.tga"',
+        # A typed sensitivity with a third decimal place shows the field's own
+        # range over the row's label; the controller tab's last row scrolls
+        # into a tall view's single column.
+        'openq4_retainedGui event tab_mouse', 'waitMsec 400', 'openq4_retainedGui focus controls_msensitivity_number',
+        'openq4_retainedGui number begin controls_msensitivity_number',
+        'openq4_retainedGui number replace controls_msensitivity_number "7.255"',
+        'waitMsec 300', 'openq4_retainedGui report', 'screenshot "screenshots/subpages-controls-entry.tga"',
+        'openq4_retainedGui number cancel controls_msensitivity_number', 'openq4_retainedGui event tab_controller', 'waitMsec 400',
+        'openq4_retainedGui focus controls_swapconfirm', 'waitMsec 300', 'screenshot "screenshots/subpages-controls-last.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 1500',
         'openq4_retainedGui focus audio', *menu_step('accept'), 'waitMsec 1500', 'openq4_retainedGui report',
         'screenshot "screenshots/subpages-audio.tga"',
@@ -1317,6 +1319,18 @@ SCENARIOS = {
         'waitMsec 1200', 'ui_retainedStatus', 'openq4_retainedGui report', 'screenshot "screenshots/settings-pause.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 1500', 'ui_retainedStatus', 'openq4_retainedGui report',
         'screenshot "screenshots/settings-pause-back.tga"',
+    ]),
+    # CONTROLS over the paused game (issue #220): its MOUSE tab steps the
+    # sensitivity and its CONTROLLER tab shows; Back returns to SETTINGS.
+    'controls-pause': ('game/airdefense1', [
+        'openq4_assertMenuActivation 10000', 'waitMsec 1200', 'openq4_retainedGui focus nav_settings', *menu_step('accept'),
+        'waitMsec 1200', 'openq4_retainedGui focus controls', *menu_step('accept'), 'waitMsec 1500', 'ui_retainedStatus',
+        'openq4_retainedGui report', 'screenshot "screenshots/controls-pause.tga"',
+        'openq4_retainedGui event tab_mouse', 'waitMsec 400', 'sensitivity', 'openq4_retainedGui focus controls_msensitivity',
+        *menu_step('right'), 'sensitivity', 'openq4_retainedGui report', 'screenshot "screenshots/controls-pause-mouse.tga"',
+        'openq4_retainedGui event tab_controller', 'waitMsec 400', 'screenshot "screenshots/controls-pause-controller.tga"',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'ui_retainedStatus', 'openq4_retainedGui report',
+        'screenshot "screenshots/controls-pause-back.tga"',
     ]),
     'settings-strogg': ('game/recomp', [
         'openq4_assertMenuActivation 10000', 'waitMsec 1200', 'openq4_retainedGui focus nav_settings', *menu_step('accept'),

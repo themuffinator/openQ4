@@ -356,12 +356,13 @@ static void ListSubtitles_f( const idCmdArgs& args ) {
 	const int count = world ? world->GetSubtitles(cues, 2) : 0;
 	idLib::Printf("Subtitles: %d\n", count);
 	for (int i = 0; i < count; ++i) {
-		// source: installed lip-sync text, an authored subtitle/ declaration, or none
-		// (speech without a transcript, listed while ui_subtitleUntranscribed is set).
+		// source: installed lip-sync text, an authored subtitle/ declaration, the
+		// installed shader's script line, or none (speech without a transcript,
+		// listed while ui_subtitleUntranscribed is set).
 		idLib::Printf("Subtitle shader=%s emitter=%d speaker=%d time=%d duration=%d radio=%d textBytes=%d source=%s\n",
 			cues[i].shader, cues[i].emitterIndex, cues[i].speakerId, cues[i].timeMsec,
 			cues[i].durationMsec, cues[i].radio ? 1 : 0, cues[i].text ? idStr::Length(cues[i].text) : 0,
-			!cues[i].transcribed ? "none" : cues[i].authored ? "authored" : "installed");
+			!cues[i].transcribed ? "none" : cues[i].authored ? "authored" : cues[i].script ? "script" : "installed");
 	}
 }
 
