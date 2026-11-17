@@ -29,8 +29,11 @@ does not restore the withdrawn release. See
   and piece of debris skip everything that cannot be water. In The Awakening's
   first battle this cuts about a tenth of the game's own work per frame. What
   happens in the game is unchanged.
-- **What to do.** Replace the game modules. `g_clipFastQueries 0` restores the
-  previous behaviour for comparison.
+- **Lighting crowds costs less.** Working out which part of an animated
+  character each light reaches now takes one pass over it instead of up to
+  six, with exactly the same result.
+- **What to do.** Replace the game and renderer modules. `g_clipFastQueries 0`
+  and `r_cullBitsOnePass 0` restore the previous behaviour for comparison.
 - Details: [performance report, section 14](performance-report.md#14-the-awakenings-outdoor-battle-fps-08-evidence-17-november-2026).
 
 ## The Awakening's prison heat exhausts burn again, 17 November 2026

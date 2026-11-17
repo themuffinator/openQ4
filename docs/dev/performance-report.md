@@ -1710,7 +1710,8 @@ very slow. Hidden-window probes on the reference laptop, `.tmp/m01-polish/`:
   Interaction creation for animated models (`R_CreateLightTris`,
   `R_CalcInteractionCullBits`) took about 12% of the process.
 
-Two clip-world changes, the same results, `g_clipFastQueries 0` to compare:
+Three changes with the same results, each with a switch to compare (`g_clipFastQueries 0` for the
+first two):
 
 1. `idClip::Contents` gathered every clip model (`-1`) and filtered by its
    content mask afterwards, defeating the sector contents test for every point
@@ -1722,13 +1723,27 @@ Two clip-world changes, the same results, `g_clipFastQueries 0` to compare:
    superset), and a query that would scan the sector refreshes it first.
    `Unlink` fell from about 516k samples to 13k (plus 86k of refreshes).
 
-Together about 10% of game-module time in the battle. Wall-clock A/B windows
+3. `R_CalcInteractionCullBits` tested each vertex of a surface against every
+   light-frustum plane crossing it in a separate `Dot` + `CmpLT` pass, so an
+   animated character in a light's corner was read up to six times per light,
+   every frame. On x64, while the SSE2 SIMD processor is active, the kernel in
+   `src/rendergeo/InteractionCullBits.h` reads each vertex once and evaluates
+   the same planes with the same arithmetic in the same order: the bits are
+   identical. `tools/tests/interaction_cull_bits_test.py` compiles the engine's
+   own `Dot` and `CmpLT` code as the reference and compares 2.49 million
+   vertices over every skip mask and vertex counts 0-52, including vertices
+   placed on the epsilon (a one-rounding change to the sum order fails it).
+   In the battle the cull-bit work fell from 25.3% to about 17% of the
+   renderer's samples. `r_cullBitsOnePass 0` restores the per-plane passes.
+
+Changes 1 and 2 cut about 10% of game-module time in the battle. Wall-clock A/B windows
 were not usable: with `notarget` the spawners keep adding enemies nobody kills,
 and other sessions loaded the machine to 100%, so the evidence is CPU-sample
 shares from two runs. The remaining clip cost is ordinary movement traces
-(projectile and monster slide moves, ground contacts). Not done: per-frame
-interaction rebuilding for animated models (a six-plane pass per vertex for
-each light), the driver's submission cost, and the 4-5% spent in OpenAL mixing.
+(projectile and monster slide moves, ground contacts). Not done: animated
+models still rebuild every light interaction every frame (`R_CreateLightTris`
+about 4% of the process after change 3), the driver's submission cost, and the
+4-5% spent in OpenAL mixing.
 
 ## Appendix: artifacts
 

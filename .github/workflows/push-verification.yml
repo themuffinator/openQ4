@@ -288,6 +288,7 @@ jobs:
             tools/tests/awakening_m01_dropship_contract.py \
             tools/tests/awakening_m01_retch_contract.py \
             tools/tests/clip_query_fast_path_contract.py \
+            tools/tests/interaction_cull_bits_test.py \
             tools/tests/awakening_status_behavior.py \
             tools/tests/clip_owner_behavior.py \
             tools/tests/clip_empty_model_behavior.py \
@@ -875,6 +876,7 @@ jobs:
           python tools/tests/awakening_m01_dropship_contract.py
           python tools/tests/awakening_m01_retch_contract.py
           python tools/tests/clip_query_fast_path_contract.py
+          python tools/tests/interaction_cull_bits_test.py
           python tools/tests/awakening_status_behavior.py
           python tools/tests/clip_owner_behavior.py
           python tools/tests/clip_empty_model_behavior.py

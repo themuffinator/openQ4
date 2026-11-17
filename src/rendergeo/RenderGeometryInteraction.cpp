@@ -31,6 +31,18 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "RenderGeometry.h"
 #include "../imagetools/ImageTools.h"
+#include "InteractionCullBits.h"
+
+#if defined( OPENQ4_CULLBITS_ONE_PASS )
+// The one-pass kernel reproduces idSIMD_SSE2's Dot and CmpLT; with any other
+// processor active (com_forceGenericSIMD) keep that processor's own passes.
+static idCVar r_cullBitsOnePass( "r_cullBitsOnePass", "1", CVAR_RENDERER | CVAR_BOOL,
+	"compute light-interaction cull bits in one pass over the vertices (identical bits); 0 = one pass per light plane, for comparison" );
+
+static bool R_SIMDIsSSE2( void ) {
+	return r_cullBitsOnePass.GetBool() && SIMDProcessor != NULL && idStr::Cmp( SIMDProcessor->GetName(), "SSE2" ) == 0;
+}
+#endif
 
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 // local copy of the renderer's inline helper; both sides read the packed
@@ -117,12 +129,27 @@ void R_CalcInteractionCullBits( const idRenderEntityLocal *ent, const srfTriangl
 	}
 
 	cullInfo.cullBits = (byte *) R_StaticAlloc( tri->numVerts * sizeof( cullInfo.cullBits[0] ) );
-	SIMDProcessor->Memset( cullInfo.cullBits, 0, tri->numVerts * sizeof( cullInfo.cullBits[0] ) );
 
-	float *planeSide = (float *) _alloca16( tri->numVerts * sizeof( float ) );
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 	const rvSilTraceVertT *silTraceVerts = R_GetInteractionSilTraceVerts( tri );
 #endif
+
+#if defined( OPENQ4_CULLBITS_ONE_PASS )
+	// One pass over the vertices for every crossing plane, bit-identical to the
+	// SSE2 Dot + CmpLT passes below (InteractionCullBits.h).
+	if (
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+		silTraceVerts == NULL &&
+#endif
+		R_SIMDIsSSE2() ) {
+		R_CullBitsOnePass( cullInfo.cullBits, cullInfo.localClipPlanes, frontBits, tri->verts, tri->numVerts, LIGHT_CLIP_EPSILON );
+		return;
+	}
+#endif
+
+	SIMDProcessor->Memset( cullInfo.cullBits, 0, tri->numVerts * sizeof( cullInfo.cullBits[0] ) );
+
+	float *planeSide = (float *) _alloca16( tri->numVerts * sizeof( float ) );
 
 	for ( i = 0; i < 6; i++ ) {
 		// if completely infront of this clipping plane
