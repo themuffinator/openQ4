@@ -1030,7 +1030,7 @@ void rvVehicleWeapon::WeaponFeedback( const idDict* dict ) {
 		player->playerView.WeaponFireFeedback( dict );
 	}
 	if( dict->GetInt("shakeTime") ) {
-		player->playerView.SetShakeParms( MS2SEC(gameLocal.GetTime() + dict->GetInt("shakeTime")), dict->GetFloat("shakeMagnitude") );
+		player->playerView.SetShakeParms( MS2SEC(gameLocal.GetTime() + dict->GetInt("shakeTime")), dict->GetFloat("shakeMagnitude"), true );
 	}
 	// openQ4 VR: a headset view never shakes, so the shot kicks in the weapon
 	// hand instead, harder for the guns that shake the screen

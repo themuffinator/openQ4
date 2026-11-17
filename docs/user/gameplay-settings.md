@@ -169,7 +169,7 @@ seta hud_damageNumberScale 1.25
 
 There is no field-of-view slider in the menus; set it from the console with `g_fov` (default `90`), for example `g_fov 100`. The number is the horizontal angle on a 4:3 screen. On a wider screen openQ4 keeps the same vertical view and shows more at the sides, so you don't need to raise it for widescreen. Multiplayer accepts `90` to `175`. To make sure your value is applied every time, put `set g_fov 100` in your `autoexec.cfg` (see [Input settings](input-settings.md#config-files)).
 
-The weapon on screen has its own controls on **Settings → Game Options → General**: **Weapon FOV** (`0` follows your field of view), **Weapon FOV Aspect**, and **Weapon X/Y/Z Offset**, described in [Display settings](display-settings.md). **Weapon Kick** (`g_weaponMuzzleKick`) makes the weapon kick back when it fires; turn it off to hold the weapon still.
+The weapon on screen has its own controls on **Settings → Game Options → General**: **Weapon FOV** (`0` follows your field of view), **Weapon FOV Aspect**, and **Weapon X/Y/Z Offset**, described in [Display settings](display-settings.md). **Weapon Kick** (`g_weaponMuzzleKick`) makes the weapon kick back when it fires; turn it off to hold the weapon still. To stop the camera itself jerking when you fire, see [Camera kick and screen shake](#camera-kick-and-screen-shake).
 
 ## Dialogue subtitles
 
@@ -240,6 +240,12 @@ These are on by default and rarely need changing. Each takes effect after `s_res
 ### Cinematics
 
 **Settings → Game Options → General → Auto Skip Cinematics** (`g_autoSkipCinematics 1`) skips every cinematic as soon as it starts, which is handy for replays and speed runs. It is off by default and affects the next cinematic, not one already playing. **Cinematic Shake** on the same page scales the extra camera movement added to cinematics (`ui_cinematicShake`, `0` none to `1` full); VR always turns it off.
+
+### Camera kick and screen shake
+
+**Settings → Game Options → General → View Kick** (`g_viewKick`) sets how much the camera jerks when you fire: the kick every single-player weapon gives the view, the lightning gun's shake while it fires, and the kick of vehicle guns. `0` keeps the view still and `1` (the default) is the original kick; the new interface's slider goes in tenths, the classic page offers Off, Low and Full. Your weapons behave exactly as before: shots still go where the crosshair points, and spread, damage and rate of fire do not change. **Weapon Kick** moves only the gun on screen, so turn both off for a completely steady view. Being hit still jolts the view.
+
+**Screen Shake** (`g_screenShake`) on the same page sets the shake from explosions, including your own rockets and grenades, from collapsing machinery and loud sounds, and from riding The Awakening's speeder bike, `0` none to `1` full. Both apply at once. Multiplayer weapons and explosions never kick or shake the view, so these settings change nothing there.
 
 ### Corpses
 
@@ -312,6 +318,8 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `g_fov` | `90` | Field of view, measured on a 4:3 screen. |
 | `g_autoSkipCinematics` | `0` | `1` skips cinematics as they start. |
 | `ui_cinematicShake` | `1` | Extra cinematic camera movement, `0` to `1`. |
+| `g_viewKick` | `1` | Camera kick and shake when you fire, `0` to `1`; aim is unchanged. |
+| `g_screenShake` | `1` | Screen shake from explosions, machinery and vehicles (single-player), `0` to `1`. |
 | `g_corpseRemoveDelaySP` | `0` | Single-player corpse delay in seconds; `0` stock, `-1` never. |
 | `g_corpseRemoveDelayMP` | `0` | Multiplayer corpse delay in seconds; `0` stock, `-1` never. |
 | `g_corpseSink` | `0` | `0` dissolve, `1` sink as a ragdoll, `2` sink without ragdoll. |

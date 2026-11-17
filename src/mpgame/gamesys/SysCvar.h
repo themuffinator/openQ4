@@ -399,6 +399,8 @@ extern idCVar	cl_gun_y;
 extern idCVar	cl_gun_z;
 extern idCVar	g_weaponFovEffect;
 extern idCVar	g_weaponMuzzleKick;
+extern idCVar	g_viewKick;
+extern idCVar	g_screenShake;
 // RAVEN BEGIN
 // bdube: cvar for messing with foreshortening
 extern idCVar	g_gun_pitch;

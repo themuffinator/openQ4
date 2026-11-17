@@ -1634,6 +1634,8 @@
 	"#str_231770"	"El renderizador dibuja como máximo 2x aquí, así que la escena usa 2x."
 	"#str_231771"	"El renderizador dibuja como máximo 4x aquí, así que la escena usa 4x."
 	"#str_231772"	"El renderizador dibuja como máximo 8x aquí, así que la escena usa 8x."
+	"#str_231773"	"Retroceso de la vista"
+	"#str_231774"	"Sacudida de pantalla"
 	"#str_231900"	"The Awakening"
 	"#str_231901"	"Compras"
 	"#str_231902"	"Mod de ráfaga"

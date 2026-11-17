@@ -85,7 +85,7 @@ extern glconfig_t glConfig;
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
 idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 );
 idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 7 );
-idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 79 );
+idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 81 );
 // The opt-ins are unarchived, so each lasts until the player quits, and
 // CVAR_NOCHEAT, because the engine counts any other unarchived CVar as a
 // cheat: joining or hosting a server without cheats resets it to its default,
@@ -5696,10 +5696,10 @@ static const mainMenuSettingsScrollPage_t MAINMENU_SETTINGS_SCROLL_PAGES[] = {
 		"game_section_choice",
 		21,
 		0,
-		79,
+		81,
 		-24,
 		-41,
-		2210,
+		2258,
 		24.0f
 	}
 };
@@ -5724,25 +5724,25 @@ static bool MainMenuSetWindowVar( idUserInterface *gui, const char *stateName, c
 
 static int MainMenuSettingsSectionChoiceForScroll( const mainMenuSettingsScrollPage_t &page, int scrollValue ) {
 	if ( idStr::Icmp( page.name, "game" ) == 0 ) {
-		if ( scrollValue < 11 ) {
+		if ( scrollValue < 13 ) {
 			return 0;
 		}
-		if ( scrollValue < 21 ) {
+		if ( scrollValue < 23 ) {
 			return 1;
 		}
-		if ( scrollValue < 41 ) {
+		if ( scrollValue < 43 ) {
 			return 2;
 		}
-		if ( scrollValue < 48 ) {
+		if ( scrollValue < 50 ) {
 			return 3;
 		}
-		if ( scrollValue < 60 ) {
+		if ( scrollValue < 62 ) {
 			return 4;
 		}
-		if ( scrollValue < 66 ) {
+		if ( scrollValue < 68 ) {
 			return 5;
 		}
-		if ( scrollValue < 73 ) {
+		if ( scrollValue < 75 ) {
 			return 6;
 		}
 		return 7;

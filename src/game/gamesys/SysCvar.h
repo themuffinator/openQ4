@@ -397,6 +397,8 @@ extern idCVar	g_gun_x;
 extern idCVar	g_gun_y;
 extern idCVar	g_gun_z;
 extern idCVar	g_weaponMuzzleKick;
+extern idCVar	g_viewKick;
+extern idCVar	g_screenShake;
 extern idCVar	cl_gun_x;
 extern idCVar	cl_gun_y;
 extern idCVar	cl_gun_z;

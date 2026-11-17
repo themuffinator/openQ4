@@ -310,8 +310,8 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","cl_player_ou
 	"in_touchscreen","in_joystickLowBatteryRumbleThreshold","in_joystickLowBatteryRumbleScale","in_promptStyle","in_swapConfirmBack",
 	"g_crosshairCustom","g_crosshairSize","g_crosshairColor","hud_hitMarker","hud_crosshairAnimated","ui_hudLayout","ui_hudScale","ui_hudWidth",
 	"ui_hudSafeInset","g_objectivesToggle","ui_hudOpacity","ui_hudDamageDirection","ui_hudPickups","ui_hudWeaponStrip",
-	"ui_reducedFlashing","ui_retainedOpaqueBacking","g_corpseSink","con_allowConsole","g_autoSkipCinematics","ui_cinematicShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
-	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
+	"ui_reducedFlashing","ui_retainedOpaqueBacking","g_corpseSink","con_allowConsole","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
+	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","g_viewKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
 	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch",
 	"vr_playSpace"};
 
@@ -4864,7 +4864,7 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	// and Up from the first row reaches the tab.
 	const auto general = bounds("game_freelook"), gameplay = bounds("game_corpsesink");
 	Check(gameplay.x > general.x+general.width,"the sections stand in two columns");
-	Check(runtime.FocusControl("game_forcemodel",0.51),"focus the first column's last row");
+	Check(runtime.FocusControl("game_screenshake",0.51),"focus the first column's last row");
 	press(MenuInput::Down,0.52);
 	Check(runtime.FocusedControl() == "game_corpsesink","Down goes on to the second column");
 	Check(runtime.FocusControl("game_freelook",0.53),"focus the first row");
@@ -4954,8 +4954,8 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	const auto panel = bounds("game-panel"), row = bounds("game_weaponkick");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"game_forcemodel","game_corpsesink","game_weaponkick","game-general-rows",2.2);
-	CheckSettingsTextScale(host,runtime,document,"game-general","game_forcemodel","game_corpsesink","game_weaponkick",2.3);
+	CheckSettingsPortrait(runtime,document,"game_screenshake","game_corpsesink","game_weaponkick","game-general-rows",2.2);
+	CheckSettingsTextScale(host,runtime,document,"game-general","game_screenshake","game_corpsesink","game_weaponkick",2.3);
 	host.cvars = saved;
 }
 

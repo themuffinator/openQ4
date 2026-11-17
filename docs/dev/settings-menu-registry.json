@@ -3899,6 +3899,62 @@
       "accessibility": "Standard focusable choiceDef row backed by a typed force-model adapter. No clears the force-model cvars."
     },
     {
+      "id": "game.view_kick",
+      "pane": "Game Options",
+      "section": "Gameplay And View",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Gameplay And View > View Kick",
+      "container": "set_game_viewkick",
+      "widgets": [
+        "set_game_viewkick_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231773",
+      "choices_key": "#str_230136",
+      "values": [
+        "0",
+        "0.5",
+        "1"
+      ],
+      "target": "g_viewKick",
+      "default": "1",
+      "cvar_range": {
+        "low": "0",
+        "high": "1"
+      },
+      "accessibility": "Focusable choiceDef row. Off, Low or Full scales the camera kick and shake when you fire; shots still go where the crosshair points. The retained page offers the full 0 to 1 range."
+    },
+    {
+      "id": "game.screen_shake",
+      "pane": "Game Options",
+      "section": "Gameplay And View",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Gameplay And View > Screen Shake",
+      "container": "set_game_screenshake",
+      "widgets": [
+        "set_game_screenshake_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231774",
+      "choices_key": "#str_230136",
+      "values": [
+        "0",
+        "0.5",
+        "1"
+      ],
+      "target": "g_screenShake",
+      "default": "1",
+      "cvar_range": {
+        "low": "0",
+        "high": "1"
+      },
+      "accessibility": "Focusable choiceDef row. Off, Low or Full scales single-player screen shake from explosions, machinery, sounds and vehicles. The retained page offers the full 0 to 1 range."
+    },
+    {
       "id": "game.corpse_time",
       "pane": "Game Options",
       "section": "Corpse, Language, Console",

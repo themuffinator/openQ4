@@ -1634,6 +1634,8 @@
 	"#str_231770"	"The renderer draws at most 2x here, so the scene uses 2x."
 	"#str_231771"	"The renderer draws at most 4x here, so the scene uses 4x."
 	"#str_231772"	"The renderer draws at most 8x here, so the scene uses 8x."
+	"#str_231773"	"View Kick"
+	"#str_231774"	"Screen Shake"
 	"#str_231900"	"The Awakening"
 	"#str_231901"	"Buying"
 	"#str_231902"	"Burst Fire Mod"

@@ -1233,6 +1233,8 @@ def main() -> None:
         "pm_zoomedSlow",
         "g_simpleItems",
         "g_mpFlatOpponentWeapons",
+        "g_viewKick",
+        "g_screenShake",
         "g_autoSkipCinematics",
         "cl_gunfov",
         "cl_gunfov_adjust",
@@ -1261,6 +1263,8 @@ def main() -> None:
         "set_game_scopesensitivity",
         "set_game_simpleitems",
         "set_game_opponentweaponstyle",
+        "set_game_viewkick",
+        "set_game_screenshake",
         "set_game_autoskipcinematics",
         "set_game_viewweapon",
         "set_game_cl_gunfov",
@@ -1314,11 +1318,11 @@ def main() -> None:
     for token in (
         "rect\t204,104,377,16",
         "rect\t0,128,640,256",
-        "rect\t-24,-41,640,2210",
+        "rect\t-24,-41,640,2258",
         "rect\t613,128,16,256",
-        "high\t79",
+        "high\t81",
         "cvar\tgui_set_game_scroll",
-        "640,2210",
+        "640,2258",
     ):
         require(game_gui + mainmenu, token, "Game Options scroll coverage")
     for token in (
@@ -1328,13 +1332,13 @@ def main() -> None:
         "#str_229960",
         "game_section_choice",
         'set "gui::gui_set_game_scroll" "0"',
-        'set "gui::gui_set_game_scroll" "11"',
-        'set "gui::gui_set_game_scroll" "21"',
-        'set "gui::gui_set_game_scroll" "41"',
-        'set "gui::gui_set_game_scroll" "48"',
-        'set "gui::gui_set_game_scroll" "60"',
-        'set "gui::gui_set_game_scroll" "67"',
-        'set "gui::gui_set_game_scroll" "74"',
+        'set "gui::gui_set_game_scroll" "13"',
+        'set "gui::gui_set_game_scroll" "23"',
+        'set "gui::gui_set_game_scroll" "43"',
+        'set "gui::gui_set_game_scroll" "50"',
+        'set "gui::gui_set_game_scroll" "62"',
+        'set "gui::gui_set_game_scroll" "69"',
+        'set "gui::gui_set_game_scroll" "76"',
         'set "cmd" "applySettingsScroll game"',
         "set_game_section_choice::noevents",
     ):
@@ -1347,7 +1351,7 @@ def main() -> None:
     reject(audio_gui + mainmenu, "set gui_set_audio_scroll", "Audio scroll cvar command")
     for token in (
         'gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 )',
-        'gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 79 )',
+        'gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 81 )',
         "HandleMainMenuSettingsScrollInput( guiActive, event->evValue )",
         'MainMenuWindowStateEqualsInt( gui, "desktop::curr", page.expectedPage )',
         "MainMenuSettingsPopupIsVisible( gui )",

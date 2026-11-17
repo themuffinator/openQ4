@@ -1634,6 +1634,8 @@
 	"#str_231770"	"Renderer zde kreslí nejvýše 2x, scéna proto používá 2x."
 	"#str_231771"	"Renderer zde kreslí nejvýše 4x, scéna proto používá 4x."
 	"#str_231772"	"Renderer zde kreslí nejvýše 8x, scéna proto používá 8x."
+	"#str_231773"	"Ráz kamery"
+	"#str_231774"	"Otřesy obrazu"
 	"#str_231900"	"The Awakening"
 	"#str_231901"	"Nakupování"
 	"#str_231902"	"Mod dávkové palby"

@@ -1634,6 +1634,8 @@
 	"#str_231770"	"O renderizador desenha no máximo 2x aqui, então a cena usa 2x."
 	"#str_231771"	"O renderizador desenha no máximo 4x aqui, então a cena usa 4x."
 	"#str_231772"	"O renderizador desenha no máximo 8x aqui, então a cena usa 8x."
+	"#str_231773"	"Tranco da câmera"
+	"#str_231774"	"Tremor de tela"
 	"#str_231900"	"The Awakening"
 	"#str_231901"	"Compras"
 	"#str_231902"	"Mod de rajada"

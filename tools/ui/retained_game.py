@@ -66,6 +66,8 @@ SECTIONS = (
         choice("game_simpleitems", "#str_41215", "g_simpleItems", "#str_41216", (0, 1, 2, 3)),
         choice("game_opponentweapons", "#str_41217", "g_mpFlatOpponentWeapons", "#str_41218", (0, 1)),
         ("verb_toggle", "game_forcemodel", "#str_223006", "gameForceModel", None),
+        slider("game_viewkick", "#str_231773", "g_viewKick", 0, 1, 0.1, 1),
+        slider("game_screenshake", "#str_231774", "g_screenShake", 0, 1, 0.1, 1),
     )),
     ("mouse", "#str_229935", (
         choice("game_invertmouse", "#str_200139", "m_pitch", "#str_200059", ("0.022", "-0.022")),

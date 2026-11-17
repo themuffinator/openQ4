@@ -1690,6 +1690,8 @@
 	"#str_231770"	"Renderer rysuje tu najwyżej 2x, więc scena używa 2x."
 	"#str_231771"	"Renderer rysuje tu najwyżej 4x, więc scena używa 4x."
 	"#str_231772"	"Renderer rysuje tu najwyżej 8x, więc scena używa 8x."
+	"#str_231773"	"Odrzut widoku"
+	"#str_231774"	"Drgania ekranu"
 	"#str_231900"	"The Awakening"
 	"#str_231901"	"Kupowanie"
 	"#str_231902"	"Mod ognia seriami"

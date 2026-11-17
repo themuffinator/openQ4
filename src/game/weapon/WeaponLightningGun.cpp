@@ -918,7 +918,7 @@ stateResult_t rvWeaponLightningGun::State_Fire( const stateParms_t& parms ) {
 				PlayCycle( ANIMCHANNEL_ALL, "shoot_loop", 0 );
 				if ( !gameLocal.isMultiplayer
 					&& owner == gameLocal.GetLocalPlayer() ) {
-					owner->playerView.SetShakeParms( MS2SEC(gameLocal.GetTime() + 500), 2.0f );
+					owner->playerView.SetShakeParms( MS2SEC(gameLocal.GetTime() + 500), 2.0f, true );
 				}
 			}
 			return SRESULT_WAIT;

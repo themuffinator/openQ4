@@ -513,6 +513,50 @@ void idPlayerView::AddBloodSpray( float duration ) {
 
 /*
 ==================
+FiringFeedbackScale
+
+openQ4 (#234): g_viewKick scales the kick and shake a shot gives the camera.
+Weapons fire along the camera, so shots still go where the crosshair points.
+A multiplayer server keeps the full kick for its remote players; each client
+chooses what its own view shows.
+==================
+*/
+static float FiringFeedbackScale( const idPlayer *player ) {
+	if ( gameLocal.isMultiplayer && player != gameLocal.GetLocalPlayer() ) {
+		return 1.0f;
+	}
+	return idMath::ClampFloat( 0.0f, 1.0f, g_viewKick.GetFloat() );
+}
+
+/*
+==================
+ScreenShakeScale
+
+openQ4 (#234): g_screenShake scales the shake from explosions, machinery,
+sounds and vehicles, which the firing kick setting leaves alone.
+==================
+*/
+static float ScreenShakeScale( void ) {
+	return idMath::ClampFloat( 0.0f, 1.0f, g_screenShake.GetFloat() );
+}
+
+/*
+==================
+idPlayerView::SetShakeParms
+==================
+*/
+void idPlayerView::SetShakeParms( float time, float scale, bool fromFiring ) {
+	const float playerScale = fromFiring ? FiringFeedbackScale( player ) : ScreenShakeScale();
+	// turned off, the request is dropped so it cannot cut short a shake already running
+	if ( playerScale <= 0.0f ) {
+		return;
+	}
+	shakeFinishTime = SEC2MS( time );
+	shakeScale = scale * playerScale;
+}
+
+/*
+==================
 idPlayerView::WeaponFireFeedback
 
 Called when a weapon fires, generates head twitches, etc
@@ -522,11 +566,12 @@ void idPlayerView::WeaponFireFeedback( const idDict *weaponDef ) {
 	int		recoilTime;
 
 	recoilTime = weaponDef->GetInt( "recoilTime" );
-	// don't shorten a damage kick in progress
-	if ( recoilTime && recoilTime > (kickFinishTime - gameLocal.time) ) {
+	const float kickScale = FiringFeedbackScale( player );
+	// don't shorten a damage kick in progress; with the kick off a shot leaves it alone
+	if ( recoilTime && kickScale > 0.0f && recoilTime > (kickFinishTime - gameLocal.time) ) {
 		idAngles angles;
 		weaponDef->GetAngles( "recoilAngles", "5 0 0", angles );
-		kickAngles = angles;
+		kickAngles = angles * kickScale;
 		int	finish = gameLocal.time + g_kickTime.GetFloat() * recoilTime;
 		kickFinishTime = finish;
 	}	
@@ -553,6 +598,8 @@ float idPlayerView::CalculateShake( idAngles &shakeAngleOffset ) const {
 	shakeAngleOffset[0] = gameLocal.random.CRandomFloat() * shakeVolume;
 	shakeAngleOffset[1] = gameLocal.random.CRandomFloat() * shakeVolume;
 	shakeAngleOffset[2] = gameLocal.random.CRandomFloat() * shakeVolume;
+	// scaled after the draws, so the setting never moves the game's random sequence
+	shakeAngleOffset *= ScreenShakeScale();
 
 	return shakeVolume;
 }

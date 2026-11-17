@@ -7,6 +7,44 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Turn off the camera kick when you fire (#234), 17 November 2026
+
+- **A steady view while you shoot.** **Settings > Game Options > General >
+  View Kick** (`g_viewKick`, `0` to `1`, default `1`) scales the camera kick
+  every single-player weapon gives when it fires, the lightning gun's shake
+  while its beam runs, and the kick and shake of vehicle guns. Turned down, the
+  view stays still; shots still go where the crosshair points, and spread,
+  damage and rate of fire are unchanged. **Weapon Kick** still moves only the
+  gun on screen.
+- **Screen shake has its own setting.** **Screen Shake** (`g_screenShake`)
+  beside it scales the shake from explosions (your own rockets and grenades
+  included), machinery, loud sounds and The Awakening's speeder bike, so you
+  can keep big blasts shaking while firing stays steady, or calm both.
+- **What to do.** Nothing; both default to the original feel. Multiplayer is
+  unchanged: its weapons have no view kick and it never shakes the screen.
+- Development: the stock `weapon_*` defs set `recoilTime` and `recoilAngles`
+  (for example the machinegun -1 pitch over 145 ms, the shotgun -0.25 over
+  600 ms), which `idPlayerView::WeaponFireFeedback` turns into `kickAngles`;
+  every `weapon_*_mp` def sets `recoilTime 0`. `g_viewKick` scales those angles
+  and skips the kick at `0`, which leaves a damage kick in progress alone. The
+  kick feeds `GetViewPos` and so the firing axis, so shots follow the camera
+  either way; with the kick off the machinegun's next shot no longer starts
+  about 0.2 degrees high. Explosion shake reaches the view through a different
+  path (BSE `shake` segments -> `StartViewEffect(VIEWEFFECT_SHAKE)`, sound
+  shaders' shakes in `CalculateShake`, scripted and vehicle `SetShakeParms`),
+  is single-player only (`ShakeOffsets` returns in multiplayer) and is not
+  caused by the player's trigger, hence the second cvar. `SetShakeParms` takes
+  `fromFiring` for the lightning gun loop and vehicle `shakeTime`, which follow
+  `g_viewKick`; at `0` a request is dropped so it cannot cut short another
+  shake. `CalculateShake` scales after its `gameLocal.random` draws, so the
+  setting never moves the game's random sequence. A multiplayer server keeps
+  the full kick for remote players. Both cvars are archived and defined in
+  both game trees. The stock page's General section gains two rows after Force
+  Model (scroll range 81, content height 2258, every later section jump two
+  steps down), and Weapon Kick's hover now sits on its own row instead of
+  Weapon X Offset's. Strings `#str_231773` and `#str_231774` in all twelve
+  languages.
+
 ## Weapon fire and explosions cast shadows (#235, #236), 17 November 2026
 
 - **Gunfire throws shadows.** On Quality, Ultra and Maximum, muzzle flashes

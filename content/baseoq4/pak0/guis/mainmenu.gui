@@ -16565,6 +16565,10 @@ windowDef Desktop
 			set "set_game_opponentweaponstyle_hover::visible" "1" ;
 			set "set_game_forcemodel::visible" "1" ;
 			set "set_game_forcemodel_hover::visible" "1" ;
+			set "set_game_viewkick::visible" "1" ;
+			set "set_game_viewkick_hover::visible" "1" ;
+			set "set_game_screenshake::visible" "1" ;
+			set "set_game_screenshake_hover::visible" "1" ;
 			set "set_game_mouse::visible" "1" ;
 			set "set_game_mpitch::visible" "1" ;
 			set "set_game_mpitch_hover::visible" "1" ;
@@ -16737,6 +16741,8 @@ windowDef Desktop
 			set "set_game_simpleitems::noevents" "0" ;
 			set "set_game_opponentweaponstyle::noevents" "0" ;
 			set "set_game_forcemodel::noevents" "0" ;
+			set "set_game_viewkick::noevents" "0" ;
+			set "set_game_screenshake::noevents" "0" ;
 			set "set_game_mpitch::noevents" "0" ;
 			set "set_game_msmooth::noevents" "0" ;
 			set "set_game_msensitivity::noevents" "0" ;
@@ -16836,6 +16842,10 @@ windowDef Desktop
 			set "set_game_opponentweaponstyle_hover::visible" "0" ;
 			set "set_game_forcemodel::visible" "0" ;
 			set "set_game_forcemodel_hover::visible" "0" ;
+			set "set_game_viewkick::visible" "0" ;
+			set "set_game_viewkick_hover::visible" "0" ;
+			set "set_game_screenshake::visible" "0" ;
+			set "set_game_screenshake_hover::visible" "0" ;
 			set "set_game_mouse::visible" "0" ;
 			set "set_game_mpitch::visible" "0" ;
 			set "set_game_mpitch_hover::visible" "0" ;
@@ -16994,6 +17004,8 @@ windowDef Desktop
 			set "set_game_simpleitems::noevents" "1" ;
 			set "set_game_opponentweaponstyle::noevents" "1" ;
 			set "set_game_forcemodel::noevents" "1" ;
+			set "set_game_viewkick::noevents" "1" ;
+			set "set_game_screenshake::noevents" "1" ;
 			set "set_game_mpitch::noevents" "1" ;
 			set "set_game_msmooth::noevents" "1" ;
 			set "set_game_msensitivity::noevents" "1" ;
@@ -19226,6 +19238,8 @@ windowDef Desktop
 				set "set_game_simpleitems_background::matcolor_w" "0.4" ;
 				set "set_game_opponentweaponstyle_background::matcolor_w" "0.4" ;
 				set "set_game_forcemodel_background::matcolor_w" "0.4" ;
+				set "set_game_viewkick_background::matcolor_w" "0.4" ;
+				set "set_game_screenshake_background::matcolor_w" "0.4" ;
 				set "set_game_mpitch_background::matcolor_w" "0.4" ;
 				set "set_game_msmooth_background::matcolor_w" "0.4" ;
 				set "set_game_msensitivity_background::matcolor_w" "0.4" ;

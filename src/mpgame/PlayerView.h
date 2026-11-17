@@ -76,7 +76,9 @@ public:
 // RAVEN BEGIN
 // jscott: accessors required for the fx system
 	void				SetDoubleVisionParms( float time, float scale ) { dvFinishTime = SEC2MS( time ); dvScale = scale; }
-	void				SetShakeParms( float time, float scale ) { shakeFinishTime = SEC2MS( time ); shakeScale = scale; }
+	// openQ4 (#234): world shakes follow g_screenShake; firing shakes pass
+	// fromFiring and follow g_viewKick instead
+	void				SetShakeParms( float time, float scale, bool fromFiring = false );
 	void				SetTunnelParms( float time, float scale ) { tvStartTime = gameLocal.time; tvFinishTime = tvStartTime + time; tvScale = 1.0f / scale; }
 // RAVEN END
 

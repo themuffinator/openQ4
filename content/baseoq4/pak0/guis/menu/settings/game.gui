@@ -55,19 +55,19 @@
 							if ( "gui::game_section_choice" == 0 ) {
 								set "gui::gui_set_game_scroll" "0" ;
 							} else if ( "gui::game_section_choice" == 1 ) {
-								set "gui::gui_set_game_scroll" "11" ;
+								set "gui::gui_set_game_scroll" "13" ;
 							} else if ( "gui::game_section_choice" == 2 ) {
-								set "gui::gui_set_game_scroll" "21" ;
+								set "gui::gui_set_game_scroll" "23" ;
 							} else if ( "gui::game_section_choice" == 3 ) {
-								set "gui::gui_set_game_scroll" "41" ;
+								set "gui::gui_set_game_scroll" "43" ;
 							} else if ( "gui::game_section_choice" == 4 ) {
-								set "gui::gui_set_game_scroll" "48" ;
+								set "gui::gui_set_game_scroll" "50" ;
 							} else if ( "gui::game_section_choice" == 5 ) {
-								set "gui::gui_set_game_scroll" "60" ;
+								set "gui::gui_set_game_scroll" "62" ;
 							} else if ( "gui::game_section_choice" == 6 ) {
-								set "gui::gui_set_game_scroll" "67" ;
+								set "gui::gui_set_game_scroll" "69" ;
 							} else {
-								set "gui::gui_set_game_scroll" "74" ;
+								set "gui::gui_set_game_scroll" "76" ;
 							}
 							set "cmd" "applySettingsScroll game" ;
 						}
@@ -80,7 +80,7 @@
 					noclip	0
 					windowDef set_game_content
 					{
-						rect	-24,-41,640,2210
+						rect	-24,-41,640,2258
 						visible	1
 
 	//--------------------------------------------------------------//
@@ -600,12 +600,100 @@
 	//==============================================================//
 				
 	//==============================================================//
+	// Settings->Game Options->View Kick
+	//==============================================================//
+
+				windowDef set_game_viewkick
+				{
+					rect	228,311,403,25
+					visible	1
+
+					windowDef set_game_viewkick_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_viewkick_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_231773"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_viewkick_value
+					{
+						rect	240,3,162,18
+						visible	1
+						forecolor	1,0.745,0.137,0.8
+						cvar	g_viewKick
+						textscale	0.24
+						font	"fonts/lowpixel"
+						choices	"#str_230136"
+						values	"0;0.5;1"
+						choiceType	1
+
+						onAction {
+							set "cmd" "play main_menu_selection" ;
+						}
+					}
+				}
+	//==============================================================//
+
+	//==============================================================//
+	// Settings->Game Options->Screen Shake
+	//==============================================================//
+
+				windowDef set_game_screenshake
+				{
+					rect	228,335,403,25
+					visible	1
+
+					windowDef set_game_screenshake_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_screenshake_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_231774"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_screenshake_value
+					{
+						rect	240,3,162,18
+						visible	1
+						forecolor	1,0.745,0.137,0.8
+						cvar	g_screenShake
+						textscale	0.24
+						font	"fonts/lowpixel"
+						choices	"#str_230136"
+						values	"0;0.5;1"
+						choiceType	1
+
+						onAction {
+							set "cmd" "play main_menu_selection" ;
+						}
+					}
+				}
+	//==============================================================//
+
+	//==============================================================//
 	// Settings->Game Options->Mouse Input
 	//==============================================================//
 
 				windowDef set_game_mouse
 				{
-					rect	259,321,327,13
+					rect	259,369,327,13
 					visible	1
 					forecolor	1,1,1,0.4
 					text	"#str_229935"
@@ -621,7 +709,7 @@
 
 				windowDef set_game_mpitch
 				{
-					rect  228,335,403,25
+					rect  228,383,403,25
 					visible 1
 											
 					windowDef set_game_mpitch_background
@@ -666,7 +754,7 @@
 
 				windowDef set_game_msmooth
 				{
-					rect	228,359,377,25
+					rect	228,407,377,25
 					visible	1
 				
 					windowDef set_game_msmooth_background
@@ -733,7 +821,7 @@
 
 				windowDef set_game_msensitivity
 				{
-					rect	228,383,377,25
+					rect	228,431,377,25
 					visible	1
 				
 					windowDef set_game_msensitivity_background
@@ -800,7 +888,7 @@
 
 				windowDef set_game_mcpi
 				{
-					rect	228,407,377,25
+					rect	228,455,377,25
 					visible	1
 
 					windowDef set_game_mcpi_background
@@ -867,7 +955,7 @@
 
 				windowDef set_game_mfilter
 				{
-					rect	228,431,377,25
+					rect	228,479,377,25
 					visible	1
 
 					windowDef set_game_mfilter_background
@@ -934,7 +1022,7 @@
 
 				windowDef set_game_maccel
 				{
-					rect	228,455,377,25
+					rect	228,503,377,25
 					visible	1
 
 					windowDef set_game_maccel_background
@@ -1000,7 +1088,7 @@
 
 				windowDef set_game_macceloffset
 				{
-					rect	228,479,377,25
+					rect	228,527,377,25
 					visible	1
 
 					windowDef set_game_macceloffset_background
@@ -1067,7 +1155,7 @@
 
 				windowDef set_game_maccelpower
 				{
-					rect	228,503,377,25
+					rect	228,551,377,25
 					visible	1
 
 					windowDef set_game_maccelpower_background
@@ -1134,7 +1222,7 @@
 
 				windowDef set_game_msenscap
 				{
-					rect	228,527,377,25
+					rect	228,575,377,25
 					visible	1
 
 					windowDef set_game_msenscap_background
@@ -1201,7 +1289,7 @@
 
 				windowDef set_game_controller
 				{
-					rect	259,561,327,13
+					rect	259,609,327,13
 					visible	1
 					forecolor	1,1,1,0.4
 					text	"#str_229924"
@@ -1211,7 +1299,7 @@
 
 				windowDef set_game_controller_enabled
 				{
-					rect  228,575,377,25
+					rect  228,623,377,25
 					visible 1
 
 					windowDef set_game_controller_enabled_background
@@ -1254,7 +1342,7 @@
 
 				windowDef set_game_controller_layout
 				{
-					rect  228,599,377,25
+					rect  228,647,377,25
 					visible 1
 
 					windowDef set_game_controller_layout_background
@@ -1298,7 +1386,7 @@
 
 				windowDef set_game_controller_deadzone
 				{
-					rect	228,623,377,25
+					rect	228,671,377,25
 					visible	1
 
 					windowDef set_game_controller_deadzone_background
@@ -1365,7 +1453,7 @@
 
 				windowDef set_game_controller_look_sensitivity
 				{
-					rect	228,647,377,25
+					rect	228,695,377,25
 					visible	1
 
 					windowDef set_game_controller_look_sensitivity_background
@@ -1426,7 +1514,7 @@
 				}
 				windowDef set_game_controller_wheel_sensitivity
 				{
-					rect	228,671,377,25
+					rect	228,719,377,25
 					visible	1
 
 					windowDef set_game_controller_wheel_sensitivity_background
@@ -1489,7 +1577,7 @@
 				}
 				windowDef set_game_wheel_offset
 				{
-					rect	228,695,377,25
+					rect	228,743,377,25
 					visible	1
 
 					windowDef set_game_wheel_offset_background
@@ -1559,7 +1647,7 @@
 
 				windowDef set_game_controller_look_curve
 				{
-					rect	228,719,377,25
+					rect	228,767,377,25
 					visible	1
 
 					windowDef set_game_controller_look_curve_background
@@ -1626,7 +1714,7 @@
 
 				windowDef set_game_controller_invert
 				{
-					rect  228,743,377,25
+					rect  228,791,377,25
 					visible 1
 
 					windowDef set_game_controller_invert_background
@@ -1669,7 +1757,7 @@
 
 				windowDef set_game_controller_trigger
 				{
-					rect	228,767,377,25
+					rect	228,815,377,25
 					visible	1
 
 					windowDef set_game_controller_trigger_background
@@ -1736,7 +1824,7 @@
 
 				windowDef set_game_controller_rumble
 				{
-					rect  228,791,377,25
+					rect  228,839,377,25
 					visible 1
 
 					windowDef set_game_controller_rumble_background
@@ -1779,7 +1867,7 @@
 
 				windowDef set_game_controller_rumble_strength
 				{
-					rect	228,815,377,25
+					rect	228,863,377,25
 					visible	1
 
 					windowDef set_game_controller_rumble_strength_background
@@ -1846,7 +1934,7 @@
 
 				windowDef set_game_controller_gyro
 				{
-					rect  228,849,377,25
+					rect  228,897,377,25
 					visible 1
 
 					windowDef set_game_controller_gyro_background
@@ -1889,7 +1977,7 @@
 
 				windowDef set_game_controller_gyro_sensitivity
 				{
-					rect	228,873,377,25
+					rect	228,921,377,25
 					visible	1
 
 					windowDef set_game_controller_gyro_sensitivity_background
@@ -1956,7 +2044,7 @@
 
 				windowDef set_game_controller_touchpad_mode
 				{
-					rect  228,897,377,25
+					rect  228,945,377,25
 					visible 1
 
 					windowDef set_game_controller_touchpad_mode_background
@@ -2000,7 +2088,7 @@
 
 				windowDef set_game_controller_touchpad_sensitivity
 				{
-					rect	228,921,377,25
+					rect	228,969,377,25
 					visible	1
 
 					windowDef set_game_controller_touchpad_sensitivity_background
@@ -2067,7 +2155,7 @@
 
 				windowDef set_game_controller_touchscreen
 				{
-					rect  228,945,377,25
+					rect  228,993,377,25
 					visible 1
 
 					windowDef set_game_controller_touchscreen_background
@@ -2110,7 +2198,7 @@
 
 				windowDef set_game_controller_low_battery_rumble
 				{
-					rect	228,969,377,25
+					rect	228,1017,377,25
 					visible	1
 
 					windowDef set_game_controller_low_battery_rumble_background
@@ -2177,7 +2265,7 @@
 
 				windowDef set_game_controller_low_battery_rumble_cap
 				{
-					rect	228,993,377,25
+					rect	228,1041,377,25
 					visible	1
 
 					windowDef set_game_controller_low_battery_rumble_cap_background
@@ -2244,7 +2332,7 @@
 
 				windowDef set_game_controller_prompt_style
 				{
-					rect	228,1017,377,25
+					rect	228,1065,377,25
 					visible	1
 
 					windowDef set_game_controller_prompt_style_background
@@ -2288,7 +2376,7 @@
 
 				windowDef set_game_controller_swap_confirm
 				{
-					rect	228,1041,377,25
+					rect	228,1089,377,25
 					visible	1
 
 					windowDef set_game_controller_swap_confirm_background
@@ -2332,7 +2420,7 @@
 				
 				windowDef set_game_customxhair
 				{
-					rect  228,1065,403,25
+					rect  228,1113,403,25
 					visible 1
 											
 					windowDef set_game_customxhair_background
@@ -2393,7 +2481,7 @@
 			
 				windowDef set_game_previewxhair
 				{
-					rect	228,1089,377,48
+					rect	228,1137,377,48
 					visible	1
 				
 					windowDef set_game_previewxhair_background
@@ -2456,7 +2544,7 @@
 
 				windowDef set_game_xhairsize
 				{
-					rect  228,1137,377,25
+					rect  228,1185,377,25
 					visible 1
 											
 					windowDef set_game_xhairsize_background
@@ -2513,7 +2601,7 @@
 
 				windowDef set_game_xhaircolor
 				{
-					rect  228,1162,377,25
+					rect  228,1210,377,25
 					visible 1
 											
 					windowDef set_game_xhaircolor_background
@@ -2657,7 +2745,7 @@
 
 				windowDef set_game_hitmarker
 				{
-					rect  228,1187,403,25
+					rect  228,1235,403,25
 					visible 1
 
 					windowDef set_game_hitmarker_background
@@ -2700,7 +2788,7 @@
 
 				windowDef set_game_hud
 				{
-					rect	259,1221,327,13
+					rect	259,1269,327,13
 					visible	1
 					forecolor	1,1,1,0.4
 					text	"#str_231235"
@@ -2715,7 +2803,7 @@
 
 				windowDef set_game_hudlayout
 				{
-					rect	228,1235,377,25
+					rect	228,1283,377,25
 					visible	1
 
 					windowDef set_game_hudlayout_background
@@ -2759,7 +2847,7 @@
 
 				windowDef set_game_hudscale
 				{
-					rect	228,1259,377,25
+					rect	228,1307,377,25
 					visible	1
 
 					windowDef set_game_hudscale_background
@@ -2825,7 +2913,7 @@
 
 				windowDef set_game_hudwidth
 				{
-					rect	228,1283,377,25
+					rect	228,1331,377,25
 					visible	1
 
 					windowDef set_game_hudwidth_background
@@ -2869,7 +2957,7 @@
 
 				windowDef set_game_hudinset
 				{
-					rect	228,1307,377,25
+					rect	228,1355,377,25
 					visible	1
 
 					windowDef set_game_hudinset_background
@@ -2935,7 +3023,7 @@
 
 				windowDef set_game_objectivestoggle
 				{
-					rect	228,1331,377,25
+					rect	228,1379,377,25
 					visible	1
 
 					windowDef set_game_objectivestoggle_background
@@ -2978,7 +3066,7 @@
 
 				windowDef set_game_hudopacity
 				{
-					rect	228,1355,377,25
+					rect	228,1403,377,25
 					visible	1
 
 					windowDef set_game_hudopacity_background
@@ -3044,7 +3132,7 @@
 
 				windowDef set_game_huddamagedir
 				{
-					rect	228,1379,377,25
+					rect	228,1427,377,25
 					visible	1
 
 					windowDef set_game_huddamagedir_background
@@ -3087,7 +3175,7 @@
 
 				windowDef set_game_hudpickups
 				{
-					rect	228,1403,377,25
+					rect	228,1451,377,25
 					visible	1
 
 					windowDef set_game_hudpickups_background
@@ -3130,7 +3218,7 @@
 
 				windowDef set_game_hudstrip
 				{
-					rect	228,1427,377,25
+					rect	228,1475,377,25
 					visible	1
 
 					windowDef set_game_hudstrip_background
@@ -3173,7 +3261,7 @@
 
 				windowDef set_game_hudflash
 				{
-					rect	228,1451,377,25
+					rect	228,1499,377,25
 					visible	1
 
 					windowDef set_game_hudflash_background
@@ -3216,7 +3304,7 @@
 
 				windowDef set_game_opaquebacking
 				{
-					rect	228,1475,377,25
+					rect	228,1523,377,25
 					visible	1
 
 					windowDef set_game_opaquebacking_background
@@ -3259,7 +3347,7 @@
 
 				windowDef set_game_corpsesink
 				{
-					rect  228,1499,377,25
+					rect  228,1547,377,25
 					visible 1
 
 					windowDef set_game_corpsesink_background
@@ -3303,7 +3391,7 @@
 
 				windowDef set_game_corpsetime
 				{
-					rect  228,1523,377,25
+					rect  228,1571,377,25
 					visible 1
 
 					windowDef set_game_corpsetime_background
@@ -3350,7 +3438,7 @@
 
 				windowDef set_game_language
 				{
-					rect  228,1547,377,25
+					rect  228,1595,377,25
 					visible 1
 											
 					windowDef set_game_language_background
@@ -3398,7 +3486,7 @@
 
 				windowDef set_game_consoleaccess
 				{
-					rect  228,1571,377,25
+					rect  228,1619,377,25
 					visible 1
 
 					windowDef set_game_consoleaccess_background
@@ -3442,7 +3530,7 @@
 
 				windowDef set_game_autoskipcinematics
 				{
-					rect  228,1595,377,25
+					rect  228,1643,377,25
 					visible 1
 
 					windowDef set_game_autoskipcinematics_background
@@ -3485,7 +3573,7 @@
 
 				windowDef set_game_cinematicshake
 				{
-					rect	228,1619,403,25
+					rect	228,1667,403,25
 					visible	1
 
 					windowDef set_game_cinematicshake_background
@@ -3528,7 +3616,7 @@
 
 				windowDef set_game_enhancedphysics
 				{
-					rect	228,1643,377,25
+					rect	228,1691,377,25
 					visible	1
 
 					windowDef set_game_enhancedphysics_background
@@ -3567,7 +3655,7 @@
 
 				windowDef set_game_viewweapon
 				{
-					rect	259,1677,327,13
+					rect	259,1725,327,13
 					visible	1
 					forecolor	1,1,1,0.4
 					text	"#str_229952"
@@ -3583,7 +3671,7 @@
 
 				windowDef set_game_cl_gunfov
 				{
-					rect	228,1691,377,25
+					rect	228,1739,377,25
 					visible	1
 
 					windowDef set_game_cl_gunfov_background
@@ -3650,7 +3738,7 @@
 
 				windowDef set_game_cl_gunfov_adjust
 				{
-					rect  228,1715,377,25
+					rect  228,1763,377,25
 					visible 1
 
 					windowDef set_game_cl_gunfov_adjust_background
@@ -3694,7 +3782,7 @@
 
 				windowDef set_game_cl_gun_x
 				{
-					rect	228,1739,377,25
+					rect	228,1787,377,25
 					visible	1
 
 					windowDef set_game_cl_gun_x_background
@@ -3760,7 +3848,7 @@
 
 				windowDef set_game_cl_gun_y
 				{
-					rect	228,1763,377,25
+					rect	228,1811,377,25
 					visible	1
 
 					windowDef set_game_cl_gun_y_background
@@ -3826,7 +3914,7 @@
 
 				windowDef set_game_cl_gun_z
 				{
-					rect	228,1787,377,25
+					rect	228,1835,377,25
 					visible	1
 
 					windowDef set_game_cl_gun_z_background
@@ -3892,7 +3980,7 @@
 
 				windowDef set_game_weaponkick
 				{
-					rect	228,1811,403,25
+					rect	228,1859,403,25
 					visible	1
 
 					windowDef set_game_weaponkick_background
@@ -3935,7 +4023,7 @@
 
 				windowDef set_game_vr
 				{
-					rect	259,1845,327,13
+					rect	259,1893,327,13
 					visible	1
 					forecolor	1,1,1,0.4
 					text	"#str_230120"
@@ -3951,7 +4039,7 @@
 
 				windowDef set_game_vr_enable
 				{
-					rect	228,1859,403,25
+					rect	228,1907,403,25
 					visible	1
 
 					windowDef set_game_vr_enable_background
@@ -3995,7 +4083,7 @@
 
 				windowDef set_game_vr_aimmode
 				{
-					rect	228,1883,403,25
+					rect	228,1931,403,25
 					visible	1
 
 					windowDef set_game_vr_aimmode_background
@@ -4039,7 +4127,7 @@
 
 				windowDef set_game_vr_lefthanded
 				{
-					rect	228,1907,403,25
+					rect	228,1955,403,25
 					visible	1
 
 					windowDef set_game_vr_lefthanded_background
@@ -4083,7 +4171,7 @@
 
 				windowDef set_game_vr_turnmode
 				{
-					rect	228,1931,403,25
+					rect	228,1979,403,25
 					visible	1
 
 					windowDef set_game_vr_turnmode_background
@@ -4127,7 +4215,7 @@
 
 				windowDef set_game_vr_snapturnangle
 				{
-					rect	228,1955,403,25
+					rect	228,2003,403,25
 					visible	1
 
 					windowDef set_game_vr_snapturnangle_background
@@ -4171,7 +4259,7 @@
 
 				windowDef set_game_vr_movedirection
 				{
-					rect	228,1979,403,25
+					rect	228,2027,403,25
 					visible	1
 
 					windowDef set_game_vr_movedirection_background
@@ -4215,7 +4303,7 @@
 
 				windowDef set_game_vr_roomscale
 				{
-					rect	228,2003,403,25
+					rect	228,2051,403,25
 					visible	1
 
 					windowDef set_game_vr_roomscale_background
@@ -4259,7 +4347,7 @@
 
 				windowDef set_game_vr_aimlaser
 				{
-					rect	228,2027,403,25
+					rect	228,2075,403,25
 					visible	1
 
 					windowDef set_game_vr_aimlaser_background
@@ -4303,7 +4391,7 @@
 
 				windowDef set_game_vr_hapticstrength
 				{
-					rect	228,2051,403,25
+					rect	228,2099,403,25
 					visible	1
 
 					windowDef set_game_vr_hapticstrength_background
@@ -4347,7 +4435,7 @@
 
 				windowDef set_game_vr_twohanded
 				{
-					rect	228,2075,403,25
+					rect	228,2123,403,25
 					visible	1
 
 					windowDef set_game_vr_twohanded_background
@@ -4391,7 +4479,7 @@
 
 				windowDef set_game_vr_vignette
 				{
-					rect	228,2099,403,25
+					rect	228,2147,403,25
 					visible	1
 
 					windowDef set_game_vr_vignette_background
@@ -4435,7 +4523,7 @@
 
 				windowDef set_game_vr_physicalcrouch
 				{
-					rect	228,2123,403,25
+					rect	228,2171,403,25
 					visible	1
 
 					windowDef set_game_vr_physicalcrouch_background
@@ -4477,7 +4565,7 @@
 
 				windowDef set_game_vr_playspace
 				{
-					rect	228,2147,403,25
+					rect	228,2195,403,25
 					visible	1
 
 					windowDef set_game_vr_playspace_background
@@ -4525,7 +4613,7 @@
 					forecolor	1,1,1,0.8
 					matcolor	1,1,1,0.4
 					low	0
-					high	79
+					high	81
 					step	1
 					vertical	1
 					scrollbar	1
