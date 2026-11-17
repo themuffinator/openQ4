@@ -1776,4 +1776,6 @@
 	"#str_232511"	"Não foi possível instalar o openQ4 %s. O openQ4 %s não foi alterado.\n\nAbrir a página de download para instalá-lo você mesmo?"
 	"#str_232512"	"O openQ4 não conseguiu abrir de novo após a atualização. Abra-o pela pasta dele."
 	"#str_232513"	"Autossombra de Personagens"
+	"#str_232514"	"Seu corpo"
+	"#str_232515"	"Não;Pernas e tronco;Com braços"
 }

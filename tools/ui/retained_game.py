@@ -102,6 +102,7 @@ SECTIONS = (
         choice("game_vrvignette", "#str_230138", "vr_comfortVignette", "#str_230136", ("0", "0.5", "1")),
         choice("game_vrcrouch", "#str_230139", "vr_physicalCrouch", "#str_200246", (0, 1)),
         choice("game_vrplayspace", "#str_231760", "vr_playSpace", "#str_231761", (0, 1, 2)),
+        choice("game_vrbody", "#str_232514", "vr_body", "#str_232515", (0, 1, 2)),
     )),
 )
 # The session's verbs, in the order HandleRetainedGameRequest takes them.

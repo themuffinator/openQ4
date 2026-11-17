@@ -1785,4 +1785,6 @@
 	"#str_232511"	"openQ4 %s n'a pas pu être installé. openQ4 %s reste inchangé.\n\nOuvrir la page de téléchargement pour l'installer vous-même ?"
 	"#str_232512"	"openQ4 n'a pas pu redémarrer après la mise à jour. Lancez-le depuis son dossier."
 	"#str_232513"	"Ombres propres des personnages"
+	"#str_232514"	"Votre corps"
+	"#str_232515"	"Non;Jambes et torse;Avec les bras"
 }

@@ -1832,4 +1832,6 @@
 	"#str_232511"	"Nie udało się zainstalować openQ4 %s, więc openQ4 %s pozostaje bez zmian.\n\nOtworzyć stronę pobierania, aby zainstalować go samodzielnie?"
 	"#str_232512"	"openQ4 nie mógł uruchomić się ponownie po aktualizacji. Uruchom go z jego folderu."
 	"#str_232513"	"Cienie własne postaci"
+	"#str_232514"	"Twoje ciało"
+	"#str_232515"	"Wył.;Nogi i tułów;Z rękami"
 }

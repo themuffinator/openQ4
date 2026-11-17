@@ -1785,4 +1785,6 @@
 	"#str_232511"	"Non è stato possibile installare openQ4 %s. openQ4 %s non è cambiato.\n\nAprire la pagina di download per installarlo da te?"
 	"#str_232512"	"openQ4 non è riuscito a riavviarsi dopo l'aggiornamento. Avvialo dalla sua cartella."
 	"#str_232513"	"Autombre dei personaggi"
+	"#str_232514"	"Il tuo corpo"
+	"#str_232515"	"No;Gambe e busto;Con le braccia"
 }

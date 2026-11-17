@@ -4487,6 +4487,30 @@
       "accessibility": "Focusable choiceDef row. Seated play measures height from where the player recentred; standing play measures it from the floor."
     },
     {
+      "id": "game.vr_body",
+      "pane": "Game Options",
+      "section": "Virtual Reality",
+      "path": "Settings > Game Options > Virtual Reality > Your Body",
+      "source": "game",
+      "container": "set_game_vr_body",
+      "widgets": [
+        "set_game_vr_body_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232514",
+      "choices_key": "#str_232515",
+      "values": [
+        "0",
+        "1",
+        "2"
+      ],
+      "target_type": "cvar",
+      "target": "vr_body",
+      "default": "2",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Chooses whether the headset shows the player's own body: none, legs and torso, or with arms that reach the hands."
+    },
+    {
       "id": "audio.subtitles",
       "pane": "Audio",
       "section": "Subtitles",

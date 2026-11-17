@@ -2293,9 +2293,9 @@ and AND-05.
   projectile launch clearance assuming a muzzle inside the body's box; a
   room-scale catch-up walked in one tic after a pause; multiplayer facing
   resets, which the server sets from the hand's usercmd; no body in vehicle
-  seats; a left-handed hold that uses the model's simpler hands; and a
-  Settings row for `vr_body`, which is console-only until its strings exist
-  in all twelve language tables.
+  seats; and a left-handed hold that uses the model's simpler hands. The
+  setting is **Your Body** on the Virtual Reality tab, in all twelve
+  language tables, on the stock and the retained pages.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and

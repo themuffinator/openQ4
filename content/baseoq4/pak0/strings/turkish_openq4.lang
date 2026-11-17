@@ -1776,4 +1776,6 @@
 	"#str_232511"	"openQ4 %s yüklenemedi. openQ4 %s değişmedi.\n\nKendiniz yüklemek için indirme sayfası açılsın mı?"
 	"#str_232512"	"openQ4 güncellemeden sonra yeniden başlayamadı. Klasöründen başlatın."
 	"#str_232513"	"Karakter Öz Gölgeleri"
+	"#str_232514"	"Vücudunuz"
+	"#str_232515"	"Kapalı;Bacaklar ve gövde;Kollarla"
 }

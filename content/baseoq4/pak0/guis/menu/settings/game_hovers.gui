@@ -1869,4 +1869,23 @@
 				}
 			}
 		}
+		windowDef set_game_vr_body_hover
+		{
+			rect	245,2245,361,20
+			visible	0
+
+			onMouseEnter {
+				if ("desktop::active" == 0) {
+					stoptransitions "set_game_vr_body_background" ;
+					set "set_game_vr_body_background::matcolor_w" "1" ;
+					set "cmd" "play main_menu_mouseover" ;
+				}
+			}
+
+			onMouseExit {
+				if ("desktop::active" == 0) {
+					transition "set_game_vr_body_background::matcolor_w" "1" "0.4" "300" ;
+				}
+			}
+		}
 	//==============================================================//

@@ -112,9 +112,10 @@ does not restore the withdrawn release. See
   vibrate; the flashlight keeps up with the gun; controls let go when the
   headset's software stops the session.
 - **What to do.** Replace the client and both game modules together (game
-  module API 59). `vr_body 1` shows legs and torso only, `vr_body 0` none; the
-  setting is console-only for now. Everything here has been checked on
-  openQ4's simulated headset only: please report how it sits on a real one.
+  module API 59) and pak0. **Your Body** on the Virtual Reality settings tab
+  (`vr_body`) chooses With Arms, Legs and Torso, or Off. Everything here has
+  been checked on openQ4's simulated headset only: please report how it sits
+  on a real one.
 - Details: [VR guide](../user/vr.md#your-body),
   [design and evidence](platform-recovery-review.md#the-players-own-body-in-the-headset-17-november-2026),
   [headset checklist](vr-headset-qualification.md) rows 3.9-3.14 and 4.9-4.14,

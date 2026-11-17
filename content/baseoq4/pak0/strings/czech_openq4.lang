@@ -1776,4 +1776,6 @@
 	"#str_232511"	"openQ4 %s se nepodařilo nainstalovat, openQ4 %s zůstává beze změny.\n\nOtevřít stránku ke stažení a nainstalovat jej ručně?"
 	"#str_232512"	"openQ4 se po aktualizaci nemohl znovu spustit. Spusťte jej z jeho složky."
 	"#str_232513"	"Vlastní stíny postav"
+	"#str_232514"	"Vaše tělo"
+	"#str_232515"	"Vypnuto;Nohy a trup;S rukama"
 }

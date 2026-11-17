@@ -46,8 +46,8 @@ weapon-hand grip to step to the next tab. The Virtual Reality tab holds the
 settings players change most: aiming with the controller or your head, weapon
 hand, snap or smooth turning and the snap angle, walk direction, room scale,
 the laser sight, vibration, the two-handed grip, the comfort vignette, physical
-crouching and the play space. The tables in this guide list every setting,
-including those you can only set in the console.
+crouching, the play space and (**not in 0.14.1**) your own body. The tables in
+this guide list every setting, including those you can only set in the console.
 
 When VR is on, the desktop window shows what your left eye sees. To turn VR off,
 set **VR Mode** back to Disabled (you can point at it in the headset).
@@ -174,6 +174,9 @@ stand, and arms that run from your shoulders to your hands.
 | Setting | Default | What it does |
 | --- | --- | --- |
 | `vr_body` | 2 | 2 legs, torso and arms that reach your hands; 1 legs and torso only, with the gun's forearms floating as before; 0 no body |
+
+The same choice is **Your Body** on the Virtual Reality tab: With Arms, Legs
+and Torso, or Off.
 
 Good to know:
 

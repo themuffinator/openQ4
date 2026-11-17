@@ -271,6 +271,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Comfort Vignette | `choiceDef` | `set_game_vr_vignette_value` | `vr_comfortVignette` | `0 Off`, `0.5 Low`, `1 Full` | Darkens the edges of each eye while the stick moves or smoothly turns the player. |
 | Physical Crouch | `choiceDef` | `set_game_vr_physicalcrouch_value` | `vr_physicalCrouch` | `Disabled;Enabled` | Crouching in the room crouches the character. |
 | Play Space | `choiceDef` | `set_game_vr_playspace_value` | `vr_playSpace` | `0 Automatic`, `1 Seated`, `2 Standing` | Seated play measures height from where the player recentred; standing play from the floor, against the standing eye height (`vr_standingHeight`, learned at the first recentre or measured by `vr_calibrateHeight`). Automatic stands when the headset knows the floor. |
+| Your Body | `choiceDef` | `set_game_vr_body_value` | `vr_body` | `0 Off`, `1 Legs and Torso`, `2 With Arms` | The player's own body in the headset: a second render entity of the player model, seen in the player's own view only and posed from the tracked head and hands (`src/framework/VRBody.h`). With Arms needs controller aiming; aimed by the head it shows legs and torso. |
 
 ## System
 

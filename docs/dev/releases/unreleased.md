@@ -626,9 +626,10 @@ the [development roadmap](../roadmap.md) for current scope.
   your hands. Your body turns with your torso rather than your gun, and your
   knees bend when you duck or crouch. Your weapon hand stays on the gun's
   grip; your other hand follows its controller and goes back to the gun for
-  the two-handed grip and for reloads. `vr_body 1` shows legs and torso only
-  and `vr_body 0` none. See the [VR guide](../../user/vr.md#your-body). It has
-  only been checked on openQ4's simulated headset so far.
+  the two-handed grip and for reloads. **Your Body** on the Virtual Reality
+  settings tab chooses With Arms, Legs and Torso, or Off (`vr_body`). See the
+  [VR guide](../../user/vr.md#your-body). It has only been checked on
+  openQ4's simulated headset so far.
 
 - VR: a gun in your hand is now hidden by whatever your hand is behind, such
   as a door frame, instead of being drawn over everything.
