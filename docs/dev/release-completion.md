@@ -53,7 +53,13 @@ does not restore the withdrawn release. See
   to 48 after the Classic ruleset's hook moved them to 37 to 49.
   `ui_retained_gate.py` passes its settings-page assertions, then stops on a
   later failure this change does not touch: its Create Server doubles do not
-  compile against MP-14's weapon-arena presets.
+  compile against MP-14's weapon-arena presets. In the staged client over a
+  paused `game/airdefense1` (capture scenario `controls-pause`, no OS input),
+  CONTROLS opened from the pause menu's SETTINGS, the Mouse tab's sensitivity
+  stepped from 5 to 5.01 through `settings.player.set`, and Back returned to
+  SETTINGS. From the title (`settings-subpages`), the Mouse tab's typed
+  number showed its range message for 7.255, and Game Options showed its
+  three tabs with View Weapon under Crosshair.
 
 ## Radio chatter and helmet-radio squad lines have subtitles (#221, AUD-07), 17 November 2026
 
