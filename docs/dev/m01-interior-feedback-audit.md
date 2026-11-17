@@ -313,6 +313,36 @@ open for the broader thirteen-map campaign gate. Physical-device comparisons,
 headset comfort and an isolated performance baseline remain broader qualification
 work; no claim of those results is made here.
 
+## Revision 4, 17 November 2026
+
+User review of the scene raised five defects. Fresh starts now compile
+`m01_dropship-v4.script`; v1-v3 stay in pak0 for their saves. v4 also redirects
+the hangar relay (`intro_unit1_seq_2_trigger_seq_3` -> `oq4_m01::hangar`), and
+`M01Cinematic.inl` keeps every original callback if any of the three anchors
+differs. `tools/tests/awakening_m01_dropship_contract.py` pins what follows.
+
+| Defect | Cause | Change |
+| --- | --- | --- |
+| Marines snap 90 degrees onto the ramp | AAS route south along x 6836, east along y 7690, north up the ramp; directional run animations change travel direction within one or two frames at each corner (traced at 10 Hz). | `boardLane` moves a `target_null` 56 units ahead along a lane with 96 and 64 unit corner radii that enters the ramp straight; one continuous `scriptedMove` follows it. The seven lane marines get `walkRange 24` and `noSimpleThink 1` (a simple think re-paths only when the AI manager's round robin reaches it, so the AI stopped at the carrot's first spot). `rvAIManager::IsSimpleThink` honours that key. Markswell's authored stop-and-turn route is unchanged. |
+| Seated marines shake before the hit | `st_dropship_chair` is a turbulence loop: the body bounces about 0.4 units every half second and the neck jolts every quarter second. | Until the first impact the loop runs at a fifth of its rate (`calm`), and the camera's flight sway is 0. Full turbulence starts with the tier-1 hit. |
+| Tak frees harnesses that are not there | The damaged cabin mesh (`env_q4x_trench_dropship`) kept harness geometry only for the two seats that tear away. The expansion's separate `env_q4x_dropship_harness` (one harness, `open`/`mitchell_open`/`dekard_open`) was never placed. | Six harnesses fill the surviving seats of both damaged sets (breach and evacuation), placed from the ship's origin and yaw; the ship's harness joints never move in any of its clips. Each `open` starts with its marine's `st_chair_to_idle` (hands push up 0.88-1.33 s, harness swings 0.75-1.33 s), Tak's with `st_tak_zipline_start`, Mitchell's once Tak frees him, Dekard's on "Got it! Dekard, let's go!". |
+| Seat names belong to Quake 4's squad | Both cabin meshes use retail's `nameplate_<name>` materials. | Two skins (the damaged mesh swaps two plates' places) map them to openQ4's own plates for Tak, Darnell, Navajas, Dekard, Townsend, Atkins, Mitchell and Markswell, drawn by `tools/assets/awakening_nameplates.py` in openQ4 Chain. Only the v4 scene applies them. |
+| Marines rappel beside the rope | Fixed stride counts left every marine 15-60 units from the line (Tak about 60). | The line's `joint20` (where the hands pass the cabin floor) and the grip offset measured in `st_repelling` (20.5 ahead, 2.6 left) give one mark. Each marine faces it, walks whole strides with the remainder absorbed in the last one, faces out of the breach and settles onto the mark before `st_repelling`. |
+
+Evidence (`.tmp/m01-polish/`, hidden windowed OpenGL, engine screenshots, no
+input): `baseline/` is v3 on the same binaries; `final-gl/` is v4 from the
+hangar through gameplay handoff with no script errors. All five rappels log
+their start on the mark (`M01_REPEL`). Plates read in the rescue and
+evacuation shots; harnesses sit on the seated marines and stand open on vacated
+seats. `lane1/` traces the lane marines: each runs the whole lane without a
+stop, and the ramp turn spreads over about 0.7 s (peak 18-27 degrees per tenth
+of a second) where AAS turned it in one or two frames. The longer walks to the
+rope move gameplay handoff from 283.0 to 285.2 s.
+
+Not covered: Vulkan, save/load and skip in each phase of v4, and a viewer's
+judgement of the slowed seated loop; the scene's motion was judged from
+traces and one-second stills, not video.
+
 ## Other findings and limits
 
 The full-run harness reported no fatal errors and a successful gameplay handoff,

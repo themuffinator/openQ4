@@ -1,0 +1,33 @@
+/*
+	openQ4: The Awakening's Falcon squad on the dropship seats (m01).
+
+	Seats 1-4 run along the cabin's right wall from the rear: Tak, Darnell,
+	Navajas, Dekard. Seats 5-8 face them: Townsend, Atkins, Mitchell, Markswell.
+	Applied by scripts/openq4/awakening/m01_dropship-v4.script only.
+*/
+
+// Quake 4's intact cabin (env_q4x_dropship_interior).
+skin skins/openq4/awakening/m01_dropship_cabin
+{
+	models/vehicles/dropship_interior/nameplate_bidwell	models/openq4/awakening/dropship/nameplate_tak
+	models/vehicles/dropship_interior/nameplate_rhodes	models/openq4/awakening/dropship/nameplate_darnell
+	models/vehicles/dropship_interior/nameplate_cortez	models/openq4/awakening/dropship/nameplate_navajas
+	models/vehicles/dropship_interior/nameplate_kane	models/openq4/awakening/dropship/nameplate_dekard
+	models/vehicles/dropship_interior/nameplate_anderson	models/openq4/awakening/dropship/nameplate_townsend
+	models/vehicles/dropship_interior/nameplate_morris	models/openq4/awakening/dropship/nameplate_atkins
+	models/vehicles/dropship_interior/nameplate_sledge	models/openq4/awakening/dropship/nameplate_mitchell
+	models/vehicles/dropship_interior/nameplate_strauss	models/openq4/awakening/dropship/nameplate_markswell
+}
+
+// The expansion's damaged cabin (env_q4x_trench_dropship) swaps two plates' places.
+skin skins/openq4/awakening/m01_dropship_damaged
+{
+	models/vehicles/dropship_interior/nameplate_bidwell	models/openq4/awakening/dropship/nameplate_townsend
+	models/vehicles/dropship_interior/nameplate_rhodes	models/openq4/awakening/dropship/nameplate_darnell
+	models/vehicles/dropship_interior/nameplate_cortez	models/openq4/awakening/dropship/nameplate_navajas
+	models/vehicles/dropship_interior/nameplate_kane	models/openq4/awakening/dropship/nameplate_dekard
+	models/vehicles/dropship_interior/nameplate_anderson	models/openq4/awakening/dropship/nameplate_tak
+	models/vehicles/dropship_interior/nameplate_morris	models/openq4/awakening/dropship/nameplate_atkins
+	models/vehicles/dropship_interior/nameplate_sledge	models/openq4/awakening/dropship/nameplate_mitchell
+	models/vehicles/dropship_interior/nameplate_strauss	models/openq4/awakening/dropship/nameplate_markswell
+}

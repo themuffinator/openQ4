@@ -1,0 +1,82 @@
+/*
+	openQ4: seat nameplates for The Awakening's dropship cabin (m01).
+
+	The expansion reuses Quake 4's cabin, whose plates still name Kane's squad.
+	These name the Falcon squad instead. The images are openQ4's own drawings
+	(tools/assets/awakening_nameplates.py), lettered in openQ4 Chain. Only the
+	skins in skins/openq4_awakening_m01.skin use them, and only The Awakening's
+	m01 dropship scene applies those skins. Like the originals they are
+	unlit, alpha-blended decals.
+*/
+
+models/openq4/awakening/dropship/nameplate_tak
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_tak.tga
+	}
+}
+
+models/openq4/awakening/dropship/nameplate_darnell
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_darnell.tga
+	}
+}
+
+models/openq4/awakening/dropship/nameplate_navajas
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_navajas.tga
+	}
+}
+
+models/openq4/awakening/dropship/nameplate_dekard
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_dekard.tga
+	}
+}
+
+models/openq4/awakening/dropship/nameplate_townsend
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_townsend.tga
+	}
+}
+
+models/openq4/awakening/dropship/nameplate_atkins
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_atkins.tga
+	}
+}
+
+models/openq4/awakening/dropship/nameplate_mitchell
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_mitchell.tga
+	}
+}
+
+models/openq4/awakening/dropship/nameplate_markswell
+{
+	noshadows
+	{
+		blend	blend
+		map		models/openq4/awakening/dropship/nameplate_markswell.tga
+	}
+}

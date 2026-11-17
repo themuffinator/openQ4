@@ -7,6 +7,28 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's opening dropship scene, tidied, 17 November 2026
+
+- **A natural walk to the dropship.** The squad runs onto the ramp in a smooth
+  curve instead of snapping round a right angle at its foot.
+- **A quiet flight until the first hit.** The seated marines no longer shake
+  while the briefing is still routine; the turbulence starts when the ship is
+  hit.
+- **The harnesses are there.** After the hull breach the surviving seats keep
+  their shoulder harnesses. Each lifts as its marine stands, and Tak's cutting
+  frees Mitchell's and Dekard's.
+- **The Falcon squad's names on the seats.** The plates above the seats name
+  Tak, Darnell, Navajas, Dekard, Townsend, Atkins, Mitchell and Markswell
+  instead of Quake 4's squad. Quake 4's own campaign is unchanged.
+- **Hands on the rope.** Each marine steps up to the line and takes hold of it
+  before rappelling down.
+- **What to do.** Replace the single-player game module and pak0, then start
+  the first mission afresh; a save from inside the opening keeps the scene it
+  was made with. `g_awakeningM01Cinematic 0` still plays the alpha's own
+  direction.
+- How it works and what was tested: scene revision 4
+  ([M01 audit](m01-interior-feedback-audit.md#revision-4-17-november-2026)).
+
 ## The Awakening's pause menu in its own style, 17 November 2026
 
 - **A pause menu made for the expansion.** With the new interface, pausing

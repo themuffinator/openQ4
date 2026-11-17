@@ -384,8 +384,10 @@ adds only the extraction-actor correction. No save payload layout changed.
 
 The authored M01 cinematic likewise keeps its original program as
 `scripts/openq4/awakening/m01_dropship.script`; the route-qualified lighting
-revision uses `m01_dropship-v2.script`. The separately qualified dramatic-feedback
-pass now selects v3 for fresh starts; see the [M01 audit](m01-interior-feedback-audit.md).
+revision uses `m01_dropship-v2.script`, and the dramatic-feedback pass
+`m01_dropship-v3.script`. Fresh starts now select v4, which also directs the
+hangar walk-on and adds the squad's nameplates, the damaged cabin's harnesses
+and the rope approach; see the [M01 audit](m01-interior-feedback-audit.md#revision-4-17-november-2026).
 The short-lived
 unversioned lighting snapshot (`42200dc6f`) did not distinguish its changed
 program in saves. M01 saves written with that snapshot can require restarting

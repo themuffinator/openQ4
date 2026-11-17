@@ -41,6 +41,7 @@ static bool Awakening_PrepareM01Cinematic( idMapFile *map ) {
 	}
 
 	// Do not redirect a different revision or a mapper's replacement callbacks.
+	bool hangarAnchor = false;
 	bool cabinAnchor = false;
 	bool evacuationAnchor = false;
 	for ( int i = 1; i < map->GetNumEntities(); ++i ) {
@@ -48,7 +49,9 @@ static bool Awakening_PrepareM01Cinematic( idMapFile *map ) {
 		if ( idStr::Icmp( args.GetString( "classname" ), "trigger_relay" ) != 0 ) {
 			continue;
 		}
-		if ( idStr::Icmp( args.GetString( "name" ), "intro_unit1_seq_5_trigger_seq_6" ) == 0 ) {
+		if ( idStr::Icmp( args.GetString( "name" ), "intro_unit1_seq_2_trigger_seq_3" ) == 0 ) {
+			hangarAnchor = idStr::Icmp( args.GetString( "call" ), "intro_unit1_seq_3" ) == 0;
+		} else if ( idStr::Icmp( args.GetString( "name" ), "intro_unit1_seq_5_trigger_seq_6" ) == 0 ) {
 			cabinAnchor = idStr::Icmp( args.GetString( "call" ), "intro_unit1_seq_6" ) == 0;
 		} else if ( idStr::Icmp( args.GetString( "name" ), "m04_trench_unit1_main" ) == 0 ) {
 			evacuationAnchor = idStr::Icmp( args.GetString( "call" ), "m04_trench_unit1_seq_1_main" ) == 0;
@@ -56,8 +59,8 @@ static bool Awakening_PrepareM01Cinematic( idMapFile *map ) {
 	}
 	// Each revision is immutable: suspended save threads retain their bytecode.
 	// The original filename remains available for pre-lighting M01 saves.
-	const char *script = "scripts/openq4/awakening/m01_dropship-v3.script";
-	if ( !cabinAnchor || !evacuationAnchor || fileSystem->ReadFile( script, NULL, NULL ) <= 0 ) {
+	const char *script = "scripts/openq4/awakening/m01_dropship-v4.script";
+	if ( !hangarAnchor || !cabinAnchor || !evacuationAnchor || fileSystem->ReadFile( script, NULL, NULL ) <= 0 ) {
 		gameLocal.Warning( "Awakening m01 direction unavailable: keeping the map's original callbacks" );
 		return false;
 	}
@@ -69,14 +72,35 @@ static bool Awakening_PrepareM01Cinematic( idMapFile *map ) {
 	// Parse the helper while level media is being cached, before the first impact.
 	gameLocal.FindEntityDef( "oq4_m01v3_cues", false );
 	gameLocal.FindEntityDef( "oq4_m01v3_action", false );
+	gameLocal.FindEntityDef( "env_q4x_dropship_harness", false );
+	declManager->FindSkin( "skins/openq4/awakening/m01_dropship_cabin", false );
+	declManager->FindSkin( "skins/openq4/awakening/m01_dropship_damaged", false );
 	gameLocal.Printf( "Awakening m01: openQ4 dropship direction enabled\n" );
 	return true;
 }
 
 static void Awakening_DirectM01Relay( idDict &args ) {
-	if ( idStr::Icmp( args.GetString( "name" ), "intro_unit1_seq_5_trigger_seq_6" ) == 0 ) {
+	// The marines who board through the hangar follow a carrot along a rounded
+	// lane a few strides ahead (oq4_m01::boardLane). At the default 100-unit
+	// walk range they would drop to a walk the whole way, and a simple think
+	// would leave them steering at where the carrot was.
+	static const char *const laneMarines[] = {
+		"ds_dekard", "ds_navajas", "ds_tak", "ds_darnell", "ds_atkins", "ds_mitchell", "ds_townsend"
+	};
+	const char *name = args.GetString( "name" );
+	if ( idStr::Icmp( name, "intro_unit1_seq_2_trigger_seq_3" ) == 0 ) {
+		args.Set( "call", "oq4_m01::hangar" );
+	} else if ( idStr::Icmp( name, "intro_unit1_seq_5_trigger_seq_6" ) == 0 ) {
 		args.Set( "call", "oq4_m01::cabin" );
-	} else if ( idStr::Icmp( args.GetString( "name" ), "m04_trench_unit1_main" ) == 0 ) {
+	} else if ( idStr::Icmp( name, "m04_trench_unit1_main" ) == 0 ) {
 		args.Set( "call", "oq4_m01::evacuate" );
+	} else {
+		for ( int i = 0; i < (int)( sizeof( laneMarines ) / sizeof( laneMarines[0] ) ); ++i ) {
+			if ( idStr::Icmp( name, laneMarines[i] ) == 0 ) {
+				args.Set( "walkRange", "24" );
+				args.Set( "noSimpleThink", "1" );
+				break;
+			}
+		}
 	}
 }

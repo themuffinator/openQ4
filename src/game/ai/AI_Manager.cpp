@@ -353,6 +353,12 @@ bool rvAIManager::IsSimpleThink ( idAI* ai ) {
 		return false;
 	}
 
+	// openQ4: an actor scripted to follow a moving goal needs its path every
+	// frame; a simple think keeps steering at where the goal used to be.
+	if ( ai->spawnArgs.GetBool( "noSimpleThink" ) ) {
+		return false;
+	}
+
 	// Add to simple think list
 	if ( !ai->simpleThinkNode.InList ( ) ) {
 		ai->simpleThinkNode.AddToEnd ( simpleThink );
