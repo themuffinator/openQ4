@@ -390,7 +390,7 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"s_voiceVolume",{0,0,1}},{"s_micInputLevel",{0,0,10}},
 		// The stock GAME OPTIONS page, in its order (mouse and controller
 		// now on CONTROLS).
-		{"in_freeLook",{1}},{"ui_autoReload",{1}},{"ui_autoSwitch",{1}},{"in_toggleZoom",{1}},{"pm_zoomedSlow",{0,1,100,true}},
+		{"in_freeLook",{1}},{"ui_autoReload",{1}},{"ui_autoSwitch",{0,0,2,true,{},{0,1,2}}},{"in_toggleZoom",{1}},{"pm_zoomedSlow",{0,1,100,true}},
 		{"g_decals",{1}},{"ui_showGun",{1}},{"g_simpleItems",{0,0,3,true,{},{0,1,2,3}}},
 		{"g_mpFlatOpponentWeapons",{0,0,1,true,{},{0,1}}},{"m_pitch",{2,0,0,false,{"0.022","-0.022"}}},{"m_smooth",{0,1,8,true}},
 		{"sensitivity",{0,0.01,30,false}},{"m_cpi",{0,0,32000,false}},{"m_filter",{0,0,31,true}},{"cl_mouseAccel",{0,-5,5,false}},
