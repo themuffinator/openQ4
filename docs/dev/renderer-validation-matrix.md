@@ -388,6 +388,55 @@ rather than the modern visible path (the classic skinned part has no proven
 lighting parity there; under MD5R its stencil shadow has no vertex buffer),
 and the native PBR owner still admits the PBR part; the control requires both.
 Vulkan keeps native ownership.
+
+## PBR Showcase Map
+
+The laboratory proves exact responses on calibrated, flat test data. The
+showcase shows how real, scanned materials look under the shipped lighting:
+fifteen textures.com PBR materials (metals, a paint-over-metal mask, glossy and
+rough dielectrics, fine fabric and leather, an alpha-cutout fence) on spheres
+and wall panels, with a wood floor, a metal floor strip and brick and concrete
+walls, all tiled at their real size. A key light, a station light and a
+projector shining through the fence cast mapped shadows with PCSS-lite; an
+authored ambient light supplies the environment.
+
+The list, with links, physical sizes and what each material exercises, is
+`tools/validation/pbr_showcase_materials.json`. Textures.com's licence forbids
+redistribution, open-source projects included, so the textures never enter Git
+or a pak: each developer downloads them with their own account into a drop
+folder (default `.tmp/pbr-showcase/downloads/<id>/`, files or zips, named with
+the map: Albedo, Normal, Roughness, Metallic, Ambient Occlusion, Alpha, Height).
+The 1024-pixel set costs about 100 credits.
+
+```bash
+python tools/validation/generate_pbr_showcase_map.py --check
+```
+
+```bash
+python tools/validation/generate_pbr_showcase_map.py --runtime-root .tmp/runtime/pbr-showcase
+```
+
+```bash
+python tools/tests/renderer_pbr_showcase.py --runtime-root .tmp/runtime/pbr-showcase --output-dir .tmp/pbr-showcase/run-gl --backend gl --binaries .install
+```
+
+The generator converts every download to 8-bit TGA at the manifest's
+resolution: sRGB albedo (alpha from the Alpha map), a renormalised
+`tangentXYZ` normal, a packed ORM map, and a specular map for the classic
+fallback stages. It settles each normal map's green-channel convention from
+its own height map (openQ4's tangent +Y runs down the image), lets materials
+without a height map follow the majority, and records every decision in the
+runtime's `pbr-showcase.json`. A manifest entry may force it with
+`normalFlipY`.
+
+The runner compiles the map, then captures every camera lit and in the
+ownership view (`r_pbrDebug 7`) on the production paths: the classic OpenGL
+light loop owning PBR, or Vulkan composing into the display-referred frame,
+with every casting light mapped. Each station camera must show its sphere drawn
+as PBR, and the engine log must stay free of diagnostics. `--synthetic` on the
+generator replaces the downloads with procedural stand-ins, so the pipeline can
+be checked without an account; on 17 November 2026 both renderers passed all
+26 captures that way.
 ## Automated Safe Matrix
 
 The modern-visible and low-overhead GL self-tests explicitly request a hidden

@@ -1,0 +1,167 @@
+{
+  "schema": 1,
+  "id": "openq4-pbr-showcase",
+  "source": "textures.com",
+  "licence": "Textures.com material, licensed to whoever downloads it. Its terms forbid redistribution, open-source projects included. Keep the downloads and everything converted from them outside Git and out of every pak; generate_pbr_showcase_map.py writes only below an ignored runtime root.",
+  "dropFolder": "Put each material's files (or its zip) in <source-dir>/<id>/. File names only need to contain the map name: Albedo, Normal, Roughness, Metallic, Ambient Occlusion, Alpha, Height.",
+  "resolution": 1024,
+  "materials": [
+    {
+      "id": "brushed_steel",
+      "title": "Brushed Stainless Steel",
+      "code": "PBR0827",
+      "url": "https://www.textures.com/download/brushed-stainless-steel-pbr0827/143069",
+      "sizeMeters": 0.1,
+      "maps": ["albedo", "normal", "roughness", "metallic", "height"],
+      "placement": "station",
+      "exercises": "Bare metal with directional micro-scratches in normal and roughness: highlight streaking and specular anti-aliasing."
+    },
+    {
+      "id": "polished_brass",
+      "title": "Polished Brass",
+      "code": "PBR0056",
+      "url": "https://www.textures.com/download/polished-brass-pbr0056/133043",
+      "sizeMeters": 0.5,
+      "sizeEstimated": true,
+      "maps": ["albedo", "normal", "roughness", "metallic"],
+      "placement": "station",
+      "exercises": "Smooth coloured conductor: tinted F0 reflections from probes and the ambient environment."
+    },
+    {
+      "id": "dented_gold",
+      "title": "Dented Gold",
+      "code": "PBR1007",
+      "url": "https://www.textures.com/download/dented-gold-pbr-material-pbr1007/147975",
+      "sizeMeters": 0.15,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "station",
+      "exercises": "Strong relief on a near-mirror metal: normal-map aliasing and roughness filtering at distance."
+    },
+    {
+      "id": "rusted_paint",
+      "title": "Paint Rusted 3",
+      "code": "PBR0822",
+      "url": "https://www.textures.com/download/paint-rusted-3-pbr-material-pbr0822/142974",
+      "sizeMeters": 2.0,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "station",
+      "exercises": "Metallic mask: bare metal and paint/rust dielectric side by side in one material."
+    },
+    {
+      "id": "treadplate",
+      "title": "Metal Treadplate Bare",
+      "code": "PBR0087",
+      "url": "https://www.textures.com/download/metal-treadplate-bare-pbr0087/133078",
+      "sizeMeters": 1.0,
+      "sizeEstimated": true,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "floorStrip",
+      "exercises": "Raised metal relief on a floor under a grazing projector: normal orientation and shadowing."
+    },
+    {
+      "id": "glazed_tiles",
+      "title": "Glazed Wall Tiles",
+      "code": "PBR0828",
+      "url": "https://www.textures.com/download/glazed-wall-tiles-pbr0828/143098",
+      "sizeMeters": 1.0,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "station",
+      "exercises": "Glossy glaze against rough grout: roughness contrast and reflection blur."
+    },
+    {
+      "id": "cream_marble",
+      "title": "Polished Cream Marble Slab",
+      "code": "PBR0434",
+      "url": "https://www.textures.com/download/polished-cream-marble-slab-pbr0434/138505",
+      "sizeMeters": 2.0,
+      "sizeEstimated": true,
+      "maps": ["albedo", "normal", "roughness"],
+      "placement": "station",
+      "exercises": "Smooth bright dielectric with no metal or AO map: Fresnel at grazing angles, scalar defaults."
+    },
+    {
+      "id": "plain_leather",
+      "title": "Plain Leather",
+      "code": "PBR0022",
+      "url": "https://www.textures.com/download/plain-leather-pbr0022/133244",
+      "sizeMeters": 0.5,
+      "sizeEstimated": true,
+      "maps": ["albedo", "normal", "roughness", "ao", "height"],
+      "placement": "station",
+      "exercises": "Fine pore normals at mid roughness; no metallic map (scalar 0)."
+    },
+    {
+      "id": "fabric_linen",
+      "title": "Fabric Linen",
+      "code": "PBR0791",
+      "url": "https://www.textures.com/download/fabric-linen-pbr0791/142375",
+      "sizeMeters": 0.5,
+      "sizeEstimated": true,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "station",
+      "exercises": "Very rough, high-frequency weave: diffuse energy and moire at distance."
+    },
+    {
+      "id": "polypropylene",
+      "title": "Polypropylene Plastic 2",
+      "code": "PBR00928",
+      "url": "https://www.textures.com/download/polypropylene-plastic-2-pbr-material-pbr00928/146476",
+      "sizeMeters": 0.5,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "station",
+      "exercises": "Smooth saturated dielectric: white specular over coloured diffuse."
+    },
+    {
+      "id": "scifi_panel",
+      "title": "Sci-Fi Industrial Panel 2",
+      "code": "PBR0332",
+      "url": "https://www.textures.com/download/sci-fi-industrial-panel-2-pbr0332/137431",
+      "sizeMeters": 2.0,
+      "sizeEstimated": true,
+      "maps": ["albedo", "normal", "roughness", "metallic", "height"],
+      "placement": "station",
+      "exercises": "Quake 4-style mixed panel: hard-edged metal masks and deep seams beside stock-looking content."
+    },
+    {
+      "id": "metal_fence",
+      "title": "Stretched Metal Fence",
+      "code": "PBR00868",
+      "url": "https://www.textures.com/download/stretched-metal-fence-pbr-material-pbr00868/145926",
+      "sizeMeters": 0.3,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "alpha"],
+      "placement": "fence",
+      "exercises": "Alpha-tested cutout metal in front of the projector: cutout coverage, two-sided shading and cutout shadow casting (PCSS penumbra on the floor)."
+    },
+    {
+      "id": "maple_floor",
+      "title": "Maple Wood Floor",
+      "code": "PBR00948",
+      "url": "https://www.textures.com/download/maple-wood-floor-pbr-material-pbr00948/146880",
+      "sizeMeters": 1.5,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "floor",
+      "exercises": "Large receiving floor: shadow quality, contact hardening and SSAO on a real surface."
+    },
+    {
+      "id": "brick_wall",
+      "title": "Mixed Medieval Brick Wall",
+      "code": "PBR0849",
+      "url": "https://www.textures.com/download/mixed-medieval-brick-wall-pbr0849/143823",
+      "sizeMeters": 1.5,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "backWall",
+      "exercises": "Deep relief and AO behind the stations: indirect occlusion and normal-mapped receivers."
+    },
+    {
+      "id": "concrete_wall",
+      "title": "Patterned Concrete Wall",
+      "code": "PBR0810",
+      "url": "https://www.textures.com/download/patterned-concrete-wall-pbr0810/142629",
+      "sizeMeters": 2.0,
+      "sizeEstimated": true,
+      "maps": ["albedo", "normal", "roughness", "metallic", "ao", "height"],
+      "placement": "sideWalls",
+      "exercises": "Rough side walls and ceiling: neutral surround for the stations, grazing point-light shadows."
+    }
+  ]
+}

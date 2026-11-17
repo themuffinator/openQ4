@@ -265,5 +265,6 @@ raw lighting values, before exposure, bloom, tone mapping and the HUD, on
 either renderer. Menus and views that are not a complete linear HDR scene are
 refused.
 
-Renderer developers: the PBR test laboratory and its scripts are described in
-the [renderer validation matrix](../dev/renderer-validation-matrix.md).
+Renderer developers: the PBR test laboratory, the showcase map of real-world
+materials and their scripts are described in the
+[renderer validation matrix](../dev/renderer-validation-matrix.md#pbr-showcase-map).
