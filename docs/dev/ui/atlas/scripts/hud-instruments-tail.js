@@ -95,67 +95,225 @@ A.crosshairAt = (parent, name = "crosshair_machinegun", size = 24) => {     // s
   return svgEl("path", { d: "M320 233V238M320 242V247M313 240H318M322 240H327", stroke: "#fff", "stroke-opacity": .85, "stroke-width": 1.2 }, parent);
 };
 
+/* Cubic-bezier easing (the CSS curve), for the retained timelines' authored eases. */
+A.bezier = (x1, y1, x2, y2) => {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx, cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const X = t => ((ax * t + bx) * t + cx) * t, Y = t => ((ay * t + by) * t + cy) * t, D = t => (3 * ax * t + 2 * bx) * t + cx;
+  return p => { if (p <= 0) return 0; if (p >= 1) return 1; let t = p;
+    for (let i = 0; i < 8; i++) { const e = X(t) - p, d = D(t); if (Math.abs(e) < 1e-5 || Math.abs(d) < 1e-6) break; t -= e / d; }
+    return Y(Math.max(0, Math.min(1, t))); };
+};
+/* One keyed animation per slot: starting a key cancels the one it replaces. fn(p) gets linear progress 0..1; it must
+   never throw (a throw would stop the frame loop). */
+const anims = new Map();
+const animate = (key, dur, fn, done) => {
+  const job = { t0: performance.now(), dur, fn, done }; anims.set(key, job);
+  const step = now => { if (anims.get(key) !== job) return; const p = dur > 0 ? Math.min(1, Math.max(0, now - job.t0) / dur) : 1;
+    try { fn(p); } catch (e) { anims.delete(key); return; }
+    if (p < 1) requestAnimationFrame(step); else { anims.delete(key); try { done?.(); } catch (e) {} } };
+  requestAnimationFrame(step);
+};
+const stopAnim = key => anims.delete(key);
+/* A piecewise track: keys [[ms, value, ease?]...] (the ease shapes the segment that leaves that key), sampled at t ms. */
+const sample = (keys, t) => {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 0; i < keys.length - 1; i++) { const [a, va, ease] = keys[i], [b, vb] = keys[i + 1];
+    if (t <= b) { const p = b > a ? (t - a) / (b - a) : 1, e = ease ? ease(p) : p;
+      return Array.isArray(va) ? va.map((v, k) => v + (vb[k] - v) * e) : va + (vb - va) * e; } }
+  return keys[keys.length - 1][1];
+};
+const EASE_OUT = A.bezier(.25, 1, .5, 1), EASE_IN = A.bezier(.5, 0, .75, 0), EASE_SLIDE = A.bezier(.4, 0, .6, 1);
+
+/* The weapon strip (section 14.5, Appendix C 1.44; remastered_hud_groups.weapon_strip). Owned weapons in slot order with
+   no gaps, 24.4 u plates on a 30 u pitch sheared about their own centres, upright 18 u icons, one ring that travels to
+   the pending weapon, a return tick under the weapon a quick switch goes back to, the prohibition sign on an empty
+   weapon, and the name above the slots (Remastered) or below them (Classic, the stock GUI, no motion).
+   roster: [{ glyph, name, ammo, owned }]. Returns { select(i), refuse(i), fire(), setPinned(b), redraw() }. */
+A.weaponStrip = (parent, { strogg = false, y = 350, classic = false, roster, ideal = 0, last = -1, pinned = true, rows } = {}) => {
+  const k = strogg ? .22 : -.22, P = strogg ? "#FFCC00" : "#FF8000", O = strogg ? "#F59512" : "#A8A360";
+  const RING = strogg ? "#F2AD0B" : "#B2CC80", RING_A = strogg ? .6 : 1, RED = strogg ? "#FF3A1A" : "#E0442E";
+  const shear = cy => `matrix(1 0 ${k} 1 ${(-k * cy).toFixed(3)} 0)`;
+  const top = y - 22, midY = top + 24;                            // the strip box: 640 x 48 u from y - 22
+  const root = svgEl("g", {}, parent);
+  const name = svgEl("g", {}, root), slotsG = svgEl("g", {}, root);
+  const cursor = svgEl("g", {}, root), glide = svgEl("g", {}, cursor), shake = svgEl("g", {}, glide);
+  const ringG = svgEl("g", { transform: shear(13) }, shake);
+  svgEl("rect", { x: 1.6, y: 1.6, width: 22.8, height: 22.8, rx: 1, fill: "none", stroke: RING, "stroke-opacity": RING_A, "stroke-width": 1.6 }, ringG);
+  const refuseRing = svgEl("rect", { x: 1.6, y: 1.6, width: 22.8, height: 22.8, rx: 1, fill: "none", stroke: RED, "stroke-width": 1.6, opacity: 0 }, ringG);
+  const pulseG = strogg ? svgEl("g", { opacity: 0 }, shake) : null;
+  if (pulseG) svgEl("rect", { x: 1.6, y: 1.6, width: 22.8, height: 22.8, rx: 1, fill: "none", stroke: P, "stroke-width": 1.2, transform: shear(13) }, pulseG);
+  const scan = strogg ? svgEl("rect", { height: .9, fill: P, opacity: 0 }, root) : null;
+  let open = pinned || classic, timer = 0, slotX = [], held = [], shown = [];
+  const owned = () => roster.map((w, i) => w.owned ? i : -1).filter(i => i >= 0);
+  const xOf = (pos, count) => 321 - 15 * count + 30 * pos;
+  const returnsTo = () => last;
+  const setXY = (el, tx = 0, ty = 0, sx = 1, sy = 1, cx = 0, cy = 0) => el.setAttribute("transform",
+    `translate(${(cx + tx).toFixed(3)} ${(cy + ty).toFixed(3)}) scale(${sx.toFixed(4)} ${sy.toFixed(4)}) translate(${-cx} ${-cy})`);
+  function draw() {
+    slotsG.innerHTML = ""; name.innerHTML = "";
+    const list = owned(), n = list.length; slotX = []; held = []; shown = list;
+    list.forEach((ri, pos) => {
+      const w = roster[ri], x = xOf(pos, n), sel = ri === ideal, empty = w.ammo === 0;
+      slotX[ri] = x;
+      const s = svgEl("g", { transform: `translate(${x} ${y})` }, slotsG);
+      svgEl("rect", { x: .8, y: .8, width: 24.4, height: 24.4, rx: 1, fill: "#000", "fill-opacity": .5, transform: shear(13) }, s);
+      const ic = svgEl("g", {}, s); held[ri] = { ic };
+      A.icon(ic, w.glyph, { x: 13, y: 4, h: 18, anchor: "middle", color: sel && !empty ? P : O, opacity: sel && !empty ? 1 : .6 });
+      if (empty) { const sg = svgEl("g", {}, s); held[ri].sign = sg;
+        svgEl("circle", { cx: 13, cy: 13, r: 7.4, fill: "none", stroke: "#A50000", "stroke-width": 2.3 }, sg);
+        svgEl("path", { d: "M18.2 7.8L7.8 18.2", stroke: "#A50000", "stroke-width": 2.3 }, sg); }
+      if (ri === returnsTo() && !sel && last >= 0 && !classic) {
+        if (strogg) svgEl("path", { d: "M10.2 29.4L13 26.8L15.8 29.4", fill: "none", stroke: RING, "stroke-opacity": RING_A, "stroke-width": 1.3, "stroke-linejoin": "miter" }, s);
+        else svgEl("rect", { x: 8.5, y: 26.9, width: 9, height: 1.5, rx: .4, fill: RING, "fill-opacity": .75, transform: shear(27.65) }, s);
+      }
+    });
+    cursor.setAttribute("transform", `translate(${slotX[ideal] ?? -999} ${y})`);
+    cursor.style.display = slotX[ideal] == null ? "none" : "";
+    /* Remastered: Marine 18 dp (12 u, small capitals) #B0C891 above the slots, R_Strogg 14.4 dp #FCFFC8; a 1 u shadow. */
+    const label = roster[ideal]?.name || "", ny = classic ? 406 : y - 7;
+    const font = strogg ? { "font-family": F_S, "font-size": 9.6, "font-weight": 600, "letter-spacing": .4 }
+      : { "font-family": F_M, "font-size": 12, style: "font-variant:small-caps" };
+    const txt = strogg ? label.toUpperCase() : label;
+    svgEl("text", { ...font, x: 321, y: ny + 1, "text-anchor": "middle", fill: "#000" }, name).textContent = txt;
+    svgEl("text", { ...font, x: 320, y: ny, "text-anchor": "middle", fill: strogg ? "#FCFFC8" : "#B0C891" }, name).textContent = txt;
+    if (scan) { scan.setAttribute("x", 313 - 15 * n); scan.setAttribute("width", 12 + 30 * n); scan.setAttribute("y", top); }
+    root.setAttribute("opacity", open ? 1 : 0);
+  }
+  /* Open: Marine rises 4 u over 140 ms with easeOut, fading in over 110 ms; Strogg tunes in about the row's middle from
+     103% wide and 30% tall, fading in over 90 ms, with a 0.9 u hairline sweeping down. Starts from wherever it is. */
+  let cur = { o: open ? 1 : 0, ty: open ? 0 : 4, sx: 1, sy: 1 };
+  const paint = () => { root.setAttribute("opacity", cur.o.toFixed(3)); setXY(root, 0, cur.ty, cur.sx, cur.sy, 320, midY); };
+  function show(wasOpen) {
+    clearTimeout(timer);
+    const from = { ...cur }, calm = reduce || classic;
+    if (classic) { cur = { o: 1, ty: 0, sx: 1, sy: 1 }; paint(); }
+    else if (calm) animate(root, 80 * (1 - from.o), p => { cur = { o: from.o + (1 - from.o) * p, ty: 0, sx: 1, sy: 1 }; paint(); });
+    else animate(root, 140, p => { const t = p * 140, e = EASE_OUT(p);
+      cur = { o: from.o + (1 - from.o) * Math.min(1, t / (strogg ? 90 : 110)), ty: from.ty * (1 - e), sx: from.sx + (1 - from.sx) * e, sy: from.sy + (1 - from.sy) * e }; paint(); });
+    if (strogg && !wasOpen && !calm) animate(scan, 150, p => { const t = p * 150;
+      scan.setAttribute("transform", `translate(0 ${(-6 + 56 * p).toFixed(2)})`); scan.setAttribute("opacity", sample([[0, 0], [30, .55], [110, .4], [150, 0]], t)); });
+    open = true;
+    if (!pinned && !classic) timer = setTimeout(() => close(150), 1000);   // the hold: 1000 ms after the latest change
+  }
+  /* Close: Marine sinks 3 u with easeIn, fading out; Strogg collapses to 102% wide and 35% tall; 150 ms, 90 ms on firing. */
+  function close(ms) {
+    if (pinned || classic || !open) return;
+    clearTimeout(timer);
+    const from = { ...cur }, calm = reduce;
+    const to = strogg ? { o: 0, ty: 0, sx: 1.02, sy: .35 } : { o: 0, ty: 3, sx: 1, sy: 1 };
+    animate(root, calm ? Math.min(80, ms) : ms, p => { const e = calm ? p : EASE_IN(p), eo = strogg ? e : p;
+      cur = { o: from.o * (1 - eo), ty: calm ? from.ty : from.ty + (to.ty - from.ty) * e, sx: calm ? from.sx : from.sx + (to.sx - from.sx) * e, sy: calm ? from.sy : from.sy + (to.sy - from.sy) * e }; paint(); },
+      () => { open = false; cur = strogg ? { o: 0, ty: 0, sx: 1.03, sy: .3 } : { o: 0, ty: 4, sx: 1, sy: 1 }; paint(); });
+  }
+  /* A change: the ring travels from the slot it left over 100 ms + 6 ms a slot (at most 170 ms; Strogg 10 ms longer,
+     stretching up to 22% at 45% of the way), only along a strip already on screen with an unchanged count. */
+  function select(i) {
+    const list = owned(), wasOpen = open, before = list.indexOf(ideal), after = list.indexOf(i);
+    if (i !== ideal) { last = ideal; ideal = i; }
+    draw();
+    const steps = after - before;
+    if (wasOpen && steps && !classic && !reduce && before >= 0) {
+      const ms = Math.min(100 + 6 * Math.abs(steps), 170) + (strogg ? 10 : 0), start = -30 * steps;
+      if (strogg) { const st = 1 + Math.min(.05 * Math.abs(steps), .22), mid = Math.round(ms * .45);
+        animate(glide, ms, p => { const t = p * ms; const [tx, sx] = sample([[0, [start, 1], EASE_SLIDE], [mid, [start * .3, st], EASE_OUT], [ms, [0, 1]]], t); setXY(glide, tx, 0, sx, 1, 13, 13); });
+        animate(pulseG, 220, p => { const e = EASE_OUT(p); pulseG.setAttribute("opacity", (.8 * (1 - p)).toFixed(3)); setXY(pulseG, 0, 0, 1 + .45 * e, 1 + .45 * e, 13, 13); });
+      } else {
+        animate(glide, ms, p => setXY(glide, start * (1 - EASE_OUT(p)), 0));
+        const ic = held[i]?.ic; if (ic) animate(ic, 150, p => { const s = 1.16 - .16 * EASE_OUT(p); setXY(ic, 0, 0, s, s, 13, 13); });
+      }
+      /* The name slides in from the side the ring came from: Marine 4 u from 0.30 over 130 ms; Strogg slips 3 u then
+         1.2 u back in hard 40 ms steps from 0.45. */
+      const sg = Math.sign(steps);
+      if (strogg) animate(name, 120, p => { const t = p * 120; const [tx, o] = t < 40 ? [3 * sg, .45] : t < 80 ? [-1.2 * sg, .8] : [0, 1]; setXY(name, tx, 0); name.setAttribute("opacity", o); });
+      else animate(name, 130, p => { setXY(name, 4 * sg * (1 - EASE_OUT(p)), 0); name.setAttribute("opacity", (.3 + .7 * p).toFixed(3)); });
+    } else { stopAnim(glide); glide.removeAttribute("transform"); name.removeAttribute("transform"); name.setAttribute("opacity", 1); }
+    show(wasOpen);
+  }
+  /* A refusal: the ring shakes (Marine -2.5, +2.0, -1.2, +0.6 u by 190 ms; Strogg hard 35 ms steps), a red ring holds
+     70 ms (Strogg 50 ms) and is gone by 240 ms (kept under reduced motion), and an empty weapon's sign throbs from 135%. */
+  function refuse(i) {
+    const wasOpen = open; draw();
+    if (!classic && !reduce) {
+      if (strogg) animate(shake, 140, p => { const t = p * 140; const [tx, sx] = t < 35 ? [2.2, 1] : t < 70 ? [-1.8, 1.06] : t < 105 ? [1, 1] : [0, 1]; setXY(shake, tx, 0, sx, 1, 13, 13); });
+      else animate(shake, 190, p => setXY(shake, sample([[0, 0, EASE_OUT], [30, -2.5], [70, 2], [110, -1.2], [150, .6], [190, 0]], p * 190), 0));
+      const sign = held[i]?.sign; if (sign) animate(sign, 180, p => { const s = 1.35 - .35 * EASE_OUT(p); setXY(sign, 0, 0, s, s, 13, 13); });
+    }
+    const hold = strogg ? 50 : 70;
+    if (!classic) animate(refuseRing, 240, p => refuseRing.setAttribute("opacity", sample([[0, 1], [hold, 1], [240, 0]], p * 240)));
+    show(wasOpen);
+  }
+  draw(); paint();
+  return { root, select, refuse, fire: () => close(90), redraw: draw, get ideal() { return ideal; }, get last() { return last; },
+    setPinned: b => { pinned = b; if (b) show(open); else { clearTimeout(timer); timer = setTimeout(() => close(150), 1000); } } };
+};
+const F_S = "Oxanium, Chakra Petch, sans-serif";
+
 /* Main HUD composite on the Remastered layout. */
 const svg = document.getElementById("hudsvg");
 if (svg) {
-  const ctl = document.getElementById("hudLayoutCtl"); if (ctl) hud.controls(ctl);
-  const OWNED = [["blaster", "BLASTER", 1, "BL"], ["machinegun", "MACHINEGUN", 1, "MG"], ["shotgun", "SHOTGUN", 1, "SG"], ["hyperblaster", "HYPERBLASTER", 0, "HB"], ["grenadelauncher", "GRENADE LAUNCHER", 1, "GL"], ["nailgun", "NAILGUN", 1, "NG"], ["rocketlauncher", "ROCKET LAUNCHER", 1, "RL"], ["railgun", "RAILGUN", 1, "RG"]];
+  const ctl = document.getElementById("hudLayoutCtl"); if (ctl) hud.controls(ctl, { minimal: true });
+  /* The stock eleven in slot order: [weapon key, name, strip glyph, crosshair]. */
+  const ROSTER = [["blaster", "Blaster", "item_blaster", "crosshair_blaster"], ["machinegun", "Machinegun", "item_machinegun", "crosshair_machinegun"],
+    ["shotgun", "Shotgun", "item_shotgun", "crosshair_shotgun"], ["hyperblaster", "Hyperblaster", "item_hyperblaster", "crosshair_blaster"],
+    ["grenadelauncher", "Grenade Launcher", "item_grenade", "crosshair_grenadelauncher"], ["nailgun", "Nailgun", "item_nailgun", "crosshair_nailgun"],
+    ["rocketlauncher", "Rocket Launcher", "item_rocket", "crosshair_rocketlauncher"], ["railgun", "Railgun", "item_railgun", "crosshair_railgun"],
+    ["lightninggun", "Lightning Gun", "item_lightning", "crosshair_lightninggun"], ["darkmattergun", "Dark Matter Gun", "item_darkmatter", "crosshair_grenadelauncher"],
+    ["napalmgun", "Napalm Launcher", "item_fire", "crosshair_napalm"]];
   const AMMO = { blaster: { infinite: true }, machinegun: { clip: 40, loaded: 32, total: 164, max: 300 }, shotgun: { clip: 8, loaded: 6, total: 24, max: 50 },
-    hyperblaster: { clip: 60, loaded: 0, total: 0, max: 300 }, grenadelauncher: { clip: 8, loaded: 3, total: 11, max: 50 }, nailgun: { clip: 50, loaded: 36, total: 86, max: 200 },
-    rocketlauncher: { clip: 0, total: 17, max: 40 }, railgun: { clip: 3, loaded: 2, total: 9, max: 50 } };
-  const showWeapon = () => ammo?.weapon({ key: OWNED[sel][0], ...AMMO[OWNED[sel][0]] });
-  let hp = 100, ap = 57, sel = 5, radio = true, rhino = false, feed = [];
-  let health, armor, ammo, hitG, feedG, stripG, radioG, radioLay;
+    hyperblaster: { clip: 60, loaded: 0, total: 0, max: 300 }, grenadelauncher: { clip: 8, loaded: 3, total: 11, max: 50 }, nailgun: { clip: 50, loaded: 50, total: 300, max: 300 },
+    rocketlauncher: { clip: 0, total: 17, max: 40 }, railgun: { clip: 3, loaded: 2, total: 9, max: 50 }, lightninggun: { clip: 0, total: 140, max: 400 },
+    darkmattergun: null, napalmgun: { clip: 20, loaded: 20, total: 60, max: 100 } };
+  const stripRoster = () => ROSTER.map(([key, name, glyph]) => ({ glyph, name, owned: !!AMMO[key], ammo: AMMO[key] ? (AMMO[key].infinite ? Infinity : AMMO[key].total) : 0 }));
+  let sel = 5, prev = 2;
+  const showWeapon = () => ammo?.weapon({ key: ROSTER[sel][0], ...AMMO[ROSTER[sel][0]] });
+  let hp = 100, ap = 57, radio = true, rhino = false, feed = [];
+  let health, armor, ammo, hitG, feedG, radioG, strip, xhG;
   const GX = () => hud.classic ? [13, 190, 326] : [101, 278, 414];
+  const full = () => !hud.minimal || hud.classic;              // Minimal (ui_hudLayout 2) keeps the gauges and the crosshair
 
-  function drawStrip() {
-    stripG.innerHTML = "";
-    const classic = hud.classic, y = classic ? 370 : 350, left = (640 - (OWNED.length * 30 - 2)) / 2;
-    OWNED.forEach(([key, name, ammoLeft, ab], i) => {
-      const x = left + i * 30, on = i === sel;
-      const plate = svgEl("g", { transform: `matrix(1 0 -0.22 1 ${0.22 * (y + 13)} 0)` }, stripG);
-      svgEl("rect", { x: x + .8, y: y + .8, width: 24.4, height: 24.4, rx: 1, fill: "#000", "fill-opacity": .5 }, plate);
-      if (on) svgEl("rect", { x: x + 1.6, y: y + 1.6, width: 22.8, height: 22.8, rx: 1, fill: "none", stroke: "#B2CC80", "stroke-width": 1.6 }, plate);
-      if (A.ICONS[key]) A.icon(stripG, key, { x: x + 13, y: y + 4, h: 18, anchor: "middle", color: on && ammoLeft ? "#FF8000" : "#A8A360", opacity: on && ammoLeft ? 1 : .6 });
-      else svgEl("text", { x: x + 13, y: y + 16, "text-anchor": "middle", "font-family": F_M, "font-size": 7.5, fill: on && ammoLeft ? "#FF8000" : "#A8A360", "fill-opacity": on && ammoLeft ? 1 : .6 }, stripG).textContent = ab;
-      if (!ammoLeft) { svgEl("circle", { cx: x + 13, cy: y + 13, r: 7.4, fill: "none", stroke: "#A50000", "stroke-width": 2.3 }, stripG); svgEl("path", { d: `M${x + 18.2} ${y + 7.8}L${x + 7.8} ${y + 18.2}`, stroke: "#A50000", "stroke-width": 2.3 }, stripG); }
-    });
-    const nm = OWNED[sel][1], ny = classic ? 406 : y - 7;          // Remastered puts the name above the slots, clear of the pickup lines
-    svgEl("text", { x: 321, y: ny + 1, "text-anchor": "middle", "font-family": F_M, "font-size": 8.4, fill: "#000" }, stripG).textContent = nm;
-    svgEl("text", { x: 320, y: ny, "text-anchor": "middle", "font-family": F_M, "font-size": 8.4, fill: "#B0C891" }, stripG).textContent = nm;
-  }
-  /* Pickup lines: Classic keeps the stock single line over the ammo gauge; Remastered centers up to two lines over the
-     status bar, newest nearest the gauges, and merges repeats with a count. */
+  /* Pickup lines (14.8; remastered_hud_groups.pickup_lines): a sheared black 0.50 plate 21 u tall, never wider than its
+     content (min 96 u), the item icon at 0.80 and the item name in Marine 14 dp (9.6 u, small capitals) #DCEAC2; a repeat
+     merges with " × n". Remastered: up to two lines centred over the status bar, newest at y 401, the older at 377.
+     Classic keeps the stock single line over the ammo gauge. */
+  const pctx2 = document.createElement("canvas").getContext("2d");
+  const measure = (t, size) => { pctx2.font = `${size}px Michroma, Eurostile, sans-serif`; pctx2.fontVariantCaps = "small-caps"; return pctx2.measureText(t).width; };
   function drawFeed() {
     feedG.innerHTML = "";
+    if (!full()) return;
     const lines = hud.classic ? feed.slice(-1) : feed.slice(-2);
     lines.forEach((p, k) => {
       const row = lines.length - 1 - k, y = 401 - row * 24;
       const g = svgEl("g", { opacity: p.alpha ?? 1 }, feedG);
-      const label = p.count > 1 && !hud.classic ? `${p.name}  ×${p.count}` : p.name;
-      const w = hud.classic ? 230 : Math.max(96, 30 + label.length * 5.9), x = hud.classic ? 21 : 320 - w / 2;
-      svgEl("rect", { x: x + 1.8, y: y + 1.5, width: w - 3.6, height: 21, rx: 1, fill: "#000", "fill-opacity": .5, transform: `matrix(1 0 -0.22 1 ${0.22 * (y + 12)} 0)` }, g);
+      const merged = p.count > 1 && !hud.classic, tw = measure(p.name, 9.6) + (merged ? 6 + measure(`×${p.count}`, 9.6) : 0);
+      const w = hud.classic ? 230 : Math.max(96, 25 + tw + 7), x = hud.classic ? 21 : 320 - w / 2;
+      svgEl("rect", { x: x + 1, y: y + 1.5, width: w - 2, height: 21, rx: 1, fill: "#000", "fill-opacity": .5, transform: `matrix(1 0 -0.22 1 ${(0.22 * (y + 12)).toFixed(2)} 0)` }, g);
       A.icon(g, p.icon, { x: x + 6, y: y + 4, h: 16, color: "#AAAC6F", opacity: .8 });
-      svgEl("text", { x: x + 25, y: y + 15, "font-family": F_M, "font-size": 6.7, fill: "#DCEAC2" }, g).textContent = label;
+      const t = svgEl("text", { x: x + 25, y: y + 15.4, "font-family": F_M, "font-size": 9.6, style: "font-variant:small-caps", fill: "#DCEAC2" }, g);
+      t.textContent = p.name;
+      if (merged) svgEl("tspan", { dx: 6 }, t).textContent = `×${p.count}`;
     });
   }
-  const drawRadio = () => { radioG.innerHTML = ""; if (radio) A.radioChatter(radioG, { rhino }); };
+  const drawRadio = () => { radioG.innerHTML = ""; if (radio && full()) A.radioChatter(radioG, { rhino }); };
+  const drawCrosshair = () => { xhG.innerHTML = ""; A.crosshairAt(xhG, ROSTER[sel][3], 32); };   // g_crosshairSize 32, the weapon's own design
   function build() {
     svg.innerHTML = "";
     const lay = hud.fit(svg);
     hud.regionsLayer(svg, lay);
-    A.crosshairAt(svg);
+    xhG = svgEl("g", {}, svg); drawCrosshair();
     const cc = hud.place(svg, "cc", lay);
+    /* Damage direction (14.7): the dome, plus Remastered's chevron at its peak so direction never depends on colour. */
     hitG = svgEl("g", { opacity: 0 }, cc);
     const hg = svgEl("radialGradient", { id: "hitDome", cx: "50%", cy: "50%", r: "50%" }, svgEl("defs", {}, svg));
     [[0, 1], [.55, .45], [1, 0]].forEach(([o, a]) => svgEl("stop", { offset: o, "stop-color": "#FF1A1A", "stop-opacity": a }, hg));
     svgEl("ellipse", { cx: 320, cy: 89, rx: 150, ry: 52, fill: "url(#hitDome)", style: "mix-blend-mode:screen;mix-blend-mode:plus-lighter" }, hitG);
+    if (!hud.classic) svgEl("path", { d: "M311 52L320 44L329 52", fill: "none", stroke: "#FF1A1A", "stroke-opacity": .9, "stroke-width": 3.2, "stroke-linejoin": "miter", style: "mix-blend-mode:screen;mix-blend-mode:plus-lighter" }, hitG);
     const sb = hud.place(svg, "bc", lay);
     const [ax, hx, rx] = GX();
     ammo = marineGauge(sb, ax, "ammo"); health = marineGauge(sb, hx, "health"); armor = marineGauge(sb, rx, "armor");
     showWeapon(); armor.set(ap, ap / 100); setHp(hp);
-    feedG = svgEl("g", {}, sb); stripG = svgEl("g", {}, sb);
-    drawFeed(); drawStrip();
+    feedG = svgEl("g", {}, sb); const stripHost = svgEl("g", {}, sb);
+    drawFeed();
+    strip = full() ? A.weaponStrip(stripHost, { y: hud.classic ? 370 : 350, classic: hud.classic, roster: stripRoster(), ideal: sel, last: prev, pinned: true }) : null;
     radioG = hud.place(svg, "tr", lay); drawRadio();
   }
   const lowState = on => {
@@ -167,14 +325,17 @@ if (svg) {
   function setHp(v) { hp = Math.max(1, Math.min(125, v)); health.set(hp, Math.min(1, hp / 100)); lowState(hp < 26);
     const box = document.getElementById("hudLow"); box?.classList.toggle("on", hp < 26); box?.setAttribute("aria-pressed", hp < 26); }
   const pop = g => {                     // gain pop: 120% white settling to 100% and the readout color over 250 ms
-    const t0 = performance.now();
+    if (reduce) return;                  // nonessential: reduced motion drops it
+    const t0 = performance.now(), ink = [...g.icon.querySelectorAll("path,circle,rect,polygon")].filter(el => /^(#A8A360|currentColor)$/i.test(el.getAttribute("fill") || ""));
+    const was = ink.map(el => el.getAttribute("fill"));
     const step = now => { const p = Math.min(1, Math.max(0, now - t0) / 250);
       g.num.style.transform = `scale(${1.2 - .2 * p})`; g.num.setAttribute("fill", p < 1 ? `rgb(${255 - 34 * p},${255 - 20 * p},${255 - 60 * p})` : "#DDEBC3");
-      g.icon.setAttribute("opacity", p < 1 ? 1 : .999); g.icon.querySelectorAll("path,circle,rect,polygon").forEach(el => el.setAttribute("fill", p < 1 ? "#FFFFFF" : "#A8A360"));
+      ink.forEach((el, i) => el.setAttribute("fill", p < 1 ? "#FFFFFF" : was[i]));   // the icon flashes white: only its tinted ink
       if (p < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
   };
   const hit = () => {                    // hit indicator: rotated toward the source, 0.70 to zero over 500 ms
+    if (!full()) return;
     hitG.setAttribute("transform", `rotate(${Math.round(Math.random() * 360)} 320 240)`);
     const t0 = performance.now();
     const step = now => { const p = Math.min(1, Math.max(0, now - t0) / 500); hitG.setAttribute("opacity", .7 * (1 - p)); if (p < 1) requestAnimationFrame(step); };
@@ -193,12 +354,40 @@ if (svg) {
   build();
   hud.on(build);
   document.getElementById("hudHit")?.addEventListener("click", () => { setHp(hp - 15); hit(); });
-  document.getElementById("hudPick")?.addEventListener("click", () => pickup("LARGE HEALTH", "health", () => { setHp(hp + 25); pop(health); }));
-  document.getElementById("hudShard")?.addEventListener("click", () => pickup("ARMOR SHARD", "armorshard", () => { ap = Math.min(200, ap + 5); armor.set(ap, Math.min(1, ap / 100)); pop(armor); }));
+  document.getElementById("hudPick")?.addEventListener("click", () => pickup("Large Health", "item_health", () => { setHp(hp + 25); pop(health); }));
+  document.getElementById("hudShard")?.addEventListener("click", () => pickup("Armor Shard", "item_armorshard", () => { ap = Math.min(200, ap + 5); armor.set(ap, Math.min(1, ap / 100)); pop(armor); }));
   document.getElementById("hudLow")?.addEventListener("click", e => { e.stopImmediatePropagation(); setHp(hp < 26 ? 100 : 20); }, true);
-  document.getElementById("hudNext")?.addEventListener("click", () => { do { sel = (sel + 1) % OWNED.length; } while (!OWNED[sel][2]); drawStrip(); showWeapon(); });
+  /* Next weapon skips weapons the player lacks or that are empty; the ring travels and the tick marks the one left. */
+  document.getElementById("hudNext")?.addEventListener("click", () => {
+    let i = sel; do { i = (i + 1) % ROSTER.length; } while (!AMMO[ROSTER[i][0]] || AMMO[ROSTER[i][0]].total === 0);
+    prev = sel; sel = i; strip?.select(i); showWeapon(); drawCrosshair(); });
   document.getElementById("hudRadio")?.addEventListener("click", () => { radio = !radio; rhino = false; drawRadio(); });
   document.getElementById("hudRhino")?.addEventListener("click", () => { radio = true; rhino = true; drawRadio(); });   // each line restarts the shrink
+}
+
+/* The weapon strip's motion, magnified: the game's behaviour (open on a change, close 1000 ms later or on firing),
+   held open at first so the still drawing shows it. The roster carries every stock weapon but the dark matter gun,
+   with the hyperblaster empty. */
+const sd = document.getElementById("stripDemo");
+if (sd) {
+  const R = [["item_blaster", "Blaster", Infinity], ["item_machinegun", "Machinegun", 164], ["item_shotgun", "Shotgun", 24], ["item_hyperblaster", "Hyperblaster", 0],
+    ["item_grenade", "Grenade Launcher", 11], ["item_nailgun", "Nailgun", 250], ["item_rocket", "Rocket Launcher", 17], ["item_railgun", "Railgun", 9],
+    ["item_lightning", "Lightning Gun", 140], ["item_darkmatter", "Dark Matter Gun", -1], ["item_fire", "Napalm Launcher", 60]]
+    .map(([glyph, name, ammo]) => ({ glyph, name, ammo: Math.max(0, ammo), owned: ammo !== -1 }));
+  let strogg = false, held = false, still = true, ideal = 5, last = 2, st;   // still: the first drawing, until a control is used
+  const build = () => { sd.innerHTML = ""; st = A.weaponStrip(sd, { strogg, y: 350, roster: R, ideal, last, pinned: held || still }); };
+  build();
+  const usable = i => R[i].owned && R[i].ammo !== 0;
+  const step = d => { let i = st.ideal; do { i = (i + d + R.length) % R.length; } while (!usable(i)); return i; };
+  const wake = () => { if (still) { still = false; st.setPinned(held); } };
+  const go = i => { wake(); if (!usable(i) || i === st.ideal) st.refuse(i); else st.select(i); ideal = st.ideal; last = st.last; };
+  const on = (id, f) => document.getElementById(id)?.addEventListener("click", f);
+  on("stripPrev", () => go(step(-1))); on("stripNext", () => go(step(1))); on("stripJump", () => go(0)); on("stripRefuse", () => go(3));
+  on("stripFire", () => { wake(); st.fire(); });
+  const box = document.getElementById("stripHold");
+  box?.addEventListener("click", e => { e.stopImmediatePropagation(); held = !held; still = false; box.classList.toggle("on", held); box.setAttribute("aria-pressed", held); st.setPinned(held); }, true);
+  document.getElementById("stripFam")?.addEventListener("click", e => { const b = e.target.closest(".seg"); if (!b) return; strogg = b.dataset.f === "s"; still = true;
+    document.querySelectorAll("#stripFam .seg").forEach(x => x.setAttribute("aria-pressed", x === b)); build(); });
 }
 
 /* Magnified anatomy: Marine (unsheared, measured) and Strogg (sheared +0.22). */

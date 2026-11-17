@@ -18,10 +18,12 @@
   <div class="frameAR stage scene" style="padding:0"><svg id="pdaSvg" viewBox="-107 0 854 480" role="img" aria-label="Objectives display with three objectives"></svg></div>
   <div class="hudctl">
     <button class="pl act" id="pdaShow"><i class="mk"></i><span class="lb">Hold scores</span></button>
-    <label><button class="box" id="pdaRem" aria-pressed="false" aria-label="Remastered layout"></button>Remastered</label>
+    <label><button class="box on" id="pdaRem" aria-pressed="true" aria-label="Remastered layout"></button>Remastered</label>
     <label><button class="box" id="pdaStrogg" aria-pressed="false" aria-label="Strogg display"></button>Strogg</label>
+    <label><button class="box" id="pdaNone" aria-pressed="false" aria-label="No objectives"></button>No objectives</label>
+    <label><button class="box" id="pdaToggle" aria-pressed="false" aria-label="Toggle Objectives"></button>Toggle Objectives</label>
   </div>
-  <p class="cap"><b>Stock</b> the three newest objectives on a 143 u pitch, open plates in #B0CD6B at 0.40 beside a black gradient over the leading 45% of the view; titles on one line, descriptions wrapping at 178 u to seven lines; entry 150 ms, then 100 ms; no exit animation. <b>Remastered</b> keeps the construction, scrolls every active objective, wraps without dropping text and lists completed objectives below.</p>
+  <p class="cap"><b>Stock</b> the three newest objectives on a 143 u pitch from 35 u, open plates in #B0CD6B at 0.40 beside a black 0.80 back bar over the leading 45% of the view; titles on one line, descriptions wrapping at 178 u to seven lines; entry 150 ms, then 100 ms; no exit animation. <b>Remastered</b> (14.11) keeps the construction in a column centred on the view: every active objective newest first, three in view with a scrollbar at the plates' trailing end, titles on up to two lines of 308 u, descriptions without a limit (the plate grows), then COMPLETED with its count, collapsed and pointing on while out of view, titles at 0.40 behind a check once scrolled to, and the serial. With none, the stock's static screenshot and "No current mission objectives." With Toggle Objectives, the HUD prompt names the control that closes it.</p>
   <div class="frameAR stage scene" style="padding:0"><svg id="noticeSvg" viewBox="-107 0 854 480" role="img" aria-label="New-objective and objective-complete notices over gameplay"></svg></div>
   <div class="hudctl">
     <button class="pl act" id="ntNew"><i class="mk"></i><span class="lb">New objective</span></button>
@@ -63,12 +65,23 @@
       <button class="seg" data-v="mcc" aria-pressed="false">MCC cannon</button>
       <button class="seg" data-v="speeder" aria-pressed="false">Speeder bike</button>
       <button class="seg" data-v="gev" aria-pressed="false">GEV</button>
+      <button class="seg" data-v="chaingun" aria-pressed="false">Chaingun turret</button>
     </div>
     <div class="frameAR stage scene" style="padding:0"><svg id="awkSvg" viewBox="-107 0 854 480" role="img" aria-label="The Awakening's vehicle display"></svg></div>
     <div id="awkLayoutCtl"></div>
     <div class="hudctl" id="awkCtl"></div>
     <p class="cap" id="awkCap"></p>
     <div class="awk-screens" id="awkScreens"></div>
+  </div>
+  <div class="demo">
+    <h3 class="h5">Recovery and death · scene filters under the HUD</h3>
+    <div class="frameAR stage scene" style="padding:0"><svg id="recSvg" viewBox="-107 0 854 480" role="img" aria-label="The view softening and draining on death, or clearing as the Air Defense crash wakes"></svg></div>
+    <div class="hudctl">
+      <button class="pl act" id="recDie"><i class="mk"></i><span class="lb">Die</span></button>
+      <button class="pl act" id="recWake"><i class="mk"></i><span class="lb">Crash awakening</span></button>
+      <button class="pl act" id="recClear"><i class="mk"></i><span class="lb">Revive</span></button>
+    </div>
+    <p class="cap">Section 14.20, Appendix C 1.22, on a 16:9 view, with the scene filter alone: no camera motion, flash or new bitmaps, and the HUD and subtitles stay sharp. <b>Death</b> keeps the stock camera and deadlines while saturation drains to 0.06 and the view softens to 3.4 dp sigma over 1800 ms; one focus swell adds up to 4.5 dp by 320 ms and settles by 1570 ms; a charcoal shade darkens the corners and a softer inward shade arrives from 300 to 2400 ms; a warm afterimage eases in over 120 ms and is gone by 1400 ms. <b>Crash awakening</b> (only airdefense1's cin_opening) restores acuity from 16 dp sigma and 0.62 saturation over each authored fade-in plus 2300 ms, under a warm brown periphery and feathered, asymmetric eyelids that open with it, with one focus hesitation at 1.8–4.1 s; blackouts close it under the stock fade. Reduced motion or reduced flashing omits the swell, afterimage and hesitation. Classic keeps the stock view effects.</p>
   </div>
   <div class="demo">
     <h3 class="h5">Scopes · the stock layers rebuilt, round at every aspect</h3>

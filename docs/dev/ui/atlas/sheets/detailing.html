@@ -42,15 +42,33 @@
     <div class="demo">
       <h3 class="h5">Cut ladder</h3>
       <div class="stage plain" style="padding:12px">
-        <svg viewBox="0 0 300 120" aria-label="Cut sizes from 2 to 38 dp">
+        <svg viewBox="0 0 300 120" aria-label="Cut sizes from 3 to 38 dp">
           <g fill="#8B964B" fill-opacity=".32" stroke="#8B964B" stroke-width="1">
-            <path d="M4 40H30V80H6L4 78Z"/><path d="M36 40H62V80H39L36 77Z"/><path d="M68 40H94V80H78L68 70Z"/><path d="M100 40H126V80H112L100 68Z"/><path d="M132 40H158V80H146L132 66Z"/><path d="M164 40H190V80H181L164 63Z"/><path d="M196 40H222V80H216L196 60Z"/><path d="M236 20H296V80H274L236 42Z"/>
+            <path d="M4 40H30V80H7L4 77Z"/><path d="M36 46H62V80H36V40H42Z"/><path d="M68 40H94V80H76L68 72Z"/><path d="M100 40H126V80H112L100 68Z"/><path d="M132 40H158V80H145L132 67Z"/><path d="M164 40H190V80H181L164 63Z"/><path d="M196 40H222V80H216L196 60Z"/><path d="M236 20H296V80H274L236 42Z"/>
           </g>
-          <g class="dim"><text x="9" y="98">2</text><text x="41" y="98">3</text><text x="71" y="98">10</text><text x="103" y="98">12</text><text x="135" y="98">14</text><text x="167" y="98">17</text><text x="199" y="98">20</text><text x="255" y="98">38</text></g>
-          <text class="dim" x="4" y="114">dp · minor ×2, hint, card, header band, nav and action plates, modal chamfer</text>
+          <g class="dim"><text x="9" y="98">3</text><text x="45" y="98">6</text><text x="75" y="98">7.5</text><text x="103" y="98">12</text><text x="135" y="98">13</text><text x="167" y="98">17</text><text x="199" y="98">20</text><text x="255" y="98">38</text></g>
+          <text class="dim" x="4" y="114">dp · see below for where each is used</text>
         </svg>
       </div>
-      <p class="cap">Only the measured cuts appear; wider dialogs stretch the modal chamfer up to 56 dp. A cut never falls below 3 dp on an essential control.</p>
+      <p class="cap">Only the measured cuts appear: 3 dp minor, the settings row's 6 dp upper-leading cut, 7.5 dp (5 u) tags and filter buttons, 12 dp cards and DISPLAY dialogs, the modal's 13 dp raised corner, 17 dp section and navigation plates, 20 dp actions and the 38 dp modal chamfer, which wider dialogs stretch up to 56 dp. A cut never falls below 3 dp on an essential control.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Black frame at the title's tab · ×4</h3>
+      <div class="stage plain" style="padding:12px">
+        <svg viewBox="0 0 300 150" aria-label="Magnified title tab of a modal, with its black frame stepping down at 45 degrees">
+          <rect x="0" y="0" width="300" height="150" fill="#454E1B" fill-opacity=".55"/>
+          <path d="M20 30H120L188 98H300V150H20Z" fill="#000" fill-opacity=".7"/>
+          <path d="M14 24H178L246 92H300" fill="none" stroke="#000" stroke-width="12"/>
+          <path d="M14 24H178L246 92V98H14Z" fill="#000"/>
+          <path d="M34 50h24v24z" fill="#E38900" fill-opacity=".9"/>
+          <text x="72" y="76" font-family="Michroma, sans-serif" font-size="26" fill="#fff" fill-opacity=".9">EX</text>
+          <path d="M150 112H246M150 108V116M246 108V116" stroke="#E38900" stroke-width="1"/>
+          <text class="dim" x="160" y="128">10 dp past the title</text>
+          <text class="dim" x="222" y="40">45° step</text>
+          <text class="dim" x="20" y="142">rim 3 dp black at 1.00 on top of the glow</text>
+        </svg>
+      </div>
+      <p class="cap">The tab starts at the frame's leading edge, carries the 6 dp corner marker 14 dp before the title, and steps down at 45° to the slot's floor 10 dp past the title's end (the Strogg family's 30°). The glow still shows in the slot beyond it and around the 3 dp outline.</p>
     </div>
     <div class="demo">
       <h3 class="h5">Marker in the cap band · ×4</h3>

@@ -10,83 +10,136 @@
 .home .sl text{font:400 7.4px Michroma,Eurostile,sans-serif;fill:rgba(255,255,255,.5);transition:fill .3s linear}
 .home .cl{font:600 9.5px Archivo,sans-serif;fill:rgba(255,255,255,.8)}
 .home .cm{font:500 7.2px Archivo,sans-serif;fill:#8C947A}
-.pl .st{position:absolute;right:6px;top:50%;translate:0 -50%;font:11px/1 var(--f-mono);color:var(--ter);pointer-events:none}
 .stack{display:grid;gap:0;width:100%;max-width:380px}
 .demo{display:grid;gap:14px;align-content:start}
-.dd{position:relative;display:grid;gap:0;max-width:380px}
-.dd .pop{margin:2px 0 0 38%;width:min(62%,240px);padding:6px 4px}
-.dd .opt{position:relative;display:flex;align-items:center;height:30px;padding:0 10px;font:500 16px/1 var(--f-low);color:var(--t80);cursor:pointer}
-.dd .opt::before{content:"";position:absolute;inset:2px 0;z-index:-1;opacity:0;background:linear-gradient(90deg,transparent,var(--list) 15%,var(--list) 85%,transparent)}
-.dd .opt:hover::before{opacity:.16}.dd .opt.sel::before{opacity:.42}
-.chev{display:inline-block;width:9px;height:9px;margin-left:10px;border-right:1.5px solid rgba(255,190,35,.8);border-bottom:1.5px solid rgba(255,190,35,.8);rotate:45deg;translate:0 -3px}
+
+/* The retained plates (pg-) and settings rows (sr-): one construction per kind, drawn at the element's size by
+   scripts/modal-backdrops.js from the generators' numbers (1 px = 1 dp; Marine set in Michroma at 0.69 of its size). */
+.pg{position:relative;display:block;height:45px;width:var(--w,100%);max-width:100%;margin:0;padding:0;border:0;background:none;color:inherit;
+  font:inherit;text-align:left;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent}
+.pg > svg.pg-art{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.pg .pg-p{opacity:.4;transition:opacity .3s linear}
+.pg .pg-mr{opacity:.4;transition:opacity .3s linear}
+.pg .pg-f,.pg .pg-mh{opacity:0;transition:opacity .3s linear}
+.pg-lb{position:absolute;top:0;left:var(--lx,26px);height:100%;display:flex;align-items:center;font:400 var(--fs,13.8px)/1 var(--f-marine);
+  text-transform:uppercase;white-space:nowrap;color:var(--t80);transform-origin:0 50%;transition:color .3s linear,scale .3s linear,translate .3s linear}
+.pg .st{position:absolute;right:6px;top:50%;translate:0 -50%;font:11px/1 var(--f-mono);color:var(--ter);pointer-events:none}
+.pg:not([disabled]):hover .pg-p,.pg.is-hover .pg-p,.pg:focus-visible .pg-p,.pg.is-focus .pg-p{opacity:var(--hot,.8);transition:none}
+.pg:not([disabled]):hover .pg-mr,.pg.is-hover .pg-mr,.pg:focus-visible .pg-mr,.pg.is-focus .pg-mr{opacity:0;transition:none}
+.pg:not([disabled]):hover .pg-mh,.pg.is-hover .pg-mh,.pg:focus-visible .pg-mh,.pg.is-focus .pg-mh{opacity:1;transition:none}
+.pg:not([disabled]):hover .pg-lb,.pg.is-hover .pg-lb,.pg:focus-visible .pg-lb,.pg.is-focus .pg-lb{color:var(--orange);scale:1.03;transition:none}
+.pg:focus-visible .pg-f,.pg.is-focus .pg-f{opacity:1;transition:opacity .08s ease-out}
+.pg:not([disabled]):active .pg-p,.pg.is-pressed .pg-p{opacity:1}
+.pg:not([disabled]):active .pg-mh,.pg.is-pressed .pg-mh,.pg:not([disabled]):active .pg-f,.pg.is-pressed .pg-f{opacity:1}
+.pg:not([disabled]):active .pg-mr,.pg.is-pressed .pg-mr{opacity:0}
+.pg:not([disabled]):active .pg-lb,.pg.is-pressed .pg-lb{color:var(--orange);scale:1.03;translate:1px 1px}
+.pg[disabled]{cursor:default}.pg[disabled] .pg-lb{color:var(--t40)}
+.pg-nav{--w:575px;--lx:106px;--fs:16.5px}
+.pg-sec{--w:312px;--lx:27px;--fs:15.4px}
+.pg-act{--w:180px;--lx:26px;--fs:13.8px}
+.pg-prim{--w:262px;--lx:42px;--fs:13.8px;--hot:1}
+.pg-bleed{display:grid;margin-left:calc(-1 * clamp(14px,3vw,32px));overflow:hidden}
+.pg-plinth{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:0 21px;width:max-content;max-width:100%;height:28.2px;padding:0 36px 0 12px;
+  background:rgba(62,74,33,.3);clip-path:polygon(0 0,calc(100% - 28.8px) 0,100% 100%,16.8px 100%,0 calc(100% - 16.8px))}
+.pg-link{position:relative;display:flex;align-items:center;gap:0;height:25.5px;margin:0;padding:0 0 0 10.5px;border:0;background:none;cursor:pointer;outline:none;
+  font:400 11px/1 var(--f-marine);text-transform:uppercase;color:var(--t50);transition:color .3s linear}
+.pg-link::before{content:"";position:absolute;left:0;top:10.9px;width:6.75px;height:6.75px;background:var(--marker);opacity:.4;clip-path:polygon(0 0,100% 0,100% 100%);transition:background .3s linear,opacity .3s linear}
+.pg-link:hover,.pg-link:focus-visible{color:var(--orange);transition:none}
+.pg-link:hover::before,.pg-link:focus-visible::before{background:var(--orange);opacity:1;transition:none}
+.pg-link:active{color:#fff}
+
+.sr-col{display:grid;gap:0;width:min(100%,430.5px)}
+.sr{position:relative;display:block;width:min(100%,430.5px);height:36px;cursor:pointer;outline:none;--vx:160px;-webkit-tap-highlight-color:transparent}
+.sr > svg.sr-art{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.sr .sr-ws,.sr .sr-rl{opacity:0;transition:opacity .3s linear}
+.sr-l{position:absolute;left:21px;top:0;width:calc(var(--vx) - 29px);height:36px;display:flex;align-items:center;overflow:hidden;
+  font:500 14px/13px var(--f-low);color:rgba(255,255,255,.85);transition:color .3s linear;pointer-events:none}
+.sr-v{position:absolute;left:var(--vx);right:26px;top:0;font:500 14px/36px var(--f-low);color:var(--value);white-space:nowrap;overflow:hidden;pointer-events:none}
+.sr-n{position:absolute;top:0;width:48px;text-align:right;font:500 15px/26px var(--f-low);color:var(--value);font-variant-numeric:tabular-nums;pointer-events:none}
+.sr-ask{position:absolute;left:var(--vx);top:0;font:500 14px/36px var(--f-low);color:var(--orange);white-space:nowrap;pointer-events:none}
+.sr-keys{position:absolute;left:var(--vx);top:8px;height:20px;display:flex;gap:4px;align-items:center;pointer-events:none}
+.sr-kc{display:inline-grid;place-items:center;height:20px;min-width:20px;padding:0 7px;box-sizing:border-box;background:rgba(255,255,255,.85);
+  font:600 11px/1 var(--f-low);color:#0A0D09;text-transform:uppercase;clip-path:polygon(0 0,100% 0,100% 100%,5.5px 100%,0 calc(100% - 5.5px))}
+.sr-pad{width:20px;height:20px;display:inline-block}
+.sr:not(.off):hover .sr-ws,.sr.is-hover .sr-ws{opacity:.6;transition:none}
+.sr:not(.off):hover .sr-l,.sr.is-hover .sr-l{color:#fff;transition:none}
+.sr:focus-visible .sr-ws,.sr.is-focus .sr-ws,.sr:focus-visible .sr-rl,.sr.is-focus .sr-rl{opacity:1;transition:opacity .08s ease-out}
+.sr:focus-visible .sr-l,.sr.is-focus .sr-l{color:var(--orange);transition:color .08s ease-out}
+.sr.dim{opacity:.38;cursor:default}
+.sr-pop{position:absolute;left:0;top:36px;width:100%;z-index:6;box-sizing:border-box;padding:2px 0 2px 2px;display:none}
+.sr-pop.open{display:block}
+.sr-pop > svg.sr-art{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.sr-vp{overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
+.sr-vp::-webkit-scrollbar{display:none}
+.sr-o{position:relative;z-index:0;height:22px;width:calc(100% - 18px);padding-left:8px;box-sizing:border-box;font:500 15px/22px var(--f-low);color:rgba(255,255,255,.9);
+  white-space:nowrap;overflow:hidden;cursor:pointer}
+.sr-o::before,.sr-o::after{content:"";position:absolute;inset:0;z-index:-1;opacity:0}
+.sr-o::before{background:rgba(139,150,75,.35)}.sr-o::after{background:rgba(227,137,0,.3)}
+.sr-o.sel::before{opacity:1}.sr-o:hover::after,.sr-o.hi::after{opacity:1}
+@media (prefers-reduced-motion:reduce){.pg .pg-p,.pg .pg-mr,.pg .pg-f,.pg .pg-mh,.pg-lb,.sr .sr-ws,.sr .sr-rl,.sr-l{transition:none!important}}
 </style>
 
 <section class="sheet" id="plates">
   <h2 class="sheet-h">Atlas - plates</h2>
-  <p class="sheet-p">Open plates: rails run along the leading edge, around the 45° lower-leading cut and along the bottom, and the fill and bottom rail dissolve toward the trailing end. Plate, marker and label are one target spanning the full pitch. The state names on the right are annotations, not part of the plate.</p>
+  <p class="sheet-p">The retained UI's plates, drawn from the generators. Menu levels stand on dark navigation plates that bleed off the leading edge; pages such as Load Game and Demos carry section plates with the 45° lower-leading cut; dialogs carry light action plates and a page's main action the primary plate; settings rows are closed light plates. Plate, marker and label are one target spanning the full pitch. The state names on the right are annotations, not part of the plate.</p>
   <div class="stage menu">
     <div class="grid">
       <div class="demo">
-        <h3 class="h5">Navigation · dark plate · 37 in 45 dp</h3>
-        <div class="stack">
-          <button class="pl nav"><i class="mk"></i><span class="lb">New game</span><span class="st">rest</span></button>
-          <button class="pl nav is-hover"><i class="mk"></i><span class="lb">Load game</span><span class="st">hover</span></button>
-          <button class="pl nav is-focus"><i class="mk"></i><span class="lb">Multiplayer</span><span class="st">focus</span></button>
-          <button class="pl nav is-current"><i class="mk"></i><span class="lb">Settings</span><span class="st">current</span></button>
-          <button class="pl nav is-pressed"><i class="mk"></i><span class="lb">Mods</span><span class="st">pressed</span></button>
-          <button class="pl nav" disabled><i class="mk"></i><span class="lb">Save game</span><span class="st">disabled</span></button>
+        <h3 class="h5">Navigation · dark plate · 36.6 in 45 dp</h3>
+        <div class="pg-bleed">
+          <button class="pg pg-nav is-focus" data-pg="nav"><span class="pg-lb">Single player</span><span class="st">focus</span></button>
+          <button class="pg pg-nav" data-pg="nav"><span class="pg-lb">Load game</span><span class="st">rest</span></button>
+          <button class="pg pg-nav is-hover" data-pg="nav"><span class="pg-lb">Multiplayer</span><span class="st">hover</span></button>
+          <button class="pg pg-nav is-pressed" data-pg="nav"><span class="pg-lb">Settings</span><span class="st">pressed</span></button>
+          <button class="pg pg-nav" data-pg="nav" disabled><span class="pg-lb">Save game</span><span class="st">disabled</span></button>
         </div>
-        <p class="cap"><b>cut</b> 17 dp (47%) · <b>marker</b> 9 dp, 13 dp in · <b>label</b> Marine 24 dp, 4 dp after the marker · <b>rails</b> #CCCC51 · fill opaque to 44%, half at 62%, clear at 88%. Focus adds the orange inset rail and the 24 dp focus light.</p>
+        <p class="cap"><b>b1_dark</b> on the 30 u pitch, running in from past the view's leading edge: no leading rail or cut on screen · black opaque to 44 % of 413 u from the canvas edge, half at 62 %, clear at 88 % · <b>rail</b> #CCCC51 along the foot only · <b>marker</b> 9 dp at 35 u · <b>label</b> Marine 24 dp at 44 u · plate 0.40, 0.80 lit, 1.00 pressed. Focus adds an orange underline 3.2 dp above the rail and the focus light.</p>
       </div>
       <div class="demo">
-        <h3 class="h5">Section navigation · light plate · hover 1.00</h3>
+        <h3 class="h5">Section plates · Load Game, Demos · cut 17 dp</h3>
         <div class="stack">
-          <button class="pl sec"><i class="mk"></i><span class="lb">Game</span></button>
-          <button class="pl sec"><i class="mk"></i><span class="lb">Controls</span></button>
-          <button class="pl sec is-current"><i class="mk"></i><span class="lb">System</span><span class="st">current</span></button>
-          <button class="pl sec"><i class="mk"></i><span class="lb">Audio</span></button>
+          <button class="pg pg-sec" data-pg="sec"><span class="pg-lb">Load game</span></button>
+          <button class="pg pg-sec is-focus" data-pg="sec"><span class="pg-lb">Delete game</span><span class="st">focus</span></button>
         </div>
         <h3 class="h5">Actions · 35 in 45 dp · cut 20 dp</h3>
-        <div class="stack" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0 12px">
-          <button class="pl act"><i class="mk"></i><span class="lb">Yes</span></button>
-          <button class="pl act"><i class="mk"></i><span class="lb">No</span></button>
+        <div class="stack" style="grid-template-columns:repeat(auto-fit,minmax(150px,180px));gap:0 18px;max-width:none">
+          <button class="pg pg-act" data-pg="act"><span class="pg-lb">Yes</span></button>
+          <button class="pg pg-act is-focus" data-pg="act"><span class="pg-lb">No</span></button>
         </div>
-        <button class="pl prim" style="--w:380px"><i class="mk"></i><span class="lb">Start game</span></button>
-        <p class="cap">The stock marks a primary action by size, not opacity: <b>START GAME</b> is a 356×43 u light plate. Light plates are white art tinted <b>marine.olive</b>, fill 49% to a third of the width, then linear to clear.</p>
+        <h3 class="h5">Primary · APPLY CHANGES, START, JOIN SERVER</h3>
+        <button class="pg pg-prim" data-pg="prim"><span class="pg-lb">Apply changes</span></button>
+        <p class="cap"><b>Section</b> b2_dark: black opaque to 57 %, half at 72 %, clear at 94 %, rails on the leading edge, cut and foot; focus underlines the foot only. <b>Action</b> olive 0.49 to 33 %, then linear to clear; focus traces the leading edge, cut and foot. <b>Primary</b> b6_light, cut 13/32 of its height, full strength when lit.</p>
       </div>
     </div>
   </div>
   <div class="stage dim menu">
     <div class="grid">
       <div class="demo">
-        <h3 class="h5">Settings rows · 29 in 36 dp</h3>
-        <div class="stack" style="max-width:460px">
-          <button class="pl row cyc" data-values="High|Ultra|Low|Medium"><span class="lb">Texture quality</span><span class="val">High</span></button>
-          <button class="pl row cyc mod" data-values="16x|Off|2x|4x|8x"><span class="lb">Anisotropic filtering</span><span class="val">16x</span></button>
-          <button class="pl row cyc" data-values="On|Off"><span class="lb">Vertical sync</span><span class="val">On</span></button>
-          <button class="pl row cyc is-hover" data-values="Borderless|Windowed|Fullscreen"><span class="lb">Window mode</span><span class="val">Borderless</span></button>
-          <button class="pl arow"><i class="mk"></i><span class="lb">Restore defaults</span></button>
+        <h3 class="h5">Settings rows · 36 dp pitch · 287 u column</h3>
+        <div class="sr-col" style="--vx:181px">
+          <div class="sr is-focus" data-sr="choice" tabindex="0"><span class="sr-l">Performance Preset</span><span class="sr-v">Enhanced</span></div>
+          <div class="sr" data-sr="button" tabindex="0"><span class="sr-l">Auto-Detect</span></div>
+          <div class="sr is-hover" data-sr="choice" tabindex="0"><span class="sr-l">Rendering Backend</span><span class="sr-v">OpenGL</span></div>
+          <div class="sr" data-sr="toggle" data-on="1" tabindex="0"><span class="sr-l">Enable Shadows</span></div>
+          <div class="sr" data-sr="toggle" tabindex="0"><span class="sr-l">Character Self-Shadows</span></div>
+          <div class="sr" data-sr="slider" data-range="0|100|5|50" tabindex="0"><span class="sr-l">Music Volume</span></div>
         </div>
-        <p class="cap">Labels 21 dp in, values at 64% of the row in <em>marine.value</em>. A value row brightens only its plate. <b>Anisotropic filtering</b> is modified, so its leading rail turns amber. Click a value to cycle it; right-click steps back.</p>
+        <p class="cap">A closed light plate: olive 0.12 with a 1 dp olive 0.32 outline and a 6 dp upper-leading cut, 1 dp inside its 36 dp pitch. <b>Label</b> Lowpixel 14 dp 21 dp in, on two lines 13 dp apart where a language needs them, white 0.85 · <b>value column</b> where every language's label fits two lines, at least 150 dp in · <b>hover</b> the olive wash at 0.60 and a white label · <b>focus</b> the wash, the orange leading rail and an orange label. Click a row to change it.</p>
       </div>
       <div class="demo">
         <h3 class="h5">Secondary links on the plinth</h3>
-        <div class="plinth">
-          <button class="pl link"><i class="mk"></i><span class="lb">Mods</span></button>
-          <button class="pl link"><i class="mk"></i><span class="lb">Updates</span></button>
-          <button class="pl link"><i class="mk"></i><span class="lb">Credits</span></button>
-          <button class="pl link"><i class="mk"></i><span class="lb">Exit</span></button>
+        <div class="pg-plinth">
+          <button class="pg-link">Mods</button><button class="pg-link">Updates</button><button class="pg-link">Credits</button><button class="pg-link">Exit</button>
         </div>
-        <p class="cap">Label 50%, marker 40%, no plate; both turn orange on hover. The plinth is a solid band in <b>marine.plinth</b> with a lower-leading cut and a parallel trailing cut.</p>
+        <p class="cap">Marine 16 dp at 0.50 after a 4.5 u marker at 0.40, 14 u apart; hover and focus turn both orange, a press turns the label white. The plinth is <b>marine.plinth</b> at 0.30 with an 11 u lower-leading cut and a 19 u trailing cut, and runs on where a language's links need it.</p>
         <h3 class="h5">Markers</h3>
         <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
           <i class="mk" style="--m:16px;opacity:.9"></i>
           <i class="mk" style="--m:16px;opacity:1;color:var(--orange)"></i>
           <i class="mk sort" style="--m:16px;opacity:.9;color:var(--sort)"></i>
-          <span class="cap">◥ at rest, active, and flipped (◢) as the sort marker. The halo reaches about 20% of the tile beyond the solid.</span>
+          <span class="cap">◥ at rest (olive 0.40) and active (orange), and flipped (◢) as the sort marker. Rows and value controls carry none.</span>
         </div>
       </div>
     </div>
   </div>
 </section>
-

@@ -31,7 +31,9 @@ const ICON_CODE = { gauntlet: "#00D9FF", machinegun: "#FFFF00", shotgun: "#FF800
   rocketlauncher: "#FF3300", railgun: "#00FF00", lightninggun: "#FFFFBA", darkmattergun: "#C400FF", napalmgun: "#FFBF40", corecannon: "#FF5AC8", freezegun: "#9EEBFF" };
 let W = W_Q4, mp = false, awk = false;
 const roster = () => mp ? (awk ? W_MP_AWK : W_MP) : (awk ? W_AWK : W_Q4);
-const CHAT = ["Attack", "Defend the base", "Need backup", "Incoming", "Enemy has our flag", "Affirmative", "Negative", "Thanks"];
+/* Quick chat (14.6, Appendix C 1.21; #str_231261-231268), clockwise from the top. */
+const CHAT = ["Attack!", "Defend!", "Need backup!", "Enemy incoming!", "On my way!", "Thanks!", "Nice shot!", "Good game!"];
+let channel = 1, mpTeam = "m", stroggOn = false;   // channel 0 All, 1 Team: a team game opens on Team
 const FAM = {
   marine: { icon: "#A8A360", sel: "#FF8000", ring: "#B2CC80", name: "#B0C891", read: "#DDEBC3", line: "#B3D06E" },
   mpMarine: { icon: "#A8A360", sel: "#AAE355", ring: "#AAE355", name: "#B0C891", read: "#DDEBC3", line: "#AAE355", mp: true },   // your team's text color
@@ -103,8 +105,10 @@ function drawMarine() {
       g.ring = svgEl("path", { d: seg(i, R0, r1, GAP), fill: "none", stroke: fam.ring, "stroke-width": 2.4, "stroke-linejoin": "round" }, g);
     }
     const a = mid(i);
-    if (chat) { const [x, y] = at(170, a);
-      svgEl("text", { x, y: y + 5, "text-anchor": "middle", "font-family": F_L, "font-weight": 500, "font-size": 15, fill: sel ? fam.sel : "#fff", "fill-opacity": sel ? 1 : .8 }, g).textContent = CHAT[i]; continue; }
+    if (chat) {                                    // Lowpixel 16 dp #DDEBC3 at 168 dp, wrapping inside 106 dp; 0.60 until selected
+      const [x, y] = at(168, a), words = CHAT[i].length > 10 ? CHAT[i].split(" ") : [CHAT[i]];
+      const t = svgEl("text", { x, y: y + 5.5 - (words.length - 1) * 9.5, "text-anchor": "middle", "font-family": F_L, "font-weight": 500, "font-size": 16, fill: "#DDEBC3", "fill-opacity": sel ? 1 : .6 }, g);
+      words.forEach((wd, k) => { const ts = svgEl("tspan", { x, dy: k ? 19 : 0 }, t); ts.textContent = wd; }); continue; }
     // the ammunition band: a curved gauge along the outer edge with the Marine fill construction and cells
     if (w[4] !== Infinity) {
       const b0 = r1 - 25, b1 = r1 - 11, frac = Math.max(0, Math.min(1, w[4] / w[5]));
@@ -139,14 +143,26 @@ function drawMarine() {
   if (!reduce) svgEl("animateTransform", { attributeName: "transform", type: "translate", from: "0 0", to: "0 2", dur: "3.6s", repeatCount: "indefinite" }, lr);
   const dbl = svgEl("g", {}, hub); fx.rings.push(dbl);
   fx.hubRings = [86, 80].map(r => svgEl("circle", { r, fill: "none", stroke: fam.line, "stroke-opacity": .35, "stroke-width": 1.1 }, dbl));
-  const dots = svgEl("g", { transform: `rotate(${(mid(hover) + Math.PI / 2) * 180 / Math.PI})` }, hub);
+  const dots = svgEl("g", { transform: `rotate(${hover < 0 ? 0 : (mid(hover) + Math.PI / 2) * 180 / Math.PI})` }, hub);
   for (let k = 0; k < 16; k++) { const [x, y] = at(93, -Math.PI / 2 + k * Math.PI / 8); svgEl("circle", { cx: x, cy: y, r: k ? 1.6 : 2.6, fill: k ? fam.line : fam.sel, "fill-opacity": k ? .35 : 1 }, dots); }
-  const [pxx, pyy] = at(R0 - 6, mid(hover)), [l1x, l1y] = at(R0 - 20, mid(hover) - .1), [l2x, l2y] = at(R0 - 20, mid(hover) + .1);
-  svgEl("path", { d: `M${pxx} ${pyy}L${l1x} ${l1y}L${l2x} ${l2y}Z`, fill: fam.sel }, hub);
+  if (hover >= 0) {                                // quick chat opens with nothing selected and no pointer
+    const [pxx, pyy] = at(R0 - 6, mid(hover)), [l1x, l1y] = at(R0 - 20, mid(hover) - .1), [l2x, l2y] = at(R0 - 20, mid(hover) + .1);
+    svgEl("path", { d: `M${pxx} ${pyy}L${l1x} ${l1y}L${l2x} ${l2y}Z`, fill: fam.sel }, hub);
+  }
   // the name slot: a clip that tunes in from a 2 u line, as the briefing's picture does
   const slot = svgEl("clipPath", { id: "nameSlot" }, hub); fx.nameClip = svgEl("rect", { x: -80, y: -26, width: 160, height: 22 }, slot);
   const nameG = svgEl("g", { "clip-path": "url(#nameSlot)" }, hub);
-  if (chat) { fx.nameTwo = false; fx.name = svgEl("text", { y: -9, "text-anchor": "middle", "font-family": F_M, "font-size": 14, fill: fam.name }, nameG); fx.name.textContent = "TEAM"; }
+  if (chat) {                                       // the channel: ALL in #FFFF8D or TEAM in your team's text color, Marine 16 dp
+    const team = mpTeam !== "dm", word = team && channel ? "TEAM" : "ALL";
+    fx.nameTwo = false; fx.name = svgEl("text", { y: -4, "text-anchor": "middle", "font-family": F_M, "font-size": 9, fill: word === "ALL" ? "#FFFF8D" : fam.sel }, nameG); fx.name.textContent = word;
+    fx.chatWord = word === "ALL" ? "#FFFF8D" : fam.sel;
+    if (team) {                                     // in a team game: the zoom control's key and Channel, Lowpixel 12 dp
+      const hint = svgEl("g", {}, hub), kw = 40;
+      svgEl("path", { d: `M${-kw / 2 - 26} 9H${kw / 2 - 26}V23H${-kw / 2 - 26 + 3.5}L${-kw / 2 - 26} ${23 - 3.5}Z`, fill: "#fff", "fill-opacity": .85 }, hint);
+      svgEl("text", { x: -26, y: 19.2, "text-anchor": "middle", "font-family": "IBM Plex Mono, monospace", "font-weight": 500, "font-size": 7.5, fill: "#10140A" }, hint).textContent = "MOUSE2";
+      svgEl("text", { x: -1, y: 20.5, "font-family": F_L, "font-weight": 500, "font-size": 12, fill: "#B0C891" }, hint).textContent = "Channel";
+    }
+  }
   else {
     const w = W[hover];
     const nm = w[1].toUpperCase(), lines = nm.length > 12 && nm.includes(" ") ? nm.split(" ") : [nm];   // labels wrap before they shrink
@@ -170,7 +186,7 @@ function draw() {
    100 ms later over 100 ms, as the briefing's labels do. */
 function tuneIn(delay, dur) {
   if (!fx.name) return;
-  const target = chat ? fam.name : fam.name;
+  const target = chat ? fx.chatWord || fam.name : fam.name;
   fx.name.setAttribute("fill", "#FFFFFF");
   const top = fx.nameTwo ? -34 : -26, h = fx.nameTwo ? 36 : 22, mid = top + h / 2;
   run(delay, dur, p => { fx.nameClip.setAttribute("y", mid - 1 - (h / 2 - 1) * p); fx.nameClip.setAttribute("height", 2 + (h - 2) * p); fx.name.setAttribute("opacity", p); });
@@ -236,7 +252,7 @@ svg.addEventListener("pointermove", e => {
 A.redrawWheel = draw;
 const status = document.getElementById("wStatus");
 const equip = () => {
-  if (chat) { status.textContent = `Sent to team: “${CHAT[hover]}”.`; return; }
+  if (chat) { status.textContent = hover < 0 ? "Released inside the dead zone: nothing is sent." : `Sent to ${mpTeam !== "dm" && channel ? "team" : "all"}: “${CHAT[hover]}”, in the sender's language.`; return; }
   const w = W[hover];
   if (w[4] === 0) { status.textContent = `${w[1]} has no ammunition; the ${W[equipped][1].toLowerCase()} stays equipped.`; return; }
   if (hover !== equipped) { previous = equipped; equipped = hover; }
@@ -251,15 +267,15 @@ svg.addEventListener("keydown", e => {
 });
 const toggle = (idName, fn) => { const b = document.getElementById(idName);
   b?.addEventListener("click", e => { e.stopImmediatePropagation(); const on = b.classList.toggle("on"); b.setAttribute("aria-pressed", on); fn(on); lastHover = -1; openFx(); }, true); };
-const famFor = (stroggOn) => mp ? FAM[{ m: "mpMarine", s: "mpStrogg", dm: "mpDM" }[mpTeam]] : stroggOn ? FAM.strogg : FAM.marine;
-let mpTeam = "m", stroggOn = false;
+const famFor = (stroggOn) => mp || chat ? FAM[{ m: "mpMarine", s: "mpStrogg", dm: "mpDM" }[mpTeam]] : stroggOn ? FAM.strogg : FAM.marine;
 toggle("wStrogg", on => { stroggOn = on; fam = famFor(on); });
-toggle("wChat", on => { chat = on; hover = on ? 0 : equipped; });
+toggle("wChat", on => { chat = on; hover = on ? -1 : equipped; channel = 1; fam = famFor(stroggOn); });   // multiplayer only, always the Marine construction
 const reroster = () => { W = roster(); equipped = Math.min(equipped, W.length - 1); previous = Math.min(previous, W.length - 1); if (!chat) hover = equipped; };
 toggle("wAwk", on => { awk = on; reroster(); });
 toggle("wMP", on => { mp = on; fam = famFor(stroggOn); reroster(); });
 document.getElementById("wTeam")?.addEventListener("click", e => { const b = e.target.closest(".seg"); if (!b) return; mpTeam = b.dataset.team;
-  document.querySelectorAll("#wTeam .seg").forEach(x => x.setAttribute("aria-pressed", x === b)); if (mp) { fam = famFor(stroggOn); lastHover = -1; draw(); } });
+  document.querySelectorAll("#wTeam .seg").forEach(x => x.setAttribute("aria-pressed", x === b)); if (mp || chat) { fam = famFor(stroggOn); channel = 1; lastHover = -1; draw(); } });
+document.getElementById("wChannel")?.addEventListener("click", () => { if (!chat || mpTeam === "dm") return; channel = 1 - channel; draw(); select(); });
 document.getElementById("wOpen")?.addEventListener("click", () => { lastHover = -1; openFx(); });
 document.getElementById("wClose")?.addEventListener("click", () => closeFx(() => setTimeout(() => { body.setAttribute("opacity", 1); lastHover = -1; draw(); }, 600)));
 })();

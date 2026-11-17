@@ -40,7 +40,22 @@
       <p class="cap" id="xhInfo">Machinegun · crosshair_machinegun</p>
     </div>
   </div>
-  <p class="cap"><b>Hit feedback</b> the stock pop: the crosshair grows 10 u and returns over 150 ms, tinted red for 100 ms in single player. <b>Hit markers</b> (optional, multiplayer) sit on the diagonals just outside the crosshair art, from half its size plus 4 dp, so they never cover a design such as the lightning gun's darts. A color change applies at once.</p>
+  <p class="cap"><b>The still picture</b> (the stock interface, or the animated crosshair turned off): on a hit the crosshair grows 10 u and returns over 150 ms, tinted red for 100 ms in single player. <b>Hit markers</b> (hud_hitMarker, off by default in both modes) put four marks on the diagonals from half the crosshair size plus 4 dp, so they never cover a design such as the lightning gun's darts. A color change applies at once.</p>
+  <h3 class="h5">Animated crosshair · on by default in the new interface</h3>
+  <div class="xh-edit">
+    <div class="xh-prev" style="background:radial-gradient(70% 70% at 50% 45%,#3a3f42,#0e0f11)"><svg id="xhAnim" viewBox="-64 -36 128 72" role="img" aria-label="The animated crosshair answering its weapon"></svg></div>
+    <div class="xh-ctl">
+      <div class="segs" role="group" aria-label="Weapon" id="xhAnimWeapon"></div>
+      <div class="segs" role="group" aria-label="Weapon actions" id="xhAnimActs">
+        <button class="seg" data-a="raise">Raise</button><button class="seg" data-a="fire">Fire</button><button class="seg" data-a="hold" aria-pressed="false">Hold fire</button>
+        <button class="seg" data-a="charge" aria-pressed="false">Charge</button><button class="seg" data-a="reload">Reload</button><button class="seg" data-a="empty" aria-pressed="false">Empty</button>
+        <button class="seg" data-a="zoom" aria-pressed="false">Zoom</button><button class="seg" data-a="lock" aria-pressed="false">Lock on</button>
+        <button class="seg" data-a="hit">Land a hit</button><button class="seg" data-a="kill">Kill</button><button class="seg" data-a="marks" aria-pressed="false">Hit markers</button>
+      </div>
+      <p class="cap" id="xhAnimInfo"></p>
+    </div>
+  </div>
+  <p class="cap">hud_crosshairAnimated 1, under ui_retained 1 only: the weapon's own design is drawn live in its pieces and the cursor GUI's picture goes transparent; context cursors, The Awakening's lock-on reticule and any design it does not know keep the still picture. <b>Assemble</b> with the weapon's raise over 260 ms (easing out, parts seating with a 10% overshoot); a weapon change folds the old design away in 70 ms first, and a dot holds the aim point while no design is up. <b>Kick</b> a damped spring (30 rad/s, damping 0.52) struck by every shot, scaled per design. <b>Cycle</b> a weapon that waits 450 ms or more between shots shows the wait: the railgun's bars and the lightning darts draw back home, the rocket halo sweeps round, the grenade quarters stand apart, and a flash marks ready. <b>Charge</b> the blaster's arcs wind shut into a ring that breathes at full charge; letting go is the shot. <b>Spin</b> the hyperblaster's arcs and the gauntlet's three teeth turn; the nailgun's brackets close with the drum and tremble at full rate. <b>Reload and empty</b> the design dims by 45%; a clip of up to twelve rounds shows a pip per round lit as it goes in, anything else a turning sweep; an empty machinegun or rocket launcher turns its ticks onto the diagonals. <b>Lock</b> the nailgun's brackets clamp shut in the stock guide's amber then red with four pips; a vehicle gun closes four corners. <b>Hits</b> squeeze the design and tint it toward the hit color (0.9 of the tier's alpha, 0.45 under reduced flashing; 0.3 of that when hit markers are on, which then dock in the design's clear space); a kill sends one ring out from the design's edge. Hit #F22B24, kill #FFE0D1, team #FFB833, own splash #8C9EB8; tiers last 180, 240, 320 and 420 ms. Reduced motion fades the design in place and stills what turns and flickers. Fire rates and clips are the stock weapon definitions; the vehicle cannon's rate here is illustrative.</p>
   <h3 class="h5">Weapon crosshairs</h3>
   <div class="xh-grid" id="xhWeapons"></div>
   <h3 class="h5">Custom set · the stock cycle order</h3>

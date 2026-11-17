@@ -8,7 +8,7 @@ const A = window.__atlas, { svgEl } = A;
    Side screens stop growing at 21:9 unless the HUD width is Full. */
 const ASPECTS = [["9:16", 9 / 16], ["5:4", 5 / 4], ["4:3", 4 / 3], ["16:10", 16 / 10], ["16:9", 16 / 9], ["21:9", 64 / 27], ["32:9", 32 / 9]];
 const SCALES = [["100%", 1], ["125%", 1.25], ["150%", 1.5]];
-const hud = { aspect: 16 / 9, regions: false, scale: 1, classic: false, device: "kbm", fns: new Set() };
+const hud = { aspect: 16 / 9, regions: false, scale: 1, classic: false, minimal: false, device: "kbm", fns: new Set() };
 const CAP = 480 * 64 / 27;
 
 hud.layout = () => {
@@ -50,7 +50,8 @@ hud.regionsLayer = (svg, lay) => {
 };
 /* Shared controls: every HUD stage on the page follows one aspect ratio, region toggle and HUD scale. */
 const rows = [];
-hud.controls = (host, { scale = true, classic = true, device = false } = {}) => {
+/* minimal: offer the Minimal layout (ui_hudLayout 2) beside Classic; only stages that draw it pass it. */
+hud.controls = (host, { scale = true, classic = true, device = false, minimal = false } = {}) => {
   const bar = document.createElement("div"); bar.className = "hudbar";
   const group = (label, items, key) => { const s = document.createElement("div"); s.className = "segs"; s.setAttribute("role", "group"); s.setAttribute("aria-label", label);
     s.innerHTML = `<span class="lbl">${label}</span>` + items.map(([t, v]) => `<button class="seg" data-k="${key}" data-v="${v}" aria-pressed="false">${t}</button>`).join("");
@@ -58,7 +59,8 @@ hud.controls = (host, { scale = true, classic = true, device = false } = {}) => 
   group("Aspect", ASPECTS, "aspect");
   if (scale) group("HUD scale", SCALES, "scale");
   const tg = document.createElement("div"); tg.className = "segs";
-  tg.innerHTML = `<button class="seg" data-t="regions" aria-pressed="false">Screen regions</button>` + (classic ? `<button class="seg" data-t="classic" aria-pressed="false">Classic</button>` : "");
+  tg.innerHTML = `<button class="seg" data-t="regions" aria-pressed="false">Screen regions</button>` + (classic ? `<button class="seg" data-t="classic" aria-pressed="false">Classic</button>` : "") +
+    (minimal ? `<button class="seg" data-t="minimal" aria-pressed="false">Minimal</button>` : "");
   bar.appendChild(tg);
   if (device) {                                   // HUD prompts follow the active device (section 14.8)
     const dg = document.createElement("div"); dg.className = "segs"; dg.setAttribute("role", "group"); dg.setAttribute("aria-label", "Prompts");
@@ -78,7 +80,8 @@ function sync() {
   document.querySelectorAll(".frameAR").forEach(fr => fr.style.setProperty("--ar", hud.aspect.toFixed(4)));
 }
 hud.on = f => hud.fns.add(f);
-hud.set = (k, v) => { hud[k] = v; sync(); hud.fns.forEach(f => f(k)); };
+/* The layouts are exclusive: Classic (0), Remastered (1, neither set) and Minimal (2). */
+hud.set = (k, v) => { hud[k] = v; if (v === true && k === "classic") hud.minimal = false; if (v === true && k === "minimal") hud.classic = false; sync(); hud.fns.forEach(f => f(k)); };
 hud.fit = svg => { const lay = hud.layout(); svg.setAttribute("viewBox", lay.vb); return lay; };
 A.hud = hud;
 })();

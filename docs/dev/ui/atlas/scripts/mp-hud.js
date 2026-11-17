@@ -208,7 +208,8 @@ function centerColumn(g) {
   if (S.notice) items.push(["frag", "You fragged Vex", 17.3]);
   if (S.notice && S.mode === "dm") items.push(["main", "3rd place with 19", 15.4]);
   if (S.sd) items.push(["main", "Sudden Death!", 15.4]);
-  if (S.warm && S.mode !== "tourney") items.push(["spec1", "WAITING FOR 2 MORE PLAYERS", 12.5]);     // spectators get the follow card instead
+  else if (S.warm && !S.spec && S.mode !== "tourney" && !S.notice) items.push(["main", "Warmup", 15.4]);
+  if (S.warm && S.mode !== "tourney") items.push(["spec1", "WAITING ON ONE MORE PLAYER", 12.5]);     // spectators get the follow card instead
   if (S.award) items.push(["award"]);
   let y = 81;
   items.forEach(([kind, text, size]) => {
@@ -353,6 +354,49 @@ function nameTags(g) {
   });
 }
 
+/* ---------- Objective points of interest (section 14.9, Appendix C 1.28; ObjectiveMarkers.cpp) ----------
+   CTF bases (a pennant: solid at home, hollow with an upward cue when carried, lower with a downward cue when
+   dropped) and Dead Zone volumes (open corner brackets around an empty, filled or split core, a padlock while the
+   artifact is required), each in a 45-degree diamond at black 0.48 with a 0.65 outline in the owner's color, the
+   straight-line distance below. Off screen, the marker stops inside the safe frame (38 u from the side edges, 80 u
+   from the top and bottom, times the HUD scale) at 0.78 with an outward chevron. Drawn in view units by the game for
+   Classic and Remastered alike; hidden while dead, zoomed, spectating free or on the scoreboard. */
+const POI_COL = { m: "#AAE355", s: "#FF8F00", n: "#DEEBC4" };
+function poiMarker(g, x, y, s, { kind, team, flag = "base", owner = "n", locked = false, dist, dir = null }) {
+  const col = POI_COL[kind === "base" ? team : owner === "split" ? "n" : owner], a = dir ? .78 : 1;
+  const m = svgEl("g", { opacity: a }, g), r = 13 * s;
+  svgEl("path", { d: `M${x} ${y - r}L${x + r} ${y}L${x} ${y + r}L${x - r} ${y}Z`, fill: "#000", "fill-opacity": .48, stroke: col, "stroke-opacity": .65, "stroke-width": .8 * s }, m);
+  const line = (pts, w = 1.2) => svgEl("path", { d: "M" + pts.map(([px, py]) => `${(x + px * s).toFixed(2)} ${(y + py * s).toFixed(2)}`).join("L"), fill: "none", stroke: col, "stroke-width": w * s, "stroke-linecap": "butt" }, m);
+  if (kind === "base") {
+    const top = flag === "dropped" ? -3 : -6;
+    line([[-4, 6], [-4, -6]]);
+    const pen = `M${x - 3 * s} ${y + top * s}H${x + 6 * s}L${x + 3 * s} ${y + (top + 4) * s}H${x - 3 * s}Z`;
+    svgEl("path", flag === "base" ? { d: pen, fill: col } : { d: pen, fill: "none", stroke: col, "stroke-width": .9 * s }, m);
+    line([[-6, 6], [6, 6]]);
+    if (flag !== "base") { const tip = flag === "dropped" ? 5 : 1; line([[1, 3], [3, tip], [5, 3]], 1); }
+  } else {
+    [-1, 1].forEach(sx => [-1, 1].forEach(sy => line([[sx * 5, sy * 2.5], [sx * 5, sy * 5], [sx * 2.5, sy * 5]])));
+    if (owner === "split") { svgEl("path", { d: `M${x - 4 * s} ${y}L${x - s} ${y - 3 * s}V${y + 3 * s}Z`, fill: POI_COL.m }, m); svgEl("path", { d: `M${x + 4 * s} ${y}L${x + s} ${y + 3 * s}V${y - 3 * s}Z`, fill: POI_COL.s }, m); }
+    else if (owner !== "n") svgEl("path", { d: `M${x} ${y - 3 * s}L${x + 3 * s} ${y}L${x} ${y + 3 * s}L${x - 3 * s} ${y}Z`, fill: col }, m);
+    if (locked) { const lx = x + 8 * s, ly = y + 8 * s;
+      svgEl("rect", { x: lx - 4 * s, y: ly - 4 * s, width: 8 * s, height: 8 * s, fill: "#000", "fill-opacity": .72 }, m);
+      svgEl("path", { d: `M${lx - 2.5 * s} ${ly}h${5 * s}v${3 * s}h${-5 * s}ZM${lx - 1.5 * s} ${ly}v${-2.5 * s}h${3 * s}v${2.5 * s}`, fill: "none", stroke: "#DEEBC4", "stroke-width": .9 * s }, m); }
+  }
+  if (dir) { const [dx, dy] = dir, nx = -dy, ny = dx, tip = [x + dx * 21 * s, y + dy * 21 * s], tail = [x + dx * 16 * s, y + dy * 16 * s];
+    svgEl("path", { d: `M${tail[0] + nx * 3 * s} ${tail[1] + ny * 3 * s}L${tip[0]} ${tip[1]}L${tail[0] - nx * 3 * s} ${tail[1] - ny * 3 * s}`, fill: "none", stroke: col, "stroke-width": 1.4 * s }, m); }
+  if (dist != null) shadowText(m, x, y + 27 * s, `${dist} m`, { ...LP(8.6 * s), fill: "#E6EDD9", "fill-opacity": .85, "text-anchor": "middle" });
+}
+function objectiveMarkers(g, lay) {
+  if (!["ctf", "dz"].includes(S.mode) || S.dead || S.specMode === "free") return;
+  const s = hud.scale, right = lay.x0 + lay.W - 38 * s;      // the safe frame's trailing side
+  if (S.mode === "ctf") {
+    poiMarker(g, 452, 262, s, { kind: "base", team: "m", dist: 23 });
+    poiMarker(g, right, 300, s, { kind: "base", team: "s", flag: S.flagTaken ? "carried" : "base", dist: 129, dir: [1, 0] });
+  } else {
+    poiMarker(g, 214, 250, s, { kind: "zone", owner: S.tick > 0 ? "m" : "split", locked: S.tick <= 0, dist: 41 });
+  }
+}
+
 /* ---------- build ---------- */
 function build() {
   svg.innerHTML = "";
@@ -360,12 +404,18 @@ function build() {
   const classic = hud.classic, team = ["tdm", "ctf", "dz", "ca"].includes(S.mode);
   hud.regionsLayer(svg, lay);
   if (!S.dead && S.specMode !== "free") A.crosshairAt(svg);
+  objectiveMarkers(svgEl("g", {}, svg), lay);
   // status bar, centered: a following spectator sees the followed player's; free-flying spectators none; Competitive
   // enlarges the readouts by 15% about the bottom edge
   if (S.specMode !== "free") {
     const sb = hud.place(svg, "bc", lay, S.comp && !classic ? " translate(320 480) scale(1.15) translate(-320 -480)" : ""), gx = classic ? [13, 190, 326] : [101, 278, 414];
     const ammo = A.marineGauge(sb, gx[0], "ammo", { mp: true, color: "#99CCCC" }), hp = A.marineGauge(sb, gx[1], "health"), ar = A.marineGauge(sb, gx[2], "armor");
-    ammo.weapon({ key: "nailgun", clip: 50, loaded: 36, total: 86, max: 200 }); hp.set(100, .8); ar.set(57, .57);
+    ammo.weapon({ key: "nailgun", clip: 50, loaded: 36, total: 86, max: 200 }); ar.set(57, .57);
+    if (S.dead && S.specMode === "off") {            // dead: health reads 0 on the low-health paint (the armor gauge leaves at 0)
+      hp.set(0, 0); ar.root.remove();
+      [hp.fill, hp.trackFill, hp.bevel].forEach(el => el.setAttribute(el === hp.bevel ? "stroke" : "fill", "#FF4C00"));
+      hp.trackFill.setAttribute("fill-opacity", .35); hp.ekg?.setColor("#4C0D00"); hp.rim.setAttribute("opacity", 1);
+    } else hp.set(100, .8);
   }
   // top-leading group
   const tl = hud.place(svg, "tl", lay);
@@ -402,7 +452,7 @@ function build() {
   if (S.spec && !classic) { followCard(hud.place(svg, "bc", lay)); if (S.specMode === "free") nameTags(svgEl("g", {}, svg)); }
   // chat and voice, leading side
   const chatLines = CHAT.map(c => ({ ...c }));
-  const chatG = A.mpChat(svg, lay, { lines: chatLines, team: "m", input: S.chat, channel: S.teamChan ? "team" : "all", typed: S.chat ? TYPED : "", classic,
+  const chatG = A.mpChat(svg, lay, { lines: chatLines, team: "m", input: S.chat, channel: S.teamChan ? "team" : "all", typed: S.chat ? TYPED : "", classic, teamGame: team,
     clear: (S.comp && !classic ? 51 * 1.15 : 51) + 8 });   // 8 u above the gauges' top, which Competitive's 15% lifts
   if (S.voice) A.mpVoice?.(svg, lay, { classic, top: chatG.topY, talkers: [{ name: "Kaz", team: ["tdm", "ctf", "dz", "ca"].includes(S.mode) ? "m" : null }, { self: true }] });
   // powerups, bottom-trailing

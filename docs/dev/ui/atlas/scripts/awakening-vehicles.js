@@ -293,9 +293,10 @@ const CAPS = {
   cannon: "The m03 dropship guns hide the gauges and strip and keep the radio, boss bar and notices. As on every HUD, Remastered keeps the transmission display in the top-trailing corner of the trailing screen, with the <b>ship-status panel</b> directly below it (the stock corner at 512,32 u touched it): an olive disc (opaque in Classic, 0.85 in Remastered) with the dropship in #475736. Its five sections turn #A13C2B at 80, 60, 40, 20 and 10% health and clear again as it is repaired, which the stock never did. Gold objective markers spin at 0.35 turn a second. Red darts on the rim point at attackers, pulsing at 2 Hz while they fade over 3 s. An additive cone shows where the gun looks relative to the ship's nose. The weapon state lives on the <b>reticule</b>, which stays at the crosshair size and changes color with the lock at once, and on the cockpit screens below. The turret HUD never said how to leave the gun; Remastered's HUD prompt adds Exit.",
   mcc: "The MCC's side gun keeps the space cannon's reticule and screens. It has <b>no turret health</b>, and rightly: the gun inherits the space cannon's noDamage, health 0 and god mode for its gunner, so nothing can damage it and a gun gauge would always read full. What the player defends is the MCC, so the readout is its hull: the stock gauge plate scaled to 136x70 u under U.S.S. Hannibal in Marine 0.25, the hull in Marine 0.50 (the MCC's health ÷ 10, 2000 when whole). Remastered stacks it under the transmission display, which the side gun's HUD lacks, fills the track in proportion (the stock track is static) and warns at 25%: the readout turns #FF3300 and its track pulses at 2 Hz, as the vehicle gauges do. Exit shows in the HUD prompt.",
   speeder: "The m07 race keeps the stock vehicle HUD: the <b>status bar</b>, centered on the bottom edge, where Remastered restores the hull and shield warnings the expansion removed and shows the machinegun's glyph for the machinegun (the bike lists it first, so the expansion showed the cannon's panel), and the radio in the trailing screen's corner. It adds a <b>progress bar</b> at the top center, 18 u lower in Remastered so the transmission display never covers its end at 4:3: a 45% black plate whose tab carries the gold race timer, and ten forward-leaning pips in two groups of five, lit one per checkpoint. Remastered pads the hundredths, turns the seconds #FF3333 over 100 ms in the last 10 s, and streaks the view's edges along the bike's path while boosting, the expansion's square-frame speed blur, never under reduced motion. The <b>HUD prompt</b> carries Boost while a boost is ready, the hazard symbol and Boosting while it lasts, and Exit, which the expansion lost when its boost line took the exit line's window. Classic keeps the boost line and Boosting... at the expansion's places.",
+  chaingun: "The Awakening's mannable Strogg chaingun (m01's trench, m04's prison) cannot be damaged, but its gunner stands exposed, so its HUD (turret_hud.gui, Appendix C 1.39) is the gunner's: the on-foot Marine status bar with health and armor in their places, the armor gauge leaving at 0, and the <b>barrel heat</b> on the gauge where ammunition shows, track 0.20 and fill 0.35 in #FF9E1A, the heat as a percentage of the gun's limit where the clip shows, the gun's glyph where the weapon render sits and three rising heat waves in the notch. From the warning level (75%) and while the gun vents, track and fill turn #FF3300 at 0.35 and 0.60 and pulse at 2 Hz, and the figures turn #FF3300. Once the barrel is warm a 40x3 u bar sits 22 u under the crosshair, #FF9E1A at 0.85, #FF3300 from the warning level; while it vents, OVERHEATED in Marine #FF3300 pulses between 100% and 55% at 2 Hz. The transmission display, damage direction, notices and Exit in the HUD prompt complete it. Classic builds it on the stock vehicle bar: HEALTH and ARMOR with their values, HEAT (OVERHEATED while venting) on the weapon panel's top row and the heat in the charge bar.",
   gev: "The GEV's HUD names ten materials that neither game ships, so openQ4 draws them in the stock vehicle construction: plates at black 0.60 sheared 0,-.32; a vertical #FF9E1A health bar draining from the top (the stock divides an already normalized value by 1000 and reads empty); the hull from above, turning with the view relative to it under a fixed turret, in #B0C891; three shield stages as arcs, #D1AF47 from 80%, #C6C251 from 40% and #A2B85C to empty, the inner arcs pulsing #FF591A to #80591A every 500 ms once the shields fail; and the weapon glyph turned 60 degrees with an infinity mark or the rocket count over the #FF9E1A charge bar. Remastered centers the cluster on the bottom edge like every status bar (Classic keeps it bottom-leading), keeps the transmission display in the trailing screen's corner and adds Exit. No map places the GEV.",
 };
-let veh = "cannon", parts = {}, promptKey = "", st = { lock: "free", dmg: 0, marker: 0, guns: true, jam: false, kills: 12, heat: 0, loaded: 5, hull: 1, prog: 3, timeLeft: 42.37, boostAt: -1e9, spHull: .9, gevShield: 1, gevHp: .82, gevWeap: 0 };
+let veh = "cannon", parts = {}, promptKey = "", st = { lock: "free", dmg: 0, marker: 0, guns: true, jam: false, kills: 12, heat: 0, loaded: 5, hull: 1, prog: 3, timeLeft: 42.37, boostAt: -1e9, spHull: .9, gevShield: 1, gevHp: .82, gevWeap: 0, cgHeat: .82, cgOver: false };
 const button = (label, fn) => { const b = document.createElement("button"); b.className = "pl act"; b.innerHTML = `<i class="mk"></i><span class="lb">${label}</span>`; b.addEventListener("click", fn); ctl.appendChild(b); };
 /* The HUD prompt (section 14.8): Exit on every ride, Boost on the speeder while a boost is ready. Classic shows only
    the stock lines (the walker-style exit line on the speeder, whose expansion HUD lost it, and its boost line). */
@@ -341,6 +342,11 @@ function build() {
     button("Boost", () => { st.boostAt = performance.now(); paint(); });
     button("Last 10 seconds", () => { st.timeLeft = 9.8; paint(); });
     button("Take a hit", () => { st.spHull = st.spHull > .25 ? .2 : .9; paint(); });
+  } else if (veh === "chaingun") {
+    chaingunHud(layer, lay, classic);
+    button("Fire a burst", () => { if (st.cgOver) return; st.cgHeat = Math.min(1, st.cgHeat + .2); if (st.cgHeat >= 1) st.cgOver = true; paint(); });
+    button("Hold the trigger", () => { if (st.cgOver) return; st.cgHeat = 1; st.cgOver = true; paint(); });
+    button("Let it cool", () => { st.cgHeat = 0; st.cgOver = false; paint(); });
   } else {
     parts.gev = gevHud(classic ? hud.place(layer, "bl", lay) : hud.place(layer, "bc", lay, " translate(210.5 0)"), defs);
     button("Hit the shields", () => { st.gevShield = st.gevShield <= 0 ? 1 : Math.max(0, +(st.gevShield - .25).toFixed(2)); paint(); });
@@ -348,7 +354,53 @@ function build() {
   }
   paint(); drawPrompt(performance.now());
 }
+/* ---------------- The chaingun turret (section 14.12, Appendix C 1.39; remastered_hud_awakening.py heat_gauge,
+   heat_reticle): the gunner's on-foot Marine status bar with the barrel heat on the ammunition gauge, and the heat under
+   the crosshair. Classic builds it on the stock vehicle bar: HEALTH and ARMOR with values, HEAT on the panel's top row
+   (OVERHEATED while the gun vents) and the heat in the charge bar. ---------------- */
+const HEAT = "#FF9E1A", HEAT_HOT = "#FF3300";
+function chaingunHud(layer, lay, classic) {
+  A.crosshairAt?.(layer);
+  const sb = hud.place(layer, "bc", lay);
+  if (classic) {
+    parts.cbar = A.vehicleBar?.(sb, { weapon: "mgun", other: "mgun", hull: .8, shield: .5, charge: 0, labels: ["HEALTH", "ARMOR"], values: [80, 50], otherText: "HEAT" });
+  } else {
+    const heatG = A.marineGauge(sb, 101, "ammo", { color: HEAT });
+    heatG.icon.innerHTML = ""; heatG.num.setAttribute("x", 118);
+    if (A.ICONS?.veh_mgun) A.icon(heatG.root, "veh_mgun", { x: 9, y: 17, h: 22, color: "#C7BD78", opacity: .4 });
+    const waves = svgEl("g", {}, heatG.root);
+    [101.5, 106, 110.5].forEach(x0 => svgEl("path", { d: "M" + Array.from({ length: 13 }, (_, k) => `${(x0 + 1.4 * Math.sin(Math.PI * 3 * k / 12)).toFixed(2)} ${(53 - 14 * k / 12).toFixed(2)}`).join("L"),
+      fill: "none", "stroke-width": 1.9, "stroke-linecap": "round", "stroke-linejoin": "round" }, waves));
+    A.marineGauge(sb, 278, "health").set(80, .8); A.marineGauge(sb, 414, "armor").set(50, .5);
+    parts.cg = { heatG, waves };
+  }
+  // under the crosshair once the barrel is warm: a 40x3 u bar, and OVERHEATED while the gun vents
+  const xh = svgEl("g", {}, hud.place(layer, "cc", lay));
+  svgEl("rect", { x: 300, y: 262, width: 40, height: 3, fill: "#000", "fill-opacity": .45 }, xh);
+  const bar = svgEl("rect", { x: 300, y: 262, width: 0, height: 3 }, xh);
+  const over = svgEl("g", {}, xh);
+  [[1, "#000"], [0, HEAT_HOT]].forEach(([d, c]) => svgEl("text", { x: 320 + d, y: 281 + d, "text-anchor": "middle", "font-family": F_M, "font-size": 7, fill: c, "fill-opacity": d ? .8 : 1 }, over).textContent = "OVERHEATED");
+  if (!reduce) svgEl("animate", { attributeName: "opacity", values: "1;.55;1", dur: ".5s", repeatCount: "indefinite" }, over);
+  parts.xh = { g: xh, bar, over };
+}
+function paintChaingun() {
+  const h = st.cgHeat, hot = h >= .75 || st.cgOver;
+  if (parts.cg) { const { heatG, waves } = parts.cg;
+    heatG.set(Math.round(h * 100), h);
+    heatG.trackFill.setAttribute("fill", hot ? HEAT_HOT : HEAT); heatG.trackFill.setAttribute("fill-opacity", hot ? .35 : .2);
+    heatG.fill.setAttribute("fill", hot ? HEAT_HOT : HEAT); heatG.fill.setAttribute("fill-opacity", hot ? .6 : .35);
+    heatG.bevel.setAttribute("stroke", hot ? HEAT_HOT : HEAT);
+    [heatG.trackFill, heatG.fill].forEach(e => e.classList.toggle("rim-on", hot && !reduce));
+    heatG.num.setAttribute("fill", hot ? HEAT_HOT : "#DDEBC3");
+    waves.setAttribute("stroke", hot ? HEAT_HOT : "#A8A360"); waves.setAttribute("stroke-opacity", hot ? .8 : .6); }
+  if (parts.cbar) { parts.cbar.charge?.setAttribute("width", (74 * h).toFixed(1)); if (parts.cbar.otherText) {
+    parts.cbar.otherText.textContent = st.cgOver ? "OVERHEATED" : "HEAT"; parts.cbar.otherText.setAttribute("fill", st.cgOver ? HEAT_HOT : "#A8A360"); } }
+  if (parts.xh) { parts.xh.g.setAttribute("opacity", h > .02 || st.cgOver ? 1 : 0); parts.xh.bar.setAttribute("width", (40 * h).toFixed(2));
+    parts.xh.bar.setAttribute("fill", hot ? HEAT_HOT : HEAT); parts.xh.bar.setAttribute("fill-opacity", hot ? .9 : .85);
+    parts.xh.over.setAttribute("display", st.cgOver ? "inline" : "none"); }
+}
 function paint() {
+  if (veh === "chaingun") paintChaingun();
   if (parts.panel) { parts.panel.dmg.forEach((d, i) => d.setAttribute("opacity", i < st.dmg ? 1 : 0));
     parts.panel.marks.forEach((m, i) => m.m.setAttribute("opacity", i === st.marker - 1 ? 1 : 0)); }
   if (parts.mcc) parts.mcc.set(st.hull);
@@ -390,6 +442,10 @@ function tick(now) {
     speedo.tick(now, boosting ? 142 : 86);
     drawPrompt(now);
   } else blurLayer.setAttribute("opacity", 0);
+  if (veh === "chaingun") {                     // the barrel cools; a vent runs until it is cold
+    if (!reduce) { st.cgHeat = Math.max(0, st.cgHeat - (st.cgOver ? .006 : .0025)); if (st.cgHeat <= 0) st.cgOver = false; }
+    paintChaingun();
+  }
   if (parts.gev) { const pulse = Math.floor(now / 500) % 2; parts.gev.out.setAttribute("stroke", pulse || reduce ? "#FF591A" : "#80591A");
     parts.gev.hull.setAttribute("transform", `rotate(${reduce ? 0 : (24 * Math.sin(now / 5000 * 2 * Math.PI)).toFixed(2)})`);
     parts.gev.charge.setAttribute("width", st.gevWeap === 0 ? (53 * ((now % 2400) / 2400)).toFixed(1) : 53); }

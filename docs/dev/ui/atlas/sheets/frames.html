@@ -7,20 +7,62 @@
 .info svg{width:18px;height:18px}
 .tip{position:absolute;z-index:6;max-width:240px;pointer-events:none;opacity:0;transition:opacity .1s linear}
 .tip.show{opacity:1}
-.ddwrap{position:relative;max-width:420px}
-.ddwrap .pop{position:absolute;left:38%;right:0;top:36px;z-index:4;display:none}
-.ddwrap .pop.open{display:block;animation:popIn .1s linear both}
-@keyframes popIn{from{opacity:0;translate:0 -4px}}
 .mdemo .scrim,.mdemo .gcol,.mdemo .modal{transition:none}
 .mdemo-ctl{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
 .stack-order{display:grid;gap:3px;max-width:360px;font:12px/1.3 var(--f-mono);color:var(--ter)}
 .stack-order span{display:flex;justify-content:space-between;gap:12px;padding:5px 10px;background:linear-gradient(90deg,rgba(139,150,75,var(--a)),transparent);clip-path:polygon(6px 0,100% 0,100% 100%,0 100%,0 6px)}
 .stack-order b{font-weight:500;color:var(--sec)}
-@media (prefers-reduced-motion:reduce){.ddwrap .pop.open{animation:none}}
+
+/* the stock modal with its black frame (build_retained_screens.confirmation), drawn by scripts/frames-hovercard.js */
+.fm-modal > svg.fm-art{position:absolute;inset:0;width:100%;height:100%;z-index:-1;overflow:visible;pointer-events:none}
+.fm-modal .mt{left:30.1px;top:5.4px;font-size:13.8px;color:rgba(255,255,255,.9);z-index:1}
+.fm-modal .mact{justify-content:space-between}
+.fm-modal .mact .pg{flex:none}
+.fm-energy{display:none}
+.fm-live .fm-energy{display:block}
+.fm-halo{animation:fmHalo 7.2s linear infinite}
+@keyframes fmHalo{0%,100%{opacity:.35}50%{opacity:1}}
+.fm-spin{transform-box:view-box;animation:fmSpin 7.2s linear infinite}
+@keyframes fmSpin{to{rotate:360deg}}
+.fm-wave{animation:fmWave 7.2s linear infinite}
+@keyframes fmWave{0%,12.5%{translate:0 var(--from);opacity:0}15.3%{opacity:1}30.5%{opacity:1}33.3%{translate:0 var(--to);opacity:0}100%{translate:0 var(--to);opacity:0}}
+
+/* the DISPLAY page's plate dialog (retained_system.dialog) */
+.fm-dlg{position:relative;z-index:1;box-sizing:border-box;width:min(560px,100%);padding:16px;isolation:isolate}
+.fm-dlg > svg.fm-art{position:absolute;inset:0;width:100%;height:100%;z-index:-1;overflow:visible;pointer-events:none}
+.fm-dlg h4{margin:0 0 12px;font:400 15.2px/28px var(--f-marine);text-transform:uppercase;color:rgba(255,255,255,.88)}
+.fm-dlg p{margin:0 0 8px;min-height:48px;font:400 11px/23px var(--f-marine);color:rgba(255,255,255,.88)}
+.fm-dlg .cnt{font:400 19.3px/34px var(--f-marine);color:var(--orange);margin-bottom:12px;font-variant-numeric:tabular-nums}
+.fm-acts{display:flex;flex-wrap:wrap;gap:8px}
+.fm-btn{position:relative;flex:1 1 128px;min-height:44px;padding:10px;border:0;background:none;cursor:pointer;outline:none;isolation:isolate;
+  font:400 11px/23px var(--f-marine);text-transform:uppercase;color:rgba(255,255,255,.88)}
+.fm-btn > svg{position:absolute;inset:0;width:100%;height:100%;z-index:-1;overflow:visible;pointer-events:none}
+.fm-btn .fo{opacity:.12;transition:opacity .3s linear}
+.fm-btn:hover .fo,.fm-btn.is-hover .fo{opacity:.55;transition:none}
+.fm-btn:focus-visible .fo,.fm-btn.is-focus .fo{opacity:1;transition:opacity .08s ease-out}
+.fm-btn:active .fo{opacity:.8}
+
+/* the tab strip (retained_mp_menus.tab_strip) and the header band (retained_create_server.header_band) */
+.fm-strip{position:relative;display:flex;align-items:flex-end;height:30px;padding:0 38px;max-width:880px;box-sizing:border-box}
+.fm-strip > svg{position:absolute;left:0;top:0;width:100%;height:30px;overflow:visible;pointer-events:none;z-index:0}
+.fm-tab{position:relative;z-index:1;flex:1 0 auto;height:30px;padding:0 23px 0 8px;border:0;background:none;cursor:pointer;outline:none;
+  font:400 9.7px/30px var(--f-marine);text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.55);transition:color .3s linear}
+.fm-tab:hover{color:rgba(255,255,255,.85);transition:none}
+.fm-tab.on{color:#fff}
+.fm-tab:focus-visible{color:var(--orange)}
+.fm-key{position:absolute;z-index:1;top:4px;width:20px;height:22px;border:0;padding:0;cursor:pointer;background:rgba(255,255,255,.85);
+  font:600 13px/22px var(--f-low);color:#0A0D09;clip-path:polygon(0 0,100% 0,100% 100%,6px 100%,0 calc(100% - 6px))}
+.fm-key:hover{background:#fff}
+.fm-key.pv{left:12px}.fm-key.nx{right:12px}
+.fm-tabbody{max-width:880px;padding:12px 4px 4px 21px;font:500 14px/1.5 var(--f-low);color:rgba(255,255,255,.4)}
+.fm-band{position:relative;height:34.5px;display:flex;align-items:center;padding-left:21px;max-width:880px;isolation:isolate;
+  font:500 14px/1 var(--f-low);color:rgba(255,255,255,.4)}
+.fm-band > svg{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.fm-energy,.fm-live .fm-energy{display:none}.fm-btn .fo,.fm-tab{transition:none}}
 </style>
 <section class="sheet" id="frames">
   <h2 class="sheet-h">Atlas - pop-up frames</h2>
-  <p class="sheet-p">Every transient surface uses one construction from a small catalogue: the modal, the card, the hover card, the tooltip, and openQ4's dropdown and action popovers built from the popover construction. A frame stays 16 dp inside the safe area, flips before it clips, and never covers the crosshair, the prompt bar or the touch controls.</p>
+  <p class="sheet-p">Every transient surface uses one construction from a small catalogue: the stock modal, the DISPLAY page's plate dialogs, the card, the hover card, the tooltip and the dropdown list. Every pop-up carries a thin opaque black frame (version 1.38). A frame stays 16 dp inside the safe area, flips before it clips, and never covers the crosshair, the prompt bar or the touch controls.</p>
   <div class="stage dim hzone menu" id="hzone">
     <h3 class="h5" style="margin-bottom:8px">Hover card and tooltip · move the pointer over the rows</h3>
     <div class="tbl" style="--cols:minmax(150px,2fr) 1fr 1fr 64px;min-width:0;overflow-x:auto">
@@ -36,24 +78,33 @@
 
   <div class="stage mstage mdemo menu" id="mdemo">
     <div class="scrim" id="mdScrim"></div><div class="gcol" id="mdGlow"></div>
-    <div class="fr modal" data-shape="modal" role="dialog" aria-label="Quit game" id="mdFrame">
-      <div class="mt" id="mdTitle">Quit game</div>
-      <p id="mdBody">Leave Quake 4? Progress since the last checkpoint is lost.</p>
-      <div class="mact" id="mdActs"><button class="pl act is-focus"><i class="mk"></i><span class="lb">Yes</span></button><button class="pl act"><i class="mk"></i><span class="lb">No</span></button></div>
+    <div class="fr modal fm-modal fm-live" role="dialog" aria-label="Exit game" id="mdFrame">
+      <div class="mt" id="mdTitle">Exit game</div>
+      <p id="mdBody">Are you sure you want to exit Quake4?</p>
+      <div class="mact" id="mdActs"><button class="pg pg-act" data-pg="act"><span class="pg-lb">Yes</span></button><button class="pg pg-act is-focus" data-pg="act"><span class="pg-lb">No</span></button></div>
     </div>
   </div>
-  <div class="mdemo-ctl"><button class="replay" id="mdEnter">Play modal.enter</button><button class="replay" id="mdLeave">Play modal.leave</button><span class="cap">The title screen stays visible around the dialog, in soft focus rather than behind a black scrim. Enter: over 200 ms the soft focus comes in (a 5 u blur and 0.80 saturation, never dimmed), the glow, cut to the dialog and its 6 dp lit margin, brightens from black and the frame reaches 0.70; at 200 ms the title, body and actions appear together. Leave: contents hide at once; after 50 ms the soft focus and glow release over 250 ms and the frame fades over 200 ms.</span></div>
+  <div class="mdemo-ctl"><button class="replay" id="mdEnter">Play modal.enter</button><button class="replay" id="mdLeave">Play modal.leave</button><span class="cap">EXIT GAME over the title screen, NO focused. The screen stays visible in soft focus (a 5 u blur at 0.80 saturation, never dimmed); the glow, cut to the dialog and its 6 dp lit margin, stands behind the black 0.70 silhouette. <b>Black frame</b>: the silhouette's outline in black 3 dp over the glow, and a black tab behind the title, from the leading edge with the corner marker, stepping down at 45° 10 dp past the title. The raised section's trailing corner is cut 13 dp, a 4 dp lug stands out of the trailing edge and the foot has a 6 dp notch. While the contents show, a faint light swells along the outline, two pulses run around it and a wave of the glow falls through the dialog every 7.2 s (never under reduced motion). Enter: over 200 ms the soft focus, glow and frame come in, then the title, body and actions together. Leave: contents hide at once; after 50 ms the soft focus and glow release over 250 ms and the frame fades over 200 ms.</span></div>
+
+  <div class="stage mstage menu" data-under="display" style="min-height:0">
+    <div class="scrim"></div>
+    <div class="fm-dlg" role="dialog" aria-label="Keep these display settings?" id="fmDlg">
+      <h4>Keep these display settings?</h4>
+      <p>Changes are waiting for confirmation.</p>
+      <div class="cnt" id="fmCount">15</div>
+      <div class="fm-acts"><button class="fm-btn">Keep</button><button class="fm-btn is-focus">Revert</button></div>
+    </div>
+  </div>
+  <p class="cap"><b>DISPLAY's dialogs</b> (Keep or Revert after a display change, and unapplied changes on the way out) are plates rather than the stock modal: #090C08 cut 12 dp at three corners in a 1 dp olive 0.70 outline over a 4 dp black stroke, so 2 dp of black shows outside it; 35 em wide at most, padding 16 dp; the title Marine 22 dp, the message Marine 16 dp and the countdown Marine 28 dp in orange; actions are 6 dp cut plates whose orange outline rests at 0.12, 0.55 under the pointer and 1.00 focused, wrapping as the text grows. No glow: the page beneath stays in soft focus.</p>
 
   <div class="grid">
     <div class="demo">
-      <h3 class="h5">Dropdown list (openQ4) · click the value</h3>
-      <div class="ddwrap">
-        <button class="pl row" id="ddBtn" aria-haspopup="listbox" aria-expanded="false"><span class="lb">Display mode</span><span class="val"><span id="ddVal">Borderless</span><i class="chev"></i></span></button>
-        <div class="fr pop" data-shape="pop" id="ddPop" role="listbox">
-          <div class="dd" style="display:block"><div class="opt">Windowed</div><div class="opt sel">Borderless</div><div class="opt">Fullscreen</div><div class="opt">Custom fullscreen</div></div>
-        </div>
+      <h3 class="h5">Dropdown list · click the value</h3>
+      <div class="sr-col" style="--vx:181px;position:relative;z-index:2;min-height:260px;align-content:start">
+        <div class="sr" data-sr="choice" data-options="OpenGL|Vulkan" data-pick="0" tabindex="0"><span class="sr-l">Rendering Backend</span><span class="sr-v">OpenGL</span></div>
+        <div class="sr is-focus" data-sr="choice" data-open="1" data-options="Minimum|Low Power|Low|Performance|Balanced|Enhanced|Quality|Ultra|Maximum" data-pick="5" tabindex="0"><span class="sr-l">Performance Preset</span><span class="sr-v">Enhanced</span></div>
       </div>
-      <p class="cap" style="margin-top:150px">As wide as the value column, eight rows before it scrolls, below its value or above when space is short, never over its own row. <b>popover.enter</b> 100 ms: opacity and 4 dp.</p>
+      <p class="cap">The stock kick-player list in the popover construction, placed by the runtime under its row (above when the room below is short) and as wide as the row, never over the row itself; eight 22 dp rows, then it scrolls. Black 0.96, a #B2CD43 0.20 hairline and a 4 dp black frame beneath. <b>list.unfold</b>; a pick, Back or an outside click closes it.</p>
     </div>
     <div class="demo">
       <h3 class="h5">Layering, bottom to top</h3>
@@ -72,11 +123,11 @@
           <div class="chead">Join match</div>
           <p>Deathmatch on q4dm5. 9 of 16 players, 7:12 remaining. Joining puts you in the next respawn wave.</p>
           <div class="stack" style="max-width:none">
-            <button class="pl act is-focus"><i class="mk"></i><span class="lb">Join game</span></button>
-            <button class="pl act"><i class="mk"></i><span class="lb">Spectate</span></button>
+            <button class="pg pg-act is-focus" data-pg="act" style="--w:100%"><span class="pg-lb">Join game</span></button>
+            <button class="pg pg-act" data-pg="act" style="--w:100%"><span class="pg-lb">Spectate</span></button>
           </div>
         </div>
-        <p class="cap"><b>header</b> 40 dp, 1 dp rule, 8 dp triangle, wash fading toward the trailing edge · <b>content inset</b> 24 dp (16 dp compact).</p>
+        <p class="cap">Black 0.94 inside one 1.5 dp <b>marine.rail.card</b> rail, 12 dp cuts at the top-trailing and bottom-leading corners and 3 dp at the others · <b>header</b> 40 dp, 1 dp rule, 8 dp triangle, wash fading toward the trailing edge · <b>content inset</b> 24 dp (16 dp compact).</p>
       </div>
       <div class="demo">
         <h3 class="h5">Hover card · follows the pointer 6 dp away</h3>
@@ -86,28 +137,27 @@
         <p class="cap"><b>content inset</b> 10 dp · Lowpixel 14 dp and Profont 13 dp · appears at once.</p>
         <h3 class="h5">Tooltip · small popover</h3>
         <div class="fr pop" data-shape="pop">Changes take effect after a restart.</div>
-        <p class="cap">Appears after 300 ms and fades in over 100 ms; neighbors in the same group replace it at once. Small popovers keep the card construction with 6 dp major cuts.</p>
+        <p class="cap">Appears after 300 ms and fades in over 100 ms; neighbors in the same group replace it at once. Small popovers keep the card construction.</p>
       </div>
     </div>
   </div>
-  <div class="grid">
+  <div class="grid wide">
     <div class="demo">
-      <h3 class="h5">Tab strip · active tab rises 33 dp</h3>
-      <div class="tabs" role="tablist" aria-label="Settings categories">
-        <span class="tabkey" aria-hidden="true">Q</span>
-        <button class="tab" role="tab" aria-selected="false" data-tab="t-game">Game</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="t-controls">Controls</button>
-        <button class="tab on" role="tab" aria-selected="true" data-tab="t-system">System</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="t-audio">Audio</button>
-        <span class="tabkey" aria-hidden="true">E</span>
+      <h3 class="h5">Tab strip · the Escape card's, and every settings category's</h3>
+      <div class="fm-strip" role="tablist" aria-label="Display sections" id="fmStrip">
+        <button class="fm-key pv" aria-label="Previous tab">Q</button>
+        <button class="fm-tab on" role="tab" aria-selected="true" data-body="GRAPHICS · the preset, the renderer and the interface's sizes.">Graphics</button>
+        <button class="fm-tab" role="tab" aria-selected="false" data-body="SCREEN · resolution, display mode, refresh rate and frame pacing.">Screen</button>
+        <button class="fm-tab" role="tab" aria-selected="false" data-body="IMAGE QUALITY · brightness, lighting, post-processing and resolution scale.">Image quality</button>
+        <button class="fm-key nx" aria-label="Next tab">E</button>
       </div>
-      <div class="tabbody" data-tabbody>SYSTEM · display, rendering and performance settings. Bumpers or a horizontal swipe change category.</div>
-      <p class="cap">The multiplayer menus' construction: the baseline rail breaks under the active tab, which rises with a small leading flare and an 18 dp 45° trailing shoulder, filled <b>#5A652A</b> from 1.00 to 0.60, and a wash fades below the strip over one tab height. Centered Marine labels at 0.55, 0.85 on hover and white when active; the previous and next glyphs sit at the ends.</p>
+      <div class="fm-tabbody" id="fmTabBody">GRAPHICS · the preset, the renderer and the interface's sizes.</div>
+      <p class="cap">Q and E keycaps 12 dp in at the ends; the tabs share the rest. The active tab rises 30 dp with a 3 dp leading flare and an 18 dp 45° trailing shoulder, filled <b>#5A652A</b> from 1.00 to 0.60 inside a white 0.75 outline, and the baseline (white 0.75) breaks under it; a #5A652A wash fades below the strip over one tab height. Marine 14 dp labels at 0.55, 0.85 on hover, white when active, orange focused. Q, E, the bumpers, a swipe or a click change tab, cross-fading the pages over 150 ms.</p>
     </div>
     <div class="demo">
       <h3 class="h5">Header band · olive 0.60</h3>
-      <div class="fr" data-shape="hband" style="height:34px;display:flex;align-items:center;padding:0 16px;font:600 14px/1 var(--f-low);letter-spacing:.08em;color:var(--t80)">DISPLAY</div>
-      <p class="cap">Upper-leading cut of 12 dp, top and leading rails, fill 49% fading from 60% of the width. Scoreboards use team colors: Marine <b style="color:#6AA42B">#6AA42B</b>, Strogg <b style="color:#FF7B04">#FF7B04</b>.</p>
+      <div class="fm-band" id="fmBand">GRAPHICS</div>
+      <p class="cap">A page that fits one screen has no strip, only the header band behind its columns' headings: an upper-leading cut of 9 u, top and leading rails, the fill at 0.49 to half the width, half that at 75 % and a tenth at 95 %, all at 0.60. Headings Lowpixel 14 dp at 0.40, 21 dp in. Scoreboards use team colors: Marine <b style="color:#6AA42B">#6AA42B</b>, Strogg <b style="color:#FF7B04">#FF7B04</b>.</p>
     </div>
   </div>
 </section>

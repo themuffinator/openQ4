@@ -54,43 +54,79 @@ const shadowed = (parent, x, y, t, o) => { const g = svgEl("g", {}, parent);
 const OBJ = [
   ["Reach the hangar control room", "Strogg forces hold the hangar. Fight through the perimeter and restore power to the control room so the dropship can land."],
   ["Destroy the three Strogg communication relays before the convoy leaves the staging area", "Each relay feeds the Strogg network. Use explosives to bring them down; the convoy cannot move until all three are silent."],
-  ["Rendezvous with Rhino Squad", "Meet Rhino Squad at the medical bay. Keep the squad medic alive and escort the wounded to the evacuation point. Strogg reinforcements are expected from the east tunnels, so hold the corridor until the lift arrives, then report to the squad leader."],
+  ["Rendezvous with Rhino Squad", "Meet Rhino Squad at the medical bay. Keep the squad medic alive and escort the wounded to the evacuation point. Strogg reinforcements are expected from the east tunnels, so hold the corridor until the lift arrives."],
 ];
 const pda = document.getElementById("pdaSvg");
 if (pda) {
-  let remastered = false, strogg = false;
+  let remastered = true, strogg = false, none = false, toggleMode = false;
   const defs = svgEl("defs", {}, pda);
   const bg = svgEl("linearGradient", { id: "pdaBar", gradientUnits: "userSpaceOnUse", x1: 0, x2: 380 }, defs);
   [[0, .8], [.5, .8], [.75, .4], [1, 0]].forEach(([o, a]) => svgEl("stop", { offset: o, "stop-color": "#000", "stop-opacity": a }, bg));
   const root = svgEl("g", {}, pda);
+  const DONE = ["Regroup with Rhino Squad", "Reach the motor pool", "Find a way through the tunnels", "Disable the tetranode"];
   let parts;
+  /* The no-objectives screenshot (gfx/objectives/none): static behind the prohibition sign, as a vector stand-in. */
+  function noneShot(parent, x, y) {
+    const g = svgEl("g", {}, parent);
+    svgEl("rect", { x, y, width: 134, height: 100, fill: "#1b1d1a", stroke: "#000", "stroke-width": 1 }, g);
+    for (let k = 0; k < 50; k++) svgEl("rect", { x: x + 1, y: y + 1 + k * 2, width: 132, height: .7, fill: "#fff", "fill-opacity": .03 + (k * 37 % 7) * .012 }, g);
+    svgEl("circle", { cx: x + 67, cy: y + 50, r: 30, fill: "none", stroke: "#fff", "stroke-opacity": .2, "stroke-width": 9 }, g);
+    svgEl("path", { d: `M${x + 46} ${y + 71}L${x + 88} ${y + 29}`, stroke: "#fff", "stroke-opacity": .2, "stroke-width": 9 }, g);
+    return g;
+  }
   function build() {
     root.innerHTML = "";
     const lay = hud.fit(pda); hud.regionsLayer(root, lay);
     const g = hud.place(root, "cl", lay);
     const col = strogg ? "#FF9000" : "#B0CD6B", mark = strogg ? "#FF9900" : "#B0CD6B";
+    const head = { "font-family": strogg ? F_S : F_M, "font-weight": strogg ? 600 : 400, "font-size": 8.4, "letter-spacing": -.4, fill: "#FF8000" };
+    const serial = strogg ? "STROGG NET 45B-43556-BGX7J54" : "SMC MILCOMM 45B-43556-BGX7J54";
     const bar = svgEl("rect", { x: -40, y: 10, width: 420, height: 460, fill: "url(#pdaBar)" }, g);
     const frames = svgEl("g", { opacity: .4 }, g), text = svgEl("g", {}, g);
-    svgEl("text", { x: 9, y: 27, "font-family": strogg ? F_S : F_M, "font-weight": strogg ? 600 : 400, "font-size": 8.4, "letter-spacing": -.4, fill: "#FF8000" }, text).textContent = ">>MISSION OBJECTIVES";
-    let y0 = 35;
-    OBJ.forEach(([title, desc], i) => {
-      const tl = remastered ? wrap(title, 52) : [title.length > 52 ? title.slice(0, 52) : title];
-      const dl = wrap(desc, 35), shown = remastered ? dl : dl.slice(0, 7);
-      const extra = Math.max(0, (remastered ? shown.length - 6 : 0) * 13.75 + (tl.length - 1) * 12);
-      objPlate(frames, 6, y0, 600, 112 + extra, 20, col, [.29, .40, .51, .56]);
+    /* Remastered (remastered_hud_objectives.py display()): a column centred on the view: the heading (16 u + 2), the
+       entries three at a time (at least 132 u each plus 11), the empty plate, COMPLETED and the serial (12 + 12 u).
+       An entry: the title on up to two lines of 308 u, the screenshot, and the description on 178 u without a limit.
+       Stock: the newest three on a fixed 143 u pitch from 35 u, descriptions cut at seven lines. */
+    const ents = none ? [] : OBJ.map(([title, desc]) => {
+      const tl = remastered ? wrap(title, 52).slice(0, 2) : [title.length > 52 ? title.slice(0, 52) : title];
+      const dl = remastered ? wrap(desc, 35) : wrap(desc, 35).slice(0, 7);
+      const h = remastered ? Math.max(132, 4 + tl.length * 12 + 2 + Math.max(100, dl.length * 13.75) + 14) : 132;
+      return { tl, dl, h };
+    });
+    const colH = 18 + (none ? 143 : ents.reduce((s, e) => s + e.h + 11, 0)) + (remastered && !none ? 14 : 0) + 24;
+    const top = remastered ? (480 - colH) / 2 : 17;
+    svgEl("text", { x: 9, y: top + 10, ...head }, text).textContent = ">>MISSION OBJECTIVES";
+    let y0 = top + 18;
+    if (none) {
+      objPlate(frames, 6, y0, 600, 112, 20, col, [.29, .40, .51, .56]);
+      noneShot(text, 28, y0 + 17);
+      ["No current mission", "objectives."].forEach((t, k) => svgEl("text", { x: 170, y: y0 + 54 + k * 16, "font-family": F_L, "font-weight": 500, "font-size": 14.9, fill: "#D0DEB6" }, text).textContent = t);
+      y0 += 143;
+    }
+    ents.forEach(({ tl, dl, h }, i) => {
+      objPlate(frames, 6, y0, 600, h - 20, 20, col, [.29, .40, .51, .56]);
       svgEl("path", { d: `M16 ${y0 + 5}h8v8.5z`, fill: mark }, frames);
       tl.forEach((t, k) => svgEl("text", { x: 26, y: y0 + 14 + k * 12, "font-family": F_L, "font-weight": 500, "font-size": 10, fill: "#fff" }, text).textContent = t);
       const oy = (tl.length - 1) * 12;
       shot(text, 28, y0 + 18 + oy, i);
-      shown.forEach((t, k) => svgEl("text", { x: 170, y: y0 + 30 + oy + k * 13.75, "font-family": F_L, "font-weight": 500, "font-size": 10, fill: "#D0DEB6" }, text).textContent = t);
-      y0 += 143 + (remastered ? extra : 0);
+      dl.forEach((t, k) => svgEl("text", { x: 170, y: y0 + 30 + oy + k * 13.75, "font-family": F_L, "font-weight": 500, "font-size": 10, fill: "#D0DEB6" }, text).textContent = t);
+      y0 += remastered ? h + 11 : 143;
     });
-    const serial = strogg ? "STROGG NET 45B-43556-BGX7J54" : "SMC MILCOMM 45B-43556-BGX7J54";
     if (remastered) {
-      svgEl("rect", { x: 614, y: 35, width: 3, height: 420, fill: "#B0CD6B", "fill-opacity": .15 }, text);
-      svgEl("rect", { x: 613, y: 35, width: 5, height: 180, fill: "#B0CD6B", "fill-opacity": .55 }, text);
-      svgEl("text", { x: 26, y: 470, "font-family": F_L, "font-weight": 600, "font-size": 8.7, "letter-spacing": .6, fill: "#fff", "fill-opacity": .4 }, text).textContent = "COMPLETED · 4    ▼";
+      if (!none) {      // COMPLETED: out of view the section is its collapsed header, pointing on; scrolled to, it lists them
+        const t = svgEl("text", { x: 24, y: y0 + 11, "font-family": F_L, "font-weight": 500, "font-size": 8.7, fill: "#fff", "fill-opacity": .4 }, text);
+        t.textContent = `COMPLETED  ${DONE.length}`;
+        const tw = t.getComputedTextLength ? t.getComputedTextLength() : 60;
+        svgEl("path", { d: `M${30 + tw} ${y0 + 5}h7l-3.5 5z`, fill: "#fff", "fill-opacity": .4 }, text);
+        y0 += 14;
+        // the scrollbar at the plates' trailing end: four items, three in view
+        svgEl("rect", { x: 614, y: 35, width: 3, height: 420, fill: col, "fill-opacity": .15 }, text);
+        svgEl("rect", { x: 613, y: 35, width: 5, height: 315, fill: col, "fill-opacity": .55 }, text);
+      }
+      svgEl("text", { x: 26, y: y0 + 12 + 9, "font-family": strogg ? F_S : F_M, "font-size": 4.7, "letter-spacing": -.3, fill: "#D9E7BF", "fill-opacity": .25 }, text).textContent = serial;
     } else svgEl("text", { x: 26, y: 465, "font-family": strogg ? F_S : F_M, "font-size": 4.7, "letter-spacing": -.3, fill: "#D9E7BF", "fill-opacity": .25 }, text).textContent = serial;
+    // Toggle Objectives (g_objectivesToggle): the HUD prompt names the control that closes the display
+    if (toggleMode && !hud.classic) A.hudPrompt?.(hud.place(root, "br", lay), { x: 629, y: 476, items: [{ kbm: "TAB", pad: "BACK", touch: "scores", label: "Close" }] });
     parts = { bar, frames, text };
   }
   build(); hud.on(build);
@@ -104,7 +140,7 @@ if (pda) {
   };
   document.getElementById("pdaShow")?.addEventListener("click", enter);
   const tog = (id, fn) => { const b = document.getElementById(id); b?.addEventListener("click", e => { e.stopImmediatePropagation(); const on = b.classList.toggle("on"); b.setAttribute("aria-pressed", on); fn(on); build(); }, true); };
-  tog("pdaRem", on => { remastered = on; }); tog("pdaStrogg", on => { strogg = on; });
+  tog("pdaRem", on => { remastered = on; }); tog("pdaStrogg", on => { strogg = on; }); tog("pdaNone", on => { none = on; }); tog("pdaToggle", on => { toggleMode = on; });
 }
 
 /* Notices over gameplay. Classic keeps the stock back bars on the 4:3 canvas. Remastered anchors the new-objective
@@ -158,8 +194,8 @@ if (nt) {
 
     fl = svgEl("g", { opacity: 0 }, nt);
     fade = svgEl("rect", { x: lay.x0, y: lay.y0, width: lay.W, height: lay.H, fill: "#000", opacity: 0 }, nt);
-    svgEl("text", { x: 320, y: 228, "text-anchor": "middle", "font-family": F_M, "font-size": 16.8, "letter-spacing": -1, fill: "#FF0000" }, fl).textContent = "OBJECTIVE FAILED:";
-    svgEl("text", { x: 320, y: 268, "text-anchor": "middle", "font-family": F_M, "font-size": 16.8, "letter-spacing": -1, fill: "#fff" }, fl).textContent = "PROTECT THE CONVOY";
+    svgEl("text", { x: 320, y: 232, "text-anchor": "middle", "font-family": F_M, "font-size": 16.8, "letter-spacing": -1, fill: "#FF0000" }, fl).textContent = "OBJECTIVE FAILED:";
+    svgEl("text", { x: 320, y: 272, "text-anchor": "middle", "font-family": F_M, "font-size": 16.8, "letter-spacing": -1, "font-variant": "small-caps", fill: "#fff" }, fl).textContent = "Protect the convoy";
     nt.appendChild(fl);
     nw.g.setAttribute("opacity", state.nw ? 1 : 0); cp.g.setAttribute("opacity", state.cp ? 1 : 0);
   }

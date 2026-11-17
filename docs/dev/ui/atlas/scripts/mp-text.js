@@ -28,7 +28,7 @@ const wrapPx = (text, size, width) => { const words = text.split(" "), out = [];
    Its bottom sits 8 u above the gauges; where the leading screen is too narrow for its width (below 16:9) it is 200 u
    wide and rises clear of the weapon strip too. Lines: channel tag, name, message; each on its own plate as wide as
    its text. The input opens at the box's bottom and pushes the lines up, never down toward the status bar. */
-A.mpChat = (svg, lay, { lines, team, input, channel = "all", typed = "", limit = 150, classic = false, clear = 59 }) => {
+A.mpChat = (svg, lay, { lines, team, input, channel = "all", typed = "", limit = 128, classic = false, clear = 59, teamGame = true }) => {
   const g = svgEl("g", {}, svg);
   if (classic) {                                    // stock: four lines at 8,302 on a 15 u pitch, 549 u wide, text only
     lines.slice(-4).forEach((l, i) => shadowText(g, 8, 314 + i * 15, `${l.name}${l.team ? ` (${l.team === "m" ? "Marine" : "Strogg"})` : ""}: ${l.text}`,
@@ -102,7 +102,7 @@ A.mpChat = (svg, lay, { lines, team, input, channel = "all", typed = "", limit =
     if (typed.length >= limit * .8) svgEl("text", { x: pw - 5, y: y + 12.4, "text-anchor": "end", "font-family": F_P, "font-size": 7.5, fill: typed.length >= limit ? "#E46D56" : "#fff", "fill-opacity": .6 }, box).textContent = `${limit - typed.length}`;
     // prompts with the active device's glyphs
     let px = 0; const py = y - 6;
-    [["Enter", "Send"], ["Tab", "Channel"], ["Esc", "Cancel"]].forEach(([k, label]) => {
+    [["Enter", "Send"], ...(teamGame ? [["Tab", "Channel"]] : []), ["Esc", "Cancel"]].forEach(([k, label]) => {
       const kw = measure(k, 6.6, F_P) + 6;
       svgEl("path", { d: `M${px} ${py - 7}H${px + kw}V${py + 2}H${px + 2.5}L${px} ${py - .5}Z`, fill: "#fff", "fill-opacity": .78 }, box);
       svgEl("text", { x: px + kw / 2, y: py, "text-anchor": "middle", "font-family": F_P, "font-size": 6.6, fill: "#10140A" }, box).textContent = k;

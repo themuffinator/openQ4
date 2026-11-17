@@ -47,7 +47,8 @@ const VBACK = "M36.2 10.4Q36.2 9.2 37.4 9.2H122.8Q124 9.2 124 10.4V54.7Q124 56.2
 const VFILL = "M40.6 14.8Q40.6 13.8 41.6 13.8H118.6Q119.6 13.8 119.6 14.8V34.5H107.3A16.6 16.6 0 0 0 93.2 44.7H41.6Q40.6 44.7 40.6 43.7Z";
 const VGLYPH = { rockets: ["veh_rocket", 14, 437, 26, .8], mgun: ["veh_mgun", 14, 436, 33, .8], cannon: ["veh_shell", 16, 432, 30, .6] };
 let vbN = 0;
-window.__atlas.vehicleBar = (sb, { weapon = "rockets", other = "mgun", count = null, charge = null, hull = .8, shield = .55, warnings = true } = {}) => {
+window.__atlas.vehicleBar = (sb, { weapon = "rockets", other = "mgun", count = null, charge = null, hull = .8, shield = .55, warnings = true,
+  labels = ["ARMOR", "SHIELDS"], values = null, otherText = null } = {}) => {
   const A = window.__atlas, id = "vb" + (++vbN) + Math.random().toString(36).slice(2, 6);
   const gauge = (gx, color, label, icon, cells) => {
     const root = svgEl("g", { transform: `translate(${gx} 420)` }, sb), sh = svgEl("g", { transform: "matrix(1 0 -0.22 1 6.49 0)" }, root);
@@ -67,18 +68,22 @@ window.__atlas.vehicleBar = (sb, { weapon = "rockets", other = "mgun", count = n
       fill.setAttribute("fill", c); fill.setAttribute("fill-opacity", warn ? .6 : .35);
       lab.setAttribute("fill", warn ? "#FF3300" : "#A8A360"); drawIcon(warn); } };
   };
-  const hullG = gauge(71, "#B3D06E", "ARMOR", "health", true), shdG = gauge(164, "#B2CF6D", "SHIELDS", "armor", false);
+  const hullG = gauge(71, "#B3D06E", labels[0], "health", true), shdG = gauge(164, "#B2CF6D", labels[1], "armor", false);
+  // values in Chain 0.5 where the on-foot gauges put theirs (66, 9 u, 52x26 u, right-aligned), sheared with the plate
+  const vals = values ? [71, 164].map(gx => svgEl("text", { x: gx + 118, y: 431 + 21, "text-anchor": "end", "font-family": F_C, "font-weight": 600, "font-size": 21.6, fill: "#DDEBC3", transform: "matrix(1 0 -0.22 1 98.9 0)" }, sb)) : null;
   const panel = svgEl("g", { transform: "matrix(1 0 -0.22 1 96.8 0)" }, sb);   // sheared about its own centre, y 440
   svgEl("path", { d: "M11.4 403.6H65.1L91 429H103.4V476.4H11.4Z", fill: "#000", "fill-opacity": .5 }, panel);
   const [pk, px, py, ph, po] = VGLYPH[weapon], [sk] = VGLYPH[other];
   A.icon(sb, pk, { x: px, y: py, h: ph, color: "#A8A360", opacity: po });           // upright, as in the stock
-  A.icon(sb, sk, { x: 23, y: 409, h: 17, color: "#A8A360", opacity: .4 });
+  const otherT = otherText != null ? svgEl("text", { x: 23, y: 421, "font-family": F_L, "font-weight": 600, "font-size": 9, fill: "#A8A360", "fill-opacity": .8 }, sb) : null;
+  if (otherT) otherT.textContent = otherText; else A.icon(sb, sk, { x: 23, y: 409, h: 17, color: "#A8A360", opacity: .4 });
   if (count != null) svgEl("text", { x: 97, y: 462, "text-anchor": "end", "font-family": F_C, "font-weight": 600, "font-size": 30, fill: "#D9E7BF", transform: "matrix(1 0 -0.22 1 98.9 0)" }, sb).textContent = count;
   let chargeR = null;
   if (charge != null) { svgEl("rect", { x: 9, y: 465, width: 85, height: 8, rx: 4, fill: "#B3D06E", "fill-opacity": .3 }, panel);
     chargeR = svgEl("rect", { x: 15, y: 467, width: 74 * charge, height: 4, fill: "#FF9E1A" }, panel); }
-  const api = { charge: chargeR, set(h, s) { hullG.set(h, warnings && h <= .25); shdG.set(s, warnings && s <= 0); } };
-  api.set(hull, shield);
+  const api = { charge: chargeR, otherText: otherT, set(h, s, v) { hullG.set(h, warnings && h <= .25); shdG.set(s, warnings && s <= 0);
+    if (vals && v) vals.forEach((e, i) => { e.textContent = v[i]; }); } };
+  api.set(hull, shield, values);
   return api;
 };
 
@@ -351,4 +356,70 @@ if (wd) {
   add("Railgun", "charged", s => { [[23, 1], [617, -1]].forEach(([x, sc]) => svgEl("path", { d: "M0 330Q20 140 200 100", fill: "none", stroke: "#009F9F", "stroke-width": 26, transform: `translate(${x} 0) scale(${sc} 1)`, style: "mix-blend-mode:screen;mix-blend-mode:plus-lighter" }, s));
     [[130, 255], [510, 255]].forEach(([cx, cy]) => svgEl("circle", { cx, cy, r: 52, fill: "none", stroke: "#CCFFFF", "stroke-opacity": .4, "stroke-width": 6, "stroke-dasharray": "40 14" }, s)); });
 }
+})();
+
+/* Recovery and death (section 14.20, Appendix C 1.22): scene filters over the view, below the readable HUD. Death drains
+   saturation to 0.06 and softens to 3.4 dp sigma over 1800 ms, with one focus swell (at most 4.5 dp more, up by 320 ms,
+   settled by 1570 ms), a charcoal corner shade, a softer inward shade from 300 to 2400 ms and a warm afterimage (in over
+   120 ms, gone by 1400 ms). The Air Defense crash wake restores acuity from 16 dp sigma and 0.62 saturation over the
+   authored fade plus 2300 ms, under a warm brown periphery and asymmetric feathered eyelids that open with it, with one
+   focus hesitation at 1.8-4.1 s. Reduced motion or reduced flashing drops the swell, afterimage and hesitation. */
+(() => {
+const A = window.__atlas, { svgEl } = A;
+const svg = document.getElementById("recSvg");
+if (!svg) return;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DP = 1 / 1.5;                                   // dp to u
+const defs = svgEl("defs", {}, svg);
+const filt = svgEl("filter", { id: "recF", x: "-5%", y: "-5%", width: "110%", height: "110%", "color-interpolation-filters": "sRGB" }, defs);
+const sat = svgEl("feColorMatrix", { type: "saturate", values: 1 }, filt), blur = svgEl("feGaussianBlur", { stdDeviation: 0 }, filt);
+const radial = (id, stops, r = .75) => { const g = svgEl("radialGradient", { id, cx: .5, cy: .5, r }, defs);
+  stops.forEach(([o, c, a]) => svgEl("stop", { offset: o, "stop-color": c, "stop-opacity": a }, g)); return `url(#${id})`; };
+const lin = (id, stops) => { const g = svgEl("linearGradient", { id, x1: 0, x2: 0, y1: 0, y2: 1 }, defs);
+  stops.forEach(([o, c, a]) => svgEl("stop", { offset: o, "stop-color": c, "stop-opacity": a }, g)); return `url(#${id})`; };
+const scene = svgEl("g", { filter: "url(#recF)" }, svg);
+const V = { x: -107, y: 0, width: 854, height: 480 };
+const corner = svgEl("rect", { ...V, fill: radial("recCorner", [[0, "#111", 0], [.55, "#111", 0], [1, "#111", .85]]), opacity: 0 }, svg);
+const inward = svgEl("rect", { ...V, fill: radial("recIn", [[0, "#151515", 0], [.35, "#151515", 0], [1, "#151515", .55]], .62), opacity: 0 }, svg);
+const warm = svgEl("rect", { ...V, fill: "#FF9A50", opacity: 0, style: "mix-blend-mode:screen" }, svg);
+const brown = svgEl("rect", { ...V, fill: radial("recBrown", [[0, "#2A1608", 0], [.5, "#2A1608", 0], [1, "#2A1608", .9]]), opacity: 0 }, svg);
+const lidU = svgEl("rect", { x: -107, y: 0, width: 854, height: 300, fill: lin("recLidU", [[0, "#0B0603", 1], [.62, "#0B0603", .92], [1, "#0B0603", 0]]) }, svg);
+const lidL = svgEl("rect", { x: -107, y: 260, width: 854, height: 220, fill: lin("recLidL", [[0, "#0B0603", 0], [.4, "#0B0603", .9], [1, "#0B0603", 1]]) }, svg);
+const black = svgEl("rect", { ...V, fill: "#000", opacity: 0 }, svg);
+const xh = svgEl("g", {}, svg); A.crosshairAt?.(xh);
+const later = f => document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", f, { once: true }) : f();
+later(() => A.levelshot?.(scene, "sp", { x0: -107, y0: 0, W: 854, H: 480 }));
+const ease = p => p <= 0 ? 0 : p >= 1 ? 1 : p * p * (3 - 2 * p);
+const bump = (t, a, peak, b) => t <= a || t >= b ? 0 : t < peak ? ease((t - a) / (peak - a)) : 1 - ease((t - peak) / (b - peak));
+let mode = null, t0 = 0;
+function frame(t) {
+  let s = 1, sigma = 0, c = 0, i = 0, w = 0, br = 0, lid = 0, bl = 0;
+  if (mode === "death") {
+    const p = ease(t / 1800);
+    s = 1 - .94 * p; sigma = 3.4 * p + (reduce ? 0 : 4.5 * bump(t, 0, 320, 1570));
+    c = p; i = ease((t - 300) / 2100); w = reduce ? 0 : .22 * bump(t, 0, 120, 1400);
+  } else if (mode === "wake") {
+    const FADE = 3000, p = ease(t / (FADE + 2300));
+    bl = 1 - ease(t / FADE);                          // the authored black fade-in
+    s = .62 + .38 * p; sigma = 16 * (1 - p) + (reduce ? 0 : 3 * bump(t, 1800, 2700, 4100));
+    br = 1 - p; lid = 1 - p;
+  }
+  sat.setAttribute("values", s.toFixed(3)); blur.setAttribute("stdDeviation", (sigma * DP).toFixed(2));
+  corner.setAttribute("opacity", c.toFixed(3)); inward.setAttribute("opacity", i.toFixed(3)); warm.setAttribute("opacity", w.toFixed(3));
+  brown.setAttribute("opacity", br.toFixed(3)); black.setAttribute("opacity", bl.toFixed(3));
+  lidU.setAttribute("transform", `translate(0 ${(-300 + 300 * lid * .82).toFixed(1)})`);   // the upper lid reaches further than the lower
+  lidL.setAttribute("transform", `translate(0 ${(220 - 220 * lid * .7).toFixed(1)})`);
+  xh.setAttribute("opacity", mode === "death" ? 0 : 1);
+}
+function run(m) {
+  mode = m; t0 = performance.now();
+  const step = now => { const t = now - t0; if (mode !== m) return; frame(t);
+    if (t < (m === "death" ? 3600 : 5600)) requestAnimationFrame(step); else if (m === "wake") { mode = null; frame(0); } };
+  requestAnimationFrame(step);
+}
+frame(0);
+document.getElementById("recDie")?.addEventListener("click", () => run("death"));
+document.getElementById("recWake")?.addEventListener("click", () => run("wake"));
+document.getElementById("recClear")?.addEventListener("click", () => { mode = null; frame(0); });
+A.recoveryFrame = (m, t) => { mode = m; frame(t); };     // a still of one moment in either sequence
 })();

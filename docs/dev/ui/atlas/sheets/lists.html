@@ -1,23 +1,141 @@
+<style>
+/* list rows (retained_saves.row_plates): #FF9C00 light over rows 3-61 of 64, 0.01 at rest, 0.16 under the pointer or
+   focus, 0.41 selected, its ends fading over the leading 5 % and trailing 13 %; a white 0.50 rule at row 62.5 faded
+   the same way; focus adds the orange inset along the leading edge and the foot to 87 % */
+.ls-list{display:grid;align-content:start}
+.ls-row{position:relative;display:grid;align-items:center;height:var(--rh);cursor:pointer;isolation:isolate;
+  font:500 var(--fs,14px)/1 var(--f-low);color:rgba(255,255,255,var(--ta,.8));white-space:nowrap;font-variant-numeric:tabular-nums}
+.ls-row::before{content:"";position:absolute;left:0;right:0;top:calc(var(--rh) * 3 / 64);bottom:calc(var(--rh) * 3 / 64);z-index:-1;
+  background:linear-gradient(90deg,transparent,rgba(255,156,0,var(--bo,.01)) 5%,rgba(255,156,0,var(--bo,.01)) 87%,transparent)}
+.ls-row::after{content:"";position:absolute;left:0;right:0;top:calc(var(--rh) * 62 / 64);height:1px;z-index:-1;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.5) 5%,rgba(255,255,255,.5) 87%,transparent)}
+.ls-row > span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ls-row .c2{color:rgba(255,255,255,var(--tb,.8))}
+.ls-row:hover,.ls-row.hov{--bo:.16;color:#fff}.ls-row:hover .c2,.ls-row.hov .c2{color:#fff}
+.ls-row.sel{--bo:.41}
+.ls-row.f{--bo:.16;background:linear-gradient(var(--orange),var(--orange)) 0 calc(var(--rh) * 3 / 64 + 1px)/1.2px calc(var(--rh) * 58 / 64 - 2.5px) no-repeat,
+  linear-gradient(var(--orange),var(--orange)) 0 calc(var(--rh) * 61 / 64 - 2.1px)/87% 1.2px no-repeat}
+.ls-row.f > span:first-of-type,.ls-row.f .ls-name{color:var(--orange)}
+.ls-sym{display:grid;place-items:center}.ls-sym svg{width:16px;height:16px}
+.ls-sb{position:relative;width:36px}
+.ls-sb::before{content:"";position:absolute;left:15.75px;width:4.5px;top:0;bottom:0;background:rgba(139,150,75,.15)}
+.ls-sb i{position:absolute;left:14.25px;width:7.5px;top:0;height:var(--th,80px);background:rgba(139,150,75,.55);clip-path:polygon(0 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%);cursor:pointer}
+.ls-sb i:hover{background:var(--orange)}
+
+/* the server browser (retained_join_game): 18 u rows at the stock tab stops */
+.ls-join{--rh:27px;width:906px}
+.ls-cols{display:grid;grid-template-columns:31.5px 31.5px 31.5px 316.5px 60px 31.5px 90px 135px 144px;padding-left:7.5px;box-sizing:border-box;width:880.5px}
+.ls-tool{position:relative;height:33px;width:894px;margin-left:-6px;isolation:isolate}
+.ls-tool > svg{position:absolute;inset:0;z-index:-1;overflow:visible}
+.ls-tool .mod{position:absolute;left:12px;width:88.5px;top:4.5px;text-align:right;font:400 10.4px/24px var(--f-marine);color:var(--t50)}
+.ls-tool .vl-spin{position:absolute;left:103.5px;top:4.5px;width:300px}
+.ls-tool .vl-tags{position:absolute;right:3px;top:4.5px;flex-wrap:nowrap}
+.ls-heads{height:25.5px;width:894px;margin:1.5px 0 0 -6px;padding-left:13.5px;background:rgba(139,150,75,.2);box-shadow:inset 0 -1.2px 0 rgba(139,150,75,.75);
+  font:500 12px/25.5px var(--f-low);color:rgba(255,255,255,.6)}
+.ls-heads span{display:flex;align-items:center;gap:4px;cursor:pointer}
+.ls-heads span:hover{box-shadow:inset 0 -1.5px 0 rgba(227,137,0,.6)}
+.ls-heads .ls-sym{opacity:.6;justify-items:center}
+.ls-ping{display:flex;align-items:flex-end;gap:1.35px;height:100%;padding:0 0 calc(27px - 18.3px) 1.5px;box-sizing:border-box;align-self:stretch}
+.ls-ping i{width:2.4px;background:rgba(255,255,255,.18)}
+.ls-ping i:nth-child(1){height:3.6px}.ls-ping i:nth-child(2){height:6px}.ls-ping i:nth-child(3){height:8.4px}.ls-ping i:nth-child(4){height:10.8px}
+.ls-ping b{font-weight:500;margin-left:3px;line-height:1;align-self:center;padding-top:8.7px}
+.ls-ping.q4 i,.ls-ping.q3 i:nth-child(-n+3){background:rgba(181,199,132,.9)}.ls-ping.q2 i:nth-child(-n+2){background:rgba(227,173,54,.9)}.ls-ping.q1 i:nth-child(1){background:rgba(228,109,86,.9)}
+.ls-under{display:flex;align-items:center;justify-content:space-between;gap:12px;width:894px;margin-top:3px}
+.ls-under .vl-spin{width:330px}
+.ls-status{display:flex;align-items:center;justify-content:space-between;width:894px;margin-top:10px;padding-left:27px;box-sizing:border-box;font:500 15px/24px var(--f-low);color:rgba(255,255,255,.8)}
+.ls-clear{font:400 10.4px/24px var(--f-marine);text-transform:uppercase;color:var(--t50);border:0;background:none;cursor:pointer;padding:0 0 0 12px;position:relative}
+.ls-clear::before{content:"";position:absolute;left:0;top:9px;width:6.75px;height:6.75px;background:var(--marker);opacity:.4;clip-path:polygon(0 0,100% 0,100% 100%)}
+.ls-clear:hover{color:var(--orange)}.ls-clear:hover::before{background:var(--orange);opacity:1}
+.ls-load{position:relative;height:21px;width:889.5px;margin:6px 0 0 -3px;background:linear-gradient(180deg,rgba(224,108,0,.3),rgba(224,108,0,.255) 15%,rgba(224,108,0,.18) 31%,rgba(224,108,0,.12) 46%,rgba(224,108,0,.093) 62%,rgba(224,108,0,.117) 77%,rgba(224,108,0,.144) 85%,rgba(224,108,0,.21))}
+.ls-load i{position:absolute;inset:0 auto 0 0;width:var(--p);background:linear-gradient(180deg,rgba(224,108,0,.5),rgba(224,108,0,.425) 15%,rgba(224,108,0,.3) 31%,rgba(224,108,0,.2) 46%,rgba(224,108,0,.155) 62%,rgba(224,108,0,.195) 77%,rgba(224,108,0,.24) 85%,rgba(224,108,0,.35))}
+.ls-load span{position:absolute;left:30px;top:0;font:500 15px/21px var(--f-low);color:rgba(255,255,255,.8)}
+
+/* Load Game, Save Game and Demos (retained_saves): browser buttons, headings over an olive rule, 20 u rows */
+.ls-saves{--rh:30px;--fs:15.8px;--ta:.9;--tb:.65;width:627px}
+.ls-saves .ls-row{grid-template-columns:270px 1fr;padding-left:6px;width:591px;box-sizing:border-box}
+.ls-bb{display:flex;gap:6px;height:33px;margin-bottom:5px}
+.ls-b{position:relative;height:33px;padding:0 36px 0 12px;border:0;background:none;cursor:pointer;isolation:isolate;
+  font:500 14px/33px var(--f-low);color:rgba(255,255,255,.8);white-space:nowrap}
+.ls-b::before{content:"";position:absolute;inset:0;z-index:-1;opacity:var(--po,.28);background:#000;
+  clip-path:polygon(0 0,100% 0,100% 100%,7.5px 100%,0 calc(100% - 7.5px))}
+.ls-b::after{content:"";position:absolute;inset:0;z-index:-1;opacity:var(--po,.28);
+  background:linear-gradient(var(--olive),var(--olive)) 0 0/1.2px calc(100% - 7.5px) no-repeat,linear-gradient(var(--olive),var(--olive)) 7.5px calc(100% - 1.2px)/100% 1.2px no-repeat,
+  linear-gradient(45deg,transparent calc(50% - .9px),var(--olive) calc(50% - .9px) calc(50% + .3px),transparent calc(50% + .3px)) 0 calc(100% - 7.5px)/7.5px 7.5px no-repeat}
+.ls-b:hover{color:var(--orange)}.ls-b:hover::before{background:rgba(139,150,75,.35);opacity:1}
+.ls-b.on{--po:.6}
+.ls-b .x{position:absolute;right:12px;top:13.5px;width:6px;height:6px;background:linear-gradient(45deg,transparent 43%,rgba(255,255,255,.8) 43% 57%,transparent 57%),linear-gradient(-45deg,transparent 43%,rgba(255,255,255,.8) 43% 57%,transparent 57%)}
+.ls-b .srt{position:absolute;right:12px;top:12.5px;width:7.5px;height:8px;background:var(--orange);clip-path:polygon(0 0,100% 0,100% 100%)}
+.ls-sh{display:grid;grid-template-columns:270px 1fr;width:615px;padding-left:0;font:500 13px/21px var(--f-low);color:rgb(184,194,158);text-transform:uppercase;
+  box-shadow:inset 0 -1.2px 0 rgba(139,150,75,.26);padding-bottom:3px;margin-bottom:1px}
+</style>
 <section class="sheet" id="lists">
   <h2 class="sheet-h">Atlas - lists</h2>
-  <p class="sheet-p">A server browser in the stock construction: an olive header band holding the column headings, 27 dp rows with soft-ended <b style="color:var(--sec)">marine.list</b> bands and a rule under every row, the flipped marker beside the sort notice, and a refresh progress bar. Rows respond to the pointer.</p>
+  <p class="sheet-p">The retained lists share one row construction from the stock list art: a soft-ended <b style="color:var(--list)">#FF9C00</b> light band per row, faint at rest, with a white rule under every row and the orange focus inset along its leading edge and foot. The server browser sets it on the stock 18 u pitch under its toolbar and sortable headings; Load Game, Save Game and Demos on 20 u rows under filter buttons and plain headings. Rows respond to the pointer.</p>
   <div class="stage dim menu">
-    <div class="listwrap">
-      <div class="scroll-x">
-        <div class="tbl" style="--cols:28px minmax(170px,2.2fr) 1fr 1.1fr 72px 56px">
-          <div class="thead fr" data-shape="hband"><span></span><span>Server</span><span>Map</span><span>Mode</span><span>Players <i class="mk sort"></i></span><span style="justify-self:end">Ping</span></div>
-          <div class="trow"><span class="sym" title="Favorite"><svg viewBox="0 0 16 16"><path d="M8 1.5l1.9 4 4.4.5-3.3 3 .9 4.4L8 11.2 4.1 13.4l.9-4.4-3.3-3 4.4-.5z" fill="#FFC928" stroke="#c0281b" stroke-width=".8"/></svg></span><span>Hangar Brawl</span><span class="dim">q4dm5</span><span>Deathmatch</span><span>15 / 16</span><span class="ping">24</span></div>
-          <div class="trow sel"><span class="sym" title="Dedicated"><svg viewBox="0 0 16 16"><rect x="4" y="2" width="8" height="12" fill="#2b2d2a" stroke="#c9ccc4" stroke-width=".8"/><path d="M5.5 5h5M5.5 7h5" stroke="#8b8e87"/><circle cx="8" cy="11" r="1.3" fill="#48e04a"/></svg></span><span>openQ4 Community · Team DM</span><span class="dim">q4dm7</span><span>Team DM</span><span>12 / 16</span><span class="ping">38</span></div>
-          <div class="trow hov"><span></span><span>Rail Only Nights</span><span class="dim">q4dm3</span><span>Tourney</span><span>2 / 4</span><span class="ping">51</span></div>
-          <div class="trow"><span class="sym" title="Password required"><svg viewBox="0 0 16 16"><path d="M5 7V5a3 3 0 016 0v2" fill="none" stroke="#d6d8d2" stroke-width="1.4"/><rect x="3.5" y="7" width="9" height="7" fill="#b4b7af"/><rect x="7.3" y="9" width="1.4" height="3" fill="#3a3c38"/></svg></span><span>Clan Scrim</span><span class="dim">q4ctf1</span><span>Capture the Flag</span><span>8 / 10</span><span class="ping">62</span></div>
-          <div class="trow"><span></span><span>Arena Ladder</span><span class="dim">q4ctf3</span><span>Arena CTF</span><span>6 / 12</span><span class="ping">79</span></div>
-          <div class="trow"><span></span><span>Low Grav Fun</span><span class="dim">q4dm1</span><span>Deathmatch</span><span>3 / 8</span><span class="ping">104</span></div>
+    <h3 class="h5" style="margin-bottom:10px">Join Game · server browser</h3>
+    <div class="scroll-x">
+      <div class="ls-join">
+        <div class="ls-tool">
+          <svg width="894" height="33" aria-hidden="true"><defs><linearGradient id="ls-tg" x1="0" x2="1"><stop offset="0" stop-opacity=".66"/><stop offset=".7" stop-opacity=".52"/><stop offset="1" stop-opacity=".3"/></linearGradient>
+            <linearGradient id="ls-ta" gradientUnits="userSpaceOnUse" x1="0" x2="225"><stop offset="0" stop-color="#E38900"/><stop offset=".25" stop-color="#E38900" stop-opacity=".8"/><stop offset="1" stop-color="#E38900" stop-opacity="0"/></linearGradient></defs>
+            <path d="M12 0H894V33H0V12Z" fill="url(#ls-tg)"/><path d="M.75 33V12L12 .75H225" fill="none" stroke="url(#ls-ta)" stroke-width="1.5"/></svg>
+          <span class="mod">MOD:</span>
+          <div class="vl-spin" data-values="All|baseoq4|q4ctf|q4max"><button class="vl-sq pv" aria-label="Previous mod"></button><output>All</output><button class="vl-sq nx" aria-label="Next mod"></button></div>
+          <div class="vl-tags"><button class="vl-tag src on" data-tag="src"><span>Internet</span></button><button class="vl-tag src" data-tag="src"><span>LAN</span></button></div>
+        </div>
+        <div class="ls-heads ls-cols">
+          <span class="ls-sym" title="Favorite"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M8 2.4L8.77 6.18 12.72 6.68 9.24 8.6 9.93 12.47 8 10.1 6.07 12.47 6.76 8.6 3.28 6.68 7.23 6.18Z" fill="#FFBE23" stroke="#C8501E" stroke-opacity=".8" stroke-width=".8"/></svg></span>
+          <span class="ls-sym" title="Password"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M5.5 8V5L6.75 3.25H9.25L10.5 5V8" fill="none" stroke="#A5AAB5" stroke-width="1.5"/><path d="M3.5 7.5H12.5V13.5H3.5Z" fill="#A5AAB5"/></svg></span>
+          <span class="ls-sym" title="Dedicated"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M4 1.75H12V14.25H4Z" fill="#A5AAB5"/><path d="M5.25 7.5H10.75V13H5.25Z" fill="#394D52"/></svg></span>
+          <span>Server Name</span><span>Ping</span>
+          <span class="ls-sym" title="Repeater"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M5 1.5L8 5 11 1.5" fill="none" stroke="#ADAAA5" stroke-width=".9"/><path d="M2 5H14V14H2Z" fill="#ADAAA5"/><path d="M3.25 6.25H12.75V12.75H3.25Z" fill="#141414"/></svg></span>
+          <span>Players <svg width="8" height="5" aria-label="sorted, most first"><path d="M0 0L4 5 8 0" fill="none" stroke="#FFBE23" stroke-width="1.5"/></svg></span><span>Game Type</span><span>Map</span>
+        </div>
+        <div style="display:grid;grid-template-columns:880.5px 36px;margin-left:0">
+          <div class="ls-list ls-cols" style="display:grid;grid-template-columns:none;padding:0">
+            <div class="ls-row ls-cols"><span class="ls-sym"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M8 2.4L8.77 6.18 12.72 6.68 9.24 8.6 9.93 12.47 8 10.1 6.07 12.47 6.76 8.6 3.28 6.68 7.23 6.18Z" fill="#FFBE23" stroke="#C8501E" stroke-opacity=".8" stroke-width=".8"/></svg></span><span></span><span class="ls-sym"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M4 1.75H12V14.25H4Z" fill="#A5AAB5"/><path d="M5.25 3H10.75V4.25H5.25Z" fill="#000" fill-opacity=".9"/><path d="M5.25 7.5H10.75V13H5.25Z" fill="#394D52"/><path d="M7 9.2A1.75 1.75 0 1 0 9 9.2M8 8.4V10.4" fill="none" stroke="#18BE08" stroke-width=".9"/></svg></span><span>Hangar Brawl</span><span class="ls-ping q4"><i></i><i></i><i></i><i></i><b>24</b></span><span></span><span>15/16</span><span>DM</span><span>q4dm5</span></div>
+            <div class="ls-row ls-cols sel f"><span></span><span></span><span class="ls-sym"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M4 1.75H12V14.25H4Z" fill="#A5AAB5"/><path d="M5.25 3H10.75V4.25H5.25Z" fill="#000" fill-opacity=".9"/><path d="M5.25 7.5H10.75V13H5.25Z" fill="#394D52"/><path d="M7 9.2A1.75 1.75 0 1 0 9 9.2M8 8.4V10.4" fill="none" stroke="#18BE08" stroke-width=".9"/></svg></span><span>openQ4 Community · Team DM</span><span class="ls-ping q3"><i></i><i></i><i></i><i></i><b>38</b></span><span></span><span>12/16</span><span>Team DM</span><span>q4dm7</span></div>
+            <div class="ls-row ls-cols hov"><span></span><span></span><span></span><span>Rail Only Nights</span><span class="ls-ping q3"><i></i><i></i><i></i><i></i><b>51</b></span><span class="ls-sym"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M5 1.5L8 5 11 1.5" fill="none" stroke="#ADAAA5" stroke-width=".9"/><path d="M2 5H14V14H2Z" fill="#ADAAA5"/><path d="M3.25 6.25H12.75V12.75H3.25Z" fill="#141414"/><path d="M3.75 6.75h2.25V11H3.75Z" fill="#B4B45A"/><path d="M6 6.75h2.25V11H6Z" fill="#31DBA5"/><path d="M8.25 6.75h2.25V11H8.25Z" fill="#CE1052"/><path d="M10.5 6.75h2.25V11H10.5Z" fill="#08088A"/></svg></span><span>2/4</span><span>Tourney</span><span>q4dm3</span></div>
+            <div class="ls-row ls-cols"><span></span><span class="ls-sym"><svg viewBox="0 0 16 16"><path d="M3 0H16V16H0V3Z" fill="#000" fill-opacity=".5"/><path d="M5.5 8V5L6.75 3.25H9.25L10.5 5V8" fill="none" stroke="#A5AAB5" stroke-width="1.5"/><path d="M3.5 7.5H12.5V13.5H3.5Z" fill="#A5AAB5"/><path d="M7.4 9.3H8.6V11.9H7.4Z" fill="#000" fill-opacity=".85"/></svg></span><span></span><span>Clan Scrim</span><span class="ls-ping q2"><i></i><i></i><i></i><i></i><b>62</b></span><span></span><span>8/10</span><span>CTF</span><span>q4ctf1</span></div>
+            <div class="ls-row ls-cols"><span></span><span></span><span></span><span>Arena Ladder</span><span class="ls-ping q2"><i></i><i></i><i></i><i></i><b>79</b></span><span></span><span>6/12</span><span>Arena CTF</span><span>q4ctf3</span></div>
+            <div class="ls-row ls-cols"><span></span><span></span><span></span><span>Low Grav Fun</span><span class="ls-ping q1"><i></i><i></i><i></i><i></i><b>164</b></span><span></span><span>3/8</span><span>DM</span><span>q4dm1</span></div>
+          </div>
+          <div class="ls-sb" style="--th:70px"><i></i></div>
+        </div>
+        <div class="ls-under">
+          <div class="vl-spin" data-values="All game types|DM|Tourney|Team DM|CTF|Arena CTF"><button class="vl-sq pv" aria-label="Previous game type"></button><output>All game types</output><button class="vl-sq nx" aria-label="Next game type"></button></div>
+          <div class="vl-tags"><button class="vl-tag on" data-tag="filter"><span>Not full</span></button><button class="vl-tag" data-tag="filter"><span>Not empty</span></button><button class="vl-tag" data-tag="filter"><span>No password</span></button></div>
+        </div>
+        <div class="ls-status"><span>184 servers</span><button class="ls-clear">Clear sorting</button></div>
+        <div class="ls-load" style="--p:59%"><i></i><span>Refreshing 184 / 312</span></div>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:14px"><b>Toolbar</b> black 0.66 fading to 0.30 with an 8 u cut and an orange line along the cut fading out along the top; MOD with its spinner, SOURCE tags at the end · <b>headings</b> olive 0.20 over a dark seam, Lowpixel 12 dp at 0.60, an olive rule at the foot, the sorted column's chevron in <em>marine.value</em> (up while ascending) · <b>rows</b> 27 dp, Lowpixel 14 dp at 0.80, the symbols on 16 dp tiles, four quality bars before the ping lit in the worst status color · <b>under the list</b> the game type spinner and filter tags, the scan's status and CLEAR SORTING, and the load bar: #E06C00 shaded top to bottom, track 0.30, fill 0.50, its notice over it. Server names are examples.</p>
+  </div>
+  <div class="stage dim menu">
+    <div class="grid wide">
+      <div class="demo">
+        <h3 class="h5">Load Game · Save Game · Demos</h3>
+        <div class="scroll-x">
+          <div class="ls-saves">
+            <div class="ls-bb"><button class="ls-b on">Manual saves<i class="x"></i></button><button class="ls-b">Autosaves</button><button class="ls-b" style="min-width:210px;text-align:left">Date<i class="srt"></i></button></div>
+            <div class="ls-sh"><span>Save name</span><span>Location</span></div>
+            <div style="display:grid;grid-template-columns:591px 36px">
+              <div class="ls-list">
+                <div class="ls-row"><span class="ls-name">Medic</span><span class="c2">AIR DEFENSE BUNKER</span></div>
+                <div class="ls-row sel f"><span class="ls-name">Bunker door</span><span class="c2">AIR DEFENSE BUNKER</span></div>
+                <div class="ls-row"><span class="ls-name">Trench entry</span><span class="c2">AIR DEFENSE BUNKER</span></div>
+                <div class="ls-row hov"><span class="ls-name">Map Start</span><span class="c2">AIR DEFENSE BUNKER</span></div>
+                <div class="ls-row"><span class="ls-name">Hangar</span><span class="c2">HANGAR PERIMETER</span></div>
+              </div>
+              <div class="ls-sb" style="--th:110px"><i></i></div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="sbw"><button class="sba" aria-label="Scroll up"></button><div class="sb" aria-hidden="true"><span class="tr"></span><span class="th"></span></div><button class="sba dn" aria-label="Scroll down"></button></div>
+      <div class="demo">
+        <p class="cap"><b>Filter buttons</b> 22 u black plates at 0.28 (0.60 for the set filter, with its close cross), a 5 u lower-leading cut and an olive 1.2 dp rail along the leading edge, cut and foot; Lowpixel 14 dp, orange with an olive 0.35 wash under the pointer. The sort button marks its direction with the orange corner marker · <b>headings</b> Lowpixel 13 dp in the heading tint over an olive 0.26 rule · <b>rows</b> 30 dp, the name in Lowpixel 15.8 dp at 0.90 and the location at 0.65 from 180 u; a row's first Accept selects it (0.41), the next loads · <b>scrollbar</b> a 4.5 dp trough at 0.15 and a 7.5 dp thumb at 0.55 with a cut foot, orange under the pointer. Demos adds NAME, MAP, DATE and DURATION columns and its own filter tags.</p>
+      </div>
     </div>
-    <div class="notice"><i class="mk sort"></i>Sorted by players, most first.<button class="pl link" style="--pitch:24px"><i class="mk"></i><span class="lb">Clear sorting</span></button></div>
-    <div class="progrow" style="margin-top:14px"><div class="prog" style="--p:59%"><i></i></div><span>REFRESHING 184 / 312</span></div>
   </div>
-  <p class="cap"><b>Rows</b> one band each: a resting #9A9C6E line band at 8%, hover at 29%, selection in <b>marine.list</b> at 50%, ends fading over 22%, no hairline; hovered text turns white · <b>scrollbar</b> a 24 dp gutter with no arrow buttons and a fixed thumb open on its leading side; the browser adds its own arrow tiles above and below · <b>progress</b> cylindrical shading with a bright center line in <b>marine.progress</b>, track 30%, fill 50%, lower-leading cut. Server names are examples.</p>
 </section>

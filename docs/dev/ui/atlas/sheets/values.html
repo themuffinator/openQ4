@@ -1,46 +1,89 @@
+<style>
+.vl-spin{display:flex;align-items:center;gap:4.5px;height:24px}
+.vl-sq{position:relative;flex:none;width:33px;height:24px;border:0;padding:0;background:none;cursor:pointer;outline:none}
+.vl-sq::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.7);box-shadow:inset 0 0 0 1px var(--olive);opacity:.6;transition:opacity .3s linear}
+.vl-sq::after{content:"";position:absolute;left:13.5px;top:7.5px;width:6px;height:9px;background:var(--value);clip-path:polygon(100% 0,0 50%,100% 100%)}
+.vl-sq.nx::after{clip-path:polygon(0 0,100% 50%,0 100%)}
+.vl-sq:hover::before{opacity:.85;transition:none}.vl-sq:focus-visible::before,.vl-sq:active::before{opacity:1;transition:opacity .08s ease-out}
+.vl-spin output{flex:1;min-width:0;font:400 10.4px/24px var(--f-marine);text-transform:uppercase;color:rgba(255,190,35,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vl-tags{display:flex;flex-wrap:wrap;gap:9px}
+.vl-tag{position:relative;height:24px;padding:0 33px 0 9px;border:0;background:none;cursor:pointer;outline:none;
+  font:400 10.4px/24px var(--f-marine);text-transform:uppercase;color:rgba(255,255,255,.85);white-space:nowrap}
+.vl-tag.src{padding-right:12px}
+.vl-tag::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.28;background:rgba(139,150,75,.5);transition:opacity .3s linear;
+  clip-path:polygon(7.5px 0,100% 0,100% 100%,0 100%,0 7.5px)}
+.vl-tag > svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:-1}
+.vl-tag .ol{opacity:.28;transition:opacity .3s linear}
+.vl-tag:hover::before,.vl-tag:hover .ol{opacity:.7;transition:none}
+.vl-tag:focus-visible::before,.vl-tag:focus-visible .ol{opacity:1}
+.vl-tag .lit{display:none}.vl-tag.on .lit{display:block}
+.vl-tag .x{display:none}.vl-tag.on .x{display:block}
+.vl-tag.on::before{opacity:0}
+.vl-field{position:relative;display:flex;align-items:center;height:22px;width:min(100%,240px);padding-left:6px;box-sizing:border-box;
+  background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px rgba(139,150,75,.45);font:500 15px/22px var(--f-low);color:var(--value);white-space:pre}
+.sr > .vl-field{position:absolute;left:calc(var(--vx) - 8px);right:12px;top:7px;width:auto}
+.vl-field .sel{background:rgba(227,137,0,.4)}
+.vl-field .caret{display:inline-block;width:1px;height:22px;background:#fff;animation:blink 1.06s steps(1) infinite}
+@media (prefers-reduced-motion:reduce){.vl-field .caret{animation:none}.vl-sq::before,.vl-tag::before,.vl-tag .ol{transition:none}}
+</style>
 <section class="sheet" id="values">
   <h2 class="sheet-h">Atlas - value controls</h2>
-  <p class="sheet-p">Settings use values that cycle in place rather than switches. Check and radio boxes are square outlines with an inset filled square. The slider is the stock tick ramp with a bar thumb. All of these respond to the mouse here; the spec gives each one a controller and touch mapping too.</p>
+  <p class="sheet-p">A settings row carries its value in the value column, in <b style="color:var(--value)">marine.value</b>: a list's value with a chevron at the row's end, the check box, the tick-track slider with its number, a fine slider's typed number, a text field, or an action's keys. The whole row is one control. The server browser's filters are the spinner squares and the cut filter tags. All of these respond to the mouse here; the spec gives each one a controller and touch mapping too.</p>
   <div class="stage dim menu">
     <div class="grid">
       <div class="demo">
-        <h3 class="h5">Boxes · 18 dp · stroke 1/16 · mark 69%</h3>
-        <div class="ctl"><button class="box on" aria-pressed="true" aria-label="Show player names"></button><span class="l">Show player names</span></div>
-        <div class="ctl"><button class="box" aria-pressed="false" aria-label="Hide full servers"></button><span class="l">Hide full servers</span></div>
-        <div class="ctl"><button class="box mixed" aria-label="All maps (some selected)"></button><span class="l">All maps <span style="color:var(--t50)">(4 of 9)</span></span></div>
-        <div class="pair" role="radiogroup" aria-label="Server source">
-          <label><button class="box on" role="radio" aria-checked="true"></button>Internet</label>
-          <label><button class="box" role="radio" aria-checked="false"></button>LAN</label>
+        <h3 class="h5">Check box · 14 dp · 1.5 dp stroke</h3>
+        <div class="sr-col">
+          <div class="sr" data-sr="toggle" data-on="1" tabindex="0"><span class="sr-l">Enable Specular</span></div>
+          <div class="sr is-hover" data-sr="toggle" tabindex="0"><span class="sr-l">Force Ambient Light</span></div>
         </div>
-        <p class="cap">Set state: an inset square in <b>marine.check</b>. Mixed state: an inset bar. The exclusive pair fills the set option's box.</p>
-      </div>
-      <div class="demo">
-        <h3 class="h5">Slider · tick ramp · 71 u range</h3>
-        <div class="slider"><span class="l" style="min-width:150px">Mouse sensitivity</span><svg class="ramp-s" width="107" height="16" role="slider" tabindex="0" aria-label="Mouse sensitivity" aria-valuemin="0" aria-valuemax="20" aria-valuenow="13"></svg><output>13</output></div>
-        <div class="slider"><span class="l" style="min-width:150px">Brightness</span><svg class="ramp-s" width="107" height="16" role="slider" tabindex="0" aria-label="Brightness" aria-valuemin="0" aria-valuemax="20" aria-valuenow="6"></svg><output>6</output></div>
-        <p class="cap">Alternating tall and short ticks rise from 3 to 13.5 dp above a baseline; the 6×12 dp bar thumb has a bright border and a 40% interior. Ticks past the thumb drop to 40%. Drag, click, or use arrow keys.</p>
-        <h3 class="h5">Filter spinner</h3>
-        <div class="spin" data-values="Deathmatch|Team DM|Tourney|Capture the Flag|Arena CTF"><button class="pv" aria-label="Previous"></button><output>Deathmatch</output><button class="nx" aria-label="Next"></button></div>
-        <p class="cap">◀ and ▶ in orange at 80% on 22×16 u black tiles at 40%; hover turns an arrow amber at once, and it returns over 300 ms.</p>
-      </div>
-      <div class="demo">
-        <h3 class="h5">Dropdown (openQ4)</h3>
-        <div class="dd">
-          <button class="pl row"><span class="lb">Display mode</span><span class="val">Borderless<i class="chev"></i></span></button>
-          <div class="fr pop" data-shape="pop">
-            <div class="opt">Windowed</div><div class="opt sel">Borderless</div><div class="opt">Fullscreen</div><div class="opt">Custom fullscreen</div>
-          </div>
+        <p class="cap">The box outline and, when set, a 7 dp square inside it, both in <em>marine.value</em>, 6 dp below the row's top at the value column. Accept or a click toggles the row.</p>
+        <h3 class="h5">Slider · a tick for every stop</h3>
+        <div class="sr-col">
+          <div class="sr is-focus" data-sr="slider" data-range="0|100|10|50" tabindex="0"><span class="sr-l">Volume</span></div>
+          <div class="sr" data-sr="slider" data-range="0|100|5|60" tabindex="0"><span class="sr-l">Subtitle Background</span></div>
+          <div class="sr" data-sr="entry" data-range="0|1|0.001|0|0" tabindex="0"><span class="sr-l">Ambient Brightness</span></div>
         </div>
-        <p class="cap">Adds a chevron and a constrained popup in the popover construction with <b>marine.list</b> bands; it unfolds from its row over 150 ms like the stock kick-player list.</p>
+        <p class="cap">Lines of white 0.45 rise from 6 to 16 dp along the track, one per step (a slider of more than 40 steps marks every second, fourth, fifth or tenth one); a 4 dp <em>marine.value</em> bar at 0.80 fills to the 4×16 dp thumb, and the number stands after the track in Lowpixel 15 dp. A slider of more than 100 steps gives the number's room to the track and takes a typed number in a 66 dp field after the row. Drag, click or use the arrow keys.</p>
       </div>
       <div class="demo">
-        <h3 class="h5">Text, binding and tags</h3>
-        <div class="field">Marine_<span class="sel">07</span><span class="caret"></span></div>
-        <div class="bind"><span class="l" style="min-width:110px">Fire</span><span class="v">MOUSE1</span><span class="kc">LMB</span></div>
-        <div class="bind"><span class="l" style="min-width:110px">Jump</span><span class="v" style="color:var(--orange)">Press a key…</span><span class="cap">hold <span class="gl" style="width:18px;height:18px;font-size:10px">B</span> 1 s to cancel</span></div>
-        <div class="tags"><span class="tag">Modified</span><span class="tag warn">Restart</span><span class="tag">New</span><span class="tag lock">Locked</span></div>
-        <div class="ctl"><span class="l" style="font-size:15px">Performance impact</span><span class="impact" aria-label="Impact 2 of 3"><i></i><i></i><i class="off"></i></span></div>
-        <p class="cap">The save name sits on a dark plate without an outline; entry fields in dialogs use a light plate. Tags are small header-band plates, never pills. The impact gauge reuses three slider ticks.</p>
+        <h3 class="h5">List · chevron · its list unfolds under the row</h3>
+        <div class="sr-col" style="--vx:198px;position:relative;z-index:2">
+          <div class="sr" data-sr="choice" tabindex="0"><span class="sr-l">Turning</span><span class="sr-v">Snap</span></div>
+          <div class="sr is-focus" data-sr="choice" data-open="1" data-options="30|45|60|90" data-pick="1" tabindex="0"><span class="sr-l">Snap Turn Angle</span><span class="sr-v">45</span></div>
+          <div class="sr" data-sr="choice" tabindex="0"><span class="sr-l">Turn Direction</span><span class="sr-v">Head</span></div>
+          <div class="sr" data-sr="choice" tabindex="0"><span class="sr-l">Comfort Vignette</span><span class="sr-v">Low</span></div>
+          <div class="sr" data-sr="choice" tabindex="0"><span class="sr-l">Play Space</span><span class="sr-v">Automatic</span></div>
+        </div>
+        <p class="cap">The value in Lowpixel 14 dp, the 12×6 dp chevron 24 dp before the row's end. The list stands under its row (above it when the room below is short) as wide as the row, 22 dp rows, eight before it scrolls: black 0.96 in a #B2CD43 0.20 hairline over a 4 dp black frame, the chosen option olive 0.35, the pointer's orange 0.30. A pick closes it at once. Click a value.</p>
+        <h3 class="h5">Text field</h3>
+        <div class="sr-col" style="--vx:150px">
+          <div class="sr is-focus" data-sr="text" tabindex="0"><span class="sr-l">Server Name</span><span class="vl-field">openQ4 <span class="sel">Server</span><span class="caret"></span></span></div>
+        </div>
+        <p class="cap">Black 0.60 in an olive 0.45 hairline from 8 dp before the value column, text in <em>marine.value</em>, a white caret, the selection orange 0.40.</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Key bindings · CONTROLS</h3>
+        <div class="sr-col" style="--vx:160px">
+          <div class="sr" data-sr="bind" tabindex="0"><span class="sr-l">Move Forward</span><span class="sr-keys"><span class="sr-kc">W</span><span class="sr-kc">↑</span></span></div>
+          <div class="sr" data-sr="bind" tabindex="0"><span class="sr-l">Jump</span><span class="sr-keys"><span class="sr-kc">Space</span><span class="sr-kc">Ins</span><svg class="sr-pad" viewBox="0 0 20 20" aria-label="A button"><g fill="none" stroke="#fff" stroke-width="1.3"><circle cx="10" cy="4.5" r="2.6"/><circle cx="4.5" cy="10" r="2.6"/><circle cx="15.5" cy="10" r="2.6"/></g><circle cx="10" cy="15.5" r="2.6" fill="#fff"/></svg></span></div>
+          <div class="sr is-focus" data-sr="bind" tabindex="0"><span class="sr-l">Move Left</span><span class="sr-ask">Press any key...</span></div>
+          <div class="sr" data-sr="bind" tabindex="0"><span class="sr-l">Quick Melee</span><span class="sr-keys"><svg width="11" height="20" aria-label="unbound"><path d="M0 10H11" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/></svg></span></div>
+        </div>
+        <p class="cap">Up to two keyboard or mouse keys as 20 dp keycaps with a lower-leading cut, then up to two controller buttons in the family in use; a dim dash for an action with none. Accept asks for a key, which the row requests in orange until Escape cancels or a key binds.</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Filter spinner · server browser</h3>
+        <div class="vl-spin" data-values="All game types|DM|Tourney|Team DM|CTF|Arena CTF|DeadZone"><button class="vl-sq pv" aria-label="Previous game type"></button><output>All game types</output><button class="vl-sq nx" aria-label="Next game type"></button></div>
+        <p class="cap">22×16 u squares of black 0.70 in an olive outline, the square at 0.60 (0.85 under the pointer, 1.00 focused), the arrow in <em>marine.value</em>; the value Marine 15 dp at 0.80 between them.</p>
+        <h3 class="h5">Filter and source tags</h3>
+        <div class="vl-tags">
+          <button class="vl-tag src on" data-tag="src"><span>Internet</span></button><button class="vl-tag src" data-tag="src"><span>LAN</span></button>
+        </div>
+        <div class="vl-tags">
+          <button class="vl-tag on" data-tag="filter"><span>Not full</span></button><button class="vl-tag" data-tag="filter"><span>Not empty</span></button><button class="vl-tag" data-tag="filter"><span>No password</span></button>
+        </div>
+        <p class="cap">Cut tags built like the header band: a 5 u upper-leading cut, olive 0.50 in an olive outline at 0.28 (0.70 under the pointer); a set tag is lit orange 0.35 in an orange outline at 0.60, a filter with its close cross. Marine 15 dp at 0.85. Click to set.</p>
       </div>
     </div>
   </div>

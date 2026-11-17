@@ -10,7 +10,12 @@ const ticks = new Set(), onScreen = new WeakMap();
 const io = "IntersectionObserver" in window ? new IntersectionObserver(es => es.forEach(e => onScreen.set(e.target, e.isIntersecting))) : null;
 let running = false;
 const loop = now => {
-  for (const t of ticks) { if (!t.el.isConnected) { ticks.delete(t); continue; } if (onScreen.get(t.root) !== false) t.fn(now); }
+  // One sheet's failing instrument must not stop every other sheet's: drop it and report it once.
+  for (const t of ticks) {
+    if (!t.el.isConnected) { ticks.delete(t); continue; }
+    if (onScreen.get(t.root) === false) continue;
+    try { t.fn(now); } catch (error) { ticks.delete(t); console.error(error); }
+  }
   running = ticks.size > 0; if (running) requestAnimationFrame(loop);
 };
 A.tick = (el, fn) => {
