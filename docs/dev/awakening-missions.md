@@ -443,6 +443,68 @@ because the map's `m04_building_unit2_seq_5_retch_blocker` AAS obstacle
 surrounds it until the fight is won; it never saw the probe player, who had
 come to rest behind a wall.
 
+## M02 squad sequences — 17 November 2026
+
+Four reported problems in `m02_trianfac`, fixed as script version 3
+(`maps/game/m02_trianfac.openq4-v3.script`). Each was reproduced on the v2
+program and checked on v3 with hidden, input-free probes (see below).
+
+- **Gray at the generator.** Stepping off the generator lift runs
+  `TeamToGeneratorRoom` at once (`trigger_once_151` is just outside the gate).
+  The lift's own arrival code was still sending Tak, Markswell and then Gray back
+  to their lift marks one at a time, so Gray was ordered back to the lift after
+  the generator room had sent him to the console. He ended up working the
+  console from beside the lift and dying far from the Retch dropped onto the
+  console. On v2 the probe shows him turning back to `razor1_pos_27` beside the
+  lift. The lift now gives its orders only if the generator room has not started.
+  On v3 he walks straight to the console, works it there and dies beside the
+  Retch's landing point (Gray at (-427, 1955), Retch at (-447, 1958)).
+- **The extra marine in the Tank fight.** `BringOnTheTank` ends by moving its
+  stand-in Dekard to `dekard_ending_pos_4`, still visible. That mark is past the
+  arena's north gate, which the scene leaves open, so a second "Dekard" stood in
+  view for the whole fight. He is now hidden there and shown again when
+  `BossKilled` starts the ending walk. Ruled out on the way: the player is hidden
+  during the cinematic, the Strogg marine released by `trigger_once_154` is
+  removed when the camera starts, and Tak stays at the momentary-door console
+  even with a follow order.
+- **The spike gun handoff.** Tak only faced the gun on the crate, played the
+  empty-handed `player_gift2` set and the gun vanished. He now kneels
+  (`stand_to_crouch`) and picks it up. The world model is bound to his
+  `MG_stock_joint`, the joint his own machinegun is skinned to, and his
+  machinegun surface is hidden while he holds it. He stands, turns to the player
+  and examines it (`weapon_check_1`, then `weapon_check_2` while still talking).
+  He then offers it with the armed `player_gift` set, held for at least 1.5 s
+  and until his line ends. The weapon is given at the handoff, and his machinegun
+  comes back after `player_gift_end`.
+- **The stuck door.** `stuck_door` was spawned non-solid. A player could walk
+  through it before Darnell and Mitchell lifted it, and reaching
+  `trigger_once_2` dropped it 48 units into the floor while they were still
+  lifting. Their hold animations also played once and stopped. The door now
+  blocks players and projectiles only (`CONTENTS_PLAYERCLIP |
+  CONTENTS_PROJECTILECLIP`). The squad's marks stand inside its bounds, and Tak
+  still ducks through the first 32-unit opening. The full 48-unit lift leaves
+  about 45 units, enough for a crouching player. Darnell and Mitchell are placed
+  exactly on their marks on arrival. Their scripted moves stop anywhere within
+  8 units, which could leave less than a player's width between them. Each hold
+  repeats one cycle at a time from where its lift animation put them, because
+  the cycles' root motion walked Darnell into the gap. A hold ends with its
+  stage, so nothing takes the pose again after the drop. The drop waits until
+  the door is fully raised, and the urging lines stop once the player is through.
+  The closed door is then fully solid, and Darnell and Mitchell lose any follow
+  order, since they stay behind.
+
+Probe traps: `setviewpos` onto a live `trigger_once` touches it twice before its
+removal runs, starting the trigger's function twice. Fire such triggers with
+`trigger <name>` or walk into them with `openq4_testInput`. `s_noSound 1` makes
+spoken and radio lines end at once, which shortens every wait on them.
+`g_autoSkipCinematics 1` skips `BringOnTheTank` and the ending entirely.
+
+Evidence: `.tmp/m02fix/runs/` (`gray2-v3`, `door2-v2`/`door2-v3`,
+`cannon-v3`, `dekard2-v2`/`dekard3-v3`, `nexus3-v3`, `save-*`/`load-*`), runtime
+`.tmp/runtime/awakening-m02/`. `tools/tests/awakening_m02_squad_contract.py`
+pins the correction table and, with the expansion installed, the SHA-256 of
+every version's program.
+
 ## Script identity and asset ownership
 
 The original expansion remains external. `MissionScripts.inl` applies bounded
@@ -452,12 +514,15 @@ installed behaviour with a warning. The reviewed installed script has SHA-256
 `52f91083b62daf55c64cce1ced7b61a502b7748110a96b8a9ce3eccdd50746fa`.
 
 Fresh corrected maps compile as
-`maps/game/m02_trianfac.openq4-v2.script`. Saves record that virtual source name,
+`maps/game/m02_trianfac.openq4-v3.script`. Saves record that virtual source name,
 so restore reconstructs the same corrected program. Older saves still compile
 `maps/game/m02_trianfac.script` unchanged. Restart M02 to adopt its script
 corrections; do not reinterpret an old suspended script with new statements.
 The v1 transformations remain unchanged for existing corrected saves. Version 2
-adds only the extraction-actor correction. No save payload layout changed.
+adds only the extraction-actor correction; version 3 adds the
+[squad sequences](#m02-squad-sequences--17-november-2026). Each correction
+records the version that introduced it, and a version applies its own and every
+earlier one. No save payload layout changed.
 
 The authored M01 cinematic likewise keeps its original program as
 `scripts/openq4/awakening/m01_dropship.script`; the route-qualified lighting

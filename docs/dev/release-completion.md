@@ -7,6 +7,25 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's Trianthinide facility squad scenes, 17 November 2026
+
+- **Gray dies where the Retch lands.** After the generator lift, Corporal Gray
+  goes straight to the generator console, works it there, and is killed by the
+  Retch that drops onto it. He no longer wanders back to the lift and works the
+  console from across the room.
+- **Tak really hands you the spike gun.** He picks it up from the crate,
+  turns to you, looks it over while he works out how to fire it, and holds it
+  out to you. Before, he gestured empty-handed while the gun vanished.
+- **The stuck door works as a door.** You can no longer walk through it before
+  Darnell and Mitchell lift it, which used to drop it into the floor. They hold
+  it up until you crouch underneath, then let it fall shut behind you.
+- **No second Dekard in the Tank fight.** The stand-in from the Tank's
+  introduction no longer stands in view at the far end of the arena; he
+  reappears only for the walk to the dropship.
+- **What to do.** Replace the single-player game module, then start the mission
+  again; saves keep the version of the mission they were made with.
+- Details: [M02 squad sequences](awakening-missions.md#m02-squad-sequences--17-november-2026).
+
 ## The Awakening's prison alarm is easy to hear again, 17 November 2026
 
 - **The alarm sounds like an alarm.** In the prison mission, the security
