@@ -1,10 +1,10 @@
 {
-  "schema_version": 25,
+  "schema_version": 26,
   "id_namespace": "openq4.ui.product",
   "date": "2026-11-17",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "374080d44659ae1f08249f9f1dfdf002b7f85159",
+    "engine_revision": "b19633878f6954e6a82d59140f548614d45cdb61",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -14,7 +14,7 @@
     "visual": {
       "path": "docs/dev/ui-visual-design.md",
       "authority": "normative visual, interaction and editor contract",
-      "sha256": "76cd2b019d61354cd40e1bb5ca298e14fcf8c8bade6d412a4ac089b81109180a"
+      "sha256": "c393566a71e03925debb05e8e67204a12570a7cd410bcc6e9232e4e2a15c086c"
     },
     "product": {
       "path": "docs/dev/archive/2026-10-18/plans/ui-product-completion.md",
@@ -15509,6 +15509,61 @@
         "rime_lit": 0.9,
         "flank_degrees": 30,
         "horn_min_step_u": 24
+      }
+    },
+    {
+      "id": "FLOW-072",
+      "title": "Loading screen framing entrance",
+      "milestone_owner": "M4",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:14",
+        "visual:8",
+        "visual:13",
+        "visual:Version 1.46"
+      ],
+      "requirement": "In Remastered, each load presents the single-player, intro and multiplayer loading screen with the levelshot alone and its framing parked past the view's edges: the top band with the leading bracket, the dot matrix and the identity 120 u above its seat, the bottom band with the lower brackets, the progress and the tips or arsenal 140 u below it. Once the first frame is up, the frame scrolls in: each band decelerates on cubic (0.16, 1, 0.3, 1) for 300 ms to pass its seat by 2.5 u, then eases back over 100 ms, the bottom band starting 40 ms after the top; each band's furniture trails it by 70 ms and seats at 320 ms without passing it; as each band locks its inner edge lights in #E06C00 with a #FFC070 core, peaking at 290 ms and gone 300 ms later; and the objectives plate and server card fade in from 260 to 460 ms, the whole entrance taking 630 ms while the level loads. Reduced motion seats the frame at once, unlit, and fades the cards in over 80 ms. A load that starts before the first frame can be drawn still ends with the frame seated. The stock screens and Classic are unchanged.",
+      "dependencies": [
+        "FLOW-047",
+        "MOT-012"
+      ],
+      "acceptance_evidence_needed": [
+        "Engine captures through the entrance of single-player, intro and multiplayer loads at 4:3, 16:9 and 21:9 on OpenGL and Vulkan: parked, in flight, at the lock with the edge light, and seated.",
+        "A trace through real loads showing the entrance starting after the first presented frame and the frame seated before the load's first phase ends, and reduced-motion captures seating at once without the light."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "top_park_u": 120,
+        "bottom_park_u": 140,
+        "band_travel_ms": 300,
+        "band_settle_ms": 100,
+        "overshoot_u": 2.5,
+        "bottom_lead_ms": 40,
+        "furniture_trail_ms": 70,
+        "furniture_travel_ms": 320,
+        "travel_bezier": [
+          0.16,
+          1,
+          0.3,
+          1
+        ],
+        "edge_light_peak_ms": 290,
+        "edge_light_fade_ms": 300,
+        "cards_fade_ms": [
+          260,
+          460
+        ],
+        "entrance_ms": 630
       }
     }
   ],

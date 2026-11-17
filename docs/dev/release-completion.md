@@ -7,6 +7,20 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Loading screens scroll their frame into view, 17 November 2026
+
+- **The loading screen opens with a quick scroll.** In the new interface each
+  level's loading screen shows its picture first, then the top and bottom
+  bands sweep in from beyond the screen's edges and lock into place, the level
+  name, brackets and progress riding in just behind them. Their inner edges
+  flash orange as they seat, and the mission objectives or server card fade in
+  after. It takes about half a second and plays while the level loads, so
+  loading takes no longer.
+- **Reduced motion.** With reduced motion on, the frame is in place at once,
+  without the flash.
+- **What to do.** Nothing. The classic interface's loading screens are
+  unchanged.
+
 ## Arena introductions and results framed by the menu's bands, 17 November 2026
 
 - **The Arena ceremony now wears the main menu's frame.** The fighter

@@ -7316,18 +7316,54 @@ int main(int argc, char** argv) {
 		Check(runtime.RunEvent("present",11.5,effects,error),"present plays");
 		runtime.Frame(viewport,11.51);
 		Check(Near(opacity(),1,.001f),"whole again for the next load");
+		// The framing entrance (section 14.17): present parks the bands and
+		// their furniture past the view's edges, and frameIn, which the
+		// session plays once the first frame is up, scrolls them in.
+		const auto shift = [&](const char* node) {
+			const auto value = runtime.PresentedValue(node,"transform");
+			Check(value.has_value(),"a framing transform");
+			return value ? static_cast<float>(value->data[1]) : 0.f;
+		};
+		const auto fade = [&](const char* node) {
+			const auto value = runtime.PresentedValue(node,"opacity");
+			Check(value.has_value(),"a framing opacity");
+			return value ? static_cast<float>(value->data[0]) : -1.f;
+		};
+		Check(Near(shift("frame-top-band"),-180,.5f) && Near(shift("frame-top"),-180,.5f) && Near(shift("frame-bottom-band"),210,.5f) &&
+			Near(shift("frame-bottom"),210,.5f) && Near(fade("objectives"),0,.001f) && Near(fade("server-card"),0,.001f),
+			"the screen presents with its framing parked and its cards hidden");
+		Check(runtime.RunEvent("frameIn",11.6,effects,error),"frameIn plays");
+		runtime.Frame(viewport,11.75);
+		Check(shift("frame-top-band") > -60 && shift("frame-top-band") < 0 && shift("frame-top") < shift("frame-top-band") - 20 &&
+			shift("frame-bottom-band") > 0 && shift("frame-bottom-band") < 60 && shift("frame-bottom") > shift("frame-bottom-band") + 20,
+			"the bands decelerate in and their furniture trails them");
+		runtime.Frame(viewport,11.891);
+		Check(Near(fade("load-top-flare"),1,.02f) && Near(fade("load-bottom-flare"),.33f,.05f),"the top edge lights as it arrives, the bottom's after it");
+		runtime.Frame(viewport,11.901);
+		Check(Near(shift("frame-top-band"),3.75f,.05f),"the top band passes its seat by 2.5 u");
+		runtime.Frame(viewport,12.25);
+		Check(Near(shift("frame-top-band"),0,.001f) && Near(shift("frame-bottom-band"),0,.001f) && Near(shift("frame-top"),0,.001f) &&
+			Near(shift("frame-bottom"),0,.001f) && Near(fade("load-top-flare"),0,.001f) && Near(fade("load-bottom-flare"),0,.001f) &&
+			Near(fade("objectives"),1,.001f) && Near(fade("server-card"),1,.001f),"the framing locks in its seat and the edges cool");
 		host.reducedMotion = true;
-		runtime.SetReducedMotion(true,12);
-		Check(runtime.RunEvent("handoff",12,effects,error),"handoff under reduced motion");
-		runtime.Frame(viewport,12.04);
+		runtime.SetReducedMotion(true,13);
+		Check(runtime.RunEvent("handoff",13,effects,error),"handoff under reduced motion");
+		runtime.Frame(viewport,13.04);
 		Check(opacity() > .3f && opacity() < .7f,"half way after 40 ms");
-		runtime.Frame(viewport,12.09);
+		runtime.Frame(viewport,13.09);
 		Check(Near(opacity(),0,.001f),"handed off within 80 ms");
-		Check(runtime.RunEvent("present",12.2,effects,error),"present under reduced motion");
-		runtime.Frame(viewport,12.21);
+		Check(runtime.RunEvent("present",13.2,effects,error),"present under reduced motion");
+		runtime.Frame(viewport,13.21);
 		Check(Near(opacity(),1,.001f),"whole again");
+		Check(Near(shift("frame-top-band"),-180,.5f) && Near(shift("frame-bottom"),210,.5f),"parked under reduced motion too");
+		Check(runtime.RunEvent("frameIn",13.22,effects,error),"frameIn under reduced motion");
+		runtime.Frame(viewport,13.23);
+		Check(Near(shift("frame-top-band"),0,.001f) && Near(shift("frame-bottom-band"),0,.001f) && Near(shift("frame-top"),0,.001f) &&
+			Near(shift("frame-bottom"),0,.001f) && fade("load-top-flare") < .001f,"reduced motion seats the framing at once, unlit");
+		runtime.Frame(viewport,13.31);
+		Check(Near(fade("objectives"),1,.001f),"and the cards are in within 80 ms");
 		host.reducedMotion = false;
-		runtime.SetReducedMotion(false,12.3);
+		runtime.SetReducedMotion(false,13.4);
 	}
 	// The Single Player page and its Campaign sub-page (sections 8 and 9, the
 	// sub-page level of 1.10): their rest states, going deeper and Back.

@@ -443,6 +443,11 @@ SCENARIOS = {
         'openq4_retainedGui pending loading_detail Corporal', 'openq4_retainedGui pending loading_phase ASSETS',
         'openq4_retainedGui pending loading_count "412/1630"',
         'openq4_retainedGui state map_loading 0.62', 'waitMsec 600', 'screenshot "screenshots/loading.tga"',
+        # The framing entrance (section 14.17): present parks the framing past
+        # the view's edges, and frameIn scrolls it in.
+        'openq4_retainedGui event present', 'waitMsec 300', 'screenshot "screenshots/loading-parked.tga"',
+        'openq4_retainedGui event frameIn', 'waitMsec 60', 'screenshot "screenshots/loading-entrance.tga"',
+        'waitMsec 700', 'screenshot "screenshots/loading-seated.tga"',
         # Pending values commit with the next state operation.
         'openq4_retainedGui pending loading_phase "LOAD TIME"', 'openq4_retainedGui pending loading_count "12.4 s"',
         'openq4_retainedGui event FinishedLoading', 'openq4_retainedGui state map_loading 1', 'waitMsec 600',

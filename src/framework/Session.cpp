@@ -4811,7 +4811,18 @@ void idSessionLocal::ShowLoadingGui() {
 		// must continue directly instead of entering the client presentation loop.
 		return;
 	}
+	// The retained loading screen presents its levelshot alone, its framing
+	// parked past the view's edges, and scrolls the framing in once its first
+	// frame is up (section 14.17): that frame builds the view and uploads the
+	// levelshot, and its cost must not eat the motion. Every path out of here
+	// plays it, so the framing can never stay parked.
+	const auto frameIn = [this]() {
+		if ( retainedLoadingActive && guiLoading != NULL ) {
+			guiLoading->HandleNamedEvent( "frameIn" );
+		}
+	};
 	if ( com_ticNumber == 0 ) {
+		frameIn();
 		return;
 	}
 	console->Close();
@@ -4822,14 +4833,20 @@ void idSessionLocal::ShowLoadingGui() {
 	const int minShowMsec = idMath::ClampInt( 0, 2000, com_minLoadingGuiMsec.GetInteger() );
 	int stop = Sys_Milliseconds() + minShowMsec;
 	int force = minShowMsec > 0 ? 2 : 1;
+	bool firstFrame = true;
 	while ( Sys_Milliseconds() < stop || force-- > 0 ) {
 		openQ4_BeginPresentationFrame();
 		com_frameTime = common->GetUserCmdTime( com_ticNumber );
 		session->Frame();
 		session->UpdateScreen( false );
+		if ( firstFrame ) {
+			firstFrame = false;
+			frameIn();
+		}
 	}
 #else
 	int stop = com_ticNumber + common->GetUserCmdTicsForMsecCeil( 1000 );
+	frameIn();
 	while ( com_ticNumber < stop ) {
 		openQ4_BeginPresentationFrame();
 		com_frameTime = common->GetUserCmdTime( com_ticNumber );

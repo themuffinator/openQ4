@@ -877,7 +877,7 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **123 partial, 233 pending and 0 verified requirements**, counting the
+There are **123 partial, 234 pending and 0 verified requirements**, counting the
 42 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
@@ -1305,3 +1305,16 @@ The revision re-binds the visual specification and the records on
 after they were bound; no evidence scope or result changes. There are 356
 rows, 314 active requirements and 42 historical superseded rows; the 358
 migration variants and seven final gates remain unaccepted.
+
+## Revision 26: The loading screen's entrance
+
+Visual specification 1.46 scrolls the Remastered loading screen's frame into
+view at the product owner's request: each load shows the levelshot alone, then
+the top and bottom bands sweep in from beyond the view's edges, pass their seat
+and lock back, the furniture they carry trailing them, while their inner edges
+light as they seat and the objectives and server card fade in. `FLOW-047`
+already holds the loading screens and keeps its scope, so `FLOW-072` appends
+the entrance alone. It is pending. The revision re-binds the visual
+specification; no evidence scope or result changes. There are 357 rows, 315
+active requirements and 42 historical superseded rows; the 358 migration
+variants and seven final gates remain unaccepted.

@@ -4976,8 +4976,11 @@ def loading_document() -> dict:
                                          "bottom" if bottom else "top": U * (54 if bottom else 28),
                                          "width": U * 52, "height": U * 52})
         corners.append(node)
-    brackets = group("brackets", {"display": keyword("block"), **FULL}, corners)
-    doc.bind("brackets.display", "brackets", "display", {"op": "select", "args": [{"state": "loading_intro"}, "none", "block"]})
+    # The leading bracket rides in with the top band, the lower pair with the bottom one.
+    brackets_top = group("brackets-top", {"display": keyword("block"), **FULL}, corners[:1])
+    brackets_bottom = group("brackets-bottom", {"display": keyword("block"), **FULL}, corners[1:])
+    for ident in ("brackets-top", "brackets-bottom"):
+        doc.bind(f"{ident}.display", ident, "display", {"op": "select", "args": [{"state": "loading_intro"}, "none", "block"]})
     # The dot matrix: ten by two 4 u squares on a 9 u pitch, top-leading.
     dots = []
     for column in range(10):
@@ -5003,7 +5006,8 @@ def loading_document() -> dict:
     doc.bind("identity.display", "identity", "display", {"op": "select", "args": [{"state": "loading_intro"}, "none", "block"]})
 
     # Objectives on the leading side, in the objectives display's open plate (section 14.11).
-    objectives = group("objectives", {"display": keyword("block"), **absolute(left=U * 18, top=U * 120, width=U * 250, height=U * 180)}, [
+    objectives = group("objectives", {"display": keyword("block"), "opacity": number(1),
+                                      **absolute(left=U * 18, top=U * 120, width=U * 250, height=U * 180)}, [
         vector("objectives-plate", absolute(left=0, top=0, width=U * 250, height=U * 180), [
             path("fill", [(0, 0), (U * 250, 0), (U * 250, U * 180), (U * 20, U * 180), (0, U * 160)],
                  fill=linear((0, 0), (U * 250, 0), [(0, rgb("#B0CD6B", 0.2)), (0.3, rgb("#B0CD6B", 0.2)), (0.56, rgb("#B0CD6B", 0)), (1, rgb("#B0CD6B", 0))])),
@@ -5063,7 +5067,7 @@ def loading_document() -> dict:
                                              "overflow": keyword("hidden")})]
     server = group("server", {"display": keyword("block"), **FULL, "pointer-events": keyword("none")}, [
         group("server-card", {**absolute(left=U * 18, bottom=720 - U * 384, width=cw), "height": keyword("auto"),
-                              "padding-bottom": length(12)}, [
+                              "padding-bottom": length(12), "opacity": number(1)}, [
             vector("server-frame", {**absolute(left=0, top=0, width=cw), "height": length(100, "%")}, [
                 path("body", outline, fill=solid([0, 0, 0, 0.94])),
                 path("wash", [(minor, 0.75), (cw - major, 0.75), (cw - major + header * 0.3, header), (0.75, header), (0.75, minor)],
@@ -5240,14 +5244,73 @@ def loading_document() -> dict:
     # 250 ms (the runtime's 80 ms under reduced motion) while the card's
     # softening ramps in below. Each load presents it whole again.
     doc.timelines.add("handoff", 250, [track("screen", "opacity", [(0, number(1)), (250, number(0))])])
-    doc.timelines.add("present", 1, [track("screen", "opacity", [(0, number(1)), (1, number(1))])])
+
+    # Framing entrance (section 14.17): the screen presents with the levelshot
+    # alone, its bands parked past the view's edges. When the first frame is
+    # up the session plays frameIn: the bands scroll in from the top and the
+    # bottom, decelerating hard, pass their seat by 2.5 u and lock back; the
+    # top leads the bottom by 40 ms. The furniture each band carries trails
+    # it by 70 ms, a parallax that reads as the frame being drawn in behind
+    # it. As each band locks its inner edge lights in the progress orange and
+    # cools over 300 ms, and the objectives and server card fade in after.
+    # Reduced motion seats the bands at once and skips the light.
+    top_park, bottom_park = transform(ty=-U * 120), transform(ty=U * 140)
+    top_over, bottom_over, seat = transform(ty=U * 2.5), transform(ty=-U * 2.5), transform()
+
+    def flare(ident: str, edge_points: list) -> dict:
+        return vector(ident, {**FULL, "opacity": number(0)}, [
+            path("halo", edge_points, closed=False, blend="additive",
+                 stroke=stroke(solid(rgb(PROGRESS, 0.4)), U * 5, minimum=1, join="round")),
+            path("core", edge_points, closed=False, blend="additive",
+                 stroke=stroke(solid(rgb("#FFC070", 0.8)), U * 0.8, minimum=1, join="miter")),
+        ])
+
+    def framing(ident: str, children: list) -> dict:
+        return group(ident, {**FULL, "transform": transform()}, children)
+
+    frame_top_band = framing("frame-top-band", [top_band, flare("load-top-flare", top_edge)])
+    frame_bottom_band = framing("frame-bottom-band", [bottom_band, flare("load-bottom-flare", bottom_edge)])
+    frame_top = framing("frame-top", [brackets_top, dot_matrix, identity])
+    frame_bottom = framing("frame-bottom", [brackets_bottom, arsenal, tips, progress])
+
+    # A play retargets its first key to the current value, so a 1 ms key
+    # parks each node before it moves, whatever the last load left.
+    def parked_until(lead: int, park: dict) -> list:
+        return [(0, park)] + ([(1, park)] if lead > 1 else []) + [(lead, park, EASE_OUT)]
+
+    def band_keys(lead: int, park: dict, over: dict) -> list:
+        return parked_until(lead, park) + [(lead + 300, over, ACCEL), (lead + 400, seat)]
+
+    def furniture_keys(lead: int, park: dict) -> list:
+        return parked_until(lead, park) + [(lead + 320, seat)]
+
+    def flare_keys(lead: int) -> list:
+        return [(0, number(0)), (lead + 230, number(0)), (lead + 290, number(1)), (lead + 590, number(0))]
+
+    cards_keys = [(0, number(0)), (1, number(0)), (260, number(0)), (460, number(1))]
+    doc.timelines.add("frameIn", 630, [
+        track("frame-top-band", "transform", band_keys(1, top_park, top_over)),
+        track("frame-bottom-band", "transform", band_keys(40, bottom_park, bottom_over)),
+        track("frame-top", "transform", furniture_keys(70, top_park)),
+        track("frame-bottom", "transform", furniture_keys(110, bottom_park)),
+        track("load-top-flare", "opacity", flare_keys(1)),
+        track("load-bottom-flare", "opacity", flare_keys(40)),
+        track("objectives", "opacity", cards_keys),
+        track("server-card", "opacity", cards_keys),
+    ])
+    parked = [("frame-top-band", top_park), ("frame-bottom-band", bottom_park), ("frame-top", top_park), ("frame-bottom", bottom_park)]
+    doc.timelines.add("present", 1, [track("screen", "opacity", [(0, number(1)), (1, number(1))])] +
+                      [track(node, "transform", [(0, value), (1, value)]) for node, value in parked] +
+                      [track(node, "opacity", [(0, number(0)), (1, number(0))])
+                       for node in ("load-top-flare", "load-bottom-flare", "objectives", "server-card")])
     doc.events["handoff"] = [{"op": "playTimeline", "timeline": "handoff"}]
     doc.events["present"] = [{"op": "playTimeline", "timeline": "present"}]
+    doc.events["frameIn"] = [{"op": "playTimeline", "timeline": "frameIn"}]
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"),
                             "font-size": length(16), "color": colour([1, 1, 1, 0.8]), "opacity": number(1)}, [
         shot,
         grid,
-        top_band, bottom_band, brackets, dot_matrix, identity, objectives, server, arsenal, tips, progress,
+        frame_top_band, frame_bottom_band, frame_top, objectives, server, frame_bottom,
     ])
     result = doc.build(root)
     result["canvas"]["minWidth"] = CANVAS_W

@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.45, 17 November 2026 (1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.46, 17 November 2026 (1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -59,6 +59,11 @@ horns are their only accents; the bands close in as the menu opens and glide
 between levels on one jolt-free curve; each level scrolls out and the next
 scrolls in the same way; and the rime line catches the light while an edge
 travels (sections 6 and 8).
+
+Version 1.46 scrolls the Remastered loading screen's frame into view: the
+levelshot shows first, then the top and bottom bands sweep in from beyond the
+view's edges, lock into place with the furniture they carry trailing them, and
+their inner edges flash orange as they seat (section 14.17).
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -3678,6 +3683,20 @@ keeps.
   only their straight spans to the view's edges. The top band anchors to the top
   edge and the bottom band to the bottom, and the corner brackets and the dot
   matrix move out with the view's corners.
+- **Entrance.** Each load presents the levelshot alone, the bands parked past
+  the view's edges with the furniture they carry: the top band with the
+  leading bracket, the dot matrix and the identity, the bottom band with the
+  lower brackets, the progress and the tips or arsenal. Once that first frame
+  is up, which builds the view and uploads the levelshot, the frame scrolls in.
+  The top band travels 120 u down and the bottom band 140 u up, each
+  decelerating hard (cubic 0.16, 1, 0.3, 1) for 300 ms to pass its seat by
+  2.5 u, then easing back over 100 ms; the bottom band starts 40 ms after the
+  top. Each band's furniture trails it by 70 ms and seats at 320 ms without
+  passing it. As each band locks, its inner edge lights in #E06C00 with a
+  #FFC070 core, peaking at 290 ms and gone 300 ms later, and the objectives
+  plate and server card fade in from 260 to 460 ms. The entrance takes 630 ms
+  and plays while the level loads. Reduced motion seats the frame at once,
+  unlit, and fades the cards in over 80 ms.
 - **Identity.** The level name trails at the top. Beneath it, on the stock
   message line, run the mission and difficulty in single player, or the game
   type and map in multiplayer.
@@ -4657,6 +4676,26 @@ and sections 2 and 13.7 follow.
 
 The atlas sheet now reaches all four levels and the confirmation through
 these transitions.
+
+### Version 1.46: the loading screen's entrance
+
+The product owner asked for a quick and interesting scroll transition that
+brings the level loading screens' top and bottom framing into view. Section
+14.17 adds the entrance to the Remastered loading screen; the stock screens
+and Classic are unchanged.
+
+| Subject | Version 1.45 | Version 1.46 |
+| --- | --- | --- |
+| First frame | The whole screen at once | The levelshot alone, the frame parked past the top and bottom edges |
+| Bands | In place | Scroll in 120 u and 140 u, decelerating hard over 300 ms, pass their seat by 2.5 u and lock back over 100 ms; the bottom band 40 ms after the top |
+| Furniture | In place | Rides with its band, trailing it by 70 ms, seated at 320 ms |
+| Inner edges | The spill only | Light in #E06C00 with a #FFC070 core as each band locks, gone 300 ms later |
+| Objectives and server card | In place | Fade in from 260 to 460 ms |
+| Reduced motion | Not applicable | The frame seats at once, unlit; the cards fade in over 80 ms |
+
+Register revision 26 appends `FLOW-072` for the entrance; `FLOW-047` keeps
+the rest of the loading screens unchanged. It is pending, and nothing is
+accepted.
 
 ### Version 1.39: the Awakening chaingun turret
 
