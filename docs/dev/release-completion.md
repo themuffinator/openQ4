@@ -286,9 +286,17 @@ does not restore the withdrawn release. See
   drew faceted bands across low-polygon bodies; shadow maps' filtered edges
   don't.
 - **What to do.** Nothing; it is off by default, so the game looks as it always
-  did. It needs shadow maps (Enhanced and up), leaves the original stencil
-  shadows and the players' own bodies and weapons alone, and takes effect at
-  once.
+  did. To try it, turn on **Character Self-Shadows** under Settings > Display >
+  Image Quality and apply. It needs shadow maps (Enhanced and up), leaves the
+  original stencil shadows and the players' own bodies and weapons alone, and
+  takes effect at once.
+- Menu row: `settings_character_self_shadow` sits under Enable Shadows on the
+  DISPLAY page's IMAGE QUALITY tab and is greyed out while shadows are off. The
+  switch joins the SYSTEM settings catalog as an immediate setting, which makes
+  that catalog 77 keys: `SettingsEffectCatalogV6` is V5 plus this key, plans
+  built on it name version 6, and a schema-1 recovery journal written against
+  V4/V5's 76 keys still decodes and takes the new key from the live value.
+  Presets and Auto-Detect leave it alone.
 - Development: `R_InteractionMaterialNoSelfShadow` in `Interaction.cpp`
   decides both ownership sites of `idInteraction::AddActiveInteraction`, the
   receiver list (local or global interactions) and the caster chain (shadow

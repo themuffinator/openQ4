@@ -333,6 +333,7 @@ const std::vector<SystemSettingDescriptor>& SystemSettingsHost::Catalog() {
 		Boolean("r_shadowMapCSM"), Number("r_shadowMapCascadeCount", 1, 4), Boolean("r_shadowMapProjectedCSM"),
 		Boolean("r_shadowMapCascadeStabilize"), Boolean("r_motionBlurObjectVectors"),
 		Boolean("r_shadowMapHashedAlpha"), Boolean("r_shadowMapTranslucentReceivers"),
+		Boolean("r_shadowMapCharacterSelfShadow", "#str_232513"),
 		Number("s_maxEmitterChannels", 1, 48, "", SystemSettingAudioRestart),
 		Number("s_maxSoundsPerShader", 0, 32, "", SystemSettingNextMap),
 		Number("s_numberOfSpeakers", 0, 6, "", SystemSettingAudioRestart, {0,2,6}),

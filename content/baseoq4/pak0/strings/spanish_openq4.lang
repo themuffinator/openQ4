@@ -1775,4 +1775,5 @@
 	"#str_232510"	"openQ4 se ha actualizado a %s."
 	"#str_232511"	"No se pudo instalar openQ4 %s. openQ4 %s no ha cambiado.\n\n¿Abrir la página de descarga para instalarlo tú mismo?"
 	"#str_232512"	"openQ4 no pudo volver a iniciarse tras actualizarse. Inícialo desde su carpeta."
+	"#str_232513"	"Autosombras de personajes"
 }

@@ -1775,4 +1775,5 @@
 	"#str_232510"	"Az openQ4 frissült erre a verzióra: %s."
 	"#str_232511"	"Az openQ4 %s telepítése nem sikerült, így az openQ4 %s változatlan.\n\nMegnyitod a letöltési oldalt, hogy magad telepítsd?"
 	"#str_232512"	"Az openQ4 a frissítés után nem tudott újraindulni. Indítsd el a mappájából."
+	"#str_232513"	"Karakterek saját árnyéka"
 }

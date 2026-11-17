@@ -1226,7 +1226,8 @@ diagnostics establish whole-frame ownership or production performance.
   shadow-mapped lights; verified on both backends, stencil unchanged. See
   [character self-shadows](release-completion.md#characters-can-shadow-themselves-238-17-november-2026).
   Remaining: physical-platform breadth; combat-crowd cost of weapon-light
-  shadows on Quality (FPS-03); a settings row for character self-shadows.
+  shadows on Quality (FPS-03). The DISPLAY page's IMAGE QUALITY tab has a
+  Character Self-Shadows row (17 November).
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple

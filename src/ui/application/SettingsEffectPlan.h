@@ -26,6 +26,8 @@ const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV4();
 // setting: both back ends apply it to the running device. Its key count cannot
 // tell it from V4, so a plan names version 4 to keep V4's meaning.
 const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV5();
+// V6 adds the character self-shadow switch, an immediate renderer setting.
+const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV6();
 
 enum class SettingsEffectCompletion { DisplayConfirmed, Automatic };
 enum class SettingsRendererStrategy { None, CoalescedDevice };

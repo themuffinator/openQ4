@@ -1784,4 +1784,5 @@
 	"#str_232510"	"openQ4 è stato aggiornato alla versione %s."
 	"#str_232511"	"Non è stato possibile installare openQ4 %s. openQ4 %s non è cambiato.\n\nAprire la pagina di download per installarlo da te?"
 	"#str_232512"	"openQ4 non è riuscito a riavviarsi dopo l'aggiornamento. Avvialo dalla sua cartella."
+	"#str_232513"	"Autombre dei personaggi"
 }

@@ -73,6 +73,8 @@
   "settings.baseline.r_useShadowMap": {"type": "boolean", "initial": false},
   "settings.draft.s_useEAXReverb": {"type": "boolean", "initial": false},
   "settings.baseline.s_useEAXReverb": {"type": "boolean", "initial": false},
+  "settings.draft.r_shadowMapCharacterSelfShadow": {"type": "boolean", "initial": false},
+  "settings.baseline.r_shadowMapCharacterSelfShadow": {"type": "boolean", "initial": false},
   "settings.draft.r_shadowMapPointLights": {"type": "boolean", "initial": true},
   "settings.baseline.r_shadowMapPointLights": {"type": "boolean", "initial": true},
   "settings.draft.r_hdrSceneTarget": {"type": "boolean", "initial": true},
@@ -492,6 +494,11 @@
    "input": "number",
    "operation": "settings.system.edit",
    "arguments": {"ui_retainedTextScale": {"input": "value"}}
+  },
+  "edit.r_shadowMapCharacterSelfShadow": {
+   "input": "boolean",
+   "operation": "settings.system.edit",
+   "arguments": {"r_shadowMapCharacterSelfShadow": {"input": "value"}}
   },
   "begin": {"operation": "settings.system.begin", "arguments": {}},
   "apply": {"operation": "settings.system.apply", "arguments": {}},
@@ -2854,6 +2861,55 @@
      },
      "block",
      "none"
+    ]
+   }
+  },
+  {
+   "id": "settings_character_self_shadow.enabled",
+   "node": "settings_character_self_shadow",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 2]},
+     {
+      "op": "&&",
+      "args": [
+       {
+        "op": "&&",
+        "args": [
+         {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+         {"op": "!", "args": [{"state": "settings.busy"}]}
+        ]
+       },
+       {"state": "settings.draft.r_shadows"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "settings_character_self_shadow.opacity",
+   "node": "settings_character_self_shadow",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {
+        "op": "&&",
+        "args": [
+         {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+         {"op": "!", "args": [{"state": "settings.busy"}]}
+        ]
+       },
+       {"state": "settings.draft.r_shadows"}
+      ]
+     },
+     1,
+     0.4
     ]
    }
   },
@@ -19450,6 +19506,227 @@
    }
   },
   {
+   "id": "tall.settings_character_self_shadow.width",
+   "node": "settings_character_self_shadow",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow.height",
+   "node": "settings_character_self_shadow",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-focus.width",
+   "node": "settings_character_self_shadow-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-focus.height",
+   "node": "settings_character_self_shadow-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-head.left",
+   "node": "settings_character_self_shadow-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-head.width",
+   "node": "settings_character_self_shadow-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     310.9075,
+     {"op": "*", "args": [152.011, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-head.height",
+   "node": "settings_character_self_shadow-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-label.font-size",
+   "node": "settings_character_self_shadow-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-label.line-height",
+   "node": "settings_character_self_shadow-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-box.left",
+   "node": "settings_character_self_shadow-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     370.2211,
+     {"op": "*", "args": [181.011, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-box.top",
+   "node": "settings_character_self_shadow-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-box.width",
+   "node": "settings_character_self_shadow-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-box.height",
+   "node": "settings_character_self_shadow-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-checked.left",
+   "node": "settings_character_self_shadow-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     370.2211,
+     {"op": "*", "args": [181.011, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-checked.top",
+   "node": "settings_character_self_shadow-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-checked.width",
+   "node": "settings_character_self_shadow-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_character_self_shadow-checked.height",
+   "node": "settings_character_self_shadow-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
    "id": "tall.settings_specular.width",
    "node": "settings_specular",
    "property": "width",
@@ -28174,6 +28451,150 @@
     },
     {
      "node": "settings_shadows-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_character_self_shadow.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "settings_character_self_shadow-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings_character_self_shadow-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings_character_self_shadow-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_character_self_shadow.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "settings_character_self_shadow-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_character_self_shadow.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "settings_character_self_shadow-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_character_self_shadow.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "settings_character_self_shadow-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_character_self_shadow.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "settings_character_self_shadow-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_character_self_shadow-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -56716,10 +57137,236 @@
                    },
                    "parts": {"checked": "settings_shadows-checked"},
                    "navigation": {
-                    "down": "settings_specular",
+                    "down": "settings_character_self_shadow",
                     "up": "settings_brightness_number",
                     "right": "settings_ambient",
                     "left": "settings_shadows"
+                   }
+                  }
+                 },
+                 {
+                  "id": "settings_character_self_shadow",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 1},
+                   "flex-shrink": {"type": "number", "value": 0}
+                  },
+                  "children": [
+                   {
+                    "id": "settings_character_self_shadow-plate",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "plate",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_character_self_shadow-wash",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "opacity": {"type": "number", "value": 0}
+                    },
+                    "paths": [
+                     {
+                      "id": "wash",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {
+                       "type": "linear",
+                       "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                       "to": [{"fraction": 1}, {"fraction": 0.0}],
+                       "stops": [
+                        {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                        {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                       ]
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_character_self_shadow-focus",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 4, "unit": "dp"},
+                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                     "opacity": {"type": "number", "value": 0}
+                    },
+                    "paths": [
+                     {
+                      "id": "rail",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_character_self_shadow-head",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 21, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 152.011, "unit": "dp"},
+                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                     "display": {"type": "keyword", "value": "flex"},
+                     "flex-direction": {"type": "keyword", "value": "row"},
+                     "align-items": {"type": "keyword", "value": "center"}
+                    },
+                    "children": [
+                     {
+                      "id": "settings_character_self_shadow-label",
+                      "type": "text",
+                      "properties": {
+                       "text": {"type": "text", "value": "#str_232513"},
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "flex-shrink": {"type": "number", "value": 1},
+                       "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                       "font-family": {"type": "font", "value": "lowpixel"},
+                       "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                       "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                       "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                       "white-space": {"type": "keyword", "value": "normal"},
+                       "overflow": {"type": "keyword", "value": "hidden"}
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_character_self_shadow-box",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
+                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                     "width": {"type": "length", "value": 14, "unit": "dp"},
+                     "height": {"type": "length", "value": 14, "unit": "dp"}
+                    },
+                    "paths": [
+                     {
+                      "id": "box",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                       "widthDp": 1.5,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_character_self_shadow-checked",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
+                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                     "width": {"type": "length", "value": 14, "unit": "dp"},
+                     "height": {"type": "length", "value": 14, "unit": "dp"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "children": [
+                     {
+                      "id": "settings_character_self_shadow-mark",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "mark",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ],
+                  "control": {
+                   "role": "toggle",
+                   "label": "#str_232513",
+                   "action": "edit.r_shadowMapCharacterSelfShadow",
+                   "value": {"state": "settings.draft.r_shadowMapCharacterSelfShadow"},
+                   "states": {
+                    "default": "settings_character_self_shadow.default",
+                    "hover": "settings_character_self_shadow.hover",
+                    "focus": "settings_character_self_shadow.focus",
+                    "pressed": "settings_character_self_shadow.pressed",
+                    "disabled": "settings_character_self_shadow.disabled"
+                   },
+                   "parts": {"checked": "settings_character_self_shadow-checked"},
+                   "navigation": {
+                    "down": "settings_specular",
+                    "up": "settings_shadows",
+                    "right": "settings_crt",
+                    "left": "settings_character_self_shadow"
                    }
                   }
                  },
@@ -56941,7 +57588,12 @@
                     "disabled": "settings_specular.disabled"
                    },
                    "parts": {"checked": "settings_specular-checked"},
-                   "navigation": {"down": "settings_bump", "up": "settings_shadows", "right": "settings_crt", "left": "settings_specular"}
+                   "navigation": {
+                    "down": "settings_bump",
+                    "up": "settings_character_self_shadow",
+                    "right": "settings_irradiance",
+                    "left": "settings_specular"
+                   }
                   }
                  },
                  {
@@ -57162,7 +57814,12 @@
                     "disabled": "settings_bump.disabled"
                    },
                    "parts": {"checked": "settings_bump-checked"},
-                   "navigation": {"down": "settings_sky", "up": "settings_specular", "right": "settings_irradiance", "left": "settings_bump"}
+                   "navigation": {
+                    "down": "settings_sky",
+                    "up": "settings_specular",
+                    "right": "settings_lightgrid_preload",
+                    "left": "settings_bump"
+                   }
                   }
                  },
                  {
@@ -61694,7 +62351,7 @@
                    "navigation": {
                     "down": "settings_irradiance",
                     "up": "settings_ambient_number",
-                    "left": "settings_specular",
+                    "left": "settings_character_self_shadow",
                     "right": "settings_crt"
                    }
                   }
@@ -61920,7 +62577,7 @@
                    "navigation": {
                     "down": "settings_lightgrid_preload",
                     "up": "settings_crt",
-                    "left": "settings_bump",
+                    "left": "settings_specular",
                     "right": "settings_irradiance"
                    }
                   }
@@ -62146,7 +62803,7 @@
                    "navigation": {
                     "down": "settings_brightness",
                     "up": "settings_irradiance",
-                    "left": "settings_sky",
+                    "left": "settings_bump",
                     "right": "settings_lightgrid_preload"
                    }
                   }

@@ -1775,4 +1775,5 @@
 	"#str_232510"	"openQ4 wurde auf %s aktualisiert."
 	"#str_232511"	"openQ4 %s konnte nicht installiert werden. openQ4 %s bleibt unverändert.\n\nDownloadseite öffnen, um es selbst zu installieren?"
 	"#str_232512"	"openQ4 konnte nach dem Update nicht neu starten. Starten Sie es aus seinem Ordner."
+	"#str_232513"	"Eigenschatten von Figuren"
 }

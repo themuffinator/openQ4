@@ -16,7 +16,7 @@ The Display page has three tabs:
 |---|---|
 | **Graphics** | Performance Preset, Auto-Detect, Rendering Backend, Rendering Device, Restart Renderer, UI Scale, Text Size, UI Aspect |
 | **Screen** | Display Device, Expand Across Displays, Fullscreen, Borderless Window, Fullscreen Policy, MSAA, V-Sync, window size, Display Resolution, custom fullscreen size, Refresh Rate |
-| **Image Quality** | Brightness, Resolution Scale, shadows, specular, bump maps, detailed sky, Bloom, SSAO, HDR Tonemap, Post AA Mode, ambient light, CRT Emulation, Irradiance Volumes, Preload Light Grids |
+| **Image Quality** | Brightness, Resolution Scale, shadows, character self-shadows, specular, bump maps, detailed sky, Bloom, SSAO, HDR Tonemap, Post AA Mode, ambient light, CRT Emulation, Irradiance Volumes, Preload Light Grids |
 
 ## Performance presets
 

@@ -1775,4 +1775,5 @@
 	"#str_232510"	"openQ4 has been updated to %s."
 	"#str_232511"	"openQ4 %s could not be installed, so openQ4 %s is unchanged.\n\nOpen the download page to install it yourself?"
 	"#str_232512"	"openQ4 could not start again after updating. Start it from its folder."
+	"#str_232513"	"Character Self-Shadows"
 }

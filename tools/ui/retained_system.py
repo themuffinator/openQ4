@@ -59,7 +59,8 @@ CATALOG = {
         "r_skipBump", "r_skipSky", "r_skipSpecular", "r_ssao", "r_useLightGrid", "ui_aspectCorrection", "image_downSize",
         "image_downSizeBump", "image_downSizeSpecular", "image_ignoreHighQuality", "image_writeGeneratedImages", "r_motionBlur",
         "r_shadowMapCSM", "r_shadowMapProjectedCSM", "r_shadowMapCascadeStabilize", "r_motionBlurObjectVectors",
-        "r_shadowMapHashedAlpha", "r_shadowMapTranslucentReceivers", "r_useShadowMap", "s_useEAXReverb")},
+        "r_shadowMapHashedAlpha", "r_shadowMapTranslucentReceivers", "r_useShadowMap", "s_useEAXReverb",
+        "r_shadowMapCharacterSelfShadow")},
     **{key: ("boolean", True) for key in ("r_shadowMapPointLights", "r_hdrSceneTarget")},
     **{key: ("number", 0) for key in (
         "r_brightness", "r_customHeight", "r_customWidth", "r_displayRefresh", "r_forceAmbient", "r_mode", "r_multiSamples",
@@ -82,7 +83,8 @@ EDITS = ("com_performancePreset", "r_bloom", "r_borderless", "r_brightness", "r_
          "image_downSizeSpecular", "image_downSizeSpecularLimit", "image_ignoreHighQuality", "image_usePrecompressedTextures",
          "image_writeGeneratedImages", "r_motionBlur", "r_rendererBenchmarkPreset", "r_rendererUploadFrameBuffers",
          "r_rendererUploadMegs", "r_shadowMapMaxUpdatesPerView", "r_shadowMapSize", "r_useShadowMap", "s_maxEmitterChannels",
-         "s_maxSoundsPerShader", "s_numberOfSpeakers", "s_useEAXReverb", "ui_retainedScale", "ui_retainedTextScale")
+         "s_maxSoundsPerShader", "s_numberOfSpeakers", "s_useEAXReverb", "ui_retainedScale", "ui_retainedTextScale",
+         "r_shadowMapCharacterSelfShadow")
 RENDER_SLOTS = 32                         # the renderer device list (RenderingSettings)
 PROFILES = ("minimum", "lowpower", "low", "performance", "balanced", "enhanced", "quality", "ultra", "maximum")   # PerformancePreset.cpp
 # The service's values as presentation variables: each its name and state.
@@ -549,7 +551,7 @@ def system_document() -> dict:
               "#str_229944", "#str_230017", "#str_229912", "#str_229915", "#str_200147", "#str_229909", "#str_229910", "#str_41093",
               "#str_41092", "#str_229946", "#str_229947", "#str_229975", "#str_229948", "#str_229949", "#str_229945", "#str_200148",
               "#str_200160", "#str_200161", "#str_200162", "#str_223009", "#str_41082", "#str_41088", "#str_41084", "#str_41094",
-              "#str_223002", "#str_223003", "#str_41090", "#str_41107", "#str_42820", "#str_41103")
+              "#str_223002", "#str_223003", "#str_41090", "#str_41107", "#str_42820", "#str_41103", "#str_232513")
     x = value_column(labels)
     draft = lambda key: st(f"settings.draft.{key}")
     edit = lambda key: f"edit.{key}"
@@ -665,6 +667,11 @@ def system_document() -> dict:
             ("settings_tonemap", "#str_41084", "r_hdrToneMap", None)):
         value = draft(setting) if action is None else no(draft(setting))
         image_rows.append(row(doc, ident, key, "toggle", x, value=value, action=edit(setting) + (action or "")))
+        if ident == "settings_shadows":
+            # #238: animated characters shadow themselves under shadow-mapped
+            # lights; it means nothing while shadows are off.
+            image_rows.append(row(doc, "settings_character_self_shadow", "#str_232513", "toggle", x,
+                                  value=draft("r_shadowMapCharacterSelfShadow"), action=edit("r_shadowMapCharacterSelfShadow")))
     postaa = choice(doc, "settings_postaa", "#str_41094", x, edit("r_postAA"), draft("r_postAA"), listed("#str_41095", (0, 1, 2, 3, 4)))
     image_rows.append(postaa)
     ambient_on = row(doc, "settings_ambient_enabled", "#str_223002", "toggle", x, value=op(">", draft("r_forceAmbient"), 0),
@@ -691,6 +698,7 @@ def system_document() -> dict:
     renderer_status["properties"]["display"] = keyword("none")
     doc.bind("settings_renderer-status.display", "settings_renderer-status", "display", op("select", op(
         "&&", st("settings.renderer.fallback"), op("==", draft("r_renderer"), st("settings.baseline.r_renderer"))), "block", "none"))
+    gate(doc, "settings_character_self_shadow", both(EDITABLE, draft("r_shadows")), opacity=dim(both(EDITABLE, draft("r_shadows"))))
     for ident in ("settings_brightness", "settings_brightness_number", "settings_shadows", "settings_specular", "settings_bump",
                   "settings_sky", "settings_bloom", "settings_ssao", "settings_tonemap", "settings_postaa", "settings_ambient_enabled",
                   "settings_ambient", "settings_ambient_number", "settings_crt", "settings_irradiance"):

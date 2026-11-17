@@ -42,7 +42,7 @@ struct View {
   // The prompt bar's key caps name their keys from the stock code strings.
   if(const auto at=locale.rfind("_openq4.lang");at!=std::string::npos){const auto code=locale.substr(0,at)+"_code.lang";if(std::ifstream(code))host.Locale(code);}host.expansion=expansion;Json::Value doc;Json::CharReaderBuilder b;auto reader=std::unique_ptr<Json::CharReader>(b.newCharReader());Check(reader->parse(s.data()+s.find('{'),s.data()+s.size(),&doc,&error),error.c_str());
   for(auto& k:doc["state"].getMemberNames())if(k.starts_with("settings.draft.")){auto d=doc["state"][k];StateValue v;auto type=d["type"].asString();if(type=="number")v=d["initial"].asDouble();else if(type=="boolean")v=d["initial"].asBool();else v=d["initial"].asString();host.live.emplace(k.substr(15),v);}
-  Check(host.live.size()==76,"full authored 76-key typed catalog");host.live["com_performancePreset"]=std::string("balanced");host.live["r_brightness"]=1.375;host.live["r_forceAmbient"]=.1375;host.live["r_renderer"]=std::string("best");Check(tx.Begin(Owner).code==SettingsCode::Ok,"begin real transaction");
+  Check(host.live.size()==77,"full authored 77-key typed catalog");host.live["com_performancePreset"]=std::string("balanced");host.live["r_brightness"]=1.375;host.live["r_forceAmbient"]=.1375;host.live["r_renderer"]=std::string("best");Check(tx.Begin(Owner).code==SettingsCode::Ok,"begin real transaction");
   std::vector<Diagnostic> ds;bool loaded=runtime.LoadDocument(s,"guis/menu/settings/system.rui",ds);for(auto& d:ds)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"actual SYSTEM compiles and loads");viewport.width=width;viewport.height=height;viewport.displayScale=density;
   // As the engine adapter lays the page out (UserInterfaceRetained): its 720 dp
   // canvas spans the view's height, at least 960 dp wide, whatever the density.
@@ -131,6 +131,14 @@ static void Tabs(View& v){
  Check(leaving&&arriving&&leaving->data[0]<1&&arriving->data[0]<1&&!v.runtime.CanActivateControl("settings_preset",v.time),"mid-fade the leaving page fades out and no longer acts");
  for(int i=0;i<10;++i)v.Frame();
  Check(PageDisplay(v,PageTabs[0])=="none"&&PageDisplay(v,PageTabs[2])=="block"&&v.runtime.PresentedValue("settings-page-image","opacity")->data[0]==1,"after 150 ms only the new page shows");
+ // Character Self-Shadows (#238) sits under Enable Shadows and acts only while shadows are on;
+ // the order above walks it with shadows off.
+ auto shadows=[&](bool on){Check(v.runtime.SetState({{"settings.draft.r_shadows",on}},v.error,v.time),v.error.c_str());v.Frame();
+  Check(v.runtime.FocusControl("settings_shadows",v.time),"Enable Shadows focuses");v.Key(MenuInput::Next);v.Frame();};
+ shadows(true);Check(v.runtime.FocusedControl()=="settings_character_self_shadow","with shadows on Next reaches Character Self-Shadows");
+ v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_specular","Character Self-Shadows comes before specular");
+ shadows(false);Check(v.runtime.FocusedControl()=="settings_specular"&&!v.runtime.FocusControl("settings_character_self_shadow",v.time),
+  "with shadows off Character Self-Shadows is skipped and takes no focus");
  v.runtime.SetReducedMotion(true,v.time);v.Event("tab_graphics");v.Frame();
  Check(v.Tab()==0&&!v.runtime.CanActivateControl("settings_brightness",v.time)&&v.runtime.CanActivateControl("settings_preset",v.time),"the tab switches at once");
  for(int i=0;i<5;++i)v.Frame();Check(PageDisplay(v,PageTabs[2])=="none","reduced motion bounds the fade to 80 ms");

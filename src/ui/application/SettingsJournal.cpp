@@ -256,7 +256,7 @@ bool DecodeEffect(const std::string& bytes,const std::map<std::string,std::size_
  if (!ParseStateValues(payload,flat,diagnostics)) return Fail(error,"Invalid typed settings effect journal payload");
  unsigned schema=0; std::string state(0,'\0'),completion(0,'\0'),strategy(0,'\0');
  if (!ReadUnsigned(flat,"schema",2,schema) || schema!=2 || !ReadText(flat,"attempt",j.attempt) || !ReadText(flat,"state",state) ||
-  !ReadUnsigned(flat,"plan.version",5,j.plan.version) || j.plan.version<1 ||
+  !ReadUnsigned(flat,"plan.version",6,j.plan.version) || j.plan.version<1 ||
   !ReadUnsigned(flat,"plan.changeMask",127,j.plan.changeMask) || !ReadUnsigned(flat,"plan.domainMask",31,j.plan.domainMask) ||
   !ReadText(flat,"plan.completion",completion) || !ReadText(flat,"plan.rendererStrategy",strategy))
   return Fail(error,"Invalid settings effect journal schema or plan");
@@ -298,8 +298,9 @@ bool DecodeEffect(const std::string& bytes,const std::map<std::string,std::size_
 bool DecodeSystemSettingsJournal(const std::string& bytes,const StateValues& current,
  SettingsRecoveryJournal& journal,std::string& error) {
  try {
-  std::map<std::string,std::size_t> catalog,quality,previous,legacy;
-  for (const auto& [key,field]:SettingsEffectCatalogV4()) catalog.emplace(key,field.type);
+  std::map<std::string,std::size_t> catalog,backend,quality,previous,legacy;
+  for (const auto& [key,field]:SettingsEffectCatalogV6()) catalog.emplace(key,field.type);
+  for (const auto& [key,field]:SettingsEffectCatalogV4()) backend.emplace(key,field.type);
   for (const auto& [key,field]:SettingsEffectCatalogV3()) quality.emplace(key,field.type);
   for (const auto& [key,field]:SettingsEffectCatalogV2()) previous.emplace(key,field.type);
   for (const auto& [key,field]:SettingsEffectCatalogV1()) legacy.emplace(key,field.type);
@@ -311,7 +312,8 @@ bool DecodeSystemSettingsJournal(const std::string& bytes,const StateValues& cur
   }
   SettingsRecoveryJournal candidate;
   if (!DecodeSettingsJournal(bytes,catalog,candidate,error)) {
-   if (!DecodeSettingsJournal(bytes,quality,candidate,error) && !DecodeSettingsJournal(bytes,previous,candidate,error) &&
+   if (!DecodeSettingsJournal(bytes,backend,candidate,error) && !DecodeSettingsJournal(bytes,quality,candidate,error) &&
+       !DecodeSettingsJournal(bytes,previous,candidate,error) &&
        !DecodeSettingsJournal(bytes,legacy,candidate,error)) return false;
    for (const auto& [key,type]:catalog) if (!candidate.baseline.contains(key)) {
     candidate.baseline.emplace(key,current.at(key));
