@@ -510,7 +510,9 @@ private/anti-private audience and distance still constrain cues; user master and
 dialogue mute and hardware voice allocation do not remove captions. The selected
 leadin/loop sample owns its text. Stops, replacement, completion and missing text
 clear the cue. Speaker labels require a matching live entity/emitter and its
-`npc_name`, with a localized radio label where applicable.
+`npc_name`, with a localized radio label where applicable. A character speaks
+through its head (an `idAFAttachment`), so the label is read from the body the
+head belongs to (#226).
 
 The Lowpixel overlay defaults to 17 dp, white text, green speaker labels and a
 0.60 black backing. Long text wraps using actual font advances and pages in
@@ -1877,6 +1879,32 @@ A script line is what was written, not always what was recorded; a caption
 pack can replace any of them with an exact transcript. Multiplayer announcers
 and the non-verbal sounds above stay uncaptioned. Ordered human play and
 physical stereo-HUD placement remain open under AUD-07.
+
+## Speaker names on characters, 17 November 2026
+
+[#226](https://github.com/themuffinator/openQ4/issues/226): **Speaker Names**
+(`ui_subtitleSpeakers`) showed only the radio label. A character speaks through
+its head: `idAI::Speak` starts the line with `head->StartLipSyncing`, so the cue's
+speaker is the head entity, which carries no `npc_name`. The overlay now reads
+the name from the body an `idAFAttachment` belongs to, as the crosshair's
+character info already does. A character without a head speaks on its body and
+was already labelled. The name is the body's spawn value after its persona
+(`def_persona`) is merged, so `game/airdefense1`'s Anderson reads *Medic
+Anderson* (`#str_107511`), not the map's `#str_400219`, which the persona replaces.
+
+`audio_subtitles_runtime.py` adds an `NPC_SPEAKER` phase on `game/airdefense1`:
+after the save and load, it moves the player beside `npc_anderson_outdoor`, runs
+the map's own `map_airdefense1::meetAndersonIntro()`, then reads the overlay's
+`speaker0`/`speaker1` state with `ui_hudTest` and captures the frame. Hidden
+OpenGL client, staged `.install`, private save path, no OS input:
+
+- With the fix, all 27 checks pass. `vo_1_1_1_20_1` is captioned
+  (`speaker=289`, the head) and `speaker0` reads `Medic Anderson: `.
+- With the previous overlay code built into the same stage, `speaker0` is
+  empty and `npc_speaker_name` fails; the other 26 checks pass.
+
+The phase runs only on stock `game/airdefense1`. The Awakening run has no
+matching scene, and the code path is shared.
 
 ## Other verification and limitations
 

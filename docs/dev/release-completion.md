@@ -47,6 +47,22 @@ does not restore the withdrawn release. See
   Not run: any ARM board, Pi or Asahi machine. What the light grid and
   temporal AA cost on a Pi is not measured.
 
+## Speaker Names shows who is talking (#226), 17 November 2026
+
+- **Subtitles name the character speaking.** With **Settings > Audio >
+  Speaker Names** on, a line now starts with the character's name, for
+  example *Medic Anderson: There. He's stabilized for the moment.* Before,
+  the setting only ever showed **Radio** on radio lines, because characters
+  speak through their head and the name is kept on their body. Radio lines
+  whose speaker is unknown still read **Radio**.
+- Nothing to do: the setting is on by default.
+- How it works:
+  [speaker names on characters](audio-voice-evidence.md#speaker-names-on-characters-17-november-2026).
+- Evidence: `audio_subtitles_runtime.py` on stock `game/airdefense1` passes
+  all 27 checks, including the new `npc_speaker_name` (Anderson's own intro
+  line, labelled `Medic Anderson`). With the previous overlay built, that
+  check fails with an empty label. `audio_subtitles.py` passes.
+
 ## Screenshots from the pause menu, and tidier emotion cues in subtitles (#224, #225), 17 November 2026
 
 - **F12 takes a screenshot from the pause menu and the title screen again.**

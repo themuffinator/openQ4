@@ -28,6 +28,12 @@ GAP_SHADERS = {False: 'vo_1_1_1_140_1', True: 'vo_7_6_2'}
 SCRIPT_SHADERS = {False: 'vo_1_1_5_100_1', True: 'vo_7_6_4'}
 # A marine's helmet-radio copy of a line whose dry recording has a transcript.
 HELMET_SHADER = 'vo_9_10_150_11_h'
+# A character who speaks through their head: the stock map's own scene, run beside
+# the character, with the name the installed English text gives them. The head
+# carries no name of its own; the caption takes the body's. The body's persona
+# (def_persona) replaces the map's npc_name at spawn, so this is the persona's name.
+NPC_SCENES = {'game/airdefense1': {'position': '9200 -6433 20', 'call': 'map_airdefense1::meetAndersonIntro();',
+                                   'shader': 'vo_1_1_1_20_1', 'english_name': 'Medic Anderson'}}
 
 
 def main():
@@ -129,6 +135,11 @@ def main():
     # A 0.4 s line that ends on its own stays up 1.5 s from its start, then clears.
     steps += ['testRadioChatter oq4_subtitle_short', 'waitMsec 800']; probe('TAIL_HELD')
     steps += ['waitMsec 1200']; probe('TAIL_GONE')
+    npc = None if args.awakening else NPC_SCENES.get(args.map)
+    if npc:
+        steps += [f'setviewpos {npc["position"]}', f'script {npc["call"]}', 'waitMsec 500']; probe('NPC_SPEAKER')
+        steps += [f'ui_hudTest guis/hud/subtitles.rui get speaker{row}' for row in (0, 1)]; capture('npc-speaker')
+        steps += ['echo SUBTITLE_NPC_SPEAKER_END']
     steps += ['testRadioChatter oq4_subtitle_a', 'set ui_subtitles 0', 'waitMsec 100']; capture('off')
     steps += ['set ui_subtitles 1', 'set ui_subtitleSpeakers 0', 'waitMsec 100']; capture('no-speaker')
     steps += ['writeConfig "subtitle-settings.cfg"', 'testRadioChatter stop',
@@ -241,7 +252,15 @@ def main():
                                      [('ui_subtitles','1'), ('ui_subtitleScale','1.6'), ('ui_subtitleBackground','0.8'), ('ui_subtitleSpeakers','0'),
                                       ('ui_subtitleUntranscribed','0')])
     captures = list((game / 'screenshots').glob('subtitles-*.tga'))
-    checks['engine_captures'] = len(captures) == 13
+    checks['engine_captures'] = len(captures) == 13 + (1 if npc else 0)
+    if npc:
+        # The scene's line is captioned and labelled with its character's name, not
+        # left bare or given the radio label.
+        section = re.search(r'^SUBTITLE_NPC_SPEAKER\s*\n(.*?)^SUBTITLE_NPC_SPEAKER_END', log, re.M | re.S)
+        labels = re.findall(r'^HUD_STATE source=guis/hud/subtitles\.rui key=speaker\d value=(.*?):?\s*$', section[1], re.M) if section else []
+        expected = npc['english_name'] if args.language == 'english' else None
+        checks['npc_speaker_name'] = bool(phases.get('NPC_SPEAKER', {}).get(npc['shader'])) and any(
+            label == expected if expected else label and label != 'Radio' for label in labels)
     from PIL import Image
     for path in captures:
         with Image.open(path) as im: im.save(path.with_suffix('.png'))

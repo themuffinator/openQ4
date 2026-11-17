@@ -58,9 +58,13 @@ void idPlayerView::DrawSubtitles() {
 		idStr speaker;
 		if (cvarSystem->GetCVarBool("ui_subtitleSpeakers")) {
 			const int entity = cue.speakerId - 1;
-			if (entity >= 0 && entity < MAX_GENTITIES && gameLocal.entities[entity] &&
-				gameLocal.entities[entity]->GetSoundEmitter() == cue.emitterIndex) {
-				const char* key = gameLocal.entities[entity]->spawnArgs.GetString("npc_name");
+			idEntity* source = entity >= 0 && entity < MAX_GENTITIES ? gameLocal.entities[entity] : NULL;
+			if (source && source->GetSoundEmitter() == cue.emitterIndex) {
+				// Characters speak through their head, which carries no name of its
+				// own: the name belongs to the body the head is attached to.
+				if (source->IsType(idAFAttachment::GetClassType()) && static_cast<idAFAttachment*>(source)->GetBody())
+					source = static_cast<idAFAttachment*>(source)->GetBody();
+				const char* key = source->spawnArgs.GetString("npc_name");
 				const char* name = !idStr::Cmpn(key, "#str_", 5) ? common->GetLanguageDict()->FindString(key) : key;
 				if (name) speaker = name;
 			}
