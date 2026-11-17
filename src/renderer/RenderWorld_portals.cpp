@@ -1099,7 +1099,15 @@ void idRenderWorldLocal::FindViewLightsAndEntities( void ) {
 		memset( &ps, 0, sizeof( ps ) );
 		ps.rect = tr.viewDef->scissor;
 
+		// A levelshot tile keeps every entity of each area the portal flow
+		// reached, unclipped by the portal chain, so nothing drops out at a
+		// tile seam. Areas the flow did not reach stay hidden, as in play: an
+		// unreached area can hold a set the player never sees (The Awakening's
+		// m09 parks a black starfield box in front of its skyline).
 		for ( int i = 0; i < numPortalAreas; i++ ) {
+			if ( portalAreas[i].viewCount != tr.viewCount ) {
+				continue;
+			}
 			AddAreaEntityRefs( i, &ps );
 		}
 	}

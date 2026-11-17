@@ -26,6 +26,14 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INDEX = ROOT / "tools" / "tests" / "data" / "retail_levelshot_mapdefs.tsv"
 CONTENT_PACKS = ROOT / "tools" / "build" / "content_packs.json"
 CLASS_SOURCES = {"base": "maps.def", "map-pack": "raven_mappack.def"}
+# The Awakening's campaign mapDefs are not retail declarations: the engine
+# points them at openQ4's sets while q4xbase is mounted (DeclEntityDef.cpp).
+AWAKENING_TABLE = ROOT / "src" / "framework" / "DeclEntityDef.cpp"
+AWAKENING_ROW_RE = re.compile(
+    r'\{\s*"(game/[a-z0-9_]+)",\s*"(gfx/guis/loadscreens/[a-z0-9_]+)",\s*'
+    r'"(gfx/guis/loadscreens/awakening/[a-z0-9_]+)"\s*\}'
+)
+AWAKENING_CAMPAIGN_MAPS = 13
 EXPECTED_COUNTS = {"base": 56, "map-pack": 7}
 VARIANTS = ("", "_left", "_right", "_top", "_bottom")
 TOKEN_RE = re.compile(r'"(?:\\.|[^"\\])*"|[{}]|[^\s{}"]+')
@@ -267,6 +275,23 @@ def validate_coverage(entries: list[Entry], content_root: Path) -> list[tuple[En
     return incomplete
 
 
+def awakening_entries(table: Path = AWAKENING_TABLE) -> list[Entry]:
+    """The engine's Awakening levelshot table: one openQ4 set per campaign mapDef."""
+    rows = AWAKENING_ROW_RE.findall(table.read_text(encoding="utf-8", errors="replace"))
+    if len(rows) != AWAKENING_CAMPAIGN_MAPS:
+        fail(f"expected {AWAKENING_CAMPAIGN_MAPS} Awakening levelshot rows in {table.name}, found {len(rows)}")
+    entries: list[Entry] = []
+    for map_def, _alpha, loadimage in rows:
+        if PurePosixPath(loadimage).name != PurePosixPath(map_def).name:
+            fail(f"Awakening levelshot {loadimage!r} is not named after its mapDef {map_def!r}")
+        entries.append(Entry("awakening", table.name, map_def, loadimage))
+    if len({entry.map_def for entry in entries}) != len(entries):
+        fail("the Awakening levelshot table names a mapDef twice")
+    if len({entry.loadimage for entry in entries}) != len(entries):
+        fail("the Awakening levelshot table names a set twice")
+    return entries
+
+
 def loadscreen_pack_root() -> Path:
     """Source folder of the content pack that ships the loadscreens (pak2 since PKG-02)."""
     packs = json.loads(CONTENT_PACKS.read_text(encoding="utf-8"))["packs"]
@@ -304,10 +329,11 @@ def main() -> int:
     if args.retail_def_root is not None:
         compare_retail_sources(entries, args.retail_def_root)
 
-    incomplete = validate_coverage(entries, args.content_root)
+    awakening = awakening_entries()
+    incomplete = validate_coverage(entries + awakening, args.content_root)
     incomplete_loadimages = {entry.loadimage for entry, _ in incomplete}
-    for classification in CLASS_SOURCES:
-        classified = [entry for entry in entries if entry.classification == classification]
+    for classification in (*CLASS_SOURCES, "awakening"):
+        classified = [entry for entry in entries + awakening if entry.classification == classification]
         missing_count = sum(entry.loadimage in incomplete_loadimages for entry in classified)
         print(
             f"{classification}: {len(classified)} mapDefs/loadimages, "

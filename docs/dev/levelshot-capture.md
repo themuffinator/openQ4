@@ -111,3 +111,56 @@ shipped content wins and the difference is noted.
 | q4dz3 | DeadZone | live match, artifact spin and acceleration pad pulse timed | none |
 | q4xctf6 | CTF | flags | none (with `r_ssao 1` the cryo liquid turns magenta; SSAO must stay off) |
 | q4xdm13 | DM | rocket launcher spin timed to the retail angle | none |
+
+## The Awakening campaign sets
+
+The Awakening's campaign mapDefs name the alpha's own levelshots: single 1024 centre images that
+were development captures (`m01_stranarus_trench2` shows a frame counter, `m03_airassault` the
+gunner HUD), and `m05_bio` and both `m06` levels reuse another map's picture (`m06_prison2`,
+retail `mcc`). openQ4 ships a five-tile set for each of the thirteen campaign levels under
+`gfx/guis/loadscreens/awakening/<map>` in the loadscreen pack. While The Awakening is mounted,
+`idDeclEntityDef::Parse` points each campaign mapDef's `loadimage` at its set
+(`DeclMapDef_ApplyAwakeningLevelshot`), so the loading screen, the pause and save pictures, the
+chapter list and `levelshot` itself all use it. A mapDef whose `loadimage` a mod changed keeps the
+mod's, and an uninstalled set leaves the alpha's. `levelshot_inventory.py` reads the engine table
+and checks every set.
+
+These are new compositions, not recoveries of the alpha's cameras: there is no retail original to
+match. Candidate cameras came from a probe sweep (48 entity positions spread through each map, two
+heights, twelve headings, scored for depth layering and exposure), then variant grids around the
+best, chosen by eye. Every set is captured 3 s after map load with `g_autoSkipCinematics 1` and
+the retail presentation pins above, so SP determinism reproduces moving set pieces (m03's
+dropships, m01's walker). fovX is 90 throughout.
+
+| Set | Camera `x y z pitch yaw` | Subject |
+| --- | --- | --- |
+| m01_stranarus_trench1 | -544 -880 174 -2 300 | a Strogg walker over the fuel tank, the road leading to the factory |
+| m01_stranarus_trench2 | 104 -264 230 -2 240 | the factory skyline across the trench under a wide sky |
+| m02_trianfac | -1784 1880 230 -2 75 | the curved catwalk through the blue crystal cavern between lit pillars |
+| m03_airassault | -12160 1280 62 -4 285 | dropships over the desert mesas |
+| m04_prison | -784 1944 122 13 270 | the arched cellblock and its central catwalk |
+| m05_bio | 3099.5 4249.8 3080 -2 210 | a dropship below the Strogg fortress wall |
+| m06_mcc | -1786 -894 234 15 60 | the MCC's lit decks under a sky of wreckage |
+| m06_mcc_invasion | 11176 8296 1954 7 255 | the S-bend road into the mesas |
+| m07_race | -3814 2060 542 2 10 | the gate, pipeline and walkway of the first track |
+| m07_race1 | 6240 -809 1006 -2 195 | the banked track sweeping to the gantry under the smoke towers |
+| m07_race2 | 2840 6656 1578 5 55 | the ringed tower above the pipeworks |
+| m08_cryofac | -1166 -1432 -598 7 30 | the cryo tubes and their feed lines |
+| m09_valkaryne | -4424 -3184 2406 12 256 | the thruster-lit crater below the ruined skyline |
+
+Traps met:
+
+- **Levelshot tiles drew unreachable areas.** A tile turns entity culling off so nothing drops out
+  at a seam, and it used to add the entities of every portal area, visible or not. m09 parks a
+  black starfield box in an area the player never sees, and it covered the skyline in every
+  capture although probes of the same pose were clean. Tiles now add only the areas the portal
+  flow reached (`RenderWorld_portals.cpp`). The sets above were captured with that fix; earlier
+  sets were not recaptured.
+- **Never hard-link a run's `gfx/guis/loadscreens/`.** `levelshot` writes under the mapDef's
+  `loadimage` name, which for these maps is a file of the expansion itself; through a hard-linked
+  content mirror it overwrote the `.home/q4xbase` original. Mirror the content with the
+  loadscreen folder left out.
+- **Probe output names are tokenised.** A name with `+` or `-` splits into several tokens and the
+  probe line is skipped without a message. Use letters, digits and `_`.
+- Unlit idTech 4 surfaces are pure black, so the MCC and prison interiors need headings that keep
+  the lit decks in frame; open-sky probes score well but often frame a black tower or slab.

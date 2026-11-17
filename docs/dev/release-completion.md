@@ -7,6 +7,25 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A loading screen for every level of The Awakening, 17 November 2026
+
+- **Thirteen new loading pictures.** Each campaign level of The Awakening now
+  has its own full-width picture: the walker over the Stranarus trench, the
+  crystal cavern of the Trian facility, dropships over the mesas, the
+  cellblock, the fortress, the MCC, the race tracks, the cryo tubes and the
+  Valkaryne's crater. The alpha's pictures were development captures, one with
+  a frame counter and one with the gunner's HUD, and three levels borrowed
+  another map's picture.
+- **Everywhere the level is shown.** The loading screen, the pause and save
+  pictures and the chapter list use them. A mod that names its own loading
+  picture keeps it.
+- **Cleaner levelshots.** A levelshot no longer draws scenery from areas the
+  camera cannot see, which put a black box over The Awakening's final skyline.
+- **What to do.** The pictures ship in the loadscreen pack (pak2), so this
+  needs that pack's new release; without it the alpha's pictures stay.
+- Cameras, method and traps:
+  [levelshot capture](levelshot-capture.md#the-awakening-campaign-sets).
+
 ## The Awakening's opening dropship scene, tidied, 17 November 2026
 
 - **A natural walk to the dropship.** The squad runs onto the ramp in a smooth
