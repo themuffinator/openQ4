@@ -1,0 +1,68 @@
+<style>
+.chg-ctl{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+.chg-ctl .pl{width:auto;min-width:150px;max-width:220px}
+.chg-ctl .pl[disabled]{opacity:.35;pointer-events:none}
+.chg-ctl label{display:inline-flex;align-items:center;gap:8px;font:500 14px/1 var(--f-low);color:var(--sec);cursor:pointer}
+.tl{position:relative;display:grid;grid-template-columns:120px minmax(0,1fr);gap:4px 12px;font:11.5px/1.3 var(--f-mono);color:var(--ter)}
+.tl .trk{position:relative;height:14px;background:rgba(255,255,255,.04)}
+.tl .bar{position:absolute;top:2px;bottom:2px;background:var(--bc,#8B964B);opacity:.8}
+.tl .bar.trap{clip-path:polygon(0 100%,8% 0,92% 0,100% 100%)}
+.tl .axis{grid-column:2;position:relative;height:16px}
+.tl .axis span{position:absolute;translate:-50% 0;color:var(--t40)}
+.tl .head{position:absolute;top:0;bottom:16px;width:1.5px;background:var(--orange);left:132px;pointer-events:none;opacity:0}
+.chg svg text{pointer-events:none}
+.chg svg .hit{cursor:pointer}
+.chg-path{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font:12px/1.3 var(--f-mono);color:var(--ter)}
+.chg-path b{font:600 11px/1.4 var(--f-low);letter-spacing:.08em;text-transform:uppercase;color:var(--t50)}
+.chg-path .lvl{display:inline-flex;gap:3px}
+.chg-path .lvl i{width:14px;height:6px;background:rgba(139,150,75,.25);clip-path:polygon(0 0,70% 0,100% 100%,0 100%)}
+.chg-path .lvl i.on{background:#8B964B}
+</style>
+<section class="sheet" id="change">
+  <h2 class="sheet-h">Atlas - screen change</h2>
+  <p class="sheet-p">Sections 8 and 9. The menu has three levels: home, pages and, in Remastered, sub-pages. Home to a page is the stock change: the framing bands dock while the home layer sweeps away. A page that leads deeper (Single Player to Campaign and Arena, Multiplayer to Demos) takes one more step: only the top band moves on, one notch pitch, and its 45-degree step slides under the page title, which lifts into the band's thin span as the parent in the path. Back always climbs one level. Click a plate or use the buttons; input during a change retargets it from the current positions.</p>
+  <div class="stage chg" style="padding:0">
+    <svg id="chg" viewBox="-107 0 854 480" role="img" aria-label="Main menu changing between home, page and sub-page" style="display:block;width:100%;height:auto">
+      <defs>
+        <radialGradient id="chgScene" cx="68%" cy="42%" r="75%"><stop offset="0" stop-color="#232a18"/><stop offset=".55" stop-color="#0e110b"/><stop offset="1" stop-color="#040503"/></radialGradient>
+        <linearGradient id="chgBand" x1="0" y1="0" x2="0" y2="1"><stop offset=".1" stop-color="#616F26" stop-opacity="0"/><stop offset=".5" stop-color="#616F26" stop-opacity=".7"/><stop offset=".9" stop-color="#616F26" stop-opacity="0"/></linearGradient>
+        <linearGradient id="chgVig" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".97"/><stop offset=".3" stop-color="#000" stop-opacity="0"/><stop offset=".7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".97"/></linearGradient>
+        <pattern id="chgPlus" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M15 8.5v13M8.5 15h13" stroke="#fff" stroke-width=".6"/></pattern>
+        <filter id="chgSoft" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="4"/></filter>
+        <linearGradient id="chgBacking" x1="0" x2="1"><stop offset=".19" stop-color="#000" stop-opacity="0"/><stop offset=".35" stop-color="#000" stop-opacity="1"/></linearGradient>
+      </defs>
+      <rect x="-107" y="0" width="854" height="480" fill="url(#chgScene)"/>
+      <rect id="chgLight" x="-107" y="0" width="854" height="480" fill="url(#chgBand)" style="mix-blend-mode:screen;mix-blend-mode:plus-lighter"/>
+      <rect x="-107" y="0" width="854" height="480" fill="url(#chgVig)"/>
+      <rect x="-107" y="0" width="854" height="480" fill="url(#chgPlus)" opacity=".04"/>
+      <rect id="chgBackingRect" x="-107" y="0" width="854" height="480" fill="url(#chgBacking)" opacity="0"/>
+      <g id="chgPages" opacity="0"></g>
+      <g id="chgSubs" opacity="0"></g>
+      <g id="chgHome">
+        <text id="chgMark" x="8" y="176" font-family="Michroma, Eurostile, sans-serif" font-size="46" fill="#A2C550" opacity=".85" style="mix-blend-mode:screen;mix-blend-mode:plus-lighter" letter-spacing="1">openQ4</text>
+        <g id="chgNav"></g>
+      </g>
+      <g id="chgTop"><path d="M-400 89.7L102.1 89.7L116.3 103.8L430.7 103.8L440.9 94.7L476.6 94.7L485.8 103.8L527.6 103.8L537.8 94.7L572.5 94.7L581.7 103.8L623.5 103.8L633.7 94.7L668.4 94.7L677.6 103.8L715.4 103.8L752.1 68.5L1400 68.5" fill="none" stroke="#626934" stroke-width="7" opacity=".7" filter="url(#chgSoft)"/><path d="M-400 89.7L102.1 89.7L116.3 103.8L430.7 103.8L440.9 94.7L476.6 94.7L485.8 103.8L527.6 103.8L537.8 94.7L572.5 94.7L581.7 103.8L623.5 103.8L633.7 94.7L668.4 94.7L677.6 103.8L715.4 103.8L752.1 68.5L1400 68.5L1400 -200L-400 -200Z" fill="#000"/><text id="chgTitle" x="116" y="92" font-family="Michroma, Eurostile, sans-serif" font-size="8.4" fill="#fff" fill-opacity="0">SETTINGS - SYSTEM</text></g>
+      <text id="chgCrumb" x="39" y="29" font-family="Michroma, Eurostile, sans-serif" font-size="8.4" fill="#fff" fill-opacity="0"></text>
+      <g id="chgBot"><path d="M-400 70.5L166.3 70.5L176.5 79.6L370.4 79.6L401.1 49.4L743.9 49.4L788.8 92.7L981.7 92.7L990.9 83.6L1400 83.6" fill="none" stroke="#626934" stroke-width="7" opacity=".7" filter="url(#chgSoft)"/><path d="M-400 70.5L166.3 70.5L176.5 79.6L370.4 79.6L401.1 49.4L743.9 49.4L788.8 92.7L981.7 92.7L990.9 83.6L1400 83.6L1400 300L-400 300Z" fill="#000"/><g id="chgLinks"></g><g id="chgBack" opacity="0"></g></g>
+      <text id="chgCarry" x="44" y="341.1" font-family="Michroma, Eurostile, sans-serif" font-size="11.2" fill="#E38900" opacity="0"></text>
+    </svg>
+  </div>
+  <div class="chg-ctl">
+    <div class="segs" role="group" aria-label="Go to" id="chgGo"><span class="lbl">Go to</span></div>
+    <button class="pl act" id="goBack"><i class="mk"></i><span class="lb">Back</span></button>
+    <label><button class="box" id="slowBox" aria-pressed="false" aria-label="Slow motion"></button>Slow motion ×4</label>
+    <label><button class="box" id="rmBox" aria-pressed="false" aria-label="Reduced motion"></button>Reduced motion</label>
+    <label><button class="box" id="carryBox" aria-pressed="false" aria-label="Title carry"></button>Title carry (Remastered)</label>
+  </div>
+  <p class="chg-path" id="chgWhere" aria-live="polite"></p>
+  <div class="tl" id="tl"></div>
+  <p class="cap" id="chgCap"></p>
+  <div class="mpkey">
+    <div><b>Levels</b>Home, pages and sub-pages. Single Player is a page whose sections, Campaign and Arena, each open a sub-page; Multiplayer's Join Game, Create Server and Demos do too, and Player Setup edits in place. A section that leads deeper summarizes itself in the content column until Accept opens it.</div>
+    <div><b>Sub-page dock</b>Only the top band moves on, one notch pitch (97 u) toward the trailing edge, on frame.step: accel(150, 150) over 300 ms. Its step falls at 122–136 u and its notches move one pitch along. The bottom band and Back never move, so nothing leaves the 4:3 canvas.</div>
+    <div><b>Path crumb</b>As the band steps, the page title rises 7 u into the thin leading span, steps down to 80% and dims to 0.40. The band's own step then separates it from the sub-page's title, which starts at the step's foot (136,19 u).</div>
+    <div><b>Classic</b>Keeps the stock: within a screen the bands stay docked, the page sweeps toward the trailing edge over 300 ms and the sub-page appears at 500 ms under a path title.</div>
+  </div>
+</section>
+

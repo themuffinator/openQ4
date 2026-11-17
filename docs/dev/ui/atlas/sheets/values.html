@@ -1,0 +1,47 @@
+<section class="sheet" id="values">
+  <h2 class="sheet-h">Atlas - value controls</h2>
+  <p class="sheet-p">Settings use values that cycle in place rather than switches. Check and radio boxes are square outlines with an inset filled square. The slider is the stock tick ramp with a bar thumb. All of these respond to the mouse here; the spec gives each one a controller and touch mapping too.</p>
+  <div class="stage dim menu">
+    <div class="grid">
+      <div class="demo">
+        <h3 class="h5">Boxes · 18 dp · stroke 1/16 · mark 69%</h3>
+        <div class="ctl"><button class="box on" aria-pressed="true" aria-label="Show player names"></button><span class="l">Show player names</span></div>
+        <div class="ctl"><button class="box" aria-pressed="false" aria-label="Hide full servers"></button><span class="l">Hide full servers</span></div>
+        <div class="ctl"><button class="box mixed" aria-label="All maps (some selected)"></button><span class="l">All maps <span style="color:var(--t50)">(4 of 9)</span></span></div>
+        <div class="pair" role="radiogroup" aria-label="Server source">
+          <label><button class="box on" role="radio" aria-checked="true"></button>Internet</label>
+          <label><button class="box" role="radio" aria-checked="false"></button>LAN</label>
+        </div>
+        <p class="cap">Set state: an inset square in <b>marine.check</b>. Mixed state: an inset bar. The exclusive pair fills the set option's box.</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Slider · tick ramp · 71 u range</h3>
+        <div class="slider"><span class="l" style="min-width:150px">Mouse sensitivity</span><svg class="ramp-s" width="107" height="16" role="slider" tabindex="0" aria-label="Mouse sensitivity" aria-valuemin="0" aria-valuemax="20" aria-valuenow="13"></svg><output>13</output></div>
+        <div class="slider"><span class="l" style="min-width:150px">Brightness</span><svg class="ramp-s" width="107" height="16" role="slider" tabindex="0" aria-label="Brightness" aria-valuemin="0" aria-valuemax="20" aria-valuenow="6"></svg><output>6</output></div>
+        <p class="cap">Alternating tall and short ticks rise from 3 to 13.5 dp above a baseline; the 6×12 dp bar thumb has a bright border and a 40% interior. Ticks past the thumb drop to 40%. Drag, click, or use arrow keys.</p>
+        <h3 class="h5">Filter spinner</h3>
+        <div class="spin" data-values="Deathmatch|Team DM|Tourney|Capture the Flag|Arena CTF"><button class="pv" aria-label="Previous"></button><output>Deathmatch</output><button class="nx" aria-label="Next"></button></div>
+        <p class="cap">◀ and ▶ in orange at 80% on 22×16 u black tiles at 40%; hover turns an arrow amber at once, and it returns over 300 ms.</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Dropdown (openQ4)</h3>
+        <div class="dd">
+          <button class="pl row"><span class="lb">Display mode</span><span class="val">Borderless<i class="chev"></i></span></button>
+          <div class="fr pop" data-shape="pop">
+            <div class="opt">Windowed</div><div class="opt sel">Borderless</div><div class="opt">Fullscreen</div><div class="opt">Custom fullscreen</div>
+          </div>
+        </div>
+        <p class="cap">Adds a chevron and a constrained popup in the popover construction with <b>marine.list</b> bands; it unfolds from its row over 150 ms like the stock kick-player list.</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Text, binding and tags</h3>
+        <div class="field">Marine_<span class="sel">07</span><span class="caret"></span></div>
+        <div class="bind"><span class="l" style="min-width:110px">Fire</span><span class="v">MOUSE1</span><span class="kc">LMB</span></div>
+        <div class="bind"><span class="l" style="min-width:110px">Jump</span><span class="v" style="color:var(--orange)">Press a key…</span><span class="cap">hold <span class="gl" style="width:18px;height:18px;font-size:10px">B</span> 1 s to cancel</span></div>
+        <div class="tags"><span class="tag">Modified</span><span class="tag warn">Restart</span><span class="tag">New</span><span class="tag lock">Locked</span></div>
+        <div class="ctl"><span class="l" style="font-size:15px">Performance impact</span><span class="impact" aria-label="Impact 2 of 3"><i></i><i></i><i class="off"></i></span></div>
+        <p class="cap">The save name sits on a dark plate without an outline; entry fields in dialogs use a light plate. Tags are small header-band plates, never pills. The impact gauge reuses three slider ticks.</p>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,84 @@
+<style>
+.hudctl{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:8px}
+.hudctl .pl{width:auto;min-width:150px;max-width:210px}
+.hudctl label{display:inline-flex;align-items:center;gap:8px;font:500 14px/1 var(--f-low);color:var(--sec);cursor:pointer}
+.anat svg{display:block;width:100%;height:auto}
+.anat .lbl{font:8px var(--f-mono);fill:#B8C29E}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:12px}
+.presets figure{margin:0;display:grid;gap:6px}
+.presets svg{width:100%;height:auto;display:block;background:radial-gradient(90% 90% at 60% 40%,#2a2e30,#0a0b0d);}
+.presets figcaption{font:12px/1.4 var(--f-mono);color:var(--ter)}
+.presets figcaption b{font:600 11px/1.3 var(--f-low);letter-spacing:.08em;color:var(--t50);display:block}
+.regions-key{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px 20px}
+.regions-key div{font:12px/1.5 var(--f-mono);color:var(--ter)}
+.regions-key b{display:block;font:600 11px/1.4 var(--f-low);letter-spacing:.08em;text-transform:uppercase;color:var(--t50)}
+</style>
+<section class="sheet" id="hud">
+  <h2 class="sheet-h">Atlas - HUD</h2>
+  <p class="sheet-p">Section 14. The HUD is its own family: rounded plates, sheared gauges and bevelled fills, never the menu's 45° plates. The Remastered layout keeps the 4:3 stock canvas as the center screen and expands outward: a wider view adds a leading and a trailing screen, and a narrower one adds top and bottom bands. Each group keeps its stock offset from the edge it belongs to and moves out with that edge. The status bar stays in the center screen. Change the aspect ratio, HUD scale or Classic layout below, and show the screen regions to see where each group anchors.</p>
+  <div class="frameAR stage scene" style="padding:0"><svg class="hudsvg" id="hudsvg" viewBox="-107 0 854 480" role="img" aria-label="Marine HUD with the status bar centered, the weapon strip, pickup lines and radio chatter"></svg></div>
+  <div id="hudLayoutCtl"></div>
+  <div class="hudctl">
+    <button class="pl act" id="hudHit"><i class="mk"></i><span class="lb">Take a hit</span></button>
+    <button class="pl act" id="hudPick"><i class="mk"></i><span class="lb">Pick up health</span></button>
+    <button class="pl act" id="hudShard"><i class="mk"></i><span class="lb">Pick up a shard</span></button>
+    <button class="pl act" id="hudNext"><i class="mk"></i><span class="lb">Next weapon</span></button>
+    <button class="pl act" id="hudRadio"><i class="mk"></i><span class="lb">Transmission</span></button>
+    <button class="pl act" id="hudRhino"><i class="mk"></i><span class="lb">Rhino squad line</span></button>
+    <label><button class="box" id="hudLow" aria-pressed="false" aria-label="Low health"></button>Low health (below 26%)</label>
+  </div>
+  <div class="regions-key">
+    <div><b>Center screen</b>The 4:3 stock canvas at full height, or at full width in a view narrower than 4:3: the crosshair, hit indicator, status bar, pickup lines, weapon strip, boss bar and centered notices.</div>
+    <div><b>Leading and trailing screens</b>The width a wider view adds: 160 dp each at 16:9, 373 dp at 21:9. Edge groups move out into them; at 32:9 they stop at the 21:9 edges unless the HUD width is Full. The transmission display always takes the trailing screen's top corner, on foot and in every vehicle.</div>
+    <div><b>Top and bottom bands</b>The height a view narrower than 4:3 adds: 16 u each at 5:4 and 329 u (370 dp) each in the 9:16 portrait view. Top and bottom groups move out into them; the center screen stays centered.</div>
+    <div><b>Classic</b>The stock 4:3 rectangles, centered, with no expansion: the gauges return to 13, 190 and 326 u and the pickup line to the ammo gauge.</div>
+  </div>
+  <p class="cap"><b>Status bar</b> the stock gauges and gaps, centered as one group on the bottom edge · <b>pickup lines</b> up to two, centered over the gauges, newest nearest them, repeats merged with a count; each holds 3000 ms · <b>weapon strip</b> above the pickup lines with its name above the slots; the stock shows it for 1000 ms after a change · <b>radio chatter</b> on the trailing edge · <b>fill</b> anchored at the trailing end, draining toward the numerals over a 20% track · <b>gains</b> pop the numeral to 120% in white over 250 ms · <b>hit indicator</b> a #FF1A1A dome 227 dp from the center, rotated toward the source, 0.70 to zero over 500 ms · <b>low health</b> #FF4C00 at once with an additive rim pulsing at 2 Hz.</p>
+  <div class="grid wide anat">
+    <div class="demo">
+      <h3 class="h5">Marine gauge · measured anatomy, ×3</h3>
+      <div class="stage plain" style="padding:10px"><svg id="gaugeAnat" viewBox="-6 -8 214 106" role="img" aria-label="Magnified Marine health gauge with its measured construction"></svg></div>
+      <p class="cap">Backing 123×40 u, radii 1–1.4 u, a 6.9 u foot under the trailing third with a 45° flank. Fill inset 4.4 u and 4.6 u, bevelled 58% to 97% at every edge. Notch: a ledge at a third of the fill height, 14.2 u long, then a concave arc of radius 16.6 u. The icon sits in the notch.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Strogg gauge · the opposite shear</h3>
+      <div class="stage plain" style="padding:10px"><svg id="gaugeStrogg" viewBox="-6 -8 214 106" role="img" aria-label="Magnified Strogg health gauge"></svg></div>
+      <p class="cap">129×67 u: a raised tab and 30° leading shoulder, a fill stepping down its leading edge and cut away below its trailing third, #FF9000 fills, upright R_Strogg numerals in #FCFFC8, and a masked grain layer. Sheared +0.22, tops toward the leading edge.</p>
+    </div>
+  </div>
+  <div class="grid wide anat">
+    <div class="demo">
+      <h3 class="h5">Transmission · the measured voice trace, ×4</h3>
+      <div class="stage plain" style="padding:10px"><svg id="radioAnat" viewBox="0 0 540 214" role="img" aria-label="Magnified incoming-transmission display with its waveform, mask and height driver"></svg></div>
+      <div class="hudctl"><div class="segs" role="group" aria-label="Height driver"><button class="seg on" id="radioTable" aria-pressed="true">Classic · stock table</button><button class="seg" id="radioVoice" aria-pressed="false">Remastered · voice envelope</button></div></div>
+      <p class="cap">The trace is <b>waveform.tga</b> rebuilt column by column: a 4-texel core with the recorded speech bursts above and below it, 37% of the columns flat. It scrolls toward the leading edge at 24.6 u/s inside a <b>right trapezoid</b> 19.2 u wide at the top and 23.1 u at the bottom, whose leading side leans with the plate, and adds #FF8000 to the plate. Classic scales its height by the canned table, 0.71 to 2.5 times, a new entry every 79 ms; Remastered draws the actual decoded audio peaks at the playback cursor. Choose a local audio file above and press Play; silence is flat, pausing holds the graph, and seeking moves it with the audio.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">EKG · the measured beat, ×3</h3>
+      <div class="stage plain" style="padding:10px"><svg id="ekgAnat" viewBox="0 0 540 214" role="img" aria-label="Magnified EKG beat with its measured waves"></svg></div>
+      <p class="cap">One beat of <b>ekg.tga</b>, twice per gauge width: a baseline at 58% of the rect, a triangular P wave, a small Q dip, an R spike rising 17.5 u, an S trough 6.2 u deep and triangular T and U waves 6.2 u and 3.0 u high. A 0.95 u core carries a halo falling from 0.24 to nothing over 3.7 u. It is added through the fill's outline in #161B0E (#4C0D00 at low health), beneath the fill, and travels toward the trailing edge at 25 u/s.</p>
+    </div>
+  </div>
+  <div class="demo">
+    <h3 class="h5">HUD presets · where each group anchors</h3>
+    <div class="presets" id="presets"></div>
+  </div>
+  <div class="grid">
+    <div class="demo">
+      <h3 class="h5">Weapon displays · normal, low, empty</h3>
+      <div class="ammo"><div class="n">86</div><div class="lo">12</div><div class="em">0</div></div>
+      <p class="cap">Gun-mounted counters. Normal <b style="color:#73A640">#73A640</b>; low <b style="color:#CA8F15">#CA8F15</b> with a 3 Hz shimmer at 80–100%; empty <b style="color:#C72C1B">#C72C1B</b> with a 2 Hz pulse at 100–50%. Reduced motion replaces the pulses with a steady emphasized state.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Weapon and item color code</h3>
+      <div class="codes">
+        <span><i style="--c:rgb(255,255,0)"></i>Machinegun</span><span><i style="--c:rgb(255,128,0)"></i>Shotgun</span><span><i style="--c:rgb(0,115,255)"></i>Hyperblaster</span>
+        <span><i style="--c:rgb(51,143,18)"></i>Grenade launcher</span><span><i style="--c:rgb(153,204,204)"></i>Nailgun</span><span><i style="--c:rgb(255,51,0)"></i>Rocket launcher</span>
+        <span><i style="--c:rgb(0,255,0)"></i>Railgun</span><span><i style="--c:rgb(255,255,186)"></i>Lightning gun</span><span><i style="--c:rgb(196,0,255)"></i>Dark Matter gun</span>
+        <span><i style="--c:rgb(255,191,64)"></i>Napalm launcher</span><span><i style="--c:rgb(0,217,255)"></i>Gauntlet</span><span><i style="--c:rgb(0,128,255)"></i>Mega health</span>
+        <span><i style="--c:rgb(255,90,200)"></i>Core Cannon (Awakening)</span><span><i style="--c:rgb(158,235,255)"></i>Freeze Gun (Awakening)</span>
+      </div>
+      <p class="cap">Gameplay information, never decoration. B.4 lists the item values; the multiplayer ammo gauge uses its own tints for a few weapons. Offer the color-vision palettes and always pair color with an icon or shape.</p>
+    </div>
+  </div>
+</section>

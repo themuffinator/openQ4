@@ -1,0 +1,512 @@
+{
+ "output": "openq4-atlas.html",
+ "parts": [
+  {
+   "file": "shell/head.html"
+  },
+  {
+   "file": "sheets/home.html"
+  },
+  {
+   "file": "sheets/change.html"
+  },
+  {
+   "file": "sheets/tokens.html"
+  },
+  {
+   "file": "sheets/plates.html"
+  },
+  {
+   "file": "sheets/values.html"
+  },
+  {
+   "file": "sheets/frames.html"
+  },
+  {
+   "file": "sheets/detailing.html"
+  },
+  {
+   "file": "sheets/lists.html"
+  },
+  {
+   "file": "sheets/modern.html"
+  },
+  {
+   "file": "sheets/components.html"
+  },
+  {
+   "file": "sheets/hud.html"
+  },
+  {
+   "file": "sheets/crosshairs.html"
+  },
+  {
+   "file": "sheets/icons.html"
+  },
+  {
+   "file": "sheets/wheel.html"
+  },
+  {
+   "file": "sheets/sphud.html"
+  },
+  {
+   "file": "sheets/mp.html"
+  },
+  {
+   "file": "sheets/loading.html"
+  },
+  {
+   "file": "sheets/init.html"
+  },
+  {
+   "file": "sheets/mpmenu.html"
+  },
+  {
+   "file": "shell/body.html"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/core.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<style>"
+  },
+  {
+   "file": "styles/hud-layout.css"
+  },
+  {
+   "text": "</style>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/hud-layout.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/icon-registry.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/crosshair-icon-data.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/awakening-icons.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/modern-keyboard.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/components-notices.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/screen-change.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/frames-hovercard.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<style>"
+  },
+  {
+   "file": "styles/hud-instruments.css"
+  },
+  {
+   "text": "</style>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/hud-instruments.js"
+  },
+  {
+   "file": "audio-waveforms.js"
+  },
+  {
+   "text": "\n// openq4-playback-graphs-end\n"
+  },
+  {
+   "file": "scripts/hud-instruments-tail.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/hud-presets.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/crosshairs.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/icons-legibility.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/squad-patches.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/runes.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/wheel-marine.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/wheel-strogg.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/objectives.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/encounters.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/awakening-vehicles.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/mp-text.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<style>"
+  },
+  {
+   "file": "styles/mp-hud.css"
+  },
+  {
+   "text": "</style>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/mp-hud.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/mp-scoreboard.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/loading.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/mp-menus.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<style>"
+  },
+  {
+   "file": "styles/home.css"
+  },
+  {
+   "text": "</style>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/home.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<style>"
+  },
+  {
+   "file": "styles/init.css"
+  },
+  {
+   "text": "</style>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/init.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<style>"
+  },
+  {
+   "file": "styles/modal-backdrops.css"
+  },
+  {
+   "text": "</style>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<script>"
+  },
+  {
+   "file": "scripts/modal-backdrops.js"
+  },
+  {
+   "text": "</script>"
+  },
+  {
+   "text": "\n"
+  },
+  {
+   "text": "<!-- openq4-wheel-placement-start -->\n<script>\n"
+  },
+  {
+   "file": "weapon-wheel-placement.js"
+  },
+  {
+   "text": "\n</script>\n<!-- openq4-wheel-placement-end -->\n"
+  },
+  {
+   "text": "<!-- openq4-medlabs-implant-start -->\n"
+  },
+  {
+   "file": "medlabs-implant.html"
+  },
+  {
+   "text": "\n<!-- openq4-medlabs-implant-end -->\n"
+  },
+  {
+   "text": "<!-- openq4-awakening-menu-start -->\n"
+  },
+  {
+   "file": "awakening-menu.html"
+  },
+  {
+   "text": "\n<!-- openq4-awakening-menu-end -->\n"
+  }
+ ]
+}

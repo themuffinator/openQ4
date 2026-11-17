@@ -1,0 +1,9 @@
+
+/* the initializing screen's layer tiles (section 14.17) */
+.inLayersH{margin:22px 0 8px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.inLayersH span{font:12px/1.4 var(--f-mono);color:var(--ter);text-transform:none;letter-spacing:0}
+.inLayers{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));gap:12px}
+.inLayers figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.inLayers svg{display:block;width:100%;height:auto;aspect-ratio:1;box-sizing:border-box;background:#171A09;border:1px solid rgba(255,255,255,.08)}
+.inLayers figcaption{font:12px/1.45 var(--f-mono);color:var(--ter)}
+.inLayers figcaption b{display:block;font:600 11px/1.4 var(--f-low);letter-spacing:.08em;text-transform:uppercase;color:var(--t50)}

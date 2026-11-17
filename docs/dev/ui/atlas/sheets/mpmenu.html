@@ -1,0 +1,22 @@
+<section class="sheet" id="mpmenu">
+  <h2 class="sheet-h">Atlas - multiplayer menus</h2>
+  <p class="sheet-p">Section 14.18. In a match the menu never takes the whole screen. One card holds a horizontal tab strip and sits in the center screen over the live view, which the game softens; the match keeps running around it and nothing pretends to pause the server. <b>Welcome</b> greets a player who has just connected with the match, the join choices and the server's rules. <b>Escape</b> is the in-match menu: Resume leads, and team, players, vote, Match Control, settings, voice, server and admin each have a tab. Switch tabs with Q and E, the bumpers, the arrow keys or a click; Esc leaves. Player names are examples.</p>
+  <div class="frameAR stage scene" style="padding:0"><svg id="mmSvg" viewBox="-107 0 854 480" role="application" aria-label="Multiplayer menu: use Q and E or the arrow keys to change tab, up and down to move, Enter to choose, Escape to leave" tabindex="0"></svg></div>
+  <div id="mmLayoutCtl"></div>
+  <div class="hudctl">
+    <div class="segs" role="group" aria-label="Menu" id="mmVariant"><span class="lbl">Menu</span><button class="seg" data-v="welcome" aria-pressed="true">Welcome</button><button class="seg" data-v="escape" aria-pressed="false">Escape</button></div>
+    <div class="segs" role="group" aria-label="Game mode" id="mmMode"><span class="lbl">Mode</span><button class="seg" data-m="team" aria-pressed="true">Team</button><button class="seg" data-m="dm" aria-pressed="false">Deathmatch</button><button class="seg" data-m="tourney" aria-pressed="false">Tourney</button></div>
+    <div class="segs" role="group" aria-label="Prompts" id="mmDev"><span class="lbl">Prompts</span><button class="seg" data-d="kbm" aria-pressed="true">Keyboard</button><button class="seg" data-d="pad" aria-pressed="false">Controller</button></div>
+    <label><button class="box on" id="mmSoft" aria-pressed="true" aria-label="Soft focus"></button>Soft focus</label>
+    <button class="pl act" id="mmOpen"><i class="mk"></i><span class="lb">Open again</span></button>
+  </div>
+  <p class="cap" id="mmStatus" aria-live="polite">Welcome menu: the join choices lead, and Auto join is focused.</p>
+  <div class="mpkey">
+    <div><b>Placement</b>A card in the center screen, never the whole view: 380×268 u for Welcome and 432×318 u for Escape, so at 16:9 the live view stays visible on every side. The card uses the section 6 construction: a 0.94 black body inside one rail, 12 dp and 3 dp cuts, a 40 dp header with its wash.</div>
+    <div><b>Tabs</b>The stock tab strip, horizontal: the active tab rises 20 u with a small leading flare and a 12 u 45° trailing shoulder, filled #5A652A from 1.00 to 0.60, the baseline breaking under it and a wash fading below. Widths fit the labels. The bumper glyphs sit at the strip's ends; focus is an orange rule, never the selection's fill.</div>
+    <div><b>Welcome</b>Join, Server, Players and Settings. Join leads with the match and the choices the game mode allows: the two team cards and Auto join, or Join game, or the Tourney queue, and Spectate. Esc spectates for now; Leave server sits at the trailing end of the prompt bar.</div>
+    <div><b>Escape</b>Team, Players, Vote, Match, Settings, Voice, Server and Admin. Resume leads the prompt bar; Main menu and Disconnect trail it, and Disconnect asks first in the stock modal. Match Control keeps its own six sections as a second, smaller strip.</div>
+    <div><b>Unavailable actions</b>Stay in place, dimmed, with a lock and the reason on the plate: a full team, a vote already running, a captain-only pause. Choosing one flashes the reason instead of doing nothing.</div>
+    <div><b>Soft focus</b>The view behind is softened by the scene effect, not dimmed: it ramps in over 250 ms as the card rises 8 u and fades in over 150 ms, and releases on every way out. Where softening is unavailable the fallback is a darkening scrim and vignette.</div>
+  </div>
+</section>

@@ -1,0 +1,4 @@
+
+@keyframes rimPulse{0%,100%{opacity:1}50%{opacity:.5}}
+.rim-on{animation:rimPulse .5s linear infinite}
+@media (prefers-reduced-motion:reduce){.rim-on{animation:none}}

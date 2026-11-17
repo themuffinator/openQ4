@@ -1,0 +1,113 @@
+<style>
+.hzone{position:relative;min-height:230px}
+.hzone .trow{max-width:520px}
+.hcard{position:absolute;z-index:5;width:250px;pointer-events:none;opacity:0}
+.hcard.show{opacity:1}
+.info{display:inline-grid;place-items:center;width:20px;height:20px;border:0;padding:0;background:none;cursor:help;vertical-align:middle}
+.info svg{width:18px;height:18px}
+.tip{position:absolute;z-index:6;max-width:240px;pointer-events:none;opacity:0;transition:opacity .1s linear}
+.tip.show{opacity:1}
+.ddwrap{position:relative;max-width:420px}
+.ddwrap .pop{position:absolute;left:38%;right:0;top:36px;z-index:4;display:none}
+.ddwrap .pop.open{display:block;animation:popIn .1s linear both}
+@keyframes popIn{from{opacity:0;translate:0 -4px}}
+.mdemo .scrim,.mdemo .gcol,.mdemo .modal{transition:none}
+.mdemo-ctl{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.stack-order{display:grid;gap:3px;max-width:360px;font:12px/1.3 var(--f-mono);color:var(--ter)}
+.stack-order span{display:flex;justify-content:space-between;gap:12px;padding:5px 10px;background:linear-gradient(90deg,rgba(139,150,75,var(--a)),transparent);clip-path:polygon(6px 0,100% 0,100% 100%,0 100%,0 6px)}
+.stack-order b{font-weight:500;color:var(--sec)}
+@media (prefers-reduced-motion:reduce){.ddwrap .pop.open{animation:none}}
+</style>
+<section class="sheet" id="frames">
+  <h2 class="sheet-h">Atlas - pop-up frames</h2>
+  <p class="sheet-p">Every transient surface uses one construction from a small catalogue: the modal, the card, the hover card, the tooltip, and openQ4's dropdown and action popovers built from the popover construction. A frame stays 16 dp inside the safe area, flips before it clips, and never covers the crosshair, the prompt bar or the touch controls.</p>
+  <div class="stage dim hzone menu" id="hzone">
+    <h3 class="h5" style="margin-bottom:8px">Hover card and tooltip · move the pointer over the rows</h3>
+    <div class="tbl" style="--cols:minmax(150px,2fr) 1fr 1fr 64px;min-width:0;overflow-x:auto">
+      <div class="trow" data-card="Hangar Brawl|q4dm5|Deathmatch|15 / 16|24 ms"><span>Hangar Brawl</span><span class="dim">q4dm5</span><span>Deathmatch</span><span class="ping">24</span></div>
+      <div class="trow" data-card="Rail Only Nights|q4dm3|Tourney|2 / 4|51 ms"><span>Rail Only Nights</span><span class="dim">q4dm3</span><span>Tourney</span><span class="ping">51</span></div>
+      <div class="trow" data-card="Clan Scrim|q4ctf1|Capture the Flag|8 / 10|62 ms"><span>Clan Scrim</span><span class="dim">q4ctf1</span><span>Capture the Flag</span><span class="ping">62</span></div>
+    </div>
+    <p class="cap" style="margin-top:12px">Anti-lag <button class="info" id="infoBtn" aria-label="About anti-lag"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="7.3" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.4"/><path d="M9 8v5M9 5.2v1.6" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/></svg></button> · hover the information symbol for a tooltip after 300 ms.</p>
+    <div class="fr card hcard" data-shape="card" id="hcard"><div class="kv" id="hcardKv"></div></div>
+    <div class="fr pop tip" data-shape="pop" id="tip">Rewinds other players to what you saw when you fired. The server must allow it.</div>
+  </div>
+  <p class="cap"><b>Hover card</b> appears at once 6 dp from the pointer and moves to the pointer's leading side near the trailing edge. <b>Tooltip</b> after 300 ms, fading in over 100 ms; neighbors in the same group replace it at once. Controller and touch players get the detail area instead.</p>
+
+  <div class="stage mstage mdemo menu" id="mdemo">
+    <div class="scrim" id="mdScrim"></div><div class="gcol" id="mdGlow"></div>
+    <div class="fr modal" data-shape="modal" role="dialog" aria-label="Quit game" id="mdFrame">
+      <div class="mt" id="mdTitle">Quit game</div>
+      <p id="mdBody">Leave Quake 4? Progress since the last checkpoint is lost.</p>
+      <div class="mact" id="mdActs"><button class="pl act is-focus"><i class="mk"></i><span class="lb">Yes</span></button><button class="pl act"><i class="mk"></i><span class="lb">No</span></button></div>
+    </div>
+  </div>
+  <div class="mdemo-ctl"><button class="replay" id="mdEnter">Play modal.enter</button><button class="replay" id="mdLeave">Play modal.leave</button><span class="cap">The title screen stays visible around the dialog, in soft focus rather than behind a black scrim. Enter: over 200 ms the soft focus comes in (a 5 u blur and 0.80 saturation, never dimmed), the glow, cut to the dialog and its 6 dp lit margin, brightens from black and the frame reaches 0.70; at 200 ms the title, body and actions appear together. Leave: contents hide at once; after 50 ms the soft focus and glow release over 250 ms and the frame fades over 200 ms.</span></div>
+
+  <div class="grid">
+    <div class="demo">
+      <h3 class="h5">Dropdown list (openQ4) · click the value</h3>
+      <div class="ddwrap">
+        <button class="pl row" id="ddBtn" aria-haspopup="listbox" aria-expanded="false"><span class="lb">Display mode</span><span class="val"><span id="ddVal">Borderless</span><i class="chev"></i></span></button>
+        <div class="fr pop" data-shape="pop" id="ddPop" role="listbox">
+          <div class="dd" style="display:block"><div class="opt">Windowed</div><div class="opt sel">Borderless</div><div class="opt">Fullscreen</div><div class="opt">Custom fullscreen</div></div>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:150px">As wide as the value column, eight rows before it scrolls, below its value or above when space is short, never over its own row. <b>popover.enter</b> 100 ms: opacity and 4 dp.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Layering, bottom to top</h3>
+      <div class="stack-order">
+        <span style="--a:.10"><b>HUD</b>in-game</span><span style="--a:.16"><b>Partial panels</b>join card, pause</span><span style="--a:.22"><b>Menu screens</b>bands and pages</span>
+        <span style="--a:.30"><b>Cards and popovers</b>detail, dropdown</span><span style="--a:.40"><b>Modals</b>one at a time</span><span style="--a:.52"><b>Notices</b>top band</span><span style="--a:.66"><b>Pointer</b>always on top</span>
+      </div>
+      <p class="cap">A second modal request waits until the first closes. A modal contains focus and returns it to its invoker; popovers opened from a keyboard or controller take focus and return it.</p>
+    </div>
+  </div>
+  <div class="stage menu">
+    <div class="grid">
+      <div class="demo">
+        <h3 class="h5">Card · in-game partial panel</h3>
+        <div class="fr card std" data-shape="card">
+          <div class="chead">Join match</div>
+          <p>Deathmatch on q4dm5. 9 of 16 players, 7:12 remaining. Joining puts you in the next respawn wave.</p>
+          <div class="stack" style="max-width:none">
+            <button class="pl act is-focus"><i class="mk"></i><span class="lb">Join game</span></button>
+            <button class="pl act"><i class="mk"></i><span class="lb">Spectate</span></button>
+          </div>
+        </div>
+        <p class="cap"><b>header</b> 40 dp, 1 dp rule, 8 dp triangle, wash fading toward the trailing edge · <b>content inset</b> 24 dp (16 dp compact).</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Hover card · follows the pointer 6 dp away</h3>
+        <div class="fr card" data-shape="card">
+          <div class="kv"><span>Map</span><b>q4dm5</b><span>Mode</span><b>Deathmatch</b><span>Players</span><b>9 / 16</b><span>Frag limit</span><b>30</b><span>Time limit</span><b>15 min</b><span>Ping</span><b>38 ms</b></div>
+        </div>
+        <p class="cap"><b>content inset</b> 10 dp · Lowpixel 14 dp and Profont 13 dp · appears at once.</p>
+        <h3 class="h5">Tooltip · small popover</h3>
+        <div class="fr pop" data-shape="pop">Changes take effect after a restart.</div>
+        <p class="cap">Appears after 300 ms and fades in over 100 ms; neighbors in the same group replace it at once. Small popovers keep the card construction with 6 dp major cuts.</p>
+      </div>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="demo">
+      <h3 class="h5">Tab strip · active tab rises 33 dp</h3>
+      <div class="tabs" role="tablist" aria-label="Settings categories">
+        <span class="tabkey" aria-hidden="true">Q</span>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-game">Game</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-controls">Controls</button>
+        <button class="tab on" role="tab" aria-selected="true" data-tab="t-system">System</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="t-audio">Audio</button>
+        <span class="tabkey" aria-hidden="true">E</span>
+      </div>
+      <div class="tabbody" data-tabbody>SYSTEM · display, rendering and performance settings. Bumpers or a horizontal swipe change category.</div>
+      <p class="cap">The multiplayer menus' construction: the baseline rail breaks under the active tab, which rises with a small leading flare and an 18 dp 45° trailing shoulder, filled <b>#5A652A</b> from 1.00 to 0.60, and a wash fades below the strip over one tab height. Centered Marine labels at 0.55, 0.85 on hover and white when active; the previous and next glyphs sit at the ends.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Header band · olive 0.60</h3>
+      <div class="fr" data-shape="hband" style="height:34px;display:flex;align-items:center;padding:0 16px;font:600 14px/1 var(--f-low);letter-spacing:.08em;color:var(--t80)">DISPLAY</div>
+      <p class="cap">Upper-leading cut of 12 dp, top and leading rails, fill 49% fading from 60% of the width. Scoreboards use team colors: Marine <b style="color:#6AA42B">#6AA42B</b>, Strogg <b style="color:#FF7B04">#FF7B04</b>.</p>
+    </div>
+  </div>
+</section>

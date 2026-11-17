@@ -1,0 +1,92 @@
+<style>
+.home .np,.home .sl{cursor:pointer;outline:none}
+.home .np .pf{opacity:.4;transition:opacity .3s linear}
+.home .np:hover .pf,.home .np:focus-visible .pf,.home .np.f .pf{opacity:.8;transition:none}
+.home .nl{font:400 11.2px Michroma,Eurostile,sans-serif;fill:rgba(255,255,255,.8);transition:fill .3s linear}
+.home .mkr{fill:#909A49;opacity:.4;transition:fill .3s linear,opacity .3s linear}
+.home .np:hover .nl,.home .np:focus-visible .nl,.home .np.f .nl,.home .sl:hover text,.home .sl:focus-visible text{fill:#E38900;transition:none}
+.home .np:hover .mkr,.home .np:focus-visible .mkr,.home .np.f .mkr,.home .sl:hover .mkr,.home .sl:focus-visible .mkr{fill:#E38900;opacity:1;transition:none}
+.home .np.f .fx,.home .np:focus-visible .fx{opacity:1}
+.home .sl text{font:400 7.4px Michroma,Eurostile,sans-serif;fill:rgba(255,255,255,.5);transition:fill .3s linear}
+.home .cl{font:600 9.5px Archivo,sans-serif;fill:rgba(255,255,255,.8)}
+.home .cm{font:500 7.2px Archivo,sans-serif;fill:#8C947A}
+.pl .st{position:absolute;right:6px;top:50%;translate:0 -50%;font:11px/1 var(--f-mono);color:var(--ter);pointer-events:none}
+.stack{display:grid;gap:0;width:100%;max-width:380px}
+.demo{display:grid;gap:14px;align-content:start}
+.dd{position:relative;display:grid;gap:0;max-width:380px}
+.dd .pop{margin:2px 0 0 38%;width:min(62%,240px);padding:6px 4px}
+.dd .opt{position:relative;display:flex;align-items:center;height:30px;padding:0 10px;font:500 16px/1 var(--f-low);color:var(--t80);cursor:pointer}
+.dd .opt::before{content:"";position:absolute;inset:2px 0;z-index:-1;opacity:0;background:linear-gradient(90deg,transparent,var(--list) 15%,var(--list) 85%,transparent)}
+.dd .opt:hover::before{opacity:.16}.dd .opt.sel::before{opacity:.42}
+.chev{display:inline-block;width:9px;height:9px;margin-left:10px;border-right:1.5px solid rgba(255,190,35,.8);border-bottom:1.5px solid rgba(255,190,35,.8);rotate:45deg;translate:0 -3px}
+</style>
+
+<section class="sheet" id="plates">
+  <h2 class="sheet-h">Atlas - plates</h2>
+  <p class="sheet-p">Open plates: rails run along the leading edge, around the 45° lower-leading cut and along the bottom, and the fill and bottom rail dissolve toward the trailing end. Plate, marker and label are one target spanning the full pitch. The state names on the right are annotations, not part of the plate.</p>
+  <div class="stage menu">
+    <div class="grid">
+      <div class="demo">
+        <h3 class="h5">Navigation · dark plate · 37 in 45 dp</h3>
+        <div class="stack">
+          <button class="pl nav"><i class="mk"></i><span class="lb">New game</span><span class="st">rest</span></button>
+          <button class="pl nav is-hover"><i class="mk"></i><span class="lb">Load game</span><span class="st">hover</span></button>
+          <button class="pl nav is-focus"><i class="mk"></i><span class="lb">Multiplayer</span><span class="st">focus</span></button>
+          <button class="pl nav is-current"><i class="mk"></i><span class="lb">Settings</span><span class="st">current</span></button>
+          <button class="pl nav is-pressed"><i class="mk"></i><span class="lb">Mods</span><span class="st">pressed</span></button>
+          <button class="pl nav" disabled><i class="mk"></i><span class="lb">Save game</span><span class="st">disabled</span></button>
+        </div>
+        <p class="cap"><b>cut</b> 17 dp (47%) · <b>marker</b> 9 dp, 13 dp in · <b>label</b> Marine 24 dp, 4 dp after the marker · <b>rails</b> #CCCC51 · fill opaque to 44%, half at 62%, clear at 88%. Focus adds the orange inset rail and the 24 dp focus light.</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Section navigation · light plate · hover 1.00</h3>
+        <div class="stack">
+          <button class="pl sec"><i class="mk"></i><span class="lb">Game</span></button>
+          <button class="pl sec"><i class="mk"></i><span class="lb">Controls</span></button>
+          <button class="pl sec is-current"><i class="mk"></i><span class="lb">System</span><span class="st">current</span></button>
+          <button class="pl sec"><i class="mk"></i><span class="lb">Audio</span></button>
+        </div>
+        <h3 class="h5">Actions · 35 in 45 dp · cut 20 dp</h3>
+        <div class="stack" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0 12px">
+          <button class="pl act"><i class="mk"></i><span class="lb">Yes</span></button>
+          <button class="pl act"><i class="mk"></i><span class="lb">No</span></button>
+        </div>
+        <button class="pl prim" style="--w:380px"><i class="mk"></i><span class="lb">Start game</span></button>
+        <p class="cap">The stock marks a primary action by size, not opacity: <b>START GAME</b> is a 356×43 u light plate. Light plates are white art tinted <b>marine.olive</b>, fill 49% to a third of the width, then linear to clear.</p>
+      </div>
+    </div>
+  </div>
+  <div class="stage dim menu">
+    <div class="grid">
+      <div class="demo">
+        <h3 class="h5">Settings rows · 29 in 36 dp</h3>
+        <div class="stack" style="max-width:460px">
+          <button class="pl row cyc" data-values="High|Ultra|Low|Medium"><span class="lb">Texture quality</span><span class="val">High</span></button>
+          <button class="pl row cyc mod" data-values="16x|Off|2x|4x|8x"><span class="lb">Anisotropic filtering</span><span class="val">16x</span></button>
+          <button class="pl row cyc" data-values="On|Off"><span class="lb">Vertical sync</span><span class="val">On</span></button>
+          <button class="pl row cyc is-hover" data-values="Borderless|Windowed|Fullscreen"><span class="lb">Window mode</span><span class="val">Borderless</span></button>
+          <button class="pl arow"><i class="mk"></i><span class="lb">Restore defaults</span></button>
+        </div>
+        <p class="cap">Labels 21 dp in, values at 64% of the row in <em>marine.value</em>. A value row brightens only its plate. <b>Anisotropic filtering</b> is modified, so its leading rail turns amber. Click a value to cycle it; right-click steps back.</p>
+      </div>
+      <div class="demo">
+        <h3 class="h5">Secondary links on the plinth</h3>
+        <div class="plinth">
+          <button class="pl link"><i class="mk"></i><span class="lb">Mods</span></button>
+          <button class="pl link"><i class="mk"></i><span class="lb">Updates</span></button>
+          <button class="pl link"><i class="mk"></i><span class="lb">Credits</span></button>
+          <button class="pl link"><i class="mk"></i><span class="lb">Exit</span></button>
+        </div>
+        <p class="cap">Label 50%, marker 40%, no plate; both turn orange on hover. The plinth is a solid band in <b>marine.plinth</b> with a lower-leading cut and a parallel trailing cut.</p>
+        <h3 class="h5">Markers</h3>
+        <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+          <i class="mk" style="--m:16px;opacity:.9"></i>
+          <i class="mk" style="--m:16px;opacity:1;color:var(--orange)"></i>
+          <i class="mk sort" style="--m:16px;opacity:.9;color:var(--sort)"></i>
+          <span class="cap">◥ at rest, active, and flipped (◢) as the sort marker. The halo reaches about 20% of the tile beyond the solid.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+

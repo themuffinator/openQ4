@@ -1,0 +1,62 @@
+<style>
+.modes{display:flex;flex-wrap:wrap;gap:0 10px}
+.modes .pl{width:auto;min-width:120px;max-width:170px}
+.mpkey{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px 20px}
+.mpkey div{font:12px/1.5 var(--f-mono);color:var(--ter)}
+.mpkey b{display:block;font:600 11px/1.4 var(--f-low);letter-spacing:.08em;text-transform:uppercase;color:var(--t50)}
+</style>
+<section class="sheet" id="mp">
+  <h2 class="sheet-h">Atlas - multiplayer HUD</h2>
+  <p class="sheet-p">Sections 14.9 and 14.14. Remastered rebuilds the top of the screen from compact HUD plates instead of the stock's full-height fading slabs, so nothing darkens the view beyond its own text. The standing or team panels, timer and round clock sit top-leading; notices stack in one center column; the kill feed and match context sit top-trailing; chat and its input sit on the leading side; the status bar stays centered. Every cue that the stock gave by color alone also has a shape, tag or marker. Player names are examples. Classic, in the layout controls, shows the stock construction.</p>
+  <div class="modes" role="group" aria-label="Game mode">
+    <button class="pl act is-current" data-mode="dm"><i class="mk"></i><span class="lb">Deathmatch</span></button>
+    <button class="pl act" data-mode="tdm"><i class="mk"></i><span class="lb">Team DM</span></button>
+    <button class="pl act" data-mode="ctf"><i class="mk"></i><span class="lb">CTF</span></button>
+    <button class="pl act" data-mode="dz"><i class="mk"></i><span class="lb">Dead Zone</span></button>
+    <button class="pl act" data-mode="tourney"><i class="mk"></i><span class="lb">Tourney</span></button>
+    <button class="pl act" data-mode="ca"><i class="mk"></i><span class="lb">Clan Arena</span></button>
+  </div>
+  <div class="frameAR stage scene" style="padding:0"><svg id="mpSvg" viewBox="-107 0 854 480" role="img" aria-label="Multiplayer HUD"></svg></div>
+  <div id="mpLayoutCtl"></div>
+  <div class="hudctl">
+    <div class="segs" role="group" aria-label="HUD preset" id="mpPreset"><span class="lbl">Preset</span><button class="seg" data-p="rem" aria-pressed="true">Remastered</button><button class="seg" data-p="comp" aria-pressed="false">Competitive</button><button class="seg" data-p="classic" aria-pressed="false">Classic</button></div>
+    <div class="segs" role="group" aria-label="Spectator view" id="mpSpecMode"><span class="lbl">Spectator</span><button class="seg" data-s="off" aria-pressed="true">Off</button><button class="seg" data-s="follow" aria-pressed="false">Following</button><button class="seg" data-s="free" aria-pressed="false">Free camera</button></div>
+  </div>
+  <div class="hudctl">
+    <button class="pl act" id="mpKill"><i class="mk"></i><span class="lb">Add a kill</span></button>
+    <button class="pl act" id="mpChatLine"><i class="mk"></i><span class="lb">Add a chat line</span></button>
+    <button class="pl act" id="mpAward"><i class="mk"></i><span class="lb">Earn an award</span></button>
+    <button class="pl act" id="mpFlag"><i class="mk"></i><span class="lb">Take the flag</span></button>
+    <button class="pl act" id="mpTick"><i class="mk"></i><span class="lb">Zone tick</span></button>
+  </div>
+  <div class="hudctl">
+    <label><button class="box" id="mpWarm" aria-pressed="false" aria-label="Warm-up"></button>Warm-up</label>
+    <label><button class="box" id="mpCount" aria-pressed="false" aria-label="Countdown"></button>Countdown</label>
+    <label><button class="box" id="mpLast" aria-pressed="false" aria-label="Last minute"></button>Last minute</label>
+    <label><button class="box" id="mpSD" aria-pressed="false" aria-label="Sudden death"></button>Sudden death</label>
+    <label><button class="box" id="mpSpec" aria-pressed="false" aria-label="Spectating"></button>Spectating</label>
+    <label><button class="box" id="mpDead" aria-pressed="false" aria-label="Dead"></button>Dead</label>
+    <label><button class="box" id="mpVote" aria-pressed="false" aria-label="Vote"></button>Vote</label>
+    <label><button class="box" id="mpChat" aria-pressed="false" aria-label="Chat input"></button>Chat input</label>
+    <label><button class="box" id="mpVoice" aria-pressed="false" aria-label="Voice"></button>Voice</label>
+    <label><button class="box" id="mpTeamChan" aria-pressed="false" aria-label="Team channel"></button>Team channel</label>
+    <label><button class="box" id="mpCtx" aria-pressed="false" aria-label="Managed match"></button>Managed match</label>
+  </div>
+  <div class="mpkey">
+    <div><b>Competitive</b>The match bar at the top center: your side, the timer, the other side. Team modes show each team's mark, name and score with the flag state, alive count or zone under it; deathmatch and Tourney show you against the leader or your opponent with ranks. Your team's status sits at the leading edge (weapon, name, health, armor; the dead dimmed), the status bar readouts grow by 15%, and the network readout stays in view.</div>
+    <div><b>Spectator</b>Following a player shows their status bar and a follow card above it: FOLLOWING, the name over their team color, rank and score, cycling chevrons and the active device's prompts. The free camera drops the status bar and tags the players in view. In Competitive both teams' status lists flank the view, the followed player marked. Classic keeps the stock breathing lines.</div>
+    <div><b>Standing</b>Deathmatch shows the leader and you on compact plates: ordinal, name cut with an ellipsis, score in Chain. Your row carries the band and the ◥ marker, and a signed gap to the leader or your lead. The leader's row shows the frag limit.</div>
+    <div><b>Team panels</b>A team block holding the faction mark, the team name and the score against the limit; your team first with the marker; flag state at the trailing end, with the carrier's name when taken. Dead Zone adds who holds the zone.</div>
+    <div><b>Timer</b>One readout per state: M:SS, the elapsed time beside ∞ when untimed, warm-up with the ready count, the countdown once, value color in the last minute and a 1 Hz pulse in the last ten seconds, sudden death, overtime, and the round and round clock in round modes.</div>
+    <div><b>Center column</b>Frag notice, main notice, spectator and warm-up lines and awards stack in that order and move down for each other instead of overlapping. Each line sits on its own plate; rank ordinals use the value color.</div>
+    <div><b>Kill feed</b>Trailing-aligned lines on their own plates; names over 14 characters end in an ellipsis so the victim is never lost; your lines are marked; team kills carry a TEAM tag; the Tourney feed fades like the rest; spectators see it.</div>
+    <div><b>Chat</b>On the leading edge, always clear of the status bar: its bottom sits 8 u above the gauges, and a narrow leading screen lifts it above the weapon strip too. Channel tags, per-line plates, eight lines while typing, the remaining-character count and Send, Channel and Cancel prompts.</div>
+    <div><b>Voice</b>Stock shows you and one talker on fading bars at the leading edge with a tiny #FFFF8D trace. Remastered stacks a plate per talker above the chat, each with a separate history of that talker's actual audio peaks in their team color, and marks you with the microphone.</div>
+  </div>
+  <div class="frameAR stage scene" style="padding:0"><svg id="sbSvg" viewBox="-107 0 854 480" role="img" aria-label="Scoreboard"></svg></div>
+  <div class="hudctl">
+    <label><button class="box" id="sbRem" aria-pressed="false" aria-label="Remastered scoreboard"></button>Remastered</label>
+    <label><button class="box" id="sbDm" aria-pressed="false" aria-label="Deathmatch scoreboard"></button>Deathmatch</label>
+  </div>
+  <p class="cap"><b>Scoreboard</b> held on the scores button: instant, not interactive, hiding the whole HUD. Your team first; header bands in the team color at 1.00; rows on server-list bands, the pitch adapting to up to 16 entries. <b>Remastered</b> adds the ◥ marker on your row, network bars beside ping, a DEATHS column, the rank line and a scroll count past 16 entries.</p>
+</section>

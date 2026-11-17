@@ -1,0 +1,64 @@
+<section class="sheet" id="tokens">
+  <h2 class="sheet-h">Atlas - tokens</h2>
+  <p class="sheet-p">Section 4 colors, shown over black as they composite in the menus. Orange always means interaction; values are amber-yellow. Status colors are openQ4 additions and always pair with a symbol and an explanation.</p>
+  <div class="sws">
+    <div class="sw"><i style="--c:#8B964B"></i><span><b>marine.olive</b>#8B964B · rails and plates</span></div>
+    <div class="sw"><i style="--c:#909A49"></i><span><b>marine.marker</b>#909A49 · ◥ markers</span></div>
+    <div class="sw"><i style="--c:#E38900"></i><span><b>marine.orange</b>#E38900 · interaction</span></div>
+    <div class="sw"><i style="--c:#FFBE23;--a:.8"></i><span><b>marine.value</b>#FFBE23 at 80% · values</span></div>
+    <div class="sw"><i style="--c:#CCCC51"></i><span><b>marine.rail.dark</b>#CCCC51 · dark plate rails</span></div>
+    <div class="sw"><i style="--c:#A0A040"></i><span><b>marine.rail.card</b>#A0A040 · card rail</span></div>
+    <div class="sw"><i style="--c:#616F26;--a:.7"></i><span><b>marine.glow</b>#616F26 · additive band</span></div>
+    <div class="sw"><i style="--c:#46501B"></i><span><b>marine.glow.modal</b>#46501B · modal glow</span></div>
+    <div class="sw"><i style="--c:#FF9C00;--a:.42"></i><span><b>marine.list</b>#FF9C00 · 16% hover, 41% selection</span></div>
+    <div class="sw"><i style="--c:#586A08"></i><span><b>marine.check</b>#586A08 · set box</span></div>
+    <div class="sw"><i style="--c:#9BA545"></i><span><b>marine.sort</b>#9BA545 · sortable column</span></div>
+    <div class="sw"><i style="--c:#E06C00;--a:.5"></i><span><b>marine.progress</b>#E06C00 · fill 50%, track 30%</span></div>
+    <div class="sw"><i style="--c:#626934;--a:.36"></i><span><b>marine.rim</b>#626934 at 37% · band rim light</span></div>
+    <div class="sw"><i style="--c:#3E4A21;--a:.3"></i><span><b>marine.plinth</b>#3E4A21 at 30% · link plinth</span></div>
+    <div class="sw"><i style="--c:#fff;--a:.8"></i><span><b>text.primary</b>white 80% · labels</span></div>
+    <div class="sw"><i style="--c:#fff;--a:.5"></i><span><b>text.title</b>white 50% · titles, links</span></div>
+    <div class="sw"><i style="--c:#fff;--a:.4"></i><span><b>text.heading</b>white 40% · headings</span></div>
+    <div class="sw"><i style="--c:#E3AD36"></i><span><b>status.warning</b>#E3AD36</span></div>
+    <div class="sw"><i style="--c:#E46D56"></i><span><b>status.error</b>#E46D56</span></div>
+    <div class="sw"><i style="--c:#B5C784"></i><span><b>status.success</b>#B5C784</span></div>
+  </div>
+  <div class="grid wide">
+    <div class="cell">
+      <h3 class="h5">Type ramp (section 5)</h3>
+      <div class="ramp">
+        <div><span class="m" style="font-size:12.5px;color:var(--t50)">Settings - System</span><span>screen title · Marine 18/22 · 50%</span></div>
+        <div><span class="m" style="font-size:16.5px">Multiplayer</span><span>primary nav · Marine 24/28</span></div>
+        <div><span class="m" style="font-size:15px">System</span><span>section nav · Marine 22/26</span></div>
+        <div><span class="m" style="font-size:14px">Apply changes</span><span>action, modal title · 20/24</span></div>
+        <div><span class="m" style="font-size:13px">Restore defaults</span><span>action row · Marine 19/23</span></div>
+        <div><span class="m" style="font-size:11px;color:var(--t50)">Credits</span><span>secondary link · 16/20 · 50%</span></div>
+        <div><span class="l" style="font-size:17px;font-weight:500">Texture quality <span style="color:rgba(255,190,35,.8)">High</span></span><span>row, value · Lowpixel 17/21</span></div>
+        <div><span class="l" style="font-size:16px;font-weight:500">Hangar Perimeter · 12/16</span><span>list row · 16/20</span></div>
+        <div><span class="l" style="font-size:14px;font-weight:600;letter-spacing:.06em;color:var(--t40)">DISPLAY</span><span>section heading · 14/18 · 40%</span></div>
+        <div><span class="l" style="font-size:13px;font-weight:600;color:var(--t40)">Players</span><span>column heading · 13/16 · 40%</span></div>
+        <div><span class="mono" style="font-size:13px">si_fps 60   net_clientMaxRate 16000</span><span>tabular · Profont 13/16</span></div>
+        <div><span class="hudnum" style="font-size:36px;line-height:1;color:#DDEBC3">125</span><span>HUD readout · Chain 36</span></div>
+      </div>
+      <p class="cap">13 dp is the floor for essential text. Marine renders lower case as small capitals; compare faces by cap height (Marine 0.50 em, Lowpixel 0.75 em).</p>
+    </div>
+    <div class="cell">
+      <h3 class="h5">Opacity ladder (section 4)</h3>
+      <div class="ladder">
+        <span class="hd">Layer</span><span class="hd">Rest</span><span class="hd">Interaction</span>
+        <b>Nav and action plate</b><span>0.40</span><span>0.80 hover or focus</span>
+        <b>Section plate, value row</b><span>0.40</span><span>1.00</span>
+        <b>Current page plate</b><span>1.00</span><span>1.00</span>
+        <b>Marker</b><span>0.40 olive</span><span>1.00 orange</span>
+        <b>Action label</b><span>0.80 white</span><span>1.00 orange, +3%</span>
+        <b>Screen title</b><span>0.50</span><span>stable</span>
+        <b>Headings</b><span>0.40</span><span>stable</span>
+        <b>Card frame</b><span>0.94 black</span><span>stable</span>
+        <b>Modal frame</b><span>0.70 over glow</span><span>stable</span>
+        <b>Modal backdrop</b><span>soft focus: 5 u blur, 0.80 saturation, not dimmed</span><span>in 200 ms, out 250 ms</span>
+        <b>Framing bands</b><span>1.00 front end</span><span>0.40 in-game MP</span>
+      </div>
+      <p class="cap">Motion: hover enters in 0 ms and leaves over 300 ms linear; press 60 ms with a 1 dp inset; focus 80 ms ease-out. Node opacity applies to a completed group, so overlapping rails and text fade as one.</p>
+    </div>
+  </div>
+</section>

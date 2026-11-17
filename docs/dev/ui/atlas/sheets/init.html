@@ -1,0 +1,26 @@
+<section class="sheet" id="init">
+  <h2 class="sheet-h">Atlas - initializing screen</h2>
+  <p class="sheet-p">Section 14.17. Before any menu exists, the engine paints one picture and a status line while it starts: LOADING, then each system as it comes up. The stock picture is a single texture. Remastered rebuilds it as separate vector layers (the field, the rings, two clamps, the emblem, the QUAKE 4 lettering and its glow), so the plate band and the teeth can turn slowly in opposite directions beneath the fixed emblem.</p>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+    <filter id="inRevealF" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="linear" slope="9.09" intercept="-.636"/><feFuncG type="linear" slope="9.09" intercept="-.636"/><feFuncB type="linear" slope="9.09" intercept="-.636"/></feComponentTransfer></filter>
+    <filter id="inRevealT" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="linear" slope="14.3" intercept="-1.287"/><feFuncG type="linear" slope="14.3" intercept="-1.287"/><feFuncB type="linear" slope="14.3" intercept="-1.287"/></feComponentTransfer></filter>
+  </defs></svg>
+  <div class="frameAR stage scene" style="padding:0"><svg id="inSvg" viewBox="-107 0 854 480" role="img" aria-label="Initializing screen"></svg></div>
+  <div id="inLayoutCtl"></div>
+  <div class="hudctl">
+    <div class="segs" role="group" aria-label="Inspection"><span class="lbl">Inspect</span><button class="seg" id="inReveal" aria-pressed="false">Reveal tones</button><button class="seg" id="inFast" aria-pressed="false">Rotation ×8</button></div>
+    <button class="pl act" id="inReplay"><i class="mk"></i><span class="lb">Start again</span></button>
+  </div>
+  <p class="cap" id="inStatus" aria-live="polite">Remastered: the band and the teeth turn in opposite directions under the fixed emblem and lettering.</p>
+  <h3 class="h5 inLayersH">Layers, each drawn alone <span>tones lifted to show the shapes, except the lettering, glow and status</span></h3>
+  <div class="inLayers" id="inLayers"></div>
+  <p class="cap"><b>Remastered accents.</b> Close to the stock picture, and only in Remastered: a warm light sweeps the rings clockwise once every 10 s, catching the rims at its leading edge; a halo breathes behind the dark emblem; embers rise slowly through the rings; a glint crosses QUAKE 4 every 9 s; and the active status segment pulses while each new step flickers in. Reduced motion keeps a fixed key light at the upper left and drops the embers, glint and pulse.</p>
+  <div class="mpkey">
+    <div><b>Rings</b>Concentric about 319,214.5 u, the center of the emblem's own ring: an inner ring at 169–175 u over a soft edge from 161 u; the plate band at 175–204 u, with two framed plates 90° wide at the top and bottom and an 8 u frame; the rim at 204–210 u, fading into the teeth ring by 222 u; eight teeth at 211–247 u, 22.5° wide on a 45° pitch; grooves out to 300 u. The tones step between #171A09 and #21270C.</div>
+    <div><b>Emblem and lettering</b>The emblem is the traced q4logo in #0E1000, in its 260 u box centered on the canvas. QUAKE 4 is the q4text logotype at 0.367 u per texel in #F2F0EC. Its orange halo is rebuilt as vector light: the letters dilated 5.5 u, blurred with a 2.25 u sigma and added in #FF8340 at 0.10.</div>
+    <div><b>Status</b>The stock prints each step in the console's 8×16 u characters, #F09E0D, centered across the canvas with its top at 410 u, and repaints only then. Remastered sets the line in Marine 16 dp on the stock line's middle at 418 u and adds a rule under it with one segment per step.</div>
+    <div><b>Motion</b>On the presentation clock, the band turns counterclockwise once every 180 s and the teeth clockwise once every 120 s, beneath the fixed clamps, emblem and lettering. Reduced motion holds them still, and Classic never turns them.</div>
+  </div>
+  <p class="cap"><b>Sequence</b> LOADING... twice, then INITIALIZING SOUND..., NETWORK..., RENDER SYSTEM... and USER INTERFACE..., LOADING GAME... and INITIALIZING MENUS... · the stock stretches the picture over the whole view, and openQ4's aspect correction pillarboxes it in #181A08, as Classic shows · Remastered extends the field and the rings to any view, and a new step replaces the line at once.</p>
+</section>
+

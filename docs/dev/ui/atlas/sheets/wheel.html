@@ -1,0 +1,35 @@
+<section class="sheet" id="wheel">
+  <h2 class="sheet-h">Atlas - weapon wheel</h2>
+  <p class="sheet-p">Section 14.6. The wheel speaks the weapon strip's language in a ring: HUD plates with rounded corners and no 45° cuts, the strip's orange icon and #B2CC80 selection ring, and the weapon color code. Every weapon keeps a fixed position, so muscle memory survives pickups. Point at a segment to select it and click to equip; the arrow keys and Enter work too.</p>
+  <div class="grid wide">
+    <div class="stage scene" style="padding:12px;display:grid;place-items:center">
+      <svg id="wheel2" viewBox="-300 -300 600 600" style="width:min(100%,560px);height:auto;touch-action:none" role="listbox" tabindex="0" aria-label="Weapon wheel"></svg>
+    </div>
+    <div class="demo">
+      <div class="chg-ctl">
+        <label><button class="box" id="wStrogg" aria-pressed="false" aria-label="Strogg HUD family"></button>Strogg HUD family</label>
+        <label><button class="box" id="wChat" aria-pressed="false" aria-label="Quick chat"></button>Quick chat</label>
+        <label><button class="box" id="wAwk" aria-pressed="false" aria-label="The Awakening's weapons"></button>The Awakening</label>
+        <label><button class="box" id="wMP" aria-pressed="false" aria-label="Multiplayer"></button>Multiplayer</label>
+        <div class="segs" role="group" aria-label="Multiplayer team" id="wTeam"><span class="lbl">Team</span><button class="seg" data-team="m" aria-pressed="true">Marine</button><button class="seg" data-team="s" aria-pressed="false">Strogg</button><button class="seg" data-team="dm" aria-pressed="false">Deathmatch</button></div>
+        <button class="replay" id="wOpen">Play wheel.open</button><button class="replay" id="wClose">Play wheel.close</button>
+      </div>
+      <div class="ladder">
+        <span class="hd">Measure</span><span class="hd">Value</span><span class="hd">Note</span>
+        <b>Ring</b><span>104–232 dp</span><span>on the projection center</span>
+        <b>Segment</b><span>black 0.50</span><span>2 dp radii, 6 dp gaps</span>
+        <b>Selected</b><span>icon #FF8000</span><span>2.4 dp #B2CC80 ring, +8 dp</span>
+        <b>Unowned</b><span>outline 0.15</span><span>keeps its position</span>
+        <b>No ammunition</b><span>red sign</span><span>release refuses</span>
+        <b>Selection</b><span>past 35%</span><span>4° hysteresis</span>
+        <b>Mouse</b><span>past 32 dp</span><span>invisible selector</span>
+        <b>Tap</b><span>under 180 ms</span><span>previous weapon</span>
+        <b>wheel.open</b><span>150 ms readable</span><span>transmission or translation</span>
+      </div>
+      <p class="cap" id="wStatus">Equipped: nailgun. The notch on the inner edge marks the shotgun, the weapon a tap returns to.</p>
+      <p class="cap"><b>Strogg HUD.</b> The wheel takes the Strogg construction, not a recolor: angular plates with a raised leading tooth, 30° shoulders, a notched inner edge and a chamfered trailing corner, twisted 4° backward like the Strogg shear; reserve as slanted cells; drifting masked grain; dashed rings turning at the Strogg terminals' 0.2 and 0.5 turns a second around an octagonal core; circuit paths to each plate; and every label written in runes that translate with the credits recipe, the name as a heading and the readouts as list rows. Oxanium stands in for R_Strogg, and the runes are a vector stand-in alphabet.</p>
+      <p class="cap">Icons are the vector reconstructions of section 14.16. The band along the outer edge is the Marine ammunition gauge in the weapon's color, filled against its maximum; the number at the inner edge is the weapon's position in the strip. The hub holds only the name and the ammunition over its signal screen; the radio's waveform belongs to the transmission display, not to a weapon selector. Under The Awakening the wheel holds thirteen positions: the Core Cannon, the napalm launcher and the Freeze Gun fill positions 11 to 13 (the expansion's weapon slots 10 to 12), and every segment narrows so the ring stays whole.</p>
+      <p class="cap"><b>Multiplayer.</b> The same ring in the Marine construction for every team, holding the multiplayer roster with the gauntlet in the blaster's place. Icons keep the weapon color code, the pending weapon at full alpha and the rest at 0.60, never the single-player orange. There are no clips, so the hub reads the reserve alone, under the name and nothing else. Your team's text color takes the selection ring, the bezel ticks, the hub's double ring and its pointer: #AAE355 for Marines, #FF8E00 for Strogg, and the stock olive in deathmatch and Tourney. Opening never slows the game, and releasing equips at once.</p>
+    </div>
+  </div>
+</section>

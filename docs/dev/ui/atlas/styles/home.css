@@ -1,0 +1,8 @@
+
+/* the Strogg pause menu (section 13.7): R_Strogg labels, orange rails and markers */
+.home.strogg .nl{font:600 12px Oxanium,"Chakra Petch",sans-serif;letter-spacing:.6px;fill:rgba(252,255,200,.8)}
+.home.strogg .np:hover .nl,.home.strogg .np:focus-visible .nl,.home.strogg .np.f .nl,.home.strogg .sl:hover text,.home.strogg .sl:focus-visible text{fill:#FFCC00}
+.home.strogg .mkr{fill:#F59512}
+.home.strogg .np:hover .mkr,.home.strogg .np:focus-visible .mkr,.home.strogg .np.f .mkr,.home.strogg .sl:hover .mkr,.home.strogg .sl:focus-visible .mkr{fill:#FFCC00}
+.home.strogg .sl text{font:600 8px Oxanium,"Chakra Petch",sans-serif;letter-spacing:.5px;fill:rgba(252,255,200,.5)}
+.homectl{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}

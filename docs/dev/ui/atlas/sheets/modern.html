@@ -1,0 +1,60 @@
+<section class="sheet" id="modern">
+  <h2 class="sheet-h">Atlas - controller and touch</h2>
+  <p class="sheet-p">Section 13 patterns, drawn in the stock vocabulary. Mouse and keyboard, controller and touch are equal primary inputs. The prompt bar lives in the bottom band's raised trailing section and follows the active device: contextual actions lead, the primary action sits beside Back, and Back stays at the trailing end.</p>
+  <div class="stage dim menu">
+    <div class="demo">
+      <h3 class="h5">Prompt bar · controller · keyboard · touch</h3>
+      <div class="pbar-wrap"><div class="pbar"><button class="pp"><span class="gl">Y</span>Details</button><button class="pp"><span class="gl">X</span>Reset</button><button class="pp"><span class="gl">A</span>Select</button><button class="pp"><span class="gl">B</span>Back</button></div></div>
+      <div class="pbar-wrap"><div class="pbar"><button class="pp"><span class="kc">Tab</span>Details</button><button class="pp"><span class="kc">Del</span>Reset</button><button class="pp"><span class="kc">Enter</span>Select</button><button class="pp"><span class="kc">Esc</span>Back</button></div></div>
+      <div class="pbar-wrap"><div class="pbar"><button class="pp touch">Details</button><button class="pp touch">Reset</button><button class="pp touch">Select</button><button class="pp touch">Back</button></div></div>
+      <p class="cap">At most five actions, updated in the same frame as focus; actions that cannot run are hidden. Keycaps are small plates with a 45° cut; touch prompts are 48 dp tappable plates.</p>
+    </div>
+  </div>
+  <div class="grid wide">
+    <div class="demo">
+      <h3 class="h5">Glyph families · positional mapping</h3>
+      <div class="scroll-x">
+        <div class="glyphs" style="min-width:470px">
+          <span class="hd">Family</span><span class="hd">Accept</span><span class="hd">Back</span><span class="hd">Secondary</span><span class="hd">Tertiary</span><span class="hd">Tabs</span><span class="hd">Pages</span>
+          <span>Xbox layout</span><span><span class="gl">A</span></span><span><span class="gl">B</span></span><span><span class="gl">X</span></span><span><span class="gl">Y</span></span><span><span class="gl bump">LB</span> <span class="gl bump">RB</span></span><span><span class="gl trig">LT</span></span>
+          <span>PlayStation layout</span><span><span class="gl"><svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="#0b0d09" stroke-width="1.6"/></svg></span></span><span><span class="gl"><svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="3.6" fill="none" stroke="#0b0d09" stroke-width="1.5"/></svg></span></span><span><span class="gl"><svg viewBox="0 0 12 12"><rect x="2.6" y="2.6" width="6.8" height="6.8" fill="none" stroke="#0b0d09" stroke-width="1.5"/></svg></span></span><span><span class="gl"><svg viewBox="0 0 12 12"><path d="M6 2.2l3.8 6.8H2.2z" fill="none" stroke="#0b0d09" stroke-width="1.4"/></svg></span></span><span><span class="gl bump">L1</span> <span class="gl bump">R1</span></span><span><span class="gl trig">L2</span></span>
+          <span>Nintendo layout</span><span><span class="gl">A</span></span><span><span class="gl">B</span></span><span><span class="gl">Y</span></span><span><span class="gl">X</span></span><span><span class="gl bump">L</span> <span class="gl bump">R</span></span><span><span class="gl trig">ZL</span></span>
+          <span>Keyboard</span><span><span class="kc">Enter</span></span><span><span class="kc">Esc</span></span><span><span class="kc">Del</span></span><span><span class="kc">Tab</span></span><span><span class="kc">Q</span> <span class="kc">E</span></span><span><span class="kc">PgUp</span></span>
+        </div>
+      </div>
+      <p class="cap">Glyphs are vector symbols in the family text color; shape and letter carry the identity. Nintendo-layout controllers confirm on the east button by default, so its row lists A under Accept; Swap Confirm and Back overrides any default.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Detail area · card construction</h3>
+      <div class="fr detail" data-shape="card">
+        <div class="chead">Anisotropic filtering</div>
+        <p>Sharpens textures seen at a glancing angle, such as floors and long corridors.</p>
+        <div class="kv"><span>Current</span><b>16x</b><span>Default</span><b>8x</b><span>Cost</span><span class="impact" aria-label="Impact 1 of 3"><i></i><i class="off"></i><i class="off"></i></span></div>
+        <div class="tags" style="margin-top:12px"><span class="tag">Modified</span></div>
+        <div class="reason" style="margin-top:12px"><span>▲</span><span>Vote kick is unavailable because this server has voting turned off.</span></div>
+      </div>
+      <p class="cap">Every setting, row and action can explain itself. Expanded layouts dock the detail area at the trailing edge, regular layouts place it under the content, and compact layouts expand it in place. It replaces hover cards for controller and touch.</p>
+    </div>
+  </div>
+  <div class="grid wide">
+    <div class="demo">
+      <h3 class="h5">On-screen keyboard · Marine vocabulary</h3>
+      <div class="stage dim menu" style="display:grid;gap:12px">
+        <div class="oskfield"><div class="field" style="width:min(100%,260px)">Marine_0<span class="caret"></span></div><span class="cap"><span class="gl" style="width:18px;height:18px;font-size:10px">X</span> delete · <span class="gl" style="width:18px;height:18px;font-size:10px">Y</span> space · <span class="gl bump" style="height:16px">RB</span> caret</span></div>
+        <div class="osk" aria-label="On-screen keyboard"></div>
+      </div>
+      <p class="cap">Shown only when the session has no platform keyboard. D-pad or left stick moves, south types, west deletes, north adds a space, the bumpers move the caret and Menu finishes.</p>
+    </div>
+  </div>
+  <div class="demo">
+    <h3 class="h5">Touch gameplay controls · first-party overlay</h3>
+    <div class="frame169 stage scene" style="padding:0"><svg class="touchsvg" viewBox="0 0 1280 720" role="img" aria-label="Touch gameplay overlay with Fire pressed"></svg></div>
+    <div class="chg-ctl" style="margin-top:8px"><label><button class="box" id="editBox" aria-pressed="false" aria-label="Layout editor"></button>Layout editor</label></div>
+    <p class="cap">Drawn in the Marine HUD family: stick bases as thin-railed rings, buttons as cut plates around centered vector symbols, 35% at rest and 80% with the orange marker while pressed (Fire is pressed here). <b>Fire</b> 88 dp · <b>jump, crouch</b> 64 dp · <b>pause</b> 48 dp · hit regions at least 48 dp with 8 dp between them. Play shows no labels. The layout editor adds labels, a 24 dp snapping grid, resize handles (75–150%) and the Default, Compact and Left-handed presets. Nothing covers the crosshair.</p>
+    <div class="tport">
+      <div class="frame916 stage scene" style="padding:0"><svg class="touchsvgp" viewBox="0 0 720 1280" role="img" aria-label="Portrait touch gameplay overlay with Fire pressed"></svg></div>
+      <p class="cap"><b>Portrait 9:16.</b> At the 720 × 1280 dp reference the center screen spans the width (1 u = 1.125 dp) and the thumb deck takes the 370 dp bottom band. The move stick floats in the deck's leading half; Fire, weapon, jump, crouch, zoom and reload gather in its trailing half; every other drag looks, in the deck or in the view above it. The readouts rise to the center screen's bottom edge, above the deck. Pause keeps the top leading corner, and score and chat move to the top trailing corner, clear of a camera cutout. Sizes, spacing, states and the layout editor match landscape, and each orientation keeps its own layout.</p>
+    </div>
+  </div>
+</section>
+

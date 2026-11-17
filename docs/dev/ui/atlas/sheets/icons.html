@@ -1,0 +1,43 @@
+<style>
+.ic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,132px),1fr));gap:8px}
+.ic-grid figure{margin:0;display:grid;gap:6px;justify-items:center;align-content:start;padding:12px 6px 8px;background:radial-gradient(80% 80% at 50% 40%,#2c3033,#0c0d0f)}
+.ic-grid .art{height:40px;display:flex;align-items:center;justify-content:center}
+.ic-grid .art svg{display:block;height:36px;width:auto;overflow:visible}
+.ic-grid .art.wide svg{height:30px}
+.ic-grid figcaption{font:11px/1.35 var(--f-mono);color:var(--ter);text-align:center;overflow-wrap:anywhere}
+.ic-grid figcaption b{display:block;font:600 11px/1.3 var(--f-low);letter-spacing:.05em;color:var(--t50)}
+.ic-sizes{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 22px;padding:14px;background:radial-gradient(90% 90% at 50% 40%,#2c3033,#0c0d0f)}
+.ic-sizes figure{margin:0;display:grid;justify-items:center;gap:6px;font:11px var(--f-mono);color:var(--ter);min-width:0;max-width:100%}
+.ic-sizes svg{max-width:100%;height:auto}
+.sq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,128px),1fr));gap:8px}
+.sq-grid figure{margin:0;display:grid;gap:4px;justify-items:center;align-content:start;padding:10px 6px 8px;background:radial-gradient(80% 80% at 50% 40%,#2c3033,#0c0d0f)}
+.sq-grid svg{width:100px;height:100px;display:block}
+.sq-grid figcaption{font:11px/1.35 var(--f-mono);color:var(--ter);text-align:center}
+.sq-grid figcaption b{display:block;font:600 11px/1.3 var(--f-low);letter-spacing:.05em;color:var(--t50)}
+.sq-grid .new figcaption{color:var(--sec)}
+.sq-radio{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
+.sq-radio figure{margin:0;display:grid;gap:6px}
+.sq-radio svg{width:100%;height:auto;display:block}
+.sq-radio figcaption{font:12px/1.4 var(--f-mono);color:var(--ter)}
+</style>
+<section class="sheet" id="icons">
+  <h2 class="sheet-h">Atlas - item icons</h2>
+  <p class="sheet-p">Section 14.16. Every stock item icon redrawn as vector paths, including the shaded weapon renders and powerup emblems the stock drew as bitmaps. Weapon renders become clean side views with their lit top facets at full ink and bodies at half, glyphs become filled silhouettes with their holes and cuts kept, and each family shares one construction. White ink takes the HUD's tint; multi-color emblems keep their colors. Switch the tint to see how each context draws them. The Awakening group comes first: the expansion's own glyphs redrawn, and openQ4 designs where it ships copies or placeholders (its two new weapon renders are copies of the napalm launcher's, and its team powerups reuse the quad icon).</p>
+  <div class="segs" role="group" aria-label="Icon tint" id="icTint">
+    <span class="lbl">Tint</span>
+    <button class="seg" data-t="hud" aria-pressed="true">HUD strip #A8A360</button>
+    <button class="seg" data-t="code" aria-pressed="false">Weapon color code</button>
+    <button class="seg" data-t="white" aria-pressed="false">White ink</button>
+  </div>
+  <div id="icGroups"></div>
+  <h3 class="h5">Legibility at HUD sizes</h3>
+  <div class="ic-sizes" id="icSizes"></div>
+  <p class="cap">The strip draws icons at 18 u (27 dp) and the kill feed at 11 u (16.5 dp). Every glyph stays recognizable at 16 dp; the railgun's loops and the hyperblaster's trails soften there as they do in the stock. Multiplayer draws weapon icons in the weapon color code at full alpha for the pending weapon and 0.60 otherwise, never in the single-player orange.</p>
+  <h3 class="h5">Squad emblems · nine stock patches traced, five Awakening squads designed</h3>
+  <div class="sq-grid" id="sqGrid"></div>
+  <p class="cap">The patches are the marines' shoulder decals (decal_&lt;squad&gt;, 256 texels), traced into flat-color layers: a light gray rim, a black border, a two-tone ground and the squad's animal. The Awakening names five squads that ship no art (Falcon, Fox, Atlas, Hades and Razor). openQ4 draws them in the same construction. In the expansion's content, Falcon's marines wear the Viper patch; openQ4 leaves the character skins alone.</p>
+  <h3 class="h5">Squad line · the transmission display</h3>
+  <div class="sq-radio" id="sqRadio"></div>
+  <div class="hudctl"><button class="pl act" id="sqPlay"><i class="mk"></i><span class="lb">Play a squad line</span></button></div>
+  <p class="cap">A radio line addressed to the player's squad shows that squad's stencil on a sheared black 0.40 plate, shrinking into place over 500 ms. Quake 4 uses the stock Rhino stencil; under The Awakening the player's squad is Falcon, and its stencil follows the same construction: the figure cut from a 64-unit plate, keeping the eye ring, the cere and the malar stripe's edge.</p>
+</section>

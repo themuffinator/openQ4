@@ -1,0 +1,8 @@
+
+@keyframes breathe{0%{opacity:1}55%{opacity:.69}56%{opacity:.5}67%{opacity:1}100%{opacity:1}}
+.breathe{animation:breathe .9s linear infinite}
+@keyframes flagPulse{0%{transform:scale(1)}25%{transform:scale(1.2143)}100%{transform:scale(1)}}
+.flag-taken{animation:flagPulse 1s linear infinite;transform-box:fill-box;transform-origin:50% 50%}
+@keyframes lastTen{0%{opacity:1}30%{opacity:.45}100%{opacity:1}}
+.last-ten{animation:lastTen 1s ease-out infinite}
+@media (prefers-reduced-motion:reduce){.breathe,.flag-taken,.last-ten{animation:none}}

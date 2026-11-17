@@ -1,0 +1,115 @@
+<section class="sheet" id="components">
+  <h2 class="sheet-h">Atlas - modern components</h2>
+  <p class="sheet-p">Section 13.14: components the stock never had, each assembled from stock parts (cut plates, header bands, markers, the card and modal constructions, the value color and the tick ramp). None of them brings a construction of its own.</p>
+  <div class="stage dim menu">
+    <div class="topband" aria-hidden="true"></div>
+    <div class="notices" id="notices">
+      <div class="ntc warn"><svg viewBox="0 0 18 18"><path d="M9 2L17 16H1Z" fill="none" stroke="#E3AD36" stroke-width="1.5"/><path d="M9 7v4M9 12.5v1.6" stroke="#E3AD36" stroke-width="1.5"/></svg><span class="txt">Controller 1 disconnected. Reconnect it to continue.</span></div>
+      <div class="ntc"><svg viewBox="0 0 18 18"><path d="M3 9.5L7 13.5L15 4.5" fill="none" stroke="#B5C784" stroke-width="1.6"/></svg><span class="txt">Display settings reverted.</span><span class="act"><span class="gl" style="width:18px;height:18px;font-size:10px">Y</span>Undo</span></div>
+      <div class="ntc"><svg viewBox="0 0 18 18"><rect x="2" y="5" width="12" height="8" fill="none" stroke="#B8C29E" stroke-width="1.4"/><path d="M15.5 7.5v3" stroke="#B8C29E" stroke-width="1.6"/><path d="M4 7h2.5v4H4z" fill="#E3AD36"/></svg><span class="txt">Controller battery low (10%).</span></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+      <p class="cap"><b>Notice</b> header-band plates hang below the top band's trailing section, newest first, at most three. 4 s, or 8 s with an action; warnings persist until resolved.</p>
+      <button class="replay" id="replayNotices">Replay notices</button>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="demo">
+      <h3 class="h5">Search across every category</h3>
+      <label class="searchf"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4.8" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1.5"/><path d="M10 10l4.5 4.5" stroke="rgba(255,255,255,.7)" stroke-width="1.5"/></svg><input id="search" type="search" value="sens" aria-label="Search settings" autocomplete="off"></label>
+      <div class="results" id="results"></div>
+      <p class="cap">Results update with every keystroke, matching labels, values and language-table synonyms, each with its category path. Accept jumps to the setting.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Filter tags</h3>
+      <div class="ftags"><button class="ftag on">Not full<i class="x"></i></button><button class="ftag on">Dedicated<i class="x"></i></button><button class="ftag">No password<i class="x"></i></button><button class="ftag">Favorites<i class="x"></i></button></div>
+      <p class="cap">Small header-band plates: set tags at 0.60, unset at 0.28. Click to toggle.</p>
+      <h3 class="h5">Network quality</h3>
+      <div>
+        <div class="nqrow"><span>Hangar Brawl</span><span class="nq" style="color:#B5C784"><i></i><i></i><i></i><i></i></span><span>24 ms</span></div>
+        <div class="nqrow"><span>Rail Only Nights</span><span class="nq" style="color:#B5C784"><i></i><i></i><i></i><i class="off"></i></span><span>88 ms</span></div>
+        <div class="nqrow"><span>Arena Ladder</span><span class="nq" style="color:#E3AD36"><i></i><i></i><i class="off"></i><i class="off"></i></span><span>150 ms</span></div>
+        <div class="nqrow"><span>Low Grav Fun</span><span class="nq" style="color:#E46D56"><i></i><i class="off"></i><i class="off"></i><i class="off"></i></span><span>260 ms</span></div>
+      </div>
+      <p class="cap">Four bars to 60 ms, three to 120, two to 200, one above; each 2% of packet loss removes a bar.</p>
+    </div>
+  </div>
+  <div class="stage mstage menu" data-under="display" style="min-height:0">
+    <div class="scrim"></div><div class="gcol"></div>
+      <div class="fr modal" data-shape="modal" role="dialog" aria-label="Keep display settings">
+        <div class="mt">Keep display settings</div>
+        <p>The display is now 2560 × 1440 at 144 Hz. Keep these settings?</p>
+        <div style="display:flex;align-items:flex-end;gap:14px"><div class="cdramp" id="cdramp" aria-hidden="true"></div><span class="cdnum" id="cdnum">15</span></div>
+        <div class="mact"><button class="pl act is-focus" id="cdKeep"><i class="mk"></i><span class="lb">Keep</span></button><button class="pl act" id="cdRevert"><i class="mk"></i><span class="lb">Revert</span></button></div>
+      </div>
+  </div>
+  <div class="stage mstage menu" data-under="controls" style="min-height:0">
+    <div class="scrim"></div><div class="gcol"></div>
+      <div class="fr modal" data-shape="modal" role="dialog" aria-label="Binding conflict">
+        <div class="mt">Binding conflict</div>
+        <p>Mouse 2 already opens <b style="color:rgba(255,190,35,.8);font-weight:500">Zoom</b> in Controls - Weapons. Swap the two bindings or clear Zoom?</p>
+        <div class="mact"><button class="pl act is-focus"><i class="mk"></i><span class="lb">Swap</span></button><button class="pl act"><i class="mk"></i><span class="lb">Clear zoom</span></button><button class="pl act"><i class="mk"></i><span class="lb">Cancel</span></button></div>
+      </div>
+  </div>
+  <p class="cap">Each modal soft-focuses the settings page beneath it instead of blacking it out. <b>Countdown confirmation</b> one tick of the ramp drops each second; timing out reverts, and Accept from any device keeps. <b>Binding conflict</b> names the action that holds the input and offers Swap, Clear or Cancel.</p>
+  <div class="grid">
+    <div class="demo">
+      <h3 class="h5">Transfer progress · first-run data setup</h3>
+      <div class="xfer">
+        <div class="xrow"><svg viewBox="0 0 18 18"><path d="M3 9.5L7 13.5L15 4.5" fill="none" stroke="#B5C784" stroke-width="1.6"/></svg><span>pak000.pk4</span><span class="s">verified</span></div>
+        <div class="xrow"><svg viewBox="0 0 18 18"><path d="M3 9.5L7 13.5L15 4.5" fill="none" stroke="#B5C784" stroke-width="1.6"/></svg><span>pak001.pk4</span><span class="s">verified</span></div>
+        <div class="xrow"><svg viewBox="0 0 18 18"><path d="M9 3v9M5 8l4 4 4-4M3 15h12" fill="none" stroke="#E38900" stroke-width="1.5"/></svg><span>pak002.pk4</span><span class="s">copying</span></div>
+        <div class="prog" style="--p:41%"><i></i></div>
+        <div class="xsum">1.18 of 2.87 GB · 48 MB/s · 0:36 left</div>
+      </div>
+      <p class="cap">Each archive is checked against the official checksums. Pausing, suspension and restarts keep progress; a failure names its fix.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">More actions · undo · empty and loading states</h3>
+      <div class="fr pop" data-shape="pop" style="max-width:280px">
+        <div class="bind" style="font-size:15px;gap:10px;padding:3px 0"><span class="gl" style="width:18px;height:18px;font-size:10px">X</span>Add to favorites</div>
+        <div class="bind" style="font-size:15px;gap:10px;padding:3px 0"><span class="gl" style="width:18px;height:18px;font-size:10px">Y</span>Copy server address</div>
+        <div class="bind" style="font-size:15px;gap:10px;padding:3px 0"><span class="gl bump" style="height:16px">RB</span>Show rules</div>
+      </div>
+      <div class="empty">
+        <span class="h5">Saved games</span>
+        <span style="font:500 15px/1.4 var(--f-low);color:var(--t80)">No saved games yet. Checkpoints and quick saves appear here.</span>
+        <button class="pl arow" style="max-width:300px"><i class="mk"></i><span class="lb">New game</span></button>
+      </div>
+      <div aria-label="Loading rows"><div class="skel"></div><div class="skel" style="width:88%"></div><div class="skel" style="width:94%"></div></div>
+      <p class="cap">Loading rows are plates at rest opacity without labels; content arrives with <b>row.reveal</b>. No shimmer and no spinner over content.</p>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="demo">
+      <h3 class="h5">Crosshair editor</h3>
+      <div class="xhed">
+        <div class="xprev"><svg id="xprev" viewBox="-60 -60 120 120"></svg></div>
+        <div style="display:grid;gap:12px">
+          <div class="xgrid" id="xgrid"></div>
+          <div class="slider"><span class="l" style="min-width:60px;font-size:15px">Size</span><svg class="ramp-s" id="xsize" width="107" height="16" role="slider" tabindex="0" aria-label="Crosshair size" aria-valuemin="0" aria-valuemax="20" aria-valuenow="8"></svg><output>8</output></div>
+          <div class="xcols" id="xcols"></div>
+        </div>
+      </div>
+      <p class="cap">Live preview over a captured scene tile; the size runs 24–72 dp in 20 steps through the five stock sizes, and eight color presets sit as small cut squares.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Stick response and color vision</h3>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+        <svg class="plot" id="stick" viewBox="-110 -110 220 220" role="img" aria-label="Left stick dead zone and live position"></svg>
+        <svg class="plot" id="curve" viewBox="-10 -110 120 120" role="img" aria-label="Response curve"></svg>
+      </div>
+      <div class="pal">
+        <span></span><span class="hd" style="font:600 11px/1.3 var(--f-low);letter-spacing:.08em;color:var(--t40)">MARINES</span><span class="hd" style="font:600 11px/1.3 var(--f-low);letter-spacing:.08em;color:var(--t40)">STROGG</span><span class="hd" style="font:600 11px/1.3 var(--f-low);letter-spacing:.08em;color:var(--t40)">MEGA</span><span class="hd" style="font:600 11px/1.3 var(--f-low);letter-spacing:.08em;color:var(--t40)">RAILGUN</span>
+        <span>Default</span><i style="--c:#6AA42B"><svg viewBox="0 0 14 14"><path d="M7 1l5 3v6l-5 3-5-3V4z" fill="#10140a"/></svg></i><i style="--c:#FF7B04"><svg viewBox="0 0 14 14"><path d="M2 3l5 2 5-2-2 5 2 5-5-2-5 2 2-5z" fill="#10140a"/></svg></i><i style="--c:rgb(0,128,255)"></i><i style="--c:rgb(0,255,0)"></i>
+        <span>Blue-orange</span><i style="--c:#3E8EDE"><svg viewBox="0 0 14 14"><path d="M7 1l5 3v6l-5 3-5-3V4z" fill="#10140a"/></svg></i><i style="--c:#F28E2B"><svg viewBox="0 0 14 14"><path d="M2 3l5 2 5-2-2 5 2 5-5-2-5 2 2-5z" fill="#10140a"/></svg></i><i style="--c:#3E8EDE"></i><i style="--c:#F7E04B"></i>
+      </div>
+      <p class="cap">The stick plot draws the dead-zone disc, the outer threshold ring and the live position; team colors always travel with their emblem shape.</p>
+    </div>
+  </div>
+  <div class="demo">
+    <h3 class="h5">Text backing</h3>
+    <div class="backing"><p>Objective updated: reach the hangar control room.</p><p class="on">Objective updated: reach the hangar control room.</p></div>
+    <p class="cap">The accessibility backing puts an opaque plate at black 0.85 behind the text in its own row shape, and replaces the light only where it supports text.</p>
+  </div>
+</section>

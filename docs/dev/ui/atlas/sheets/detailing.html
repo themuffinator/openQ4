@@ -1,0 +1,95 @@
+<style>
+.dt svg{display:block;width:100%;height:auto;max-width:100%}
+.dt .dim{font:9px var(--f-mono);fill:#8C947A}
+.fmt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 16px;font:13px/1.5 var(--f-mono);color:var(--ter)}
+.fmt b{font:500 15px/1.5 var(--f-low);color:rgba(255,190,35,.8);font-variant-numeric:tabular-nums}
+.ok,.no{font:600 11px/1 var(--f-low);letter-spacing:.08em;text-transform:uppercase}
+.ok{color:#B5C784}.no{color:#E46D56}
+</style>
+<section class="sheet" id="detailing">
+  <h2 class="sheet-h">Atlas - detailing</h2>
+  <p class="sheet-p">Construction at four times magnification. Detail decides whether a reconstruction reads as authored or traced: continuous mitered rails, 45° cuts with equal extents, markers inside the cap band, separators that stop short of rails, and numbers set with tabular figures.</p>
+  <div class="grid dt">
+    <div class="demo">
+      <h3 class="h5">Cut and rail join · ×4</h3>
+      <div class="stage plain" style="padding:12px">
+        <svg viewBox="0 0 300 170" aria-label="Magnified lower-leading cut with its mitered rail">
+          <defs><pattern id="px4" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M4 0V4H0" fill="none" stroke="rgba(255,255,255,.04)" stroke-width=".5"/></pattern></defs>
+          <rect x="0" y="0" width="300" height="170" fill="url(#px4)"/>
+          <path d="M40 20H300V136H108L40 68Z" fill="#8B964B" fill-opacity=".2"/>
+          <path d="M43 20V66.8L109.2 133H300" fill="none" stroke="#8B964B" stroke-width="6"/>
+          <path d="M40 150H108M40 146V154M108 146V154" stroke="#E38900" stroke-width="1"/>
+          <path d="M22 68V136M18 68H26M18 136H26" stroke="#E38900" stroke-width="1"/>
+          <text class="dim" x="56" y="164">17 dp</text><text class="dim" x="0" y="106">17 dp</text>
+          <text class="dim" x="150" y="60">rail 1.5 dp, one stroke, mitered</text>
+        </svg>
+      </div>
+      <p class="cap">A 45° cut keeps equal horizontal and vertical extent after layout; the rail runs through it as one continuous stroke. Grid: one physical pixel at the reference.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Joins · correct and avoided</h3>
+      <div class="stage plain" style="padding:12px">
+        <svg viewBox="0 0 300 170" aria-label="Correct and incorrect rail joins">
+          <path d="M20 30V90L60 130H140" fill="none" stroke="#8B964B" stroke-width="5"/>
+          <path d="M170 30V93" stroke="#8B964B" stroke-width="5"/><path d="M167 87L210 130" stroke="#8B964B" stroke-width="5" opacity=".95"/><path d="M204 130H290" stroke="#8B964B" stroke-width="5"/>
+          <circle cx="170" cy="90" r="9" fill="none" stroke="#E46D56" stroke-width="1.2"/><circle cx="207" cy="130" r="9" fill="none" stroke="#E46D56" stroke-width="1.2"/>
+          <text class="ok" x="20" y="160" fill="#B5C784" font-size="10" font-family="Archivo">CONTINUOUS</text>
+          <text class="no" x="170" y="160" fill="#E46D56" font-size="10" font-family="Archivo">OVERLAPPING SEGMENTS</text>
+        </svg>
+      </div>
+      <p class="cap">Separate segments brighten where their antialiased ends overlap and open gaps at fractional scales. Draw each rail as one path.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Cut ladder</h3>
+      <div class="stage plain" style="padding:12px">
+        <svg viewBox="0 0 300 120" aria-label="Cut sizes from 2 to 38 dp">
+          <g fill="#8B964B" fill-opacity=".32" stroke="#8B964B" stroke-width="1">
+            <path d="M4 40H30V80H6L4 78Z"/><path d="M36 40H62V80H39L36 77Z"/><path d="M68 40H94V80H78L68 70Z"/><path d="M100 40H126V80H112L100 68Z"/><path d="M132 40H158V80H146L132 66Z"/><path d="M164 40H190V80H181L164 63Z"/><path d="M196 40H222V80H216L196 60Z"/><path d="M236 20H296V80H274L236 42Z"/>
+          </g>
+          <g class="dim"><text x="9" y="98">2</text><text x="41" y="98">3</text><text x="71" y="98">10</text><text x="103" y="98">12</text><text x="135" y="98">14</text><text x="167" y="98">17</text><text x="199" y="98">20</text><text x="255" y="98">38</text></g>
+          <text class="dim" x="4" y="114">dp · minor ×2, hint, card, header band, nav and action plates, modal chamfer</text>
+        </svg>
+      </div>
+      <p class="cap">Only the measured cuts appear; wider dialogs stretch the modal chamfer up to 56 dp. A cut never falls below 3 dp on an essential control.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Marker in the cap band · ×4</h3>
+      <div class="stage plain" style="padding:12px">
+        <svg viewBox="0 0 300 140" aria-label="Marker aligned inside the label's cap band">
+          <path d="M0 52H300M0 88H300" stroke="#E38900" stroke-width=".8" stroke-dasharray="3 3"/>
+          <path d="M20 52h36v36z" fill="#E38900"/>
+          <path d="M13 45h50v50z" fill="none" stroke="#E38900" stroke-opacity=".35" stroke-dasharray="2 2"/>
+          <text x="72" y="88" font-family="Michroma, sans-serif" font-size="50" fill="#E38900">SET</text>
+          <text class="dim" x="206" y="48">cap band</text><text class="dim" x="0" y="118">halo reaches 20% of the tile beyond the solid; label follows 4 dp after</text>
+        </svg>
+      </div>
+      <p class="cap">The marker's legs sit inside the cap band of the Marine label it precedes, never on the baseline or the em box.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Separators and locked content</h3>
+      <div class="stage plain" style="padding:12px">
+        <svg viewBox="0 0 300 150" aria-label="Separator stopping short of a rail, and a hatched locked plate">
+          <path d="M20 10V60" stroke="#8B964B" stroke-width="1.5"/>
+          <path d="M34 35H290" stroke="#8B964B" stroke-opacity=".3" stroke-width="1"/>
+          <path d="M22 44H32" stroke="#E38900" stroke-width=".8"/><text class="dim" x="36" y="52">a rule starts 8 dp inside the rail</text>
+          <defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V8" stroke="#fff" stroke-width="1"/></pattern>
+            <linearGradient id="lockfill" x1="0" x2="1"><stop offset=".5" stop-color="#8B964B" stop-opacity=".49"/><stop offset="1" stop-color="#8B964B" stop-opacity="0"/></linearGradient></defs>
+          <g opacity=".4"><path d="M20 84H290V120H40L20 100Z" fill="url(#lockfill)"/><path d="M20.75 84V100L40 119.25H230" fill="none" stroke="#8B964B" stroke-width="1.5"/></g>
+          <path d="M20 84H290V120H40L20 100Z" fill="url(#hatch)" opacity=".1"/>
+          <path d="M34 96v-3a4 4 0 018 0v3M32 96h12v9H32z" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="1.3"/>
+          <text x="54" y="107" font-family="Michroma, sans-serif" font-size="9.5" fill="#fff" fill-opacity=".4">TIER 4 · BOSS</text>
+          <text class="dim" x="20" y="140">locked: lock symbol + 45° hatch, 8 dp pitch at 0.10</text>
+        </svg>
+      </div>
+      <p class="cap">Unavailable content rests at 0.40 and explains itself in the detail area; hatch marks only locked content, never color alone.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Numbers and units</h3>
+      <div class="fmt">
+        <span>refresh</span><b>144 Hz</b><span>latency</span><b>16 ms</b><span>size</span><b>1.2 GB</b><span>scale</span><b>125%</b>
+        <span>multiplier</span><b>4x</b><span>resolution</span><b>2560 × 1440</b><span>range</span><b>75–200%</b><span>time left</span><b>0:36</b>
+      </div>
+      <p class="cap">Tabular figures wherever digits change or align. A space before units, none before % or x; the multiplication sign for resolutions; an en dash for ranges; decimal separators follow the language.</p>
+    </div>
+  </div>
+</section>

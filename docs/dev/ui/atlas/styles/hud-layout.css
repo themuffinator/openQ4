@@ -1,0 +1,11 @@
+
+/* HUD stages that follow the chosen aspect ratio (section 14.4) */
+.frameAR{position:relative;aspect-ratio:var(--ar,1.7778);width:min(100%,calc(66vh * var(--ar,1.7778)));margin-inline:auto;overflow:hidden}
+.frameAR > svg{position:absolute;inset:0;width:100%;height:100%}
+.segs{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.segs .lbl{font:600 11px/1 var(--f-low);letter-spacing:.08em;text-transform:uppercase;color:var(--t40);margin-right:4px}
+.segs .seg{font:500 12px/1 var(--f-mono);color:var(--ter);background:rgba(139,150,75,.12);border:0;padding:7px 10px 7px 12px;cursor:pointer;
+  clip-path:polygon(0 0,100% 0,100% 100%,6px 100%,0 calc(100% - 6px))}
+.segs .seg:hover,.segs .seg:focus-visible{color:var(--t80);background:rgba(139,150,75,.26)}
+.segs .seg[aria-pressed="true"]{background:rgba(139,150,75,.5);color:#fff}
+.hudbar{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin-top:8px}

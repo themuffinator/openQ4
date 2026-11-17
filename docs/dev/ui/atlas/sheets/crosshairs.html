@@ -1,0 +1,55 @@
+<style>
+.xh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,122px),1fr));gap:8px}
+.xh-grid figure{margin:0;display:grid;gap:6px;justify-items:center;padding:12px 6px 8px;background:radial-gradient(80% 80% at 50% 42%,#3a3e40,#0e0f11);cursor:pointer;border:0;position:relative}
+.xh-grid figure[aria-pressed="true"]{box-shadow:inset 0 0 0 1px var(--orange)}
+.xh-grid figure:focus-visible{box-shadow:inset 0 0 0 2px var(--orange)}
+.xh-grid figure > svg{width:64px;height:64px;display:block;overflow:visible}
+.xh-grid figcaption{font:11px/1.35 var(--f-mono);color:var(--ter);text-align:center}
+.xh-grid figcaption b{display:block;font:600 11px/1.3 var(--f-low);letter-spacing:.06em;color:var(--t50);text-transform:uppercase}
+.xh-grid .num{position:absolute;left:6px;top:4px;font:600 10px/1 var(--f-mono);color:var(--t40)}
+.xh-edit{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:760px){.xh-edit{grid-template-columns:1fr}}
+.xh-prev{position:relative;aspect-ratio:16/9;background:radial-gradient(70% 60% at 52% 40%,#4a4f52 0%,#23272a 52%,#0a0b0d 100%);overflow:hidden}
+.xh-prev svg{position:absolute;inset:0;width:100%;height:100%}
+.xh-ctl{display:grid;gap:12px}
+.xh-ctl .row{display:grid;gap:6px}
+.xh-ctl .row > span{font:600 11px/1.3 var(--f-low);letter-spacing:.08em;text-transform:uppercase;color:var(--t40)}
+.xh-sw{display:flex;flex-wrap:wrap;gap:6px}
+.xh-sw button{width:28px;height:28px;border:0;padding:0;cursor:pointer;background:var(--c);clip-path:polygon(0 0,100% 0,100% 100%,7px 100%,0 calc(100% - 7px))}
+.xh-sw button[aria-pressed="true"]{outline:2px solid #fff;outline-offset:2px}
+.xh-size{display:flex;align-items:center;gap:10px;font:12px var(--f-mono);color:var(--sec)}
+.xh-size input{flex:1;accent-color:#E38900}
+.xh-ticks{display:flex;justify-content:space-between;font:10px var(--f-mono);color:var(--t40);padding-inline:2px}
+</style>
+<section class="sheet" id="crosshairs">
+  <h2 class="sheet-h">Atlas - crosshairs</h2>
+  <p class="sheet-p">Section 14.15. Every stock crosshair and context cursor, 31 textures, redrawn as vector paths: true circles and straight strokes where the stock is line art, smooth curves where it is organic, symmetric where the stock meant symmetry, and each design centered on the aim point. White ink takes the crosshair color; the black outline and shadow ink stays black at every tint, as in the stock. Pick any crosshair below to preview it.</p>
+  <div class="xh-edit">
+    <div class="xh-prev"><svg id="xhPrev" viewBox="0 0 640 360" role="img" aria-label="Crosshair preview over a scene"></svg></div>
+    <div class="xh-ctl">
+      <div class="row"><span>Size</span>
+        <div class="xh-size"><input type="range" id="xhSize" min="24" max="72" step="3" value="48" aria-label="Crosshair size in dp"><b id="xhSizeV">48 dp</b></div>
+        <div class="xh-ticks"><span>24</span><span>36</span><span>48</span><span>60</span><span>72 dp</span></div>
+      </div>
+      <div class="row"><span>Color · the stock menu's eight swatches</span><div class="xh-sw" id="xhSw"></div></div>
+      <div class="hudctl" style="margin:0">
+        <button class="pl act" id="xhHit"><i class="mk"></i><span class="lb">Land a hit</span></button>
+        <label><button class="box" id="xhMarkers" aria-pressed="false" aria-label="Hit markers"></button>Hit markers</label>
+        <label><button class="box on" id="xhSP" aria-pressed="true" aria-label="Single player"></button>Single player</label>
+      </div>
+      <p class="cap" id="xhInfo">Machinegun · crosshair_machinegun</p>
+    </div>
+  </div>
+  <p class="cap"><b>Hit feedback</b> the stock pop: the crosshair grows 10 u and returns over 150 ms, tinted red for 100 ms in single player. <b>Hit markers</b> (optional, multiplayer) sit on the diagonals just outside the crosshair art, from half its size plus 4 dp, so they never cover a design such as the lightning gun's darts. A color change applies at once.</p>
+  <h3 class="h5">Weapon crosshairs</h3>
+  <div class="xh-grid" id="xhWeapons"></div>
+  <h3 class="h5">Custom set · the stock cycle order</h3>
+  <div class="xh-grid" id="xhCustom"></div>
+  <p class="cap">Twenty entries in the stock order: the eight weapon designs, ten simple marks, the gauntlet and the napalm launcher. Entries 10 and 16 are the same art in the stock, so the picker offers nineteen designs. The picker steps both ways. Vehicles always use their weapon's crosshair.</p>
+  <h3 class="h5">Context cursors · click to play their stock motion</h3>
+  <div class="xh-grid" id="xhContext"></div>
+  <p class="cap">Context cursors keep their own colors and motion: the use hand pulses 24–28 u every 600 ms; the talk, medic, tech and locked cursors close from 34 to 22 u while fading in over 200 ms; the enter-vehicle chevron rises 7 u and fades over 500 ms above a triangle dimming to 0.40; the friendly X closes from 40 to 34 u. The world-GUI cursor is never drawn while a world GUI has focus, and the friendly X needs the far character-info option off, so both are rare in stock play.</p>
+  <h3 class="h5">The Awakening · the space cannon's reticule, its guides and two new cursors</h3>
+  <div class="xh-grid" id="xhAwakening"></div>
+  <p class="cap">The space cannon's lock-on reticule changes art and color with the lock: white while nothing is targeted, yellow while its rockets acquire, #40FF40 once locked, #FF1A1A over a friendly target and white again, without the side bars, out of range. Its pulse cannon shows only the white, out-of-range and friendly states. Three guide effects turn 0.3 turn a second around targets: the stock nailgun lock ring in amber while the rockets acquire, the lock guide in red once locked, and the stock ring in gray around the nearest enemy. Gray brackets frame a target out of range, but the stock material adds nothing, so only Remastered shows them. The busy-talk cursor stays red. The speeder's cannon and the stock walker's cannon name a vehicle_cannon crosshair that neither game ships, so openQ4 draws one. The expansion's new weapons borrow stock crosshairs: the Core Cannon the grenade launcher's, the napalm launcher the rocket launcher's, the Freeze Gun the blaster's, and the grapple the rocket launcher's in yellow.</p>
+</section>

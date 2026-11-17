@@ -1,0 +1,87 @@
+<style>
+.wdisp{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:10px}
+.wdisp figure{margin:0;display:grid;gap:6px}
+.wdisp svg{width:100%;height:auto;display:block;background:#050605}
+.wdisp figcaption{font:12px/1.4 var(--f-mono);color:var(--ter)}
+.awk-screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px}
+.awk-screens figure{margin:0;display:grid;gap:6px}.awk-screens figure[hidden]{display:none}
+.awk-screens svg{width:100%;height:auto;display:block}
+.awk-screens figcaption{font:12px/1.4 var(--f-mono);color:var(--ter)}.awk-screens figcaption b{color:var(--sec);font-weight:500}
+.scopes{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px}
+.scopes figure{margin:0;display:grid;gap:6px}
+.scopes svg{width:100%;height:auto;display:block}
+.scopes figcaption{font:12px/1.4 var(--f-mono);color:var(--ter)}
+</style>
+<section class="sheet" id="sphud">
+  <h2 class="sheet-h">Atlas - objectives and encounters</h2>
+  <p class="sheet-p">Sections 14.11–14.13. The objectives display, its notices, the boss bar, vehicle HUDs, scopes and weapon displays, from the measured stock. Objectives, screenshots and names below are examples; the screenshots are bitmap exceptions drawn here as placeholders.</p>
+  <div class="frameAR stage scene" style="padding:0"><svg id="pdaSvg" viewBox="-107 0 854 480" role="img" aria-label="Objectives display with three objectives"></svg></div>
+  <div class="hudctl">
+    <button class="pl act" id="pdaShow"><i class="mk"></i><span class="lb">Hold scores</span></button>
+    <label><button class="box" id="pdaRem" aria-pressed="false" aria-label="Remastered layout"></button>Remastered</label>
+    <label><button class="box" id="pdaStrogg" aria-pressed="false" aria-label="Strogg display"></button>Strogg</label>
+  </div>
+  <p class="cap"><b>Stock</b> the three newest objectives on a 143 u pitch, open plates in #B0CD6B at 0.40 beside a black gradient over the leading 45% of the view; titles on one line, descriptions wrapping at 178 u to seven lines; entry 150 ms, then 100 ms; no exit animation. <b>Remastered</b> keeps the construction, scrolls every active objective, wraps without dropping text and lists completed objectives below.</p>
+  <div class="frameAR stage scene" style="padding:0"><svg id="noticeSvg" viewBox="-107 0 854 480" role="img" aria-label="New-objective and objective-complete notices over gameplay"></svg></div>
+  <div class="hudctl">
+    <button class="pl act" id="ntNew"><i class="mk"></i><span class="lb">New objective</span></button>
+    <button class="pl act" id="ntDone"><i class="mk"></i><span class="lb">Complete</span></button>
+    <button class="pl act" id="ntFail"><i class="mk"></i><span class="lb">Fail</span></button>
+  </div>
+  <div id="noticeCtl"></div>
+  <p class="cap"><b>New objective</b> on the leading screen: the frame grows from a strip over 150 ms, then the title (two lines of 134 u) and the screenshot fade in over 100 ms. <b>Complete</b> on the trailing screen under the radio chatter, mirrored so its fill dissolves toward the center, with no screenshot. Remastered drops the stock back bars: each plate carries a black 0.50 backing inside its own outline, so nothing darkens the view outside the notice. Classic keeps the back bars on the 4:3 canvas. Each notice closes on its own after the player moves 64 units from where they stood at 2 s, or at 5 s; this demo closes at 5 s. <b>Failure</b> appears at once under a 12 s fade to black (shortened here).</p>
+  <div class="grid wide">
+    <div class="demo">
+      <h3 class="h5">Boss bar · measured octagon, hexagon and shield brackets</h3>
+      <div class="stage scene" style="padding:10px"><svg id="bossSvg" viewBox="200 30 240 70" role="img" aria-label="Boss health and shield bar"></svg></div>
+      <div class="hudctl">
+        <button class="pl act" id="bossHit"><i class="mk"></i><span class="lb">Hit the boss</span></button>
+        <button class="pl act" id="bossShield"><i class="mk"></i><span class="lb">Hit the shield</span></button>
+      </div>
+      <p class="cap">Health drains toward its leading point; each shield half drains from the center toward its outer point and pulses #FF4000 at 2 Hz below 1000 points. Nothing is sheared and there are no numerals.</p>
+    </div>
+    <div class="demo">
+      <h3 class="h5">Walker and hover tank HUD</h3>
+      <div class="frameAR stage scene" style="padding:0"><svg id="vehSvg" viewBox="-107 0 854 480" role="img" aria-label="Walker HUD with the status bar, the transmission display and the Exit prompt"></svg></div>
+      <div id="vehLayoutCtl"></div>
+      <div class="hudctl">
+        <div class="segs" role="group" aria-label="Vehicle" id="vehKind"><span class="lbl">Vehicle</span><button class="seg" data-v="walker" aria-pressed="true">Walker</button><button class="seg" data-v="tank" aria-pressed="false">Hover tank</button></div>
+        <button class="pl act" id="vehEnter"><i class="mk"></i><span class="lb">Enter</span></button>
+        <button class="pl act" id="vehWeap"><i class="mk"></i><span class="lb">Switch weapon</span></button>
+        <button class="pl act" id="vehHit"><i class="mk"></i><span class="lb">Take a hit</span></button>
+        <button class="pl act" id="vehShock"><i class="mk"></i><span class="lb">Shock</span></button>
+        <label><button class="box" id="vehLock" aria-pressed="false" aria-label="Vehicle locked"></button>Vehicle locked</label>
+      </div>
+      <p class="cap">The vehicle's <b>status bar</b>, centered on the bottom edge as on foot: numeral-free Marine gauges labelled ARMOR and SHIELDS, red at 25% hull or with no shield, and the chamfered weapon panel with the current weapon's traced glyph, the other's at 0.40, the rocket count and the #FF9E1A charge bar. Entry lines wipe open inside moving brackets and fade over 5.5 s; hits flash an additive #550000 edge; shocks pulse red brackets once a second for 2.5 s. The <b>transmission display</b> keeps the top-trailing corner of the trailing screen, as on every HUD. The stock's "[ Press JUMP to exit ]" named an action rather than its control; the <b>HUD prompt</b> shows the active device's glyph for jump, then Exit, on a HUD plate at the bottom-trailing corner, and a lock with Vehicle locked in #FF8000 while a script holds the player in. Classic sets the same prompt at the stock line's place, with its shadow and no plate.</p>
+    </div>
+  </div>
+  <div class="demo">
+    <h3 class="h5">The Awakening · vehicle displays</h3>
+    <div class="segs" role="group" aria-label="Vehicle" id="awkVeh">
+      <span class="lbl">Vehicle</span>
+      <button class="seg" data-v="cannon" aria-pressed="true">Space cannon</button>
+      <button class="seg" data-v="mcc" aria-pressed="false">MCC cannon</button>
+      <button class="seg" data-v="speeder" aria-pressed="false">Speeder bike</button>
+      <button class="seg" data-v="gev" aria-pressed="false">GEV</button>
+    </div>
+    <div class="frameAR stage scene" style="padding:0"><svg id="awkSvg" viewBox="-107 0 854 480" role="img" aria-label="The Awakening's vehicle display"></svg></div>
+    <div id="awkLayoutCtl"></div>
+    <div class="hudctl" id="awkCtl"></div>
+    <p class="cap" id="awkCap"></p>
+    <div class="awk-screens" id="awkScreens"></div>
+  </div>
+  <div class="demo">
+    <h3 class="h5">Scopes · the stock layers rebuilt, round at every aspect</h3>
+    <div class="scopes" id="scopes"></div>
+    <div class="hudctl">
+      <button class="pl act" id="scFire"><i class="mk"></i><span class="lb">Fire the railgun</span></button>
+      <button class="pl act" id="scLock"><i class="mk"></i><span class="lb">Toggle the lock</span></button>
+    </div>
+    <p class="cap">Each scope draws its stock layers in stock order over the view, here a 16:9 screen. <b>Machinegun</b>: beyond the r 182 u lens, an optical smear under a 40% gray veil; inside, a green glow rising toward the rim, a black double ring, broken posts, fine ticks, and 16 compass dots that turn with the view. <b>Railgun</b>: a diamond, |dx| + |dy| &lt; 362 u, inside a black edge, with a 26% band within the edge and a gray haze beyond that thickens toward the corners. A teal glow lines the edge; #00FFFF bars flank the horizontal hair; a ring turns 40 degrees a second; one sheared #99FFFF cell shows per round; and a diamond sweeps outward every 2 s (2% in Classic, 8% in Remastered, so it reads). <b>Nailgun</b>: an amber glow inside four hooks and a three-band surround, with a notched ring that turns with the view. On a lock the glow brightens, the arrow lights toward the target, the lines spread and the R_Strogg readouts fade in. The aperture keeps its shape at every aspect while the veil, haze or surround reaches the screen edges. The Awakening Core Cannon's scope modification uses the machinegun scope.</p>
+  </div>
+  <div class="demo">
+    <h3 class="h5">Weapon displays · the gun-mounted screens</h3>
+    <div class="wdisp" id="wdisp"></div>
+    <p class="cap">Machinegun and shotgun digits shimmer at 3 Hz (the 9 Hz overlay flicker is capped at 3 Hz); the hyperblaster flickers and flashes a localized RELOAD plate below 10; the nailgun fills six slanted cells; the rocket launcher lights three cells; the railgun's charge arcs turn orange-red after the last shot.</p>
+  </div>
+</section>

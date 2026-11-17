@@ -1,0 +1,18 @@
+<section class="sheet" id="loading">
+  <h2 class="sheet-h">Atlas - loading screens</h2>
+  <p class="sheet-p">Section 14.17. The loading screen keeps the stock identity: a full-bleed levelshot between two heavy bands, the level name trailing at the top, the dot matrix, the corner brackets and the orange progress bar. Remastered carries the bands out to the edges of any view and fills them with what a player waits for: the mission and its objectives, a progress readout that names its current stage, tips, and a continue prompt in the active device's glyphs. Multiplayer shows the server card and the map's arsenal as each item spawns, then hands over to the welcome menu. Levelshots here are vector stand-ins; in the game they are the bitmap exception.</p>
+  <div class="frameAR stage scene" style="padding:0"><svg id="ldSvg" viewBox="-107 0 854 480" role="img" aria-label="Loading screen"></svg></div>
+  <div id="ldLayoutCtl"></div>
+  <div class="hudctl">
+    <div class="segs" role="group" aria-label="Loading screen" id="ldKind"><span class="lbl">Screen</span><button class="seg" data-kind="sp" aria-pressed="true">Single player</button><button class="seg" data-kind="mp" aria-pressed="false">Multiplayer</button><button class="seg" data-kind="intro" aria-pressed="false">Intro</button></div>
+    <div class="segs" role="group" aria-label="Active device" id="ldDev"><span class="lbl">Device</span><button class="seg" data-dev="mouse" aria-pressed="true">Mouse</button><button class="seg" data-dev="pad" aria-pressed="false">Controller</button><button class="seg" data-dev="touch" aria-pressed="false">Touch</button></div>
+    <button class="pl act" id="ldReplay"><i class="mk"></i><span class="lb">Load again</span></button>
+  </div>
+  <div class="mpkey">
+    <div><b>Bands</b>The stock silhouettes: the top band thick over the leading half with its riser at 269–290 u, the bottom band thick over the trailing two thirds from 207 u, both black 0.80 with an additive #181D0A spill into the picture. Remastered lengthens only their straight spans to the view's edges and anchors them to the top and bottom.</div>
+    <div><b>Identity</b>The level name trails at the top in Marine over a gradient that darkens toward the trailing edge; Remastered adds the mission line beneath it and, when the map has them, the objectives in the objectives display's construction on the leading side.</div>
+    <div><b>Progress</b>The load_bar construction in #E06C00: track 0.30, fill 0.50, lower-leading cut. Remastered names the stage it is in and counts it, so a long step reads as work rather than a hang. LOADING pulses only once the level is ready and becomes the continue prompt.</div>
+    <div><b>Multiplayer</b>Stock raises the bottom band to 227 u for the server lines and a row of 24 u item icons. Remastered keeps the picture tall: the server card sits on the leading side, the arsenal fills in along the band as each item spawns, and the screen gives way to the welcome menu instead of a continue prompt.</div>
+  </div>
+  <p class="cap"><b>Timing</b> LOADING, then "- CLICK TO CONTINUE -" pulsing 100% → 50% over 500 ms and back over 200 ms, <b>load_screen_ready</b> on completion and <b>load_screen_click</b> on the click · Remastered tips change every 6 s with a 250 ms cross-fade; the levelshot drifts in by 3% over the load, and not at all under reduced motion · the multiplayer screen never waits for a click.</p>
+</section>
