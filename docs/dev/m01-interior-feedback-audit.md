@@ -339,9 +339,18 @@ stop, and the ramp turn spreads over about 0.7 s (peak 18-27 degrees per tenth
 of a second) where AAS turned it in one or two frames. The longer walks to the
 rope move gameplay handoff from 283.0 to 285.2 s.
 
-Not covered: Vulkan, save/load and skip in each phase of v4, and a viewer's
-judgement of the slowed seated loop; the scene's motion was judged from
-traces and one-second stills, not video.
+Follow-up checks on the committed v4 (`fc5bb1138`), same binaries:
+
+| Check | Result and evidence |
+| --- | --- |
+| Vulkan, whole scene | `final-vk/`: PASS; beat times identical to OpenGL, all five rappels on the mark, cleanup complete. Harnesses, plates and the hangar run match the OpenGL stills. |
+| Save/load in eight phases | `checkpoints/`: in-process autosave and reload at cabin, incoming, breach, rescue, evacuation, first weld, engine failure and descent; all eight fixtures retained, the scene reaches handoff. PASS. |
+| Save/load mid-hangar | `checkpoint-hangar/`: saved while the lane marines run; after the reload the scene keeps the same beat times (cabin 150.0, handoff 285.2) and every rappel lands on the mark. PASS. |
+| Skip in nine phases | `skip/<phase>/`, `skip-matrix.json`: each fixture loaded in a fresh process, then the engine's cinematic skip; 9/9 reach gameplay with helper and light counts zero. PASS. |
+
+Not covered: a viewer's judgement of the slowed seated loop and of the ramp
+curve; the scene's motion was judged from traces and one-second stills, not
+video.
 
 ## Other findings and limits
 
