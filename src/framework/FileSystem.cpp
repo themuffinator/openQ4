@@ -1733,6 +1733,8 @@ private:
 	bool					ValidateConfiguredGameDir( const char *gameDir, idStr *reason = NULL );
 	bool					NormalizeMapPath( const char *mapName, idStr &relativePath ) const;
 	bool					AddonPackProvidesMap( const pack_t *pak, const char *relativeMapPath ) const;
+	bool					PackHasFile( const pack_t *pak, const char *relativePath ) const;
+	bool					IsOpenQ4CorePackCopy( const pack_t *pak ) const;
 	void					FreePack( pack_t *pack ) const;
 	void					StageStartupAddonPaks( void );
 
@@ -5427,6 +5429,17 @@ void idFileSystemLocal::AddGameDirectory( const char *path, const char *dir ) {
 		if ( !pak ) {
 			continue;
 		}
+		// openQ4's own packs belong only in baseoq4. A copy of its core pack in
+		// any other folder, usually a mod's, outranks the current one and hides
+		// every newer menu, string and shader behind the copy's old ones (#219),
+		// so it is skipped.
+		if ( idStr::Icmp( dir, OPENQ4_GAMEDIR ) && FS_ParseNumberedPakName( pakfiles[ i ].c_str(), numberedPak ) &&
+			 numberedPak.digitCount == 1 && IsOpenQ4CorePackCopy( pak ) ) {
+			common->Warning( "Ignoring %s: it is a copy of openQ4's own content pack, which belongs only in the %s folder. It can be deleted.",
+				pakfile.c_str(), OPENQ4_GAMEDIR );
+			FreePack( pak );
+			continue;
+		}
 		// insert the pak after the directory it comes from
 		search = new searchpath_t;
 		search->dir = NULL;
@@ -5553,11 +5566,8 @@ bool idFileSystemLocal::AddonPackProvidesMap( const pack_t *pak, const char *rel
 		return false;
 	}
 
-	const int hash = HashFileName( relativeMapPath );
-	for ( const fileInPack_t *pakFile = pak->hashTable[ hash ]; pakFile; pakFile = pakFile->next ) {
-		if ( !FilenameCompare( pakFile->name, relativeMapPath ) ) {
-			return true;
-		}
+	if ( PackHasFile( pak, relativeMapPath ) ) {
+		return true;
 	}
 
 	if ( !pak->addon_info ) {
@@ -5577,6 +5587,39 @@ bool idFileSystemLocal::AddonPackProvidesMap( const pack_t *pak, const char *rel
 	}
 
 	return false;
+}
+
+/*
+================
+idFileSystemLocal::PackHasFile
+================
+*/
+bool idFileSystemLocal::PackHasFile( const pack_t *pak, const char *relativePath ) const {
+	if ( !pak || !relativePath || !relativePath[0] ) {
+		return false;
+	}
+
+	const int hash = HashFileName( relativePath );
+	for ( const fileInPack_t *pakFile = pak->hashTable[ hash ]; pakFile; pakFile = pakFile->next ) {
+		if ( !FilenameCompare( pakFile->name, relativePath ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+================
+idFileSystemLocal::IsOpenQ4CorePackCopy
+
+True for a copy of openQ4's own core pack (pak0.pk4 in baseoq4) from any
+release. Every one carries openQ4's defaults config at its root and openQ4's
+English string table; a mod that overrides one of them has no reason to carry
+both.
+================
+*/
+bool idFileSystemLocal::IsOpenQ4CorePackCopy( const pack_t *pak ) const {
+	return PackHasFile( pak, "openq4_defaults.cfg" ) && PackHasFile( pak, "strings/english_openq4.lang" );
 }
 
 /*

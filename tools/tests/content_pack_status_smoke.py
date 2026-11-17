@@ -6,6 +6,11 @@ stop at startup with a report in the player's language that names the pack,
 says what it holds and where to get it. The core pack, pak0, carries the
 string tables, so a problem with it is reported at once in English.
 
+A copy of the core pack in a mod's folder (#219: a player copied an older
+pak0.pk4 next to a texture pack) must be skipped with a warning rather than
+outrank the current one, while the mod's own packs, including one that only
+overrides openQ4's defaults config, still mount.
+
 Each case runs the staged client from a fixed, reusable runtime (default
 .tmp/runtime/pack-diagnostics) refreshed from the staged package by hard link.
 The client shows its fatal report in a console window and waits for the
@@ -79,19 +84,47 @@ def stage(package: Path, runtime: Path, drop: str | None, stale: str | None, lef
             archive.writestr("strings/english_zz_leftover.lang", '{\n\t"#str_231700"\t"LEFTOVER PACK WAS MOUNTED"\n}\n')
 
 
+MOD_DIR = "pakcopyprobe"
+
+
+def stage_mod(home: Path, runtime: Path) -> None:
+    """A mod folder holding an old copy of openQ4's core pack and a pack of its own."""
+    mod = home / MOD_DIR
+    mod.mkdir(parents=True)
+    runtime_manifest = json.loads((runtime / "baseoq4" / "mod.json").read_text(encoding="utf-8"))
+    manifest = {
+        "name": "Pack copy probe", "version": "1.0", "releaseDate": "2026-11-17",
+        "website": "https://github.com/themuffinator/openQ4", "author": "openQ4 tests",
+        "requiredopenQ4Version": runtime_manifest["requiredopenQ4Version"],
+    }
+    (mod / "mod.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    with zipfile.ZipFile(mod / "pak0.pk4", "w") as archive:
+        # The two files every openQ4 core pack carries, as an older release had them.
+        archive.writestr("openq4_defaults.cfg", "// openQ4 defaults from an older release\n")
+        archive.writestr("strings/english_openq4.lang", '{\n\t"#str_231700"\t"STALE CORE COPY WAS MOUNTED"\n}\n')
+    with zipfile.ZipFile(mod / "pak1.pk4", "w") as archive:
+        # A mod may override openQ4's defaults config on its own; that alone is not a copy.
+        archive.writestr("openq4_defaults.cfg", "// the mod's own defaults\n")
+
+
 def run_case(args, label: str, language: str, drop: str | None, stale: str | None,
-             leftover: str | None = None, quit_after_start: bool = False) -> dict:
+             leftover: str | None = None, quit_after_start: bool = False, mod: bool = False) -> dict:
     runtime = args.runtime.resolve()
     stage(args.runtime_dir.resolve(), runtime, drop, stale, leftover)
     home = args.output_dir.resolve() / label
     log = home / "baseoq4" / "logs" / "openq4.log"
     home.mkdir(parents=True)
+    if mod:
+        stage_mod(home, runtime)
+        log = home / MOD_DIR / "logs" / "openq4.log"
     cvars = {
         "fs_basepath": str(args.basepath.resolve()), "fs_savepath": str(home), "fs_devpath": str(home),
         "sys_lang": language, "logFile": "2", "logFileName": "logs/openq4.log", "s_noSound": "1",
         "r_hiddenWindow": "1", "r_fullscreen": "0", "r_mode": "-1", "r_customWidth": "640", "r_customHeight": "360",
         "in_mouse": "0", "in_joystick": "0", "win_allowMultipleInstances" if os.name == "nt" else "sys_allowMultipleInstances": "1",
     }
+    if mod:
+        cvars["fs_game"] = MOD_DIR
     command = [str(runtime / f"openQ4-client_x64{SUFFIX}")] + [p for k, v in cvars.items() for p in ("+set", k, v)]
     if quit_after_start:
         command += ["+echo", "PACK_STATUS_STARTED", "+quit"]
@@ -114,7 +147,8 @@ def run_case(args, label: str, language: str, drop: str | None, stale: str | Non
     fatal = text[text.find(FATAL_MARKER) + 1:] if FATAL_MARKER in text else ""
     return {"label": label, "language": language, "dropped": drop, "stale": stale, "leftover": leftover,
             "fatal": fatal[:4000], "started": "PACK_STATUS_STARTED" in text,
-            "pack_lines": [line for line in text.splitlines() if ".pk4" in line and "baseoq4" in line][:20]}
+            "pack_lines": [line for line in text.splitlines()
+                           if ".pk4" in line and ("baseoq4" in line or MOD_DIR in line)][:20]}
 
 
 def main() -> int:
@@ -135,13 +169,14 @@ def main() -> int:
         run_case(args, "french-stale-light-grids", "french", None, "pak1.pk4"),
         run_case(args, "english-missing-core", "english", "pak0.pk4", None),
         run_case(args, "english-leftover-overlay", "english", None, None, leftover="pak7.pk4", quit_after_start=True),
+        run_case(args, "english-core-copy-in-mod", "english", None, None, quit_after_start=True, mod=True),
     ]
 
     def expect(case: dict, needle: str, what: str) -> None:
         if needle not in case["fatal"]:
             failures.append(f"{case['label']}: missing {what}: {needle!r}")
 
-    german, french, core, leftover = cases
+    german, french, core, leftover, core_copy = cases
     expect(german, lang_value("german", "#str_231700"), "German headline")
     expect(german, lang_value("german", "#str_231704") % ("pak2.pk4", lang_value("german", loadscreens.contents_string), "baseoq4"),
            "German missing-pack line")
@@ -157,7 +192,20 @@ def main() -> int:
         failures.append("english-leftover-overlay: the leftover pak7.pk4 was not reported as ignored")
     if any("Loaded pk4" in line and "pak7.pk4" in line for line in leftover["pack_lines"]):
         failures.append("english-leftover-overlay: the leftover pak7.pk4 was mounted")
-    report = {"status": "fail" if failures else "pass", "cases": cases, "failures": failures}
+    copy_label = "english-core-copy-in-mod"
+
+    def mod_pack(name: str) -> tuple[str, str]:
+        return (f"{MOD_DIR}/{name}", f"{MOD_DIR}\\{name}")
+    if core_copy["fatal"] or not core_copy["started"]:
+        failures.append(f"{copy_label}: a core-pack copy in a mod folder must not stop startup: {core_copy['fatal'][:300]}")
+    if not any("Ignoring" in line and any(p in line for p in mod_pack("pak0.pk4")) and "copy of openQ4's own content pack" in line
+               for line in core_copy["pack_lines"]):
+        failures.append(f"{copy_label}: the copy {MOD_DIR}/pak0.pk4 was not reported as ignored")
+    if any("Loaded pk4" in line and any(p in line for p in mod_pack("pak0.pk4")) for line in core_copy["pack_lines"]):
+        failures.append(f"{copy_label}: the copy {MOD_DIR}/pak0.pk4 was mounted")
+    if not any("Loaded pk4" in line and any(p in line for p in mod_pack("pak1.pk4")) for line in core_copy["pack_lines"]):
+        failures.append(f"{copy_label}: the mod's own {MOD_DIR}/pak1.pk4 was not mounted")
+    report ={"status": "fail" if failures else "pass", "cases": cases, "failures": failures}
     (args.output_dir.resolve() / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"status": report["status"], "failures": failures}, indent=2))
     return int(bool(failures))

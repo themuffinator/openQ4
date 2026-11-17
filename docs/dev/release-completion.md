@@ -7,6 +7,29 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A copy of openQ4's own pack in a mod's folder no longer hides the new menus (#219), 17 November 2026
+
+- **Menus stay current when openQ4's pack was copied into a mod's folder.** A
+  copy of openQ4's `pak0.pk4` from an older build sitting in a mod's folder,
+  next to a texture pack for example, used to take priority over the installed
+  one. Its old menus, text and shaders then hid every newer one, and new pages
+  showed raw `#str_` codes (#219). openQ4 now skips such a copy at startup,
+  says so in the log, and uses its own pack from `baseoq4/`.
+- **Worth a tidy-up.** The copy can be deleted: openQ4's packs belong only in
+  `baseoq4/`. Copies of `pak1.pk4` or `pak2.pk4` (light grids and loading
+  screens) are not detected, since mods can carry those for their own maps, so
+  delete those too if you copied them.
+- How it works: in any folder other than `baseoq4`, a `pak0.pk4`-`pak9.pk4`
+  that carries both `openq4_defaults.cfg` at its root and
+  `strings/english_openq4.lang`, as every openQ4 core pack has, is not
+  mounted. A mod pack carrying only one of the two still mounts.
+- Evidence: `content_pack_status_smoke` gains a case that starts the client
+  with a mod whose folder holds an old core-pack copy as `pak0.pk4` and a
+  `pak1.pk4` carrying only `openq4_defaults.cfg`. Against this build the copy
+  is reported as ignored and not mounted, the mod's own pack mounts and startup
+  completes; the 0.14.1-based build staged before the change mounts the copy
+  and fails the case. The four existing cases still pass.
+
 ## Choose PNG screenshots in the Settings menu (#223), 17 November 2026
 
 - **Save screenshots as PNG from the menu.** **Settings > Game Options >

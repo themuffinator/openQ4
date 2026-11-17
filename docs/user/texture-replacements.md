@@ -177,8 +177,11 @@ no DDS replacement for 'textures/stone/wall01':
   `image_usePrecompressedTextures` is `0`, or the pack has no DDS files.
   Uncompressed textures need four or more times the memory. See
   [when textures don't fit](display-settings.md#when-textures-dont-fit-in-video-memory).
-- If menus show raw `#str_` codes while the pack is loaded, the pack carries a
-  copy of one of openQ4's own string tables (`strings/*_openq4.lang`) from an
-  older build. Remove it: a texture pack doesn't need openQ4's files. Releases
-  after 0.14.1 read such a copy on top of openQ4's own table, so newer text
-  still shows, but the pack's old wording still wins where it has a string.
+- If menus show raw `#str_` codes while the pack is loaded, the mod's folder
+  holds a copy of openQ4's own files from an older build. The usual culprit is
+  openQ4's `pak0.pk4`, `pak1.pk4` or `pak2.pk4` copied in next to the pack;
+  less often, one of the pack's own PK4s carries a `strings/*_openq4.lang`
+  file. Delete those copies. openQ4's packs belong only in `baseoq4/`, and a
+  texture pack doesn't need any of openQ4's files. Releases after 0.14.1 skip
+  a copy of openQ4's `pak0.pk4` found in a mod's folder and read a mod's
+  `*_openq4.lang` on top of openQ4's own table, so newer text still shows.
