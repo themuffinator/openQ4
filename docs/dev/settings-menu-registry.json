@@ -535,6 +535,29 @@
       "accessibility": "Focusable bindDef row that captures the next key or button for this command."
     },
     {
+      "id": "controls.weapons.weap-lastweapon",
+      "pane": "Controls",
+      "section": "Weapons",
+      "path": "Settings > Controls > Weapons > Last Weapon",
+      "source": "controls",
+      "container": "p_set_ctrls_weap",
+      "widgets": [
+        "set_ctrls_weap_lastweapon_key",
+        "set_ctrls_weap_lastweapon"
+      ],
+      "widget_type": "bind",
+      "label_key": "#str_232541",
+      "target_type": "bind",
+      "target": "_impulse51",
+      "default": "g;JOY2",
+      "default_keys": [
+        "g",
+        "JOY2"
+      ],
+      "restart_required": false,
+      "accessibility": "Focusable bindDef row that captures the next key or button for this command."
+    },
+    {
       "id": "controls.attack_look.attk-attack",
       "pane": "Controls",
       "section": "Attack/Look",
@@ -851,8 +874,10 @@
       "label_key": "#str_42222",
       "target_type": "bind",
       "target": "_hook",
-      "default": "unbound",
-      "default_keys": [],
+      "default": "MOUSE4",
+      "default_keys": [
+        "MOUSE4"
+      ],
       "restart_required": false,
       "accessibility": "Focusable bindDef row that captures the next key or button for this command."
     },
@@ -2260,10 +2285,10 @@
       ],
       "widget_type": "choice",
       "label_key": "#str_200135",
-      "choices_key": "#str_200059",
+      "choices_key": "#str_232540",
       "target_type": "cvar",
       "target": "ui_autoSwitch",
-      "default": "1",
+      "default": "2",
       "restart_required": false,
       "accessibility": "Standard focusable choiceDef row."
     },

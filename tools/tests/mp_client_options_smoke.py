@@ -194,11 +194,23 @@ def main() -> int:
             # live with a restart that respawns everyone. Weapons are given after it.
             if stage == 10 and done(host, "OPT_DONE_HOST_0") and "MP match phase: 2 -> 3" in host:
                 if stage == 10:
-                    dispatch("host", ["waitMsec 2500",
-                                      'set ui_weaponOrder "rg rl"', "waitMsec 1000",
-                                      "give weapon_rocketlauncher", "waitMsec 2000", "echo OPT_AFTER_RL", report,
+                    # Smart switching (ui_autoSwitch 2, the default) first: every weapon
+                    # given is new, so weapons-stay never refuses one. _impulseN is the
+                    # engine's own impulse command, not input. Both settings are archived,
+                    # so a reused savepath still holds the last run's values: set them.
+                    dispatch("host", ["waitMsec 2500", "set ui_autoSwitch 2", 'set ui_weaponOrder ""', "waitMsec 1000",
+                                      "echo OPT_SMART_SPAWN", report,
+                                      "give weapon_shotgun", "waitMsec 2000", "echo OPT_SMART_SG", report,
+                                      "give weapon_rocketlauncher", "waitMsec 2000", "echo OPT_SMART_RL", report,
+                                      "_impulse0", "waitMsec 2000", "echo OPT_SMART_GAUNTLET", report,
+                                      "give weapon_hyperblaster", "waitMsec 2000", "echo OPT_SMART_HB", report,
+                                      "_impulse51", "waitMsec 2000", "echo OPT_LAST_WEAPON", report,
+                                      "set ui_autoSwitch 0", "waitMsec 1000",
+                                      "give weapon_nailgun", "waitMsec 2000", "echo OPT_OFF_NG", report,
+                                      "set ui_autoSwitch 1", 'set ui_weaponOrder "rg gl"', "waitMsec 1000",
+                                      "give weapon_grenadelauncher", "waitMsec 2000", "echo OPT_AFTER_GL", report,
                                       "give weapon_railgun", "waitMsec 2000", "echo OPT_AFTER_RG", report,
-                                      "give weapon_shotgun", "waitMsec 2000", "echo OPT_AFTER_SG", report,
+                                      "give weapon_lightninggun", "waitMsec 2000", "echo OPT_AFTER_LG", report,
                                       "say status #h #a #w at #l with #n", 'say "quoted ##h #h"', "listLocations"],
                              "OPT_DONE_HOST_1")
                     stage = 1
@@ -282,9 +294,16 @@ def main() -> int:
     if stage == 9 and not any(codes.values()) and "client joined Marine team" not in plain(host):
         failures.append("the client never joined the host's match")
     elif stage == 9 and not any(codes.values()):
-        # weapon preference order: "rg rl" with the machine gun in hand
-        for marker, expected in (("OPT_AFTER_RL", "weapon_rocketlauncher"), ("OPT_AFTER_RG", "weapon_railgun"),
-                                 ("OPT_AFTER_SG", "weapon_railgun")):
+        # smart switching: the machine gun and the gauntlet give way, a real weapon stays
+        for marker, expected in (("OPT_SMART_SPAWN", "weapon_machinegun"), ("OPT_SMART_SG", "weapon_shotgun"),
+                                 ("OPT_SMART_RL", "weapon_shotgun"), ("OPT_SMART_GAUNTLET", "weapon_gauntlet"),
+                                 ("OPT_SMART_HB", "weapon_hyperblaster"), ("OPT_LAST_WEAPON", "weapon_gauntlet"),
+                                 ("OPT_OFF_NG", "weapon_gauntlet")):
+            weapon = fact(after(host, marker), "weapon") or {}
+            check(f"smart switch {marker}", weapon.get("def", "").startswith(expected) and weapon.get("order_listed") == "0", weapon)
+        # weapon preference order: "rg gl" with the gauntlet in hand, under ui_autoSwitch 1
+        for marker, expected in (("OPT_AFTER_GL", "weapon_grenadelauncher"), ("OPT_AFTER_RG", "weapon_railgun"),
+                                 ("OPT_AFTER_LG", "weapon_railgun")):
             weapon = fact(after(host, marker), "weapon") or {}
             check(f"weapon order {marker}", weapon.get("def", "").startswith(expected) and weapon.get("order_listed") == "2", weapon)
 
@@ -298,7 +317,7 @@ def main() -> int:
               team.group(0) if team else None)
 
         # landmarks
-        place = fact(after(host, "OPT_AFTER_RL"), "location") or {}
+        place = fact(after(host, "OPT_AFTER_GL"), "location") or {}
         check("landmark place names", int(place.get("landmarks", "0")) > 0 and place.get("name", "") != "", place)
 
         # team info over the wire, and the HUD state

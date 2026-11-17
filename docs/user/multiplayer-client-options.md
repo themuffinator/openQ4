@@ -73,7 +73,10 @@ seta ui_weaponOrder "rg rl lg hb ng gl sg mg"
 
 - **Picking up a weapon** switches to it only when you rank it above the one in
   your hands. A weapon you did not list is never switched to. This needs
-  `ui_autoSwitch 1`, the default.
+  `ui_autoSwitch` on. With `ui_autoSwitch 2` (Smart, the default) the pickup
+  must also be one Smart allows: it takes over only from the gauntlet, the
+  machinegun or an empty weapon. Set `ui_autoSwitch 1` to let your order alone
+  decide. See [Weapon switching](gameplay-settings.md#weapon-switching).
 - **Running out of ammunition** switches to the best ranked weapon you carry
   that still has some. When none of your listed weapons qualifies, Quake 4
   picks as it always has.
@@ -83,7 +86,7 @@ its slot number or one of these: `rg` railgun, `rl` rocket launcher, `lg`
 lightning gun, `gl` grenade launcher, `hb` hyperblaster, `ng` nailgun, `nap`
 napalm gun, `sg` shotgun, `mg` machine gun, `bfg` dark matter gun, `g`
 gauntlet, `bl` blaster. Separate them with spaces or commas. Leave the setting
-empty for Quake 4's behaviour, where every pickup switches.
+empty to leave the choice to `ui_autoSwitch` alone.
 
 The server makes both choices, so the order works on any openQ4 server from
 this version on. Buying always switches to what you bought.

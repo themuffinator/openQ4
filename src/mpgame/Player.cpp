@@ -1332,21 +1332,16 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
 
  			if ( !gameLocal.world->spawnArgs.GetBool( "no_Weapons" ) || ( weaponName == "weapon_fists" ) ) {
  				if ( ( weapons & ( 1 << i ) ) == 0 || gameLocal.isMultiplayer ) {
-					if ( ( owner->GetUserInfo()->GetBool( "ui_autoSwitch" ) 
-						|| ( gameLocal.isMultiplayer && gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) )
-						&& idealWeapon && !checkOnly )
+					// openQ4: ui_autoSwitch (Smart by default) and ui_weaponOrder decide
+					// whether a pickup takes over the weapon in hand. Buying always switches.
+					if ( idealWeapon && !checkOnly &&
+						 ( ( gameLocal.isMultiplayer && gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) ||
+						   owner->AutoSwitchOnPickup( *idealWeapon, i ) ) )
 					{
 						// client prediction should not get here
 						assert( !gameLocal.isClient );
-						// openQ4 (MP-15): a player who set ui_weaponOrder switches only to a
-						// weapon they rank above the one in hand. Buying always switches.
-						const mpWeaponOrder_t &order = owner->GetWeaponOrder();
-						if ( !gameLocal.isMultiplayer || !MPWeaponOrderActive( order ) ||
-							 gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ||
-							 MPWeaponOrderSwitchOnPickup( order, *idealWeapon, i ) ) {
- 							*idealWeapon = i;
-						}
- 					} 
+ 						*idealWeapon = i;
+ 					}
  					if ( owner->hud && updateHud && lastGiveTime + 1000 < gameLocal.time && !checkOnly ) {
  						owner->hud->SetStateInt( "newWeapon", i );
  						owner->hud->HandleNamedEvent( "newWeapon" );
@@ -7111,6 +7106,56 @@ const mpWeaponOrder_t &idPlayer::GetWeaponOrder( void ) {
 		weaponOrderParsed = true;
 	}
 	return weaponOrder;
+}
+
+/*
+===============
+idPlayer::SmartSwitchRole
+
+openQ4: how smart switching treats the weapon in a slot (mp/WeaponOrder.h).
+===============
+*/
+int idPlayer::SmartSwitchRole( int slot ) {
+	const char *weap = ( slot >= 0 && slot < MAX_WEAPONS ) ? spawnArgs.GetString( va( "def_weapon%d", slot ) ) : "";
+	if ( !weap[ 0 ] ) {
+		return MP_SWITCH_ROLE_ARMED;
+	}
+	int ammoRequired = 0;
+	const int ammoIndex = inventory.AmmoIndexForWeaponClass( weap, &ammoRequired );
+	return MPSmartSwitchRole( weap, ammoIndex != 0 && ammoRequired != 0 );
+}
+
+/*
+===============
+idPlayer::AutoSwitchOnPickup
+
+openQ4: whether picking up the weapon in slot picked takes the player off held,
+the weapon in hand or being raised. ui_autoSwitch 0 never switches and 1 always
+does, as Quake 4's switch did; 2, Smart and openQ4's default, lets a pickup take
+over only from the gauntlet, the machinegun or an empty weapon. A ui_weaponOrder
+then lets the switch through only upward in the player's order (MP-15).
+===============
+*/
+bool idPlayer::AutoSwitchOnPickup( int held, int picked ) {
+	const idDict *userInfo = GetUserInfo();
+	const int mode = userInfo ? userInfo->GetInt( "ui_autoSwitch" ) : MP_AUTO_SWITCH_NEVER;
+	if ( mode <= MP_AUTO_SWITCH_NEVER ) {
+		return false;
+	}
+	if ( !gameLocal.isMultiplayer ) {
+		return true;
+	}
+	if ( mode >= MP_AUTO_SWITCH_SMART ) {
+		const bool heldOwned = held >= 0 && held < MAX_WEAPONS && ( inventory.weapons & ( 1 << held ) ) != 0;
+		const char *heldWeapon = heldOwned ? spawnArgs.GetString( va( "def_weapon%d", held ) ) : "";
+		const bool heldUsable = heldWeapon[ 0 ] != '\0' && inventory.HasAmmo( heldWeapon ) != 0;
+		if ( !MPSmartSwitchAllows( heldUsable, heldUsable ? SmartSwitchRole( held ) : MP_SWITCH_ROLE_ARMED,
+								   SmartSwitchRole( picked ) ) ) {
+			return false;
+		}
+	}
+	const mpWeaponOrder_t &order = GetWeaponOrder();
+	return !MPWeaponOrderActive( order ) || MPWeaponOrderSwitchOnPickup( order, held, picked );
 }
 
 /*

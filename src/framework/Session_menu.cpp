@@ -375,7 +375,7 @@ static const char *const RETAINED_CONTROLS_GUI = "guis/menu/settings/controls.ru
 static const char *const RETAINED_CONTROLS_BINDINGS[] = {
 	"_forward", "_back", "_moveleft", "_moveright", "_moveUp", "_moveDown", "_left", "_right", "_strafe", "_speed", "_impulse0",
 	"_impulse1", "_impulse2", "_impulse3", "_impulse4", "_impulse5", "_impulse6", "_impulse7", "_impulse8", "_impulse9",
-	"_impulse10", "buymenu", "_quickChat", "_attack", "_impulse15", "_impulse14", "_impulse13", "_lookUp", "_lookDown", "_mlook",
+	"_impulse10", "buymenu", "_quickChat", "_impulse51", "_attack", "_impulse15", "_impulse14", "_impulse13", "_lookUp", "_lookDown", "_mlook",
 	"centerview", "_zoom", "_impulse19", "_impulse50", "screenshot", "_weaponWheel", "_hook", "savegame quick", "loadgame quick",
 	"clientMessageMode", "clientMessageMode 1", "_impulse28", "_impulse29", "_ingamestats", "_impulse17", "emote salute",
 	"emote cheer", "emote taunt", "emote grab_a", "_voicechat"

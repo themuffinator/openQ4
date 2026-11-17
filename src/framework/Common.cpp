@@ -186,6 +186,7 @@ idCVar com_product_lang_ext( "com_product_lang_ext", "1", CVAR_INTEGER | CVAR_SY
 idCVar r_skipGlowOverlay( "r_skipGlowOverlay", "0", CVAR_ARCHIVE | CVAR_RENDERER, "skip glow overlays when non-zero" );
 static idCVar r_borderlessDefaultMigrated( "r_borderlessDefaultMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for legacy bordered window defaults" );
 static idCVar net_rateDefaultMigrated( "net_rateDefaultMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the legacy 25600 B/s network rate caps" );
+static idCVar ui_autoSwitchDefaultMigrated( "ui_autoSwitchDefaultMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the smart weapon switch default" );
 static idCVar vr_weaponOffsetDefaultMigrated( "vr_weaponOffsetDefaultMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the VR weapon offsets that held weapons replaced" );
 static idCVar s_audioDefaultsMigrated( "s_audioDefaultsMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "number of one-time audio default migrations already applied" );
 
@@ -313,6 +314,28 @@ static void Common_MigrateLegacyVRWeaponOffsets( void ) {
 		cvarSystem->SetCVarFloat( "vr_weaponOffsetZ", 0.0f, CVAR_ARCHIVE );
 	}
 	vr_weaponOffsetDefaultMigrated.SetBool( true );
+}
+
+/*
+==================
+Common_MigrateLegacyAutoSwitchDefault
+
+ui_autoSwitch was Quake 4's on/off switch and every profile archived its
+default, 1, which now means "always switch". Smart switching (2) is the new
+default, so the exact old default moves to it, once. 0 was a deliberate choice
+and is left alone; so is anything set after this runs.
+==================
+*/
+static void Common_MigrateLegacyAutoSwitchDefault( void ) {
+	if ( ui_autoSwitchDefaultMigrated.GetBool() ) {
+		return;
+	}
+	const char *autoSwitch = cvarSystem->GetCVarString( "ui_autoSwitch" );
+	if ( autoSwitch != NULL && idStr::Cmp( autoSwitch, "1" ) == 0 ) {
+		common->Printf( "Migrating legacy weapon switch config: ui_autoSwitch 1 -> 2 (smart)\n" );
+		cvarSystem->SetCVarInteger( "ui_autoSwitch", 2, CVAR_ARCHIVE );
+	}
+	ui_autoSwitchDefaultMigrated.SetBool( true );
 }
 
 /*
@@ -8088,6 +8111,7 @@ void idCommonLocal::InitGame( void ) {
 	Common_MigrateLegacyBorderlessWindowDefault();
 	Common_MigrateLegacyNetworkRateCaps();
 	Common_MigrateLegacyVRWeaponOffsets();
+	Common_MigrateLegacyAutoSwitchDefault();
 	Common_MigrateLegacyAudioDefaults();
 
 	// cvars are initialized, but not the rendering system. Allow preference startup dialog

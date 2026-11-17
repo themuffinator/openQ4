@@ -121,11 +121,31 @@ def check_weapon_order() -> None:
     player = read("src/mpgame/Player.cpp")
     give = player[player.index("bool idInventory::Give("):]
     give = give[:give.index("\n}\n")]
-    require("MPWeaponOrderSwitchOnPickup( order, *idealWeapon, i )" in give and "!MPWeaponOrderActive( order )" in give,
-            "a pickup switches only upward in the player's order, and as Quake 4 does without one")
-    require("IsBuyingAllowedInTheCurrentGameMode()" in give[give.index("owner->GetWeaponOrder()"):
-                                                             give.index("MPWeaponOrderSwitchOnPickup")],
+    switch = give.index("owner->AutoSwitchOnPickup( *idealWeapon, i )")
+    require("IsBuyingAllowedInTheCurrentGameMode()" in give[give.rindex("if ( idealWeapon && !checkOnly", 0, switch):switch],
             "buying still switches to what was bought")
+    require('GetBool( "ui_autoSwitch" )' not in give, "ui_autoSwitch is read as its three modes, not as Quake 4's switch")
+    pickup = function_body(player, "bool idPlayer::AutoSwitchOnPickup( int held, int picked )")
+    smart = pickup.find("MPSmartSwitchAllows(")
+    ranked = pickup.find("MPWeaponOrderSwitchOnPickup( order, held, picked )")
+    require('GetInt( "ui_autoSwitch" )' in pickup and "mode <= MP_AUTO_SWITCH_NEVER" in pickup
+            and "mode >= MP_AUTO_SWITCH_SMART" in pickup[:smart] and 0 < smart < ranked
+            and "!MPWeaponOrderActive( order )" in pickup[smart:],
+            "smart switching decides first, then a pickup switches only upward in the player's order, "
+            "and as Quake 4 does without one")
+    require("inventory.HasAmmo( heldWeapon ) != 0" in pickup[:smart], "an empty weapon in hand gives way to a pickup")
+    role = function_body(player, "int idPlayer::SmartSwitchRole( int slot )")
+    require("AmmoIndexForWeaponClass( weap, &ammoRequired )" in role and "MPSmartSwitchRole(" in role,
+            "a weapon that needs no ammunition is one smart switching leaves for anything")
+    for module in ("src/game/gamesys/SysCvar.cpp", "src/mpgame/gamesys/SysCvar.cpp"):
+        line = re.search(r'^idCVar ui_autoSwitch\(.*$', read(module), re.M).group(0)
+        require('"2"' in line and "CVAR_INTEGER" in line and "CVAR_USERINFO" in line and ", 0, 2," in line,
+                f"{module}: ui_autoSwitch ships as Smart (2) in the user info, from 0 to 2")
+    common = read("src/framework/Common.cpp")
+    migrate = function_body(common, "static void Common_MigrateLegacyAutoSwitchDefault( void )")
+    require('idStr::Cmp( autoSwitch, "1" ) == 0' in migrate and 'SetCVarInteger( "ui_autoSwitch", 2, CVAR_ARCHIVE )' in migrate
+            and "ui_autoSwitchDefaultMigrated.SetBool( true )" in migrate,
+            "a profile on Quake 4's old default moves to Smart once; 0 is left alone")
     best = function_body(player, "void idPlayer::NextBestWeapon( void )")
     ranked = best.find("MPWeaponOrderBest( order, usable )")
     stock = best.find("while ( w > 0 )")

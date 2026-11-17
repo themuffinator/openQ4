@@ -39,7 +39,7 @@ def verb_choice(ident: str, label: str, verb: str, key: str, count: int, enabled
 SECTIONS = (
     ("general", "#str_231542", (
         toggle("game_autoreload", "#str_200134", "ui_autoReload"),
-        toggle("game_autoswitch", "#str_200135", "ui_autoSwitch"),
+        choice("game_autoswitch", "#str_200135", "ui_autoSwitch", "#str_232540", (0, 1, 2)),
         toggle("game_decals", "#str_200136", "g_decals"),
         toggle("game_showgun", "#str_200138", "ui_showGun"),
         verb_choice("game_gunposition", "#str_223007", "gameGunPosition", "#str_223008", 3),

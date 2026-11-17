@@ -7,6 +7,34 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Smart weapon switching, a Last Weapon key and Quake Live-style defaults, 17 November 2026
+
+- **Pickups no longer pull your weapon away mid-fight.** Auto Weapon Switch
+  (`ui_autoSwitch`) gains a third choice, **Smart**, and it is the new default.
+  In multiplayer a pickup takes over only from the gauntlet, the machinegun you
+  spawn with, a weapon that needs no ammunition (the Classic ruleset's blaster)
+  or a weapon that has run dry. With the railgun up, running over a shotgun
+  keeps the railgun. In single player you still switch to each weapon the first
+  time you get it. **Always** is Quake 4's old behaviour and **Off** never
+  switches. A [weapon preference order](../user/multiplayer-client-options.md#weapon-preference-order)
+  still has to agree before a switch, and buying still switches. The
+  [gameplay guide](../user/gameplay-settings.md#weapon-switching) explains it.
+- **Last Weapon.** A new key switches back to the weapon you held before, on
+  `G` by default and on the controller's right bumper as before. The bumper used
+  to do nothing in single player; it now works in both modes. Find it under
+  **Settings → Controls → Weapons → Last Weapon**.
+- **Defaults checked against Quake Live.** Quake Live keeps each number key on
+  its own weapon slot and the wheel on next and previous weapon, which openQ4
+  already does, so the number keys keep Quake 4's slot order. From Quake Live's
+  layout openQ4 takes the weapon toggle (here `G`, because `F` is the
+  flashlight) and puts the grappling hook on `Mouse4`.
+- **What to do.** Nothing for the switch: a profile still on Quake 4's default
+  (`ui_autoSwitch 1`) moves to Smart once, and `0` stays off. The new keys reach
+  new profiles and a reset of the controls to their defaults; an existing profile keeps its own
+  bindings, so bind Last Weapon and the hook yourself if you want them. Replace
+  the client, both game modules and pak0 together. Servers decide the switch
+  from each player's setting, so on an older server Smart behaves as Always.
+
 ## Multiplayer: the rest of the 17 November audit, 17 November 2026
 
 - **Bounce Shot and Burst Fire look right online.** Other players now see a

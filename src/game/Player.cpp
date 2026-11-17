@@ -6506,8 +6506,10 @@ void idPlayer::LastWeapon( void ) {
 	if ( !(inventory.weapons & ( 1 << previousWeapon ) ) ) {
 		return;
 	}
-	
-	idealWeapon = previousWeapon;
+
+	// openQ4: through SelectWeapon, which refuses while weapons are disabled, in a
+	// cinematic or when the last weapon is out of ammunition, as a weapon key does.
+	SelectWeapon( previousWeapon, false );
 }
 
 /*
@@ -10151,10 +10153,11 @@ void idPlayer::PerformImpulse( int impulse ) {
 			break;
 		}
 
-// 		case IMPULSE_51: {
-// 			LastWeapon();
-// 			break;
-// 		}
+		// openQ4: the last weapon (Quake Live's "weapon toggle"), as in multiplayer
+		case IMPULSE_51: {
+			LastWeapon();
+			break;
+		}
 // jmarshall end
 	} 
 

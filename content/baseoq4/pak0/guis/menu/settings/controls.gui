@@ -588,6 +588,20 @@
 						}
 
 					}
+					bindDef set_ctrls_weap_lastweapon_key
+					{
+						rect	452,431,149,17
+						visible	1
+						forecolor	1,0.745,0.137,0.8
+						bind	_impulse51
+						textscale	0.24
+						font	"fonts/lowpixel"
+
+						onAction {
+							set "cmd" "play main_menu_selection" ;
+						}
+
+					}
 					windowDef set_ctrls_weap_blastergaunt
 					{
 						rect	260,119,189,18
@@ -702,6 +716,15 @@
 						visible	1
 						forecolor	1,1,1,0.8
 						text	"#str_231269"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					windowDef set_ctrls_weap_lastweapon
+					{
+						rect	260,431,189,17
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_232541"
 						textscale	0.24
 						font	"fonts/lowpixel"
 					}

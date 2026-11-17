@@ -114,6 +114,7 @@ The numbered `set_b_controls_move_1..13` windows are row hover/action surfaces f
 | Napalm Launcher | `set_ctrls_weap_napalmlauncher_key` | `_impulse10` |
 | Buy Menu | `set_ctrls_weap_buymenu_key` | `buymenu` |
 | Quick Chat | `set_ctrls_weap_quickchat_key` | `_quickChat` |
+| Last Weapon | `set_ctrls_weap_lastweapon_key` | `_impulse51` (switch back to the previous weapon) |
 
 ### Attack/Look
 
@@ -162,7 +163,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 |---|---|---|---|---|---|
 | Free Look | `choiceDef` | `set_game_freelook_value` | `in_freeLook` | `No;Yes` | Boolean picker. |
 | Auto Reload | `choiceDef` | `set_game_autoreload_value` | `ui_autoReload` | `No;Yes` | Boolean picker. |
-| Auto Switch | `choiceDef` | `set_game_autoswitch_value` | `ui_autoSwitch` | `No;Yes` | Boolean picker. |
+| Auto Switch | `choiceDef` | `set_game_autoswitch_value` | `ui_autoSwitch` | `Off;Always;Smart` | 0 never, 1 always (Quake 4), 2 smart (default): see `docs/user/weapon-switching.md`. |
 | Toggle Zoom | `choiceDef` | `set_game_togglezoom_value` | `in_toggleZoom` | `No;Yes` | Boolean picker. |
 | Scope Sensitivity | `sliderDef` + `editDef` | `set_game_scopesensitivity_slider_bar`, `set_game_scopesensitivity_value` | `pm_zoomedSlow` | `1..100`, step `1` | Percent of normal mouse, gyro/touchpad mouse-look, and controller look speed while scoped. Fresh configs default to `50`. |
 | Show Decals | `choiceDef` | `set_game_showdecals_value` | `g_decals` | `No;Yes` | Boolean picker. |

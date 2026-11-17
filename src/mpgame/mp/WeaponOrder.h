@@ -5,7 +5,8 @@
 // would rather hold, best first, in ui_weaponOrder. The server then switches
 // on a pickup only to a weapon the player ranks above the one in hand, and
 // falls back to the best ranked weapon that still has ammunition when the
-// one in hand runs dry.
+// one in hand runs dry. Smart switching (ui_autoSwitch 2) decides first
+// whether a pickup may take over from the weapon in hand at all.
 //
 // This core owns no engine types, so tools/tests/native can compile it alone.
 //----------------------------------------------------------------
@@ -173,6 +174,73 @@ inline bool MPWeaponOrderSwitchOnPickup( const mpWeaponOrder_t &order, int curre
 		return false;
 	}
 	return pickedRank < MPWeaponOrderRank( order, current );
+}
+
+/*
+================
+Smart weapon switching
+
+ui_autoSwitch says what a weapon pickup does to the weapon in hand. Quake 4
+shipped it as a switch: 0 never changes weapon and 1 always does. openQ4 adds
+2, Smart, and makes it the default: a pickup takes over only from a weapon
+the player was merely holding until something better turned up (after
+Quake II rerelease's and WORR's smart switch):
+
+- an empty weapon, or no weapon at all, gives way to anything;
+- a weapon that needs no ammunition (the gauntlet, the Classic ruleset's
+  blaster) gives way to any weapon that does;
+- the machinegun, Quake 4's spawn weapon, gives way to any other weapon
+  that needs ammunition;
+- any other weapon stays in hand: picking up a rocket launcher in a railgun
+  duel no longer pulls the railgun away.
+
+A ui_weaponOrder still has the last word when a switch is allowed: the
+pickup must also rank above the weapon in hand (MPWeaponOrderSwitchOnPickup).
+================
+*/
+static const int MP_AUTO_SWITCH_NEVER = 0;
+static const int MP_AUTO_SWITCH_ALWAYS = 1;
+static const int MP_AUTO_SWITCH_SMART = 2;
+
+enum mpSwitchRole_t {
+	MP_SWITCH_ROLE_ARMED = 0,		// a weapon worth keeping
+	MP_SWITCH_ROLE_STARTER,			// the machinegun every player spawns with
+	MP_SWITCH_ROLE_UNARMED			// needs no ammunition: the gauntlet, a blaster
+};
+
+// definition is the weapon's entity definition ("weapon_machinegun_mp").
+inline int MPSmartSwitchRole( const char *definition, bool needsAmmo ) {
+	if ( !needsAmmo ) {
+		return MP_SWITCH_ROLE_UNARMED;
+	}
+	if ( definition == 0 ) {
+		return MP_SWITCH_ROLE_ARMED;
+	}
+	const char *name = definition;
+	int length = MPWeaponOrderLength( name );
+	if ( length > 7 && MPWeaponOrderSame( name, 7, "weapon_", 7 ) ) {
+		name += 7;
+		length -= 7;
+	}
+	if ( length > 3 && MPWeaponOrderSame( name + length - 3, 3, "_mp", 3 ) ) {
+		length -= 3;
+	}
+	return MPWeaponOrderSame( name, length, "machinegun", 10 ) ? MP_SWITCH_ROLE_STARTER : MP_SWITCH_ROLE_ARMED;
+}
+
+// heldUsable is false when the player holds no weapon or one that is out of
+// ammunition; heldRole is then ignored.
+inline bool MPSmartSwitchAllows( bool heldUsable, int heldRole, int pickedRole ) {
+	if ( pickedRole == MP_SWITCH_ROLE_UNARMED ) {
+		return !heldUsable;
+	}
+	if ( !heldUsable || heldRole == MP_SWITCH_ROLE_UNARMED ) {
+		return true;
+	}
+	if ( heldRole == MP_SWITCH_ROLE_STARTER ) {
+		return pickedRole == MP_SWITCH_ROLE_ARMED;
+	}
+	return false;
 }
 
 // The best ranked weapon among the usable ones (bit per slot: owned, with

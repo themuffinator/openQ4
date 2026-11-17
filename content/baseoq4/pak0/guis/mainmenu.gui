@@ -16445,6 +16445,7 @@ windowDef Desktop
 			set "set_ctrls_weap_napalmlauncher_key::noevents" "0" ;
 			set "set_ctrls_weap_buymenu_key::noevents" "0" ;
 			set "set_ctrls_weap_quickchat_key::noevents" "0" ;
+			set "set_ctrls_weap_lastweapon_key::noevents" "0" ;
 			set "set_ctrls_attk_attack_key::noevents" "0" ;
 			set "set_ctrls_attk_prevweap_key::noevents" "0" ;
 			set "set_ctrls_attk_nextweap_key::noevents" "0" ;
@@ -16510,6 +16511,7 @@ windowDef Desktop
 			set "set_ctrls_weap_napalmlauncher_key::noevents" "1" ;
 			set "set_ctrls_weap_buymenu_key::noevents" "1" ;
 			set "set_ctrls_weap_quickchat_key::noevents" "1" ;
+			set "set_ctrls_weap_lastweapon_key::noevents" "1" ;
 			set "set_ctrls_attk_attack_key::noevents" "1" ;
 			set "set_ctrls_attk_prevweap_key::noevents" "1" ;
 			set "set_ctrls_attk_nextweap_key::noevents" "1" ;

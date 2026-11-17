@@ -77,9 +77,11 @@ The mouse controls are on **Settings → Controls → Mouse**, which starts with
 | Zoom | `Mouse2`, `Mouse3` |
 | Reload | `R` |
 | Flashlight | `F` |
+| Last weapon | `G` (**Not in 0.14.1**) |
 | Weapon wheel | `E` |
 | Next / previous weapon | Mouse wheel down / up, or `[` / `]` |
-| Weapons | `1` to `0` and `-` |
+| Weapons | `1` to `0` and `-`, in weapon-slot order |
+| Grappling hook (Classic multiplayer ruleset) | `Mouse4` (**Not in 0.14.1**) |
 | Console | `` ` `` and `~` |
 | Menu | `Escape` |
 | Objectives / scores | `Tab` |

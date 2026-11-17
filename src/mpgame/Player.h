@@ -973,6 +973,9 @@ public:
 	// openQ4 (MP-15): mp/WeaponOrder.h
 	const mpWeaponOrder_t &	GetWeaponOrder		( void );
 	int						GetIdealWeapon		( void ) const { return idealWeapon; }
+	// openQ4: ui_autoSwitch, with Smart switching (mp/WeaponOrder.h)
+	bool					AutoSwitchOnPickup	( int held, int picked );
+	int						SmartSwitchRole		( int slot );
 
 	bool					IsGibbed			( void ) const;
 	const idVec3&			GetGibDir			( void ) const;

@@ -205,7 +205,7 @@
 							cvar	ui_autoSwitch
 							textscale	0.24
 							font	"fonts/lowpixel"
-							choices	"#str_200059"
+							choices	"#str_232540"
 							choiceType	0
 		
 							onAction {

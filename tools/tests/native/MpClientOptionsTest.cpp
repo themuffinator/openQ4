@@ -148,6 +148,27 @@ static void TestWeaponOrder( void ) {
 	CHECK( MPWeaponOrderBest( order, ( 1u << 1 ) | ( 1u << 2 ) ) == -1 );	// none listed: Quake 4 decides
 	CHECK( MPWeaponOrderBest( order, 0 ) == -1 );
 
+	// smart switching (ui_autoSwitch 2): which weapons a pickup may take over from
+	CHECK( MPSmartSwitchRole( "weapon_gauntlet_mp", false ) == MP_SWITCH_ROLE_UNARMED );
+	CHECK( MPSmartSwitchRole( "weapon_blaster", false ) == MP_SWITCH_ROLE_UNARMED );
+	CHECK( MPSmartSwitchRole( "weapon_machinegun_mp", true ) == MP_SWITCH_ROLE_STARTER );
+	CHECK( MPSmartSwitchRole( "weapon_machinegun", true ) == MP_SWITCH_ROLE_STARTER );
+	CHECK( MPSmartSwitchRole( "WEAPON_MACHINEGUN_MP", true ) == MP_SWITCH_ROLE_STARTER );
+	CHECK( MPSmartSwitchRole( "weapon_machinegun_upgraded", true ) == MP_SWITCH_ROLE_ARMED );
+	CHECK( MPSmartSwitchRole( "weapon_railgun_mp", true ) == MP_SWITCH_ROLE_ARMED );
+	CHECK( MPSmartSwitchRole( 0, true ) == MP_SWITCH_ROLE_ARMED );
+	CHECK( MPSmartSwitchAllows( true, MP_SWITCH_ROLE_UNARMED, MP_SWITCH_ROLE_ARMED ) );		// gauntlet -> rocket launcher
+	CHECK( MPSmartSwitchAllows( true, MP_SWITCH_ROLE_UNARMED, MP_SWITCH_ROLE_STARTER ) );	// blaster -> machinegun
+	CHECK( MPSmartSwitchAllows( true, MP_SWITCH_ROLE_STARTER, MP_SWITCH_ROLE_ARMED ) );		// machinegun -> shotgun
+	CHECK( !MPSmartSwitchAllows( true, MP_SWITCH_ROLE_STARTER, MP_SWITCH_ROLE_STARTER ) );
+	CHECK( !MPSmartSwitchAllows( true, MP_SWITCH_ROLE_ARMED, MP_SWITCH_ROLE_ARMED ) );		// railgun stays in hand
+	CHECK( !MPSmartSwitchAllows( true, MP_SWITCH_ROLE_ARMED, MP_SWITCH_ROLE_STARTER ) );
+	CHECK( !MPSmartSwitchAllows( true, MP_SWITCH_ROLE_STARTER, MP_SWITCH_ROLE_UNARMED ) );	// never down to the gauntlet
+	CHECK( !MPSmartSwitchAllows( true, MP_SWITCH_ROLE_UNARMED, MP_SWITCH_ROLE_UNARMED ) );
+	CHECK( MPSmartSwitchAllows( false, MP_SWITCH_ROLE_ARMED, MP_SWITCH_ROLE_ARMED ) );		// an empty weapon gives way
+	CHECK( MPSmartSwitchAllows( false, MP_SWITCH_ROLE_ARMED, MP_SWITCH_ROLE_UNARMED ) );
+	CHECK( MP_AUTO_SWITCH_NEVER == 0 && MP_AUTO_SWITCH_ALWAYS == 1 && MP_AUTO_SWITCH_SMART == 2 );	// Quake 4's 0 and 1 keep their meaning
+
 	// aliases
 	MPWeaponOrderParse( "gl mg sg hb ng nap bfg g bl", names, 16, order );
 	CHECK( order.listed == 9 );

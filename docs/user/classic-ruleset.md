@@ -153,7 +153,8 @@ shows in your team's colour.
   Turn it off with `bot_grapple 0`.
 
 Bind it under **Settings → Controls → Attack/Look → Grappling Hook**, or from
-the console, for example `bind MOUSE4 _hook`. It has no default key.
+the console, for example `bind MOUSE4 _hook`. Its default key is `Mouse4`, as in
+Quake Live (**Not in 0.14.1**; an existing configuration keeps its own keys).
 
 ## Limits
 

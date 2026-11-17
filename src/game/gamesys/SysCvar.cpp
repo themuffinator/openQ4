@@ -151,7 +151,7 @@ idCVar ui_clan(						"ui_clan",					"",	CVAR_GAME | CVAR_USERINFO | PC_CVAR_ARCH
 idCVar ui_handicap(					"ui_handicap",				"100",	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "player handicap percentage", 1, 100 );
 idCVar ui_hitscanTint(				"ui_hitscanTint",			"120.0 0.6 1.0",	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "a tint applied to select hitscan effects.  Specified as a value in HSV color space. Hue [0.0-360.0] Saturation [0.0-1.0] Value [0.75-1.0]" );
 // RAVEN END
-idCVar ui_autoSwitch(				"ui_autoSwitch",			"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "auto switch weapon" );
+idCVar ui_autoSwitch(				"ui_autoSwitch",			"2",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "switch to a weapon when picking it up: 0 never, 1 always (Quake 4), 2 smart: in multiplayer only from the gauntlet, the machinegun or an empty weapon (single player switches only to weapons not yet carried)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar ui_autoReload(				"ui_autoReload",			"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "auto reload weapon" );
 idCVar ui_showGun(					"ui_showGun",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "show gun" );
 idCVar ui_ready(					"ui_ready",				si_readyArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "player is ready to start playing", idCmdSystem::ArgCompletion_String<si_readyArgs> );
