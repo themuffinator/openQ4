@@ -66,8 +66,9 @@ CHANNEL_END = re.compile(r'^SOUND_DIALOGUE_END channels=(\d+)\s*$', re.M)
 # The harness's own markers are matched anywhere on a line: a map script that prints
 # without a newline (process2's "colour swap left") leaves the next echo mid-line.
 SCENE_MARK = re.compile(r'SCENE_(?:PROBE|STEP|MEMORY|END|BEGIN)\b', re.M)
-# Installed lip-sync text, or an authored subtitle/ declaration from a caption pack.
-TRANSCRIBED = ('text', 'authored')
+# Installed lip-sync text (a helmet-radio copy shares its dry line's), an authored
+# subtitle/ declaration from a caption pack, or the installed shader's script line.
+TRANSCRIBED = ('text', 'authored', 'script', 'helmet')
 CUE = re.compile(r'^Subtitle shader=(\S+) emitter=\d+ speaker=\d+ time=\d+ duration=\d+ radio=\d textBytes=\d+', re.M)
 PROBE = re.compile(r'SCENE_PROBE (\S+) (\d+) (full|mute)\s*$', re.M)
 ADMISSION = re.compile(r'^Audio admission: reserved=(\d+) KiB peak=(\d+) KiB budget=(\d+) MiB refused=(\d+)', re.M)

@@ -617,6 +617,20 @@ static bool SoundSubtitleTextUsable( const char* text ) {
 	return text != NULL && text[0] && idStr::Icmpn( text, "#str_", 5 ) && idStr::Icmp( text, "<DEFAULTED>" );
 }
 
+// Squad chatter over the helmet radio: each marine line has a processed copy in
+// a helmet/ directory, played by its own "<shader>_h" shader, and only the dry
+// line's shader declares the transcript. A helmet copy shares it.
+static const rvDeclLipSync* SoundHelmetLipSync( const char* shaderName, const char* sampleKey ) {
+	const int length = idStr::Length( shaderName );
+	if( length < 3 || idStr::Icmp( shaderName + length - 2, "_h" ) ) return NULL;
+	bool helmet = false;
+	for( const char* p = sampleKey; *p && !helmet; ++p )
+		helmet = *p == '/' && !idStr::Icmpn( p, "/helmet/", 8 );
+	if( !helmet ) return NULL;
+	idStr dry( shaderName ); dry.CapLength( length - 2 );
+	return SoundDeclaredLipSync( dry.c_str() );
+}
+
 // The transcript a playing sample may show. Authored caption declarations come
 // first: a lipSync named "subtitle/<sample path without extension>" or, for a
 // single-sample shader's leadin, "subtitle/<shader>". A caption pack uses them to
@@ -625,8 +639,12 @@ static bool SoundSubtitleTextUsable( const char* text ) {
 // falls back to the installed data. There, one shader can choose different
 // utterances: only a single-sample shader has an unambiguous same-name
 // transcript, for its leadin; variants need an explicit full sample-path
-// lipSync declaration. Descriptions, filenames and missing localization keys
-// are never transcripts. status, when asked for, says why there is no text.
+// lipSync declaration. When the installed lip-sync data has no usable text for
+// a single-sample shader's leadin, a helmet-radio copy takes its dry line's
+// transcript, and failing that the shader's own script line (its description,
+// cleaned by SoundScriptCaption) is the last resort: most radio chatter has no
+// other text. Filenames and missing localization keys are never transcripts.
+// status, when asked for, says why there is no text.
 static const char* SoundTranscriptText( const idSoundShader* shader, const idSoundSample* sample, bool leadin, SoundTranscript* status ) {
 	const bool single = shader->GetNumEntries() == 1 && leadin;
 	idStr key = sample->GetName(); key.StripFileExtension();
@@ -641,25 +659,32 @@ static const char* SoundTranscriptText( const idSoundShader* shader, const idSou
 			return text;
 		}
 	}
+	// No installed text: say why, unless the dry line's transcript or the shader's
+	// script line can stand in.
+	const auto untranscribed = [&]( SoundTranscript why ) -> const char* {
+		const rvDeclLipSync* dry = single ? SoundHelmetLipSync( shader->GetName(), key.c_str() ) : NULL;
+		const char* text = dry != NULL && dry->GetRawTranscribeText()[0] ? dry->GetSubtitleText() : NULL;
+		if( SoundSubtitleTextUsable( text ) ) {
+			if( status != NULL ) *status = SoundTranscript::Helmet;
+			return text;
+		}
+		const char* script = single ? shader->GetScriptCaption() : NULL;
+		if( script != NULL && script[0] ) why = SoundTranscript::Script;
+		if( status != NULL ) *status = why;
+		return why == SoundTranscript::Script ? script : NULL;
+	};
 	const rvDeclLipSync* lip = NULL;
 	if( single )
 		lip = SoundDeclaredLipSync( shader->GetName() );
 	if( lip == NULL )
 		lip = SoundDeclaredLipSync( key.c_str() );
-	if( lip == NULL ) {
-		if( status != NULL )
-			*status = !single && SoundDeclaredLipSync( shader->GetName() ) != NULL ? SoundTranscript::Variant : SoundTranscript::Undeclared;
-		return NULL;
-	}
-	if( !lip->GetRawTranscribeText()[0] ) {
-		if( status != NULL ) *status = SoundTranscript::NoText;
-		return NULL;
-	}
+	if( lip == NULL )
+		return untranscribed( !single && SoundDeclaredLipSync( shader->GetName() ) != NULL ? SoundTranscript::Variant : SoundTranscript::Undeclared );
+	if( !lip->GetRawTranscribeText()[0] )
+		return untranscribed( SoundTranscript::NoText );
 	const char* text = lip->GetSubtitleText();
-	if( !SoundSubtitleTextUsable( text ) ) {
-		if( status != NULL ) *status = SoundTranscript::Unresolved;
-		return NULL;
-	}
+	if( !SoundSubtitleTextUsable( text ) )
+		return untranscribed( SoundTranscript::Unresolved );
 	if( status != NULL ) *status = SoundTranscript::Text;
 	return text;
 }
@@ -702,7 +727,7 @@ static bool SoundChannelSubtitle( idSoundWorldLocal* world, idSoundEmitterLocal*
 	const char* text = SoundTranscriptText( channel->soundShader, sample, sample == channel->leadinSample, &transcript );
 	cue = { text, channel->soundShader->GetName(), emitter->Index(), emitter->emitterId,
 		channel->startTime, cursor, sample->LengthInMsec(), IsRadioChatterChannel( channel ),
-		text != NULL, transcript == SoundTranscript::Authored };
+		text != NULL, transcript == SoundTranscript::Authored, transcript == SoundTranscript::Script };
 	return true;
 }
 
@@ -743,6 +768,7 @@ void idSoundWorldLocal::RememberSubtitleTail( idSoundEmitterLocal* emitter, idSo
 	tail.radio = cue.radio;
 	tail.transcribed = cue.transcribed;
 	tail.authored = cue.authored;
+	tail.script = cue.script;
 	if( slot == numSubtitleTails ) ++numSubtitleTails;
 }
 
@@ -788,7 +814,7 @@ int idSoundWorldLocal::GetSubtitles( soundSubtitle_t* cues, int capacity ) {
 			continue;
 		}
 		const soundSubtitle_t cue = { tail.transcribed ? tail.text.c_str() : NULL, tail.shader->GetName(), tail.emitterIndex, tail.speakerId,
-			tail.startTime, tail.durationMsec - 1, tail.durationMsec, tail.radio, tail.transcribed, tail.authored };
+			tail.startTime, tail.durationMsec - 1, tail.durationMsec, tail.radio, tail.transcribed, tail.authored, tail.script };
 		if( cue.transcribed ) SoundKeepNewestSubtitle( spoken, numSpoken, capacity, cue );
 		else if( untranscribed ) SoundKeepNewestSubtitle( marked, numMarked, capacity, cue );
 	}

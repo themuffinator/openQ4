@@ -282,14 +282,14 @@ int LangDict_GetCodePageGeneration( void ) {
 LangDict_UnicodeForByte
 ============
 */
-unsigned int LangDict_UnicodeForByte( int byte ) {
+static unsigned int LangDict_UnicodeForByteInCodePage( int byte, langCodePage_t codePage ) {
 	if ( byte < 0 || byte > 0xFF ) {
 		return 0;
 	}
 	if ( byte < 0x80 ) {
 		return (unsigned int)byte;
 	}
-	const unsigned short *table = LangDict_HighTableForCodePage( langDictActiveCodePage );
+	const unsigned short *table = LangDict_HighTableForCodePage( codePage );
 	if ( table != NULL ) {
 		return table[byte - 0x80];
 	}
@@ -298,6 +298,10 @@ unsigned int LangDict_UnicodeForByte( int byte ) {
 	}
 	// CP1252 agrees with Latin-1 from 0xA0 up.
 	return (unsigned int)byte;
+}
+
+unsigned int LangDict_UnicodeForByte( int byte ) {
+	return LangDict_UnicodeForByteInCodePage( byte, langDictActiveCodePage );
 }
 
 /*
@@ -545,7 +549,10 @@ through untouched.
 Which codepage a legacy table is read as follows sys_lang, and it has to,
 because the byte values overlap completely: 0xB9 is superscript one in
 Windows-1252, a-ogonek in Windows-1250 and a soft-hyphen-adjacent punctuation
-mark in Windows-1251. There is no way to tell from the bytes.
+mark in Windows-1251. There is no way to tell from the bytes. Callers pass it:
+string tables the active codepage, and text whose codepage is known regardless
+of the language, such as the stock sound shaders' English script lines, that
+one.
 
 This is the inverse of what the engine used to do. Converting the other way -
 UTF-8 down to a codepage - was forced by 256 byte-indexed font glyphs, and it
@@ -553,7 +560,7 @@ capped the engine at whatever one 8-bit page could express. Going up instead
 means a table can hold any script the fonts have art for.
 ============
 */
-static bool LangDict_ConvertCodePageToUtf8( const char *buffer, int length, idStr &converted ) {
+bool LangDict_ConvertCodePageToUtf8( const char *buffer, int length, langCodePage_t codePage, idStr &converted ) {
 	const unsigned char *p = (const unsigned char *)buffer;
 
 	if ( LangDict_IsUtf8( buffer, length ) ) {
@@ -587,7 +594,7 @@ static bool LangDict_ConvertCodePageToUtf8( const char *buffer, int length, idSt
 
 		// A slot the codepage leaves unassigned has no character to encode.
 		// Substitute rather than emit U+0000, which would truncate the table.
-		unsigned int cp = LangDict_UnicodeForByte( c );
+		unsigned int cp = LangDict_UnicodeForByteInCodePage( c, codePage );
 		if ( cp == 0 ) {
 			cp = UNICODE_REPLACEMENT;
 		}
@@ -664,7 +671,7 @@ bool idLangDict::Load( const char *fileName, bool clear, const char *gameDir ) {
 		parseText += 3;
 		parseLength -= 3;
 	}
-	if ( LangDict_ConvertCodePageToUtf8( parseText, parseLength, transcoded ) ) {
+	if ( LangDict_ConvertCodePageToUtf8( parseText, parseLength, langDictActiveCodePage, transcoded ) ) {
 		idLib::common->DPrintf( "%s: converted legacy 8-bit string table to UTF-8\n", fileName );
 		parseText = transcoded.c_str();
 		parseLength = transcoded.Length();

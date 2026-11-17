@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Radio chatter and helmet-radio squad lines have subtitles (#221, AUD-07), 17 November 2026
+
+- **Radio transmissions are captioned.** 249 of the 333 radio lines the stock
+  maps play, and about 390 other campaign lines, have no lip-sync transcript.
+  Each of them carries its line as written in the game's script, in its sound
+  shader's description, and subtitles now show that instead of
+  **[untranscribed speech]**. Stage directions, speaker tags and notes are left
+  out; the text is converted from Windows-1252, so apostrophes and dashes draw
+  correctly in every menu language. A recorded take is sometimes shorter than
+  the script line.
+- **Helmet-radio squad lines share their transcript.** The 692 marine lines
+  heard over the helmet radio are processed copies of lines that do have a
+  transcript; each now shows its dry line's text.
+- Installed lip-sync text and caption packs still come first. Only screams,
+  laughter, pain sounds and multiplayer announcers keep the marker.
+- `listSubtitles` reports script-line captions as `script`, and the speech
+  audit's `transcript=` status adds `script` and `helmet`.
+
 ## Screenshots from the pause menu, and tidier emotion cues in subtitles (#224, #225), 17 November 2026
 
 - **F12 takes a screenshot from the pause menu and the title screen again.**

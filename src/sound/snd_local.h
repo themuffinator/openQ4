@@ -292,7 +292,7 @@ struct soundSubtitleTail_t {
 	idStr				text;
 	const idSoundShader* shader;
 	int					emitterIndex, logicalChannel, speakerId, startTime, durationMsec, until;
-	bool				radio, transcribed, authored;
+	bool				radio, transcribed, authored, script;
 };
 
 extern idCVar ui_subtitleUntranscribed;

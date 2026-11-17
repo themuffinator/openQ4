@@ -63,6 +63,11 @@ int						LangDict_NextCodePoint( const char *p, int available, unsigned int &cod
 						// True when the whole buffer is well-formed UTF-8.
 bool					LangDict_IsUtf8( const char *buffer, int length );
 
+						// Re-encodes legacy 8-bit text written in codePage as UTF-8, with
+						// the same ASCII folds a legacy string table gets. False, leaving
+						// converted untouched, when the buffer is already UTF-8 (or ASCII).
+bool					LangDict_ConvertCodePageToUtf8( const char *buffer, int length, langCodePage_t codePage, idStr &converted );
+
 						// Which codepage a sys_lang value's legacy 8-bit tables are
 						// authored in, and which one its retail bitmap atlases index by.
 langCodePage_t			LangDict_CodePageForLanguage( const char *language );

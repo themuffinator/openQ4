@@ -134,6 +134,10 @@ public:
 	// so the editor can draw correct default sound spheres
 	// this is currently defined as meters, which sucks, IMHO.
 	virtual float			GetMinDistance() const;		// FIXME: replace this with a GetSoundShaderParms()
+
+	// The spoken line this shader's description gives, as UTF-8, or "" when the
+	// description is missing, a stage direction or a note (SoundScriptCaption).
+	const char*				GetScriptCaption() const { return scriptCaption.c_str(); }
 	virtual float			GetMaxDistance() const;
 
 	// returns NULL if an AltSound isn't defined in the shader.
@@ -187,9 +191,11 @@ private:
 	float					maxFrequencyShift;
 	bool					noShakes;
 	bool					frequentlyUsed;
+	idStr					scriptCaption;	// derived from desc when parsed
 
 private:
 	void					Init();
+	void					UpdateScriptCaption();
 	bool					ParseShader( idLexer& src );
 	idSoundSample*			GetSampleByIndex( int index ) const;
 };
@@ -287,7 +293,8 @@ option existing simultaniously with a live game.
 // or the next GetSubtitles call. Timing follows the sample clock, including pause
 // and frequency/time shifts. text is NULL for speech without a transcript, which
 // is reported only while ui_subtitleUntranscribed asks for it; authored marks text
-// from a subtitle/ declaration rather than the installed lip-sync data.
+// from a subtitle/ declaration rather than the installed lip-sync data, and script
+// text from the installed sound shader's script line (its description).
 struct soundSubtitle_t {
 	const char* text;
 	const char* shader;
@@ -295,6 +302,7 @@ struct soundSubtitle_t {
 	bool radio;
 	bool transcribed;
 	bool authored;
+	bool script;
 };
 
 class idSoundWorld
