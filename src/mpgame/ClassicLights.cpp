@@ -39,6 +39,21 @@ const float	CLASSIC_EXPLOSION_RADIUS	= 260.0f;
 const int	CLASSIC_EXPLOSION_TIME		= 220;
 const float	CLASSIC_EXPLOSION_MAX		= 512.0f;
 
+// A shadowed explosion flash keeps the entities it starts inside out of its
+// shadows: the burnt shell of a barrel around the light would otherwise black
+// out the room the flash is meant to light.
+const int	MAX_CLASSIC_FLASH_SUPPRESS	= 4;
+
+// Light ids for those flashes, one per pool slot.  High enough never to meet
+// the weapon ids (hundreds) or the actor flashlight ids (entityNumber + 1).
+const int	CLASSIC_FLASH_LIGHT_ID_BASE	= 0x7e000000;
+
+// A second explosion flash this close in space and time to a live one is the
+// same event: a projectile's detonation flash and its detonation effect, or a
+// barrel's flash and its fx_explode.
+const float	CLASSIC_FLASH_MERGE_DIST	= 160.0f;
+const int	CLASSIC_FLASH_MERGE_TIME	= 50;
+
 typedef struct classicFlash_s {
 	renderLight_t		light;
 	qhandle_t			handle;
@@ -46,6 +61,10 @@ typedef struct classicFlash_s {
 	int					endTime;
 	float				startRadius;
 	idVec3				color;
+	bool				explosion;			// an explosion flash, not a muzzle flash
+	bool				generic;			// raised for an effect, not for a known projectile or barrel
+	int					numSuppressed;
+	idEntityPtr<idEntity>	suppressed[ MAX_CLASSIC_FLASH_SUPPRESS ];
 } classicFlash_t;
 
 static classicFlash_t	classicFlashes[ MAX_CLASSIC_FLASHES ];
@@ -347,7 +366,8 @@ bool G_ClassicProjectileLight( const idDict &spawnArgs, renderLight_t &light ) {
 	light.shaderParms[SHADERPARM_ALPHA]	= 1.0f;
 	light.shaderParms[SHADERPARM_TIMEOFFSET] = -MS2SEC( gameLocal.time );
 	light.detailLevel					= DEFAULT_LIGHT_DETAIL_LEVEL;
-	light.noShadows						= true;
+	// idProjectile keeps its own model out of these shadows
+	light.noShadows						= !G_DynamicLightShadowsEnabled();
 
 	return true;
 }
@@ -361,6 +381,26 @@ A slot is live while endTime is set; the render handle is only taken on the
 first update, so it cannot stand in for occupancy.
 ================
 */
+/*
+================
+G_ReleaseClassicFlashSuppress
+
+Hands the entities a flash kept out of its shadows back their shadows.
+touchEntities is false while the world is being torn down underneath us.
+================
+*/
+static void G_ReleaseClassicFlashSuppress( classicFlash_t &flash, bool touchEntities ) {
+	for ( int i = 0; i < flash.numSuppressed; i++ ) {
+		idEntity *ent = touchEntities ? flash.suppressed[ i ].GetEntity() : NULL;
+		if ( ent && ent->GetRenderEntity()->suppressShadowInLightID == flash.light.lightId ) {
+			ent->GetRenderEntity()->suppressShadowInLightID = 0;
+			ent->UpdateVisuals();
+		}
+		flash.suppressed[ i ] = NULL;
+	}
+	flash.numSuppressed = 0;
+}
+
 static classicFlash_t *G_AllocClassicFlash( void ) {
 	classicFlash_t *oldest = NULL;
 
@@ -385,15 +425,86 @@ static classicFlash_t *G_AllocClassicFlash( void ) {
 		gameRenderWorld->FreeLightDef( oldest->handle );
 		oldest->handle = -1;
 	}
+	G_ReleaseClassicFlashSuppress( *oldest, true );
 	return oldest;
 }
 
 /*
 ================
-G_ClassicFlash
+G_FindClassicExplosionFlash
+
+A live explosion flash raised for the same event: started this frame or the
+one before, near the same spot.
 ================
 */
-void G_ClassicFlash( const idVec3 &origin, const idVec3 &color, float radius, int durationMS ) {
+static classicFlash_t *G_FindClassicExplosionFlash( const idVec3 &origin ) {
+	if ( !classicFlashesInitialized ) {
+		return NULL;
+	}
+	for ( int i = 0; i < MAX_CLASSIC_FLASHES; i++ ) {
+		classicFlash_t &flash = classicFlashes[ i ];
+		if ( flash.endTime == 0 || !flash.explosion ) {
+			continue;
+		}
+		if ( gameLocal.time - flash.startTime > CLASSIC_FLASH_MERGE_TIME ) {
+			continue;
+		}
+		if ( ( flash.light.origin - origin ).LengthSqr() > Square( CLASSIC_FLASH_MERGE_DIST ) ) {
+			continue;
+		}
+		return &flash;
+	}
+	return NULL;
+}
+
+/*
+================
+G_SuppressClassicFlashEnclosers
+
+An explosion flash starts inside whatever blew up: a barrel's burnt shell, a
+turret or a flyer coming apart.  Those keep their shadows in every other light
+but stay out of this one's, which is the same arrangement the firer's body and
+gun have with their muzzle flash.  Level geometry (func_static) is left alone,
+and so is an entity whose suppression slot already belongs to someone else.
+================
+*/
+static void G_SuppressClassicFlashEnclosers( classicFlash_t &flash ) {
+	idEntity *touching[ 16 ];
+	const idVec3 &origin = flash.light.origin;
+	const idBounds probe( origin - idVec3( 1.0f, 1.0f, 1.0f ), origin + idVec3( 1.0f, 1.0f, 1.0f ) );
+	const int count = gameLocal.EntitiesTouchingBounds( gameLocal.currentThinkingEntity, probe, -1, touching, 16 );
+
+	for ( int i = 0; i < count && flash.numSuppressed < MAX_CLASSIC_FLASH_SUPPRESS; i++ ) {
+		idEntity *ent = touching[ i ];
+		if ( !ent || ent == gameLocal.world || ent->IsType( idStaticEntity::GetClassType() ) ) {
+			continue;
+		}
+		renderEntity_t *renderEnt = ent->GetRenderEntity();
+		if ( !renderEnt || !renderEnt->hModel || renderEnt->noShadow ) {
+			continue;
+		}
+		const int owned = renderEnt->suppressShadowInLightID;
+		if ( owned != 0 && ( owned < CLASSIC_FLASH_LIGHT_ID_BASE ||
+							 owned >= CLASSIC_FLASH_LIGHT_ID_BASE + MAX_CLASSIC_FLASHES ) ) {
+			continue;
+		}
+		renderEnt->suppressShadowInLightID = flash.light.lightId;
+		ent->UpdateVisuals();
+		flash.suppressed[ flash.numSuppressed++ ] = ent;
+	}
+}
+
+/*
+================
+G_RaiseClassicFlash
+
+shadowLightId names a light id whose shadows the caster already suppresses
+(the firing weapon's muzzle flash).  An explosion flash passes 0 and gets an id
+of its own, with the entities it starts inside kept out of its shadows.
+================
+*/
+static void G_RaiseClassicFlash( const idVec3 &origin, const idVec3 &color, float radius, int durationMS,
+								 bool explosion, bool generic, int shadowLightId, bool castShadows ) {
 	if ( !G_ClassicFlashAllowed() ) {
 		return;
 	}
@@ -418,7 +529,27 @@ void G_ClassicFlash( const idVec3 &origin, const idVec3 &color, float radius, in
 		return;
 	}
 
-	classicFlash_t *flash = G_AllocClassicFlash();
+	classicFlash_t *flash = NULL;
+	if ( explosion ) {
+		classicFlash_t *same = G_FindClassicExplosionFlash( origin );
+		if ( same ) {
+			if ( generic || !same->generic ) {
+				// already lit; the first specific flash for an event stands
+				return;
+			}
+			// a projectile or barrel flash knows its colour and size; it
+			// replaces the generic flash an effect raised for the same blast
+			if ( same->handle != -1 ) {
+				gameRenderWorld->FreeLightDef( same->handle );
+				same->handle = -1;
+			}
+			G_ReleaseClassicFlashSuppress( *same, true );
+			flash = same;
+		}
+	}
+	if ( !flash ) {
+		flash = G_AllocClassicFlash();
+	}
 
 	memset( &flash->light, 0, sizeof( flash->light ) );
 	flash->light.shader			= shader;
@@ -426,7 +557,7 @@ void G_ClassicFlash( const idVec3 &origin, const idVec3 &color, float radius, in
 	flash->light.origin			= origin;
 	flash->light.axis			= mat3_identity;
 	flash->light.detailLevel	= DEFAULT_LIGHT_DETAIL_LEVEL;
-	flash->light.noShadows		= true;
+	flash->light.noShadows		= !castShadows;
 	flash->light.shaderParms[SHADERPARM_ALPHA]		= 1.0f;
 	flash->light.shaderParms[SHADERPARM_TIMEOFFSET]	= -MS2SEC( gameLocal.time );
 
@@ -435,6 +566,27 @@ void G_ClassicFlash( const idVec3 &origin, const idVec3 &color, float radius, in
 	flash->startTime	= gameLocal.time;
 	flash->endTime		= gameLocal.time + durationMS;
 	flash->handle		= -1;
+	flash->explosion	= explosion;
+	flash->generic		= generic;
+	flash->numSuppressed = 0;
+
+	if ( castShadows ) {
+		if ( shadowLightId != 0 ) {
+			flash->light.lightId = shadowLightId;
+		} else {
+			flash->light.lightId = CLASSIC_FLASH_LIGHT_ID_BASE + (int)( flash - classicFlashes );
+			G_SuppressClassicFlashEnclosers( *flash );
+		}
+	}
+}
+
+/*
+================
+G_ClassicFlash
+================
+*/
+void G_ClassicFlash( const idVec3 &origin, const idVec3 &color, float radius, int durationMS ) {
+	G_RaiseClassicFlash( origin, color, radius, durationMS, true, false, 0, G_DynamicLightShadowsEnabled() );
 }
 
 /*
@@ -442,7 +594,7 @@ void G_ClassicFlash( const idVec3 &origin, const idVec3 &color, float radius, in
 G_ClassicMuzzleFlash
 ================
 */
-void G_ClassicMuzzleFlash( const idDict &weaponDef, const idVec3 &origin ) {
+void G_ClassicMuzzleFlash( const idDict &weaponDef, const idVec3 &origin, int shadowLightId, bool castShadows ) {
 	idVec4 flashColor;
 	idVec3 color;
 
@@ -466,7 +618,10 @@ void G_ClassicMuzzleFlash( const idDict &weaponDef, const idVec3 &origin ) {
 	// never strobes at a fixed size.
 	radius += classicFlashRandom.RandomFloat() * CLASSIC_MUZZLEFLASH_JITTER;
 
-	G_ClassicFlash( origin, color, radius * G_ClassicLightScale(), CLASSIC_MUZZLEFLASH_TIME );
+	// Without a light id the firer suppresses, the gun would shadow its own
+	// flash, so a muzzle flash only casts when the weapon hands one over.
+	G_RaiseClassicFlash( origin, color, radius * G_ClassicLightScale(), CLASSIC_MUZZLEFLASH_TIME,
+		false, false, shadowLightId, castShadows && shadowLightId != 0 );
 }
 
 /*
@@ -499,7 +654,118 @@ void G_ClassicExplosionFlash( const idDict &spawnArgs, const idVec3 &origin, flo
 		return;
 	}
 
-	G_ClassicFlash( origin, profile.burstColor, radius * G_ClassicLightScale(), profile.burstTime );
+	G_RaiseClassicFlash( origin, profile.burstColor, radius * G_ClassicLightScale(), profile.burstTime,
+		true, false, 0, G_DynamicLightShadowsEnabled() );
+}
+
+/*
+===============================================================================
+
+	Effect explosions
+
+	Projectiles and barrels raise their own flashes, but most of what blows up
+	in Quake 4 only plays an effect: dying turrets, flyers and hover tanks,
+	harvester parts, vehicles and every scripted level explosion.  An effect is
+	taken for an explosion when its name says so (explosion, explode,
+	detonate, death, destroy, or anything under effects/explosions/) and it
+	burns: it
+	draws a gfx/effects/fire/ material.  The second test keeps gore bursts,
+	electrical deaths and smoke trails dark.  An effect that already carries a
+	light segment lights itself.
+
+===============================================================================
+*/
+
+typedef enum {
+	CLASSIC_EFFECT_UNKNOWN = 0,
+	CLASSIC_EFFECT_PLAIN,
+	CLASSIC_EFFECT_EXPLOSION
+} classicEffectKind_t;
+
+// Indexed by effect decl index; decls outlive maps, so the verdicts do too.
+static idList<byte>		classicEffectKinds;
+
+/*
+================
+G_ClassicEffectIsExplosion
+================
+*/
+static bool G_ClassicEffectIsExplosion( const idDecl *effect ) {
+	const int index = effect->Index();
+	if ( index < 0 ) {
+		return false;
+	}
+	if ( index < classicEffectKinds.Num() && classicEffectKinds[ index ] != CLASSIC_EFFECT_UNKNOWN ) {
+		return classicEffectKinds[ index ] == CLASSIC_EFFECT_EXPLOSION;
+	}
+	if ( index >= classicEffectKinds.Num() ) {
+		const int oldNum = classicEffectKinds.Num();
+		classicEffectKinds.SetNum( index + 1 );
+		for ( int i = oldNum; i < classicEffectKinds.Num(); i++ ) {
+			classicEffectKinds[ i ] = CLASSIC_EFFECT_UNKNOWN;
+		}
+	}
+
+	bool explosion = false;
+	idStr name = effect->GetName();
+	name.BackSlashesToSlashes();
+	name.ToLower();
+	if ( name.Find( "explo" ) >= 0 || name.Find( "detonat" ) >= 0 || name.Find( "death" ) >= 0 ||
+		 name.Find( "destroy" ) >= 0 ||
+		 name.Find( "effects/explosions/" ) >= 0 ) {
+		const int length = effect->GetTextLength();
+		if ( length > 0 ) {
+			idTempArray<char> text( length + 1 );
+			effect->GetText( text.Ptr() );
+			text[ length ] = '\0';
+
+			idLexer lexer( LEXFL_NOERRORS | LEXFL_NOWARNINGS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWPATHNAMES );
+			lexer.LoadMemory( text.Ptr(), length, effect->GetName() );
+
+			bool burns = false;
+			bool lit = false;
+			idToken token;
+			idToken prev;
+			idToken prev2;
+			while ( lexer.ReadToken( &token ) ) {
+				// a light segment opens as: light "name" {
+				if ( token == "{" && prev.type == TT_STRING && !prev2.Icmp( "light" ) ) {
+					lit = true;
+					break;
+				}
+				if ( token.type == TT_STRING && !idStr::Icmpn( token.c_str(), "gfx/effects/fire/", 17 ) ) {
+					burns = true;
+				}
+				prev2 = prev;
+				prev = token;
+			}
+			explosion = burns && !lit;
+		}
+	}
+
+	classicEffectKinds[ index ] = explosion ? CLASSIC_EFFECT_EXPLOSION : CLASSIC_EFFECT_PLAIN;
+	if ( explosion ) {
+		common->DPrintf( "classic dynamic lights: '%s' flashes as an explosion\n", effect->GetName() );
+	}
+	return explosion;
+}
+
+/*
+================
+G_ClassicEffectFlash
+================
+*/
+void G_ClassicEffectFlash( const idDecl *effect, const idVec3 &origin, bool loop ) {
+	if ( loop || !effect || !G_ClassicFlashAllowed() ) {
+		return;
+	}
+	if ( !G_ClassicEffectIsExplosion( effect ) ) {
+		return;
+	}
+	const float radius = CLASSIC_EXPLOSION_RADIUS * G_ClassicLightScale();
+	const idVec3 color( classicExplosionColor[0], classicExplosionColor[1], classicExplosionColor[2] );
+	G_RaiseClassicFlash( origin, color, radius, CLASSIC_EXPLOSION_TIME,
+		true, true, 0, G_DynamicLightShadowsEnabled() );
 }
 
 /*
@@ -544,6 +810,7 @@ void G_UpdateClassicLights( void ) {
 				gameRenderWorld->FreeLightDef( flash.handle );
 				flash.handle = -1;
 			}
+			G_ReleaseClassicFlashSuppress( flash, true );
 			flash.endTime = 0;
 			continue;
 		}
@@ -585,6 +852,7 @@ void G_FreeClassicLights( void ) {
 			}
 			classicFlashes[ i ].handle = -1;
 		}
+		G_ReleaseClassicFlashSuppress( classicFlashes[ i ], false );
 		classicFlashes[ i ].endTime = 0;
 	}
 }

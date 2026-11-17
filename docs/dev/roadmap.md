@@ -1213,7 +1213,16 @@ diagnostics establish whole-frame ownership or production performance.
   turns. The gameplay benchmark's `shadow-translucent-medlabs` candidate
   remains unusable (it falls back for shadow geometry before translucent
   moments, stationary too). See [movers, cutouts and translucents](renderer-validation-matrix.md#continuous-motion-shadow-tour-6-november-2026-ren-03).
-  Remaining: physical-platform breadth.
+  Weapon lights, 17 November (#235, #236): muzzle flashes, classic flashes and
+  the light segments of weapon, monster and vehicle effects now follow
+  `g_dynamicLightShadows` (on from Quality up), and explosion effects with no
+  light of their own get a classic flash. The firer's body and gun, a
+  projectile's own model and whatever an explosion starts inside are kept out
+  of those shadows. A storage2 probe shows them mapped on both backends and
+  drawn by the stencil path on Balanced, with no self-occlusion. See
+  [weapon-light shadows](release-completion.md#weapon-fire-and-explosions-cast-shadows-235-236-17-november-2026).
+  Remaining: physical-platform breadth; combat-crowd cost of weapon-light
+  shadows on Quality (FPS-03).
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple

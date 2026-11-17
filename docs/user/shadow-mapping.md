@@ -166,6 +166,8 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 - **Shadows float away from the objects casting them.** For point lights, first confirm `r_shadowMapCasterCulling 2` and `r_shadowMapPointMaxWorldBias 4`, then lower `r_shadowMapPointFilterRadius`, `r_shadowMapPointBias` or `r_shadowMapPointNormalBias` in small steps. For spotlights, lower `r_shadowMapBias`, `r_shadowMapNormalBias`, `r_shadowMapTexelBiasScale`, `r_shadowMapPolygonFactor` or `r_shadowMapPolygonOffset` in small steps.
 - **Speckles or stripes on surfaces (shadow acne).** Raise the matching bias a very little. If it only happens with a wide soft edge, raise the shadow resolution or narrow `r_shadowMapFilterRadius` first.
 - **Outdoor sunlight shadows look too soft or too sharp.** Distant lights use a tighter edge (`r_shadowMapDistantFilterScale 0.35`). Lower it toward `0` for sharper shadows, or set `1` for the same softness as other lights.
+- **Character shadows outdoors look blocky.** Quake 4 lights its outdoor areas with a few very large lights, and without cascades each of them gets one shadow map stretched over the whole area: 2048 pixels across on Quality, 4096 on Ultra. Turn on cascades with `r_shadowMapCSM 1` (Maximum already does), which spends the sharpest map on the area around you. Raising `r_shadowMapSize` helps less and costs more memory. If you prefer the original hard-edged look, `r_useShadowMap 0` brings back the stencil shadows.
+- **Characters don't shadow some objects, or themselves.** That is how Quake 4 was made. Characters and many props, consoles and machines use materials marked to keep out of each other's shadows, so the original stencil shadows looked clean on their low-polygon models. Characters still shadow most of the level, and the level still shadows them. openQ4 keeps the original rule.
 - **Soft edges don't change with distance.** Check `r_shadowMapFilterMode 2`.
 - **A fence or grate casts a solid shadow.** Its material's holes come from something shadow maps can't trace (a video, a generated texture or unusual texture coordinates). `r_shadowMapHashedAlpha` can't change that.
 - **Glass casts no shadow, or too much.** Glass shadows need `r_shadowMapTranslucentMoments 1`, and only common blended materials are supported. Lower `r_shadowMapTranslucentDensity` if they're too strong.
@@ -276,7 +278,7 @@ Shadow artifacts usually come in two kinds: speckles or stripes on a lit surface
 
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
-| `g_dynamicLightShadows` | `-1` | `-1..1` | Shadows from your weapon's flashlight and from projectile lights. `-1` follows the preset (flashlight wherever shadows are drawn, projectile lights on Quality and up), `0` never, `1` always. A weapon picks up the change when it is next drawn or a save is loaded. |
+| `g_dynamicLightShadows` | `-1` | `-1..1` | Shadows from weapon lights: your flashlight, muzzle flashes (yours and enemies'), glowing projectiles and explosion flashes. `-1` follows the preset (the flashlight wherever shadows are drawn, the rest on Quality and up), `0` never, `1` always. **Not in 0.14.1:** muzzle flashes, enemy weapon effects and explosion flashes; 0.14.1 covers the flashlight and projectile lights only. A flashlight picks up the change when the weapon is next drawn or a save is loaded; the other lights pick it up with the next shot. |
 
 ### Troubleshooting and diagnostics
 

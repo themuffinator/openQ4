@@ -304,6 +304,8 @@ public:
 	void				GetCrosshairSignals			( crosshairSignals_t &signals ) const;
 	virtual void		GetCrosshairDetail			( crosshairSignals_t &signals ) const { }
 	int					GetFirstPersonShadowSuppressLightId( void ) const;
+	// openQ4: whether this weapon's muzzle flashes cast shadows (g_dynamicLightShadows)
+	bool				MuzzleFlashCastsShadows( void ) const;
 
 	idMat3				ForeshortenAxis				( const idMat3& axis ) const;
 	// openQ4 VR: the muzzle where this frame draws the view model at the

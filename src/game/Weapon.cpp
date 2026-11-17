@@ -36,6 +36,25 @@ int rvWeapon::GetFirstPersonShadowSuppressLightId( void ) const {
 	return ( lightIndex + 1 ) * 100 + owner->entityNumber;
 }
 
+/*
+================
+rvWeapon::MuzzleFlashCastsShadows
+
+openQ4: muzzle flashes follow g_dynamicLightShadows, as projectile lights do;
+retail made them shadowless for stencil-volume cost.  The firer's body, head
+and world weapon suppress their shadows in the muzzle-flash light id, which
+the view, world and classic flashes all carry, so the gun cannot shadow its
+own flash.  A shadow-casting flashlight takes that suppression slot, and the
+flashes then stay shadowless rather than throw the player's own silhouette.
+================
+*/
+bool rvWeapon::MuzzleFlashCastsShadows( void ) const {
+	if ( owner == NULL || !G_DynamicLightShadowsEnabled() ) {
+		return false;
+	}
+	return GetFirstPersonShadowSuppressLightId() == ( WPLIGHT_MUZZLEFLASH + 1 ) * 100 + owner->entityNumber;
+}
+
 /***********************************************************************
 
   rvViewWeapon  
@@ -1018,7 +1037,9 @@ void rvWeapon::InitLights ( void ) {
 	light = &lights[WPLIGHT_MUZZLEFLASH_WORLD];
 	light->suppressLightInViewID = owner->entityNumber+1;
 	light->allowLightInViewID = 0;
-	light->lightId = ( WPLIGHT_MUZZLEFLASH_WORLD + 1 ) * 100 + owner->entityNumber;
+	// openQ4: the view flash's id, in which the firer's body and gun suppress
+	// their shadows, so a shadow-casting world flash is never blocked by them
+	light->lightId = ( WPLIGHT_MUZZLEFLASH + 1 ) * 100 + owner->entityNumber;
 
 	// flashlight	
 	light = &lights[WPLIGHT_FLASHLIGHT];
@@ -2788,7 +2809,9 @@ void rvWeapon::MuzzleFlash ( void ) {
 		if ( !GetGlobalJointTransform( false, flashJointWorld, classicOrigin, classicAxis ) ) {
 			classicOrigin = playerViewOrigin + playerViewAxis[0] * 16.0f;
 		}
-		G_ClassicMuzzleFlash( spawnArgs, classicOrigin );
+		const bool classicShadows = MuzzleFlashCastsShadows();
+		G_ClassicMuzzleFlash( spawnArgs, classicOrigin,
+			classicShadows ? ( WPLIGHT_MUZZLEFLASH + 1 ) * 100 + owner->entityNumber : 0, classicShadows );
 	}
 // openQ4 END
 
@@ -2800,11 +2823,11 @@ void rvWeapon::MuzzleFlash ( void ) {
 		// these will be different each fire
 		light.shaderParms[ SHADERPARM_TIMEOFFSET ]	= -MS2SEC( gameLocal.time );
 		light.shaderParms[ SHADERPARM_DIVERSITY ]	= viewModel->GetRenderEntity()->shaderParms[ SHADERPARM_DIVERSITY ];
-		light.noShadows = true;
+		light.noShadows = !MuzzleFlashCastsShadows();
 
 		lightWorld.shaderParms[ SHADERPARM_TIMEOFFSET ]	= -MS2SEC( gameLocal.time );
 		lightWorld.shaderParms[ SHADERPARM_DIVERSITY ]	= viewModel->GetRenderEntity()->shaderParms[ SHADERPARM_DIVERSITY ];
-		lightWorld.noShadows = true;
+		lightWorld.noShadows = light.noShadows;
 
 		// the light will be removed at this time
 		muzzleFlashEnd = gameLocal.time + muzzleFlashTime;

@@ -2450,6 +2450,18 @@ rvClientEffect* idEntity::PlayEffect( const idDecl *effect, jointHandle_t joint,
 		delete clientEffect;
 		return NULL;
 	}
+
+	// openQ4: an explosion effect nothing else lights gets a classic flash
+	if ( !loop ) {
+		idVec3 flashOrigin = renderEntity.origin;
+		idVec3 jointOrigin;
+		idMat3 jointAxis;
+		idAnimator *animator = GetAnimator();
+		if ( animator && animator->GetJointTransform( joint, gameLocal.time, jointOrigin, jointAxis ) ) {
+			flashOrigin = renderEntity.origin + ( jointOrigin + jointAxis * originOffset ) * renderEntity.axis;
+		}
+		G_ClassicEffectFlash( effect, flashOrigin, loop );
+	}
 	
 	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_RED ]		= effectTint[ 0 ];
 	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_GREEN ]	= effectTint[ 1 ];
@@ -2545,6 +2557,9 @@ rvClientEffect* idEntity::PlayEffect( const idDecl *effect, const idVec3& origin
 		delete clientEffect;
 		return NULL;
 	}
+
+	// openQ4: an explosion effect nothing else lights gets a classic flash
+	G_ClassicEffectFlash( effect, origin, loop );
 	
 	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_RED ]		= effectTint[ 0 ];
 	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_GREEN ]	= effectTint[ 1 ];

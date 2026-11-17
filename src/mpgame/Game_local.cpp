@@ -9573,6 +9573,9 @@ rvClientEffect* idGameLocal::PlayEffect(
 		return NULL;
 	}
 
+	// openQ4: an explosion effect nothing else lights gets a classic flash
+	G_ClassicEffectFlash( effect, origin, loop );
+
 	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_RED ]		= effectTint[ 0 ];
 	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_GREEN ]	= effectTint[ 1 ];
 	clientEffect->GetRenderEffect()->shaderParms[ SHADERPARM_BLUE ]		= effectTint[ 2 ];

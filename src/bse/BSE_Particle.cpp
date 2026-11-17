@@ -1660,6 +1660,36 @@ void rvElectricityParticle::SetupElectricity(rvParticleTemplate* pt) {
 	mJitterTable = ResolveElectricityJitterTable(info->mJitterTableName, info->mJitterTable);
 }
 
+// openQ4: the lights in weapon, monster and vehicle effects (muzzle flashes,
+// projectile glows, impacts, explosions) follow the game's g_dynamicLightShadows
+// like the game's own weapon lights do: -1 casts on Quality and up
+// (com_machineSpec 3), 0 never, 1 always. Retail authored nearly all of them
+// without "shadows". Other effects keep the authored flag. The game module
+// registers the cvar; with no game loaded there is none, and the flag stands.
+static bool BSE_CombatLightCastsShadows(rvBSE* effect) {
+	if (!effect || !cvarSystem) {
+		return false;
+	}
+	const char* declName = effect->GetDeclName();
+	if (!declName || !*declName) {
+		return false;
+	}
+	idStr name(declName);
+	name.BackSlashesToSlashes();
+	if (name.Icmpn("effects/weapons/", 16) && name.Icmpn("effects/monsters/", 17) &&
+		name.Icmpn("effects/vehicles/", 17)) {
+		return false;
+	}
+	const idCVar* mode = cvarSystem->Find("g_dynamicLightShadows");
+	if (!mode) {
+		return false;
+	}
+	if (mode->GetInteger() < 0) {
+		return cvarSystem->GetCVarInteger("com_machineSpec") >= 3;
+	}
+	return mode->GetInteger() != 0;
+}
+
 bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time) {
 	idRenderWorld* renderWorld = effect ? effect->GetRenderWorld() : NULL;
 	if (!renderWorld && session) {
@@ -1699,7 +1729,7 @@ bool rvLightParticle::InitLight(rvBSE* effect, rvSegmentTemplate* st, float time
 	mLight.shaderParms[ SHADERPARM_BLUE ] = tint.z;
 	mLight.pointLight = true;
 	mLight.detailLevel = 10.0f;
-	mLight.noShadows = !pt->GetShadows();
+	mLight.noShadows = !pt->GetShadows() && !BSE_CombatLightCastsShadows(effect);
 	mLight.noSpecular = !pt->GetSpecular();
 	mLight.shader = pt->GetMaterial();
 

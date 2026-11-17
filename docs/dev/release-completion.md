@@ -7,6 +7,50 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Weapon fire and explosions cast shadows (#235, #236), 17 November 2026
+
+- **Gunfire throws shadows.** On Quality, Ultra and Maximum, muzzle flashes
+  (yours and enemies'), glowing projectiles and explosion flashes now cast
+  shadows, so a firefight in a dark corridor throws the shooters' silhouettes
+  across the walls. Quake 4 left these lights shadowless to save the cost of
+  its original stencil shadows; shadow maps make them affordable on the top
+  presets. The gun that fired, a projectile's own model and whatever blew up
+  never shadow their own flash.
+- **More explosions light the room.** Explosions that only play an effect
+  (dying turrets, flyers and tanks, vehicles, harvester parts and the scripted
+  explosions in the levels) now flash their surroundings like rockets and
+  barrels already did. Gore bursts, electrical deaths and smoke trails are left
+  alone, and effects that carry their own light keep it.
+- **What to do.** Nothing. `g_dynamicLightShadows` still decides: `-1` follows
+  the preset, `0` turns these shadows off, and `1` turns them on with any
+  preset that draws shadows, including the original stencil shadows on
+  Balanced and below. Multiplayer follows the same rule.
+- Development: `rvWeapon::MuzzleFlashCastsShadows` gates the view, world and
+  classic muzzle flashes; all three carry the muzzle-flash light id that the
+  firer's body, head and world weapon already suppress, and stay shadowless
+  while a shadow-casting flashlight holds that slot. Classic explosion flashes
+  get their own light id per pool slot and suppress the shadows of the
+  non-static entities their origin starts inside. Projectiles with a
+  shadow-casting light suppress their own model in it. BSE light segments in
+  `effects/weapons/`, `effects/monsters/` and `effects/vehicles/` follow the
+  cvar (`BSE_CombatLightCastsShadows`). `G_ClassicEffectFlash`, called from
+  `idGameLocal::PlayEffect` and both `idEntity::PlayEffect` overloads,
+  classifies an effect once per decl (explosion/detonate/death/destroy name or
+  `effects/explosions/`, a `gfx/effects/fire/` material, no light segment) and
+  merges with a projectile or barrel flash raised for the same blast. SP and
+  MP game trees carry the same change.
+- Evidence (17 November, Windows x64, Quality unless noted, storage2 with a
+  Strogg marine, no OS input): with `g_dynamicLightShadows 1` the shadow report
+  shows the weapon's `lights/muzzleflash` and the classic `lights/round` flashes
+  mapped on OpenGL and Vulkan, the marine's own muzzle light and its bolt's
+  classic light mapped, and a `func_fx` of `effects/explosions/surface/medium`
+  classified as an explosion with a mapped flash; with `0` the same lights
+  report `noShadows-flag`. Frames show the marine's shadow from the flash and
+  no self-occlusion on either backend, and Balanced draws the same flashes
+  with stencil shadows. No shadow-pass failures or errors in the logs.
+  Not covered: a multiplayer match (the MP module builds with the same
+  change but was not run) and combat-crowd cost on Quality.
+
 ## Updates are found, and install from the game (#227), 16 November 2026
 
 - **The Updates button finds openQ4 releases.** It used to ask Quake 4's old

@@ -19,7 +19,7 @@ Both are saved, so your choice survives a restart. `g_projectileLights 0` still 
 
 **Bright projectiles.** Rockets, plasma bolts and dark matter spheres carry a light. This only fills gaps: a projectile that already has its own light keeps it, and the single-player rocket and grenade, whose trails already light their surroundings, are left alone so their glow isn't doubled. Their multiplayer trails have no light, so those get the classic one.
 
-**Explosions.** A detonation flashes the surrounding walls and fades over 120 to 400 ms, depending on what went off. Exploding barrels and other breakables flash too.
+**Explosions.** A detonation flashes the surrounding walls and fades over 120 to 400 ms, depending on what went off. Exploding barrels and other breakables flash too. **Not in 0.14.1:** so do the explosions that only play an effect: dying turrets, flyers and tanks, vehicles, harvester parts and the scripted explosions in the levels. openQ4 counts an effect as an explosion when its name says so and it draws fire. Gore bursts, electrical deaths and smoke trails don't qualify, and an effect that already carries its own light keeps it.
 
 Bullets, nails, debris and glass get nothing: they aren't bright, there are far too many of them to light, and Quake II and Quake III didn't light them either.
 
@@ -64,7 +64,9 @@ An entity definition can override what openQ4 picks for it:
 
 ## Cost
 
-Each classic light is a real light in openQ4's renderer, not the cheap tint it was in Quake II. To keep the cost down, they cast no shadows, at most 24 flashes are alive at once (the oldest is reused when the pool is full), and flashes more than about 3000 units from you are skipped.
+Each classic light is a real light in openQ4's renderer, not the cheap tint it was in Quake II. To keep the cost down, at most 24 flashes are alive at once (the oldest is reused when the pool is full), and flashes more than about 3000 units from you are skipped.
+
+**Shadows (Not in 0.14.1).** Classic lights cast shadows on the Quality, Ultra and Maximum presets, together with the game's own muzzle flashes and the lights in weapon and enemy effects. `g_dynamicLightShadows` controls all of them: `-1` follows the preset, `0` turns them off, `1` turns them on with any preset that draws shadows. The gun that fired, a projectile's own model and whatever blew up stay out of their own flash's shadows. See [Shadow mapping](shadow-mapping.md).
 
 ## Seeing them without firing
 
@@ -84,3 +86,4 @@ testClassicLight explosion projectile_dmg         // that projectile's explosion
 | `g_classicDynamicLightScale` | `1` | `0.25..4` | Reach of those lights. |
 | `g_projectileLights` | `1` | `0..1` | Shows lights on projectiles, classic ones included. |
 | `g_muzzleFlash` | `1` | `0..1` | Shows muzzle flashes. |
+| `g_dynamicLightShadows` | `-1` | `-1..1` | Shadows from weapon lights, classic ones included. `-1` casts them on Quality and up. |

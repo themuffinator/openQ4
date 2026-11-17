@@ -48,7 +48,8 @@ bool					G_ClassicLightsEnabled		( void );
 bool					G_ClassicLightProfile		( const idDict &spawnArgs, classicLightProfile_t &profile );
 
 // Installs the tracking light for a bright projectile into an otherwise unused
-// renderLight_t.  Returns false when the projectile gets no classic light,
+// renderLight_t.  Its shadows follow g_dynamicLightShadows; the projectile
+// keeps its own model out of them.  Returns false when the projectile gets no classic light,
 // either because the class is unlit or because the shipped effect for it
 // already carries an authored light segment.
 bool					G_ClassicProjectileLight	( const idDict &spawnArgs, renderLight_t &light );
@@ -56,8 +57,21 @@ bool					G_ClassicProjectileLight	( const idDict &spawnArgs, renderLight_t &ligh
 // One-shot world flashes.  G_ClassicExplosionFlash's defaultRadius is used for
 // call sites that know something exploded even though the def carries no
 // recognised projectile class or splash damage -- barrels and damagables.
+//
+// Flashes follow g_dynamicLightShadows (G_DynamicLightShadowsEnabled).  A muzzle
+// flash passes the firing weapon's muzzle-flash light id, in which the firer's
+// body and gun already suppress their shadows; an explosion flash instead asks
+// the entities it starts inside, such as a barrel's burnt shell, to stay out
+// of its shadows.
 void					G_ClassicFlash				( const idVec3 &origin, const idVec3 &color, float radius, int durationMS );
-void					G_ClassicMuzzleFlash		( const idDict &weaponDef, const idVec3 &origin );
+void					G_ClassicMuzzleFlash		( const idDict &weaponDef, const idVec3 &origin, int shadowLightId = 0, bool castShadows = false );
+
+// Explosion flash for an effect nothing else lights: an explosion, detonation
+// or death effect that burns (it draws fire materials) and carries no light
+// segment of its own, such as a dying turret or a scripted level explosion.
+// A flash raised at the same spot in the same frame, by a detonating
+// projectile or an exploding barrel, already covers it.
+void					G_ClassicEffectFlash		( const idDecl *effect, const idVec3 &origin, bool loop );
 void					G_ClassicExplosionFlash		( const idDict &spawnArgs, const idVec3 &origin, float defaultRadius = 0.0f );
 void					G_ClassicWorldExplosionFlash	( const idDict &spawnArgs, const idVec3 &origin );
 

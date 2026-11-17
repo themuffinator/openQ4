@@ -22,6 +22,9 @@
 
 static const float BOUNCE_SOUND_MIN_VELOCITY	= 200.0f;
 static const float BOUNCE_SOUND_MAX_VELOCITY	= 400.0f;
+// openQ4: light ids for projectile lights that cast shadows, clear of the
+// weapon, actor and classic flash ids
+static const int PROJECTILE_LIGHT_ID_BASE		= 0x7d000000;
 
 const idEventDef EV_Explode( "<explode>", NULL );
 const idEventDef EV_Fizzle( "<fizzle>", NULL );
@@ -324,6 +327,14 @@ void idProjectile::Create( idEntity* _owner, const idVec3 &start, const idVec3 &
 		G_ClassicProjectileLight( spawnArgs, renderLight );
 	}
 // openQ4 END
+
+	// openQ4: a projectile whose light casts shadows keeps its own model out of
+	// them; the light sits inside it.  Stock projectile defs already say
+	// "noshadows", but a mod's need not.
+	if ( renderLight.shader && !renderLight.noShadows ) {
+		renderLight.lightId = PROJECTILE_LIGHT_ID_BASE + entityNumber;
+		renderEntity.suppressShadowInLightID = renderLight.lightId;
+	}
 
 	spawnArgs.GetVector( "light_offset", "0 0 0", lightOffset );
 
