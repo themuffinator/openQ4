@@ -80,6 +80,7 @@ ENGINE_SOURCE_GLOBS = [
 # renderer modules; built as the openq4_imagetools static library
 IMAGETOOLS_SOURCE_GLOBS = [
     "imagetools/*.cpp",
+    "imagetools/BC7/*.cpp",
     "imagetools/Color/*.cpp",
     "imagetools/DXT/*.cpp",
     "imagetools/ETC/*.cpp",

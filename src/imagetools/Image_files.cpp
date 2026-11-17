@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ImageTools.h"
 #include "LegacyScopeMask.h"
 #include "DXT/DXTCodec.h"
+#include "BC7/BC7Codec.h"
 #include "PNG/PNGCodec.h"
 
 idCVar image_usePrecompressedTextures(
@@ -1236,24 +1237,14 @@ static bool R_TryResolvePreferredDDSImageSource( const idStr &candidateName, idS
 	}
 
 	if ( info.format == DDS_STORED_FORMAT_BC7 ) {
-		if ( !allowPrecompressedDDS ) {
-			if ( rejectReason != NULL ) {
-				*rejectReason = "BC7 data, but this image is an image-program input that must be decoded on the CPU";
-			}
-			return false;
-		}
-		if ( !ImageTools_GetCompressionCaps().bptcTextureCompressionAvailable ) {
-			if ( rejectReason != NULL ) {
-				*rejectReason = "BC7 data, but the active renderer reports no BPTC support";
-			}
-			return false;
-		}
+		// Like DXT, BC7 goes up as it is when it can, and LoadDDS decodes it on
+		// the CPU when it feeds an image program or the renderer has no BPTC.
 		ddsName = candidateName;
 		if ( timestamp != NULL ) {
 			*timestamp = ddsTimestamp;
 		}
 		if ( precompressedDDS != NULL ) {
-			*precompressedDDS = true;
+			*precompressedDDS = allowPrecompressedDDS && ImageTools_GetCompressionCaps().bptcTextureCompressionAvailable;
 		}
 		return true;
 	}
@@ -1304,6 +1295,69 @@ public:
 	~idSuppressRetailProgramDDS() { ddsRetailProgramSuppressed--; }
 };
 
+// the dds/ shadow and the Quake 4-style sibling of a plain image name
+static void R_AppendPlainImageDDSCandidates( const char *imageName, idStrList &candidates, idStrList &origins, const char *shadowOrigin, const char *siblingOrigin ) {
+	idStr sourceName = imageName;
+	sourceName.DefaultFileExtension( ".tga" );
+	sourceName.BackSlashesToSlashes();
+	sourceName.ToLower();
+
+	idStr ext;
+	sourceName.ExtractFileExtension( ext );
+	if ( ext != "tga" && ext != "jpg" && ext != "png" ) {
+		return;
+	}
+	if ( !R_ImageNameHasDDSShadowPrefix( sourceName ) ) {
+		idStr shadowDDSName = "dds/";
+		shadowDDSName += sourceName;
+		shadowDDSName.StripFileExtension();
+		shadowDDSName.DefaultFileExtension( ".dds" );
+		R_AppendDDSCandidate( candidates, origins, shadowDDSName, shadowOrigin );
+	}
+
+	idStr siblingDDSName = sourceName;
+	siblingDDSName.StripFileExtension();
+	siblingDDSName.DefaultFileExtension( ".dds" );
+	R_AppendDDSCandidate( candidates, origins, siblingDDSName, siblingOrigin );
+}
+
+/*
+=============
+R_DownsizeProgramInput
+
+The plain image inside "downsize( <image>, <levels> )", or false for anything
+else. openQ4's downsize() returns its input unchanged (image_downSize and its
+limits do the shrinking for every image alike), so a DDS of that input is
+exactly what the program would produce.
+=============
+*/
+static bool R_DownsizeProgramInput( const char *imageProgram, idStr &input ) {
+	if ( imageProgram == NULL || imageProgram[0] == '\0' ) {
+		return false;
+	}
+
+	idLexer src;
+	src.LoadMemory( imageProgram, idLib::SizeToInt( strlen( imageProgram ), "R_DownsizeProgramInput" ), imageProgram );
+	src.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
+
+	idToken token;
+	idToken image;
+	idToken levels;
+	const bool matched = src.ReadToken( &token ) && token.Icmp( "downsize" ) == 0 &&
+		src.ReadToken( &token ) && token == "(" &&
+		src.ReadToken( &image ) && !R_ImageNameIsProgramOperator( image ) &&
+		src.ReadToken( &token ) && token == "," &&
+		src.ReadToken( &levels ) && levels.type == TT_NUMBER &&
+		src.ReadToken( &token ) && token == ")" &&
+		!src.ReadToken( &token );
+	src.FreeSource();
+	if ( !matched ) {
+		return false;
+	}
+	input = image;
+	return true;
+}
+
 /*
 =============
 R_BuildDDSCandidates
@@ -1312,6 +1366,12 @@ Ordered list of DDS files that may stand in for an image source. User-supplied
 replacements are probed before the retail progimg/ tree: the retail tree exists
 for nearly every image-program result, so probing it first made a user's dds/
 pack a silent no-op for every bump map and most speculars.
+
+downsize( <image>, N ) also takes a DDS of its input, ahead of the retail
+result. Quake 4's materials wrap most character, weapon and monster textures in
+downsize(), so without this a texture pack that replaces those images by their
+own names never reached the screen: its BC7 files were turned away as image
+program inputs, and the stock progimg/downsize/ file won.
 =============
 */
 static void R_BuildDDSCandidates( const char *cname, idStrList &candidates, idStrList &origins ) {
@@ -1320,27 +1380,17 @@ static void R_BuildDDSCandidates( const char *cname, idStrList &candidates, idSt
 	R_AppendDDSCandidate( candidates, origins, canonicalDDSName, "dds/ (dhewm3 naming)" );
 
 	if ( R_IsPlainImageSourceName( cname ) ) {
-		idStr sourceName = cname;
-		sourceName.DefaultFileExtension( ".tga" );
-		sourceName.BackSlashesToSlashes();
-		sourceName.ToLower();
+		R_AppendPlainImageDDSCandidates( cname, candidates, origins,
+			"dds/ (asset path)", "alongside the original asset (Quake 4 style)" );
+	}
 
-		idStr ext;
-		sourceName.ExtractFileExtension( ext );
-		if ( ext == "tga" || ext == "jpg" || ext == "png" ) {
-			if ( !R_ImageNameHasDDSShadowPrefix( sourceName ) ) {
-				idStr shadowDDSName = "dds/";
-				shadowDDSName += sourceName;
-				shadowDDSName.StripFileExtension();
-				shadowDDSName.DefaultFileExtension( ".dds" );
-				R_AppendDDSCandidate( candidates, origins, shadowDDSName, "dds/ (asset path)" );
-			}
-
-			idStr siblingDDSName = sourceName;
-			siblingDDSName.StripFileExtension();
-			siblingDDSName.DefaultFileExtension( ".dds" );
-			R_AppendDDSCandidate( candidates, origins, siblingDDSName, "alongside the original asset (Quake 4 style)" );
-		}
+	idStr downsizeInput;
+	if ( R_DownsizeProgramInput( cname, downsizeInput ) ) {
+		idStr inputDDSName;
+		R_ImageProgramToCompressedFileName( downsizeInput, inputDDSName );
+		R_AppendDDSCandidate( candidates, origins, inputDDSName, "downsize() input, dds/ (dhewm3 naming)" );
+		R_AppendPlainImageDDSCandidates( downsizeInput, candidates, origins,
+			"downsize() input, dds/ (asset path)", "downsize() input, alongside the original asset" );
 	}
 
 	// stock retail data last, so any user replacement wins
@@ -1713,6 +1763,77 @@ bool R_ImageDDS_RunSelfTest() {
 		}
 	}
 
+	// downsize( <image>, N ) offers its input's DDS files ahead of the retail result
+	struct downsizeCase_t {
+		const char *imageProgram;
+		const char *expectedInput;
+	};
+	const downsizeCase_t downsizeCases[] = {
+		{ "downsize( models/characters/marine/helmet_d, 1)", "models/characters/marine/helmet_d" },
+		{ "downsize( textures/a.tga, 0 )", "textures/a.tga" },
+		{ "downsize( addnormals( textures/a, heightmap( textures/b, 2)), 1)", NULL },
+		{ "downsize( textures/a, 1) extra", NULL },
+		{ "textures/a", NULL }
+	};
+	for ( int i = 0; i < (int)( sizeof( downsizeCases ) / sizeof( downsizeCases[0] ) ); i++ ) {
+		idStr input;
+		const bool parsed = R_DownsizeProgramInput( downsizeCases[i].imageProgram, input );
+		if ( parsed != ( downsizeCases[i].expectedInput != NULL ) ||
+			 ( parsed && input.Icmp( downsizeCases[i].expectedInput ) != 0 ) ) {
+			common->Warning( "Image DDS self-test failed: downsize input of '%s' read as '%s'",
+				downsizeCases[i].imageProgram, parsed ? input.c_str() : "(none)" );
+			return false;
+		}
+	}
+	idStrList downsizeCandidates;
+	idStrList downsizeOrigins;
+	R_BuildDDSCandidates( "downsize( models/characters/marine/helmet_d, 1)", downsizeCandidates, downsizeOrigins );
+	const char *expectedDownsizeCandidates[] = {
+		"dds/downsize/models/characters/marine/helmet_d 1.dds",
+		"dds/models/characters/marine/helmet_d.dds",
+		"models/characters/marine/helmet_d.dds",
+		"progimg/downsize/models/characters/marine/helmet_d_1.dds"
+	};
+	const int expectedDownsizeCount = (int)( sizeof( expectedDownsizeCandidates ) / sizeof( expectedDownsizeCandidates[0] ) );
+	bool downsizeOrderMatches = downsizeCandidates.Num() == expectedDownsizeCount;
+	for ( int i = 0; downsizeOrderMatches && i < expectedDownsizeCount; i++ ) {
+		downsizeOrderMatches = downsizeCandidates[i].Icmp( expectedDownsizeCandidates[i] ) == 0;
+	}
+	if ( !downsizeOrderMatches ) {
+		common->Warning( "Image DDS self-test failed: downsize() DDS candidates are out of order (%d found)", downsizeCandidates.Num() );
+		for ( int i = 0; i < downsizeCandidates.Num(); i++ ) {
+			common->Printf( "   %s [%s]\n", downsizeCandidates[i].c_str(), downsizeOrigins[i].c_str() );
+		}
+		return false;
+	}
+
+	// one mode 6 BC7 block, decoded the way LoadDDS decodes a level: both
+	// endpoints 0x80 0x40 0x20 0xfe, every index 0
+	byte bc7Block[16];
+	memset( bc7Block, 0, sizeof( bc7Block ) );
+	{
+		const byte color[4] = { 0x80, 0x40, 0x20, 0xfe };
+		uint64 low = 0x40;
+		int position = 7;
+		for ( int channel = 0; channel < 4; channel++ ) {
+			low |= (uint64)( color[channel] >> 1 ) << position;
+			low |= (uint64)( color[channel] >> 1 ) << ( position + 7 );
+			position += 14;
+		}
+		for ( int i = 0; i < 8; i++ ) {
+			bc7Block[i] = (byte)( low >> ( i * 8 ) );
+		}
+	}
+	byte bc7Rgba[4 * 4 * 4];
+	BC7_DecodeImage( bc7Block, bc7Rgba, 4, 4 );
+	for ( int texel = 0; texel < 16; texel++ ) {
+		const byte *rgba = bc7Rgba + texel * 4;
+		if ( rgba[0] != 0x80 || rgba[1] != 0x40 || rgba[2] != 0x20 || rgba[3] != 0xfe ) {
+			common->Warning( "Image DDS self-test failed: BC7 texel %d decoded to %d %d %d %d", texel, rgba[0], rgba[1], rgba[2], rgba[3] );
+			return false;
+		}
+	}
+
 	common->Printf( "Image DDS self-test passed\n" );
 	return true;
 }
@@ -1721,11 +1842,16 @@ bool R_ImageDDS_RunSelfTest() {
 =============
 LoadDDS
 
-Decodes DXT1, DXT3, DXT5 and RXGB files on the CPU. DXT3 is only ever read
+Decodes DXT1, DXT3, DXT5, RXGB and BC7 files on the CPU. DXT3 is only ever read
 here, never uploaded as it is: Quake 4 ships a DXT3 .dds beside the .tga of
 each font atlas, and those atlases must keep coming from the .tga (see
 idImage::DeriveOpts). A DXT3 file is used only when a material names it outright
 or nothing else by its name exists, as with the Awakening expansion's three.
+
+BC7 comes through here when it feeds an image program, such as a texture pack's
+replacement for an addnormals() or heightmap() input, or when the renderer has
+no BPTC support. Only the top level is read; the destination image builds its
+own mips, as it does for every other source.
 =============
 */
 static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp, bool decodeRXGBNormalMap ) {
@@ -1768,14 +1894,21 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 	}
 
 	int blockSize = 0;
+	int dataOffset = DDS_HEADER_BYTES;
 	enum ddsCompression_t {
 		DDS_COMPRESSION_DXT1,
 		DDS_COMPRESSION_DXT3,
-		DDS_COMPRESSION_DXT5
+		DDS_COMPRESSION_DXT5,
+		DDS_COMPRESSION_BC7
 	} compression;
 	bool storedRXGBNormalMap = false;
 
-	if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '1' ) ) {
+	ddsFileInfo_t bc7Info;
+	if ( R_ParseDDSFileInfo( buffer, fileSize, fileSize, bc7Info ) && bc7Info.format == DDS_STORED_FORMAT_BC7 ) {
+		blockSize = 16;
+		compression = DDS_COMPRESSION_BC7;
+		dataOffset = bc7Info.dataOffset;
+	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '1' ) ) {
 		blockSize = 8;
 		compression = DDS_COMPRESSION_DXT1;
 	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '3' ) ) {
@@ -1796,7 +1929,6 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 	const int blocksWide = Max( 1, (int)( ( ddsWidth + 3 ) >> 2 ) );
 	const int blocksHigh = Max( 1, (int)( ( ddsHeight + 3 ) >> 2 ) );
 	const int levelSize = blocksWide * blocksHigh * blockSize;
-	const int dataOffset = 128;
 
 	if ( fileSize < ( dataOffset + levelSize ) ) {
 		fileSystem->FreeFile( buffer );
@@ -1816,7 +1948,9 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 
 	byte *decodedRgba = (byte *)R_StaticAlloc( (int)paddedBytes );
 	idDxtDecoder decoder;
-	if ( compression == DDS_COMPRESSION_DXT1 ) {
+	if ( compression == DDS_COMPRESSION_BC7 ) {
+		BC7_DecodeImage( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );
+	} else if ( compression == DDS_COMPRESSION_DXT1 ) {
 		decoder.DecompressImageDXT1( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );
 	} else if ( compression == DDS_COMPRESSION_DXT3 ) {
 		decoder.DecompressImageDXT5( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );

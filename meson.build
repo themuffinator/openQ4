@@ -346,6 +346,14 @@ if get_option('build_native_tests')
     args: [files('tools/tests/png_codec.py'), '--run', openq4_png_codec_test, meson.project_build_root() / 'png-codec-test'],
     depends: openq4_png_codec_test, timeout: 300)
 
+  # BC7 decoder: seeded blocks for every mode against digests from two
+  # independent decoders (tools/tests/bc7_reference.py)
+  openq4_bc7_codec_test = executable(
+    'openq4-bc7-codec-test', files('tools/tests/native/Bc7CodecTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-bc7-codec', openq4_bc7_codec_test, timeout: 60)
+
   # Render demo block container: the codec, the stream of blocks cut at any
   # byte or damaged anywhere, and the timeline its headers alone give
   openq4_demo_block_codec_test = executable(

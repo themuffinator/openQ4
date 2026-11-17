@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Texture packs reach characters, weapons and monsters, 17 November 2026
+
+- **BC7 packs now replace character, weapon and monster textures.** Quake 4
+  builds most of these through a `downsize()` step, and openQ4 used to pass
+  over a pack's file for them and show Quake 4's own half-size texture. A
+  file named after the texture, such as a hi-def marine helmet, is now used,
+  and it stays compressed (#217).
+- **BC7 files work wherever DXT files do.** A BC7 replacement that feeds a
+  texture openQ4 builds itself, such as a bump map's inputs, is now decoded
+  instead of skipped. On graphics without BC7 support, every Mac with OpenGL
+  among them, BC7 files now load uncompressed instead of being ignored.
+- **Quake 4's own textures.** A dozen stock textures that ship their own DDS
+  file next to a precomputed half-size copy now load the full-size file.
+- **What to do.** Nothing. Pack authors: see
+  [DDS texture replacements](../user/texture-replacements.md#bump-maps-and-other-image-programs),
+  which also explains why loose copies of original textures make a packed
+  replacement look out of date.
+
 ## The chat bubble stays off dead players, 17 November 2026
 
 - **No more chat bubble blinking over a body.** Multiplayer hides the
