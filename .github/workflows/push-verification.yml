@@ -286,6 +286,7 @@ jobs:
             tools/tests/mp_client_options.py \
             tools/tests/awakening_turret_skin_contract.py \
             tools/tests/awakening_m01_dropship_contract.py \
+            tools/tests/awakening_m01_retch_contract.py \
             tools/tests/awakening_status_behavior.py \
             tools/tests/clip_owner_behavior.py \
             tools/tests/clip_empty_model_behavior.py \
@@ -871,6 +872,7 @@ jobs:
           python tools/tests/mp_client_options.py
           python tools/tests/awakening_turret_skin_contract.py
           python tools/tests/awakening_m01_dropship_contract.py
+          python tools/tests/awakening_m01_retch_contract.py
           python tools/tests/awakening_status_behavior.py
           python tools/tests/clip_owner_behavior.py
           python tools/tests/clip_empty_model_behavior.py

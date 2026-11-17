@@ -1,0 +1,123 @@
+// openQ4's direction for The Awakening's Retch ambush (m01 part 2).
+// Replaces m04_building_unit2_seq_5 on a fresh start. Loaded as a map script.
+//
+// The writers' scene: an Atlas survivor meets Falcon squad ("You're Falcon
+// squad, good. The entire walker unit was wiped out... some spider-legged
+// Strogg piece of shit is tearing them apart."), the Retch bursts through the
+// door behind him and kills him ("Arrrghh!"), Tak: "What the hell is that
+// thing?!", Navajas: "Kill it!". The door then closes behind the Retch and
+// opens again (m04_building_unit2_seq_6) once it and the light tank are dead.
+//
+// The shared clip st_retch_intro (both actors, 151 frames at 24 fps) keeps the
+// Retch 116 units back, behind the door, until frame 88 (3.67 s); it lunges
+// through the doorway, lifts the marine and throws him down by frame 144. The
+// alpha opened the door 0.3 s after the lunge, screamed after the kill had
+// finished, and held the camera on an idle Retch for six seconds.
+#include "scripts/doom_defs.script"
+
+namespace oq4_m01_retch {
+
+#define BRIEFING_LENGTH		9.3		// vo_atlas6_youfalcsq
+#define LUNGE				3.67	// st_retch_intro frame 88
+#define KILL_LENGTH			6.29	// st_retch_intro, 151 frames
+
+void mark(string beat) {
+    sys.println("oq4_m01_retch: " + beat + " @ " + sys.getTime());
+}
+
+void until(float deadline) {
+    if (sys.getTime() < deadline) {
+        sys.wait(deadline - sys.getTime());
+    }
+}
+
+// Close the door behind the Retch once it is clear of the doorway, so the
+// fight stays on the squad's side and the way on stays shut until it is won.
+void closeBehind() {
+    entity retch = $m04_building_unit2_seq_4_retch_1;
+    // Measure from the closed door: the panel is bound to its mover, which is open now.
+    vector door = $m04_building_unit2_seq_5_retch_kill_door.getVectorKey("origin");
+    vector gap;
+    float deadline = sys.getTime() + 8;
+    while (sys.getTime() < deadline && isValidEntity(retch) && retch.getHealth() > 0) {
+        gap = retch.getWorldOrigin() - door;
+        gap_z = 0;
+        if (sys.vecLength(gap) > 96) { break; }
+        sys.wait(0.1);
+    }
+    sys.trigger($m04_building_unit2_seq_5_retch_kill_door_anc);
+    mark("door_closed");
+}
+
+void squadReacts() {
+    entity marine = $m04_building_unit2_seq_4_retch_kill_marine;
+    $tak.lookAt(marine);
+    $navajas.lookAt(marine);
+}
+
+float started;
+
+void ambush() {
+    entity marine = $m04_building_unit2_seq_4_retch_kill_marine;
+    entity retch = $m04_building_unit2_seq_4_retch_1;
+    entity door = $m04_building_unit2_seq_5_retch_kill_door_anc;
+    float killStart;
+
+    // A teleport onto the trigger can touch it twice in one frame.
+    if (started) { return; }
+    started = 1;
+    mark("ambush");
+    squadReacts();
+    sys.fadeOut('0 0 0', 0.3);
+    sys.wait(0.3);
+    sys.trigger($m04_building_unit2_seq_5_cin_cam_main);
+    sys.fadeIn('0 0 0', 0.6);
+
+    // He keeps his pleading loop (anim_idle st_retch_intro_loop) while he talks.
+    aiSpeak(marine, "lipsync_atlas6_youfalcsq");
+    // Start the shared clip so the lunge lands as he finishes "...tearing them apart".
+    sys.wait(BRIEFING_LENGTH - LUNGE);
+    aiScriptedAnim(marine, "st_retch_intro", 4, 0);
+    sys.trigger(retch);
+    killStart = sys.getTime();
+    mark("kill");
+
+    // The door slides open just ahead of the lunge.
+    until(killStart + LUNGE - 0.45);
+    sys.trigger(door);
+    retch.startSound("snd_growl", SND_CHANNEL_VOICE, 0);
+    until(killStart + LUNGE);
+    retch.startSound("snd_smash", SND_CHANNEL_BODY, 0);
+    aiSpeak(marine, "lipsync_atlas6_die");
+    until(killStart + LUNGE + 1.4);
+    aiSpeak($tak, "lipsync_tak_whthelltht");
+
+    // He lands at frame 144; keep him there instead of letting his idle stand him up.
+    until(killStart + KILL_LENGTH - 0.05);
+    aiScriptedAnimLoop(marine, "st_retch_intro_end_idle", 2);
+    retch.startSound("snd_rush", SND_CHANNEL_VOICE, 0);
+    aiSpeakWait($navajas, "lipsync_nava_killit");
+    mark("kill_done");
+
+    sys.fadeOut('0 0 0', 0.25);
+    sys.wait(0.25);
+    sys.trigger($m04_building_unit2_seq_5_cin_cam_main);
+    // Its entrance plays as a scripted animation; release it to its own AI.
+    aiScriptedStop(retch);
+    retch.enableDamage();
+    retch.becomeAggressive();
+    retch.enableTarget();
+    // It has just looked down the camera at the squad: come for them, rather
+    // than idling in the corridor until something wakes it.
+    retch.setEnemy($player1);
+    retch.faceEntity($player1);
+    sys.trigger($m04_building_unit2_seq_3_ai_blocker_top_level);
+    sys.trigger($m04_building_unit2_seq_5_lt_tank);
+    marine.kill();
+    $tak.lookAt($null_entity);
+    $navajas.lookAt($null_entity);
+    sys.fadeIn('0 0 0', 0.4);
+    thread closeBehind();
+    mark("fight");
+}
+}

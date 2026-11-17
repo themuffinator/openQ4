@@ -7,6 +7,23 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's landing zone and Retch ambush, 17 November 2026
+
+- **The squad is there when you land.** As you rappel out of the dropship,
+  Darnell, Tak and the Atlas fire team are already on the ground below instead
+  of popping into view when you touch down.
+- **A Retch ambush worth watching.** In the second part of the first mission
+  the Atlas survivor finishes telling the squad what happened before the Retch
+  bursts through the door behind him. The door opens as it lunges, his scream
+  lands as it grabs him, and the scene ends as soon as Tak and Navajas react,
+  instead of holding on the creature for six seconds. Short fades lead in and
+  out, and the Retch comes for you afterwards.
+- **What to do.** Replace the single-player game module and pak0, then start
+  the mission afresh; saves keep the scene they were made with.
+  `g_awakeningM01Retch 0` plays the alpha's version of the ambush.
+- Details: [M01 audit, revision 5](m01-interior-feedback-audit.md#revision-5-17-november-2026)
+  and [the Retch ambush](awakening-missions.md#retch-ambush-m01-part-2--17-november-2026).
+
 ## A loading screen for every level of The Awakening, 17 November 2026
 
 - **Thirteen new loading pictures.** Each campaign level of The Awakening now

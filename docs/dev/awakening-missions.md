@@ -366,6 +366,40 @@ be invented or re-enabled.
   also guards older post-introduction saves; neither their scripts nor their
   save layout changes.
 
+## Retch ambush, m01 part 2 — 17 November 2026
+
+`m04_building_unit2_seq_5` is redirected to `oq4_m01_retch::ambush`
+(`scripts/openq4/awakening/m01_retch.script`, `src/game/awakening/M01Retch.inl`)
+on a fresh start, while the trigger and the scene's nine named entities match;
+`g_awakeningM01Retch 0` keeps the alpha's function.
+
+The writers' VO notes give the scene: Atlas Marine 6 meets Falcon ("You're Falcon
+squad, good. The entire walker unit was wiped out... some spider-legged Strogg
+piece of shit is tearing them apart", 9.3 s), dies screaming ("Arrrghh!"), Tak:
+"What the hell is that thing?!", Navajas: "Kill it!". The marine and the Retch
+share `st_retch_intro` (151 frames): the Retch waits 116 units back, behind the
+door, until frame 88 (3.67 s), lunges, lifts him and throws him down by frame
+144. The marine's loop (`st_retch_intro_loop`, scene frames 1-113) and held end
+pose (`st_retch_intro_end_idle`) were authored but the dead pose was never used.
+
+| Alpha | openQ4 |
+| --- | --- |
+| Hard cut to the camera and back. | Short fades in and out. |
+| The kill starts after the briefing ends; the door opens 4 s into it, 0.3 s after the Retch has passed through it. | The kill starts 3.67 s before the briefing ends; the door opens 0.45 s before the lunge. |
+| The death scream plays after the kill has finished. | The scream starts on the grab; Tak reacts as the marine is thrown. |
+| The camera holds an idle Retch for 6 s. | Control returns as Navajas finishes "Kill it!". |
+| The marine stands back up into his idle before he is killed. | He holds the authored dead pose, then dies where he fell. |
+| The door closes as the camera ends. | It closes once the Retch is clear of the doorway (or after 8 s); seq_6 still reopens it after the Retch and the light tank die. |
+| The Retch stays in its scripted entrance. | It is released to its AI with the player as its enemy, facing them. |
+
+The trigger can fire twice when a teleport lands on it; the scene runs once.
+Evidence: `.tmp/m01-polish/retch-base/` (alpha) and `retch-new/` (openQ4),
+hidden OpenGL probes with engine screenshots every 0.25 s. Not verified: the
+fight itself in normal play. In the probes the Retch stays in turret mode
+because the map's `m04_building_unit2_seq_5_retch_blocker` AAS obstacle
+surrounds it until the fight is won; it never saw the probe player, who had
+come to rest behind a wall.
+
 ## Script identity and asset ownership
 
 The original expansion remains external. `MissionScripts.inl` applies bounded

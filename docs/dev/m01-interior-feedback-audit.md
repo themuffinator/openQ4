@@ -352,6 +352,18 @@ Not covered: a viewer's judgement of the slowed seated loop and of the ramp
 curve; the scene's motion was judged from traces and one-second stills, not
 video.
 
+## Revision 5, 17 November 2026
+
+The landing zone's marines (`darnell`, `tak` and four Atlas marines, all
+`hide 2`) were only shown at touchdown, so the escape camera descended onto
+empty ground and the squad popped in as it landed. `m01_dropship-v5.script`
+shows Darnell and the Atlas fire team once Darnell's rappel ends and Tak once
+his does; `landing()` triggers only those not yet shown. The Atlas marines get
+`cinematic 1` at spawn (they lacked it, and non-cinematic entities do not think
+during a cinematic). Evidence: `.tmp/m01-polish/descent/` (OpenGL, whole scene,
+handoff at 285.2 s as in v4); a marine is in view during the descent where v4
+showed none. v4 stays in pak0 for its saves.
+
 ## Other findings and limits
 
 The full-run harness reported no fatal errors and a successful gameplay handoff,

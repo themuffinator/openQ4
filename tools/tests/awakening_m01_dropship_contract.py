@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The Awakening's m01 dropship scene, revision 4 (docs/dev/m01-interior-feedback-audit.md).
+"""The Awakening's m01 dropship scene, revisions 4-5 (docs/dev/m01-interior-feedback-audit.md).
 
-- Fresh m01 starts compile scripts/openq4/awakening/m01_dropship-v4.script and
+- Fresh m01 starts compile scripts/openq4/awakening/m01_dropship-v5.script and
   redirect the hangar, cabin and evacuation relays to it, only when all three
-  of the map's anchors match. Revisions 1-3 stay in pak0 unchanged in name,
+  of the map's anchors match. Revisions 1-4 stay in pak0 unchanged in name,
   because suspended save threads keep their bytecode.
 - The seven marines who board along the rounded hangar lane get a short walk
   range and keep full AI thinks (a simple think steers at a stale goal);
@@ -13,6 +13,8 @@
   in pak0, and the generator reproduces the committed images.
 - The scene places the expansion's harness model in the six surviving seats of
   both damaged cabin sets, and every rappel goes through the rope approach.
+- The landing zone's marines show as they reach the ground, not at touchdown,
+  and the Atlas fire team animates during the cinematic.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PAK0 = ROOT / "content" / "baseoq4" / "pak0"
 SCRIPT_DIR = PAK0 / "scripts" / "openq4" / "awakening"
-V4 = SCRIPT_DIR / "m01_dropship-v4.script"
+V5 = SCRIPT_DIR / "m01_dropship-v5.script"
 CINEMATIC = ROOT / "src" / "game" / "awakening" / "M01Cinematic.inl"
 MANAGER = ROOT / "src" / "game" / "ai" / "AI_Manager.cpp"
 SKINS = PAK0 / "skins" / "openq4_awakening_m01.skin"
@@ -47,18 +49,18 @@ def check(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    script = V4.read_text(encoding="ascii")
+    script = V5.read_text(encoding="ascii")
     cinematic = CINEMATIC.read_text(encoding="utf-8")
 
     # Revision selection and immutability of the older programs.
-    check('"scripts/openq4/awakening/m01_dropship-v4.script"' in cinematic, "M01Cinematic does not select revision 4")
-    for older in ["m01_dropship.script", "m01_dropship-v2.script", "m01_dropship-v3.script"]:
+    check('"scripts/openq4/awakening/m01_dropship-v5.script"' in cinematic, "M01Cinematic does not select revision 5")
+    for older in ["m01_dropship.script", "m01_dropship-v2.script", "m01_dropship-v3.script", "m01_dropship-v4.script"]:
         check((SCRIPT_DIR / older).is_file(), f"older revision {older} must stay in pak0 for saves")
     for relay, call in [("intro_unit1_seq_2_trigger_seq_3", "oq4_m01::hangar"),
                         ("intro_unit1_seq_5_trigger_seq_6", "oq4_m01::cabin"),
                         ("m04_trench_unit1_main", "oq4_m01::evacuate")]:
         check(f'"{relay}"' in cinematic and f'"{call}"' in cinematic, f"relay {relay} is not directed to {call}")
-        check(f"void {call.split('::')[1]}()" in script, f"{call} is missing from revision 4")
+        check(f"void {call.split('::')[1]}()" in script, f"{call} is missing from revision 5")
     check("!hangarAnchor || !cabinAnchor || !evacuationAnchor" in cinematic, "a missing anchor must keep the original callbacks")
 
     # Lane marines: walk range and full thinks, scoped to them.
@@ -90,6 +92,15 @@ def main() -> int:
     check("markRope();" in script, "the rope mark is never computed")
     check(len(re.findall(r'aiScriptedAnimWait\([^,]+, "st_repelling"', script)) == 1, "a rappel bypasses descend()")
     check(not re.search(r"descend\([^)]*,", script), "descend() no longer takes a stride count")
+
+    # The landing zone is peopled during the descent.
+    check("thread descendThen($m04_trench_unit1_seq_1_darnell);" in script, "Darnell's arrival does not show the LZ")
+    check("descend($m04_trench_unit1_seq_1_tak);\n    takLands();" in script, "ground Tak must show after his rappel")
+    landing = script[script.index("void landing() {"):script.index("void evacuate()")]
+    check("sys.trigger($tak);" not in landing and "sys.trigger($darnell);" not in landing,
+          "landing() must not trigger the LZ marines a second time")
+    check('"m04_trench_unit1_seq_2_atlas_guy_", 33' in cinematic and 'args.Set( "cinematic", "1" )' in cinematic,
+          "the Atlas fire team must animate during the cinematic")
 
     # Skins, materials and plate images.
     materials = MATERIALS.read_text(encoding="ascii")

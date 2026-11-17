@@ -59,7 +59,7 @@ static bool Awakening_PrepareM01Cinematic( idMapFile *map ) {
 	}
 	// Each revision is immutable: suspended save threads retain their bytecode.
 	// The original filename remains available for pre-lighting M01 saves.
-	const char *script = "scripts/openq4/awakening/m01_dropship-v4.script";
+	const char *script = "scripts/openq4/awakening/m01_dropship-v5.script";
 	if ( !hangarAnchor || !cabinAnchor || !evacuationAnchor || fileSystem->ReadFile( script, NULL, NULL ) <= 0 ) {
 		gameLocal.Warning( "Awakening m01 direction unavailable: keeping the map's original callbacks" );
 		return false;
@@ -94,6 +94,11 @@ static void Awakening_DirectM01Relay( idDict &args ) {
 		args.Set( "call", "oq4_m01::cabin" );
 	} else if ( idStr::Icmp( name, "m04_trench_unit1_main" ) == 0 ) {
 		args.Set( "call", "oq4_m01::evacuate" );
+	} else if ( !idStr::Icmpn( name, "m04_trench_unit1_seq_2_atlas_guy_", 33 ) ) {
+		// The Atlas fire team holds the landing zone and shows while the escape
+		// camera descends (oq4_m01::darnellLands), so it must animate during the
+		// cinematic like the Falcon marines beside it.
+		args.Set( "cinematic", "1" );
 	} else {
 		for ( int i = 0; i < (int)( sizeof( laneMarines ) / sizeof( laneMarines[0] ) ); ++i ) {
 			if ( idStr::Icmp( name, laneMarines[i] ) == 0 ) {

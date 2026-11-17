@@ -6730,6 +6730,7 @@ Parses textual entity definitions out of an entstring and spawns gentities.
 #include "awakening/CampaignRepairs.inl"
 #include "awakening/ContentRepairs.inl"
 #include "awakening/M01Radio.inl"
+#include "awakening/M01Retch.inl"
 #include "awakening/MissionScripts.h"
 
 void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, unsigned short* entityNumOut, int* startSpawnCount ) {
@@ -6825,6 +6826,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 	// capture spawn count of start of map entities (after we've spawned in the physics ents)
 	const bool directAwakeningM01 = Awakening_PrepareM01Cinematic( mapFile );
 	const bool directAwakeningM01Radio = Awakening_PrepareM01Radio( mapFile );
+	const bool directAwakeningM01Retch = Awakening_PrepareM01Retch( mapFile );
 	const int awakeningChapter = Awakening_PrepareCampaignRepairs( mapFile );
 	Awakening_PrecacheContentRepairs();
 	if ( startSpawnCount ) {
@@ -6844,6 +6846,9 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 		}
 		if ( directAwakeningM01Radio ) {
 			Awakening_DirectM01Radio( args );
+		}
+		if ( directAwakeningM01Retch ) {
+			Awakening_DirectM01Retch( args );
 		}
 		Awakening_DirectLateMissionEntity( args );
 		Awakening_CorrectLateMissionMedia( args );
