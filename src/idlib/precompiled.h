@@ -348,7 +348,6 @@ public:
 #include "../idlib/Lib.h"
 
 // framework
-#include "../framework/BuildVersion.h"
 #include "../framework/BuildDefines.h"
 #include "../framework/licensee.h"
 #include "../framework/CmdSystem.h"

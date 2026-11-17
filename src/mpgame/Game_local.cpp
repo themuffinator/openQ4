@@ -6,6 +6,7 @@
 
 #include "../idlib/NumericString.h"
 #include "../sys/AutoVersion.h"
+#include "../framework/BuildVersion.h"
 
 struct game_name_s {
 	game_name_s( void ) {

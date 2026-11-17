@@ -7,6 +7,10 @@
 ===============================================================================
 */
 
+// Only the release version, which is stable across commits: this header is in
+// every precompiled header. PROJECT_VERSION_FULL, PROJECT_VERSION_DATE and
+// GAME_WINDOW_TITLE below expand to build-id macros, so a file that uses them
+// must also include "openq4_build_id_generated.h" itself.
 #include "openq4_version_generated.h"
 
 // RAVEN BEGIN

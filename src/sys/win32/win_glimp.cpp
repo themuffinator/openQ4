@@ -44,6 +44,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "win_local.h"
+#include "openq4_build_id_generated.h"
 #include "rc/AFEditor_resource.h"
 #include "rc/doom_resource.h"
 #include "../../renderer/tr_local.h"

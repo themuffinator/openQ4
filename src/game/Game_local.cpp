@@ -2,6 +2,7 @@
 
 
 #include "Game_local.h"
+#include "framework/BuildVersion.h"
 #include "physics/PhysicsTelemetry.h"
 #include "awakening/MissionScripts.h"
 #include "awakening/ContentRepairs.h"

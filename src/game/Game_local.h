@@ -37,7 +37,6 @@ inline void operator delete[]( void *p ) { Memory::Free(p); }
 class idRenderWorld;
 extern idRenderWorld *				gameRenderWorld;
 
-#include "../sys/AutoVersion.h"
 // the "gameversion" client command will print this plus compile date
 #define	GAME_VERSION		"baseQUAKE4-1"
 

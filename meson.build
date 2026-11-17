@@ -131,6 +131,7 @@ version_iteration = get_option('version_iteration').strip()
 version_base_override = get_option('version_base_override').strip()
 openal_root_override = get_option('openal_root_override').strip()
 generated_version_header_path = meson.current_build_dir() / 'openq4_version_generated.h'
+generated_build_id_header_path = meson.current_build_dir() / 'openq4_build_id_generated.h'
 version_metadata_command = [
   py,
   meson.project_source_root() / 'tools' / 'build' / 'openq4_version.py',
@@ -150,19 +151,31 @@ if version_iteration != ''
   version_metadata_command += ['--iteration', version_iteration]
 endif
 version_metadata_result = run_command(
-  version_metadata_command + ['--header-out', generated_version_header_path],
+  version_metadata_command + [
+    '--header-out', generated_version_header_path,
+    '--build-id-header-out', generated_build_id_header_path,
+  ],
   check: true,
 )
 
 # Git metadata changes whenever HEAD or the worktree changes, without changing
 # meson.build. Re-run the lightweight generator for every build invocation;
-# write_if_changed keeps downstream recompilation limited to real version
-# changes. The configure-time invocation above ensures the header also exists
-# before a backend performs its first dependency scan.
+# write_if_changed keeps downstream recompilation limited to real changes. The
+# configure-time invocation above ensures both headers also exist before a
+# backend performs its first dependency scan.
+#
+# The output is split so a commit does not recompile the whole tree:
+# openq4_version_generated.h holds only the release version and is safe to
+# include everywhere (licensee.h, precompiled.h); openq4_build_id_generated.h
+# holds the Git SHA, dirty flag, commit count and date, and only the few files
+# that print or compare those include it.
 generated_version_header = custom_target(
   'openq4_version_generated',
-  output: 'openq4_version_generated.h',
-  command: version_metadata_command + ['--header-out', '@OUTPUT@'],
+  output: ['openq4_version_generated.h', 'openq4_build_id_generated.h'],
+  command: version_metadata_command + [
+    '--header-out', '@OUTPUT0@',
+    '--build-id-header-out', '@OUTPUT1@',
+  ],
   depend_files: files('tools/build/openq4_version.py'),
   build_always_stale: true,
   build_by_default: true,

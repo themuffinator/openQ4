@@ -30,6 +30,7 @@ void Updater_Check( bool ) {}
 #include "../updater/UpdatePlan.h"
 #include "../updater/UpdateSigningKey.h"
 #include "openq4_paks_generated.h"
+#include "openq4_build_id_generated.h"
 
 #include <algorithm>
 #include <atomic>

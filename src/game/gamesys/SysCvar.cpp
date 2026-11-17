@@ -2,6 +2,7 @@
 
 
 #include "../Game_local.h"
+#include "../../sys/AutoVersion.h"
 
 #if defined( _DEBUG )
 	#define	BUILD_DEBUG	"-debug"

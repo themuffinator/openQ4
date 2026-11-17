@@ -1,7 +1,10 @@
 #ifndef __AUTO_VERSION_HEADER
 #define __AUTO_VERSION_HEADER
 
-#include "openq4_version_generated.h"
+// These values move with every commit; include this header only where they
+// are used (the .rc files and a few version strings), never from a widely
+// shared header.
+#include "openq4_build_id_generated.h"
 
 // used by the .rc files
 #define VERSION_MAJOR_RELEASE			OPENQ4_VERSION_MAJOR

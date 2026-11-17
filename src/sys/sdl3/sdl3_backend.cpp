@@ -44,6 +44,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../framework/Console.h"
 #include "../../framework/FileSystem.h"
 #include "../../framework/licensee.h"
+#include "openq4_build_id_generated.h"
 #include "../../framework/Session.h"
 #include "../../ui/RetainedUI.h"
 #include "../../ui/Rectangle.h"

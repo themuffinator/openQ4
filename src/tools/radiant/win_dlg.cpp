@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "qe3.h"
+#include "openq4_build_id_generated.h"
 
 BOOL CALLBACK EditCommandDlgProc (
     HWND hwndDlg,	// handle to dialog box

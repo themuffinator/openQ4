@@ -368,7 +368,9 @@ def validate_version_header_build_refresh_contract() -> None:
     meson_text = (ROOT / "meson.build").read_text(encoding="utf-8")
     for token in (
         "generated_version_header = custom_target(",
-        "version_metadata_command + ['--header-out', '@OUTPUT@']",
+        "output: ['openq4_version_generated.h', 'openq4_build_id_generated.h'],",
+        "'--header-out', '@OUTPUT0@',",
+        "'--build-id-header-out', '@OUTPUT1@',",
         "build_always_stale: true",
         "build_by_default: true",
         "openq4_engine_sources += [openq4_paks_generated_header, generated_version_header]",
@@ -379,8 +381,56 @@ def validate_version_header_build_refresh_contract() -> None:
         if token not in meson_text:
             raise AssertionError(f"version header build-refresh contract is missing {token!r}")
 
-    if "version_metadata_command + ['--header-out', generated_version_header_path]" not in meson_text:
-        raise AssertionError("configure-time version header bootstrap is missing")
+    for token in (
+        "'--header-out', generated_version_header_path,",
+        "'--build-id-header-out', generated_build_id_header_path,",
+    ):
+        if token not in meson_text:
+            raise AssertionError(f"configure-time version header bootstrap is missing {token!r}")
+
+    # The Git SHA, dirty flag and commit count change with every commit, so
+    # they live in their own header. If a header that nearly every translation
+    # unit includes pulls them in, every commit (and the first edit after one)
+    # recompiles the whole tree.
+    build_id_header = "openq4_build_id_generated.h"
+    volatile_headers = (build_id_header, "BuildVersion.h", "AutoVersion.h")
+    for shared in (
+        "src/framework/licensee.h",
+        "src/idlib/precompiled.h",
+        "src/game/Game_local.h",
+        "src/mpgame/Game_local.h",
+    ):
+        includes = [
+            line for line in (ROOT / shared).read_text(encoding="latin-1").splitlines()
+            if line.lstrip().startswith("#include")
+        ]
+        for line in includes:
+            if any(header in line for header in volatile_headers):
+                raise AssertionError(f"{shared} includes per-commit version data: {line.strip()}")
+
+    header_dir = WORK / "version-header-split"
+    header_dir.mkdir(parents=True, exist_ok=True)
+    stable = header_dir / "openq4_version_generated.h"
+    build_id = header_dir / build_id_header
+    subprocess.run(
+        [
+            sys.executable, str(BUILD_DIR / "openq4_version.py"), "--source-root", str(ROOT),
+            "--header-out", str(stable), "--build-id-header-out", str(build_id),
+        ],
+        check=True, capture_output=True, text=True,
+    )
+    stable_text = stable.read_text(encoding="utf-8")
+    for macro in (
+        "OPENQ4_VERSION ", "OPENQ4_VERSION_TAG", "OPENQ4_VERSION_DATE",
+        "OPENQ4_PRODUCT_VERSION_FULL", "OPENQ4_VERSION_RESOURCE_", "OPENQ4_VERSION_GIT_",
+        "OPENQ4_VERSION_COMMIT_COUNT",
+    ):
+        if macro in stable_text:
+            raise AssertionError(f"release-version header carries per-commit macro {macro.strip()}")
+    build_id_text = build_id.read_text(encoding="utf-8")
+    for token in ('#include "openq4_version_generated.h"', "OPENQ4_VERSION_GIT_SHA", "OPENQ4_VERSION_RESOURCE_BUILD"):
+        if token not in build_id_text:
+            raise AssertionError(f"build-id header is missing {token}")
 
 
 def validate_release_build_history() -> None:

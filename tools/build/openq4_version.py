@@ -71,7 +71,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--header-out",
         default="",
-        help="Optional output path for a generated C/C++ version header.",
+        help=(
+            "Optional output path for the generated C/C++ release-version header "
+            "(stable across commits)."
+        ),
+    )
+    parser.add_argument(
+        "--build-id-header-out",
+        default="",
+        help=(
+            "Optional output path for the generated C/C++ build-id header (Git SHA, "
+            "dirty flag, commit count, date). It includes the release-version "
+            "header, which must be written to the same directory."
+        ),
     )
     return parser.parse_args(argv[1:])
 
@@ -290,22 +302,17 @@ def generate_header_text(
     track: str,
     iteration: str,
     version_short: str,
-    version: str,
-    version_tag: str,
-    version_date: str,
     product_version: str,
-    product_version_full: str,
     major: int,
     minor: int,
     patch: int,
-    resource_build: int,
-    resource_commas: str,
-    resource_dotted: str,
-    git_sha: str,
-    git_dirty: bool,
-    commit_count: int,
 ) -> str:
-    git_dirty_value = 1 if git_dirty else 0
+    """The release version: changes only when the version itself changes.
+
+    Nearly every translation unit includes this header through licensee.h and
+    the precompiled headers, so it must not carry anything that moves with
+    each commit or worktree edit; that belongs in the build-id header.
+    """
     return "\n".join(
         [
             "#ifndef OPENQ4_VERSION_GENERATED_H",
@@ -315,15 +322,50 @@ def generate_header_text(
             f'#define OPENQ4_VERSION_TRACK "{track}"',
             f'#define OPENQ4_VERSION_ITERATION "{iteration}"',
             f'#define OPENQ4_VERSION_SHORT "{version_short}"',
-            f'#define OPENQ4_VERSION "{version}"',
-            f'#define OPENQ4_VERSION_TAG "{version_tag}"',
-            f'#define OPENQ4_VERSION_DATE "{version_date}"',
             f'#define OPENQ4_PRODUCT_VERSION "{product_version}"',
-            f'#define OPENQ4_PRODUCT_VERSION_FULL "{product_version_full}"',
             "",
             f"#define OPENQ4_VERSION_MAJOR {major}",
             f"#define OPENQ4_VERSION_MINOR {minor}",
             f"#define OPENQ4_VERSION_PATCH {patch}",
+            "",
+            "#endif",
+            "",
+        ]
+    )
+
+
+def generate_build_id_header_text(
+    *,
+    version: str,
+    version_tag: str,
+    version_date: str,
+    product_version_full: str,
+    resource_build: int,
+    resource_commas: str,
+    resource_dotted: str,
+    git_sha: str,
+    git_dirty: bool,
+    commit_count: int,
+) -> str:
+    """The build identity: Git SHA, dirty flag, commit count and commit date.
+
+    These change with every commit (and the dirty flag with the first edit
+    after one), so only the few files that print or compare them include this
+    header; including it widely makes every commit a full rebuild.
+    """
+    git_dirty_value = 1 if git_dirty else 0
+    return "\n".join(
+        [
+            "#ifndef OPENQ4_BUILD_ID_GENERATED_H",
+            "#define OPENQ4_BUILD_ID_GENERATED_H",
+            "",
+            '#include "openq4_version_generated.h"',
+            "",
+            f'#define OPENQ4_VERSION "{version}"',
+            f'#define OPENQ4_VERSION_TAG "{version_tag}"',
+            f'#define OPENQ4_VERSION_DATE "{version_date}"',
+            f'#define OPENQ4_PRODUCT_VERSION_FULL "{product_version_full}"',
+            "",
             f"#define OPENQ4_VERSION_RESOURCE_BUILD {resource_build}",
             f'#define OPENQ4_VERSION_RESOURCE_COMMAS_STRING "{resource_commas}"',
             f'#define OPENQ4_VERSION_RESOURCE_DOTTED "{resource_dotted}"',
@@ -399,20 +441,24 @@ def main(argv: list[str]) -> int:
     resource_dotted = f"{major}.{minor}.{patch}.{resource_build}"
 
     if args.header_out:
-        header_path = Path(args.header_out).resolve()
         header_text = generate_header_text(
             base_version=base_version,
             track=track,
             iteration=iteration,
             version_short=version_short,
-            version=version,
-            version_tag=version_tag,
-            version_date=version_date,
             product_version=product_version,
-            product_version_full=product_version_full,
             major=major,
             minor=minor,
             patch=patch,
+        )
+        write_if_changed(Path(args.header_out).resolve(), header_text)
+
+    if args.build_id_header_out:
+        build_id_header_text = generate_build_id_header_text(
+            version=version,
+            version_tag=version_tag,
+            version_date=version_date,
+            product_version_full=product_version_full,
             resource_build=resource_build,
             resource_commas=resource_commas,
             resource_dotted=resource_dotted,
@@ -420,7 +466,7 @@ def main(argv: list[str]) -> int:
             git_dirty=git_dirty,
             commit_count=commit_count,
         )
-        write_if_changed(header_path, header_text)
+        write_if_changed(Path(args.build_id_header_out).resolve(), build_id_header_text)
 
     emit_metadata(
         {

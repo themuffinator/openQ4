@@ -46,6 +46,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ParallelJobSystem.h"
 #include "LevelEditor.h"
 #include "Updater.h"
+#include "openq4_build_id_generated.h"
 #include "DurableFile.h"
 #include "SettingsPersistence.h"
 #include "PerformancePreset.h"
