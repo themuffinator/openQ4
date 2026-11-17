@@ -1,10 +1,10 @@
 {
-  "schema_version": 24,
+  "schema_version": 25,
   "id_namespace": "openq4.ui.product",
-  "date": "2026-11-13",
+  "date": "2026-11-17",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "2be5fb2267f1ff9d98eb6acf81af784169290366",
+    "engine_revision": "374080d44659ae1f08249f9f1dfdf002b7f85159",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -14,7 +14,7 @@
     "visual": {
       "path": "docs/dev/ui-visual-design.md",
       "authority": "normative visual, interaction and editor contract",
-      "sha256": "719c4574c4355f56dd8502d15cf70c6b132c26d60d4fb8182d5935d6fa4bc492"
+      "sha256": "76cd2b019d61354cd40e1bb5ca298e14fcf8c8bade6d412a4ac089b81109180a"
     },
     "product": {
       "path": "docs/dev/archive/2026-10-18/plans/ui-product-completion.md",
@@ -174,7 +174,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/runtime-performance.md",
       "scope": "Debug CPU fixture counters; release GPU/frame pacing/resource budgets unqualified.",
-      "sha256": "4c47b0c07a6ed3c7ee281ff4440fb8915359be1ef004609bacc6344bdf617894"
+      "sha256": "a7f8287f788db3a3947e91f4fa2750049f96d1d3b73c287400398399eb0472a1"
     },
     "instance-persistence-foundation": {
       "kind": "qualified_foundation_checkpoint",
@@ -358,7 +358,7 @@
       "scope": "Shared six-profile catalog and ordered 32 assignments preserve Common behavior; typed preset/Auto-Detect operations merge under an owned guarded transaction with exact failure atomicity and all 21 unrelated fields preserved. Production SYSTEM uses source-derived vector controls, six existing locale tables, guarded local Number drafts, transient highlight and authoritative readback before proposal acknowledgement. Native Runtime/RmlUi covers 48 locale/wider-glyph/density/resize cases; integrated gameplay evidence is bounded separately. Complete effect execution/persistence, actual font/platform matrix, every production page, editor and migration remain unaccepted.",
       "local_capture_summary": ".tmp/ui/preset-session-integration/validation-evidence.json",
       "local_capture_summary_sha256": "69ccd3f6872a47cf9fa66f632c969c426e9e95f61098ee7b93f9f7c317e526b8",
-      "sha256": "d536719ec50f337b7e990438874db5bb95a35c6dc1f582192723052b27dc85d2"
+      "sha256": "e5f6c8ec8e2047be5972e167049f593a77a35cccfe499ef61ff8a4d37c992f66"
     },
     "windows-text-session": {
       "kind": "implementation_checkpoint",
@@ -393,7 +393,7 @@
     "system-compact-opening": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/performance-presets.md",
-      "sha256": "d536719ec50f337b7e990438874db5bb95a35c6dc1f582192723052b27dc85d2",
+      "sha256": "e5f6c8ec8e2047be5972e167049f593a77a35cccfe499ef61ff8a4d37c992f66",
       "baseline_engine_revision": "efcfdb0ffe6eaffa11dbf2ced026495539156478",
       "companion_revision": "1cd33980f072ac3d78978a07b388b4b6fe6b5eb2",
       "scope": "Compact preset row and asymmetric wrapping footer preserve one-line real Marine-font Apply text and the complete first brightness row at 200% in reviewed English Vulkan gameplay. OpenGL at 125% also reviewed. All47 integrated UI suites pass including 41,623 deterministic Runtime checks across48 locale/wider-glyph/density/resize cases. Visible scrollbar, complete controls, every real-font/platform state and product acceptance remain required.",
@@ -1093,7 +1093,7 @@
     "audio-subtitles-playback": {
       "kind": "implementation_checkpoint",
       "path": "docs/dev/audio-voice-evidence.md",
-      "sha256": "8d9e0143474eee72d1a3e04e805f7ba2a1efddb37bf650d95771deb4a5383ecc",
+      "sha256": "546907828f0a4061053f9963326d923201a7cc8e2e5db779a4d4f45a97d6fccb",
       "scope": "Playback-driven installed-transcript subtitles and persistent controls; stock/Awakening runtime plus Classic and native layout checks. Portrait title-card collisions, full corpus and headset qualification remain open. No acceptance granted."
     },
     "inventory-android-setup-return": {
@@ -15449,6 +15449,66 @@
         "fire_close_ms": 90,
         "ring_travel_max_ms": 170,
         "refusal_max_ms": 240
+      }
+    },
+    {
+      "id": "FLOW-071",
+      "title": "Awakening in-game menus",
+      "milestone_owner": "M5",
+      "implementation_owner": "UI migration, session and SP/MP integration",
+      "source_refs": [
+        "visual:9",
+        "visual:11",
+        "product:4 M2",
+        "product:4 M4",
+        "product:4 M5",
+        "original:Stage 5",
+        "original:Stage 6",
+        "visual:2",
+        "visual:4",
+        "visual:6",
+        "visual:8",
+        "visual:13",
+        "visual:Version 1.40",
+        "visual:Version 1.41",
+        "visual:Version 1.42",
+        "visual:Version 1.45"
+      ],
+      "requirement": "While The Awakening is the running campaign (its content active, with or without a mod over it) and the player is not Strogg, the single-player pause and every screen it opens over the paused game (Save, Load, Restart Level, Objectives, the settings pages and their confirmations) take the Awakening family at every menu level: the Awakening tokens of section 4 in place of the Marine colors with marine.orange kept for focus, hover and selection; the Valkaryne frames of section 6 (horns on the bands' steps of 24 u or more, every smaller step a straight 30-degree flank, horned corners on the level block and confirmations, blade ends on navigation and section plates, action buttons and the plinth, needle rules, fullers and a lens around the focused marker); the rime line on the bands' inner edges; seeded frost on the bands only, fixed to the view and carved around each level's band text; snow behind the instruments over a low haze; GAME PAUSED followed by the campaign's name in awakening.value. Its motion keeps the stock choreography's order and timing in the Awakening motion of section 8: the bands close in from 30 u over 400 ms as the menu opens while the frost grows over 900 ms; bands, levels and carried titles travel on cubic (0.65, 0, 0.35, 1); docking to a page the bottom band leads and the top band follows 40 ms later so both arrive at 550 ms; each level below a page steps the top band 97 u over 300 ms; the departing level scrolls 640 u and the arriving level scrolls in its last 32 u over 250 ms from the side the menu travels from; tabs scroll their rows in strip order and lists scroll by whole rows over 150 ms; a moving band's rime line brightens with its speed from 0.45 to 0.90. Reduced motion places bands and levels at once, shows the frost complete and the snow still; high contrast drops the frost, rime wash, snow and haze and keeps the rime line at 1.00; the Phone profile's power saving drops the snow. The title screen, multiplayer menus, HUD and Classic layout keep their own families, and a Strogg player's pause is the Strogg pause.",
+      "dependencies": [
+        "FLOW-048",
+        "FLOW-063",
+        "MOT-012",
+        "MOT-016",
+        "ART-037"
+      ],
+      "acceptance_evidence_needed": [
+        "Engine captures of the Awakening pause, a page, a settings sub-page and a confirmation on OpenGL and Vulkan at 4:3, 16:9 and 21:9, beside the Marine pause on the same map, with the frost, snow, haze, horns, blades, lens and rime visible.",
+        "Sampled band, level and title positions and rime opacity through an opening, a dock to a page and back, a step to a sub-page and back and a reversed step, against the section 8 keys; reduced-motion, high-contrast and power-saving captures; selection traces showing the Marine pause outside The Awakening and the Strogg pause for a Strogg player under it."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Implementation and acceptance evidence covering the entire stated requirement are required.",
+      "constraints": {
+        "frost_seed": 1414,
+        "close_in_u": 30,
+        "close_ms": 400,
+        "frost_grow_ms": 900,
+        "glide_bezier": [
+          0.65,
+          0,
+          0.35,
+          1
+        ],
+        "top_band_lag_ms": 40,
+        "level_arrive_u": 32,
+        "level_arrive_ms": 250,
+        "list_scroll_ms": 150,
+        "rime_rest": 0.45,
+        "rime_lit": 0.9,
+        "flank_degrees": 30,
+        "horn_min_step_u": 24
       }
     }
   ],
