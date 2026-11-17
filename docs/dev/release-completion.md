@@ -7,6 +7,15 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's freeze gun recharges, 17 November 2026
+
+- **A battery that refills.** The freeze gun's charge now tops itself back up
+  to 35 a second after you stop spraying, whether you are holding it or not.
+  A long spray still drains it, and ammo pickups can still carry you past 35.
+  Before, a drained freeze gun stayed empty until you found a pickup.
+- **What to do.** Replace the single-player game module. Saves need nothing.
+- Details: [status targeting](awakening-status-targeting.md#remaining-content-questions).
+
 ## Bodies lying in levels no longer blow apart on Linux, 17 November 2026
 
 - **Corpses and wounded marines that a level places for you to find now lie

@@ -5884,7 +5884,31 @@ void idPlayer::UpdatePowerUps( void ) {
 					}
 
 					nextAmmoRegenPulse[ ammoIndex ] = gameLocal.time + time;
-				}	
+				}
+			}
+		}
+	} else if ( !gameLocal.isClient ) {
+		// openQ4: The Awakening's freeze gun runs on a battery that recharges
+		// by itself, held or holstered, at its def's ammoRegenStep per
+		// ammoRegenTime up to its starting charge. Firing holds the next pulse
+		// back (rvWeaponFreezeGun), so a sustained spray still drains it;
+		// pickups can top it up past the recharge limit.
+		for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+			if ( !( inventory.weapons & ( 1 << i ) ) ) {
+				continue;
+			}
+			const idDeclEntityDef *weaponDef = GetWeaponDef( i );
+			if ( weaponDef == NULL || idStr::Icmp( weaponDef->dict.GetString( "weaponclass" ), "rvWeaponFreezeGun" ) ) {
+				continue;
+			}
+			const int ammoIndex = inventory.AmmoIndexForWeaponIndex( i );
+			const int max = inventory.StartingAmmoForWeaponIndex( i );
+			if ( ammoIndex < 0 || ammoIndex >= MAX_AMMO || inventory.ammo[ ammoIndex ] < 0 || inventory.ammo[ ammoIndex ] >= max ) {
+				continue;
+			}
+			if ( gameLocal.time > nextAmmoRegenPulse[ ammoIndex ] ) {
+				inventory.ammo[ ammoIndex ] = idMath::ClampInt( 0, max, inventory.ammo[ ammoIndex ] + inventory.AmmoRegenStepForWeaponIndex( i ) );
+				nextAmmoRegenPulse[ ammoIndex ] = gameLocal.time + inventory.AmmoRegenTimeForWeaponIndex( i );
 			}
 		}
 	}
@@ -11437,8 +11461,10 @@ void Cmd_OpenQ4ViewReport_f( const idCmdArgs &args ) {
 		return;
 	}
 	const idAngles angles = view->viewaxis.ToAngles();
-	gameLocal.Printf( "openq4_viewReport: %d origin %s angles %s fov %.1f %.1f vehicle %d god %d\n", gameLocal.time,
-		view->vieworg.ToString( 1 ), angles.ToString( 1 ), view->fov_x, view->fov_y, player->IsInVehicle() ? 1 : 0, player->godmode ? 1 : 0 );
+	const rvWeapon *weapon = player->weapon;
+	gameLocal.Printf( "openq4_viewReport: %d origin %s angles %s fov %.1f %.1f vehicle %d god %d weapon %s ammo %d clip %d\n", gameLocal.time,
+		view->vieworg.ToString( 1 ), angles.ToString( 1 ), view->fov_x, view->fov_y, player->IsInVehicle() ? 1 : 0, player->godmode ? 1 : 0,
+		weapon ? weapon->spawnArgs.GetString( "classname" ) : "none", weapon ? weapon->AmmoAvailable() : -1, weapon ? weapon->AmmoInClip() : -1 );
 }
 
 /*

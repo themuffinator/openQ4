@@ -64,6 +64,13 @@ Qualification results are added here after the staged checks finish.
 The alpha's missing assets, empty race navigation and unfinished script/voice
 content remain separate issues. Goob damage-over-time bypasses hit-region and
 Retch resistance scaling through the existing raw damage path; changing that
-needs a deliberate balance decision. Freeze-gun `ammoRegenStep`/`ammoRegenTime`
-describe the ammo-regeneration powerup, not evidence of passive recharge. Its
-clipless battery shader stays full; changing that display is separate work.
+needs a deliberate balance decision.
+
+The freeze gun's battery recharges (17 November 2026, by user decision). The
+alpha DLL only reads `ammoRegenStep`/`ammoRegenTime` under the ammo-regeneration
+powerup, so a drained gun stayed empty; openQ4 now applies them without the
+powerup: 5 every 200 ms up to the starting charge of 35, held or holstered.
+Each shot holds the next pulse back by one second, so a sustained spray drains
+it (80 to 0 in about 11 s) and pickups still stack past 35. The headless M04
+probe recorded 0 to 35 within 4.5 s of switching away and back. The clipless
+battery shader stays full; changing that display is separate work.
