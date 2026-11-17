@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The Awakening's m01 dropship scene, revisions 4-5 (docs/dev/m01-interior-feedback-audit.md).
+"""The Awakening's m01 dropship scene, revisions 4-6 (docs/dev/m01-interior-feedback-audit.md).
 
-- Fresh m01 starts compile scripts/openq4/awakening/m01_dropship-v5.script and
+- Fresh m01 starts compile scripts/openq4/awakening/m01_dropship-v6.script and
   redirect the hangar, cabin and evacuation relays to it, only when all three
-  of the map's anchors match. Revisions 1-4 stay in pak0 unchanged in name,
+  of the map's anchors match. Revisions 1-5 stay in pak0 unchanged in name,
   because suspended save threads keep their bytecode.
 - The seven marines who board along the rounded hangar lane get a short walk
   range and keep full AI thinks (a simple think steers at a stale goal);
@@ -15,6 +15,8 @@
   both damaged cabin sets, and every rappel goes through the rope approach.
 - The landing zone's marines show as they reach the ground, not at touchdown,
   and the Atlas fire team animates during the cinematic.
+- Markswell's entrance, briefing and sit hold their last frames instead of
+  returning to his armed idle, and the sit is unclipped so it reaches his seat.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PAK0 = ROOT / "content" / "baseoq4" / "pak0"
 SCRIPT_DIR = PAK0 / "scripts" / "openq4" / "awakening"
-V5 = SCRIPT_DIR / "m01_dropship-v5.script"
+V6 = SCRIPT_DIR / "m01_dropship-v6.script"
 CINEMATIC = ROOT / "src" / "game" / "awakening" / "M01Cinematic.inl"
 MANAGER = ROOT / "src" / "game" / "ai" / "AI_Manager.cpp"
 SKINS = PAK0 / "skins" / "openq4_awakening_m01.skin"
@@ -49,18 +51,19 @@ def check(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    script = V5.read_text(encoding="ascii")
+    script = V6.read_text(encoding="ascii")
     cinematic = CINEMATIC.read_text(encoding="utf-8")
 
     # Revision selection and immutability of the older programs.
-    check('"scripts/openq4/awakening/m01_dropship-v5.script"' in cinematic, "M01Cinematic does not select revision 5")
-    for older in ["m01_dropship.script", "m01_dropship-v2.script", "m01_dropship-v3.script", "m01_dropship-v4.script"]:
+    check('"scripts/openq4/awakening/m01_dropship-v6.script"' in cinematic, "M01Cinematic does not select revision 6")
+    for older in ["m01_dropship.script", "m01_dropship-v2.script", "m01_dropship-v3.script", "m01_dropship-v4.script",
+                  "m01_dropship-v5.script"]:
         check((SCRIPT_DIR / older).is_file(), f"older revision {older} must stay in pak0 for saves")
     for relay, call in [("intro_unit1_seq_2_trigger_seq_3", "oq4_m01::hangar"),
                         ("intro_unit1_seq_5_trigger_seq_6", "oq4_m01::cabin"),
                         ("m04_trench_unit1_main", "oq4_m01::evacuate")]:
         check(f'"{relay}"' in cinematic and f'"{call}"' in cinematic, f"relay {relay} is not directed to {call}")
-        check(f"void {call.split('::')[1]}()" in script, f"{call} is missing from revision 5")
+        check(f"void {call.split('::')[1]}()" in script, f"{call} is missing from revision 6")
     check("!hangarAnchor || !cabinAnchor || !evacuationAnchor" in cinematic, "a missing anchor must keep the original callbacks")
 
     # Lane marines: walk range and full thinks, scoped to them.
@@ -101,6 +104,18 @@ def main() -> int:
           "landing() must not trigger the LZ marines a second time")
     check('"m04_trench_unit1_seq_2_atlas_guy_", 33' in cinematic and 'args.Set( "cinematic", "1" )' in cinematic,
           "the Atlas fire team must animate during the cinematic")
+
+    # Markswell's performance: one take split into three clips.
+    for clip in ["st_markswell_enters", "st_markswell_talks", "st_markswell_sits"]:
+        check(re.search(r'aiScriptedAnim(?:Wait)?\(\$intro_unit1_seq_6_markswell, "' + clip + r'", 8, 0\);', script) is not None,
+              f"{clip} must hold its last frame, not end in the armed idle")
+    sit = script[script.index("void cabinSit() {"):script.index("void cabin() {")]
+    check(sit.index("$intro_unit1_seq_6_markswell.disableClip();") < sit.index('"st_markswell_sits"'),
+          "the seat and hidden stand-in stop an unclipped sit short of the seat")
+    cabin = script[script.index("void cabin() {"):script.index("void prepareMarine(")]
+    check("float acknowledged = thread sceneRadio(\"vo_vansen_rogerthtp\");" in cabin
+          and cabin.index("sys.waitForThread(acknowledged);") < cabin.index('"st_markswell_talks"'),
+          "the briefing must start as Vansen's acknowledgement ends")
 
     # Skins, materials and plate images.
     materials = MATERIALS.read_text(encoding="ascii")

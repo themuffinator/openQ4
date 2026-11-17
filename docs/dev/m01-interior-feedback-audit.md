@@ -364,6 +364,25 @@ during a cinematic). Evidence: `.tmp/m01-polish/descent/` (OpenGL, whole scene,
 handoff at 285.2 s as in v4); a marine is in view during the descent where v4
 showed none. v4 stays in pak0 for its saves.
 
+## Revision 6, 17 November 2026
+
+User review: the lieutenant standing at the front of the cabin (Markswell)
+dropped into a rifle stance before he spoke, and sat down in the aisle after
+the first hit. `st_markswell_enters`, `st_markswell_talks` and
+`st_markswell_sits` are consecutive ranges (1-101, 102-480, 481-644) of one
+performance; the cabin's `markswell_sits` (frames 481-575) lowers his seat.
+
+| Defect | Cause | Change |
+| --- | --- | --- |
+| Rifle stance before the briefing | The entrance started with Vansen's acknowledgement (5.4 s with the radio) but reports done after 3.9 s, and `endWithIdle` returned him to his armed idle for about a second before `st_markswell_talks`. | The entrance starts 1.3 s into the acknowledgement and the briefing as it ends. All three clips end without idle, so any remaining gap holds the entrance's last frame, which is the briefing's first. |
+| Sits down in the aisle | The sit's root motion carries him 45.8 units across into his seat, but his movement box met the hidden seated stand-in (`markswell_sitting`, 348 2918) after 5.6 units and, with that removed, the seat's collision after 14.7. He finished the clip mid-aisle; the stand-in later appeared 33 units away. | `disableClip()` for the sit (the clip has no vertical travel, so losing gravity is harmless). He ends at 347.96 2925.7, the clip's authored seat; the stand-in at 2918 replaces him on the cut to the wide shot. |
+
+Evidence (`.tmp/m01-markswell/`, hidden windowed OpenGL, engine screenshots,
+no input): `base1/` is v5 with a position probe; `fix1/` the candidate with the
+same probe; `v6-focus/` the committed v6 with a save and reload as the ship is
+first hit; `v6-full/` v6 from the hangar to gameplay. Not covered: Vulkan, and
+judgement from video rather than one-second stills and 50 ms bursts.
+
 ## Other findings and limits
 
 The full-run harness reported no fatal errors and a successful gameplay handoff,

@@ -7,6 +7,16 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Markswell's briefing in The Awakening's opening, 17 November 2026
+
+- **The lieutenant's briefing plays as one performance.** In the first
+  mission's dropship, Markswell walks in, briefs the squad and, when the ship
+  is hit, stumbles into his own seat. He no longer stops in a rifle stance
+  before speaking or sits down in the middle of the aisle.
+- **What to do.** Replace the single-player game module and pak0, then start
+  the mission afresh; saves keep the scene they were made with.
+- Details: [M01 audit, revision 6](m01-interior-feedback-audit.md#revision-6-17-november-2026).
+
 ## The Awakening's landing zone and Retch ambush, 17 November 2026
 
 - **The squad is there when you land.** As you rappel out of the dropship,

@@ -59,7 +59,7 @@ static bool Awakening_PrepareM01Cinematic( idMapFile *map ) {
 	}
 	// Each revision is immutable: suspended save threads retain their bytecode.
 	// The original filename remains available for pre-lighting M01 saves.
-	const char *script = "scripts/openq4/awakening/m01_dropship-v5.script";
+	const char *script = "scripts/openq4/awakening/m01_dropship-v6.script";
 	if ( !hangarAnchor || !cabinAnchor || !evacuationAnchor || fileSystem->ReadFile( script, NULL, NULL ) <= 0 ) {
 		gameLocal.Warning( "Awakening m01 direction unavailable: keeping the map's original callbacks" );
 		return false;
