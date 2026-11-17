@@ -48,7 +48,7 @@ idCVar r_dynamicResolutionDebug( "r_dynamicResolutionDebug", "0",
 
 idCVar r_temporalAA( "r_temporalAA", "2",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
-	"temporal anti-aliasing and upscaling, with automatic SMAA rollback: 0 = off, 1 = always, 2 = automatic (upscale whenever the 3D scene renders below native resolution with a smooth scale mode, or with dynamic resolution)", 0, 2 );
+	"temporal anti-aliasing and upscaling, with automatic SMAA rollback: 0 = off, 1 = always, 2 = automatic (upscale whenever the 3D scene renders below native resolution with a smooth scale mode and a frame cap above 30 Hz, or with dynamic resolution)", 0, 2 );
 idCVar r_temporalAAFeedback( "r_temporalAAFeedback", "0.90",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
 	"maximum accepted temporal-history contribution", 0.0f, 0.98f );
@@ -874,10 +874,32 @@ bool R_TemporalPresentation_DynamicResolutionRequested( void ) {
 	return r_rendererDynamicResolution.GetBool() && !R_TemporalPresentation_VRFrame();
 }
 
+// The lowest frame cap at which automatic temporal AA still upscales. A cap
+// below it (30 Hz) is the Minimum and Low Power presets (small ARM boards,
+// small phones, battery play, software renderers) or a player's own choice.
+static const int TEMPORAL_AUTOMATIC_MIN_CAP_HZ = 31;
+
+// True when com_maxfps caps presentation below TEMPORAL_AUTOMATIC_MIN_CAP_HZ.
+// 0 is uncapped, which says nothing about the hardware.
+static bool R_TemporalPresentation_LowRateCap( void ) {
+	if ( cvarSystem == NULL ) {
+		return false;
+	}
+	const int maxFps = cvarSystem->GetCVarInteger( "com_maxfps" );
+	return maxFps > 0 && maxFps < TEMPORAL_AUTOMATIC_MIN_CAP_HZ;
+}
+
 // r_temporalAA 2 hands sub-native rendering to TAAU, which reconstructs far
 // more detail than a bilinear stretch. It stays off at native resolution
 // (where MSAA/SMAA already serve), for the crop and nearest scale modes a
 // player picks on purpose, and on backends without a temporal resolve.
+//
+// It also stays off under a 30 Hz frame cap. The hardware that runs one is
+// where the resolve pass, its history targets and the float scene target TAA
+// keeps alive cost the most, and a 30 Hz history takes twice as long to settle
+// after motion. The presets own com_maxfps, so Low Power stretches its 75%
+// scene without a new preset target; r_temporalAA 1 still forces TAA, and
+// dynamic resolution, which steers its scale through TAA, keeps it.
 static bool R_TemporalPresentation_AutomaticTemporalAAWanted( void ) {
 #if defined( OPENQ4_RENDERER_GLES_MODULE )
 	return false;
@@ -893,6 +915,9 @@ static bool R_TemporalPresentation_AutomaticTemporalAAWanted( void ) {
 	}
 	if ( r_rendererDynamicResolution.GetBool() ) {
 		return true;
+	}
+	if ( R_TemporalPresentation_LowRateCap() ) {
+		return false;
 	}
 	const int scaleMode = r_resolutionScaleMode.GetInteger();
 	return r_screenFraction.GetInteger() < 100 && ( scaleMode == 1 || scaleMode == 2 );

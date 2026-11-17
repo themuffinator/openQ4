@@ -1828,6 +1828,11 @@ image on both backends.
   on Quality and Ultra by memory and resolution class (Maximum stays manual).
   The reference laptop still detects Enhanced. The larger classes are policy
   derived from this item's measurements, not measured on such cards.
+  Follow-up, 17 November (#233): ARM64 Linux boards without a discrete or Apple
+  GPU are capped at Performance, as the Steam Deck is, and Minimum and Low Power
+  drop the light grid and, through their 30 Hz cap, automatic temporal AA; see
+  [ARM boards and the low-power floor](ui/performance-presets.md#arm-boards-and-the-low-power-floor-17-november-2026).
+  Model-suite coverage only: no ARM board ran it.
 - [ ] **FPS-03 — P1, implementation: shadow-map cost.** In hub2 the shadow maps are 33 of
   the current Ultra's 54 ms per frame and 30 ms of that is point lights: a point light
   with any moving caster in range re-renders all six cube faces every frame, because

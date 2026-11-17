@@ -3371,7 +3371,10 @@ bool Common_CapturePerformancePresetSignals(openq4::PerformancePresetSignals& ou
  signals.arm64=Common_HostCpuIsArm64();
 #if defined( __ANDROID__ )
  signals.mobile=true;
+#elif defined( __linux__ )
+ signals.linuxHost=true;
 #endif
+ signals.appleGpu=RendererIsAppleGpu(config.renderer_string);
 #if defined( USE_SDL3 )
  // Unlike the legacy platform getters, SDL reports 0 on query failure instead
  // of inventing 512/1024/2048 MiB. Use one observation on all supported hosts.
@@ -3422,6 +3425,7 @@ static bool Common_DetectPerformancePreset( openQ4PerformancePreset_t &preset, i
   case Reason::Shared:policy="shared-memory GPU budget";break;
   case Reason::Resolution:policy="drawable resolution budget";break;
   case Reason::Cpu:policy="limited or unknown CPU concurrency";break;
+  case Reason::ArmBoard:policy="ARM board power budget";break;
   default:break;
  }
  reason=va("%s; GPU=%s, RAM=%d MiB, dedicated VRAM=%d MiB (0=unknown/shared), drawable=%dx%d, CPUs=%d, scene scale=%d%%, post AA=%d, display=%d Hz (0=unknown), frame cap=%d",
@@ -3909,11 +3913,12 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 	// tier maps them, and the stencil tiers keep the inert default.
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointLights", preset.shadowMapPointLights, Common_PerformancePresetIsNamed( preset, "enhanced" ) ? 0 : 1 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_crt", preset.crt, 0 );
-	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useLightGrid", preset.useLightGrid, 1 );
-	// Only the two tiers below the documented minimum hardware draw no shadows;
-	// Low restores the stencil shadows every tier above it keeps.
+	// Only the two tiers below the documented minimum hardware draw no shadows
+	// and skip the light-grid indirect pass; Low restores both, and every tier
+	// above it keeps them.
 	const bool shadowlessTier = Common_PerformancePresetIsNamed( preset, "minimum" ) || Common_PerformancePresetIsNamed( preset, "lowpower" );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadows", preset.shadows, shadowlessTier ? 0 : 1 );
+	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useLightGrid", preset.useLightGrid, shadowlessTier ? 0 : 1 );
 
 	if ( shadowlessTier || Common_PerformancePresetIsNamed( preset, "low" ) ) {
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_maxfps", preset.maxFps, shadowlessTier ? 30 : 60 );
@@ -4072,6 +4077,7 @@ static bool Common_ValidatePerformancePresetProgression( void ) {
 		passed &= Common_PerformancePresetCheckNonDecreasingBudget( previousPreset, preset, "image_downSizeLimit", previousPreset.downSizeLimit, preset.downSizeLimit );
 		passed &= Common_PerformancePresetCheckNonDecreasingBudget( previousPreset, preset, "s_maxSoundsPerShader", previousPreset.maxSoundsPerShader, preset.maxSoundsPerShader );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadows", previousPreset.shadows, preset.shadows );
+		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_useLightGrid", previousPreset.useLightGrid, preset.useLightGrid );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_useShadowMap", previousPreset.useShadowMap, preset.useShadowMap );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapSize", previousPreset.shadowMapSize, preset.shadowMapSize );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapPointSize", previousPreset.shadowMapPointSize, preset.shadowMapPointSize );
@@ -4279,6 +4285,50 @@ static bool Common_ValidatePerformancePresetApplied( const openQ4PerformancePres
 	return passed;
 }
 
+// Synthetic machines for the platform ceilings, so a self-test on any host
+// covers the small boards and Apple Silicon it is not running on.
+static bool Common_ValidatePerformancePresetPlatformCeilings( void ) {
+	openq4::PerformancePresetSignals board;
+	board.arm64 = board.linuxHost = true;
+	board.gpuClass = RendererGpuClass::Integrated;
+	board.systemRamMB = 16384;
+	board.modernEffects = board.postAAAvailable = true;
+	board.logicalCpus = 8;
+	board.drawableWidth = 1920;
+	board.drawableHeight = 1080;
+	board.displayRefreshHz = 144;
+	struct platformCase_t {
+		const char *label;
+		openq4::PerformancePresetSignals signals;
+		const char *preset;
+		int maxFps;
+	};
+	platformCase_t cases[] = {
+		{ "16 GiB ARM board", board, "performance", 60 },
+		{ "Raspberry Pi", board, "lowpower", 30 },
+		{ "Apple Silicon on Asahi Linux", board, "balanced", 144 },
+		{ "Apple Silicon on macOS", board, "balanced", 144 },
+		{ "Windows on ARM", board, "balanced", 144 },
+	};
+	cases[1].signals.raspberryPi = true;
+	cases[1].signals.systemRamMB = 8058;
+	cases[1].signals.logicalCpus = 4;
+	cases[2].signals.appleGpu = true;
+	cases[3].signals.appleGpu = true;
+	cases[3].signals.linuxHost = false;
+	cases[4].signals.linuxHost = false;
+	bool passed = true;
+	for ( const platformCase_t &entry : cases ) {
+		const openq4::PerformancePresetDetection detected = openq4::DetectPerformancePreset( entry.signals );
+		if ( detected.preset == NULL || idStr::Icmp( detected.preset->name, entry.preset ) != 0 || detected.maxFps != entry.maxFps ) {
+			common->Printf( "PerformancePreset self-test failed: %s detected '%s' at %d Hz, expected '%s' at %d Hz\n", entry.label,
+				detected.preset != NULL ? detected.preset->name : "", detected.maxFps, entry.preset, entry.maxFps );
+			passed = false;
+		}
+	}
+	return passed;
+}
+
 static void Com_PerformancePresetSelfTest_f( const idCmdArgs &args ) {
 	bool passed = true;
 
@@ -4321,6 +4371,7 @@ static void Com_PerformancePresetSelfTest_f( const idCmdArgs &args ) {
 		common->Printf( "PerformancePreset self-test failed: memory telemetry sanitizer returned an unexpected value\n" );
 		passed = false;
 	}
+	passed &= Common_ValidatePerformancePresetPlatformCeilings();
 
 	openQ4PerformancePresetCVarBackup_t backups[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT];
 	const int savedModifiedFlags = cvarSystem->GetModifiedFlags();

@@ -8,7 +8,7 @@ Neither has a menu control; both use console settings ("console variables"). Mos
 
 ## Automatic upscaling (default)
 
-Temporal AA is automatic by default (`r_temporalAA 2`). It switches itself on only when the 3D scene renders below your screen's resolution: when **Settings → Display → Image Quality → Resolution Scale** is below 100%, or when dynamic resolution is on. At full resolution it stays off and your MSAA and SMAA settings apply as usual. The **Performance**, **Low**, **Low Power** and **Minimum** presets render below full resolution, so they use temporal upscaling.
+Temporal AA is automatic by default (`r_temporalAA 2`). It switches itself on only when the 3D scene renders below your screen's resolution: when **Settings → Display → Image Quality → Resolution Scale** is below 100%, or when dynamic resolution is on. At full resolution it stays off and your MSAA and SMAA settings apply as usual. The **Performance** and **Low** presets render below full resolution, so they use temporal upscaling. **Not in 0.14.1:** **Low Power** and **Minimum** also render below full resolution, but their 30 FPS cap leaves automatic mode off: on the small boards, phones and battery-limited machines those presets are for, a plain stretch costs less, and at 30 FPS temporal AA takes twice as long to settle after you move. Any frame cap of 30 or lower does the same; `r_temporalAA 1` turns it on anyway.
 
 Automatic mode leaves alone the cropped and pixelated scale modes (`r_resolutionScaleMode 0` and `3`), because those looks are chosen on purpose; see [Resolution scale](display-settings.md#resolution-scale). It also stays off on OpenGL ES and on OpenGL drivers too old to run its shaders (without GLSL 1.30).
 
@@ -44,7 +44,7 @@ For a fixed scale instead, leave `r_rendererDynamicResolution 0` and lower **Res
 
 | Setting | Default | What it does |
 |---|---:|---|
-| `r_temporalAA` | `2` | `0` off, `1` always on (full resolution too), `2` automatic: on below full resolution. |
+| `r_temporalAA` | `2` | `0` off, `1` always on (full resolution too), `2` automatic: on below full resolution, unless the frame cap is 30 or lower. |
 | `r_temporalAASharpness` | `0.5` | Sharpening applied to the image you see (`0` to `1`). The frames TAA collects stay unsharpened. |
 | `r_temporalAAFeedback` | `0.9` | How much of earlier frames is kept (`0` to `0.98`). Higher is smoother but slower to react. Still parts of the picture keep a little more. |
 | `r_temporalAAReactiveEffects` | `0.85` | How strongly particles, effects and moving glass ignore earlier frames (`0` to `1`), which stops them smearing. |

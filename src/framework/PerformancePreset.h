@@ -78,6 +78,11 @@ struct PerformancePresetSignals {
  // legacyRenderer means insufficient classic material/texture capability,
  // not merely an API version that lacks optional modern post effects.
  bool explicitLowPower=false, raspberryPi=false, steamDeck=false, arm64=false, legacyRenderer=false, mobile=false;
+ // A desktop Linux host (not Android, which reports mobile) and an Apple GPU
+ // by its active-renderer name. With arm64 they tell a small ARM board, whose
+ // GPU openQ4 cannot rank, from Apple Silicon (macOS or Asahi Linux) and from
+ // Windows on ARM; see PerformancePresetIsArmBoard.
+ bool linuxHost=false, appleGpu=false;
  int systemRamMB=0, videoRamMB=0;
  RendererGpuClass gpuClass=RendererGpuClass::Unknown;
  bool modernEffects=false, postAAAvailable=false;
@@ -86,7 +91,15 @@ struct PerformancePresetSignals {
  int displayRefreshHz=0;
 };
 enum class PerformancePresetReason { ExplicitLowPower, RaspberryPi, SteamDeck, Mobile, LegacyRenderer,
- Software, Virtual, LowMemory, ModestMemory, Dedicated, Shared, Unknown, Resolution, Cpu };
+ Software, Virtual, LowMemory, ModestMemory, Dedicated, Shared, Unknown, Resolution, Cpu, ArmBoard };
+// An ARM board: an arm64 desktop Linux host whose GPU is not discrete and not
+// Apple's. Rockchip/Mali, Allwinner, Amlogic, MediaTek, Qualcomm and NVIDIA
+// Jetson boards all land here without a name list, so a board openQ4 has never
+// seen still gets the ceiling. The Raspberry Pi is one, with its own stricter hint.
+constexpr bool PerformancePresetIsArmBoard(const PerformancePresetSignals& signals) noexcept{
+ return signals.arm64&&signals.linuxHost&&!signals.mobile&&!signals.appleGpu&&
+  signals.gpuClass!=RendererGpuClass::Discrete;
+}
 // Verified dedicated memory of the active GPU, as capacity classes. Each floor
 // is 15/16 of the nominal size, because drivers report a little less than the
 // card's label (an 8 GiB card reports 7956-8188 MiB).
@@ -109,7 +122,8 @@ struct PerformancePresetDetection {
  int screenFraction=100, postAA=0, scenePixelBudget=0;
  // A first launch presents at the display's rate rather than the tier's
  // manual-choice cap (FPS-02); the tier's cap when the rate is unknown. A
- // power-limited device (phone, Deck, Pi, explicit request) keeps the lower.
+ // power-limited device (phone, Deck, Pi, ARM board, explicit request) keeps
+ // the lower.
  int maxFps=0;
 };
 inline constexpr int PerformancePresetUnknownSystemRamMB=0;

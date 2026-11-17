@@ -111,7 +111,7 @@ static int SDL_GetNumLogicalCPUCores(){observations.push_back("cpu");return raw.
 // The display rate a detected start caps at (FPS-02); not an observation the
 // ordering checks count.
 static float Sys_SDL_GetWindowRefreshHz(){return (float)raw.displayRefreshHz;}
-struct Config{bool isInitialized=true;int dedicatedVideoMemoryMB=0,vidWidth=0,vidHeight=0,maxTextureSize=0;RendererGpuClass gpuClass=RendererGpuClass::Unknown;const char* version_string="OpenGL";bool GLSL130Available=true,GLSLProgramAvailable=true,ARBVertexProgramAvailable=true,ARBFragmentProgramAvailable=true;struct{bool hasFBO=true;}backendCaps;};
+struct Config{bool isInitialized=true;int dedicatedVideoMemoryMB=0,vidWidth=0,vidHeight=0,maxTextureSize=0;RendererGpuClass gpuClass=RendererGpuClass::Unknown;const char* version_string="OpenGL";const char* renderer_string="";bool GLSL130Available=true,GLSLProgramAvailable=true,ARBVertexProgramAvailable=true,ARBFragmentProgramAvailable=true;struct{bool hasFBO=true;}backendCaps;};
 struct Renderer{
  bool initialized=true;
  bool overrideConfig=false;Config config;
@@ -184,6 +184,13 @@ int main(){
  renderer.config.GLSL130Available=false;
  Check(Common_CapturePerformancePresetSignals(got,error)&&!got.legacyRenderer&&!got.modernEffects&&!got.postAAAvailable,"Apple GLSL 1.20 lacks modern effects, not classic material quality");
  Check(std::string(openq4::DetectPerformancePreset(got).preset->name)=="balanced","Apple compatibility context keeps native classic quality");
+ Check(!got.appleGpu,"an unnamed device is not Apple's");
+ for(const char* name:{"Apple M2 (G14G B1)","Apple M4 Pro","Apple GPU"}){renderer.config.renderer_string=name;
+  Check(Common_CapturePerformancePresetSignals(got,error)&&got.appleGpu,"Apple Silicon is recognized by its active renderer name, Asahi included");}
+ for(const char* name:{"V3D 7.1.7.0","Mali-G610 (Panfrost)","FD618","NVIDIA Tegra Orin (nvgpu)/integrated"}){renderer.config.renderer_string=name;
+  Check(Common_CapturePerformancePresetSignals(got,error)&&!got.appleGpu,"board GPUs are not Apple's");}
+ renderer.config.renderer_string=nullptr;Check(Common_CapturePerformancePresetSignals(got,error)&&!got.appleGpu,"a missing renderer name is not Apple's");
+ renderer.config.renderer_string="";
  renderer.config.GLSLProgramAvailable=false;
  Check(Common_CapturePerformancePresetSignals(got,error)&&!got.legacyRenderer,"complete ARB programs retain classic rendering without GLSL");
  renderer.config.ARBFragmentProgramAvailable=false;
@@ -390,6 +397,9 @@ def main():
     ('resolution-step','native','src/framework/PerformancePreset.cpp','ceiling=Balanced+capacity;','ceiling=Ultra;'),
     ('power-cap-ignored','native','src/framework/PerformancePreset.cpp','if(!powerLimited||signals.displayRefreshHz<result.maxFps)','if(true)'),
     ('phone-scene-budget','native','src/framework/PerformancePreset.cpp','if(ram<PerformancePresetMobileFlagshipRamMB)budget','if(false)budget'),
+    ('arm-board-ceiling','native','src/framework/PerformancePreset.cpp','if(armBoard&&tier>Performance)','if(false&&tier>Performance)'),
+    ('arm-board-cap','native','src/framework/PerformancePreset.cpp','signals.mobile||armBoard;','signals.mobile;'),
+    ('apple-gpu-ignored','common',None,'signals.appleGpu=RendererIsAppleGpu(config.renderer_string);','signals.appleGpu=false;'),
     ('fixed-specular','native','src/framework/PerformancePreset.cpp','{"image_downSizeSpecularLimit",64}','{"image_downSizeSpecularLimit",63}'),
     ('omit-edit','native','src/ui/application/SettingsTransaction.cpp','candidate[key]=value;','candidate[key]=declaration->second;'),
     ('merged-validation','native','src/ui/application/SettingsTransaction.cpp','if(!ValidateDraft(candidate,error))return false;','if(false)return false;'),

@@ -668,7 +668,8 @@ preset system a configuration was tuned against, as `<revision>.<fingerprint>`
 (`1.6c792296` when introduced). The fingerprint is an FNV-1a hash that moves by
 itself whenever the presets change. It covers every preset's full expansion
 (each of the 55 targets and its value, in order) and the detector's complete
-answer for a fixed matrix of 9,036 machines. The matrix spans every GPU class,
+answer for a fixed matrix of 9,042 machines (9,036 until the
+[ARM-board ceiling](#arm-boards-and-the-low-power-floor-17-november-2026)). The matrix spans every GPU class,
 the video and system memory bands on both sides of each threshold, the
 resolution classes, CPU concurrency, known and unknown refresh rates, and each
 platform ceiling on three common machines. So a new tier, a changed value or a
@@ -727,3 +728,118 @@ recommendation. `open` shows the check from the front end, `apply`, `keep` and
 `later` answer it, and `reset` clears the record so the next start asks again.
 Each showing logs one `PRESET_CHECK show` line with the recorded and current
 versions, both presets and the number of settings that would change.
+
+## ARM boards and the low-power floor, 17 November 2026
+
+Triage of [#233](https://github.com/themuffinator/openQ4/issues/233) (a
+Raspberry Pi 5, correctly detected as `Raspberry Pi host` and given Low Power)
+found three gaps around small ARM boards.
+
+### Every ARM board gets a ceiling, not only the Pi
+
+`PerformancePresetSignals::arm64` was captured but never read. Only a Pi was
+caught, through its device-tree model or an environment variable. Any other
+board with an integrated GPU fell into the shared-memory branch, so a 16 GiB
+Rockchip RK3588 board (Mali-G610 under panfrost) got Balanced: native scale,
+2x MSAA and a frame cap following the display. An 8 GiB board escaped only
+because it reports a little under 8192 MiB.
+
+The detector now applies the handheld ceiling, Performance, to an **ARM
+board**: an arm64 desktop Linux host (not Android, which keeps the phone
+rules) whose GPU is neither discrete nor Apple's
+(`PerformancePresetIsArmBoard`). It reports `ARM board power budget`, and a
+board counts as power-limited, so its frame cap stays at Performance's 60 on a
+faster display. The scene budget is the integrated 1080p class: 85% at 1080p,
+75% at 1440p, 50% at 4K. The Pi's own hint is stricter and still wins.
+
+Two signals make the rule. `linuxHost` is set at compile time on Linux other
+than Android. `appleGpu` comes from the active renderer's name
+(`RendererIsAppleGpu`: `Apple M…` and `Apple GPU`, which covers macOS GL,
+MoltenVK and Mesa's Asahi driver).
+
+**Why a platform rule and not a GPU-name list.** The alternative was to
+recognise board GPUs by `GL_RENDERER` (Broadcom V3D, Mali, Adreno, PowerVR,
+Vivante) or by Vulkan's driver ID (V3DV, panfrost, turnip). That list fails
+open. Mesa renames devices (freedreno reports `FD618`), GL and Vulkan spell
+the same GPU differently, and a board openQ4 has never seen would keep
+Balanced silently. The platform rule fails closed: every arm64 Linux machine
+without a discrete GPU is treated as a board, and the only exemption, Apple
+Silicon under Asahi, is one well-known name. The cost is that a fast
+non-Apple ARM machine running Linux, such as a Snapdragon X laptop or a
+Jetson AGX Orin, starts at Performance. Its owner can raise it; Windows on ARM
+is unaffected. The ceiling matches what the hardware is: RK3588's Mali-G610 is
+the GPU of mid-range phones, which already get Performance.
+
+ISA alone still ranks nothing: on macOS, Windows or x86 Linux, flipping
+`arm64` never changes a recommendation, and the self-test checks that across
+every signal combination.
+
+### Low Power and Minimum shed the light grid and automatic temporal AA
+
+On the Pi, Low Power still ran two costs that retail did not have:
+
+- **Light grids** (`r_useLightGrid 1`). The indirect pass is an openQ4
+  addition: a full-screen pass with a depth copy on OpenGL, plus the map's
+  grid pack (18.6 MiB for `game/airdefense2`) and its atlases in shared
+  memory. Minimum and Low Power now set it to 0 and draw retail's lighting.
+  This is an existing preset target, so the 55-target footprint, the SYSTEM
+  catalog and the effect journal are unchanged. The intent check now
+  requires 0 on exactly those two tiers and a non-decreasing progression.
+  (The #233 reporter also found that `r_useLightGrid 0` stopped a flicker on
+  the Pi's OpenGL driver. That is a driver fault, tracked separately; this
+  change was not made for it.)
+- **Automatic temporal AA** (`r_temporalAA 2`) switched on for Low Power's
+  75% scene. It adds a resolve pass at output resolution, history targets
+  and the floating-point scene target it keeps alive. `r_temporalAA` is not
+  a preset target, and making it one would need a new SYSTEM catalog
+  version, a journal upgrade and regenerated state for one value. The
+  presets already own the frame cap, so the automatic mode now stands down
+  under a cap of 30 Hz or lower (`TEMPORAL_AUTOMATIC_MIN_CAP_HZ`). Only
+  Minimum and Low Power cap at 30, and the self-test pins that. A 30 Hz
+  history also takes twice as long to settle after motion. `r_temporalAA 1`
+  still forces TAA, and dynamic resolution, which steers its scale through
+  TAA, keeps it.
+
+### The Linux VRAM guess is not dedicated memory
+
+On UMA boards the log says `guess failed, using conservative modern VRAM
+setting (2048MB VRAM)`. That value comes from `Sys_GetVideoRam`, which
+detection never reads: the observer takes only the active renderer's
+dedicated memory (0 on the Pi, as its `dedicated VRAM=0` line shows), and
+`ui_performance_presets.py` fails if the observer ever asks the host for
+VRAM. The 2048 reaches two places. One is the `Video memory:` startup line.
+The other is the one-time Linux migration that removes the legacy 256-texel
+cap a fabricated 64 MiB guess once caused, which is what that migration is
+for. Nothing treats it as a GPU's own memory. No change was needed.
+
+### Version and validation
+
+The preset system version moves from `1.6c792296` to `1.f3cd9be4`. The light
+grid values and the new rule both change the fingerprint, and the detection
+matrix gains an ARM board and Asahi on each of its three common machines
+(9,042 machines). Configurations saved earlier are offered the system check
+once.
+
+- `ui_performance_presets.py --mutations`: the model suite (549,949 checks),
+  the real SYSTEM host and Common bodies, and the Android observer pass. All
+  32 mutations are rejected, three of them new: the board ceiling removed,
+  the board's frame cap following the display, and the Apple name ignored.
+  New cases cover the #233 Pi 5 (8058 MiB, V3D on GL, 720p: Low Power at
+  75%), RK3588 boards at 8, 16 and 32 GiB, an unrecognised board driver,
+  Apple Silicon on macOS and Asahi, Windows on ARM, a discrete card in an
+  arm64 workstation, and Android. The invariant sweep now includes the Linux
+  host and Apple GPU bits (256 flag combinations).
+- `performance_preset_check.py` (the pinned version against a compiled
+  model), `renderer_temporal_presentation.py`,
+  `linux_gui_presentation_defaults.py` and `ui_system_presets.py` pass.
+- The Windows debugoptimized build is clean, and the Meson suites
+  `openq4-ui-performance-presets`, `openq4-ui-system-presets(-source)` and
+  both temporal cores pass under MSVC. `performancePresetSelfTest` in the
+  staged client now also checks synthetic machines (a 16 GiB board, a Pi,
+  Apple Silicon on Asahi and macOS, Windows on ARM). It passed with
+  `presets=9`, and this machine (RTX 4060 Laptop) still detects Enhanced.
+- In `game/airdefense1` on Vulkan, Low Power rendered its 75% scene with
+  `taaRequested=0` and no temporal resolves. After `com_maxfps 60` the same
+  session reported `taaRequested=1` and resolved 119 frames.
+- Not run: any ARM board, Pi or Asahi machine. The rule is covered by the
+  model suite only. What the light grid and TAA cost on a Pi is not measured.

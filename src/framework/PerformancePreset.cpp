@@ -9,20 +9,24 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	// The three bottom recipes are for hardware at and below the documented
 	// minimum (4 GiB RAM, a 1 GiB ARB2-class GPU). Lowering resolution alone left
 	// every rendering feature in place, so the two lowest also draw no shadows:
-	// no shadow volumes are built, submitted or filled.
+	// no shadow volumes are built, submitted or filled. They also skip the
+	// light-grid indirect pass, an openQ4 addition to retail lighting that costs a
+	// full-screen pass, a depth copy and the map's grid atlases in shared memory.
+	// Their 30 Hz cap also stands automatic temporal AA down (r_temporalAA 2):
+	// a 75% scene is stretched rather than reconstructed from history.
 	//
 	// Minimum is the floor: software and limited renderers, 2 GiB systems.
 	{ "minimum", 0, "low",
 		50, 0, 0, 30,
 		1, 512, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
+		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
 		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0 },
 	// Low Power is the battery and small-board recipe: Raspberry Pi, low-memory
 	// phones and an explicit power request. No shadows, 30 Hz.
 	{ "lowpower", 0, "low",
 		75, 0, 0, 30,
 		1, 1024, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
+		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
 		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0 },
 	// Low is the documented minimum PC: the original stencil shadows at 60 Hz,
 	// with Low Power's reduced scene and texture sizes.
@@ -269,6 +273,12 @@ PerformancePresetDetection DetectPerformancePreset(const PerformancePresetSignal
  if(signals.raspberryPi&&tier>LowPower){tier=LowPower;result.reason=Reason::RaspberryPi;}
  if(signals.steamDeck&&tier>Performance){tier=Performance;result.reason=Reason::SteamDeck;}
  if(signals.mobile&&tier>Performance){tier=Performance;result.reason=Reason::Mobile;}
+ // An ARM board's GPU has no capacity signal and no name list that keeps up
+ // with new boards. RK3588's Mali-G610 is a mid-range phone GPU, the class
+ // phones already get Performance for, so every board gets the handheld ceiling.
+ // The Pi's own hint above is stricter; Apple and discrete GPUs are not boards.
+ const bool armBoard=PerformancePresetIsArmBoard(signals);
+ if(armBoard&&tier>Performance){tier=Performance;result.reason=Reason::ArmBoard;}
  // Reduce the recommendation for the actual drawable, independently of the
  // currently selected render scale. Never change window size or display mode.
  // Each resolution class above 1440p costs one tier, so an 8 GiB card is
@@ -293,7 +303,7 @@ PerformancePresetDetection DetectPerformancePreset(const PerformancePresetSignal
  // 120 Hz phone or a 90 Hz handheld stays at Performance's 60.
  result.maxFps=result.preset->maxFps;
  if(signals.displayRefreshHz>=PerformancePresetMinDisplayRefreshHz&&signals.displayRefreshHz<=PerformancePresetMaxDisplayRefreshHz){
-  const bool powerLimited=signals.explicitLowPower||signals.raspberryPi||signals.steamDeck||signals.mobile;
+  const bool powerLimited=signals.explicitLowPower||signals.raspberryPi||signals.steamDeck||signals.mobile||armBoard;
   if(!powerLimited||signals.displayRefreshHz<result.maxFps)result.maxFps=signals.displayRefreshHz;
  }
  result.postAA=(signals.postAAAvailable||signals.modernEffects)?result.preset->postAA:0;
@@ -369,14 +379,15 @@ template<typename Visit> int VisitFingerprintMachines(Visit&& visit) {
  common[2].gpuClass=RendererGpuClass::Integrated;common[2].systemRamMB=PerformancePresetMobileFlagshipRamMB+2048;
  common[2].drawableWidth=2400;common[2].drawableHeight=1080;
  for(auto& machine:common){machine.logicalCpus=8;machine.modernEffects=machine.postAAAvailable=true;}
- for(int flag=0;flag<6;++flag)for(const auto& machine:common)for(const int hertz:{0,90}){
+ for(int flag=0;flag<7;++flag)for(const auto& machine:common)for(const int hertz:{0,90}){
   auto signals=machine;signals.displayRefreshHz=hertz;
   switch(flag){
    case 0:signals.explicitLowPower=true;break;
    case 1:signals.raspberryPi=true;break;
    case 2:signals.steamDeck=true;break;
-   case 3:signals.arm64=true;break;
+   case 3:signals.arm64=signals.linuxHost=true;break; // An ARM board.
    case 4:signals.legacyRenderer=true;break;
+   case 5:signals.arm64=signals.linuxHost=signals.appleGpu=true;break; // Asahi Linux.
    default:signals.mobile=true;break;
   }
   visit(signals);++machines;

@@ -55,6 +55,14 @@ inline RendererGpuClass RendererClassifyGLDevice(std::string_view name) noexcept
     has("arc a")||has("arc b"))return RendererGpuClass::Discrete;
  return RendererGpuClass::Unknown;
 }
+// Apple's own GPUs by active-renderer name: "Apple M4 Pro" (macOS GL and
+// MoltenVK), "Apple GPU", and Mesa's "Apple M1 (G13G B1)" on Asahi Linux.
+// Performance detection exempts them from the ARM-board ceiling.
+inline bool RendererIsAppleGpu(const char* name) noexcept {
+ if(name==nullptr)return false;
+ const std::string_view text(name);
+ return RendererNameContains(text,"apple m")||RendererNameContains(text,"apple gpu");
+}
 inline const char* RendererGpuClassName(RendererGpuClass type) noexcept {
  switch(type){
   case RendererGpuClass::Integrated:return "integrated/shared";

@@ -50,8 +50,8 @@ static void Profiles(){
  // Independent golden setter values for the revised quality progression.
  // Maximum asks for 8 samples, the most the Vulkan renderer draws (FPS-05).
  const std::vector<std::vector<int>> numbers={
- {0,50,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
- {0,75,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
+ {0,50,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
+ {0,75,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
  {0,75,0,0,60,2,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {1,85,0,1,60,2,1,0,0,0,0,64,0,0,1,0,0,1024,2,0,0,0,0,0,1,16,4,0,1,40,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {2,100,2,1,120,4,1,0,0,0,0,64,0,0,1,0,0,1024,0,0,0,0,0,0,1,16,4,0,1,48,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
@@ -99,11 +99,35 @@ static void Detection(){
  s.drawableWidth=7680;s.drawableHeight=4320;expect(s,"performance");
  s=desktop;s.logicalCpus=2;expect(s,"performance");s.logicalCpus=0;expect(s,"performance");
  s=desktop;s.gpuClass=GPU::Integrated;s.videoRamMB=128;expect(s,"balanced");
- s.arm64=true;expect(s,"balanced"); // Apple Silicon is not penalized for ISA/UMA.
+ s.arm64=true;s.appleGpu=true;expect(s,"balanced"); // Apple Silicon is not penalized for ISA/UMA.
+ s.linuxHost=true;expect(s,"balanced"); // Nor is it on Asahi Linux.
+ s.appleGpu=false;s.linuxHost=false;expect(s,"balanced"); // Windows on ARM (Snapdragon X) keeps the iGPU rule.
+ s.linuxHost=true;s.appleGpu=true;
  s.modernEffects=false;expect(s,"balanced"); // Apple GL 2.1 still runs classic quality.
  s.drawableWidth=1920;s.drawableHeight=1200;expect(s,"balanced"); // A 16:10 panel is the 1080p class.
  s.drawableWidth=2256;s.drawableHeight=1504;expect(s,"performance");
  s.drawableWidth=2560;s.drawableHeight=1600;expect(s,"performance");
+ // ARM boards: any arm64 desktop-Linux host without a discrete or Apple GPU
+ // gets the handheld ceiling, whatever its memory. RK3588/Mali, Jetson, a
+ // Snapdragon laptop on Linux and an unrecognized driver all land here.
+ {
+  PerformancePresetSignals board;board.arm64=board.linuxHost=true;board.gpuClass=GPU::Integrated;
+  board.systemRamMB=16384;board.modernEffects=true;board.logicalCpus=8;board.drawableWidth=1920;board.drawableHeight=1080;
+  Check(PerformancePresetIsArmBoard(board),"an arm64 Linux iGPU is an ARM board");
+  const auto found=DetectPerformancePreset(board);
+  Check(std::string(found.preset->name)=="performance"&&found.reason==PerformancePresetReason::ArmBoard,"a 16 GiB Rockchip board is Performance, not Balanced");
+  for(int ram:{8192,32768})for(auto gpu:{GPU::Integrated,GPU::Unknown}){auto b=board;b.systemRamMB=ram;b.gpuClass=gpu;expect(b,"performance");}
+  auto b=board;b.systemRamMB=7900;expect(b,"performance"); // An 8 GiB board reports a little less.
+  b.systemRamMB=4096;expect(b,"low");b.systemRamMB=2048;expect(b,"minimum"); // Smaller memory budgets still win.
+  b=board;b.raspberryPi=true;Check(DetectPerformancePreset(b).reason==PerformancePresetReason::RaspberryPi,"a Pi is named by its own, stricter hint");expect(b,"lowpower");
+  b=board;b.explicitLowPower=true;expect(b,"lowpower");
+  b=board;b.gpuClass=GPU::Software;expect(b,"minimum");
+  b=board;b.gpuClass=GPU::Discrete;b.videoRamMB=8192;Check(!PerformancePresetIsArmBoard(b),"a discrete card is not a board GPU");expect(b,"enhanced"); // An Ampere workstation.
+  b=board;b.appleGpu=true;Check(!PerformancePresetIsArmBoard(b),"Asahi Linux is Apple Silicon");expect(b,"balanced");
+  b=board;b.linuxHost=false;Check(!PerformancePresetIsArmBoard(b),"macOS and Windows on ARM are not boards");expect(b,"balanced");
+  b=board;b.arm64=false;Check(!PerformancePresetIsArmBoard(b),"x86 Linux iGPUs are not boards");expect(b,"balanced");
+  b=board;b.mobile=true;Check(!PerformancePresetIsArmBoard(b)&&DetectPerformancePreset(b).reason==PerformancePresetReason::Mobile,"Android keeps its phone rules");
+ }
  s=desktop;s.gpuClass=GPU::Unknown;expect(s,"performance");
  s.gpuClass=GPU::Virtual;expect(s,"performance");
  s.gpuClass=GPU::Software;s.steamDeck=true;expect(s,"minimum");
@@ -166,13 +190,17 @@ static void Detection(){
   {"",GPU::Unknown}})Check(RendererClassifyGLDevice(name)==type,"active GL driver classification");
  Check(RendererClassifyGLDevice(std::string(4096,'x')+" GeForce")==GPU::Unknown,"an overlong name is bounded, not overrun");
  // Memory cannot override hardware/power constraints, and ISA never ranks a GPU.
- for(int flags=0;flags<64;++flags)for(auto gpu:{GPU::Unknown,GPU::Integrated,GPU::Discrete,GPU::Virtual,GPU::Software})
+ for(int flags=0;flags<256;++flags)for(auto gpu:{GPU::Unknown,GPU::Integrated,GPU::Discrete,GPU::Virtual,GPU::Software})
  for(int ram:{-1,0,2048,4096,8192,16384,4194305})for(int vram:{-1,0,512,1024,2048,8192,12288,16384,32768,262145}){
   s=desktop;s.explicitLowPower=flags&1;s.raspberryPi=flags&2;s.steamDeck=flags&4;s.legacyRenderer=flags&8;s.arm64=flags&16;s.mobile=flags&32;
+  s.linuxHost=flags&64;s.appleGpu=flags&128;
   s.gpuClass=gpu;s.systemRamMB=ram;s.videoRamMB=vram;const auto result=DetectPerformancePreset(s);
+  const bool board=PerformancePresetIsArmBoard(s);
   Check(result.preset>=&PerformancePresets()[0]&&result.preset<FindPerformancePreset("maximum"),"auto never selects Maximum, which has no frame-rate target");
   if(gpu!=GPU::Discrete||vram<PerformancePresetVram12GiB||vram>262144)Check(result.preset<=FindPerformancePreset("enhanced"),"only a verified 12 GiB class card passes Enhanced");
-  s.arm64=!s.arm64;Check(DetectPerformancePreset(s).preset==result.preset,"CPU ISA cannot rank graphics");
+  if(board)Check(result.preset<=FindPerformancePreset("performance"),"ARM board ceiling across hardware combinations");
+  // Only the board rule reads the ISA, and only with a desktop Linux host.
+  if(s.appleGpu||!s.linuxHost){auto x86=s;x86.arm64=!x86.arm64;Check(DetectPerformancePreset(x86).preset==result.preset,"CPU ISA alone cannot rank graphics; Apple Silicon is never a board");}
   if(gpu==GPU::Software||s.legacyRenderer)Check(result.preset==FindPerformancePreset("minimum"),"capability limits dominate environment hints");
   if(gpu==GPU::Discrete&&vram>0&&vram<=512)Check(result.preset==FindPerformancePreset("minimum"),"dedicated memory limits dominate all power hints");
   if(s.mobile)Check(result.preset<=FindPerformancePreset("performance")&&result.preset!=FindPerformancePreset("low"),"mobile power ceiling across hardware combinations");
@@ -184,6 +212,9 @@ static void Detection(){
  for(const auto& preset:PerformancePresets()){
   const std::string name=preset.name;
   Check(preset.shadows==(name=="minimum"||name=="lowpower"?0:1),"only Minimum and Low Power draw no shadows");
+  Check(preset.useLightGrid==(name=="minimum"||name=="lowpower"?0:1),"only Minimum and Low Power skip the light grid");
+  // Their 30 Hz cap is what stands automatic temporal AA down in the renderer.
+  Check((preset.maxFps<=30)==(name=="minimum"||name=="lowpower"),"only Minimum and Low Power cap at 30 Hz");
  }
 }
 static void DetectionResolution(){
@@ -223,6 +254,16 @@ static void DetectionResolution(){
  s.gpuClass=GPU::Discrete;s.videoRamMB=1024;s.drawableWidth=1920;s.drawableHeight=1080;expect("low",75,0);
  s.drawableWidth=1366;s.drawableHeight=768;expect("low",75,0);s.drawableWidth=2560;s.drawableHeight=1440;expect("low",50,0);
  s.videoRamMB=8192;s.raspberryPi=true;s.drawableWidth=1920;s.drawableHeight=1080;expect("lowpower",75,0);s.raspberryPi=false;
+ // The Pi 5 of issue #233: 8 GiB, V3D on GL, a 720p display.
+ s.gpuClass=GPU::Integrated;s.videoRamMB=0;s.systemRamMB=8058;s.logicalCpus=4;s.arm64=s.linuxHost=true;s.raspberryPi=true;
+ s.modernEffects=false;s.postAAAvailable=false;s.drawableWidth=1280;s.drawableHeight=720;expect("lowpower",75,0);
+ s.drawableWidth=1920;s.drawableHeight=1080;expect("lowpower",75,0);s.drawableWidth=3840;s.drawableHeight=2160;expect("lowpower",25,0);
+ // Any other ARM board: Performance's 85% up to 1080p, then the iGPU scene budget.
+ s.raspberryPi=false;s.systemRamMB=16384;s.logicalCpus=8;s.modernEffects=true;s.drawableWidth=1920;s.drawableHeight=1080;expect("performance",85,1);
+ s.drawableWidth=2560;s.drawableHeight=1440;expect("performance",75,1);s.drawableWidth=3840;s.drawableHeight=2160;expect("performance",50,1);
+ // Asahi Linux on an M2 keeps Apple Silicon's Balanced.
+ s.appleGpu=true;s.drawableWidth=1920;s.drawableHeight=1080;expect("balanced",100,1);
+ s.appleGpu=false;s.arm64=s.linuxHost=false;s.gpuClass=GPU::Discrete;s.videoRamMB=8192;s.systemRamMB=16384;s.postAAAvailable=true;
  // Phones: a 12 GiB flagship keeps the 1080p class, smaller ones a 720p scene.
  s.gpuClass=GPU::Integrated;s.mobile=true;s.systemRamMB=11400;
  s.drawableWidth=2340;s.drawableHeight=1080;expect("performance",85,1);
@@ -282,6 +323,10 @@ static void DetectionResolution(){
   Check(cap(deck,90)==60&&cap(deck,40)==40,"a handheld keeps its tier cap");
   auto pi=d;pi.raspberryPi=true;
   Check(cap(pi,60)==30&&cap(pi,30)==30&&cap(pi,0)==30,"a small board keeps Low Power's 30");
+  auto board=d;board.arm64=board.linuxHost=true;board.gpuClass=RendererGpuClass::Integrated;
+  Check(cap(board,144)==60&&cap(board,60)==60&&cap(board,50)==50&&cap(board,0)==60,"an ARM board keeps Performance's 60");
+  auto mac=board;mac.appleGpu=true;mac.drawableWidth=1920;mac.drawableHeight=1080;
+  Check(cap(mac,120)==120,"Apple Silicon follows its display");
   auto request=d;request.explicitLowPower=true;
   Check(cap(request,144)==30,"an explicit low-power request keeps its cap");
   auto small=d;small.systemRamMB=4096;
@@ -368,8 +413,8 @@ static void SystemVersion(){
  Check(version.compare(0,revision.size(),revision)==0&&version.size()==revision.size()+8,"version is revision.fingerprint");
  for(size_t i=revision.size();i<version.size();++i)
   Check((version[i]>='0'&&version[i]<='9')||(version[i]>='a'&&version[i]<='f'),"fingerprint is lower-case hex");
- Check(PerformancePresetFingerprintMachines()==9036,"detection matrix covers every GPU class, memory band, resolution class and platform ceiling");
- Check(version=="1.6c792296","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
+ Check(PerformancePresetFingerprintMachines()==9042,"detection matrix covers every GPU class, memory band, resolution class and platform ceiling");
+ Check(version=="1.f3cd9be4","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
 }
 int main(){
 #if defined(_WIN32) && defined(_DEBUG)

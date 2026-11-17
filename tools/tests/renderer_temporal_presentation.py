@@ -84,6 +84,10 @@ def main() -> int:
         "defined( OPENQ4_RENDERER_GLES_MODULE )",
         "glConfig.GLSL130Available",
         "r_screenFraction.GetInteger() < 100 && ( scaleMode == 1 || scaleMode == 2 )",
+        # ... but not under a 30 Hz cap (Minimum and Low Power)
+        "static const int TEMPORAL_AUTOMATIC_MIN_CAP_HZ = 31;",
+        "return maxFps > 0 && maxFps < TEMPORAL_AUTOMATIC_MIN_CAP_HZ;",
+        "if ( R_TemporalPresentation_LowRateCap() ) {",
         "R_TemporalPresentation_CapturePreviousPositions(",
         "tri->positionsFrame == frame - 1",
         "R_TemporalPresentation_PreviousPositionCache(",

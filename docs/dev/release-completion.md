@@ -7,6 +7,46 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Better first-launch settings on ARM boards, and a lighter Low Power (#233), 17 November 2026
+
+- **ARM boards other than the Raspberry Pi start on sensible settings.**
+  Rockchip, Orange Pi, Radxa, NVIDIA Jetson and other ARM64 Linux boards
+  without a separate graphics card used to get the Balanced preset at full
+  resolution when they had 16 GB of memory. Auto-Detect now starts them on
+  Performance with a 60 FPS cap, as it does a Steam Deck. A Raspberry Pi still
+  gets Low Power. Apple Silicon, on macOS or Asahi Linux, and Windows on ARM
+  are not affected.
+- **Low Power and Minimum do less work.** Both presets now turn off light
+  grids and use the original game's lighting. Their 30 FPS cap also leaves
+  automatic temporal upscaling off: the 75% (or 50%) scene is stretched to the
+  screen, which costs less on the small boards, phones and battery-limited
+  machines these presets are for. Any frame cap of 30 or lower does the same;
+  `r_temporalAA 1` turns temporal AA back on.
+- **What to do.** Nothing for a new install. Because the presets changed,
+  an existing configuration sees the System Check once at its next start and
+  can apply the new recommendation or keep its settings. To get the lighter
+  Low Power or Minimum on a configuration you keep, choose the preset again.
+- How it works: an ARM board is an arm64 Linux host (not Android) whose
+  active GPU is neither discrete nor named as Apple's. The rule depends on
+  the platform, not on a list of GPU names, so a board openQ4 has never seen
+  is still covered. The preset system version moves from `1.6c792296` to
+  `1.f3cd9be4`. The Linux log line `guess failed, using conservative modern
+  VRAM setting` was checked and does not feed preset detection, which reads
+  only the active graphics device's own memory. See
+  [performance presets](ui/performance-presets.md#arm-boards-and-the-low-power-floor-17-november-2026).
+- Evidence: `ui_performance_presets.py --mutations` passes, with 549,949 model
+  checks and all 32 mutations rejected, three of them new. New cases cover the
+  #233 Pi 5, RK3588 boards from 8 to 32 GB, Apple Silicon on macOS and Asahi,
+  Windows on ARM, an ARM workstation with a discrete card, and Android.
+  `performance_preset_check.py`, `renderer_temporal_presentation.py`,
+  `linux_gui_presentation_defaults.py` and `ui_system_presets.py` pass. The
+  Windows build is clean and the Meson preset and temporal suites pass. The
+  staged client's `performancePresetSelfTest`, which now includes a board, a
+  Pi and Apple Silicon, passes. In `game/airdefense1` on Vulkan, Low Power
+  drew its 75% scene with temporal AA off, and turned it on at a 60 FPS cap.
+  Not run: any ARM board, Pi or Asahi machine. What the light grid and
+  temporal AA cost on a Pi is not measured.
+
 ## A copy of openQ4's own pack in a mod's folder no longer hides the new menus (#219), 17 November 2026
 
 - **Menus stay current when openQ4's pack was copied into a mod's folder.** A
