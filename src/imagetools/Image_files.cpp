@@ -1289,6 +1289,8 @@ eligible.
 */
 static int ddsRetailProgramSuppressed = 0;
 
+static const char *const R_RETAIL_PROGRAM_DDS_ORIGIN = "retail progimg/";
+
 class idSuppressRetailProgramDDS {
 public:
 	idSuppressRetailProgramDDS() { ddsRetailProgramSuppressed++; }
@@ -1397,7 +1399,7 @@ static void R_BuildDDSCandidates( const char *cname, idStrList &candidates, idSt
 	if ( ddsRetailProgramSuppressed == 0 && R_ImageHasRetailProgramDDSName( cname ) ) {
 		idStr retailDDSName;
 		R_ImageProgramToRetailCompressedFileName( cname, retailDDSName );
-		R_AppendDDSCandidate( candidates, origins, retailDDSName, "retail progimg/" );
+		R_AppendDDSCandidate( candidates, origins, retailDDSName, R_RETAIL_PROGRAM_DDS_ORIGIN );
 	}
 }
 
@@ -1411,14 +1413,118 @@ static bool R_HasUncompressedLegacyScopeMask( const char *name ) {
 	return fileSystem->ReadFile( source, NULL ) > 0;
 }
 
+// R_RetailProgramInputReplaced resolves inputs through the resolver below;
+// their misses are not what the log was asked about
+static int ddsResolveQuiet = 0;
+
+/*
+=============
+R_ImageProgramInputNames
+
+The images an image program reads: every name in it that is not an operator,
+a number or punctuation. The _white, _black and _flat stand-ins are left out.
+=============
+*/
+static void R_ImageProgramInputNames( const char *imageProgram, idStrList &inputs ) {
+	inputs.Clear();
+	if ( imageProgram == NULL || imageProgram[0] == '\0' ) {
+		return;
+	}
+
+	idLexer src;
+	src.LoadMemory( imageProgram, idLib::SizeToInt( strlen( imageProgram ), "R_ImageProgramInputNames" ), imageProgram );
+	src.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
+
+	idToken token;
+	while ( src.ReadToken( &token ) ) {
+		if ( token.type != TT_NAME || R_ImageNameIsProgramOperator( token ) || token[0] == '_' ) {
+			continue;
+		}
+		inputs.AddUnique( token );
+	}
+	src.FreeSource();
+}
+
+/*
+=============
+R_ResolveImageSourceFile
+
+The file R_LoadImageInternal reads for a plain image name: a DDS replacement
+first, then the source formats in the order it tries them.
+=============
+*/
+static bool R_ResolveImageSourceFile( const char *imageName, idStr &path ) {
+	idStr name = imageName;
+	name.DefaultFileExtension( ".tga" );
+	name.BackSlashesToSlashes();
+	name.ToLower();
+
+	idStr ext;
+	name.ExtractFileExtension( ext );
+	if ( ext != "dds" ) {
+		idStr ddsName;
+		ddsResolveQuiet++;
+		const bool replaced = R_ResolvePreferredDDSImageSource( name.c_str(), ddsName, NULL, false, NULL );
+		ddsResolveQuiet--;
+		if ( replaced ) {
+			path = ddsName;
+			return true;
+		}
+	}
+
+	static const char *const tgaOrder[] = { "tga", "jpg", "png", "dds", NULL };
+	static const char *const jpgOrder[] = { "jpg", "tga", "dds", NULL };
+	static const char *const pngOrder[] = { "png", "tga", "jpg", "dds", NULL };
+	static const char *const ddsOrder[] = { "dds", NULL };
+	const char *const *order = ext == "jpg" ? jpgOrder : ext == "png" ? pngOrder : ext == "dds" ? ddsOrder : tgaOrder;
+	idStr stem = name;
+	stem.StripFileExtension();
+	for ( int i = 0; order[i] != NULL; i++ ) {
+		idStr candidate = stem;
+		candidate += ".";
+		candidate += order[i];
+		if ( fileSystem->ReadFile( candidate.c_str(), NULL, NULL ) > 0 ) {
+			path = candidate;
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+=============
+R_RetailProgramInputReplaced
+
+Quake 4's progimg/ files are image programs computed from Quake 4's own
+images. Once any input comes from somewhere else, such as a texture pack's
+_local or _h replacement, the stored result no longer matches what the program
+makes, and it must be computed again from the replacement.
+=============
+*/
+static bool R_RetailProgramInputReplaced( const char *imageProgram, idStr &replacedPath ) {
+	idStrList inputs;
+	R_ImageProgramInputNames( imageProgram, inputs );
+	for ( int i = 0; i < inputs.Num(); i++ ) {
+		idStr path;
+		if ( R_ResolveImageSourceFile( inputs[i], path ) && fileSystem->GetFileOrigin( path.c_str() ) == FS_FILE_ORIGIN_ADDED ) {
+			replacedPath = path;
+			return true;
+		}
+	}
+	return false;
+}
+
 /*
 =============
 R_ResolvePreferredDDSImageSource
 =============
 */
-bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIME_T *timestamp, bool allowPrecompressedDDS, bool *precompressedDDS ) {
+bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIME_T *timestamp, bool allowPrecompressedDDS, bool *precompressedDDS, bool *retailResultSuperseded ) {
 	if ( precompressedDDS != NULL ) {
 		*precompressedDDS = false;
+	}
+	if ( retailResultSuperseded != NULL ) {
+		*retailResultSuperseded = false;
 	}
 	if ( timestamp != NULL ) {
 		*timestamp = FILE_NOT_FOUND_TIMESTAMP;
@@ -1434,7 +1540,7 @@ bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIM
 	idStrList origins;
 	R_BuildDDSCandidates( cname, candidates, origins );
 
-	const bool logMisses = image_showPrecompressedTextures.GetBool();
+	const bool logMisses = image_showPrecompressedTextures.GetBool() && ddsResolveQuiet == 0;
 	idStr rejections;
 	const bool preferScopeSource = R_HasUncompressedLegacyScopeMask( cname );
 
@@ -1446,6 +1552,28 @@ bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIM
 		}
 		const char *rejectReason = NULL;
 		if ( R_TryResolvePreferredDDSImageSource( candidates[i], ddsName, timestamp, allowPrecompressedDDS, precompressedDDS, &rejectReason ) ) {
+			idStr replacedInput;
+			if ( origins[i] == R_RETAIL_PROGRAM_DDS_ORIGIN &&
+				 fileSystem->GetFileOrigin( candidates[i].c_str() ) == FS_FILE_ORIGIN_SHIPPED &&
+				 R_RetailProgramInputReplaced( cname, replacedInput ) ) {
+				ddsName.Clear();
+				if ( timestamp != NULL ) {
+					*timestamp = FILE_NOT_FOUND_TIMESTAMP;
+				}
+				if ( precompressedDDS != NULL ) {
+					*precompressedDDS = false;
+				}
+				if ( retailResultSuperseded != NULL ) {
+					*retailResultSuperseded = true;
+				}
+				if ( logMisses ) {
+					idStr reason = "Quake 4's own result, but its input ";
+					reason += replacedInput;
+					reason += " comes from outside the shipped packs";
+					rejections += va( "   %-64s [%s] %s\n", candidates[i].c_str(), origins[i].c_str(), reason.c_str() );
+				}
+				continue;
+			}
 			return true;
 		}
 		if ( logMisses ) {
@@ -1804,6 +1932,19 @@ bool R_ImageDDS_RunSelfTest() {
 		for ( int i = 0; i < downsizeCandidates.Num(); i++ ) {
 			common->Printf( "   %s [%s]\n", downsizeCandidates[i].c_str(), downsizeOrigins[i].c_str() );
 		}
+		return false;
+	}
+
+	// the inputs whose origin decides whether Quake 4's progimg/ result stands
+	idStrList programInputs;
+	R_ImageProgramInputNames( "downsize( addnormals( models/a/b_local, heightmap( models/a/b_h.tga, 2 ) ), 1)", programInputs );
+	if ( programInputs.Num() != 2 || programInputs[0].Icmp( "models/a/b_local" ) != 0 || programInputs[1].Icmp( "models/a/b_h.tga" ) != 0 ) {
+		common->Warning( "Image DDS self-test failed: image program inputs read as %d names", programInputs.Num() );
+		return false;
+	}
+	R_ImageProgramInputNames( "heightmap( _flat, 4 )", programInputs );
+	if ( programInputs.Num() != 0 ) {
+		common->Warning( "Image DDS self-test failed: '_flat' was read as an image program input" );
 		return false;
 	}
 

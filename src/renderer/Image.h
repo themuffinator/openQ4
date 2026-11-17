@@ -606,7 +606,9 @@ IMAGEFILES
 
 void R_LoadImage(const char* name, byte** pic, int* width, int* height, ID_TIME_T* timestamp, bool makePowerOf2);
 void R_LoadImageForUsage(const char* name, byte** pic, int* width, int* height, ID_TIME_T* timestamp, bool makePowerOf2, textureUsage_t usage);
-bool R_ResolvePreferredDDSImageSource(const char* name, idStr& ddsName, ID_TIME_T* timestamp, bool allowPrecompressedDDS, bool* precompressedDDS);
+// retailResultSuperseded: set when Quake 4's own progimg/ result was passed over
+// because one of the program's inputs comes from outside the shipped packs.
+bool R_ResolvePreferredDDSImageSource(const char* name, idStr& ddsName, ID_TIME_T* timestamp, bool allowPrecompressedDDS, bool* precompressedDDS, bool* retailResultSuperseded = NULL);
 // enables per-candidate DDS probe memoization for the duration of a level
 // load; disabling also clears all memoized probe results
 void R_SetDDSProbeCacheActive(bool active);

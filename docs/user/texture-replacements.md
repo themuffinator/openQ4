@@ -92,15 +92,21 @@ You can replace either end:
   ```
 
   Pack tools should keep that naming for combined programs such as
-  `heightmap`, `addnormals`, `add` and `scale`. This is the way to replace one
-  of Quake 4's own bump maps.
-- **Replace an input.** Ship `dds/textures/stone/wall01_local.dds` and openQ4
-  recomputes the program's result from it at load, but only where Quake 4 has
-  no precomputed result of its own. Quake 4 ships one for nearly every stock
-  bump map, and that one is used ahead of a recomputed result, so this option
-  mostly serves a mod's own materials. A recomputed result is not compressed,
-  so a large input costs video memory. **Not in 0.14.1:** BC7 inputs are
-  decoded; 0.14.1 skipped them.
+  `heightmap`, `addnormals`, `add` and `scale`.
+- **Replace an input.** Ship `dds/textures/stone/wall01_local.dds` (or the
+  `.dds` beside the original) and openQ4 recomputes the program's result from
+  it at load. This is the simplest option and what a pack made for Quake 4
+  normally does. **Not in 0.14.1:** Quake 4 ships a precomputed result for
+  nearly every stock bump map, and 0.14.1 kept using it even after a pack
+  replaced the inputs. openQ4 now sets Quake 4's result aside as soon as any
+  input comes from outside Quake 4's and openQ4's own packs, and stores the
+  rebuilt bump map compressed (DXT5, the layout Quake 4's own use), so a 2K
+  bump map costs about 5 MB of video memory rather than 21 MB. BC7 inputs are
+  decoded too; 0.14.1 skipped them.
+
+Rebuilding takes longer than loading a finished file, so the first load of a
+map after installing a pack is slower. openQ4 keeps the results in its image
+cache, and later loads read them from there.
 
 **`downsize()` textures. Not in 0.14.1.** Quake 4 wraps most character, weapon
 and monster textures in `downsize( <texture>, 1 )`. A replacement named after
@@ -120,10 +126,11 @@ For each image, openQ4 tries these in order and uses the first usable file:
 2. `dds/<texture path>.dds`, for plain textures
 3. `<texture path>.dds`, beside the original `.tga`, `.jpg` or `.png`, as Quake 4 packs do
 4. for `downsize( <texture>, N )`, steps 2 and 3 for that texture (**Not in 0.14.1**)
-5. `progimg/...`, the precomputed results inside Quake 4's own PK4s
+5. `progimg/...`, the precomputed results inside Quake 4's own PK4s, unless an
+   input of the program was replaced (**Not in 0.14.1**)
 
 Quake 4's own precomputed files come last, so a replacement named in steps 1-4
-always wins. openQ4 finds them
+always wins, and so does a replaced input. openQ4 finds them
 automatically, including nested programs and environment cube faces under
 `gfx/env/`; you don't need to extract, rename or regenerate them.
 

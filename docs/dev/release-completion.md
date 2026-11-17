@@ -54,6 +54,13 @@ does not restore the withdrawn release. See
   texture openQ4 builds itself, such as a bump map's inputs, is now decoded
   instead of skipped. On graphics without BC7 support, every Mac with OpenGL
   among them, BC7 files now load uncompressed instead of being ignored.
+- **Packs' bump maps show too.** Quake 4 ships most bump maps precomputed, and
+  openQ4 kept using those even when a pack replaced the textures they are
+  built from. It now rebuilds a bump map from the pack's files and stores it
+  compressed, the way Quake 4 stores its own. The first load of a map after
+  installing a pack takes longer while they are built; later loads reuse them.
+  Without a pack, nothing changes: all 270 bump maps on `airdefense1` still
+  come from Quake 4's files.
 - **Quake 4's own textures.** A dozen stock textures that ship their own DDS
   file next to a precomputed half-size copy now load the full-size file.
 - **What to do.** Nothing. Pack authors: see

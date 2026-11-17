@@ -818,9 +818,18 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	idStr preferredDDSName;
 	ID_TIME_T preferredDDSFileTime = FILE_NOT_FOUND_TIMESTAMP;
 	bool preferredDDSPrecompressed = false;
+	bool retailResultSuperseded = false;
 	bool preferredDDSImage = !explicitDDSImage &&
 		cubeFiles == CF_2D &&
-		R_ResolvePreferredDDSImageSource( GetName(), preferredDDSName, &preferredDDSFileTime, true, &preferredDDSPrecompressed );
+		R_ResolvePreferredDDSImageSource( GetName(), preferredDDSName, &preferredDDSFileTime, true, &preferredDDSPrecompressed, &retailResultSuperseded );
+	if ( retailResultSuperseded && !preferredDDSImage && usage == TD_BUMP && glConfig.textureCompressionAvailable ) {
+		// A texture pack replaced an input of a bump map Quake 4 ships
+		// precomputed, so it is built again here. Store it the way Quake 4's
+		// own is stored, DXT5 with X in alpha (RXGB), not as RGBA8: a 2K pack
+		// would otherwise add about 21 MB per bump map.
+		opts.format = FMT_DXT5;
+		opts.colorFormat = CFM_NORMAL_DXT5;
+	}
 	if ( preferredDDSImage && !fileSystem->InProductionMode() ) {
 		ID_TIME_T originalSourceTime = FILE_NOT_FOUND_TIMESTAMP;
 		{

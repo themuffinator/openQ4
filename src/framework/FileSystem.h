@@ -147,6 +147,13 @@ typedef enum {
 	FIND_ADDON
 } findFile_t;
 
+// Where the file a read would open comes from (idFileSystem::GetFileOrigin).
+typedef enum {
+	FS_FILE_ORIGIN_NOT_FOUND,
+	FS_FILE_ORIGIN_SHIPPED,		// a verified retail Quake 4 PK4 or one of openQ4's own packs
+	FS_FILE_ORIGIN_ADDED		// anything else: a loose file, a mod's or texture pack's PK4
+} fsFileOrigin_t;
+
 // Typed scheduling records used by the learned, per-map preload manifest.
 // These values are part of the engine/game and renderer-module ABI; append new
 // values instead of reordering existing ones.
@@ -470,6 +477,12 @@ public:
 	// must then call renderSystem->ReloadGeneratedCacheImages() or, if that
 	// fails, restart as for PURE_RESTART. Both stay unreadable while pure.
 	virtual bool			TakePureImageCacheEviction( void ) = 0;
+	// Appended for RENDER_API_VERSION 36. Whether the file a read of
+	// relativePath would open ships with the game: a member of a retail
+	// Quake 4 PK4 whose checksum matches, or of one of openQ4's own packs.
+	// Quake 4's precomputed image-program results are only valid while every
+	// input still comes from there.
+	virtual fsFileOrigin_t	GetFileOrigin( const char *relativePath ) = 0;
 };
 
 extern idFileSystem *		fileSystem;

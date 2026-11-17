@@ -197,7 +197,7 @@ bool idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 
 	const bool needsMutableCopy =
 		( colorFormat == CFM_YCOCG_DXT5 ) ||
-		( colorFormat == CFM_NORMAL_DXT5 && !image_highQualityCompression.GetBool() ) ||
+		( colorFormat == CFM_NORMAL_DXT5 ) ||
 		( colorFormat == CFM_GREEN_ALPHA );
 	if ( needsMutableCopy ) {
 		byte * converted = (byte *)Mem_Alloc( width * height * 4 );
@@ -208,11 +208,12 @@ bool idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			// convert the image data to YCoCg and use the YCoCgDXT5 compressor
 			idColorSpace::ConvertRGBToCoCg_Y( converted, converted, width, height );
 		} else if ( colorFormat == CFM_NORMAL_DXT5 ) {
-			// Blah, HQ swizzles automatically, Fast doesn't
+			// Quake 4's RXGB layout, which every interaction path reads: X in
+			// alpha, Y in green, Z kept in blue (the classic decode uses it, so
+			// BFG's two-channel layout with blue zeroed would light it wrongly)
 			for ( int i = 0; i < width * height; i++ ) {
 				converted[i*4+3] = converted[i*4+0];
 				converted[i*4+0] = 0;
-				converted[i*4+2] = 0;
 			}
 		} else {
 			for ( int i = 0; i < width * height; i++ ) {
@@ -287,10 +288,11 @@ bool idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			img.Alloc( dxtWidth * dxtHeight );
             if (!img.data) return false;
 			if ( colorFormat == CFM_NORMAL_DXT5 ) {
+				// already swizzled to RXGB above; the colour block carries Y and Z
 				if ( image_highQualityCompression.GetBool() ) {
-					dxt.CompressNormalMapDXT5HQ( dxtPic, img.data, dxtWidth, dxtHeight );
+					dxt.CompressImageDXT5HQ( dxtPic, img.data, dxtWidth, dxtHeight );
 				} else {
-					dxt.CompressNormalMapDXT5Fast( dxtPic, img.data, dxtWidth, dxtHeight );
+					dxt.CompressImageDXT5Fast( dxtPic, img.data, dxtWidth, dxtHeight );
 				}
 			} else if ( colorFormat == CFM_YCOCG_DXT5 ) {
 				if ( image_highQualityCompression.GetBool() ) {

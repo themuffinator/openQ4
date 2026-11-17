@@ -1566,6 +1566,8 @@ public:
 	virtual bool			GeneratedCacheReadsEnabled( generatedCacheKind_t kind ) const;
 	virtual bool			GeneratedCacheWritesEnabled( generatedCacheKind_t kind ) const;
 	virtual bool			TakePureImageCacheEviction( void );
+	virtual fsFileOrigin_t	GetFileOrigin( const char *relativePath );
+	bool					IsShippedPack( const pack_t *pak ) const;
 	virtual idFile *		GetNewFileMemory( void );
 	virtual idFile *		GetNewFilePermanent( void );
 	virtual idFile *		OpenFileReadFlags( const char *relativePath, int searchFlags, pack_t **foundInPak = NULL, bool allowCopyFiles = true, const char* gamedir = NULL );
@@ -7200,6 +7202,52 @@ bool idFileSystemLocal::TakePureImageCacheEviction( void ) {
 	// is cleared.
 	loadedImageCacheFromDir = false;
 	return true;
+}
+
+/*
+=====================
+idFileSystemLocal::IsShippedPack
+
+A retail Quake 4 PK4 in the base game directory whose checksum matches the
+official one, or one of openQ4's own runtime packs in its own directory.
+=====================
+*/
+bool idFileSystemLocal::IsShippedPack( const pack_t *pak ) const {
+	if ( pak == NULL ) {
+		return false;
+	}
+	idStr name = pak->pakFilename;
+	name.StripPath();
+	const officialPk4Info_t *official = FindOfficialPk4Info( name.c_str() );
+	if ( official != NULL && (unsigned int)pak->checksum == official->checksum && IsBaseGamePack( pak ) ) {
+		return true;
+	}
+	return FS_FindOpenQ4PackTableEntry( name.c_str() ) != NULL && IsGameDirPack( pak, OPENQ4_GAMEDIR );
+}
+
+/*
+=====================
+idFileSystemLocal::GetFileOrigin
+
+Resolves relativePath exactly as a read would, without reading it or marking
+its pak referenced, and reports whether the winning copy ships with the game.
+=====================
+*/
+fsFileOrigin_t idFileSystemLocal::GetFileOrigin( const char *relativePath ) {
+	if ( !searchPaths || relativePath == NULL || relativePath[0] == '\0' ) {
+		return FS_FILE_ORIGIN_NOT_FOUND;
+	}
+	pack_t *pak = NULL;
+	packMemberProbe_t probe;
+	idFile *loose = OpenFileReadSearch( relativePath, FSFLAG_SEARCH_DIRS | FSFLAG_SEARCH_PAKS | FSFLAG_PURE_NOREF, &pak, false, NULL, &probe );
+	if ( loose != NULL ) {
+		CloseFile( loose );
+		return FS_FILE_ORIGIN_ADDED;
+	}
+	if ( !probe.found || pak == NULL ) {
+		return FS_FILE_ORIGIN_NOT_FOUND;
+	}
+	return IsShippedPack( pak ) ? FS_FILE_ORIGIN_SHIPPED : FS_FILE_ORIGIN_ADDED;
 }
 
 /*
