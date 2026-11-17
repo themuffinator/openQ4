@@ -246,4 +246,42 @@ enum vkStencilReadbackMode_t {
 bool				VK_Exec_QueueStencilReadback( int mode, const char **failure = NULL );
 void				VK_DebugTools_PrintStencilReadback( const byte *stencil, int width, int height, int mode );
 
+/*
+===============================================================================
+
+	Reflected models. A surface whose model is placed by a reflection (a
+	model matrix of negative determinant: the VR view model's mirrored arms
+	for a left-handed hold) winds the other way round on screen. The prepared
+	domain plans refuse such instances (negativeScale), and the legacy
+	per-surface passes cull by the material and the view's mirror swap alone,
+	so for such a surface's draws vkSurfaceWinding_t flips the front face, and
+	restores the pass's canonical one after them.
+
+===============================================================================
+*/
+bool			VK_Exec_SurfaceMirrored( const drawSurf_t *drawSurf );
+VkFrontFace		VK_Exec_CanonicalFrontFace();
+
+class vkSurfaceWinding_t {
+public:
+	vkSurfaceWinding_t( VkCommandBuffer cmd, const drawSurf_t *drawSurf, bool record = true )
+		: cmd( cmd ), flipped( record && cmd != VK_NULL_HANDLE && VK_Exec_SurfaceMirrored( drawSurf ) ) {
+		if ( flipped ) {
+			vkCmdSetFrontFace( cmd, VK_Exec_CanonicalFrontFace() == VK_FRONT_FACE_CLOCKWISE
+				? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE );
+		}
+	}
+	~vkSurfaceWinding_t() {
+		if ( flipped ) {
+			vkCmdSetFrontFace( cmd, VK_Exec_CanonicalFrontFace() );
+		}
+	}
+private:
+	vkSurfaceWinding_t( const vkSurfaceWinding_t & );
+	void			operator=( const vkSurfaceWinding_t & );
+
+	VkCommandBuffer	cmd;
+	bool			flipped;
+};
+
 #endif /* !__VK_EXECUTOR_HOOKS_H__ */

@@ -108,6 +108,7 @@ rvViewWeapon::rvViewWeapon()
 */
 rvViewWeapon::rvViewWeapon() {
 	modelDefHandle		= -1;
+	vrArmsDefHandle		= -1;
 	weapon				= NULL;
 		
 	Clear();
@@ -242,6 +243,19 @@ void rvViewWeapon::Clear( void ) {
  	animator.ClearAllAnims( gameLocal.time, 0 );
 
 	FreeModelDef();
+	FreeVRArmsDef();
+}
+
+/*
+================
+rvViewWeapon::FreeVRArmsDef
+================
+*/
+void rvViewWeapon::FreeVRArmsDef( void ) {
+	if ( vrArmsDefHandle != -1 ) {
+		gameRenderWorld->FreeEntityDef( vrArmsDefHandle );
+		vrArmsDefHandle = -1;
+	}
 }
 
 /*
@@ -418,6 +432,7 @@ void rvViewWeapon::PresentWeapon( bool showViewModel ) {
 		Present();
 	} else {
 		FreeModelDef();
+		FreeVRArmsDef();
 	}
 
 	UpdateSound();
@@ -465,6 +480,7 @@ void rvViewWeapon::UpdatePresentationWeapon( bool showViewModel ) {
 		UpdatePresentationModel();
 	} else {
 		FreeModelDef();
+		FreeVRArmsDef();
 	}
 
 	weapon->RestoreAuthoritativeViewModelTransform();
@@ -479,6 +495,7 @@ rvViewWeapon::UpdatePresentationModel
 */
 void rvViewWeapon::UpdatePresentationModel( void ) {
 	if ( weapon == NULL || !renderEntity.hModel || IsHidden() ) {
+		FreeVRArmsDef();
 		return;
 	}
 
@@ -507,23 +524,59 @@ void rvViewWeapon::UpdatePresentationModel( void ) {
 		presentationRenderEntity.origin = GetPhysics()->GetOrigin();
 	}
 
-	// openQ4 VR: the arms meet the body the headset shows (vr_body)
-	if ( presentationAnimator != NULL && weapon->GetOwner() != NULL && weapon->GetOwner()->VRBodyHasArms() ) {
+	// openQ4 VR: the arms meet the body the headset shows (vr_body). Held in
+	// the left hand, the arms are drawn by an entity of their own, the mirror
+	// image of the right-handed hold across the gun's barrel plane, so the
+	// right hand on the grip becomes a left one, with or without the body; the
+	// gun itself stays as modelled, its writing readable.
+	renderEntity_t mirroredArms;
+	bool drawMirroredArms = false;
+	idVec3 armsOrigin = presentationRenderEntity.origin;
+	idMat3 armsAxis = presentationRenderEntity.axis;
+	int armSurfaces = 0;
+	const bool mirrored = presentationAnimator != NULL && weapon->GetVRArmsMirror( armsOrigin, armsAxis, armSurfaces );
+	const bool bodyArms = presentationAnimator != NULL && weapon->GetOwner() != NULL && weapon->GetOwner()->VRBodyHasArms();
+	if ( mirrored || bodyArms ) {
 		int armJointCount = presentationRenderEntity.numJoints;
 		idJointMat *armJoints = hasPresentationJoints ? presentationRenderEntity.joints : NULL;
 		if ( armJoints == NULL ) {
 			presentationAnimator->CreateFrame( gameLocal.time, false );
 			presentationAnimator->GetJoints( &armJointCount, &armJoints );
 		}
-		int hideSurfaces = 0;
-		const idJointMat *posed = weapon->PoseVRArms( armJoints, armJointCount, presentationRenderEntity.origin, presentationRenderEntity.axis, hideSurfaces );
-		presentationRenderEntity.suppressSurfaceMask |= hideSurfaces;
-		if ( posed != NULL ) {
+		const idJointMat *posed = NULL;
+		if ( bodyArms ) {
+			int hideSurfaces = 0;
+			posed = weapon->PoseVRArms( armJoints, armJointCount, armsOrigin, armsAxis, hideSurfaces );
+			presentationRenderEntity.suppressSurfaceMask |= hideSurfaces;
+		}
+		if ( mirrored && armJoints != NULL ) {
+			const idJointMat *armsPose = posed != NULL ? posed : armJoints;
+			mirroredArms = presentationRenderEntity;
+			mirroredArms.origin = armsOrigin;
+			mirroredArms.axis = armsAxis;
+			mirroredArms.callback = NULL;
+			mirroredArms.numJoints = armJointCount;
+			mirroredArms.joints = const_cast<idJointMat *>( armsPose );
+			mirroredArms.suppressSurfaceMask = presentationRenderEntity.suppressSurfaceMask | ~armSurfaces;
+			mirroredArms.gui[ 0 ] = mirroredArms.gui[ 1 ] = mirroredArms.gui[ 2 ] = NULL;
+			mirroredArms.hModel->BoundsFromJoints( armsPose, mirroredArms.bounds );
+			presentationRenderEntity.suppressSurfaceMask |= armSurfaces;
+			drawMirroredArms = true;
+		} else if ( posed != NULL ) {
 			presentationRenderEntity.callback = NULL;
 			presentationRenderEntity.numJoints = armJointCount;
 			presentationRenderEntity.joints = const_cast<idJointMat *>( posed );
 			presentationRenderEntity.hModel->BoundsFromJoints( posed, presentationRenderEntity.bounds );
 		}
+	}
+	if ( drawMirroredArms ) {
+		if ( vrArmsDefHandle == -1 ) {
+			vrArmsDefHandle = gameRenderWorld->AddEntityDef( &mirroredArms );
+		} else {
+			gameRenderWorld->UpdateEntityDef( vrArmsDefHandle, &mirroredArms );
+		}
+	} else {
+		FreeVRArmsDef();
 	}
 
 	presentationPoseHeld = true;
@@ -715,6 +768,7 @@ rvWeapon::rvWeapon ( void ) {
 	
 	forceGUIReload = false;
 	vrHoldKnown = false;
+	vrArmsMirrorable = false;
 	vrArmsValid = false;
 	vrArmSurfaces = 0;
 	vrArmJoints = NULL;
@@ -1037,6 +1091,7 @@ void rvWeapon::InitViewModel( void ) {
 
 	// openQ4 VR: a new view model holds its gun its own way
 	vrHoldKnown = false;
+	vrArmsMirrorable = false;
 
 	// Eject offset
 	spawnArgs.GetVector ( "ejectOffset", "0 0 0", ejectOffset );
@@ -1513,7 +1568,7 @@ up to 13 degrees off the model's forward axis, toward a crosshair at the
 centre of a flat screen; the hold turns them onto the hand's aim.
 ================
 */
-void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip ) const {
+void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip, bool leftHand ) const {
 	// unmeasured: straight ahead, held where the stock models put the right hand
 	barrel.Set( 1.0f, 0.0f, 0.0f );
 	grip.Set( 13.0f, -5.0f, -5.0f );
@@ -1524,6 +1579,9 @@ void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip ) const {
 		vrHoldKnown = true;
 		vrHoldBarrel = barrel;
 		vrHoldGrip = grip;
+		vrHoldGripLeft = idVec3( grip.x, -grip.y, grip.z );
+		vrHoldMuzzle = vec3_origin;
+		vrArmsMirrorable = false;
 		vrArmsValid = false;
 		vrArmSurfaces = 0;
 		const idRenderModel *model = viewAnimator->ModelHandle();
@@ -1589,6 +1647,11 @@ void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip ) const {
 				// a flash joint turned well away from the model's forward axis is no barrel
 				if ( forward.Normalize() > 0.0f && forward.x > 0.8f ) {
 					vrHoldBarrel = forward;
+					// held in the left hand, the arms are mirrored across the
+					// upright plane along the barrel, and so is the grip
+					vrHoldMuzzle = joints[ flashJointView ].ToVec3();
+					vrHoldGripLeft = VRBody_MirrorPoint( vrHoldGrip, vrHoldMuzzle, VRBody_BarrelNormal( vrHoldBarrel ) );
+					vrArmsMirrorable = vrArmsValid && vrArmSurfaces != 0;
 				}
 			}
 		}
@@ -1596,7 +1659,7 @@ void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip ) const {
 			vrHoldBarrel.ToString( 3 ), vrHoldGrip.ToString( 1 ) );
 	}
 	barrel = vrHoldBarrel;
-	grip = vrHoldGrip;
+	grip = leftHand && vrArmsMirrorable ? vrHoldGripLeft : vrHoldGrip;
 }
 
 /*
@@ -1610,6 +1673,39 @@ puts it instead of following its controller.
 */
 bool rvWeapon::VROffHandBusy( void ) const {
 	return status != WP_READY && status != WP_OUTOFAMMO;
+}
+
+/*
+================
+rvWeapon::GetVRArmsMirror
+
+openQ4 VR: held in the left hand, the view model's arms are drawn mirrored
+across the upright plane along the gun's barrel, through its muzzle, as the
+hold measured them (GetVRHold). origin and axis come in as the view model's
+placement and leave as the arms' mirrored one; armSurfaces gains the arm
+surfaces. False, leaving them as they are, for a right-handed hold or a model
+that cannot be mirrored.
+================
+*/
+bool rvWeapon::GetVRArmsMirror( idVec3 &origin, idMat3 &axis, int &armSurfaces ) const {
+	if ( owner == NULL || viewAnimator == NULL ) {
+		return false;
+	}
+	vrFrameState_t frame;
+	float trackingYaw;
+	// only a gun in the hand is held by the mirrored grip (GetVRWeaponTransform)
+	if ( !owner->GetVRView( frame, trackingYaw ) || frame.aimMode != VR_AIM_HAND || frame.weaponHand != VR_HAND_LEFT ) {
+		return false;
+	}
+	idVec3 barrel;
+	idVec3 grip;
+	GetVRHold( barrel, grip );
+	if ( !vrArmsMirrorable ) {
+		return false;
+	}
+	VRBody_MirrorPlacement( origin, axis, vrHoldMuzzle, VRBody_BarrelNormal( vrHoldBarrel ), origin, axis );
+	armSurfaces = vrArmSurfaces;
+	return true;
 }
 
 /*
@@ -1644,9 +1740,12 @@ const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints,
 	const int weaponHand = frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT;
 	const int offHand = weaponHand == VR_HAND_LEFT ? VR_HAND_RIGHT : VR_HAND_LEFT;
 	// The view model's arms are a right hand on the grip and a left hand in
-	// support. Held in the left hand they would be the wrong hands on the
-	// wrong arms, so there the body's own arms reach the controllers.
-	if ( weaponHand != VR_HAND_RIGHT ) {
+	// support. Held in the left hand they are drawn mirrored (GetVRArmsMirror:
+	// origin and axis are then the mirrored placement), the right hand on the
+	// grip becoming a left one; a model that cannot be mirrored leaves the
+	// body's own arms to reach the controllers.
+	const bool mirrored = weaponHand != VR_HAND_RIGHT;
+	if ( mirrored && !vrArmsMirrorable ) {
 		hideSurfaces |= vrArmSurfaces;
 		return NULL;
 	}
@@ -1679,6 +1778,12 @@ const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints,
 		idVec3 palm;
 		idMat3 aimAxis;
 		const bool tracked = owner->GetVRHandPose( offHand, palm, aimAxis );
+		if ( mirrored ) {
+			// Mirrored, the model's left hand supports with the right
+			// controller: its mirror image, a left controller in the arms' own
+			// (mirrored) space.
+			aimAxis[ 1 ] = -aimAxis[ 1 ];
+		}
 		const int now = Sys_Milliseconds();
 		const float seconds = vrOffHandTime > 0 ? idMath::ClampFloat( 0.0f, 0.1f, ( now - vrOffHandTime ) * 0.001f ) : 0.0f;
 		vrOffHandTime = now;

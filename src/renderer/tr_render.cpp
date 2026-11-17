@@ -408,6 +408,7 @@ void RB_RenderDrawSurfListWithFunction( drawSurf_t **drawSurfs, int numDrawSurfs
 	const drawSurf_t		*drawSurf;
 
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	for (i = 0  ; i < numDrawSurfs ; i++ ) {
 		drawSurf = drawSurfs[i];
@@ -435,6 +436,8 @@ void RB_RenderDrawSurfListWithFunction( drawSurf_t **drawSurfs, int numDrawSurfs
 		}
 
 		// render it
+		// the winding for this surface's space, before it draws
+		RB_SetSurfaceWinding( drawSurf->space );
 		triFunc_( drawSurf );
 
 		if ( drawSurf->space->weaponDepthHack || drawSurf->space->modelDepthHack != 0.0f ) {
@@ -443,6 +446,7 @@ void RB_RenderDrawSurfListWithFunction( drawSurf_t **drawSurfs, int numDrawSurfs
 
 		backEnd.currentSpace = drawSurf->space;
 	}
+	RB_SetSurfaceWinding( NULL );
 }
 
 /*
@@ -459,6 +463,7 @@ void RB_RenderDrawSurfListWithFunctionIgnoreScissor( drawSurf_t **drawSurfs, int
 	const drawSurf_t *drawSurf;
 
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	for ( i = 0; i < numDrawSurfs; i++ ) {
 		drawSurf = drawSurfs[i];
@@ -475,6 +480,8 @@ void RB_RenderDrawSurfListWithFunctionIgnoreScissor( drawSurf_t **drawSurfs, int
 			RB_EnterModelDepthHack( drawSurf->space->modelDepthHack );
 		}
 
+		// the winding for this surface's space, before it draws
+		RB_SetSurfaceWinding( drawSurf->space );
 		triFunc_( drawSurf );
 
 		if ( drawSurf->space->weaponDepthHack || drawSurf->space->modelDepthHack != 0.0f ) {
@@ -483,6 +490,7 @@ void RB_RenderDrawSurfListWithFunctionIgnoreScissor( drawSurf_t **drawSurfs, int
 
 		backEnd.currentSpace = drawSurf->space;
 	}
+	RB_SetSurfaceWinding( NULL );
 }
 
 /*
@@ -495,6 +503,7 @@ void RB_RenderDrawSurfChainWithFunction( const drawSurf_t *drawSurfs,
 	const drawSurf_t		*drawSurf;
 
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	for ( drawSurf = drawSurfs ; drawSurf ; drawSurf = drawSurf->nextOnLight ) {
 		// change the matrix if needed
@@ -520,6 +529,8 @@ void RB_RenderDrawSurfChainWithFunction( const drawSurf_t *drawSurfs,
 		}
 
 		// render it
+		// the winding for this surface's space, before it draws
+		RB_SetSurfaceWinding( drawSurf->space );
 		triFunc_( drawSurf );
 
 		if ( drawSurf->space->weaponDepthHack || drawSurf->space->modelDepthHack != 0.0f ) {
@@ -528,6 +539,7 @@ void RB_RenderDrawSurfChainWithFunction( const drawSurf_t *drawSurfs,
 
 		backEnd.currentSpace = drawSurf->space;
 	}
+	RB_SetSurfaceWinding( NULL );
 }
 
 /*
@@ -963,6 +975,7 @@ void RB_CreateSingleDrawInteractionsFiltered( const drawSurf_t *surf, void (*Dra
 	// change the matrix and light projection vectors if needed
 	if ( surf->space != backEnd.currentSpace ) {
 		backEnd.currentSpace = surf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 		glLoadMatrixf( surf->space->modelViewMatrix );
 	}
 

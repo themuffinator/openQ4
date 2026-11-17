@@ -7,6 +7,19 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## VR: the gun's own hands in your left hand, 17 November 2026
+
+- **Left-handed players see real hands on the gun.** With **Weapon Hand** set to
+  Left (`vr_leftHanded 1`), each gun is now held by its own modelled hands,
+  mirrored: a left hand on the grip and the right hand supporting it or
+  following your controller. Before, your character's simpler hands held it.
+  The gun itself is not mirrored, so ammunition counters and markings still
+  read the right way round. It works with or without the VR body.
+- **Mirrored models draw the right way out.** OpenGL and Vulkan both drew a
+  mirrored model inside out in some passes; they now face it correctly.
+- **What to do.** Nothing. Replace the client, both renderers and both game
+  modules together.
+
 ## Smart weapon switching, a Last Weapon key and Quake Live-style defaults, 17 November 2026
 
 - **Pickups no longer pull your weapon away mid-fight.** Auto Weapon Switch

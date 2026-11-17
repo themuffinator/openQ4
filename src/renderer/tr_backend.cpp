@@ -238,6 +238,31 @@ void GL_Cull( int cullType ) {
 
 /*
 ====================
+RB_SetSurfaceWinding
+
+openQ4: a surface placed by a reflection (a model matrix of negative
+determinant, such as the VR view model's mirrored arms for a left-handed
+hold) winds the other way round on screen. GL_Cull swaps the culled face
+for a mirrored view alone, so the legacy passes call this whenever the
+space they draw in changes: the front face turns for a reflected space and
+returns for any other, or for none. The modern executor culls such a
+draw by its negativeScale instead and keeps the default front face.
+====================
+*/
+void RB_SetSurfaceWinding( const viewEntity_t *space ) {
+	bool reflected = false;
+	if ( space != NULL ) {
+		const float *m = space->modelMatrix;
+		const float determinant = m[0] * ( m[5] * m[10] - m[6] * m[9] )
+			- m[1] * ( m[4] * m[10] - m[6] * m[8] )
+			+ m[2] * ( m[4] * m[9] - m[5] * m[8] );
+		reflected = determinant < 0.0f;
+	}
+	R_GLStateCache().SetFrontFace( reflected ? GL_CW : GL_CCW );
+}
+
+/*
+====================
 GL_TexEnv
 ====================
 */

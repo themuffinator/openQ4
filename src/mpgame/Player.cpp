@@ -13909,7 +13909,7 @@ bool idPlayer::GetVRWeaponTransform( idVec3 &origin, idMat3 &axis, bool presenta
 	// the gun sits in the hand the way its own model holds it
 	idVec3 barrel;
 	idVec3 grip;
-	weapon->GetVRHold( barrel, grip );
+	weapon->GetVRHold( barrel, grip, frame.weaponHand == VR_HAND_LEFT );
 	return VR_WeaponTransform( frame, eyeOrigin, trackingYaw, barrel, grip, origin, axis );
 }
 

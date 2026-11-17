@@ -322,6 +322,7 @@ static void GLESD3_CreateSingleDrawInteractions( const drawSurf_t *surf ) {
 
 	if ( surf->space != backEnd.currentSpace ) {
 		backEnd.currentSpace = surf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 	}
 
 	// an empty rect covers no pixels: skip rather than issue a rejected call
@@ -540,6 +541,7 @@ void RB_GLESD3_DrawInteractions( void ) {
 	RB_GLESD3_ResetShadowDrawCount();
 
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	for ( viewLight_t *vLight = viewDef->viewLights; vLight; vLight = vLight->next ) {
 		backEnd.vLight = vLight;

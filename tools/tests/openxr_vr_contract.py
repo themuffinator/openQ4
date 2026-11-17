@@ -598,8 +598,42 @@ def check_body() -> None:
         require(weapon_source, "const idJointMat *rvWeapon::PoseVRArms(", f"{tree}: the view weapon's arms meet the body")
         require(weapon_source, "renderEntity.weaponDepthHackInViewID = owner->IsVRHandAiming() ? 0 : owner->entityNumber + 1;",
                 f"{tree}: a gun in the hand keeps its true place in depth")
-        require(weapon_source, "\tif ( weaponHand != VR_HAND_RIGHT ) {\n\t\thideSurfaces |= vrArmSurfaces;\n\t\treturn NULL;",
-                f"{tree}: a left-handed hold takes the body's own arms")
+        # a left-handed hold: the view model's arms mirrored across the barrel
+        # plane by an entity of their own, the gun as modelled
+        require(weapon_source, "\tif ( mirrored && !vrArmsMirrorable ) {\n\t\thideSurfaces |= vrArmSurfaces;\n\t\treturn NULL;",
+                f"{tree}: a view model that cannot be mirrored leaves the body's own arms to the left hand")
+        require(weapon_source, "VRBody_MirrorPlacement( origin, axis, vrHoldMuzzle, VRBody_BarrelNormal( vrHoldBarrel ), origin, axis );",
+                f"{tree}: the left-handed arms are mirrored across the barrel plane")
+        require(weapon_source, "mirroredArms.suppressSurfaceMask = presentationRenderEntity.suppressSurfaceMask | ~armSurfaces;",
+                f"{tree}: the mirrored entity draws the arms alone")
+        require(weapon_source, "presentationRenderEntity.suppressSurfaceMask |= armSurfaces;",
+                f"{tree}: the gun drawn as modelled hides its own arms")
+        require(weapon_source, "vrHoldGripLeft = VRBody_MirrorPoint( vrHoldGrip, vrHoldMuzzle, VRBody_BarrelNormal( vrHoldBarrel ) );",
+                f"{tree}: the left hand grips the right grip's mirror image")
+        require(weapon_source, "\t\tif ( mirrored ) {\n\t\t\t// Mirrored, the model's left hand supports with the right\n",
+                f"{tree}: the mirrored support hand follows the right controller's mirror image")
+        require(player, "weapon->GetVRHold( barrel, grip, frame.weaponHand == VR_HAND_LEFT );",
+                f"{tree}: the gun sits in the left hand by the mirrored grip")
+    body = read("src/framework/VRBody.h")
+    require(body, "\tconst idVec3 shifted = origin + ( normal * ( 2.0f * ( point * normal ) ) ) * axis;\n\tmirroredAxis = reflect * axis;",
+            "VRBody_MirrorPlacement may write over its own arguments")
+    # reflected models wind the other way round in every backend
+    require(read("src/renderer/tr_backend.cpp"), "R_GLStateCache().SetFrontFace( reflected ? GL_CW : GL_CCW );",
+            "GL legacy passes turn the front face for a reflected space")
+    render = read("src/renderer/tr_render.cpp")
+    if render.count("\t\tRB_SetSurfaceWinding( drawSurf->space );\n\t\ttriFunc_( drawSurf );") != 3:
+        raise AssertionError("the GL draw-surface loops set the winding before each surface draws")
+    require(read("src/renderer/ModernGLExecutor.cpp"), "\tR_GLStateCache().SetFrontFace( GL_CCW );\n",
+            "the modern GL executor keeps the default front face")
+    require(read("src/renderer/Vulkan/vk_ExecutorHooks.h"), "class vkSurfaceWinding_t {", "Vulkan winds a reflected surface's draws")
+    interactions = read("src/renderer/Vulkan/vk_Interactions.cpp")
+    for needle in ("\tvkSurfaceWinding_t winding( interPass.cmd, surf, !preparing );",
+                   "static void VK_T_BasicFog( const drawSurf_t *surf ) {\n\tconst srfTriangles_t *tri = surf->geo;\n\tvkSurfaceWinding_t winding( interPass.cmd, surf );",
+                   "static void VK_T_BlendLight( const drawSurf_t *surf ) {\n\tconst srfTriangles_t *tri = surf->geo;\n\tvkSurfaceWinding_t winding( interPass.cmd, surf );"):
+        require(interactions, needle, "Vulkan interactions, fog and blend lights wind reflected surfaces")
+    executor = read("src/renderer/Vulkan/vk_GuiExecutor.cpp")
+    if executor.count("vkSurfaceWinding_t winding( cmd, drawSurf );") != 2:
+        raise AssertionError("Vulkan depth fill and shader passes wind reflected surfaces")
 
 
 def check_strings() -> None:

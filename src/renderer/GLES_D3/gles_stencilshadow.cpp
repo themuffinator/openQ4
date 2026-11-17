@@ -109,6 +109,7 @@ static void RB_GLESD3_T_Shadow( const drawSurf_t *surf ) {
 
 	if ( surf->space != backEnd.currentSpace ) {
 		backEnd.currentSpace = surf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 	}
 	float mvp[ 16 ];
 	myGlMultMatrix( surf->space->modelViewMatrix, backEnd.viewDef->projectionMatrix, mvp );

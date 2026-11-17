@@ -79,6 +79,7 @@ here: it waits on the AND-05 distribution decision.
 | 3.16 | On HTC Vive wands, press each trackpad up, down, left, right and in the middle; then rest a thumb on the right pad without pressing. | Right: up crouches, down jumps, left and right turn, the middle recentres when held. Left: up toggles the flashlight, down reloads, the middle runs. A resting thumb on the right pad neither turns nor changes weapon; the left pad walks as before. |
 | 3.17 | On Windows Mixed Reality controllers, press each touchpad in its upper and lower half; click both thumbsticks. | Upper half: crouch (right), flashlight (left). Lower half: jump (right), reload (left). The thumbstick clicks keep their own actions. |
 | 3.18 | With a mirror or your shadow in view, point the gun straight up, then straight down, rolling your wrist. | Your character in the mirror or shadow keeps facing one way; it no longer spins on the spot. |
+| 3.19 | Set **Weapon Hand** to Left. Hold each gun close to your face, turn it, and let go of it with the right hand and take hold again. | A left hand grips each gun as the right hand did, the right hand supports it and follows its controller when free; no arm is dark, see-through or inside out, and the gun's displays read the right way round. |
 
 ## 4. Body, space and movement (VR-02, VR-03)
 

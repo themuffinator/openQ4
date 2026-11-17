@@ -394,6 +394,40 @@ typedef struct vrViewArm_s {
 	idMat3					elbowAxisLocal;
 } vrViewArm_t;
 
+// The gun's lateral axis, square to its barrel and the model's up: the
+// normal of the upright plane along the barrel that a left-handed hold
+// mirrors the view model's arms across.
+ID_INLINE idVec3 VRBody_BarrelNormal( const idVec3 &barrel ) {
+	idVec3 normal = barrel.Cross( idVec3( 0.0f, 0.0f, 1.0f ) );
+	if ( normal.Normalize() < 1e-3f ) {
+		normal.Set( 0.0f, 1.0f, 0.0f );
+	}
+	return normal;
+}
+
+// A model-space point's mirror image across the plane through point with unit
+// normal normal.
+ID_INLINE idVec3 VRBody_MirrorPoint( const idVec3 &in, const idVec3 &point, const idVec3 &normal ) {
+	return in - normal * ( 2.0f * ( ( in - point ) * normal ) );
+}
+
+// The placement that draws a model mirrored across a plane of its own space
+// (through point, unit normal normal) where origin and axis draw it as it is.
+// The axis it returns is a reflection: the renderer flips such a model's
+// facing (negativeScale). The results may be the arguments themselves.
+ID_INLINE void VRBody_MirrorPlacement( const idVec3 &origin, const idMat3 &axis, const idVec3 &point, const idVec3 &normal,
+		idVec3 &mirroredOrigin, idMat3 &mirroredAxis ) {
+	idMat3 reflect;
+	for ( int i = 0; i < 3; i++ ) {
+		reflect[i] = vec3_origin;
+		reflect[i][i] = 1.0f;
+		reflect[i] -= normal * ( 2.0f * normal[i] );
+	}
+	const idVec3 shifted = origin + ( normal * ( 2.0f * ( point * normal ) ) ) * axis;
+	mirroredAxis = reflect * axis;
+	mirroredOrigin = shifted;
+}
+
 // Where a view arm's elbow end is now.
 ID_INLINE idVec3 VRBody_ViewArmElbow( const vrViewArm_t &arm, const idJointMat *joints ) {
 	return joints[arm.forearm].ToVec3() + arm.elbowLocal * joints[arm.forearm].ToMat3();

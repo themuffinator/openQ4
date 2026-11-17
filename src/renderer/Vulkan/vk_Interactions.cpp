@@ -95,6 +95,7 @@ static idCVar r_vkPBRBakedFailureAfter( "r_vkPBRBakedFailureAfter", "0", CVAR_RE
 #include "volk.h"
 
 #include "VulkanDevice.h"
+#include "vk_ExecutorHooks.h"
 #include "vk_Image.h"
 #include "vk_PBRProbes.h"
 #include "vk_HDRScene.h"
@@ -4637,6 +4638,7 @@ static void VK_CreateSingleDrawInteractions( const drawSurf_t *surf ) {
 	drawInteraction_t	inter;
 
 	const bool preparing = vkPBRTransparentView.preparing;
+	vkSurfaceWinding_t winding( interPass.cmd, surf, !preparing );
 	if ( !preparing && vkPBRTransparentView.ready
 			&& VK_PBRTransparentFindSurface( surf ) != NULL ) {
 		// The whole native contribution was sealed before the light loop.
@@ -6859,6 +6861,7 @@ Documented Phase G2 gaps (mirroring the interaction walk):
 */
 static void VK_T_BasicFog( const drawSurf_t *surf ) {
 	const srfTriangles_t *tri = surf->geo;
+	vkSurfaceWinding_t winding( interPass.cmd, surf );
 
 	if ( tri == NULL || R_TriHasPrimBatchMesh( tri ) || tri->ambientCache == NULL ) {
 		interPass.fogSkipCount++;
@@ -7030,6 +7033,7 @@ rides the push block. Shares VK_T_BasicFog's prim-batch/cache-less gaps.
 */
 static void VK_T_BlendLight( const drawSurf_t *surf ) {
 	const srfTriangles_t *tri = surf->geo;
+	vkSurfaceWinding_t winding( interPass.cmd, surf );
 
 	if ( tri == NULL || R_TriHasPrimBatchMesh( tri ) || tri->ambientCache == NULL ) {
 		interPass.fogSkipCount++;

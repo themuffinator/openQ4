@@ -107,6 +107,10 @@ private:
 	
 	friend		class rvWeapon;
 	rvWeapon*	weapon;
+
+	// openQ4 VR: the view model's arms drawn mirrored for a left-handed hold
+	int						vrArmsDefHandle;
+	void					FreeVRArmsDef				( void );
 };
 
 class rvWeapon : public idClass {
@@ -301,8 +305,12 @@ public:
 	// weapon hand. False outside hand aim or without a flash joint.
 	bool				GetVRMuzzle					( idVec3 &origin ) const;
 	// openQ4 VR: how the view model holds its gun at true scale: the barrel's
-	// direction and the point the right hand grips, in model space.
-	void				GetVRHold					( idVec3 &barrel, idVec3 &grip ) const;
+	// direction and the point the right hand grips, in model space; with
+	// leftHand, where the mirrored arms' hand grips it (GetVRArmsMirror).
+	void				GetVRHold					( idVec3 &barrel, idVec3 &grip, bool leftHand = false ) const;
+	// openQ4 VR: the mirrored placement of the view model's arms for a
+	// left-handed hold; false when the arms are drawn as modelled.
+	bool				GetVRArmsMirror				( idVec3 &origin, idMat3 &axis, int &armSurfaces ) const;
 	// openQ4 VR: this draw's view model joints with its arms meeting the
 	// body the headset shows (vr_body); NULL to draw the model as it is.
 	const idJointMat *	PoseVRArms					( const idJointMat *joints, int numJoints, const idVec3 &origin, const idMat3 &axis, int &hideSurfaces );
@@ -469,6 +477,11 @@ protected:
 	mutable bool					vrHoldKnown;
 	mutable idVec3					vrHoldBarrel;
 	mutable idVec3					vrHoldGrip;
+	// openQ4 VR: the muzzle in the hold, where the mirrored left hand grips,
+	// and whether the arms can be mirrored (GetVRArmsMirror)
+	mutable idVec3					vrHoldMuzzle;
+	mutable idVec3					vrHoldGripLeft;
+	mutable bool					vrArmsMirrorable;
 	// openQ4 VR: the view model's own arms, measured with the hold (VRBody.h):
 	// the support hand's and the weapon hand's, the weapon hand's wrist in the
 	// hold, and the surfaces the arms are drawn by

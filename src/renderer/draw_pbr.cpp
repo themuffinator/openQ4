@@ -1716,6 +1716,7 @@ static void RB_GLPBR_RestoreWalkSurface( const drawSurf_t *surf, idDrawVert *ac 
 	if ( surf->space != backEnd.currentSpace ) {
 		glLoadMatrixf( surf->space->modelViewMatrix );
 		backEnd.currentSpace = surf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 	}
 	if ( surf->space->weaponDepthHack ) {
 		RB_EnterWeaponDepthHack();

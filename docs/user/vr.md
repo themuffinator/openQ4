@@ -230,8 +230,10 @@ Good to know:
   the gun rides with your view as on a flat screen, and you get the legs and
   torso only.
 - The guns are modelled for a right hand on the grip. If you hold the weapon in
-  your left hand (`vr_leftHanded 1`), your character's own simpler hands hold
-  it and the gun's modelled hands are hidden.
+  your left hand (`vr_leftHanded 1`), the gun's own hands are drawn as their
+  mirror image, so a left hand grips the gun and the right hand supports it
+  (**not in 0.14.1**, where your character's simpler hands held it). The gun
+  itself is not mirrored, so its displays still read the right way round.
 - At an open gun or turret, where your character stands at the controls, you
   see your body there with its hands on the controls (**not in 0.14.1**).
   Closed vehicles, such as the walker and the hovertank, hide you inside, so

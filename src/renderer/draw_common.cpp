@@ -4076,6 +4076,7 @@ static bool RB_RenderMotionVectorBuffer( drawSurf_t **drawSurfs, int numDrawSurf
 
 	RB_SetMotionVectorMode( 0.0f, 0.0f );
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 	backEnd.currentScissor.Clear();
 	for ( int i = 0; i < numDrawSurfs; i++ ) {
 		const drawSurf_t *surf = drawSurfs[i];
@@ -4085,6 +4086,7 @@ static bool RB_RenderMotionVectorBuffer( drawSurf_t **drawSurfs, int numDrawSurf
 		if ( surf->space != backEnd.currentSpace ) {
 			glLoadMatrixf( surf->space->modelViewMatrix );
 			backEnd.currentSpace = surf->space;
+			RB_SetSurfaceWinding( backEnd.currentSpace );
 		}
 		if ( r_useScissor.GetBool() && !backEnd.currentScissor.Equals( surf->scissorRect ) ) {
 			backEnd.currentScissor = surf->scissorRect;
@@ -8437,6 +8439,7 @@ static void RB_RVSpecialRestoreDrawingView( void ) {
 	glMatrixMode( GL_MODELVIEW );
 	glLoadIdentity();
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	glViewport(
 		RB_TileOffsetX() + backEnd.viewDef->viewport.x1,
@@ -8610,6 +8613,7 @@ static void RB_RVSpecialBeginCapture( idRenderTexture *renderTexture, int width,
 	glEnableClientState( GL_VERTEX_ARRAY );
 	glEnableClientState( GL_TEXTURE_COORD_ARRAY );
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 }
 
 static void RB_RVSpecialEndCapture( idRenderTexture *previousRenderTexture ) {
@@ -9561,6 +9565,7 @@ static bool RB_SSAOWorldDepthSurfFilter( const drawSurf_t *surf ) {
 static int RB_RenderDrawSurfListWithFilter( drawSurf_t **drawSurfs, int numDrawSurfs, void (*triFunc_)( const drawSurf_t * ), rbDrawSurfFilter_t filter ) {
 	int rendered = 0;
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	for ( int i = 0; i < numDrawSurfs; i++ ) {
 		const drawSurf_t *drawSurf = drawSurfs[i];
@@ -9599,6 +9604,7 @@ static int RB_RenderDrawSurfListWithFilter( drawSurf_t **drawSurfs, int numDrawS
 		}
 
 		backEnd.currentSpace = drawSurf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 		rendered++;
 	}
 
@@ -10897,6 +10903,7 @@ static void RB_SharedGuiGLRestoreState( bool inWorld ) {
 		| GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
 	GL_Cull( CT_FRONT_SIDED );
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 }
 
 static bool RB_DrawSharedGuiViewForScope( const viewDef_t *viewDef,
@@ -10981,6 +10988,7 @@ static bool RB_DrawSharedGuiViewForScope( const viewDef_t *viewDef,
 		glDisable( GL_DEPTH_TEST );
 	}
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	int drawnPasses = 0;
 	int noopPasses = 0;
@@ -11643,6 +11651,7 @@ static void RB_SharedWorldAmbientGLRestoreState( void ) {
 	glEnable( GL_DEPTH_TEST );
 	GL_Cull( CT_FRONT_SIDED );
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 }
 
 static void RB_DrawSharedWorldAmbientPhase(
@@ -11785,6 +11794,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 	if ( surf->space != backEnd.currentSpace ) {
 		glLoadMatrixf( surf->space->modelViewMatrix );
 		backEnd.currentSpace = surf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 		RB_SetProgramEnvironmentSpace();
 	}
 
@@ -12482,6 +12492,7 @@ int RB_STD_DrawShaderPasses( drawSurf_t **drawSurfs, int numDrawSurfs, rbShaderP
 	// because we want to defer the matrix load because many
 	// surfaces won't draw any ambient passes
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 	for (i = 0  ; i < numDrawSurfs ; i++ ) {
 		if ( filter != NULL && !filter( drawSurfs[i] ) ) {
 			continue;
@@ -14213,6 +14224,7 @@ static bool RB_ClassicFogBlend_GLDrawPreparedView( const viewDef_t *viewDef, boo
 	GL_Cull( CT_FRONT_SIDED );
 	glEnable( GL_STENCIL_TEST );
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	const bool coverageRecorded = !recordOwnership || R_ClassicFogBlendDomain_RecordOwned(
 		viewDef, CLASSIC_FOG_BLEND_BACKEND_GL,
@@ -14246,6 +14258,7 @@ bool RB_ClassicFogBlend_DrawLinearView( const viewDef_t *viewDef, GLuint vertexP
 	const viewDef_t *savedView = backEnd.viewDef;
 	backEnd.viewDef = viewDef;
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 	glMatrixMode( GL_PROJECTION );
 	glLoadMatrixf( viewDef->projectionMatrix );
 	glMatrixMode( GL_MODELVIEW );
@@ -14255,6 +14268,7 @@ bool RB_ClassicFogBlend_DrawLinearView( const viewDef_t *viewDef, GLuint vertexP
 	glUseProgramObjectARB( 0 );
 	backEnd.viewDef = savedView;
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 	return submitted;
 }
 
@@ -15700,6 +15714,7 @@ static bool RB_STD_DrawLightGridInlineSurface( const drawSurf_t *surf ) {
 	glMatrixMode( GL_MODELVIEW );
 	glLoadMatrixf( surf->space->modelViewMatrix );
 	backEnd.currentSpace = surf->space;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 	if ( r_useScissor.GetBool() && !backEnd.currentScissor.Equals( surf->scissorRect ) ) {
 		backEnd.currentScissor = surf->scissorRect;
 		glScissor(
@@ -15794,6 +15809,7 @@ static void RB_STD_LightGridIndirect( void ) {
 	memset( &drawStats, 0, sizeof( drawStats ) );
 
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 	for ( int i = 0; i < backEnd.viewDef->numDrawSurfs; i++ ) {
 		drawSurf_t *surf = backEnd.viewDef->drawSurfs[i];
 		worldConsidered++;
@@ -15825,6 +15841,7 @@ static void RB_STD_LightGridIndirect( void ) {
 	RB_LogComment( "---------- RB_STD_ViewWeaponLightGridIndirect ----------\n" );
 
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 	for ( int i = 0; i < backEnd.viewDef->numDrawSurfs; i++ ) {
 		drawSurf_t *surf = backEnd.viewDef->drawSurfs[i];
 		if ( surf == NULL || surf->material == NULL ) {
@@ -16040,6 +16057,7 @@ static void RB_PlayerVisibilityApplyScissor( const idScreenRect &rect ) {
 static void RB_PlayerVisibilitySetSurfaceSetup( const drawSurf_t *surf, const float *modelViewMatrix, const bool useSurfaceScissor ) {
 	glLoadMatrixf( modelViewMatrix );
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	RB_PlayerVisibilityApplyScissor( useSurfaceScissor ? surf->scissorRect : backEnd.viewDef->scissor );
 }
@@ -16584,6 +16602,7 @@ static void RB_STD_DrawPlayerVisibilityEffects( drawSurf_t **drawSurfs, int numD
 	GL_Cull( CT_FRONT_SIDED );
 	GL_ClearStateDelta();
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	if ( submitted ) {
 		backEnd.currentRenderCopied = false;
@@ -16778,6 +16797,7 @@ static void RB_STD_DrawCelOutlines( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	GL_Cull( CT_FRONT_SIDED );
 	GL_ClearStateDelta();
 	backEnd.currentSpace = NULL;
+	RB_SetSurfaceWinding( backEnd.currentSpace );
 
 	if ( submitted ) {
 		backEnd.currentRenderCopied = false;

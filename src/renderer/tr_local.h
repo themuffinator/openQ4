@@ -1838,6 +1838,8 @@ void	GL_ClearStateDelta( void );
 void	GL_State( int stateVector );
 void	GL_TexEnv( int env );
 void	GL_Cull( int cullType );
+// openQ4: the front face for a surface space, turned for a reflected one
+void	RB_SetSurfaceWinding( const viewEntity_t *space );
 
 const int GLS_SRCBLEND_ZERO						= 0x00000001;
 const int GLS_SRCBLEND_ONE						= 0x0;

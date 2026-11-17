@@ -173,6 +173,7 @@ static void GLESD3_T_BasicFog( const drawSurf_t *surf ) {
 	if ( surf->space != gles_fogSpace ) {
 		gles_fogSpace = surf->space;
 		backEnd.currentSpace = surf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 
 		float mvp[ 16 ];
 		myGlMultMatrix( surf->space->modelViewMatrix, backEnd.viewDef->projectionMatrix, mvp );
@@ -349,6 +350,7 @@ static void GLESD3_T_BlendLight( const drawSurf_t *surf ) {
 	if ( surf->space != gles_fogSpace ) {
 		gles_fogSpace = surf->space;
 		backEnd.currentSpace = surf->space;
+		RB_SetSurfaceWinding( backEnd.currentSpace );
 
 		float mvp[ 16 ];
 		myGlMultMatrix( surf->space->modelViewMatrix, backEnd.viewDef->projectionMatrix, mvp );

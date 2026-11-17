@@ -2320,15 +2320,24 @@ and AND-05.
   client turns its body onto a facing the server set from the hand
   (`idVRSystem::TurnBody`, game API 60), and the server holds a VR client's
   delta through frozen views as the client does; and an exposed seat shows the
-  seat's own pose under the head (`vrBodySeated`). Still open: a left-handed
-  hold with the view model's own hands. The rigs are mirror images (the
-  partner of a right arm joint is the left one reflected across the gun, its
-  wrist with the first axis reversed and every other joint with all three,
-  measured from the machinegun's symmetric bind pose and every view model's
-  weights), but a mirrored hold built on that drew the hands off the grip with
-  stretched mesh between, and was taken out; it needs a capture harness that
-  frames the hands. The model heading others see still comes from the aim,
-  held near the vertical, not from the head, which the server never learns.
+  seat's own pose under the head (`vrBodySeated`). The model heading others
+  see still comes from the aim, held near the vertical, not from the head,
+  which the server never learns.
+  Left-handed hold, 17 November 2026: the view model's own arms now hold a
+  gun in the left hand, drawn by an entity of their own as the mirror image
+  of the right-handed hold across the gun's upright barrel plane
+  (`rvWeapon::GetVRArmsMirror`, `VRBody_MirrorPlacement`); the gun stays as
+  modelled and sits in the left hand by the mirrored grip. The earlier
+  attempt mirrored partner joints by name, which only the machinegun's rig
+  allows: the other rigs hang the left wrist on the gun or number their
+  fingers differently, and an offline skinning check stretched their arms up
+  to 24 times. A reflected model winds the other way round on screen, which
+  the legacy GL passes (`RB_SetSurfaceWinding`, at each surface-space change)
+  and the Vulkan per-surface passes (`vkSurfaceWinding_t`) now honour, as the
+  modern GL executor did by `negativeScale`; before, both drew such a model
+  inside out. `openxr_vr_hold_closeup.py` frames every gun's hold close up,
+  right- and left-handed, through the test runtime's new `lens` command, and
+  sets each left-handed capture, flipped back, beside the right-handed one.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and

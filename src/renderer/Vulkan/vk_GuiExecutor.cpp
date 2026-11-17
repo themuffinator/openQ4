@@ -757,6 +757,18 @@ VkFrontFace VK_Exec_CanonicalFrontFace() {
 	return VK_Exec_ActiveLowerOrigin() ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
 }
 
+// a surface placed by a reflection (vk_ExecutorHooks.h, vkSurfaceWinding_t)
+bool VK_Exec_SurfaceMirrored( const drawSurf_t *drawSurf ) {
+	if ( drawSurf == NULL || drawSurf->space == NULL ) {
+		return false;
+	}
+	const float *m = drawSurf->space->modelMatrix;
+	const float determinant = m[0] * ( m[5] * m[10] - m[6] * m[9] )
+		- m[1] * ( m[4] * m[10] - m[6] * m[8] )
+		+ m[2] * ( m[4] * m[9] - m[5] * m[8] );
+	return determinant < 0.0f;
+}
+
 /*
 ====================
 Default output
@@ -15180,6 +15192,7 @@ typedef struct vkDepthFillState_s {
 
 static bool VK_Exec_FillDepthSurface( VkCommandBuffer cmd, int slot, const viewDef_t *viewDef,
 		const drawSurf_t *drawSurf, int fbHeight, vkDepthFillState_t &fill ) {
+	vkSurfaceWinding_t winding( cmd, drawSurf );
 	const idMaterial *shader = drawSurf->material;
 	const srfTriangles_t *tri = drawSurf->geo;
 	if ( shader == NULL || tri == NULL || !shader->IsDrawn() ) {
@@ -15907,6 +15920,7 @@ void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 					continue;
 				}
 				VK_Exec_SetSurfScissor( cmd, viewDef, drawSurf, fbHeight );
+				vkSurfaceWinding_t winding( cmd, drawSurf );
 
 				if ( drawSurf->space != currentSpace ) {
 					currentSpace = drawSurf->space;

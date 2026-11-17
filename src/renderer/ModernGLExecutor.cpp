@@ -3476,6 +3476,10 @@ static void R_ModernGLExecutor_ApplyCommandDepthRange( const modernGLSubmitComma
 }
 
 static void R_ModernGLExecutor_ApplyCommandCullState( const modernGLSubmitCommand_t &command ) {
+	// a reflected draw is culled by its negativeScale below, under the default
+	// front face (the legacy passes turn it for a reflected space instead:
+	// RB_SetSurfaceWinding)
+	R_GLStateCache().SetFrontFace( GL_CCW );
 	if ( command.twoSided || command.cullType == CT_TWO_SIDED ) {
 		R_GLStateCache().SetCullFaceEnabled( false );
 		return;

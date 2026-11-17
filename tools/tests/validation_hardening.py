@@ -927,6 +927,7 @@ def validate_validation_wiring() -> None:
         "mp_bot_pad_traffic_replay.py",
         # Need a staged OpenXR client, the built test runtime and retail assets.
         "openxr_vr_controller_profiles_smoke.py",
+        "openxr_vr_hold_closeup.py",
         "openxr_vr_playspace_smoke.py",
         "openxr_vr_stereo_cost.py",
         "openxr_vr_stereo_share_smoke.py",

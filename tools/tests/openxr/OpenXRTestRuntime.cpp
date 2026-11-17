@@ -72,6 +72,10 @@
 //   focus <0|1>                                     toggle between FOCUSED and VISIBLE
 //   exit                                            ask the application to quit (STOPPING)
 //   thermal <cpu|gpu> <normal|warning|impaired>     a thermal limit report (XR_EXT_performance_settings)
+//   lens <degrees>                                  a narrow, symmetric field of view that many degrees
+//                                                   across each eye (the height follows the eye's
+//                                                   aspect), to frame something close; 0 restores the
+//                                                   headset's own frusta
 
 #if defined( _WIN32 )
 #define WIN32_LEAN_AND_MEAN
@@ -544,6 +548,7 @@ struct RuntimeGlobals {
 	int						burstRemaining = 0;
 	int						burstIndex = 0;
 	int						burstScale = 4;
+	float					lensDegrees = 0.0f;	// script "lens": a zoomed, symmetric field of view
 	int						eyeWidth = 1440;
 	int						eyeHeight = 1600;
 	double					refreshRate = 90.0;
@@ -956,6 +961,16 @@ bool StagePoseOfSpace( const TRSpace *space, Pose &out ) {
 // Typical consumer-headset eye frusta: wider towards the temple than the nose.
 XrFovf EyeFov( int eye ) {
 	XrFovf fov;
+	const RuntimeGlobals &g = G();
+	if ( g.lensDegrees > 0.0f ) {
+		const float across = g.lensDegrees * 0.5f * 3.14159265358979f / 180.0f;
+		const float up = std::atan( std::tan( across ) * g.eyeHeight / static_cast<float>( g.eyeWidth ) );
+		fov.angleLeft = -across;
+		fov.angleRight = across;
+		fov.angleUp = up;
+		fov.angleDown = -up;
+		return fov;
+	}
 	if ( eye == 0 ) {
 		fov.angleLeft = -0.94f;
 		fov.angleRight = 0.78f;
@@ -1516,6 +1531,9 @@ void RunScriptCommand( TRSession *session, const std::vector<std::string> &a ) {
 			HandInput &hand = g.hands[a[1] == "left" ? 0 : 1];
 			hand.padX = f( 2, 0.0f );
 			hand.padY = f( 3, 0.0f );
+		} else if ( command == "lens" && a.size() >= 2 ) {
+			const float degrees = f( 1, 0.0f );
+			g.lensDegrees = degrees >= 1.0f && degrees <= 170.0f ? degrees : 0.0f;
 		} else if ( command == "capture" && a.size() >= 2 ) {
 			g.pendingCapture = a[1];
 		} else if ( command == "burst" && a.size() >= 3 ) {
