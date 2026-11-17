@@ -278,6 +278,7 @@ source review records these separately:
 | Source under content/baseoq4/pak0 | Purpose and disposition |
 | --- | --- |
 | `def/weapons/00_napalmgun_openq4.def` | Deliberate residue balance change (smaller hazard, longer lifetime), including stock-named impact declaration; retain as an intentional gameplay difference, never describe a run using it as stock gameplay |
+| `def/weapons/00_weaponmods_mp_openq4.def` | Multiplayer twins (`_mp`) of the Bounce Shot and Burst Fire projectiles: physics-synced so remote clients see bounces and steering, with the weapons' own multiplayer speed and size. Multiplayer only; no single-player definition changes |
 | `def/vehicles/awakening_turret_openq4.def`, `materials/00_awakening_turret_openq4.mtr`, three `effects/openq4_awakening_turret_*` files | Additive Awakening turret implementation; Q4-04 owns campaign-scoped behavior |
 | `def/openq4_m01_cinematic.def`, `scripts/openq4/awakening/m01_dropship.script` | Original Awakening scene helpers referencing installed media; Q4-04 |
 | `def/liquids_openq4.def`, `materials/liquids_openq4.mtr`, `materials/types/liquids_openq4.mtt`, two `effects/openq4_liquids_surface_bubbles_*` files | Intentional liquid feature resources; retain separately from retail compatibility claims |

@@ -163,6 +163,13 @@ typedef struct serverClient_s {
 	int					gameMessageBudget;
 	int					gameMessageBudgetTime;
 	int					gameMessagesDiscarded;
+	// openQ4: packets carrying this client's tag that could not be read, counted
+	// over CLIENT_MALFORMED_WINDOW_MSEC (CLIENT_MALFORMED_MAX drops the client)
+	int					malformedCount;
+	int					malformedWindowStart;
+	// openQ4: the other clients whose user info this client has still to be sent,
+	// one bit a slot: a join sends what its reliable queue can take a frame
+	unsigned int		pendingUserInfo;
 
 	idMsgChannel		channel;
 	int					lastConnectTime;
@@ -319,6 +326,8 @@ private:
 	void				SendPrintToClient( int clientNum, const char *string );
 	void				SendUserInfoBroadcast( int userInfoNum, const idDict &info, bool sendToAll = false );
 	void				SendUserInfoToClient( int clientNum, int userInfoNum, const idDict &info );
+	void				SendPendingUserInfo( int clientNum, int reserveBytes );
+	void				NoteMalformedPacket( int clientNum );
 	void				SendSyncedCvarsBroadcast( const idDict &cvars );
 	void				SendSyncedCvarsToClient( int clientNum, const idDict &cvars );
 	void				SendApplySnapshotToClient( int clientNum, int sequence );
@@ -342,6 +351,8 @@ private:
 	int					ValidateChallenge( const netadr_t from, int challenge, int clientId );	// returns -1 if validate failed
 	bool				AllowConnectionlessResponse( const netadr_t from, bool infoResponse );
 	bool				RefreshRcon2Verifier( void );
+	bool				RconLimitIsPenalised( const rconRateLimit_t &limit ) const;
+	int					RconRateSlot( const netadr_t from, bool allocate );
 	bool				AllowRconChallenge( const netadr_t from );
 	bool				AllowRconProofAttempt( const netadr_t from );
 	void				RecordRconFailure( const netadr_t from );

@@ -10476,6 +10476,30 @@ bool idPlayer::CanBuyItem( const char* itemName )
 }
 
 
+/*
+================
+Player_ClassicArmorPurchaseAddsArmor
+
+openQ4: under the Classic ruleset an armour item is a tier (inv_armor_tier), and
+one that adds nothing to what the player wears is not picked up. A purchase
+was charged all the same: 100 combat armour bought combat armour for nothing.
+Always true outside Classic.
+================
+*/
+static bool Player_ClassicArmorPurchaseAddsArmor( const idPlayer *player, const char *itemName ) {
+	if ( !gameLocal.IsClassicRuleset() ) {
+		return true;
+	}
+	const idDict *itemDict = gameLocal.FindEntityDefDict( itemName, false );
+	const char *tier = itemDict != NULL ? itemDict->GetString( "inv_armor_tier", "" ) : "";
+	if ( tier[ 0 ] == '\0' ) {
+		return true;
+	}
+	int newTier;
+	int newArmor;
+	return rvClassicRules::ArmorAfterPickup( player->inventory.armorTier, player->inventory.armor, tier, newTier, newArmor );
+}
+
 itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 {
 	idStr itemNameStr = itemName;
@@ -10506,7 +10530,10 @@ itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 	}
 	else if( itemNameStr == "item_armor_small" )
 	{
-		if( inventory.armor >= 190 )
+		if( !Player_ClassicArmorPurchaseAddsArmor( this, itemName ) )
+			return IBS_ALREADY_HAVE;
+
+		if( !gameLocal.IsClassicRuleset() && inventory.armor >= 190 )
 			return IBS_ALREADY_HAVE;
 
 		if( inventory.carryOverWeapons & CARRYOVER_FLAG_ARMOR_LIGHT )
@@ -10517,7 +10544,10 @@ itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 	}
 	else if( itemNameStr == "item_armor_large" )
 	{
-		if( inventory.armor >= 190 )
+		if( !Player_ClassicArmorPurchaseAddsArmor( this, itemName ) )
+			return IBS_ALREADY_HAVE;
+
+		if( !gameLocal.IsClassicRuleset() && inventory.armor >= 190 )
 			return IBS_ALREADY_HAVE;
 
 		if( inventory.carryOverWeapons & CARRYOVER_FLAG_ARMOR_HEAVY )
@@ -11631,6 +11661,13 @@ void idPlayer::UpdateDeathSkin( bool state_hitch ) {
 				deathSkinTime = 0;
 				deathClearContentsTime = 0;
 				doingDeathSkin = false;
+				return;
+			}
+
+			// openQ4: the step is relative, and prediction replays a frame
+			// several times on a client: a corpse sank once a pass, not once a
+			// frame. The server's frames are all new.
+			if ( !gameLocal.isNewFrame ) {
 				return;
 			}
 
@@ -13681,6 +13718,18 @@ void idPlayer::OffsetChaseCameraView( const idAngles &look, float range, float h
 	// an 8 unit box keeps the near plane out of whatever stopped the camera
 	trace_t trace;
 	const idBounds bounds( idVec3( -4.0f, -4.0f, -4.0f ), idVec3( 4.0f, 4.0f, 4.0f ) );
+
+	// openQ4: the raised focus is clipped too. The pull-back below started from
+	// it unchecked, so under a low ceiling it began inside the brush and the
+	// camera stayed there. Rise from the middle of the player's own box, which
+	// is clear space, up to the focus.
+	const idVec3 bodyCenter = GetPhysics()->GetAbsBounds().GetCenter();
+	gameLocal.TraceBounds( this, trace, bodyCenter, focus, bounds, MASK_SOLID, this );
+	if ( trace.fraction < 1.0f ) {
+		focus = trace.endpos;
+		view = focus - axis[0] * range;
+	}
+
 	gameLocal.TraceBounds( this, trace, focus, view, bounds, MASK_SOLID, this );
 	if ( trace.fraction < 1.0f ) {
 		view = trace.endpos;
@@ -15973,7 +16022,10 @@ void idPlayer::LocalClientPredictionThink( void ) {
 	}
 // openQ4 END
 
-	UpdateHud();
+	// openQ4: the HUD shows the last pass; each replay pass republished it
+	if ( gameLocal.isLastPredictFrame ) {
+		UpdateHud();
+	}
 
  	if ( gameLocal.isNewFrame ) {
  		UpdatePowerUps();

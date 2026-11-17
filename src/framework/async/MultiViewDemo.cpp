@@ -1930,7 +1930,12 @@ void idMultiViewDemo::CaptureServerFrame( int gameFrame, int gameTime ) {
 		StopRecording( "duration limit reached", true );
 		return;
 	}
-	if ( snapshotSequence > 0 && gameTime - lastSnapshotGameTime < static_cast<int>( header.snapshotDelay ) ) {
+	// openQ4: paced on the frames' real times. The game clock counts 16 ms a frame
+	// where frames are 16.67 ms apart, so 50 ms took four frames, not three, and
+	// the default delay recorded 15 snapshots a second instead of 20.
+	if ( snapshotSequence > 0 &&
+		common->GetUserCmdTime( gameFrame ) - common->GetUserCmdTime( lastSnapshotGameFrame ) <
+			static_cast<int>( header.snapshotDelay ) ) {
 		return;
 	}
 

@@ -103,6 +103,8 @@ public:
 
 	// Armour.
 	static bool				GiveArmor( idPlayer *player, const char *tierName );
+	// What a pickup of the tier would leave; false when it adds nothing.
+	static bool				ArmorAfterPickup( int tier, int armor, const char *tierName, int &newTier, int &newArmor );
 	static int				AbsorbDamage( int tier, int armor, int damage, bool energy );
 	static int				EffectiveArmorTier( int tier, int armor );	// what the armour counts as; NONE without armour
 	static const char *		ArmorTierName( int tier );

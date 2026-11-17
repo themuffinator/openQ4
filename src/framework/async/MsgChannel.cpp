@@ -121,6 +121,7 @@ idMsgChannel::idMsgChannel
 idMsgChannel::idMsgChannel() {
 	id = -1;
 	key = 0;
+	lastPacketMalformed = false;
 	compressor = NULL;
 }
 
@@ -135,6 +136,7 @@ void idMsgChannel::Init( const netadr_t adr, const int id, const int key ) {
 	this->remoteAddress = adr;
 	this->id = id;
 	this->key = key;
+	this->lastPacketMalformed = false;
 	this->maxRate = 50000;
 	// openQ4: a channel is opened again without a Shutdown when a client
 	// reconnects onto its old slot, when a listen server changes map and when a
@@ -371,7 +373,9 @@ bool idMsgChannel::ReadMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	// read message size
 	messageSize = msg.ReadShort();
 	if ( messageSize < (int)sizeof( int ) + (int)sizeof( short ) || messageSize > out.GetMaxSize() ) {
-		common->Printf( "%s: bad message size %d\n", Sys_NetAdrToString( remoteAddress ), messageSize );
+		if ( net_channelShowDrop.GetBool() ) {
+			common->Printf( "%s: bad message size %d\n", Sys_NetAdrToString( remoteAddress ), messageSize );
+		}
 		return false;
 	}
 	// openQ4: the zero-run coder turns six bits into at most twenty-four, so a packet
@@ -380,8 +384,10 @@ bool idMsgChannel::ReadMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	// receiver about 131,000 bit reads, the result parsed as an empty message, and the
 	// sender was never dropped for it.
 	if ( messageSize > 4 * msg.GetRemaingData() + 8 ) {
-		common->Printf( "%s: message size %d exceeds its %d packed bytes\n", Sys_NetAdrToString( remoteAddress ),
-			messageSize, msg.GetRemaingData() );
+		if ( net_channelShowDrop.GetBool() ) {
+			common->Printf( "%s: message size %d exceeds its %d packed bytes\n", Sys_NetAdrToString( remoteAddress ),
+				messageSize, msg.GetRemaingData() );
+		}
 		return false;
 	}
 	out.SetSize( messageSize );
@@ -393,7 +399,9 @@ bool idMsgChannel::ReadMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	// Bitstream decompressors report their cursor, which can step past the logical
 	// output size on the final partial word.
 	if ( decompressedBytes < out.GetSize() ) {
-		common->Printf( "%s: truncated compressed message\n", Sys_NetAdrToString( remoteAddress ) );
+		if ( net_channelShowDrop.GetBool() ) {
+			common->Printf( "%s: truncated compressed message\n", Sys_NetAdrToString( remoteAddress ) );
+		}
 		return false;
 	}
 	incomingCompression = compressor->GetCompressionRatio();
@@ -414,7 +422,9 @@ bool idMsgChannel::ReadMessageData( idBitMsg &out, const idBitMsg &msg ) {
 	while( reliableMessageSize != 0 ) {
 		const int remaining = out.GetSize() - out.GetReadCount();
 		if ( reliableMessageSize <= 0 || remaining < (int)sizeof( int ) || reliableMessageSize > remaining - (int)sizeof( int ) ) {
-			common->Printf( "%s: bad reliable message\n", Sys_NetAdrToString( remoteAddress ) );
+			if ( net_channelShowDrop.GetBool() ) {
+				common->Printf( "%s: bad reliable message\n", Sys_NetAdrToString( remoteAddress ) );
+			}
 			return false;
 		}
 		reliableSequence = out.ReadLong();
@@ -618,6 +628,8 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 	bool		fragmented;
 	idBitMsg	fragMsg;
 
+	lastPacketMalformed = false;
+
 	// get sequence numbers
 	if ( msg.GetRemaingData() < (int)sizeof( int ) + (int)sizeof( short ) ) {
 		// openQ4: this runs before the tag check below, so anyone can draw it
@@ -661,7 +673,10 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 	// read the fragment information
 	if ( fragmented ) {
 		if ( msg.GetRemaingData() < (int)sizeof( short ) * 2 ) {
-			common->Printf( "%s: runt fragment header\n", Sys_NetAdrToString( remoteAddress ) );
+			if ( net_channelShowDrop.GetBool() ) {
+				common->Printf( "%s: runt fragment header\n", Sys_NetAdrToString( remoteAddress ) );
+			}
+			lastPacketMalformed = true;
 			return false;
 		}
 		fragStart = msg.ReadShort();
@@ -779,6 +794,7 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 
 	// read the message data
 	if ( !ReadMessageData( msg, fragMsg ) ) {
+		lastPacketMalformed = true;
 		return false;
 	}
 

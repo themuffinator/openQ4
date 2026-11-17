@@ -3144,6 +3144,35 @@ void Session_RescanSI_f( const idCmdArgs &args ) {
 	}
 }
 
+/*
+=================
+Session_PublishSI_f
+
+openQ4: publishes the named server info cvars and nothing else. rescanSI takes
+every one, so a setting an operator had typed for the next map (si_map,
+si_gameType, si_ruleset...) went live whenever the map database announced what
+plays next. Names only, because the values (si_mapPick's ';' lists) would not
+survive the command line.
+=================
+*/
+void Session_PublishSI_f( const idCmdArgs &args ) {
+	bool changed = false;
+	for ( int i = 1; i < args.Argc(); i++ ) {
+		const idCVar *cvar = cvarSystem->Find( args.Argv( i ) );
+		if ( cvar == NULL || ( cvar->GetFlags() & CVAR_SERVERINFO ) == 0 ) {
+			common->DWarning( "publishSI: %s is not a server info cvar", args.Argv( i ) );
+			continue;
+		}
+		if ( idStr::Cmp( sessLocal.mapSpawnData.serverInfo.GetString( cvar->GetName() ), cvar->GetString() ) != 0 ) {
+			sessLocal.mapSpawnData.serverInfo.Set( cvar->GetName(), cvar->GetString() );
+			changed = true;
+		}
+	}
+	if ( changed && game && idAsyncNetwork::server.IsActive() ) {
+		game->SetServerInfo( sessLocal.mapSpawnData.serverInfo );
+	}
+}
+
 #ifndef ID_DEDICATED
 static bool Session_IsLightGridBakeMultiplayerMap( const idStr &mapName ) {
 	return idStr::Icmpn( mapName.c_str(), "mp/", 3 ) == 0;
@@ -11126,6 +11155,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "takeViewNotes2", TakeViewNotes2_f, CMD_FL_SYSTEM, "extended take view notes" );
 
 	cmdSystem->AddCommand( "rescanSI", Session_RescanSI_f, CMD_FL_SYSTEM, "internal - rescan serverinfo cvars and tell game" );
+	cmdSystem->AddCommand( "publishSI", Session_PublishSI_f, CMD_FL_SYSTEM, "internal - publish the named serverinfo cvars only: publishSI <cvar> [cvar...]" );
 
 	cmdSystem->AddCommand( "hitch", Session_Hitch_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "hitches the game" );
 

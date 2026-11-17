@@ -1,5 +1,6 @@
 // Lightweight world fixtures; decision functions below are taken verbatim from
 // production by mp_bot_regressions.py. No second implementation of goal policy.
+#include <cctype>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -90,7 +91,15 @@ template<class T> struct idList : std::vector<T> {
     int Append(const T& x) { this->push_back(x); return Num()-1; }
     T* Ptr() { return this->data(); }
 };
-struct idStr : std::string { using std::string::string; };
+struct idStr : std::string {
+    using std::string::string;
+    static int Icmp(const char* a,const char* b) {
+        for (;; ++a, ++b) {
+            const int ca=std::tolower((unsigned char)*a), cb=std::tolower((unsigned char)*b);
+            if (ca!=cb || !ca) return ca-cb;
+        }
+    }
+};
 // Keyed like an idDict: an unset key answers the caller's default.
 struct Args {
     std::map<std::string,std::string> values;

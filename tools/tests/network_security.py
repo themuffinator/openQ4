@@ -183,8 +183,15 @@ def validate_oob_budgets() -> None:
     require_before(rcon_challenge, "AllowConnectionlessResponse( from, false )", "serverPort.SendPacket", "rcon2 response budget")
     require_before(connect, "ValidateChallenge( from, challenge, clientId )", "protocol != ASYNC_PROTOCOL_VERSION", "challenge before protocol reply")
     require_before(connect, "OS < 0 || OS >= MAX_GAME_OS", "ValidateChallenge( from, challenge, clientId )", "client OS bounds before challenge state")
-    require_before(connect, "AllowConnectionlessResponse( from, false )", "protocol != ASYNC_PROTOCOL_VERSION", "connect reply budget")
-    require_before(connect, "AllowConnectionlessResponse( from, false )", "clientDataChecksum != serverDataChecksum", "checksum reply budget")
+    # A connect that proves its challenge came from the address the challenge went
+    # to, so it cannot be a reflection; charging it let a challenge flood turn real
+    # players away (audit 17 November). ValidateChallenge charges the failures.
+    reject(connect, "AllowConnectionlessResponse( from, false )", "proven connect is not charged to the reply budget")
+    validate_body = function_body(server, "int idAsyncServer::ValidateChallenge(", "ValidateChallenge")
+    require(validate_body, "AllowConnectionlessResponse( from, false )", "a failed challenge proof is charged")
+    # Rate limits key an IPv6 source on its /64; link-local neighbours on the whole address.
+    require(server, "IPv6PrefixMatches( left.ip6, right.ip6, 64 )", "IPv6 rate source is the /64")
+    require(limiter, "AsyncServer_SameRateSource( from, oobRateLimits[ index ].address )", "OOB budget keys on the rate source")
     require(pure, "AllowConnectionlessResponse( from, false )", "pure failure reply budget")
     require(download, "AllowConnectionlessResponse( from, false )", "download response budget")
     inactive = connectionless[connectionless.index("if ( !active )") :]
@@ -1329,6 +1336,66 @@ def validate_protocol_2_42() -> None:
     reject(network, "tagRandom.SetSeed( random.RandomInt() );", "snapshot tags drawn from the gameplay random stream")
 
 
+def validate_mp_audit_round_2026_11_17() -> None:
+    """The second round on the 17 November multiplayer audit's open network items."""
+    server = read("src/framework/async/AsyncServer.cpp")
+    channel = read("src/framework/async/MsgChannel.cpp")
+    bitmsg = read("src/idlib/BitMsg.cpp")
+    session = read("src/framework/Session.cpp")
+    mvd = read("src/framework/async/MultiViewDemo.cpp")
+
+    # rcon: an entry holding failures or a lockout is never handed to another source
+    slot = function_body(server, "int idAsyncServer::RconRateSlot(", "RconRateSlot")
+    require(slot, "RconLimitIsPenalised( limit )", "penalised rcon entries are not evicted")
+    for name in ("bool idAsyncServer::AllowRconChallenge(", "bool idAsyncServer::AllowRconProofAttempt(",
+                 "void idAsyncServer::RecordRconFailure("):
+        require(function_body(server, name, name), "RconRateSlot( from, true )", f"{name} takes a slot or refuses")
+    reject(function_body(server, "void idAsyncServer::RecordRconFailure(", "RecordRconFailure"),
+           "Sys_CompareNetAdrBase( from, limit.address )", "a failure is recorded even after an eviction")
+    require(server, "limit.failureWindowStart = -static_cast<int>( AsyncServer_Elapsed( serverTime, limit.failureWindowStart ) );",
+            "rcon failure windows survive the map change")
+
+    # malformed packets: counted, a run of them drops the client, none prints a line by default
+    require(channel, "lastPacketMalformed = true;", "the channel flags an unreadable tagged packet")
+    process = function_body(server, "bool idAsyncServer::ProcessMessage(", "ProcessMessage")
+    require_before(process, "client.channel.LastPacketMalformed()", "NoteMalformedPacket( i )", "malformed packets are counted")
+    note = function_body(server, "void idAsyncServer::NoteMalformedPacket(", "NoteMalformedPacket")
+    require(note, "client.malformedCount >= CLIENT_MALFORMED_MAX", "a run of malformed packets drops the client")
+    require(note, 'DropClient( clientNum, "#str_07138" )', "malformed drop reason")
+    require(server, "const int CLIENT_MALFORMED_MAX			= 8;", "malformed threshold")
+    for text in ('"%s: bad message size %d\\n"', '"%s: bad reliable message\\n"'):
+        index = channel.index(text)
+        require(channel[max(0, index - 120):index], "net_channelShowDrop.GetBool()", "malformed packets print only on request")
+
+    # join burst: staged by the joiner's free reliable queue, never all in one frame
+    require(server, "SendPendingUserInfo( clientNum, JOIN_USERINFO_RESERVE_BYTES );", "join sends what fits")
+    pending = function_body(server, "void idAsyncServer::SendPendingUserInfo(", "SendPendingUserInfo")
+    require_before(pending, "client.channel.GetReliableSpaceLeft() < msg.GetSize() + 8 + reserveBytes",
+                   "SendReliableMessage( clientNum, msg )", "a pending user info waits for queue room")
+    require(server, "SendPendingUserInfo( i, PENDING_USERINFO_RESERVE_BYTES );", "the rest follows in later frames")
+    broadcast = function_body(server, "void idAsyncServer::SendUserInfoBroadcast(", "SendUserInfoBroadcast")
+    require(broadcast, "clients[i].pendingUserInfo & ( 1u << userInfoNum )", "no delta to a client still owed the whole info")
+
+    # byte 255 cannot end a string early
+    write_string = function_body(bitmsg, "void idBitMsg::WriteString(", "idBitMsg::WriteString")
+    require(write_string, "dataPtr[i] == 255", "WriteString sends no byte 255")
+
+    # the map database publishes its two keys only
+    require(session, '"publishSI", Session_PublishSI_f', "publishSI registered")
+    publish = function_body(session, "void Session_PublishSI_f(", "Session_PublishSI_f")
+    require(publish, "CVAR_SERVERINFO", "publishSI publishes server info cvars only")
+    reject(publish, "MoveCVarsToDict", "publishSI does not rescan every server info cvar")
+    mapdb = read("src/mpgame/mp/MapDatabaseHost.cpp")
+    require(mapdb, "publishSI si_nextMap si_mapPick", "map database publishes named keys")
+    reject(mapdb, '"rescanSI\\n"', "map database no longer rescans")
+
+    # MVD snapshots on the frames' real times
+    capture = function_body(mvd, "void idMultiViewDemo::CaptureServerFrame(", "CaptureServerFrame")
+    require(capture, "common->GetUserCmdTime( gameFrame ) - common->GetUserCmdTime( lastSnapshotGameFrame )",
+            "MVD pacing uses the real frame ladder")
+    reject(capture, "gameTime - lastSnapshotGameTime < static_cast<int>( header.snapshotDelay )", "MVD pacing on the 16 ms label")
+
+
 def main() -> None:
     validate_crypto_and_native_vectors()
     validate_secure_random_and_connection_challenges()
@@ -1344,6 +1411,7 @@ def main() -> None:
     validate_channel_and_message_abuse_bounds()
     validate_session_lifecycle_and_flood_bounds()
     validate_protocol_2_42()
+    validate_mp_audit_round_2026_11_17()
     validate_documentation_and_registration()
     print("network_security: ok")
 

@@ -1082,10 +1082,14 @@ static void Cmd_OpenQ4ReportClientOptions_f( const idCmdArgs &args ) {
 	gameLocal.Printf( "CLIENTOPT hitsound set=%d tones=%d stock=%d last_pitch=%.2f\n", hud_hitSound.GetInteger(), tones, stock, pitch );
 
 	if ( player->mphud != NULL ) {
+		// the crosshair name can hold a line break; the report is one line
+		idStr aimText = idStr( player->mphud->GetStateString( "aim_text" ) ).RemoveEscapes();
+		aimText.Replace( "\n", " " );
+		aimText.Replace( "\r", " " );
 		gameLocal.Printf( "CLIENTOPT hud xhair_ammo=\"%s\" local_clock=\"%s\" it_count=%d it0=\"%s\"/\"%s\" aim=\"%s\" ts0=\"%s\"@\"%s\"\n",
 			player->mphud->GetStateString( "oq4_xhair_ammo" ), player->mphud->GetStateString( "oq4_local_clock" ),
 			player->mphud->GetStateInt( "oq4_it_count" ), player->mphud->GetStateString( "oq4_it_0_name" ),
-			player->mphud->GetStateString( "oq4_it_0_time" ), idStr( player->mphud->GetStateString( "aim_text" ) ).RemoveEscapes().c_str(),
+			player->mphud->GetStateString( "oq4_it_0_time" ), aimText.c_str(),
 			player->mphud->GetStateString( "oq4_ts0_0_name" ), player->mphud->GetStateString( "oq4_ts0_0_location" ) );
 	}
 }

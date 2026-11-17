@@ -87,6 +87,7 @@ struct netadr_t { int type = 0; };
 static int Net_FragmentSize( const netadr_t & ) { return 1300; }
 static const char *Sys_NetAdrToString( const netadr_t & ) { return "fixture"; }
 struct Common { void Printf( const char *, ... ) {} } commonStorage;
+struct Cvar { bool GetBool() const { return false; } } net_channelShowDrop;
 static Common *common = &commonStorage;
 
 class idBitMsg {

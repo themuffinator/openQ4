@@ -7,6 +7,38 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Multiplayer: the rest of the 17 November audit, 17 November 2026
+
+- **Bounce Shot and Burst Fire look right online.** Other players now see a
+  Bounce Shot bolt bounce and a Burst Fire rocket steer, where they saw both
+  fly straight to an impact that never happened. Both fly at their weapon's
+  normal multiplayer speed.
+- **Classic armour: no paying for nothing.** Under the Classic ruleset, an
+  armour purchase that would add nothing is refused before any credits are
+  spent, and bots go for Classic armour, which they used to ignore.
+- **Multiview demos record 20 snapshots a second.** That is what the default
+  setting always asked for; recordings took 15. Expect files about a third
+  larger than before.
+- **Busier servers join cleanly.** A player joining a full server whose
+  players all have long settings no longer gets disconnected on arrival:
+  the other players' details are sent as fast as the connection takes them.
+- **Server hardening.** A player who has proved their connection is never
+  turned away by the server's flood limits, and an IPv6 host counts as one
+  source however many addresses it uses. Wrong rcon passwords keep counting
+  however many other addresses ask the server for a challenge, and over a
+  map change. A client that keeps sending broken packets is disconnected
+  instead of filling the log, and a name containing one particular invalid
+  byte no longer scrambles that player's settings.
+- **Map rotation and managed matches.** Announcing the next map no longer
+  applies other settings you have typed for the next map early, and a
+  refereed or series match no longer has its next map replaced by the
+  rotation.
+- **Smaller fixes.** Under Quad Hog, a frag made by the hog's last rocket
+  still scores when the same blast kills the hog. The chase and death
+  cameras stay out of low ceilings, bodies sink at the same speed on every
+  screen, and item timers, bot definition lookups and resting items cost the
+  server less each frame.
+
 ## VR: controllers with fewer buttons, steadier sessions, and the audit's other leads, 17 November 2026
 
 - **Every action on every controller.** Valve Index gets the flashlight:

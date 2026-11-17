@@ -119,8 +119,17 @@ public:
 					// the sequence number of the message.
 	bool			Process( const netadr_t from, int time, idBitMsg &msg, int &sequence );
 
+					// True when the last packet Process refused carried this connection's tag
+					// but could not be read: the other end, or someone who guessed the tag,
+					// sent a broken packet, not a late or repeated one.
+	bool			LastPacketMalformed( void ) const { return lastPacketMalformed; }
+
 					// Sends a reliable message, in order and without duplicates.
 	bool			SendReliableMessage( const idBitMsg &msg );
+
+					// Bytes the outgoing reliable queue can still take; a message of n bytes
+					// needs n plus its 8-byte queue header.
+	int				GetReliableSpaceLeft( void ) const { return reliableSend.GetSpaceLeft(); }
 
 					// Returns true if a new reliable message is available and stores the message.
 	bool			GetReliableMessage( idBitMsg &msg );
@@ -131,6 +140,7 @@ private:
 	netadr_t		remoteAddress;	// address of remote host
 	int				id;				// our identification used instead of port number
 	int				key;			// the connect challenge packets are tagged with
+	bool			lastPacketMalformed;
 	int				maxRate;		// maximum number of bytes that may go out per second
 	idCompressor *	compressor;		// compressor used for data compression
 

@@ -102,6 +102,10 @@ protected:
 
 private:
 	idVec3					orgOrigin;
+	// openQ4: where the model was last updated from (Think)
+	idVec3					presentedOrigin;
+	idMat3					presentedAxis;
+	bool					visualsPresented;
 
 	rvPhysics_Particle		physicsObj;
 

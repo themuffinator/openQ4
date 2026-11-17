@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Rcon2Protocol.h"
 
 #include "../Session_local.h"
+#include "../../sys/NetworkEndpoint.h"
 
 #include <cstdint>
 
@@ -68,6 +69,21 @@ const int RETAIL_CHALLENGE_REQUEST_BYTES = 5;
 
 static ID_INLINE bool AsyncServer_SameEndpoint( const netadr_t &left, const netadr_t &right ) {
 	return left.port == right.port && Sys_CompareNetAdrBase( left, right );
+}
+
+// openQ4: the source a rate limit counts. An IPv6 host is given a whole /64 and can
+// answer from any address in it, so the limits key on the prefix. IPv4 and a
+// link-local neighbour keep their whole address: every host on a link shares the
+// link-local prefix.
+static ID_INLINE bool AsyncServer_SameRateSource( const netadr_t &left, const netadr_t &right ) {
+	if ( left.type == NA_IP6 && right.type == NA_IP6 ) {
+		const bool linkLocal = left.ip6[ 0 ] == 0xfe && ( left.ip6[ 1 ] & 0xc0 ) == 0x80;
+		if ( linkLocal ) {
+			return Sys_CompareNetAdrBase( left, right );
+		}
+		return idNetworkEndpoint::IPv6PrefixMatches( left.ip6, right.ip6, 64 );
+	}
+	return Sys_CompareNetAdrBase( left, right );
 }
 
 static ID_INLINE std::uint32_t AsyncServer_Elapsed( int now, int then ) {
@@ -135,6 +151,17 @@ const int CLIENT_USERINFO_BUDGET_RATE	= 1024;		// bytes a second
 // sends a handful a second; past the allowance they are discarded.
 const int CLIENT_GAME_MESSAGE_BURST		= 120;
 const int CLIENT_GAME_MESSAGE_RATE		= 60;		// messages a second
+
+// openQ4: what a joining client's reliable queue keeps free while the other clients'
+// user info is sent to it (SendPendingUserInfo): room for the synced cvars, the
+// enter-game message and the game's first messages, which follow at once, and
+// for the chat and changes of a busy server after that.
+const int JOIN_USERINFO_RESERVE_BYTES	= 6144;
+const int PENDING_USERINFO_RESERVE_BYTES	= 2048;
+
+// openQ4: unreadable packets carrying a client's tag (NoteMalformedPacket)
+const int CLIENT_MALFORMED_MAX			= 8;
+const int CLIENT_MALFORMED_WINDOW_MSEC	= 10000;
 
 // openQ4: how long the rest of a fragmented message may run ahead of the rate
 // (idMsgChannel::ReadyToSendFragment): 50 ms of the default 128,000 bytes a second
@@ -598,16 +625,23 @@ void idAsyncServer::ExecuteMapChange( void ) {
 	// openQ4: an rcon lockout is a server time and the clock restarts here. A lockout
 	// set late in a long map lasted until the new map's clock reached the old value,
 	// twenty minutes where thirty seconds were meant. Carry over what is left of it.
+	// The windows that count failures and challenges are rebased the same way;
+	// they used to lapse at every change, so a map change reset the counts.
 	for ( int index = 0; index < MAX_RCON_RATE_LIMITS; ++index ) {
 		rconRateLimit_t &limit = rconRateLimits[ index ];
-		if ( !limit.active || limit.blockedUntil == 0 ) {
+		if ( !limit.active ) {
 			continue;
 		}
-		if ( AsyncServer_TimeBefore( serverTime, limit.blockedUntil ) ) {
-			limit.blockedUntil = Max( 1, static_cast<int>( AsyncServer_Elapsed( limit.blockedUntil, serverTime ) ) );
-		} else {
-			limit.blockedUntil = 0;
+		if ( limit.blockedUntil != 0 ) {
+			if ( AsyncServer_TimeBefore( serverTime, limit.blockedUntil ) ) {
+				limit.blockedUntil = Max( 1, static_cast<int>( AsyncServer_Elapsed( limit.blockedUntil, serverTime ) ) );
+			} else {
+				limit.blockedUntil = 0;
+			}
 		}
+		limit.challengeWindowStart = -static_cast<int>( AsyncServer_Elapsed( serverTime, limit.challengeWindowStart ) );
+		limit.lastChallengeTime = -static_cast<int>( AsyncServer_Elapsed( serverTime, limit.lastChallengeTime ) );
+		limit.failureWindowStart = -static_cast<int>( AsyncServer_Elapsed( serverTime, limit.failureWindowStart ) );
 	}
 	serverTime = 0;
 	// openQ4: server time restarts here; the stats report waited out the whole of
@@ -1055,6 +1089,9 @@ void idAsyncServer::ClearClient( int clientNum ) {
 	client.gameMessageBudget = CLIENT_GAME_MESSAGE_BURST;
 	client.gameMessageBudgetTime = 0;
 	client.gameMessagesDiscarded = 0;
+	client.malformedCount = 0;
+	client.malformedWindowStart = 0;
+	client.pendingUserInfo = 0;
 	client.channel.Shutdown();
 	client.lastConnectTime = 0;
 	client.lastEmptyTime = 0;
@@ -1103,6 +1140,9 @@ void idAsyncServer::InitClient( int clientNum, int clientId, int clientRate ) {
 	client.gameMessageBudget = CLIENT_GAME_MESSAGE_BURST;
 	client.gameMessageBudgetTime = serverTime;
 	client.gameMessagesDiscarded = 0;
+	client.malformedCount = 0;
+	client.malformedWindowStart = serverTime;
+	client.pendingUserInfo = 0;
 	client.channel.ResetRate();
 	// openQ4: the rate comes off the wire. A negative one became the channel's rate
 	// as it stood and held that client to about a packet a second.
@@ -1199,6 +1239,34 @@ void idAsyncServer::LocalClientInput( void ) {
 
 /*
 ==================
+idAsyncServer::NoteMalformedPacket
+
+openQ4: a packet carrying a client's tag that cannot be read. Each used to print
+a line and the client was never dropped. Only the client, or someone who guessed
+its 16-bit tag, can send one, so a short run of them drops the client, and a lone
+one does not hand a guesser a way to kick a player.
+==================
+*/
+void idAsyncServer::NoteMalformedPacket( int clientNum ) {
+	serverClient_t &client = clients[ clientNum ];
+	if ( client.clientState <= SCS_ZOMBIE ) {
+		return;
+	}
+	if ( client.malformedCount == 0 ||
+		AsyncServer_Elapsed( serverTime, client.malformedWindowStart ) >= CLIENT_MALFORMED_WINDOW_MSEC ) {
+		client.malformedWindowStart = serverTime;
+		client.malformedCount = 0;
+	}
+	client.malformedCount++;
+	if ( client.malformedCount >= CLIENT_MALFORMED_MAX ) {
+		common->Printf( "client %d sent %d unreadable packets in %d seconds\n", clientNum,
+			client.malformedCount, CLIENT_MALFORMED_WINDOW_MSEC / 1000 );
+		DropClient( clientNum, "#str_07138" );
+	}
+}
+
+/*
+==================
 idAsyncServer::DropClient
 ==================
 */
@@ -1225,6 +1293,10 @@ void idAsyncServer::DropClient( int clientNum, const char *reason ) {
 	// state makes every slot's teardown an exactly-once operation.
 	const serverClientState_t priorState = client.clientState;
 	client.clientState = SCS_ZOMBIE;
+	client.pendingUserInfo = 0;
+	for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
+		clients[ i ].pendingUserInfo &= ~( 1u << clientNum );
+	}
 
 	if ( priorState >= SCS_PUREWAIT && clientNum != localClientNum ) {
 		msg.Init( msgBuf, sizeof( msgBuf ) );
@@ -1429,6 +1501,11 @@ void idAsyncServer::SendUserInfoBroadcast( int userInfoNum, const idDict &info, 
 
 	for ( int i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
 		if ( clients[i].clientState >= SCS_CONNECTED && ( sendToAll || i != userInfoNum || gameModifiedInfo ) ) {
+			// openQ4: a client still waiting for this user info gets it whole, as it
+			// is then, and has no copy a delta could apply to
+			if ( clients[i].pendingUserInfo & ( 1u << userInfoNum ) ) {
+				continue;
+			}
 			SendReliableMessage( i, msg );
 		}
 	}
@@ -1482,6 +1559,54 @@ void idAsyncServer::SendUserInfoToClient( int clientNum, int userInfoNum, const 
 	msg.WriteDeltaDict( info, NULL );
 
 	SendReliableMessage( clientNum, msg );
+}
+
+/*
+==================
+idAsyncServer::SendPendingUserInfo
+
+openQ4: sends a client the other clients' user info it is still owed, while its
+reliable queue keeps reserveBytes free. The rest waits for a later frame.
+==================
+*/
+void idAsyncServer::SendPendingUserInfo( int clientNum, int reserveBytes ) {
+	serverClient_t &client = clients[ clientNum ];
+	if ( client.clientState < SCS_CONNECTED || clientNum == localClientNum ||
+		client.channel.GetRemoteAddress().type == NA_BOT ) {
+		client.pendingUserInfo = 0;
+		return;
+	}
+
+	for ( int i = 0; i < MAX_ASYNC_CLIENTS && client.pendingUserInfo != 0; i++ ) {
+		const unsigned int bit = 1u << i;
+		if ( ( client.pendingUserInfo & bit ) == 0 ) {
+			continue;
+		}
+		if ( clients[ i ].clientState < SCS_CONNECTED ) {
+			client.pendingUserInfo &= ~bit;
+			continue;
+		}
+
+		idBitMsg	msg;
+		byte		msgBuf[ MAX_MESSAGE_SIZE ];
+		msg.Init( msgBuf, sizeof( msgBuf ) );
+		msg.WriteByte( SERVER_RELIABLE_MESSAGE_CLIENTINFO );
+		msg.WriteByte( i );
+		msg.WriteBits( 0, 1 );
+#if ID_CLIENTINFO_TAGS
+		msg.WriteLong( 0 );
+#endif
+		msg.WriteDeltaDict( sessLocal.mapSpawnData.userInfo[ i ], NULL );
+
+		if ( client.channel.GetReliableSpaceLeft() < msg.GetSize() + 8 + reserveBytes ) {
+			return;
+		}
+		client.pendingUserInfo &= ~bit;
+		SendReliableMessage( clientNum, msg );
+		if ( client.clientState < SCS_CONNECTED ) {
+			return;
+		}
+	}
 }
 
 /*
@@ -1911,11 +2036,18 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 		client.deferredServerInfo = false;
 
 		// send the user info of other clients
+		// openQ4: all of it went into the reliable queue in this frame. Thirty-one
+		// user infos near the 2 KiB limit are four times the 16 KiB queue, and an
+		// overflow drops the joiner. What the queue can take goes now; the rest
+		// follows as acknowledgements free room (RunFrame), each copy current
+		// when it leaves.
+		client.pendingUserInfo = 0;
 		for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
 			if ( clients[i].clientState >= SCS_CONNECTED && i != clientNum ) {
-				SendUserInfoToClient( clientNum, i, sessLocal.mapSpawnData.userInfo[i] );
+				client.pendingUserInfo |= 1u << i;
 			}
 		}
+		SendPendingUserInfo( clientNum, JOIN_USERINFO_RESERVE_BYTES );
 
 		// send synchronized cvars to client
 		SendSyncedCvarsToClient( clientNum, sessLocal.mapSpawnData.syncedCVars );
@@ -2044,7 +2176,10 @@ void idAsyncServer::ProcessUnreliableClientMessage( int clientNum, const idBitMs
 			break;
 		}
 		default: {
-			common->Printf( "unknown unreliable message %d from client %d\n", id, clientNum );
+			if ( idAsyncNetwork::verbose.GetBool() ) {
+				common->Printf( "unknown unreliable message %d from client %d\n", id, clientNum );
+			}
+			NoteMalformedPacket( clientNum );
 			break;
 		}
 	}
@@ -2253,7 +2388,7 @@ bool idAsyncServer::AllowConnectionlessResponse( const netadr_t from, bool infoR
 	std::uint32_t oldestAge = 0;
 	for ( int index = 0; index < MAX_OOB_RATE_LIMITS; ++index ) {
 		if ( oobRateLimits[ index ].active &&
-			Sys_CompareNetAdrBase( from, oobRateLimits[ index ].address ) ) {
+			AsyncServer_SameRateSource( from, oobRateLimits[ index ].address ) ) {
 			slot = index;
 			break;
 		}
@@ -2363,38 +2498,76 @@ bool idAsyncServer::RefreshRcon2Verifier( void ) {
 
 /*
 ==================
+idAsyncServer::RconLimitIsPenalised
+==================
+*/
+bool idAsyncServer::RconLimitIsPenalised( const rconRateLimit_t &limit ) const {
+	if ( limit.blockedUntil != 0 && AsyncServer_TimeBefore( serverTime, limit.blockedUntil ) ) {
+		return true;
+	}
+	return limit.failureCount > 0 &&
+		AsyncServer_Elapsed( serverTime, limit.failureWindowStart ) < RCON2_FAILURE_WINDOW_MSEC;
+}
+
+/*
+==================
+idAsyncServer::RconRateSlot
+
+openQ4: the source's rate entry, made when allocate is set. An entry holding
+failures or a lockout is never handed to another source. Evicting one between a
+challenge and its proof, by asking for challenges from enough other sources,
+meant failed proofs were never counted. When every entry carries failures, a new
+source is refused (-1) until one of them runs out.
+==================
+*/
+int idAsyncServer::RconRateSlot( const netadr_t from, bool allocate ) {
+	int victim = -1;
+	bool victimFree = false;
+	std::uint32_t victimAge = 0;
+	for ( int index = 0; index < MAX_RCON_RATE_LIMITS; ++index ) {
+		const rconRateLimit_t &limit = rconRateLimits[ index ];
+		if ( limit.active && AsyncServer_SameRateSource( from, limit.address ) ) {
+			return index;
+		}
+		if ( victimFree ) {
+			continue;
+		}
+		if ( !limit.active ) {
+			victim = index;
+			victimFree = true;
+			continue;
+		}
+		if ( RconLimitIsPenalised( limit ) ) {
+			continue;
+		}
+		const std::uint32_t age = AsyncServer_Elapsed( serverTime, limit.lastChallengeTime );
+		if ( victim < 0 || age > victimAge ) {
+			victim = index;
+			victimAge = age;
+		}
+	}
+	if ( !allocate || victim < 0 ) {
+		return -1;
+	}
+	rconRateLimit_t &limit = rconRateLimits[ victim ];
+	memset( &limit, 0, sizeof( limit ) );
+	limit.active = true;
+	limit.address = from;
+	limit.challengeWindowStart = serverTime;
+	limit.lastChallengeTime = serverTime;
+	limit.failureWindowStart = serverTime;
+	return victim;
+}
+
+/*
+==================
 idAsyncServer::AllowRconChallenge
 ==================
 */
 bool idAsyncServer::AllowRconChallenge( const netadr_t from ) {
-	int slot = -1;
-	int oldest = 0;
-	std::uint32_t oldestAge = 0;
-	for ( int index = 0; index < MAX_RCON_RATE_LIMITS; ++index ) {
-		if ( rconRateLimits[ index ].active &&
-			Sys_CompareNetAdrBase( from, rconRateLimits[ index ].address ) ) {
-			slot = index;
-			break;
-		}
-		if ( !rconRateLimits[ index ].active ) {
-			oldest = index;
-			oldestAge = static_cast<std::uint32_t>( -1 );
-		} else {
-			const std::uint32_t age = AsyncServer_Elapsed( serverTime,
-				rconRateLimits[ index ].challengeWindowStart );
-			if ( oldestAge != static_cast<std::uint32_t>( -1 ) && age > oldestAge ) {
-				oldest = index;
-				oldestAge = age;
-			}
-		}
-	}
+	const int slot = RconRateSlot( from, true );
 	if ( slot < 0 ) {
-		slot = oldest;
-		memset( &rconRateLimits[ slot ], 0, sizeof( rconRateLimits[ slot ] ) );
-		rconRateLimits[ slot ].active = true;
-		rconRateLimits[ slot ].address = from;
-		rconRateLimits[ slot ].challengeWindowStart = serverTime;
-		rconRateLimits[ slot ].failureWindowStart = serverTime;
+		return false;
 	}
 
 	rconRateLimit_t &limit = rconRateLimits[ slot ];
@@ -2421,48 +2594,43 @@ bool idAsyncServer::AllowRconChallenge( const netadr_t from ) {
 }
 
 bool idAsyncServer::AllowRconProofAttempt( const netadr_t from ) {
-	for ( int index = 0; index < MAX_RCON_RATE_LIMITS; ++index ) {
-		if ( rconRateLimits[ index ].active &&
-			Sys_CompareNetAdrBase( from, rconRateLimits[ index ].address ) ) {
-			rconRateLimit_t &limit = rconRateLimits[ index ];
-			if ( limit.blockedUntil == 0 ) {
-				return true;
-			}
-			if ( AsyncServer_TimeBefore( serverTime, limit.blockedUntil ) ) {
-				return false;
-			}
-			limit.blockedUntil = 0;
-			return true;
-		}
+	// A proof whose failure could not be counted is not tried.
+	const int slot = RconRateSlot( from, true );
+	if ( slot < 0 ) {
+		return false;
 	}
+	rconRateLimit_t &limit = rconRateLimits[ slot ];
+	if ( limit.blockedUntil == 0 ) {
+		return true;
+	}
+	if ( AsyncServer_TimeBefore( serverTime, limit.blockedUntil ) ) {
+		return false;
+	}
+	limit.blockedUntil = 0;
 	return true;
 }
 
 void idAsyncServer::RecordRconFailure( const netadr_t from ) {
-	// Ensure a rate slot exists without allowing the failure to bypass a full
-	// table. A proof can only reach this point after a challenge used this path.
-	for ( int index = 0; index < MAX_RCON_RATE_LIMITS; ++index ) {
-		rconRateLimit_t &limit = rconRateLimits[ index ];
-		if ( !limit.active || !Sys_CompareNetAdrBase( from, limit.address ) ) {
-			continue;
-		}
-		if ( AsyncServer_Elapsed( serverTime, limit.failureWindowStart ) >= RCON2_FAILURE_WINDOW_MSEC ) {
-			limit.failureWindowStart = serverTime;
-			limit.failureCount = 0;
-		}
-		limit.failureCount++;
-		if ( limit.failureCount >= RCON2_FAILURE_MAX_ATTEMPTS ) {
-			limit.blockedUntil = static_cast<int>( static_cast<std::uint32_t>( serverTime ) +
-				static_cast<std::uint32_t>( RCON2_FAILURE_BLOCK_MSEC ) );
-			for ( int challengeIndex = 0; challengeIndex < MAX_RCON2_CHALLENGES; ++challengeIndex ) {
-				if ( rcon2Challenges[ challengeIndex ].active &&
-					Sys_CompareNetAdrBase( from, rcon2Challenges[ challengeIndex ].address ) ) {
-					idCrypto::SecureZero( &rcon2Challenges[ challengeIndex ],
-						sizeof( rcon2Challenges[ challengeIndex ] ) );
-				}
+	const int slot = RconRateSlot( from, true );
+	if ( slot < 0 ) {
+		return;
+	}
+	rconRateLimit_t &limit = rconRateLimits[ slot ];
+	if ( AsyncServer_Elapsed( serverTime, limit.failureWindowStart ) >= RCON2_FAILURE_WINDOW_MSEC ) {
+		limit.failureWindowStart = serverTime;
+		limit.failureCount = 0;
+	}
+	limit.failureCount++;
+	if ( limit.failureCount >= RCON2_FAILURE_MAX_ATTEMPTS ) {
+		limit.blockedUntil = static_cast<int>( static_cast<std::uint32_t>( serverTime ) +
+			static_cast<std::uint32_t>( RCON2_FAILURE_BLOCK_MSEC ) );
+		for ( int challengeIndex = 0; challengeIndex < MAX_RCON2_CHALLENGES; ++challengeIndex ) {
+			if ( rcon2Challenges[ challengeIndex ].active &&
+				AsyncServer_SameRateSource( from, rcon2Challenges[ challengeIndex ].address ) ) {
+				idCrypto::SecureZero( &rcon2Challenges[ challengeIndex ],
+					sizeof( rcon2Challenges[ challengeIndex ] ) );
 			}
 		}
-		return;
 	}
 }
 
@@ -2735,10 +2903,12 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 		}
 	}
 
+	// openQ4: a connect that proves its challenge is not charged to the reply
+	// budget. It came from the address the challenge was sent to, so it cannot be
+	// a reflection, and charging it let a flood of spoofed challenge requests,
+	// or of challenges from the client's own address, turn real players away.
+	// ValidateChallenge charges the failures.
 	if ( ( ichallenge = ValidateChallenge( from, challenge, clientId ) ) == -1 ) {
-		return;
-	}
-	if ( !AllowConnectionlessResponse( from, false ) ) {
 		return;
 	}
 
@@ -3349,13 +3519,10 @@ void idAsyncServer::ProcessRemoteConsole2Message( const netadr_t from, const idB
 		RecordRconFailure( from );
 		PrintOOB( from, SERVER_PRINT_MISC, "#str_04847" );
 	} else {
-		for ( int index = 0; index < MAX_RCON_RATE_LIMITS; ++index ) {
-			if ( rconRateLimits[ index ].active &&
-				Sys_CompareNetAdrBase( from, rconRateLimits[ index ].address ) ) {
-				rconRateLimits[ index ].failureCount = 0;
-				rconRateLimits[ index ].failureWindowStart = serverTime;
-				break;
-			}
+		const int slot = RconRateSlot( from, false );
+		if ( slot >= 0 ) {
+			rconRateLimits[ slot ].failureCount = 0;
+			rconRateLimits[ slot ].failureWindowStart = serverTime;
 		}
 		ExecuteRemoteConsoleCommand( from, command, true );
 	}
@@ -3595,6 +3762,9 @@ bool idAsyncServer::ProcessMessage( const netadr_t from, idBitMsg &msg ) {
 
 		// make sure it is a valid, in sequence packet
 		if ( !client.channel.Process( from, serverTime, msg, sequence ) ) {
+			if ( client.channel.LastPacketMalformed() ) {
+				NoteMalformedPacket( i );
+			}
 			return false;		// out of order, duplicated, fragment, etc.
 		}
 
@@ -3909,6 +4079,14 @@ void idAsyncServer::RunFrame( bool allowBlocking ) {
 		if ( client.channel.UnsentFragmentsLeft() ) {
 			AsyncServer_SendFragmentBurst( client.channel, serverPort, serverTime );
 			continue;
+		}
+
+		// openQ4: the rest of a join's user info, as the queue frees room
+		if ( client.pendingUserInfo != 0 ) {
+			SendPendingUserInfo( i, PENDING_USERINFO_RESERVE_BYTES );
+			if ( client.clientState <= SCS_ZOMBIE ) {
+				continue;
+			}
 		}
 
 		// if the channel is not yet ready to send new data

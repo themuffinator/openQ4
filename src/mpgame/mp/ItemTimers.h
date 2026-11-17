@@ -38,6 +38,8 @@ typedef enum {
 } itemTimerKind_t;
 
 static const int MP_ITEMTIMERS_MAX_ROWS = 12;
+// tracked items a send collects across every instance (Tourney arenas each have theirs)
+static const int MP_ITEMTIMERS_MAX_TRACKED = 256;
 // the HUD lists the first six: the powerups and mega health, then armour
 static const int MP_ITEMTIMERS_HUD_ROWS = 6;
 static const int MP_ITEMTIMERS_SEND_MSEC = 1000;
@@ -100,6 +102,14 @@ typedef struct itemTimerRow_s {
 	int		respawnAt;		// client real time the item returns, 0 when it is there
 } itemTimerRow_t;
 
+// a tracked item as a send collects it once, before choosing each recipient's rows
+typedef struct itemTimerTracked_s {
+	int		entityNumber;
+	int		kind;
+	int		priority;
+	int		instance;
+} itemTimerTracked_t;
+
 /*
 ===============================================================================
 
@@ -136,6 +146,8 @@ public:
 
 private:
 	int						BuildRows( itemTimerRow_t *rows, int maxRows, int instance ) const;
+	int						CollectTracked( itemTimerTracked_t *tracked, int maxTracked ) const;
+	int						RowsFromTracked( const itemTimerTracked_t *tracked, int trackedCount, itemTimerRow_t *rows, int maxRows, int instance ) const;
 	bool					Tracked( const idItem *item ) const;
 
 	// server: game time the item returns, 0 while it is there, -1 while held

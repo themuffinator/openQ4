@@ -75,6 +75,7 @@ def main() -> None:
         "float rvBot::PathDistanceRemaining(",
         "void rvBot::AbandonGoal(",
         "int rvBot::ItemPendingMsec(",
+        "static int BotItemArmorWorth(",
         "idEntity *rvBot::PickItemGoal(",
         "void rvBot::UpdateGoal(",
     ))

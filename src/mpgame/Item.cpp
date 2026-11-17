@@ -309,6 +309,9 @@ idItem::idItem() {
 	pickedUpByClientNum = -1;
 	classicMegaHolder = NULL;
 	classicMegaRespawn = 0.0f;
+	presentedOrigin.Zero();
+	presentedAxis.Identity();
+	visualsPresented = false;
 }
 
 /*
@@ -580,14 +583,25 @@ void idItem::Think( void ) {
 		return;
 	}
 
-	if ( gameLocal.IsMultiplayer() && g_skipItemShadowsMP.GetBool() ) {
-		renderEntity.suppressShadowInViewID = gameLocal.localClientNum + 1;
-	} else {
-		renderEntity.suppressShadowInViewID = 0;
-	}
+	const int suppressShadowInViewID = ( gameLocal.IsMultiplayer() && g_skipItemShadowsMP.GetBool() ) ? gameLocal.localClientNum + 1 : 0;
+	const bool shadowChanged = renderEntity.suppressShadowInViewID != suppressShadowInViewID;
+	renderEntity.suppressShadowInViewID = suppressShadowInViewID;
 
 	if( !(simpleItem && pickedUp) ) {
-		UpdateVisuals();
+		// openQ4: an item whose model does not move (every item on a dedicated
+		// server, which draws no spin or bob) updated its model every tic all the
+		// same, which also threw away its PVS areas, and every client's snapshot
+		// then worked them out again for every item on the map. Update it when
+		// it moves; Hide, Show, a skin and a respawn update it themselves.
+		const idVec3 &origin = GetPhysics()->GetOrigin();
+		const idMat3 &axis = GetPhysics()->GetAxis();
+		const bool visualMoves = simpleItem || ( spin && !( gameLocal.isServer && !gameLocal.isListenServer ) );
+		if ( visualMoves || shadowChanged || !visualsPresented || origin != presentedOrigin || axis != presentedAxis ) {
+			UpdateVisuals();
+			presentedOrigin = origin;
+			presentedAxis = axis;
+			visualsPresented = true;
+		}
 		Present();
 	}
 }

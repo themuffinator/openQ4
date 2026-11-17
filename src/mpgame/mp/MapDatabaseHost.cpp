@@ -697,6 +697,12 @@ mpMapAdvance_t mpMapDatabaseHost::ServerAdvance( void ) {
 		// the campaign names its own maps and never had a rotation
 		return MP_MAP_ADVANCE_SCRIPT;
 	}
+	if ( !RotationActive() ) {
+		// A managed match chooses its own maps (the series, the referee). Every
+		// one reached this at the end of its review and the rotation rewrote
+		// si_map under it, taking any map queued before the match was managed.
+		return MP_MAP_ADVANCE_STAY;
+	}
 	Refresh();
 	const int current = CurrentEntry();
 
@@ -819,7 +825,8 @@ void mpMapDatabaseHost::PublishServerInfo( bool force ) {
 	publishedPick = offered;
 	si_nextMap.SetString( next.c_str() );
 	si_mapPick.SetString( offered.c_str() );
-	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "rescanSI\n" );
+	// only these two: rescanSI would also put live any si_ setting typed for the next map
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "publishSI si_nextMap si_mapPick\n" );
 }
 
 void mpMapDatabaseHost::ServerClientDisconnect( int clientNum ) {

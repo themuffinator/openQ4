@@ -2735,6 +2735,52 @@ bool rvBot::RecoverToNavMesh( idPlayer *self, usercmd_t &cmd ) {
 	return false;
 }
 
+
+/*
+================
+BotItemArmorWorth / BotItemArmorGain
+
+openQ4: armour an item carries. The Classic ruleset swaps inv_armor for a tier
+(inv_armor_tier), so bots read none on any Classic armour and never went for
+it. Worth is the item's nominal size; gain is what picking it up would add to
+what this bot wears now (none when the pickup would be refused).
+================
+*/
+static int BotItemArmorWorth( const idEntity *item ) {
+	if ( item == NULL ) {
+		return 0;
+	}
+	const char *tier = item->spawnArgs.GetString( "inv_armor_tier", "" );
+	if ( tier[ 0 ] ) {
+		if ( !idStr::Icmp( tier, "body" ) ) {
+			return 100;
+		}
+		if ( !idStr::Icmp( tier, "combat" ) ) {
+			return 50;
+		}
+		if ( !idStr::Icmp( tier, "jacket" ) ) {
+			return 25;
+		}
+		return 2;
+	}
+	return item->spawnArgs.GetInt( "inv_armor", "0" );
+}
+
+static int BotItemArmorGain( const idPlayer *self, const idEntity *item ) {
+	const char *tier = item->spawnArgs.GetString( "inv_armor_tier", "" );
+	if ( tier[ 0 ] ) {
+		int newTier;
+		int newArmor;
+		if ( !rvClassicRules::ArmorAfterPickup( self->inventory.armorTier, self->inventory.armor, tier, newTier, newArmor ) ) {
+			return 0;
+		}
+		// an upgrade can hold fewer points of a better armour: still worth having
+		return Max( newArmor - self->inventory.armor, BotItemArmorWorth( item ) / 4 );
+	}
+	const int amount = item->spawnArgs.GetInt( "inv_armor", "0" );
+	return Min( amount, Max( 0, self->inventory.maxarmor - self->inventory.armor ) );
+}
+
 /*
 ================
 rvBot::ItemUtility
@@ -2768,13 +2814,12 @@ float rvBot::ItemUtility( idPlayer *self, idItem *item ) const {
 		}
 	}
 
-	const int armorAmount = item->spawnArgs.GetInt( "inv_armor", "0" );
-	if ( armorAmount > 0 ) {
-		const int maxArmor = Max( 1, self->inventory.maxarmor );
-		const int deficit = Max( 0, maxArmor - self->inventory.armor );
-		if ( deficit > 0 ) {
+	if ( BotItemArmorWorth( item ) > 0 ) {
+		const int maxArmor = gameLocal.IsClassicRuleset() ? CLASSIC_ARMOR_CAP : Max( 1, self->inventory.maxarmor );
+		const int gain = BotItemArmorGain( self, item );
+		if ( gain > 0 ) {
 			utility = Max( utility, 0.8f + 3.0f * idMath::ClampFloat( 0.0f, 1.0f,
-				(float)Min( deficit, armorAmount ) / (float)maxArmor ) );
+				(float)gain / (float)maxArmor ) );
 		}
 	}
 
@@ -2876,7 +2921,7 @@ static float BotItemPatrolValue( const idItem *item ) {
 	}
 
 	const int health = item->spawnArgs.GetInt( "inv_health", "0" );
-	const int armor = item->spawnArgs.GetInt( "inv_armor", "0" );
+	const int armor = BotItemArmorWorth( item );
 	if ( health >= 100 || armor >= 100 ) {
 		return 4.5f;
 	}
@@ -3445,7 +3490,7 @@ void rvBot::UpdateGoal( idPlayer *self ) {
 	// edge of death, a pickup a few steps away - are not matters of taste.
 	float itemPriority = item ? ( 10.0f + itemUtility * 5.0f ) * ( 0.5f + idMath::ClampFloat( 0.0f, 1.0f, traits.itemFocus ) ) : 0.0f;
 	const bool itemIsHealth = item && item->spawnArgs.GetInt( "inv_health", "0" ) > 0;
-	const bool itemIsArmor = item && item->spawnArgs.GetInt( "inv_armor", "0" ) > 0;
+	const bool itemIsArmor = item && BotItemArmorWorth( item ) > 0;
 	const int maxHealth = Max( 1, self->inventory.maxHealth );
 	const bool criticalHealth = self->health <= Max( 15, (int)( traits.retreatHealth * maxHealth * 0.65f ) );
 	if ( ( itemIsHealth || ( itemIsArmor && outmatched ) ) && wantHealth ) {

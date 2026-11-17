@@ -65,6 +65,7 @@ public:
 	netadr_t remoteAddress;
 	int id = 7, key = 0x51f0c3a9, outgoingSequence = 1, incomingSequence = 0;
 	bool unsentFragments = true;
+	bool lastPacketMalformed = false;
 	int unsentFragmentStart = 0, fragmentSequence = -1, fragmentLength = 0;
 	int fragmentExpectedLength = -1;
 	unsigned int fragmentReceived = 0;

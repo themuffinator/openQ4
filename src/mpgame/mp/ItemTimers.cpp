@@ -218,27 +218,73 @@ its place from one second to the next.
 ================
 */
 int rvItemTimers::BuildRows( itemTimerRow_t *rows, int maxRows, int instance ) const {
-	int count = 0;
-	for ( int priority = 0; priority < 3 && count < maxRows; priority++ ) {
-		for ( int entityNumber = MAX_CLIENTS; entityNumber < MAX_GENTITIES && count < maxRows; entityNumber++ ) {
-			idEntity *ent = gameLocal.entities[ entityNumber ];
-			if ( ent == NULL || !ent->IsType( idItem::GetClassType() ) ) {
-				continue;
-			}
-			const idItem *item = static_cast< const idItem * >( ent );
-			const itemTimerKind_t kind = KindForItem( item );
-			if ( MPItemTimerPriority( kind ) != priority || !Tracked( item ) ) {
-				continue;
-			}
-			if ( instance >= 0 && item->GetInstance() != instance ) {
-				continue;
-			}
-			itemTimerRow_t &row = rows[ count++ ];
-			row.kind = kind;
-			row.entityNumber = entityNumber;
-			row.state = MPItemTimerPackState( respawnAt[ entityNumber ], gameLocal.time );
-			row.respawnAt = 0;
+	itemTimerTracked_t tracked[ MP_ITEMTIMERS_MAX_TRACKED ];
+	const int trackedCount = CollectTracked( tracked, MP_ITEMTIMERS_MAX_TRACKED );
+	return RowsFromTracked( tracked, trackedCount, rows, maxRows, instance );
+}
+
+/*
+================
+rvItemTimers::CollectTracked
+
+openQ4: every tracked item in list order (priority, then map order), in one pass
+over the entities. The list used to be built from three passes over every entity
+slot for each recipient, and once more for a recording; now a send collects once
+and RowsFromTracked picks out each recipient's instance.
+================
+*/
+int rvItemTimers::CollectTracked( itemTimerTracked_t *tracked, int maxTracked ) const {
+	int bucketCount[ 3 ] = { 0, 0, 0 };
+	itemTimerTracked_t found[ MP_ITEMTIMERS_MAX_TRACKED ];
+	int foundCount = 0;
+	for ( int entityNumber = MAX_CLIENTS; entityNumber < MAX_GENTITIES && foundCount < MP_ITEMTIMERS_MAX_TRACKED; entityNumber++ ) {
+		idEntity *ent = gameLocal.entities[ entityNumber ];
+		if ( ent == NULL || !ent->IsType( idItem::GetClassType() ) ) {
+			continue;
 		}
+		const idItem *item = static_cast< const idItem * >( ent );
+		const itemTimerKind_t kind = KindForItem( item );
+		const int priority = MPItemTimerPriority( kind );
+		if ( priority < 0 || priority > 2 || !Tracked( item ) ) {
+			continue;
+		}
+		itemTimerTracked_t &entry = found[ foundCount++ ];
+		entry.entityNumber = entityNumber;
+		entry.kind = kind;
+		entry.priority = priority;
+		entry.instance = item->GetInstance();
+		bucketCount[ priority ]++;
+	}
+
+	// a stable split by priority keeps map order within each
+	int count = 0;
+	for ( int priority = 0; priority < 3; priority++ ) {
+		for ( int i = 0; i < foundCount && count < maxTracked && bucketCount[ priority ] > 0; i++ ) {
+			if ( found[ i ].priority == priority ) {
+				tracked[ count++ ] = found[ i ];
+			}
+		}
+	}
+	return count;
+}
+
+/*
+================
+rvItemTimers::RowsFromTracked
+================
+*/
+int rvItemTimers::RowsFromTracked( const itemTimerTracked_t *tracked, int trackedCount, itemTimerRow_t *rows, int maxRows, int instance ) const {
+	int count = 0;
+	for ( int i = 0; i < trackedCount && count < maxRows; i++ ) {
+		const itemTimerTracked_t &entry = tracked[ i ];
+		if ( instance >= 0 && entry.instance != instance ) {
+			continue;
+		}
+		itemTimerRow_t &row = rows[ count++ ];
+		row.kind = entry.kind;
+		row.entityNumber = entry.entityNumber;
+		row.state = MPItemTimerPackState( respawnAt[ entry.entityNumber ], gameLocal.time );
+		row.respawnAt = 0;
 	}
 	return count;
 }
@@ -268,6 +314,9 @@ void rvItemTimers::ServerFrame( void ) {
 		return;
 	}
 
+	itemTimerTracked_t tracked[ MP_ITEMTIMERS_MAX_TRACKED ];
+	const int trackedCount = CollectTracked( tracked, MP_ITEMTIMERS_MAX_TRACKED );
+
 	bool sent = false;
 	for ( int recipient = 0; recipient < Min( gameLocal.numClients, MAX_CLIENTS ); recipient++ ) {
 		if ( recipient == gameLocal.localClientNum || botManager.IsBot( recipient ) ) {
@@ -283,7 +332,7 @@ void rvItemTimers::ServerFrame( void ) {
 		}
 
 		itemTimerRow_t rows[ MP_ITEMTIMERS_MAX_ROWS ];
-		const int count = BuildRows( rows, MP_ITEMTIMERS_MAX_ROWS, player->GetInstance() );
+		const int count = RowsFromTracked( tracked, trackedCount, rows, MP_ITEMTIMERS_MAX_ROWS, player->GetInstance() );
 
 		idBitMsg	msg;
 		byte		msgBuf[ 16 + MP_ITEMTIMERS_MAX_ROWS * 4 ];
@@ -304,7 +353,7 @@ void rvItemTimers::ServerFrame( void ) {
 	// policy shows it to anyone; one copy, addressed to whoever plays it back.
 	if ( sent || gameLocal.IsServerDemoRecording() ) {
 		itemTimerRow_t rows[ MP_ITEMTIMERS_MAX_ROWS ];
-		const int count = BuildRows( rows, MP_ITEMTIMERS_MAX_ROWS, -1 );
+		const int count = RowsFromTracked( tracked, trackedCount, rows, MP_ITEMTIMERS_MAX_ROWS, -1 );
 
 		idBitMsg	msg;
 		byte		msgBuf[ 16 + MP_ITEMTIMERS_MAX_ROWS * 4 ];

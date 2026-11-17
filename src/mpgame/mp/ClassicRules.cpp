@@ -519,26 +519,30 @@ const char *rvClassicRules::ArmorTierName( int tier ) {
 
 /*
 ================
-rvClassicRules::GiveArmor
+rvClassicRules::ArmorAfterPickup
+
+What a pickup of the named tier leaves a player holding the given armour, without
+giving it. Returns false when it would add nothing, which is when a pickup stays
+on the ground and a purchase is refused.
 ================
 */
-bool rvClassicRules::GiveArmor( idPlayer *player, const char *tierName ) {
-	if ( player == NULL || tierName == NULL ) {
+bool rvClassicRules::ArmorAfterPickup( int tier, int armor, const char *tierName, int &newTierOut, int &newArmorOut ) {
+	newTierOut = tier;
+	newArmorOut = armor;
+	if ( tierName == NULL ) {
 		return false;
 	}
-
-	idInventory &inv = player->inventory;
-	const int oldTier = EffectiveArmorTier( inv.armorTier, inv.armor );
+	const int oldTier = EffectiveArmorTier( tier, armor );
 
 	if ( !idStr::Icmp( tierName, "shard" ) ) {
-		if ( inv.armor >= CLASSIC_ARMOR_CAP ) {
+		if ( armor >= CLASSIC_ARMOR_CAP ) {
 			return false;
 		}
 		if ( oldTier == CLASSIC_ARMOR_NONE ) {
-			inv.armorTier = CLASSIC_ARMOR_JACKET;
-			inv.armor = CLASSIC_SHARD_ARMOR;
+			newTierOut = CLASSIC_ARMOR_JACKET;
+			newArmorOut = CLASSIC_SHARD_ARMOR;
 		} else {
-			inv.armor = Min( inv.armor + CLASSIC_SHARD_ARMOR, CLASSIC_ARMOR_CAP );
+			newArmorOut = Min( armor + CLASSIC_SHARD_ARMOR, CLASSIC_ARMOR_CAP );
 		}
 		return true;
 	}
@@ -557,27 +561,47 @@ bool rvClassicRules::GiveArmor( idPlayer *player, const char *tierName ) {
 
 	const classicArmorInfo_t &newInfo = classicArmor[ newTier ];
 	if ( oldTier == CLASSIC_ARMOR_NONE ) {
-		inv.armorTier = newTier;
-		inv.armor = newInfo.baseCount;
+		newTierOut = newTier;
+		newArmorOut = newInfo.baseCount;
 		return true;
 	}
 
 	const classicArmorInfo_t &oldInfo = classicArmor[ oldTier ];
 	if ( newInfo.normalProtection > oldInfo.normalProtection ) {
 		// upgrade: the old armour is worth less in the new armour's terms
-		const int salvage = (int)( oldInfo.normalProtection / newInfo.normalProtection * (float)inv.armor );
-		inv.armor = Min( newInfo.baseCount + salvage, newInfo.maxCount );
-		inv.armorTier = newTier;
+		const int salvage = (int)( oldInfo.normalProtection / newInfo.normalProtection * (float)armor );
+		newArmorOut = Min( newInfo.baseCount + salvage, newInfo.maxCount );
+		newTierOut = newTier;
 		return true;
 	}
 
 	// same or weaker: top the current armour up by the pickup's worth
 	const int salvage = (int)( newInfo.normalProtection / oldInfo.normalProtection * (float)newInfo.baseCount );
-	const int newCount = Min( inv.armor + salvage, oldInfo.maxCount );
-	if ( inv.armor >= newCount ) {
+	const int newCount = Min( armor + salvage, oldInfo.maxCount );
+	if ( armor >= newCount ) {
 		return false;
 	}
-	inv.armor = newCount;
+	newArmorOut = newCount;
+	return true;
+}
+
+/*
+================
+rvClassicRules::GiveArmor
+================
+*/
+bool rvClassicRules::GiveArmor( idPlayer *player, const char *tierName ) {
+	if ( player == NULL || tierName == NULL ) {
+		return false;
+	}
+	idInventory &inv = player->inventory;
+	int newTier;
+	int newArmor;
+	if ( !ArmorAfterPickup( inv.armorTier, inv.armor, tierName, newTier, newArmor ) ) {
+		return false;
+	}
+	inv.armorTier = newTier;
+	inv.armor = newArmor;
 	return true;
 }
 

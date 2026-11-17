@@ -2147,6 +2147,13 @@ image on both backends.
   six-bot match logged 53 such loads; it now logs none, with every player
   model loaded with the map (`g_precachePlayerModels`) at no measurable cost
   in load time ([measured](mp-audit-2026-11-17.md#measured)).
+  Second round, 17 November ([second round](mp-audit-2026-11-17.md#second-round)): multiplayer
+  `FindEntityDef` answers from a per-map cache; item timers collect their
+  items once a send instead of three passes over every entity slot a
+  recipient; an item whose model does not move keeps its PVS areas instead of
+  dropping them every tic; the local HUD is published once a frame, not once
+  a prediction pass; entities that are neither networked nor map entities
+  skip the snapshot PVS test. None of these was measured.
 - [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07
   attribution found the Quality frame CPU-bound on one thread (tic, scene front end and
   Vulkan recording in turn); the render-thread prototype's first stage gained 0.5 ms
@@ -5248,6 +5255,16 @@ Completion substeps:
   challenge budget and IPv6 per-source keying, rcon limiter eviction, a
   staged join burst, dropping a client that sends malformed packets, and
   names containing byte 0xFF.
+  Second round, 17 November ([second round](mp-audit-2026-11-17.md#second-round)): all six closed.
+  By the owner's decision a `connect` that proves its challenge is no longer
+  charged to the reply budget, and rate limits key an IPv6 source on its /64.
+  An rcon entry holding failures is never evicted (a new source is refused
+  while every entry holds some), and its windows survive a map change. A join
+  sends the other clients' user info as the joiner's reliable queue frees
+  room. Eight unreadable packets in ten seconds drop a client, silently
+  unless `net_channelShowDrop` is set. Byte 255 is sent as `.`. Covered by
+  `network_security.py` and the channel fixtures; not run against a hostile
+  client or a full server.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,
@@ -5294,6 +5311,12 @@ Completion substeps:
   projectiles are single-player definitions with no physics sync, so a remote
   client draws them flying straight; and Classic armour bought at 100 points
   costs credits for nothing.
+  Second round, 17 November ([second round](mp-audit-2026-11-17.md#second-round)): both closed.
+  `projectile_hyperblaster_bounce1_mp` and `projectile_rocket_homing_mp` send
+  their physics with the weapons' multiplayer tuning, and a Classic armour
+  purchase that would add nothing is refused before it is charged (bots value
+  Classic armour by what it adds, MP-11). A remote-client capture of each mod
+  is still owed.
 - [ ] **MP-11 — P2, implementation and qualification: Classic multiplayer ruleset.**
   A Quake 2 inspired ruleset over the stock maps and weapons
   ([player guide](../user/classic-ruleset.md)), selected by `si_ruleset` and
@@ -5476,6 +5499,11 @@ Completion substeps:
   file. Covered by the map database contract, not by a run. Open: the
   database's publish still does a full `rescanSI`, and `ServerAdvance` is not
   gated for managed matches.
+  Second round, 17 November ([second round](mp-audit-2026-11-17.md#second-round)): both closed. The
+  database publishes its two keys with the new engine command `publishSI`,
+  and a managed match stays on its map at the end of its review instead of
+  having the rotation rewrite `si_map`. `mp_map_rotation_smoke.py` passes on
+  the build, the client reading the next map and the pick from the server info.
 - [ ] **MP-14 — P2, decision and implementation: rulesets, modifiers and presets.**
   Muff Mode layers Instagib, Quad Hog, Vampiric Damage, Weapons Frenzy and
   NadeFest over any mode and names 58 presets; CPMA composes modes from
@@ -5588,6 +5616,8 @@ Completion substeps:
   everyone; a long `say` is cut instead of ending the client; a player cannot
   be named `server`; the team list gives an eliminated player their own team
   only. Contracts only; not run.
+  Second round, 17 November ([second round](mp-audit-2026-11-17.md#second-round)): item timers build
+  their list once a send.
 - [ ] **MP-16 — P2, implementation: live spectating and casting.** Give live
   spectators what MVD playback already has: follow by name from a named list,
   auto-follow of the killer, the leader, a powerup carrier or a flag carrier
@@ -5658,6 +5688,9 @@ Completion substeps:
   spawn point; team chat reaches the whole team and spectator-only chat only
   those who chose to watch. Contracts only; the spectator smoke was not
   re-run. Open: the chase and death cameras' clip trace.
+  Second round, 17 November ([second round](mp-audit-2026-11-17.md#second-round)): the chase and death
+  cameras clip their raised focus before pulling back, so a low ceiling no
+  longer holds the camera inside it. Not yet looked at by eye.
 - [ ] **MP-17 — P1, decision and implementation: player identity, persistence
   and ranking.** `com_guid` is read-only and never written, so GUID bans do
   nothing and no feature can recognise a returning player; the archived plan
@@ -5780,6 +5813,9 @@ Completion substeps:
   16 ms game clock, which gives 15 a second where the default asks for 20.
   Matching the request makes recordings about a third larger, so it is a
   decision for this item ([audit](mp-audit-2026-11-17.md#engine-network-layer)).
+  Decided 17 November: record the 20 a second asked for. Snapshots are paced
+  on the frames' real times; recordings grow by about a third
+  ([second round](mp-audit-2026-11-17.md#second-round)).
 - [ ] **MP-24 — P1, qualification: demo robustness and platform breadth.** The
   render container has native coverage of 416 header flips, 2,264 truncations
   and hostile payloads; MVD has 2,032 cut points through `mvdRecover` and a

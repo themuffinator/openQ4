@@ -267,7 +267,7 @@ your configuration.
 
 | Setting | Default | What it does |
 |---|---:|---|
-| `mvd_snapshotDelay` | `50` | Milliseconds between snapshots. Lower values record finer detail and bigger files; the default matches the normal multiplayer update rate. |
+| `mvd_snapshotDelay` | `50` | Milliseconds between snapshots: `50` records 20 a second, the normal multiplayer update rate. Lower values record finer detail and bigger files. Recordings made before 17 November 2026 took 15 a second at this setting, so new ones are about a third larger. |
 | `mvd_maxSnapshotMB` | `4` | Largest size of one snapshot, in MB, before compression. |
 | `mvd_maxSizeMB` | `1024` | Largest file size in MB; `0` for no limit. |
 | `mvd_maxDurationMinutes` | `360` | Longest recording, in minutes; `0` for no limit. |

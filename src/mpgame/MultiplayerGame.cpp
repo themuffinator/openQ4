@@ -28045,6 +28045,12 @@ bool idMultiplayerGame::QuadHogFragScores( idPlayer *killer, idPlayer *dead ) co
 	if ( killer == NULL || dead == NULL || killer == dead ) {
 		return true;	// a suicide costs a point, hog or not
 	}
+	// openQ4: the hog is also the player recorded as holding the quad. A hog
+	// that killed itself and an opponent with one blast lost the powerup with
+	// its own death first, and the opponent's frag did not score.
+	if ( quadHogClient >= 0 && ( killer->entityNumber == quadHogClient || dead->entityNumber == quadHogClient ) ) {
+		return true;
+	}
 	return killer->PowerUpActive( POWERUP_QUADDAMAGE ) || dead->PowerUpActive( POWERUP_QUADDAMAGE );
 }
 

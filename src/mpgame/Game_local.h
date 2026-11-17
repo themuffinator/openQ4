@@ -949,6 +949,18 @@ public:
 
 	const idDeclEntityDef *	FindEntityDef( const char *name, bool makeDefault = true ) const;
 	const idDict *			FindEntityDefDict( const char *name, bool makeDefault = true ) const;
+	void					ClearEntityDefCache( void ) const;
+
+private:
+	// openQ4: multiplayer FindEntityDef answers for the map, found or not
+	struct entityDefCacheEntry_t {
+		idStr					name;
+		const idDeclEntityDef *	decl;
+	};
+	mutable idHashIndex		entityDefCacheHash;
+	mutable idList<entityDefCacheEntry_t> entityDefCache;
+
+public:
 
 	void					RegisterEntity( idEntity *ent );
 	void					UnregisterEntity( idEntity *ent );

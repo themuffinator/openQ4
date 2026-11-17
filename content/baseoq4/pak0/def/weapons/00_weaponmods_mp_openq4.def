@@ -1,0 +1,28 @@
+// openQ4 multiplayer twins of the weapon-mod projectiles.
+//
+// Multiplayer looks for "<name>_mp" before "<name>". Bounce Shot and Burst Fire
+// fire projectile_hyperblaster_bounce1 and projectile_rocket_homing, which have no
+// multiplayer twin, so a match spawned the single-player definitions: no physics
+// sync, and the single-player speed and size. A remote client then drew every
+// bounced bolt and steered rocket flying straight on from where it left the
+// barrel, to an impact that never happened.
+//
+// Each twin keeps the stock mod's behaviour, takes the multiplayer tuning of the
+// weapon's own _mp projectile, and sends its physics, as grenades do.
+
+entityDef projectile_hyperblaster_bounce1_mp
+{
+	"inherit"					"projectile_hyperblaster_bounce1"
+	"def_splash_damage"			"damage_hyperblaster_splash"
+	"speed"						"1950"
+	"net_syncPhysics"			"1"
+}
+
+entityDef projectile_rocket_homing_mp
+{
+	"inherit"					"projectile_rocket_homing"
+	"predictTime"				"50"
+	"speed"						"935"
+	"size"						"5 5 5"
+	"net_syncPhysics"			"1"
+}

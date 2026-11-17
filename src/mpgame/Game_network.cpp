@@ -998,6 +998,13 @@ void idGameLocal::WriteSnapshot( snapshot_t *&clientSnapshot, entityState_t *ent
 			continue;
 		}
 
+		// openQ4: an entity that is neither a map entity nor networked leaves no
+		// mark below whatever the PVS says; skip it before the PVS test, which
+		// ran for every spawned entity once a recipient a snapshot.
+		if ( !ent->fl.networkSync && !isMapEntity[ ent->entityNumber ] ) {
+			continue;
+		}
+
 		// if the entity is not in the player PVS
 		if ( doPVS && !ent->PhysicsTeamInPVS( pvsHandle ) && ent->entityNumber != transmitEntity && ent->entityNumber != transmitEntity2 ) {
 			// A player this recipient may see wherever they are still has to reach

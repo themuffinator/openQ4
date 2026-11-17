@@ -160,6 +160,15 @@ void idBitMsg::WriteString( const char *s, int maxLength ) {
 		dataPtr = GetByteSpace( l + 1 );
 		memcpy( dataPtr, s, l );
 		dataPtr[l] = '\0';
+		// openQ4: ReadString ends a string at byte 255 as well as at 0, so a 255
+		// sent as it is cut the string short there and the rest was read as the
+		// next field: a name holding one shifted every key of its user info. Send
+		// what the reader keeps, as it turns '%' into '.'. UTF-8 never uses 255.
+		for ( int i = 0; i < l; i++ ) {
+			if ( dataPtr[i] == 255 ) {
+				dataPtr[i] = '.';
+			}
+		}
 	}
 }
 
