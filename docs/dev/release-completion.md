@@ -7,6 +7,30 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Choose PNG screenshots in the Settings menu (#223), 17 November 2026
+
+- **Save screenshots as PNG from the menu.** **Settings > Game Options >
+  General > Screenshot Format** now offers TGA or PNG, in the new interface
+  and on the classic page. PNG files open in any image viewer or browser and
+  can be uploaded to most sites, which TGA files often cannot. The choice
+  applies from the next screenshot and is remembered.
+- **Nothing to do.** TGA stays the default; the console setting behind the menu
+  is `r_screenshotFormat` (`0` TGA, `1` PNG), and `screenshot <name>.png`
+  still writes a PNG whatever the setting.
+- How it works: the classic page inserts the row after Console Access (scroll
+  range 82, content height 2282, the View Weapon and Virtual Reality section
+  jumps one step down); the retained page lists it in the GAMEPLAY column.
+  Strings `#str_231775`-`231776` in all twelve languages; the retained
+  adapter accepts `r_screenshotFormat` 0 or 1.
+- Evidence: `settings_menu_coverage`, `choice_gui_value_contract`,
+  `gui_clipping_contract`, `menu_controller_navigation` and
+  `lang_table_encoding` pass. In a hidden OpenGL client with a private save
+  path and no OS input, the classic page in `game/airdefense1` showed the row
+  on the grid reading TGA, then PNG once the setting changed; automatically
+  named screenshots were written as `shot00001.png` at PNG and `.tga` at TGA.
+  In the new interface, choosing PNG on the row through the semantic menu
+  input set `r_screenshotFormat 1`, and the next screenshot was a PNG.
+
 ## Turn off the camera kick when you fire (#234), 17 November 2026
 
 - **A steady view while you shoot.** **Settings > Game Options > General >

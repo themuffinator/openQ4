@@ -406,7 +406,7 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"ui_hudWidth",{0,0,2,true,{},{0,1,2}}},{"ui_hudSafeInset",{0,0,10,false}},{"g_objectivesToggle",{1}},
 		{"ui_hudOpacity",{0,0.25,1,false}},{"ui_hudDamageDirection",{1}},{"ui_hudPickups",{1}},{"ui_hudWeaponStrip",{1}},
 		{"ui_reducedFlashing",{1}},{"ui_retainedOpaqueBacking",{1}},{"g_corpseSink",{0,0,2,true,{},{0,1,2}}},{"con_allowConsole",{0,0,1,true,{},{0,1}}},
-		{"g_autoSkipCinematics",{1}},{"ui_cinematicShake",{0,0,1,false}},{"g_screenShake",{0,0,1,false}},{"g_enhancedPhysics",{1}},
+		{"r_screenshotFormat",{0,0,1,true,{},{0,1}}},{"g_autoSkipCinematics",{1}},{"ui_cinematicShake",{0,0,1,false}},{"g_screenShake",{0,0,1,false}},{"g_enhancedPhysics",{1}},
 		{"cl_gunfov",{0,0,179,false}},{"cl_gunfov_adjust",{0,0,1,true,{},{0,1}}},
 		{"cl_gun_x",{0,-5,5,false}},{"cl_gun_y",{0,-5,5,false}},{"cl_gun_z",{0,-5,5,false}},{"g_weaponMuzzleKick",{1}},{"g_viewKick",{0,0,1,false}},
 		{"vr_enable",{0,0,1,true,{},{0,1}}},{"vr_aimMode",{0,0,1,true,{},{1,0}}},{"vr_leftHanded",{0,0,1,true,{},{0,1}}},

@@ -3412,6 +3412,33 @@
       "accessibility": "Standard focusable choiceDef row."
     },
     {
+      "id": "game.screenshot_format",
+      "pane": "Game Options",
+      "section": "Corpse, Language, Console",
+      "path": "Settings > Game Options > Corpse, Language, Console > Screenshot Format",
+      "source": "game",
+      "container": "set_game_screenshotformat",
+      "widgets": [
+        "set_game_screenshotformat_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_231775",
+      "choices_key": "#str_231776",
+      "values": [
+        "0",
+        "1"
+      ],
+      "target_type": "cvar",
+      "target": "r_screenshotFormat",
+      "default": "0",
+      "cvar_range": {
+        "low": "0",
+        "high": "1"
+      },
+      "restart_required": false,
+      "accessibility": "Standard focusable choiceDef row. TGA or PNG for the numbered screenshots F12 saves from the next one on; screenshot <name>.png always writes a PNG."
+    },
+    {
       "id": "game.crosshair_color",
       "pane": "Game Options",
       "section": "Crosshair",

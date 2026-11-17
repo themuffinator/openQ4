@@ -244,6 +244,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Corpse Time | `choiceDef` | `set_game_corpsetime_value` | GUI state `corpse_time_choice` via `applyCorpseTimeChoice` | `Stock`, `Never`, `5 sec`, `10 sec`, `15 sec`, `30 sec`, `60 sec`, `Custom` | The C++ menu adapter writes `g_corpseRemoveDelaySP` or `g_corpseRemoveDelayMP` depending on current mode. Custom is selected when current cvar does not match a listed value and remains a no-op when chosen. |
 | Language | `choiceDef` | `set_game_language_value` | `sys_lang` | `english`, `spanish`, `french`, `italian` | Displayed as English, Spanish, French, Italian. |
 | Console Access | `choiceDef` | `set_game_consoleaccess_value` | `con_allowConsole` | `0 Ctrl+Alt+Tilde`, `1 Tilde` | Controls shortcut required to open the console. |
+| Screenshot Format | `choiceDef` | `set_game_screenshotformat_value` | `r_screenshotFormat` | `0 TGA`, `1 PNG` | Archived renderer cvar, default TGA. Applies to the next numbered screenshot (F12, `screenshot` with no name); `screenshot <name>.png` always writes PNG. PNGs use `image_pngCompressionLevel`. |
 
 ### View Weapon
 

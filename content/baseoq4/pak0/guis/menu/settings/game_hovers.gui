@@ -1432,9 +1432,28 @@
 				}
 			}
 		}
-		windowDef set_game_autoskipcinematics_hover
+		windowDef set_game_screenshotformat_hover
 		{
 			rect	245,1645,361,20
+			visible	0
+
+			onMouseEnter {
+				if ("desktop::active" == 0) {
+					stoptransitions "set_game_screenshotformat_background" ;
+					set "set_game_screenshotformat_background::matcolor_w" "1" ;
+					set "cmd" "play main_menu_mouseover" ;
+				}
+			}
+
+			onMouseExit {
+				if ("desktop::active" == 0) {
+					transition "set_game_screenshotformat_background::matcolor_w" "1" "0.4" "300" ;
+				}
+			}
+		}
+		windowDef set_game_autoskipcinematics_hover
+		{
+			rect	245,1669,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1453,7 +1472,7 @@
 		}
 		windowDef set_game_cinematicshake_hover
 		{
-			rect	245,1669,361,20
+			rect	245,1693,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1472,7 +1491,7 @@
 		}
 		windowDef set_game_enhancedphysics_hover
 		{
-			rect	245,1693,361,20
+			rect	245,1717,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1491,7 +1510,7 @@
 		}
 		windowDef set_game_cl_gunfov_hover
 		{
-			rect	245,1741,361,20
+			rect	245,1765,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1510,7 +1529,7 @@
 		}
 		windowDef set_game_cl_gunfov_adjust_hover
 		{
-			rect	245,1765,361,20
+			rect	245,1789,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1529,7 +1548,7 @@
 		}
 		windowDef set_game_cl_gun_x_hover
 		{
-			rect	245,1789,361,20
+			rect	245,1813,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1548,7 +1567,7 @@
 		}
 		windowDef set_game_cl_gun_y_hover
 		{
-			rect	245,1813,361,20
+			rect	245,1837,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1567,7 +1586,7 @@
 		}
 		windowDef set_game_cl_gun_z_hover
 		{
-			rect	245,1837,361,20
+			rect	245,1861,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1586,7 +1605,7 @@
 		}
 		windowDef set_game_weaponkick_hover
 		{
-			rect	245,1861,361,20
+			rect	245,1885,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1605,7 +1624,7 @@
 		}
 		windowDef set_game_vr_enable_hover
 		{
-			rect	245,1909,361,20
+			rect	245,1933,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1624,7 +1643,7 @@
 		}
 		windowDef set_game_vr_aimmode_hover
 		{
-			rect	245,1933,361,20
+			rect	245,1957,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1643,7 +1662,7 @@
 		}
 		windowDef set_game_vr_lefthanded_hover
 		{
-			rect	245,1957,361,20
+			rect	245,1981,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1662,7 +1681,7 @@
 		}
 		windowDef set_game_vr_turnmode_hover
 		{
-			rect	245,1981,361,20
+			rect	245,2005,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1681,7 +1700,7 @@
 		}
 		windowDef set_game_vr_snapturnangle_hover
 		{
-			rect	245,2005,361,20
+			rect	245,2029,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1700,7 +1719,7 @@
 		}
 		windowDef set_game_vr_movedirection_hover
 		{
-			rect	245,2029,361,20
+			rect	245,2053,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1719,7 +1738,7 @@
 		}
 		windowDef set_game_vr_roomscale_hover
 		{
-			rect	245,2053,361,20
+			rect	245,2077,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1738,7 +1757,7 @@
 		}
 		windowDef set_game_vr_aimlaser_hover
 		{
-			rect	245,2077,361,20
+			rect	245,2101,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1757,7 +1776,7 @@
 		}
 		windowDef set_game_vr_hapticstrength_hover
 		{
-			rect	245,2101,361,20
+			rect	245,2125,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1776,7 +1795,7 @@
 		}
 		windowDef set_game_vr_twohanded_hover
 		{
-			rect	245,2125,361,20
+			rect	245,2149,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1795,7 +1814,7 @@
 		}
 		windowDef set_game_vr_vignette_hover
 		{
-			rect	245,2149,361,20
+			rect	245,2173,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1814,7 +1833,7 @@
 		}
 		windowDef set_game_vr_physicalcrouch_hover
 		{
-			rect	245,2173,361,20
+			rect	245,2197,361,20
 			visible	0
 
 			onMouseEnter {
@@ -1833,7 +1852,7 @@
 		}
 		windowDef set_game_vr_playspace_hover
 		{
-			rect	245,2197,361,20
+			rect	245,2221,361,20
 			visible	0
 
 			onMouseEnter {

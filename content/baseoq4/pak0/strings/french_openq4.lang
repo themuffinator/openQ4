@@ -1645,6 +1645,8 @@
 	"#str_231772"	"Le moteur de rendu dessine au plus en 8x ici : la scène utilise 8x."
 	"#str_231773"	"Recul de la vue"
 	"#str_231774"	"Tremblement de l'écran"
+	"#str_231775"	"Format des captures"
+	"#str_231776"	"TGA;PNG"
 	"#str_231900"	"The Awakening"
 	"#str_231901"	"Achats"
 	"#str_231902"	"Mod tir en rafale"

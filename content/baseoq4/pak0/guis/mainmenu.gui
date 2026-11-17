@@ -16683,7 +16683,9 @@ windowDef Desktop
 			set "set_game_language::visible" "1" ;
 			set "set_game_language_hover::visible" "1" ;
 			set "set_game_consoleaccess::visible" "1" ;
+			set "set_game_screenshotformat::visible" "1" ;
 			set "set_game_consoleaccess_hover::visible" "1" ;
+			set "set_game_screenshotformat_hover::visible" "1" ;
 			set "set_game_autoskipcinematics::visible" "1" ;
 			set "set_game_autoskipcinematics_hover::visible" "1" ;
 			set "set_game_cinematicshake::visible" "1" ;
@@ -16792,6 +16794,7 @@ windowDef Desktop
 			set "set_game_corpsetime::noevents" "0" ;
 			set "set_game_language_value::noevents" "0" ;
 			set "set_game_consoleaccess::noevents" "0" ;
+			set "set_game_screenshotformat::noevents" "0" ;
 			set "set_game_autoskipcinematics::noevents" "0" ;
 			set "set_game_enhancedphysics::noevents" "0" ;
 			set "set_game_cl_gunfov::noevents" "0" ;
@@ -16946,7 +16949,9 @@ windowDef Desktop
 			set "set_game_language::visible" "0" ;
 			set "set_game_language_hover::visible" "0" ;
 			set "set_game_consoleaccess::visible" "0" ;
+			set "set_game_screenshotformat::visible" "0" ;
 			set "set_game_consoleaccess_hover::visible" "0" ;
+			set "set_game_screenshotformat_hover::visible" "0" ;
 			set "set_game_autoskipcinematics::visible" "0" ;
 			set "set_game_autoskipcinematics_hover::visible" "0" ;
 			set "set_game_cinematicshake::visible" "0" ;
@@ -17055,6 +17060,7 @@ windowDef Desktop
 			set "set_game_corpsetime::noevents" "1" ;
 			set "set_game_language_value::noevents" "1" ;
 			set "set_game_consoleaccess::noevents" "1" ;
+			set "set_game_screenshotformat::noevents" "1" ;
 			set "set_game_autoskipcinematics::noevents" "1" ;
 			set "set_game_enhancedphysics::noevents" "1" ;
 			set "set_game_cl_gunfov::noevents" "1" ;
@@ -19263,6 +19269,7 @@ windowDef Desktop
 				set "set_game_corpsetime_background::matcolor_w" "0.4" ;
 				set "set_game_language_background::matcolor_w" "0.4" ;
 				set "set_game_consoleaccess_background::matcolor_w" "0.4" ;
+				set "set_game_screenshotformat_background::matcolor_w" "0.4" ;
 				set "set_game_autoskipcinematics_background::matcolor_w" "0.4" ;
 				set "set_game_enhancedphysics_background::matcolor_w" "0.4" ;
 				set "set_game_cl_gunfov_background::matcolor_w" "0.4" ;

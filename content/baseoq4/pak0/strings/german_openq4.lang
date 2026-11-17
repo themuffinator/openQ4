@@ -1636,6 +1636,8 @@
 	"#str_231772"	"Der Renderer zeichnet hier höchstens 8x, daher nutzt die Szene 8x."
 	"#str_231773"	"Kamerarückstoß"
 	"#str_231774"	"Bildschirmwackeln"
+	"#str_231775"	"Screenshot-Format"
+	"#str_231776"	"TGA;PNG"
 	"#str_231900"	"The Awakening"
 	"#str_231901"	"Kaufen"
 	"#str_231902"	"Salvenfeuer-Mod"
