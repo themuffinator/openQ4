@@ -297,7 +297,10 @@ OpenGL ES was not exercised here; the kept format changes nothing for it.
 
 ### Overlays (PKG-04)
 
-pak1 and pak2 record content generation 1 (`3677866d6`, `849a65032`). In a
+pak1 records content generation 1 (`3677866d6`). pak2 started generation 2 at
+`5ead3e6dd` (17 November 2026), when The Awakening's thirteen campaign
+levelshot sets added 143 files (307 MB), far over the overlay budget; its
+generation 1 was `849a65032`. In a
 demonstration on the real tree, one loadscreen (`generic.tga`) was edited:
 `overlay-plan --apply` declared `pak3.pk4`, the build rebuilt pak2 from the
 generation's blobs with its published MD5 (`4494b435…`) and packed the fix

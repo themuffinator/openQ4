@@ -70,8 +70,11 @@ does not restore the withdrawn release. See
   picture keeps it.
 - **Cleaner levelshots.** A levelshot no longer draws scenery from areas the
   camera cannot see, which put a black box over The Awakening's final skyline.
-- **What to do.** The pictures ship in the loadscreen pack (pak2), so this
-  needs that pack's new release; without it the alpha's pictures stay.
+- **What to do.** The pictures ship in a new loadscreen pack (pak2,
+  content generation 2), which the next release publishes alongside the
+  binaries: replace pak2 when you update. The installer and the in-game
+  updater fetch it; a manual update that keeps the old pak2 stops at startup
+  and names the pack to replace.
 - Cameras, method and traps:
   [levelshot capture](levelshot-capture.md#the-awakening-campaign-sets).
 
