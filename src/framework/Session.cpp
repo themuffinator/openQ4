@@ -4237,7 +4237,7 @@ void idSessionLocal::Clear() {
 	guiSystem = guiSystemParent = NULL;
 	guiSystemParentHandle = NULL;
 	systemGuiTransition = systemGuiBackEvent = false;
-	guiRetainedHome = guiRetainedTitle = guiRetainedPause = guiRetainedPauseStrogg = NULL;
+	guiRetainedHome = guiRetainedTitle = guiRetainedPause = guiRetainedPauseStrogg = guiRetainedPauseAwakening = NULL;
 	retainedPauseStrogg = -1;
 	retainedNewestSave = 0;
 	guiRetainedReleasing = NULL;
@@ -4270,6 +4270,9 @@ void idSessionLocal::Clear() {
 	guiRetainedLoadStrogg = NULL;
 	guiRetainedSaveStrogg = NULL;
 	guiRetainedRestartStrogg = NULL;
+	guiRetainedLoadAwakening = NULL;
+	guiRetainedSaveAwakening = NULL;
+	guiRetainedRestartAwakening = NULL;
 	guiRetainedDemos = NULL;
 	retainedModSelected = -1;
 	guiRetainedRestartMenu = NULL;
@@ -7281,7 +7284,8 @@ pause document is loaded; a game module that does not answer lists none.
 */
 void idSessionLocal::PrecacheRetainedLevelImages() {
 #ifndef ID_DEDICATED
-	if ( ( guiRetainedPause == NULL && guiRetainedPauseStrogg == NULL ) || game == NULL || guiMainMenu == NULL ) {
+	if ( ( guiRetainedPause == NULL && guiRetainedPauseStrogg == NULL && guiRetainedPauseAwakening == NULL ) || game == NULL ||
+			guiMainMenu == NULL ) {
 		return;
 	}
 	guiMainMenu->SetStateInt( "level_image_count", 0 );

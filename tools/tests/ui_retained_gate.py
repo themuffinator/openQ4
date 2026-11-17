@@ -597,6 +597,7 @@ class idSessionLocal {
 public:
     idUserInterface *guiActive = nullptr, *guiMainMenu = nullptr, *guiTest = nullptr;
     idUserInterface *guiRetainedHome = nullptr, *guiRetainedTitle = nullptr, *guiRetainedPause = nullptr, *guiRetainedPauseStrogg = nullptr;
+    idUserInterface *guiRetainedPauseAwakening = nullptr;
     int retainedPauseStrogg = -1;
     ID_TIME_T retainedNewestSave = 0;
     idUserInterface* guiRetainedReleasing = nullptr; int retainedReleaseUntil = 0;
@@ -674,10 +675,18 @@ public:
     idUserInterface* guiRetainedRestart = nullptr; void HandleRetainedRestartRequest(idUserInterface*, const char*);
     // The Strogg pause's pages.
     idUserInterface *guiRetainedLoadStrogg = nullptr, *guiRetainedSaveStrogg = nullptr, *guiRetainedRestartStrogg = nullptr;
-    bool IsRetainedLoadPage(const idUserInterface* gui) const { return gui && (gui == guiRetainedLoad || gui == guiRetainedLoadStrogg); }
-    bool IsRetainedSavePage(const idUserInterface* gui) const { return gui && (gui == guiRetainedSave || gui == guiRetainedSaveStrogg); }
+    idUserInterface *guiRetainedLoadAwakening = nullptr, *guiRetainedSaveAwakening = nullptr, *guiRetainedRestartAwakening = nullptr;
+    bool IsRetainedPause(const idUserInterface* gui) const {
+        return gui && (gui == guiRetainedPause || gui == guiRetainedPauseStrogg || gui == guiRetainedPauseAwakening);
+    }
+    bool IsRetainedLoadPage(const idUserInterface* gui) const {
+        return gui && (gui == guiRetainedLoad || gui == guiRetainedLoadStrogg || gui == guiRetainedLoadAwakening);
+    }
+    bool IsRetainedSavePage(const idUserInterface* gui) const {
+        return gui && (gui == guiRetainedSave || gui == guiRetainedSaveStrogg || gui == guiRetainedSaveAwakening);
+    }
     bool IsRetainedRestartPage(const idUserInterface* gui) const {
-        return gui && (gui == guiRetainedRestart || gui == guiRetainedRestartStrogg);
+        return gui && (gui == guiRetainedRestart || gui == guiRetainedRestartStrogg || gui == guiRetainedRestartAwakening);
     }
     // The Demos page; the library its scan finds (demoFiles), what was played
     // and deleted, and refusals.
@@ -5544,6 +5553,8 @@ def main() -> int:
                        'guis/menu/mp_escape.rui', 'guis/menu/mp_welcome.rui', 'guis/menu/mp_summary.rui', 'guis/menu/loadgame.rui',
                        'guis/menu/savegame.rui', 'guis/menu/restartlevel.rui', 'guis/menu/loadgame_strogg.rui',
                        'guis/menu/savegame_strogg.rui', 'guis/menu/restartlevel_strogg.rui',
+                       'guis/menu/pause_awakening.rui', 'guis/menu/loadgame_awakening.rui',
+                       'guis/menu/savegame_awakening.rui', 'guis/menu/restartlevel_awakening.rui',
                        'guis/menu/demos.rui', 'guis/menu/restartmenu.rui', 'guis/menu/credits.rui', 'guis/menu/arena.rui',
                        'guis/menu/multiplayer.rui', 'guis/menu/createserver.rui', 'guis/menu/joingame.rui',
                        'guis/menu/arena_pause.rui', 'guis/menu/settings/audio.rui', 'guis/menu/settings/game.rui',
@@ -5844,6 +5855,16 @@ def main() -> int:
     family = family[:family.index('}')]
     assert 'gui->SetStateBool( "pause_strogg", player != NULL && player->spawnArgs.GetBool( "strogg" ) );' in family
     assert 'retainedPauseStrogg = -1;' in function_body(menu, 'void idSessionLocal::PrepareRetainedLevel(')
+    # The Awakening's pause: while the expansion's campaign runs and the player
+    # is not Strogg; its pages follow the pause that handed off, and they load
+    # only with that campaign (visual specification 13.7).
+    home = function_body(menu, 'void idSessionLocal::UpdateRetainedHome(')
+    assert home.index('RetainedPauseIsStrogg()') < home.index('} else if ( mapSpawned && FS_AwakeningActive() ) {') <         home.index('RetainedHomeDocument( guiRetainedPauseAwakening, RETAINED_PAUSE_AWAKENING_GUI )') < home.index('if ( want == NULL ) {')
+    page = function_body(menu, 'bool idSessionLocal::BeginRetainedPage(')
+    assert 'const bool awakening = !settings && guiRetainedHome != NULL && guiRetainedHome == guiRetainedPauseAwakening;' in page
+    assert 'awakening ? ( saving ? RETAINED_SAVEGAME_AWAKENING_GUI : restarting ? RETAINED_RESTART_AWAKENING_GUI : RETAINED_LOADGAME_AWAKENING_GUI )' in page
+    level = function_body(menu, 'void idSessionLocal::PrepareRetainedLevel(')
+    assert level.index('if ( FS_AwakeningActive() ) {') < level.index('guiRetainedPauseAwakening = FindRetainedGui( RETAINED_PAUSE_AWAKENING_GUI, false, true );')
     # The Objectives page's screenshots resolve inside the load, after the game
     # spawns the map and before the media are finished.
     change = function_body(session, 'void idSessionLocal::ExecuteMapChange(')
@@ -5867,7 +5888,7 @@ def main() -> int:
         draw.index('guiRetainedReleasing->Redraw( presentationTime );')
     assert session.count('guiRetainedReleasing->Redraw(') == 1
     release_ms = int(re.search(r'static const int RETAINED_RELEASE_MSEC = (\d+);', menu).group(1))
-    for name in ('pause', 'pause_strogg'):
+    for name in ('pause', 'pause_strogg', 'pause_awakening'):
         text = (ROOT / f'content/baseoq4/pak0/guis/menu/{name}.rui').read_text(encoding='utf-8')
         document = json.loads(re.sub(r'^\s*//.*$', '', text, flags=re.M))
         release = next(item for item in document['timelines'] if item['id'] == 'release')

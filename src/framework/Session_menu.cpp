@@ -6731,6 +6731,9 @@ void idSessionLocal::HandleNoteCommands( const char *menuCommand ) {
 static const char *const RETAINED_TITLE_GUI = "guis/menu/title.rui";
 static const char *const RETAINED_PAUSE_GUI = "guis/menu/pause.rui";
 static const char *const RETAINED_PAUSE_STROGG_GUI = "guis/menu/pause_strogg.rui";
+// The Awakening's pause (visual specification 13.7), presented while the
+// expansion's campaign runs and the player is not Strogg.
+static const char *const RETAINED_PAUSE_AWAKENING_GUI = "guis/menu/pause_awakening.rui";
 static const char *const RETAINED_LOADING_GUI = "guis/loading/loading.rui";
 static const char *const RETAINED_SINGLEPLAYER_GUI = "guis/menu/singleplayer.rui";
 static const char *const RETAINED_CAMPAIGNS_GUI = "guis/menu/campaigns.rui";
@@ -6748,6 +6751,11 @@ static const char *const RETAINED_RESTART_GUI = "guis/menu/restartlevel.rui";
 static const char *const RETAINED_LOADGAME_STROGG_GUI = "guis/menu/loadgame_strogg.rui";
 static const char *const RETAINED_SAVEGAME_STROGG_GUI = "guis/menu/savegame_strogg.rui";
 static const char *const RETAINED_RESTART_STROGG_GUI = "guis/menu/restartlevel_strogg.rui";
+// And in The Awakening's family, which its pause hands off to; they load
+// with the first level of the expansion's campaign.
+static const char *const RETAINED_LOADGAME_AWAKENING_GUI = "guis/menu/loadgame_awakening.rui";
+static const char *const RETAINED_SAVEGAME_AWAKENING_GUI = "guis/menu/savegame_awakening.rui";
+static const char *const RETAINED_RESTART_AWAKENING_GUI = "guis/menu/restartlevel_awakening.rui";
 // The Demos page, which the title's DEMOS hands off to as LOAD GAME does to
 // its page. Its list holds this many demos at a time (ROWS in
 // tools/ui/retained_demos.py); demos.filter picks one of the legacy
@@ -7455,6 +7463,10 @@ void idSessionLocal::UpdateRetainedHome() {
 			// and the Marine pause stands in when that cannot present.
 			if ( mapSpawned && RetainedPauseIsStrogg() ) {
 				want = RetainedHomeDocument( guiRetainedPauseStrogg, RETAINED_PAUSE_STROGG_GUI );
+			} else if ( mapSpawned && FS_AwakeningActive() ) {
+				// The Awakening's campaign takes its own family; the Marine
+				// pause stands in when that cannot present.
+				want = RetainedHomeDocument( guiRetainedPauseAwakening, RETAINED_PAUSE_AWAKENING_GUI );
 			}
 			if ( want == NULL ) {
 				want = mapSpawned ? RetainedHomeDocument( guiRetainedPause, RETAINED_PAUSE_GUI ) :
@@ -7495,7 +7507,7 @@ void idSessionLocal::UpdateRetainedHome() {
 		// does (section 4): the closed screen keeps drawing only that, over
 		// the running game, without input or cursor.
 		if ( want == NULL && guiActive == NULL && mapSpawned &&
-				( previous == guiRetainedPause || previous == guiRetainedPauseStrogg ) ) {
+				IsRetainedPause( previous ) ) {
 			previous->HandleNamedEvent( "release" );
 			guiRetainedReleasing = previous;
 			retainedReleaseUntil = now + RETAINED_RELEASE_MSEC;
@@ -7503,7 +7515,7 @@ void idSessionLocal::UpdateRetainedHome() {
 		PumpApplicationActions( previous );
 	}
 	if ( want != NULL ) {
-		if ( want == guiRetainedPause || want == guiRetainedPauseStrogg ) {
+		if ( IsRetainedPause( want ) ) {
 			PublishRetainedPauseState( want );
 		} else {
 			Session_PublishRetainedTitleState( want, this );
@@ -7603,7 +7615,7 @@ void idSessionLocal::DrawRetainedHome( int presentationTime ) {
 	// The legacy menu keeps its timelines, music and hand-off choreography
 	// running unseen; only the retained screen reaches the output.
 	UI_RunTimeEvents( guiMainMenu, presentationTime );
-	if ( ( guiRetainedHome == guiRetainedPause || guiRetainedHome == guiRetainedPauseStrogg ) && mapSpawned &&
+	if ( IsRetainedPause( guiRetainedHome ) && mapSpawned &&
 		!com_skipGameDraw.GetBool() && GetLocalClientNum() >= 0 ) {
 		// The paused view stays behind the pause screen, under its scrim.
 		if ( !game->Draw( GetLocalClientNum(), true ) ) {
@@ -8137,6 +8149,7 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 	const bool credits = !idStr::Icmp( request, "credits" );
 	const bool multiplayer = !idStr::Icmp( request, "multiplayer" ), settings = !idStr::Icmp( request, "settings" );
 	const bool strogg = !settings && guiRetainedHome != NULL && guiRetainedHome == guiRetainedPauseStrogg;
+	const bool awakening = !settings && guiRetainedHome != NULL && guiRetainedHome == guiRetainedPauseAwakening;
 	if ( ( !saving && !restarting && !credits && !multiplayer && !settings && idStr::Icmp( request, "loadGame" ) ) ||
 			guiRetainedHome == NULL ||
 			guiActive != guiMainMenu || ( ( credits || multiplayer ) && mapSpawned ) ||
@@ -8150,9 +8163,11 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 	// gate came on after startup. A view that stopped drawing after a renderer
 	// or language change hands the page back to the stock one for good.
 	idUserInterface *&loaded = strogg ? ( saving ? guiRetainedSaveStrogg : restarting ? guiRetainedRestartStrogg : guiRetainedLoadStrogg ) :
+		awakening ? ( saving ? guiRetainedSaveAwakening : restarting ? guiRetainedRestartAwakening : guiRetainedLoadAwakening ) :
 		saving ? guiRetainedSave : restarting ? guiRetainedRestart :
 		credits ? guiRetainedCredits : multiplayer ? guiRetainedMpPage : settings ? guiRetainedSettingsPage : guiRetainedLoad;
 	const char *path = strogg ? ( saving ? RETAINED_SAVEGAME_STROGG_GUI : restarting ? RETAINED_RESTART_STROGG_GUI : RETAINED_LOADGAME_STROGG_GUI ) :
+		awakening ? ( saving ? RETAINED_SAVEGAME_AWAKENING_GUI : restarting ? RETAINED_RESTART_AWAKENING_GUI : RETAINED_LOADGAME_AWAKENING_GUI ) :
 		saving ? RETAINED_SAVEGAME_GUI : restarting ? RETAINED_RESTART_GUI :
 		credits ? RETAINED_CREDITS_GUI : multiplayer ? RETAINED_MPPAGE_GUI : settings ? RETAINED_SETTINGSPAGE_GUI : RETAINED_LOADGAME_GUI;
 	if ( loaded != NULL && UI_RetainedViewFailed( loaded ) ) {
@@ -10125,8 +10140,7 @@ void idSessionLocal::UpdateRetainedNotices() {
 	if ( gui != retainedNoticesGui ) {
 		// A home screen stays drawn behind a page, as its frame: it drops the
 		// stack the page now shows.
-		if ( retainedNoticesGui != NULL && ( retainedNoticesGui == guiRetainedTitle || retainedNoticesGui == guiRetainedPause ||
-				retainedNoticesGui == guiRetainedPauseStrogg ) ) {
+		if ( retainedNoticesGui != NULL && ( retainedNoticesGui == guiRetainedTitle || IsRetainedPause( retainedNoticesGui ) ) ) {
 			for ( int slot = 0; slot < slots; ++slot ) {
 				retainedNoticesGui->SetStateBool( va( "notice.%d.shown", slot ), false );
 			}
@@ -11076,6 +11090,19 @@ void idSessionLocal::PrepareRetainedLevel( const char *mapPath, bool multiplayer
 	if ( guiRetainedPauseStrogg == NULL ) {
 		guiRetainedPauseStrogg = FindRetainedGui( RETAINED_PAUSE_STROGG_GUI, false, true );
 	}
+	// The Awakening's pause and its pages load only with the expansion's
+	// campaign; the pages parse on the job workers.
+	if ( FS_AwakeningActive() ) {
+		if ( guiRetainedPauseAwakening == NULL ) {
+			guiRetainedPauseAwakening = FindRetainedGui( RETAINED_PAUSE_AWAKENING_GUI, false, true );
+		}
+		const char *const pages[] = {
+			guiRetainedLoadAwakening == NULL ? RETAINED_LOADGAME_AWAKENING_GUI : NULL,
+			guiRetainedSaveAwakening == NULL ? RETAINED_SAVEGAME_AWAKENING_GUI : NULL,
+			guiRetainedRestartAwakening == NULL ? RETAINED_RESTART_AWAKENING_GUI : NULL
+		};
+		UI_RetainedPrefetchDocuments( pages, static_cast<int>( sizeof( pages ) / sizeof( pages[0] ) ) );
+	}
 	// The pages only the Marine pause reaches, so its SAVE GAME and RESTART
 	// LEVEL never stall their hand-offs on a load, and the restart screen,
 	// which only a level reaches; each loads with the first level that needs
@@ -11147,6 +11174,9 @@ void idSessionLocal::PrefetchRetainedLevel() {
 		}
 		if ( guiRetainedPauseStrogg == NULL ) {
 			documents.Append( RETAINED_PAUSE_STROGG_GUI );
+		}
+		if ( guiRetainedPauseAwakening == NULL && FS_AwakeningActive() ) {
+			documents.Append( RETAINED_PAUSE_AWAKENING_GUI );
 		}
 		if ( guiRetainedLoad == NULL ) {
 			documents.Append( RETAINED_LOADGAME_GUI );

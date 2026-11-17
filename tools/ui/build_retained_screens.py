@@ -5395,6 +5395,10 @@ def main() -> int:
                  "arena_pause": arena_pause_document(), "audio": audio_document(),
                  "game": game_document(), "controls": controls_document(), "system": system_document(),
                  "settings": settings_page_document()}
+    # The Awakening's in-game menus, carried from the Marine ones.
+    from retained_awakening import AWAKENING_OUTPUTS, awakening_documents
+    documents.update(awakening_documents(documents))
+    OUTPUTS.update(AWAKENING_OUTPUTS)
     # The session's notices (section 13.13) over every retained menu but the
     # loading screen, the Strogg family's pages and the multiplayer cards.
     for name in NOTICE_DOCUMENTS:

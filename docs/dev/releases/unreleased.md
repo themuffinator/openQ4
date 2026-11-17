@@ -9,6 +9,15 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **The Awakening pauses in its own frozen style.** While you play the
+  expansion's campaign with the new interface, the pause menu and its Save,
+  Load and Restart Level pages wear The Awakening's look: black, horned frames
+  after the Valkaryne, rimed in glacial light, with frost creeping over them
+  and snow drifting behind the menu. The frames close in as the menu opens and
+  glide smoothly to each page and back, and the control you are on glows in a
+  reactor-orange lens. Quake 4's campaign keeps the Marine menus, and a
+  stroggified player keeps the Strogg pause.
+
 - **Buy your gear by Quake 4's or The Awakening's rules.** A server's
   **Buying** option (Create Server, the vote and the admin page) now chooses
   between the retail buy menu and the expansion's, completed on the stock

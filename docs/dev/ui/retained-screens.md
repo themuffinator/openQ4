@@ -9,6 +9,73 @@ adds partial evidence for `FLOW-024`, `FLOW-047`, `FLOW-048`, `ART-030` and
 `REN-014` in the [requirement register](product-requirements.md); the
 remaining screen migrations and the final gates stay open.
 
+## 17 November 2026: The Awakening's pause
+
+While The Awakening is the running campaign (`FS_AwakeningActive()`, with or
+without a mod over it) and the player is not Strogg, the single-player pause
+is `guis/menu/pause_awakening.rui`, and its SAVE GAME, LOAD GAME and RESTART
+LEVEL hand off to `loadgame_awakening.rui`, `savegame_awakening.rui` and
+`restartlevel_awakening.rui` (visual specification 1.40 to 1.45, sections 6,
+8 and 13.7; `FLOW-071`). `tools/ui/retained_awakening.py` builds each from
+the Marine document the generator has just made and carries it into the
+family, so the two pauses never drift apart in layout, bindings or actions.
+
+- **Choosing it.** `UpdateRetainedHome` asks for the Strogg pause first, then
+  the Awakening pause; the Marine pause stands in when neither presents.
+  `BeginRetainedPage` follows the pause that handed off. The level load reads
+  the Awakening pause and starts parsing its three pages on the job workers
+  only while the expansion's campaign is mounted.
+- **Palette.** The section 4 tokens replace the Marine colors everywhere,
+  timelines and bindings included; other olive tints turn to the same hue of
+  ice; `marine.orange` stays the one interaction color, and a done
+  objective's check stays green.
+- **Frames.** The bands are the horned silhouettes with 30-degree flanks,
+  each a group holding its rim-lit art, the fullers, the frost and the rime
+  line. Navigation, section and action plates end in a blade and light the
+  lens about their marker with hover, focus and press. The level block and
+  every confirmation take the horned corner, the confirmations a horn under
+  the chamfer too; the plinth ends in a blade and the level block's foot rule
+  is a needle. The campaign's name follows GAME PAUSED, placed by its
+  measured width in each language and left out of a tall view.
+- **Frost, snow and haze.** Each band holds its frost in a group masked by
+  the band's own silhouette and feathered black over the last 6 u inside its
+  edge; the group carries the band's opposite motion, so the frost stays with
+  the view while the band moves over it. Crystals are seeded across the
+  widest view and, within 200 u of each corner, anchored to that corner, so
+  every aspect gets dense corners. `frost.grow` reveals them in six steps of
+  reach on its 900 ms curve rather than as a continuous front. The prompt
+  bar's slot is carved at home and the title's and BACK's slots on a page.
+  Snow is two layers drawn twice along the artwork's 13-degree line, so one
+  looping transform per layer (80 s far, 34 s near) carries every flake;
+  far flakes are squares under 1.5 dp, and flakes do not sway. The haze lies
+  under the light band.
+- **Motion.** Everything that travelled on `accel(a, d)` takes the glide.
+  `open` closes the bands in from 30 u over 400 ms, the prompt bar with the
+  bottom band, while the frost grows; `depart` docks the bottom band from
+  50 ms and the top band from 90 ms, both arriving at 550 ms; `returnHome`
+  brings the bottom band home from the first frame and the top band 40 ms
+  later, and the home level scrolls in its last 32 u from the trailing side
+  from 450 ms. The rime line swells to 0.90 at the middle of each move. A
+  page's `arrive` scrolls its stage in its last 32 u from the leading side.
+- **Size.** The pause document is 3.7 MB against the Marine pause's 1.3 MB,
+  nearly all of it frost and snow geometry.
+- **Not yet.** The settings pages and the objectives display keep the Marine
+  family's shapes and choreography under the Awakening pause; tabs and lists
+  scroll as the Marine ones do; a page leaving on Back still disappears at
+  once rather than scrolling out; and high contrast and power saving do not
+  yet drop the frost, snow and haze.
+
+Checked in game on `m01_stranarus_trench1` (`fs_game q4xbase`) on Vulkan at
+1280x720 and 1680x720 with `openq4_assertMenuActivation` and
+`openq4_retainedGui` only: the pause opening with the frost growing, the dock
+to Save Game with the carried title, Save Game in the family, Back gliding
+home, and the quit confirmation's horns, with no UI warnings in the log. The
+generator's `--check` holds every document; `ui_retained_pause.py` passes;
+`ui_retained_gate.py` passes its source assertions, including the new
+Awakening selection ones, and then stops compiling its session harness on
+errors already on `main` (Create Server presets and
+`idServerScan::MatchTypeName`).
+
 ## 14 November 2026: the title drops its dither
 
 At the user's request the title's backdrop no longer passes through the

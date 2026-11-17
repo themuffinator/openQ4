@@ -7,6 +7,20 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's pause menu in its own style, 17 November 2026
+
+- **A pause menu made for the expansion.** With the new interface, pausing
+  The Awakening's campaign opens its own pause menu: black frames with horns
+  after the Valkaryne, a glacial rim and frost, snow behind the menu, and an
+  orange lens around the control you are on. Save Game, Load Game, Restart
+  Level and the quit and exit questions share the look.
+- **Smoother frames.** The frames close in as the menu opens, glide to a page
+  and back on one smooth curve, the lower frame leading, and the menu
+  scrolls back into place as you return.
+- **What to do.** Nothing. Quake 4's campaign keeps the Marine menus, a
+  stroggified player keeps the Strogg pause, and the stock interface is
+  unchanged. The settings pages keep the Marine look for now.
+
 ## Texture packs reach characters, weapons and monsters, 17 November 2026
 
 - **BC7 packs now replace character, weapon and monster textures.** Quake 4

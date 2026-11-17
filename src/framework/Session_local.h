@@ -743,6 +743,7 @@ public:
 	idUserInterface *	guiRetainedTitle;
 	idUserInterface *	guiRetainedPause;
 	idUserInterface *	guiRetainedPauseStrogg;	// the Strogg family's pause
+	idUserInterface *	guiRetainedPauseAwakening;	// The Awakening's pause, while its campaign runs
 	int					retainedPauseStrogg;	// this level's player is Strogg (-1: not asked yet)
 	ID_TIME_T			retainedNewestSave;		// when the newest save was written (0: none)
 	idUserInterface *	guiRetainedReleasing;	// a closed pause screen releasing the softened view
@@ -795,14 +796,21 @@ public:
 	idUserInterface *	guiRetainedLoadStrogg;
 	idUserInterface *	guiRetainedSaveStrogg;
 	idUserInterface *	guiRetainedRestartStrogg;
+	// The same pages in The Awakening's family, which its pause hands off to.
+	idUserInterface *	guiRetainedLoadAwakening;
+	idUserInterface *	guiRetainedSaveAwakening;
+	idUserInterface *	guiRetainedRestartAwakening;
+	bool				IsRetainedPause( const idUserInterface *gui ) const {
+		return gui != NULL && ( gui == guiRetainedPause || gui == guiRetainedPauseStrogg || gui == guiRetainedPauseAwakening );
+	}
 	bool				IsRetainedLoadPage( const idUserInterface *gui ) const {
-		return gui != NULL && ( gui == guiRetainedLoad || gui == guiRetainedLoadStrogg );
+		return gui != NULL && ( gui == guiRetainedLoad || gui == guiRetainedLoadStrogg || gui == guiRetainedLoadAwakening );
 	}
 	bool				IsRetainedSavePage( const idUserInterface *gui ) const {
-		return gui != NULL && ( gui == guiRetainedSave || gui == guiRetainedSaveStrogg );
+		return gui != NULL && ( gui == guiRetainedSave || gui == guiRetainedSaveStrogg || gui == guiRetainedSaveAwakening );
 	}
 	bool				IsRetainedRestartPage( const idUserInterface *gui ) const {
-		return gui != NULL && ( gui == guiRetainedRestart || gui == guiRetainedRestartStrogg );
+		return gui != NULL && ( gui == guiRetainedRestart || gui == guiRetainedRestartStrogg || gui == guiRetainedRestartAwakening );
 	}
 	// The Demos page (NULL until it first loads): the library entries its
 	// filter shows (indices into demoLibrary, newest first), the first one

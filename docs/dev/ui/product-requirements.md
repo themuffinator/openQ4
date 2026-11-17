@@ -877,7 +877,7 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **123 partial, 234 pending and 0 verified requirements**, counting the
+There are **124 partial, 233 pending and 0 verified requirements**, counting the
 42 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
@@ -1318,3 +1318,16 @@ the entrance alone. It is pending. The revision re-binds the visual
 specification; no evidence scope or result changes. There are 357 rows, 315
 active requirements and 42 historical superseded rows; the 358 migration
 variants and seven final gates remain unaccepted.
+
+## 17 November 2026: The Awakening's pause
+
+[The Awakening's pause](retained-screens.md#17-november-2026-the-awakenings-pause)
+adds bounded evidence to `FLOW-071`, which moves from pending to partial:
+while the expansion's campaign runs and the player is not Strogg, the
+retained pause and its Load Game, Save Game and Restart Level pages take the
+Awakening family's palette, frames, frost, snow and haze and its motion.
+The settings pages, the objectives display's frames, tab and list scrolling,
+a page's scroll out on Back, the high-contrast and power-saving variants and
+the acceptance captures remain. The increment re-binds the retained screens
+notes. All normative requirements, constraints, dependencies, historical rows
+and acceptance gates remain unchanged.
