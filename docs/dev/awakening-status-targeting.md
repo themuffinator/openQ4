@@ -72,5 +72,13 @@ powerup, so a drained gun stayed empty; openQ4 now applies them without the
 powerup: 5 every 200 ms up to the starting charge of 35, held or holstered.
 Each shot holds the next pulse back by one second, so a sustained spray drains
 it (80 to 0 in about 11 s) and pickups still stack past 35. The headless M04
-probe recorded 0 to 35 within 4.5 s of switching away and back. The clipless
-battery shader stays full; changing that display is separate work.
+probe recorded 0 to 35 within 4.5 s of switching away and back.
+
+The coolant tubes show the charge. None of the alpha's freeze-gun materials
+read a shader parm, so `materials/00_awakening_freezegun_openq4.mtr` in pak0
+redefines `models/weapons/freezegun/freezegun_tube` ahead of
+`q4x_weapons.mtr`, the same three glow stages scaled by parm 6. The weapon
+writes parm 6 on the view model as the drained fraction of the 35 charge (0
+full, so any other entity on that mesh keeps the full glow). A fixed-tic M04
+capture showed bright tubes at 80, nearly dark tubes at 4 and bright again
+after recharging to 35.

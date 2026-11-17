@@ -13,7 +13,11 @@ does not restore the withdrawn release. See
   to 35 a second after you stop spraying, whether you are holding it or not.
   A long spray still drains it, and ammo pickups can still carry you past 35.
   Before, a drained freeze gun stayed empty until you found a pickup.
-- **What to do.** Replace the single-player game module. Saves need nothing.
+- **See the charge on the gun.** The glowing coolant tubes dim as the battery
+  drains and brighten as it refills, so you can read the charge without the
+  HUD.
+- **What to do.** Replace the single-player game module and openQ4's pak0.
+  Saves need nothing.
 - Details: [status targeting](awakening-status-targeting.md#remaining-content-questions).
 
 ## Bodies lying in levels no longer blow apart on Linux, 17 November 2026

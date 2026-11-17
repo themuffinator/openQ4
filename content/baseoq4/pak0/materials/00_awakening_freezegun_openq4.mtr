@@ -1,0 +1,41 @@
+/*
+	openQ4: The Awakening's freeze gun shows its battery charge in its
+	coolant tubes.
+
+	This is the expansion's own tube material from materials/q4x_weapons.mtr,
+	with its three glow stages scaled by shader parm 6. rvWeaponFreezeGun sets
+	parm 6 on the view model to the drained fraction of the battery: 0 when
+	full, so the tubes glow as the alpha drew them, and 1 when empty, leaving
+	a faint glow. Every other entity leaves parm 6 at 0 and keeps the full
+	glow. This file loads ahead of q4x_weapons.mtr ("00_" sorts first), so it
+	is the declaration used; all textures are the player's copy of The
+	Awakening. Outside The Awakening nothing uses it.
+*/
+
+models/weapons/freezegun/freezegun_tube
+{
+	diffusemap		models/weapons/freezegun/freezegun_tubes_d.tga
+	bumpmap			models/weapons/freezegun/freezegun_tubes_local.tga
+	specularmap		models/weapons/freezegun/freezegun_tubes_s.tga
+
+	{
+		blend		add
+		map			models/weapons/freezegun/freezegun_tubes_add.tga
+		scroll		time * -0.05, time * -0.05
+		rgb			1 - 0.9 * parm6
+	}
+	{
+		blend		add
+		map			models/weapons/freezegun/freezegun_tubes_add2.tga
+		scale		.03, 1
+		scroll		time * -2, time * 0
+		rgb			1 - 0.95 * parm6
+	}
+	{
+		blend		add
+		map			models/weapons/freezegun/freezegun_tubes_add2.tga
+		scale		.1, 1
+		scroll		time * -4, time * 0
+		rgb			1 - 0.95 * parm6
+	}
+}
