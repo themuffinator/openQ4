@@ -453,7 +453,7 @@ void idMsgChannel::SendNextFragment( idPort &port, const int time ) {
 	const int sequenceWord = static_cast<int>( static_cast<unsigned int>( outgoingSequence ) | FRAGMENT_BIT );
 	msg.WriteShort( id );
 	msg.WriteLong( sequenceWord );
-	msg.WriteShort( Net_PacketTag( key, sequenceWord ) );
+	msg.WriteUShort( Net_PacketTag( key, sequenceWord ) );
 
 	fragLength = Net_FragmentSize( remoteAddress );
 	if ( unsentFragmentStart + fragLength > unsentMsg.GetSize() ) {
@@ -569,7 +569,7 @@ int idMsgChannel::SendMessage( idPort &port, const int time, const idBitMsg &msg
 	// write the header
 	unsentMsg.WriteShort( id );
 	unsentMsg.WriteLong( outgoingSequence );
-	unsentMsg.WriteShort( Net_PacketTag( key, outgoingSequence ) );
+	unsentMsg.WriteUShort( Net_PacketTag( key, outgoingSequence ) );
 
 	// write out the message data
 	// openQ4: the length test above is taken before packing, and packing can grow
@@ -620,7 +620,10 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 
 	// get sequence numbers
 	if ( msg.GetRemaingData() < (int)sizeof( int ) + (int)sizeof( short ) ) {
-		common->Printf( "%s: runt packet\n", Sys_NetAdrToString( remoteAddress ) );
+		// openQ4: this runs before the tag check below, so anyone can draw it
+		if ( net_channelShowDrop.GetBool() || net_channelShowPackets.GetBool() ) {
+			common->Printf( "%s: runt packet\n", Sys_NetAdrToString( remoteAddress ) );
+		}
 		return false;
 	}
 	sequence = msg.ReadLong();
@@ -628,7 +631,7 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg &msg, int &s
 	// openQ4: a packet without this connection's tag is not from its other end
 	// (Net_PacketTag). Nothing about the channel changes for one: not the port below,
 	// the rates, nor the sequence, which is what such a packet was sent to move.
-	if ( static_cast<unsigned short>( msg.ReadShort() ) != Net_PacketTag( key, sequence ) ) {
+	if ( msg.ReadUShort() != Net_PacketTag( key, sequence ) ) {
 		if ( net_channelShowDrop.GetBool() || net_channelShowPackets.GetBool() ) {
 			common->Printf( "%s: packet without this connection's tag\n", Sys_NetAdrToString( from ) );
 		}

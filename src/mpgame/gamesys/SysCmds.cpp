@@ -905,7 +905,10 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 	// openQ4 (MP-15): #h #a #w #l #n become the sender's health, armour, weapon,
 	// location and nearby team mates here, before the line leaves this client.
 	// A dedicated server's console has no player to speak for.
-	if ( gameLocal.isClient || cvarSystem->GetCVarInteger( "net_serverDedicated" ) == 0 ) {
+	// A team line outside a team game goes to everyone below, so its tokens stay
+	// as typed: a `say_team #w at #l` bind pressed in a duel told the opponent.
+	const bool teamLineToAll = team && !gameLocal.IsTeamGame();
+	if ( !teamLineToAll && ( gameLocal.isClient || cvarSystem->GetCVarInteger( "net_serverDedicated" ) == 0 ) ) {
 		idStr expanded;
 		if ( MPChatExpandForPlayer( gameLocal.GetLocalPlayer(), text.c_str(), args.Argc() > 2, expanded ) > 0 ) {
 			text = expanded;
@@ -929,6 +932,20 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 // RAVEN END
 	if ( text[ text.Length() - 1 ] == '\n' ) {
 		text[ text.Length() - 1 ] = '\0';
+	}
+	// openQ4: the server reads this much of a chat line. A longer one (a paste, a
+	// long bind) overflowed the 256-byte message built below, and a message that
+	// overflows is a fatal error on the client. Cut on a character and not inside
+	// a colour escape.
+	if ( text.Length() > MP_CHAT_TOKEN_TEXT_BYTES - 1 ) {
+		int cut = MP_CHAT_TOKEN_TEXT_BYTES - 1;
+		while ( cut > 0 && ( static_cast<unsigned char>( text[ cut ] ) & 0xC0 ) == 0x80 ) {
+			cut--;
+		}
+		if ( cut > 0 && text[ cut - 1 ] == '^' ) {
+			cut--;
+		}
+		text.CapLength( cut );
 	}
 	name = "player";
 
@@ -964,7 +981,8 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 		byte		msgBuf[ 256 ];
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
 		outMsg.WriteByte( team ? GAME_RELIABLE_MESSAGE_TCHAT : GAME_RELIABLE_MESSAGE_CHAT );
-		outMsg.WriteString( name );
+		// the server takes the name from its own user info; this one only has to fit
+		outMsg.WriteString( name, 64 );
 		outMsg.WriteString( text );
 		outMsg.WriteString( "" );
 		networkSystem->ClientSendReliableMessage( outMsg );
@@ -1123,7 +1141,11 @@ static void Cmd_Kick_f( const idCmdArgs &args ) {
 		return;
 	}
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "say kicking out client %d '%s^0'\n", player->entityNumber, gameLocal.userInfo[ player->entityNumber ].GetString( "ui_name" ) ) );
-	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d\n", player->entityNumber ) );
+	// the kick deletes the player; a kick is not a lost connection (g_pauseOnDisconnect)
+	const int kickedClient = player->entityNumber;
+	gameLocal.mpGame.BeginServerDrop( kickedClient );
+	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d\n", kickedClient ) );
+	gameLocal.mpGame.EndServerDrop( kickedClient );
 }
 
 /*

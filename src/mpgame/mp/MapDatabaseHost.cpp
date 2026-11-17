@@ -46,6 +46,8 @@ static const char *const MAPDB_STR_PICK_CLOSED		= "#str_232114";	// "There is no
 static const char *const MAPDB_STR_NOT_QUEUEABLE	= "#str_232115";	// "This server keeps that map out of the queue: "
 
 static const int MAPDB_THINK_MSEC = 1000;
+// game frames ServerAdvance answers "already changed" for one issued map (about half a second)
+static const int MAPDB_ADVANCE_REPEAT_FRAMES = 32;
 
 /*
 ================
@@ -92,6 +94,22 @@ reload must still see the file that was just edited.  A file shipped inside a
 pack is the fallback.
 ================
 */
+/*
+================
+MapDbBlankByteOrderMark
+
+Windows editors save UTF-8 with a byte order mark. The parser met it as an
+unknown word on line 1 and refused the whole file, with a message that named
+nothing a person could see in the file.
+================
+*/
+static void MapDbBlankByteOrderMark( idStr &text ) {
+	if ( text.Length() >= 3 && static_cast<unsigned char>( text[ 0 ] ) == 0xEF &&
+		static_cast<unsigned char>( text[ 1 ] ) == 0xBB && static_cast<unsigned char>( text[ 2 ] ) == 0xBF ) {
+		text[ 0 ] = text[ 1 ] = text[ 2 ] = ' ';
+	}
+}
+
 static bool MapDbReadOverrideFile( const char *fileName, idStr &text ) {
 	static const char *const roots[] = { "fs_savepath", "fs_devpath", "fs_basepath", "fs_cdpath" };
 	text.Clear();
@@ -115,6 +133,7 @@ static bool MapDbReadOverrideFile( const char *fileName, idStr &text ) {
 			text.Clear();
 			return false;
 		}
+		MapDbBlankByteOrderMark( text );
 		return true;
 	}
 	void *buffer = NULL;
@@ -124,6 +143,7 @@ static bool MapDbReadOverrideFile( const char *fileName, idStr &text ) {
 	}
 	if ( length <= MP_MAPDB_MAX_TEXT_BYTES ) {
 		text.Append( static_cast<const char *>( buffer ), length );
+		MapDbBlankByteOrderMark( text );
 	}
 	fileSystem->FreeFile( buffer );
 	return length <= MP_MAPDB_MAX_TEXT_BYTES;
@@ -159,6 +179,7 @@ mpMapDatabaseHost::mpMapDatabaseHost( void ) {
 	discoveredDecls = 0;
 	rotationFromFile = false;
 	mapChangePending = false;
+	hostingNext = false;
 	mapSeed = 1;
 	nextThinkTime = 0;
 	advanceAttempts = 0;
@@ -283,7 +304,7 @@ void mpMapDatabaseHost::LoadOverrides( void ) {
 
 	// the server owns the database; a client lists what it has installed and
 	// asks the server for the rest
-	if ( gameLocal.isClient ) {
+	if ( ClientRole() ) {
 		return;
 	}
 	const char *fileName = g_mapDatabase.GetString();
@@ -330,7 +351,7 @@ file's rotation block; a client reads the server's.
 ================
 */
 void mpMapDatabaseHost::SyncRotation( bool force ) {
-	const char *cycle = gameLocal.isClient ? gameLocal.serverInfo.GetString( "si_mapCycle" ) : si_mapCycle.GetString();
+	const char *cycle = ClientRole() ? gameLocal.serverInfo.GetString( "si_mapCycle" ) : si_mapCycle.GetString();
 	if ( !force && rotationList.Cmp( cycle ) == 0 ) {
 		return;
 	}
@@ -338,7 +359,7 @@ void mpMapDatabaseHost::SyncRotation( bool force ) {
 	if ( rotationList.Length() > 0 ) {
 		int unknown = 0;
 		const int placed = database.SetRotationFromList( rotationList.c_str(), &unknown );
-		if ( unknown > 0 && !gameLocal.isClient ) {
+		if ( unknown > 0 && !ClientRole() ) {
 			gameLocal.Warning( "map database: si_mapCycle names %d maps that are not installed or twice; %d maps rotate", unknown, placed );
 		}
 	} else if ( rotationFromFile ) {
@@ -352,6 +373,7 @@ void mpMapDatabaseHost::Shutdown( void ) {
 	RevertSettings();
 	built = false;
 	mapChangePending = false;
+	hostingNext = false;
 	database.Clear();
 }
 
@@ -430,6 +452,39 @@ int mpMapDatabaseHost::PlayerCount( void ) const {
 bool mpMapDatabaseHost::RotationActive( void ) const {
 	return gameLocal.isMultiplayer && gameLocal.isServer && !gameLocal.mpGame.IsManagedMatch() &&
 		!gameLocal.mpGame.IsArenaCampaignMatch();
+}
+
+/*
+================
+mpMapDatabaseHost::ClientRole
+
+Whether this process reads the server's database rather than its own file.
+gameLocal.isClient still describes the last session while a server prepares
+its first map: a player who had joined a game, or played a demo back, and then
+hosted one got no mapdb.txt for the whole first map, and a rotation built from
+the server they had left.
+================
+*/
+bool mpMapDatabaseHost::ClientRole( void ) const {
+	return gameLocal.isClient && !hostingNext;
+}
+
+/*
+================
+mpMapDatabaseHost::NextGameType
+
+The game type the next map loads with. An operator sets si_gameType during a
+match to have it at the next map; the rotation chose for the game type being
+played instead, and the load that followed refused the map as incompatible
+until the request was thrown away.
+================
+*/
+int mpMapDatabaseHost::NextGameType( void ) const {
+	const mpGameTypeInfo_t *pending = MPGameTypeByName( si_gameType.GetString() );
+	if ( pending != NULL && MPGameTypeIsSelectable( pending->type ) ) {
+		return pending->type;
+	}
+	return gameLocal.gameType;
 }
 
 /*
@@ -542,6 +597,8 @@ part of the server info the map starts with.
 ================
 */
 void mpMapDatabaseHost::ServerPrepareMap( const char *map ) {
+	// only a server prepares a map (ClientRole)
+	hostingNext = true;
 	// the override file is read again here: an edit takes effect at the next map
 	Rebuild();
 	const bool hadSettings = appliedSettings.Num() > 0;
@@ -565,6 +622,7 @@ void mpMapDatabaseHost::ServerPrepareMap( const char *map ) {
 }
 
 void mpMapDatabaseHost::ServerMapStarted( const char *map ) {
+	hostingNext = false;
 	Refresh();
 	mapChangePending = false;
 	advanceIssued.Clear();
@@ -593,6 +651,7 @@ void mpMapDatabaseHost::ServerMapShutdown( void ) {
 }
 
 void mpMapDatabaseHost::NonServerMapStarted( void ) {
+	hostingNext = false;
 	mapChangePending = false;
 	RevertSettings();
 	Rebuild();
@@ -610,7 +669,7 @@ idStr mpMapDatabaseHost::ServerPredictNext( mpMapSelection *selectionOut ) {
 	Refresh();
 	const int current = CurrentEntry();
 	const int mode = g_mapRotation.GetInteger();
-	mpMapSelection selection = database.ChooseNext( current, gameLocal.gameType, PlayerCount(),
+	mpMapSelection selection = database.ChooseNext( current, NextGameType(), PlayerCount(),
 		mode == MP_MAP_ROTATION_SHUFFLE, mapSeed, false );
 	if ( MapDbRotationSource( selection.source ) && mode != MP_MAP_ROTATION_ORDER && mode != MP_MAP_ROTATION_SHUFFLE ) {
 		selection.index = -1;
@@ -642,15 +701,20 @@ mpMapAdvance_t mpMapDatabaseHost::ServerAdvance( void ) {
 	const int current = CurrentEntry();
 
 	// The caller asks again every frame until the map changes; one request
-	// takes one queued map.
-	if ( advanceIssued.Length() > 0 && advanceIssued.Icmp( si_map.GetString() ) == 0 && ++advanceAttempts < 4 ) {
+	// takes one queued map. The change runs after the engine frame, which can
+	// hold several game frames when the server is catching up: four repeats
+	// was few enough for a second queued map to be taken and the first lost.
+	// The count still ends, so a map that will not load gives way to another.
+	if ( advanceIssued.Length() > 0 && advanceIssued.Icmp( si_map.GetString() ) == 0 &&
+		++advanceAttempts < MAPDB_ADVANCE_REPEAT_FRAMES ) {
 		return MP_MAP_ADVANCE_CHANGED;
 	}
 	advanceIssued.Clear();
 	advanceAttempts = 0;
 
 	const int mode = g_mapRotation.GetInteger();
-	const mpMapSelection selection = database.ChooseNext( current, gameLocal.gameType, PlayerCount(),
+	const int nextGameType = NextGameType();
+	const mpMapSelection selection = database.ChooseNext( current, nextGameType, PlayerCount(),
 		mode == MP_MAP_ROTATION_SHUFFLE, mapSeed, true );
 	if ( MapDbRotationSource( selection.source ) || selection.index < 0 ) {
 		if ( mode == MP_MAP_ROTATION_SCRIPT ) {
@@ -658,7 +722,7 @@ mpMapAdvance_t mpMapDatabaseHost::ServerAdvance( void ) {
 		}
 		if ( mode == MP_MAP_ROTATION_STAY || selection.index < 0 ) {
 			if ( mode != MP_MAP_ROTATION_STAY ) {
-				gameLocal.Printf( "map database: no map of the rotation supports %s; staying\n", MPGameTypeName( gameLocal.gameType ) );
+				gameLocal.Printf( "map database: no map of the rotation supports %s; staying\n", MPGameTypeName( nextGameType ) );
 			}
 			return MP_MAP_ADVANCE_STAY;
 		}
@@ -699,7 +763,7 @@ void mpMapDatabaseHost::ServerMatchEnded( void ) {
 	if ( database.QueueNum() > 0 || database.Pick().open ) {
 		return;
 	}
-	if ( !database.PickOpen( CurrentEntry(), gameLocal.gameType, PlayerCount(), mapSeed ) ) {
+	if ( !database.PickOpen( CurrentEntry(), NextGameType(), PlayerCount(), mapSeed ) ) {
 		return;
 	}
 	idStr offer;

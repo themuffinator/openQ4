@@ -171,6 +171,8 @@ public:
 	static bool				GetMasterAddress( int index, netadr_t &adr );
 							// get the hardcoded idnet master, equivalent to GetMasterAddress( 0, .. )
 	static netadr_t			GetMasterAddress( void );
+							// look up again, at the next request, the masters that failed to resolve
+	static void				RetryMasterAddresses( void );
 	
 	static void				GetNETServers( );
 	

@@ -158,6 +158,12 @@ static bool MPPresetReadFile( const char *name, idDict &settings, idStr &reason 
 		reason = va( "%s could not be read", path.c_str() );
 		return false;
 	}
+	// openQ4: a UTF-8 byte order mark, which Windows editors write, read as part
+	// of the first key and made it "not a setting a preset may change"
+	if ( length >= 3 && static_cast<unsigned char>( text[ 0 ] ) == 0xEF &&
+		static_cast<unsigned char>( text[ 1 ] ) == 0xBB && static_cast<unsigned char>( text[ 2 ] ) == 0xBF ) {
+		text[ 0 ] = text[ 1 ] = text[ 2 ] = ' ';
+	}
 
 	int start = 0;
 	int lineNumber = 0;
@@ -526,6 +532,20 @@ void MP_Preset_f( const idCmdArgs &args ) {
 		return;
 	}
 	idStr reason;
+	// openQ4: a preset may name a game type. On a running server with no map
+	// that plays it the restart cannot happen, so say so before anything is
+	// written; where a map does play it, QueueRulesRestart moves there.
+	if ( gameLocal.isServer && gameLocal.isMultiplayer && gameLocal.GameState() == GAMESTATE_ACTIVE ) {
+		idDict wanted;
+		if ( rvMPPresets::Settings( args.Argv( 1 ), wanted, reason ) ) {
+			const char *gameTypeName = wanted.GetString( "si_gameType" );
+			if ( gameTypeName[ 0 ] != '\0' && !gameLocal.mpGame.AnyMapPlaysGameType( gameTypeName ) ) {
+				common->Printf( "preset: no installed map plays %s\n", gameTypeName );
+				return;
+			}
+		}
+		reason.Clear();
+	}
 	if ( !rvMPPresets::Apply( args.Argv( 1 ), reason ) ) {
 		common->Printf( "preset: %s\n", reason.c_str() );
 		return;

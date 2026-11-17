@@ -579,6 +579,7 @@ extern idCVar g_perfTest_aiNoObstacleAvoid;
 extern idCVar g_perfTest_aiUndying;
 extern idCVar g_perfTest_aiNoVisTrace;
 extern idCVar g_perfTest_noJointTransform;
+extern idCVar g_precachePlayerModels;
 extern idCVar g_perfTest_noPlayerFocus;
 extern idCVar g_perfTest_noProjectiles;
 

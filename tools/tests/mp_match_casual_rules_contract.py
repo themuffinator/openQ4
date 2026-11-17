@@ -70,6 +70,7 @@ struct idMultiplayerGame {
 };
 struct Game {
     int gameType=GAME_DM;
+    bool isClient=false;
     idDict serverInfo;
     void Warning(const char* text) { std::fprintf(stderr,"%s\n",text); }
     template<class A, class... B> void Warning(const char* text, A first, B... rest) { std::fprintf(stderr,text,first,rest...); std::fputc('\n',stderr); }

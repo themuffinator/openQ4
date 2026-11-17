@@ -547,6 +547,7 @@ struct MpGame {
     bool HasModifier(int modifier) const { return (latched & BIT(modifier)) != 0; }
     bool RejectManagedLegacyMutation(const char *) { return managed; }
     void QueueRulesRestart() { ++restarts; }
+    bool AnyMapPlaysGameType(const char *) { return true; }
 };
 struct GameLocal {
     bool isMultiplayer = true, isClient = false, isServer = true;

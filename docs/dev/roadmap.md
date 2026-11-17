@@ -2140,6 +2140,13 @@ image on both backends.
   and the level transition. Close when each class is attributed in the report, fixed or
   given a declared budget, and the hitch scenario shows no frame above a declared ceiling
   outside level loads on both backends.
+  Progress, 17 November (multiplayer): a player or bot arriving with a model
+  nobody had used yet had its declaration, head, skin and images read from
+  disk mid-match, on the server and on every client that could see them, and
+  the first fall of a match read its damage definition the same way. A
+  six-bot match logged 53 such loads; it now logs none, with every player
+  model loaded with the map (`g_precachePlayerModels`) at no measurable cost
+  in load time ([measured](mp-audit-2026-11-17.md#measured)).
 - [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07
   attribution found the Quality frame CPU-bound on one thread (tic, scene front end and
   Vulkan recording in turn); the render-thread prototype's first stage gained 0.5 ms
@@ -5197,6 +5204,20 @@ Completion substeps:
   Still open as decisions: predicting jump pads for the local player, a
   per-address connection limit, a private salt for the hit-scan spread, and
   carrying the snapshot base in the header.
+  Progress, 17 November: [multiplayer audit](mp-audit-2026-11-17.md#engine-network-layer).
+  Six fixes with no change to the network format: the 2.42 packet tag is
+  written unsigned (every tag with its top bit set logged a value-overflow
+  warning); an out-of-band bad-challenge notice or denial is obeyed only
+  during the handshake that draws it (one forged packet, or a late duplicate
+  `connect`, used to end an in-game session); `auth` and runt packets print
+  nothing outside developer mode; an rcon lockout is carried across a map
+  change instead of lasting the new map's length; a master lookup that failed
+  is tried again at each forced heartbeat instead of being reported as a
+  success; an oversize datagram no longer ends the frame's packet drain.
+  The network contracts pass with the changed lines. Left open: the global
+  challenge budget and IPv6 per-source keying, rcon limiter eviction, a
+  staged join burst, dropping a client that sends malformed packets, and
+  names containing byte 0xFF.
 - [ ] **MP-09 — P1, implementation and qualification: bot combat strength.**
   Each skill level fights as [its description](mp-bots.md#what-each-skill-level-feels-like)
   says, and skill 5 threatens a strong player. Gates: on the plain skill curve,
@@ -5233,6 +5254,16 @@ Completion substeps:
   rules' buying mask now covers the four CTF modes, which had kept a buying
   CTF match in warmup. Remaining: hands-on play and the UI register's FLOW-010
   acceptance with a visual-spec record of the card's detail-column reasons.
+  Progress, 17 November ([audit](mp-audit-2026-11-17.md#gameplay)): a buy
+  from a bind or the buy card is no longer lost on a remote client (it went
+  through the event path that drops outside a new frame); the Chain Lightning
+  Mod chains in multiplayer, to opponents in play and never to its owner or
+  team mates; FC Armor Regen no longer ends with a burst of lost armour; the
+  Ammo Regen rune leaves a weapon arena's unlimited ammunition alone. None of
+  these was run in play. Still open: the Bounce Shot and Burst Fire
+  projectiles are single-player definitions with no physics sync, so a remote
+  client draws them flying straight; and Classic armour bought at 100 points
+  costs credits for nothing.
 - [ ] **MP-11 — P2, implementation and qualification: Classic multiplayer ruleset.**
   A Quake 2 inspired ruleset over the stock maps and weapons
   ([player guide](../user/classic-ruleset.md)), selected by `si_ruleset` and
@@ -5335,6 +5366,18 @@ Completion substeps:
   `modifier`/`preset`/`arena` votes (MP-14's layer) and MP-16's
   `spectatorchat` vote (`si_voteFlags` bits from 20 are reserved for them), Duel
   casual timeouts, and Vulkan, dedicated, remote-client and real-input runs.
+  Progress, 17 November ([audit](mp-audit-2026-11-17.md#match-flow-votes-and-pauses)):
+  nine defects fixed. The idle drop no longer deletes a player inside its own
+  think; a casual server keeps a limit changed by a vote, at the console or
+  by hosting again (the rules import laid the first values back at every map
+  start), and a joining client's own settings are left alone; a player who is
+  eliminated or on the scoreboard can vote; `si_spectatorLock` holds someone
+  who connects with `ui_autoJoin`; `g_pauseOnDisconnect` is one pause a side
+  a match, ends when the player is back, lets them back in under the lock and
+  ignores kicks and idle drops; the stock vote menu obeys `g_voteLimit` and
+  the next-map switch. The idle drop, the kept limit and the client's
+  settings were [run](mp-audit-2026-11-17.md#checked); the electorate, the
+  lock and the disconnect pause are covered by their contracts only.
 - [ ] **MP-13 — P2, implementation: map pools, rotation and the player queue.**
   Replace the `si_mapCycle` string and `mapcycle.scriptcfg` with one structured
   map database (Muff Mode `mapdb.json`, CPMA `map_cfgdir`): for each stock or
@@ -5393,6 +5436,16 @@ Completion substeps:
   has no map filter to convert; shuffle and the legacy script mode are
   covered by the core harness and by reading, not by a live run; nobody has
   played it, and only Windows x64 has run the smoke.
+  Progress, 17 November ([audit](mp-audit-2026-11-17.md#rulesets-the-map-database-presets-and-buying)):
+  the rotation, the prediction and the pick use the game type set for the
+  next map; a player who was a client and then hosts gets their `mapdb.txt`
+  on the first map; map votes ask the database, so a `modes` override counts;
+  the shuffle's recent window follows the rotation's size; a queued map is
+  not taken twice by a slow frame; a quit puts a map's own settings back
+  before the configuration is saved; a byte order mark no longer fails the
+  file. Covered by the map database contract, not by a run. Open: the
+  database's publish still does a full `rescanSI`, and `ServerAdvance` is not
+  gated for managed matches.
 - [ ] **MP-14 — P2, decision and implementation: rulesets, modifiers and presets.**
   Muff Mode layers Instagib, Quad Hog, Vampiric Damage, Weapons Frenzy and
   NadeFest over any mode and names 58 presets; CPMA composes modes from
@@ -5462,6 +5515,11 @@ Completion substeps:
   marker for the hog; the Modifiers tab's caption size and its UI register
   record; Vulkan and dedicated-server runs, the percentages in play, and a
   person playing each modifier with real input.
+  Progress, 17 November ([audit](mp-audit-2026-11-17.md#rulesets-the-map-database-presets-and-buying)):
+  changing `si_ruleset` on a running map (a passed ruleset vote, `preset
+  classic`) hung the server in a restart loop; it now loads the map again
+  once, which was run. A preset whose game type the map cannot play moves to
+  a map that can, or is refused when none is installed.
 - [ ] **MP-15 — P2, implementation: competitive HUD and client options.** CPMA's
   SuperHUD, Q4MAX's HUD scripts and Muff Mode's client commands set the
   expectation. openQ4 already has crosshair size, colour, custom art, animation
@@ -5494,6 +5552,12 @@ Completion substeps:
   written. The frag line and the match clock were already stock. Still open:
   the human judgement, menu rows, register rows and spec text, 4:3 captures,
   a team list outside Competitive, and editor placement under UI-06.
+  Progress, 17 November ([audit](mp-audit-2026-11-17.md#client-options-chat-and-spectating)):
+  item timers clear with the restart in place at a match's start and at each
+  round; `say_team` tokens are not expanded when the line will go to
+  everyone; a long `say` is cut instead of ending the client; a player cannot
+  be named `server`; the team list gives an eliminated player their own team
+  only. Contracts only; not run.
 - [ ] **MP-16 — P2, implementation: live spectating and casting.** Give live
   spectators what MVD playback already has: follow by name from a named list,
   auto-follow of the killer, the leader, a powerup carrier or a flag carrier
@@ -5557,6 +5621,13 @@ Completion substeps:
   and a menu page for the named list under UI-11 (the vitals reuse the
   managed context panel's rows); the three new modes in MVD playback's
   `demo_autoTrack`; real-input play; other platforms.
+  Progress, 17 November ([audit](mp-audit-2026-11-17.md#client-options-chat-and-spectating)):
+  an eliminated team member is no longer sent every opponent's position and
+  vitals, and can follow their own team mates (they could follow nobody); a
+  free camera with nobody to follow stays where it is instead of jumping to a
+  spawn point; team chat reaches the whole team and spectator-only chat only
+  those who chose to watch. Contracts only; the spectator smoke was not
+  re-run. Open: the chase and death cameras' clip trace.
 - [ ] **MP-17 — P1, decision and implementation: player identity, persistence
   and ranking.** `com_guid` is read-only and never written, so GUID bans do
   nothing and no feature can recognise a returning player; the archived plan
@@ -5675,6 +5746,10 @@ Completion substeps:
   measurements recorded in [multiview demos](multiview-demos.md), the native
   codec test extended to each encoding, and `compressDemo`/`demoConvert`
   reproducing the ratios on the fixtures.
+  Noted 17 November: MVD snapshots are paced in milliseconds against the
+  16 ms game clock, which gives 15 a second where the default asks for 20.
+  Matching the request makes recordings about a third larger, so it is a
+  decision for this item ([audit](mp-audit-2026-11-17.md#engine-network-layer)).
 - [ ] **MP-24 — P1, qualification: demo robustness and platform breadth.** The
   render container has native coverage of 416 header flips, 2,264 truncations
   and hostile payloads; MVD has 2,032 cut points through `mvdRecover` and a

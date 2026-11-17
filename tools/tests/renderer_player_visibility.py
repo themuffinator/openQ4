@@ -1044,7 +1044,7 @@ def test_pvs_replication_is_exempted_only_where_the_viewer_is_entitled():
         "void idGameLocal::ServerWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, int lastSnapshotFrame )",
     )
     assert_true(
-        "const bool pvsExemptAllPlayers = player->spectating;" in server,
+        "const bool pvsExemptAllPlayers = player->spectating && player->wantSpectate;" in server,
         "the spectator exemption must key on the recipient, not on the player being written",
     )
     assert_true(

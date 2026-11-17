@@ -184,7 +184,8 @@ def live_adapter_contracts(
         "BuildManagedTeamCommunicationBinding( i, managedRecipient )",
         "managedRecipient ) || to->IsPlayerMuted( p )",
         "to->team == p->team",
-        "!to->spectating",
+        # the whole team, an eliminated member included; not someone who left to watch
+        "!to->wantSpectate",
         "!managedTeamCommunication",
     ):
         require(chat, token, "managed text adapter and casual fallback")

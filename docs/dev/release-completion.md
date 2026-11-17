@@ -7,6 +7,55 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Multiplayer: servers that keep your settings, fairer rounds and fewer hitches, 17 November 2026
+
+- **A server keeps the limits you set.** A frag, time or capture limit changed
+  by a passed vote, at the console or by hosting again with other settings now
+  stays for the maps that follow. A casual server used to put its first
+  values back at every map start, and a `buying` vote did nothing. Joining
+  someone else's server no longer overwrites your own hosting settings.
+- **No more hung server on a ruleset change.** Voting in the Classic ruleset,
+  or typing `preset classic`, on a running map loads the map again once. It
+  used to lock the server in a restart loop. A preset for a game type the
+  current map cannot play moves to a map that can.
+- **Out for the round is not the same as spectating.** An eliminated player
+  sees what their team sees and no more: the server no longer sends them
+  every opponent's position and health. They can follow their own team mates
+  (they could follow nobody), hear and use team chat, and vote. Players on the
+  end-of-match scoreboard can vote too.
+- **No hitch when someone joins.** Every player model is loaded with the map,
+  so a player or bot arriving with a model nobody had used yet no longer
+  stalls the match while it loads. `g_precachePlayerModels 0` turns that off
+  on a machine short of memory.
+- **Steadier matches.** An idle player dropped by `g_inactivity` can no longer
+  crash the server. `g_pauseOnDisconnect` gives each side one pause a match,
+  ends as soon as the player is back and lets them back in past
+  `si_spectatorLock`; a kick does not pause the match. The lock also holds
+  someone who connects mid-match. A listen-server host's mouse no longer slows
+  down when another player uses a scope.
+- **Smaller fixes.** Buying from a bind or the buy card is not lost on a busy
+  connection. The Chain Lightning Mod chains in multiplayer. The Ammo Regen
+  rune no longer empties a weapon arena's unlimited ammunition, and FC Armor
+  Regen no longer ends with a burst of lost armour. Item timers reset when the
+  match starts. A very long chat line is cut instead of closing the game. A
+  spectator alone on a server no longer jumps to a spawn point on every
+  attack press. The map rotation honours a game type set for the next map,
+  and no longer alternates between two maps of a short list. `mapdb.txt` and
+  preset files saved with a byte order mark load.
+- **Server security.** A forged packet can no longer disconnect a player who
+  is in a match, a modified client can no longer ask the server for unlimited
+  weapon drops, nobody can take the name `server`, and a wrong rcon password
+  late in a long map no longer locks an address out for the next map's whole
+  length.
+- **What to do.** Replace the engine and the multiplayer game module on the
+  server and on clients. The network protocol is unchanged (2.42).
+- Guides: [competitive matches](../user/competitive-matches.md#voting-on-casual-servers)
+  and [server setup](../user/server-setup.md#server-settings).
+- Evidence and what is still open: [multiplayer audit, 17 November](mp-audit-2026-11-17.md).
+  The 125 static multiplayer tests pass; the kept limit, the ruleset change,
+  the idle drop and a joining client's settings were run on a listen server.
+  The spectating, chat, voting, disconnect-pause, rotation and weapon fixes
+  are checked by their contracts and by reading only: they were not played.
 ## Your own body in VR, and a headset audit, 17 November 2026
 
 - **Look down and you are there.** In the headset you now have a chest, legs

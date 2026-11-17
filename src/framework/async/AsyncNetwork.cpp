@@ -239,8 +239,31 @@ bool idAsyncNetwork::GetMasterAddress( int index, netadr_t &adr ) {
 		}
 		masters[ index ].resolved = true;
 	}
+	// openQ4: a lookup that failed stays failed until RetryMasterAddresses. From the
+	// second call on it used to be handed out as a good address, so a server whose
+	// name service was not up at launch sent "heartbeats" to nowhere until restart.
+	if ( masters[ index ].address.type == NA_BAD ) {
+		return false;
+	}
 	adr = masters[ index ].address;
 	return true;
+}
+
+/*
+==================
+idAsyncNetwork::RetryMasterAddresses
+
+Lets the next GetMasterAddress look up again each master whose lookup failed.
+A lookup can block, and GetMasterAddress runs for every out-of-band packet a
+client reads, so the retry is asked for only where a pause does not show.
+==================
+*/
+void idAsyncNetwork::RetryMasterAddresses( void ) {
+	for ( int index = 0; index < MAX_MASTER_SERVERS; index++ ) {
+		if ( masters[ index ].resolved && masters[ index ].address.type == NA_BAD ) {
+			masters[ index ].resolved = false;
+		}
+	}
 }
 
 /*

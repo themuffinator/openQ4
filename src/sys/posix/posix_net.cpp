@@ -1311,40 +1311,49 @@ static bool Net_GetPacketFromSocket( int socketFd, const char *context, netadr_t
 		return false;
 	}
 
-	struct iovec iov;
-	iov.iov_base = data;
-	iov.iov_len = static_cast<size_t>( maxSize );
-	struct msghdr message;
-	memset( &message, 0, sizeof( message ) );
-	message.msg_name = &from;
-	message.msg_namelen = sizeof( from );
-	message.msg_iov = &iov;
-	message.msg_iovlen = 1;
+	// openQ4: a datagram larger than the buffer is discarded by the read that reports
+	// it. Returning "nothing to read" for it ended the caller's drain, so anyone could
+	// hold a server's commands back with one or two a frame. Read past a bounded number.
+	for ( int oversize = 0; ; oversize++ ) {
+		struct iovec iov;
+		iov.iov_base = data;
+		iov.iov_len = static_cast<size_t>( maxSize );
+		struct msghdr message;
+		memset( &message, 0, sizeof( message ) );
+		memset( &from, 0, sizeof( from ) );
+		message.msg_name = &from;
+		message.msg_namelen = sizeof( from );
+		message.msg_iov = &iov;
+		message.msg_iovlen = 1;
 
-	const ssize_t ret = recvmsg( socketFd, &message, 0 );
+		const ssize_t ret = recvmsg( socketFd, &message, 0 );
 
-	if ( ret == -1 ) {
-		if ( errno == EAGAIN || errno == EWOULDBLOCK || errno == ECONNREFUSED ) {
-			// those commonly happen, don't verbose
+		if ( ret == -1 ) {
+			if ( errno == EAGAIN || errno == EWOULDBLOCK || errno == ECONNREFUSED ) {
+				// those commonly happen, don't verbose
+				return false;
+			}
+			common->DPrintf( "%s recvmsg(): %s\n", context, strerror( errno ) );
 			return false;
 		}
-		common->DPrintf( "%s recvmsg(): %s\n", context, strerror( errno ) );
-		return false;
-	}
 
-	if ( !SockadrToNetadr( reinterpret_cast<const struct sockaddr *>( &from ), &net_from ) ) {
-		common->DPrintf( "%s: unsupported address family\n", context );
-		return false;
-	}
-	if ( ( message.msg_flags & MSG_TRUNC ) != 0 || ret > maxSize ) {
-		common->DPrintf( "%s: oversize packet from %s\n", context, Sys_NetAdrToString( net_from ) );
-		memset( &net_from, 0, sizeof( net_from ) );
-		net_from.type = NA_BAD;
-		return false;
-	}
+		if ( !SockadrToNetadr( reinterpret_cast<const struct sockaddr *>( &from ), &net_from ) ) {
+			common->DPrintf( "%s: unsupported address family\n", context );
+			return false;
+		}
+		if ( ( message.msg_flags & MSG_TRUNC ) != 0 || ret > maxSize ) {
+			common->DPrintf( "%s: oversize packet from %s\n", context, Sys_NetAdrToString( net_from ) );
+			memset( &net_from, 0, sizeof( net_from ) );
+			net_from.type = NA_BAD;
+			if ( oversize < 16 ) {
+				continue;
+			}
+			return false;
+		}
 
-	size = static_cast<int>( ret );
-	return true;
+		size = static_cast<int>( ret );
+		return true;
+	}
 }
 
 bool idPort::GetPacket( netadr_t &net_from, void *data, int &size, int maxSize ) {

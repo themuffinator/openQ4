@@ -138,7 +138,9 @@ void Eligibility() {
     CHECK(!IsEligibleVotePlayerSlot(4));
     gameLocal.numClients = 1; CHECK(!IsEligibleVotePlayerSlot(1)); gameLocal.numClients = MAX_CLIENTS;
     auto& p = players[1];
-    p.spectating = true; CHECK(!IsEligibleVotePlayerSlot(1)); p.spectating = false;
+    // In a spectator camera without having chosen it (eliminated, the end-of-match
+    // review, benched by sudden death): still a player, still a voter.
+    p.spectating = true; CHECK(IsEligibleVotePlayerSlot(1)); p.spectating = false;
     p.wantSpectate = true; CHECK(!IsEligibleVotePlayerSlot(1)); p.wantSpectate = false;
     // si_spectatorVote admits spectating humans, never bots
     gameLocal.serverInfo.spectatorVote = true;

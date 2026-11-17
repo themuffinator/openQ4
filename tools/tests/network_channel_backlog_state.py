@@ -104,8 +104,10 @@ public:
 		std::memcpy( buffer + size, data, n ); size += n;
 	}
 	void WriteShort( int value ) { WriteInteger( static_cast<uint32_t>( value ), 2 ); }
+	void WriteUShort( int value ) { WriteInteger( static_cast<uint32_t>( value ), 2 ); }
 	void WriteLong( int value ) { WriteInteger( static_cast<uint32_t>( value ), 4 ); }
 	int ReadShort() const { return static_cast<int16_t>( ReadInteger( 2 ) ); }
+	int ReadUShort() const { return static_cast<uint16_t>( ReadInteger( 2 ) ); }
 	int ReadLong() const { return static_cast<int32_t>( ReadInteger( 4 ) ); }
 	void ReadData( void *data, int n ) const {
 		if ( n < 0 || n > size - read ) { std::abort(); }

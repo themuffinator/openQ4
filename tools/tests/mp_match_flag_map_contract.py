@@ -87,7 +87,8 @@ struct idGameLocal {
     int gameType=GAME_CTF;
     idDict serverInfo;
     std::map<std::string,idDeclEntityDef> defs;
-    struct MP { bool IsBuyingAllowedInTheCurrentGameMode() const { return false; } } mpGame;
+    struct MP { bool IsBuyingAllowedInTheCurrentGameMode() const { return false; }
+        bool PickupInhibited(const char*) const { return false; } } mpGame;
     const idDeclEntityDef* FindEntityDef(const char* n,bool) const {
         auto i=defs.find(n); return i==defs.end()?nullptr:&i->second;
     }

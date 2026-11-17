@@ -857,6 +857,17 @@ public:
 	// A caller that has just written new rules queues the restart that
 	// latches them here, so CheckModifierChange does not queue a second one.
 	void			QueueRulesRestart( void );
+	// openQ4: a drop the server decides on while entities think (g_inactivity) runs
+	// from Run, outside the think loop: dropping a client deletes its player at once
+	void			QueueClientDrop( int clientNum, const char *reason );
+	void			RunQueuedClientDrops( void );
+	// the server is removing this client itself (a kick, an idle drop): not a lost connection
+	void			BeginServerDrop( int clientNum ) { if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) { serverDropInFlight[ clientNum ] = true; } }
+	void			EndServerDrop( int clientNum ) { if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) { serverDropInFlight[ clientNum ] = false; } }
+	// g_pauseOnDisconnect: the pause is held for this side's player to come back
+	bool			DisconnectPauseAdmits( const char *teamName ) const;
+	void			RulesRestartRefused( void ) { modifierRestartPending = false; }
+	bool			AnyMapPlaysGameType( const char *gameTypeName );
 	// Quad Hog: the client carrying the quad (-1 for none), and whether a
 	// frag scores under its rule.
 	int				QuadHogClient( void ) const { return quadHogClient; }
@@ -1560,6 +1571,13 @@ private:
 	int				votesCalledThisMap[ MAX_CLIENTS ];	// g_voteLimit: votes a connection started on this map
 	mpMatchPauseState_t	announcedPauseState;		// the pause state the casual centre print last described
 	int				disconnectPauseSide;		// g_pauseOnDisconnect: the side that lost a player
+	int				disconnectPauseHumans;		// playing humans left on that side when its pause began
+	int				disconnectPauseUsedMask;	// sides that have had their disconnect pause this match
+	int				queuedDropSpawnId[ MAX_CLIENTS ];	// the occupant a server drop is queued for, 0 for none
+	const char *	queuedDropReason[ MAX_CLIENTS ];
+	bool			serverDropInFlight[ MAX_CLIENTS ];
+	int				CountPlayingHumans( int team ) const;
+	void			CheckDisconnectPauseReturn( void );
 	bool			abortCheckAfterPause;		// run CheckAbortGame when that pause ends
 
 	idStr			localisedGametype;

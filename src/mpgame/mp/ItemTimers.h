@@ -121,6 +121,8 @@ public:
 	void					OnPickup( const idItem *item, float respawnSeconds );
 	void					OnHeld( const idItem *item );
 	void					OnAvailable( const idItem *item );
+	// a restart in place puts every item back: nothing is waiting to return
+	void					OnMapRestart( int instance );
 	void					ServerFrame( void );
 	// a pause moved every deadline in the match forward by this much
 	void					ShiftMatchTime( int deltaMsec );

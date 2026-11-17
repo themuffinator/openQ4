@@ -1159,7 +1159,11 @@ void idGameLocal::ServerWriteSnapshot( int clientNum, int sequence, idBitMsg &ms
 	// the whole match; a live player is entitled to its own team. The team is taken
 	// from the player being spectated when there is one, so a follow spectator sees
 	// exactly what the player it follows would.
-	const bool pvsExemptAllPlayers = player->spectating;
+	// A spectator is someone who chose to watch (wantSpectate). The spectating flag
+	// alone is also an eliminated team member waiting for the round to end, and
+	// that one was sent every living opponent's position, health and armour while
+	// still able to talk to the team mates who were playing on.
+	const bool pvsExemptAllPlayers = player->spectating && player->wantSpectate;
 	const int pvsExemptTeam = ( !pvsExemptAllPlayers && IsTeamGame() ) ? spectated->team : TEAM_NONE;
 
 	WriteSnapshot(
@@ -1548,7 +1552,12 @@ void idGameLocal::ServerProcessReliableMessage( int clientNum, const idBitMsg &m
 			break;
 		}
 		case GAME_RELIABLE_MESSAGE_DROPWEAPON: {
-			mpGame.DropWeapon( clientNum );
+			// openQ4: no client offers this (clientDropWeapon is not registered), so it
+			// only comes from a modified one. The throw it asks for leaves a weapon item
+			// holding a full starting load of ammunition, once for every message sent
+			// while the weapon lowers: a refill for the sender, and enough items to run
+			// the map out of entities. A weapon is dropped when its carrier dies.
+			common->DPrintf( "client %d: ignored a drop weapon request\n", clientNum );
 			break;
 		}
 		case GAME_RELIABLE_MESSAGE_CALLVOTE: {

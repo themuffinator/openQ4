@@ -575,6 +575,7 @@ public:
 	static const char*		GetSpawnClassname ( void );
 	static void				PrecacheSpawnDecls( void );
 	static void				PrecacheMultiplayerSpawn( void );
+	static void				PrecachePlayerModel( const rvDeclPlayerModel *model );
 
 	virtual void			Hide( void );
 	virtual void			Show( void );

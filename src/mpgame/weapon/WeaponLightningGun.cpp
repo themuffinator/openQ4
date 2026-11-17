@@ -443,9 +443,13 @@ void rvWeaponLightningGun::UpdateChainLightning ( void ) {
 	}
 
 	// Need to have a primary target that is not on the same team for chain lightning to work
+	// openQ4: sides exist in multiplayer only in a team game. Every player's team is 0
+	// in the others, so this test refused every target and the mod never chained.
 	path   = &currentPath;
 	target = dynamic_cast<idActor*>(path->target.GetEntity());
-	if ( !target || !target->health || target->team == owner->team ) {
+	const bool sameSide = target != NULL && target->team == owner->team &&
+		( !gameLocal.isMultiplayer || gameLocal.IsTeamGame() );
+	if ( !target || !target->health || sameSide ) {
 		StopChainLightning ( );
 		return;
 	}
@@ -505,46 +509,72 @@ void rvWeaponLightningGun::UpdateChainLightning ( void ) {
 	}
 	
 	// Cap the number of chain lightning jumps
-	while ( chainLightning.Num ( ) + 1 < LIGHTNINGGUN_MAX_PATHS ) {	
-		for ( target = aiManager.GetEnemyTeam ( (aiTeam_t)owner->team ); target; target = target->teamNode.Next() ) {
-			// Must be a valid entity that takes damage to chain lightning too
-			if ( !target || target->health <= 0 || !target->fl.takedamage ) {
-				continue;
-			}
-			// Must be within starting chain path range
-			if ( (target->GetPhysics()->GetOrigin() - path->target->GetPhysics()->GetOrigin()).LengthSqr() > Square ( chainLightningRange[0] ) ) {
-				continue;
-			}
-			
-			// Make sure we can trace to the target from the current path
-			trace_t	tr;
-			idVec3	origin;
-			origin = (target->GetPhysics()->GetAbsBounds().GetCenter() + target->GetEyePosition()) * 0.5f;
-			origin += target->GetPhysics()->GetGravityNormal() * (gameLocal.random.RandomFloat() * 20.0f - 10.0f);
+	// One candidate: in range of the path's end, in sight of it, and not yet used.
+	const auto tryChain = [&]( idActor *candidate ) -> bool {
+		// Must be a valid entity that takes damage to chain lightning too
+		if ( !candidate || candidate->health <= 0 || !candidate->fl.takedamage ) {
+			return false;
+		}
+		// Must be within starting chain path range
+		if ( (candidate->GetPhysics()->GetOrigin() - path->target->GetPhysics()->GetOrigin()).LengthSqr() > Square ( chainLightningRange[0] ) ) {
+			return false;
+		}
+
+		// Make sure we can trace to the target from the current path
+		trace_t	tr;
+		idVec3	origin;
+		origin = (candidate->GetPhysics()->GetAbsBounds().GetCenter() + candidate->GetEyePosition()) * 0.5f;
+		origin += candidate->GetPhysics()->GetGravityNormal() * (gameLocal.random.RandomFloat() * 20.0f - 10.0f);
 // RAVEN BEGIN
 // ddynerman: multiple clip worlds
-			gameLocal.TracePoint ( owner, tr, path->origin, origin, MASK_SHOT_RENDERMODEL, path->target );
+		gameLocal.TracePoint ( owner, tr, path->origin, origin, MASK_SHOT_RENDERMODEL, path->target );
 // RAVEN END
-			if ( tr.c.entityNum != target->entityNumber ) {
-				continue;
+		if ( tr.c.entityNum != candidate->entityNumber ) {
+			return false;
+		}
+
+		path = &chainLightning.Alloc ( );
+		path->target = candidate;
+		path->normal = tr.endpos - path->origin;
+		path->normal.Normalize();
+		path->origin = tr.endpos;
+
+		// Flag this entity to ensure it is skipped
+		candidate->fl.takedamage = false;
+		return true;
+	};
+	while ( chainLightning.Num ( ) + 1 < LIGHTNINGGUN_MAX_PATHS ) {
+		bool chained = false;
+		if ( gameLocal.isMultiplayer ) {
+			// openQ4: the single-player team lists hold an actor under the team it
+			// spawned with, until it first dies. In multiplayer that is team 0 for
+			// everyone and then nothing: a Marine's beam found nobody, and a Strogg's
+			// could arc to any player who had not died yet, its owner and its team
+			// mates included. Walk the players instead: opponents in play in the
+			// owner's instance.
+			for ( int clientNum = 0; clientNum < gameLocal.numClients && !chained; clientNum++ ) {
+				idEntity *candidate = gameLocal.entities[ clientNum ];
+				if ( candidate == NULL || !candidate->IsType( idPlayer::GetClassType() ) ) {
+					continue;
+				}
+				idPlayer *other = static_cast<idPlayer *>( candidate );
+				if ( other == owner || other->spectating || other->GetInstance() != owner->GetInstance() ||
+					( gameLocal.IsTeamGame() && other->team == owner->team ) ) {
+					continue;
+				}
+				chained = tryChain( other );
 			}
-			
-			path = &chainLightning.Alloc ( );
-			path->target = target;
-			path->normal = tr.endpos - path->origin;
-			path->normal.Normalize();
-			path->origin = tr.endpos;
-			
-			// Flag this entity to ensure it is skipped
-			target->fl.takedamage = false;
-			break;
+		} else {
+			for ( target = aiManager.GetEnemyTeam ( (aiTeam_t)owner->team ); target && !chained; target = target->teamNode.Next() ) {
+				chained = tryChain( target );
+			}
 		}
 		// Found nothing? just break out early
-		if ( !target ) {
+		if ( !chained ) {
 			break;
 		}
-	}	
-	
+	}
+
 	// Reset the take damage flag 
 	currentPath.target->fl.takedamage = true;
 	for ( i = chainLightning.Num() - 1; i >= 0; i -- ) {

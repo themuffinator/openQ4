@@ -2032,6 +2032,16 @@ void idCommonLocal::Quit( void ) {
 			WriteConfiguration();
 		}
 #endif
+		// openQ4: a multiplayer map can carry its own settings (mapdb.txt). They go
+		// into archived cvars while the map runs and are taken back when the server
+		// stops, but the configuration is written from the frame loop, and a quit
+		// has no frame after the stop: the file kept the map's values, and the next
+		// launch read them as the operator's own on every map. Stop the server while
+		// the configuration can still be written.
+		if ( idAsyncNetwork::server.IsActive() ) {
+			idAsyncNetwork::server.Kill();
+			WriteConfiguration();
+		}
 		Shutdown();
 	}
 

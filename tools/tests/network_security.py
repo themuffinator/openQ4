@@ -1254,7 +1254,7 @@ def validate_protocol_2_42() -> None:
     require(header, "const int ASYNC_PROTOCOL_MINOR\t\t= 42;", "protocol number")
 
     process = function_body(channel, "bool idMsgChannel::Process(", "channel receive")
-    tag_test = "if ( static_cast<unsigned short>( msg.ReadShort() ) != Net_PacketTag( key, sequence ) ) {"
+    tag_test = "if ( msg.ReadUShort() != Net_PacketTag( key, sequence ) ) {"
     for later, context in (
         ("remoteAddress.port = from.port;", "the tag is checked before the port is followed"),
         ("UpdateIncomingRate( time, msg.GetSize() );", "the tag is checked before the rate is charged"),
@@ -1263,9 +1263,9 @@ def validate_protocol_2_42() -> None:
     ):
         require_before(process, tag_test, later, context)
     require(function_body(channel, "void idMsgChannel::SendNextFragment(", "fragment send"),
-            "msg.WriteShort( Net_PacketTag( key, sequenceWord ) );", "fragments carry the tag")
+            "msg.WriteUShort( Net_PacketTag( key, sequenceWord ) );", "fragments carry the tag")
     require(function_body(channel, "int idMsgChannel::SendMessage(", "message send"),
-            "unsentMsg.WriteShort( Net_PacketTag( key, outgoingSequence ) );", "messages carry the tag")
+            "unsentMsg.WriteUShort( Net_PacketTag( key, outgoingSequence ) );", "messages carry the tag")
     require(function_body(channel, "static unsigned short Net_PacketTag(", "packet tag"),
             "unsigned int hash = static_cast<unsigned int>( key ) * 0x9E3779B1u;", "the tag is keyed")
     require(function_body(channel, "void idMsgChannel::Init(", "channel init"), "this->key = key;", "the channel keeps its key")

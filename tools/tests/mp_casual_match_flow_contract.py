@@ -211,8 +211,15 @@ def check_policies() -> None:
 
     userinfo = function_body(player, "bool idPlayer::UserInfoChanged( void )")
     require('gameLocal.serverInfo.GetInt( "si_spectatorLock" )' in userinfo, "the userinfo path reads the spectator lock")
-    require("( liveState == SUDDENDEATH || ( livePlay && spectatorLock >= 1 ) ) && !spec && wantSpectate == true" in userinfo,
+    require("( liveState == SUDDENDEATH || ( livePlay && spectatorLock >= 1 ) ) && joiningPlay && !heldOpen" in userinfo,
             "lock 1 keeps spectators out during live play and sudden death stays as it was")
+    # someone arriving with ui_autoJoin is held like a spectator coming back; bots fill by their own rules
+    require("const bool arriving = !gameLocal.isClient && initialJoinPending && !botManager.IsBot( entityNumber );" in userinfo
+            and "const bool joiningPlay = !spec && ( wantSpectate == true || arriving );" in userinfo,
+            "the lock applies to a client that connects with ui_autoJoin")
+    # the side a disconnect pause is held for may take its player back
+    require('gameLocal.mpGame.DisconnectPauseAdmits( userInfo->GetString( "ui_team" ) )' in userinfo,
+            "a disconnect pause lets the side it waits for take a player in under the lock")
     require("livePlay && spectatorLock >= 2 && spec && !wantSpectate" in userinfo, "lock 2 keeps players in")
     toggle = function_body(game, "void idMultiplayerGame::ToggleSpectate")
     require('"si_spectatorLock"' in toggle and '"#str_42776"' in toggle, "the client says why it cannot join")
@@ -226,7 +233,14 @@ def check_policies() -> None:
         require(token in inactivity, f"inactivity never counts {token}")
     require("g_inactivity.GetInteger() * 1000" in inactivity, "the limit is g_inactivity seconds")
     require('"#str_42777"' in inactivity and '"#str_42778"' in inactivity and '"#str_42779"' in inactivity, "warn, move and drop messages")
-    before(inactivity, 'GetBool( "si_spectators" )', 'ServerDropClient( entityNumber, "#str_42779" )', "spectators first, a drop only without them")
+    before(inactivity, 'GetBool( "si_spectators" )', 'QueueClientDrop( entityNumber, "#str_42779" )', "spectators first, a drop only without them")
+    # dropping a client deletes its player at once; this is that player's own Think
+    require("ServerDropClient" not in inactivity, "the inactivity drop is queued, never made from inside the player's Think")
+    queued = function_body(game, "void idMultiplayerGame::RunQueuedClientDrops")
+    require("gameLocal.GetSpawnId( occupant ) != spawnId" in queued and "networkSystem->ServerDropClient( clientNum, reason );" in queued,
+            "a queued drop runs for the occupant it was queued for")
+    before(function_body(game, "void idMultiplayerGame::Run( void )"), "RunQueuedClientDrops();", "CommonRun();",
+           "queued drops run before the frame's rules")
     require("SHIFT_PLAYER_TIME( inactivityLastInputTime );" in function_body(player, "void idPlayer::ThinkMatchPaused"),
             "a pause does not count as idle time")
 
@@ -240,12 +254,22 @@ def check_policies() -> None:
     require("technicalPauseDurationMsec = 0;" in clear and "technicalPauseExpires = false;" in clear, "ClearPause disarms the expiry")
 
     disconnect = function_body(game, "void idMultiplayerGame::DisconnectClient")
-    require("if ( !BeginDisconnectPause( disconnectedPlayingHuman, disconnectedGameSide ) ) {" in disconnect, "the disconnect pause gates the abort check")
+    require("if ( !BeginDisconnectPause( disconnectedPlayingHuman && !serverDrop, disconnectedGameSide ) ) {" in disconnect,
+            "the disconnect pause gates the abort check")
+    # a kick or an idle drop is the server's own doing, not a lost connection
+    require("const bool serverDrop = clientNum >= 0 && clientNum < MAX_CLIENTS && serverDropInFlight[ clientNum ];" in disconnect,
+            "a client the server removed itself does not pause the match")
     require("disconnectedPlayingHuman = disconnectedState->human && disconnectedState->active;" in disconnect, "only a playing human pauses the match")
     begin = function_body(game, "bool idMultiplayerGame::BeginDisconnectPause")
     for token in ("g_pauseOnDisconnect.GetInteger()", "IsManagedMatch()", "!gameLocal.IsTeamGame()", "state != GAMEON && state != SUDDENDEATH",
-                  "matchSession.GetPause().state != MP_MATCH_PAUSE_RUNNING", "MP_MATCH_PAUSE_REASON_PLAYER_DISCONNECT", "seconds * 1000"):
+                  "matchSession.GetPause().state != MP_MATCH_PAUSE_RUNNING", "MP_MATCH_PAUSE_REASON_PLAYER_DISCONNECT", "seconds * 1000",
+                  "( disconnectPauseUsedMask & ( 1 << side ) ) != 0", "disconnectPauseHumans = CountPlayingHumans( side );"):
         require(token in begin, f"the disconnect pause checks {token}")
+    # one pause a side a match, and it ends when the side has its player back
+    back = function_body(game, "void idMultiplayerGame::CheckDisconnectPauseReturn")
+    require("CountPlayingHumans( disconnectPauseSide ) > disconnectPauseHumans" in back
+            and "matchSession.RequestResumeByAuthority( matchSession.GetSessionRevision() );" in back,
+            "the disconnect pause ends once the side has a player more than it was left with")
     announce = function_body(game, "void idMultiplayerGame::AnnounceCasualPauseTransitions")
     require("abortCheckAfterPause" in announce and "CheckAbortGame();" in announce, "the abort check runs when the pause ends")
     require(announce.index("CheckAbortGame();") < announce.index("if ( IsManagedMatch() ) {"), "the deferred abort check does not depend on the announcement")

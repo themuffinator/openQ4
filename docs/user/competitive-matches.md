@@ -144,7 +144,9 @@ follow one player never ends up following someone else who has since taken
 their slot. Bots can be followed. Demo playback has its own camera controls.
 
 On a casual server a spectator is neutral and can follow anyone on either
-team.
+team. A player who is out for the round (eliminated, or waiting between
+Tourney fights) is not a spectator: they can follow their own team mates, and
+they see what their team sees and no more.
 
 #### Auto-follow
 
@@ -417,21 +419,36 @@ and `si_voteFlags` (which votes are forbidden). A vote fails as soon as the
 players who have not voted could no longer carry it. Each player waits thirty
 seconds after their vote ends before calling another.
 
+A spectator, for voting, is someone who chose to watch. A player who has been
+eliminated for the round, or who is looking at the end-of-match scoreboard,
+is still a player and can call and cast votes.
+
+A limit changed by a vote applies to the match being played where the game
+can apply it at once, and stays in force for the maps that follow. An
+`overtime` or `timelimit` vote passed during a live match takes full effect
+from the next match.
+
 ### Spectators, idle players and disconnects
 
 **Not in 0.14.1.** Three casual-server policies, all off unless the operator
 turns them on:
 
 - `si_spectatorLock 1` keeps spectators out of a match while it is live; they
-  join when it ends. `2` also keeps players from leaving to spectate.
+  join when it ends. `2` also keeps players from leaving to spectate. Someone
+  who connects while the match is live is a spectator until it ends, and is
+  told so.
 - `g_inactivity <seconds>` warns a playing human who has sent no input for
   that long, then moves them to spectators (or drops them when the server has
   no spectators). Bots are never counted, and a pause does not count as idle
   time.
 - `g_pauseOnDisconnect <seconds>` pauses a live team match when a playing human
-  disconnects, so they can reconnect or a replacement can join, instead of
-  forfeiting an emptied side at once. The pause ends on its own, and the usual
-  checks run then.
+  loses their connection, so they can reconnect or a replacement can join,
+  instead of forfeiting an emptied side at once. Each side gets one such pause
+  a match. The pause ends as soon as the side has its player back, or on its
+  own when the time runs out, and the usual checks run then. A player the
+  server removed itself (a kick, an idle drop) does not pause the match. While
+  the pause lasts, that side may take a player in even with `si_spectatorLock`
+  on.
 
 ### Round modes
 

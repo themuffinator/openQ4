@@ -1387,7 +1387,15 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 				idGameLocal::userInfo[ clientNum ].Set( "ui_name", va( "%s_", idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) ) );
 				modifiedInfo = true;
 			}
-		
+
+			// openQ4: "server" signs a dedicated server's own chat lines and notices, and
+			// the chat presentation keys on that name. A player by that name, with or
+			// without colour codes, spoke as the server.
+			if ( idStr::IcmpNoEscape( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), "server" ) == 0 ) {
+				idGameLocal::userInfo[ clientNum ].Set( "ui_name", va( "%s_", idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) ) );
+				modifiedInfo = true;
+			}
+
 			// don't allow dupe nicknames
 			for ( i = 0; i < numClients; i++ ) {
 				if ( i == clientNum ) {
@@ -1592,12 +1600,19 @@ void idGameLocal::SetServerInfo( const idDict &_serverInfo ) {
 	UpdateRepeaterInfo( true );
 
 	// openQ4: the ruleset is latched for the life of a map, and clients read the snapshot
-	// layout from it, so a mid-map change restarts the map rather than drifting apart.
-	// MapRestart treats si_ruleset as a full-restart key.
+	// layout from it, so a mid-map change loads the map again rather than drifting apart.
+	// The load is asked for as a session command. This used to queue serverMapRestart,
+	// but by then the new value is already in serverInfo, so MapRestart saw no changed
+	// key, restarted in place, rescanned and came back here with the latch still wrong:
+	// a passed ruleset vote or a `preset classic` hung the server in that loop. The
+	// session command is idempotent, and LoadMap clears it when a load is already under
+	// way (the engine also calls this with the next map's info while this one runs).
 	if ( isServer && isMultiplayer && gamestate == GAMESTATE_ACTIVE &&
 		( rvClassicRules::RulesetFromServerInfo( serverInfo ) == MP_RULESET_CLASSIC ) != classicRuleset ) {
-		Printf( "si_ruleset changed to %s; restarting the map\n", rvClassicRules::RulesetName( rvClassicRules::RulesetFromServerInfo( serverInfo ) ) );
-		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "serverMapRestart\n" );
+		if ( sessionCommand.Icmp( "nextMap" ) != 0 ) {
+			Printf( "si_ruleset changed to %s; loading the map again\n", rvClassicRules::RulesetName( rvClassicRules::RulesetFromServerInfo( serverInfo ) ) );
+		}
+		sessionCommand = "nextMap";
 	}
 
 	if ( isServer ) {
@@ -2017,6 +2032,10 @@ void idGameLocal::LocalMapRestart( int instance ) {
 	InitScriptForMap();
 
 	MapPopulate( instance );
+	// openQ4: every item of the restarted instance is back (rvItemTimers::OnMapRestart)
+	if ( isMultiplayer && !isClient ) {
+		mpGame.itemTimers.OnMapRestart( instance );
+	}
 
 	// once the map is populated, set the spawnCount back to where it was so we don't risk any collision
 	// (note that if there are no players in the game, we could just leave it at it's current value)
@@ -2056,6 +2075,9 @@ void idGameLocal::MapRestart( int instance ) {
 
 		if ( mpGame.PickMap( "", true ) ) {
 			common->Warning( "map %s and gametype %s are incompatible, aborting map change", si_map.GetString(), si_gameType.GetString() );
+			// openQ4: the restart a rules change queued is not going to happen; its
+			// latch stayed set and later modifier changes never restarted the match
+			mpGame.RulesRestartRefused();
 			if ( (++incompatibleMaps) >= 50 ) {
 				common->Warning( "too many incompatible maps for gametype %s; setting gametype to DM.", si_gameType.GetString() );
 				si_gameType.SetString( "DM" );
@@ -2095,13 +2117,19 @@ void idGameLocal::MapRestart( int instance ) {
 				break;
 			}
 		}
+		// openQ4: the loop above compares against serverInfo, which a rescan may already
+		// have brought up to date. The ruleset latch is what the running map was loaded
+		// with, so a ruleset that differs from it needs the full load whatever the keys say.
+		const bool rulesetChanged = isMultiplayer &&
+			( rvClassicRules::RulesetFromServerInfo( newInfo ) == MP_RULESET_CLASSIC ) != classicRuleset;
+
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "rescanSI" " " __FILE__ " " __LINESTR__ );
 
 		SetGameType();
 
 		mpGame.isBuyingAllowedRightNow = false;
 
-		if ( i != newInfo.GetNumKeyVals() ) {
+		if ( i != newInfo.GetNumKeyVals() || rulesetChanged ) {
 			gameLocal.sessionCommand = "nextMap";
 		} else {
 			outMsg.Init( msgBuf, sizeof( msgBuf ) );

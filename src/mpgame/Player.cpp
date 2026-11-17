@@ -235,7 +235,9 @@ a free spectator is exactly who most needs to see everyone.
 ================
 */
 static idPlayer *Player_VisibilityReference( idPlayer *localViewer, bool &spectatorView ) {
-	spectatorView = localViewer->spectating;
+	// A participant in a spectator camera (eliminated, benched) keeps its own
+	// side's view: only someone who chose to watch sees everyone.
+	spectatorView = localViewer->spectating && localViewer->wantSpectate;
 	if ( !spectatorView ) {
 		return localViewer;
 	}
@@ -4173,6 +4175,8 @@ bool idPlayer::UserInfoChanged( void ) {
 	}
 
 	spec = ( idStr::Icmp( userInfo->GetString( "ui_spectate" ), "Spectate" ) == 0 );
+	// openQ4: someone whose first join is decided by this call (see the lock below)
+	const bool arriving = !gameLocal.isClient && initialJoinPending && !botManager.IsBot( entityNumber );
 	if ( !gameLocal.isClient && initialJoinPending ) {
 		if ( gameLocal.isServer && managedMatch ) {
 			// Managed userinfo has already been reconciled through the authoritative
@@ -4259,9 +4263,22 @@ bool idPlayer::UserInfoChanged( void ) {
  		const mpGameState_t liveState = gameLocal.mpGame.GetGameState()->GetMPGameState();
  		const bool livePlay = liveState == GAMEON || liveState == SUDDENDEATH;
  		const int spectatorLock = gameLocal.serverInfo.GetInt( "si_spectatorLock" );
- 		if ( ( liveState == SUDDENDEATH || ( livePlay && spectatorLock >= 1 ) ) && !spec && wantSpectate == true ) {
+ 		// A client that connects with ui_autoJoin has never been in play and its
+ 		// wantSpectate is still false, so the lock, which asked only about
+ 		// spectators coming back, let it straight into a live match or a sudden
+ 		// death: a locked-out spectator had only to reconnect. Bots fill by their
+ 		// own rules. The side a disconnect pause is held for may take its player
+ 		// back (idMultiplayerGame::DisconnectPauseAdmits).
+ 		const bool joiningPlay = !spec && ( wantSpectate == true || arriving );
+ 		const bool heldOpen = livePlay && gameLocal.mpGame.DisconnectPauseAdmits( userInfo->GetString( "ui_team" ) );
+ 		if ( ( liveState == SUDDENDEATH || ( livePlay && spectatorLock >= 1 ) ) && joiningPlay && !heldOpen ) {
  			userInfo->Set( "ui_spectate", "Spectate" );
  			modifiedInfo |= true;
+ 			wantSpectate = true;
+ 			if ( arriving && gameLocal.isServer ) {
+ 				// the client asked for nothing it could be answered for: say why it is watching
+ 				gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42776" );
+ 			}
  		} else if ( livePlay && spectatorLock >= 2 && spec && !wantSpectate ) {
  			userInfo->Set( "ui_spectate", "Play" );
  			modifiedInfo |= true;
@@ -6477,7 +6494,11 @@ void idPlayer::UpdatePowerUps( void ) {
 				int max			= inventory.StartingAmmoForWeaponIndex( i );
 
 				// only regen ammo if lower than starting
-				if( gameLocal.time > nextAmmoRegenPulse[ ammoIndex ] && inventory.ammo[ ammoIndex ] < max ) {
+				// openQ4: and not unlimited. A fixed loadout's ammunition is -1, which is
+				// lower than any start: the Ammo Regen rune in a weapon arena counted it
+				// up from there and left the carrier with none.
+				if( gameLocal.time > nextAmmoRegenPulse[ ammoIndex ] && inventory.ammo[ ammoIndex ] >= 0 &&
+					inventory.ammo[ ammoIndex ] < max ) {
 					int step		= inventory.AmmoRegenStepForWeaponIndex( i );
 					int time		= inventory.AmmoRegenTimeForWeaponIndex( i );
 
@@ -6522,8 +6543,12 @@ void idPlayer::UpdatePowerUps( void ) {
 			const int armorCap = Min( inventory.maxarmor + FC_ARMOR_REGEN_OVER_MAX, FC_ARMOR_REGEN_WIRE_MAX );
 			if ( inventory.armor < armorCap ) {
 				inventory.armor = Min( inventory.armor + FC_ARMOR_REGEN_STEP, armorCap );
-				nextArmorPulse = gameLocal.time + FC_ARMOR_REGEN_PULSE;
 			}
+			// openQ4: the clock runs for the whole powerup. Left to stand while the
+			// armour sat at its cap, it was up to twenty seconds stale when the
+			// powerup ran out, and the decay below then took a point a frame until
+			// it caught up: twenty armour gone in a third of a second.
+			nextArmorPulse = gameLocal.time + FC_ARMOR_REGEN_PULSE;
 		} else if ( inventory.armor > inventory.maxarmor && !gameLocal.IsClassicRuleset() ) {
 			// openQ4: Classic armour keeps its points; each tier has its own limit
 			nextArmorPulse += ARMOR_PULSE;
@@ -8064,7 +8089,12 @@ bool idPlayer::CycleSpectatorFollow( int direction ) {
 		candidate->UpdateHudWeapon( candidate->currentWeapon );
 		return true;
 	}
-	SpectateFreeFly( true );
+	// Nobody to follow. Release a followed player; a camera that is already free
+	// stays where it is. SpectateFreeFly with no one followed puts the camera on
+	// a spawn point, so every attack press alone on a server was a teleport.
+	if ( spectator != entityNumber ) {
+		SpectateFreeFly( true );
+	}
 	return false;
 }
 
@@ -8147,7 +8177,10 @@ void idPlayer::ServerSpectatorFollow( int operation, int targetSlot, int targetS
 		SetSpectatorAutoFollow( MP_AUTOTRACK_OFF );
 	}
 	if ( operation == SPECTATOR_FOLLOW_FREE ) {
-		SpectateFreeFly( true );
+		// already free: stay put (see CycleSpectatorFollow)
+		if ( spectator != entityNumber ) {
+			SpectateFreeFly( true );
+		}
 		gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42884", "" );
 		return;
 	}
@@ -8505,7 +8538,16 @@ void idPlayer::UpdateFocus( void ) {
 	}
 
 #ifndef _XENON
-	cvarSystem->SetCVarInteger( "pm_isZoomed", zoomed ? pm_zoomedSlow.GetInteger() : 0 );
+	// openQ4: pm_isZoomed is this process's look-sensitivity scale. Every player's
+	// Think wrote it, so on a listen server the host's mouse slowed whenever the
+	// player who thought last was scoped, and the host's own scope was undone by
+	// anyone who was not.
+	if ( IsLocalClient() ) {
+		const int zoomedSlow = zoomed ? pm_zoomedSlow.GetInteger() : 0;
+		if ( pm_isZoomed.GetInteger() != zoomedSlow ) {
+			pm_isZoomed.SetInteger( zoomedSlow );
+		}
+	}
 #endif
 
 #ifdef _XENON
@@ -10630,6 +10672,20 @@ void idPlayer::GenerateImpulseForBuyAttempt( const char* itemName ) {
 		// not an item the buy menu sells; impulse 0 would select weapon 0
 		return;
 	}
+	if ( gameLocal.isClient ) {
+		// openQ4: a buy comes from a bind or a menu button, between frames, and is
+		// made once. PerformImpulse sends through ClientSendEvent, which drops an
+		// event whenever the last prediction pass was a re-run, so the purchase
+		// was lost at random with nothing said. Nothing else in PerformImpulse
+		// acts on a buy impulse on a client: the server does the buying.
+		idBitMsg	msg;
+		byte		msgBuf[MAX_EVENT_PARAM_SIZE];
+		msg.Init( msgBuf, sizeof( msgBuf ) );
+		msg.BeginWriting();
+		msg.WriteBits( itemBuyImpulse, IMPULSE_NUMBER_OF_BITS );
+		ClientSendRequestEvent( EVENT_IMPULSE, &msg );
+		return;
+	}
 	PerformImpulse( itemBuyImpulse );
 }
 // RITUAL END
@@ -11783,7 +11839,9 @@ void idPlayer::Think( void ) {
 #ifdef _XENON
 			usercmdGen->SetSlowJoystick( zoom ? pm_zoomedSlow.GetInteger() : 100 );
 #else
-			cvarSystem->SetCVarInteger( "pm_isZoomed", zoom ? pm_zoomedSlow.GetInteger() : 0 );
+			if ( IsLocalClient() ) {
+				cvarSystem->SetCVarInteger( "pm_isZoomed", zoom ? pm_zoomedSlow.GetInteger() : 0 );
+			}
 #endif
 		}
 
@@ -12083,7 +12141,8 @@ void idPlayer::CheckInactivity( const usercmd_t &oldCmd ) {
 			wantSpectate = true;
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "updateUI %d\n", entityNumber ) );
 		} else {
-			networkSystem->ServerDropClient( entityNumber, "#str_42779" );
+			// queued: the drop deletes this player, and this is its own Think
+			gameLocal.mpGame.QueueClientDrop( entityNumber, "#str_42779" );
 		}
 		return;
 	}
@@ -18192,13 +18251,42 @@ void idPlayer::PrecacheSpawnDecls( void ) {
 		"liquid_openq4",
 		"damage_suicide",
 		"damage_telefrag",
+		"damage_gib",
 		"dmg_shellshock",
 		"dmg_shellshock_nohl",
 	};
 
 	for ( int i = 0; i < (int)( sizeof( spawnDefs ) / sizeof( spawnDefs[ 0 ] ) ); i++ ) {
 		declManager->FindType( DECL_ENTITYDEF, spawnDefs[ i ], false, false );
+		// openQ4: in multiplayer gameLocal.FindEntityDef asks for the "_mp" definition
+		// first, and the falls have one. The plain names cached here were not the
+		// ones used, so the first fall of a match read its definition from disk.
+		if ( gameLocal.isMultiplayer ) {
+			declManager->FindType( DECL_ENTITYDEF, va( "%s_mp", spawnDefs[ i ] ), false, false );
+		}
 	}
+}
+
+/*
+=====================
+idPlayer::PrecachePlayerModel
+
+A playerModel names its model, head and skin in keys the def_ media rule does
+not follow, so they are cached directly; a model the player setup menu already
+parsed would not cache them again either.
+=====================
+*/
+void idPlayer::PrecachePlayerModel( const rvDeclPlayerModel *model ) {
+	if ( model == NULL ) {
+		return;
+	}
+	idDict media;
+	media.Set( "model", model->model.c_str() );
+	media.Set( "def_head", model->head.c_str() );
+	media.Set( "def_head_ui", model->uiHead.c_str() );
+	media.Set( "skin", model->skin.c_str() );
+	media.SetDefaults( &model->sounds );
+	gameLocal.CacheDictionaryMedia( &media );
 }
 
 /*
@@ -18241,17 +18329,19 @@ void idPlayer::PrecacheMultiplayerSpawn( void ) {
 		if ( modelNames[ i ] == NULL || modelNames[ i ][ 0 ] == '\0' ) {
 			continue;
 		}
-		const rvDeclPlayerModel *model = static_cast<const rvDeclPlayerModel *>( declManager->FindType( DECL_PLAYER_MODEL, modelNames[ i ], false ) );
-		if ( model == NULL ) {
-			continue;
+		PrecachePlayerModel( static_cast<const rvDeclPlayerModel *>( declManager->FindType( DECL_PLAYER_MODEL, modelNames[ i ], false ) ) );
+	}
+
+	// Everyone else's. A player or a bot arriving with a model nobody had used yet
+	// had it read from disk in the middle of the match, on the server and on every
+	// client that could see them: the model declaration, the head, the skin and
+	// their images, a visible hitch each time. The models share most of their
+	// meshes and animations, so loading them all costs little next to that.
+	if ( g_precachePlayerModels.GetBool() ) {
+		const int numModels = declManager->GetNumDecls( DECL_PLAYER_MODEL );
+		for ( int i = 0; i < numModels; i++ ) {
+			PrecachePlayerModel( static_cast<const rvDeclPlayerModel *>( declManager->DeclByIndex( DECL_PLAYER_MODEL, i, true ) ) );
 		}
-		idDict media;
-		media.Set( "model", model->model.c_str() );
-		media.Set( "def_head", model->head.c_str() );
-		media.Set( "def_head_ui", model->uiHead.c_str() );
-		media.Set( "skin", model->skin.c_str() );
-		media.SetDefaults( &model->sounds );
-		gameLocal.CacheDictionaryMedia( &media );
 	}
 
 	// The weapons SetupWeaponEntity caches on spawn, the warmup arsenal's included.
@@ -18393,7 +18483,8 @@ void idPlayer::SetEmote( playerEmote_t newEmote ) {
 		if( gameLocal.isServer ) {
 			ServerSendInstanceEvent( EVENT_EMOTE, &msg, false, -1 );
 		} else {
-			ClientSendEvent( EVENT_EMOTE, &msg );
+			// openQ4: asked for from the console, between frames (see ClientSendRequestEvent)
+			ClientSendRequestEvent( EVENT_EMOTE, &msg );
 		}
 	}
 }

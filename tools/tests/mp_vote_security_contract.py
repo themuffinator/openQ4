@@ -123,8 +123,11 @@ def main() -> None:
 
     eligible_vote = body(multiplayer, "static bool IsEligibleVotePlayerSlot")
     require(eligible_vote, "gameLocal.mpGame.IsInGame", "vote electorate connection state")
-    require(eligible_vote, "!player->spectating", "vote electorate spectator exclusion")
-    require(eligible_vote, "!player->wantSpectate", "vote electorate pending spectator exclusion")
+    # A spectator is someone who chose to watch. An eliminated player, or one
+    # looking at the end-of-match scoreboard, is still a player and a voter.
+    require(eligible_vote, "!player->wantSpectate", "vote electorate spectator exclusion")
+    if "!player->spectating" in eligible_vote:
+        raise AssertionError("the vote electorate must not exclude players who are merely in a spectator camera")
     require(eligible_vote, "!player->IsFakeClient()", "vote electorate special-view exclusion")
     require(eligible_vote, "!botManager.IsBot( clientNum )", "vote electorate bot exclusion")
 

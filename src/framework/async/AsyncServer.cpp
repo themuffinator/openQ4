@@ -595,6 +595,20 @@ void idAsyncServer::ExecuteMapChange( void ) {
 	}
 	serverReloadingEngine = false;
 
+	// openQ4: an rcon lockout is a server time and the clock restarts here. A lockout
+	// set late in a long map lasted until the new map's clock reached the old value,
+	// twenty minutes where thirty seconds were meant. Carry over what is left of it.
+	for ( int index = 0; index < MAX_RCON_RATE_LIMITS; ++index ) {
+		rconRateLimit_t &limit = rconRateLimits[ index ];
+		if ( !limit.active || limit.blockedUntil == 0 ) {
+			continue;
+		}
+		if ( AsyncServer_TimeBefore( serverTime, limit.blockedUntil ) ) {
+			limit.blockedUntil = Max( 1, static_cast<int>( AsyncServer_Elapsed( limit.blockedUntil, serverTime ) ) );
+		} else {
+			limit.blockedUntil = 0;
+		}
+	}
 	serverTime = 0;
 	// openQ4: server time restarts here; the stats report waited out the whole of
 	// the previous map's time before it printed again.
@@ -3527,12 +3541,14 @@ bool idAsyncServer::ConnectionlessMessage( const netadr_t from, const idBitMsg &
 	
 	// auth server
 	if ( idStr::Icmp( string, "auth" ) == 0 ) {
+		// openQ4: developer prints. Anyone can send this packet, and a line a packet
+		// on the console and in the log file is a flood.
 		if ( !Sys_CompareNetAdrBase( from, idAsyncNetwork::GetMasterAddress() ) ) {
-			common->Printf( "auth: bad source %s\n", Sys_NetAdrToString( from ) );
+			common->DPrintf( "auth: bad source %s\n", Sys_NetAdrToString( from ) );
 			return false;
 		}
 		if ( idAsyncNetwork::LANServer.GetBool() ) {
-			common->Printf( "auth message from master. net_LANServer is enabled, ignored.\n" );
+			common->DPrintf( "auth message from master. net_LANServer is enabled, ignored.\n" );
 		}
 		ProcessAuthMessage( msg );
 		return false;
@@ -4042,6 +4058,9 @@ void idAsyncServer::MasterHeartbeat( bool force ) {
 	}
 	if ( force ) {
 		nextHeartbeatTime = 0;
+		// openQ4: a forced heartbeat comes with a map start or from the console, where
+		// a slow lookup does not show. Try again the masters that did not resolve.
+		idAsyncNetwork::RetryMasterAddresses();
 	}
 	// not yet
 	if ( serverTime < nextHeartbeatTime ) {

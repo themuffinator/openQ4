@@ -241,8 +241,9 @@ def check_hud_state() -> None:
     rows = function_body(game, "void idMultiplayerGame::PublishRemasteredCompetitive(")
     require("teamInfo.Resolve( player, info );" in rows and '"oq4_ts%d_%d_location"' in rows,
             "the team list reads team mates through the team info and names where they are")
-    require("localPlayer->spectating || player->team == localPlayer->team" in rows,
-            "an opponent's row is never given a location")
+    require("neutralView || player->team == localPlayer->team" in rows
+            and "const bool neutralView = localPlayer->spectating && localPlayer->wantSpectate;" in rows,
+            "an opponent's row is never given a location, and an eliminated player is not a neutral spectator")
 
 
 def check_strings() -> None:

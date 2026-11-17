@@ -1031,12 +1031,19 @@ bool Net_GetUDPPacket( SOCKET netSocket, netadr_t &net_from, char *data, int &si
 	// or crashed) as WSAECONNRESET on the next read, one read for each. It was returned
 	// as "nothing to read", which ends the caller's drain: on a listen server, which
 	// drains once a rendered frame, every packet queued behind it waited a frame and the
-	// other players' commands came late. Read past a bounded number of them.
+	// other players' commands came late. Read past a bounded number of them. A datagram
+	// larger than the buffer (WSAEMSGSIZE) is discarded by the same read and ended the
+	// drain the same way, so anyone could hold a server's commands back with one or two
+	// a frame; it is read past too.
 	for ( int resets = 0; ; resets++ ) {
 		memset( &from, 0, sizeof( from ) );
 		fromlen = sizeof( from );
 		ret = recvfrom( netSocket, data, maxSize, 0, reinterpret_cast<struct sockaddr *>( &from ), &fromlen );
-		if ( ret != SOCKET_ERROR || WSAGetLastError() != WSAECONNRESET || resets >= 16 ) {
+		if ( ret != SOCKET_ERROR || resets >= 16 ) {
+			break;
+		}
+		const int receiveError = WSAGetLastError();
+		if ( receiveError != WSAECONNRESET && receiveError != WSAEMSGSIZE ) {
 			break;
 		}
 	}

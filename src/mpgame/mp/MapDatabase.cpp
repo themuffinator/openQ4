@@ -1368,11 +1368,14 @@ void mpMapDatabase::NotePlayed( int index ) {
 mpMapDatabase::RecentlyPlayed
 
 A small rotation must not rule itself out: only as many recent maps count as
-leave half of the database fresh.
+leave half of the rotation fresh. The window was half of every installed map,
+so a four-map si_mapCycle on a full install called all of its maps recent and
+the shuffle fell back to "anything but this map": A, B, A, B.
 ================
 */
 bool mpMapDatabase::RecentlyPlayed( int index ) const {
-	const int considered = ( count / 2 < historyCount ) ? count / 2 : historyCount;
+	const int pool = rotationExplicit ? rotationCount : count;
+	const int considered = ( pool / 2 < historyCount ) ? pool / 2 : historyCount;
 	for ( int position = 0; position < considered; ++position ) {
 		if ( history[ position ] == index ) {
 			return true;

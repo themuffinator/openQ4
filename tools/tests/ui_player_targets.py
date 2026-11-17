@@ -100,6 +100,7 @@ struct idMultiplayerGame {
     bool IsArenaCampaignMatch()const{return arena;}bool IsManagedMatch()const{return managed;}
     bool RetainedAdminChanges(serverAdminData_t&)const{return false;}
     bool RejectManagedLegacyMutation(const char*)const{return managed;}
+    void BeginServerDrop(int){} void EndServerDrop(int){}
     void ClientVoiceMute(int,bool);void ServerHandleVoiceMuting(int,int,int,bool);
     bool VoteKickTargetCurrent()const;void CheckVote();bool AbortInheritedVoteForManagedMatch(){return false;}
     void ClientUpdateVote(int v,int,int,const voteStruct_t&){updates.push_back(v);}
@@ -182,7 +183,7 @@ int main(){
     const auto sent=networkObject.sent.size();
     m.ClientCallVote(VOTE_KICK,"31",original);m.ClientCallPackedVote(mixed,original);assert(networkObject.sent.size()==sent);
     // Missing/truncated/trailing identity bytes fail the complete mixed request.
-    for(int size=0;size<=7;++size){if(size==4)continue;auto bad=packed;bad.bytes.resize(4+size);bad.cursor=4;AdmitPacked(bad,mixed);
+    for(int size=0;size<=7;++size){if(size==4)continue;auto bad=packed;bad.bytes.resize(6+size);bad.cursor=6;AdmitPacked(bad,mixed);
         auto old=legacy;old.bytes.resize(5+size);old.cursor=5;AdmitLegacy(old,"31");assert(admitted==2);}
     for(const char* capability:{"","0","1"}){
         g.serverInfo.values["si_uiTargetProtocol"]=capability;m.ClientCallVote(VOTE_KICK,"31");m.ClientCallPackedVote(mixed);assert(networkObject.sent.size()==sent);
@@ -191,7 +192,7 @@ int main(){
     voteStruct_t restart;restart.m_fieldFlags=VOTEFLAG_RESTART;m.ClientCallPackedVote(restart);
     assert(networkObject.sent.back().bytes==std::vector<byte>({GAME_RELIABLE_MESSAGE_CALLPACKEDVOTE,1,0,0,0}));
     g.serverInfo.values["si_uiTargetProtocol"]="2";m.ClientCallPackedVote(mixed);
-    auto currentPacket=networkObject.sent.back();currentPacket.cursor=4;AdmitPacked(currentPacket,mixed);assert(admitted==3);
+    auto currentPacket=networkObject.sent.back();currentPacket.cursor=6;AdmitPacked(currentPacket,mixed);assert(admitted==3);
     // An ordered catalog binds a compact menu row. Replacement with the same
     // entity address/name invalidates the selection and the mixed draft.
     m.retainedVoteDraft[m.RVF_KICK]=-1;m.RetainedVoteChoices();const auto catalog=m.retainedVoteKickCatalog;

@@ -2340,7 +2340,12 @@ void idAsyncClient::ProcessPrintMessage( const netadr_t from, const idBitMsg &ms
 		}
 	}
 	guiNetMenu->SetStateString( "status", string );
-	if ( opcode == SERVER_PRINT_GAMEDENY ) {
+	// openQ4: a server sends a denial or a bad-challenge notice only in answer to a
+	// connection request. An out-of-band packet needs nothing but the server's address
+	// on it, so past the handshake these are printed and not obeyed: one forged packet
+	// used to disconnect an in-game player or open a password prompt over the match,
+	// and a late duplicate of an accepted connect made a connected client reconnect.
+	if ( opcode == SERVER_PRINT_GAMEDENY && ( clientState == CS_CHALLENGING || clientState == CS_CONNECTING ) ) {
 		if ( game_opcode == ALLOW_BADPASS ) {
 			retpass = session->MessageBox( MSG_PROMPT, common->GetLanguageDict()->GetString ( "#str_04321" ), string, true, "passprompt_ok" );
 			ClearPendingPackets();
@@ -2358,7 +2363,7 @@ void idAsyncClient::ProcessPrintMessage( const netadr_t from, const idBitMsg &ms
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, "disconnect" );
 		}
 		// ALLOW_NOTYET just keeps running as usual. The GUI has an abort button
-	} else if ( opcode == SERVER_PRINT_BADCHALLENGE && clientState >= CS_CONNECTING ) {
+	} else if ( opcode == SERVER_PRINT_BADCHALLENGE && clientState == CS_CONNECTING ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "reconnect" );
 	}
 }

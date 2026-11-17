@@ -148,6 +148,34 @@ void rvItemTimers::OnHeld( const idItem *item ) {
 
 /*
 ================
+rvItemTimers::OnMapRestart
+
+The restart in place at a match's start and at each round respawns every map
+entity under its old number and keeps the clock running, but shuts the event
+queue, so no item's respawn event ever reports it back. A quad taken in warmup
+went on counting down on the list through the first minute of the match while
+it lay on its pad.
+================
+*/
+void rvItemTimers::OnMapRestart( int instance ) {
+	if ( gameLocal.isClient ) {
+		return;
+	}
+	for ( int entityNum = 0; entityNum < MAX_GENTITIES; entityNum++ ) {
+		if ( respawnAt[ entityNum ] == 0 ) {
+			continue;
+		}
+		// a Tourney arena restarts alone: the other arenas' items are still out
+		const idEntity *ent = gameLocal.entities[ entityNum ];
+		if ( instance == -1 || ent == NULL || ent->GetInstance() == instance ) {
+			respawnAt[ entityNum ] = 0;
+		}
+	}
+	nextSendTime = 0;
+}
+
+/*
+================
 rvItemTimers::OnAvailable
 ================
 */

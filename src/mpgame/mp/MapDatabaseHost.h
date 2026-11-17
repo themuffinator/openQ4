@@ -106,6 +106,8 @@ private:
 	int					CurrentEntry( void );
 	int					PlayerCount( void ) const;
 	bool				RotationActive( void ) const;
+	bool				ClientRole( void ) const;
+	int					NextGameType( void ) const;
 	void				ServerQueueSet( int clientNum, const char *path );
 	void				ServerQueueClear( int clientNum );
 	void				ServerQueueList( int clientNum );
@@ -132,6 +134,7 @@ private:
 	idList<appliedSetting_t> appliedSettings;
 	idStr				appliedMap;				// the map the applied settings belong to
 	bool				mapChangePending;		// ServerPrepareMap ran; the map has not started yet
+	bool				hostingNext;			// ServerPrepareMap ran for a map this process will serve
 
 	idStr				advanceIssued;			// the map ServerAdvance last wrote to si_map
 	int					advanceAttempts;

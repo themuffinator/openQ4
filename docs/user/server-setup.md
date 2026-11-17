@@ -323,11 +323,12 @@ address to force IPv6.
 | `si_allowVoting`, `si_voteFlags` | `si_allowVoting 1` lets players call votes; `si_voteFlags` is a bit mask of the votes you forbid (type `si_voteFlags` for the bits) |
 | `g_votePercent` | Percentage of the players eligible when a vote starts that must vote yes for it to pass (default 51, a plain majority). **Not in 0.14.1** |
 | `g_voteLimit` | Most votes one player may call on a map; `0` for no limit. **Not in 0.14.1** |
-| `si_spectatorVote` | `1` lets spectators call and cast votes. **Not in 0.14.1** |
+| `si_spectatorVote` | `1` lets spectators call and cast votes. A player who is out for the round or on the scoreboard is not a spectator and can always vote. **Not in 0.14.1** |
 | `si_timeouts`, `si_timeoutLength` | Team timeouts each side may call in a team match (`0` for none) and how long one lasts, in seconds. See [Timeouts on casual servers](competitive-matches.md#timeouts-on-casual-servers). **Not in 0.14.1** |
-| `si_spectatorLock` | During live play, `1` keeps spectators from joining the game until it ends and `2` keeps players from leaving it too. **Not in 0.14.1** |
+| `si_spectatorLock` | During live play, `1` keeps spectators, and anyone who connects, from joining the game until it ends and `2` keeps players from leaving it too. **Not in 0.14.1** |
 | `g_inactivity` | Seconds a playing human may send no input before being moved to spectators (or dropped when `si_spectators` is off); `0` turns it off. **Not in 0.14.1** |
-| `g_pauseOnDisconnect` | Seconds a live team match pauses when a playing human disconnects, so they can reconnect; `0` turns it off. **Not in 0.14.1** |
+| `g_pauseOnDisconnect` | Seconds a live team match pauses when a playing human loses their connection, so they can reconnect; `0` turns it off. One pause a side a match; it ends when the player is back, and a kick or an idle drop does not start one. **Not in 0.14.1** |
+| `g_precachePlayerModels` | `1` (default) loads every player model with a multiplayer map, so a player or bot arriving with a model nobody has used yet does not hitch the match; `0` loads only your own and the defaults, for a machine short of memory. Set on each machine; it is not a server rule. **Not in 0.14.1** |
 
 Bot settings are listed under [Bots](#bots).
 
@@ -432,7 +433,11 @@ until you fix it.
 A `set` line gives a map its own value for a setting. The server applies it
 just before the map loads and puts the old value back when the map ends, so
 it never leaks into the next map. If you change the setting by hand while the
-map is running, your value stays.
+map is running, your value stays. Quitting on such a map puts the old values
+back before the configuration is saved.
+
+Save `mapdb.txt` and preset files as plain text or UTF-8; a byte order mark,
+which some Windows editors add, is ignored.
 
 A map can set game rules: `si_` and `g_` settings such as `si_fragLimit`,
 `si_timeLimit` or `si_instagib`. It cannot change the map, the game type, the

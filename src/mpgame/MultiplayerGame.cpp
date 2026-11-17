@@ -361,8 +361,13 @@ static bool IsEligibleVotePlayerSlot( int clientNum ) {
 	idPlayer *player = static_cast< idPlayer * >( gameLocal.entities[ clientNum ] );
 	// IsFakeClient identifies the engine's special view entity, not an AI bot.
 	// si_spectatorVote admits spectators to the electorate; bots never enter it.
+	// A spectator is someone who chose to watch (wantSpectate). The spectating
+	// flag is also set on an eliminated player, on everyone during the end-of-match
+	// review and on the players sudden death benches: counting those as spectators
+	// left nobody able to call a vote on the scoreboard, and made a lone survivor
+	// an electorate of one who passed any vote alone.
 	const bool spectatorVote = gameLocal.serverInfo.GetBool( "si_spectatorVote" );
-	return ( spectatorVote || ( !player->spectating && !player->wantSpectate ) ) && !player->IsFakeClient() &&
+	return ( spectatorVote || !player->wantSpectate ) && !player->IsFakeClient() &&
 		!botManager.IsBot( clientNum );
 }
 
@@ -492,8 +497,10 @@ static int LegacyVoteFieldFlag( idMultiplayerGame::vote_flags_t voteIndex ) {
 		case idMultiplayerGame::VOTE_KICK:
 			return VOTEFLAG_KICK;
 		case idMultiplayerGame::VOTE_MAP:
-		case idMultiplayerGame::VOTE_NEXTMAP:
 			return VOTEFLAG_MAP;
+		case idMultiplayerGame::VOTE_NEXTMAP:
+			// its own switch since MP-12; it was still gated on the map vote's
+			return VOTEFLAG_NEXTMAP;
 		case idMultiplayerGame::VOTE_GAMETYPE:
 			return VOTEFLAG_GAMETYPE;
 		case idMultiplayerGame::VOTE_TIMELIMIT:
@@ -550,6 +557,25 @@ const idDict *MultiplayerResolveMapDecl( const char *mapPath ) {
 	// openQ4: a map with no mapDef of that name (an addon pack's map) is found
 	// in the map database, which holds every multiplayer map
 	return mpMapHost.DeclForPath( normalizedPath.c_str() );
+}
+
+/*
+================
+MPVoteMapSupportsGameType
+
+What the map database says a map plays, its `modes` override included, which
+is what the load checks. The votes asked the mapDef alone: a map limited to
+one mode was voted in under another and then could not restart, and a mode an
+override added was refused. A game type the table does not know is looked up
+in the mapDef as before.
+================
+*/
+static bool MPVoteMapSupportsGameType( const char *mapPath, const char *gameTypeName ) {
+	const mpGameTypeInfo_t *wanted = MPGameTypeByName( gameTypeName );
+	if ( wanted != NULL ) {
+		return mpMapHost.Supports( mapPath, wanted->type );
+	}
+	return MPMapSupportsGameTypeName( MultiplayerResolveMapDecl( mapPath ), gameTypeName );
 }
 
 /*
@@ -1239,6 +1265,11 @@ idMultiplayerGame::idMultiplayerGame() {
 	memset( matchOperationNextAllowedTime, 0, sizeof( matchOperationNextAllowedTime ) );
 	memset( nextVoteAllowedTime, 0, sizeof( nextVoteAllowedTime ) );
 	memset( nextVoteRejectNoticeTime, 0, sizeof( nextVoteRejectNoticeTime ) );
+	memset( queuedDropSpawnId, 0, sizeof( queuedDropSpawnId ) );
+	memset( queuedDropReason, 0, sizeof( queuedDropReason ) );
+	memset( serverDropInFlight, 0, sizeof( serverDropInFlight ) );
+	disconnectPauseHumans = 0;
+	disconnectPauseUsedMask = 0;
 	mapListTruncationWarned = false;
 	matchItemTimingFullWarned = false;
 	currentStatClientNum = -1;
@@ -1919,6 +1950,7 @@ void idMultiplayerGame::BeginCompetitiveFrame( void ) {
 		return;
 	}
 	InitializeMatchItemTimingObservations();
+	CheckDisconnectPauseReturn();
 	AnnounceCasualPauseTransitions();
 
 	if ( IsGameplayFrozen() ) {
@@ -2588,6 +2620,12 @@ bool idMultiplayerGame::CanSpectatorFollow( int observerSlot,
 		recipient ) ) {
 		return false;
 	}
+	// openQ4: the observer is in a spectator camera (checked above), so it asks as
+	// one. A participant stays active in the session while eliminated, between
+	// Tourney fights or benched by sudden death, and an active recipient is granted
+	// no follow target at all: such a player could follow nobody and sat in free
+	// flight. Asked as a spectator, a sided one gets its own side and no other.
+	recipient.active = false;
 
 	uint32_t targetGeneration = 0;
 	mpParticipantId targetParticipant;
@@ -7213,73 +7251,16 @@ bool idMultiplayerGame::InitializeCompetitiveRules( void ) {
 
 	const mpMatchRulesValidationContext_t context =
 		BuildCompetitiveRuleValidationContext();
-	if ( competitiveRulesInitialized ) {
-		if ( matchRules.HasStagedSnapshot() ) {
-			const mpMatchRulesSnapshot *staged = matchRules.StagedSnapshot();
-			if ( staged != NULL && staged->GetInteger( MP_RULE_GAME_TYPE ) ==
-				gameLocal.gameType ) {
-				mpCompetitiveRules candidate = matchRules;
-				const mpRuleCommitResult_t applied =
-					candidate.ApplyStagedAtWarmup( context );
-				if ( !applied.Succeeded() ) {
-					competitiveRulesFailure = applied.failure.reason;
-					gameLocal.serverInfo.Set( "si_matchRules", "invalid" );
-					return false;
-				}
-				matchRules = candidate;
-				competitiveRulesValidForSession = true;
-				competitiveRulesFailure = MP_RULE_VALID;
-				const mpMatchProfileDescriptor_t *appliedProfile =
-					matchRules.Committed().SourceProfile() >= 0 ?
-					MPMatchProfile( matchRules.Committed().SourceProfile() ) : NULL;
-				if ( appliedProfile != NULL ) {
-					g_matchProfile.SetString( appliedProfile->key );
-					gameLocal.serverInfo.Set( "g_matchProfile", appliedProfile->key );
-				}
-				g_matchProfile.ClearModified();
-				MirrorCompetitiveRulesToLegacy();
-				PublishCompetitiveRulesIdentity();
-				return true;
-			}
-			gameLocal.Warning( "discarded staged match rules after a gametype change" );
-			matchRules.DiscardStagedSnapshot();
-		}
 
-		const bool selectorChanged = g_matchProfile.IsModified();
-		if ( !selectorChanged &&
-			matchRules.Committed().GetInteger( MP_RULE_GAME_TYPE ) == gameLocal.gameType ) {
-			const mpMatchRulesDraft current = matchRules.BeginDraftFromCommitted();
-			if ( !mpCompetitiveRules::ValidateDraft( current, context, failure ) ) {
-				competitiveRulesFailure = failure.reason;
-				gameLocal.serverInfo.Set( "si_matchRules", "invalid" );
-				return false;
-			}
-			competitiveRulesValidForSession = true;
-			competitiveRulesFailure = MP_RULE_VALID;
-			MirrorCompetitiveRulesToLegacy();
-			PublishCompetitiveRulesIdentity();
-			return true;
-		}
-	}
+	// openQ4: a pure client keeps a local snapshot but owns no rules. It used to
+	// mirror that snapshot over its own si_ cvars, which are the player's hosting
+	// settings and archived, and over the server info it had just been sent.
+	const bool authority = !gameLocal.isClient;
 
-	mpMatchRulesDraft draft;
-	if ( profile == NULL || !matchRules.BeginDraftFromProfile( profile->id,
-		gameLocal.gameType, draft, failure ) ) {
-		gameLocal.Warning( "match profile '%s' does not support gametype '%s'; using the recommended profile",
-			requestedProfile, MPGameTypeName( gameLocal.gameType ) );
-		profile = MPMatchProfile( MPRecommendedMatchProfileForGameType( gameLocal.gameType ) );
-		if ( profile == NULL || !matchRules.BeginDraftFromProfile( profile->id,
-			gameLocal.gameType, draft, failure ) ) {
-			competitiveRulesFailure = failure.reason;
-			return false;
-		}
-	}
-
-	// A casual session deliberately preserves the existing server's values at
-	// this boundary.  After commit those values are mirrors, not another rules
-	// authority.  Every setter is typed and failure leaves the prior snapshot
-	// untouched.
-	if ( profile->id == MP_MATCH_PROFILE_CASUAL ) {
+	// A casual session's rules are the server's settings.  Every setter is typed.
+	// Written against a draft so the same import seeds a new session from the
+	// profile and lays changed settings over the rules of a running one.
+	const auto importCasualSettings = [&]( mpMatchRulesDraft &draft, mpRuleValidationFailure_t &failure ) -> bool {
 		const int readyBasisPoints = idMath::ClampInt( 0, 10000,
 			idMath::Ftoi( gameLocal.serverInfo.GetFloat( "si_warmupReadyPercentage" ) * 10000.0f + 0.5f ) );
 		const bool duel = MPGameTypeHasAny( gameLocal.gameType, GTF_DUEL );
@@ -7357,7 +7338,114 @@ bool idMultiplayerGame::InitializeCompetitiveRules( void ) {
 			MP_TIMEOUT_DURING_LIVE_PLAY, failure );
 		imported = imported && draft.SetEnum( MP_RULE_TIMEOUT_RESUME_POLICY,
 			MP_TIMEOUT_RESUME_OWNER_OR_REFEREE, failure );
-		if ( !imported ) {
+		return imported;
+	};
+
+	if ( competitiveRulesInitialized ) {
+		if ( matchRules.HasStagedSnapshot() ) {
+			const mpMatchRulesSnapshot *staged = matchRules.StagedSnapshot();
+			if ( staged != NULL && staged->GetInteger( MP_RULE_GAME_TYPE ) ==
+				gameLocal.gameType ) {
+				mpCompetitiveRules candidate = matchRules;
+				const mpRuleCommitResult_t applied =
+					candidate.ApplyStagedAtWarmup( context );
+				if ( !applied.Succeeded() ) {
+					competitiveRulesFailure = applied.failure.reason;
+					if ( authority ) {
+						gameLocal.serverInfo.Set( "si_matchRules", "invalid" );
+					}
+					return false;
+				}
+				matchRules = candidate;
+				competitiveRulesValidForSession = true;
+				competitiveRulesFailure = MP_RULE_VALID;
+				const mpMatchProfileDescriptor_t *appliedProfile =
+					matchRules.Committed().SourceProfile() >= 0 ?
+					MPMatchProfile( matchRules.Committed().SourceProfile() ) : NULL;
+				if ( appliedProfile != NULL && authority ) {
+					g_matchProfile.SetString( appliedProfile->key );
+					gameLocal.serverInfo.Set( "g_matchProfile", appliedProfile->key );
+				}
+				g_matchProfile.ClearModified();
+				if ( authority ) {
+					MirrorCompetitiveRulesToLegacy();
+					PublishCompetitiveRulesIdentity();
+				}
+				return true;
+			}
+			gameLocal.Warning( "discarded staged match rules after a gametype change" );
+			matchRules.DiscardStagedSnapshot();
+		}
+
+		const bool selectorChanged = g_matchProfile.IsModified();
+		if ( !selectorChanged &&
+			matchRules.Committed().GetInteger( MP_RULE_GAME_TYPE ) == gameLocal.gameType ) {
+			mpMatchRulesDraft current = matchRules.BeginDraftFromCommitted();
+			// openQ4: the casual profile was imported once and mirrored back at every
+			// map start from then on, so a limit changed on a running server - by a
+			// passed vote, at the console, or by hosting again with other settings -
+			// was put back at the next map start or restart. Lay the settings over
+			// the rules in force and commit them when that changes anything. Rules a
+			// typed operation set and no setting carries are kept either way.
+			if ( !matchRules.Committed().GetBool( MP_RULE_MANAGED_MATCH ) &&
+				matchRules.Committed().SourceProfile() == MP_MATCH_PROFILE_CASUAL ) {
+				mpMatchRulesDraft refreshed = current;
+				mpRuleValidationFailure_t refreshFailure;
+				if ( !importCasualSettings( refreshed, refreshFailure ) ) {
+					gameLocal.Warning( "could not import casual match rule %d (%d); keeping the rules in force",
+						refreshFailure.field, refreshFailure.reason );
+				} else {
+					bool settingsChanged = false;
+					for ( int field = 0; field < MP_RULE_FIELD_COUNT && !settingsChanged; field++ ) {
+						settingsChanged = refreshed.GetInteger( static_cast<mpRuleFieldId_t>( field ) ) !=
+							current.GetInteger( static_cast<mpRuleFieldId_t>( field ) );
+					}
+					if ( settingsChanged ) {
+						const mpRuleCommitResult_t refresh = matchRules.Commit( refreshed, context,
+							MP_RULES_OPEN_FOR_COMMIT );
+						if ( refresh.Succeeded() ) {
+							current = refreshed;
+						} else {
+							gameLocal.Warning( "the changed server settings are not valid match rules (field %d, reason %d); keeping the rules in force",
+								refresh.failure.field, refresh.failure.reason );
+						}
+					}
+				}
+			}
+			if ( !mpCompetitiveRules::ValidateDraft( current, context, failure ) ) {
+				competitiveRulesFailure = failure.reason;
+				if ( authority ) {
+					gameLocal.serverInfo.Set( "si_matchRules", "invalid" );
+				}
+				return false;
+			}
+			competitiveRulesValidForSession = true;
+			competitiveRulesFailure = MP_RULE_VALID;
+			if ( authority ) {
+				MirrorCompetitiveRulesToLegacy();
+				PublishCompetitiveRulesIdentity();
+			}
+			return true;
+		}
+	}
+
+	mpMatchRulesDraft draft;
+	if ( profile == NULL || !matchRules.BeginDraftFromProfile( profile->id,
+		gameLocal.gameType, draft, failure ) ) {
+		gameLocal.Warning( "match profile '%s' does not support gametype '%s'; using the recommended profile",
+			requestedProfile, MPGameTypeName( gameLocal.gameType ) );
+		profile = MPMatchProfile( MPRecommendedMatchProfileForGameType( gameLocal.gameType ) );
+		if ( profile == NULL || !matchRules.BeginDraftFromProfile( profile->id,
+			gameLocal.gameType, draft, failure ) ) {
+			competitiveRulesFailure = failure.reason;
+			return false;
+		}
+	}
+
+	// A casual session deliberately preserves the existing server's values at
+	// this boundary.  A failure leaves the prior snapshot untouched.
+	if ( profile->id == MP_MATCH_PROFILE_CASUAL ) {
+		if ( !importCasualSettings( draft, failure ) ) {
 			competitiveRulesFailure = failure.reason;
 			gameLocal.Warning( "could not import casual match rule %d (%d)", failure.field, failure.reason );
 			return false;
@@ -7370,18 +7458,24 @@ bool idMultiplayerGame::InitializeCompetitiveRules( void ) {
 		competitiveRulesFailure = commit.failure.reason;
 		gameLocal.Warning( "competitive rules rejected field %d (%d)",
 			commit.failure.field, commit.failure.reason );
-		gameLocal.serverInfo.Set( "si_matchRules", "invalid" );
+		if ( authority ) {
+			gameLocal.serverInfo.Set( "si_matchRules", "invalid" );
+		}
 		return false;
 	}
 
 	competitiveRulesValidForSession = true;
 	competitiveRulesInitialized = true;
 	competitiveRulesFailure = MP_RULE_VALID;
-	g_matchProfile.SetString( profile->key );
-	gameLocal.serverInfo.Set( "g_matchProfile", profile->key );
+	if ( authority ) {
+		g_matchProfile.SetString( profile->key );
+		gameLocal.serverInfo.Set( "g_matchProfile", profile->key );
+	}
 	g_matchProfile.ClearModified();
-	MirrorCompetitiveRulesToLegacy();
-	PublishCompetitiveRulesIdentity();
+	if ( authority ) {
+		MirrorCompetitiveRulesToLegacy();
+		PublishCompetitiveRulesIdentity();
+	}
 	return true;
 }
 
@@ -7451,10 +7545,16 @@ void idMultiplayerGame::MirrorCompetitiveRulesToLegacy( void ) {
 	MIRROR_MATCH_INT( si_roundWarmupDelay, "si_roundWarmupDelay", MP_RULE_ROUND_COUNTDOWN_SECONDS );
 	MIRROR_MATCH_INT( si_roundEndDelay, "si_roundEndDelay", MP_RULE_ROUND_REVIEW_SECONDS );
 	MIRROR_MATCH_INT( si_mercyLimit, "si_mercyLimit", MP_RULE_MERCY_LIMIT );
-	const int overtimeSeconds = rules.GetInteger( MP_RULE_OVERTIME_POLICY ) == MP_OVERTIME_TIMED_PERIODS ?
-		rules.GetInteger( MP_RULE_OVERTIME_PERIOD_SECONDS ) : 0;
-	si_overtime.SetInteger( overtimeSeconds );
-	gameLocal.serverInfo.SetInt( "si_overtime", overtimeSeconds );
+	// openQ4: with no time limit there is no overtime to play and the rules hold
+	// none, but the server's si_overtime is still the operator's: writing 0 here
+	// lost it for good the first time a map ran without a time limit.
+	if ( rules.GetInteger( MP_RULE_TIME_LIMIT_MINUTES ) > 0 ||
+		rules.GetInteger( MP_RULE_OVERTIME_POLICY ) == MP_OVERTIME_TIMED_PERIODS ) {
+		const int overtimeSeconds = rules.GetInteger( MP_RULE_OVERTIME_POLICY ) == MP_OVERTIME_TIMED_PERIODS ?
+			rules.GetInteger( MP_RULE_OVERTIME_PERIOD_SECONDS ) : 0;
+		si_overtime.SetInteger( overtimeSeconds );
+		gameLocal.serverInfo.SetInt( "si_overtime", overtimeSeconds );
+	}
 	MIRROR_MATCH_INT( si_suddenDeathRespawnDelay, "si_suddenDeathRespawnDelay", MP_RULE_SUDDEN_DEATH_RESPAWN_DELAY );
 	MIRROR_MATCH_INT( si_suddenDeathRespawnIncrease, "si_suddenDeathRespawnIncrease", MP_RULE_SUDDEN_DEATH_RESPAWN_INCREASE );
 	MIRROR_MATCH_INT( si_suddenDeathRespawnMax, "si_suddenDeathRespawnMax", MP_RULE_SUDDEN_DEATH_RESPAWN_MAX );
@@ -10272,6 +10372,11 @@ void idMultiplayerGame::Clear() {
 	votePacked = false;
 	memset( nextVoteAllowedTime, 0, sizeof( nextVoteAllowedTime ) );
 	memset( nextVoteRejectNoticeTime, 0, sizeof( nextVoteRejectNoticeTime ) );
+	memset( queuedDropSpawnId, 0, sizeof( queuedDropSpawnId ) );
+	memset( queuedDropReason, 0, sizeof( queuedDropReason ) );
+	memset( serverDropInFlight, 0, sizeof( serverDropInFlight ) );
+	disconnectPauseHumans = 0;
+	disconnectPauseUsedMask = 0;
 	memset( votesCalledThisMap, 0, sizeof( votesCalledThisMap ) );
 	announcedPauseState = MP_MATCH_PAUSE_RUNNING;
 	disconnectPauseSide = MP_MATCH_SIDE_NONE;
@@ -12824,7 +12929,9 @@ void idMultiplayerGame::ExecuteVote( void ) {
 				common->Warning( "Ignoring vote execution for invalid kick slot '%s'", voteValue.c_str() );
 				break;
 			}
+			BeginServerDrop( kickClientNum );
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d", kickClientNum ) );
+			EndServerDrop( kickClientNum );
 			break;
 		}
 		case VOTE_MAP:
@@ -13187,8 +13294,7 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 		}
 
 		if ( voteData.m_fieldFlags & VOTEFLAG_MAP ) {
-			const idDict *mapDict = MultiplayerResolveMapDecl( voteData.m_map.c_str() );
-			if ( !MPMapSupportsGameTypeName( mapDict, voteString ) ) {
+			if ( !MPVoteMapSupportsGameType( voteData.m_map.c_str(), voteString ) ) {
 				gameLocal.ServerSendChatMessage( clientNum, "server", "#str_41801" );
 				validVote = false;
 				voteData.m_fieldFlags &= ( ~VOTEFLAG_GAMETYPE );
@@ -13196,8 +13302,7 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 		}
 	} else {
 		if ( voteData.m_fieldFlags & VOTEFLAG_MAP ) {
-			const idDict *mapDict = MultiplayerResolveMapDecl( voteData.m_map.c_str() );
-			if ( !MPMapSupportsGameTypeName( mapDict, si_gameType.GetString() ) ) {
+			if ( !MPVoteMapSupportsGameType( voteData.m_map.c_str(), si_gameType.GetString() ) ) {
 				gameLocal.ServerSendChatMessage( clientNum, "server", "#str_41802" );
 				validVote = false;
 				voteData.m_fieldFlags &= ( ~VOTEFLAG_MAP );
@@ -13823,7 +13928,9 @@ void idMultiplayerGame::ExecutePackedVote( void ) {
 	}
 	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_KICK ) ) {
 		if ( IsValidVotePlayerSlot( currentVoteData.m_kick ) && currentVoteData.m_kick != gameLocal.localClientNum ) {
+			BeginServerDrop( currentVoteData.m_kick );
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d", currentVoteData.m_kick ) );
+			EndServerDrop( currentVoteData.m_kick );
 		} else {
 			common->Warning( "Ignoring packed vote execution for invalid kick slot %d", currentVoteData.m_kick );
 		}
@@ -16801,6 +16908,7 @@ void idMultiplayerGame::Run( void ) {
 
 	assert( gameLocal.isMultiplayer && gameLocal.isServer && gameState );
 
+	RunQueuedClientDrops();
 	CommonRun();
 	PublishMVDMarkers();
 	// openQ4: the map database publishes the map it would load next
@@ -18379,7 +18487,7 @@ const char *idMultiplayerGame::RetainedVoteRefusal( void ) {
 		return "#str_108023";
 	}
 	const idPlayer *local = gameLocal.GetLocalPlayer();
-	if ( local == NULL || local->spectating || local->wantSpectate ) {
+	if ( local == NULL || ( local->wantSpectate && !gameLocal.serverInfo.GetBool( "si_spectatorVote" ) ) ) {
 		return "#str_231049";
 	}
 	if ( vote != VOTE_NONE ) {
@@ -18398,7 +18506,7 @@ const char *idMultiplayerGame::RetainedBallotRefusal( void ) const {
 		return "#str_231050";
 	}
 	const idPlayer *local = gameLocal.GetLocalPlayer();
-	if ( local == NULL || local->spectating || local->wantSpectate ) {
+	if ( local == NULL || ( local->wantSpectate && !gameLocal.serverInfo.GetBool( "si_spectatorVote" ) ) ) {
 		return "#str_231049";
 	}
 	if ( voted ) {
@@ -22251,11 +22359,16 @@ void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, i
 		? va( common->GetLocalizedString( "#str_41330" ), va( "%d", round ) ) : "" );
 
 	// Team status: up to eight players a team, best score first.
+	// The spectator presentation lists both teams. Someone who chose to watch may
+	// have that; a participant in a spectator camera (eliminated, waiting) gets
+	// its own team only, as it did while it played.
 	const int maxRows = 8;
 	const bool showLocations = hud_teamLocations.GetBool();
+	const bool neutralView = localPlayer->spectating && localPlayer->wantSpectate;
+	const bool sidedSpectator = localPlayer->spectating && !localPlayer->wantSpectate;
 	for ( int team = 0; team < 2; team++ ) {
 		idStaticList<idPlayer *, MAX_CLIENTS> members;
-		if ( teamGame ) {
+		if ( teamGame && !( sidedSpectator && localPlayer->team != ( team ? TEAM_STROGG : TEAM_MARINE ) ) ) {
 			for ( int i = 0; i < Min( gameLocal.numClients, MAX_CLIENTS ); i++ ) {
 				idPlayer *player = OQ4_HudClient( i );
 				if ( player != NULL && !player->spectating && player->team == ( team ? TEAM_STROGG : TEAM_MARINE ) ) {
@@ -22279,7 +22392,7 @@ void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, i
 			mpTeamInfoEntry_t info;
 			teamInfo.Resolve( player, info );
 			const bool dead = info.health <= 0 || ( player == localPlayer && player->pfl.dead );
-			const bool placed = showLocations && !dead && ( localPlayer->spectating || player->team == localPlayer->team );
+			const bool placed = showLocations && !dead && ( neutralView || player->team == localPlayer->team );
 			_mphud->SetStateString( va( "oq4_ts%d_%d_name", team, i ), OQ4_HudPlain( player->GetUserInfo()->GetString( "ui_name" ) ).c_str() );
 			_mphud->SetStateInt( va( "oq4_ts%d_%d_weapon", team, i ), info.weapon );
 			_mphud->SetStateInt( va( "oq4_ts%d_%d_health", team, i ), Max( 0, info.health ) );
@@ -22907,8 +23020,12 @@ void idMultiplayerGame::WriteToSnapshot( idBitMsgDelta &msg ) const {
 // RITUAL BEGIN - DeadZone Messages
 	msg.WriteBits(isBuyingAllowedRightNow, 1);
 	msg.WriteShort(powerupCount);
-	msg.WriteFloat( marineScoreBarPulseAmount );
-	msg.WriteFloat( stroggScoreBarPulseAmount );
+	// openQ4: the DeadZone score bar pulses are each client's own (UpdateHud); the
+	// reader discards these. A listen server wrote its host's decaying values, which
+	// change every frame and so went out in full in every snapshot. The fields stay
+	// for the layout and stay zero, which costs nothing after the first snapshot.
+	msg.WriteFloat( 0.0f );
+	msg.WriteFloat( 0.0f );
 // RITUAL END
 
 
@@ -23904,6 +24021,117 @@ void idMultiplayerGame::AnnounceCasualPauseTransitions( void ) {
 
 /*
 ================
+idMultiplayerGame::QueueClientDrop
+
+Dropping a client deletes its player before the call returns. g_inactivity
+decides inside that player's own Think, so the rest of the think ran on a
+freed entity and the frame's think loop stepped on from it. The drop is
+recorded for the occupant of the slot and runs from Run.
+================
+*/
+void idMultiplayerGame::QueueClientDrop( int clientNum, const char *reason ) {
+	if ( gameLocal.isClient || clientNum < 0 || clientNum >= MAX_CLIENTS || reason == NULL ) {
+		return;
+	}
+	const idEntity *occupant = gameLocal.entities[ clientNum ];
+	if ( occupant == NULL ) {
+		return;
+	}
+	queuedDropSpawnId[ clientNum ] = gameLocal.GetSpawnId( occupant );
+	queuedDropReason[ clientNum ] = reason;
+}
+
+/*
+================
+idMultiplayerGame::RunQueuedClientDrops
+================
+*/
+void idMultiplayerGame::RunQueuedClientDrops( void ) {
+	for ( int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++ ) {
+		if ( queuedDropSpawnId[ clientNum ] == 0 ) {
+			continue;
+		}
+		const int spawnId = queuedDropSpawnId[ clientNum ];
+		const char *reason = queuedDropReason[ clientNum ];
+		queuedDropSpawnId[ clientNum ] = 0;
+		queuedDropReason[ clientNum ] = NULL;
+		// gone already, or the slot belongs to another connection now
+		const idEntity *occupant = gameLocal.entities[ clientNum ];
+		if ( occupant == NULL || gameLocal.GetSpawnId( occupant ) != spawnId ) {
+			continue;
+		}
+		BeginServerDrop( clientNum );
+		networkSystem->ServerDropClient( clientNum, reason );
+		EndServerDrop( clientNum );
+	}
+}
+
+/*
+================
+idMultiplayerGame::CountPlayingHumans
+================
+*/
+int idMultiplayerGame::CountPlayingHumans( int team ) const {
+	int count = 0;
+	for ( int clientNum = 0; clientNum < gameLocal.numClients; clientNum++ ) {
+		const idEntity *ent = gameLocal.entities[ clientNum ];
+		if ( ent == NULL || !ent->IsType( idPlayer::GetClassType() ) || !playerState[ clientNum ].ingame ||
+			botManager.IsBot( clientNum ) ) {
+			continue;
+		}
+		const idPlayer *player = static_cast<const idPlayer *>( ent );
+		if ( !player->wantSpectate && player->team == team ) {
+			count++;
+		}
+	}
+	return count;
+}
+
+/*
+================
+idMultiplayerGame::DisconnectPauseAdmits
+
+si_spectatorLock keeps spectators out of live play, and a match held by
+g_pauseOnDisconnect is still live: the player it waited for came back, was
+refused by the lock, and the side forfeited when the pause ran out. The side
+the pause is held for may take a player in.
+================
+*/
+bool idMultiplayerGame::DisconnectPauseAdmits( const char *teamName ) const {
+	if ( !abortCheckAfterPause || disconnectPauseSide < 0 || disconnectPauseSide >= TEAM_MAX || teamName == NULL ) {
+		return false;
+	}
+	return idStr::Icmp( teamName, teamNames[ disconnectPauseSide ] ) == 0;
+}
+
+/*
+================
+idMultiplayerGame::CheckDisconnectPauseReturn
+
+The pause waits for a player; once the side has one more than it was left
+with, there is nothing to wait for.
+================
+*/
+void idMultiplayerGame::CheckDisconnectPauseReturn( void ) {
+	// each side has one disconnect pause a match: outside live play the count starts again
+	if ( gameState != NULL && gameState->GetMPGameState() != GAMEON && gameState->GetMPGameState() != SUDDENDEATH ) {
+		disconnectPauseUsedMask = 0;
+	}
+	if ( !abortCheckAfterPause || disconnectPauseSide < 0 || disconnectPauseSide >= TEAM_MAX ) {
+		return;
+	}
+	const mpMatchPauseView &pause = matchSession.GetPause();
+	if ( pause.state != MP_MATCH_PAUSED || pause.kind != MP_MATCH_PAUSE_KIND_TECHNICAL ||
+		pause.reason != MP_MATCH_PAUSE_REASON_PLAYER_DISCONNECT ) {
+		return;
+	}
+	if ( CountPlayingHumans( disconnectPauseSide ) > disconnectPauseHumans ) {
+		matchSession.RequestResumeByAuthority( matchSession.GetSessionRevision() );
+	}
+}
+
+/*
+================
 idMultiplayerGame::BeginDisconnectPause
 
 openQ4 MP-12: g_pauseOnDisconnect. When a playing human leaves a live casual
@@ -23927,12 +24155,20 @@ bool idMultiplayerGame::BeginDisconnectPause( bool playingHuman, int side ) {
 	if ( matchSession.GetPause().state != MP_MATCH_PAUSE_RUNNING ) {
 		return false;
 	}
+	// One a side a match. Nobody but a referee can end a technical pause, so
+	// without a budget one player could hold a match still for as long as they
+	// liked by leaving and coming back.
+	if ( ( disconnectPauseUsedMask & ( 1 << side ) ) != 0 ) {
+		return false;
+	}
 	const mpMatchMutationResult result = matchSession.RequestTechnicalPause(
 		MP_MATCH_PAUSE_REASON_PLAYER_DISCONNECT, matchSession.GetSessionRevision(), seconds * 1000 );
 	if ( !result.WasApplied() ) {
 		return false;
 	}
+	disconnectPauseUsedMask |= ( 1 << side );
 	disconnectPauseSide = side;
+	disconnectPauseHumans = CountPlayingHumans( side );
 	abortCheckAfterPause = true;
 	return true;
 }
@@ -25082,7 +25318,8 @@ void idMultiplayerGame::ServerCallVote( int clientNum, const idBitMsg &msg ) {
 		common->Warning( "Ignoring vote from invalid client slot %d", clientNum );
 		return;
 	}
-	if ( !VoteRateLimitAccepted( clientNum ) ) {
+	// openQ4: g_voteLimit as well; the stock vote menu's message went around it
+	if ( !VoteRateLimitAccepted( clientNum ) || !VoteLimitAccepted( clientNum ) ) {
 		return;
 	}
 	if ( matchRules.Committed().GetBool( MP_RULE_MANAGED_MATCH ) ) {
@@ -25409,7 +25646,8 @@ void idMultiplayerGame::DisconnectClient( int clientNum ) {
 	UpdatePlayerRanks();
 	// openQ4 MP-12: g_pauseOnDisconnect holds a live casual team match while the
 	// player reconnects; the abort check runs when the pause ends
-	if ( !BeginDisconnectPause( disconnectedPlayingHuman, disconnectedGameSide ) ) {
+	const bool serverDrop = clientNum >= 0 && clientNum < MAX_CLIENTS && serverDropInFlight[ clientNum ];
+	if ( !BeginDisconnectPause( disconnectedPlayingHuman && !serverDrop, disconnectedGameSide ) ) {
 		CheckAbortGame( disconnectedParticipant, disconnectedGameSide,
 			disconnectedCompetitionSide );
 	}
@@ -25955,7 +26193,10 @@ void idMultiplayerGame::ProcessChatMessage( int clientNum, bool team, const char
 				break;
 
 			case 1:
-				if ( !p || ( to->spectating && !to->IsPlayerMuted( p ) ) ) {
+				// to those who chose to watch (and Tourney's waiting players), not to an
+				// eliminated participant, who could pass a spectator's line on to its team
+				if ( !p || ( to->spectating && ( to->wantSpectate || gameLocal.gameType == GAME_TOURNEY ) &&
+					!to->IsPlayerMuted( p ) ) ) {
 					if ( i == gameLocal.localClientNum ) {
 						AddChatLine( "%s^0: %s\n", suffixed_name.c_str(), prefixed_text.c_str() );
 					} else {
@@ -25978,7 +26219,10 @@ void idMultiplayerGame::ProcessChatMessage( int clientNum, bool team, const char
 						networkSystem->ServerSendReliableMessage( i, outMsg );
 					}
 				} else if ( !p || ( to->team == p->team && !to->IsPlayerMuted( p ) ) ) {
-					if ( !to->spectating ) {
+					// the whole team, an eliminated member included: it used to hear
+					// nothing of its team, its own line included. Someone who left
+					// for the spectators keeps a stale team and is not on it.
+					if ( !to->wantSpectate ) {
 						if ( i == gameLocal.localClientNum ) {
 							PrintChatLine( va( "%s^0: %s\n", suffixed_name.c_str(), prefixed_text.c_str() ), true );
 						} else {
@@ -26546,7 +26790,9 @@ idMultiplayerGame::HandleServerAdminKickPlayer
 void idMultiplayerGame::HandleServerAdminKickPlayer( int clientNum ) {
 	if ( RejectManagedLegacyMutation( "server admin kick" ) || !IsValidVotePlayerSlot( clientNum ) ||
 		clientNum == gameLocal.localClientNum || SendRemoteAdminPlayerTarget( "kick", clientNum ) ) return;
+	BeginServerDrop( clientNum );
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %i", clientNum ) );
+	EndServerDrop( clientNum );
 }
 
 /*
@@ -27668,10 +27914,39 @@ void idMultiplayerGame::QueueRulesRestart( void ) {
 	if ( gameLocal.isClient || modifierRestartPending ) {
 		return;
 	}
+	// openQ4: the settings may now name a game type this map does not play; a
+	// preset can change it. MapRestart refuses such a restart, so the console
+	// said "applied", nothing changed and this latch stayed set. Move to a map
+	// that plays it, as a passed game type vote does.
+	if ( PickMap( "", true ) && PickMap( si_gameType.GetString() ) ) {
+		gameLocal.sessionCommand = "nextMap";
+		return;
+	}
 	modifierRestartPending = true;
 	// Ahead of anything already queued (an exec'd script, say), so nothing
 	// runs under rules the server info no longer advertises.
 	cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "serverMapRestart\n" );
+}
+
+/*
+================
+idMultiplayerGame::AnyMapPlaysGameType
+
+A name the game type table does not know passes: the map load decides.
+================
+*/
+bool idMultiplayerGame::AnyMapPlaysGameType( const char *gameTypeName ) {
+	const mpGameTypeInfo_t *wanted = MPGameTypeByName( gameTypeName );
+	if ( wanted == NULL ) {
+		return true;
+	}
+	const mpMapDatabase &mapDatabase = mpMapHost.Database();
+	for ( int index = 0; index < mapDatabase.Num(); index++ ) {
+		if ( mapDatabase.Supports( index, wanted->type ) ) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /*
