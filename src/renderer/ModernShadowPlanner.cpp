@@ -945,12 +945,12 @@ static void R_ModernShadowPlanner_InitDescriptorContract( modernShadowLightDescr
 	descriptor.compareMode = descriptor.pointLight ? MODERN_SHADOW_COMPARE_MANUAL_PACKED_DEPTH : MODERN_SHADOW_COMPARE_MANUAL_DEPTH;
 	descriptor.biasModel = descriptor.pointLight ? MODERN_SHADOW_BIAS_POINT_VECTOR : ( descriptor.mapType == MODERN_SHADOW_MAP_CASCADE ? MODERN_SHADOW_BIAS_CASCADE_SCALED : MODERN_SHADOW_BIAS_CONSTANT_NORMAL );
 	const shadowMapProjectedFilterSettings_t projectedFilterSettings = R_ShadowMapProjectedFilterSettings( vLight );
-	// Modern receivers filter every pixel with one fixed kernel of this
-	// radius and size their atlas guard from it. Under PCSS-lite the effective
-	// radius is the classic shader's blocker-search and maximum-penumbra bound,
-	// not a blur width: as a fixed kernel it was 8 texels and shadowed grazing
-	// walls that nothing occludes. The modern path has no blocker search, so it
-	// keeps the contact radius.
+	// The contact radius, rounded up: the receiver-guard and diagnostics
+	// figure. Projected receivers filter from the descriptor's own filter
+	// record (rendererModernShadowDescriptor_t::projectedFilter), with the
+	// classic blocker search under PCSS-lite. The effective radius is that
+	// search's bound, not a blur width: as a fixed kernel it was 8 texels and
+	// shadowed grazing walls that nothing occludes.
 	descriptor.pcfKernel = static_cast<int>( idMath::Ceil( descriptor.pointLight
 		? r_shadowMapPointFilterRadius.GetFloat()
 		: projectedFilterSettings.filterRadius ) );

@@ -217,13 +217,16 @@ typedef struct modernClusterShadowDescriptorGpuRecord_s {
 	float				bias[4];
 	float				projection[4];
 	float				projectedAtlasRect[RENDERER_MODERN_SHADOW_DESCRIPTOR_MAX_CASCADES][4];
+	// rendererModernShadowDescriptor_t::projectedFilter. Appended so every
+	// earlier offset holds; 64 UBO records are now exactly 32 KiB.
+	float				filterParams[4];
 } modernClusterShadowDescriptorGpuRecord_t;
 
 // The GLSL twin (struct ModernClusterShadowDescriptor in
 // ModernGLShaderLibrary.cpp) is hand-synced; every member is a vec4/mat4
 // multiple so tight C packing equals std140/std430. These pins turn silent
 // layout drift into a compile error.
-assert_sizeof( modernClusterShadowDescriptorGpuRecord_t, ( 5 * 4 + 4 * 16 + 6 * 4 + 4 * 4 ) * sizeof( float ) );
+assert_sizeof( modernClusterShadowDescriptorGpuRecord_t, ( 5 * 4 + 4 * 16 + 6 * 4 + 4 * 4 + 4 ) * sizeof( float ) );
 assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, identity, 0 );
 assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, policy, 16 );
 assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, layout, 32 );
@@ -237,6 +240,7 @@ assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, worldTexelSize, 384 )
 assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, bias, 400 );
 assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, projection, 416 );
 assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, projectedAtlasRect, 432 );
+assert_offsetof( modernClusterShadowDescriptorGpuRecord_t, filterParams, 496 );
 
 typedef struct modernClusterDebugPixel_s {
 	unsigned char		r;
@@ -864,6 +868,14 @@ static void R_ModernClusteredLighting_CopyPlannerShadowDescriptor( rendererModer
 		dst.projection[1] = src.projectionScale;
 		dst.projection[2] = static_cast<float>( src.projectedFallbackCascade );
 		dst.projection[3] = static_cast<float>( src.projectedFallbackReason );
+		// The receivers filter as the classic shader and Vulkan do: the same
+		// contact radius, taps, rotation and PCSS-lite blocker search.
+		const shadowMapProjectedFilterSettings_t filter = R_ShadowMapProjectedFilterSettings( src.viewLight );
+		const bool pcss = filter.filterMode == 2;
+		dst.projectedFilter[0] = filter.filterRadius;
+		dst.projectedFilter[1] = static_cast<float>( filter.filterTaps + 32 * filter.filterMode );
+		dst.projectedFilter[2] = pcss ? filter.pcssLightRadius : 0.0f;
+		dst.projectedFilter[3] = pcss ? filter.pcssMaxRadius : 0.0f;
 	}
 	memcpy( dst.bias, src.bias, sizeof( dst.bias ) );
 	dst.normalOffsetScale = src.normalOffsetScale;
@@ -955,6 +967,7 @@ static void R_ModernClusteredLighting_FillShadowDescriptorGpuRecord( modernClust
 	memcpy( dst.bias, src.bias, sizeof( dst.bias ) );
 	memcpy( dst.projection, src.projection, sizeof( dst.projection ) );
 	memcpy( dst.projectedAtlasRect, src.projectedAtlasRect, sizeof( dst.projectedAtlasRect ) );
+	memcpy( dst.filterParams, src.projectedFilter, sizeof( dst.filterParams ) );
 }
 
 static void R_ModernClusteredLighting_ApplyShadowDescriptor( modernClusterLightRecord_t &record, const viewLight_t *vLight, rendererClusteredLightingStats_t &stats ) {

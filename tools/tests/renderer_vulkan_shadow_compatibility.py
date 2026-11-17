@@ -2013,9 +2013,10 @@ def validate_shadow_filtering_contract() -> None:
         ),
         "shared projected shadow filter policy",
     )
-    # Modern GL receivers have no blocker search and filter with one fixed
-    # kernel. PCSS-lite's effective radius bounds the classic search, not the
-    # blur: as an 8-texel kernel it shadowed unoccluded grazing walls.
+    # pcfKernel stays the contact radius. PCSS-lite's effective radius bounds
+    # the blocker search, not the blur: as an 8-texel fixed kernel it shadowed
+    # unoccluded grazing walls. Modern GL receivers filter from their own
+    # filter record, as the classic shader and Vulkan do.
     planner = read("src/renderer/ModernShadowPlanner.cpp")
     require_compact(
         planner,
@@ -2026,6 +2027,28 @@ def validate_shadow_filtering_contract() -> None:
     )
     if "projectedFilterSettings.effectiveFilterRadius" in planner:
         raise AssertionError("Modern GL receivers must not filter with the PCSS search bound")
+    require_order(
+        read("src/renderer/ModernClusteredLighting.cpp"),
+        (
+            "R_ShadowMapProjectedFilterSettings( src.viewLight )",
+            "dst.projectedFilter[1] = static_cast<float>( filter.filterTaps + 32 * filter.filterMode );",
+            "dst.projectedFilter[2] = pcss ? filter.pcssLightRadius : 0.0f;",
+            "dst.projectedFilter[3] = pcss ? filter.pcssMaxRadius : 0.0f;",
+            "memcpy( dst.filterParams, src.projectedFilter, sizeof( dst.filterParams ) );",
+        ),
+        "modern GL projected filter record",
+    )
+    require_order(
+        read("src/renderer/ModernGLShaderLibrary.cpp"),
+        (
+            "float ModernClusterProjectedEffectiveRadius(",
+            "float ModernClusterProjectedPCSSRadius(",
+            "if (blockerCount <= 0.0) { return 0.0; }",
+            "mat2 rotation = ModernClusterProjectedRotation(descriptor, tileTexel, depth);",
+            "float filterRadius = ModernClusterProjectedPCSSRadius(",
+        ),
+        "modern GL PCSS-lite projected receivers",
+    )
 
     interactions = read("src/renderer/Vulkan/vk_Interactions.cpp")
     shadow_slice = braced_body(
@@ -2512,13 +2535,24 @@ def validate_projected_footprint_bias_contract() -> None:
             r'"float ModernClusterShadowFootprintBias(ModernClusterShadowDescriptor descriptor, int cascadeIndex, vec3 normal, vec3 lightDir) {\n"',
             r'"    float depthPerUnit = min(length(vec3(shadowMatrix[0].z, shadowMatrix[1].z, shadowMatrix[2].z)), 1.0);\n"',
             r'"    float bias = ModernClusterShadowReceiverBias(descriptor, cascadeIndex, normal, lightDir, depth) + tapBias;\n"',
+            r'"    float footprintBias = ModernClusterShadowFootprintBias(descriptor, cascadeIndex, normal, lightDir);\n"',
             r'"    float shadow = ModernClusterCompareProjected(descriptor, uv, depth, cascadeIndex, normal, lightDir, 0.0);\n"',
-            r'"        float tapBias = ModernClusterShadowFootprintBias(descriptor, cascadeIndex, normal, lightDir) * radius * 0.70710678;\n"',
+            r'"        float tapBias = footprintBias * filterRadius;\n"',
         ),
         "modern GL projected footprint bias",
     )
-    if modern.count("depth, cascadeIndex, normal, lightDir, tapBias);") != 4:
-        raise AssertionError("Every modern GL projected PCF tap must carry the footprint bias")
+    # The PCSS-lite blocker search applies it per probe too.
+    require(
+        modern,
+        "if (d < compareDepth - length(o) * searchBias) { blockerDepth += d; blockerCount += 1.0; }",
+        "modern GL PCSS blocker-search footprint bias",
+    )
+    for tap_index in range(1, 13):
+        require(
+            modern,
+            f"depth, cascadeIndex, normal, lightDir, length(o{tap_index}) * tapBias);",
+            f"modern GL projected tap o{tap_index} footprint bias",
+        )
 
 
 def point_receiver_settings(

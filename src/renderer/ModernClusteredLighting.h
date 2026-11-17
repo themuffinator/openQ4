@@ -209,6 +209,12 @@ typedef struct rendererModernShadowDescriptor_s {
 	float	projectedBaseClipPlanes[4][4];
 	float	projectedClipPlanes[RENDERER_MODERN_SHADOW_DESCRIPTOR_MAX_CASCADES][4][4];
 	float	projectedAtlasRect[RENDERER_MODERN_SHADOW_DESCRIPTOR_MAX_CASCADES][4];
+	// Projected filter, as the classic and Vulkan receivers take it
+	// (R_ShadowMapProjectedFilterSettings): x = contact radius in texels,
+	// y = taps + 32 * filter mode, z = PCSS search (light) radius and
+	// w = PCSS maximum radius, both zero unless the mode is PCSS-lite (2).
+	// Zero for point lights.
+	float	projectedFilter[4];
 } rendererModernShadowDescriptor_t;
 
 typedef struct rendererModernLightDescriptor_s {

@@ -1045,7 +1045,19 @@ and the pictures agree:
 
 OpenGL and Vulkan differ from each other in 5 to 14 pixels of these captures.
 The one or two levels on OpenGL do not follow the filter (the same with one
-tap) or the translucent receiver setting; their cause was not found.
+tap) or the translucent receiver setting.
+
+**Corrected on 17 November: none of those pixels is PBR.** The counts above
+cover the whole frame outside the translucent station, and the laboratory
+room around the stations is a classic material. Captured again with an
+ownership mask (`r_pbrDebug 7`, one pixel eroded at the edges), the 175,000
+pixels of the PBR stations are never brighter mapped than unshadowed, with
+the projector mapped or the point light too; every brighter pixel is on the
+room. That is the stock-path difference recorded above (the ARB program's
+normalization cube, 0.996 of unit length), by design. The same room drawn
+with `r_pbrMaterials 0` shows it on the stations as well, and the modern
+OpenGL path, which draws the room with exact vectors, shows no pixel brighter
+anywhere (see "Modern OpenGL receivers and PCSS-lite" below).
 
 One station is lighter whenever shadows are on, on both renderers and under
 stencil as much as under maps: the translucent one. That is the ownership
@@ -1060,6 +1072,54 @@ in-engine self-tests on both renderers; and the 74 static tests that read the
 touched files. The enhanced-material branch of the receivers reads the same
 as the classic shader's; the PBR branch was not compared with its unshadowed
 counterpart.
+
+### Modern OpenGL receivers and PCSS-lite
+
+Added on 17 November. The modern OpenGL path (the opt-in modern visible frame,
+`ModernGLShaderLibrary.cpp`) filtered projected shadows with a fixed five-tap
+box at the contact radius: no blocker search, no rotation, and a kernel unlike
+the classic shader's and Vulkan's. Since the October fix for grazing-wall acne
+it had used the contact radius because the PCSS-lite search bound, as a fixed
+kernel, shadowed walls nothing occludes.
+
+- **The shadow descriptor carries the projected filter.** One `vec4` appended
+  to the GPU record (`filterParams`: contact radius, taps + 32 x mode, PCSS
+  search and maximum radii, both zero unless the mode is 2), filled from
+  `R_ShadowMapProjectedFilterSettings` like the other two receivers. 64 UBO
+  records are now exactly 32 KiB.
+- **The modern receiver runs the classic kernel.** Rotation by a hash of the
+  texel within the tile, the 1/5/9/13-tap sets with the balanced five-tap
+  ring, the per-tap footprint bias, and under PCSS-lite the blocker search
+  (`ModernClusterProjectedPCSSRadius`, the classic `ProjectedPCSSRadius` with
+  its footprint bias per probe). The atlas guard and the receiver-plane bias
+  use the effective radius, as the classic shader does. `pcfKernel` stays the
+  contact radius.
+
+PBR laboratory, overview camera, OpenGL, every light mapped. Widening the PCSS
+radii to 16 texels against the defaults (4 and 8) is the control: a receiver
+without a blocker search cannot respond to it.
+
+| Pixels changed by more than two levels | Modern, before | Modern, after | Classic receivers |
+|---|---:|---:|---:|
+| PCSS radii widened to 16 | 0 | 9,601 | 9,813 |
+| PCF radius widened to 8 (mode 1) | 17,192 | 29,315 | 22,129 |
+
+The widened penumbrae fall on the same pixels on both paths (84% overlap) and
+change them in the same direction in 99.7% of them. At the default radii the
+modern picture with PCSS-lite and with plain PCF differ in 52 pixels; the
+kernel itself moved 7,700 pixels against the old box. Four room patches no
+station can shadow are identical to the unshadowed capture on the modern path
+before and after (mean and maximum difference 0).
+
+**A laboratory gap found on the way.** Under the laboratory's settings the
+modern path did not own any shadowed frame before or after this change ("PBR
+did not own the visible frame"): the first-run preset leaves point lights on
+stencil, and a view with a stencil-shadow pass falls back to the classic path
+(blocker `pass=stencilShadow`, reason `missingVertexBuffer`). The figures above
+set `r_shadowMapPointLights 1`. The laboratory's modern shadow controls need
+the same setting to test the modern receivers at all.
+Vulkan was not rebuilt or captured for this change; its receivers are
+untouched.
 
 ### Caster order and the live window
 
@@ -1579,10 +1639,11 @@ whether Enhanced can now map point lights on Vulkan.
 
 1. Fullscreen budgets for the three tiers, on the reference machine with
    nothing else running. Every change of this round moved what they cost.
-2. On OpenGL a mapped light draws a PBR receiver one level brighter, two at
-   most, than the same light unshadowed, in up to a tenth of the view. Not
-   the filter and not the translucent setting; Vulkan is exact. Invisible,
-   and unexplained.
+2. The PBR laboratory's modern OpenGL shadow controls leave point lights on
+   stencil, so the modern path never owns their frames (see "Modern OpenGL
+   receivers and PCSS-lite"). The earlier item here, PBR receivers one or two
+   levels brighter under a map on OpenGL, was the classic room around the
+   stations; the PBR pixels are exact (see "The PBR branch").
 3. A static model that moves under still lights (a lift, a door) builds its
    volumes again each frame it moves, 40 to 45 microseconds a view in hub2.
    Leaving them out needs a mark on the entity for having moved.
