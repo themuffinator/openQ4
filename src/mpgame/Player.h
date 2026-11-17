@@ -500,6 +500,19 @@ public:
 	bool					vrBodyViewArm[ VR_NUM_HANDS ];	// the view weapon draws this arm's forearm and hand
 	idVec3					vrBodyElbow[ VR_NUM_HANDS ];	// in the body's own space
 	idVec3					vrBodyWrist[ VR_NUM_HANDS ];
+	// in an exposed seat the body is the seat's own animation, its neck under
+	// the head: the arms stay on the controls
+	bool					vrBodySeated;
+	// openQ4 VR: the third-person model's heading under a tracked aim, which
+	// holds still while the gun points near straight up or down
+	// (VR_ModelYawFollow). Never sent.
+	float					vrModelYaw;
+	bool					vrModelYawValid;
+	// openQ4 VR: the facing the server last sent this client (deltaViewAngles
+	// yaw). The server sets a facing from the weapon hand's usercmd; when it
+	// changes the client turns its body so the head faces there instead.
+	float					vrSnapshotDeltaYaw;
+	bool					vrSnapshotDeltaYawValid;
 
 	// openQ4 VR: the body crouched by the button, until it stands again
 	mutable bool			vrButtonCrouch;
@@ -671,6 +684,9 @@ public:
 	// player's first-person view and a headset presents it; trackingYaw
 	// places the tracking space in the world.
 	bool					GetVRView( vrFrameState_t &frame, float &trackingYaw ) const;
+	// The weapon hand's aim turned from the head's heading, degrees (local
+	// player aiming with a tracked hand).
+	bool					GetVRHandFromHead( float &handFromHead ) const;
 	// True while the view weapon follows the weapon-hand controller.
 	bool					IsVRHandAiming( void ) const;
 	// The view weapon at the weapon hand: from the interpolated eye for

@@ -447,6 +447,73 @@ inline bool VR_RoomScaleWalkInput( float headX, float headY, float aimYawDegrees
 
 /*
 ====================
+Room-scale catch-up (single player)
+
+How far the body walks after the head this tic: what lies beyond the free
+lean radius, but no more than maxStep. A player who walked about the room
+while the game was paused, or while the tracking was lost, left the head
+metres from the body; walked in one tic, that step skipped the ground
+between (a pit, a trigger) and showed as a jump. Capped, the body catches up
+over a few tics at a run.
+====================
+*/
+inline float VR_RoomScaleCatchUp( float distance, float freeRadius, float maxStep ) {
+	const float beyond = distance - freeRadius;
+	if ( !( beyond > 0.0f ) ) {
+		return 0.0f;
+	}
+	return ( maxStep > 0.0f && beyond > maxStep ) ? maxStep : beyond;
+}
+
+/*
+====================
+The third-person model's heading under a tracked aim
+
+The model faces the usercmd yaw, which a hand-held gun sets. Aimed near
+straight up or down, that yaw is the hand's roll and swings with every
+twitch, and the model in mirrors and shadows spun round. The model follows
+the aim's yaw fully up to 55 degrees of pitch, less and less beyond, and not
+at all past 80; returns its new yaw, degrees. Shots still follow the aim.
+====================
+*/
+inline float VR_ModelYawFollow( float modelYaw, float aimYaw, float aimPitch ) {
+	const float pitch = std::fabs( aimPitch );
+	float follow = ( 80.0f - pitch ) / 25.0f;
+	follow = follow < 0.0f ? 0.0f : ( follow > 1.0f ? 1.0f : follow );
+	return VR_NormalizeDegrees180( modelYaw + VR_NormalizeDegrees180( aimYaw - modelYaw ) * follow );
+}
+
+/*
+====================
+Touchpads pressed by region
+
+Controllers with a touchpad in place of face buttons (Vive wands, Windows
+Mixed Reality) press it as one of several buttons by where the thumb rests:
+a centre within centreRadius (0 for none), then the nearest of up, down, left
+and right. x and y are the pad's -1..1 axes, y up.
+====================
+*/
+enum vrPadRegion_t {
+	VR_PAD_NONE = -1,
+	VR_PAD_CENTRE,
+	VR_PAD_UP,
+	VR_PAD_DOWN,
+	VR_PAD_LEFT,
+	VR_PAD_RIGHT
+};
+
+inline int VR_TrackpadRegion( float x, float y, float centreRadius ) {
+	if ( !( x == x ) || !( y == y ) || x * x + y * y <= centreRadius * centreRadius ) {
+		return VR_PAD_CENTRE;
+	}
+	if ( std::fabs( y ) >= std::fabs( x ) ) {
+		return y >= 0.0f ? VR_PAD_UP : VR_PAD_DOWN;
+	}
+	return x > 0.0f ? VR_PAD_RIGHT : VR_PAD_LEFT;
+}
+
+/*
+====================
 Physical crouch
 
 The tracked head lowered well below where it was recentred crouches the

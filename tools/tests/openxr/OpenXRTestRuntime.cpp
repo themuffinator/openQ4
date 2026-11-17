@@ -19,7 +19,12 @@
 //   OPENQ4_XR_TEST_EYE_SIZE "WIDTHxHEIGHT" recommended per-eye size (default 1440x1600)
 //   OPENQ4_XR_TEST_RATE     display refresh in Hz (default 90); 0 runs unpaced
 //   OPENQ4_XR_TEST_NO_INPUT 1 keeps every controller action inactive
+//   OPENQ4_XR_TEST_PROFILE  the interaction profile to report, among those the
+//                           application suggested bindings for (default: the
+//                           first of Touch, Index, Vive, WMR, simple)
 //   OPENQ4_XR_TEST_FAULT    "call:occurrence:value" (e.g. xrWaitSwapchainImage:2:timeout);
+//                           the value "failure" returns XR_ERROR_RUNTIME_FAILURE
+//                           without losing the instance (a failed optional call)
 //                           imageFill:<n>:unbound hands an OpenGL swapchain texture
 //                           names the runtime never made, so nothing can render into them
 //   OPENQ4_XR_TEST_FAULT_AFTER optional existing-file marker before counting calls
@@ -53,8 +58,9 @@
 // the script without any input). Commands:
 //   head <yawDeg> <pitchDeg> <rollDeg> [x y z]      head pose in the stage space (metres)
 //   hand <left|right> <x> <y> <z> <yaw> <pitch> <roll>
-//   button <left|right> <trigger|squeeze|a|b|x|y|menu|thumbclick> <value>
+//   button <left|right> <trigger|squeeze|a|b|x|y|menu|thumbclick|padclick|padforce> <value>
 //   stick <left|right> <x> <y>
+//   pad <left|right> <x> <y>                         the touchpad (Vive, WMR, Index)
 //   capture <path prefix>                           write every layer of the next submitted frame
 //   burst <path prefix> <frames> [scale]            write the left eye of that many consecutive frames,
 //                                                   shrunk by an integer scale (default 4), to catch a
@@ -438,6 +444,8 @@ struct HandInput {
 	float	squeeze;
 	bool	a, b, x, y, menu, thumbClick;
 	float	stickX, stickY;
+	bool	padClick;
+	float	padX, padY, padForce;
 };
 
 // Device entry points of a Vulkan session, from the application's loader.
@@ -546,6 +554,7 @@ struct RuntimeGlobals {
 	bool					noInput = false;
 	bool					sessionLost = false, instanceLost = false;
 	std::string				faultCall, faultValue, faultAfter, faultOnce;
+	std::string				forcedProfile;
 	int						faultOccurrence = 1, faultCalls = 0;
 	bool					faultFired = false;
 	int						trackingInvalidFrames = 0;
@@ -614,6 +623,7 @@ bool Fault( const char *call ) {
 
 XrResult FaultResult() {
 	const std::string &value = G().faultValue;
+	if ( value == "failure" ) return XR_ERROR_RUNTIME_FAILURE;
 	if ( value == "session" ) return XR_ERROR_SESSION_LOST;
 	if ( value == "instance" ) return XR_ERROR_INSTANCE_LOST;
 	if ( value == "runtime" ) return XR_ERROR_RUNTIME_FAILURE;
@@ -745,6 +755,9 @@ void InitGlobals() {
 		ParseScript( script );
 	}
 	g.noInput = std::getenv( "OPENQ4_XR_TEST_NO_INPUT" ) != nullptr;
+	if ( const char *profile = std::getenv( "OPENQ4_XR_TEST_PROFILE" ) ) {
+		g.forcedProfile = profile;
+	}
 	if ( const char *fault = std::getenv( "OPENQ4_XR_TEST_FAULT" ) ) {
 		std::istringstream input( fault );
 		std::string occurrence;
@@ -994,17 +1007,30 @@ bool EvaluateBinding( TRInstance *instance, XrPath binding, float &value, float 
 		value = input.y ? 1.0f : 0.0f;
 	} else if ( component == "menu/click" || component == "system/click" ) {
 		value = input.menu ? 1.0f : 0.0f;
-	} else if ( component == "thumbstick/click" || component == "trackpad/click" ) {
+	} else if ( component == "thumbstick/click" ) {
 		value = input.thumbClick ? 1.0f : 0.0f;
-	} else if ( component == "thumbstick" || component == "trackpad" ) {
+	} else if ( component == "thumbstick" ) {
 		isVector = true;
 		x = input.stickX;
 		y = input.stickY;
 		value = std::sqrt( x * x + y * y );
-	} else if ( component == "thumbstick/x" || component == "trackpad/x" ) {
+	} else if ( component == "thumbstick/x" ) {
 		value = input.stickX;
-	} else if ( component == "thumbstick/y" || component == "trackpad/y" ) {
+	} else if ( component == "thumbstick/y" ) {
 		value = input.stickY;
+	} else if ( component == "trackpad/click" ) {
+		value = input.padClick ? 1.0f : 0.0f;
+	} else if ( component == "trackpad/force" ) {
+		value = input.padForce;
+	} else if ( component == "trackpad" ) {
+		isVector = true;
+		x = input.padX;
+		y = input.padY;
+		value = std::sqrt( x * x + y * y );
+	} else if ( component == "trackpad/x" ) {
+		value = input.padX;
+	} else if ( component == "trackpad/y" ) {
+		value = input.padY;
 	} else if ( component == "grip/pose" || component == "aim/pose" ) {
 		value = 1.0f;
 	} else {
@@ -1018,9 +1044,14 @@ XrPath ChooseProfile( TRInstance *instance ) {
 		"/interaction_profiles/oculus/touch_controller",
 		"/interaction_profiles/valve/index_controller",
 		"/interaction_profiles/htc/vive_controller",
+		"/interaction_profiles/microsoft/motion_controller",
 		"/interaction_profiles/khr/simple_controller",
 	};
+	const std::string &forced = G().forcedProfile;
 	for ( const char *name : preference ) {
+		if ( !forced.empty() && forced != name ) {
+			continue;
+		}
 		std::map<std::string, XrPath>::const_iterator it = instance->pathIds.find( name );
 		if ( it == instance->pathIds.end() ) {
 			continue;
@@ -1472,11 +1503,19 @@ void RunScriptCommand( TRSession *session, const std::vector<std::string> &a ) {
 				hand.menu = on;
 			} else if ( name == "thumbclick" ) {
 				hand.thumbClick = on;
+			} else if ( name == "padclick" ) {
+				hand.padClick = on;
+			} else if ( name == "padforce" ) {
+				hand.padForce = value;
 			}
 		} else if ( command == "stick" && a.size() >= 4 ) {
 			HandInput &hand = g.hands[a[1] == "left" ? 0 : 1];
 			hand.stickX = f( 2, 0.0f );
 			hand.stickY = f( 3, 0.0f );
+		} else if ( command == "pad" && a.size() >= 4 ) {
+			HandInput &hand = g.hands[a[1] == "left" ? 0 : 1];
+			hand.padX = f( 2, 0.0f );
+			hand.padY = f( 3, 0.0f );
 		} else if ( command == "capture" && a.size() >= 2 ) {
 			g.pendingCapture = a[1];
 		} else if ( command == "burst" && a.size() >= 3 ) {
@@ -3504,6 +3543,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrAttachSessionActionSets( XrSession handle, c
 
 XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetCurrentInteractionProfile( XrSession handle, XrPath topLevelUserPath, XrInteractionProfileState *profile ) {
 	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	if ( Fault( "xrGetCurrentInteractionProfile" ) ) return FaultResult();
 	TRSession *session = GetSession( handle );
 	if ( session == nullptr ) {
 		return XR_ERROR_HANDLE_INVALID;
@@ -3738,6 +3778,7 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetInputSourceLocalizedName( XrSession handl
 
 XRAPI_ATTR XrResult XRAPI_CALL TR_xrApplyHapticFeedback( XrSession handle, const XrHapticActionInfo *hapticActionInfo, const XrHapticBaseHeader *hapticFeedback ) {
 	std::lock_guard<std::recursive_mutex> guard( G().lock );
+	if ( Fault( "xrApplyHapticFeedback" ) ) return FaultResult();
 	TRSession *session = GetSession( handle );
 	if ( session == nullptr ) {
 		return XR_ERROR_HANDLE_INVALID;

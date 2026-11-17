@@ -130,6 +130,9 @@ public:
 		(void)trackingDelta;
 		return false;
 	}
+	virtual void			TurnBody( float yawDegrees ) {
+		(void)yawDegrees;
+	}
 };
 
 #if defined( OPENQ4_OPENXR )

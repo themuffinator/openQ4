@@ -47,6 +47,7 @@ here: it waits on the AND-05 distribution decision.
 | 1.6 | Set **VR Mode** to Disabled, then back to Enabled. | Desktop play is unchanged while off; VR returns when on. |
 | 1.7 | Step aside, turn, and use the headset's own recenter (for example hold the Meta button). | You end up at the origin facing forward in one clean step: no jump, slide or second correction a moment later. |
 | 1.8 | Resize and maximize the desktop window during VR gameplay, then set **VR Mode** to Disabled. | The mirror fills the window at each size; the flat view afterwards fits the window. |
+| 1.9 | Load the runtime with another application or a heavy desktop task while in VR gameplay, so the compositor stalls for a moment. | The session survives a short stall (the console may say a swapchain image was waited for again); only a stall of more than a second returns VR to the desktop. |
 
 ## 2. Refresh, latency and frame cost (VR-02, VR-04)
 
@@ -74,6 +75,10 @@ here: it waits on the AND-05 distribution decision.
 | 3.12 | Switch **Weapon Hand** to left and look at both hands. | The character's own (simpler) hands hold the gun and follow the right controller; no modelled right hand sits on a left arm. |
 | 3.13 | Put the gun hand behind a door frame, a crate and a wall corner. | The gun is hidden by what the hand is behind, at the depth both eyes agree on. |
 | 3.14 | On Valve Index controllers, hold both controllers normally without squeezing. | No weapon switch, no weapon wheel and no two-handed grip until you squeeze. |
+| 3.15 | On Valve Index controllers, squeeze the left trackpad firmly, then rest a thumb on it without pressing. | The firm squeeze toggles the flashlight; a resting thumb does nothing. |
+| 3.16 | On HTC Vive wands, press each trackpad up, down, left, right and in the middle; then rest a thumb on the right pad without pressing. | Right: up crouches, down jumps, left and right turn, the middle recentres when held. Left: up toggles the flashlight, down reloads, the middle runs. A resting thumb on the right pad neither turns nor changes weapon; the left pad walks as before. |
+| 3.17 | On Windows Mixed Reality controllers, press each touchpad in its upper and lower half; click both thumbsticks. | Upper half: crouch (right), flashlight (left). Lower half: jump (right), reload (left). The thumbstick clicks keep their own actions. |
+| 3.18 | With a mirror or your shadow in view, point the gun straight up, then straight down, rolling your wrist. | Your character in the mirror or shadow keeps facing one way; it no longer spins on the spot. |
 
 ## 4. Body, space and movement (VR-02, VR-03)
 
@@ -103,6 +108,8 @@ here: it waits on the AND-05 distribution decision.
 | 5.3 | Die, respawn, and load a save. | Each transition is free of flashes or a view stuck at the wrong height. |
 | 5.4 | Snap-turn several times, then finish a level, and separately load a save. | The next level starts facing the way its start faces, and the save loads facing the way it was saved, not turned by the earlier snap turns. |
 | 5.5 | Save in the walker's seat facing somewhere other than straight ahead, load the save, and look around. | The view loads facing the way you saved, along the walker's sights; nothing swings round after the load. |
+| 5.6 | Climb onto an open gun (airdefense1's anti-aircraft gun) and look down and around. | Your character stands at the controls under you, hands on the handles, at your height; no body sits inside the walker or the hovertank. |
+| 5.7 | In multiplayer on someone else's server, with the gun hanging well off to one side, respawn and go through a teleporter. | You face the way the spawn point or teleporter sends you, whatever the hand does. |
 
 ## 6. Menus, HUD and screens in the world (VR-01, VR-02)
 

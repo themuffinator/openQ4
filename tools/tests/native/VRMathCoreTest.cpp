@@ -406,6 +406,42 @@ static void TestBody( void ) {
 	Check( VR_BodyScale( 68.0f, 0.0f ) == 1.0f && VR_BodyScale( 10.0f, 77.5f ) == 0.6f && VR_BodyScale( 200.0f, 77.5f ) == 1.2f, "a nonsense height stays within bounds" );
 }
 
+static void TestAuditLeads( void ) {
+	// room scale: a lean is free, a step walks, a long way catches up at a capped pace
+	Check( VR_RoomScaleCatchUp( 3.0f, 4.0f, 3.3f ) == 0.0f, "a lean inside the free radius walks nothing" );
+	Check( Near( VR_RoomScaleCatchUp( 6.0f, 4.0f, 3.3f ), 2.0f, 1e-5f ), "a short step walks what lies beyond the lean" );
+	Check( Near( VR_RoomScaleCatchUp( 120.0f, 4.0f, 3.3f ), 3.3f, 1e-5f ), "metres walked while paused catch up a tic's step at a time" );
+	Check( Near( VR_RoomScaleCatchUp( 120.0f, 4.0f, 0.0f ), 116.0f, 1e-4f ), "no cap walks the whole way" );
+	float walked = 0.0f;
+	int tics = 0;
+	for ( float distance = 84.0f; distance > 4.0f && tics < 1000; tics++ ) {
+		const float step = VR_RoomScaleCatchUp( distance, 4.0f, 3.3f );
+		walked += step;
+		distance -= step;
+	}
+	Check( Near( walked, 80.0f, 1e-3f ) && tics >= 25 && tics <= 26, "two metres behind, the body is back under the head in under half a second" );
+
+	// the third-person model under a tracked aim
+	Check( Near( VR_ModelYawFollow( 10.0f, 40.0f, 30.0f ), 40.0f, 1e-4f ), "below 55 degrees of pitch the model faces the aim" );
+	Check( Near( VR_ModelYawFollow( 10.0f, -170.0f, 85.0f ), 10.0f, 1e-4f ), "aimed near straight down the model holds its heading" );
+	Check( Near( VR_ModelYawFollow( 170.0f, -170.0f, -30.0f ), -170.0f, 1e-4f ), "the follow takes the short way round" );
+	const float partial = VR_ModelYawFollow( 0.0f, 90.0f, 67.5f );
+	Check( partial > 40.0f && partial < 50.0f, "between 55 and 80 degrees the model follows part of the way" );
+	float model = 0.0f;
+	for ( int tic = 0; tic < 600; tic++ ) {
+		// a hand pointing at the floor, its yaw spinning with the roll
+		model = VR_ModelYawFollow( model, static_cast<float>( ( tic * 37 ) % 360 ) - 180.0f, 88.0f );
+	}
+	Check( model == 0.0f, "a spinning yaw at the floor never turns the model" );
+
+	// touchpads pressed by region
+	Check( VR_TrackpadRegion( 0.1f, 0.2f, 0.5f ) == VR_PAD_CENTRE, "a press near the middle is the centre" );
+	Check( VR_TrackpadRegion( 0.1f, 0.9f, 0.5f ) == VR_PAD_UP && VR_TrackpadRegion( -0.2f, -0.7f, 0.5f ) == VR_PAD_DOWN, "up and down" );
+	Check( VR_TrackpadRegion( 0.8f, 0.3f, 0.5f ) == VR_PAD_RIGHT && VR_TrackpadRegion( -0.8f, -0.3f, 0.5f ) == VR_PAD_LEFT, "left and right" );
+	Check( VR_TrackpadRegion( 0.1f, 0.2f, 0.0f ) == VR_PAD_UP && VR_TrackpadRegion( 0.0f, -0.05f, 0.0f ) == VR_PAD_DOWN, "with no centre every press has a side" );
+	Check( VR_TrackpadRegion( std::nanf( "" ), 0.5f, 0.0f ) == VR_PAD_CENTRE, "a nonsense pad reads as the centre" );
+}
+
 int main() {
 	TestBasis();
 	TestOrientation();
@@ -423,6 +459,7 @@ int main() {
 	TestQuad();
 	TestHeadsetServices();
 	TestBody();
+	TestAuditLeads();
 	std::printf( "VR math core: all checks passed\n" );
 	return 0;
 }

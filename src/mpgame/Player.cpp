@@ -1481,6 +1481,11 @@ idPlayer::idPlayer() {
 	vrBodyYawTime = -1;
 	vrBodyPosed = false;
 	vrBodyMode = VR_BODY_OFF;
+	vrBodySeated = false;
+	vrModelYaw = 0.0f;
+	vrModelYawValid = false;
+	vrSnapshotDeltaYaw = 0.0f;
+	vrSnapshotDeltaYawValid = false;
 	vrBodyScale = 1.0f;
 	vrBodyOrigin.Zero();
 	vrBodyAxis.Identity();
@@ -9618,23 +9623,45 @@ idPlayer::SetViewAngles
 void idPlayer::SetViewAngles( const idAngles &angles ) {
 	UpdateDeltaViewAngles(angles);
 	viewAngles = angles;
+	// a new facing: the model takes it at once, wherever the gun points
+	vrModelYawValid = false;
 	// openQ4 VR: a facing is the head's. The usercmd turns with the weapon hand,
 	// so the facing above points the gun where the player was meant to look,
 	// wherever the hand happens to hang: a teleporter could leave the player
 	// facing a wall with the gun at their side. Turn the tracking space by the
-	// angle between hand and head as well, and the head faces there.
-	if ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 && vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) {
-		vrFrameState_t frame;
-		vrSystem->GetFrameState( frame );
-		const vrPose_t &aim = frame.aim[ frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT ];
-		if ( frame.active && frame.aimMode == VR_AIM_HAND && frame.head.valid && aim.valid ) {
-			const float handFromHead = idMath::AngleNormalize180( aim.axis[0].ToYaw() - VR_PoseHeading( frame.head ) );
-			idAngles delta = deltaViewAngles;
-			delta.yaw = idMath::AngleNormalize180( delta.yaw + handFromHead );
-			SetDeltaViewAngles( delta );
-			viewAngles.yaw = idMath::AngleNormalize180( viewAngles.yaw + handFromHead );
-		}
+	// angle between hand and head as well, and the head faces there. A client
+	// does not own its delta: it turns its body when the server's facing
+	// arrives instead (ReadFromSnapshot).
+	float handFromHead;
+	if ( !gameLocal.isClient && ( usercmd.buttons & BUTTON_VRAIM ) != 0 && GetVRHandFromHead( handFromHead ) ) {
+		idAngles delta = deltaViewAngles;
+		delta.yaw = idMath::AngleNormalize180( delta.yaw + handFromHead );
+		SetDeltaViewAngles( delta );
+		viewAngles.yaw = idMath::AngleNormalize180( viewAngles.yaw + handFromHead );
 	}
+}
+
+/*
+================
+idPlayer::GetVRHandFromHead
+
+openQ4 VR: how far the weapon hand's aim is turned from the head's heading,
+degrees, for the local player aiming with a tracked hand.
+================
+*/
+bool idPlayer::GetVRHandFromHead( float &handFromHead ) const {
+	handFromHead = 0.0f;
+	if ( vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this ) {
+		return false;
+	}
+	vrFrameState_t frame;
+	vrSystem->GetFrameState( frame );
+	const vrPose_t &aim = frame.aim[ frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT ];
+	if ( !frame.active || frame.aimMode != VR_AIM_HAND || !frame.head.valid || !aim.valid ) {
+		return false;
+	}
+	handFromHead = idMath::AngleNormalize180( aim.axis[0].ToYaw() - VR_PoseHeading( frame.head ) );
+	return true;
 }
 
 /*
@@ -9643,8 +9670,15 @@ idPlayer::UpdateViewAngles
 ================
 */
 void idPlayer::UpdateViewAngles( void ) {
+	// openQ4 VR: a headset's view is where the head is. Holding the view still
+	// against a tracked weapon hand would turn the tracked world by however far
+	// the hand moved meanwhile, so a frozen view leaves the delta as it is. The
+	// server knows a VR client by its usercmd; the server's delta is the one
+	// every client takes (ReadFromSnapshot), so it must decide the same way.
+	const bool vrTrackedAim = ( usercmd.buttons & BUTTON_VRAIM ) != 0
+		|| ( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this );
 	if ( ( weaponWheelActive || ( usercmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0 ) && !spectating && health > 0 &&
-		 !( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) ) {
+		 !vrTrackedAim ) {
 		UpdateDeltaViewAngles( viewAngles );
 		return;
 	}
@@ -9656,17 +9690,16 @@ void idPlayer::UpdateViewAngles( void ) {
 	if ( gameLocal.isMultiplayer && gameLocal.mpGame.ArenaCampaignLocksPlayers() && !arenaFreeLook ) {
 		// The Arena entrance and spawn-in freeze facing as well as movement.
 		// Keep input deltas current so returning to gameplay cannot snap the view.
-		UpdateDeltaViewAngles( viewAngles );
+		if ( !vrTrackedAim ) {
+			UpdateDeltaViewAngles( viewAngles );
+		}
 		return;
 	}
 
 	if ( !noclip && ( gameLocal.inCinematic || privateCameraView || gameLocal.GetCamera() || influenceActive == INFLUENCE_LEVEL2 ) ) {
 		// no view changes at all, but we still want to update the deltas or else when
 		// we get out of this mode, our view will snap to a kind of random angle
-		// openQ4 VR: a headset's view is where the head is. Holding the delta
-		// against the weapon hand would turn the tracked world by however far
-		// the hand moved meanwhile, so it stays as it is.
-		if ( !( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) ) {
+		if ( !vrTrackedAim ) {
 			UpdateDeltaViewAngles( viewAngles );
 		}
 		return;
@@ -9732,9 +9765,18 @@ void idPlayer::UpdateViewAngles( void ) {
 	// input still integrates above -- but the bodies stay exactly where the match
 	// ended. Turning the model here would spin the victor on the spot while the
 	// camera circled it.
+	// openQ4 VR: under a tracked aim the model holds its heading while the gun
+	// points near straight up or down, where the hand's yaw is only its roll
+	// (VR_ModelYawFollow); the server and every client turn it alike
+	float modelYaw = viewAngles.yaw;
+	if ( vrAim && vrModelYawValid ) {
+		modelYaw = VR_ModelYawFollow( vrModelYaw, viewAngles.yaw, viewAngles.pitch );
+	}
 	if ( !arenaFreeLook ) {
 		// orient the model towards the direction we're looking
-		SetAngles( idAngles( 0, viewAngles.yaw, 0 ) );
+		SetAngles( idAngles( 0, modelYaw, 0 ) );
+		vrModelYaw = modelYaw;
+		vrModelYawValid = vrAim;
 	}
 
 	// save in the log for analyzing weapon angle offsets
@@ -14077,12 +14119,15 @@ round with the tracking space when the stick turns the player.
 */
 void idPlayer::BeginVRBody( void ) {
 	vrBodyPosed = false;
+	vrBodySeated = false;
 	vrBodyViewArm[ VR_HAND_LEFT ] = vrBodyViewArm[ VR_HAND_RIGHT ] = false;
 
+	// a closed vehicle hides its driver (rvVehiclePosition::SetDriver); an
+	// exposed seat shows the driver at its controls, and the body with it
 	vrFrameState_t frame;
 	float trackingYaw;
 	if ( !GetVRView( frame, trackingYaw ) || !frame.stereo || frame.body == VR_BODY_OFF || !frame.head.valid
-			|| health <= 0 || spectating || IsInVehicle() || IsHidden() || renderEntity.hModel == NULL ) {
+			|| health <= 0 || spectating || IsHidden() || renderEntity.hModel == NULL ) {
 		FreeVRBody();
 		vrBodyYawTime = -1;
 		return;
@@ -14163,6 +14208,24 @@ void idPlayer::BeginVRBody( void ) {
 	const vrVec3_t neckPoint = VR_NeckFromHead( VR_Vec3( headOrigin.x, headOrigin.y, headOrigin.z ),
 		VR_Vec3( headAxis[0].x, headAxis[0].y, headAxis[0].z ), VR_Vec3( headAxis[2].x, headAxis[2].y, headAxis[2].z ), frame.unitsPerMetre );
 
+	if ( IsInVehicle() ) {
+		// An exposed seat: the seat's own animation has the hands on its
+		// controls, so the body is that pose as the world sees it, moved so its
+		// neck sits under the tracked head, set back as a standing body is.
+		vrBodySeated = true;
+		vrBodyMode = VR_BODY_TORSO;
+		vrBodyScale = 1.0f;
+		vrBodyAxis = renderEntity.axis;
+		memcpy( vrBodyJoints, animated, numJoints * sizeof( vrBodyJoints[0] ) );
+		idVec3 back = headAxis[0];
+		back.z = 0.0f;
+		back.Normalize();
+		const float setback = VR_BodySetback( VR_Vec3( headAxis[0].x, headAxis[0].y, headAxis[0].z ) ) * frame.unitsPerMetre;
+		vrBodyOrigin = idVec3( neckPoint.x, neckPoint.y, neckPoint.z ) - animated[ vrBodyRig.neck ].ToVec3() * vrBodyAxis - back * setback;
+		vrBodyPosed = true;
+		return;
+	}
+
 	// The torso's heading is kept in the tracking space, which the stick's
 	// turns carry round with the player. The head's heading is taken from its
 	// forward and up together, so it holds while the player looks at their feet.
@@ -14230,7 +14293,8 @@ void idPlayer::FinishVRBody( void ) {
 	}
 	const int *parents = animator.ModelDef()->JointParents();
 	const idMat3 toBody = vrBodyAxis.Transpose();
-	for ( int hand = 0; hand < VR_NUM_HANDS; hand++ ) {
+	// a seated body keeps its hands on the seat's controls
+	for ( int hand = 0; hand < VR_NUM_HANDS && !vrBodySeated; hand++ ) {
 		if ( vrBodyMode != VR_BODY_FULL ) {
 			VRBody_FoldArm( vrBodyRig, parents, hand, vrBodyJoints );
 			continue;
@@ -16646,6 +16710,24 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	physicsObj.ApplySnapshotState( decodedPhysics );
 	remotePredictedTics = 0;
 	ApplyBindSnapshotInfo( decodedBindInfo );
+	// openQ4 VR: the server set a new facing (a spawn, a teleporter) from this
+	// client's usercmd, which a tracked weapon hand turns: the gun faces where
+	// the player was meant to look. Turn the body by the angle between hand and
+	// head, and the next usercmds face the head there instead.
+	if ( entityNumber == gameLocal.localClientNum && vrSnapshotDeltaYawValid
+			&& idMath::Fabs( idMath::AngleNormalize180( decodedDeltaViewAngles.yaw - vrSnapshotDeltaYaw ) ) > 0.001f ) {
+		float handFromHead;
+		if ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 && GetVRHandFromHead( handFromHead ) ) {
+			vrSystem->TurnBody( handFromHead );
+			if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+				gameLocal.Printf( "VR facing from the server: %.1f, head turned onto it by %.1f\n",
+					idMath::AngleNormalize180( SHORT2ANGLE( usercmd.angles[ YAW ] ) + decodedDeltaViewAngles.yaw ), handFromHead );
+			}
+		}
+		vrModelYawValid = false;
+	}
+	vrSnapshotDeltaYaw = decodedDeltaViewAngles.yaw;
+	vrSnapshotDeltaYawValid = true;
 	deltaViewAngles = decodedDeltaViewAngles;
 	health = decodedHealth;
 	inventory.armor = decodedArmor;

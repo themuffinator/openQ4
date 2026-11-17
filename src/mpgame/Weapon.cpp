@@ -3570,6 +3570,17 @@ void rvWeapon::Attack( bool altAttack, int num_attacks, float spread, float fuse
 		muzzleAxis = playerViewAxis;		
 		muzzleOrigin += playerViewAxis[0] * muzzleOffset;
 	}
+	// openQ4 VR: a gun in the hand has its muzzle ahead of the hand, which
+	// may be right up against a wall: a shot from there started on the far
+	// side. The muzzle stays short of whatever lies between it and the hand,
+	// as GetVRAimOrigin keeps the hand short of what lies between it and the eye.
+	if ( owner->IsVRHandAiming() ) {
+		trace_t clearance;
+		gameLocal.TracePoint( owner, clearance, playerViewOrigin, muzzleOrigin, MASK_SHOT_RENDERMODEL, owner );
+		if ( clearance.fraction < 1.0f ) {
+			muzzleOrigin = playerViewOrigin + ( clearance.endpos - playerViewOrigin ) * 0.9f;
+		}
+	}
 
 	// add some to the kick time, incrementally moving repeat firing weapons back
 	if ( kick_endtime < gameLocal.realClientTime ) {
@@ -3723,6 +3734,13 @@ void rvWeapon::LaunchProjectiles ( idDict& dict, const idVec3& muzzleOrigin, con
 //RAVEN END
 			else {
 				start = ownerBounds.GetCenter();
+			}
+			// openQ4 VR: the way to the muzzle is cleared from the body's box, on
+			// the line of the shot, which assumes a muzzle at the eye inside it. A
+			// gun in the hand is anywhere about the body, often outside the box; its
+			// way is cleared from the hand, which is clear of the eye.
+			if ( owner->IsVRHandAiming() ) {
+				start = playerViewOrigin;
 			}
 // RAVEN BEGIN
 // ddynerman: multiple clip worlds

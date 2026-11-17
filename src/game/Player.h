@@ -460,6 +460,14 @@ public:
 	bool					vrBodyViewArm[ VR_NUM_HANDS ];	// the view weapon draws this arm's forearm and hand
 	idVec3					vrBodyElbow[ VR_NUM_HANDS ];	// in the body's own space
 	idVec3					vrBodyWrist[ VR_NUM_HANDS ];
+	// in an exposed seat (a turret, a gun on a tram) the body is the seat's own
+	// animation, its neck under the head: the arms stay on the controls
+	bool					vrBodySeated;
+	// openQ4 VR: the third-person model's heading under a tracked aim, which
+	// holds still while the gun points near straight up or down
+	// (VR_ModelYawFollow). Never saved.
+	float					vrModelYaw;
+	bool					vrModelYawValid;
 
 	bool					presentationCanInterpolate;
 	idVec3					presentationPrevViewOrigin;

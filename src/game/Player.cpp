@@ -1267,6 +1267,9 @@ idPlayer::idPlayer() {
 	vrBodyYawTime = -1;
 	vrBodyPosed = false;
 	vrBodyMode = VR_BODY_OFF;
+	vrBodySeated = false;
+	vrModelYaw = 0.0f;
+	vrModelYawValid = false;
 	vrBodyScale = 1.0f;
 	vrBodyOrigin.Zero();
 	vrBodyAxis.Identity();
@@ -8824,6 +8827,8 @@ idPlayer::SetViewAngles
 void idPlayer::SetViewAngles( const idAngles &angles ) {
 	UpdateDeltaViewAngles(angles);
 	viewAngles = angles;
+	// a new facing: the model takes it at once, wherever the gun points
+	vrModelYawValid = false;
 	// openQ4 VR: a facing is the head's. The usercmd turns with the weapon hand,
 	// so the facing above points the gun where the player was meant to look,
 	// wherever the hand happens to hang: a teleporter could leave the player
@@ -9007,8 +9012,18 @@ void idPlayer::UpdateViewAngles( void ) {
 
 	UpdateDeltaViewAngles( viewAngles );
 
+	// openQ4 VR: under a tracked aim the model, seen in mirrors and shadows,
+	// holds its heading while the gun points near straight up or down, where
+	// the hand's yaw is only its roll (VR_ModelYawFollow)
+	float modelYaw = viewAngles.yaw;
+	if ( vrAim && vrModelYawValid ) {
+		modelYaw = VR_ModelYawFollow( vrModelYaw, viewAngles.yaw, viewAngles.pitch );
+	}
+	vrModelYaw = modelYaw;
+	vrModelYawValid = vrAim;
+
 	// orient the model towards the direction we're looking
-	SetAngles( idAngles( 0, viewAngles.yaw, 0 ) );
+	SetAngles( idAngles( 0, modelYaw, 0 ) );
 
 	// save in the log for analyzing weapon angle offsets
 	loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
@@ -13047,15 +13062,19 @@ void idPlayer::UpdateVRRoomScale( void ) {
 	if ( gameLocal.isMultiplayer || noclip || spectating || health <= 0 || IsInVehicle() || !GetVRView( frame, trackingYaw ) || !frame.roomScale || !frame.head.valid ) {
 		return;
 	}
-	// leaning a little is free; beyond it the body follows
+	// leaning a little is free; beyond it the body follows, at no more than a
+	// sprint (5 m/s): a head that wandered off while the game was paused
+	// catches up over a few tics instead of one step across whatever lies
+	// between (VR_RoomScaleCatchUp)
 	const float freeRadius = 4.0f;
 	const idVec3 offset( frame.head.origin.x, frame.head.origin.y, 0.0f );
 	const float distance = offset.Length();
-	if ( distance <= freeRadius ) {
+	const float step = VR_RoomScaleCatchUp( distance, freeRadius, 5.0f * frame.unitsPerMetre * MS2SEC( gameLocal.msec ) );
+	if ( step <= 0.0f ) {
 		return;
 	}
 	const idMat3 tracking = VR_TrackingAxis( trackingYaw );
-	const idVec3 walked = physicsObj.VRWalk( ( offset * ( ( distance - freeRadius ) / distance ) ) * tracking );
+	const idVec3 walked = physicsObj.VRWalk( ( offset * ( step / distance ) ) * tracking );
 	idVec3 walkedTracking = walked * tracking.Transpose();
 	walkedTracking.z = 0.0f;
 	if ( walkedTracking.LengthSqr() > 0.0f && vrSystem->ShiftTrackingOrigin( walkedTracking ) ) {
@@ -13391,12 +13410,15 @@ round with the tracking space when the stick turns the player.
 */
 void idPlayer::BeginVRBody( void ) {
 	vrBodyPosed = false;
+	vrBodySeated = false;
 	vrBodyViewArm[ VR_HAND_LEFT ] = vrBodyViewArm[ VR_HAND_RIGHT ] = false;
 
+	// a closed vehicle hides its driver (rvVehiclePosition::SetDriver); an
+	// exposed seat shows the driver at its controls, and the body with it
 	vrFrameState_t frame;
 	float trackingYaw;
 	if ( !GetVRView( frame, trackingYaw ) || !frame.stereo || frame.body == VR_BODY_OFF || !frame.head.valid
-			|| health <= 0 || spectating || IsInVehicle() || IsHidden() || renderEntity.hModel == NULL ) {
+			|| health <= 0 || spectating || IsHidden() || renderEntity.hModel == NULL ) {
 		FreeVRBody();
 		vrBodyYawTime = -1;
 		return;
@@ -13477,6 +13499,24 @@ void idPlayer::BeginVRBody( void ) {
 	const vrVec3_t neckPoint = VR_NeckFromHead( VR_Vec3( headOrigin.x, headOrigin.y, headOrigin.z ),
 		VR_Vec3( headAxis[0].x, headAxis[0].y, headAxis[0].z ), VR_Vec3( headAxis[2].x, headAxis[2].y, headAxis[2].z ), frame.unitsPerMetre );
 
+	if ( IsInVehicle() ) {
+		// An exposed seat: the seat's own animation has the hands on its
+		// controls, so the body is that pose as the world sees it, moved so its
+		// neck sits under the tracked head, set back as a standing body is.
+		vrBodySeated = true;
+		vrBodyMode = VR_BODY_TORSO;
+		vrBodyScale = 1.0f;
+		vrBodyAxis = renderEntity.axis;
+		memcpy( vrBodyJoints, animated, numJoints * sizeof( vrBodyJoints[0] ) );
+		idVec3 back = headAxis[0];
+		back.z = 0.0f;
+		back.Normalize();
+		const float setback = VR_BodySetback( VR_Vec3( headAxis[0].x, headAxis[0].y, headAxis[0].z ) ) * frame.unitsPerMetre;
+		vrBodyOrigin = idVec3( neckPoint.x, neckPoint.y, neckPoint.z ) - animated[ vrBodyRig.neck ].ToVec3() * vrBodyAxis - back * setback;
+		vrBodyPosed = true;
+		return;
+	}
+
 	// The torso's heading is kept in the tracking space, which the stick's
 	// turns carry round with the player. The head's heading is taken from its
 	// forward and up together, so it holds while the player looks at their feet.
@@ -13544,7 +13584,8 @@ void idPlayer::FinishVRBody( void ) {
 	}
 	const int *parents = animator.ModelDef()->JointParents();
 	const idMat3 toBody = vrBodyAxis.Transpose();
-	for ( int hand = 0; hand < VR_NUM_HANDS; hand++ ) {
+	// a seated body keeps its hands on the seat's controls
+	for ( int hand = 0; hand < VR_NUM_HANDS && !vrBodySeated; hand++ ) {
 		if ( vrBodyMode != VR_BODY_FULL ) {
 			VRBody_FoldArm( vrBodyRig, parents, hand, vrBodyJoints );
 			continue;

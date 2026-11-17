@@ -237,7 +237,17 @@ def main() -> int:
             report["failures"].append("no frame went without layers after the screen image broke")
         if any(layer.get("type") == "quad" for e in after for layer in e.get("layers", [])):
             report["failures"].append("a frame submitted the virtual screen it never wrote")
-    if args.fault != "none" and not args.fault.endswith((":tracking", ":unbound")):
+    # A swapchain wait that times out once is made again, and a failed optional
+    # call (xrGetCurrentInteractionProfile:<n>:failure) goes without: neither
+    # may retire the session.
+    survivable = args.fault.endswith((":timeout", ":failure"))
+    if survivable and faults:
+        if "session: none" in log.split("XR_FAULT_BEFORE", 1)[-1].split("XR_FAULT_DESKTOP", 1)[0]:
+            report["failures"].append("a survivable fault retired the session")
+        expected_message = "waiting again" if args.fault.endswith(":timeout") else "(VR goes on without it)"
+        if expected_message not in log:
+            report["failures"].append(f"the log does not show the fault survived ({expected_message!r})")
+    if args.fault != "none" and not args.fault.endswith((":tracking", ":unbound")) and not survivable:
         fallback = log.split("XR_FAULT_AFTER", 1)[-1].split("XR_FAULT_AUTO", 1)[0]
         if "session: none" not in fallback:
             report["failures"].append("fault did not retire the session before fallback capture")

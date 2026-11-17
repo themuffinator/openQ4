@@ -7,6 +7,41 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## VR: controllers with fewer buttons, steadier sessions, and the audit's other leads, 17 November 2026
+
+- **Every action on every controller.** Valve Index gets the flashlight:
+  squeeze the left trackpad firmly. HTC Vive wands and Windows Mixed Reality
+  controllers press their touchpads as buttons by where your thumb is, so
+  jumping, crouching, reloading and the flashlight all have a place. On a Vive
+  wand a thumb resting on the right pad no longer turns you or changes weapon;
+  press left or right to turn. The [VR guide](../user/vr.md#controls) has the
+  layouts.
+- **A hitch is not the end of VR.** When the headset's software stalls for a
+  moment, openQ4 waits up to a second for it instead of dropping back to the
+  desktop. A failure in something VR can do without, such as vibration or a
+  headset's refresh-rate setting, is reported in the console and VR carries on;
+  it used to stop VR until `vr_restart`.
+- **Facing the right way in multiplayer.** After a respawn or a teleporter your
+  head faces where the game sends you, as in single player; before, your gun
+  did, wherever your hand hung.
+- **Smaller fixes.** Your character in mirrors, in your shadow and to other
+  players no longer spins on the spot while you point the gun straight up or
+  down. A gun held against a wall no longer shoots through it. The comfort
+  vignette is centred where your head looks in both eyes, so headsets with
+  angled displays see one clear centre. Walking about your room while the game
+  is paused no longer moves your character the whole way in one jump when you
+  resume. At an open gun or turret you see your body at the controls.
+- **What to do.** Replace the client, both game modules (game module API 60)
+  and pak0 together. Everything here was checked on openQ4's simulated headset
+  only; the [headset checklist](vr-headset-qualification.md) rows 1.9, 3.15 to
+  3.18, 5.6 and 5.7 are for real headsets.
+- **Still open.** Holding the weapon in your left hand still uses your
+  character's simpler hands: a version with the gun's own hands mirrored was
+  built and taken out again because its hands did not sit on the grip.
+- Details and evidence:
+  [design and evidence](platform-recovery-review.md#the-audits-leads-second-round-17-november-2026)
+  and the roadmap's VR-02 entry.
+
 ## The Awakening's freeze gun recharges, 17 November 2026
 
 - **A battery that refills.** The freeze gun's charge now tops itself back up

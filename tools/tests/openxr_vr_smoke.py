@@ -494,7 +494,8 @@ def main(argv: list[str] | None = None) -> None:
     # the runtime's binding UI shows these names: they come from the language table
     localized = sorted(e["localized"] for e in events if e.get("event") == "create_action")
     assert localized == sorted(["Aim pose", "Grip pose", "Trigger", "Grip", "Thumbstick", "Thumbstick click",
-                                "Primary button", "Secondary button", "Menu", "Vibration"]), localized
+                                "Primary button", "Secondary button", "Menu", "Vibration",
+                                "Touchpad", "Touchpad click"]), localized
     assert [e["localized"] for e in events if e.get("event") == "create_action_set"] == ["Gameplay"], \
         "the action set name is not localised"
     assert any(e.get("event") == "end_session" for e in events), "the runtime's exit request never ended the session"

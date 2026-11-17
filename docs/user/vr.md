@@ -70,6 +70,10 @@ launch with `+set vr_enable 1`.
 - If VR fails during play, openQ4 releases any controls you were holding and
   carries on in the desktop window. It tries again after three seconds, or
   waits for `vr_restart` if the runtime itself stopped.
+- **Not in 0.14.1:** a runtime that stalls for a moment costs a frame, not
+  your VR session: openQ4 waits up to a second before giving up. A failure in
+  something VR can do without, such as vibration or a headset's refresh-rate
+  setting, is reported in the console and VR carries on.
 - If the desktop window is minimized or hidden, the headset keeps rendering;
   only the desktop view waits for the window to come back.
 
@@ -97,6 +101,15 @@ you can rebind them in **Settings → Controls** like any gamepad button.
 
 The weapon hand is the right hand. Set `vr_leftHanded 1` to hold the weapon in
 your left hand; the triggers, grips and sticks swap with it.
+
+The table shows Meta Quest Touch controllers. Controllers with fewer buttons
+use these instead (**not in 0.14.1**; before, some had no flashlight or jump):
+
+| Controller | Differences |
+| --- | --- |
+| Valve Index | Left B opens the menu. Squeeze the left trackpad firmly for the flashlight. |
+| HTC Vive wand | The trackpad is the stick. Press it to use it as buttons. Right pad: up crouches, down jumps, left and right turn, centre is the stick click. Left pad: up toggles the flashlight, down reloads, centre runs. The right menu button also crouches. A thumb resting on the right pad does nothing until you press. |
+| Windows Mixed Reality | Press the touchpad. Upper half: crouch (right) or flashlight (left). Lower half: jump (right) or reload (left). The thumbsticks work as on Touch. |
 
 Menus open on a floating screen in front of you, and the game world stays around
 you while the game is paused. Point your weapon-hand controller at the screen:
@@ -186,7 +199,10 @@ Good to know:
 - The guns are modelled for a right hand on the grip. If you hold the weapon in
   your left hand (`vr_leftHanded 1`), your character's own simpler hands hold
   it and the gun's modelled hands are hidden.
-- You have no body in a vehicle or turret seat, or while a cinematic plays.
+- At an open gun or turret, where your character stands at the controls, you
+  see your body there with its hands on the controls (**not in 0.14.1**).
+  Closed vehicles, such as the walker and the hovertank, hide you inside, so
+  you have no body there, nor while a cinematic plays.
 - Only you see this body. Mirrors, your shadow and other players show your
   character as before.
 - The body has only been checked with openQ4's simulated headset. If it sits
@@ -354,6 +370,11 @@ your hand. Damage numbers rise on the HUD from the player you hit.
 
 Servers older than 0.14.1 can leave your shots a fixed angle above or below the
 laser after you respawn or teleport. 0.14.1 servers keep shots on the laser.
+
+**Not in 0.14.1:** after you respawn or go through a teleporter, your head
+faces the way the game sends you, as in single player; before, your gun did,
+wherever your hand hung. Your character in other players' view no longer spins
+on the spot while you point your gun straight up or down.
 
 ## Meta Quest without a PC
 

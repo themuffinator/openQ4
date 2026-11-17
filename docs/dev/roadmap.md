@@ -2296,6 +2296,32 @@ and AND-05.
   seats; and a left-handed hold that uses the model's simpler hands. The
   setting is **Your Body** on the Virtual Reality tab, in all twelve
   language tables, on the stock and the retained pages.
+  The same day a second round took those leads
+  ([release record](release-completion.md#vr-controllers-with-fewer-buttons-steadier-sessions-and-the-audits-other-leads-17-november-2026)):
+  Index's left trackpad force is the flashlight, and Vive wands and Windows
+  Mixed Reality controllers press their touchpads by region
+  (`VR_TrackpadRegion`), proven per profile by
+  `openxr_vr_controller_profiles_smoke.py` (the test runtime reports a chosen
+  profile, `OPENQ4_XR_TEST_PROFILE`); a swapchain wait that times out is made
+  again for up to a second; optional calls (haptics, the profile's name,
+  refresh rate, performance levels, thread hints) go through `CheckOptional`,
+  so a runtime failure there no longer stops VR; the comfort vignette centres
+  on the head's forward in both eyes; the third-person model holds its heading
+  past 55 degrees of aim pitch (`VR_ModelYawFollow`); a hand-held muzzle and a
+  projectile's way are cleared from the hand; a single-player room-scale
+  catch-up walks at no more than 5 m/s (`VR_RoomScaleCatchUp`); a multiplayer
+  client turns its body onto a facing the server set from the hand
+  (`idVRSystem::TurnBody`, game API 60), and the server holds a VR client's
+  delta through frozen views as the client does; and an exposed seat shows the
+  seat's own pose under the head (`vrBodySeated`). Still open: a left-handed
+  hold with the view model's own hands. The rigs are mirror images (the
+  partner of a right arm joint is the left one reflected across the gun, its
+  wrist with the first axis reversed and every other joint with all three,
+  measured from the machinegun's symmetric bind pose and every view model's
+  weights), but a mirrored hold built on that drew the hands off the grip with
+  stretched mesh between, and was taken out; it needs a capture harness that
+  frames the hands. The model heading others see still comes from the aim,
+  held near the vertical, not from the head, which the server never learns.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and

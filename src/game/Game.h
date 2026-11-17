@@ -739,7 +739,9 @@ extern rvGameLog *				gameLog;
 //     structured MVD markers.
 // 59: vrFrameState_t appends twoHanded and body (the player's own body in a
 //     headset, vr_body); idVRSystem::GetFrameState fills the caller's copy.
-const int GAME_API_VERSION		= 59;
+// 60: idVRSystem appends TurnBody: a multiplayer client turns the tracked head onto
+//     a facing the server set from the weapon hand's usercmd.
+const int GAME_API_VERSION		= 60;
 
 struct gameImport_t {
 

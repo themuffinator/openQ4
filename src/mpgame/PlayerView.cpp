@@ -1088,12 +1088,15 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 
 	// the listener follows the tracked head
 	idVec3 headOrigin = eyeOrigin;
+	// the comfort vignette centres on where the head looks, in both eyes
+	idVec3 headForward = eyeAxis[0];
 	if ( vrFrame.head.valid ) {
 		idMat3 headAxis;
 		vrPose_t head = vrFrame.head;
 		head.origin += VR_HeadOffsetCorrection( vrFrame );
 		VR_PoseToWorld( head, eyeOrigin, trackingYaw, headOrigin, headAxis );
 		soundSystem->PlaceListener( headOrigin, headAxis, player->entityNumber + 1, gameLocal.time, "Undefined" );
+		headForward = headAxis[0];
 	}
 
 	// where the shot lands, marked in each eye over its 3D pass
@@ -1139,7 +1142,7 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 		SingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );
 		// the flat wash that stands in for the underwater pass belongs in the eyes
 		LiquidWash();
-		VR_DrawComfortVignette( lensView, vignette, vignetteMaterial );
+		VR_DrawComfortVignette( lensView, headForward, vignette, vignetteMaterial );
 		if ( drawAimMarker ) {
 			VR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );
 		}
