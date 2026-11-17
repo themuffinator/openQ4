@@ -3105,9 +3105,10 @@ Completion must advance through the existing dependencies:
   (visual specification 1.40 to 1.45): horned, frosted bands that close in as
   the menu opens and glide between levels, blade-ended plates with the lens,
   snow and haze ([The Awakening's pause](ui/retained-screens.md#17-november-2026-the-awakenings-pause),
-  `FLOW-071`). Remaining: the settings pages and the objectives display in
-  the family, tab and list scrolling, a page scrolling out on Back, the
-  high-contrast and power-saving variants, and acceptance captures.
+  `FLOW-071`), and so do its SETTINGS page and the CONTROLS, GAME OPTIONS,
+  DISPLAY and AUDIO categories. Remaining: the objectives display's frames,
+  tab and list scrolling, a page scrolling out on Back, the high-contrast and
+  power-saving variants, and acceptance captures.
 - [ ] **UI-05 — P1, decision and qualification: resolve visual policy conflicts.**
   Reconcile SP/MP hit-marker defaults with visual specification section 14.7 and
   other recorded deviations before acceptance. Preserve editable vector framing,

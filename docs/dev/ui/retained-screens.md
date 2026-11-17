@@ -57,19 +57,43 @@ family, so the two pauses never drift apart in layout, bindings or actions.
   later, and the home level scrolls in its last 32 u from the trailing side
   from 450 ms. The rime line swells to 0.90 at the middle of each move. A
   page's `arrive` scrolls its stage in its last 32 u from the leading side.
-- **Size.** The pause document is 3.7 MB against the Marine pause's 1.3 MB,
-  nearly all of it frost and snow geometry.
-- **Not yet.** The settings pages and the objectives display keep the Marine
-  family's shapes and choreography under the Awakening pause; tabs and lists
-  scroll as the Marine ones do; a page leaving on Back still disappears at
-  once rather than scrolling out; and high contrast and power saving do not
-  yet drop the frost, snow and haze.
+- **Size.** Each copy adds about 2.4 MB of frost and snow geometry to its
+  Marine page: the pause is 3.8 MB against 1.3 MB, CONTROLS 9.5 MB against
+  7.4 MB. The level load reads the pause and starts parsing its pages and
+  SETTINGS on the job workers; the categories load as they open.
+- **Settings.** The pause's SETTINGS opens `settings_awakening.rui`, and its
+  CONTROLS, GAME OPTIONS, DISPLAY and AUDIO open
+  `settings/controls_awakening.rui`, `game_awakening.rui`,
+  `system_awakening.rui` and `audio_awakening.rui`: the Marine pages carried
+  into the family as the pause is, their bands resting at the page or
+  sub-page dock their Marine pages give them, with the crumbs, title and
+  prompt bar carved out of the frost. The copies keep their document ids,
+  which their application contracts name (the SYSTEM page is checked by
+  id). `SyncRetainedSettingsFamily` picks the family as SETTINGS opens: The
+  Awakening's while the Awakening pause is the home behind it, the Marine
+  family from the title, the Marine and Strogg pauses and multiplayer. A
+  change of family drops the cached settings views, and `FindRetainedGui`
+  reads the family's copy of a settings page, the Marine page standing in
+  when the copy is not installed. Wherever a document moves its bands
+  (`frame.step` between SETTINGS and a category, or the pause's dock), the
+  frost takes the opposite motion and the rime line swells.
+- **Notices and narrow views.** The copies carry the session's notices where
+  their Marine pages do (the pause, its pages and SETTINGS), and the bottom
+  band, its frost and its slots measure from the view's foot, as
+  `fit_narrow` anchors the Marine band, so a view narrower than 4:3 keeps
+  them on its edge.
+- **Not yet.** The objectives display keeps the Marine shapes under the
+  Awakening pause; tabs and lists scroll as the Marine ones do; a page
+  leaving on Back still disappears at once rather than scrolling out; and
+  high contrast and power saving do not yet drop the frost, snow and haze.
 
 Checked in game on `m01_stranarus_trench1` (`fs_game q4xbase`) on Vulkan at
 1280x720 and 1680x720 with `openq4_assertMenuActivation` and
 `openq4_retainedGui` only: the pause opening with the frost growing, the dock
 to Save Game with the carried title, Save Game in the family, Back gliding
-home, and the quit confirmation's horns, with no UI warnings in the log. The
+home, and the quit confirmation's horns, with no UI warnings in the log;
+then SETTINGS, CONTROLS, Back and DISPLAY in the family, and the pause and
+SETTINGS in a 720x960 view. The
 generator's `--check` holds every document; `ui_retained_pause.py` passes;
 `ui_retained_gate.py` passes its source assertions, including the new
 Awakening selection ones, and then stops compiling its session harness on

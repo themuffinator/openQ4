@@ -35,13 +35,14 @@ does not restore the withdrawn release. See
   The Awakening's campaign opens its own pause menu: black frames with horns
   after the Valkaryne, a glacial rim and frost, snow behind the menu, and an
   orange lens around the control you are on. Save Game, Load Game, Restart
-  Level and the quit and exit questions share the look.
+  Level, the quit and exit questions and the settings pages (Controls, Game
+  Options, Display and Audio) share the look.
 - **Smoother frames.** The frames close in as the menu opens, glide to a page
   and back on one smooth curve, the lower frame leading, and the menu
   scrolls back into place as you return.
 - **What to do.** Nothing. Quake 4's campaign keeps the Marine menus, a
   stroggified player keeps the Strogg pause, and the stock interface is
-  unchanged. The settings pages keep the Marine look for now.
+  unchanged. Settings opened from the title keep the Marine look.
 
 ## Texture packs reach characters, weapons and monsters, 17 November 2026
 

@@ -427,7 +427,17 @@ def carve(ident: str, x_fraction: float, left_dp: float, top_dp: float, width_dp
     return vector(ident, {**FULL, "opacity": number(opacity), "pointer-events": keyword("none")}, paths)
 
 
-def awakening_band(prefix: str, top: bool, edge_ops: list, fullers: list) -> dict:
+PAUSE_CARVES = {"top": [("carve-title", 0.5, -CANVAS_W / 2 + U * 37, U * 19, U * 214, U * 18.3, 0)],
+                "bottom": [("carve-home", 1.0, -U * 172, U * 447, U * 160, 22, 1),
+                           ("carve-page", 0.5, -CANVAS_W / 2 + PAGE_BAR_LEFT, U * 441, CANVAS_W - PAGE_BAR_LEFT - U * 8, 45, 0)]}
+# A page's band text: the crumbs and the title in the top band's thin span,
+# and the page's prompt bar in the bottom band.
+PAGE_CARVES = {"top": [("carve-title", 0.5, -CANVAS_W / 2 + U * 37, U * 12, U * 330, U * 25.3, 1)],
+               "bottom": [("carve-page", 0.5, -CANVAS_W / 2 + PAGE_BAR_LEFT, U * 441, CANVAS_W - PAGE_BAR_LEFT - U * 8, 45, 1)]}
+
+
+def awakening_band(prefix: str, top: bool, edge_ops: list, fullers: list, base: dict | None = None,
+                   carves: dict | None = None) -> dict:
     """One Awakening band (section 6): its rim light, the opaque band, the
     fullers, the frost held to the view under the band's silhouette and
     fading out 6 u inside its edge, and the rime line. The group keeps the
@@ -445,16 +455,49 @@ def awakening_band(prefix: str, top: bool, edge_ops: list, fullers: list) -> dic
             (0, 0 if top else U * 466), (0, U * 14 if top else U * 480),
             [(0, tint(FROST, 0.1 if top else 0)), (1, tint(FROST, 0 if top else 0.1))]))]),
         *frost_layers(f"{ident}-crystals", top),
-        *([carve(f"{ident}-carve-title", 0.5, -CANVAS_W / 2 + U * 37, U * 19, U * 214, U * 18.3, 0)] if top else
-          [carve(f"{ident}-carve-home", 1.0, -U * 172, U * 447, U * 160, 22, 1),
-           carve(f"{ident}-carve-page", 0.5, -CANVAS_W / 2 + PAGE_BAR_LEFT, U * 441, CANVAS_W - PAGE_BAR_LEFT - U * 8, 45, 0)]),
+        *[carve(f"{ident}-{name}", *spec) for name, *spec in (carves or PAUSE_CARVES)["top" if top else "bottom"]],
     ])
+    base = base or transform()
+    frost["properties"]["transform"] = opposite(base)
     feather = vector(f"{ident}-feather", dict(FULL), edge_strokes("fade", edge_ops, "#000000", 0.98, 6.0, steps=8))
     held = group(f"{ident}-held", {**FULL, "pointer-events": keyword("none")}, [frost, feather],
                  mask={"paths": [shape_path("band", view_shape(fill_ops), fill=solid([1, 1, 1, 1]))]})
     rime = vector(f"{ident}-rime", {**FULL, "opacity": number(RIME_REST)}, [
         shape_path("rime", view_shape(edge_ops), stroke=stroke(solid(tint(RIME, 0.9)), U * 0.5, minimum=1))])
-    return group(ident, {**FULL, "transform": transform(), "pointer-events": keyword("none")}, [art, held, rime])
+    band = group(ident, {**FULL, "transform": base, "pointer-events": keyword("none")}, [art, held, rime])
+    if not top:
+        anchor_bottom(band)
+    return band
+
+
+def _foot(value):
+    """A y in dp from the canvas top as dp from the view's foot."""
+    return {"fraction": 1, "dp": round(value - 720, 2)} if isinstance(value, (int, float)) else value
+
+
+def anchor_bottom(node) -> None:
+    """The bottom band follows the view's foot, as fit_narrow anchors the
+    Marine one: in a view narrower than 4:3 the canvas grows taller than
+    720 dp. Every y under `node` (paths, masks, paints) measures from the
+    foot, and generated art in a 720 dp box sits on it."""
+    if isinstance(node, dict):
+        if "points" in node and isinstance(node["points"], list):
+            for point in node["points"]:
+                if isinstance(point, list) and len(point) == 2:
+                    point[1] = _foot(point[1])
+        for key in ("from", "to"):
+            if isinstance(node.get(key), list) and len(node[key]) == 2:
+                node[key][1] = _foot(node[key][1])
+        props = node.get("properties")
+        if isinstance(props, dict) and props.get("top", {}).get("value") == 0 and props.get("height", {}).get("value") == 720:
+            del props["top"]
+            props["bottom"] = length(0)
+        for value in node.values():
+            if isinstance(value, (dict, list)):
+                anchor_bottom(value)
+    elif isinstance(node, list):
+        for value in node:
+            anchor_bottom(value)
 
 
 def wash_shape(top: bool) -> Shape:
@@ -548,10 +591,14 @@ def nav_blades(doc: dict, root: dict) -> None:
     end = lead + U * 256
     for node in list(walk_nodes(root)):
         control = node.get("control")
-        if not control or not node["id"].startswith("nav_"):
+        if not control:
             continue
-        plate = find(node, f"{node['id']}-plate")
-        if plate is None:
+        plate = next((c for c in node.get("children", ()) if c.get("id") == f"{node['id']}-plate"), None)
+        if plate is None or len(plate.get("paths", ())) != 2 or plate["paths"][0]["id"] != "fill":
+            continue
+        corners = [c["points"][0] for c in plate["paths"][0]["commands"] if c.get("points")]
+        if len(corners) != 4 or not all(isinstance(v, (int, float)) for p in corners for v in p) or \
+                abs(corners[0][1] - top) > 0.01 or abs(corners[2][1] - bottom) > 0.01 or abs(corners[1][0] - (lead + U * 413)) > 0.5:
             continue
         fill = blade([(end, bottom), (0, bottom)], top, bottom, end)
         plate["paths"][0] = shape_path("fill", fill, fill=linear((lead, 0), (end, 0), [(0, tint(DEEP)), (0.55, tint(DEEP)),
@@ -869,6 +916,85 @@ def band_moves(doc: dict, prefix: str) -> None:
             set_track(line, node, "opacity", [(0, number(1 - value)), (when, number(1 - value)), (when + 1, number(value))])
 
 
+def follow_bands(doc: dict) -> None:
+    """Wherever a timeline moves a band, its frost takes the opposite motion
+    (so the frost stays with the view) and its rime line swells to 0.90 at
+    the middle of each move and settles as the band does (rime.catch)."""
+    for line in doc["timelines"]:
+        for entry in list(line["tracks"]):
+            if entry["property"] != "transform" or entry["node"] not in ("band-top", "band-bottom"):
+                continue
+            node, keys = entry["node"], entry["keys"]
+            frost = [{**copy.deepcopy(key), "value": opposite(key["value"])} for key in keys]
+            line["tracks"] = [t for t in line["tracks"] if not (t["node"] == f"{node}-frost" and t["property"] == "transform")]
+            line["tracks"].append({"node": f"{node}-frost", "property": "transform", "keys": frost})
+            rime = [(keys[0]["atMs"], RIME_REST)]
+            for a, b in zip(keys, keys[1:]):
+                moving = a["value"]["value"][:2] != b["value"]["value"][:2]
+                if moving and b["atMs"] - a["atMs"] >= 2:
+                    middle = round((a["atMs"] + b["atMs"]) / 2)
+                    rime[-1] = (rime[-1][0], rime[-1][1], SWELL)
+                    rime += [(middle, RIME_LIT, SWELL), (b["atMs"], RIME_REST)]
+                elif b["atMs"] > rime[-1][0]:
+                    rime.append((b["atMs"], RIME_REST))
+            set_track(line, f"{node}-rime", "opacity", [(at, number(v), *e) for at, v, *e in rime])
+
+
+def awaken_frame(doc: dict, carves: dict | None = None) -> None:
+    """Carry a document's frame into the family: the palette, the horned,
+    frosted and rimed bands where its Marine bands stood (keeping their
+    resting dock), the haze, the snow and the frost-tinted crosses, the
+    Valkaryne frames on its plates, card and dialogs, the glide in place of
+    accel(a, d), and frost and rime that follow every band move."""
+    root = doc["root"]
+    recolour(doc)
+    top_ops, bottom_ops, fullers = band_edges()
+    parent, _ = parent_of(root, "band-top")
+    children = parent["children"]
+    for index, child in enumerate(children):
+        if child["id"] in ("band-top", "band-bottom"):
+            top = child["id"] == "band-top"
+            base = copy.deepcopy(child["properties"].get("transform") or transform())
+            children[index] = awakening_band("band", top, top_ops if top else bottom_ops,
+                                             [f for f in fullers if f[0] == ("top" if top else "bottom")], base, carves)
+    light_index = next(i for i, c in enumerate(children) if c["id"] == "field-light")
+    children.insert(light_index, haze())
+    grid = find(root, "field-grid")
+    for item in grid["paths"]:
+        item["stroke"]["paint"] = solid(tint(FROST, 0.04))
+    rand = Mulberry(SEED + 1)
+    far, far_ms = snow_layer("snow-far", rand, 0.0006, 0.3, 0.8, 0.59, 6)
+    near, near_ms = snow_layer("snow-near", rand, 0.0001, 0.9, 1.8, 0.78, 14)
+    grid_index = next(i for i, c in enumerate(children) if c["id"] == "field-grid")
+    children[grid_index + 1:grid_index + 1] = [far, near]
+    drift = transform(-U * 0.23 * 480, U * 480)
+    doc["timelines"].append({"id": "snow", "durationMs": far_ms, "iterations": 0, "tracks": [
+        track("snow-far", "transform", [(0, transform()), (far_ms, drift)])]})
+    doc["timelines"].append({"id": "snowNear", "durationMs": near_ms, "iterations": 0, "tracks": [
+        track("snow-near", "transform", [(0, transform()), (near_ms, drift)])]})
+    events = doc.setdefault("events", {})
+    for event in ("open", "returnHome", "onActivate"):
+        if event not in events and not timeline(doc, event) and event != "onActivate":
+            continue
+        if event not in events and timeline(doc, event):
+            # A named event without a program plays the timeline of its name;
+            # a program must do so itself.
+            events[event] = [{"op": "playTimeline", "timeline": event}]
+        events.setdefault(event, []).extend([{"op": "playTimeline", "timeline": "snow"}, {"op": "playTimeline", "timeline": "snowNear"}])
+    for line in doc["timelines"]:
+        for entry in line["tracks"]:
+            for key in entry["keys"]:
+                if key.get("easing") == ACCEL:
+                    key["easing"] = GLIDE
+    nav_blades(doc, root)
+    action_blades(doc, root)
+    section_blades(doc, root)
+    horn_card(root)
+    horn_plinth(root)
+    horn_modals(root)
+    follow_bands(doc)
+
+
 # ----------------------------------------------------------------- the pause
 
 def campaign_title(doc_state: dict, bindings: list, title: dict) -> dict:
@@ -898,45 +1024,7 @@ def awaken_pause(document: dict) -> dict:
     doc = copy.deepcopy(document)
     doc["id"] = "openq4.pause_awakening"
     root = doc["root"]
-    recolour(doc)
-    chrome = find(root, "chrome")
-    children = chrome["children"]
-    # The bands: horned, frosted and rimed.
-    top_ops, bottom_ops, fullers = band_edges()
-    for index, child in enumerate(children):
-        if child["id"] == "band-top":
-            children[index] = awakening_band("band", True, top_ops, [f for f in fullers if f[0] == "top"])
-        elif child["id"] == "band-bottom":
-            children[index] = awakening_band("band", False, bottom_ops, [f for f in fullers if f[0] == "bottom"])
-    # The haze under the light band; snow over the backdrop, behind the instruments.
-    light_index = next(i for i, c in enumerate(children) if c["id"] == "field-light")
-    children.insert(light_index, haze())
-    grid = find(root, "field-grid")
-    for item in grid["paths"]:
-        item["stroke"]["paint"] = solid(tint(FROST, 0.04))
-    rand = Mulberry(SEED + 1)
-    far, far_ms = snow_layer("snow-far", rand, 0.0006, 0.3, 0.8, 0.59, 6)
-    near, near_ms = snow_layer("snow-near", rand, 0.0001, 0.9, 1.8, 0.78, 14)
-    grid_index = next(i for i, c in enumerate(children) if c["id"] == "field-grid")
-    children[grid_index + 1:grid_index + 1] = [far, near]
-    drift = transform(-U * 0.23 * 480, U * 480)
-    doc["timelines"].append({"id": "snow", "durationMs": far_ms, "iterations": 0, "tracks": [
-        track("snow-far", "transform", [(0, transform()), (far_ms, drift)])]})
-    doc["timelines"].append({"id": "snowNear", "durationMs": near_ms, "iterations": 0, "tracks": [
-        track("snow-near", "transform", [(0, transform()), (near_ms, drift)])]})
-    events = doc.setdefault("events", {})
-    for event in ("open", "returnHome", "onActivate"):
-        if event not in events and timeline(doc, event):
-            # A named event without a program plays the timeline of its name;
-            # a program must do so itself.
-            events[event] = [{"op": "playTimeline", "timeline": event}]
-        events.setdefault(event, []).extend([{"op": "playTimeline", "timeline": "snow"}, {"op": "playTimeline", "timeline": "snowNear"}])
-    # Plates, card, plinth and dialogs in the Valkaryne's frames.
-    nav_blades(doc, root)
-    action_blades(doc, root)
-    horn_card(root)
-    horn_plinth(root)
-    horn_modals(root)
+    awaken_frame(doc)
     # GAME PAUSED, then the campaign's name.
     title = find(root, "paused-title")
     parent, index = parent_of(root, "paused-title")
@@ -995,11 +1083,36 @@ def awaken_page(document: dict, ident: str) -> dict:
 
 AWAKENING_OUTPUTS = {name: PAK0 / "guis" / "menu" / f"{name}.rui"
                      for name in ("pause_awakening", "loadgame_awakening", "savegame_awakening", "restartlevel_awakening")}
+AWAKENING_OUTPUTS.update({f"{name}_awakening": PAK0 / "guis" / "menu" / f"{path}_awakening.rui"
+                          for name, path in {"settings": "settings", "controls": "settings/controls", "game": "settings/game",
+                                             "audio": "settings/audio", "system": "settings/system"}.items()})
+
+
+# The settings pages the Awakening pause opens: the SETTINGS page and its
+# categories. They keep their document ids, which their application
+# contracts name (the SYSTEM page's is checked by id).
+SETTINGS = {"settings": "settings", "controls": "settings/controls", "game": "settings/game", "audio": "settings/audio",
+            "system": "settings/system"}
+
+
+def awaken_settings(document: dict) -> dict:
+    """A settings page carried into the family, its band text carved out of the frost."""
+    doc = copy.deepcopy(document)
+    awaken_frame(doc, PAGE_CARVES)
+    return doc
 
 
 def awakening_documents(documents: dict) -> dict:
     """The Awakening family's documents, from the Marine ones just built."""
-    return {"pause_awakening": awaken_pause(documents["pause"]),
-            "loadgame_awakening": awaken_page(documents["loadgame"], "openq4.loadgame_awakening"),
-            "savegame_awakening": awaken_page(documents["savegame"], "openq4.savegame_awakening"),
-            "restartlevel_awakening": awaken_page(documents["restartlevel"], "openq4.restartlevel_awakening")}
+    from build_retained_screens import NOTICE_DOCUMENTS
+    from retained_notices import with_notices
+
+    def built(name: str) -> dict:
+        # The Marine document as the generator presents it: with the
+        # session's notices where it carries them, so the copy does too.
+        return with_notices(copy.deepcopy(documents[name])) if name in NOTICE_DOCUMENTS else documents[name]
+    return {"pause_awakening": awaken_pause(built("pause")),
+            "loadgame_awakening": awaken_page(built("loadgame"), "openq4.loadgame_awakening"),
+            "savegame_awakening": awaken_page(built("savegame"), "openq4.savegame_awakening"),
+            "restartlevel_awakening": awaken_page(built("restartlevel"), "openq4.restartlevel_awakening"),
+            **{f"{name}_awakening": awaken_settings(built(name)) for name in SETTINGS}}

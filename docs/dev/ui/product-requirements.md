@@ -1324,9 +1324,10 @@ variants and seven final gates remain unaccepted.
 [The Awakening's pause](retained-screens.md#17-november-2026-the-awakenings-pause)
 adds bounded evidence to `FLOW-071`, which moves from pending to partial:
 while the expansion's campaign runs and the player is not Strogg, the
-retained pause and its Load Game, Save Game and Restart Level pages take the
-Awakening family's palette, frames, frost, snow and haze and its motion.
-The settings pages, the objectives display's frames, tab and list scrolling,
+retained pause, its Load Game, Save Game and Restart Level pages and the
+SETTINGS page with its four categories take the Awakening family's palette,
+frames, frost, snow and haze and its motion. The objectives display's
+frames, tab and list scrolling,
 a page's scroll out on Back, the high-contrast and power-saving variants and
 the acceptance captures remain. The increment re-binds the retained screens
 notes. All normative requirements, constraints, dependencies, historical rows

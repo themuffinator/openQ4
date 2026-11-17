@@ -839,6 +839,8 @@ public:
     idUserInterface* SelectRetainedLoadingGui(idUserInterface*, bool);
     idUserInterface* FindRetainedGui(const char*, bool, bool);
     idUserInterface* RetainedHomeDocument(idUserInterface*&, const char*);
+    bool retainedSettingsAwakening = false;
+    const char* RetainedFamilyPath(const char*) const; void SyncRetainedSettingsFamily();
     bool RetainedPauseIsStrogg();
     bool RetainedSystemAvailable() const;
     void PreloadRetainedScreens(); void PrepareRetainedLevel(const char*, bool); void PrecacheRetainedLevelImages();
@@ -5555,6 +5557,9 @@ def main() -> int:
                        'guis/menu/savegame_strogg.rui', 'guis/menu/restartlevel_strogg.rui',
                        'guis/menu/pause_awakening.rui', 'guis/menu/loadgame_awakening.rui',
                        'guis/menu/savegame_awakening.rui', 'guis/menu/restartlevel_awakening.rui',
+                       'guis/menu/settings_awakening.rui', 'guis/menu/settings/controls_awakening.rui',
+                       'guis/menu/settings/game_awakening.rui', 'guis/menu/settings/audio_awakening.rui',
+                       'guis/menu/settings/system_awakening.rui',
                        'guis/menu/demos.rui', 'guis/menu/restartmenu.rui', 'guis/menu/credits.rui', 'guis/menu/arena.rui',
                        'guis/menu/multiplayer.rui', 'guis/menu/createserver.rui', 'guis/menu/joingame.rui',
                        'guis/menu/arena_pause.rui', 'guis/menu/settings/audio.rui', 'guis/menu/settings/game.rui',
@@ -5865,6 +5870,18 @@ def main() -> int:
     assert 'awakening ? ( saving ? RETAINED_SAVEGAME_AWAKENING_GUI : restarting ? RETAINED_RESTART_AWAKENING_GUI : RETAINED_LOADGAME_AWAKENING_GUI )' in page
     level = function_body(menu, 'void idSessionLocal::PrepareRetainedLevel(')
     assert level.index('if ( FS_AwakeningActive() ) {') < level.index('guiRetainedPauseAwakening = FindRetainedGui( RETAINED_PAUSE_AWAKENING_GUI, false, true );')
+    # Its SETTINGS page and categories load their Awakening copies while the
+    # Awakening pause is the home behind them; any other home keeps the
+    # Marine pages, and a change of family drops the cached settings views.
+    find = function_body(menu, 'idUserInterface *idSessionLocal::FindRetainedGui(')
+    assert find.index('const char *family = RetainedFamilyPath( path );') < find.index('uiManager->FindGui( path, true, !shared, shared )')
+    sync = function_body(menu, 'void idSessionLocal::SyncRetainedSettingsFamily(')
+    assert '( guiRetainedHome == guiRetainedPauseAwakening || retainedPageHome == guiRetainedPauseAwakening )' in sync
+    for pointer in ('guiRetainedSettingsPage', 'guiRetainedAudio', 'guiRetainedGame', 'guiRetainedControls'):
+        assert f'{pointer} = NULL;' in sync, pointer
+    assert 'SyncRetainedSettingsFamily();' in function_body(menu, 'idUserInterface *idSessionLocal::RetainedSettingsPage(')
+    for marine in ('settings', 'settings/controls', 'settings/game', 'settings/audio', 'settings/system'):
+        assert f'"guis/menu/{marine}_awakening.rui"' in menu, marine
     # The Objectives page's screenshots resolve inside the load, after the game
     # spawns the map and before the media are finished.
     change = function_body(session, 'void idSessionLocal::ExecuteMapChange(')
@@ -6081,6 +6098,7 @@ def main() -> int:
         'static void Session_RetainedSaveDetails(', 'static void Session_PublishRetainedTitleState(',
         'static void Session_PublishSummaryShot(', 'static void Session_PublishSinglePlayerSummaries(',
         'static void Session_PublishMultiplayerSummaries(', 'static void Session_PublishCampaignSummaries(', 'idUserInterface *idSessionLocal::FindRetainedGui(',
+        'const char *idSessionLocal::RetainedFamilyPath(', 'void idSessionLocal::SyncRetainedSettingsFamily(',
         'bool idSessionLocal::RetainedSystemAvailable(', 'bool idSessionLocal::ReturnSystemSettings(', 'void idSessionLocal::OpenCampaignSelector(',
         'bool idSessionLocal::OpenRetainedCampaignSkill(', 'bool idSessionLocal::OpenRetainedCampaignChapters(', 'void idSessionLocal::BeginRetainedCampaignSkill(',
         'bool idSessionLocal::RetainedHomeInputBlocked(',

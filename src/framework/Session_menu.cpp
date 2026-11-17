@@ -6756,6 +6756,18 @@ static const char *const RETAINED_RESTART_STROGG_GUI = "guis/menu/restartlevel_s
 static const char *const RETAINED_LOADGAME_AWAKENING_GUI = "guis/menu/loadgame_awakening.rui";
 static const char *const RETAINED_SAVEGAME_AWAKENING_GUI = "guis/menu/savegame_awakening.rui";
 static const char *const RETAINED_RESTART_AWAKENING_GUI = "guis/menu/restartlevel_awakening.rui";
+// The settings pages in The Awakening's family, each beside the page it
+// copies; the Awakening pause's SETTINGS opens them.
+static const struct {
+	const char *marine;
+	const char *awakening;
+} RETAINED_SETTINGS_AWAKENING[] = {
+	{ "guis/menu/settings.rui",				"guis/menu/settings_awakening.rui" },
+	{ "guis/menu/settings/controls.rui",	"guis/menu/settings/controls_awakening.rui" },
+	{ "guis/menu/settings/game.rui",		"guis/menu/settings/game_awakening.rui" },
+	{ "guis/menu/settings/audio.rui",		"guis/menu/settings/audio_awakening.rui" },
+	{ "guis/menu/settings/system.rui",		"guis/menu/settings/system_awakening.rui" },
+};
 // The Demos page, which the title's DEMOS hands off to as LOAD GAME does to
 // its page. Its list holds this many demos at a time (ROWS in
 // tools/ui/retained_demos.py); demos.filter picks one of the legacy
@@ -7171,6 +7183,12 @@ idUserInterface *idSessionLocal::FindRetainedGui( const char *path, bool shared,
 	if ( retainedStock.FindIndex( path ) >= 0 ) {
 		return NULL;
 	}
+	// A settings page loads in the family of the pause behind it; the Marine
+	// page stands in when its Awakening copy is not installed.
+	const char *family = RetainedFamilyPath( path );
+	if ( family != path && fileSystem->ReadFile( family, NULL, NULL ) > 0 ) {
+		path = family;
+	}
 	idUserInterface *gui = NULL;
 	const char *missingPage = home ? Session_RetainedHomeMissingPage( guiMainMenu ) : NULL;
 	if ( missingPage != NULL ) {
@@ -7191,6 +7209,49 @@ idUserInterface *idSessionLocal::FindRetainedGui( const char *path, bool shared,
 		retainedStock.Append( path );
 	}
 	return gui;
+}
+
+/*
+===============
+idSessionLocal::RetainedFamilyPath
+
+The settings page `path` in the family the settings pages take: its
+Awakening copy while they are in The Awakening's family, else `path`.
+===============
+*/
+const char *idSessionLocal::RetainedFamilyPath( const char *path ) const {
+	if ( retainedSettingsAwakening && path != NULL ) {
+		for ( const auto &page : RETAINED_SETTINGS_AWAKENING ) {
+			if ( !idStr::Icmp( path, page.marine ) ) {
+				return page.awakening;
+			}
+		}
+	}
+	return path;
+}
+
+/*
+===============
+idSessionLocal::SyncRetainedSettingsFamily
+
+Entering the SETTINGS page: it and its categories take The Awakening's
+family when the Awakening pause is the home behind them, and the Marine
+family otherwise (the title, the Marine and Strogg pauses, multiplayer). A
+change of family drops the cached settings views, so each loads again in
+its family; the other family's views stay loaded for when it returns.
+===============
+*/
+void idSessionLocal::SyncRetainedSettingsFamily() {
+	const bool awakening = guiRetainedPauseAwakening != NULL &&
+		( guiRetainedHome == guiRetainedPauseAwakening || retainedPageHome == guiRetainedPauseAwakening );
+	if ( awakening == retainedSettingsAwakening ) {
+		return;
+	}
+	retainedSettingsAwakening = awakening;
+	guiRetainedSettingsPage = NULL;
+	guiRetainedAudio = NULL;
+	guiRetainedGame = NULL;
+	guiRetainedControls = NULL;
 }
 #endif
 
@@ -8150,6 +8211,9 @@ bool idSessionLocal::BeginRetainedPage( const char *request ) {
 	const bool multiplayer = !idStr::Icmp( request, "multiplayer" ), settings = !idStr::Icmp( request, "settings" );
 	const bool strogg = !settings && guiRetainedHome != NULL && guiRetainedHome == guiRetainedPauseStrogg;
 	const bool awakening = !settings && guiRetainedHome != NULL && guiRetainedHome == guiRetainedPauseAwakening;
+	if ( settings && retainedPagePending == NULL ) {
+		SyncRetainedSettingsFamily();
+	}
 	if ( ( !saving && !restarting && !credits && !multiplayer && !settings && idStr::Icmp( request, "loadGame" ) ) ||
 			guiRetainedHome == NULL ||
 			guiActive != guiMainMenu || ( ( credits || multiplayer ) && mapSpawned ) ||
@@ -9055,6 +9119,10 @@ drawing.
 */
 idUserInterface *idSessionLocal::RetainedSettingsPage() {
 #ifndef ID_DEDICATED
+	// Not while a settings page is up: its family holds until it closes.
+	if ( guiActive == NULL || guiActive == guiMainMenu || IsRetainedPause( guiActive ) || guiActive == guiRetainedTitle ) {
+		SyncRetainedSettingsFamily();
+	}
 	// A view that stopped drawing hands the page back for good.
 	if ( guiRetainedSettingsPage != NULL && UI_RetainedViewFailed( guiRetainedSettingsPage ) ) {
 		common->Warning( "retained UI: '%s' stopped drawing; the stock screen presents instead", RETAINED_SETTINGSPAGE_GUI );
@@ -11099,7 +11167,8 @@ void idSessionLocal::PrepareRetainedLevel( const char *mapPath, bool multiplayer
 		const char *const pages[] = {
 			guiRetainedLoadAwakening == NULL ? RETAINED_LOADGAME_AWAKENING_GUI : NULL,
 			guiRetainedSaveAwakening == NULL ? RETAINED_SAVEGAME_AWAKENING_GUI : NULL,
-			guiRetainedRestartAwakening == NULL ? RETAINED_RESTART_AWAKENING_GUI : NULL
+			guiRetainedRestartAwakening == NULL ? RETAINED_RESTART_AWAKENING_GUI : NULL,
+			RETAINED_SETTINGS_AWAKENING[0].awakening
 		};
 		UI_RetainedPrefetchDocuments( pages, static_cast<int>( sizeof( pages ) / sizeof( pages[0] ) ) );
 	}

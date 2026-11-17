@@ -800,6 +800,12 @@ public:
 	idUserInterface *	guiRetainedLoadAwakening;
 	idUserInterface *	guiRetainedSaveAwakening;
 	idUserInterface *	guiRetainedRestartAwakening;
+	// The settings pages in The Awakening's family: the SETTINGS page and its
+	// categories load in it while the Awakening pause is the home behind them
+	// (SyncRetainedSettingsFamily); FindRetainedGui reads the family's copy.
+	bool				retainedSettingsAwakening;
+	void				SyncRetainedSettingsFamily();
+	const char *		RetainedFamilyPath( const char *path ) const;
 	bool				IsRetainedPause( const idUserInterface *gui ) const {
 		return gui != NULL && ( gui == guiRetainedPause || gui == guiRetainedPauseStrogg || gui == guiRetainedPauseAwakening );
 	}

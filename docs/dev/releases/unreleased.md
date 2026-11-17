@@ -10,8 +10,9 @@ the [development roadmap](../roadmap.md) for current scope.
 ## Highlights
 
 - **The Awakening pauses in its own frozen style.** While you play the
-  expansion's campaign with the new interface, the pause menu and its Save,
-  Load and Restart Level pages wear The Awakening's look: black, horned frames
+  expansion's campaign with the new interface, the pause menu, its Save,
+  Load and Restart Level pages and the settings pages it opens wear The
+  Awakening's look: black, horned frames
   after the Valkaryne, rimed in glacial light, with frost creeping over them
   and snow drifting behind the menu. The frames close in as the menu opens and
   glide smoothly to each page and back, and the control you are on glows in a

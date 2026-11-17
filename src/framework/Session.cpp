@@ -4273,6 +4273,7 @@ void idSessionLocal::Clear() {
 	guiRetainedLoadAwakening = NULL;
 	guiRetainedSaveAwakening = NULL;
 	guiRetainedRestartAwakening = NULL;
+	retainedSettingsAwakening = false;
 	guiRetainedDemos = NULL;
 	retainedModSelected = -1;
 	guiRetainedRestartMenu = NULL;
