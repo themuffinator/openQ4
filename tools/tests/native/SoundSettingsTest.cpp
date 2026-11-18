@@ -38,6 +38,7 @@ public:
 	void (AL_APIENTRY *soundSettingsDeleteFilters)(ALsizei,const ALuint*)=nullptr;void DestroyWetDryFilters();
 	float gain=1,wetLevel=1,dryLevel=1,occlusion=0,environmentMuffle=0;
 	float eaxDirectGain=1,eaxDirectGainHF=1,eaxPrimaryGain=1,eaxPrimaryGainHF=1;
+	ALuint reverbSendSlot[2]={0,0};
 	bool ApplyWetDryRoutingChecked(bool,bool,ALuint,SoundSettingsSourceReceipt&);
 	void FlushSourceBuffers(){} bool IsPlaying(){return false;}
 };
@@ -55,6 +56,9 @@ public:
 	// the settings boundary's use of it is counted.
 	int areaReverbReleases=0;
 	bool HasAreaReverbResources()const{return false;} void ReleaseAreaReverbSlots(){++areaReverbReleases;} ALuint GetPrimaryAuxEffectSlot()const{return auxEffectSlot;}
+	// s_reverbIdleSlots: no slot goes idle here, and waking one makes no counted call.
+	int reverbSendNotes=0;
+	bool IsReverbSlotIdle(int)const{return false;} void NoteReverbSend(ALuint){++reverbSendNotes;}
 };
 struct World { int updates=0,budget=0; bool throws=false; void Update(){++updates;budget=s_maxEmitterChannels.GetInteger();if(throws)throw std::runtime_error("world failure");} float CurrentRumbleAmplitude(){return 0;} };
 struct idSoundSystemLocal { idSoundHardware_OpenAL hardware; bool muted=false,needsRestart=false; World* currentSoundWorld=nullptr; int soundTime=0,restarts=0;

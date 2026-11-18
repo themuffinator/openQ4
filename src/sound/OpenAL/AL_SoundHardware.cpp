@@ -43,6 +43,8 @@ idCVar s_showPerfData( "s_showPerfData", "0", CVAR_BOOL, "Show sound backend per
 idCVar s_outputLimiter( "s_outputLimiter", "1", CVAR_ARCHIVE | CVAR_BOOL, "soft-limit the final mix so loud scenes compress instead of clipping" );
 idCVar s_resampler( "s_resampler", "auto", CVAR_ARCHIVE, "OpenAL resampler for every voice: auto (an 11th order sinc when the runtime has one), default (the runtime's own), or a name or number from listResamplers; takes effect on s_restart" );
 extern idCVar s_useEAXReverb;
+idCVar s_reverbIdleSlots( "s_reverbIdleSlots", "1", CVAR_SOUND | CVAR_BOOL, "let an area reverb slot no voice has fed for longer than its tail hold the null effect, which the OpenAL mixer skips; 0 keeps all four reverbs running" );
+idCVar s_reverbPanStep( "s_reverbPanStep", "0.05", CVAR_SOUND | CVAR_FLOAT, "while the view turns, resend a reverb slot's panning only once it moved this far (0.05 is about 3 degrees); it settles exactly when the view stops. 0 resends every change", 0.0f, 0.5f );
 extern idCVar s_deviceName;
 extern idCVar s_openALHRTF;
 extern idCVar s_numberOfSpeakers;
@@ -2707,11 +2709,17 @@ void idSoundHardware_OpenAL::ResetReverbSlotState()
 	areaReverbUnavailable = false;
 	primaryReverbSlot = 0;
 	trackedReverbSlot = 0;
+	reverbClock = 0;
 	for( int i = 0; i < SOUND_REVERB_SLOTS; i++ )
 	{
 		memset( &appliedReverb[i], 0, sizeof( appliedReverb[i] ) );
 		appliedReverbSlot[i] = 0;
 		reverbEffectType[i] = 0;
+		memset( &requestedReverb[i], 0, sizeof( requestedReverb[i] ) );
+		requestedReverbSlot[i] = 0;
+		reverbSlotIdle[i] = false;
+		reverbSlotRingsUntil[i] = 0;
+		reverbSlotLastFed[i] = 0;
 	}
 	reverbSlotGeneration++;
 }
@@ -2778,6 +2786,8 @@ int idSoundHardware_OpenAL::SyncReverbSlots()
 		primaryReverbSlot = 0;
 		appliedReverbSlot[0] = 0;
 		reverbEffectType[0] = 0;
+		requestedReverbSlot[0] = 0;
+		reverbSlotIdle[0] = false;
 		reverbSlotGeneration++;
 	}
 	const bool reverbUsable = efxEnabled && auxEffectSlot != 0 && auxReverbEffect != 0 && openalContext != NULL && openQ4_LoadHardwareEfxProcs();
@@ -2787,13 +2797,17 @@ int idSoundHardware_OpenAL::SyncReverbSlots()
 		{
 			ReleaseAreaReverbSlots();
 		}
+		// the settings path binds slot 0 itself while reverb is off
+		reverbSlotIdle[0] = false;
 		return 0;
 	}
 	if( !HasAreaReverbResources() && !areaReverbUnavailable && maxAuxiliarySends >= 2 )
 	{
 		CreateAreaReverbSlots();
 	}
-	return HasAreaReverbResources() ? SOUND_REVERB_SLOTS : 1;
+	const int numSlots = HasAreaReverbResources() ? SOUND_REVERB_SLOTS : 1;
+	UpdateIdleReverbSlots( numSlots );
+	return numSlots;
 #else
 	return 0;
 #endif
@@ -2859,7 +2873,11 @@ bool idSoundHardware_OpenAL::CreateAreaReverbSlots()
 		reverbEffectType[i] = type;
 		if( i > 0 )
 		{
+			// created holding their reverb, and idle once the first sweep finds them unfed
 			appliedReverbSlot[i] = 0;
+			requestedReverbSlot[i] = 0;
+			reverbSlotIdle[i] = false;
+			reverbSlotRingsUntil[i] = 0;
 		}
 	}
 	reverbSlotGeneration++;
@@ -2898,6 +2916,8 @@ void idSoundHardware_OpenAL::ReleaseAreaReverbSlots()
 		}
 		appliedReverbSlot[i + 1] = 0;
 		reverbEffectType[i + 1] = 0;
+		requestedReverbSlot[i + 1] = 0;
+		reverbSlotIdle[i + 1] = false;
 	}
 	CheckALErrors();
 	primaryReverbSlot = 0;
@@ -2921,9 +2941,23 @@ void idSoundHardware_OpenAL::SetReverbSlotProperties( int slot, const soundRever
 
 	soundReverbEFX_t efx;
 	SoundReverb_ConvertEAXToEFX( properties, efx );
-	if( appliedReverbSlot[slot] == slotHandle && SoundReverb_EFXEqual( appliedReverb[slot], efx ) )
+	// A turning view moves every slot's panning a fraction of a degree each frame, and
+	// each new set of parameters makes OpenAL Soft recompute the reverb and every
+	// playing source. While the request keeps moving, hold the panning until it has
+	// moved s_reverbPanStep; once it stops, send the exact value.
+	const bool requestMoving = requestedReverbSlot[slot] != slotHandle || !SoundReverb_EFXEqual( requestedReverb[slot], efx );
+	requestedReverb[slot] = efx;
+	requestedReverbSlot[slot] = slotHandle;
+	if( appliedReverbSlot[slot] == slotHandle )
 	{
-		return;
+		if( SoundReverb_EFXEqual( appliedReverb[slot], efx ) )
+		{
+			return;
+		}
+		if( requestMoving && SoundReverb_PanWithinStep( appliedReverb[slot], efx, s_reverbPanStep.GetFloat() ) )
+		{
+			return;
+		}
 	}
 
 	CheckALErrors();
@@ -2982,8 +3016,12 @@ void idSoundHardware_OpenAL::SetReverbSlotProperties( int slot, const soundRever
 		return;
 	}
 
-	// a slot holds a copy of its effect; binding it again publishes the parameters
-	qalAuxiliaryEffectSloti( slotHandle, AL_EFFECTSLOT_EFFECT, effect );
+	// a slot holds a copy of its effect; binding it again publishes the parameters.
+	// An idle slot keeps the null effect and takes these when a voice wakes it.
+	if( !reverbSlotIdle[slot] )
+	{
+		qalAuxiliaryEffectSloti( slotHandle, AL_EFFECTSLOT_EFFECT, effect );
+	}
 	if( CheckALErrors() != AL_NO_ERROR )
 	{
 		appliedReverbSlot[slot] = 0;
@@ -2991,6 +3029,153 @@ void idSoundHardware_OpenAL::SetReverbSlotProperties( int slot, const soundRever
 	}
 	appliedReverb[slot] = efx;
 	appliedReverbSlot[slot] = slotHandle;
+	// input still ringing now rings with the new decay
+	if( !reverbSlotIdle[slot] && reverbClock - reverbSlotRingsUntil[slot] < 0 )
+	{
+		reverbSlotRingsUntil[slot] = Max( reverbSlotRingsUntil[slot], reverbSlotLastFed[slot] + ReverbSlotTailMs( slot ) );
+	}
+#endif
+}
+
+/*
+========================
+idSoundHardware_OpenAL idle reverb slots
+
+OpenAL Soft runs every effect slot holding a reverb on every mixer update,
+whether or not a source feeds it; with four area slots that was half the
+mixer's time in a quiet scene. A slot no playing voice has fed for longer than
+its reverb rings holds the null effect instead. Voices call NoteReverbSend
+before they attach a send or start playing, so a slot always has its reverb
+back before any input reaches it, and its tail never cuts off: it goes idle
+only after the last input has decayed by 90 dB.
+========================
+*/
+int idSoundHardware_OpenAL::ReverbSlotIndex( ALuint slotHandle ) const
+{
+	if( slotHandle == 0 )
+	{
+		return -1;
+	}
+	for( int slot = 0; slot < SOUND_REVERB_SLOTS; slot++ )
+	{
+		if( GetReverbSlotHandle( slot ) == slotHandle )
+		{
+			return slot;
+		}
+	}
+	return -1;
+}
+
+int idSoundHardware_OpenAL::ReverbSlotTailMs( int slot ) const
+{
+	if( slot >= 0 && slot < SOUND_REVERB_SLOTS && appliedReverbSlot[slot] != 0 && appliedReverbSlot[slot] == GetReverbSlotHandle( slot ) )
+	{
+		return SoundReverb_TailHoldMs( appliedReverb[slot] );
+	}
+	// parameters not known yet: the effect's defaults, or whatever the slot held
+	return SoundReverb_MaxTailHoldMs();
+}
+
+bool idSoundHardware_OpenAL::IsReverbSlotIdle( int slot ) const
+{
+	return slot >= 0 && slot < SOUND_REVERB_SLOTS && reverbSlotIdle[slot];
+}
+
+void idSoundHardware_OpenAL::WakeReverbSlot( int slot )
+{
+#if OPENQ4_OPENAL_EFX_SUPPORTED
+	if( slot < 0 || slot >= SOUND_REVERB_SLOTS || !reverbSlotIdle[slot] )
+	{
+		return;
+	}
+	reverbSlotIdle[slot] = false;
+	const ALuint slotHandle = GetReverbSlotHandle( slot );
+	const ALuint effect = ReverbEffectHandle( slot );
+	if( slotHandle == 0 || effect == 0 || !openQ4_LoadHardwareEfxProcs() )
+	{
+		return;
+	}
+	CheckALErrors();
+	qalAuxiliaryEffectSloti( slotHandle, AL_EFFECTSLOT_EFFECT, effect );
+#if OPENQ4_OPENAL_DEFERRED_UPDATES_SUPPORTED
+	// Inside the frame's deferred block the slot would take its reverb only when the
+	// block ends, while a source starts at once (alSourcePlay is never deferred), so
+	// the first mixer update of the sound could reach a slot still holding nothing.
+	// Publish now; the rest of the frame stays deferred.
+	if( deferredUpdatesActive )
+	{
+		qalProcessUpdatesSOFT();
+		qalDeferUpdatesSOFT();
+	}
+#endif
+	if( CheckALErrors() != AL_NO_ERROR )
+	{
+		// the next parameter update binds it again
+		appliedReverbSlot[slot] = 0;
+	}
+#endif
+}
+
+void idSoundHardware_OpenAL::NoteReverbSend( ALuint slotHandle )
+{
+	const int slot = ReverbSlotIndex( slotHandle );
+	if( slot < 0 )
+	{
+		return;
+	}
+	WakeReverbSlot( slot );
+	reverbSlotLastFed[slot] = reverbClock;
+	const int ringsUntil = reverbClock + ReverbSlotTailMs( slot );
+	if( ringsUntil - reverbSlotRingsUntil[slot] > 0 )
+	{
+		reverbSlotRingsUntil[slot] = ringsUntil;
+	}
+}
+
+void idSoundHardware_OpenAL::UpdateIdleReverbSlots( int numSlots )
+{
+#if OPENQ4_OPENAL_EFX_SUPPORTED
+	reverbClock = Sys_Milliseconds();
+	const bool idleAllowed = s_reverbIdleSlots.GetBool();
+	for( int slot = 0; slot < numSlots && slot < SOUND_REVERB_SLOTS; slot++ )
+	{
+		if( !idleAllowed )
+		{
+			WakeReverbSlot( slot );
+			continue;
+		}
+		const ALuint slotHandle = GetReverbSlotHandle( slot );
+		if( reverbSlotIdle[slot] || slotHandle == 0 || reverbClock - reverbSlotRingsUntil[slot] < 0 )
+		{
+			continue;
+		}
+		// Voices note their sends every frame they mix; a playing voice that has not
+		// (one whose channel skipped a frame) still feeds the slot, so look before
+		// letting it go. Paused and stopped voices note again before they play.
+		bool fed = false;
+		for( int i = 0; i < voices.Num() && !fed; i++ )
+		{
+			const idSoundVoice_OpenAL& voice = voices[i];
+			if( voice.reverbSendSlot[0] != slotHandle && voice.reverbSendSlot[1] != slotHandle )
+			{
+				continue;
+			}
+			ALint state = AL_STOPPED;
+			alGetSourcei( voice.openalSource, AL_SOURCE_STATE, &state );
+			fed = alGetError() == AL_NO_ERROR && state == AL_PLAYING;
+		}
+		if( fed )
+		{
+			NoteReverbSend( slotHandle );
+			continue;
+		}
+		CheckALErrors();
+		qalAuxiliaryEffectSloti( slotHandle, AL_EFFECTSLOT_EFFECT, AL_EFFECT_NULL );
+		if( CheckALErrors() == AL_NO_ERROR )
+		{
+			reverbSlotIdle[slot] = true;
+		}
+	}
 #endif
 }
 

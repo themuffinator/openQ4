@@ -1802,7 +1802,79 @@ low-core-count one.
 Follow-ups, in order of measured share: the BSE particle walk and sprite
 evaluation; render-target switches for point cubes; the per-frame static
 buffers for geometry that lives one frame; the double skinning for posed
-bounds; the depth-copy framebuffer attach and detach; idle reverb slots.
+bounds; the depth-copy framebuffer attach and detach; idle reverb slots
+(done, below).
+
+### Follow-up: idle reverb slots and the turning view
+
+OpenAL Soft 1.25.1 runs every effect slot that holds a reverb on every mixer
+update, whether or not a source feeds it, and each new set of slot
+parameters makes it recompute every playing source as well (read from its
+`alu.cpp` and `effects/reverb.cpp`). openQ4 kept all four area slots bound
+and, while the view turned, sent every slot all 23 parameters each frame
+because its panning had moved a fraction of a degree.
+
+**What changed.** A slot that no playing voice has fed for longer than its
+reverb rings now holds the null effect, which the mixer skips. The hold is
+the reflection and late delays plus 1.5 times the slowest band's decay time
+(90 dB down) plus a quarter second, from the slot's current preset: 2.5 s for
+Generic, 15.4 s for Hangar. A voice wakes the slot before it attaches a send
+or starts playing. The wake is published at once, because the frame's
+deferred updates would otherwise reach the mixer after a source that
+`alSourcePlay` started immediately. Before a slot goes idle, the sweep checks
+that no playing source still sends to it. While a slot's requested
+parameters keep changing in panning alone, the panning is resent only after
+it has moved 0.05 (about 3 degrees). Once the view stops, the exact value is
+sent.
+`s_reverbIdleSlots 0` keeps all four reverbs running and
+`s_reverbPanStep 0` resends every change. With both at 0 the old behaviour
+returns exactly. `listReverbs` marks idle slots.
+
+**Mixer cost, measured precisely.** The machine sat at 100% load from other
+sessions, so the game's thread CPU moved by up to 3 points between two
+identical windows (`s_useEAXReverb 0`, where the cvars do nothing). The cost
+was therefore measured with a loopback benchmark: the shipped OpenAL32.dll
+1.25.1 renders as fast as it can, with HRTF, 48 kHz, 480-sample updates as
+the device uses, four EAX reverb slots holding Stone Corridor, Stone Corridor,
+Bathroom and Hangar, and the view turning at 24 degrees a second as in
+`benchmarkViewSweep 720 30000`. Figures are the minimum of 9 interleaved
+6-second runs, in ms of mixing per second of audio:
+
+| Scene | Before | After | No reverb slots |
+| --- | ---: | ---: | ---: |
+| No voices, still | 15.6 | 4.1 (idle slots) | 3.9 |
+| No voices, turning | 15.7 (median 19.3) | 4.1 (idle slots) | 3.9 |
+| 16 voices feeding the slots, still | 28.1 | 28.1 | 15.6 |
+| 16 voices, turning | 30.8 (median 34.0) | 28.2 (median 31.5) | 15.6 |
+
+With no voices, idle slots remove the whole reverb cost of the mix, about
+three quarters of it. With voices playing, the slots must run. Resending the
+panning every frame then cost about 9% more than a still view, and the
+0.05 step brings that back to the still cost, cutting slot updates from 240 to
+26 a second. On the main thread those updates took 0.27 ms of AL calls a
+second, falling to 0.06.
+
+**In game** (hub2, Quality, hidden window; per-thread CPU over 10 s windows
+in one process, switching the cvars between windows, so the threads and
+device stay the same): the mixer thread went from 4.5% to 3.1% of a core
+with a still view (three windows each) and from 7.3% to 3.1% while turning
+(two each). `s_reverbIdleSlots 1` alone gave 3.1% turning, and
+`s_reverbPanStep 0.05` alone left it at 7.3%, since the scene had no voices.
+The parent round's 12% and 16% were read under different load, and the
+kit's thread tagging (start addresses in msvcrt.dll) read back as 0 in this
+session. These figures show the direction; the loopback table gives the
+size.
+
+**The sound is unchanged.** OpenAL's wave writer recorded hub2 with 9 voices
+playing, then `s_volume 0` for 18 s, then sound again, once with each
+behaviour. The reverb tails after the stop match within 0.9 dB per 250 ms
+block from -48 dB down to -151 dB, 118 dB below the playing level. At that
+point the new build's slots went idle and the old one rang on inaudibly. The
+level 0.5-4.5 s after sound resumed is -32.8 dB before and -32.7 dB after.
+`SoundReverbCoreTest` covers the hold for every retail preset and the pan
+step rules, and `sound_settings.py` passes its 35 mutants. The checked
+settings path accepts slot 0 parked on the null effect while it still owns
+its reverb.
 
 ## Appendix: artifacts
 

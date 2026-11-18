@@ -2131,7 +2131,8 @@ void idSoundReverb::PrintInfo() const
 	{
 		const int area = slotToArea[slot];
 		const int effect = area >= 0 ? EffectForArea( const_cast<idSoundReverb*>( this ), area ) : -1;
-		common->Printf( "  [%d]%s area %d %s\n", slot, slot == primarySlot ? "*" : " ", area,
-			effect >= 0 ? effects[effect].name.c_str() : "-" );
+		common->Printf( "  [%d]%s area %d %s%s\n", slot, slot == primarySlot ? "*" : " ", area,
+			effect >= 0 ? effects[effect].name.c_str() : "-",
+			soundSystemLocal.hardware.IsReverbSlotIdle( slot ) ? " (idle: no voice feeds it)" : "" );
 	}
 }

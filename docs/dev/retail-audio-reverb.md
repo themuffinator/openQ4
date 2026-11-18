@@ -185,6 +185,15 @@ listener alone.
   flags. Unlike retail, which forces `s_useEAXOcclusion 1` whenever it finds EAX, openQ4 honours
   0. `s_showReverb 1` prints the slot assignment whenever it changes, and `listReverbs` prints
   the presets, the map's area table and the current slots.
+- **Idle slots and pan steps.** A slot no playing voice has fed for longer than its reverb rings
+  holds the null effect, which OpenAL Soft skips. The hold is the reflection and late delays,
+  1.5 times the slowest band's decay and 0.25 s, from `SoundReverb_TailHoldMs`. Voices call
+  `NoteReverbSend` before they attach a send or play, which binds the reverb again and
+  publishes it straight away, even inside the frame's deferred updates. While a slot's request
+  keeps changing only in panning, it is resent once it has moved `s_reverbPanStep` (0.05),
+  and exactly when it settles. `s_reverbIdleSlots 0` and `s_reverbPanStep 0` restore the
+  previous behaviour, and `listReverbs` marks idle slots. The measurements are in
+  [performance report section 15](performance-report.md#follow-up-idle-reverb-slots-and-the-turning-view).
 - **Interface.** `idSoundSystem::EndLevelLoad( mapName )` takes the session's map path, as in
   the SDK, and `GetReverbName`, `GetNumAreas`, `GetReverb` and `SetReverb` provide the SDK's
   reverb editor interface. The retail reverb editor (`editReverb`) itself is a Windows tool and

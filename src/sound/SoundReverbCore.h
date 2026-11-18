@@ -222,6 +222,75 @@ inline bool SoundReverb_EFXEqual( const soundReverbEFX_t &a, const soundReverbEF
 /*
 ===============================================================================
 
+	Reverb slot update economy (openQ4)
+
+	OpenAL Soft runs every slot that holds a reverb on every mixer update, fed or
+	not, and each new set of slot parameters makes it recompute every playing
+	source as well. A slot no voice has fed for longer than its tail can hold the
+	null effect until a voice needs it again, and a turning view need not resend a
+	slot's panning for every fraction of a degree.
+
+===============================================================================
+*/
+
+// The milliseconds a reverb still rings after its input stops: the reflection and
+// late reverb delays, then the slowest of the low, mid and high bands decaying by
+// 90 dB (1.5 x the 60 dB decay time), plus a quarter second of echo and margin.
+inline int SoundReverb_TailHoldMs( const soundReverbEFX_t &efx ) {
+	const float decay = SoundReverb_Clamp( efx.decayTime, SOUND_REVERB_EFX_MIN_DECAY_TIME, SOUND_REVERB_EFX_MAX_DECAY_TIME );
+	float slowest = decay;
+	const float ratios[2] = { efx.decayHFRatio, efx.decayLFRatio };
+	for ( int i = 0; i < 2; i++ ) {
+		const float band = SoundReverb_Clamp( decay * ratios[i], SOUND_REVERB_EFX_MIN_DECAY_TIME, SOUND_REVERB_EFX_MAX_DECAY_TIME );
+		slowest = band > slowest ? band : slowest;
+	}
+	const float delays = SoundReverb_Clamp( efx.reflectionsDelay, 0.0f, SOUND_REVERB_EFX_MAX_REFLECTIONS_DELAY ) +
+		SoundReverb_Clamp( efx.lateReverbDelay, 0.0f, SOUND_REVERB_EFX_MAX_LATE_REVERB_DELAY );
+	return (int)std::ceil( ( delays + slowest * 1.5f + 0.25f ) * 1000.0f );
+}
+
+// The hold for a slot whose parameters are unknown: the longest a reverb can ring.
+inline int SoundReverb_MaxTailHoldMs() {
+	soundReverbEFX_t longest = {};
+	longest.decayTime = SOUND_REVERB_EFX_MAX_DECAY_TIME;
+	longest.decayHFRatio = longest.decayLFRatio = 1.0f;
+	longest.reflectionsDelay = SOUND_REVERB_EFX_MAX_REFLECTIONS_DELAY;
+	longest.lateReverbDelay = SOUND_REVERB_EFX_MAX_LATE_REVERB_DELAY;
+	return SoundReverb_TailHoldMs( longest );
+}
+
+inline float SoundReverb_PanDistance( const float a[3], const float b[3] ) {
+	const float d0 = a[0] - b[0];
+	const float d1 = a[1] - b[1];
+	const float d2 = a[2] - b[2];
+	return std::sqrt( d0 * d0 + d1 * d1 + d2 * d2 );
+}
+
+// True when next differs from applied only in its panning, and by less than step
+// (a unit-length pan moves 0.05 per 2.9 degrees). Exact equality still counts as
+// a match; a step of 0 or less accepts nothing else.
+inline bool SoundReverb_PanWithinStep( const soundReverbEFX_t &applied, const soundReverbEFX_t &next, float step ) {
+	soundReverbEFX_t samePan = next;
+	for ( int i = 0; i < 3; i++ ) {
+		samePan.reflectionsPan[i] = applied.reflectionsPan[i];
+		samePan.lateReverbPan[i] = applied.lateReverbPan[i];
+	}
+	if ( !SoundReverb_EFXEqual( applied, samePan ) ) {
+		return false;
+	}
+	if ( SoundReverb_EFXEqual( applied, next ) ) {
+		return true;
+	}
+	if ( !( step > 0.0f ) ) {
+		return false;
+	}
+	return SoundReverb_PanDistance( applied.reflectionsPan, next.reflectionsPan ) < step &&
+		SoundReverb_PanDistance( applied.lateReverbPan, next.lateReverbPan ) < step;
+}
+
+/*
+===============================================================================
+
 	Area slot planning
 
 	The retail UpdateNearbyAreaEfx block, inlined into the mixer of Quake4.exe
