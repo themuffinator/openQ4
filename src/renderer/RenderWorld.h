@@ -58,7 +58,7 @@ const int SHADERPARM_BEAM_WIDTH		= 11;
 // RGBA is the colour at the apex, and these two take slots the model owns.
 // Materials drawn on a cone beam should not read parms 6 or 7.
 const int SHADERPARM_CONEBEAM_START_WIDTH	= 6;	// width at the apex
-const int SHADERPARM_CONEBEAM_REACH		= 7;	// 0..1: the beam's length as a fraction of its full reach
+const int SHADERPARM_CONEBEAM_REACH		= 7;	// 0..1: the beam's length as a fraction of its full reach, where it has faded out
 
 const int SHADERPARM_SPRITE_WIDTH		= 8;
 const int SHADERPARM_SPRITE_HEIGHT		= 9;

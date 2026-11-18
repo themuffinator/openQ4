@@ -362,6 +362,8 @@ protected:
 	float					flashlightBeamLength;	// to the first surface in the beam's way
 	float					flashlightBeamReach;	// flashlightRadius
 	float					flashlightBeamSpread;	// tangent of the beam's half angle
+	idVec3					flashlightLensOffset;	// flashlight_flaresurf's centre in the flashlight joint's frame
+	jointHandle_t			flashlightLensJoint;	// the joint flashlightLensOffset was found for
 	enum {
 		FLASHLIGHT_BEAM_NONE,
 		FLASHLIGHT_BEAM_EFFECT,	// the retail fx_flashlight effect
@@ -376,6 +378,7 @@ protected:
 	void					FlashlightUpdate	( bool forceOn = false );
 	void					FlashlightBeamUpdate	( bool firstOn, bool traced );
 	void					FreeFlashlightBeam	( void );
+	void					UpdateFlashlightLens	( void );
 	void					InitDeathPush		( const idVec3& dir, int location, const idDict* damageDict, float pushScale = 1.0f );
 	void					DeathPush			( void );
 

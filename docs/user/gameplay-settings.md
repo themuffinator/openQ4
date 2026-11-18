@@ -286,7 +286,7 @@ It is off by default; off runs the original physics exactly. A change takes effe
 
 ### Flashlights
 
-**Not in 0.14.1.** Your flashlight stays on your side of the wall. Held hard against a wall, a door or a thin panel, the gun used to reach through it, so the flashlight lit the room behind and left the wall in front of you dark. The marines' flashlight beams now widen from the gun out to the flashlight's reach and stop at the first wall or person in the way; the original thin beam passed straight through walls. `g_flashlightBeam 0` brings the original beam back.
+**Not in 0.14.1.** Your flashlight stays on your side of the wall. Held hard against a wall, a door or a thin panel, the gun used to reach through it, so the flashlight lit the room behind and left the wall in front of you dark. The marines' flashlight beams now shine from the flashlight under the barrel, widen out to the flashlight's reach as a soft cone, and stop at the first wall or person in the way; the original thin beam passed straight through walls. `g_flashlightBeam 0` brings the original beam back.
 
 ## Settings reference
 

@@ -228,21 +228,26 @@ idBounds idRenderModelBeam::Bounds( const struct renderEntity_s *renderEntity ) 
 
 A light beam drawn as a sheet that always faces the view: narrow at the apex
 (the renderEntity origin) and widening to the end point, like the cone of
-lit air in front of a flashlight. It is several rows long and three columns
-wide, so the texture keeps its shape across a strongly tapered sheet instead of
-shearing along one diagonal.
+lit air in front of a flashlight. It is three columns wide and several rows
+long, the rows closer together near the apex where the sheet widens fastest,
+so the cross-section keeps its shape instead of shearing along a diagonal.
 
-The texture runs from its centre (s = 0.5) at the apex towards its trailing
-edge, scaled by SHADERPARM_CONEBEAM_REACH, so a beam cut short by a wall stops
-at the brightness it had there rather than fading out early. The sheet fades
+The texture is sampled only across the beam: every row reads the middle line
+of the image (s = 0.5) from one edge (t = 0) to the other (t = 1). Nothing in
+it runs along the beam, so no texture detail stretches into lines however long
+the beam is; a smooth radial image gives a soft cross-section. Brightness
+falls off along the beam in the vertex colour instead, linearly to nothing at
+the full reach, where SHADERPARM_CONEBEAM_REACH says the end is (a beam cut
+short by a wall ends at the brightness it had there). The sheet also fades
 where it would be seen end on (looking down the beam) and where it passes
 through the camera, the two places a flat sheet cannot pass for a volume.
+Colour and alpha fade together, which suits additive materials.
 
 ===============================================================================
 */
 
 static const char *coneBeam_SnapshotName = "_coneBeam_Snapshot_";
-static const int CONEBEAM_ROWS = 6;
+static const int CONEBEAM_ROWS = 8;
 static const int CONEBEAM_COLUMNS = 3;
 static const int CONEBEAM_VERTS = CONEBEAM_ROWS * CONEBEAM_COLUMNS;
 static const int CONEBEAM_INDEXES = ( CONEBEAM_ROWS - 1 ) * ( CONEBEAM_COLUMNS - 1 ) * 6;
@@ -345,7 +350,10 @@ idRenderModel *idRenderModelConeBeam::InstantiateDynamicModel( const struct rend
 	const float alpha = renderEntity->shaderParms[SHADERPARM_ALPHA];
 
 	for ( int row = 0; row < CONEBEAM_ROWS; row++ ) {
-		const float fraction = static_cast<float>( row ) / static_cast<float>( CONEBEAM_ROWS - 1 );
+		// rows crowd towards the apex: width and fade stay linear in distance,
+		// so the vertex interpolation between rows is still exact
+		const float step = static_cast<float>( row ) / static_cast<float>( CONEBEAM_ROWS - 1 );
+		const float fraction = step * step;
 		const idVec3 centre = localTarget * fraction;
 		const float halfWidth = 0.5f * R_ConeBeamWidth( renderEntity, fraction );
 
@@ -365,13 +373,16 @@ idRenderModel *idRenderModelConeBeam::InstantiateDynamicModel( const struct rend
 		const float facingFade = idMath::ClampFloat( 0.0f, 1.0f, ( 0.985f - endOn ) / ( 0.985f - 0.85f ) );
 		const float nearFade = idMath::ClampFloat( 0.0f, 1.0f, ( distance - halfWidth ) / 48.0f );
 
-		byte color[4];
-		color[0] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_RED] );
-		color[1] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_GREEN] );
-		color[2] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_BLUE] );
-		color[3] = R_ConeBeamColorByte( alpha * facingFade * nearFade );
+		// linear falloff with distance, to nothing at the full reach
+		const float intensity = ( 1.0f - reach * fraction ) * facingFade * nearFade;
 
-		const float s = 0.5f + 0.5f * reach * fraction;
+		byte color[4];
+		color[0] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_RED] * intensity );
+		color[1] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_GREEN] * intensity );
+		color[2] = R_ConeBeamColorByte( renderEntity->shaderParms[SHADERPARM_BLUE] * intensity );
+		color[3] = R_ConeBeamColorByte( alpha * intensity );
+
+		const float s = 0.5f;
 		for ( int column = 0; column < CONEBEAM_COLUMNS; column++ ) {
 			idDrawVert &vert = tri->verts[row * CONEBEAM_COLUMNS + column];
 			const float side = 1.0f - static_cast<float>( column );	// +1, 0, -1

@@ -18,11 +18,12 @@ does not restore the withdrawn release. See
   trace per light per game frame.
 - **Marines' flashlight beams cone out and stop at walls.** The original beam
   was a thin bundle of lines about 100 units long that went straight through
-  any wall in front of it. It now widens from the gun at the flashlight's
-  authored angle (`flashlightAngle`) out to its reach (`flashlightRadius`),
-  fades with distance like the light, and ends at the first wall or character
-  in its way. It uses Quake 4's own beam texture. `g_flashlightBeam 0` brings
-  back the original effect.
+  any wall in front of it. It now leaves the flashlight itself, mounted under
+  the barrel, rather than the muzzle, and widens at the flashlight's authored
+  angle (`flashlightAngle`) out to its reach (`flashlightRadius`). It fades
+  with distance like the light and ends at the first wall or character in its
+  way. It is drawn with Quake 4's own soft glow, so no texture streaks stretch
+  along it. `g_flashlightBeam 0` brings back the original effect.
 - **What to do.** Nothing. Replace the client, both renderers and both game
   modules together.
 

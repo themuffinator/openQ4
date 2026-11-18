@@ -483,6 +483,8 @@ idActor::idActor( void )
 	flashlightBeamLength = 0.0f;
 	flashlightBeamReach = 0.0f;
 	flashlightBeamSpread = 0.0f;
+	flashlightLensOffset.Zero();
+	flashlightLensJoint = INVALID_JOINT;
 
 	deathPushTime	= 0;
 	deathPushForce.Zero();
@@ -681,6 +683,11 @@ void idActor::Spawn( void ) {
 		flashlightBeamSpread = Max( flashlight.up.Length(), flashlight.right.Length() ) / flashlight.target.Length();
 	} else {
 		flashlightBeamSpread = idMath::Tan( DEG2RAD( 15.0f ) );
+	}
+	// read the lens position while the level loads, not when a script first
+	// turns the flashlight on
+	if ( spawnArgs.GetString( "fx_flashlight", "" )[0] ) {
+		UpdateFlashlightLens();
 	}
 
 	if ( spawnArgs.GetString( "flashlight_flaresurf", NULL ) ) {
@@ -1609,6 +1616,198 @@ void idActor::Event_Flashlight( bool on ) {
 
 /*
 =====================
+openQ4_FindFlashlightLens
+
+Where a flashlight's lens sits on its gun. Quake 4 places a marine's
+flashlight at the gun's muzzle-flash joint, but the flashlight itself, drawn by
+the flashlight_flaresurf surface, is mounted behind it and under the barrel:
+3.5 units back and 2 down on the machinegun, 11 back on the shotgun, whose
+joint is the longer gun's muzzle. A rigid attachment keeps the surface at one
+offset in the joint's frame in every pose, so its bind pose answers for all of
+them. The base model holds no posed surfaces and GPU skinning leaves an
+instantiated copy unposed, so the bind pose is read from the md5mesh text,
+once per model, surface and joint.
+=====================
+*/
+static bool openQ4_ReadFlashlightLens( const char *meshFile, const char *surface, const char *jointName, idVec3 &offset ) {
+	idStr extension;
+	idStr( meshFile ).ExtractFileExtension( extension );
+	if ( extension.Icmp( "md5mesh" ) != 0 ) {
+		return false;
+	}
+
+	idLexer parser( LEXFL_ALLOWPATHNAMES | LEXFL_NOSTRINGESCAPECHARS | LEXFL_NOERRORS | LEXFL_NOFATALERRORS );
+	if ( !parser.LoadFile( meshFile ) ) {
+		return false;
+	}
+
+	idToken token;
+	int numJoints = 0;
+	while ( parser.ReadToken( &token ) && token != "joints" ) {
+		if ( token == "numJoints" ) {
+			numJoints = parser.ParseInt();
+		}
+	}
+	if ( numJoints <= 0 || numJoints > 4096 || !parser.ExpectTokenString( "{" ) ) {
+		return false;
+	}
+
+	idList<idVec3> jointOrigins;
+	idList<idMat3> jointAxes;
+	jointOrigins.SetNum( numJoints );
+	jointAxes.SetNum( numJoints );
+	int lensJoint = -1;
+	for ( int i = 0; i < numJoints; i++ ) {
+		idQuat q;
+		parser.ReadToken( &token );
+		if ( token.Icmp( jointName ) == 0 ) {
+			lensJoint = i;
+		}
+		parser.ParseInt();
+		parser.Parse1DMatrix( 3, jointOrigins[i].ToFloatPtr() );
+		parser.Parse1DMatrix( 3, q.ToFloatPtr() );
+		q.w = q.CalcW();
+		jointAxes[i] = q.ToMat3();
+	}
+	if ( lensJoint < 0 || parser.HadError() || !parser.ExpectTokenString( "}" ) ) {
+		return false;
+	}
+
+	while ( parser.ReadToken( &token ) ) {
+		if ( token != "mesh" || !parser.ExpectTokenString( "{" ) || !parser.ExpectTokenString( "shader" ) || !parser.ReadToken( &token ) ) {
+			continue;
+		}
+		if ( token.Icmp( surface ) != 0 ) {
+			parser.SkipBracedSection( false );
+			continue;
+		}
+
+		parser.ExpectTokenString( "numverts" );
+		const int numVerts = parser.ParseInt();
+		if ( numVerts <= 0 || numVerts > 65536 ) {
+			return false;
+		}
+		idList<int> firstWeight, weightCount;
+		firstWeight.SetNum( numVerts );
+		weightCount.SetNum( numVerts );
+		for ( int i = 0; i < numVerts; i++ ) {
+			float st[2];
+			parser.ExpectTokenString( "vert" );
+			parser.ParseInt();
+			parser.Parse1DMatrix( 2, st );
+			firstWeight[i] = parser.ParseInt();
+			weightCount[i] = parser.ParseInt();
+		}
+
+		parser.ExpectTokenString( "numtris" );
+		const int numTris = parser.ParseInt();
+		for ( int i = 0; i < numTris && !parser.HadError(); i++ ) {
+			parser.ExpectTokenString( "tri" );
+			parser.ParseInt();
+			parser.ParseInt();
+			parser.ParseInt();
+			parser.ParseInt();
+		}
+
+		parser.ExpectTokenString( "numweights" );
+		const int numWeights = parser.ParseInt();
+		if ( numWeights <= 0 || numWeights > 262144 || parser.HadError() ) {
+			return false;
+		}
+		idList<idVec3> weightPoints;	// bias * the offset in model space
+		weightPoints.SetNum( numWeights );
+		for ( int i = 0; i < numWeights; i++ ) {
+			idVec3 weightOffset;
+			parser.ExpectTokenString( "weight" );
+			parser.ParseInt();
+			const int joint = parser.ParseInt();
+			const float bias = parser.ParseFloat();
+			parser.Parse1DMatrix( 3, weightOffset.ToFloatPtr() );
+			if ( joint < 0 || joint >= numJoints ) {
+				return false;
+			}
+			weightPoints[i] = ( jointOrigins[joint] + weightOffset * jointAxes[joint] ) * bias;
+		}
+		if ( parser.HadError() ) {
+			return false;
+		}
+
+		idVec3 centre = vec3_origin;
+		for ( int i = 0; i < numVerts; i++ ) {
+			if ( firstWeight[i] < 0 || weightCount[i] <= 0 || firstWeight[i] + weightCount[i] > numWeights ) {
+				return false;
+			}
+			for ( int j = 0; j < weightCount[i]; j++ ) {
+				centre += weightPoints[ firstWeight[i] + j ];
+			}
+		}
+		centre /= static_cast<float>( numVerts );
+
+		// world = origin + offset * axis, so offset = ( world - origin ) * axis^T
+		offset = ( centre - jointOrigins[lensJoint] ) * jointAxes[lensJoint].Transpose();
+		// a surface this far from the joint is not a lens mounted on that gun
+		return offset.LengthSqr() <= Square( 24.0f );
+	}
+	return false;
+}
+
+typedef struct openQ4FlashlightLens_s {
+	char	key[ MAX_STRING_CHARS ];
+	idVec3	offset;
+	bool	found;
+} openQ4FlashlightLens_t;
+
+static const int OPENQ4_FLASHLIGHT_LENS_CACHE = 16;
+static openQ4FlashlightLens_t s_flashlightLenses[ OPENQ4_FLASHLIGHT_LENS_CACHE ];
+static int s_numFlashlightLenses;
+
+static bool openQ4_FindFlashlightLens( const char *meshFile, const char *surface, const char *jointName, idVec3 &offset ) {
+	const char *key = va( "%s|%s|%s", meshFile, surface, jointName );
+	const int cached = Min( s_numFlashlightLenses, OPENQ4_FLASHLIGHT_LENS_CACHE );
+	for ( int i = 0; i < cached; i++ ) {
+		if ( idStr::Icmp( s_flashlightLenses[i].key, key ) == 0 ) {
+			offset = s_flashlightLenses[i].offset;
+			return s_flashlightLenses[i].found;
+		}
+	}
+
+	openQ4FlashlightLens_t &entry = s_flashlightLenses[ s_numFlashlightLenses++ % OPENQ4_FLASHLIGHT_LENS_CACHE ];
+	idStr::Copynz( entry.key, key, sizeof( entry.key ) );
+	entry.offset.Zero();
+	entry.found = openQ4_ReadFlashlightLens( meshFile, surface, jointName, entry.offset );
+	if ( !entry.found ) {
+		entry.offset.Zero();
+	}
+	offset = entry.offset;
+	return entry.found;
+}
+
+/*
+=====================
+idActor::UpdateFlashlightLens
+
+openQ4: finds the visible flashlight on the current gun for the beam to leave
+from. An authored flashlightOffset already moves the light where its author
+wanted it, so the beam then starts with the light.
+=====================
+*/
+void idActor::UpdateFlashlightLens( void ) {
+	flashlightLensJoint = flashlightJoint;
+	flashlightLensOffset.Zero();
+
+	const char *surface = spawnArgs.GetString( "flashlight_flaresurf", "" );
+	if ( !surface[0] || flashlightJoint == INVALID_JOINT || renderEntity.hModel == NULL || spawnArgs.FindKey( "flashlightOffset" ) != NULL ) {
+		return;
+	}
+	const char *jointName = animator.GetJointName( flashlightJoint );
+	if ( jointName == NULL || !jointName[0] ) {
+		return;
+	}
+	openQ4_FindFlashlightLens( renderEntity.hModel->Name(), surface, jointName, flashlightLensOffset );
+}
+
+/*
+=====================
 idActor::FlashlightUpdate
 =====================
 */
@@ -1694,10 +1893,18 @@ void idActor::FlashlightBeamUpdate( bool firstOn, bool traced ) {
 		return;
 	}
 
+	// the beam leaves the flashlight's lens, not the muzzle joint that places
+	// the light; it keeps that joint's back-off from walls. The light stays at
+	// the joint, as in retail, so the gun never shadows it.
+	if ( flashlightLensJoint != flashlightJoint ) {
+		UpdateFlashlightLens();
+		traced = true;
+	}
 	const idVec3 direction = flashlight.axis[0];
+	const idVec3 beamOrigin = flashlight.origin + flashlightLensOffset * flashlight.axis;
 	if ( traced ) {
 		trace_t tr;
-		gameLocal.TracePoint( this, tr, flashlight.origin, flashlight.origin + direction * flashlightBeamReach, CONTENTS_OPAQUE | CONTENTS_RENDERMODEL, this );
+		gameLocal.TracePoint( this, tr, beamOrigin, beamOrigin + direction * flashlightBeamReach, CONTENTS_OPAQUE | CONTENTS_RENDERMODEL, this );
 		flashlightBeamLength = flashlightBeamReach * tr.fraction;
 	}
 	if ( flashlightBeamLength < 1.0f ) {
@@ -1711,21 +1918,24 @@ void idActor::FlashlightBeamUpdate( bool firstOn, bool traced ) {
 		if ( flashlightBeam.hModel == NULL ) {
 			return;
 		}
-		flashlightBeam.customShader = declManager->FindMaterial( "gfx/effects/particles_shapes/lightbeam" );
+		// Quake 4's smooth additive glow, drawn across the beam: the streaky
+		// lightbeam texture is made for thin line particles and stretched into
+		// long lines over a wide beam
+		flashlightBeam.customShader = declManager->FindMaterial( "gfx/effects/particles_shapes/add_sphere" );
 		flashlightBeam.axis = mat3_identity;
 		flashlightBeam.noShadow = true;
 		flashlightBeam.noSelfShadow = true;
 		flashlightBeam.entityNum = entityNumber;
 	}
 
-	static const float FLASHLIGHT_BEAM_APEX_WIDTH = 2.0f;
-	static const float FLASHLIGHT_BEAM_ALPHA = 0.55f;
-	const idVec3 end = flashlight.origin + direction * flashlightBeamLength;
-	flashlightBeam.origin = flashlight.origin;
-	flashlightBeam.shaderParms[ SHADERPARM_RED ] = flashlight.shaderParms[ SHADERPARM_RED ];
-	flashlightBeam.shaderParms[ SHADERPARM_GREEN ] = flashlight.shaderParms[ SHADERPARM_GREEN ];
-	flashlightBeam.shaderParms[ SHADERPARM_BLUE ] = flashlight.shaderParms[ SHADERPARM_BLUE ];
-	flashlightBeam.shaderParms[ SHADERPARM_ALPHA ] = FLASHLIGHT_BEAM_ALPHA;
+	static const float FLASHLIGHT_BEAM_APEX_WIDTH = 3.0f;	// about the lens
+	static const float FLASHLIGHT_BEAM_INTENSITY = 0.3f;
+	const idVec3 end = beamOrigin + direction * flashlightBeamLength;
+	flashlightBeam.origin = beamOrigin;
+	flashlightBeam.shaderParms[ SHADERPARM_RED ] = flashlight.shaderParms[ SHADERPARM_RED ] * FLASHLIGHT_BEAM_INTENSITY;
+	flashlightBeam.shaderParms[ SHADERPARM_GREEN ] = flashlight.shaderParms[ SHADERPARM_GREEN ] * FLASHLIGHT_BEAM_INTENSITY;
+	flashlightBeam.shaderParms[ SHADERPARM_BLUE ] = flashlight.shaderParms[ SHADERPARM_BLUE ] * FLASHLIGHT_BEAM_INTENSITY;
+	flashlightBeam.shaderParms[ SHADERPARM_ALPHA ] = 1.0f;
 	flashlightBeam.shaderParms[ SHADERPARM_CONEBEAM_START_WIDTH ] = FLASHLIGHT_BEAM_APEX_WIDTH;
 	flashlightBeam.shaderParms[ SHADERPARM_CONEBEAM_REACH ] = flashlightBeamLength / flashlightBeamReach;
 	flashlightBeam.shaderParms[ SHADERPARM_BEAM_END_X ] = end.x;
