@@ -197,8 +197,10 @@ public:
 
 	void		UploadScratch(const byte* pic, int width, int height);
 
-	// estimates size of the GL image based on dimensions and storage type
-	int			StorageSize() const;
+	// bytes of the GPU storage: every allocated level, compressed levels in
+	// whole blocks, all six faces of a cube and every MSAA sample. 64-bit: one
+	// 8K RGBA8 texture with mips already passes 2^31 bits on the way.
+	int64		StorageSize() const;
 
 	// print a one line summary of the image
 	void		Print() const;

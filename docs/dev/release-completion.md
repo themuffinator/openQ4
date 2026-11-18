@@ -7,6 +7,31 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## More texture pack formats, and an option to keep big packs in memory, 18 November 2026
+
+- **More DDS files load.** BC1 and BC3 (DXT1/DXT5) files saved with a DX10
+  header, which is what `texconv` writes for sRGB formats, now load instead of
+  being skipped, and so do BC4 and BC5 files (common for normal maps and masks)
+  and uncompressed DDS files. BC5 normal maps get their Z channel rebuilt.
+  [The formats table](../user/texture-replacements.md#formats) lists them all.
+- **Compress textures that are not DDS.** A pack of TGA or PNG files, or loose
+  originals that make a pack look out of date, can multiply a map's video
+  memory. `image_useCompression 1` and `image_useNormalCompression 2`, Quake
+  4's own settings, now store such textures compressed: DXT1 when the image has
+  no transparency, DXT5 when it has, and bump maps in Quake 4's normal-map
+  layout. Both are off by default, so nothing changes unless you turn them on.
+  Quake 4's own DDS textures, sky boxes and menu art are never re-encoded.
+- **First loads that compress are faster.** Compressing a texture is now spread
+  across processor cores, which shortens the first load after installing a
+  pack. The same applies to Android devices that compress to ETC2, and with
+  `image_useETC2 2` or higher they now store opaque colour textures at half the
+  size (not yet checked on a device).
+- **Correct memory figures.** `listImages` counted large texture packs wrongly:
+  its total turned negative past 2 GB, a single 8K texture could read as
+  negative, and each size was an estimate. It now adds up the mipmap levels
+  actually stored, and names every format.
+- **What to do.** Nothing. Replace the client and both renderers together.
+
 ## Flashlights that stop at walls, 17 November 2026
 
 - **Your flashlight lights the wall in front of you.** Held against a wall, a

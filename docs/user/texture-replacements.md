@@ -29,12 +29,12 @@ To check that the pack is being used, see [Troubleshooting](#troubleshooting).
 `image_usePrecompressedTextures` is a console variable (cvar) with three values.
 Set it, then load a map or run `reloadImages all`:
 
-- `1` (default) uses any supported replacement (DXT1, DXT5, RXGB and BC7) and
+- `1` (default) uses any supported replacement (see [Formats](#formats)) and
   also reuses the precomputed textures in Quake 4's own PK4s. **This is the
   right setting for a BC7 pack.** The performance presets keep it at 1.
-- `2` uses only BC7 replacements, and ignores DXT and RXGB files, including the
-  ones in Quake 4's PK4s. Use it only if you want everything else to come from
-  the uncompressed originals.
+- `2` uses only BC7, BC4 and BC5 replacements, and ignores DXT and RXGB files,
+  including the ones in Quake 4's PK4s. Use it only if you want everything else
+  to come from the uncompressed originals. (**Not in 0.14.1:** BC4 and BC5.)
 - `0` turns off all DDS replacements, including your own packs.
 
 **BC7 needs graphics support.** Run `gfxInfo` and check the
@@ -134,23 +134,42 @@ always wins, and so does a replaced input. openQ4 finds them
 automatically, including nested programs and environment cube faces under
 `gfx/env/`; you don't need to extract, rename or regenerate them.
 
-### BC7 files
+### Formats
 
-openQ4 accepts single 2D BC7 textures with either:
+openQ4 accepts single 2D DDS textures in these formats, with a classic header
+(FourCC) or a DX10 header:
 
-- a DX10 header with `DXGI_FORMAT_BC7_UNORM` or `DXGI_FORMAT_BC7_UNORM_SRGB`; or
-- a common `BC7` FourCC code.
+| Format | FourCC | DX10 `DXGI_FORMAT_` | How it loads |
+| --- | --- | --- | --- |
+| BC1 / DXT1 | `DXT1` | `BC1_UNORM`, `BC1_UNORM_SRGB` | as it is |
+| BC3 / DXT5, RXGB | `DXT5`, `RXGB` | `BC3_UNORM`, `BC3_UNORM_SRGB` | as it is |
+| BC7 | `BC7`, `BC7L`, `BC70` | `BC7_UNORM`, `BC7_UNORM_SRGB` | as it is where BC7 is supported, else decoded |
+| BC4 | `ATI1`, `BC4U` | `BC4_UNORM` | decoded, as greyscale |
+| BC5 | `ATI2`, `BC5U` | `BC5_UNORM` | decoded, as a normal map (Z rebuilt) |
+| BC2 / DXT3 | `DXT3` | `BC2_UNORM`, `BC2_UNORM_SRGB` | decoded; only when a material names the `.dds` |
+| Uncompressed 24/32-bit | none | `R8G8B8A8_UNORM`, `B8G8R8A8_UNORM`, `B8G8R8X8_UNORM` (and `_SRGB`) | decoded; only when a material names the `.dds` |
 
-Texture arrays, cube maps, volume textures, invalid sizes and files with
-missing mipmap levels are rejected safely. Your own mipmaps are used as they
-are. When texture size is reduced, openQ4 skips the largest levels, and images
-that never use mipmaps upload only the full-size level.
+**Not in 0.14.1:** BC1 and BC3 behind a DX10 header (what `texconv` writes for
+an sRGB format, and with `-dx10`), BC4, BC5 and uncompressed DDS files. 0.14.1
+skipped them. An `_SRGB` variant loads exactly like the plain one, as Quake 4's
+own textures do. Signed (`_SNORM`) formats, texture arrays, cube maps,
+volume textures, invalid sizes and files with missing mipmap levels are rejected
+safely.
+
+Your own mipmaps are used as they are. When texture size is reduced, openQ4
+skips the largest levels, and images that never use mipmaps upload only the
+full-size level. Formats that are decoded get their mipmaps rebuilt from the
+top level.
+
+Decoded files are uncompressed in video memory unless you turn on
+[compression of decoded textures](#compressing-textures-that-are-not-dds).
 
 ### Normal maps
 
 Write BC7 normal maps the ordinary way: X, Y and Z in red, green and blue, with
 alpha unused. That is the default in `texconv`, NVTT, Compressonator and
-`bc7enc`, and it is what openQ4 expects.
+`bc7enc`, and it is what openQ4 expects. BC5 normal maps store X and Y only;
+openQ4 rebuilds Z from them.
 
 > **Packs encoded with `bc7enc -r2a` need re-encoding.** That option moves the
 > channels into the DXT5 normal-map layout. openQ4 reads BC7 normal maps as
@@ -173,6 +192,28 @@ texture memory and hide the pack. With `image_showPrecompressedTextures 1` the
 log names each one as `Ignoring stale DDS replacement`. Move loose texture
 folders out of the game's folders when you install a packed texture pack.
 
+## Compressing textures that are not DDS
+
+**Not in 0.14.1.** A pack made of TGA, PNG or JPG files, a BC4/BC5 pack, or
+loose originals that make a packed replacement look stale (see
+[Stale files](#stale-files)) all load uncompressed: four to eight times the
+video memory of a DDS file. Two settings, with Quake 4's own names, compress
+such textures when they load:
+
+- `image_useCompression 1` stores colour and specular textures as DXT1, or as
+  DXT5 when the image has transparency.
+- `image_useNormalCompression 2` stores bump maps as DXT5 in Quake 4's own
+  normal-map layout (`1` reads as `2`).
+
+Both default to `0`, which keeps decoded textures uncompressed and full quality,
+as before. They never re-encode a DDS file (almost all of Quake 4's own
+textures are DDS), sky boxes, or menu, HUD and other 2D art. Changing either
+reloads the textures at once. The first load of each map afterwards is slower
+while the textures are compressed; openQ4 keeps the results in its image cache,
+and the uncompressed copies stay there too, so switching back is quick. They
+need graphics with DXT support (`gfxInfo` shows `S3TC/DXT=1`), which every
+desktop GPU has.
+
 ## Troubleshooting
 
 Enter these in the console to check a pack:
@@ -193,15 +234,21 @@ no DDS replacement for 'textures/stone/wall01':
    textures/stone/wall01.dds           [alongside the original asset (Quake 4 style)] no such file
 ```
 
-- `listImages` marks which loaded images are BC7.
-- `imageDDSSelfTest` checks openQ4's built-in DDS naming and BC7 header
-  handling, if you suspect the engine rather than your pack.
+- `listImages` shows each loaded image's format (`DXT1`, `DXT5`, `BC7`,
+  `RGBA8` for uncompressed) and size; `listImages uncompressed` lists only the
+  uncompressed ones, the first place to look when a pack uses too much memory.
+  **Not in 0.14.1:** the totals are correct past 2 GB, and each size counts the
+  mipmap levels actually stored.
+- `imageDDSSelfTest` checks openQ4's built-in DDS naming and header handling
+  for every format above, if you suspect the engine rather than your pack.
 - If nothing is replaced at all, check `gfxInfo` for BC7 support and that
   `image_usePrecompressedTextures` is not `0`.
 - If a map takes minutes to load, or Vulkan warns that textures are being
   reduced to fit video memory, the pack is probably loading uncompressed:
   `image_usePrecompressedTextures` is `0`, or the pack has no DDS files.
-  Uncompressed textures need four or more times the memory. See
+  Uncompressed textures need four or more times the memory;
+  [`image_useCompression`](#compressing-textures-that-are-not-dds) brings it
+  back down. See
   [when textures don't fit](display-settings.md#when-textures-dont-fit-in-video-memory).
 - If menus show raw `#str_` codes while the pack is loaded, the mod's folder
   holds a copy of openQ4's own files from an older build. The usual culprit is

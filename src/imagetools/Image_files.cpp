@@ -41,7 +41,7 @@ idCVar image_usePrecompressedTextures(
 	"image_usePrecompressedTextures",
 	"1",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
-	"automatic DDS texture replacements: 0 = off, 1 = stock progimg plus supported DDS formats, 2 = BC7/BPTC DDS only; custom dhewm3-compatible replacements belong under dds/",
+	"automatic DDS texture replacements: 0 = off, 1 = stock progimg plus supported DDS formats, 2 = BC7/BPTC, BC4 and BC5 DDS only (DXT/RXGB ignored); custom dhewm3-compatible replacements belong under dds/",
 	0,
 	2 );
 
@@ -776,10 +776,37 @@ static ID_INLINE uint32 R_MakeFourCC( const char a, const char b, const char c, 
 	return ( (uint32)(byte)a ) | ( (uint32)(byte)b << 8 ) | ( (uint32)(byte)c << 16 ) | ( (uint32)(byte)d << 24 );
 }
 
+static const uint32 DDS_PIXELFORMAT_ALPHAPIXELS = 0x00000001;
 static const uint32 DDS_PIXELFORMAT_FOURCC = 0x00000004;
+static const uint32 DDS_PIXELFORMAT_RGB = 0x00000040;
 static const uint32 DDS_HEADER_FLAG_MIPMAPCOUNT = 0x00020000;
 static const int DDS_HEADER_BYTES = 128;
 static const int DDS_DXT10_HEADER_BYTES = 20;
+// The DXGI formats a DX10 header may carry. Modern exporters (texconv, NVTT 3,
+// Compressonator) put BC1-BC3 behind a DX10 header whenever an sRGB variant is
+// asked for, and write BC4/BC5 either that way or under ATI1/ATI2. The classic
+// renderer samples every colour texture as gamma-space data, so an _SRGB
+// variant reads exactly as its UNORM twin, as Quake 4's own DXT does.
+static const int DDS_DXGI_FORMAT_R8G8B8A8_TYPELESS = 27;
+static const int DDS_DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29;
+static const int DDS_DXGI_FORMAT_BC1_TYPELESS = 70;
+static const int DDS_DXGI_FORMAT_BC1_UNORM_SRGB = 72;
+static const int DDS_DXGI_FORMAT_BC2_TYPELESS = 73;
+static const int DDS_DXGI_FORMAT_BC2_UNORM_SRGB = 75;
+static const int DDS_DXGI_FORMAT_BC3_TYPELESS = 76;
+static const int DDS_DXGI_FORMAT_BC3_UNORM = 77;
+static const int DDS_DXGI_FORMAT_BC3_UNORM_SRGB = 78;
+static const int DDS_DXGI_FORMAT_BC4_TYPELESS = 79;
+static const int DDS_DXGI_FORMAT_BC4_UNORM = 80;
+static const int DDS_DXGI_FORMAT_BC5_TYPELESS = 82;
+static const int DDS_DXGI_FORMAT_BC5_UNORM = 83;
+static const int DDS_DXGI_FORMAT_B8G8R8A8_UNORM = 87;
+static const int DDS_DXGI_FORMAT_B8G8R8X8_UNORM = 88;
+static const int DDS_DXGI_FORMAT_B8G8R8A8_TYPELESS = 90;
+static const int DDS_DXGI_FORMAT_B8G8R8A8_UNORM_SRGB = 91;
+static const int DDS_DXGI_FORMAT_B8G8R8X8_TYPELESS = 92;
+static const int DDS_DXGI_FORMAT_B8G8R8X8_UNORM_SRGB = 93;
+static const int DDS_DXGI_FORMAT_BC7_TYPELESS = 97;
 static const int DDS_DXGI_FORMAT_BC7_UNORM = 98;
 static const int DDS_DXGI_FORMAT_BC7_UNORM_SRGB = 99;
 static const int DDS_DX10_RESOURCE_DIMENSION_TEXTURE2D = 3;
@@ -788,12 +815,19 @@ static const int DDS_MAX_MIP_LEVELS = 32;
 static const uint32 DDS_CAPS2_CUBEMAP = 0x00000200;
 static const uint32 DDS_CAPS2_VOLUME = 0x00200000;
 
+// DXT1, DXT5, RXGB and BC7 can go to the GPU as they are. BC4, BC5 and the
+// uncompressed layouts have no textureFormat_t of their own, so LoadDDS
+// decodes them and the destination image stores the result the way it stores
+// any decoded source (see R_DDSStoredFormatIsDirect).
 enum ddsStoredFormat_t {
 	DDS_STORED_FORMAT_INVALID,
 	DDS_STORED_FORMAT_DXT1,
 	DDS_STORED_FORMAT_DXT5,
 	DDS_STORED_FORMAT_RXGB,
-	DDS_STORED_FORMAT_BC7
+	DDS_STORED_FORMAT_BC7,
+	DDS_STORED_FORMAT_BC4,			// one channel, read as luminance
+	DDS_STORED_FORMAT_BC5,			// two channels; Z is rebuilt as for a normal map
+	DDS_STORED_FORMAT_UNCOMPRESSED	// 24 or 32 bpp, one byte per channel
 };
 
 struct ddsFileInfo_t {
@@ -803,19 +837,41 @@ struct ddsFileInfo_t {
 	int numLevels;
 	uint32 width;
 	uint32 height;
+	// DDS_STORED_FORMAT_UNCOMPRESSED only: bytes per pixel, and the byte of a
+	// pixel each of R, G, B and A sits at (-1 when there is no alpha)
+	int bytesPerPixel;
+	int channelOffset[4];
 };
 
 static int R_DDSBlockSizeForStoredFormat( ddsStoredFormat_t format ) {
 	switch ( format ) {
 		case DDS_STORED_FORMAT_DXT1:
+		case DDS_STORED_FORMAT_BC4:
 			return 8;
 		case DDS_STORED_FORMAT_DXT5:
 		case DDS_STORED_FORMAT_RXGB:
 		case DDS_STORED_FORMAT_BC7:
+		case DDS_STORED_FORMAT_BC5:
 			return 16;
 		default:
 			return 0;
 	}
+}
+
+// the formats R_LoadPrecompressedDDS uploads without decoding them first
+static bool R_DDSStoredFormatIsDirect( ddsStoredFormat_t format ) {
+	return format == DDS_STORED_FORMAT_DXT1 || format == DDS_STORED_FORMAT_DXT5 ||
+		format == DDS_STORED_FORMAT_RXGB || format == DDS_STORED_FORMAT_BC7;
+}
+
+// the bytes of one whole level of a stored format
+static int64 R_DDSLevelBytes( ddsStoredFormat_t format, int bytesPerPixel, uint32 width, uint32 height ) {
+	if ( format == DDS_STORED_FORMAT_UNCOMPRESSED ) {
+		return (int64)width * height * bytesPerPixel;
+	}
+	const int64 blocksWide = Max( (int64)1, ( (int64)width + 3 ) >> 2 );
+	const int64 blocksHigh = Max( (int64)1, ( (int64)height + 3 ) >> 2 );
+	return blocksWide * blocksHigh * R_DDSBlockSizeForStoredFormat( format );
 }
 
 static int R_DDSMaxMipLevelsForSize( uint32 width, uint32 height ) {
@@ -846,9 +902,10 @@ static int R_DDSStoredMipLevelCount( uint32 headerFlags, uint32 mipMapCount, uin
 	return Min( headerLevels, maxLevelsForSize );
 }
 
-static bool R_DDSComputeLevelLayout( int fileSize, int dataOffset, uint32 width, uint32 height, ddsStoredFormat_t format, int numLevels, idList<int> *levelOffsets, idList<int> *levelSizes ) {
-	const int blockSize = R_DDSBlockSizeForStoredFormat( format );
-	if ( blockSize <= 0 || numLevels <= 0 || numLevels > DDS_MAX_MIP_LEVELS || width == 0 || height == 0 ||
+static bool R_DDSComputeLevelLayout( int fileSize, int dataOffset, uint32 width, uint32 height, ddsStoredFormat_t format, int numLevels, idList<int> *levelOffsets, idList<int> *levelSizes, int bytesPerPixel = 0 ) {
+	const bool validFormat = format == DDS_STORED_FORMAT_UNCOMPRESSED ?
+		( bytesPerPixel == 3 || bytesPerPixel == 4 ) : R_DDSBlockSizeForStoredFormat( format ) > 0;
+	if ( !validFormat || numLevels <= 0|| numLevels > DDS_MAX_MIP_LEVELS || width == 0 || height == 0 ||
 		 width > 0x7fffffff || height > 0x7fffffff ) {
 		return false;
 	}
@@ -864,10 +921,8 @@ static bool R_DDSComputeLevelLayout( int fileSize, int dataOffset, uint32 width,
 	uint32 levelWidth = width;
 	uint32 levelHeight = height;
 	for ( int level = 0; level < numLevels; level++ ) {
-		const int64 blocksWide = Max( (int64)1, ( (int64)levelWidth + 3 ) >> 2 );
-		const int64 blocksHigh = Max( (int64)1, ( (int64)levelHeight + 3 ) >> 2 );
-		const int64 levelSize = blocksWide * blocksHigh * blockSize;
-		if ( levelSize <= 0 || levelSize > 0x7fffffff || offset < 0 || offset > fileSize - (int)levelSize ) {
+		const int64 levelSize = R_DDSLevelBytes( format, bytesPerPixel, levelWidth, levelHeight );
+		if ( levelSize <= 0|| levelSize > 0x7fffffff || offset < 0 || offset > fileSize - (int)levelSize ) {
 			return false;
 		}
 
@@ -886,12 +941,125 @@ static bool R_DDSComputeLevelLayout( int fileSize, int dataOffset, uint32 width,
 	return true;
 }
 
-// DXT3 files are left to LoadDDS (see there), so R_ParseDDSFileInfo rejects them
-static bool R_DDSFileIsDXT3( const byte *file, int fileSize ) {
-	return fileSize >= DDS_HEADER_BYTES &&
-		R_ReadLittleUInt32( file + 0 ) == R_MakeFourCC( 'D', 'D', 'S', ' ' ) &&
-		( R_ReadLittleUInt32( file + 80 ) & DDS_PIXELFORMAT_FOURCC ) != 0 &&
-		R_ReadLittleUInt32( file + 84 ) == R_MakeFourCC( 'D', 'X', 'T', '3' );
+// DXT3 (BC2) files are left to LoadDDS (see there), so R_ParseDDSFileInfo
+// rejects them. dataOffset, when given, receives where the first level starts.
+static bool R_DDSFileIsDXT3( const byte *file, int fileSize, int *dataOffset = NULL ) {
+	if ( fileSize < DDS_HEADER_BYTES ||
+		 R_ReadLittleUInt32( file + 0 ) != R_MakeFourCC( 'D', 'D', 'S', ' ' ) ||
+		 ( R_ReadLittleUInt32( file + 80 ) & DDS_PIXELFORMAT_FOURCC ) == 0 ) {
+		return false;
+	}
+	const uint32 fourCC = R_ReadLittleUInt32( file + 84 );
+	if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '3' ) ) {
+		if ( dataOffset != NULL ) {
+			*dataOffset = DDS_HEADER_BYTES;
+		}
+		return true;
+	}
+	if ( fourCC == R_MakeFourCC( 'D', 'X', '1', '0' ) && fileSize >= DDS_HEADER_BYTES + DDS_DXT10_HEADER_BYTES ) {
+		const uint32 dxgiFormat = R_ReadLittleUInt32( file + DDS_HEADER_BYTES );
+		if ( dxgiFormat >= DDS_DXGI_FORMAT_BC2_TYPELESS && dxgiFormat <= DDS_DXGI_FORMAT_BC2_UNORM_SRGB &&
+			 R_ReadLittleUInt32( file + DDS_HEADER_BYTES + 4 ) == DDS_DX10_RESOURCE_DIMENSION_TEXTURE2D &&
+			 R_ReadLittleUInt32( file + DDS_HEADER_BYTES + 12 ) == 1 ) {
+			if ( dataOffset != NULL ) {
+				*dataOffset = DDS_HEADER_BYTES + DDS_DXT10_HEADER_BYTES;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+=============
+R_DecodeBC4Channel
+
+Decodes BC4 blocks (one 8-byte block per 4x4 texels, the same layout as a
+DXT5 alpha block) into one byte of each RGBA texel. blockStride steps from one
+block to the next, so BC5's interleaved red and green blocks decode with the
+same routine. The interpolation follows the format's UNORM rule, rounded to
+the nearest byte.
+=============
+*/
+static void R_DecodeBC4Channel( const byte *blocks, int blockStride, byte *rgba, int channel, int paddedWidth, int paddedHeight ) {
+	const int blocksWide = paddedWidth / 4;
+	const int blocksHigh = paddedHeight / 4;
+	for ( int by = 0; by < blocksHigh; by++ ) {
+		for ( int bx = 0; bx < blocksWide; bx++ ) {
+			const byte *block = blocks + (size_t)( by * blocksWide + bx ) * blockStride;
+			const int e0 = block[0];
+			const int e1 = block[1];
+			int values[8];
+			values[0] = e0;
+			values[1] = e1;
+			if ( e0 > e1 ) {
+				for ( int i = 1; i <= 6; i++ ) {
+					values[i + 1] = ( ( 7 - i ) * e0 + i * e1 + 3 ) / 7;
+				}
+			} else {
+				for ( int i = 1; i <= 4; i++ ) {
+					values[i + 1] = ( ( 5 - i ) * e0 + i * e1 + 2 ) / 5;
+				}
+				values[6] = 0;
+				values[7] = 255;
+			}
+			uint64_t indices = 0;
+			for ( int i = 0; i < 6; i++ ) {
+				indices |= (uint64_t)block[2 + i] << ( 8 * i );
+			}
+			for ( int texel = 0; texel < 16; texel++ ) {
+				const int x = bx * 4 + ( texel & 3 );
+				const int y = by * 4 + ( texel >> 2 );
+				rgba[ ( (size_t)y * paddedWidth + x ) * 4 + channel ] = (byte)values[ ( indices >> ( 3 * texel ) ) & 7 ];
+			}
+		}
+	}
+}
+
+/*
+=============
+R_DecodeBC4BC5
+
+BC4 becomes luminance (the channel copied to R, G and B), which is how a
+specular or height mask reads in Quake 4's materials. BC5 becomes a normal:
+X and Y from its two channels and Z rebuilt as sqrt( 1 - x^2 - y^2 ), the
+layout every other decoded normal map arrives in.
+=============
+*/
+static void R_DecodeBC4BC5( const byte *blocks, bool twoChannel, byte *rgba, int paddedWidth, int paddedHeight ) {
+	const int stride = twoChannel ? 16 : 8;
+	R_DecodeBC4Channel( blocks, stride, rgba, 0, paddedWidth, paddedHeight );
+	if ( twoChannel ) {
+		R_DecodeBC4Channel( blocks + 8, stride, rgba, 1, paddedWidth, paddedHeight );
+	}
+	const int texels = paddedWidth * paddedHeight;
+	for ( int i = 0; i < texels; i++ ) {
+		byte *texel = rgba + (size_t)i * 4;
+		if ( twoChannel ) {
+			const float x = texel[0] * ( 2.0f / 255.0f ) - 1.0f;
+			const float y = texel[1] * ( 2.0f / 255.0f ) - 1.0f;
+			const float zz = 1.0f - x * x - y * y;
+			const float z = zz > 0.0f ? sqrtf( zz ) : 0.0f;
+			const int blue = (int)( ( z * 0.5f + 0.5f ) * 255.0f + 0.5f );
+			texel[2] = (byte)( blue < 0 ? 0 : ( blue > 255 ? 255 : blue ) );
+		} else {
+			texel[1] = texel[2] = texel[0];
+		}
+		texel[3] = 255;
+	}
+}
+
+// Copies an uncompressed DDS level into RGBA by the byte offsets its header gave.
+static void R_DecodeUncompressedDDS( const byte *pixels, const ddsFileInfo_t &info, byte *rgba, int width, int height ) {
+	const int64 texels = (int64)width * height;
+	for ( int64 i = 0; i < texels; i++ ) {
+		const byte *source = pixels + i * info.bytesPerPixel;
+		byte *dest = rgba + i * 4;
+		dest[0] = source[ info.channelOffset[0] ];
+		dest[1] = source[ info.channelOffset[1] ];
+		dest[2] = source[ info.channelOffset[2] ];
+		dest[3] = info.channelOffset[3] >= 0 ? source[ info.channelOffset[3] ] : 255;
+	}
 }
 
 static bool R_ParseDDSFileInfo( const byte *header, int headerBytes, int fileSize, ddsFileInfo_t &info ) {
@@ -920,13 +1088,40 @@ static bool R_ParseDDSFileInfo( const byte *header, int headerBytes, int fileSiz
 		 ddsWidth > 0x7fffffff ||
 		 ddsHeight > 0x7fffffff ||
 		 ( caps2 & ( DDS_CAPS2_CUBEMAP | DDS_CAPS2_VOLUME ) ) != 0 ||
-		 ( pixelFormatFlags & DDS_PIXELFORMAT_FOURCC ) == 0 ) {
+		 ( pixelFormatFlags & ( DDS_PIXELFORMAT_FOURCC | DDS_PIXELFORMAT_RGB ) ) == 0 ) {
 		return false;
 	}
 
 	int localDataOffset = DDS_HEADER_BYTES;
 	ddsStoredFormat_t format = DDS_STORED_FORMAT_INVALID;
-	if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '1' ) ) {
+	int bytesPerPixel = 0;
+	int channelOffset[4] = { -1, -1, -1, -1 };
+	if ( ( pixelFormatFlags & DDS_PIXELFORMAT_FOURCC ) == 0 ) {
+		// Uncompressed: accepted when every channel is one whole byte, which
+		// covers what image tools write (A8R8G8B8, X8R8G8B8, A8B8G8R8, R8G8B8).
+		const uint32 bitCount = R_ReadLittleUInt32( header + 88 );
+		const uint32 masks[4] = {
+			R_ReadLittleUInt32( header + 92 ), R_ReadLittleUInt32( header + 96 ), R_ReadLittleUInt32( header + 100 ),
+			( pixelFormatFlags & DDS_PIXELFORMAT_ALPHAPIXELS ) != 0 ? R_ReadLittleUInt32( header + 104 ) : 0u };
+		if ( bitCount != 24 && bitCount != 32 ) {
+			return false;
+		}
+		bytesPerPixel = (int)bitCount / 8;
+		for ( int channel = 0; channel < 4; channel++ ) {
+			if ( channel == 3 && masks[channel] == 0 ) {
+				continue;	// no alpha: read as opaque
+			}
+			for ( int byteIndex = 0; byteIndex < bytesPerPixel; byteIndex++ ) {
+				if ( masks[channel] == ( 0xffu << ( byteIndex * 8 ) ) ) {
+					channelOffset[channel] = byteIndex;
+				}
+			}
+			if ( channelOffset[channel] < 0 ) {
+				return false;
+			}
+		}
+		format = DDS_STORED_FORMAT_UNCOMPRESSED;
+	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '1' ) ) {
 		format = DDS_STORED_FORMAT_DXT1;
 	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '5' ) ) {
 		format = DDS_STORED_FORMAT_DXT5;
@@ -940,22 +1135,52 @@ static bool R_ParseDDSFileInfo( const byte *header, int headerBytes, int fileSiz
 		const uint32 resourceDimension = R_ReadLittleUInt32( header + DDS_HEADER_BYTES + 4 );
 		const uint32 miscFlag = R_ReadLittleUInt32( header + DDS_HEADER_BYTES + 8 );
 		const uint32 arraySize = R_ReadLittleUInt32( header + DDS_HEADER_BYTES + 12 );
-		if ( ( dxgiFormat == DDS_DXGI_FORMAT_BC7_UNORM || dxgiFormat == DDS_DXGI_FORMAT_BC7_UNORM_SRGB ) &&
-			 resourceDimension == DDS_DX10_RESOURCE_DIMENSION_TEXTURE2D &&
+		if ( resourceDimension == DDS_DX10_RESOURCE_DIMENSION_TEXTURE2D &&
 			 ( miscFlag & DDS_DX10_RESOURCE_MISC_TEXTURECUBE ) == 0 &&
 			 arraySize == 1 ) {
-			format = DDS_STORED_FORMAT_BC7;
-			localDataOffset += DDS_DXT10_HEADER_BYTES;
+			if ( dxgiFormat >= DDS_DXGI_FORMAT_BC1_TYPELESS && dxgiFormat <= DDS_DXGI_FORMAT_BC1_UNORM_SRGB ) {
+				format = DDS_STORED_FORMAT_DXT1;
+			} else if ( dxgiFormat >= DDS_DXGI_FORMAT_BC3_TYPELESS && dxgiFormat <= DDS_DXGI_FORMAT_BC3_UNORM_SRGB ) {
+				format = DDS_STORED_FORMAT_DXT5;
+			} else if ( dxgiFormat == DDS_DXGI_FORMAT_BC4_TYPELESS || dxgiFormat == DDS_DXGI_FORMAT_BC4_UNORM ) {
+				format = DDS_STORED_FORMAT_BC4;	// the _SNORM variants stay rejected: nothing here is signed
+			} else if ( dxgiFormat == DDS_DXGI_FORMAT_BC5_TYPELESS || dxgiFormat == DDS_DXGI_FORMAT_BC5_UNORM ) {
+				format = DDS_STORED_FORMAT_BC5;
+			} else if ( dxgiFormat >= DDS_DXGI_FORMAT_BC7_TYPELESS && dxgiFormat <= DDS_DXGI_FORMAT_BC7_UNORM_SRGB ) {
+				format = DDS_STORED_FORMAT_BC7;
+			} else if ( dxgiFormat >= DDS_DXGI_FORMAT_R8G8B8A8_TYPELESS && dxgiFormat <= DDS_DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ) {
+				format = DDS_STORED_FORMAT_UNCOMPRESSED;
+				bytesPerPixel = 4;
+				channelOffset[0] = 0; channelOffset[1] = 1; channelOffset[2] = 2; channelOffset[3] = 3;
+			} else if ( dxgiFormat == DDS_DXGI_FORMAT_B8G8R8A8_UNORM || dxgiFormat == DDS_DXGI_FORMAT_B8G8R8A8_TYPELESS ||
+						dxgiFormat == DDS_DXGI_FORMAT_B8G8R8A8_UNORM_SRGB || dxgiFormat == DDS_DXGI_FORMAT_B8G8R8X8_UNORM ||
+						dxgiFormat == DDS_DXGI_FORMAT_B8G8R8X8_TYPELESS || dxgiFormat == DDS_DXGI_FORMAT_B8G8R8X8_UNORM_SRGB ) {
+				const bool hasAlpha = dxgiFormat == DDS_DXGI_FORMAT_B8G8R8A8_UNORM || dxgiFormat == DDS_DXGI_FORMAT_B8G8R8A8_TYPELESS ||
+					dxgiFormat == DDS_DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+				format = DDS_STORED_FORMAT_UNCOMPRESSED;
+				bytesPerPixel = 4;
+				channelOffset[0] = 2; channelOffset[1] = 1; channelOffset[2] = 0; channelOffset[3] = hasAlpha ? 3 : -1;
+			}
+			// BC2 stays with LoadDDS, as DXT3 does; any other DXGI format is unsupported
+			if ( format != DDS_STORED_FORMAT_INVALID ) {
+				localDataOffset += DDS_DXT10_HEADER_BYTES;
+			}
 		}
 	} else if ( fourCC == R_MakeFourCC( 'B', 'C', '7', '0' ) ||
 				fourCC == R_MakeFourCC( 'B', 'C', '7', 'L' ) ||
 				fourCC == R_MakeFourCC( 'B', 'C', '7', ' ' ) ) {
 		format = DDS_STORED_FORMAT_BC7;
+	} else if ( fourCC == R_MakeFourCC( 'A', 'T', 'I', '1' ) || fourCC == R_MakeFourCC( 'B', 'C', '4', 'U' ) ) {
+		format = DDS_STORED_FORMAT_BC4;
+	} else if ( fourCC == R_MakeFourCC( 'A', 'T', 'I', '2' ) || fourCC == R_MakeFourCC( 'B', 'C', '5', 'U' ) ) {
+		// NVTT, texconv and Compressonator all write ATI2 with X in the first
+		// block, which is BC5's order, so the two FourCCs read alike
+		format = DDS_STORED_FORMAT_BC5;
 	}
 
 	const int numLevels = R_DDSStoredMipLevelCount( headerFlags, ddsMipMapCount, ddsWidth, ddsHeight );
 	if ( format == DDS_STORED_FORMAT_INVALID || numLevels <= 0 ||
-		 !R_DDSComputeLevelLayout( fileSize, localDataOffset, ddsWidth, ddsHeight, format, numLevels, NULL, NULL ) ) {
+		 !R_DDSComputeLevelLayout( fileSize, localDataOffset, ddsWidth, ddsHeight, format, numLevels, NULL, NULL, bytesPerPixel ) ) {
 		return false;
 	}
 
@@ -965,6 +1190,10 @@ static bool R_ParseDDSFileInfo( const byte *header, int headerBytes, int fileSiz
 	info.numLevels = numLevels;
 	info.width = ddsWidth;
 	info.height = ddsHeight;
+	info.bytesPerPixel = bytesPerPixel;
+	for ( int channel = 0; channel < 4; channel++ ) {
+		info.channelOffset[channel] = channelOffset[channel];
+	}
 	return true;
 }
 
@@ -1249,8 +1478,26 @@ static bool R_TryResolvePreferredDDSImageSource( const idStr &candidateName, idS
 		return true;
 	}
 
+	if ( info.format == DDS_STORED_FORMAT_BC4 || info.format == DDS_STORED_FORMAT_BC5 ) {
+		// Texture packs ship BC5 normal maps and BC4 masks. No renderer format
+		// stands for them, so LoadDDS always decodes them; the result is cached
+		// and stored like any other decoded source (image_useNormalCompression
+		// re-encodes a BC5 normal map as DXT5 RXGB).
+		ddsName = candidateName;
+		if ( timestamp != NULL ) {
+			*timestamp = ddsTimestamp;
+		}
+		if ( precompressedDDS != NULL ) {
+			*precompressedDDS = false;
+		}
+		return true;
+	}
+
 	if ( rejectReason != NULL ) {
-		*rejectReason = "unsupported DDS pixel format";
+		// Quake 4 ships an uncompressed DDS beside the .tga of 18 HUD images, and
+		// the .tga stays their source: such a file is read only when named outright.
+		*rejectReason = info.format == DDS_STORED_FORMAT_UNCOMPRESSED ?
+			"uncompressed DDS is read only when a material names it" : "unsupported DDS pixel format";
 	}
 	return false;
 }
@@ -1665,6 +1912,9 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 			break;
 		}
 
+		if ( !R_DDSStoredFormatIsDirect( info.format ) ) {
+			break;	// BC4, BC5 and uncompressed data are LoadDDS's to decode
+		}
 		if ( info.format == DDS_STORED_FORMAT_BC7 && !ImageTools_GetCompressionCaps().bptcTextureCompressionAvailable ) {
 			idLib::Warning( "Image file '%s' uses BC7/BPTC DDS data, but the active renderer does not support BPTC texture compression", name.c_str() );
 			break;
@@ -1891,6 +2141,129 @@ bool R_ImageDDS_RunSelfTest() {
 		}
 	}
 
+	// BC1 and BC3 behind a DX10 header (texconv's sRGB output) read as DXT1/DXT5
+	memset( header, 0, sizeof( header ) );
+	R_WriteLittleUInt32( header + 0, R_MakeFourCC( 'D', 'D', 'S', ' ' ) );
+	R_WriteLittleUInt32( header + 4, 124 );
+	R_WriteLittleUInt32( header + 12, 4 );
+	R_WriteLittleUInt32( header + 16, 4 );
+	R_WriteLittleUInt32( header + 76, 32 );
+	R_WriteLittleUInt32( header + 80, DDS_PIXELFORMAT_FOURCC );
+	R_WriteLittleUInt32( header + 84, R_MakeFourCC( 'D', 'X', '1', '0' ) );
+	R_WriteLittleUInt32( header + DDS_HEADER_BYTES + 4, DDS_DX10_RESOURCE_DIMENSION_TEXTURE2D );
+	R_WriteLittleUInt32( header + DDS_HEADER_BYTES + 12, 1 );
+	const struct dx10Case_t { int dxgi; ddsStoredFormat_t format; int levelBytes; } dx10Cases[] = {
+		{ DDS_DXGI_FORMAT_BC1_UNORM_SRGB, DDS_STORED_FORMAT_DXT1, 8 },
+		{ DDS_DXGI_FORMAT_BC3_UNORM, DDS_STORED_FORMAT_DXT5, 16 },
+		{ DDS_DXGI_FORMAT_BC4_UNORM, DDS_STORED_FORMAT_BC4, 8 },
+		{ DDS_DXGI_FORMAT_BC5_UNORM, DDS_STORED_FORMAT_BC5, 16 },
+		{ DDS_DXGI_FORMAT_B8G8R8A8_UNORM_SRGB, DDS_STORED_FORMAT_UNCOMPRESSED, 64 },
+		{ 81, DDS_STORED_FORMAT_INVALID, 8 },		// BC4_SNORM
+		{ DDS_DXGI_FORMAT_BC2_UNORM_SRGB, DDS_STORED_FORMAT_INVALID, 16 }
+	};
+	for ( int i = 0; i < (int)( sizeof( dx10Cases ) / sizeof( dx10Cases[0] ) ); i++ ) {
+		R_WriteLittleUInt32( header + DDS_HEADER_BYTES, dx10Cases[i].dxgi );
+		const bool accepted = R_ParseDDSFileInfo( header, sizeof( header ), (int)sizeof( header ) + dx10Cases[i].levelBytes, info );
+		if ( accepted != ( dx10Cases[i].format != DDS_STORED_FORMAT_INVALID ) ||
+			 ( accepted && ( info.format != dx10Cases[i].format || info.dataOffset != (int)sizeof( header ) ) ) ) {
+			common->Warning( "Image DDS self-test failed: DX10 DXGI format %d read as stored format %d", dx10Cases[i].dxgi, accepted ? (int)info.format : -1 );
+			return false;
+		}
+	}
+	// the last case left BC2 in the header: R_DDSFileIsDXT3 must claim it for LoadDDS
+	int dxt3Offset = 0;
+	if ( !R_DDSFileIsDXT3( header, sizeof( header ), &dxt3Offset ) || dxt3Offset != (int)sizeof( header ) ) {
+		common->Warning( "Image DDS self-test failed: DX10 BC2 was not left to the DXT3 decoder" );
+		return false;
+	}
+
+	// legacy A8R8G8B8 (the layout of Quake 4's own uncompressed HUD DDS files)
+	memset( header, 0, DDS_HEADER_BYTES );
+	R_WriteLittleUInt32( header + 0, R_MakeFourCC( 'D', 'D', 'S', ' ' ) );
+	R_WriteLittleUInt32( header + 4, 124 );
+	R_WriteLittleUInt32( header + 12, 2 );
+	R_WriteLittleUInt32( header + 16, 2 );
+	R_WriteLittleUInt32( header + 76, 32 );
+	R_WriteLittleUInt32( header + 80, DDS_PIXELFORMAT_RGB | DDS_PIXELFORMAT_ALPHAPIXELS );
+	R_WriteLittleUInt32( header + 88, 32 );
+	R_WriteLittleUInt32( header + 92, 0x00ff0000 );
+	R_WriteLittleUInt32( header + 96, 0x0000ff00 );
+	R_WriteLittleUInt32( header + 100, 0x000000ff );
+	R_WriteLittleUInt32( header + 104, 0xff000000 );
+	if ( !R_ParseDDSFileInfo( header, DDS_HEADER_BYTES, DDS_HEADER_BYTES + 16, info ) ||
+		 info.format != DDS_STORED_FORMAT_UNCOMPRESSED || info.bytesPerPixel != 4 ||
+		 info.channelOffset[0] != 2 || info.channelOffset[1] != 1 || info.channelOffset[2] != 0 || info.channelOffset[3] != 3 ) {
+		common->Warning( "Image DDS self-test failed: A8R8G8B8 metadata was rejected or misread" );
+		return false;
+	}
+	{
+		const byte bgra[4] = { 0x10, 0x20, 0x30, 0x40 };
+		byte rgba[4];
+		R_DecodeUncompressedDDS( bgra, info, rgba, 1, 1 );
+		if ( rgba[0] != 0x30 || rgba[1] != 0x20 || rgba[2] != 0x10 || rgba[3] != 0x40 ) {
+			common->Warning( "Image DDS self-test failed: A8R8G8B8 texel decoded to %d %d %d %d", rgba[0], rgba[1], rgba[2], rgba[3] );
+			return false;
+		}
+	}
+	R_WriteLittleUInt32( header + 92, 0x00ff8000 );
+	if ( R_ParseDDSFileInfo( header, DDS_HEADER_BYTES, DDS_HEADER_BYTES + 16, info ) ) {
+		common->Warning( "Image DDS self-test failed: a channel mask that is not one byte was accepted" );
+		return false;
+	}
+
+	// BC4 and BC5: both endpoint modes, and BC5's rebuilt Z
+	{
+		// mode 1 (e0 > e1): 255 and 0 with indices 0..7 across the first row
+		// and index 1 (the second endpoint) everywhere else
+		byte bc4[8] = { 255, 0 };
+		uint64 indices = 0;
+		for ( int texel = 0; texel < 16; texel++ ) {
+			indices |= (uint64)( texel < 8 ? texel : 1 ) << ( 3 * texel );
+		}
+		for ( int i = 0; i < 6; i++ ) {
+			bc4[2 + i] = (byte)( indices >> ( 8 * i ) );
+		}
+		byte bc4Rgba[4 * 4 * 4];
+		R_DecodeBC4BC5( bc4, false, bc4Rgba, 4, 4 );
+		const int expected[8] = { 255, 0, 219, 182, 146, 109, 73, 36 };
+		for ( int texel = 0; texel < 16; texel++ ) {
+			const int want = texel < 8 ? expected[texel] : 0;
+			const byte *rgba = bc4Rgba + texel * 4;
+			if ( rgba[0] != want || rgba[1] != want || rgba[2] != want || rgba[3] != 255 ) {
+				common->Warning( "Image DDS self-test failed: BC4 texel %d decoded to %d %d %d %d, wanted %d", texel, rgba[0], rgba[1], rgba[2], rgba[3], want );
+				return false;
+			}
+		}
+		// mode 2 (e0 <= e1): indices 6 and 7 are the constants 0 and 255
+		byte bc4b[8] = { 10, 60, 0 };
+		indices = (uint64)6 | ( (uint64)7 << 3 ) | ( (uint64)2 << 6 );
+		for ( int i = 0; i < 6; i++ ) {
+			bc4b[2 + i] = (byte)( indices >> ( 8 * i ) );
+		}
+		R_DecodeBC4BC5( bc4b, false, bc4Rgba, 4, 4 );
+		if ( bc4Rgba[0] != 0 || bc4Rgba[4] != 255 || bc4Rgba[8] != 20 || bc4Rgba[12] != 10 ) {
+			common->Warning( "Image DDS self-test failed: BC4 six-value block decoded to %d %d %d %d", bc4Rgba[0], bc4Rgba[4], bc4Rgba[8], bc4Rgba[12] );
+			return false;
+		}
+		// BC5 with X and Y both at the 128 midpoint: a flat normal, Z = 255
+		byte bc5[16] = { 128, 128, 0, 0, 0, 0, 0, 0, 128, 128, 0, 0, 0, 0, 0, 0 };
+		R_DecodeBC4BC5( bc5, true, bc4Rgba, 4, 4 );
+		for ( int texel = 0; texel < 16; texel++ ) {
+			const byte *rgba = bc4Rgba + texel * 4;
+			if ( rgba[0] != 128 || rgba[1] != 128 || rgba[2] != 255 || rgba[3] != 255 ) {
+				common->Warning( "Image DDS self-test failed: BC5 flat normal decoded to %d %d %d %d", rgba[0], rgba[1], rgba[2], rgba[3] );
+				return false;
+			}
+		}
+		// X at full positive: Z falls to the midpoint
+		bc5[0] = bc5[1] = 255;
+		R_DecodeBC4BC5( bc5, true, bc4Rgba, 4, 4 );
+		if ( bc4Rgba[0] != 255 || bc4Rgba[1] != 128 || bc4Rgba[2] < 127 || bc4Rgba[2] > 129 ) {
+			common->Warning( "Image DDS self-test failed: BC5 +X normal decoded to %d %d %d", bc4Rgba[0], bc4Rgba[1], bc4Rgba[2] );
+			return false;
+		}
+	}
+
 	// downsize( <image>, N ) offers its input's DDS files ahead of the retail result
 	struct downsizeCase_t {
 		const char *imageProgram;
@@ -1983,7 +2356,9 @@ bool R_ImageDDS_RunSelfTest() {
 =============
 LoadDDS
 
-Decodes DXT1, DXT3, DXT5, RXGB and BC7 files on the CPU. DXT3 is only ever read
+Decodes DXT1, DXT3, DXT5, RXGB, BC7, BC4, BC5 and uncompressed 24/32-bit files
+on the CPU, with a legacy or a DX10 header. BC4, BC5 and uncompressed data only
+ever come through here: no renderer format stands for them. DXT3 is only ever read
 here, never uploaded as it is: Quake 4 ships a DXT3 .dds beside the .tga of
 each font atlas, and those atlases must keep coming from the .tga (see
 idImage::DeriveOpts). A DXT3 file is used only when a material names it outright
@@ -2029,7 +2404,7 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 	const uint32 pixelFormatFlags = R_ReadLittleUInt32( buffer + 80 );
 	const uint32 fourCC = R_ReadLittleUInt32( buffer + 84 );
 
-	if ( ddsWidth == 0 || ddsHeight == 0 || ( pixelFormatFlags & 0x4 ) == 0 ) {
+	if ( ddsWidth == 0 || ddsHeight == 0 || ( pixelFormatFlags & ( DDS_PIXELFORMAT_FOURCC | DDS_PIXELFORMAT_RGB ) ) == 0 ) {
 		fileSystem->FreeFile( buffer );
 		return;
 	}
@@ -2040,21 +2415,48 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		DDS_COMPRESSION_DXT1,
 		DDS_COMPRESSION_DXT3,
 		DDS_COMPRESSION_DXT5,
-		DDS_COMPRESSION_BC7
+		DDS_COMPRESSION_BC7,
+		DDS_COMPRESSION_BC4,
+		DDS_COMPRESSION_BC5,
+		DDS_COMPRESSION_NONE
 	} compression;
 	bool storedRXGBNormalMap = false;
 
-	ddsFileInfo_t bc7Info;
-	if ( R_ParseDDSFileInfo( buffer, fileSize, fileSize, bc7Info ) && bc7Info.format == DDS_STORED_FORMAT_BC7 ) {
+	// A file whose whole layout parses is read by what the parser found: that
+	// covers BC7, BC4, BC5, uncompressed data and BC1/BC3 behind a DX10 header.
+	// The FourCC switch below stays for files whose header promises more mip
+	// levels than they hold, which have always decoded from their top level.
+	ddsFileInfo_t parsedInfo;
+	const bool parsed = R_ParseDDSFileInfo( buffer, fileSize, fileSize, parsedInfo );
+	int dxt3Offset = DDS_HEADER_BYTES;
+	if ( parsed && parsedInfo.format != DDS_STORED_FORMAT_DXT1 && parsedInfo.format != DDS_STORED_FORMAT_DXT5 ) {
+		dataOffset = parsedInfo.dataOffset;
+		switch ( parsedInfo.format ) {
+			case DDS_STORED_FORMAT_BC7:	compression = DDS_COMPRESSION_BC7; blockSize = 16; break;
+			case DDS_STORED_FORMAT_BC4:	compression = DDS_COMPRESSION_BC4; blockSize = 8; break;
+			case DDS_STORED_FORMAT_BC5:	compression = DDS_COMPRESSION_BC5; blockSize = 16; break;
+			case DDS_STORED_FORMAT_RXGB:
+				compression = DDS_COMPRESSION_DXT5;
+				blockSize = 16;
+				storedRXGBNormalMap = true;
+				break;
+			default:
+				compression = DDS_COMPRESSION_NONE;
+				blockSize = 0;
+				break;
+		}
+	} else if ( parsed ) {
+		// DXT1 or DXT5, possibly behind a DX10 header
+		dataOffset = parsedInfo.dataOffset;
+		blockSize = parsedInfo.format == DDS_STORED_FORMAT_DXT1 ? 8 : 16;
+		compression = parsedInfo.format == DDS_STORED_FORMAT_DXT1 ? DDS_COMPRESSION_DXT1 : DDS_COMPRESSION_DXT5;
+	} else if ( R_DDSFileIsDXT3( buffer, fileSize, &dxt3Offset ) ) {
 		blockSize = 16;
-		compression = DDS_COMPRESSION_BC7;
-		dataOffset = bc7Info.dataOffset;
+		compression = DDS_COMPRESSION_DXT3;
+		dataOffset = dxt3Offset;
 	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '1' ) ) {
 		blockSize = 8;
 		compression = DDS_COMPRESSION_DXT1;
-	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '3' ) ) {
-		blockSize = 16;
-		compression = DDS_COMPRESSION_DXT3;
 	} else if ( fourCC == R_MakeFourCC( 'D', 'X', 'T', '5' ) ) {
 		blockSize = 16;
 		compression = DDS_COMPRESSION_DXT5;
@@ -2067,19 +2469,23 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		return;
 	}
 
+	// uncompressed levels have no blocks to pad to; the parser already checked
+	// that the whole chain is present
+	const bool blockCompressed = compression != DDS_COMPRESSION_NONE;
 	const int blocksWide = Max( 1, (int)( ( ddsWidth + 3 ) >> 2 ) );
 	const int blocksHigh = Max( 1, (int)( ( ddsHeight + 3 ) >> 2 ) );
-	const int levelSize = blocksWide * blocksHigh * blockSize;
+	const int64 levelSize = blockCompressed ? (int64)blocksWide * blocksHigh * blockSize
+		: (int64)ddsWidth * ddsHeight * parsedInfo.bytesPerPixel;
 
-	if ( fileSize < ( dataOffset + levelSize ) ) {
+	if ( levelSize <= 0 || (int64)fileSize < ( dataOffset + levelSize ) ) {
 		fileSystem->FreeFile( buffer );
 		return;
 	}
 
 	const int realWidth = (int)ddsWidth;
 	const int realHeight = (int)ddsHeight;
-	const int paddedWidth = blocksWide * 4;
-	const int paddedHeight = blocksHigh * 4;
+	const int paddedWidth = blockCompressed ? blocksWide * 4 : realWidth;
+	const int paddedHeight = blockCompressed ? blocksHigh * 4 : realHeight;
 	const int64 realBytes = (int64)realWidth * realHeight * 4;
 	const int64 paddedBytes = (int64)paddedWidth * paddedHeight * 4;
 	if ( realBytes <= 0 || realBytes > 0x7FFFFFFF || paddedBytes <= 0 || paddedBytes > 0x7FFFFFFF ) {
@@ -2089,7 +2495,11 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 
 	byte *decodedRgba = (byte *)R_StaticAlloc( (int)paddedBytes );
 	idDxtDecoder decoder;
-	if ( compression == DDS_COMPRESSION_BC7 ) {
+	if ( compression == DDS_COMPRESSION_NONE ) {
+		R_DecodeUncompressedDDS( buffer + dataOffset, parsedInfo, decodedRgba, realWidth, realHeight );
+	} else if ( compression == DDS_COMPRESSION_BC4 || compression == DDS_COMPRESSION_BC5 ) {
+		R_DecodeBC4BC5( buffer + dataOffset, compression == DDS_COMPRESSION_BC5, decodedRgba, paddedWidth, paddedHeight );
+	} else if ( compression == DDS_COMPRESSION_BC7 ) {
 		BC7_DecodeImage( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );
 	} else if ( compression == DDS_COMPRESSION_DXT1 ) {
 		decoder.DecompressImageDXT1( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );

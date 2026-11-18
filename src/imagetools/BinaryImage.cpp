@@ -42,6 +42,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "ETC/ETCCodec.h"
 #include "Color/ColorSpace.h"
 
+#include <thread>
+#include <vector>
+
 idCVar image_highQualityCompression( "image_highQualityCompression", "0", CVAR_BOOL, "Use high quality (slow) compression" );
 idCVar image_writeGeneratedImages( "image_writeGeneratedImages", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "write generated binary image cache files during runtime loads" );
 idCVar image_showGeneratedImageWrites( "image_showGeneratedImageWrites", "0", CVAR_RENDERER | CVAR_BOOL, "print each generated binary image cache write" );
@@ -164,6 +167,69 @@ static void R_PadRGBAImageTo4x4Blocks( const byte *src, int width, int height,
 
 /*
 ========================
+R_EncodeBlockLevel
+
+Block-compresses one padded level (width and height multiples of four),
+splitting it into bands of whole block rows across threads once it is big
+enough to repay starting them. Every encoder Load2DFromMemory uses works one
+4x4 block at a time and carries nothing from one block to the next, so the
+bands write exactly the bytes a single pass would: the generated cache stays
+byte-identical whatever the core count.
+
+The encode is the dominant cost of a first visit that decodes: ETC2 on an
+S3TC-less phone, image_useCompression on a texture pack, the RXGB rebuild of
+a replaced bump map. A 2048x2048 DXT5 level is ~260,000 blocks.
+
+A thread that cannot be started leaves its band to the calling thread, so a
+refusal only costs speed.
+========================
+*/
+template< typename encode_t >
+static void R_EncodeBlockLevel( const byte *src, byte *dst, int width, int height, int bytesPerBlock, const encode_t &encode ) {
+	const int64 R_PARALLEL_ENCODE_MIN_BLOCKS = 128 * 128;	// a 512x512 level
+	const int R_PARALLEL_ENCODE_MIN_BAND_ROWS = 16;			// block rows per band
+	const int R_PARALLEL_ENCODE_MAX_THREADS = 8;
+	const int blocksWide = width / 4;
+	const int blockRows = height / 4;
+	int bands = 1;
+	if ( (int64)blocksWide * blockRows >= R_PARALLEL_ENCODE_MIN_BLOCKS ) {
+		const int cores = (int)std::thread::hardware_concurrency();
+		bands = Min( Max( 1, cores ), R_PARALLEL_ENCODE_MAX_THREADS );
+		bands = Min( bands, Max( 1, blockRows / R_PARALLEL_ENCODE_MIN_BAND_ROWS ) );
+	}
+	if ( bands <= 1 ) {
+		encode( src, dst, width, height );
+		return;
+	}
+
+	const int rowsPerBand = ( blockRows + bands - 1 ) / bands;
+	auto encodeBand = [&]( int band ) {
+		const int firstRow = band * rowsPerBand;
+		const int rows = Min( rowsPerBand, blockRows - firstRow );
+		if ( rows > 0 ) {
+			encode( src + (size_t)firstRow * 4 * width * 4, dst + (size_t)firstRow * blocksWide * bytesPerBlock, width, rows * 4 );
+		}
+	};
+	std::vector<std::thread> workers;
+	// joins on every exit, so an unwinding band never leaves a joinable thread
+	struct JoinWorkers { std::vector<std::thread> &threads; ~JoinWorkers() { for ( std::thread &t : threads ) { if ( t.joinable() ) { t.join(); } } } } joinWorkers{ workers };
+	int started = 1;	// band 0 is this thread's
+	try {
+		workers.reserve( (size_t)bands - 1 );
+		for ( ; started < bands; started++ ) {
+			workers.emplace_back( encodeBand, started );
+		}
+	} catch ( ... ) {
+		// fewer threads than planned: the bands that never started run here
+	}
+	encodeBand( 0 );
+	for ( int band = started; band < bands; band++ ) {
+		encodeBand( band );
+	}
+}
+
+/*
+========================
 idBinaryImage::Load2DFromMemory
 ========================
 */
@@ -273,51 +339,61 @@ bool idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 		img.width = scaledWidth;
 		img.height = scaledHeight;
 
-		// compress data or convert floats as necessary
+		// compress data or convert floats as necessary; each band of a block
+		// encode takes its own encoder (see R_EncodeBlockLevel)
+		const bool highQuality = image_highQualityCompression.GetBool();
 		if ( textureFormat == FMT_DXT1 ) {
-			idDxtEncoder dxt;
 			img.Alloc( dxtWidth * dxtHeight / 2 );
             if (!img.data) return false;
-			if ( image_highQualityCompression.GetBool() ) {
-				dxt.CompressImageDXT1HQ( dxtPic, img.data, dxtWidth, dxtHeight );
-			} else {
-				dxt.CompressImageDXT1Fast( dxtPic, img.data, dxtWidth, dxtHeight );
-			}
+			R_EncodeBlockLevel( dxtPic, img.data, dxtWidth, dxtHeight, 8, [highQuality]( const byte *s, byte *d, int w, int h ) {
+				idDxtEncoder dxt;
+				if ( highQuality ) {
+					dxt.CompressImageDXT1HQ( s, d, w, h );
+				} else {
+					dxt.CompressImageDXT1Fast( s, d, w, h );
+				}
+			} );
 		} else if ( textureFormat == FMT_DXT5 ) {
-			idDxtEncoder dxt;
 			img.Alloc( dxtWidth * dxtHeight );
             if (!img.data) return false;
-			if ( colorFormat == CFM_NORMAL_DXT5 ) {
-				// already swizzled to RXGB above; the colour block carries Y and Z
-				if ( image_highQualityCompression.GetBool() ) {
-					dxt.CompressImageDXT5HQ( dxtPic, img.data, dxtWidth, dxtHeight );
-				} else {
-					dxt.CompressImageDXT5Fast( dxtPic, img.data, dxtWidth, dxtHeight );
-				}
-			} else if ( colorFormat == CFM_YCOCG_DXT5 ) {
-				if ( image_highQualityCompression.GetBool() ) {
-					dxt.CompressYCoCgDXT5HQ( dxtPic, img.data, dxtWidth, dxtHeight );
-				} else {
-					dxt.CompressYCoCgDXT5Fast( dxtPic, img.data, dxtWidth, dxtHeight );
-				}
+			if ( colorFormat == CFM_YCOCG_DXT5 ) {
+				R_EncodeBlockLevel( dxtPic, img.data, dxtWidth, dxtHeight, 16, [highQuality]( const byte *s, byte *d, int w, int h ) {
+					idDxtEncoder dxt;
+					if ( highQuality ) {
+						dxt.CompressYCoCgDXT5HQ( s, d, w, h );
+					} else {
+						dxt.CompressYCoCgDXT5Fast( s, d, w, h );
+					}
+				} );
 			} else {
-				fileData.colorFormat = colorFormat = CFM_DEFAULT;
-				if ( image_highQualityCompression.GetBool() ) {
-					dxt.CompressImageDXT5HQ( dxtPic, img.data, dxtWidth, dxtHeight );
-				} else {
-					dxt.CompressImageDXT5Fast( dxtPic, img.data, dxtWidth, dxtHeight );
+				// CFM_NORMAL_DXT5 was already swizzled to RXGB above, and its
+				// colour block carries Y and Z, so it encodes as plain DXT5
+				if ( colorFormat != CFM_NORMAL_DXT5 ) {
+					fileData.colorFormat = colorFormat = CFM_DEFAULT;
 				}
+				R_EncodeBlockLevel( dxtPic, img.data, dxtWidth, dxtHeight, 16, [highQuality]( const byte *s, byte *d, int w, int h ) {
+					idDxtEncoder dxt;
+					if ( highQuality ) {
+						dxt.CompressImageDXT5HQ( s, d, w, h );
+					} else {
+						dxt.CompressImageDXT5Fast( s, d, w, h );
+					}
+				} );
 			}
 		} else if ( textureFormat == FMT_ETC2_RGB8 ) {
-			idEtcEncoder etc;
 			img.Alloc( dxtWidth * dxtHeight / 2 );
             if (!img.data) return false;
-			etc.CompressImageETC2_RGB8( dxtPic, img.data, dxtWidth, dxtHeight );
+			R_EncodeBlockLevel( dxtPic, img.data, dxtWidth, dxtHeight, 8, []( const byte *s, byte *d, int w, int h ) {
+				idEtcEncoder etc;
+				etc.CompressImageETC2_RGB8( s, d, w, h );
+			} );
 		} else if ( textureFormat == FMT_ETC2_RGBA8 ) {
-			idEtcEncoder etc;
 			img.Alloc( dxtWidth * dxtHeight );
             if (!img.data) return false;
-			etc.CompressImageETC2_RGBA8( dxtPic, img.data, dxtWidth, dxtHeight );
+			R_EncodeBlockLevel( dxtPic, img.data, dxtWidth, dxtHeight, 16, []( const byte *s, byte *d, int w, int h ) {
+				idEtcEncoder etc;
+				etc.CompressImageETC2_RGBA8( s, d, w, h );
+			} );
 		} else if ( textureFormat == FMT_EAC_RG11 ) {
 			// Normal maps only, and they reach here with X already in red and Y
 			// in green: idDxtDecoder::DecompressNormalMapDXT5 writes the decoded
@@ -325,10 +401,12 @@ bool idBinaryImage::Load2DFromMemory( int width, int height, const byte * pic_co
 			// CFM_NORMAL_DXT5 pre-swizzle above would move X into alpha, but
 			// DeriveOpts only ever pairs this format with CFM_DEFAULT, so it
 			// does not run.
-			idEtcEncoder etc;
 			img.Alloc( dxtWidth * dxtHeight );
             if (!img.data) return false;
-			etc.CompressImageEAC_RG11( dxtPic, img.data, dxtWidth, dxtHeight );
+			R_EncodeBlockLevel( dxtPic, img.data, dxtWidth, dxtHeight, 16, []( const byte *s, byte *d, int w, int h ) {
+				idEtcEncoder etc;
+				etc.CompressImageEAC_RG11( s, d, w, h );
+			} );
 		} else if ( textureFormat == FMT_LUM8 || textureFormat == FMT_INT8 ) {
 			// LUM8 and INT8 just read the red channel
 			img.Alloc( scaledWidth * scaledHeight );

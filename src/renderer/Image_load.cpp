@@ -275,6 +275,95 @@ static ID_INLINE textureFormat_t R_ETC2FormatForUsage( textureUsage_t usage, boo
 	}
 }
 
+extern idCVar image_useCompression;
+extern idCVar image_useNormalCompression;
+
+/*
+========================
+R_DecodedImageCompression
+
+The block format image_useCompression and image_useNormalCompression give a
+file-backed image whose pixels the engine decodes, or FMT_NONE to keep what
+DeriveOpts chose. Only called where DeriveOpts left FMT_RGBA8, so ETC2, light,
+lookup, PBR and high-quality images never reach it.
+
+Left alone: cube maps (sky faces show block edges against a smooth gradient),
+images that may not be reduced (the 2D/HUD/menu namespaces and nopicmip
+materials, where block artefacts sit on screen at 1:1), and the legacy scope
+distortion masks, whose exact values the scope shader thresholds.
+
+Diffuse and default images ask for DXT5; ActuallyLoadImage stores the ones
+with no alpha as DXT1 (see R_ImageOpaqueSplitFormat). Specular alpha is
+unused, so specular goes straight to DXT1. Bump maps use Quake 4's RXGB
+layout, the one its own precomputed normal maps ship in.
+========================
+*/
+static textureFormat_t R_DecodedImageCompression( textureUsage_t usage, cubeFiles_t cube, bool allowDownSize,
+		const char *name, textureColor_t &colorFormat ) {
+	if ( !glConfig.textureCompressionAvailable || cube != CF_2D || !allowDownSize || R_IsLegacyScopeDistortionMask( name ) ) {
+		return FMT_NONE;
+	}
+	switch ( usage ) {
+		case TD_DIFFUSE:
+		case TD_DEFAULT:
+			if ( image_useCompression.GetInteger() > 0 ) {
+				colorFormat = CFM_DEFAULT;
+				return FMT_DXT5;
+			}
+			break;
+		case TD_SPECULAR:
+			if ( image_useCompression.GetInteger() > 0 ) {
+				colorFormat = CFM_DEFAULT;
+				return FMT_DXT1;
+			}
+			break;
+		case TD_BUMP:
+			if ( image_useNormalCompression.GetInteger() > 0 ) {
+				colorFormat = CFM_NORMAL_DXT5;
+				return FMT_DXT5;
+			}
+			break;
+		default:
+			break;
+	}
+	return FMT_NONE;
+}
+
+/*
+========================
+R_ImageOpaqueSplitFormat
+
+The half-size format an opaque image can take instead of the one its usage
+asked for: DXT1 for DXT5, ETC2 RGB8 for ETC2 RGBA8. Only colour data with the
+default layout splits, and only for the usages R_DecodedImageCompression and
+R_ETC2FormatForUsage give a four-channel format to. FMT_NONE when no split
+applies. The generated cache accepts either half of a split (see
+R_GeneratedImageHeaderMatchesDerivedOpts).
+========================
+*/
+static textureFormat_t R_ImageOpaqueSplitFormat( textureFormat_t format, textureColor_t colorFormat, textureUsage_t usage ) {
+	if ( colorFormat != CFM_DEFAULT || ( usage != TD_DIFFUSE && usage != TD_DEFAULT ) ) {
+		return FMT_NONE;
+	}
+	if ( format == FMT_DXT5 ) {
+		return FMT_DXT1;
+	}
+	if ( format == FMT_ETC2_RGBA8 ) {
+		return FMT_ETC2_RGB8;
+	}
+	return FMT_NONE;
+}
+
+static bool R_ImagePixelsOpaque( const byte *pic, int width, int height ) {
+	const int64 texels = (int64)width * height;
+	for ( int64 i = 0; i < texels; i++ ) {
+		if ( pic[ i * 4 + 3 ] != 255 ) {
+			return false;
+		}
+	}
+	return true;
+}
+
 /*
 ========================
 idImage::DeriveOpts
@@ -432,12 +521,12 @@ ID_INLINE void idImage::DeriveOpts() {
 			int	temp_width = opts.width;
 			int	temp_height = opts.height;
 			while ( temp_width > 1 || temp_height > 1 ) {
+				// A full chain for block formats too, as ETC2 and every DDS
+				// already have: Load2DFromMemory pads each small level to whole
+				// blocks. Stopping at the first level that was not a multiple of
+				// four left a 100x60 DXT image with no mips at all.
 				temp_width >>= 1;
 				temp_height >>= 1;
-				if ( ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 || opts.format == FMT_BC7 ) &&
-					( ( temp_width & 0x3 ) != 0 || ( temp_height & 0x3 ) != 0 ) ) {
-						break;
-				}
 				opts.numLevels++;
 			}
 		}
@@ -446,8 +535,12 @@ ID_INLINE void idImage::DeriveOpts() {
 
 static ID_INLINE bool R_GeneratedImageHeaderMatchesDerivedOpts( const bimageFile_t &header, const idImageOpts &derivedOpts, textureUsage_t usage ) {
 	if ( header.colorFormat != derivedOpts.colorFormat ||
-		header.format != derivedOpts.format ||
 		header.textureType != derivedOpts.textureType ) {
+		return false;
+	}
+	// an opaque image derived as DXT5 or ETC2 RGBA8 was stored at half the size
+	if ( header.format != derivedOpts.format &&
+		 header.format != R_ImageOpaqueSplitFormat( derivedOpts.format, derivedOpts.colorFormat, usage ) ) {
 		return false;
 	}
 
@@ -797,20 +890,42 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 
 	// Figure out opts.colorFormat and opts.format so we can make sure the binary image is up to date
 	DeriveOpts();
+	bool compressDecoded = false;
+	if ( opts.format == FMT_RGBA8 ) {
+		textureColor_t compressedColor = CFM_DEFAULT;
+		const textureFormat_t compressedFormat = R_DecodedImageCompression( usage, cubeFiles, allowDownSize, GetName(), compressedColor );
+		if ( compressedFormat != FMT_NONE ) {
+			opts.format = compressedFormat;
+			opts.colorFormat = compressedColor;
+			compressDecoded = true;
+		}
+	}
+
+	// the cache file name: compressed images get their own ("c1"), so turning
+	// image_useCompression on and off again finds both copies rather than
+	// re-deriving and overwriting one each time; the unmipped sampler policy
+	// changes the generated mip count ( DeriveOpts ), so it keeps its own too
+	auto decorateGeneratedName = [&]( idStr &name ) {
+		if ( !compressDecoded && filter != TF_LINEAR && filter != TF_NEAREST ) {
+			return;
+		}
+		idStr nameExt;
+		name.ExtractFileExtension( nameExt );
+		name.StripFileExtension();
+		if ( compressDecoded ) {
+			name += "c1";
+		}
+		if ( filter == TF_LINEAR || filter == TF_NEAREST ) {
+			name += "m0";
+		}
+		if ( nameExt.Length() > 0 ) {
+			name.SetFileExtension( nameExt );
+		}
+	};
 
 	idStr generatedName = GetName();
 	GetGeneratedName( generatedName, GetName(), usage, cubeFiles, allowDownSize, flags, &consumedDownsize );
-	if ( filter == TF_LINEAR || filter == TF_NEAREST ) {
-		// the unmipped sampler policy changes the generated mip count ( DeriveOpts ), so
-		// keep its cache file distinct from the mipped variant of the same source
-		idStr mipExt;
-		generatedName.ExtractFileExtension( mipExt );
-		generatedName.StripFileExtension();
-		generatedName += "m0";
-		if ( mipExt.Length() > 0 ) {
-			generatedName.SetFileExtension( mipExt );
-		}
-	}
+	decorateGeneratedName( generatedName );
 	idStr sourceExtension;
 	idStr sourceName = GetName();
 	sourceName.ExtractFileExtension( sourceExtension );
@@ -861,15 +976,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	if ( preferredDDSImage && !preferredDDSPrecompressed ) {
 		generatedName = preferredDDSName;
 		GetGeneratedName( generatedName, GetName(), usage, cubeFiles, allowDownSize, flags, &consumedDownsize );
-		if ( filter == TF_LINEAR || filter == TF_NEAREST ) {
-			idStr mipExt;
-			generatedName.ExtractFileExtension( mipExt );
-			generatedName.StripFileExtension();
-			generatedName += "m0";
-			if ( mipExt.Length() > 0 ) {
-				generatedName.SetFileExtension( mipExt );
-			}
-		}
+		decorateGeneratedName( generatedName );
 	}
 	bool q4StockImageCandidateResolved = false;
 	if ( !explicitDDSImage && !preferredDDSImage && cubeFiles == CF_2D ) {
@@ -1130,10 +1237,14 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 					if ( !R_ShouldSuppressMissingImageWarning( GetName() ) ) {
 						idLib::Warning( "Couldn't load image: %s : %s", GetName(), generatedName.c_str() );
 					}
-					// create a default so it doesn't get continuously reloaded
+					// create a default so it doesn't get continuously reloaded;
+					// RGBA8 because the cleared texels below are RGBA8, whatever
+					// block format the image would have been stored in
 					opts.width = 8;
 					opts.height = 8;
 					opts.numLevels = 1;
+					opts.format = FMT_RGBA8;
+					opts.colorFormat = CFM_DEFAULT;
 					DeriveOpts();
 					AllocImage();
 
@@ -1161,6 +1272,13 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 				opts.height = height;
 				opts.numLevels = 0;
 				DeriveOpts();
+				// Half the memory for an image with no alpha to keep. Decided on
+				// the pixels as decoded, so a texture pack's opaque diffuse takes
+				// DXT1 (or ETC2 RGB8) and an alpha-tested one keeps its alpha.
+				const textureFormat_t opaqueFormat = R_ImageOpaqueSplitFormat( opts.format, opts.colorFormat, usage );
+				if ( opaqueFormat != FMT_NONE && R_ImagePixelsOpaque( pic, width, height ) ) {
+					opts.format = opaqueFormat;
+				}
 				if (!im.Load2DFromMemory( opts.width, opts.height, pic, opts.numLevels, opts.format, opts.colorFormat, opts.gammaMips, ( flags & IMAGEFLAG_FILTER_NEUTRAL_ALPHA ) != 0 )) return;
 
 			}
@@ -2011,18 +2129,30 @@ void idImage::UploadScratch( const byte * data, int cols, int rows ) {
 StorageSize
 ==================
 */
-int idImage::StorageSize() const {
+int64 idImage::StorageSize() const {
 
 	if ( !IsLoaded() ) {
 		return 0;
 	}
-	int baseSize = opts.width * opts.height;
-	if ( opts.numLevels > 1 ) {
-		baseSize *= 4;
-		baseSize /= 3;
+	// Sum the levels actually allocated. The old 4/3 estimate assumed a chain to
+	// 1x1, ignored that a compressed 2x2 or 1x1 level still takes a whole block,
+	// and multiplied by the bit count in an int, which went negative for one
+	// 8K RGBA8 texture.
+	const int bytesPerBlock = BytesPerBlockForFormat( opts.format );
+	const int64 bitsPerTexel = BitsForFormat( opts.format );
+	const int levels = Max( 1, opts.numLevels );
+	int64 baseSize = 0;
+	int levelWidth = Max( 1, opts.width );
+	int levelHeight = Max( 1, opts.height );
+	for ( int level = 0; level < levels; level++ ) {
+		if ( bytesPerBlock > 0 ) {
+			baseSize += ( ( (int64)levelWidth + 3 ) >> 2 ) * ( ( (int64)levelHeight + 3 ) >> 2 ) * bytesPerBlock;
+		} else {
+			baseSize += ( (int64)levelWidth * levelHeight * bitsPerTexel + 7 ) / 8;
+		}
+		levelWidth = Max( 1, levelWidth >> 1 );
+		levelHeight = Max( 1, levelHeight >> 1 );
 	}
-	baseSize *= BitsForFormat( opts.format );
-	baseSize /= 8;
 	// A cube map allocates all six faces under one idImage. Counting one face
 	// made listImages report a sixth of what reflection probes and the lightgrid
 	// actually cost, which is the difference between the total agreeing with the
@@ -2080,8 +2210,11 @@ void idImage::Print() const {
 		NAME_FORMAT( ETC2_RGBA8 );
 		NAME_FORMAT( EAC_RG11 );
 		NAME_FORMAT( DEPTH );
+		NAME_FORMAT( DEPTH_STENCIL );
 		NAME_FORMAT( X16 );
 		NAME_FORMAT( Y16_X16 );
+		NAME_FORMAT( RGBA16F );
+		NAME_FORMAT( SRGBA8 );
 		default:
 			common->Printf( "<%3i>", opts.format );
 			break;
@@ -2123,7 +2256,7 @@ void idImage::Print() const {
 			break;
 	}
 
-	common->Printf( "%5i %4ik ", GetUseCount(), StorageSize() / 1024 );
+	common->Printf( "%5i %6lldk ", GetUseCount(), (long long)( StorageSize() / 1024 ) );
 
 	common->Printf( " %s\n", GetName() );
 }

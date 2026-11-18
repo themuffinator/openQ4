@@ -170,6 +170,27 @@ idCVar image_useETC2(
 	"compress textures to ETC2 when the driver exposes no S3TC:\n 0: off, keep uncompressed RGBA8\n 1: specular only\n 2: specular and diffuse\n 3: specular, diffuse and bump (bump as EAC_RG11)",
 	0,
 	3 );
+// Quake 4's own names and meanings. Retail compressed every colour texture
+// and RXGB-compressed bump maps below its Ultra spec; openQ4 keeps the
+// uncompressed Ultra behaviour by default. Only textures the engine decodes
+// are affected: precompressed DDS (almost all of Quake 4's stock textures) and
+// 2D/HUD art (images that may not be reduced) are never re-encoded. Meant for
+// texture packs whose loose TGA or PNG files would otherwise sit in video memory
+// at 32 bpp. Encoded once, then read from the generated image cache.
+idCVar image_useCompression(
+	"image_useCompression",
+	"0",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
+	"block-compress textures decoded from TGA/PNG/JPG/BC4/BC5 sources: 0 = keep uncompressed RGBA8, 1 = diffuse and specular to DXT1 (DXT5 when the image has alpha)",
+	0,
+	1 );
+idCVar image_useNormalCompression(
+	"image_useNormalCompression",
+	"0",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
+	"block-compress bump maps decoded from TGA/PNG/JPG/BC5 sources or built by image programs: 0 = keep uncompressed RGBA8, 2 = DXT5 RXGB as Quake 4 stores its own (1 reads as 2)",
+	0,
+	2 );
 idCVar image_picmip(
 	"image_picmip",
 	"0",
@@ -317,7 +338,8 @@ static bool R_ImageReductionCvarsChanged( bool clear ) {
 		&image_downSize, &image_downSizeLimit,
 		&image_downSizeSpecular, &image_downSizeSpecularLimit,
 		&image_downSizeBump, &image_downSizeBumpLimit,
-		&image_usePrecompressedTextures
+		&image_usePrecompressedTextures,
+		&image_useCompression, &image_useNormalCompression
 	};
 
 	bool changed = false;
@@ -494,7 +516,7 @@ static void R_ImageDDSSelfTest_f( const idCmdArgs &args ) {
 
 typedef struct {
 	idImage	*image;
-	int		size;
+	int64	size;		// bytes, or msec in the level-load profile
 	int		index;
 } sortedImage_t;
 
@@ -803,9 +825,10 @@ R_ListImages_f
 ===============
 */
 void R_ListImages_f( const idCmdArgs &args ) {
-	int		i, partialSize;
+	int		i;
+	int64	partialSize;
 	idImage	*image;
-	int		totalSize;
+	int64	totalSize;	// 64-bit: a texture pack passes 2 GiB long before the list ends
 	int		count = 0;
 	bool	uncompressedOnly = false;
 	bool	unloaded = false;
@@ -839,7 +862,7 @@ void R_ListImages_f( const idCmdArgs &args ) {
 	}
 
 	if ( failed ) {
-		common->Printf( "usage: listImages [ sorted | namesort | unloaded | duplicated | showOverSized ]\n" );
+		common->Printf( "usage: listImages [ sorted | namesort | uncompressed | unloaded | duplicated | oversized ]\n" );
 		return;
 	}
 
@@ -1768,7 +1791,7 @@ int idImageManager::LoadLevelImages( bool pacifier ) {
 			}
 			common->Printf(
 				"  image %4d msec %6.1f MiB %s\n",
-				pendingImages[ i ].size,
+				static_cast<int>( pendingImages[ i ].size ),
 				static_cast<double>( pendingImages[ i ].image->StorageSize() ) / ( 1024.0 * 1024.0 ),
 				pendingImages[ i ].image->GetName() );
 		}
@@ -1842,47 +1865,35 @@ idImageManager::PrintMemInfo
 */
 void idImageManager::PrintMemInfo( MemInfo_t *mi ) {
 	R_RenderThread_Sync( "image registry" );
-	int i, j, total = 0;
-	int *sortIndex;
-	idFile *f;
-
-	f = fileSystem->OpenFileWrite( mi->filebase + "_images.txt" );
+	idFile *f = fileSystem->OpenFileWrite( mi->filebase + "_images.txt" );
 	if ( !f ) {
 		return;
 	}
 
-	// sort first
-	sortIndex = new int[images.Num()];
-
-	for ( i = 0; i < images.Num(); i++ ) {
-		sortIndex[i] = i;
+	// One size per image, sorted once: the old exchange sort asked every image
+	// for its size O(n^2) times, millions of calls for a loaded level.
+	idList<sortedImage_t> sorted;
+	sorted.SetNum( images.Num() );
+	for ( int i = 0; i < images.Num(); i++ ) {
+		sorted[i].image = images[i];
+		sorted[i].size = images[i]->StorageSize();
+		sorted[i].index = i;
+	}
+	if ( sorted.Num() > 1 ) {
+		qsort( sorted.Ptr(), sorted.Num(), sizeof( sortedImage_t ), R_QsortImageSizes );
 	}
 
-	for ( i = 0; i < images.Num() - 1; i++ ) {
-		for ( j = i + 1; j < images.Num(); j++ ) {
-			if ( images[sortIndex[i]]->StorageSize() < images[sortIndex[j]]->StorageSize() ) {
-				int temp = sortIndex[i];
-				sortIndex[i] = sortIndex[j];
-				sortIndex[j] = temp;
-			}
-		}
+	int64 total = 0;
+	for ( int i = 0; i < sorted.Num(); i++ ) {
+		total += sorted[i].size;
+		f->Printf( "%14lld %3i %s\n", (long long)sorted[i].size, sorted[i].image->refCount, sorted[i].image->GetName() );
 	}
 
-	// print next
-	for ( i = 0; i < images.Num(); i++ ) {
-		idImage *im = images[sortIndex[i]];
-		int size;
+	// MemInfo_t is shared with the engine and stays an int; saturate it rather
+	// than wrap negative once a texture pack passes 2 GiB
+	mi->imageAssetsTotal = (int)Min( total, (int64)0x7fffffff );
 
-		size = im->StorageSize();
-		total += size;
-
-		f->Printf( "%s %3i %s\n", idStr::FormatNumber( size ).c_str(), im->refCount, im->GetName() );
-	}
-
-	delete [] sortIndex;
-	mi->imageAssetsTotal = total;
-
-	f->Printf( "\nTotal image bytes allocated: %s\n", idStr::FormatNumber( total ).c_str() );
+	f->Printf( "\nTotal image bytes allocated: %lld\n", (long long)total );
 	fileSystem->CloseFile( f );
 }
 
