@@ -285,7 +285,7 @@ public:
 	// every block-compressed format: gates the compressed upload path, the
 	// 4-pixel alignment asserts and the block-size arithmetic
 	bool		IsCompressed() const {
-		return ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 || opts.format == FMT_BC7 ||
+		return ( opts.format == FMT_DXT1 || opts.format == FMT_DXT5 || IsBPTCFormat( opts.format ) ||
 				 opts.format == FMT_ETC2_RGB8 || opts.format == FMT_ETC2_RGBA8 || opts.format == FMT_EAC_RG11 );
 	}
 

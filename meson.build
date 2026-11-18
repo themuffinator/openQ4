@@ -367,6 +367,15 @@ if get_option('build_native_tests')
   )
   test('openq4-bc7-codec', openq4_bc7_codec_test, timeout: 60)
 
+  # BC6H codec: seeded blocks for every mode, UF16 and SF16, against digests
+  # the GPU decoded (tools/tests/native/Bc6hGpuReference.cpp), and the encoder's
+  # error on synthetic HDR images at every quality level
+  openq4_bc6h_codec_test = executable(
+    'openq4-bc6h-codec-test', files('tools/tests/native/Bc6hCodecTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-bc6h-codec', openq4_bc6h_codec_test, timeout: 120)
+
   # Render demo block container: the codec, the stream of blocks cut at any
   # byte or damaged anywhere, and the timeline its headers alone give
   openq4_demo_block_codec_test = executable(

@@ -113,6 +113,8 @@ static const char* R_TextureFormatName( textureFormat_t format ) {
 		case FMT_DEPTH_STENCIL: return "DEPTH_STENCIL";
 		case FMT_RGBA16F: return "RGBA16F";
 		case FMT_BC7: return "BC7";
+		case FMT_BC6H_UF16: return "BC6H";
+		case FMT_BC6H_SF16: return "BC6H_SF16";
 		default: return "UNKNOWN";
 	}
 }

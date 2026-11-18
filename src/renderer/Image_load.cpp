@@ -556,7 +556,7 @@ static ID_INLINE bool R_BinaryImageHeaderSupportedByRenderer( const bimageFile_t
 	if ( ( format == FMT_DXT1 || format == FMT_DXT5 ) && !glConfig.textureCompressionAvailable ) {
 		return false;
 	}
-	if ( format == FMT_BC7 && !glConfig.bptcTextureCompressionAvailable ) {
+	if ( IsBPTCFormat( format ) && !glConfig.bptcTextureCompressionAvailable ) {
 		return false;
 	}
 	if ( ( format == FMT_ETC2_RGB8 || format == FMT_ETC2_RGBA8 || format == FMT_EAC_RG11 ) &&
@@ -2206,6 +2206,8 @@ void idImage::Print() const {
 		NAME_FORMAT( DXT1 );
 		NAME_FORMAT( DXT5 );
 		NAME_FORMAT( BC7 );
+		NAME_FORMAT( BC6H_UF16 );
+		NAME_FORMAT( BC6H_SF16 );
 		NAME_FORMAT( ETC2_RGB8 );
 		NAME_FORMAT( ETC2_RGBA8 );
 		NAME_FORMAT( EAC_RG11 );

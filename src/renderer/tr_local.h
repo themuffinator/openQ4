@@ -1665,6 +1665,7 @@ extern idCVar r_lightGridDepthBiasFactor;	// polygon offset factor for light-gri
 extern idCVar r_lightGridDepthBiasUnits;	// polygon offset units for light-grid overlay
 extern idCVar r_lightGridDepthTolerance;	// depth texture tolerance for light-grid receiver clipping
 extern idCVar r_lightGridPortalBlend;	// world-unit blend radius for light-grid sampling across visible portal boundaries
+extern idCVar r_useBPTC;	// 0 reports no BPTC (BC7/BC6H), to test their decode paths
 extern idCVar r_lightGridSoftwareDecode;	// decode DXT light-grid pack atlases on the CPU, as renderers without S3TC must
 extern idCVar r_lightGridPreload;		// preload all light-grid atlases during map load instead of streaming visible areas
 extern idCVar r_lightGridResidencyFrames;	// keep light-grid atlases resident after visible/neighbor use; 0 disables runtime purging

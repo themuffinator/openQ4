@@ -114,12 +114,33 @@ enum textureFormat_t {
 	FMT_ETC2_RGB8,		// 4 bpp, opaque
 	FMT_ETC2_RGBA8,		// 8 bpp, ETC2 RGB + EAC alpha
 	FMT_EAC_RG11,		// 8 bpp, two channels; normal maps reconstruct Z
-	FMT_SRGBA8 = 19		// 32 bpp, sRGB colour with linear alpha
+	FMT_SRGBA8 = 19,	// 32 bpp, sRGB colour with linear alpha
+
+	//------------------------
+	// BC6H (BPTC float): three channels of half-float colour, alpha always
+	// 1.0, one eighth of the size of FMT_RGBA16F. The same extension gates
+	// these as FMT_BC7 (ARB_texture_compression_bptc, core in GL 4.2;
+	// EXT_texture_compression_bptc on ES; textureCompressionBC on Vulkan), so
+	// glConfig.bptcTextureCompressionAvailable covers both. The values are
+	// linear: there is no sRGB variant.
+	//------------------------
+
+	FMT_BC6H_UF16 = 20,	// 8 bpp, unsigned half float
+	FMT_BC6H_SF16 = 21	// 8 bpp, signed half float
 };
 
 // the last value the generated-image cache will accept; keep in step with the
 // enum above
-#define FMT_MAX_VALID		FMT_SRGBA8
+#define FMT_MAX_VALID		FMT_BC6H_SF16
+
+// the BPTC formats: FMT_BC7 and both BC6H variants
+ID_INLINE bool IsBPTCFormat( textureFormat_t format ) {
+	return format == FMT_BC7 || format == FMT_BC6H_UF16 || format == FMT_BC6H_SF16;
+}
+
+ID_INLINE bool IsBC6HFormat( textureFormat_t format ) {
+	return format == FMT_BC6H_UF16 || format == FMT_BC6H_SF16;
+}
 
 int BitsForFormat( textureFormat_t format );
 // 4x4 block size in bytes for the block-compressed formats; 0 for the rest
