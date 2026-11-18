@@ -1592,6 +1592,7 @@ extern idCVar r_shadowMapCacheMovingLights;	// 1 = moving lights go through the 
 extern idCVar r_shadowMapStencilFallbackViews;	// views without a failure before a light leaves the stencil fallback
 extern idCVar r_shadowMapPointCacheMegs;	// memory bound on those slots, MiB
 extern idCVar r_shadowMapPointCompose;	// 1 = compose live casters over a cached static cube
+extern idCVar r_shadowMapPointLayered;	// 1 = draw a point shadow cube as one layered target (OpenGL)
 extern idCVar r_shadowMapStaticCutouts;	// 1 = cutout casters with unchanging coverage are cached as static
 extern idCVar r_shadowMapCacheCSM;		// 1 = allow CSM/static cache reuse
 extern idCVar r_shadowMapTranslucentFilterRadius;	// translucent moment filter radius, -1 = inherit opaque radius

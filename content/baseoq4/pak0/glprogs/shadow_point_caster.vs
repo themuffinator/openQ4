@@ -7,6 +7,12 @@ uniform vec4 uGlobalLightOrigin;
 uniform vec4 uAlphaTexCoordS;
 uniform vec4 uAlphaTexCoordT;
 
+#ifdef OPENQ4_POINT_SHADOW_LAYERED
+// the engine draws all six faces into one layered cube target and names the
+// face here (ARB_shader_viewport_layer_array or AMD_vertex_shader_layer)
+uniform int uPointShadowLayer;
+#endif
+
 varying vec3 vPointShadowVector;
 varying vec2 vAlphaTexCoord;
 varying vec3 vAlphaHashCoord;
@@ -22,4 +28,7 @@ void main() {
 	vAlphaTexCoord = vec2( dot( alphaTexCoord, uAlphaTexCoordS ), dot( alphaTexCoord, uAlphaTexCoordT ) );
 	vAlphaHashCoord = worldPos;
 	gl_Position = ftransform();
+#ifdef OPENQ4_POINT_SHADOW_LAYERED
+	gl_Layer = uPointShadowLayer;
+#endif
 }

@@ -42,6 +42,19 @@ does not restore the withdrawn release. See
   `s_reverbPanStep 0` bring back the old behaviour, for comparison.
 - Details: [performance report, section 15](performance-report.md#follow-up-idle-reverb-slots-and-the-turning-view).
 
+## Point-light shadows cost less processor time on OpenGL, 18 November 2026
+
+- **Less work for every shadowed lamp.** A point light's shadow has six faces,
+  and the game used to switch drawing target for each one, which the graphics
+  driver charges for. Where the driver supports it, all six faces now go into
+  one target. In a busy stock battle the shadow pass's own overhead, apart
+  from drawing the shadow casters, fell to about a third. Shadows look exactly
+  as before.
+- **What to do.** Replace the renderer modules and the `baseoq4` packs.
+  `r_shadowMapPointLayered 0` draws the faces one at a time, for comparison.
+  Drivers without the needed feature keep the old path by themselves.
+- Details: [performance report, section 15](performance-report.md#15-cpu-profile-of-the-stock-combat-and-hub2-scenes-fps-08-evidence-18-november-2026).
+
 ## Bullet holes and blood splats cost less to keep, 18 November 2026
 
 - **Less work per frame in long fights.** Every frame, each decal in view

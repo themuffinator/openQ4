@@ -1792,6 +1792,43 @@ six switches a cube remain. The change was reverted. The way to recover the
 2.7% is fewer switches: all six faces in one target (layered rendering or a
 cube atlas).
 
+**Fixed: one render target per point cube.** OpenGL now attaches a point
+shadow cube's colour and depth as one layered target, and the caster vertex
+shader names each face through `gl_Layer`, which
+`ARB_shader_viewport_layer_array` (or `AMD_vertex_shader_layer`) allows
+outside a geometry shader. The CPU still walks the six faces with their own
+matrices and per-face caster culling, so every face draws exactly the casters
+it drew before; only the target switches go. One clear covers the six faces,
+and a compose copies the cached cube into the scratch cube with
+`glCopyImageSubData`, one call per image, where it used to bind both cubes and
+blit each face. A cube now costs one bind of it and one back to the scene
+target, where it took one bind a face (two composing) besides those. Without the extensions, or when the
+two cubes' images differ, the faces are drawn one at a time as before, and
+`r_shadowMapPointLayered 0` forces that for comparison. Shadows are
+bit-identical: hub2 with `ai_freeze 1` and `g_stopTime 1`, five views with
+the static cache off and five with it on, and four views of the combat wave
+(composing over cached cubes), each captured layered, face by face and
+layered again in one session, differ only where two layered captures also
+differ (the animated HUD and one pixel of the battle). CPU samples, one build
+toggled by the cvar:
+
+| Scene | Cube pass, share of all samples | Binding / caster drawing | Non-drawing cube work / caster drawing |
+| --- | --- | --- | --- |
+| hub2, static cache off (every cube redrawn), face by face | 10.8% | 0.42 | 0.80 |
+| hub2, static cache off, layered | 9.5% | 0.25 | 0.49 |
+| Combat wave (cubes composed), face by face | 7.8% | 1.61 | 3.26 |
+| Combat wave, layered | 2.6% | 0.56 | 1.11 |
+
+Caster drawing itself did not grow (6.0% and 6.4% of hub2's samples), so the
+driver did not move the switch cost into the draws. The combat wave varies
+from run to run in how many cubes it composes; an earlier pair, taken while a
+second probe overlapped it, gave 3.1% and 2.2% with the same direction in
+every ratio. What remains is the one bind to each cube and the one back to
+the scene target, about equal in cost: drawing all of a view's cubes before
+its scene target is bound would take most of the rest. The opt-in shared
+interaction stream (`RB_SharedWorldInteractionGLRenderPointMap`) still draws
+face by face.
+
 **Audio.** Per-thread CPU in hub2: the OpenAL mixer takes about 12% of a core
 with a still camera and 16% while the view turns, 6% with
 `s_useEAXReverb 0`. The four reverb slots run on silence too (the scene had
@@ -1800,7 +1837,8 @@ the main thread, so not a frame-rate cost on this machine, but a power and
 low-core-count one.
 
 Follow-ups, in order of measured share: the BSE particle walk and sprite
-evaluation; render-target switches for point cubes; the per-frame static
+evaluation; the two render-target switches each point cube still makes
+(down from one or two a face, above); the per-frame static
 buffers for geometry that lives one frame; the double skinning for posed
 bounds; the depth-copy framebuffer attach and detach; idle reverb slots
 (done, below).
