@@ -1914,6 +1914,96 @@ step rules, and `sound_settings.py` passes its 35 mutants. The checked
 settings path accepts slot 0 parked on the null effect while it still owns
 its reverb.
 
+## 16. The BSE particle runtime (FPS-08), 18 November 2026
+
+Section 15 put BSE effects at 10.6% of the combat scene's samples under
+`R_AddEffectSurfaces`. Counted with the game tic's own servicing of client
+effects (`idRenderWorldLocal::UpdateEffectDef` from `rvClientEffect::Think`,
+another 3.6%), effects took 12.8% of all samples. The wave keeps about 3,100
+live particles in about 190 effects and 860 segments each frame
+(`bse_speeds 1`).
+
+**Where it went.** `rvSegment::UpdateSimpleParticles` was 3.6% of all
+samples, 3.3 of them on one line: the load of each particle's `mEndTime`
+while walking the segment's used list. Particles are objects several cache
+lines long reached through `mNext`, so every particle was a cache miss every frame, only
+to be counted as live. The walk ran for every serviced effect, drawn or not.
+Drawing the same particles then missed again on the virtual `Render` call of
+each one.
+
+**What changed** (`src/bse/`):
+
+- **Expiry stops at the first live particle** (`bse_particleListEarlyOut`).
+  A simple segment's list is already in end-time order. Spawning inserts by
+  end time, and only complex segments (constant, physics, timeout effects,
+  electricity, lights) push to the front. So the expired particles are the
+  ones at the head, and every particle after the first live one is live. The
+  segment now keeps its list's tail, length and first and last end times
+  through every change to the list. A frame with nothing to retire touches no
+  particle; retiring takes them off the head in the old order. The live count
+  the walk used to sum is the list's length, because only electricity
+  overrides `Update` and its segments are complex. Spawning appends at the
+  tail when the new particle ends strictly later than it, which is where the
+  old walk would have put it. An equal end time still walks, so ties keep
+  their order. Constant segments push their particles' end times on as they
+  draw, so their tail is re-read before each insertion.
+- **The next particle is fetched while one is drawn or updated**
+  (`bse_particlePrefetch`), and each segment's first particle is fetched
+  while the previous segment draws.
+- **Two small exact skips without a cvar.** `ServiceEffect` looks the effect's
+  decl name up only when `bse_singleEffect` is set, the only filter that can
+  drop an effect there (`EC_IGNORE` is never rate limited). A sprite with zero
+  rotation takes sin(±0) = ±0 and cos(±0) = 1 instead of calling `sinf` and
+  `cosf`. Both are too small to resolve on their own in these profiles.
+
+**Exactness.** Neither cvar changes a particle, vertex, bound or free-list
+order. A validation build (not committed) checked, after every expiry pass,
+that the list was in end-time order and its kept length, tail and end times
+matched a full walk. It checked every generic pass the same way and every
+fast-path insertion's tail end time against the tail particle. In the combat
+wave and hub2 it ran 9.4 million list checks, 1.4 million generic passes and
+0.5 million insertions without a mismatch. `bse_lifecycle_runtime.py` (start,
+stop, restart, delete, save and restore of a stock effect) and
+`bse_retail_parity.py` pass.
+
+**Measured** with the method of section 15, but inside one profile: the probe
+flips the cvars every 1.5 s for 60 s, and a `listCvars` or `listCmds` burst
+marks which state each window is in. 150 ms around every burst is dropped.
+Each cost is divided by the rest of the frame's tic and scene work
+(`idGameLocal::RunFrame` plus `idRenderWorldLocal::RenderScene`, less BSE),
+which the change does not touch, so frame-rate drift between windows cancels.
+Combat wave, Quality, OpenGL, both cvars off against on (four profiles: 0.74,
+0.74, 0.76 with prefetch held on, 0.77 on the final build):
+
+| BSE work per frame, relative to the rest of the frame | Off | On | On / off |
+| --- | ---: | ---: | ---: |
+| All effects (service and draw) | 0.505 | 0.390 | 0.77 |
+| Servicing | 0.227 | 0.097 | 0.43 |
+| Expiry walk (`UpdateSimpleParticles`) | 0.130 | 0.005 | 0.03 |
+| Spawning (`Check`) | 0.039 | 0.034 | 0.87 |
+| Drawing (`RenderEffect`) | 0.278 | 0.293 | 1.05 |
+
+Effects fell from 9.4% to 7.5% of all samples in that profile, and from
+13.3% to 9.8% in the first. Drawing rises a little because the misses the
+walk used to take now land on the first touch in the draw, for effects in
+view. Off-screen effects no longer pay them at all. Prefetching on its own,
+with the early-out held on, took drawing to 0.86 and 0.96 of its cost in two
+profiles. The virtual-call miss fell from 1.45% to 0.21% of samples, part of
+it moving to the next field read. In hub2, where most effects are serviced
+but few are in view, effects cost 0.47 of their former per-frame work
+(servicing 0.32).
+
+**Measured and set aside.** Bounding a particle surface as each particle
+writes its vertices, instead of reading them back afterwards, cost more
+(0.60% + 0.95% of samples in the per-particle bounds step, against 1.36% for
+the pass it replaced). Fetching two particles ahead, by following the
+already-requested next particle's link, waited on that link and drew at 1.07
+of one-ahead.
+
+What remains in effects, about 7.5% of the combat scene: sprite and line
+evaluation (envelope table lookups, positions, `sinf`/`cosf`), the per-model
+vertex-cache release in `rvBSE::Render`, and per-frame owner updates.
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;

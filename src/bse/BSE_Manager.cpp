@@ -30,6 +30,10 @@ idCVar bse_rateLimit("bse_rateLimit", "6", CVAR_FLOAT, "rate limit for spawned e
 idCVar bse_rateCost("bse_rateCost", "1", CVAR_FLOAT, "rate cost multiplier for spawned effects");
 idCVar bse_scale("bse_scale", "1", CVAR_FLOAT | CVAR_ARCHIVE, "effect scalability amount");
 idCVar bse_maxParticles("bse_maxParticles", "2048", CVAR_INTEGER, "maximum per-segment particle allocation");
+// openQ4 (FPS-08): CPU savings in the particle runtime that leave every particle and
+// vertex as it was; set either to 0 to compare against the full work.
+idCVar bse_particleListEarlyOut("bse_particleListEarlyOut", "1", CVAR_BOOL, "retire expired particles from a list sorted by end time without walking the live ones, and append at its tail; 0 walks every particle every frame");
+idCVar bse_particlePrefetch("bse_particlePrefetch", "1", CVAR_BOOL, "fetch the next particle into the cache while one is updated or drawn");
 
 int bse_frameSpawned = 0;
 int bse_frameServiced = 0;
@@ -300,10 +304,15 @@ bool rvBSEManagerLocal::ServiceEffect(class rvRenderEffectLocal* def, float owne
 		presentationTime = pauseTime;
 	}
 
-	const char* effectName = def->parms.declEffect ? def->parms.declEffect->GetName() : "";
-	if (Filtered(effectName, EC_IGNORE)) {
-		def->expired = true;
-		return true;
+	// EC_IGNORE is never rate limited, so only a bse_singleEffect filter can drop the
+	// effect here; look the decl's name up only then (it was a cache miss a service).
+	const char* singleFilter = bse_singleEffect.GetString();
+	if (singleFilter && singleFilter[0] != '\0') {
+		const char* effectName = def->parms.declEffect ? def->parms.declEffect->GetName() : "";
+		if (Filtered(effectName, EC_IGNORE)) {
+			def->expired = true;
+			return true;
+		}
 	}
 
 	def->effect->SetRenderWorld( reinterpret_cast<idRenderWorld*>(def->world) );

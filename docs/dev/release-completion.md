@@ -7,6 +7,19 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Smoke, sparks and muzzle flashes cost less to run, 18 November 2026
+
+- **Less processor time per frame in fights.** Every frame the effects system
+  stepped through every live particle of every effect, including effects out
+  of view, only to find out which ones had burnt out. It now checks just the
+  oldest particles, adds new ones without searching the list, and asks for
+  the next particle's memory while it draws the current one. In a busy stock battle effects take about three quarters of the work
+  they did, and about half in a quiet hub full of off-screen effects. Effects
+  look, move and fade exactly as before.
+- **What to do.** Replace the game executable. `bse_particleListEarlyOut 0`
+  and `bse_particlePrefetch 0` bring back the old work, for comparison.
+- Details: [performance report, section 16](performance-report.md#16-the-bse-particle-runtime-fps-08-18-november-2026).
+
 ## Switching between Quake 4 and The Awakening without restarting, 18 November 2026
 
 - **Picking the other campaign no longer restarts the game.** Choosing

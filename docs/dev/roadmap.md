@@ -2175,6 +2175,13 @@ image on both backends.
   work fell from 0.80 to 0.49 of caster drawing in hub2 with the cache off and
   from 3.26 to 1.11 in the composing combat wave. Each cube still makes two
   switches, to it and back to the scene target.
+  BSE particles ([report section 16](performance-report.md#16-the-bse-particle-runtime-fps-08-18-november-2026)):
+  expiry stops at the first live particle of an end-time-ordered list and
+  spawning appends at its tail (`bse_particleListEarlyOut`), and the next
+  particle is fetched while one is drawn (`bse_particlePrefetch`); both exact.
+  Effects' per-frame work fell to 0.77 of before in the combat wave (servicing
+  0.43, the expiry walk 0.03) and to 0.47 in hub2. Fused surface bounds and
+  two-ahead prefetching were measured slower and dropped.
 - [ ] **FPS-09 — P1, qualification: regression gate.** Put the suite in the release
   checklist (`docs/dev/release-completion.md`, the manual release workflow): the core
   scenarios on the reference machine before every release and on every renderer,

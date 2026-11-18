@@ -91,7 +91,7 @@ class rvSegment
 {
 public:
 	friend	class			rvBSE;
-	rvSegment(void) { mFlags = 0; mParticles = NULL; mUsedHead = NULL; mFreeHead = NULL; mParticleCount = 0; mLoopParticleCount = 0; }
+	rvSegment(void) { mFlags = 0; mParticles = NULL; mUsedHead = NULL; mUsedTail = NULL; mUsedCount = 0; mUsedHeadEnd = 0.0f; mUsedTailEnd = 0.0f; mFreeHead = NULL; mParticleCount = 0; mLoopParticleCount = 0; }
 	~rvSegment(void);
 
 	void					SetFlag(bool on, int flag) { on ? mFlags |= flag : mFlags &= ~flag; }
@@ -144,6 +144,7 @@ public:
 	rvParticle* GetFreeParticle(rvBSE* effect);
 	rvParticle* SpawnParticle(rvBSE* effect, rvSegmentTemplate* st, float birthTime, const idVec3& initPos = vec3_origin, const idMat3& initAxis = mat3_identity);
 	void					SpawnParticles(rvBSE* effect, rvSegmentTemplate* st, float birthTime, int count);
+	void					LinkUsedParticle(rvSegmentTemplate* st, rvParticle* particle);
 
 	void					AllocateSurface(rvBSE* effect, idRenderModel* model);
 	void					ClearSurface(rvBSE* effect, idRenderModel* model);
@@ -178,6 +179,14 @@ protected:
 
 	rvParticle* mFreeHead;						// Linked list of particles
 	rvParticle* mUsedHead;
+	// openQ4: the last particle of the used list, how many it holds and the end
+	// times of its first and last particles, kept by every change to the list, so
+	// a list sorted by end time can append and retire particles without walking or
+	// even touching it (bse_particleListEarlyOut).
+	rvParticle* mUsedTail;
+	int						mUsedCount;
+	float					mUsedHeadEnd;
+	float					mUsedTailEnd;
 	rvParticle* mParticles;
 };
 

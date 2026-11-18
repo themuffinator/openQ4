@@ -493,7 +493,16 @@ idRenderModel* rvBSE::Render(idRenderModel* model, const struct renderEffect_s* 
 	mViewOrg = view->renderView.vieworg;
 
 	float time = view->floatTime;
+	const bool prefetch = bse_particlePrefetch.GetBool();
+	if (prefetch && mSegments.Num() > 0 && mSegments[0].mUsedHead) {
+		BSE_PrefetchBytes(mSegments[0].mUsedHead, BSE_ParticleTypeSize(mSegments[0].mParticleType));
+	}
 	for (int i = 0; i < mSegments.Num(); ++i) {
+		// openQ4: start fetching the next segment's first particle; a segment's own
+		// loop can only prefetch from the second particle on.
+		if (prefetch && i + 1 < mSegments.Num() && mSegments[i + 1].mUsedHead) {
+			BSE_PrefetchBytes(mSegments[i + 1].mUsedHead, BSE_ParticleTypeSize(mSegments[i + 1].mParticleType));
+		}
 		const bool active = mSegments[i].Active();
 
 		mSegments[i].ClearSurface(this, renderModel);
