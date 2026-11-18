@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's Cryofac opening, door seals and ice wall, 18 November 2026
+
+- **The squad starts on its feet.** At the start of Cryofac, Tak and Navajas
+  spawned inside two of the parked speeders, and Navajas's first mark was
+  inside a third bike: he walked into it for half a minute before the
+  introduction moved on, while Tak wandered off. They now start beside the
+  bikes and reach the ice door in a few seconds.
+- **The door seals no longer pretend to work.** The panels beside the cryodoors
+  showed a usable cursor and played their unlock animation when pressed, but
+  only Tak can open those doors. You can no longer use them.
+- **Napalm melts the whole second ice wall.** Only shots near the middle of the
+  wall counted; napalm on its left side, bottom or top edge did nothing, which
+  the flamethrower made obvious. Any napalm on the ice now counts. Other
+  weapons still cannot melt it.
+- **What to do.** Replace the single-player game module and start the level
+  again; a save made inside Cryofac keeps the old behaviour.
+- Details: [Cryofac's opening, door seals and second ice wall](awakening-missions.md#cryofacs-opening-door-seals-and-second-ice-wall--18-november-2026).
+
 ## Bullet holes and blood splats cost less to keep, 18 November 2026
 
 - **Less work per frame in long fights.** Every frame, each decal in view

@@ -41,7 +41,32 @@ void Awakening_CorrectLateMissionMedia( idDict &args ) {
 	}
 }
 
+// The second ice wall's napalm volume (door_ice_damage_2) is a box buried in
+// its two ice meshes, exposed only in a strip down the middle. Napalm that hit
+// the visible ice anywhere else - the whole western third, the bottom, the
+// top edge - struck the meshes, which take no damage, and the wall stayed.
+// The meshes hand their damage to the volume, whose napalm-only filter and
+// health still decide; RemoveDoorIce2 removes all three together.
+static void Awakening_StartCryofacDetails() {
+	idEntity *volume = gameLocal.FindEntity( "door_ice_damage_2" );
+	if ( !volume || !volume->IsType( idDamagable::GetClassType() ) || idStr::Icmp( volume->spawnArgs.GetString( "damage_filter" ), "goob" ) ) {
+		return;
+	}
+	static const char * const meshes[] = { "door_ice_2a", "door_ice_2b" };
+	for ( int i = 0; i < 2; ++i ) {
+		idEntity *mesh = gameLocal.FindEntity( meshes[i] );
+		if ( mesh && mesh->IsType( idStaticEntity::GetClassType() ) && !mesh->fl.takedamage && mesh->GetDamageEntity() == mesh ) {
+			mesh->SetDamageEntity( volume );
+			mesh->fl.takedamage = true;
+		}
+	}
+}
+
 void Awakening_StartLateMissionDetails() {
+	if ( Awakening_LateCampaignActive() && g_awakeningLateMissions.GetBool() && Awakening_CorrectedCryofac() ) {
+		Awakening_StartCryofacDetails();
+		return;
+	}
 	if ( !Awakening_LateCampaignActive() || !gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ||
 		idStr::Icmp( gameLocal.GetMapName(), "maps/game/m09_valkaryne" ) ) { return; }
 	struct sealPanel_t { const char *name; const char *door; const char *team; const char *origin; const char *angle; const char *callback; };
