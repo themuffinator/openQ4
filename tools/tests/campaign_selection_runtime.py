@@ -209,7 +209,13 @@ def run(args, case: str) -> dict:
         expected_gui = 'singleplayer' if case == 'real-singleplayer-retained' else 'campaigns'
         passed = passed and not retained_warnings and f'RETAINED_GUI_LOADED guis/menu/{expected_gui}.rui' in log
     if case in ('switch-sp','switch-mp','switch-arena'):
-        passed = passed and 'AWAKENING_GAMEPLAY_BEFORE_SWITCH' in logs.get('q4xbase','')
+        # The menu's switch into the expansion runs in place
+        # (idCommonLocal::RemountCampaign), so the log stays where it opened.
+        # Arena starts in the expansion itself; leaving it from a running level
+        # still reloads the engine.
+        passed = passed and 'AWAKENING_GAMEPLAY_BEFORE_SWITCH' in log
+        if case != 'switch-arena':
+            passed = passed and 'CAMPAIGN_SWITCH end to=q4xbase awakening=1' in log
     if case in ('switch-mp','direct-mp','dedicated'):
         passed = passed and '"si_gameType" is:"CTF"' in log and '"com_activeGameModule" is:"game_mp"' in log
     if case == 'switch-arena':

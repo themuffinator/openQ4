@@ -158,6 +158,31 @@ void RestartSound_f( const idCmdArgs& args )
 
 /*
 ========================
+Sound_PurgeSamplesForRemount
+========================
+*/
+void Sound_PurgeSamplesForRemount( void )
+{
+	// A campaign remount changed the search path: a sample of the same name
+	// may now come from another file. Free them all; each loads again from
+	// the new search path when it next plays (idSoundEmitter loads unloaded
+	// samples) or when a level references it.
+	soundSystemLocal.FinishSampleDecodes( true );
+	int purged = 0;
+	for( int i = 0; i < soundSystemLocal.samples.Num(); i++ )
+	{
+		idSoundSample* sample = soundSystemLocal.samples[i];
+		if( sample->IsLoaded() || sample->IsDecoding() )
+		{
+			sample->FreeData();
+			purged++;
+		}
+	}
+	common->Printf( "%d sound samples freed for the campaign switch\n", purged );
+}
+
+/*
+========================
 ReloadSounds_f
 ========================
 */

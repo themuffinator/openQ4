@@ -34,6 +34,12 @@ If you have questions concerning this license or the applicable additional terms
 #include "../bse/BSE_API.h"
 // jmarshall end
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
+static void DeclManager_Fingerprint_f( const idCmdArgs &args );
+
 /*
 
 GUIs and script remain separately parsed
@@ -196,6 +202,19 @@ private:
 														// its source removed will be defaulted
 	bool						needsPrecache;			// packed decl stubs expand source text lazily when first parsed
 	idDeclLocal *				nextInFile;				// next decl in the decl file
+
+	// A campaign remount (idDeclManagerLocal::BeginRemount) detaches every decl
+	// from its file and lets the files of the new search path claim them back.
+	byte						remountState;			// DECL_REMOUNT_*
+	bool						remountLive;			// has parsed data in use: FinishRemount parses it again
+	bool						remountRemoved;			// no file of the mounted game defines it any more
+};
+
+enum {
+	DECL_REMOUNT_NONE,
+	DECL_REMOUNT_ORPHAN,		// defined by a file before the remount, unclaimed so far
+	DECL_REMOUNT_IMPLICIT,		// implicit before the remount; a file of the new game may define it
+	DECL_REMOUNT_IMPLICIT_REMOVED	// as IMPLICIT, and hidden by an earlier remount: stays hidden unless claimed
 };
 
 class idDeclFile {
@@ -366,8 +385,16 @@ public:
 	idDeclType *				GetDeclType( int type ) const { return declTypes[type]; }
 	const idDeclFile *			GetImplicitDeclFile( void ) const { return &implicitDecls; }
 
+	// Campaign remount; see DeclManager_BeginRemount in DeclManager.h.
+	void						ReleaseModuleDecls( void );
+	void						BeginRemount( void );
+	void						FinishRemount( void );
+	bool						IsRemounting( void ) const { return remounting; }
+	void						WriteFingerprint( idFile *file );
+
 	idHashTable<rvDeclGuide *>	guideTable;
 private:
+	void						RegisterEngineDeclFolders( void );
 	void						RegisterDeclFolder( const char *folder, const char *extension, declType_t defaultType, bool unique, bool norecurse );
 	void						LoadDeclFileLayers( const char *fileName, declType_t defaultType, bool unique );
 	idDeclFile *				FindLoadedDeclFile( const char *fileName, const char *layerGameDir = "" );
@@ -397,6 +424,9 @@ private:
 	int							indent;			// for MediaPrint
 	bool						insideLevelLoad;
 	idFile *					singleDeclFile;
+	bool						registeringEngineTypes;		// inside Init's own RegisterDeclType calls
+	bool						moduleDeclType[DECL_MAX_TYPES];	// registered by the game module, whose allocator lives there
+	bool						remounting;
 
 	static idCVar				decl_show;
 
@@ -1098,8 +1128,21 @@ int idDeclFile::LoadAndParse( bool unique ) {
 		referencedThisLevel = false;
 		newDecl = declManagerLocal.FindTypeWithoutParsing( identifiedType, name, false );
 		if ( newDecl ) {
-			// update the existing copy
-			if ( newDecl->sourceFile == this && !newDecl->redefinedInReload ) {
+			if ( newDecl->remountState != DECL_REMOUNT_NONE ) {
+				// A campaign remount: the first file of the new search path to
+				// define the decl takes it, as the first one does at startup.
+				// One with parsed data (in use, or looked up since the remount
+				// began) parses again once every file is registered, in
+				// FinishRemount, so its references resolve against the whole
+				// new game rather than the files claimed so far.
+				referencedThisLevel = false;
+				newDecl->remountLive = newDecl->remountLive || newDecl->declState != DS_UNPARSED;
+				newDecl->remountState = DECL_REMOUNT_NONE;
+				newDecl->remountRemoved = false;
+				newDecl->nextInFile = this->decls;
+				this->decls = newDecl;
+			} else if ( newDecl->sourceFile == this && !newDecl->redefinedInReload ) {
+				// update the existing copy
 				referencedThisLevel = newDecl->referencedThisLevel;
 			} else {
 				// a layered copy only fills in what the mod's copy above it left out
@@ -1142,7 +1185,13 @@ int idDeclFile::LoadAndParse( bool unique ) {
 			idDeclLocal *aliasDecl = declManagerLocal.FindTypeWithoutParsing( identifiedType, strippedName.c_str(), false );
 			referencedThisLevel = false;
 			if ( aliasDecl ) {
-				if ( aliasDecl->sourceFile == this && !aliasDecl->redefinedInReload ) {
+				if ( aliasDecl->remountState != DECL_REMOUNT_NONE ) {
+					aliasDecl->remountLive = aliasDecl->remountLive || aliasDecl->declState != DS_UNPARSED;
+					aliasDecl->remountState = DECL_REMOUNT_NONE;
+					aliasDecl->remountRemoved = false;
+					aliasDecl->nextInFile = this->decls;
+					this->decls = aliasDecl;
+				} else if ( aliasDecl->sourceFile == this && !aliasDecl->redefinedInReload ) {
 					referencedThisLevel = aliasDecl->referencedThisLevel;
 				} else if ( !DeclManager_IsopenQ4OverrideDeclFile( aliasDecl->sourceFile ) ) {
 					aliasDecl = NULL;
@@ -1409,6 +1458,10 @@ void idDeclManagerLocal::Init( void ) {
 	ParseGuides();
 // jmarshall end
 
+	remounting = false;
+	memset( moduleDeclType, 0, sizeof( moduleDeclType ) );
+	registeringEngineTypes = true;
+
 	// decls used throughout the engine
 	RegisterDeclType( "table",				DECL_TABLE,			idDeclAllocator<idDeclTable> );
 	RegisterDeclType( "material",			DECL_MATERIAL,		openQ4_MaterialDeclAllocator );
@@ -1435,6 +1488,7 @@ void idDeclManagerLocal::Init( void ) {
 	RegisterDeclType( "video",				DECL_VIDEO,			idDeclAllocator<idDeclVideo> );
 	RegisterDeclType( "audio",				DECL_AUDIO,			idDeclAllocator<idDeclAudio> );
 	RegisterDeclType( "playerModel",			DECL_PLAYER_MODEL,	idDeclAllocator<rvDeclPlayerModel> );
+	registeringEngineTypes = false;
 
 	if ( com_SingleDeclFile.GetBool() ) {
 		StartLoadingDecls();
@@ -1444,16 +1498,7 @@ void idDeclManagerLocal::Init( void ) {
 	} else {
 		cmdSystem->AddCommand( "writeDeclFile", WriteDeclFile_f, CMD_FL_SYSTEM, "writes parsed decls to a packed .decls file (optional mode: openq4 or retail)" );
 
-		RegisterDeclFolderWrapper( "materials",		".mtr",			DECL_MATERIAL );
-		RegisterDeclFolderWrapper( "skins",			".skin",		DECL_SKIN );
-		RegisterDeclFolderWrapper( "sound",			".sndshd",		DECL_SOUND, false, true );
-
-		// jmarshall: Raven Decl Support
-		RegisterDeclFolderWrapper( "materials/types",	".mtt",			DECL_MATERIALTYPE );
-		RegisterDeclFolderWrapper( "lipsync",			".lipsync",		DECL_LIPSYNC );
-		RegisterDeclFolderWrapper( "playbacks",			".playback",	DECL_PLAYBACK, true );
-		RegisterDeclFolderWrapper( "effects",			".fx",			DECL_EFFECT, true );
-// jmarshall end
+		RegisterEngineDeclFolders();
 	}
 
 	// add console commands
@@ -1461,6 +1506,7 @@ void idDeclManagerLocal::Init( void ) {
 	cmdSystem->AddCommand( "listAllDecls", ListAllDecls_f, CMD_FL_SYSTEM, "lists every decl name grouped by type" );
 
 	cmdSystem->AddCommand( "reloadDecls", ReloadDecls_f, CMD_FL_SYSTEM, "reloads decls" );
+	cmdSystem->AddCommand( "openq4_declFingerprint", DeclManager_Fingerprint_f, CMD_FL_SYSTEM, "writes every file-defined decl (type, name, file, line, text checksum) to a file under fs_savepath" );
 	cmdSystem->AddCommand( "reloadFile", ReloadFile_f, CMD_FL_SYSTEM, "reloads a single decl file" );
 	cmdSystem->AddCommand( "resaveDecl", ResaveDecl_f, CMD_FL_SYSTEM, "resaves one decl or every decl of a type" );
 	cmdSystem->AddCommand( "touch", TouchDecl_f, CMD_FL_SYSTEM, "touches a decl" );
@@ -1874,6 +1920,200 @@ void idDeclManagerLocal::Reload( bool force ) {
 
 /*
 ===================
+idDeclManagerLocal::ReleaseModuleDecls
+
+A campaign remount unloads the game module, whose allocators made every decl
+of the types it registered (models, cameras, exports). Free those objects
+while the module is still loaded, as Shutdown does, and forget the types: the
+module registers them again as it initializes. The decls themselves keep their
+places, so every index and pointer to them stays good.
+===================
+*/
+void idDeclManagerLocal::ReleaseModuleDecls( void ) {
+	for ( int type = 0; type < DECL_MAX_TYPES && type < declTypes.Num(); type++ ) {
+		if ( !moduleDeclType[type] || declTypes[type] == NULL ) {
+			continue;
+		}
+		for ( int i = 0; i < linearLists[type].Num(); i++ ) {
+			idDeclLocal *decl = linearLists[type][i];
+			if ( decl->self != NULL ) {
+				decl->self->FreeData();
+				delete decl->self;
+				decl->self = NULL;
+			}
+			decl->declState = DS_UNPARSED;
+		}
+		delete declTypes[type];
+		declTypes[type] = NULL;
+		moduleDeclType[type] = false;
+	}
+}
+
+/*
+===================
+idDeclManagerLocal::BeginRemount
+
+The search path has just changed under a running engine (a campaign switch,
+idCommonLocal::RemountCampaign). Rather than free every decl, which the
+renderer, sound system and interfaces hold by pointer, detach each one from its
+file and register the decl folders again in the order Init does: the first file
+of the new search path to define a decl takes it, exactly as at startup. The
+game module registers its own folders as it loads again, and FinishRemount
+settles what no file claimed and parses again every decl that was in use (or
+was looked up meanwhile); any other parses on its next use.
+===================
+*/
+void idDeclManagerLocal::BeginRemount( void ) {
+	remounting = true;
+
+	ParseGuides();
+
+	for ( int type = 0; type < DECL_MAX_TYPES; type++ ) {
+		for ( int i = 0; i < linearLists[type].Num(); i++ ) {
+			idDeclLocal *decl = linearLists[type][i];
+			const bool wasRemoved = decl->remountRemoved;
+			decl->remountRemoved = false;
+			decl->remountLive = decl->self != NULL && decl->declState != DS_UNPARSED && decl->referencedThisLevel;
+			if ( decl->sourceFile == NULL || decl->sourceFile == &implicitDecls ) {
+				decl->remountState = wasRemoved ? DECL_REMOUNT_IMPLICIT_REMOVED : DECL_REMOUNT_IMPLICIT;
+				continue;
+			}
+			if ( !decl->remountLive && decl->self != NULL && decl->declState != DS_UNPARSED ) {
+				decl->self->FreeData();
+			}
+			if ( !decl->remountLive ) {
+				decl->declState = DS_UNPARSED;
+			}
+			if ( decl->textSource ) {
+				Mem_Free( decl->textSource );
+				decl->textSource = NULL;
+			}
+			decl->textLength = 0;
+			decl->compressedLength = 0;
+			decl->sourceFile = &implicitDecls;
+			decl->sourceTextOffset = 0;
+			decl->sourceTextLength = 0;
+			decl->sourceLine = 0;
+			decl->nextInFile = NULL;
+			decl->redefinedInReload = false;
+			decl->remountState = DECL_REMOUNT_ORPHAN;
+		}
+	}
+
+	loadedFiles.DeleteContents( true );
+	declFolders.DeleteContents( true );
+	checksum = 0;
+
+	RegisterEngineDeclFolders();
+}
+
+/*
+===================
+idDeclManagerLocal::FinishRemount
+
+After the game module has registered its folders: a decl no file claimed is
+gone from the mounted game. It keeps its place, as an implicit decl, but a
+lookup that would not create it no longer finds it (remountRemoved). One in use
+takes its implicit definition at once, as a fresh lookup of the name would.
+===================
+*/
+void idDeclManagerLocal::FinishRemount( void ) {
+	// Settle first, then parse: a parse may look up any other decl, which must
+	// already be in its final state.
+	int claimed = 0, removed = 0;
+	idList<idDeclLocal *> reparse;
+	for ( int type = 0; type < DECL_MAX_TYPES; type++ ) {
+		const bool typeRegistered = type < declTypes.Num() && declTypes[type] != NULL;
+		for ( int i = 0; i < linearLists[type].Num(); i++ ) {
+			idDeclLocal *decl = linearLists[type][i];
+			if ( decl->remountState == DECL_REMOUNT_ORPHAN ) {
+				decl->remountRemoved = true;
+				removed++;
+				if ( decl->remountLive || decl->declState != DS_UNPARSED ) {
+					decl->declState = DS_UNPARSED;
+					decl->remountLive = true;
+				}
+			} else if ( decl->remountState == DECL_REMOUNT_IMPLICIT_REMOVED ) {
+				decl->remountRemoved = true;
+				removed++;
+			} else if ( decl->sourceFile != &implicitDecls && decl->sourceFile != NULL ) {
+				claimed++;
+			}
+			if ( decl->remountLive && decl->declState == DS_UNPARSED && typeRegistered ) {
+				reparse.Append( decl );
+			}
+			decl->remountState = DECL_REMOUNT_NONE;
+			decl->remountLive = false;
+		}
+	}
+	for ( int i = 0; i < reparse.Num(); i++ ) {
+		if ( reparse[i]->declState == DS_UNPARSED ) {
+			reparse[i]->ParseLocal();
+		}
+	}
+	remounting = false;
+	common->Printf( "Decls remounted: %d defined by %d files, %d no longer defined; %d in use parsed again\n",
+		claimed, loadedFiles.Num(), removed, reparse.Num() );
+}
+
+/*
+===================
+idDeclManagerLocal::WriteFingerprint
+
+Every decl a file defines, one sorted line each: type, name, file (and the
+game directory of a layered copy), line and text checksum. Two engines that
+mounted the same game this way and from a fresh start write the same lines.
+===================
+*/
+void idDeclManagerLocal::WriteFingerprint( idFile *file ) {
+	// std::sort, not idList::Sort: qsort moves idStr objects bytewise.
+	std::vector<std::string> lines;
+	for ( int type = 0; type < DECL_MAX_TYPES; type++ ) {
+		const char *typeName = type < declTypes.Num() && declTypes[type] != NULL ? declTypes[type]->typeName.c_str() : va( "type%d", type );
+		for ( int i = 0; i < linearLists[type].Num(); i++ ) {
+			const idDeclLocal *decl = linearLists[type][i];
+			if ( decl->sourceFile == NULL || decl->sourceFile == &implicitDecls || decl->remountRemoved ) {
+				continue;
+			}
+			lines.push_back( va( "%s\t%s\t%s\t%s\t%d\t%08x\n", typeName, decl->name.c_str(), decl->sourceFile->fileName.c_str(),
+				decl->sourceFile->layerGameDir.c_str(), decl->sourceLine, (unsigned int)decl->checksum ) );
+		}
+	}
+	std::sort( lines.begin(), lines.end() );
+	for ( const std::string &line : lines ) {
+		file->Write( line.c_str(), static_cast<int>( line.size() ) );
+	}
+	common->Printf( "decl fingerprint: %d file-defined decls in %d files\n", static_cast<int>( lines.size() ), loadedFiles.Num() );
+}
+
+static void DeclManager_Fingerprint_f( const idCmdArgs &args ) {
+	if ( args.Argc() != 2 ) {
+		common->Printf( "usage: openq4_declFingerprint <file under fs_savepath>\n" );
+		return;
+	}
+	idFile *file = fileSystem->OpenFileWrite( args.Argv( 1 ), "fs_savepath" );
+	if ( file == NULL ) {
+		common->Warning( "openq4_declFingerprint: could not write %s", args.Argv( 1 ) );
+		return;
+	}
+	declManagerLocal.WriteFingerprint( file );
+	fileSystem->CloseFile( file );
+}
+
+void DeclManager_ReleaseModuleDecls( void ) {
+	declManagerLocal.ReleaseModuleDecls();
+}
+
+void DeclManager_BeginRemount( void ) {
+	declManagerLocal.BeginRemount();
+}
+
+void DeclManager_FinishRemount( void ) {
+	declManagerLocal.FinishRemount();
+}
+
+/*
+===================
 idDeclManagerLocal::BeginLevelLoad
 ===================
 */
@@ -1936,6 +2176,31 @@ void idDeclManagerLocal::RegisterDeclType( const char *typeName, declType_t type
 		declTypes.AssureSize( (int)type + 1, NULL );
 	}
 	declTypes[type] = declType;
+	if ( (int)type >= 0 && (int)type < DECL_MAX_TYPES ) {
+		moduleDeclType[type] = !registeringEngineTypes;
+	}
+}
+
+/*
+===================
+idDeclManagerLocal::RegisterEngineDeclFolders
+
+The decl folders the engine registers itself, in the order Init and a
+campaign remount both register them. The game module registers its own
+(def, af) as it initializes.
+===================
+*/
+void idDeclManagerLocal::RegisterEngineDeclFolders( void ) {
+	RegisterDeclFolderWrapper( "materials",		".mtr",			DECL_MATERIAL );
+	RegisterDeclFolderWrapper( "skins",			".skin",		DECL_SKIN );
+	RegisterDeclFolderWrapper( "sound",			".sndshd",		DECL_SOUND, false, true );
+
+	// jmarshall: Raven Decl Support
+	RegisterDeclFolderWrapper( "materials/types",	".mtt",			DECL_MATERIALTYPE );
+	RegisterDeclFolderWrapper( "lipsync",			".lipsync",		DECL_LIPSYNC );
+	RegisterDeclFolderWrapper( "playbacks",			".playback",	DECL_PLAYBACK, true );
+	RegisterDeclFolderWrapper( "effects",			".fx",			DECL_EFFECT, true );
+	// jmarshall end
 }
 
 /*
@@ -3469,11 +3734,21 @@ idDeclLocal *idDeclManagerLocal::FindTypeWithoutParsing( declType_t type, const 
 	hash = hashTables[typeIndex].GenerateKey( canonicalName, false );
 	for ( i = hashTables[typeIndex].First( hash ); i >= 0; i = hashTables[typeIndex].Next( i ) ) {
 		if ( linearLists[typeIndex][i]->name.Icmp( canonicalName ) == 0 ) {
+			idDeclLocal *found = linearLists[typeIndex][i];
+			if ( found->remountRemoved ) {
+				// No file of the mounted game defines it since a campaign
+				// remount: absent to a lookup that would not create it, and an
+				// implicit decl again to one that would, as after a fresh start.
+				if ( !makeDefault ) {
+					return NULL;
+				}
+				found->remountRemoved = false;
+			}
 			// only print these when decl_show is set to 2, because it can be a lot of clutter
 			if ( decl_show.GetInteger() > 1 ) {
 				MediaPrint( "referencing %s %s\n", declTypes[ type ]->typeName.c_str(), name );
 			}
-			return linearLists[typeIndex][i];
+			return found;
 		}
 	}
 
@@ -3562,6 +3837,9 @@ idDeclLocal::idDeclLocal( void ) {
 	redefinedInReload = false;
 	needsPrecache = false;
 	nextInFile = NULL;
+	remountState = DECL_REMOUNT_NONE;
+	remountLive = false;
+	remountRemoved = false;
 }
 
 /*
@@ -4082,7 +4360,8 @@ void idDeclLocal::ParseLocal( bool noCaching ) {
 	// only after runtime rasterization.
 	const bool generatedRetainedResource = type == DECL_MATERIAL && generatedDefaultText && IsImplicit() &&
 		( name.Icmp("_retainedsolid") == 0 || name.Icmp("_retainedmultiply") == 0 || name.Icmp("_retainedPauseScene") == 0 || name.Icmpn("_retained/_ttfatlas_",20) == 0 || name.Icmpn("_retained/_ttfatlasx_",21) == 0 || name.Icmpn("_retained/_ttfatlasr_",21) == 0 || name.Icmpn("_retainedLayer/",15) == 0 || name.Icmpn("_retainedMask/",14) == 0 || name.Icmpn("_retainedLinearMask/",20) == 0 || name.Icmpn("_retainedBlur/",14) == 0 || name.Icmpn("_retainedAtlas/",15) == 0 || name.Icmpn("_retainedMultiplyAtlas/",23) == 0 || name.Icmpn("_retainedModel/",15) == 0 || name.Icmpn("_retainedModelResolve/",22) == 0 );
-	if ( common->IsInitialized() && !declManagerLocal.GetInsideLoad() && !openQ4_IsAnyToolActive() && !generatedRetainedResource ) {
+	if ( common->IsInitialized() && !declManagerLocal.GetInsideLoad() && !declManagerLocal.IsRemounting() &&
+			!openQ4_IsAnyToolActive() && !generatedRetainedResource ) {
 		common->Warning( "Loading non pre-cached %s decl %s", declManagerLocal.GetDeclNameFromType( type ), name.c_str() );
 	}
 

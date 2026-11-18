@@ -3509,6 +3509,13 @@ Completion substeps must keep three forms of evidence distinct:
   v1/v2 script statements remain unchanged.
   Focused encounter and restore evidence belongs there; full traversal remains
   part of this gate.
+  Progress, 18 November: the menu switch between Quake 4 and The Awakening
+  remounts in place (`idCommonLocal::RemountCampaign`) instead of reloading the
+  engine; decl fingerprints after a switch match fresh starts in both
+  directions, and m01/airdefense1 play after a switch. A switch from a running
+  level and MP entry from The Awakening keep the engine reload; Linux and
+  macOS runs of the in-place switch, with and without a mod over the
+  expansion, remain to qualify here.
   Progress, 2 November: freeze persistence passes one save/restore case. On
   `game/m01_stranarus_trench2` a spawned Strogg marine hit by the freeze gun
   reports "frozen solid" at 5888 ms, the game saves and restores, the marine

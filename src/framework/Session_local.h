@@ -294,7 +294,20 @@ public:
 	// A campaign entered: its game started, its levels (chapters), or else its
 	// difficulty page, after any engine reload into its game directory.
 	void SelectCampaign( const char *campaign, bool start = false, bool chapters = false );
-	bool OpenRetainedCampaignSkill();
+	// A campaign switch in place at the menu (campaignRemount), or, where that
+	// cannot run, the engine reload that carries on into the campaign.
+	void RemountCampaign( const char *campaign, bool start, bool chapters, idUserInterface *page = NULL );
+	void UpdatePendingCampaignRemount();
+	const char *PendingCampaign( const idUserInterface *gui ) const { return gui != NULL && gui == pendingRemountPage ? pendingRemountCampaign.c_str() : NULL; }
+	idUserInterface *pendingRemountPage;	// the difficulty page opened for a campaign not yet mounted
+	idStr pendingRemountCampaign;
+	int pendingRemountAt;
+	bool pendingRemountQueued;	// campaignRemount queued for pendingRemountPage
+	bool CanRemountCampaign() const;
+	void ReloadEngineForCampaign( const char *campaign, const char *gameDir, const char *gameBase, bool start, bool chapters );
+	void CampaignRemounted();
+	bool campaignRemounting;	// SelectCampaign straight after a remount: never switch again
+	bool OpenRetainedCampaignSkill( int awakeningTitle = -1 );
 	bool OpenRetainedCampaignChapters();
 	// The active campaign's chapters: every level in campaign order, each
 	// unlocked once the player reaches it (Session.cpp).

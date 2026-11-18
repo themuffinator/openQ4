@@ -73,6 +73,7 @@ struct idSessionLocal {
     void UpdateRetainedHome() {}
     void RetainedHomeFrameEvent() {}
     void UpdateRetainedSubpage() {}
+    void UpdatePendingCampaignRemount() {}
     void UpdateRetainedPage() {}
     void UpdateRetainedMultiplayerPage() {}
     void UpdateRetainedJoinGame() {}

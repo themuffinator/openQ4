@@ -7,6 +7,51 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Switching between Quake 4 and The Awakening without restarting, 18 November 2026
+
+- **Picking the other campaign no longer restarts the game.** Choosing
+  **New Game** for The Awakening, or for Quake 4 again from it, closed down
+  and rebuilt the whole engine: the window froze for 6 to 22 seconds, the
+  page transition stopped half way, the menu music went silent until you
+  returned to the title, and the other campaign's own startup scripts and
+  settings file replaced the settings you had. Now the campaign's difficulty
+  page slides in straight away, the game swaps the campaign's files in behind
+  it in two to four seconds while the page holds still, and the menu music
+  starts again. The window, the menus and the renderer stay up throughout.
+- **Your settings carry across.** The settings you switch with are written to
+  both campaigns' folders, so key bindings and video settings no longer differ
+  between the campaigns.
+- **What to do.** Nothing. From a level, a demo or multiplayer, openQ4 still
+  restarts its engine to change campaigns. `com_campaignRemount 0` brings back
+  the old restart for every switch.
+- How it works: the switch unloads the single-player game module, mounts the
+  other campaign's search path (`fs_game`, `fs_game_base`), detaches every
+  decl from its file and registers the decl folders again so the new files
+  claim them exactly as at startup (decls in use are parsed again; decls the
+  campaign no longer defines become implicit and are hidden from lookups that
+  would not create them), reloads the language strings and the game module,
+  and reloads images, models, legacy GUIs and sound samples the new search
+  path resolves to other files (`idCommonLocal::RemountCampaign`,
+  `DeclManager_BeginRemount`/`FinishRemount`). The retained text relayout runs
+  only when the strings actually changed. Models and legacy GUIs now compare
+  pk4 content stamps for identity, as images already did, so a file that
+  moves between a pk4 and a loose copy is reloaded in both directions. The
+  first switch into The Awakening on a new install still checks openQ4's
+  packs once (about a second), as the engine reload did.
+- Verified on Windows with the retained Campaign page's own controls (no
+  device input), GL and Vulkan: Quake 4 → The Awakening → Quake 4, twice in a
+  row, walking Back to the title after each switch; the classic menus
+  (`ui_retained 0`); m01 and airdefense1 start and play after a switch, and a
+  save made in m01 after three switches loads back. `openq4_declFingerprint`
+  (new) wrote the same 22,441 Awakening and 17,210 Quake 4 decls, with the
+  same files, lines and text checksums, after every switch as after a fresh
+  start in that campaign; m01 logs the same missing content after a switch as
+  after a fresh start. `campaign_selection_runtime.py` passes its switch,
+  multiplayer, Arena and mod cases, and now requires the in-place switch.
+  On a machine shared with other builds the switch took 2.4 to 3.8 s, against
+  5.6 to 8.8 s for the engine reload it replaces, and 22 s for the reload's
+  first entry into The Awakening.
+
 ## The Awakening's Cryofac opening, door seals and ice wall, 18 November 2026
 
 - **The squad starts on its feet.** At the start of Cryofac, Tak and Navajas

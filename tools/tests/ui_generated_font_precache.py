@@ -39,6 +39,7 @@ static struct {
 } commonObject,*common=&commonObject;
 static struct {
     bool GetInsideLoad(){return insideLoad;}
+    bool IsRemounting(){return false;}
     const char* GetDeclNameFromType(int){return "test";}
 } declManagerLocal;
 static bool openQ4_IsAnyToolActive(){return tool;}
@@ -81,7 +82,8 @@ def main():
     source = (ROOT/'src/framework/DeclManager.cpp').read_text(encoding='utf-8')
     guard = re.search(r'\tconst bool generatedRetainedResource = [\s\S]*?;',source)
     assert guard
-    branch = function_body(source,'if ( common->IsInitialized() && !declManagerLocal.GetInsideLoad() && !openQ4_IsAnyToolActive() && !generatedRetainedResource )')
+    # A campaign remount parses decls again with the engine up; it warns of none.
+    branch = function_body(source,'if ( common->IsInitialized() && !declManagerLocal.GetInsideLoad() && !declManagerLocal.IsRemounting() &&\n\t\t\t!openQ4_IsAnyToolActive() && !generatedRetainedResource )')
     fonts = (ROOT/'src/renderer/tr_fontTTF.cpp').read_text(encoding='utf-8')
     for prefix in ('_ttfatlas_','_ttfatlasx_'):
         assert f'va( "{prefix}%s_%i"' in fonts
