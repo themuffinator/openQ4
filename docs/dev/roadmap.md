@@ -2163,6 +2163,13 @@ image on both backends.
   game tic per scene from the attribution runs, land the stage-2 overlap under REN-07,
   and reduce the front-end and tic work the attribution names. Close when the CPU-bound
   scenes meet their declared budgets with the GPU as the limit; shared with HF-07.
+  Progress, 18 November ([report section 15](performance-report.md#15-cpu-profile-of-the-stock-combat-and-hub2-scenes-fps-08-evidence-18-november-2026)):
+  a CPU profile of the stock combat and hub2 scenes ranks the main thread's
+  work: BSE effects 10.6%, point-cube render-target switches 2.7%, depth copies
+  2.2%, posed MD5 bounds 2.0%, per-frame static buffers 1.8%. The faded-decal
+  pass now skips decals with nothing to remove (exact; 4.9% to 0.9% of the
+  combat front end, `r_decalFadeEarlyOut`). A framebuffer per cube face was
+  measured and reverted: the driver charges for the switch, not the attachment.
 - [ ] **FPS-09 — P1, qualification: regression gate.** Put the suite in the release
   checklist (`docs/dev/release-completion.md`, the manual release workflow): the core
   scenarios on the reference machine before every release and on every renderer,

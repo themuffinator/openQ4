@@ -1745,6 +1745,65 @@ models still rebuild every light interaction every frame (`R_CreateLightTris`
 about 4% of the process after change 3), the driver's submission cost, and the
 4-5% spent in OpenAL mixing.
 
+## 15. CPU profile of the stock combat and hub2 scenes (FPS-08 evidence), 18 November 2026
+
+A round of CPU sampling on the current build, to rank what the main thread
+spends a frame on. Hidden 1280x720 windows on the reference laptop, OpenGL,
+the Quality preset, the suite's `combat_airdefense1` wave and `indoor_hub2`
+view with `benchmarkViewSweep`; 20 s of samples from the Visual Studio
+collector, exported with `xperf -a dumper` and symbolized with
+`llvm-symbolizer` against the build's PDBs (the collector's traces carry no
+image debug identities, so `xperf -symbols` cannot name openQ4's frames). A
+hidden window paces at 60 Hz, so shares are per frame of work, not frame
+rates; other sessions kept the machine at 40-60% load, which ruled out
+wall-clock A/Bs, so changes were judged by sample ratios inside one profile.
+
+In the combat scene the main thread holds 94% of the samples. Shares of all
+samples:
+
+| Work | Share | Notes |
+| --- | --- | --- |
+| OpenGL driver | 28% | 11 points of it under draw submission (`RB_DrawElementsWithCounters`) |
+| BSE effects (`R_AddEffectSurfaces`) | 10.6% | sprite particles 3.2, the per-frame walk of each segment's particle list 2.9 (cache misses on `mEndTime`) |
+| Point-light shadow cube faces | 2.7% | the driver's cost of switching render target six times a cube |
+| Depth copies for soft particles and SSAO | 2.2% | `CopyDepthbuffer`, mostly driver |
+| Posed MD5 bounds | 2.0% | every animated model is skinned twice more a frame for its bounds: once in the game tic, once for the presentation pose |
+| Static buffers re-specified for per-frame geometry | 1.8% | animated meshes and effects get a `glBufferData` each frame through `R_CreateAmbientCache` |
+| Faded-decal pass | 1.0% | fixed, below |
+| OpenAL (its own thread) | 4.5% | |
+
+**Fixed: the faded-decal pass.** Every view, every decal on every entity in
+view zeroed its vertex map, copied each vertex onto itself and remapped its
+indexes, though a decal only changes when a triangle reaches its stay time or
+a winding is added. A decal now records whether every vertex is referenced
+(set by the pass, cleared by any addition) and its oldest triangle's start
+time; while both say nothing can go, the pass returns at once. The pass it
+skips would keep every triangle, move no vertex and leave the geometry flags
+alone, so the result is exact. In the combat scene the pass fell from 4.9% to
+0.9% of the scene front end (`RenderScene`), and per decal drawn it is 8.8
+times cheaper. `r_decalFadeEarlyOut 0` runs the full pass on every decal.
+
+**Measured and set aside: a framebuffer per cube face.** Giving each face of
+a cube target its own framebuffer, attached once, made a face a bind instead
+of a re-attachment. With the static cache off in hub2 (every cube redrawn
+every frame) binding cost 0.62 of the caster drawing with it and 0.46
+without: NVIDIA's driver charges for the render-target switch itself, and
+six switches a cube remain. The change was reverted. The way to recover the
+2.7% is fewer switches: all six faces in one target (layered rendering or a
+cube atlas).
+
+**Audio.** Per-thread CPU in hub2: the OpenAL mixer takes about 12% of a core
+with a still camera and 16% while the view turns, 6% with
+`s_useEAXReverb 0`. The four reverb slots run on silence too (the scene had
+no audible voices), and turning re-sends each slot's panning every frame. Off
+the main thread, so not a frame-rate cost on this machine, but a power and
+low-core-count one.
+
+Follow-ups, in order of measured share: the BSE particle walk and sprite
+evaluation; render-target switches for point cubes; the per-frame static
+buffers for geometry that lives one frame; the double skinning for posed
+bounds; the depth-copy framebuffer attach and detach; idle reverb slots.
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;

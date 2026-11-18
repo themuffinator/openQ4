@@ -7,6 +7,18 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Bullet holes and blood splats cost less to keep, 18 November 2026
+
+- **Less work per frame in long fights.** Every frame, each decal in view
+  (bullet holes, scorch marks, blood) was checked for faded triangles and
+  rebuilt even when nothing had faded. A decal now skips that until its oldest
+  part is due to fade or something is added to it. In a busy stock battle this
+  took the check from about a twentieth of the scene's setup work to under a
+  hundredth. Decals look and fade exactly as before.
+- **What to do.** Replace the renderer modules. `r_decalFadeEarlyOut 0` runs
+  the old check on every decal, for comparison.
+- Details: [performance report, section 15](performance-report.md#15-cpu-profile-of-the-stock-combat-and-hub2-scenes-fps-08-evidence-18-november-2026).
+
 ## The Awakening's turret alarms stop, and the title menu's descriptions switch cleanly (#230, #228), 18 November 2026
 
 - **The dropship turret's lock alarm stops when it should.** In The
