@@ -7,6 +7,36 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The Awakening's turret alarms stop, and the title menu's descriptions switch cleanly (#230, #228), 18 November 2026
+
+- **The dropship turret's lock alarm stops when it should.** In The
+  Awakening's air assault, the missile launcher's seek and lock tones and the
+  pulse cannon's overheat alarm are looping sounds, but they were started like
+  gunshots and never stopped. Every target you locked on to and every jam
+  added another copy that played forever, until they filled the turret's
+  sound slots: the alarm droned over the fight and your own guns went quiet,
+  firing only now and then. Each tone now plays once and follows the lock:
+  seeking, then locked, then silent when the target is gone or you switch
+  weapons. The overheat alarm sounds only while the cannon is jammed and you
+  are in the seat, and starts as soon as sustained fire leaves it room.
+- **Menu descriptions switch at once and stay readable.** The line under the
+  title menu that explains the highlighted item faded out over 300 ms while
+  the next one appeared, so sweeping down the menu stacked half-faded
+  sentences. It now switches instantly and sits on a dark backing, so it
+  reads over every backdrop scene.
+- **What to do.** Nothing. Replace the client and the single-player game
+  module together.
+- Evidence: headless m03 probes (`g_debugVehicle 1`, `s_showStartSound 1`,
+  muted): across three lock cycles the seek tone starts on one vehicle
+  channel, the lock tone replaces it, and it stops when the target is removed
+  and when the pulse cannon is selected; through two bursts of sustained fire
+  every jam starts the alarm on its own channel and every cool-down stops it,
+  and a jam that met a full emitter started the alarm once a slot freed.
+  Leaving the seat stops both through `ActivateParts( false )`, checked in
+  code, not in a probe. Title captures 40 ms and 120 ms after a focus change
+  show only the new item's sentence. `openq4-ui-retained-screens-menus`,
+  `-pointer-reach` and `-optics` pass.
+
 ## More texture pack formats, and an option to keep big packs in memory, 18 November 2026
 
 - **More DDS files load.** BC1 and BC3 (DXT1/DXT5) files saved with a DX10
