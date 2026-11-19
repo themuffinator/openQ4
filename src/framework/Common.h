@@ -207,6 +207,10 @@ int					openQ4_GetActiveToolFlags( int flags );
 bool				openQ4_IsAnyToolActive( void );
 void				openQ4_ToolPrint( const char *text );
 bool				openQ4_ShouldCacheEntityDefMedia( bool noCaching );
+// Engine only: switches the single-player campaign's game directories at the
+// menu without reloading the engine (idCommonLocal::RemountCampaign). False
+// when it failed part way and the caller must reload the engine instead.
+bool				Com_RemountCampaign( const char *gameDir, const char *gameBase );
 class idCommon {
 public:
 	virtual						~idCommon(void) {}

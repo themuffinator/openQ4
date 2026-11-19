@@ -166,6 +166,15 @@ static bool VK_Image_GetFormatInfo( const idImageOpts &opts,
 			info.bytesPerBlock = 16;
 			info.blockDim = 4;
 			break;
+		case FMT_BC6H_UF16:
+		case FMT_BC6H_SF16:
+			// textureCompressionBC covers BC6H with BC7, so the loaders' BPTC
+			// gates (glConfig.bptcTextureCompressionAvailable) apply unchanged;
+			// alpha samples as 1.0, as RGBA16F's opaque alpha does
+			info.format = opts.format == FMT_BC6H_SF16 ? VK_FORMAT_BC6H_SFLOAT_BLOCK : VK_FORMAT_BC6H_UFLOAT_BLOCK;
+			info.bytesPerBlock = 16;
+			info.blockDim = 4;
+			break;
 		case FMT_ALPHA:
 			// alpha in the red channel: RGB=1, A=R
 			info.format = VK_FORMAT_R8_UNORM;

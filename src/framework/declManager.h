@@ -480,6 +480,16 @@ public:
 
 extern idDeclManager *		declManager;
 
+// Engine only: a campaign remount (idCommonLocal::RemountCampaign) changes the
+// search path under a running engine. ReleaseModuleDecls frees the decls the
+// game module allocated before it unloads; BeginRemount, after the filesystem
+// restart, detaches every decl and registers the engine's decl folders again so
+// the new game's files claim them; FinishRemount, once the game module has
+// registered its own, settles the decls no file defines any more.
+void						DeclManager_ReleaseModuleDecls( void );
+void						DeclManager_BeginRemount( void );
+void						DeclManager_FinishRemount( void );
+
 template< declType_t type >
 ID_INLINE void idListDecls_f( const idCmdArgs &args ) {
 	declManager->ListType( args, type );

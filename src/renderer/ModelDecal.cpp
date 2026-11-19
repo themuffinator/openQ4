@@ -32,6 +32,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "tr_local.h"
 #include "Model_local.h"
 
+static idCVar r_decalFadeEarlyOut( "r_decalFadeEarlyOut", "1", CVAR_RENDERER | CVAR_BOOL,
+	"skip the per-view faded-decal pass for a decal with nothing to remove yet; 0 runs the pass on every decal, for comparison" );
+
 namespace {
 
 void R_WriteDrawVertToDemo( idDemoFile *f, const idDrawVert &vert ) {
@@ -140,6 +143,8 @@ idRenderModelDecal::idRenderModelDecal( void ) {
 	tri.indexes = indexes;
 	material = NULL;
 	nextDecal = NULL;
+	compacted = false;
+	oldestIndexStartTime = 0.0f;
 }
 
 /*
@@ -313,6 +318,7 @@ void idRenderModelDecal::AddWinding( const idWinding &w, const idMaterial *decal
 				tri.numIndexes + ( windingPointCount - 2 ) * 3 < MAX_DECAL_INDEXES ) {
 
 		material = decalMaterial;
+		compacted = false;
 
 		// add to this decal
 		invFadeDepth = -1.0f / fadeDepth;
@@ -547,10 +553,18 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 	minTime = time - decalInfo.stayTime;
 	geometryChanged = false;
 
+	// every triangle starts after oldestIndexStartTime and every vertex is
+	// referenced: the pass below would keep all of it and move nothing
+	if ( decals->compacted && decals->oldestIndexStartTime > (float)minTime && r_decalFadeEarlyOut.GetBool() ) {
+		return decals;
+	}
+
+	float oldestKept = idMath::INFINITY;
 	newNumIndexes = 0;
 	for ( i = 0; i < decals->tri.numIndexes; i += 3 ) {
 		if ( decals->indexStartTime[i] > (float)minTime ) {
 			// keep this triangle
+			oldestKept = Min( oldestKept, decals->indexStartTime[i] );
 			if ( newNumIndexes != i ) {
 				for ( j = 0; j < 3; j++ ) {
 					decals->tri.indexes[newNumIndexes+j] = decals->tri.indexes[i+j];
@@ -612,6 +626,8 @@ idRenderModelDecal *idRenderModelDecal::RemoveFadedDecals( idRenderModelDecal *d
 		decals->tri.facePlanesCalculated = false;
 	}
 
+	decals->compacted = true;
+	decals->oldestIndexStartTime = oldestKept;
 	return decals;
 }
 
@@ -770,6 +786,7 @@ bool idRenderModelDecal::ReadFromDemoFile( idDemoFile *f ) {
 	tri.verts = verts;
 	tri.indexes = indexes;
 	material = NULL;
+	compacted = false;
 
 	if ( f == NULL || f->ReadInt( numDecals ) != sizeof( numDecals ) ) {
 		return R_RejectDecalDemo( f, "truncated decal count" );

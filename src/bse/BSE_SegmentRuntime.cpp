@@ -41,7 +41,49 @@ rvParticle* AllocateParticleArray(int particleType, int count) {
 	}
 }
 
-ID_INLINE void InsertByEndTime(rvParticle*& head, rvParticle* particle) {
+}
+
+int BSE_ParticleTypeSize(int particleType) {
+	switch (particleType) {
+	case PTYPE_LINE:
+		return static_cast<int>(sizeof(rvLineParticle));
+	case PTYPE_ORIENTED:
+		return static_cast<int>(sizeof(rvOrientedParticle));
+	case PTYPE_DECAL:
+		return static_cast<int>(sizeof(rvDecalParticle));
+	case PTYPE_MODEL:
+		return static_cast<int>(sizeof(rvModelParticle));
+	case PTYPE_LIGHT:
+		return static_cast<int>(sizeof(rvLightParticle));
+	case PTYPE_ELECTRICITY:
+		return static_cast<int>(sizeof(rvElectricityParticle));
+	case PTYPE_LINKED:
+		return static_cast<int>(sizeof(rvLinkedParticle));
+	case PTYPE_ORIENTEDLINKED:
+		return static_cast<int>(sizeof(sdOrientedLinkedParticle));
+	case PTYPE_DEBRIS:
+		return static_cast<int>(sizeof(rvDebrisParticle));
+	default:
+		return static_cast<int>(sizeof(rvSpriteParticle));
+	}
+}
+
+namespace {
+// Insert after every particle that ends strictly earlier, so the list stays in
+// end-time order with equal end times newest first.
+ID_INLINE void InsertByEndTime(rvParticle*& head, rvParticle*& tail, float& tailEnd, rvParticle* particle) {
+	// openQ4: an emitter's newest particle usually ends last; the walk below would
+	// pass every particle in the list to append it, so append at the tail directly,
+	// comparing with the tail's end time as the segment keeps it. Only a strictly
+	// later end time may skip the walk: an equal one goes before.
+	if (tail && bse_particleListEarlyOut.GetBool() && particle->GetEndTime() > tailEnd) {
+		particle->SetNext(NULL);
+		tail->SetNext(particle);
+		tail = particle;
+		tailEnd = particle->GetEndTime();
+		return;
+	}
+
 	rvParticle* prev = NULL;
 	rvParticle* cur = head;
 	while (cur && particle->GetEndTime() > cur->GetEndTime()) {
@@ -54,6 +96,10 @@ ID_INLINE void InsertByEndTime(rvParticle*& head, rvParticle* particle) {
 	}
 	else {
 		head = particle;
+	}
+	if (!cur) {
+		tail = particle;
+		tailEnd = particle->GetEndTime();
 	}
 }
 
@@ -156,6 +202,8 @@ rvParticle* rvSegment::InitParticleArray(rvBSE* effect) {
 	mParticles = NULL;
 	mFreeHead = NULL;
 	mUsedHead = NULL;
+	mUsedTail = NULL;
+	mUsedCount = 0;
 
 	const rvSegmentTemplate* st = GetSegmentTemplate();
 	const int requestedCount = effect->GetLooping() ? mLoopParticleCount : mParticleCount;
@@ -193,6 +241,8 @@ rvParticle* rvSegment::InitParticleArray(rvBSE* effect) {
 
 	mFreeHead = mParticles;
 	mUsedHead = NULL;
+	mUsedTail = NULL;
+	mUsedCount = 0;
 	return mParticles;
 }
 
@@ -229,6 +279,38 @@ rvParticle* rvSegment::GetFreeParticle(rvBSE* effect) {
 	}
 
 	return particle;
+}
+
+void rvSegment::LinkUsedParticle(rvSegmentTemplate* st, rvParticle* particle) {
+	const int type = st->mParticleTemplate.GetType();
+	const bool linked = (type == PTYPE_LINKED || type == PTYPE_ORIENTEDLINKED);
+	if (st->GetTemporary()) {
+		mUsedHead = particle;
+		mUsedTail = particle;
+		mUsedTailEnd = particle->GetEndTime();
+		mUsedCount = 1;
+		particle->SetNext(NULL);
+	}
+	else if (linked || !st->GetComplexParticle()) {
+		if (mUsedTail && st->GetInfiniteDuration()) {
+			// Render pushes a constant segment's end times on each frame.
+			mUsedTailEnd = mUsedTail->GetEndTime();
+		}
+		InsertByEndTime(mUsedHead, mUsedTail, mUsedTailEnd, particle);
+		++mUsedCount;
+	}
+	else {
+		particle->SetNext(mUsedHead);
+		mUsedHead = particle;
+		if (!mUsedTail) {
+			mUsedTail = particle;
+			mUsedTailEnd = particle->GetEndTime();
+		}
+		++mUsedCount;
+	}
+	if (mUsedHead == particle) {
+		mUsedHeadEnd = particle->GetEndTime();
+	}
 }
 
 rvParticle* rvSegment::SpawnParticle(rvBSE* effect, rvSegmentTemplate* st, float birthTime, const idVec3& initOffset, const idMat3& initAxis) {
@@ -269,19 +351,7 @@ rvParticle* rvSegment::SpawnParticle(rvBSE* effect, rvSegmentTemplate* st, float
 			fraction);
 	}
 
-	const int type = st->mParticleTemplate.GetType();
-	const bool linked = (type == PTYPE_LINKED || type == PTYPE_ORIENTEDLINKED);
-	if (st->GetTemporary()) {
-		mUsedHead = particle;
-		particle->SetNext(NULL);
-	}
-	else if (linked || !st->GetComplexParticle()) {
-		InsertByEndTime(mUsedHead, particle);
-	}
-	else {
-		particle->SetNext(mUsedHead);
-		mUsedHead = particle;
-	}
+	LinkUsedParticle(st, particle);
 
 	return particle;
 }
@@ -330,19 +400,7 @@ void rvSegment::SpawnParticles(rvBSE* effect, rvSegmentTemplate* st, float birth
 				fraction);
 		}
 
-		const int type = st->mParticleTemplate.GetType();
-		const bool linked = (type == PTYPE_LINKED || type == PTYPE_ORIENTEDLINKED);
-		if (st->GetTemporary()) {
-			mUsedHead = particle;
-			particle->SetNext(NULL);
-		}
-		else if (linked || !st->GetComplexParticle()) {
-			InsertByEndTime(mUsedHead, particle);
-		}
-		else {
-			particle->SetNext(mUsedHead);
-			mUsedHead = particle;
-		}
+		LinkUsedParticle(st, particle);
 	}
 }
 
@@ -350,6 +408,37 @@ void rvSegment::UpdateSimpleParticles(float time) {
 	rvSegmentTemplate* st = GetSegmentTemplate();
 	if (!st) {
 		mActiveCount = 0;
+		return;
+	}
+
+	// openQ4: a simple segment's list is in end-time order (LinkUsedParticle), so its
+	// expired particles are the ones at the head, and once one particle is live so is
+	// every particle after it. Retire the head and stop there: walking the live
+	// particles only to count them cost a cache miss each. Only electricity
+	// overrides Update, and its segments are complex, so each live particle counts
+	// one, the list's length. The segment keeps its head's end time (simple
+	// particles never change theirs), so a list with nothing to retire is not
+	// touched at all.
+	if (bse_particleListEarlyOut.GetBool()) {
+		if (mUsedHead && !(mUsedHeadEnd - BSE_TIME_EPSILON > time)) {
+			rvParticle* p = mUsedHead;
+			while (p && !(p->GetEndTime() - BSE_TIME_EPSILON > time)) {
+				rvParticle* next = p->GetNext();
+				p->SetNext(mFreeHead);
+				p->Destroy();
+				mFreeHead = p;
+				--mUsedCount;
+				p = next;
+			}
+			mUsedHead = p;
+			if (p) {
+				mUsedHeadEnd = p->GetEndTime();
+			}
+			else {
+				mUsedTail = NULL;
+			}
+		}
+		mActiveCount = mUsedCount;
 		return;
 	}
 
@@ -373,8 +462,16 @@ void rvSegment::UpdateSimpleParticles(float time) {
 			p->SetNext(mFreeHead);
 			p->Destroy();
 			mFreeHead = p;
+			--mUsedCount;
 		}
 		p = next;
+	}
+	mUsedTail = prev;
+	if (mUsedHead) {
+		mUsedHeadEnd = mUsedHead->GetEndTime();
+	}
+	if (prev) {
+		mUsedTailEnd = prev->GetEndTime();
 	}
 }
 
@@ -391,9 +488,13 @@ void rvSegment::UpdateGenericParticles(rvBSE* effect, rvSegmentTemplate* st, flo
 	rvParticle* p = mUsedHead;
 	mActiveCount = 0;
 
+	const int prefetchBytes = bse_particlePrefetch.GetBool() ? BSE_ParticleTypeSize(mParticleType) : 0;
 	while (p) {
 		rvParticle* next = p->GetNext();
 		bool remove = false;
+		if (next && prefetchBytes > 0) {
+			BSE_PrefetchBytes(next, prefetchBytes);
+		}
 
 		if (infinite) {
 			p->RunPhysics(effect, st, time);
@@ -430,6 +531,7 @@ void rvSegment::UpdateGenericParticles(rvBSE* effect, rvSegmentTemplate* st, flo
 			p->SetNext(mFreeHead);
 			p->Destroy();
 			mFreeHead = p;
+			--mUsedCount;
 		}
 		else {
 			mActiveCount += p->Update(st->GetParticleTemplate(), time);
@@ -437,6 +539,20 @@ void rvSegment::UpdateGenericParticles(rvBSE* effect, rvSegmentTemplate* st, flo
 		}
 
 		p = next;
+	}
+
+	// The last particle kept is the tail, unless a smoke trail fed this segment
+	// behind the walk.
+	rvParticle* tail = prev ? prev : mUsedHead;
+	while (tail && tail->GetNext()) {
+		tail = tail->GetNext();
+	}
+	mUsedTail = tail;
+	if (tail) {
+		mUsedTailEnd = tail->GetEndTime();
+	}
+	if (mUsedHead) {
+		mUsedHeadEnd = mUsedHead->GetEndTime();
 	}
 }
 

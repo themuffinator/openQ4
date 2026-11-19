@@ -386,12 +386,57 @@ static void TestRoomRolloff() {
 	CHECK( std::isfinite( infinite ) && infinite >= 0.0f && infinite < 1.0e-30f );
 }
 
+// s_reverbIdleSlots and s_reverbPanStep (openQ4)
+static void TestSlotEconomy() {
+	soundReverbEAX_t eax;
+	SoundReverb_DefaultEAX( eax );
+	soundReverbEFX_t efx;
+	SoundReverb_ConvertEAXToEFX( eax, efx );
+	// Generic: 1.49 s decay, HF ratio 0.83, LF 1.0, delays 7 ms + 11 ms
+	const int generic = SoundReverb_TailHoldMs( efx );
+	CHECK( generic >= 1490 * 3 / 2 + 18 + 250 && generic <= 1490 * 3 / 2 + 18 + 252 );
+	// the slowest band sets the hold
+	soundReverbEFX_t slowLow = efx;
+	slowLow.decayLFRatio = 2.0f;
+	CHECK( SoundReverb_TailHoldMs( slowLow ) > generic + 2000 );
+	// every retail preset is covered by the unknown-parameter hold
+	const int longest = SoundReverb_MaxTailHoldMs();
+	CHECK( longest >= 30000 && longest <= 31000 );
+	for ( const retailPreset_t &preset : retailPresets ) {
+		soundReverbEFX_t p;
+		SoundReverb_ConvertEAXToEFX( preset.eax, p );
+		const int hold = SoundReverb_TailHoldMs( p );
+		CHECK( hold > (int)( p.decayTime * 1500.0f ) && hold <= longest );
+	}
+	soundReverbEFX_t broken = efx;
+	broken.decayTime = std::nanf( "" );
+	broken.reflectionsDelay = INFINITY;
+	CHECK( SoundReverb_TailHoldMs( broken ) > 0 && SoundReverb_TailHoldMs( broken ) <= longest );
+
+	// pan steps: only a pan-only change under the step is held
+	soundReverbEFX_t turned = efx;
+	turned.reflectionsPan[0] = 0.03f;
+	turned.lateReverbPan[0] = 0.03f;
+	CHECK( SoundReverb_PanWithinStep( efx, efx, 0.0f ) );
+	CHECK( SoundReverb_PanWithinStep( efx, turned, 0.05f ) );
+	CHECK( !SoundReverb_PanWithinStep( efx, turned, 0.0f ) );
+	CHECK( !SoundReverb_PanWithinStep( efx, turned, 0.02f ) );
+	soundReverbEFX_t lateOnly = efx;
+	lateOnly.lateReverbPan[2] = 0.06f;
+	CHECK( !SoundReverb_PanWithinStep( efx, lateOnly, 0.05f ) );
+	soundReverbEFX_t louder = turned;
+	louder.gain = efx.gain * 0.5f;
+	CHECK( !SoundReverb_PanWithinStep( efx, louder, 0.5f ) );
+	CHECK( !SoundReverb_PanWithinStep( efx, turned, std::nanf( "" ) ) );
+}
+
 int main() {
 	TestRanges();
 	TestConversion();
 	TestPlanner();
 	TestSends();
 	TestRoomRolloff();
+	TestSlotEconomy();
 	std::printf( "SoundReverbCore: %d checks passed\n", checks );
 	return 0;
 }

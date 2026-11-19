@@ -63,6 +63,7 @@ PFN_glNamedFramebufferDrawBuffer	glNamedFramebufferDrawBuffer = NULL;
 PFN_glNamedFramebufferDrawBuffers	glNamedFramebufferDrawBuffers = NULL;
 PFN_glNamedFramebufferReadBuffer	glNamedFramebufferReadBuffer = NULL;
 PFN_glNamedFramebufferTexture		glNamedFramebufferTexture = NULL;
+PFN_glFramebufferTexture			glFramebufferTexture = NULL;
 PFN_glCheckNamedFramebufferStatus	glCheckNamedFramebufferStatus = NULL;
 PFN_glTextureParameteri				glTextureParameteri = NULL;
 PFN_glTextureStorage2D				glTextureStorage2D = NULL;

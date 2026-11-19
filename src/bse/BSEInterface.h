@@ -27,6 +27,8 @@ extern	idCVar				bse_debris;
 extern	idCVar				bse_scale;
 extern	idCVar				bse_singleEffect;
 extern	idCVar				bse_maxParticles;
+extern	idCVar				bse_particleListEarlyOut;
+extern	idCVar				bse_particlePrefetch;
 
 // Temporary BSE frame counters (spawned/serviced/rendered), reset each StartFrame.
 extern int					bse_frameSpawned;

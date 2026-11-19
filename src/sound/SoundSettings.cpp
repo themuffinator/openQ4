@@ -173,7 +173,9 @@ struct SoundSettingsAccess {
 			if (!query) return false;
 			ALint bound=-1; SOUND_READ_CALL(query(c.slot,AL_EFFECTSLOT_EFFECT,&bound));
 			SOUND_READ_TEST(alGetError()==AL_NO_ERROR);
-			if (bound!=static_cast<ALint>(c.efx?c.effect:0)) return false;
+			// s_reverbIdleSlots parks an unfed slot 0 on the null effect; it still owns c.effect
+			const bool idle=c.efx && bound==0 && h.IsReverbSlotIdle(0);
+			if (bound!=static_cast<ALint>(c.efx?c.effect:0) && !idle) return false;
 		} else if (!c.slot && c.efx && effectProof) return false;
 		if (c.efx && (!c.filters || !c.effect)) return false;
 		if (c.effect && effectProof) {

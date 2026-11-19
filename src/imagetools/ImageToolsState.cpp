@@ -101,6 +101,8 @@ int BitsForFormat( textureFormat_t format ) {
 		case FMT_DXT1:		return 4;
 		case FMT_DXT5:		return 8;
 		case FMT_BC7:		return 8;
+		case FMT_BC6H_UF16:	return 8;
+		case FMT_BC6H_SF16:	return 8;
 		case FMT_ETC2_RGB8:	return 4;
 		case FMT_ETC2_RGBA8:	return 8;
 		case FMT_EAC_RG11:	return 8;
@@ -133,6 +135,8 @@ int BytesPerBlockForFormat( textureFormat_t format ) {
 		case FMT_ETC2_RGB8:		return 8;
 		case FMT_DXT5:			return 16;
 		case FMT_BC7:			return 16;
+		case FMT_BC6H_UF16:		return 16;
+		case FMT_BC6H_SF16:		return 16;
 		case FMT_ETC2_RGBA8:	return 16;
 		case FMT_EAC_RG11:		return 16;
 		default:				return 0;

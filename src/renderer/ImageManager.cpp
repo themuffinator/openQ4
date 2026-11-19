@@ -1588,7 +1588,7 @@ void idImageManager::Init() {
 
 	cmdSystem->AddCommand( "reloadImages", R_ReloadImages_f, CMD_FL_RENDERER, "reloads images" );
 	cmdSystem->AddCommand( "listImages", R_ListImages_f, CMD_FL_RENDERER, "lists images" );
-	cmdSystem->AddCommand( "imageDDSSelfTest", R_ImageDDSSelfTest_f, CMD_FL_RENDERER, "validates DDS naming, BC7 metadata handling and DXT3 decoding" );
+	cmdSystem->AddCommand( "imageDDSSelfTest", R_ImageDDSSelfTest_f, CMD_FL_RENDERER, "validates DDS naming, BC7 and BC6H metadata handling and DXT3 decoding" );
 	cmdSystem->AddCommand( "combineCubeImages", R_CombineCubeImages_f, CMD_FL_RENDERER, "combines six images for roq compression" );
 
 	// swallow the born-modified state of the reduction cvars so the first

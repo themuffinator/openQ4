@@ -171,6 +171,22 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     require(late, "cryoProgram.Icmp( awakeningM08Version4 ) == 0", "LateMissions.inl")
     for line, speaker, reply in CRYOFAC_REPLIES:
         require(late, f'aiSpeakWait( ${speaker}, \\"lipsync_{reply}\\" );', "LateMissions.inl v4 edits")
+    # Cryofac's opening: the squad and Navajas's first mark move out of the
+    # parked speeders, only from the recovered map's own placements.
+    for name, before, after in (("tak", "-2288 -6432 768", "-2224 -6480 768"),
+                                ("navajas", "-2048 -6456 768", "-2096 -6470 768"),
+                                ("navajas_intropos_1", "-2120 -6352 768", "-2120 -6408 768")):
+        if not re.search(r'\{\s*"%s",\s*"%s",\s*"%s"\s*\}' % (name, before, after), late):
+            raise AssertionError(f"LateMissions.inl must move Cryofac's {name} from {before} to {after}")
+    # only Tak opens the cryodoors: their seal panels take no input
+    require(late, '!idStr::Icmp( args.GetString( "gui" ), "guis/common/strogg/generic_seal.gui" )', "Cryofac seals")
+    require(late, 'args.SetBool( "gui_noninteractive", true );', "Cryofac seals")
+    require(late, "Awakening_CorrectCryofacEntity( args );", "Awakening_DirectLateMissionEntity")
+    # the second ice wall's meshes pass napalm on to its buried damage volume
+    details = read(ROOT / "src/game/awakening/LateMissionDetails.inl")
+    require(details, 'gameLocal.FindEntity( "door_ice_damage_2" )', "Awakening_StartCryofacDetails")
+    require(details, "mesh->SetDamageEntity( volume );", "Awakening_StartCryofacDetails")
+    require(details, "Awakening_StartCryofacDetails();", "Awakening_StartLateMissionDetails")
     require(read(ROOT / "src/game/Misc.cpp"),
             'sound = Awakening_RecordedLine( spawnArgs.GetString( "snd_radiochatter", "" ) );', "idFuncRadioChatter")
     # a radio line nothing declares stays silent instead of sounding the missing-sample tone

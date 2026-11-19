@@ -11480,9 +11480,12 @@ void Cmd_OpenQ4ViewReport_f( const idCmdArgs &args ) {
 	}
 	const idAngles angles = view->viewaxis.ToAngles();
 	const rvWeapon *weapon = player->weapon;
-	gameLocal.Printf( "openq4_viewReport: %d origin %s angles %s fov %.1f %.1f vehicle %d god %d weapon %s ammo %d clip %d\n", gameLocal.time,
+	// "focus" names the entity whose interactive GUI the crosshair is on, or "none"
+	const idEntity *focusGui = player->GetFocusGuiEntity();
+	gameLocal.Printf( "openq4_viewReport: %d origin %s angles %s fov %.1f %.1f vehicle %d god %d weapon %s ammo %d clip %d focus %s\n", gameLocal.time,
 		view->vieworg.ToString( 1 ), angles.ToString( 1 ), view->fov_x, view->fov_y, player->IsInVehicle() ? 1 : 0, player->godmode ? 1 : 0,
-		weapon ? weapon->spawnArgs.GetString( "classname" ) : "none", weapon ? weapon->AmmoAvailable() : -1, weapon ? weapon->AmmoInClip() : -1 );
+		weapon ? weapon->spawnArgs.GetString( "classname" ) : "none", weapon ? weapon->AmmoAvailable() : -1, weapon ? weapon->AmmoInClip() : -1,
+		focusGui != NULL ? focusGui->GetName() : "none" );
 }
 
 /*

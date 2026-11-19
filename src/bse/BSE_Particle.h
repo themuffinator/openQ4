@@ -8,6 +8,12 @@
 #include "../renderer/ModelManager.h"
 #include "../renderer/RenderWorld.h"
 
+#if defined( _MSC_VER ) && ( defined( _M_X64 ) || defined( _M_IX86 ) )
+#include <xmmintrin.h>
+#elif defined( _MSC_VER ) && defined( _M_ARM64 )
+#include <intrin.h>
+#endif
+
 #define BSE_FUTURE				( 0.016f )			// How far into the future to check for particle spawning
 #define BSE_TIME_EPSILON		( 0.002f )			// Edge condition checks
 #define BSE_PHYSICS_TIME_SAMPLE	( 0.1f )			// Number of seconds to check the position delta for physics
@@ -41,7 +47,29 @@ enum
 	PTYPE_COUNT
 };
 
-// Defined classes 
+// openQ4: particles live in per-segment arrays but are visited through linked lists,
+// so each one is a cache miss when its frame comes round. Asking for the next one
+// while the current one is worked on overlaps the two (bse_particlePrefetch).
+ID_INLINE void BSE_PrefetchBytes( const void *address, int bytes ) {
+	const uintptr_t end = reinterpret_cast<uintptr_t>( address ) + static_cast<uintptr_t>( bytes );
+	for ( uintptr_t line = reinterpret_cast<uintptr_t>( address ) & ~static_cast<uintptr_t>( 63 ); line < end; line += 64 ) {
+		const char *p = reinterpret_cast<const char *>( line );
+#if defined( _MSC_VER ) && ( defined( _M_X64 ) || defined( _M_IX86 ) )
+		_mm_prefetch( p, _MM_HINT_T0 );
+#elif defined( _MSC_VER ) && defined( _M_ARM64 )
+		__prefetch( p );
+#elif defined( __GNUC__ ) || defined( __clang__ )
+		__builtin_prefetch( p );
+#else
+		(void)p;
+#endif
+	}
+}
+
+// Size of one particle of a PTYPE_* in its segment's array.
+int BSE_ParticleTypeSize( int particleType );
+
+// Defined classes
 class rvParticle;
 class rvSpriteParticle;
 class rvLineParticle;

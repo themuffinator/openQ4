@@ -184,6 +184,8 @@ public:
 	// Output changes are qualified by SoundOutputRecoveryTest; here they only gate Update.
 	bool outputUnchanged = true, outputRecovery = false;
 	bool CheckOutput() { return outputUnchanged; }
+	// Reverb slots are qualified by SoundReverbCoreTest; waking them before play is a no-op here.
+	void NoteReverbSends() {}
 };
 static bool outputConnected = true;
 struct { struct { bool IsOutputConnected() const { return outputConnected; } } hardware; } soundSystemLocal;

@@ -46,8 +46,10 @@ openQ4 never loads the expansion's original game DLL, or game modules that older
 
 ## Saves and switching
 
-- Each campaign keeps its settings, saves and caches in its own folder inside openQ4's save folder (`fs_savepath`): `baseoq4` for Quake 4 and `q4xbase` for The Awakening.
-- Switching campaigns reloads the game's files, so nothing from The Awakening carries over into Quake 4, Arena or multiplayer. Arena and multiplayer always run on stock Quake 4 content; the expansion's multiplayer changes are not supported.
+- Each campaign keeps its saves and caches in its own folder inside openQ4's save folder (`fs_savepath`): `baseoq4` for Quake 4 and `q4xbase` for The Awakening. Its settings file is kept there too.
+- **Switching campaigns in the menus takes two to four seconds and keeps the game running.** Choosing **New Game** for the other campaign opens its difficulty page straight away; the game swaps the campaign's files in behind it, which holds the page still for a moment and restarts the menu music. The window, the menus and your settings stay as they are: the settings you switch with carry over to the other campaign.
+- The switch loads the other campaign's files in place of the current one's, so nothing from The Awakening carries over into Quake 4, Arena or multiplayer. Arena and multiplayer always run on stock Quake 4 content; the expansion's multiplayer changes are not supported.
+- From a level, a demo or a multiplayer game, and when entering multiplayer, openQ4 still restarts its engine to change campaigns, which takes longer.
 - When you upgrade openQ4, keep your existing save folders. Saves from older openQ4 versions that this version can load stay with their own campaign. Update openQ4 as a whole package, never just the executable or one game module.
 
 ## Known issues
@@ -93,7 +95,7 @@ The console variable `fs_awakeningActive` reads `1` while the expansion is loade
 
 ## Console commands and settings
 
-These console commands follow the same rules as the menus, including the reload when you switch campaigns.
+These console commands follow the same rules as the menus, including how they switch campaigns.
 
 | Command or setting | What it does |
 |---|---|
@@ -106,6 +108,7 @@ These console commands follow the same rules as the menus, including the reload 
 | `fs_awakeningpath` | Where The Awakening's content lives, if not next to `q4base`. Saved; takes effect after a restart. |
 | `ui_chaptersQuake4`, `ui_chaptersAwakening` | Where each campaign's chapter unlocks are saved. You never need to set them by hand. |
 | `fs_awakeningActive` | **Not in 0.14.1:** read-only; `1` while The Awakening's files are loaded. |
+| `com_campaignRemount` | **Not in 0.14.1:** `1` (default) switches campaigns in place at the menu; `0` restarts the engine for every switch, as 0.14.1 does. |
 
 ## Credits
 

@@ -353,17 +353,55 @@ void Awakening_PrepareLateMission( idDict &worldArgs ) {
 	gameLocal.Printf( "Awakening M09: mission corrections v4 enabled\n" );
 }
 
+// True on Cryofac while it runs one of the corrected programs above.
+static bool Awakening_CorrectedCryofac() {
+	idStr map = gameLocal.GetMapName();
+	map.BackSlashesToSlashes();
+	map.StripFileExtension();
+	if ( map.Icmp( "maps/game/m08_cryofac" ) != 0 ) { return false; }
+	const function_t *main = gameLocal.program.FindFunction( "main" );
+	idStr cryoProgram = main ? gameLocal.program.GetFilename( main->filenum ) : "";
+	cryoProgram.BackSlashesToSlashes();
+	return cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 ||
+		cryoProgram.Icmp( awakeningM08Version3 ) == 0 || cryoProgram.Icmp( awakeningM08Version4 ) == 0;
+}
+
+// Cryofac placements the recovered map gets wrong. Each repair names the
+// value it replaces, so a custom map that moved the entity keeps its own.
+static void Awakening_CorrectCryofacEntity( idDict &args ) {
+	const idStr name = args.GetString( "name" );
+	// Three speeders were parked over the squad's opening marks. Tak and
+	// Navajas spawned inside two of them, and Navajas's first mark is 22 units
+	// inside the third: he walked into it until the scripted-move watchdog
+	// gave up 30 seconds later, holding the whole introduction. Each moves to
+	// the nearest clear floor beside the same bike, keeping its facing.
+	struct relocation_t { const char *name; const char *before; const char *after; };
+	static const relocation_t relocations[] = {
+		{ "tak",				"-2288 -6432 768",	"-2224 -6480 768" },
+		{ "navajas",			"-2048 -6456 768",	"-2096 -6470 768" },
+		{ "navajas_intropos_1",	"-2120 -6352 768",	"-2120 -6408 768" },
+	};
+	for ( int i = 0; i < sizeof( relocations ) / sizeof( relocations[0] ); ++i ) {
+		if ( !name.Icmp( relocations[i].name ) && !idStr::Cmp( args.GetString( "origin" ), relocations[i].before ) ) {
+			args.Set( "origin", relocations[i].after );
+		}
+	}
+	// The cryodoors open from script (Tak's TakOpenDoor) or, for cryodoor 4,
+	// on approach - never from their seal panels, which target nothing: a
+	// player's press played the seal's "open" animation beside a shut door.
+	const bool cryodoorSeal = !name.Icmpn( "cryodoor_", 9 ) && name.Length() > 15 && !name.Right( 6 ).Icmp( "_panel" ) &&
+		!idStr::Icmp( args.GetString( "gui" ), "guis/common/strogg/generic_seal.gui" );
+	if ( cryodoorSeal && args.FindKey( "target" ) == NULL ) {
+		args.SetBool( "gui_noninteractive", true );
+	}
+}
+
 void Awakening_DirectLateMissionEntity( idDict &args ) {
 	if ( !Awakening_LateCampaignActive() ) { return; }
 	idStr map = gameLocal.GetMapName();
 	map.BackSlashesToSlashes();
 	map.StripFileExtension();
-	const function_t *main = gameLocal.program.FindFunction( "main" );
-	idStr cryoProgram = main ? gameLocal.program.GetFilename( main->filenum ) : "";
-	cryoProgram.BackSlashesToSlashes();
-	const bool correctedCryo = map.Icmp( "maps/game/m08_cryofac" ) == 0 &&
-		( cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 || cryoProgram.Icmp( awakeningM08Version3 ) == 0 ||
-		cryoProgram.Icmp( awakeningM08Version4 ) == 0 );
+	const bool correctedCryo = Awakening_CorrectedCryofac();
 	const char *finaleNamespace = gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ? "oq4_m09_v4::" :
 		gameLocal.program.FindFunction( "oq4_m09_v3::main" ) ? "oq4_m09_v3::" :
 		gameLocal.program.FindFunction( "oq4_m09_v2::main" ) ? "oq4_m09_v2::" : "oq4_m09_v1::";
@@ -426,6 +464,9 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 		if ( !idStr::Icmp( args.GetString( "requestDocking" ), "valkaryne_dock" ) ) {
 			args.Set( "requestDocking", va( "%svalkaryne_dock", finaleNamespace ) );
 		}
+	}
+	if ( g_awakeningLateMissions.GetBool() && correctedCryo ) {
+		Awakening_CorrectCryofacEntity( args );
 	}
 	if ( g_awakeningLateMissions.GetBool() && correctedCryo &&
 		!idStr::Icmp( args.GetString( "name" ), "trigger_once_85" ) &&

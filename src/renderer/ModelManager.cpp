@@ -653,7 +653,7 @@ void idRenderModelManagerLocal::ReloadModels( bool forceAll ) {
 			ID_TIME_T current;
 
 			fileSystem->ReadFile( model->Name(), NULL, &current );
-			if ( current <= model->Timestamp() ) {
+			if ( FS_SourceStampCurrent( current, model->Timestamp() ) ) {
 				continue;
 			}
 		}

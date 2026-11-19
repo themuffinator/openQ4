@@ -1200,6 +1200,9 @@ static idStr Common_BuildPlatformProfileConfigName( const char *profileName ) {
 	void						DetachBSE( void );
 	void						LoadGameDLL( void );
 	void						UnloadGameDLL( void );
+public:
+	bool						RemountCampaign( const char *gameDir, const char *gameBase );
+private:
 	void						FilterLangList( idStrList* list, idStr lang );
 
 	bool						com_fullyInitialized;
@@ -1226,6 +1229,8 @@ static idStr Common_BuildPlatformProfileConfigName( const char *profileName ) {
 	bool						gameShutdownAfterDeclsCalled;
 
 	idLangDict					languageDict;
+	uint64_t					languageDictHash = 0;		// content of languageDict when the retained UI last heard of it
+	bool						languageDictHashed = false;
 
 #ifdef ID_WRITE_VERSION
 	idCompressor *				config_compressor;
@@ -5048,6 +5053,118 @@ void Com_ReloadEngine_f( const idCmdArgs &args ) {
 	fileSystem->SetIsFileLoadingAllowed( false );
 }
 
+// The async thread must not search the global CVar registry while a game DLL is
+// registering its static CVars; see openQ4_ShouldUseSmoothSingleplayerSlowTime.
+static std::atomic<bool> openQ4_singleplayerGameModuleReady( false );
+
+/*
+=================
+idCommonLocal::RemountCampaign
+
+Switches the single-player campaign (Quake 4 and The Awakening, with or without
+a player's mod over it) in place, at the menu, instead of reloading the engine:
+the window, the renderer and its images, the sound device, the interfaces and
+the session stay up. What depends on the game directories is rebuilt:
+
+- the game module is shut down and unloaded, with the decls it allocated;
+- the filesystem mounts the new search path (fs_game, fs_game_base);
+- every decl is detached from its file and the decl folders are registered
+  again, so the new game's files define them exactly as at a fresh start
+  (DeclManager_BeginRemount), and decls in use parse again at once;
+- the language strings load again and the game module loads and initializes
+  (registering and claiming its own decls), then decls no file defines any
+  more are settled (DeclManager_FinishRemount);
+- images, models, interface files and sound samples the new search path
+  resolves differently are loaded again.
+
+Settings carry across: the config is written to the old game directory before
+the switch and to the new one after it, rather than replaying the new game's
+default.cfg and config over the player's current settings.
+
+False when it failed part way; the engine is then in no state to continue and
+the caller must reload it (reloadEngine) to finish the switch.
+=================
+*/
+bool idCommonLocal::RemountCampaign( const char *gameDir, const char *gameBase ) {
+	const idStr toGame = gameDir;
+	const idStr toBase = gameBase;
+	const idStr fromGame = fileSystem->GetActiveGameDir();
+	const int start = Sys_Milliseconds();
+	Printf( "CAMPAIGN_SWITCH begin from=%s to=%s base=%s\n", fromGame.c_str(), toGame.c_str(), toBase.c_str() );
+
+	cvarSystem->SetModifiedFlags( CVAR_ARCHIVE );
+	WriteConfiguration();
+
+	soundSystem->StopAllSounds();
+	Sound_PurgeSamplesForRemount();
+	const bool wasFileLoadingAllowed = fileSystem->GetIsFileLoadingAllowed();
+	fileSystem->SetIsFileLoadingAllowed( true );
+
+	int unloadMsec = 0, mountMsec = 0, declMsec = 0, gameMsec = 0, mediaMsec = 0;
+	try {
+		int phase = Sys_Milliseconds();
+		openQ4_singleplayerGameModuleReady.store( false, std::memory_order_release );
+		SetGameTimeScale( 1.0f );
+		// The one-shot lifecycle of ShutdownGame: the state is published before
+		// crossing into module code.
+		Com_SetGameModuleLoadPhase( GAME_MODULE_PHASE_GAME_SHUTDOWN );
+		if ( game != NULL && !gameShutdownCalled ) { gameShutdownCalled = true; game->Shutdown(); }
+		// cached collision polygons hold material decls, as in ShutdownGame
+		collisionModelManager->Shutdown();
+		// the module's decl objects go while its allocators and vtables exist
+		DeclManager_ReleaseModuleDecls();
+		Com_SetGameModuleLoadPhase( GAME_MODULE_PHASE_GAME_FINALIZE );
+		if ( game != NULL && !gameShutdownAfterDeclsCalled ) { gameShutdownAfterDeclsCalled = true; game->ShutdownAfterDecls(); }
+		UnloadGameDLL();
+		unloadMsec = Sys_Milliseconds() - phase;
+
+		phase = Sys_Milliseconds();
+		cvarSystem->SetCVarString( "fs_game", toGame.c_str() );
+		cvarSystem->SetCVarString( "fs_game_base", toBase.c_str() );
+		cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
+		fileSystem->Restart();
+		mountMsec = Sys_Milliseconds() - phase;
+
+		phase = Sys_Milliseconds();
+		DeclManager_BeginRemount();
+		InitLanguageDict( false, false );
+		declMsec = Sys_Milliseconds() - phase;
+
+		phase = Sys_Milliseconds();
+		LoadGameDLL();
+		DeclManager_FinishRemount();
+		gameMsec = Sys_Milliseconds() - phase;
+	}
+	catch ( idException &ex ) {
+		Warning( "The campaign switch to '%s' failed in phase '%s' (%s); reloading the engine to finish it",
+			toGame.c_str(), Com_GameModuleLoadPhaseName( Com_GetGameModuleLoadPhase() ), ex.error );
+		fileSystem->SetIsFileLoadingAllowed( wasFileLoadingAllowed );
+		return false;
+	}
+
+	// Media the new search path resolves to other files: images and models
+	// compare their source stamps, interface files their timestamps.
+	const int phase = Sys_Milliseconds();
+	cmdSystem->BufferCommandText( CMD_EXEC_NOW, "reloadImages\n" );
+	renderModelManager->ReloadModels( false );
+	uiManager->Reload( false );
+	mediaMsec = Sys_Milliseconds() - phase;
+
+	// the settings as they stand, now in the new game directory too
+	cvarSystem->SetModifiedFlags( CVAR_ARCHIVE );
+	WriteConfiguration();
+	fileSystem->SetIsFileLoadingAllowed( wasFileLoadingAllowed );
+
+	Printf( "CAMPAIGN_SWITCH end to=%s awakening=%d msec=%d (unload %d, mount %d, decls %d, game %d, media %d)\n",
+		fileSystem->GetActiveGameDir(), FS_AwakeningActive() ? 1 : 0, Sys_Milliseconds() - start,
+		unloadMsec, mountMsec, declMsec, gameMsec, mediaMsec );
+	return true;
+}
+
+bool Com_RemountCampaign( const char *gameDir, const char *gameBase ) {
+	return commonLocal.RemountCampaign( gameDir, gameBase );
+}
+
 /*
 =================
 Com_ReloadGameModule_f
@@ -5671,7 +5788,24 @@ void idCommonLocal::InitLanguageDict( bool applyStartupSysLang, bool allowAutoLa
 	fileSystem->FreeFileList(langFiles);
 
 	Sys_InitScanTable();
-	RetainedUI_LanguageChanged();
+	// The retained interface lays its text out again for a new dictionary. A
+	// reload that read back the same strings (a campaign switch whose games
+	// share their tables) leaves it as it is: that relayout costs over a second.
+	uint64_t contentHash = 1469598103934665603ull;
+	for ( int i = 0; i < languageDict.GetNumKeyVals(); i++ ) {
+		const idLangKeyValue *kv = languageDict.GetKeyVal( i );
+		for ( const idStr *text : { &kv->key, &kv->value } ) {
+			for ( int c = 0; c <= text->Length(); c++ ) {
+				contentHash = ( contentHash ^ (byte)( *text )[ c ] ) * 1099511628211ull;
+			}
+		}
+	}
+	contentHash ^= idStr::Hash( cvarSystem->GetCVarString( "sys_lang" ) );
+	if ( !languageDictHashed || contentHash != languageDictHash ) {
+		languageDictHashed = true;
+		languageDictHash = contentHash;
+		RetainedUI_LanguageChanged();
+	}
 }
 
 /*
@@ -7094,7 +7228,7 @@ void openQ4_GetAsyncTimingStats( openq4AsyncTimingStats_t &stats, int maxSamples
 // registering its static CVars. Module swaps grow that registry on the main
 // thread and can invalidate an in-flight FindInternal traversal. Publish the
 // only bit of module state needed by the timer after game->Init() completes.
-static std::atomic<bool> openQ4_singleplayerGameModuleReady( false );
+// (declared before idCommonLocal::RemountCampaign, which also clears it)
 
 static bool openQ4_ShouldUseSmoothSingleplayerSlowTime( float effectiveTimeScale ) {
 	if ( !openQ4_singleplayerGameModuleReady.load( std::memory_order_acquire ) ||
@@ -8218,6 +8352,7 @@ idCommonLocal::ShutdownGame
 */
 void idCommonLocal::ShutdownGame( bool reloading ) {
 	UI_SettingsShutdown();
+	languageDictHashed = false;
 	// Stop advertising a ready single-player module before any shutdown work can
 	// race the async thread or mutate game-owned state.
 	openQ4_singleplayerGameModuleReady.store( false, std::memory_order_release );

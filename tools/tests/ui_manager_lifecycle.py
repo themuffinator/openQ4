@@ -35,6 +35,8 @@ bool openQ4_UpdateInitialization(){return false;}
 void RetainedUI_PrecacheModelWorlds(){}
 namespace openq4 { void NativeInputBeforeUiChange(std::uint64_t,std::uint64_t) noexcept {++nativePublicationInvalidations;} }
 using ID_TIME_T = long long;
+// FileSystem.h: these stamps are all loose-file times
+static bool FS_SourceStampCurrent(ID_TIME_T current, ID_TIME_T loaded) { return current <= loaded; }
 struct idStr : std::string {
     using std::string::string;
     using std::string::operator=;

@@ -538,6 +538,7 @@ idCVar r_shadowMapStencilFallbackViews( "r_shadowMapStencilFallbackViews", "240"
 idCVar r_shadowMapPointCacheMegs( "r_shadowMapPointCacheMegs", "512", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "video memory the static point-light cubemap cache may fill, in MiB: slots beyond it stay unused, except that the first twelve are always available. Vulkan allows the scratch cubes of a view (uncached and composed point lights) the same figure again", 64, 8192 );
 idCVar r_shadowMapStaticCutouts( "r_shadowMapStaticCutouts", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "cache cutout (alpha-tested) shadow casters with the static shadow depth when their coverage cannot change: constant material registers, ordinary alpha images, no deform. 0 draws every cutout caster every view, over the cached depth" );
 idCVar r_shadowMapPointCompose( "r_shadowMapPointCompose", "1", CVAR_RENDERER | CVAR_BOOL, "draw a point light's moving and cutout casters over a copy of its cached static cube instead of re-rendering all six faces every view; 0 restores the full re-render for comparison" );
+idCVar r_shadowMapPointLayered( "r_shadowMapPointLayered", "1", CVAR_RENDERER | CVAR_BOOL, "OpenGL: draw the six faces of a point-light shadow cube into one layered target, the vertex shader choosing each face (ARB_shader_viewport_layer_array or AMD_vertex_shader_layer), so a cube costs one render-target switch instead of six; 0 attaches each face in turn for comparison" );
 idCVar r_shadowMapCacheCSM( "r_shadowMapCacheCSM", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "allow static-cache reuse for view-fitted CSM/global shadow-map passes" );
 idCVar r_shadowMapTranslucentFilterRadius( "r_shadowMapTranslucentFilterRadius", "-1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "translucent shadow moment filter radius in texels, -1 = inherit opaque shadow radius", -1.0f, 8.0f );
 idCVar r_shadowMapTranslucentMinVariance( "r_shadowMapTranslucentMinVariance", "0.00001", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "minimum variance used when resolving translucent shadow moments", 0.000001f, 0.01f );
@@ -765,7 +766,8 @@ idCVar r_lightGridDepthBiasFactor( "r_lightGridDepthBiasFactor", "0", CVAR_RENDE
 idCVar r_lightGridDepthBiasUnits( "r_lightGridDepthBiasUnits", "0", CVAR_RENDERER | CVAR_FLOAT, "fallback polygon offset units for depth-tested baked light-grid overlay receivers", -4096.0f, 4096.0f );
 idCVar r_lightGridDepthTolerance( "r_lightGridDepthTolerance", "0.005", CVAR_RENDERER | CVAR_FLOAT, "normalized depth tolerance for clipping baked light-grid receivers against captured scene depth", 0.0f, 0.1f );
 idCVar r_lightGridPortalBlend( "r_lightGridPortalBlend", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "world-unit radius for blending indirect light grids across visible portal boundaries; 0 disables", 0.0f, 256.0f );
-idCVar r_lightGridSoftwareDecode( "r_lightGridSoftwareDecode", "0", CVAR_RENDERER | CVAR_BOOL, "decode DXT-compressed light-grid pack atlases in software even where the GPU samples DXT; renderers without S3TC always do, so 1 tests that path" );
+idCVar r_useBPTC( "r_useBPTC", "1", CVAR_RENDERER | CVAR_BOOL, "use BPTC (BC7 and BC6H) textures where the graphics support them; 0 treats the renderer as having none, so BC7 and BC6H files take the decode paths an OpenGL Mac takes. Takes effect on vid_restart" );
+idCVar r_lightGridSoftwareDecode( "r_lightGridSoftwareDecode", "0", CVAR_RENDERER | CVAR_BOOL, "decode DXT- and BC6H-compressed light-grid pack atlases in software even where the GPU samples them; renderers without S3TC (DXT) or BPTC (BC6H) always do, so 1 tests that path" );
 idCVar r_lightGridPreload( "r_lightGridPreload", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "preload every light-grid atlas while loading a map; 0 streams visible areas on demand, 1 avoids area-transition uploads at the cost of longer map loads and more VRAM" );
 idCVar r_lightGridResidencyFrames( "r_lightGridResidencyFrames", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "frames to keep light-grid atlases resident after visible/neighbor use; 0 disables runtime purging", 0, 3600, idCmdSystem::ArgCompletion_Integer<0,3600> );
 idCVar r_lightGridBakeWorkers( "r_lightGridBakeWorkers", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "worker threads for light-grid probe integration (-1 = disabled, 0 = auto, 1..8 = explicit)", -1, 8, idCmdSystem::ArgCompletion_Integer<-1,8> );
@@ -1500,7 +1502,8 @@ static bool R_CheckPortableExtensions( bool legacyPolicy, char *error, int error
 		glConfig.glVersion >= 4.2f || R_CheckExtension( "GL_ARB_texture_compression_bptc" ) || R_CheckExtension( "GL_EXT_texture_compression_bptc" );
 	glConfig.bptcTextureCompressionAvailable =
 		textureCompressionAvailable &&
-		bptcTextureCompressionAdvertised;
+		bptcTextureCompressionAdvertised &&
+		r_useBPTC.GetBool();
 
 	// ETC2 and EAC are core in OpenGL ES 3.0 -- no extension string to check,
 	// and every device that can run this renderer has them. That is the whole

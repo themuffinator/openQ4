@@ -109,6 +109,11 @@ private:
 	glIndex_t					indexes[MAX_DECAL_INDEXES];
 	float						indexStartTime[MAX_DECAL_INDEXES];
 	idRenderModelDecal *		nextDecal;
+	// openQ4: RemoveFadedDecals has nothing to do for a decal whose vertices
+	// are all referenced (compacted, nothing added since) and whose oldest
+	// triangle has not reached its stay time, so it skips the pass for one.
+	bool						compacted;
+	float						oldestIndexStartTime;
 
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 	friend bool					R_MD5R_CreateDecalTriangles( idRenderModelDecal *decalModel, const srfTriangles_t &sourceTri, const decalProjectionInfo_t &localInfo );

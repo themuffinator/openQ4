@@ -464,6 +464,8 @@ typedef void ( GL_APIENTRY *PFN_glNamedFramebufferDrawBuffer )( GLuint framebuff
 typedef void ( GL_APIENTRY *PFN_glNamedFramebufferDrawBuffers )( GLuint framebuffer, GLsizei n, const GLenum *bufs );
 typedef void ( GL_APIENTRY *PFN_glNamedFramebufferReadBuffer )( GLuint framebuffer, GLenum src );
 typedef void ( GL_APIENTRY *PFN_glNamedFramebufferTexture )( GLuint framebuffer, GLenum attachment, GLuint texture, GLint level );
+// Layered attachment: ES 3.2 core, not ES 3.0
+typedef void ( GL_APIENTRY *PFN_glFramebufferTexture )( GLenum target, GLenum attachment, GLuint texture, GLint level );
 typedef GLenum ( GL_APIENTRY *PFN_glCheckNamedFramebufferStatus )( GLuint framebuffer, GLenum target );
 typedef void ( GL_APIENTRY *PFN_glTextureParameteri )( GLuint texture, GLenum pname, GLint param );
 typedef void ( GL_APIENTRY *PFN_glTextureStorage2D )( GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height );
@@ -512,6 +514,7 @@ extern PFN_glNamedFramebufferDrawBuffer		glNamedFramebufferDrawBuffer;
 extern PFN_glNamedFramebufferDrawBuffers	glNamedFramebufferDrawBuffers;
 extern PFN_glNamedFramebufferReadBuffer		glNamedFramebufferReadBuffer;
 extern PFN_glNamedFramebufferTexture		glNamedFramebufferTexture;
+extern PFN_glFramebufferTexture				glFramebufferTexture;
 extern PFN_glCheckNamedFramebufferStatus	glCheckNamedFramebufferStatus;
 extern PFN_glTextureParameteri				glTextureParameteri;
 extern PFN_glTextureStorage2D				glTextureStorage2D;

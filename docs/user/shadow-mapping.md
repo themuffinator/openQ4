@@ -303,5 +303,6 @@ These help when reporting a shadow problem. Leave the last five settings at thei
 | `r_shadowMapSkipStencilShadows` | `1` | Skips building original shadows for lights drawn with shadow maps, which saves processor time. A light whose map fails gets them back the next frame. |
 | `r_shadowMapConservativeCasters` | `1` | Lets objects off screen cast shadows onto what you can see. |
 | `r_shadowMapPointCompose` | `1` | Comparison switch: draws a point light's moving objects over its stored shadow instead of redrawing all six faces. |
+| `r_shadowMapPointLayered` | `1` | Comparison switch, OpenGL: draws all six faces of a point light's shadow in one pass where the graphics driver allows it, which saves processor time. `0` draws the faces one at a time. The picture is identical. |
 | `r_shadowMapCacheMovingLights` | `0` | Comparison switch: a moving light gets a new shadow every frame, so it is drawn directly rather than stored. `1` stores it anyway. A light that only changes colour is not moving. |
 | `r_vkShadowSampleResident` | `1` | Comparison switch, Vulkan: reads a stored spotlight shadow in place instead of copying it each frame. The picture is identical. |

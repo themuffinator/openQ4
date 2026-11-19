@@ -23,7 +23,14 @@
 
 	Weapon sounds are one-shots on SND_CHANNEL_ANY: vehicle weapons share a
 	sound channel with the part added before them, so private channels would
-	cut off the turret's own motor sounds.
+	cut off the turret's own motor sounds. The expansion's looping cues (the
+	missile lock's seek and lock tones, the pulse cannon's overheat alarm)
+	are the exception: started on SND_CHANNEL_ANY they never stop, and each
+	new target or jam stacked another copy until the tones drowned the guns.
+	They play on vehicle channels no part or vehicle code uses, one cue to a
+	channel, and follow the weapon's state. Sustained fire can fill the
+	vehicle's sixteen emitter slots with overlapping shots, which refuses a
+	new cue, so a cue that should be playing starts again once a slot frees.
 
 ===============================================================================
 */
@@ -218,6 +225,11 @@ protected:
 	void					PrepareScreens( void ) const;
 	void					PrecacheSound( const char *soundKey, const char *defaultShader = "" ) const;
 	void					PlaySound( const char *soundKey, const char *defaultShader = "" ) const;
+							// a looping cue on one of the vehicle's own channels; a new cue replaces the last
+	void					StartLoop( s_channelType channel, const char *soundKey ) const;
+	void					StopLoop( s_channelType channel ) const;
+							// restarts a looping cue the emitter refused or lost
+	void					KeepLoop( s_channelType channel, const char *soundKey ) const;
 
 	idEntity *				GetAimedEntity( float range, idVec3 &point ) const;
 	bool					IsFriendly( idEntity *ent ) const;
@@ -244,6 +256,11 @@ const char *riVehicleCockpitWeapon::crosshairNames[ NUM_CROSSHAIRS ] = {
 };
 
 static const float COCKPIT_TARGET_CONE = 30.0f;
+
+// the looping cues' channels on the vehicle: rvVehicle and its parts use the
+// voice, body, weapon, radio and custom channels, never these
+static const s_channelType LOCK_TONE_CHANNEL	= SND_CHANNEL_ITEM;
+static const s_channelType OVERHEAT_CHANNEL		= SND_CHANNEL_HEART;
 
 // sounds the expansion hard-coded; defs may override them with these keys
 static const char * const PULSE_STARTUP_SOUND	= "space_cannon_startup";
@@ -463,6 +480,59 @@ void riVehicleCockpitWeapon::PlaySound( const char *soundKey, const char *defaul
 
 /*
 ================
+riVehicleCockpitWeapon::StartLoop
+================
+*/
+void riVehicleCockpitWeapon::StartLoop( s_channelType channel, const char *soundKey ) const {
+	rvVehicle *vehicle = parent.GetEntity();
+	const char *shaderName = spawnArgs.GetString( soundKey, "" );
+	if ( vehicle == NULL ) {
+		return;
+	}
+	if ( !shaderName[ 0 ] ) {
+		vehicle->StopSound( channel, false );
+		return;
+	}
+	vehicle->StartSoundShader( declManager->FindSound( shaderName, false ), channel, 0, false, NULL );
+}
+
+/*
+================
+riVehicleCockpitWeapon::KeepLoop
+================
+*/
+void riVehicleCockpitWeapon::KeepLoop( s_channelType channel, const char *soundKey ) const {
+	rvVehicle *vehicle = parent.GetEntity();
+	const char *shaderName = spawnArgs.GetString( soundKey, "" );
+	if ( vehicle == NULL || !shaderName[ 0 ] ) {
+		return;
+	}
+	const idSoundShader *shader = declManager->FindSound( shaderName, false );
+	// only a looping cue: a def's one-shot override plays once per state
+	if ( shader == NULL || shader->GetParms() == NULL || !( shader->GetParms()->soundShaderFlags & SSF_LOOPING ) ) {
+		return;
+	}
+	idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, vehicle->GetSoundEmitter() );
+	if ( emitter != NULL && emitter->CurrentlyPlaying( channel ) ) {
+		return;
+	}
+	vehicle->StartSoundShader( shader, channel, 0, false, NULL );
+}
+
+/*
+================
+riVehicleCockpitWeapon::StopLoop
+================
+*/
+void riVehicleCockpitWeapon::StopLoop( s_channelType channel ) const {
+	rvVehicle *vehicle = parent.GetEntity();
+	if ( vehicle != NULL ) {
+		vehicle->StopSound( channel, false );
+	}
+}
+
+/*
+================
 riVehicleCockpitWeapon::GetAimedEntity
 ================
 */
@@ -600,6 +670,7 @@ private:
 	void					UpdateTargeting( void );
 	void					StopGuides( void );
 	void					UpdateBarrels( void );
+	void					UpdateOverheatAlarm( void );
 
 	barrel_t				barrels[ NUM_BARRELS ];
 	bool					barrelsSettled;	// not saved: a spawned or loaded cannon settles its barrels to the selection
@@ -611,6 +682,7 @@ private:
 	float					heatDissipationPerSecond;
 	int						lastHeatTime;
 	bool					overheated;
+	bool					overheatAlarm;	// not saved: a loaded cannon starts its alarm again
 	bool					attackHeld;
 	float					range;
 
@@ -634,6 +706,7 @@ riVCWPulseCannon::riVCWPulseCannon( void ) {
 	heatDissipationPerSecond = 0.0f;
 	lastHeatTime = 0;
 	overheated = false;
+	overheatAlarm = false;
 	attackHeld = false;
 	range = 0.0f;
 	for ( int i = 0; i < NUM_BARRELS; i++ ) {
@@ -723,6 +796,7 @@ void riVCWPulseCannon::Cool( void ) {
 		if ( g_debugVehicle.GetInteger() ) {
 			gameLocal.Printf( "%d %s: cooled to %.0f\n", gameLocal.time, GetClassname(), heat );
 		}
+		UpdateOverheatAlarm();
 		PlaySound( "snd_overheatRecoverSound" );
 		// m03's script jams the gun with the same screen text: leave it up
 		// while the script has the weapon disabled, the script clears it
@@ -732,6 +806,30 @@ void riVCWPulseCannon::Cool( void ) {
 		}
 	}
 	SetGuiStateFloat( "HeatPercentage", heatTolerance > 0.0f ? idMath::ClampFloat( 0.0f, 1.0f, heat / heatTolerance ) : 0.0f );
+	UpdateOverheatAlarm();
+}
+
+/*
+================
+riVCWPulseCannon::UpdateOverheatAlarm
+
+The overheat alarm loops while the cannon is jammed and its gunner is aboard.
+================
+*/
+void riVCWPulseCannon::UpdateOverheatAlarm( void ) {
+	const bool sound = overheated && IsActive();
+	if ( sound == overheatAlarm ) {
+		if ( sound ) {
+			KeepLoop( OVERHEAT_CHANNEL, "snd_overheatedSound" );
+		}
+		return;
+	}
+	overheatAlarm = sound;
+	if ( sound ) {
+		StartLoop( OVERHEAT_CHANNEL, "snd_overheatedSound" );
+	} else {
+		StopLoop( OVERHEAT_CHANNEL );
+	}
 }
 
 /*
@@ -888,7 +986,7 @@ bool riVCWPulseCannon::Fire( void ) {
 		if ( g_debugVehicle.GetInteger() ) {
 			gameLocal.Printf( "%d %s: overheated\n", gameLocal.time, GetClassname() );
 		}
-		PlaySound( "snd_overheatedSound" );
+		UpdateOverheatAlarm();
 		SendGuiEvent( "JammedTextOn" );
 	}
 	return true;
@@ -907,6 +1005,7 @@ void riVCWPulseCannon::Activate( bool activate ) {
 	} else {
 		StopGuides();
 	}
+	UpdateOverheatAlarm();
 }
 
 /*
@@ -980,12 +1079,14 @@ private:
 	static const int		MAGAZINE_SIZE = 5;
 
 	void					SetLockState( lockState_t state );
+	void					UpdateLockTone( void );
 	void					UpdateTargeting( void );
 	void					SetRocketsLoaded( int count );
 	void					UpdateMagazine( void );
 	void					StopGuides( void );
 
 	lockState_t				lockState;
+	lockState_t				lockTone;	// not saved: a loaded launcher starts its tone again
 	idEntityPtr<idActor>	lockTarget;
 	int						lockStartTime;
 	int						timeToHardLock;
@@ -1013,6 +1114,7 @@ riVCWMissileTurret::riVCWMissileTurret
 */
 riVCWMissileTurret::riVCWMissileTurret( void ) {
 	lockState = LOCK_NONE;
+	lockTone = LOCK_NONE;
 	lockStartTime = 0;
 	timeToHardLock = 0;
 	aimPoint.Zero();
@@ -1129,13 +1231,38 @@ void riVCWMissileTurret::SetLockState( lockState_t state ) {
 			break;
 		case LOCK_ACQUIRING:
 			lockStartTime = gameLocal.time;
-			PlaySound( "snd_acquiringTarget" );
 			SendGuiEvent( "lockStatusAcquiringTarget" );
 			break;
 		case LOCK_LOCKED:
-			PlaySound( "snd_targetLock" );
 			SendGuiEvent( "lockStatusLockedTarget" );
 			break;
+	}
+	UpdateLockTone();
+}
+
+/*
+================
+riVCWMissileTurret::UpdateLockTone
+
+The seek tone loops while acquiring, the lock tone while locked, and both
+stop with the lock. Moving from one acquiring target to the next keeps the
+seek tone running.
+================
+*/
+void riVCWMissileTurret::UpdateLockTone( void ) {
+	const char *soundKey = lockState == LOCK_ACQUIRING ? "snd_acquiringTarget" :
+		lockState == LOCK_LOCKED ? "snd_targetLock" : NULL;
+	if ( lockState == lockTone ) {
+		if ( soundKey != NULL ) {
+			KeepLoop( LOCK_TONE_CHANNEL, soundKey );
+		}
+		return;
+	}
+	lockTone = lockState;
+	if ( soundKey != NULL ) {
+		StartLoop( LOCK_TONE_CHANNEL, soundKey );
+	} else {
+		StopLoop( LOCK_TONE_CHANNEL );
 	}
 }
 
@@ -1183,6 +1310,7 @@ void riVCWMissileTurret::UpdateTargeting( void ) {
 	acquiringGuide.Update( spawnArgs, lockState == LOCK_ACQUIRING ? candidate : NULL, player );
 	outOfRangeGuide.Update( spawnArgs, outOfRange ? enemy : NULL, player );
 	closestGuide.Stop();
+	UpdateLockTone();
 }
 
 /*

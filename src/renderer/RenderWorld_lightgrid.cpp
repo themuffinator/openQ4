@@ -23,6 +23,7 @@ GNU General Public License for more details.
 #include "RendererModule.h"
 #include "RendererUpload.h"
 #include "../imagetools/DXT/DXTCodec.h"
+#include "../imagetools/BC6H/BC6HCodec.h"
 #if !defined( _WIN32 )
 #include <unistd.h>
 #endif
@@ -2701,11 +2702,15 @@ static lightGridPackedImageLoadResult_t LightGrid_LoadPackedImageRef( idRenderWo
 		common->Warning( "LightGrid pack: %s requires BC7/BPTC texture support", image->GetName() );
 		return LIGHTGRID_PACKED_IMAGE_LOAD_FAILED;
 	}
+	// An HDR (BC6H) atlas decodes to RGBA16F where BPTC is missing, which keeps
+	// its range; it costs eight times the memory, not the pack.
+	const bool bc6hChunk = IsBC6HFormat( static_cast<textureFormat_t>( header.format ) );
+	const bool decodeBC6H = bc6hChunk && ( !glConfig.bptcTextureCompressionAvailable || r_lightGridSoftwareDecode.GetBool() );
 
 	idImageOpts opts;
 	opts.textureType = static_cast<textureType_t>( header.textureType );
-	opts.format = decodeDXT ? FMT_RGBA8 : static_cast<textureFormat_t>( header.format );
-	opts.colorFormat = decodeDXT ? CFM_DEFAULT : static_cast<textureColor_t>( header.colorFormat );
+	opts.format = decodeDXT ? FMT_RGBA8 : ( decodeBC6H ? FMT_RGBA16F : static_cast<textureFormat_t>( header.format ) );
+	opts.colorFormat = ( decodeDXT || decodeBC6H ) ? CFM_DEFAULT : static_cast<textureColor_t>( header.colorFormat );
 	opts.width = header.width;
 	opts.height = header.height;
 	opts.numLevels = header.numLevels;
@@ -2714,6 +2719,19 @@ static lightGridPackedImageLoadResult_t LightGrid_LoadPackedImageRef( idRenderWo
 	const int imageCount = packedImage.NumImages();
 	for ( int i = 0; i < imageCount; i++ ) {
 		const bimageImage_t &img = packedImage.GetImageHeader( i );
+		if ( decodeBC6H ) {
+			const int paddedWidth = Max( 4, ( img.width + 3 ) & ~3 );
+			const int paddedHeight = Max( 4, ( img.height + 3 ) & ~3 );
+			idTempArray<unsigned short> decoded( paddedWidth * paddedHeight * 4 );
+			BC6H_DecodeImage( packedImage.GetImageData( i ), header.format == FMT_BC6H_SF16, decoded.Ptr(), paddedWidth, paddedHeight );
+			if ( paddedWidth != img.width ) {
+				for ( int y = 1; y < img.height; y++ ) {
+					memmove( decoded.Ptr() + y * img.width * 4, decoded.Ptr() + y * paddedWidth * 4, img.width * 4 * sizeof( unsigned short ) );
+				}
+			}
+			image->SubImageUpload( img.level, 0, 0, img.destZ, img.width, img.height, decoded.Ptr() );
+			continue;
+		}
 		if ( !decodeDXT ) {
 			image->SubImageUpload( img.level, 0, 0, img.destZ, img.width, img.height, packedImage.GetImageData( i ) );
 			continue;

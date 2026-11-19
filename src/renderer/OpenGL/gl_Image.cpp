@@ -97,6 +97,13 @@ bool idImage::ReadPixelsRGBA8( idList<byte> &pixels ) {
 #ifndef GL_COMPRESSED_RGBA_BPTC_UNORM
 #define GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C
 #endif
+// BC6H; the same values as the _ARB and _EXT (ES) names
+#ifndef GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT
+#define GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT 0x8E8E
+#endif
+#ifndef GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT
+#define GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT 0x8E8F
+#endif
 
 // core in ES 3.0 and in desktop GL 4.3, but the desktop GL headers this file
 // sees are older than either
@@ -579,6 +586,24 @@ void idImage::AllocImage() {
 		internalFormat = GL_COMPRESSED_RGBA_BPTC_UNORM;
 		dataFormat = GL_RGBA;
 		dataType = GL_UNSIGNED_BYTE;
+		break;
+	case FMT_BC6H_UF16:
+	case FMT_BC6H_SF16:
+		if ( !glConfig.bptcTextureCompressionAvailable ) {
+			// Same shape as the BC7 gate above. The loaders decode BC6H to
+			// RGBA16F on such a renderer (R_LoadPrecompressedDDS, the light-grid
+			// pack loader, R_BinaryImageHeaderSupportedByRenderer), so reaching
+			// here means a caller skipped them.
+			R_ImagePolicyObserveError( "Requested GL BC6H/BPTC image format is unsupported" );
+			common->Warning( "%s holds BC6H/BPTC data but this renderer does not expose BPTC; uploading as uncompressed RGBA16F", GetName() );
+			internalFormat = GL_RGBA16F;
+			dataFormat = GL_RGBA;
+			dataType = GL_HALF_FLOAT;
+			break;
+		}
+		internalFormat = opts.format == FMT_BC6H_SF16 ? GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT : GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT;
+		dataFormat = GL_RGB;
+		dataType = GL_HALF_FLOAT;
 		break;
 	case FMT_ETC2_RGB8:
 	case FMT_ETC2_RGBA8:

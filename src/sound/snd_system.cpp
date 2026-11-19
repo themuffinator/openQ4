@@ -158,6 +158,31 @@ void RestartSound_f( const idCmdArgs& args )
 
 /*
 ========================
+Sound_PurgeSamplesForRemount
+========================
+*/
+void Sound_PurgeSamplesForRemount( void )
+{
+	// A campaign remount changed the search path: a sample of the same name
+	// may now come from another file. Free them all; each loads again from
+	// the new search path when it next plays (idSoundEmitter loads unloaded
+	// samples) or when a level references it.
+	soundSystemLocal.FinishSampleDecodes( true );
+	int purged = 0;
+	for( int i = 0; i < soundSystemLocal.samples.Num(); i++ )
+	{
+		idSoundSample* sample = soundSystemLocal.samples[i];
+		if( sample->IsLoaded() || sample->IsDecoding() )
+		{
+			sample->FreeData();
+			purged++;
+		}
+	}
+	common->Printf( "%d sound samples freed for the campaign switch\n", purged );
+}
+
+/*
+========================
 ReloadSounds_f
 ========================
 */
@@ -2131,7 +2156,8 @@ void idSoundReverb::PrintInfo() const
 	{
 		const int area = slotToArea[slot];
 		const int effect = area >= 0 ? EffectForArea( const_cast<idSoundReverb*>( this ), area ) : -1;
-		common->Printf( "  [%d]%s area %d %s\n", slot, slot == primarySlot ? "*" : " ", area,
-			effect >= 0 ? effects[effect].name.c_str() : "-" );
+		common->Printf( "  [%d]%s area %d %s%s\n", slot, slot == primarySlot ? "*" : " ", area,
+			effect >= 0 ? effects[effect].name.c_str() : "-",
+			soundSystemLocal.hardware.IsReverbSlotIdle( slot ) ? " (idle: no voice feeds it)" : "" );
 	}
 }

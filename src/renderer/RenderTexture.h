@@ -60,6 +60,11 @@ public:
 
 	bool					MakeCurrent( void );
 	bool					MakeCurrent( int cubeFace );
+	// Attaches every face of a cube target at once (a layered framebuffer):
+	// the shader then chooses the face with gl_Layer. False when the layered
+	// attachment is unavailable or incomplete; the target is then left bound
+	// with face 0 attached, and per-face MakeCurrent still works.
+	bool					MakeCurrentLayered( void );
 	static void				BindNull(void);
 
 	unsigned int					GetDeviceHandle(void);

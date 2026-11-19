@@ -19,6 +19,175 @@ does not restore the withdrawn release. See
   Quake 4 includes its own Russian subtitles.
 - **What to do.** Nothing. Choose **Русский** under Settings → Game Options.
 
+## Smoke, sparks and muzzle flashes cost less to run, 18 November 2026
+
+- **Less processor time per frame in fights.** Every frame the effects system
+  stepped through every live particle of every effect, including effects out
+  of view, only to find out which ones had burnt out. It now checks just the
+  oldest particles, adds new ones without searching the list, and asks for
+  the next particle's memory while it draws the current one. In a busy stock battle effects take about three quarters of the work
+  they did, and about half in a quiet hub full of off-screen effects. Effects
+  look, move and fade exactly as before.
+- **What to do.** Replace the game executable. `bse_particleListEarlyOut 0`
+  and `bse_particlePrefetch 0` bring back the old work, for comparison.
+- Details: [performance report, section 16](performance-report.md#16-the-bse-particle-runtime-fps-08-18-november-2026).
+
+## Switching between Quake 4 and The Awakening without restarting, 18 November 2026
+
+- **Picking the other campaign no longer restarts the game.** Choosing
+  **New Game** for The Awakening, or for Quake 4 again from it, closed down
+  and rebuilt the whole engine: the window froze for 6 to 22 seconds, the
+  page transition stopped half way, the menu music went silent until you
+  returned to the title, and the other campaign's own startup scripts and
+  settings file replaced the settings you had. Now the campaign's difficulty
+  page slides in straight away, the game swaps the campaign's files in behind
+  it in two to four seconds while the page holds still, and the menu music
+  starts again. The window, the menus and the renderer stay up throughout.
+- **Your settings carry across.** The settings you switch with are written to
+  both campaigns' folders, so key bindings and video settings no longer differ
+  between the campaigns.
+- **What to do.** Nothing. From a level, a demo or multiplayer, openQ4 still
+  restarts its engine to change campaigns. `com_campaignRemount 0` brings back
+  the old restart for every switch.
+- How it works: the switch unloads the single-player game module, mounts the
+  other campaign's search path (`fs_game`, `fs_game_base`), detaches every
+  decl from its file and registers the decl folders again so the new files
+  claim them exactly as at startup (decls in use are parsed again; decls the
+  campaign no longer defines become implicit and are hidden from lookups that
+  would not create them), reloads the language strings and the game module,
+  and reloads images, models, legacy GUIs and sound samples the new search
+  path resolves to other files (`idCommonLocal::RemountCampaign`,
+  `DeclManager_BeginRemount`/`FinishRemount`). The retained text relayout runs
+  only when the strings actually changed. Models and legacy GUIs now compare
+  pk4 content stamps for identity, as images already did, so a file that
+  moves between a pk4 and a loose copy is reloaded in both directions. The
+  first switch into The Awakening on a new install still checks openQ4's
+  packs once (about a second), as the engine reload did.
+- Verified on Windows with the retained Campaign page's own controls (no
+  device input), GL and Vulkan: Quake 4 → The Awakening → Quake 4, twice in a
+  row, walking Back to the title after each switch; the classic menus
+  (`ui_retained 0`); m01 and airdefense1 start and play after a switch, and a
+  save made in m01 after three switches loads back. `openq4_declFingerprint`
+  (new) wrote the same 22,441 Awakening and 17,210 Quake 4 decls, with the
+  same files, lines and text checksums, after every switch as after a fresh
+  start in that campaign; m01 logs the same missing content after a switch as
+  after a fresh start. `campaign_selection_runtime.py` passes its switch,
+  multiplayer, Arena and mod cases, and now requires the in-place switch.
+  On a machine shared with other builds the switch took 2.4 to 3.8 s, against
+  5.6 to 8.8 s for the engine reload it replaces, and 22 s for the reload's
+  first entry into The Awakening.
+
+## The Awakening's Cryofac opening, door seals and ice wall, 18 November 2026
+
+- **The squad starts on its feet.** At the start of Cryofac, Tak and Navajas
+  spawned inside two of the parked speeders, and Navajas's first mark was
+  inside a third bike: he walked into it for half a minute before the
+  introduction moved on, while Tak wandered off. They now start beside the
+  bikes and reach the ice door in a few seconds.
+- **The door seals no longer pretend to work.** The panels beside the cryodoors
+  showed a usable cursor and played their unlock animation when pressed, but
+  only Tak can open those doors. You can no longer use them.
+- **Napalm melts the whole second ice wall.** Only shots near the middle of the
+  wall counted; napalm on its left side, bottom or top edge did nothing, which
+  the flamethrower made obvious. Any napalm on the ice now counts. Other
+  weapons still cannot melt it.
+- **What to do.** Replace the single-player game module and start the level
+  again; a save made inside Cryofac keeps the old behaviour.
+- Details: [Cryofac's opening, door seals and second ice wall](awakening-missions.md#cryofacs-opening-door-seals-and-second-ice-wall--18-november-2026).
+
+## Room reverb costs less when nothing is playing into it, 18 November 2026
+
+- **Less audio work in quiet places.** The game keeps up to four room reverbs
+  running around you. Until now all four kept running even when no sound was
+  feeding them. A reverb now stops once nothing has played into it for longer
+  than its echo lasts, and starts again before the next sound reaches it. In
+  a quiet room this cuts the audio mixer's work by about three quarters, to
+  what it costs with reverb turned off. When you turn on the spot, the game
+  also stops updating each reverb's direction for every fraction of a degree,
+  which takes away the extra mixing that turning added while sounds play.
+- **It sounds the same.** Echoes still fade out in full: a reverb stops only
+  once its tail is far below hearing. Recordings with the old and new
+  behaviour match within a decibel.
+- **What to do.** Replace the game executable. `s_reverbIdleSlots 0` and
+  `s_reverbPanStep 0` bring back the old behaviour, for comparison.
+- Details: [performance report, section 15](performance-report.md#follow-up-idle-reverb-slots-and-the-turning-view).
+
+## Point-light shadows cost less processor time on OpenGL, 18 November 2026
+
+- **Less work for every shadowed lamp.** A point light's shadow has six faces,
+  and the game used to switch drawing target for each one, which the graphics
+  driver charges for. Where the driver supports it, all six faces now go into
+  one target. In a busy stock battle the shadow pass's own overhead, apart
+  from drawing the shadow casters, fell to about a third. Shadows look exactly
+  as before.
+- **What to do.** Replace the renderer modules and the `baseoq4` packs.
+  `r_shadowMapPointLayered 0` draws the faces one at a time, for comparison.
+  Drivers without the needed feature keep the old path by themselves.
+- Details: [performance report, section 15](performance-report.md#15-cpu-profile-of-the-stock-combat-and-hub2-scenes-fps-08-evidence-18-november-2026).
+
+## Bullet holes and blood splats cost less to keep, 18 November 2026
+
+- **Less work per frame in long fights.** Every frame, each decal in view
+  (bullet holes, scorch marks, blood) was checked for faded triangles and
+  rebuilt even when nothing had faded. A decal now skips that until its oldest
+  part is due to fade or something is added to it. In a busy stock battle this
+  took the check from about a twentieth of the scene's setup work to under a
+  hundredth. Decals look and fade exactly as before.
+- **What to do.** Replace the renderer modules. `r_decalFadeEarlyOut 0` runs
+  the old check on every decal, for comparison.
+- Details: [performance report, section 15](performance-report.md#15-cpu-profile-of-the-stock-combat-and-hub2-scenes-fps-08-evidence-18-november-2026).
+
+## The Awakening's turret alarms stop, and the title menu's descriptions switch cleanly (#230, #228), 18 November 2026
+
+- **The dropship turret's lock alarm stops when it should.** In The
+  Awakening's air assault, the missile launcher's seek and lock tones and the
+  pulse cannon's overheat alarm are looping sounds, but they were started like
+  gunshots and never stopped. Every target you locked on to and every jam
+  added another copy that played forever, until they filled the turret's
+  sound slots: the alarm droned over the fight and your own guns went quiet,
+  firing only now and then. Each tone now plays once and follows the lock:
+  seeking, then locked, then silent when the target is gone or you switch
+  weapons. The overheat alarm sounds only while the cannon is jammed and you
+  are in the seat, and starts as soon as sustained fire leaves it room.
+- **Menu descriptions switch at once and stay readable.** The line under the
+  title menu that explains the highlighted item faded out over 300 ms while
+  the next one appeared, so sweeping down the menu stacked half-faded
+  sentences. It now switches instantly and sits on a dark backing, so it
+  reads over every backdrop scene.
+- **What to do.** Nothing. Replace the client and the single-player game
+  module together.
+- Evidence: headless m03 probes (`g_debugVehicle 1`, `s_showStartSound 1`,
+  muted): across three lock cycles the seek tone starts on one vehicle
+  channel, the lock tone replaces it, and it stops when the target is removed
+  and when the pulse cannon is selected; through two bursts of sustained fire
+  every jam starts the alarm on its own channel and every cool-down stops it,
+  and a jam that met a full emitter started the alarm once a slot freed.
+  Leaving the seat stops both through `ActivateParts( false )`, checked in
+  code, not in a probe. Title captures 40 ms and 120 ms after a focus change
+  show only the new item's sentence. `openq4-ui-retained-screens-menus`,
+  `-pointer-reach` and `-optics` pass.
+
+## HDR textures in BC6H, 18 November 2026
+
+- **BC6H texture files load.** BC6H stores high dynamic range colour, such as
+  a bright sky or a light's glow, at the size of a BC7 file instead of eight
+  times that. DDS files in BC6H (unsigned or signed, as `texconv`, NVTT and
+  Compressonator write them) now go to the graphics card as they are wherever
+  BC7 works, on OpenGL, OpenGL ES and Vulkan.
+- **No BC6H support, no lost range.** On graphics without BC7/BC6H, every Mac
+  with OpenGL among them, BC6H files are decoded to 16-bit floating point, so
+  they look the same and only use more video memory.
+- **Light-grid packs can carry HDR lighting.** A light-grid pack may store its
+  lighting atlases as BC6H, decoded where the graphics cannot take them.
+- **What to do.** Nothing. See [the formats table](../user/texture-replacements.md#formats)
+  if you make texture packs.
+- Evidence: the decoder matches an Intel Iris Xe and an NVIDIA RTX 4060
+  bit for bit on 4,096 random blocks of each of the 14 modes, the four
+  reserved modes, unsigned and signed (`openq4-bc6h-codec` test; digests
+  regenerated by `tools/tests/native/Bc6hGpuReference.cpp`). The codec also
+  carries an encoder (`BC6H_EncodeImage`) whose error on synthetic HDR content
+  is pinned by the same test; nothing in the engine encodes BC6H at runtime yet.
+
 ## More texture pack formats, and an option to keep big packs in memory, 18 November 2026
 
 - **More DDS files load.** BC1 and BC3 (DXT1/DXT5) files saved with a DX10

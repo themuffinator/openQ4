@@ -2046,7 +2046,9 @@ typedef struct {
 	GLint			pointShadowDepthMode;
 	GLint			casterDepthOffset;
 	GLint			alphaMap;
+	GLint			pointShadowLayer;	// the layered variant's face uniform, -1 otherwise
 	bool			depthCompareMode;
+	bool			layered;
 } pointShadowCasterProgram_t;
 
 typedef struct {
@@ -5992,7 +5994,29 @@ static const char *programBaseName = "glprogs/shadow_point_interaction";
 	return true;
 }
 
-static bool RB_PointShadowMapLoadCasterProgram( void ) {
+// FPS-08: the driver charges for every render-target switch, and a cube drawn
+// face by face makes six (twelve when composing). The layered variant attaches
+// the whole cube once and names each face from the vertex shader through
+// gl_Layer, which only these extensions allow outside a geometry shader.
+static int g_pointShadowLayeredRejectedGeneration = -1;
+
+static const char *RB_PointShadowMapLayerExtension( void ) {
+	if ( GLEW_ARB_shader_viewport_layer_array ) {
+		return "GL_ARB_shader_viewport_layer_array";
+	}
+	if ( GLEW_AMD_vertex_shader_layer ) {
+		return "GL_AMD_vertex_shader_layer";
+	}
+	return NULL;
+}
+
+static bool RB_PointShadowMapLayeredWanted( void ) {
+	return r_shadowMapPointLayered.GetBool() && glFramebufferTexture != NULL
+		&& RB_PointShadowMapLayerExtension() != NULL
+		&& g_pointShadowLayeredRejectedGeneration != tr.videoRestartCount;
+}
+
+static bool RB_PointShadowMapLoadCasterProgramVariant( const bool layered ) {
 static const char *programBaseName = "glprogs/shadow_point_caster";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
@@ -6000,7 +6024,8 @@ static const char *programBaseName = "glprogs/shadow_point_caster";
 	}
 
 	const bool depthCompareMode = RB_PointShadowMapDepthCompareEnabled();
-	if ( g_pointShadowCasterProgram.programObject != 0 && g_pointShadowCasterProgram.programGeneration == tr.videoRestartCount && g_pointShadowCasterProgram.depthCompareMode == depthCompareMode ) {
+	if ( g_pointShadowCasterProgram.programObject != 0 && g_pointShadowCasterProgram.programGeneration == tr.videoRestartCount
+			&& g_pointShadowCasterProgram.depthCompareMode == depthCompareMode && g_pointShadowCasterProgram.layered == layered ) {
 		return g_pointShadowCasterProgram.programValid;
 	}
 
@@ -6026,11 +6051,35 @@ static const char *programBaseName = "glprogs/shadow_point_caster";
 		return false;
 	}
 
+	// An older shader without the layer write would draw every face into the
+	// first; the caller then falls back to drawing face by face.
+	const char *vertexVersionEnd = layered ? strchr( vertexBuffer, '\n' ) : NULL;
+	if ( layered && ( vertexVersionEnd == NULL || strstr( vertexBuffer, "OPENQ4_POINT_SHADOW_LAYERED" ) == NULL ) ) {
+		fileSystem->FreeFile( vertexBuffer );
+		fileSystem->FreeFile( fragmentBuffer );
+		return false;
+	}
+
 	GLhandleARB vertexShader = glCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
 	GLhandleARB fragmentShader = glCreateShaderObjectARB( GL_FRAGMENT_SHADER_ARB );
 	const GLcharARB *vertexSource = (const GLcharARB *)vertexBuffer;
 	const GLcharARB *fragmentSource = (const GLcharARB *)fragmentBuffer;
-	glShaderSourceARB( vertexShader, 1, &vertexSource, NULL );
+	if ( layered ) {
+		const idStr layerHeader = va( "#extension %s : require\n#define OPENQ4_POINT_SHADOW_LAYERED 1\n", RB_PointShadowMapLayerExtension() );
+		const GLcharARB *vertexSources[3] = {
+			(const GLcharARB *)vertexBuffer,
+			(const GLcharARB *)layerHeader.c_str(),
+			(const GLcharARB *)( vertexVersionEnd + 1 )
+		};
+		const GLint vertexLengths[3] = {
+			static_cast<GLint>( vertexVersionEnd - vertexBuffer + 1 ),
+			static_cast<GLint>( layerHeader.Length() ),
+			-1
+		};
+		glShaderSourceARB( vertexShader, 3, vertexSources, vertexLengths );
+	} else {
+		glShaderSourceARB( vertexShader, 1, &vertexSource, NULL );
+	}
 	if ( depthCompareMode ) {
 		// The compare variant writes radial depth to gl_FragDepth; the default
 		// variant must not reference gl_FragDepth at all so the rasterized
@@ -6123,9 +6172,25 @@ static const char *programBaseName = "glprogs/shadow_point_caster";
 	g_pointShadowCasterProgram.casterDepthOffset = glGetUniformLocationARB( programObject, "uShadowCasterDepthOffset" );
 	g_pointShadowCasterProgram.depthCompareMode = depthCompareMode;
 	g_pointShadowCasterProgram.alphaMap = glGetUniformLocationARB( programObject, "uAlphaMap" );
+	g_pointShadowCasterProgram.layered = layered;
+	g_pointShadowCasterProgram.pointShadowLayer = layered ? glGetUniformLocationARB( programObject, "uPointShadowLayer" ) : -1;
+	if ( layered && g_pointShadowCasterProgram.pointShadowLayer < 0 ) {
+		RB_PointShadowMapFreeCasterProgram();
+		return false;
+	}
 
-	common->Printf( "Loaded GLSL program '%s'\n", programBaseName );
+	common->Printf( "Loaded GLSL program '%s'%s\n", programBaseName, layered ? " (layered cube)" : "" );
 	return true;
+}
+
+static bool RB_PointShadowMapLoadCasterProgram( void ) {
+	const bool layered = RB_PointShadowMapLayeredWanted();
+	if ( RB_PointShadowMapLoadCasterProgramVariant( layered ) || !layered ) {
+		return g_pointShadowCasterProgram.programValid;
+	}
+	common->Warning( "The layered point shadow caster did not build; drawing shadow cube faces one at a time" );
+	g_pointShadowLayeredRejectedGeneration = tr.videoRestartCount;
+	return RB_PointShadowMapLoadCasterProgramVariant( false );
 }
 
 static bool RB_PointTranslucentShadowMapLoadCasterProgram( void ) {
@@ -8755,6 +8820,39 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	return allCastersRendered;
 }
 
+// The layered path copies a cached cube into the scratch cube with
+// glCopyImageSubData, all six faces per image in one call, which needs the two
+// cubes' images to match exactly; the per-face blit converts, this does not.
+static bool RB_PointShadowMapCanCopyCube( idRenderTexture *from, idRenderTexture *to ) {
+	if ( glCopyImageSubData == NULL || !( GLEW_ARB_copy_image || GLEW_VERSION_4_3 ) || from == NULL || to == NULL ) {
+		return false;
+	}
+	if ( from->GetNumColorImages() != to->GetNumColorImages() || from->GetDepthImage() == NULL || to->GetDepthImage() == NULL ) {
+		return false;
+	}
+	for ( int i = 0; i < to->GetNumColorImages(); i++ ) {
+		if ( from->GetColorImage( i )->GetOpts().format != to->GetColorImage( i )->GetOpts().format ) {
+			return false;
+		}
+	}
+	return from->GetDepthImage()->GetOpts().format == to->GetDepthImage()->GetOpts().format
+		&& from->GetWidth() == to->GetWidth() && from->GetHeight() == to->GetHeight();
+}
+
+static void RB_PointShadowMapCopyCubeImage( idImage *from, idImage *to, const int width, const int height ) {
+	glCopyImageSubData( from->GetDeviceHandle(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
+		to->GetDeviceHandle(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, width, height, 6 );
+}
+
+static void RB_PointShadowMapCopyCube( idRenderTexture *from, idRenderTexture *to ) {
+	const int width = to->GetWidth();
+	const int height = to->GetHeight();
+	for ( int i = 0; i < to->GetNumColorImages(); i++ ) {
+		RB_PointShadowMapCopyCubeImage( from->GetColorImage( i ), to->GetColorImage( i ), width, height );
+	}
+	RB_PointShadowMapCopyCubeImage( from->GetDepthImage(), to->GetDepthImage(), width, height );
+}
+
 // The render modes are RB_RenderShadowMap's. A composed cube starts as a copy
 // of composeFrom, the light's cached static cube, and receives only the live
 // chains; the copy and the cache share one projection because the cache
@@ -8820,10 +8918,18 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 	const int shadowMapWidth = g_pointShadowMapRenderTexture->GetWidth();
 	const int shadowMapHeight = g_pointShadowMapRenderTexture->GetHeight();
 
+	// One layered bind serves all six faces (and a compose copies the cached
+	// cube in one call per image), instead of a render-target switch per face.
+	bool layered = g_pointShadowCasterProgram.layered && g_pointShadowCasterProgram.pointShadowLayer >= 0
+		&& ( !composeMode || RB_PointShadowMapCanCopyCube( composeFrom->renderTexture, g_pointShadowMapRenderTexture ) );
+
 	// probe framebuffer completeness before touching pass state: an
 	// incomplete point shadow target fails the pass into the stencil
 	// fallback instead of FatalError'ing the whole session
-	g_pointShadowMapRenderTexture->MakeCurrent( 0 );
+	if ( !layered || !g_pointShadowMapRenderTexture->MakeCurrentLayered() ) {
+		layered = false;
+		g_pointShadowMapRenderTexture->MakeCurrent( 0 );
+	}
 	if ( g_pointShadowMapRenderTexture->IsKnownIncomplete() ) {
 		if ( g_pointShadowMapRenderTexture->GetNumColorImages() == 0 ) {
 			// A cube target without a colour attachment should be complete on
@@ -8854,6 +8960,10 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 		glUniform1fARB( g_pointShadowCasterProgram.pointShadowDepthMode, RB_PointShadowMapDepthModeValue() );
 	}
 	RB_ShadowMapSetCasterDepthOffsetUniform( g_pointShadowCasterProgram.casterDepthOffset );
+	if ( g_pointShadowCasterProgram.pointShadowLayer >= 0 ) {
+		// face by face, a layered program's layer write must name the only image
+		glUniform1iARB( g_pointShadowCasterProgram.pointShadowLayer, 0 );
+	}
 	if ( g_pointShadowCasterProgram.alphaMap >= 0 ) {
 		glUniform1iARB( g_pointShadowCasterProgram.alphaMap, 0 );
 	}
@@ -8890,11 +9000,23 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 
 	const GLbitfield composeCopyMask = GL_DEPTH_BUFFER_BIT
 		| ( g_pointShadowMapRenderTexture->GetNumColorImages() > 0 ? GL_COLOR_BUFFER_BIT : 0 );
+	if ( layered ) {
+		glViewport( 0, 0, shadowMapWidth, shadowMapHeight );
+		glScissor( 0, 0, shadowMapWidth, shadowMapHeight );
+		if ( composeMode ) {
+			RB_PointShadowMapCopyCube( composeFrom->renderTexture, g_pointShadowMapRenderTexture );
+		} else {
+			// a layered clear covers every face
+			glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+		}
+	}
 	for ( int cubeFace = 0; cubeFace < 6; cubeFace++ ) {
 		float lightModelViewMatrix[16];
 		RB_PointShadowMapBuildModelViewMatrix( backEnd.vLight->globalLightOrigin, cubeFace, lightModelViewMatrix );
 
-		if ( composeMode ) {
+		if ( layered ) {
+			glUniform1iARB( g_pointShadowCasterProgram.pointShadowLayer, cubeFace );
+		} else if ( composeMode ) {
 			// Attach this face of the cached cube first: binding the scratch
 			// target afterwards leaves it the draw framebuffer.
 			if ( !composeFrom->renderTexture->MakeCurrent( cubeFace ) ) {
@@ -8902,21 +9024,23 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 				break;
 			}
 		}
-		if ( !g_pointShadowMapRenderTexture->MakeCurrent( cubeFace ) ) {
-			allCastersRendered = false;
-			break;
-		}
-		glViewport( 0, 0, shadowMapWidth, shadowMapHeight );
-		glScissor( 0, 0, shadowMapWidth, shadowMapHeight );
-		if ( composeMode ) {
-			// A blit obeys the scissor box, which covers the whole face here.
-			const GLuint scratchHandle = g_pointShadowMapRenderTexture->GetDeviceHandle();
-			glBindFramebuffer( GL_READ_FRAMEBUFFER, composeFrom->renderTexture->GetDeviceHandle() );
-			glBlitFramebuffer( 0, 0, shadowMapWidth, shadowMapHeight,
-				0, 0, shadowMapWidth, shadowMapHeight, composeCopyMask, GL_NEAREST );
-			glBindFramebuffer( GL_READ_FRAMEBUFFER, scratchHandle );
-		} else {
-			glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+		if ( !layered ) {
+			if ( !g_pointShadowMapRenderTexture->MakeCurrent( cubeFace ) ) {
+				allCastersRendered = false;
+				break;
+			}
+			glViewport( 0, 0, shadowMapWidth, shadowMapHeight );
+			glScissor( 0, 0, shadowMapWidth, shadowMapHeight );
+			if ( composeMode ) {
+				// A blit obeys the scissor box, which covers the whole face here.
+				const GLuint scratchHandle = g_pointShadowMapRenderTexture->GetDeviceHandle();
+				glBindFramebuffer( GL_READ_FRAMEBUFFER, composeFrom->renderTexture->GetDeviceHandle() );
+				glBlitFramebuffer( 0, 0, shadowMapWidth, shadowMapHeight,
+					0, 0, shadowMapWidth, shadowMapHeight, composeCopyMask, GL_NEAREST );
+				glBindFramebuffer( GL_READ_FRAMEBUFFER, scratchHandle );
+			} else {
+				glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+			}
 		}
 
 		backEnd.currentSpace = NULL;
