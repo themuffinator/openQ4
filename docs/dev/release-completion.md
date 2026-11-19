@@ -638,6 +638,11 @@ does not restore the withdrawn release. See
   over a pack's file for them and show Quake 4's own half-size texture. A
   file named after the texture, such as a hi-def marine helmet, is now used,
   and it stays compressed (#217).
+- **Leftover loose textures no longer hide a pack.** A loose copy of an
+  original texture, such as an old extracted `.tga` in `q4base`, used to make
+  a pack's BC7 file look out of date, so the original loaded uncompressed. The
+  pack's file now wins. When `image_showPrecompressedTextures 1` reports a
+  pack file set aside, the log line names the loose file on disk (#217).
 - **BC7 files work wherever DXT files do.** A BC7 replacement that feeds a
   texture openQ4 builds itself, such as a bump map's inputs, is now decoded
   instead of skipped. On graphics without BC7 support, every Mac with OpenGL

@@ -197,12 +197,25 @@ grace for timestamp rounding.
 
 Files inside a PK4 have no timestamp, so they count as older than any loose
 file. A packed replacement is never stale against an original that is also
-packed, but a loose copy of the original texture, such as an extracted `.tga`
-left in `q4base`, `baseoq4` or the mod's folder, makes it look out of date.
-openQ4 then loads the loose original, uncompressed, which can multiply a map's
-texture memory and hide the pack. With `image_showPrecompressedTextures 1` the
-log names each one as `Ignoring stale DDS replacement`. Move loose texture
-folders out of the game's folders when you install a packed texture pack.
+packed. A pack's DDS named after the texture itself also wins over a loose
+copy of the original, such as an extracted `.tga` left in `q4base`, `baseoq4`
+or the mod's folder.
+
+A pack's finished image-program result (a `progimg/...` or `dds/addnormals/...`
+file) can still look out of date when every file the program is built from is
+loose on disk. openQ4 then rebuilds it from those loose files, uncompressed.
+With `image_showPrecompressedTextures 1` the log names each one as
+`Ignoring stale DDS replacement ...: newer loose source <full path>`, so you
+can see which folder holds the file. Move leftover loose texture folders out
+of the game's folders when you install a packed texture pack.
+
+**In 0.14.1** any loose copy of an original texture made a pack's BC7 file
+for it look stale, and the log did not say where the loose file was. It can
+only be in a folder searched before Quake 4's own packs: the mod's folder,
+`baseoq4` or `q4base` in the Quake 4 folder, or the mod's or `baseoq4` folder
+under the save path (`%LOCALAPPDATA%\openQ4` on Windows).
+Look for the texture's name without an extension, since the loose copy can be
+a `.tga`, `.jpg` or `.png`.
 
 ## Compressing textures that are not DDS
 

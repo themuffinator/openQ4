@@ -953,7 +953,16 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 		}
 		if ( R_IsPreferredDDSStale( preferredDDSName, preferredDDSFileTime, originalSourceTime ) ) {
 			if ( cvarSystem->GetCVarBool( "image_showPrecompressedTextures" ) ) {
-				common->Printf( "Ignoring stale DDS replacement %s for %s\n", preferredDDSName.c_str(), GetName() );
+				// Say which file won: a pk4 member never makes a DDS stale, so it
+				// is always a loose file, and players otherwise have to guess
+				// which of their folders holds it (#217).
+				idStr loosePaths;
+				if ( R_DescribeLooseImageSources( GetName(), loosePaths ) > 0 ) {
+					common->Printf( "Ignoring stale DDS replacement %s for %s: newer loose source %s\n",
+						preferredDDSName.c_str(), GetName(), loosePaths.c_str() );
+				} else {
+					common->Printf( "Ignoring stale DDS replacement %s for %s\n", preferredDDSName.c_str(), GetName() );
+				}
 			}
 			preferredDDSImage = false;
 			preferredDDSPrecompressed = false;

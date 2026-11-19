@@ -1772,6 +1772,44 @@ static bool R_ResolveImageSourceFile( const char *imageName, idStr &path ) {
 
 /*
 =============
+R_DescribeLooseImageSources
+
+Names the files on disk that make a texture pack's DDS look out of date. A pk4
+member never does: its stamp orders as 0, so only a loose file, with a real
+modification time, can be newer than a DDS inside a pack.
+=============
+*/
+int R_DescribeLooseImageSources( const char *imageProgram, idStr &paths ) {
+	paths.Clear();
+	idStrList inputs;
+	R_ImageProgramInputNames( imageProgram, inputs );
+	int found = 0;
+	for ( int i = 0; i < inputs.Num(); i++ ) {
+		idStr path;
+		if ( !R_ResolveImageSourceFile( inputs[i], path ) ) {
+			continue;
+		}
+		ID_TIME_T stamp = FILE_NOT_FOUND_TIMESTAMP;
+		fileSystem->ReadFileContentStamp( path.c_str(), NULL, &stamp );
+		if ( stamp == FILE_NOT_FOUND_TIMESTAMP || FS_IsPakMemberContentStamp( stamp ) ) {
+			continue;
+		}
+		idFile *file = fileSystem->OpenFileRead( path.c_str(), false );
+		if ( file == NULL ) {
+			continue;
+		}
+		if ( found > 0 ) {
+			paths += ", ";
+		}
+		paths += file->GetFullPath();
+		fileSystem->CloseFile( file );
+		found++;
+	}
+	return found;
+}
+
+/*
+=============
 R_RetailProgramInputReplaced
 
 Quake 4's progimg/ files are image programs computed from Quake 4's own
