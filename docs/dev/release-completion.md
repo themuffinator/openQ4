@@ -7,6 +7,17 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Russian gameplay text, 19 November 2026
+
+- **More of the game in Russian.** HUD and multiplayer messages, key names,
+  objectives and in-world terminals are now translated, not only the menus.
+  Russian matches German and the other fully translated languages.
+- **Names stay as they are.** Multiplayer map names and key names such as
+  JOY1 keep their original spelling, as in every other language.
+- **Subtitles.** Campaign subtitles are still English, unless your copy of
+  Quake 4 includes its own Russian subtitles.
+- **What to do.** Nothing. Choose **Русский** under Settings → Game Options.
+
 ## Your controller rumbles when you fire and when you are hit (#244), 19 November 2026
 
 - **Every shot and every hit now rumbles a gamepad.** Rumble used to come

@@ -1,0 +1,9 @@
+// string table
+// russian
+//
+
+{	
+	"#str_600001" 	"CAMPGROUNDS REDUX"
+	"#str_600005" 	"TREMORS"
+	"#str_600007" 	"RAILED"
+}
