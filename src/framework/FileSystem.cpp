@@ -5465,11 +5465,15 @@ idFileSystemLocal::DropMountedPakCopies
   list, so nobody could join.
 
   Called before pak is inserted at the top of the search order. A mounted
-  pak with the same checksum is an identical copy that can only ever be
-  shadowed by pak, so it is dropped quietly and every file still resolves to
-  the content it did before. A pak with the same name in the same game
-  folder but a different checksum is a genuine conflict: warn and keep both,
-  and pak takes precedence as it always has.
+  pak with the same name in the same game folder and the same checksum is an
+  identical copy that can only ever be shadowed by pak, so it is dropped
+  quietly and every file still resolves to the content it did before. The
+  name and folder must match too: required retail paks are looked up by
+  their own name in q4base, so a renamed copy, or one in a mod folder, must
+  not stand in for the canonical entry. Those stay mounted, and
+  UpdatePureServerChecksums lists their checksum once. A pak with the same
+  name in the same game folder but a different checksum is a genuine
+  conflict: warn and keep both, and pak takes precedence as it always has.
 ================
 */
 void idFileSystemLocal::DropMountedPakCopies( const pack_t *pak, const char *dir ) {
@@ -5485,6 +5489,12 @@ void idFileSystemLocal::DropMountedPakCopies( const pack_t *pak, const char *dir
 			link = &sp->next;
 			continue;
 		}
+		idStr oldName;
+		sp->pack->pakFilename.ExtractFileName( oldName );
+		if ( oldName.Icmp( newName ) || !FS_PakPathIsInGameDir( sp->pack->pakFilename.c_str(), dir ) ) {
+			link = &sp->next;
+			continue;
+		}
 		if ( sp->pack->checksum == pak->checksum ) {
 			if ( fs_debug.GetInteger() ) {
 				common->Printf( "Dropping pk4 %s: identical to %s\n", sp->pack->pakFilename.c_str(), pak->pakFilename.c_str() );
@@ -5494,12 +5504,8 @@ void idFileSystemLocal::DropMountedPakCopies( const pack_t *pak, const char *dir
 			delete sp;
 			continue;
 		}
-		idStr oldName;
-		sp->pack->pakFilename.ExtractFileName( oldName );
-		if ( !oldName.Icmp( newName ) && FS_PakPathIsInGameDir( sp->pack->pakFilename.c_str(), dir ) ) {
-			common->Warning( "%s and %s have the same name but different contents; using %s",
-				sp->pack->pakFilename.c_str(), pak->pakFilename.c_str(), pak->pakFilename.c_str() );
-		}
+		common->Warning( "%s and %s have the same name but different contents; using %s",
+			sp->pack->pakFilename.c_str(), pak->pakFilename.c_str(), pak->pakFilename.c_str() );
 		link = &sp->next;
 	}
 }
@@ -6938,6 +6944,15 @@ void idFileSystemLocal::SetRestrictions( void ) {
 #endif
 }
 
+static bool PackListHasChecksum( const idList<pack_t *> &paks, int checksum ) {
+	for ( int i = 0; i < paks.Num(); i++ ) {
+		if ( paks[ i ]->checksum == checksum ) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /*
 =====================
 idFileSystemLocal::UpdatePureServerChecksums
@@ -6959,6 +6974,12 @@ void idFileSystemLocal::UpdatePureServerChecksums( void ) {
 			continue;
 		}
 		if ( status == PURE_NEUTRAL && !search->pack->referenced ) {
+			continue;
+		}
+		// An identical copy that stayed mounted (a renamed pak, or one in
+		// another game folder) ranks below the copy already listed and can
+		// only be shadowed by it. Clients refuse a list naming a checksum twice.
+		if ( PackListHasChecksum( serverPaks, search->pack->checksum ) ) {
 			continue;
 		}
 		serverPaks.Append( search->pack );

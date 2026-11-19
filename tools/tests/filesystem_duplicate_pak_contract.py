@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Check that a pak reachable from two search roots is mounted only once.
 
-An identical copy (same checksum) already in the search list must be dropped
-quietly, so a server never names one checksum twice in its pure list. A pak
-with the same name in the same game folder but different contents must warn
-and stay mounted. Directory entries and unrelated paks are left alone.
+An identical copy (same name, same game folder, same checksum) already in the
+search list must be dropped quietly. A renamed identical copy, or one in another
+game folder, must stay mounted: required retail paks are found by their own name
+in q4base, so the canonical entry must never be freed in favour of a copy. The
+pure list then names such a checksum once. A pak with the same name in the same
+game folder but different contents must warn and stay mounted. Directory entries
+and unrelated paks are left alone.
 """
 from __future__ import annotations
 
@@ -100,27 +103,35 @@ int main() {
     assert(!HasPak(fs, "/games/quake4/q4base/pak022.pk4"));
     assert(HasPak(fs, "/games/quake4/q4base/pak013.pk4") && Count(fs) == 5);
 
-    // Identical content under another name is still the same pak.
+    // Identical content under another name keeps the canonical entry, which
+    // the required-pak check looks up by name.
     pack_t renamed{"/opt/openq4/q4base/patch013.pk4", 0x13};
     fs.DropMountedPakCopies(&renamed, "q4base");
-    assert(fs.freed == 2 && common->warnings == 0 && Count(fs) == 4);
+    assert(fs.freed == 1 && common->warnings == 0 && Count(fs) == 5);
+    assert(HasPak(fs, "/games/quake4/q4base/pak013.pk4"));
+
+    // So does an identical copy in another game folder, such as a mod.
+    pack_t modCopy{"/opt/openq4/mymod/pak013.pk4", 0x13};
+    fs.DropMountedPakCopies(&modCopy, "mymod");
+    assert(fs.freed == 1 && common->warnings == 0 && Count(fs) == 5);
+    assert(HasPak(fs, "/games/quake4/q4base/pak013.pk4"));
 
     // Same name, same folder, different contents: warn and keep both.
     pack_t changed{"/opt/openq4/q4base/pak001.pk4", 0x7777};
     fs.DropMountedPakCopies(&changed, "q4base");
-    assert(fs.freed == 2 && common->warnings == 1 && Count(fs) == 4);
+    assert(fs.freed == 1 && common->warnings == 1 && Count(fs) == 5);
     assert(HasPak(fs, "/games/quake4/q4base/pak001.pk4"));
 
     // A mod's pak named like a retail one is an intended override: no warning.
     pack_t mod{"/opt/openq4/mymod/pak001.pk4", 0x8888};
     fs.DropMountedPakCopies(&mod, "mymod");
-    assert(fs.freed == 2 && common->warnings == 1 && Count(fs) == 4);
+    assert(fs.freed == 1 && common->warnings == 1 && Count(fs) == 5);
 
     // fs_debug reports the drop.
     fs_debug.value = 1;
     pack_t again{"/opt/openq4/q4base/pak001.pk4", 0x01};
     fs.DropMountedPakCopies(&again, "q4base");
-    assert(fs.freed == 3 && common->prints == 1 && Count(fs) == 3);
+    assert(fs.freed == 2 && common->prints == 1 && Count(fs) == 4);
 
     // Directory entries are never touched, including the head.
     assert(fs.searchPaths->dir && fs.searchPaths->next->pack);
@@ -129,7 +140,7 @@ int main() {
         delete sp->pack; delete sp->dir; delete sp;
         sp = next;
     }
-    puts("filesystem_duplicate_pak_contract: PASS (identical copies dropped, conflicts warned)");
+    puts("filesystem_duplicate_pak_contract: PASS (identical copies dropped, renamed copies kept, conflicts warned)");
 }
 '''
 
@@ -139,8 +150,13 @@ def main() -> None:
     parser.add_argument("--source", type=Path, default=ROOT / "src/framework/FileSystem.cpp")
     parser.add_argument("--sanitize", action="store_true")
     args = parser.parse_args()
-    body = function_body(args.source.read_text(encoding="utf-8"),
-                         "void idFileSystemLocal::DropMountedPakCopies(")
+    text = args.source.read_text(encoding="utf-8")
+    body = function_body(text, "void idFileSystemLocal::DropMountedPakCopies(")
+    # A renamed or cross-folder copy stays mounted, so the pure list itself
+    # must name each checksum once: clients refuse a list with a repeat.
+    pure = function_body(text, "void idFileSystemLocal::UpdatePureServerChecksums(")
+    if "PackListHasChecksum( serverPaks, search->pack->checksum )" not in pure:
+        raise SystemExit("UpdatePureServerChecksums must skip a checksum it already listed")
     compiler = next((path for name in ("clang++", "g++", "c++") if (path := shutil.which(name))), None)
     if compiler is None:
         raise RuntimeError("a C++ compiler is required")
