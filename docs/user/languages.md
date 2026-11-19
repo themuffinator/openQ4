@@ -14,7 +14,8 @@ openQ4 can show its menus and game text in twelve languages. Choose one with **S
 | Hungarian | `hungarian` | The same as German |
 | Turkish | `turkish` | The same as German |
 | Ukrainian | `ukrainian` | The same as German |
-| Polish, Russian | `polish`, `russian` | Menus and openQ4's own settings; other game text is in English |
+| Russian | `russian` | The same as German (**Not in 0.14.1**: 0.14.1 translates only the menus and openQ4's own settings) |
+| Polish | `polish` | Menus and openQ4's own settings; other game text is in English |
 
 On the very first launch openQ4 picks your system language if it is one of
 these. Portuguese systems get Brazilian Portuguese. After that your choice is

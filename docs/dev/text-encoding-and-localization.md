@@ -333,6 +333,33 @@ python tools/tests/localization_smoke.py --language ukrainian --mode MP --render
 `german_localization_smoke.py` remains as the German case with its original
 evidence folder.
 
+## Russian gameplay text
+
+Russian started with only the `guis` and `openq4` tables. The `code` and
+`maps` tables were contributed by Nikita Skatkov (pull request #243) and
+follow the contract above, so Russian is now in `FULL_TABLE_LANGUAGES`.
+`russian_mappack.lang` keeps the map names, as the other languages' do.
+
+Bringing the contribution under the contract changed a few things:
+
+- Strings the game formats keep the English shape. The tournament placings
+  keep their `^0` colour resets, and the fourth-and-later placing starts with
+  its ordinal ending (`-е^0 место`), because the game prints the rank number
+  straight before it. The ready-up prompts keep their `\n`, and their
+  semicolons stay.
+- Names keep their original spelling, as in every other table. This covers
+  multiplayer map names, joystick and AUX key names, the `DM` and `CTF`
+  game-type abbreviations and the product name `openQ4`.
+- `russian_openq4.lang` had carried 56 `code` keys while Russian had no `code`
+  table. They now live in `russian_code.lang` with the same text, so every key
+  is in one table and what players see does not change. The openQ4 table
+  loads last, so its text was the one in effect.
+
+Campaign subtitles (`russian_lips.lang`) are not bundled; the contributed
+draft was still mostly English and is left to a later pull request. As with
+German, an installation's own Russian dialogue table stays in effect, and
+otherwise the English subtitles apply.
+
 ## What is not covered
 
 - **Text input above Latin-1.** `idEditField` and the win32/SDL scan tables are

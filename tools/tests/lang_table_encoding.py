@@ -57,6 +57,7 @@ FULL_TABLE_LANGUAGES = {
     "hungarian": "Magyar",
     "turkish": "Türkçe",
     "ukrainian": "Українська",
+    "russian": "Русский",
 }
 
 # Letters each of those languages is not written without.  They must turn up
@@ -69,6 +70,7 @@ SIGNATURE_LETTERS = {
     "hungarian": "őűöüáéí",
     "turkish": "ğışçöüİ",
     "ukrainian": "єіїщЄІ",
+    "russian": "ыэъёЫЭ",
 }
 
 # The chooser appends languages, so an index never moves once shipped: the

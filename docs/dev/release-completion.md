@@ -7,6 +7,18 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Russian gameplay text, 19 November 2026
+
+- **More of the game in Russian.** HUD and multiplayer messages, key names,
+  objectives and in-world terminals are now translated, not only the menus.
+  Russian matches German and the other fully translated languages.
+  Translation contributed by Nikita Skatkov.
+- **Names stay as they are.** Multiplayer map names and key names keep their
+  original spelling, as in every other language.
+- **Subtitles.** Campaign subtitles are still English, unless your copy of
+  Quake 4 includes its own Russian subtitles.
+- **What to do.** Nothing. Choose **Русский** under Settings → Game Options.
+
 ## More texture pack formats, and an option to keep big packs in memory, 18 November 2026
 
 - **More DDS files load.** BC1 and BC3 (DXT1/DXT5) files saved with a DX10
