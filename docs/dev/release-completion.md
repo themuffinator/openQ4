@@ -18,6 +18,33 @@ does not restore the withdrawn release. See
   Quake 4 includes its own Russian subtitles.
 - **What to do.** Nothing. Choose **Русский** under Settings → Game Options.
 
+## Sharp character and object shadows outdoors on Quality and Ultra (#239), 19 November 2026
+
+- **Your own shadow, other characters' and nearby objects' shadows now show
+  up outdoors.** Quake 4 lights its outdoor areas with a few enormous lights.
+  On Quality and Ultra each of them had one shadow map stretched over the
+  whole area, about 25 game units per shadow pixel around you on Air Defense
+  1, so characters were two pixels wide and most nearby shadows vanished.
+  Quality and Ultra now give sunlight and other distant lights cascades: the
+  sharpest shadow map covers the area around you. Indoor spotlights keep one
+  map each, as before; Maximum still cascades those too. On ten outdoor views
+  of Air Defense 1, the share of the original game's shadow that appears went
+  from about 28% to 96%, on OpenGL and Vulkan alike.
+- **Distant shadows no longer stop at the edge of the cascades.** With
+  cascades on, shadows used to end about 1,500 units from you. The last
+  cascade now holds the light's whole shadow map, and anything farther away
+  that the nearer cascades still cover keeps their sharper shadow.
+  `r_shadowMapCascadeFarMap 0` restores the old behaviour.
+- **What to do.** Nothing, if you use the Quality or Ultra preset. Players on
+  an earlier preset version see the graphics check once at startup, because
+  the presets changed. If you set shadows yourself, `r_shadowMapCSM 1` turns
+  cascades on.
+- **Cost.** The extra shadow work is small: on Vulkan the sunlight's shadow
+  maps take about 0.15 ms more per frame at 2560 x 1440. On OpenGL the
+  distant part of the sunlight's shadow is kept between frames, so only
+  moving characters are redrawn into it, and the cascades draw 18% fewer
+  objects than Maximum's did before.
+
 ## Your controller rumbles when you fire and when you are hit (#244), 19 November 2026
 
 - **Every shot and every hit now rumbles a gamepad.** Rumble used to come

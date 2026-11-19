@@ -56,8 +56,8 @@ static void Profiles(){
  {1,85,0,1,60,2,1,0,0,0,0,64,0,0,1,0,0,1024,2,0,0,0,0,0,1,16,4,0,1,40,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {2,100,2,1,120,4,1,0,0,0,0,64,0,0,1,0,0,1024,0,0,0,0,0,0,1,16,4,0,1,48,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
  {2,100,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1},
- {3,100,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
- {3,100,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,0,4,1,1,1,1,1},
+ {3,100,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1},
+ {3,100,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1},
  {3,100,8,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1}};
  const char* names[]={"minimum","lowpower","low","performance","balanced","enhanced","quality","ultra","maximum"};
  const char* renderer[]={"low","low","low","baseline","baseline","modern","modern","high-end","high-end"};
@@ -414,7 +414,7 @@ static void SystemVersion(){
  for(size_t i=revision.size();i<version.size();++i)
   Check((version[i]>='0'&&version[i]<='9')||(version[i]>='a'&&version[i]<='f'),"fingerprint is lower-case hex");
  Check(PerformancePresetFingerprintMachines()==9042,"detection matrix covers every GPU class, memory band, resolution class and platform ceiling");
- Check(version=="1.f3cd9be4","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
+ Check(version=="1.46eb190c","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
 }
 int main(){
 #if defined(_WIN32) && defined(_DEBUG)

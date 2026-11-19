@@ -858,6 +858,7 @@ static void R_ModernShadowPlanner_ClearDescriptorContract( modernShadowLightDesc
 	}
 	descriptor.projectedFallbackCascade = -1;
 	descriptor.projectedFallbackReason = SHADOWMAP_PROJECTED_FALLBACK_NONE;
+	descriptor.wholeLightCascadeSlot = 0;
 	descriptor.projectedSampleCount = 0;
 	descriptor.projectedValidSampleCount = 0;
 	descriptor.projectedSkippedSampleCount = 0;
@@ -880,6 +881,7 @@ static void R_ModernShadowPlanner_ApplyProjectedContract( modernShadowLightDescr
 	descriptor.projectedCascadeFallback = projectedState.cascadeFallback;
 	descriptor.projectedFallbackCascade = projectedState.fallbackCascade;
 	descriptor.projectedFallbackReason = projectedState.fallbackReason;
+	descriptor.wholeLightCascadeSlot = projectedState.wholeLightCascade + 1;
 	descriptor.requestedCascadeCount = Max( 1, projectedState.requestedCascadeCount );
 	descriptor.cascadeCount = idMath::ClampInt( 1, MODERN_SHADOW_DESCRIPTOR_MAX_CASCADES, projectedState.cascadeCount );
 	descriptor.atlasDiv = Max( 1, projectedState.atlasDiv );
@@ -2471,6 +2473,7 @@ bool RendererShadowPlanner_RunSelfTest( void ) {
 	rendererShadowPlannerBoolCVarRestore_t restoreTranslucent( r_shadowMapTranslucentMoments );
 	rendererShadowPlannerBoolCVarRestore_t restoreStaticCache( r_shadowMapStaticCache );
 	rendererShadowPlannerBoolCVarRestore_t restoreCacheCSM( r_shadowMapCacheCSM );
+	rendererShadowPlannerBoolCVarRestore_t restoreCascadeFarMap( r_shadowMapCascadeFarMap );
 	rendererShadowPlannerIntCVarRestore_t restoreCascadeCount( r_shadowMapCascadeCount );
 	rendererShadowPlannerIntCVarRestore_t restoreShadowMapSize( r_shadowMapSize );
 	rendererShadowPlannerIntCVarRestore_t restoreProjectedCacheSize( r_shadowMapProjectedCacheSize );
@@ -2485,6 +2488,9 @@ bool RendererShadowPlanner_RunSelfTest( void ) {
 	r_shadowMapTranslucentMoments.SetBool( false );
 	r_shadowMapStaticCache.SetBool( true );
 	r_shadowMapCacheCSM.SetBool( false );
+	// The fixtures pin view-fitted cascades; the whole-light last cascade has
+	// its own test (R_ShadowMapCascadeWholeLightSelfTest).
+	r_shadowMapCascadeFarMap.SetBool( false );
 	r_shadowMapCascadeCount.SetInteger( 3 );
 	r_shadowMapSize.SetInteger( 1024 );
 	r_shadowMapProjectionPad.SetFloat( 0.20f );
@@ -3135,6 +3141,10 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (cascade stability)\n" );
 		return false;
 	}
+	if ( !R_ShadowMapCascadeWholeLightSelfTest() ) {
+		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (whole-light cascade)\n" );
+		return false;
+	}
 
 	if ( !rg_modernShadowPlannerInitialized || !rg_modernShadowPlannerFeatures.scenePackets ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test passed (planner unavailable)\n" );
@@ -3184,6 +3194,7 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 	rendererShadowProjectedDiagnosticBoolCVarRestore_t restoreTranslucent( r_shadowMapTranslucentMoments );
 	rendererShadowProjectedDiagnosticBoolCVarRestore_t restoreStaticCache( r_shadowMapStaticCache );
 	rendererShadowProjectedDiagnosticBoolCVarRestore_t restoreCacheCSM( r_shadowMapCacheCSM );
+	rendererShadowProjectedDiagnosticBoolCVarRestore_t restoreCascadeFarMap( r_shadowMapCascadeFarMap );
 	rendererShadowProjectedDiagnosticBoolCVarRestore_t restoreReceiverPlaneBias( r_shadowMapReceiverPlaneBias );
 	rendererShadowProjectedDiagnosticBoolCVarRestore_t restoreCascadeStabilize( r_shadowMapCascadeStabilize );
 	rendererShadowProjectedDiagnosticIntCVarRestore_t restoreCascadeCount( r_shadowMapCascadeCount );
@@ -3210,6 +3221,7 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 	r_shadowMapTranslucentMoments.SetBool( false );
 	r_shadowMapStaticCache.SetBool( false );
 	r_shadowMapCacheCSM.SetBool( false );
+	r_shadowMapCascadeFarMap.SetBool( false );
 	r_shadowMapReceiverPlaneBias.SetBool( false );
 	r_shadowMapCascadeStabilize.SetBool( true );
 	r_shadowMapCascadeCount.SetInteger( 3 );

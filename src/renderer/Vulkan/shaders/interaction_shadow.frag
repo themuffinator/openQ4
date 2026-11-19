@@ -69,7 +69,8 @@ layout(set = 7, binding = 1, std140) uniform ShadowBlock {
     vec4 normalOffsetWorld;
     vec4 viewDepthRow;
     vec4 biasParams;   // x: constant bias, y: normal bias, z: cascade blend, w: cascade count
-    vec4 texelSize;    // x,y: 1 / atlas dimensions, z: r_shadowMapTexelBiasScale
+    vec4 texelSize;    // x,y: 1 / atlas dimensions, z: r_shadowMapTexelBiasScale,
+                       // w: index + 1 of the whole-light cascade (0 = none)
     vec4 filterParams; // x: radius, y: taps, z: mode, w: hardware compare
     vec4 pcssParams;   // x: light radius, y: max radius, z: effective radius, w: receiver-plane bias
     vec4 debugParams;  // x: debug mode, y: fallback reason, zw: PCSS ownership UV offset
@@ -557,14 +558,62 @@ float SampleCascadeByIndex(int cascadeIndex) {
         AtlasRectByIndex(cascadeIndex), cascadeIndex);
 }
 
+int WholeLightCascade() {
+    return int(shadow.texelSize.w + 0.5) - 1;
+}
+
+// How far inside cascade index's crop the receiver sits, as a fraction of the
+// crop and clear of the filter guard; zero or less outside it
+// (GL shadow_interaction.fs CascadeHoldMargin).
+float CascadeHoldMargin(int cascadeIndex) {
+    vec4 coord = ShadowCoordByIndex(cascadeIndex);
+    if (coord.w != coord.w || coord.w <= 1.0e-5 || coord.w > 65536.0
+            || coord.z <= 0.0 || coord.z >= 1.0) {
+        return -1.0;
+    }
+    vec2 localUv = coord.xy / coord.w * 0.5 + 0.5;
+    vec4 rect = AtlasRectByIndex(cascadeIndex);
+    float guardRadius = max(0.5, shadow.pcssParams.z + 0.75);
+    vec2 guard = abs(shadow.texelSize.xy) * guardRadius
+        / max(abs(rect.zw - rect.xy), vec2(1.0e-6));
+    vec2 edge = min(localUv, vec2(1.0) - localUv) - guard;
+    return min(edge.x, edge.y);
+}
+
+// Past the fitted reach the last fitted cascade still serves every receiver
+// its crop holds, fading into the whole-light map over the crop's outer 5%.
+const float kWholeLightFade = 0.05;
+
+float WholeLightHeld(int wholeLight) {
+    return clamp(CascadeHoldMargin(wholeLight - 1) / kWholeLightFade, 0.0, 1.0);
+}
+
 float SampleShadowFactor() {
     int cascadeIndex = SelectShadowCascade(vViewDepth);
     gShadowCascadeIndex = cascadeIndex;
     gShadowCascadeBlend = 0.0;
+    int wholeLight = WholeLightCascade();
+    if (wholeLight > 0 && cascadeIndex >= wholeLight) {
+        float held = WholeLightHeld(wholeLight);
+        if (held >= 1.0) {
+            gShadowCascadeIndex = wholeLight - 1;
+            return SampleCascadeByIndex(wholeLight - 1);
+        }
+        float whole = SampleCascadeByIndex(wholeLight);
+        if (held <= 0.0) {
+            return whole;
+        }
+        gShadowCascadeIndex = wholeLight - 1;
+        gShadowCascadeBlend = 1.0 - held;
+        return mix(whole, SampleCascadeByIndex(wholeLight - 1), held);
+    }
     float shadowFactor = SampleCascadeByIndex(cascadeIndex);
     int lastInteriorIndex = ShadowCascadeCount() - 2;
     float cascadeBlend = shadow.biasParams.z;
-    if (cascadeIndex > lastInteriorIndex || cascadeBlend <= 0.0) {
+    // Inside the reach a receiver never blends toward the whole-light map:
+    // the fitted cascade it is in is finer.
+    if (cascadeIndex > lastInteriorIndex || cascadeBlend <= 0.0
+            || cascadeIndex + 1 == wholeLight) {
         return shadowFactor;
     }
 
@@ -663,10 +712,23 @@ vec3 SampleTranslucentShadow() {
         return vec3(1.0);
     }
     int cascadeIndex = SelectShadowCascade(vViewDepth);
+    int wholeLight = WholeLightCascade();
+    if (wholeLight > 0 && cascadeIndex >= wholeLight) {
+        float held = WholeLightHeld(wholeLight);
+        if (held >= 1.0) {
+            return SampleTranslucentCascadeByIndex(wholeLight - 1);
+        }
+        vec3 whole = SampleTranslucentCascadeByIndex(wholeLight);
+        if (held <= 0.0) {
+            return whole;
+        }
+        return mix(whole, SampleTranslucentCascadeByIndex(wholeLight - 1), held);
+    }
     vec3 transmittance = SampleTranslucentCascadeByIndex(cascadeIndex);
     int lastInteriorIndex = ShadowCascadeCount() - 2;
     float cascadeBlend = shadow.biasParams.z;
-    if (cascadeIndex > lastInteriorIndex || cascadeBlend <= 0.0) {
+    if (cascadeIndex > lastInteriorIndex || cascadeBlend <= 0.0
+            || cascadeIndex + 1 == wholeLight) {
         return transmittance;
     }
 

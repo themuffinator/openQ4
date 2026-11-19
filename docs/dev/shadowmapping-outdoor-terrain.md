@@ -41,6 +41,106 @@ idLib state. Shadow admission now refreshes for each renderer view, while the
 hold uses the renderer's frame counter. Both backends share this correction.
 It preserves the authored distance/coverage thresholds and staggered hold.
 
+## Cascaded sunlight on Quality and Ultra, 19 November 2026 (#239)
+
+Players reported blocky or missing character shadows outdoors on Quality.
+Air Defense 1's sunlight is `light_146`, a point light whose `light_center`
+puts its source about 19,000 units from a 14,784 x 13,888 x 6,368 volume. Its
+single 2048 map measures 25 world units per texel at the player (renderer
+estimate), so a character is two texels wide and the texel-scaled bias and
+normal offset remove most nearby shadows. Cascade 0 measures 0.73.
+
+The change follows id Tech 6 (DOOM 2016, SIGGRAPH 2016 "The Devil is in the
+Details", slides 17-18): cascades for directional lights only, one PCF path for
+every light type, and static shadows cached separately from moving casters.
+
+- **Presets.** Quality and Ultra now set `r_shadowMapCSM 1` with
+  `r_shadowMapProjectedCSM 0`: sunlight, parallel and distant point sources are
+  cascaded and ordinary spotlights keep one map. Maximum keeps cascading
+  spotlights. The preset system version moves to `1.46eb190c`, so existing
+  players see the system check once.
+- **Whole-light last cascade** (`r_shadowMapCascadeFarMap`, default 1). The
+  fitted cascades ended at `r_shadowMapCascadeDistance` and receivers beyond
+  their crops came out unshadowed (the cascade range end in REN-03). The last
+  of the requested cascades now holds the light's base projection at the
+  cascade tile size, with the single map's bias contract
+  (`R_ShadowMapSetWholeLightCascade`). The other cascades split the reach.
+- **Per-pixel selection past the reach.** Choosing the whole-light map by
+  view depth alone cost elevated views most of their distant shadows (ridge
+  91% -> 60%): Air Defense 1's buildings stand past the reach but inside the
+  last fitted crop, at 6.8 units a texel against the whole map's 50. A
+  per-view "hold depth" (deepest cross-section inside that crop) did not help,
+  because the full frustum cross-section leaves the crop long before the
+  buildings do. Every receiver path now tests the last fitted crop per pixel
+  (`CascadeHoldMargin`: GL `shadow_interaction.fs`, Vulkan
+  `interaction_shadow.frag`, the modern clustered library) and fades to the
+  whole-light map over the crop's outer 5%. Inside the reach a receiver never
+  blends toward the whole-light map. Vulkan carries the index in
+  `texelSize.w`, GL in `uShadowWholeLightCascade`, the modern record in
+  `counts.w` (index + 1, 0 = none).
+
+Measured on ten frozen poses (the nine stops below plus the player standing
+at `info_player_start` looking at the ground), 2560 x 1440, Quality. Score:
+the share of pixels that stencil shadows by more than 15 levels where the mode
+keeps at least half of that occlusion.
+
+| Mode | OpenGL | Vulkan |
+| --- | ---: | ---: |
+| Single map (0.14.1 Quality) | 27.7% | 27.6% |
+| Four fitted cascades (0.14.1 Maximum layout) | 96.0% | 96.0% |
+| Three fitted + whole-light (new Quality) | 96.4% | 96.4% |
+
+| Pose | Single map | Four fitted | New |
+| --- | ---: | ---: | ---: |
+| Standing at the start, own surroundings | 0.6% | 90.5% | 90.6% |
+| Wreckage | 5.6% | 100% | 100% |
+| Opening | 37.4% | 94.7% | 94.5% |
+| Ridge (elevated) | 68.3% | 90.2% | 90.1% |
+| Vista | 81.1% | 81.7% | 89.3% |
+| Distant | 92.9% | 84.1% | 89.7% |
+
+(OpenGL; Vulkan agrees within one point everywhere.) Splitting the reach
+three ways instead of four costs up to a point at tank, reverse and opening.
+Single-map results vary between launches at some poses (opening 39% or 96%)
+with identical interactions, casters and cache reports; the cause is open and
+cascades are unaffected.
+
+**Cached whole-light slot (OpenGL, `r_shadowMapCascadeFarCache`, default 1).**
+The whole-light cascade does not move with the camera, so its still scenery is
+kept in an atlas cell of its own (a projected cache entry in a separate pass-kind
+namespace, keyed by the pass signature with the fitted projection replaced by
+the whole-light cascade's planes, texel and depth contract). Each frame the cell
+is copied into the cascade's tile and only moving casters are drawn over it.
+A changed caster set, a moving light or a disabled static cache draws it fresh.
+Cached and freshly drawn frames match outside the animated HUD (3 pixels by one
+level over nine poses). Vulkan redraws the slot with the other cascades; its
+whole cascade set costs a fraction of a millisecond.
+
+Cost, Air Defense 1 opening, view turning, per frame. Caster draws come from the
+`casterDraws=` field added to the `SM metrics` report and do not depend on load:
+
+| Layout | Caster draws | Caster indexes |
+| --- | ---: | ---: |
+| Single map (0.14.1 Quality) | 17 | 27k |
+| Four fitted cascades (0.14.1 Maximum layout) | 359 | 333k |
+| Three fitted + whole-light, slot redrawn | 447 | 379k |
+| Three fitted + whole-light, slot cached (new default) | 296 | 279k |
+
+Vulkan's projected map rendering measured 0.09 ms for the single map and 0.23 ms
+for the new layout (three interleaved repeats each). OpenGL timer queries were
+not repeatable on the shared machine on 19 November (two other projects'
+clients held the GPU); the quietest earlier run put four fitted cascades at
++0.6 to +1.4 ms of shadow GPU time over the single map at 2560 x 1440, and the
+cached layout issues 18% fewer caster draws than that layout. The FPS-02
+Quality/Ultra budgets still need re-measuring on the reference machine.
+
+`rendererShadowProjectedDiagnosticSelfTest` runs
+`R_ShadowMapCascadeWholeLightSelfTest` on light_146's parameters: layouts of
+four fitted, three plus whole-light and one plus whole-light; fitted crops
+holding receivers inside the reach; the last cascade equal to the base
+projection; every receiver past the reach inside the light covered; and a
+distinct cache identity. The planner fixtures pin fitted-only cascades.
+
 ## Reproduction
 
 ```powershell

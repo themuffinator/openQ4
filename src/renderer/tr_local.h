@@ -1808,6 +1808,8 @@ typedef enum {
 } shadowMapDebugMode_t;
 extern idCVar r_shadowMapDebugMode;		// projected shadow-map visualization mode
 extern idCVar r_shadowMapCascadeStabilize;	// snap projected-light cascade bounds to texels
+extern idCVar r_shadowMapCascadeFarMap;		// last cascade holds the whole light past the fitted reach
+extern idCVar r_shadowMapCascadeFarCache;	// GL: cache that cascade's still scenery between frames
 extern idCVar r_shadowMapPointFarScale;	// range padding multiplier used by point-light shadow maps
 extern idCVar r_shadowMapPolygonFactor;	// slope-scale bias used when rendering simple shadow maps
 extern idCVar r_shadowMapPolygonOffset;	// constant bias used when rendering simple shadow maps

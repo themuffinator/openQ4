@@ -1852,6 +1852,7 @@ typedef struct {
 	GLint			shadowCascadeBiasScale;
 	GLint			shadowCascadeCount;
 	GLint			shadowCascadeBlend;
+	GLint			shadowWholeLightCascade;
 	GLint			shadowDebugMode;
 	GLint			shadowReceiverDebugReason;
 	GLint			translucentShadowEnabled;
@@ -2267,6 +2268,12 @@ typedef struct {
 	int					staticHysteresisPasses;
 	int					pointDepthComparePasses;
 	int					projectedAtlasTilesRendered;
+	// projected caster draws (one per surface per cascade tile) and their indexes
+	int					projectedCasterDraws;
+	int					projectedCasterIndexes;
+	// whole-light cascades served from their cached still scenery / drawn and stored
+	int					wholeLightReuses;
+	int					wholeLightPublishes;
 	int					projectedAtlasTilesAllocated;
 	int					projectedCacheSlotsUsed;
 	int					projectedCacheSlotsTotal;
@@ -3573,7 +3580,7 @@ static int RB_ShadowMapMapNameHash( const viewDef_t *viewDef ) {
 		? idStr::Hash( viewDef->renderWorld->mapName.c_str() ) : 0;
 }
 
-static int RB_ShadowMapBuildPassSignatureForView( const viewLight_t *vLight, const viewDef_t *viewDef, const shadowMapPassKind_t passKind, const bool pointLight ) {
+static int RB_ShadowMapBuildPassSignatureForView( const viewLight_t *vLight, const viewDef_t *viewDef, const shadowMapPassKind_t passKind, const bool pointLight, const bool wholeLightOnly = false ) {
 	int hash = static_cast<int>( 2166136261u );
 	const int cascadeCount = RB_ShadowMapCascadeCountForLight( vLight );
 	const idRenderWorldLocal *renderWorld =
@@ -3621,7 +3628,26 @@ static int RB_ShadowMapBuildPassSignatureForView( const viewLight_t *vLight, con
 		shadowMapProjectedLightState_t projectedState;
 		R_BuildShadowMapProjectedLightState( vLight, viewDef,
 			RB_ShadowMapTileSizeForLight( vLight ), projectedState );
-		hash = R_ShadowMapProjectedStateHash( hash, projectedState );
+		if ( wholeLightOnly ) {
+			// The whole-light cascade depends on the light alone, not on the
+			// view-fitted cascades beside it, so camera motion keeps it.
+			const int whole = projectedState.wholeLightCascade;
+			hash = RB_ShadowMapHashInt( hash, 0x57484c43 );
+			hash = RB_ShadowMapHashInt( hash, whole );
+			hash = RB_ShadowMapHashInt( hash, projectedState.tileSize );
+			if ( whole >= 0 && whole < SHADOWMAP_PROJECTED_MAX_CASCADES ) {
+				for ( int plane = 0; plane < 4; ++plane ) {
+					for ( int component = 0; component < 4; ++component ) {
+						hash = RB_ShadowMapHashFloat( hash, projectedState.clipPlanes[whole][plane][component] );
+					}
+				}
+				hash = RB_ShadowMapHashFloat( hash, projectedState.worldTexelSize[whole] );
+				hash = RB_ShadowMapHashFloat( hash, projectedState.texelDepthBias[whole] );
+				hash = RB_ShadowMapHashFloat( hash, projectedState.depthRange[whole] );
+			}
+		} else {
+			hash = R_ShadowMapProjectedStateHash( hash, projectedState );
+		}
 	}
 	if ( vLight != NULL ) {
 		for ( int i = 0; i < 3; i++ ) {
@@ -5585,6 +5611,7 @@ static const char *programBaseName = "glprogs/shadow_interaction";
 	g_shadowMapProgram.shadowCascadeBiasScale = glGetUniformLocationARB( programObject, "uShadowCascadeBiasScale[0]" );
 	g_shadowMapProgram.shadowCascadeCount = glGetUniformLocationARB( programObject, "uShadowCascadeCount" );
 	g_shadowMapProgram.shadowCascadeBlend = glGetUniformLocationARB( programObject, "uShadowCascadeBlend" );
+	g_shadowMapProgram.shadowWholeLightCascade = glGetUniformLocationARB( programObject, "uShadowWholeLightCascade" );
 	g_shadowMapProgram.shadowDebugMode = glGetUniformLocationARB( programObject, "uShadowDebugMode" );
 	g_shadowMapProgram.shadowReceiverDebugReason = glGetUniformLocationARB( programObject, "uShadowReceiverDebugReason" );
 	g_shadowMapProgram.translucentShadowEnabled = glGetUniformLocationARB( programObject, "uTranslucentShadowEnabled" );
@@ -7056,7 +7083,7 @@ static void RB_ShadowMapStatsReport( void ) {
 	}
 
 	common->Printf(
-		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f]\n",
+		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f] casterDraws=%d casterIndexes=%d farSlot=%d/%d\n",
 		g_shadowMapStats.shadowMapUpdates,
 		g_shadowMapStats.composePasses,
 		g_shadowMapStats.subviewUpdates,
@@ -7077,7 +7104,11 @@ static void RB_ShadowMapStatsReport( void ) {
 		g_shadowMapStats.gpuTimerSamples,
 		g_shadowMapStats.gpuTimerPending,
 		g_shadowMapStats.minWorldTexelSize,
-		g_shadowMapStats.maxWorldTexelSize );
+		g_shadowMapStats.maxWorldTexelSize,
+		g_shadowMapStats.projectedCasterDraws,
+		g_shadowMapStats.projectedCasterIndexes,
+		g_shadowMapStats.wholeLightReuses,
+		g_shadowMapStats.wholeLightPublishes );
 	common->Printf(
 		"SM timings: cpu(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuSync(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuQuery(map=%.2f/%d reuse=%.2f/%d mask=%.2f/%d receiverFallback=%.2f/%d stencilFallback=%.2f/%d pending=%d:%d/%d/%d/%d/%d)\n",
 		g_shadowMapStats.cpuPhaseMilliseconds[SHADOWMAP_TIMING_MAP_RENDER],
@@ -7974,6 +8005,8 @@ static bool RB_ShadowMapDrawCasterChain( const drawSurf_t *surf, const int casca
 			// Culled from this tile, not missing from the map.
 			continue;
 		}
+		g_shadowMapStats.projectedCasterDraws++;
+		g_shadowMapStats.projectedCasterIndexes += casterGeo->numIndexes;
 
 		RB_ShadowMapTouchCache( ambientCache );
 		RB_ShadowMapTouchCache( casterGeo->indexCache );
@@ -8635,6 +8668,43 @@ static void RB_ShadowMapRestoreViewViewport( void ) {
 	glScissor( x, y, width, height );
 }
 
+// The whole-light cascade of a cascaded light (r_shadowMapCascadeFarMap) is
+// the light's base projection: unlike the view-fitted cascades it does not
+// move with the camera, so its still scenery is cached in an atlas cell of
+// its own and only moving casters are drawn over it each frame, as id Tech 6
+// caches static shadow geometry and composites dynamic casters over it. On
+// Air Defense 1 that slot was 161 of a frame's 439 cascade caster draws.
+// It applies to passes drawn into the scratch target; a cascaded pass that is
+// itself cached (r_shadowMapCacheCSM) keeps its whole block.
+static const int SHADOWMAP_WHOLE_LIGHT_PASS_KIND_OFFSET = 16;
+// cache pass kind of the pass RB_ShadowMapRunPass is drawing fresh, or -1
+static int g_shadowMapWholeLightPassKind = -1;
+
+static bool RB_ShadowMapWholeLightCacheable( const viewLight_t *vLight ) {
+	return r_shadowMapCascadeFarCache.GetBool() && r_shadowMapStaticCache.GetBool()
+		&& vLight != NULL && RB_ShadowMapLightIndex( vLight ) >= 0
+		&& vLight->shadowMapStaticCasterCount > 0
+		&& !R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount )
+		&& g_shadowMapWholeLightPassKind >= 0
+		&& glBlitFramebuffer != NULL
+		&& g_shadowMapAtlasRenderTexture != NULL && g_shadowMapAtlasDepthImage != NULL
+		&& g_shadowMapRenderTexture != NULL && g_shadowMapRenderTexture != g_shadowMapAtlasRenderTexture
+		&& RB_ShadowMapProjectedCacheSlotLimit() > 0;
+}
+
+// Copy one square depth tile between the scratch target and the atlas (blit
+// obeys scissor, so it is disabled around the copy), then rebind the target.
+static void RB_ShadowMapCopyDepthTile( idRenderTexture *from, const int fromX, const int fromY,
+		idRenderTexture *to, const int toX, const int toY, const int size ) {
+	glDisable( GL_SCISSOR_TEST );
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, from->GetDeviceHandle() );
+	glBindFramebuffer( GL_DRAW_FRAMEBUFFER, to->GetDeviceHandle() );
+	glBlitFramebuffer( fromX, fromY, fromX + size, fromY + size,
+		toX, toY, toX + size, toY + size, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
+	glBindFramebuffer( GL_FRAMEBUFFER, g_shadowMapRenderTexture->GetDeviceHandle() );
+	glEnable( GL_SCISSOR_TEST );
+}
+
 static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf_t *secondaryCasters, const drawSurf_t *tertiaryCasters, const drawSurf_t *quaternaryCasters,
 	const shadowMapRenderMode_t renderMode = SHADOWMAP_RENDER_FULL, const projectedShadowMapCacheEntry_t *composeFrom = NULL ) {
 	if ( !RB_ShadowMapEnsureResources( backEnd.vLight ) ) {
@@ -8736,6 +8806,25 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	RB_ShadowMapResetCasterCull();
 	const bool useHashedAlpha = RB_ShadowMapHashedAlphaEnabled();
 
+	// the whole-light cascade's cached still scenery (see RB_ShadowMapWholeLightCacheable)
+	const int wholeLightCascade = g_projectedShadowMapState.wholeLightCascade;
+	projectedShadowMapCacheEntry_t *wholeLightEntry = NULL;
+	bool wholeLightPublish = false;
+	int wholeLightSignature = 0;
+	if ( !composeMode && drawStaticChains && wholeLightCascade >= 0
+			&& RB_ShadowMapWholeLightCacheable( backEnd.vLight ) ) {
+		const shadowMapPassKind_t cacheKind = static_cast<shadowMapPassKind_t>( g_shadowMapWholeLightPassKind );
+		const shadowMapPassKind_t wholeKind = static_cast<shadowMapPassKind_t>(
+			g_shadowMapWholeLightPassKind + SHADOWMAP_WHOLE_LIGHT_PASS_KIND_OFFSET );
+		wholeLightSignature = RB_ShadowMapBuildPassSignatureForView( backEnd.vLight, backEnd.viewDef, cacheKind, false, true );
+		wholeLightEntry = RB_ShadowMapFindProjectedCacheEntry( RB_ShadowMapLightIndex( backEnd.vLight ), wholeKind, wholeLightSignature );
+		if ( wholeLightEntry == NULL ) {
+			wholeLightEntry = RB_ShadowMapAllocProjectedCacheEntry(
+				RB_ShadowMapAtlasSpanForBlock( g_projectedShadowMapState.tileSize ) );
+			wholeLightPublish = wholeLightEntry != NULL;
+		}
+	}
+
 	for ( int cascadeIndex = 0; cascadeIndex < g_projectedShadowMapState.cascadeCount; cascadeIndex++ ) {
 		float clipMatrix[16];
 		// cascade tile offsets are relative to the light's slot in the shared
@@ -8757,9 +8846,42 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 
 		backEnd.currentSpace = NULL;
 		RB_SetSurfaceWinding( backEnd.currentSpace );
-		if ( drawStaticChains ) {
-			allCastersRendered &= RB_ShadowMapDrawCasterChain( primaryCasters, cascadeIndex, useHashedAlpha );
-			allCastersRendered &= RB_ShadowMapDrawCasterChain( secondaryCasters, cascadeIndex, useHashedAlpha );
+		const bool wholeLightTile = cascadeIndex == wholeLightCascade && wholeLightEntry != NULL;
+		if ( wholeLightTile && !wholeLightPublish ) {
+			// still scenery from the cache; only moving casters are drawn
+			RB_ShadowMapCopyDepthTile( g_shadowMapAtlasRenderTexture,
+				wholeLightEntry->atlasCellX * g_shadowMapAtlasCellSize,
+				wholeLightEntry->atlasCellY * g_shadowMapAtlasCellSize,
+				g_shadowMapRenderTexture, tileX, tileY, g_projectedShadowMapState.tileSize );
+			wholeLightEntry->lastUsedFrame = tr.frameCount;
+			g_shadowMapStats.wholeLightReuses++;
+		} else if ( drawStaticChains ) {
+			const bool staticOk = RB_ShadowMapDrawCasterChain( primaryCasters, cascadeIndex, useHashedAlpha )
+				& RB_ShadowMapDrawCasterChain( secondaryCasters, cascadeIndex, useHashedAlpha );
+			allCastersRendered &= staticOk;
+			if ( wholeLightTile ) {
+				// store the still scenery before moving casters join it
+				if ( staticOk ) {
+					RB_ShadowMapCopyDepthTile( g_shadowMapRenderTexture, tileX, tileY, g_shadowMapAtlasRenderTexture,
+						wholeLightEntry->atlasCellX * g_shadowMapAtlasCellSize,
+						wholeLightEntry->atlasCellY * g_shadowMapAtlasCellSize, g_projectedShadowMapState.tileSize );
+					wholeLightEntry->valid = true;
+					wholeLightEntry->lightIndex = RB_ShadowMapLightIndex( backEnd.vLight );
+					wholeLightEntry->passKind = g_shadowMapWholeLightPassKind + SHADOWMAP_WHOLE_LIGHT_PASS_KIND_OFFSET;
+					wholeLightEntry->lightClass = static_cast<int>( RB_ShadowMapLightClass( backEnd.vLight ) );
+					wholeLightEntry->signature = wholeLightSignature;
+					wholeLightEntry->tileSize = g_projectedShadowMapState.tileSize;
+					wholeLightEntry->atlasDiv = 1;
+					wholeLightEntry->cascadeCount = 1;
+					wholeLightEntry->lastUsedFrame = tr.frameCount;
+					wholeLightEntry->lastUpdatedFrame = tr.frameCount;
+					wholeLightEntry->atlasStorageGeneration = g_shadowMapAtlasDepthImage->GetStorageGeneration();
+					wholeLightEntry->state = g_projectedShadowMapState;
+					g_shadowMapStats.wholeLightPublishes++;
+				} else {
+					wholeLightEntry->valid = false;
+				}
+			}
 		}
 		if ( drawDynamicChains ) {
 			allCastersRendered &= RB_ShadowMapDrawCasterChain( tertiaryCasters, cascadeIndex, useHashedAlpha );
@@ -11730,6 +11852,10 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 	if ( g_shadowMapProgram.shadowCascadeBlend >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.shadowCascadeBlend, idMath::ClampFloat( 0.0f, 0.5f, r_shadowMapCascadeBlend.GetFloat() ) );
 	}
+	if ( g_shadowMapProgram.shadowWholeLightCascade >= 0 ) {
+		glUniform1fARB( g_shadowMapProgram.shadowWholeLightCascade,
+			static_cast<float>( g_projectedShadowMapState.wholeLightCascade + 1 ) );
+	}
 	if ( g_shadowMapProgram.shadowDebugMode >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.shadowDebugMode, (float)RB_ShadowMapDebugMode() );
 	}
@@ -12959,9 +13085,11 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 
 	shadowMapTimedPhase_t renderTimer;
 	RB_ShadowMapBeginTimedPhase( renderTimer, vLight, passKind, SHADOWMAP_TIMING_MAP_RENDER );
+	g_shadowMapWholeLightPassKind = pointLight ? -1 : static_cast<int>( RB_ShadowMapCachePassKind( vLight, passKind ) );
 	bool renderOk = pointLight
 		? RB_RenderPointShadowMap( primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, freshRenderMode )
 		: RB_RenderShadowMap( primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, freshRenderMode );
+	g_shadowMapWholeLightPassKind = -1;
 	const float renderMilliseconds = RB_ShadowMapEndTimedPhase( renderTimer );
 	g_shadowMapStats.cpuRenderMilliseconds += renderMilliseconds;
 	RB_ShadowMapCompleteCacheUpdate( schedule, vLight, passKind, pointLight, renderOk );
@@ -16592,6 +16720,10 @@ static void RB_SharedWorldInteractionGLBeginMappedReceiver(
 			pass.projected.state.cascadeCount );
 		glUniform1fARB( g_shadowMapProgram.shadowCascadeBlend,
 			pass.projected.cascadeBlend );
+		if ( g_shadowMapProgram.shadowWholeLightCascade >= 0 ) {
+			glUniform1fARB( g_shadowMapProgram.shadowWholeLightCascade,
+				static_cast<float>( pass.projected.state.wholeLightCascade + 1 ) );
+		}
 		glUniform1fARB( g_shadowMapProgram.shadowDebugMode, 0.0f );
 		glUniform1fARB( g_shadowMapProgram.shadowReceiverDebugReason, 0.0f );
 		glUniform1fARB( g_shadowMapProgram.translucentShadowEnabled,

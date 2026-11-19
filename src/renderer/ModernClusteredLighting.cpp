@@ -839,6 +839,7 @@ static void R_ModernClusteredLighting_CopyPlannerShadowDescriptor( rendererModer
 	dst.cascadeIndex = src.cascadeIndex;
 	dst.projectedFallbackCascade = src.projectedFallbackCascade;
 	dst.projectedFallbackReason = src.projectedFallbackReason;
+	dst.wholeLightCascadeSlot = src.wholeLightCascadeSlot;
 	dst.projectedSampleCount = src.projectedSampleCount;
 	dst.projectedValidSampleCount = src.projectedValidSampleCount;
 	dst.projectedSkippedSampleCount = src.projectedSkippedSampleCount;
@@ -951,7 +952,9 @@ static void R_ModernClusteredLighting_FillShadowDescriptorGpuRecord( modernClust
 	dst.counts[0] = static_cast<float>( src.cascadeCount );
 	dst.counts[1] = static_cast<float>( src.requestedCascadeCount );
 	dst.counts[2] = static_cast<float>( src.atlasDiv );
-	dst.counts[3] = static_cast<float>( src.projectedSampleCount );
+	// was the diagnostic sample count, which no shader read; the receivers
+	// need the whole-light cascade (ModernClusterSampleProjectedShadow)
+	dst.counts[3] = static_cast<float>( src.wholeLightCascadeSlot );
 	// modular stamp instead of raw frame number: frame counts overflow
 	// float precision on long soaks, the 2^20 residue stays exact
 	dst.freshness[0] = static_cast<float>( src.updateFrame & 0xFFFFF );

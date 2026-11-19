@@ -52,6 +52,10 @@ struct PerformancePreset {
 	// 0 draws no shadows at all: Minimum and Low Power, for hardware below
 	// the documented minimum. Every tier from Low up keeps them.
 	int shadows;
+	// 0 keeps ordinary spotlights on one map while cascades are on, so only
+	// sunlight and distant sources are cascaded (Quality, Ultra); 1 lets
+	// spotlights cascade too (Maximum). Matters only with shadowMapCSM 1.
+	int shadowMapProjectedCSM;
 };
 inline constexpr const char* PerformancePresetDefaultName = "balanced";
 inline constexpr int PerformancePresetCount = 9;

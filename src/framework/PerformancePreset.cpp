@@ -20,31 +20,31 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		50, 0, 0, 30,
 		1, 512, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
-		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0 },
+		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1 },
 	// Low Power is the battery and small-board recipe: Raspberry Pi, low-memory
 	// phones and an explicit power request. No shadows, 30 Hz.
 	{ "lowpower", 0, "low",
 		75, 0, 0, 30,
 		1, 1024, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0 },
+		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1 },
 	// Low is the documented minimum PC: the original stencil shadows at 60 Hz,
 	// with Low Power's reduced scene and texture sizes.
 	{ "low", 0, "low",
 		75, 0, 0, 60,
 		2, 1024, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 1 },
+		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 1, 1 },
 	{ "performance", 1, "baseline",
 		85, 0, 1, 60,
 		2, 0, 0, 0, 1, 0,
 		0, 1024, 2, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 40, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1 },
+		0, 1, 40, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1 },
 	{ "balanced", 2, "baseline",
 		100, 2, 1, 120,
 		4, 0, 0, 0, 1, 0,
 		0, 1024, 0, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1 },
+		0, 1, 48, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1 },
 	// The three top recipes are built from measured feature costs to hold a
 	// refresh class on the reference machine (RTX 4060 Laptop, 2560x1440, both
 	// backends, every timed scene; docs/dev/performance-report.md section 11):
@@ -58,14 +58,17 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		100, 0, 2, 144,
 		16, 0, 0, 0, 1, 0,
 		1, 1024, 0, 1, 1, 1, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 4096, 12, 5, 8, 0, 0, 1 },
+		0, 1, 48, 512, 5, 5, 0, 0, 4096, 12, 5, 8, 0, 0, 1, 1 },
 	// Quality shadow-maps every light class: 2048 projected maps with PCSS and
-	// 512 point cubes, with 2x MSAA under SMAA high.
+	// 512 point cubes, with 2x MSAA under SMAA high. Sunlight and distant
+	// sources are cascaded (spotlights keep one map): Quake 4 lights outdoor
+	// areas with a few huge lights, whose single map is ~25 world units a
+	// texel at the player and loses most near shadows outdoors.
 	{ "quality", 3, "modern",
 		100, 2, 2, 144,
 		16, 0, 0, 0, 1, 0,
 		1, 2048, 0, 1, 1, 1, 0, 0, 1, 32, 4,
-		0, 1, 48, 512, 9, 9, 2, 0, 4096, 20, 5, 8, 0, 1, 1 },
+		0, 1, 48, 512, 9, 9, 2, 0, 4096, 20, 5, 8, 1, 1, 1, 0 },
 	// image_usePrecompressedTextures stays at 1 here even though retail's top
 	// machine spec used 0. In openQ4 that cvar also gates user-supplied DDS
 	// replacement packs, so 0 silently discarded a player's high-resolution BC7
@@ -75,12 +78,13 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	// Ultra is the best image that still holds 75 Hz: 4x MSAA under SMAA ultra,
 	// 4096 projected maps with 13-tap PCSS in an 8192 atlas, and 32 SSAO samples.
 	// Point cubes stay at 512 (larger cubes cost more than every other upgrade
-	// together), and cascades and motion blur are left to Maximum.
+	// together). Sunlight is cascaded as on Quality; spotlight cascades and
+	// motion blur are left to Maximum.
 	{ "ultra", 3, "high-end",
 		100, 4, 3, 240,
 		16, 0, 0, 0, 1, 0,
 		1, 4096, 0, 1, 1, 1, 0, 0, 1, 32, 4,
-		0, 1, 48, 512, 13, 9, 2, 0, 8192, 32, 5, 8, 0, 1, 1 },
+		0, 1, 48, 512, 13, 9, 2, 0, 8192, 32, 5, 8, 1, 1, 1, 0 },
 	// Maximum requests every supported quality maximum and carries no frame-rate
 	// target (FPS-02): it is the choice for players who want everything on.
 	// MSAA is 8 samples, the most the Vulkan renderer draws, so Maximum is one
@@ -92,7 +96,7 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		100, 8, 3, 240,
 		16, 0, 0, 0, 1, 0,
 		1, 4096, 0, 1, 1, 1, 1, 0, 1, 32, 4,
-		0, 1, 48, 2048, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1 }
+		0, 1, 48, 2048, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1, 1 }
 }};
 static const std::array<const char*,PerformancePresetTargetCount> Targets{{
 	"com_performancePreset",
@@ -210,7 +214,7 @@ bool ExpandPerformancePreset(const PerformancePreset& preset,PerformancePresetAs
   {"image_picmip",0},
   {"r_shadowMapCSM",preset.shadowMapCSM},
   {"r_shadowMapCascadeCount",4},
-  {"r_shadowMapProjectedCSM",1},
+  {"r_shadowMapProjectedCSM",preset.shadowMapProjectedCSM},
   {"r_shadowMapCascadeStabilize",1},
   {"r_motionBlurObjectVectors",1},
   {"r_shadowMapHashedAlpha",1},

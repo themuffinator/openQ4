@@ -38,6 +38,8 @@ uniform float uShadowSplitDepths[4];
 uniform float uShadowCascadeBiasScale[4];
 uniform int uShadowCascadeCount;
 uniform float uShadowCascadeBlend;
+// index + 1 of the cascade that holds the light's whole map, 0 = none
+uniform float uShadowWholeLightCascade;
 uniform float uShadowDebugMode;
 uniform float uShadowReceiverDebugReason;
 uniform float uTranslucentShadowEnabled;
@@ -704,12 +706,63 @@ int SelectCascade( float viewDepth ) {
 	return 3;
 }
 
+int WholeLightCascade() {
+	return int( uShadowWholeLightCascade + 0.5 ) - 1;
+}
+
+// How far inside cascade index's crop the receiver sits, as a fraction of the
+// crop and clear of the filter guard; zero or less outside it.
+float CascadeHoldMargin( int index ) {
+	vec4 coord = ShadowCoordByIndex( index );
+	if ( coord.w != coord.w || coord.w < kShadowCoordWEpsilon || coord.w > kShadowCoordMaxMagnitude
+			|| coord.z <= 0.0 || coord.z >= 1.0 ) {
+		return -1.0;
+	}
+	vec2 localUv = coord.xy / coord.w * 0.5 + 0.5;
+	vec4 rect = uShadowAtlasRect[0];
+	if ( index == 1 ) {
+		rect = uShadowAtlasRect[1];
+	} else if ( index == 2 ) {
+		rect = uShadowAtlasRect[2];
+	} else if ( index >= 3 ) {
+		rect = uShadowAtlasRect[3];
+	}
+	vec2 guard = ShadowAtlasGuardBand() / max( abs( rect.zw - rect.xy ), vec2( 1.0e-6 ) );
+	vec2 edge = min( localUv, vec2( 1.0 ) - localUv ) - guard;
+	return min( edge.x, edge.y );
+}
+
+// Past the fitted reach the last fitted cascade still serves every receiver
+// its crop holds, fading into the whole-light map over the crop's outer 5%;
+// only receivers outside it take the whole map (ShadowMapProjected.cpp,
+// R_ShadowMapSetWholeLightCascade).
+const float kWholeLightFade = 0.05;
+
+float WholeLightHeld( int wholeLight ) {
+	return clamp( CascadeHoldMargin( wholeLight - 1 ) / kWholeLightFade, 0.0, 1.0 );
+}
+
 vec4 SampleShadow() {
 	int cascadeIndex = SelectCascade( vViewDepth );
+	int wholeLight = WholeLightCascade();
+	if ( wholeLight > 0 && cascadeIndex >= wholeLight ) {
+		float held = WholeLightHeld( wholeLight );
+		if ( held >= 1.0 ) {
+			return vec4( SampleCascadeByIndex( wholeLight - 1 ).x, float( wholeLight - 1 ), 0.0, 0.0 );
+		}
+		vec4 whole = SampleCascadeByIndex( wholeLight );
+		if ( held <= 0.0 ) {
+			return vec4( whole.x, float( wholeLight ), 0.0, 0.0 );
+		}
+		float fitted = SampleCascadeByIndex( wholeLight - 1 ).x;
+		return vec4( mix( whole.x, fitted, held ), float( wholeLight - 1 ), 1.0 - held, 0.0 );
+	}
 	vec4 shadowInfo = SampleCascadeByIndex( cascadeIndex );
 	int lastInteriorIndex = uShadowCascadeCount - 2;
 
-	if ( cascadeIndex > lastInteriorIndex || uShadowCascadeBlend <= 0.0 ) {
+	// Inside the reach a receiver never blends toward the whole-light map:
+	// the fitted cascade it is in is finer.
+	if ( cascadeIndex > lastInteriorIndex || uShadowCascadeBlend <= 0.0 || cascadeIndex + 1 == wholeLight ) {
 		return vec4( shadowInfo.x, float( cascadeIndex ), 0.0, 0.0 );
 	}
 
@@ -921,10 +974,22 @@ vec3 SampleTranslucentShadow() {
 	}
 
 	int cascadeIndex = SelectCascade( vViewDepth );
+	int wholeLight = WholeLightCascade();
+	if ( wholeLight > 0 && cascadeIndex >= wholeLight ) {
+		float held = WholeLightHeld( wholeLight );
+		if ( held >= 1.0 ) {
+			return SampleTranslucentShadowCascadeByIndex( wholeLight - 1 );
+		}
+		vec3 whole = SampleTranslucentShadowCascadeByIndex( wholeLight );
+		if ( held <= 0.0 ) {
+			return whole;
+		}
+		return mix( whole, SampleTranslucentShadowCascadeByIndex( wholeLight - 1 ), held );
+	}
 	vec3 shadow = SampleTranslucentShadowCascadeByIndex( cascadeIndex );
 	int lastInteriorIndex = uShadowCascadeCount - 2;
 
-	if ( cascadeIndex > lastInteriorIndex || uShadowCascadeBlend <= 0.0 ) {
+	if ( cascadeIndex > lastInteriorIndex || uShadowCascadeBlend <= 0.0 || cascadeIndex + 1 == wholeLight ) {
 		return shadow;
 	}
 
