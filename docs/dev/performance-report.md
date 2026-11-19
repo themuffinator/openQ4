@@ -1745,6 +1745,265 @@ models still rebuild every light interaction every frame (`R_CreateLightTris`
 about 4% of the process after change 3), the driver's submission cost, and the
 4-5% spent in OpenAL mixing.
 
+## 15. CPU profile of the stock combat and hub2 scenes (FPS-08 evidence), 18 November 2026
+
+A round of CPU sampling on the current build, to rank what the main thread
+spends a frame on. Hidden 1280x720 windows on the reference laptop, OpenGL,
+the Quality preset, the suite's `combat_airdefense1` wave and `indoor_hub2`
+view with `benchmarkViewSweep`; 20 s of samples from the Visual Studio
+collector, exported with `xperf -a dumper` and symbolized with
+`llvm-symbolizer` against the build's PDBs (the collector's traces carry no
+image debug identities, so `xperf -symbols` cannot name openQ4's frames). A
+hidden window paces at 60 Hz, so shares are per frame of work, not frame
+rates; other sessions kept the machine at 40-60% load, which ruled out
+wall-clock A/Bs, so changes were judged by sample ratios inside one profile.
+
+In the combat scene the main thread holds 94% of the samples. Shares of all
+samples:
+
+| Work | Share | Notes |
+| --- | --- | --- |
+| OpenGL driver | 28% | 11 points of it under draw submission (`RB_DrawElementsWithCounters`) |
+| BSE effects (`R_AddEffectSurfaces`) | 10.6% | sprite particles 3.2, the per-frame walk of each segment's particle list 2.9 (cache misses on `mEndTime`) |
+| Point-light shadow cube faces | 2.7% | the driver's cost of switching render target six times a cube |
+| Depth copies for soft particles and SSAO | 2.2% | `CopyDepthbuffer`, mostly driver |
+| Posed MD5 bounds | 2.0% | every animated model is skinned twice more a frame for its bounds: once in the game tic, once for the presentation pose |
+| Static buffers re-specified for per-frame geometry | 1.8% | animated meshes and effects get a `glBufferData` each frame through `R_CreateAmbientCache` |
+| Faded-decal pass | 1.0% | fixed, below |
+| OpenAL (its own thread) | 4.5% | |
+
+**Fixed: the faded-decal pass.** Every view, every decal on every entity in
+view zeroed its vertex map, copied each vertex onto itself and remapped its
+indexes, though a decal only changes when a triangle reaches its stay time or
+a winding is added. A decal now records whether every vertex is referenced
+(set by the pass, cleared by any addition) and its oldest triangle's start
+time; while both say nothing can go, the pass returns at once. The pass it
+skips would keep every triangle, move no vertex and leave the geometry flags
+alone, so the result is exact. In the combat scene the pass fell from 4.9% to
+0.9% of the scene front end (`RenderScene`), and per decal drawn it is 8.8
+times cheaper. `r_decalFadeEarlyOut 0` runs the full pass on every decal.
+
+**Measured and set aside: a framebuffer per cube face.** Giving each face of
+a cube target its own framebuffer, attached once, made a face a bind instead
+of a re-attachment. With the static cache off in hub2 (every cube redrawn
+every frame) binding cost 0.62 of the caster drawing with it and 0.46
+without: NVIDIA's driver charges for the render-target switch itself, and
+six switches a cube remain. The change was reverted. The way to recover the
+2.7% is fewer switches: all six faces in one target (layered rendering or a
+cube atlas).
+
+**Fixed: one render target per point cube.** OpenGL now attaches a point
+shadow cube's colour and depth as one layered target, and the caster vertex
+shader names each face through `gl_Layer`, which
+`ARB_shader_viewport_layer_array` (or `AMD_vertex_shader_layer`) allows
+outside a geometry shader. The CPU still walks the six faces with their own
+matrices and per-face caster culling, so every face draws exactly the casters
+it drew before; only the target switches go. One clear covers the six faces,
+and a compose copies the cached cube into the scratch cube with
+`glCopyImageSubData`, one call per image, where it used to bind both cubes and
+blit each face. A cube now costs one bind of it and one back to the scene
+target, where it took one bind a face (two composing) besides those. Without the extensions, or when the
+two cubes' images differ, the faces are drawn one at a time as before, and
+`r_shadowMapPointLayered 0` forces that for comparison. Shadows are
+bit-identical: hub2 with `ai_freeze 1` and `g_stopTime 1`, five views with
+the static cache off and five with it on, and four views of the combat wave
+(composing over cached cubes), each captured layered, face by face and
+layered again in one session, differ only where two layered captures also
+differ (the animated HUD and one pixel of the battle). CPU samples, one build
+toggled by the cvar:
+
+| Scene | Cube pass, share of all samples | Binding / caster drawing | Non-drawing cube work / caster drawing |
+| --- | --- | --- | --- |
+| hub2, static cache off (every cube redrawn), face by face | 10.8% | 0.42 | 0.80 |
+| hub2, static cache off, layered | 9.5% | 0.25 | 0.49 |
+| Combat wave (cubes composed), face by face | 7.8% | 1.61 | 3.26 |
+| Combat wave, layered | 2.6% | 0.56 | 1.11 |
+
+Caster drawing itself did not grow (6.0% and 6.4% of hub2's samples), so the
+driver did not move the switch cost into the draws. The combat wave varies
+from run to run in how many cubes it composes; an earlier pair, taken while a
+second probe overlapped it, gave 3.1% and 2.2% with the same direction in
+every ratio. What remains is the one bind to each cube and the one back to
+the scene target, about equal in cost: drawing all of a view's cubes before
+its scene target is bound would take most of the rest. The opt-in shared
+interaction stream (`RB_SharedWorldInteractionGLRenderPointMap`) still draws
+face by face.
+
+**Audio.** Per-thread CPU in hub2: the OpenAL mixer takes about 12% of a core
+with a still camera and 16% while the view turns, 6% with
+`s_useEAXReverb 0`. The four reverb slots run on silence too (the scene had
+no audible voices), and turning re-sends each slot's panning every frame. Off
+the main thread, so not a frame-rate cost on this machine, but a power and
+low-core-count one.
+
+Follow-ups, in order of measured share: the BSE particle walk and sprite
+evaluation; the two render-target switches each point cube still makes
+(down from one or two a face, above); the per-frame static
+buffers for geometry that lives one frame; the double skinning for posed
+bounds; the depth-copy framebuffer attach and detach; idle reverb slots
+(done, below).
+
+### Follow-up: idle reverb slots and the turning view
+
+OpenAL Soft 1.25.1 runs every effect slot that holds a reverb on every mixer
+update, whether or not a source feeds it, and each new set of slot
+parameters makes it recompute every playing source as well (read from its
+`alu.cpp` and `effects/reverb.cpp`). openQ4 kept all four area slots bound
+and, while the view turned, sent every slot all 23 parameters each frame
+because its panning had moved a fraction of a degree.
+
+**What changed.** A slot that no playing voice has fed for longer than its
+reverb rings now holds the null effect, which the mixer skips. The hold is
+the reflection and late delays plus 1.5 times the slowest band's decay time
+(90 dB down) plus a quarter second, from the slot's current preset: 2.5 s for
+Generic, 15.4 s for Hangar. A voice wakes the slot before it attaches a send
+or starts playing. The wake is published at once, because the frame's
+deferred updates would otherwise reach the mixer after a source that
+`alSourcePlay` started immediately. Before a slot goes idle, the sweep checks
+that no playing source still sends to it. While a slot's requested
+parameters keep changing in panning alone, the panning is resent only after
+it has moved 0.05 (about 3 degrees). Once the view stops, the exact value is
+sent.
+`s_reverbIdleSlots 0` keeps all four reverbs running and
+`s_reverbPanStep 0` resends every change. With both at 0 the old behaviour
+returns exactly. `listReverbs` marks idle slots.
+
+**Mixer cost, measured precisely.** The machine sat at 100% load from other
+sessions, so the game's thread CPU moved by up to 3 points between two
+identical windows (`s_useEAXReverb 0`, where the cvars do nothing). The cost
+was therefore measured with a loopback benchmark: the shipped OpenAL32.dll
+1.25.1 renders as fast as it can, with HRTF, 48 kHz, 480-sample updates as
+the device uses, four EAX reverb slots holding Stone Corridor, Stone Corridor,
+Bathroom and Hangar, and the view turning at 24 degrees a second as in
+`benchmarkViewSweep 720 30000`. Figures are the minimum of 9 interleaved
+6-second runs, in ms of mixing per second of audio:
+
+| Scene | Before | After | No reverb slots |
+| --- | ---: | ---: | ---: |
+| No voices, still | 15.6 | 4.1 (idle slots) | 3.9 |
+| No voices, turning | 15.7 (median 19.3) | 4.1 (idle slots) | 3.9 |
+| 16 voices feeding the slots, still | 28.1 | 28.1 | 15.6 |
+| 16 voices, turning | 30.8 (median 34.0) | 28.2 (median 31.5) | 15.6 |
+
+With no voices, idle slots remove the whole reverb cost of the mix, about
+three quarters of it. With voices playing, the slots must run. Resending the
+panning every frame then cost about 9% more than a still view, and the
+0.05 step brings that back to the still cost, cutting slot updates from 240 to
+26 a second. On the main thread those updates took 0.27 ms of AL calls a
+second, falling to 0.06.
+
+**In game** (hub2, Quality, hidden window; per-thread CPU over 10 s windows
+in one process, switching the cvars between windows, so the threads and
+device stay the same): the mixer thread went from 4.5% to 3.1% of a core
+with a still view (three windows each) and from 7.3% to 3.1% while turning
+(two each). `s_reverbIdleSlots 1` alone gave 3.1% turning, and
+`s_reverbPanStep 0.05` alone left it at 7.3%, since the scene had no voices.
+The parent round's 12% and 16% were read under different load, and the
+kit's thread tagging (start addresses in msvcrt.dll) read back as 0 in this
+session. These figures show the direction; the loopback table gives the
+size.
+
+**The sound is unchanged.** OpenAL's wave writer recorded hub2 with 9 voices
+playing, then `s_volume 0` for 18 s, then sound again, once with each
+behaviour. The reverb tails after the stop match within 0.9 dB per 250 ms
+block from -48 dB down to -151 dB, 118 dB below the playing level. At that
+point the new build's slots went idle and the old one rang on inaudibly. The
+level 0.5-4.5 s after sound resumed is -32.8 dB before and -32.7 dB after.
+`SoundReverbCoreTest` covers the hold for every retail preset and the pan
+step rules, and `sound_settings.py` passes its 35 mutants. The checked
+settings path accepts slot 0 parked on the null effect while it still owns
+its reverb.
+
+## 16. The BSE particle runtime (FPS-08), 18 November 2026
+
+Section 15 put BSE effects at 10.6% of the combat scene's samples under
+`R_AddEffectSurfaces`. Counted with the game tic's own servicing of client
+effects (`idRenderWorldLocal::UpdateEffectDef` from `rvClientEffect::Think`,
+another 3.6%), effects took 12.8% of all samples. The wave keeps about 3,100
+live particles in about 190 effects and 860 segments each frame
+(`bse_speeds 1`).
+
+**Where it went.** `rvSegment::UpdateSimpleParticles` was 3.6% of all
+samples, 3.3 of them on one line: the load of each particle's `mEndTime`
+while walking the segment's used list. Particles are objects several cache
+lines long reached through `mNext`, so every particle was a cache miss every frame, only
+to be counted as live. The walk ran for every serviced effect, drawn or not.
+Drawing the same particles then missed again on the virtual `Render` call of
+each one.
+
+**What changed** (`src/bse/`):
+
+- **Expiry stops at the first live particle** (`bse_particleListEarlyOut`).
+  A simple segment's list is already in end-time order. Spawning inserts by
+  end time, and only complex segments (constant, physics, timeout effects,
+  electricity, lights) push to the front. So the expired particles are the
+  ones at the head, and every particle after the first live one is live. The
+  segment now keeps its list's tail, length and first and last end times
+  through every change to the list. A frame with nothing to retire touches no
+  particle; retiring takes them off the head in the old order. The live count
+  the walk used to sum is the list's length, because only electricity
+  overrides `Update` and its segments are complex. Spawning appends at the
+  tail when the new particle ends strictly later than it, which is where the
+  old walk would have put it. An equal end time still walks, so ties keep
+  their order. Constant segments push their particles' end times on as they
+  draw, so their tail is re-read before each insertion.
+- **The next particle is fetched while one is drawn or updated**
+  (`bse_particlePrefetch`), and each segment's first particle is fetched
+  while the previous segment draws.
+- **Two small exact skips without a cvar.** `ServiceEffect` looks the effect's
+  decl name up only when `bse_singleEffect` is set, the only filter that can
+  drop an effect there (`EC_IGNORE` is never rate limited). A sprite with zero
+  rotation takes sin(±0) = ±0 and cos(±0) = 1 instead of calling `sinf` and
+  `cosf`. Both are too small to resolve on their own in these profiles.
+
+**Exactness.** Neither cvar changes a particle, vertex, bound or free-list
+order. A validation build (not committed) checked, after every expiry pass,
+that the list was in end-time order and its kept length, tail and end times
+matched a full walk. It checked every generic pass the same way and every
+fast-path insertion's tail end time against the tail particle. In the combat
+wave and hub2 it ran 9.4 million list checks, 1.4 million generic passes and
+0.5 million insertions without a mismatch. `bse_lifecycle_runtime.py` (start,
+stop, restart, delete, save and restore of a stock effect) and
+`bse_retail_parity.py` pass.
+
+**Measured** with the method of section 15, but inside one profile: the probe
+flips the cvars every 1.5 s for 60 s, and a `listCvars` or `listCmds` burst
+marks which state each window is in. 150 ms around every burst is dropped.
+Each cost is divided by the rest of the frame's tic and scene work
+(`idGameLocal::RunFrame` plus `idRenderWorldLocal::RenderScene`, less BSE),
+which the change does not touch, so frame-rate drift between windows cancels.
+Combat wave, Quality, OpenGL, both cvars off against on (four profiles: 0.74,
+0.74, 0.76 with prefetch held on, 0.77 on the final build):
+
+| BSE work per frame, relative to the rest of the frame | Off | On | On / off |
+| --- | ---: | ---: | ---: |
+| All effects (service and draw) | 0.505 | 0.390 | 0.77 |
+| Servicing | 0.227 | 0.097 | 0.43 |
+| Expiry walk (`UpdateSimpleParticles`) | 0.130 | 0.005 | 0.03 |
+| Spawning (`Check`) | 0.039 | 0.034 | 0.87 |
+| Drawing (`RenderEffect`) | 0.278 | 0.293 | 1.05 |
+
+Effects fell from 9.4% to 7.5% of all samples in that profile, and from
+13.3% to 9.8% in the first. Drawing rises a little because the misses the
+walk used to take now land on the first touch in the draw, for effects in
+view. Off-screen effects no longer pay them at all. Prefetching on its own,
+with the early-out held on, took drawing to 0.86 and 0.96 of its cost in two
+profiles. The virtual-call miss fell from 1.45% to 0.21% of samples, part of
+it moving to the next field read. In hub2, where most effects are serviced
+but few are in view, effects cost 0.47 of their former per-frame work
+(servicing 0.32).
+
+**Measured and set aside.** Bounding a particle surface as each particle
+writes its vertices, instead of reading them back afterwards, cost more
+(0.60% + 0.95% of samples in the per-particle bounds step, against 1.36% for
+the pass it replaced). Fetching two particles ahead, by following the
+already-requested next particle's link, waited on that link and drew at 1.07
+of one-ahead.
+
+What remains in effects, about 7.5% of the combat scene: sprite and line
+evaluation (envelope table lookups, positions, `sinf`/`cosf`), the per-model
+vertex-cache release in `rvBSE::Render`, and per-frame owner updates.
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;

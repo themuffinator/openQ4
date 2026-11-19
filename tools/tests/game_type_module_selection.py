@@ -68,10 +68,37 @@ def validate_shutdown_lifecycle_contract(common: str) -> None:
 
     reject(unload, "game->Shutdown();", "binary-only game module unload")
     reject(unload, "game->ShutdownAfterDecls();", "binary-only game module unload")
-    if common.count("game->Shutdown();") != 1:
-        raise AssertionError("game module must receive exactly one engine-driven early shutdown")
-    if common.count("game->ShutdownAfterDecls();") != 1:
-        raise AssertionError("game module must receive exactly one engine-driven late finalization")
+    # Two engine-driven paths: ShutdownGame, and the campaign remount, which
+    # unloads the module without tearing the rest of the engine down.
+    if common.count("game->Shutdown();") != 2:
+        raise AssertionError("game module must receive exactly one engine-driven early shutdown per lifecycle path")
+    if common.count("game->ShutdownAfterDecls();") != 2:
+        raise AssertionError("game module must receive exactly one engine-driven late finalization per lifecycle path")
+    remount = function_body(common, "bool idCommonLocal::RemountCampaign( const char *gameDir, const char *gameBase )",
+        "campaign remount")
+    remount_order = [
+        "openQ4_singleplayerGameModuleReady.store( false, std::memory_order_release );",
+        "gameShutdownCalled = true;",
+        "game->Shutdown();",
+        "collisionModelManager->Shutdown();",
+        # the module's decl objects go while its allocators and vtables exist
+        "DeclManager_ReleaseModuleDecls();",
+        "gameShutdownAfterDeclsCalled = true;",
+        "game->ShutdownAfterDecls();",
+        "UnloadGameDLL();",
+        "fileSystem->Restart();",
+        "DeclManager_BeginRemount();",
+        "LoadGameDLL();",
+        "DeclManager_FinishRemount();",
+    ]
+    positions = [remount.find(token) for token in remount_order]
+    if -1 in positions or positions != sorted(positions):
+        raise AssertionError("campaign remount must retire the game module, its decls and the search path in order")
+    for guard in ("if ( game != NULL && !gameShutdownCalled )", "if ( game != NULL && !gameShutdownAfterDeclsCalled )"):
+        require(remount, guard, "campaign remount one-shot game lifecycle")
+    shutdown_without_remount = common.replace(remount, "")
+    if shutdown_without_remount.count("game->Shutdown();") != 1 or shutdown_without_remount.count("game->ShutdownAfterDecls();") != 1:
+        raise AssertionError("game module must receive exactly one engine-driven early shutdown outside the remount")
 
     for token in (
         "gameShutdownCalled = false;",
@@ -673,7 +700,7 @@ def validate_two_phase_game_api_contract() -> None:
         return
 
     game_api = read(game_api_path)
-    require(game_api, "const int GAME_API_VERSION\t\t= 60;", "current game API version")
+    require(game_api, "const int GAME_API_VERSION\t\t= 61;", "current game API version")
     require(
         game_api,
         "virtual void\t\t\t\tShutdownAfterDecls( void ) = 0;",

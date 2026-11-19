@@ -869,15 +869,19 @@ class Document:
         """Button feedback timelines. `tracks` maps state -> [(node, prop, value)].
         Hover responds at once (hover.enter 0 ms: a 1 ms step, the shortest a
         timeline can run) and focus over 80 ms; every return to rest is linear
-        over 300 ms (hover.leave); press insets 1 dp over 60 ms (section 8)."""
+        over 300 ms (hover.leave); press insets 1 dp over 60 ms (section 8).
+        A track given a fourth item, its own duration, reaches its value in
+        that time instead (a message line's 1 ms switch)."""
         durations = {"default": 300, "hover": 1, "focus": 80, "pressed": 60, "disabled": 150}
         ids = {}
         for state, duration in durations.items():
             ident = f"{control}.{state}"
             keys = []
-            for node, prop, value in tracks[state]:
+            for entry in tracks[state]:
+                node, prop, value = entry[:3]
+                span = entry[3] if len(entry) > 3 else duration
                 ease = None if state == "default" else EASE_OUT
-                keys.append(track(node, prop, [(0, value, ease), (duration, value)]))
+                keys.append(track(node, prop, [(0, value, ease), (span, value)]))
             self.timelines.add(ident, duration, keys)
             ids[state] = ident
         return ids
@@ -953,8 +957,11 @@ def navigation_plate(doc: Document, ident: str, key: str, *, action: str | None 
         detail_id = detail["id"]
         parts.append(detail)
     lit, rest = number(1), number(0)
+    # Every item's message line shares one slot, so it switches at once
+    # (1 ms) both ways: a line fading out under the next one's stacked
+    # half-faded sentences as focus swept down the menu (#228).
     def with_detail(tracks, shown):
-        return tracks + ([(detail_id, "opacity", lit if shown else rest)] if detail_id else [])
+        return tracks + ([(detail_id, "opacity", lit if shown else rest, 1)] if detail_id else [])
     ids = doc.states(ident, {
         "default": with_detail([(f"{ident}-plate", "opacity", number(0.4)), (f"{ident}-marker", "opacity", number(0.4)),
                                 (f"{ident}-marker-hot", "opacity", number(0)), (f"{ident}-focus", "opacity", number(0)),
@@ -987,12 +994,23 @@ def navigation_plate(doc: Document, ident: str, key: str, *, action: str | None 
                  parts, control=control)
 
 
+MESSAGE_BACKING = 0.6   # black behind the message line, so it reads over any backdrop picture (#228)
+
+
 def message_line(ident: str, offset_u: float, children: list) -> dict:
     """The stock message-of-the-day slot at 44,364 u (section 13.7), placed
     inside a navigation button so its hover and focus can show it. It never
-    takes the pointer: only the plate is the button's target."""
+    takes the pointer: only the plate is the button's target. A dark backing
+    sits behind it, 10 u before its leading edge and 2 u above it, and fades
+    in and out at its ends; it takes the line's size wherever text size or
+    a tall view grows the line."""
+    shade = [(0, [0, 0, 0, 0]), (0.05, [0, 0, 0, MESSAGE_BACKING]), (0.72, [0, 0, 0, MESSAGE_BACKING]), (1, [0, 0, 0, 0])]
+    backing = vector(f"{ident}-backing", {**absolute(left=-U * 10, top=-U * 2), "width": length(100, "%"),
+                                          "height": length(100, "%"), "pointer-events": keyword("none")}, [
+        path("shade", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})],
+             fill=linear((0, 0), ({"fraction": 1}, 0), shade))])
     return group(ident, {**absolute(left=NAV_LEAD + U * 44, top=U * offset_u, width=U * 433, height=U * 33),
-                         "opacity": number(0), "pointer-events": keyword("none")}, children)
+                         "opacity": number(0), "pointer-events": keyword("none")}, [backing, *children])
 
 
 def link(doc: Document, ident: str, key: str, *, action: str | None = None, event: str | None = None, size: float = 16) -> dict:

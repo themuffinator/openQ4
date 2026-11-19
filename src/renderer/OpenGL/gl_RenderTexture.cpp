@@ -113,6 +113,8 @@ static const char* R_TextureFormatName( textureFormat_t format ) {
 		case FMT_DEPTH_STENCIL: return "DEPTH_STENCIL";
 		case FMT_RGBA16F: return "RGBA16F";
 		case FMT_BC7: return "BC7";
+		case FMT_BC6H_UF16: return "BC6H";
+		case FMT_BC6H_SF16: return "BC6H_SF16";
 		default: return "UNKNOWN";
 	}
 }
@@ -620,6 +622,71 @@ bool idRenderTexture::MakeCurrent( int cubeFace ) {
 	knownIncomplete = false;
 	incompleteGeneration = -1;
 	validatedCubeFaces |= faceBit;
+	return true;
+}
+
+/*
+================
+idRenderTexture::MakeCurrentLayered
+================
+*/
+// Bit 6 of validatedCubeFaces records that the layered attachment set was
+// complete; bit 7 that it was not, so a driver that rejects it is asked once
+// per framebuffer object.
+static const unsigned int RENDER_TEXTURE_LAYERED_VALID = 1u << 6;
+static const unsigned int RENDER_TEXTURE_LAYERED_INVALID = 1u << 7;
+
+bool idRenderTexture::MakeCurrentLayered( void ) {
+	if ( !glConfig.isInitialized || glBindFramebuffer == NULL || glFramebufferTexture == NULL ) {
+		return false;
+	}
+	const bool cubeColor = colorImages.Num() > 0 && colorImages[0]->GetOpts().textureType == TT_CUBIC;
+	const bool cubeDepth = depthImage != nullptr && depthImage->GetOpts().textureType == TT_CUBIC;
+	// a layered framebuffer needs every attachment layered
+	if ( ( colorImages.Num() > 0 && !cubeColor ) || ( depthImage != nullptr && !cubeDepth ) || ( !cubeColor && !cubeDepth ) ) {
+		return false;
+	}
+	if ( !EnsureDeviceHandle() || !HasCurrentDeviceHandle() ) {
+		BindNull();
+		return false;
+	}
+	if ( ( validatedCubeFaces & RENDER_TEXTURE_LAYERED_INVALID ) != 0 ) {
+		return false;
+	}
+	glBindFramebuffer( GL_FRAMEBUFFER, deviceHandle );
+	R_TrackDefaultFramebufferBound( false );
+
+	for ( int i = 0; i < colorImages.Num(); i++ ) {
+		if ( colorImages[i]->GetOpts().textureType != TT_CUBIC ) {
+			common->FatalError( "idRenderTexture::MakeCurrentLayered: Mixed cubemap/non-cubemap color targets are unsupported!" );
+		}
+		glFramebufferTexture( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, colorImages[i]->GetDeviceHandle(), 0 );
+	}
+	R_SetRenderTextureDrawBuffers( colorImages.Num() );
+	if ( cubeDepth ) {
+		if ( depthImage->GetOpts().format == FMT_DEPTH ) {
+			glFramebufferTexture( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthImage->GetDeviceHandle(), 0 );
+		} else if ( depthImage->GetOpts().format == FMT_DEPTH_STENCIL ) {
+			glFramebufferTexture( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, depthImage->GetDeviceHandle(), 0 );
+		} else {
+			common->FatalError( "idRenderTexture::MakeCurrentLayered: Unknown depth buffer format for cubemap target!" );
+		}
+	}
+
+	if ( ( validatedCubeFaces & RENDER_TEXTURE_LAYERED_VALID ) != 0 ) {
+		return true;
+	}
+	const GLenum framebufferStatus = glCheckFramebufferStatus( GL_FRAMEBUFFER );
+	if ( framebufferStatus != GL_FRAMEBUFFER_COMPLETE ) {
+		// Not FailFramebuffer: the per-face attachments may still be fine,
+		// so the target is not latched incomplete. Put face 0 back.
+		common->Warning( "idRenderTexture::MakeCurrentLayered: layered attachments of '%s' are incomplete (0x%x); drawing its faces one at a time",
+			debugLabel.c_str(), framebufferStatus );
+		validatedCubeFaces |= RENDER_TEXTURE_LAYERED_INVALID;
+		MakeCurrent( 0 );
+		return false;
+	}
+	validatedCubeFaces |= RENDER_TEXTURE_LAYERED_VALID;
 	return true;
 }
 

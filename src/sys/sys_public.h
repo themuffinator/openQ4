@@ -491,6 +491,14 @@ int				Sys_ReturnJoystickInputEvent( const int n, int &axis, int &value );
 void			Sys_EndJoystickInputEvents( void );
 bool			Sys_GetJoystickAxisState( int axis, int &value );
 bool			Sys_SetJoystickRumble( float lowFrequency, float highFrequency, int durationMsec );
+// openQ4: controller rumble comes from two places. The sound system sends the
+// rumble of what the player hears once a frame (Sys_UpdateJoystickRumble), and
+// gameplay adds short pulses of its own, a shot or a hit (Sys_PulseJoystickRumble,
+// idSys::ControllerRumblePulse). Each motor gets the stronger of the two until
+// the pulse ends. Main thread only; in_joystickRumble and in_joystickRumbleScale
+// apply to both.
+void			Sys_UpdateJoystickRumble( float soundLowFrequency, float soundHighFrequency, int soundDurationMsec );
+void			Sys_PulseJoystickRumble( float lowFrequency, float highFrequency, int durationMsec );
 // openQ4 VR: delivers a tracked-controller button exactly like a gamepad
 // button, to the event queue (menus, console) and the key poll queue (usercmd
 // bindings); mouse buttons are the menu pointer's clicks and take the mouse's
@@ -757,6 +765,9 @@ public:
 
 	virtual int				Milliseconds(void) = 0;
 	virtual bool			SecureRandomBytes( void *buffer, int bytes ) = 0;
+	// openQ4: a short gamepad rumble from gameplay (0..1 per motor), mixed with
+	// the sound system's rumble until it ends; see Sys_PulseJoystickRumble.
+	virtual void			ControllerRumblePulse( float lowFrequency, float highFrequency, int durationMsec ) = 0;
 };
 
 extern idSys *				sys;

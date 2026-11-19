@@ -85,6 +85,20 @@ inline bool FS_IsPakMemberContentStamp( ID_TIME_T stamp ) {
 	return stamp < FILE_NOT_FOUND_TIMESTAMP;
 }
 
+// Whether a reload may keep what it loaded from a source stamped `loaded` when
+// the search path now stamps it `current`. Loose files keep the "not newer"
+// rule; a pk4 member's content stamp is an identity with no order, so any
+// difference means another file (a campaign switch) or a changed one.
+inline bool FS_SourceStampCurrent( ID_TIME_T current, ID_TIME_T loaded ) {
+	if ( current == FILE_NOT_FOUND_TIMESTAMP ) {
+		return true;
+	}
+	if ( FS_IsPakMemberContentStamp( current ) || FS_IsPakMemberContentStamp( loaded ) ) {
+		return current == loaded;
+	}
+	return current <= loaded;
+}
+
 inline ID_TIME_T FS_ContentStampOrderTime( ID_TIME_T stamp ) {
 	return FS_IsPakMemberContentStamp( stamp ) ? 0 : stamp;
 }

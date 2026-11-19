@@ -124,6 +124,9 @@ public:
 
 	// Drops both reverb sends so the hardware can release its effect slots.
 	void					DetachReverbSends();
+	// Before playing: the slots this voice's sends feed take their reverb back
+	// (s_reverbIdleSlots) and count as fed.
+	void					NoteReverbSends();
 
 	void					Create( const idSoundSample* leadinSample, const idSoundSample* loopingSample );
 
@@ -253,6 +256,7 @@ private:
 	int						startFlags;				// the shader flags Start was given
 	bool					deepRoutedQueue;		// holds one of SOUND_QUEUE_DEEP_ROUTED_VOICES until its buffers are deleted
 	float					appliedSourceRadius;	// last AL_SOURCE_RADIUS sent, -1 = none yet
+	ALuint					reverbSendSlot[2];		// effect slot each send was last attached to, 0 = none
 };
 
 /*

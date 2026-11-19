@@ -42,6 +42,104 @@ idCVar sys_lang( "sys_lang", "english", CVAR_SYSTEM | CVAR_ARCHIVE,  "", sysLang
 idSysLocal			sysLocal;
 idSys *				sys = &sysLocal;
 
+/*
+==============================================================
+
+	Controller rumble mix
+
+	The sound system sends the rumble of what the player hears every frame;
+	gameplay pulses (a shot, a hit) ride on top of it until they end. Sending
+	either alone would cancel the other a frame later, which is why a weapon's
+	own fire never rumbled (#244).
+
+==============================================================
+*/
+
+idCVar in_joystickRumbleLog( "in_joystickRumbleLog", "0", CVAR_SYSTEM | CVAR_BOOL, "print each gameplay rumble pulse and the mixed level it sends to the controller" );
+
+static const float SYS_RUMBLE_STOP_THRESHOLD = 0.01f;
+
+static float	sysRumbleSoundLow = 0.0f;
+static float	sysRumbleSoundHigh = 0.0f;
+static int		sysRumbleSoundDuration = 0;
+static float	sysRumblePulseLow = 0.0f;
+static float	sysRumblePulseHigh = 0.0f;
+static int		sysRumblePulseEnd = 0;
+
+static float Sys_ClampRumble( float value ) {
+	// NaN compares false and becomes 0
+	return value > 0.0f ? ( value < 1.0f ? value : 1.0f ) : 0.0f;
+}
+
+static void Sys_SendMixedJoystickRumble( const char *reason ) {
+	const int now = Sys_Milliseconds();
+	const bool pulseActive = now < sysRumblePulseEnd;
+
+	float low = sysRumbleSoundLow;
+	float high = sysRumbleSoundHigh;
+	int duration = sysRumbleSoundDuration;
+	if ( pulseActive ) {
+		if ( sysRumblePulseLow > low ) {
+			low = sysRumblePulseLow;
+		}
+		if ( sysRumblePulseHigh > high ) {
+			high = sysRumblePulseHigh;
+		}
+		// While the pulse is the stronger, it ends at its own time even if the
+		// next frame is late; the next update sends the sound's level again.
+		if ( low > sysRumbleSoundLow || high > sysRumbleSoundHigh ) {
+			duration = sysRumblePulseEnd - now;
+		}
+	}
+
+	if ( ( low <= SYS_RUMBLE_STOP_THRESHOLD && high <= SYS_RUMBLE_STOP_THRESHOLD ) || duration <= 0 ) {
+		Sys_SetJoystickRumble( 0.0f, 0.0f, 0 );
+		return;
+	}
+
+	const bool sent = Sys_SetJoystickRumble( low, high, duration );
+	if ( reason != NULL && in_joystickRumbleLog.GetBool() ) {
+		const char *outcome = "sent";
+		if ( !sent ) {
+			outcome = ( !cvarSystem->GetCVarBool( "in_joystick" ) || !cvarSystem->GetCVarBool( "in_joystickRumble" ) ) ?
+				"not sent, rumble is off" : "not sent, no controller";
+		}
+		common->Printf( "rumble: %s low %.2f high %.2f for %d ms (sound %.2f/%.2f), %s\n",
+			reason, low, high, duration, sysRumbleSoundLow, sysRumbleSoundHigh, outcome );
+	}
+}
+
+void Sys_UpdateJoystickRumble( float soundLowFrequency, float soundHighFrequency, int soundDurationMsec ) {
+	sysRumbleSoundLow = Sys_ClampRumble( soundLowFrequency );
+	sysRumbleSoundHigh = Sys_ClampRumble( soundHighFrequency );
+	sysRumbleSoundDuration = soundDurationMsec > 0 ? soundDurationMsec : 0;
+	if ( sysRumbleSoundDuration == 0 ) {
+		sysRumbleSoundLow = sysRumbleSoundHigh = 0.0f;
+	}
+	Sys_SendMixedJoystickRumble( NULL );
+}
+
+void Sys_PulseJoystickRumble( float lowFrequency, float highFrequency, int durationMsec ) {
+	const float low = Sys_ClampRumble( lowFrequency );
+	const float high = Sys_ClampRumble( highFrequency );
+	if ( durationMsec <= 0 || ( low <= SYS_RUMBLE_STOP_THRESHOLD && high <= SYS_RUMBLE_STOP_THRESHOLD ) ) {
+		return;
+	}
+	// a pulse over one still running takes the stronger of each and the later end
+	const int now = Sys_Milliseconds();
+	const int end = now + ( durationMsec < 2000 ? durationMsec : 2000 );
+	if ( now < sysRumblePulseEnd ) {
+		sysRumblePulseLow = low > sysRumblePulseLow ? low : sysRumblePulseLow;
+		sysRumblePulseHigh = high > sysRumblePulseHigh ? high : sysRumblePulseHigh;
+		sysRumblePulseEnd = end > sysRumblePulseEnd ? end : sysRumblePulseEnd;
+	} else {
+		sysRumblePulseLow = low;
+		sysRumblePulseHigh = high;
+		sysRumblePulseEnd = end;
+	}
+	Sys_SendMixedJoystickRumble( "pulse" );
+}
+
 // engine-owned window state; written by the platform window layer, read by
 // GUI/session code (see sys_public.h)
 engineWindowState_t	engineWindowState;

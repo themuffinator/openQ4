@@ -296,7 +296,7 @@ static void VK_FillGLConfigFromDevice( void ) {
 	// without block compression degrades to uncompressed art instead of failing
 	// every BC image allocation one warning at a time.
 	glConfig.textureCompressionAvailable = vkCtx.textureCompressionBCSupported;
-	glConfig.bptcTextureCompressionAvailable = vkCtx.textureCompressionBCSupported;
+	glConfig.bptcTextureCompressionAvailable = vkCtx.textureCompressionBCSupported && r_useBPTC.GetBool();
 	glConfig.cubeMapAvailable = true;
 
 	// imagetools keeps a private copy of these per linked binary and gates all

@@ -741,7 +741,9 @@ extern rvGameLog *				gameLog;
 //     headset, vr_body); idVRSystem::GetFrameState fills the caller's copy.
 // 60: idVRSystem appends TurnBody: a multiplayer client turns the tracked head onto
 //     a facing the server set from the weapon hand's usercmd.
-const int GAME_API_VERSION		= 60;
+// 61: idSys appends ControllerRumblePulse: the game's weapon fire and hits
+//     rumble a gamepad, mixed with the sound system's rumble.
+const int GAME_API_VERSION		= 61;
 
 struct gameImport_t {
 

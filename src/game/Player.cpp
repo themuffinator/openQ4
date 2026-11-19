@@ -11480,9 +11480,12 @@ void Cmd_OpenQ4ViewReport_f( const idCmdArgs &args ) {
 	}
 	const idAngles angles = view->viewaxis.ToAngles();
 	const rvWeapon *weapon = player->weapon;
-	gameLocal.Printf( "openq4_viewReport: %d origin %s angles %s fov %.1f %.1f vehicle %d god %d weapon %s ammo %d clip %d\n", gameLocal.time,
+	// "focus" names the entity whose interactive GUI the crosshair is on, or "none"
+	const idEntity *focusGui = player->GetFocusGuiEntity();
+	gameLocal.Printf( "openq4_viewReport: %d origin %s angles %s fov %.1f %.1f vehicle %d god %d weapon %s ammo %d clip %d focus %s\n", gameLocal.time,
 		view->vieworg.ToString( 1 ), angles.ToString( 1 ), view->fov_x, view->fov_y, player->IsInVehicle() ? 1 : 0, player->godmode ? 1 : 0,
-		weapon ? weapon->spawnArgs.GetString( "classname" ) : "none", weapon ? weapon->AmmoAvailable() : -1, weapon ? weapon->AmmoInClip() : -1 );
+		weapon ? weapon->spawnArgs.GetString( "classname" ) : "none", weapon ? weapon->AmmoAvailable() : -1, weapon ? weapon->AmmoInClip() : -1,
+		focusGui != NULL ? focusGui->GetName() : "none" );
 }
 
 /*
@@ -13309,12 +13312,21 @@ float idPlayer::VRCrouchLift( const vrFrameState_t &frame ) const {
 ===============
 idPlayer::VRVibrate
 
-openQ4 VR: a pulse in the local player's controllers. Prediction reruns a
-multiplayer client's frames, so only a new frame pulses.
+openQ4: a pulse in the local player's controllers. Prediction reruns a
+multiplayer client's frames, so only a new frame pulses. Without a headset
+it rumbles a gamepad instead (#244): the weapon hand is the sharp
+high-frequency motor, the other hand the heavy low-frequency one, and
+in_joystickRumble turns it off with the sound-driven rumble.
 ===============
 */
 void idPlayer::VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const {
-	if ( vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
+	if ( gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
+		return;
+	}
+	if ( vrSystem == NULL || !vrSystem->IsActive() ) {
+		const float high = weaponHand ? amplitude : amplitude * 0.5f;
+		const float low = otherHand ? amplitude : amplitude * 0.5f;
+		sys->ControllerRumblePulse( low, high, durationMsec );
 		return;
 	}
 	vrFrameState_t frame;

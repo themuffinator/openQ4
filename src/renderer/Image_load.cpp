@@ -556,7 +556,7 @@ static ID_INLINE bool R_BinaryImageHeaderSupportedByRenderer( const bimageFile_t
 	if ( ( format == FMT_DXT1 || format == FMT_DXT5 ) && !glConfig.textureCompressionAvailable ) {
 		return false;
 	}
-	if ( format == FMT_BC7 && !glConfig.bptcTextureCompressionAvailable ) {
+	if ( IsBPTCFormat( format ) && !glConfig.bptcTextureCompressionAvailable ) {
 		return false;
 	}
 	if ( ( format == FMT_ETC2_RGB8 || format == FMT_ETC2_RGBA8 || format == FMT_EAC_RG11 ) &&
@@ -953,7 +953,16 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 		}
 		if ( R_IsPreferredDDSStale( preferredDDSName, preferredDDSFileTime, originalSourceTime ) ) {
 			if ( cvarSystem->GetCVarBool( "image_showPrecompressedTextures" ) ) {
-				common->Printf( "Ignoring stale DDS replacement %s for %s\n", preferredDDSName.c_str(), GetName() );
+				// Say which file won: a pk4 member never makes a DDS stale, so it
+				// is always a loose file, and players otherwise have to guess
+				// which of their folders holds it (#217).
+				idStr loosePaths;
+				if ( R_DescribeLooseImageSources( GetName(), loosePaths ) > 0 ) {
+					common->Printf( "Ignoring stale DDS replacement %s for %s: newer loose source %s\n",
+						preferredDDSName.c_str(), GetName(), loosePaths.c_str() );
+				} else {
+					common->Printf( "Ignoring stale DDS replacement %s for %s\n", preferredDDSName.c_str(), GetName() );
+				}
 			}
 			preferredDDSImage = false;
 			preferredDDSPrecompressed = false;
@@ -2206,6 +2215,8 @@ void idImage::Print() const {
 		NAME_FORMAT( DXT1 );
 		NAME_FORMAT( DXT5 );
 		NAME_FORMAT( BC7 );
+		NAME_FORMAT( BC6H_UF16 );
+		NAME_FORMAT( BC6H_SF16 );
 		NAME_FORMAT( ETC2_RGB8 );
 		NAME_FORMAT( ETC2_RGBA8 );
 		NAME_FORMAT( EAC_RG11 );

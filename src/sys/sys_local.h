@@ -80,6 +80,9 @@ public:
 	virtual bool			SecureRandomBytes( void *buffer, int bytes ) {
 		return Sys_GetSecureRandomBytes( buffer, bytes );
 	}
+	virtual void			ControllerRumblePulse( float lowFrequency, float highFrequency, int durationMsec ) {
+		Sys_PulseJoystickRumble( lowFrequency, highFrequency, durationMsec );
+	}
 };
 
 #endif /* !__SYS_LOCAL__ */

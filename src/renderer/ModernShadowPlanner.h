@@ -142,6 +142,8 @@ typedef struct modernShadowLightDescriptor_s {
 	int					cascadeIndex;
 	int					projectedFallbackCascade;
 	int					projectedFallbackReason;
+	// index + 1 of the cascade holding the light's whole map, 0 = none
+	int					wholeLightCascadeSlot;
 	int					projectedSampleCount;
 	int					projectedValidSampleCount;
 	int					projectedSkippedSampleCount;

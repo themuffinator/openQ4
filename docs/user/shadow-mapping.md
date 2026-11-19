@@ -13,9 +13,11 @@ Choose a preset on **Settings → Display → Graphics → Performance Preset** 
 | Minimum, Low Power | None, to save work on weak or battery-powered hardware. |
 | Low, Performance, Balanced | Quake 4's original stencil shadows. |
 | Enhanced | Shadow maps for spotlights and sunlight. Point lights, which are most of Quake 4's lights, keep the original shadows, because their shadow maps cost the most. |
-| Quality | Shadow maps for every light, with soft edges that harden where objects meet surfaces. |
+| Quality | Shadow maps for every light, with soft edges that harden where objects meet surfaces. Sunlight and other distant lights get cascades, so outdoor shadows stay sharp around you. |
 | Ultra | As Quality, with sharper spotlight and sunlight shadows and smoother edges. |
-| Maximum | Every shadow setting at its highest, including sharper point-light shadows and extra detail for distant light. |
+| Maximum | Every shadow setting at its highest, including sharper point-light shadows and cascades for spotlights too. |
+
+**Not in 0.14.1:** in 0.14.1 only Maximum used cascades, so on Quality and Ultra the shadows of characters and nearby objects outdoors were blocky or missing.
 
 The change applies at once; you don't need to restart the renderer. **Settings → Display → Image Quality → Enable Shadows** turns all shadows off or on, whichever kind the preset uses.
 
@@ -45,7 +47,7 @@ These are the settings that matter most. Each is described fully in the [setting
 - **Sharpness.** `r_shadowMapSize` sets the resolution of spotlight and sunlight shadows (presets use 1024 to 4096). `r_shadowMapPointSize` does the same for point lights (512, or 2048 on Maximum). Higher values are sharper but use more video memory; point-light size costs the most, because each point light stores six images.
 - **Point lights.** `r_shadowMapPointLights 0` keeps the original shadows for point lights only. It is the biggest single saving, and it is what Enhanced does.
 - **Soft edges.** `r_shadowMapFilterMode` picks the edge style: `2` contact-hardening (the default), `1` an even soft edge, `0` a simple fixed blur. `r_shadowMapFilterTaps` (5, 9 or 13) sets how many samples smooth each edge: more is smoother and costs more.
-- **Large outdoor areas.** `r_shadowMapCSM 1` turns on cascades: a distant light, such as sunlight, gets several shadow maps, with the sharpest one closest to you. Only Maximum turns cascades on, because they cost more.
+- **Large outdoor areas.** `r_shadowMapCSM 1` turns on cascades: a distant light, such as sunlight, gets several shadow maps, with the sharpest one closest to you. Quality, Ultra and Maximum turn them on; only Maximum also cascades ordinary spotlights (`r_shadowMapProjectedCSM`), which costs more indoors. Past the cascades' reach (`r_shadowMapCascadeDistance`), the light's whole shadow map takes over, so distant shadows don't disappear. **Not in 0.14.1.**
 - **Crowded views.** All spotlight and sunlight shadows share one large texture, the shadow atlas (`r_shadowMapAtlasSize`). When a view has more lights than fit, openQ4 draws the lights that cover the least of the world at half or quarter size, rather than dropping any of them.
 
 ### Example settings
@@ -172,7 +174,8 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 - **Shadows float away from the objects casting them.** For point lights, first confirm `r_shadowMapCasterCulling 2` and `r_shadowMapPointMaxWorldBias 4`, then lower `r_shadowMapPointFilterRadius`, `r_shadowMapPointBias` or `r_shadowMapPointNormalBias` in small steps. For spotlights, lower `r_shadowMapBias`, `r_shadowMapNormalBias`, `r_shadowMapTexelBiasScale`, `r_shadowMapPolygonFactor` or `r_shadowMapPolygonOffset` in small steps.
 - **Speckles or stripes on surfaces (shadow acne).** Raise the matching bias a very little. If it only happens with a wide soft edge, raise the shadow resolution or narrow `r_shadowMapFilterRadius` first.
 - **Outdoor sunlight shadows look too soft or too sharp.** Distant lights use a tighter edge (`r_shadowMapDistantFilterScale 0.35`). Lower it toward `0` for sharper shadows, or set `1` for the same softness as other lights.
-- **Character shadows outdoors look blocky.** Quake 4 lights its outdoor areas with a few very large lights, and without cascades each of them gets one shadow map stretched over the whole area: 2048 pixels across on Quality, 4096 on Ultra. Turn on cascades with `r_shadowMapCSM 1` (Maximum already does), which spends the sharpest map on the area around you. Raising `r_shadowMapSize` helps less and costs more memory. If you prefer the original hard-edged look, `r_useShadowMap 0` brings back the stencil shadows.
+- **Character shadows outdoors look blocky.** Quake 4 lights its outdoor areas with a few very large lights, and without cascades each of them gets one shadow map stretched over the whole area: on Air Defense 1 about 25 world units per shadow pixel at 2048, so a character is two pixels wide and most nearby shadows vanish. Cascades (`r_shadowMapCSM 1`) spend the sharpest map on the area around you. Quality, Ultra and Maximum turn them on (**not in 0.14.1**, where only Maximum did); on Enhanced or your own settings, turn them on yourself. Raising `r_shadowMapSize` helps much less and costs more memory. If you prefer the original hard-edged look, `r_useShadowMap 0` brings back the stencil shadows.
+- **Distant shadows disappear outdoors with cascades on.** Check `r_shadowMapCascadeFarMap 1` (the default), which keeps the light's whole map for everything past the cascades' reach. **Not in 0.14.1**, where shadows ended at `r_shadowMapCascadeDistance`.
 - **Characters don't shadow some objects, or themselves.** That is how Quake 4 was made. Characters and many props, consoles and machines use materials marked to keep out of each other's shadows, so the original stencil shadows looked clean on their low-polygon models. Characters still shadow most of the level, and the level still shadows them. openQ4 keeps the original rule unless you turn on [character self-shadows](#character-self-shadows).
 - **Soft edges don't change with distance.** Check `r_shadowMapFilterMode 2`.
 - **A fence or grate casts a solid shadow.** Its material's holes come from something shadow maps can't trace (a video, a generated texture or unusual texture coordinates). `r_shadowMapHashedAlpha` can't change that.
@@ -191,8 +194,8 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 | `r_shadows` | `1` | `0..1` | Draws shadows at all. Must be on for shadow maps. |
 | `r_useShadowMap` | `0` | `0..1` | Uses shadow maps for the lights that support them. Enhanced, Quality, Ultra and Maximum set it to `1`. |
 | `r_shadowMapPointLights` | `1` | `0..1` | Uses shadow maps for point lights too. Most of Quake 4's lights are point lights (about 19 in 20 shadow-casting ones), so `0` keeps nearly every light on the original shadows. Enhanced sets `0`. |
-| `r_shadowMapCSM` | `0` | `0..1` | Cascades for spotlights and sunlight: several shadow maps per light, sharpest nearest you. Maximum sets `1`. |
-| `r_shadowMapProjectedCSM` | `1` | `0..1` | Lets ordinary spotlights use cascades when `r_shadowMapCSM` is on. Sunlight and other parallel lights keep their own wide coverage either way. |
+| `r_shadowMapCSM` | `0` | `0..1` | Cascades for sunlight, distant lights and (with `r_shadowMapProjectedCSM`) spotlights: several shadow maps per light, sharpest nearest you. Quality, Ultra and Maximum set `1` (**not in 0.14.1**, where only Maximum did). |
+| `r_shadowMapProjectedCSM` | `1` | `0..1` | Lets ordinary spotlights use cascades when `r_shadowMapCSM` is on. Sunlight and distant lights are cascaded either way. Maximum sets `1`; Quality and Ultra set `0`, so indoor spotlights keep one map each. |
 | `r_shadowMapHashedAlpha` | `1` | `0..1` | Steadier shadows from grates, fences and foliage. `0` gives harder, cleaner cutout edges. |
 | `r_shadowMapCharacterSelfShadow` | `0` | `0..1` | Character self-shadows: under shadow-mapped lights, animated characters shadow themselves, each other and props. `0` keeps the original rule. **Not in 0.14.1.** |
 | `r_shadowMapStableAlphaHash` | `1` | `0..1` | Keeps that cutout pattern fixed to the world, so it doesn't crawl as the camera moves. |
@@ -232,7 +235,8 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 | Setting | Default | Range | What it does |
 |---|---:|---:|---|
 | `r_shadowMapCascadeCount` | `4` | `1..4` | Number of cascades when `r_shadowMapCSM` is on. |
-| `r_shadowMapCascadeDistance` | `1536` | `64..8192` | How far from you the cascades reach, in game units. |
+| `r_shadowMapCascadeDistance` | `1536` | `64..8192` | How far from you the cascades reach, in game units. Past it, the light's whole shadow map takes over (`r_shadowMapCascadeFarMap`). |
+| `r_shadowMapCascadeFarMap` | `1` | `0..1` | The last cascade holds the light's whole shadow, so shadows continue past the cascades' reach. Anything farther away that the nearer cascades still cover keeps their sharper shadow. `0` fits every cascade around you instead: no shadows beyond the reach. **Not in 0.14.1.** |
 | `r_shadowMapCascadeLambda` | `0.75` | `0..1` | How the cascades divide that distance: lower spaces them evenly, higher packs more detail close to you. |
 | `r_shadowMapCascadeBlend` | `0.15` | `0..0.5` | Width of the crossfade between neighbouring cascades. |
 | `r_shadowMapCascadeStabilize` | `1` | `0..1` | Holds cascades steady to stop shimmering as you move. |
@@ -303,5 +307,7 @@ These help when reporting a shadow problem. Leave the last five settings at thei
 | `r_shadowMapSkipStencilShadows` | `1` | Skips building original shadows for lights drawn with shadow maps, which saves processor time. A light whose map fails gets them back the next frame. |
 | `r_shadowMapConservativeCasters` | `1` | Lets objects off screen cast shadows onto what you can see. |
 | `r_shadowMapPointCompose` | `1` | Comparison switch: draws a point light's moving objects over its stored shadow instead of redrawing all six faces. |
+| `r_shadowMapPointLayered` | `1` | Comparison switch, OpenGL: draws all six faces of a point light's shadow in one pass where the graphics driver allows it, which saves processor time. `0` draws the faces one at a time. The picture is identical. |
 | `r_shadowMapCacheMovingLights` | `0` | Comparison switch: a moving light gets a new shadow every frame, so it is drawn directly rather than stored. `1` stores it anyway. A light that only changes colour is not moving. |
+| `r_shadowMapCascadeFarCache` | `1` | Comparison switch, OpenGL: keeps the still scenery of the cascades' whole-light map between frames and draws only moving objects over it. `0` redraws it every frame. The picture is identical. **Not in 0.14.1.** |
 | `r_vkShadowSampleResident` | `1` | Comparison switch, Vulkan: reads a stored spotlight shadow in place instead of copying it each frame. The picture is identical. |

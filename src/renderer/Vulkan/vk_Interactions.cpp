@@ -871,6 +871,7 @@ static bool VK_ClassicInteraction_BuildMappedShadowBlock(
 	block.texelSize[ 1 ] = residentMap
 		? physicalPass.invMapSize : physicalLight.invAtlasSize[ 1 ];
 	block.texelSize[ 2 ] = Max( 0.0f, r_shadowMapTexelBiasScale.GetFloat() );
+	block.texelSize[ 3 ] = static_cast<float>( projected.wholeLightCascade + 1 );
 	block.filterParams[ 0 ] = mapPass.projected.filter.filterRadius;
 	block.filterParams[ 1 ] = static_cast<float>(
 		mapPass.projected.filter.filterTaps );
@@ -3830,6 +3831,7 @@ static int VK_Inter_WriteShadowSlice( const viewEntity_t *space ) {
 	block.texelSize[ 0 ] = residentMap ? passState->invMapSize : state->invAtlasSize[ 0 ];
 	block.texelSize[ 1 ] = residentMap ? passState->invMapSize : state->invAtlasSize[ 1 ];
 	block.texelSize[ 2 ] = Max( 0.0f, r_shadowMapTexelBiasScale.GetFloat() );
+	block.texelSize[ 3 ] = static_cast<float>( projected.wholeLightCascade + 1 );
 	const shadowMapProjectedFilterSettings_t filterSettings =
 			R_ShadowMapProjectedFilterSettings( state->vLight );
 	block.filterParams[ 0 ] = filterSettings.filterRadius;

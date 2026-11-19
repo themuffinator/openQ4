@@ -30,9 +30,9 @@ A preset sets resolution scale, anti-aliasing, shadows, effects, texture sizes, 
 | `performance` | Modest desktops, laptops and handhelds such as the Steam Deck | 85% scale, SMAA medium, original shadows, full-size textures, 60 FPS cap |
 | `balanced` | Most desktops; the default | Full resolution, 2x MSAA with SMAA medium, original shadows, 120 FPS cap |
 | `enhanced` | High-refresh play with modern effects | Full resolution, SMAA high, shadow maps for spotlights and sunlight (other lights keep the original shadows), bloom, SSAO, tone mapping, 144 FPS cap |
-| `quality` | Soft shadow maps on every light | Full resolution, 2x MSAA with SMAA high, soft shadow maps for every light, bloom, SSAO, tone mapping, 144 FPS cap |
+| `quality` | Soft shadow maps on every light | Full resolution, 2x MSAA with SMAA high, soft shadow maps for every light with cascaded sun shadows (not in 0.14.1), bloom, SSAO, tone mapping, 144 FPS cap |
 | `ultra` | The best image that still plays smoothly on a strong graphics card | Full resolution, 4x MSAA with SMAA ultra, larger and softer shadow maps, more SSAO detail, 240 FPS cap |
-| `maximum` | Everything on, with no frame-rate target | As Ultra, plus 8x MSAA (not in 0.14.1, which asks for 16x), the largest shadow maps, cascaded sun shadows and motion blur |
+| `maximum` | Everything on, with no frame-rate target | As Ultra, plus 8x MSAA (not in 0.14.1, which asks for 16x), the largest shadow maps, cascades for spotlights as well as sunlight, and motion blur |
 
 What the effects are:
 

@@ -587,6 +587,10 @@ public:
 
 extern idSoundSystem*	soundSystem;
 
+// Engine only: frees every loaded sound sample for a campaign remount, after
+// StopAllSounds; each loads again from the new search path on its next use.
+void Sound_PurgeSamplesForRemount( void );
+
 #define OPENQ4_SOUND_HAS_SOUNDWORLD_SKIP 1
 
 #endif /* !__SOUND__ */

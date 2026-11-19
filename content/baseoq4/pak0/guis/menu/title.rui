@@ -8434,6 +8434,62 @@
    }
   },
   {
+   "id": "tall.detail-continue-backing.left",
+   "node": "detail-continue-backing",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -15.0
+      ]
+     },
+     -15.0
+    ]
+   }
+  },
+  {
+   "id": "tall.detail-continue-backing.top",
+   "node": "detail-continue-backing",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -3.0
+      ]
+     },
+     -3.0
+    ]
+   }
+  },
+  {
    "id": "tall.detail-continue-shot.top",
    "node": "detail-continue-shot",
    "property": "top",
@@ -9382,6 +9438,62 @@
    }
   },
   {
+   "id": "tall.detail-singleplayer-backing.left",
+   "node": "detail-singleplayer-backing",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -15.0
+      ]
+     },
+     -15.0
+    ]
+   }
+  },
+  {
+   "id": "tall.detail-singleplayer-backing.top",
+   "node": "detail-singleplayer-backing",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -3.0
+      ]
+     },
+     -3.0
+    ]
+   }
+  },
+  {
    "id": "tall.detail-singleplayer-text.font-size",
    "node": "detail-singleplayer-text",
    "property": "font-size",
@@ -10058,6 +10170,62 @@
       ]
      },
      966.0
+    ]
+   }
+  },
+  {
+   "id": "tall.detail-loadgame-backing.left",
+   "node": "detail-loadgame-backing",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -15.0
+      ]
+     },
+     -15.0
+    ]
+   }
+  },
+  {
+   "id": "tall.detail-loadgame-backing.top",
+   "node": "detail-loadgame-backing",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -3.0
+      ]
+     },
+     -3.0
     ]
    }
   },
@@ -10742,6 +10910,62 @@
    }
   },
   {
+   "id": "tall.detail-multiplayer-backing.left",
+   "node": "detail-multiplayer-backing",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -15.0
+      ]
+     },
+     -15.0
+    ]
+   }
+  },
+  {
+   "id": "tall.detail-multiplayer-backing.top",
+   "node": "detail-multiplayer-backing",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -3.0
+      ]
+     },
+     -3.0
+    ]
+   }
+  },
+  {
    "id": "tall.detail-multiplayer-text.font-size",
    "node": "detail-multiplayer-text",
    "property": "font-size",
@@ -11418,6 +11642,62 @@
       ]
      },
      966.0
+    ]
+   }
+  },
+  {
+   "id": "tall.detail-settings-backing.left",
+   "node": "detail-settings-backing",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -15.0
+      ]
+     },
+     -15.0
+    ]
+   }
+  },
+  {
+   "id": "tall.detail-settings-backing.top",
+   "node": "detail-settings-backing",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 1.0]},
+     {
+      "op": "*",
+      "args": [
+       {
+        "op": "min",
+        "args": [
+         1.6,
+         {
+          "op": "/",
+          "args": [{"op": "+", "args": [-340.0, {"op": "/", "args": [960.0, {"state": "view.aspect"}]}]}, 563.2]
+         }
+        ]
+       },
+       -3.0
+      ]
+     },
+     -3.0
     ]
    }
   },
@@ -22869,7 +23149,7 @@
     {
      "node": "detail-continue",
      "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
     }
    ]
   },
@@ -23000,7 +23280,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -23066,7 +23346,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -23132,7 +23412,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
      ]
     }
    ]
@@ -23186,7 +23466,7 @@
     {
      "node": "detail-singleplayer",
      "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
     }
    ]
   },
@@ -23317,7 +23597,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -23383,7 +23663,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -23449,7 +23729,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
      ]
     }
    ]
@@ -23503,7 +23783,7 @@
     {
      "node": "detail-loadgame",
      "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
     }
    ]
   },
@@ -23634,7 +23914,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -23700,7 +23980,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -23766,7 +24046,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
      ]
     }
    ]
@@ -23820,7 +24100,7 @@
     {
      "node": "detail-multiplayer",
      "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
     }
    ]
   },
@@ -23951,7 +24231,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -24017,7 +24297,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -24083,7 +24363,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
      ]
     }
    ]
@@ -24137,7 +24417,7 @@
     {
      "node": "detail-settings",
      "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
     }
    ]
   },
@@ -24268,7 +24548,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -24334,7 +24614,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
      ]
     }
    ]
@@ -24400,7 +24680,7 @@
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
      ]
     }
    ]
@@ -31513,6 +31793,41 @@
             },
             "children": [
              {
+              "id": "detail-continue-backing",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -15.0, "unit": "dp"},
+               "top": {"type": "length", "value": -3.0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "shade",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                 "to": [{"fraction": 1}, {"fraction": 0.0}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0, 0, 0, 0]}},
+                  {"at": 0.05, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 0.72, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 1, "color": {"type": "color", "value": [0, 0, 0, 0]}}
+                 ]
+                }
+               }
+              ]
+             },
+             {
               "id": "detail-continue-shot",
               "type": "image",
               "properties": {
@@ -31810,6 +32125,41 @@
             },
             "children": [
              {
+              "id": "detail-singleplayer-backing",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -15.0, "unit": "dp"},
+               "top": {"type": "length", "value": -3.0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "shade",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                 "to": [{"fraction": 1}, {"fraction": 0.0}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0, 0, 0, 0]}},
+                  {"at": 0.05, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 0.72, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 1, "color": {"type": "color", "value": [0, 0, 0, 0]}}
+                 ]
+                }
+               }
+              ]
+             },
+             {
               "id": "detail-singleplayer-text",
               "type": "text",
               "properties": {
@@ -32040,6 +32390,41 @@
              "pointer-events": {"type": "keyword", "value": "none"}
             },
             "children": [
+             {
+              "id": "detail-loadgame-backing",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -15.0, "unit": "dp"},
+               "top": {"type": "length", "value": -3.0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "shade",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                 "to": [{"fraction": 1}, {"fraction": 0.0}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0, 0, 0, 0]}},
+                  {"at": 0.05, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 0.72, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 1, "color": {"type": "color", "value": [0, 0, 0, 0]}}
+                 ]
+                }
+               }
+              ]
+             },
              {
               "id": "detail-loadgame-text",
               "type": "text",
@@ -32272,6 +32657,41 @@
             },
             "children": [
              {
+              "id": "detail-multiplayer-backing",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -15.0, "unit": "dp"},
+               "top": {"type": "length", "value": -3.0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "shade",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                 "to": [{"fraction": 1}, {"fraction": 0.0}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0, 0, 0, 0]}},
+                  {"at": 0.05, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 0.72, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 1, "color": {"type": "color", "value": [0, 0, 0, 0]}}
+                 ]
+                }
+               }
+              ]
+             },
+             {
               "id": "detail-multiplayer-text",
               "type": "text",
               "properties": {
@@ -32502,6 +32922,41 @@
              "pointer-events": {"type": "keyword", "value": "none"}
             },
             "children": [
+             {
+              "id": "detail-settings-backing",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -15.0, "unit": "dp"},
+               "top": {"type": "length", "value": -3.0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "pointer-events": {"type": "keyword", "value": "none"}
+              },
+              "paths": [
+               {
+                "id": "shade",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                 "to": [{"fraction": 1}, {"fraction": 0.0}],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0, 0, 0, 0]}},
+                  {"at": 0.05, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 0.72, "color": {"type": "color", "value": [0, 0, 0, 0.6]}},
+                  {"at": 1, "color": {"type": "color", "value": [0, 0, 0, 0]}}
+                 ]
+                }
+               }
+              ]
+             },
              {
               "id": "detail-settings-text",
               "type": "text",

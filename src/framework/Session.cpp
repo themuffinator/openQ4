@@ -3846,6 +3846,20 @@ static void Session_CampaignSelect_f( const idCmdArgs &args ) {
     sessLocal.SelectCampaign( args.Argv( 1 ), start, chapters );
 }
 
+static void Session_CampaignRemount_f( const idCmdArgs &args ) {
+    const bool start = args.Argc() == 3 && !idStr::Icmp( args.Argv( 2 ), "start" );
+    const bool chapters = args.Argc() == 3 && !idStr::Icmp( args.Argv( 2 ), "chapters" );
+    if ( args.Argc() < 2 || args.Argc() > 3 || ( args.Argc() == 3 && !start && !chapters ) ) {
+        common->Printf( "usage: campaignRemount quake4|awakening|arena [start|chapters]\n" ); return;
+    }
+    // The difficulty page opened ahead of the switch learns its campaign's
+    // state in place (SelectCampaign, UpdatePendingCampaignRemount).
+    idUserInterface *page = sessLocal.pendingRemountQueued ? sessLocal.pendingRemountPage : NULL;
+    sessLocal.pendingRemountPage = NULL;
+    sessLocal.pendingRemountQueued = false;
+    sessLocal.RemountCampaign( args.Argv( 1 ), start, chapters, page );
+}
+
 static void Session_CampaignMenu_f( const idCmdArgs &args ) {
     if ( args.Argc() > 2 || ( args.Argc() == 2 && idStr::Icmp( args.Argv( 1 ), "campaigns" ) ) ) return;
     sessLocal.OpenCampaignSelector( args.Argc() == 2 );
@@ -4268,6 +4282,11 @@ void idSessionLocal::Clear() {
 	systemGuiTransition = systemGuiBackEvent = false;
 	guiRetainedHome = guiRetainedTitle = guiRetainedPause = guiRetainedPauseStrogg = guiRetainedPauseAwakening = NULL;
 	retainedPauseStrogg = -1;
+	campaignRemounting = false;
+	pendingRemountPage = NULL;
+	pendingRemountCampaign.Clear();
+	pendingRemountAt = 0;
+	pendingRemountQueued = false;
 	retainedNewestSave = 0;
 	guiRetainedReleasing = NULL;
 	retainedReleaseUntil = 0;
@@ -11093,6 +11112,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "iamtheduke", Session_IAmTheDuke_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "toggles the SP-only iamtheduke cheat text overlay" );
 	cmdSystem->AddCommand( "bakeLightGrids", Session_BakeLightGrids_f, CMD_FL_SYSTEM|CMD_FL_CHEAT, "bakes openQ4-compatible lightgrid metadata and irradiance atlases for the current map or a batch of maps" );
     cmdSystem->AddCommand( "campaignSelect", Session_CampaignSelect_f, CMD_FL_SYSTEM, "selects a built-in single-player campaign" );
+    cmdSystem->AddCommand( "campaignRemount", Session_CampaignRemount_f, CMD_FL_SYSTEM, "switches to a built-in single-player campaign in place (queued by campaignSelect)" );
     cmdSystem->AddCommand( "campaignList", Session_CampaignList_f, CMD_FL_SYSTEM, "reports built-in campaign content readiness without mounting it" );
     cmdSystem->AddCommand( "campaignMenu", Session_CampaignMenu_f, CMD_FL_SYSTEM, "opens the single-player or campaign selector" );
     cmdSystem->AddCommand( "campaignChapters", Session_CampaignChapters_f, CMD_FL_SYSTEM, "lists the active campaign's chapters and which are reached" );

@@ -220,6 +220,8 @@ idSoundVoice_OpenAL::idSoundVoice_OpenAL()
 	openalStreamingBufferQueued[0] = false;
 	openalStreamingBufferQueued[1] = false;
 	openalStreamingBufferQueued[2] = false;
+	reverbSendSlot[0] = 0;
+	reverbSendSlot[1] = 0;
 }
 
 /*
@@ -737,6 +739,8 @@ void idSoundVoice_OpenAL::DestroyInternal()
 		soundSettingsSourceGeneration = 0;
 		hasVUMeter = false;
 	}
+	reverbSendSlot[0] = 0;
+	reverbSendSlot[1] = 0;
 	DeleteStreamingBuffers();
 	ResetQueuedBufferState();
 	DestroyWetDryFilters();
@@ -1399,6 +1403,7 @@ bool idSoundVoice_OpenAL::Update()
 
 	if( !paused && queuedBuffers > 0 && state != AL_PLAYING )
 	{
+		NoteReverbSends();
 		alSourcePlay( openalSource );
 		if( CheckALErrors() != AL_NO_ERROR )
 		{
@@ -1643,6 +1648,7 @@ bool idSoundVoice_OpenAL::UnPause()
 		return StreamBlockPending();
 	}
 
+	NoteReverbSends();
 	alSourcePlay( openalSource );
 	if( CheckALErrors() != AL_NO_ERROR )
 	{
@@ -1905,8 +1911,26 @@ void idSoundVoice_OpenAL::DetachReverbSends()
 	{
 		alSource3i( openalSource, AL_AUXILIARY_SEND_FILTER, AL_EFFECTSLOT_NULL, send, AL_FILTER_NULL );
 	}
+	reverbSendSlot[0] = 0;
+	reverbSendSlot[1] = 0;
 	CheckALErrors();
 #endif
+}
+
+/*
+========================
+idSoundVoice_OpenAL::NoteReverbSends
+========================
+*/
+void idSoundVoice_OpenAL::NoteReverbSends()
+{
+	for( int send = 0; send < 2; send++ )
+	{
+		if( reverbSendSlot[send] != 0 )
+		{
+			soundSystemLocal.hardware.NoteReverbSend( reverbSendSlot[send] );
+		}
+	}
 }
 
 /*
@@ -2106,11 +2130,15 @@ void idSoundVoice_OpenAL::ApplyWetDryRouting()
 	{
 		qalFilterf( openalAuxFilter, AL_LOWPASS_GAIN, wetFilterGain );
 		qalFilterf( openalAuxFilter, AL_LOWPASS_GAINHF, wetFilterGainHF );
+		// the slot takes its reverb back before this voice's input reaches it
+		soundSystemLocal.hardware.NoteReverbSend( primarySlot );
 		alSource3i( openalSource, AL_AUXILIARY_SEND_FILTER, primarySlot, 0, openalAuxFilter );
+		reverbSendSlot[0] = primarySlot;
 	}
 	else if( hasEfxFilters )
 	{
 		alSource3i( openalSource, AL_AUXILIARY_SEND_FILTER, AL_EFFECTSLOT_NULL, 0, AL_FILTER_NULL );
+		reverbSendSlot[0] = 0;
 	}
 
 	if( hasEfxFilters && soundSystemLocal.hardware.GetMaxAuxiliarySends() >= 2 )
@@ -2124,11 +2152,14 @@ void idSoundVoice_OpenAL::ApplyWetDryRouting()
 		{
 			qalFilterf( openalAreaAuxFilter, AL_LOWPASS_GAIN, areaFilterGain );
 			qalFilterf( openalAreaAuxFilter, AL_LOWPASS_GAINHF, areaFilterGainHF );
+			soundSystemLocal.hardware.NoteReverbSend( areaSlot );
 			alSource3i( openalSource, AL_AUXILIARY_SEND_FILTER, areaSlot, 1, openalAreaAuxFilter );
+			reverbSendSlot[1] = areaSlot;
 		}
 		else
 		{
 			alSource3i( openalSource, AL_AUXILIARY_SEND_FILTER, AL_EFFECTSLOT_NULL, 1, AL_FILTER_NULL );
+			reverbSendSlot[1] = 0;
 		}
 	}
 #else
@@ -2199,7 +2230,9 @@ bool idSoundVoice_OpenAL::ApplyWetDryRoutingChecked(bool filters, bool wet, ALui
 			SOUND_VOICE_CALL(filterf(openalAuxFilter,AL_LOWPASS_GAIN,auxiliary));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
 			SOUND_VOICE_CALL(filterf(openalAuxFilter,AL_LOWPASS_GAINHF,auxiliaryHF));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
 		}
+		if (route) soundSystemLocal.hardware.NoteReverbSend(slot);
 		SOUND_VOICE_CALL(alSource3i(source,AL_AUXILIARY_SEND_FILTER,route?slot:AL_EFFECTSLOT_NULL,0,route?openalAuxFilter:AL_FILTER_NULL));SOUND_VOICE_TEST(alGetError()==AL_NO_ERROR);
+		reverbSendSlot[0]=route?slot:0;
 		receipt.directFilter=openalDirectFilter;receipt.auxiliaryFilter=route?openalAuxFilter:0;receipt.slot=route?slot:0;
 	} else
 #endif

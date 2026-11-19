@@ -174,6 +174,13 @@ public:
 	bool			HasAreaReverbResources() const;
 	// detaches every voice's reverb sends, then frees slots 1-3
 	void			ReleaseAreaReverbSlots();
+	// s_reverbIdleSlots: a slot no playing voice has fed for longer than its tail
+	// holds the null effect, which OpenAL skips. A voice calls this before it
+	// attaches a send to the slot or starts playing into it; the slot takes its
+	// reverb back first and counts as fed this frame.
+	void			NoteReverbSend( ALuint slotHandle );
+	// the slot holds the null effect until a voice feeds it again
+	bool			IsReverbSlotIdle( int slot ) const;
 
 	// OpenAL info
 	static void		PrintDeviceList( const char* list );
@@ -220,6 +227,16 @@ private:
 	soundReverbEFX_t	appliedReverb[SOUND_REVERB_SLOTS];
 	ALuint				appliedReverbSlot[SOUND_REVERB_SLOTS];	// slot handle appliedReverb went to
 	ALint				reverbEffectType[SOUND_REVERB_SLOTS];	// AL_EFFECT_EAXREVERB/REVERB, 0 = unqueried
+	soundReverbEFX_t	requestedReverb[SOUND_REVERB_SLOTS];	// the last parameters asked for, applied or held back
+	ALuint				requestedReverbSlot[SOUND_REVERB_SLOTS];
+	bool				reverbSlotIdle[SOUND_REVERB_SLOTS];		// bound to the null effect by the idle sweep
+	int					reverbSlotRingsUntil[SOUND_REVERB_SLOTS];	// reverbClock when the last input's tail ends
+	int					reverbSlotLastFed[SOUND_REVERB_SLOTS];	// reverbClock of the last voice that fed the slot
+	int					reverbClock;							// Sys_Milliseconds at this frame's slot sync
+	int					ReverbSlotIndex( ALuint slotHandle ) const;
+	int					ReverbSlotTailMs( int slot ) const;
+	void				WakeReverbSlot( int slot );
+	void				UpdateIdleReverbSlots( int numSlots );
 	bool				deviceEventsEnabled;
 	int					enabledDeviceEventFlags;
 	bool				reopenDeviceAvailable;

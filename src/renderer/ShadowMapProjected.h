@@ -45,6 +45,9 @@ typedef struct shadowMapProjectedLightState_s {
 	int					fallbackReason;
 	int					requestedCascadeCount;
 	int					fallbackCascade;
+	// Index of the cascade that holds the light's whole map (the base
+	// projection) for receivers past the view-fitted cascades, or -1.
+	int					wholeLightCascade;
 	int					cascadeCount;
 	int					atlasDiv;
 	int					tileSize;
@@ -71,6 +74,9 @@ void R_ShadowMapBuildClipPlanes( const idPlane lightProject[4], idPlane clipPlan
 bool R_ShadowMapBuildParallelClipPlanes( const viewLight_t *vLight, idPlane clipPlanes[4] );
 bool R_ShadowMapBuildDistantPointClipPlanes( const viewLight_t *vLight, idPlane clipPlanes[4], float *farWidth = NULL );
 void R_ShadowMapBuildBaseClipPlanesForLight( const viewLight_t *vLight, idPlane clipPlanes[4] );
+// Whether a light cascaded this many ways keeps its whole map in the last
+// cascade (r_shadowMapCascadeFarMap) instead of fitting it to the view.
+bool R_ShadowMapCascadeUsesWholeLightMap( int cascadeCount );
 // Whether a projection shows the light's view mirrored, which swaps the face
 // the rasterizer reports for every triangle. A cube face is a camera at the
 // light and never does. A projected map takes its S and T rows from the
@@ -98,6 +104,7 @@ float R_ShadowMapSnapCascadeCenter( float rawCenter, float quantizedExtent, int 
 int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_t &state );
 // pins the stabilization guarantees (shadow plan invariant I5)
 bool R_ShadowMapCascadeStabilitySelfTest( void );
+bool R_ShadowMapCascadeWholeLightSelfTest( void );
 bool R_ShadowMapDistantPointProjectionSelfTest( void );
 bool R_ShadowMapCasterFacesSelfTest( void );
 void R_BuildShadowMapProjectedLightState( const viewLight_t *vLight, const viewDef_t *viewDef, int tileSize, shadowMapProjectedLightState_t &state );

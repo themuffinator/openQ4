@@ -1037,7 +1037,7 @@ void idUserInterfaceManagerLocal::ReloadGuis( bool all, bool levelLoad ) {
 		const idStr sourcePath = gui->GetSourceFile();
 		if ( !all ) {
 			fileSystem->ReadFile( sourcePath, NULL, &ts );
-			if ( ts <= gui->GetTimeStamp() ) {
+			if ( FS_SourceStampCurrent( ts, gui->GetTimeStamp() ) ) {
 				continue;
 			}
 		}

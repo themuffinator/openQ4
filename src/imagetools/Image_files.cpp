@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ImageTools.h"
 #include "LegacyScopeMask.h"
 #include "DXT/DXTCodec.h"
+#include "BC6H/BC6HCodec.h"
 #include "BC7/BC7Codec.h"
 #include "PNG/PNGCodec.h"
 
@@ -185,6 +186,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 static void LoadJPG( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
 static void LoadPNG( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp );
 static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp, bool decodeRXGBNormalMap );
+static bool R_LoadBC6HAsHalfFloat( idBinaryImage &image, const byte *fileBuffer, const int *levelOffsets, int width, int height, int numLevels, bool isSigned );
 
 /*
 ========================================================================
@@ -806,6 +808,9 @@ static const int DDS_DXGI_FORMAT_B8G8R8A8_TYPELESS = 90;
 static const int DDS_DXGI_FORMAT_B8G8R8A8_UNORM_SRGB = 91;
 static const int DDS_DXGI_FORMAT_B8G8R8X8_TYPELESS = 92;
 static const int DDS_DXGI_FORMAT_B8G8R8X8_UNORM_SRGB = 93;
+static const int DDS_DXGI_FORMAT_BC6H_TYPELESS = 94;
+static const int DDS_DXGI_FORMAT_BC6H_UF16 = 95;
+static const int DDS_DXGI_FORMAT_BC6H_SF16 = 96;
 static const int DDS_DXGI_FORMAT_BC7_TYPELESS = 97;
 static const int DDS_DXGI_FORMAT_BC7_UNORM = 98;
 static const int DDS_DXGI_FORMAT_BC7_UNORM_SRGB = 99;
@@ -815,8 +820,8 @@ static const int DDS_MAX_MIP_LEVELS = 32;
 static const uint32 DDS_CAPS2_CUBEMAP = 0x00000200;
 static const uint32 DDS_CAPS2_VOLUME = 0x00200000;
 
-// DXT1, DXT5, RXGB and BC7 can go to the GPU as they are. BC4, BC5 and the
-// uncompressed layouts have no textureFormat_t of their own, so LoadDDS
+// DXT1, DXT5, RXGB, BC7 and BC6H can go to the GPU as they are. BC4, BC5 and
+// the uncompressed layouts have no textureFormat_t of their own, so LoadDDS
 // decodes them and the destination image stores the result the way it stores
 // any decoded source (see R_DDSStoredFormatIsDirect).
 enum ddsStoredFormat_t {
@@ -827,7 +832,9 @@ enum ddsStoredFormat_t {
 	DDS_STORED_FORMAT_BC7,
 	DDS_STORED_FORMAT_BC4,			// one channel, read as luminance
 	DDS_STORED_FORMAT_BC5,			// two channels; Z is rebuilt as for a normal map
-	DDS_STORED_FORMAT_UNCOMPRESSED	// 24 or 32 bpp, one byte per channel
+	DDS_STORED_FORMAT_UNCOMPRESSED,	// 24 or 32 bpp, one byte per channel
+	DDS_STORED_FORMAT_BC6H_UF16,	// half-float RGB; decoded to RGBA16F without BPTC
+	DDS_STORED_FORMAT_BC6H_SF16
 };
 
 struct ddsFileInfo_t {
@@ -852,6 +859,8 @@ static int R_DDSBlockSizeForStoredFormat( ddsStoredFormat_t format ) {
 		case DDS_STORED_FORMAT_RXGB:
 		case DDS_STORED_FORMAT_BC7:
 		case DDS_STORED_FORMAT_BC5:
+		case DDS_STORED_FORMAT_BC6H_UF16:
+		case DDS_STORED_FORMAT_BC6H_SF16:
 			return 16;
 		default:
 			return 0;
@@ -861,7 +870,8 @@ static int R_DDSBlockSizeForStoredFormat( ddsStoredFormat_t format ) {
 // the formats R_LoadPrecompressedDDS uploads without decoding them first
 static bool R_DDSStoredFormatIsDirect( ddsStoredFormat_t format ) {
 	return format == DDS_STORED_FORMAT_DXT1 || format == DDS_STORED_FORMAT_DXT5 ||
-		format == DDS_STORED_FORMAT_RXGB || format == DDS_STORED_FORMAT_BC7;
+		format == DDS_STORED_FORMAT_RXGB || format == DDS_STORED_FORMAT_BC7 ||
+		format == DDS_STORED_FORMAT_BC6H_UF16 || format == DDS_STORED_FORMAT_BC6H_SF16;
 }
 
 // the bytes of one whole level of a stored format
@@ -1148,6 +1158,10 @@ static bool R_ParseDDSFileInfo( const byte *header, int headerBytes, int fileSiz
 				format = DDS_STORED_FORMAT_BC5;
 			} else if ( dxgiFormat >= DDS_DXGI_FORMAT_BC7_TYPELESS && dxgiFormat <= DDS_DXGI_FORMAT_BC7_UNORM_SRGB ) {
 				format = DDS_STORED_FORMAT_BC7;
+			} else if ( dxgiFormat == DDS_DXGI_FORMAT_BC6H_TYPELESS || dxgiFormat == DDS_DXGI_FORMAT_BC6H_UF16 ) {
+				format = DDS_STORED_FORMAT_BC6H_UF16;	// a typeless file is read as unsigned, as texconv writes it
+			} else if ( dxgiFormat == DDS_DXGI_FORMAT_BC6H_SF16 ) {
+				format = DDS_STORED_FORMAT_BC6H_SF16;
 			} else if ( dxgiFormat >= DDS_DXGI_FORMAT_R8G8B8A8_TYPELESS && dxgiFormat <= DDS_DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ) {
 				format = DDS_STORED_FORMAT_UNCOMPRESSED;
 				bytesPerPixel = 4;
@@ -1170,6 +1184,9 @@ static bool R_ParseDDSFileInfo( const byte *header, int headerBytes, int fileSiz
 				fourCC == R_MakeFourCC( 'B', 'C', '7', 'L' ) ||
 				fourCC == R_MakeFourCC( 'B', 'C', '7', ' ' ) ) {
 		format = DDS_STORED_FORMAT_BC7;
+	} else if ( fourCC == R_MakeFourCC( 'B', 'C', '6', 'H' ) ) {
+		// no standard FourCC exists; a few older exporters wrote this one
+		format = DDS_STORED_FORMAT_BC6H_UF16;
 	} else if ( fourCC == R_MakeFourCC( 'A', 'T', 'I', '1' ) || fourCC == R_MakeFourCC( 'B', 'C', '4', 'U' ) ) {
 		format = DDS_STORED_FORMAT_BC4;
 	} else if ( fourCC == R_MakeFourCC( 'A', 'T', 'I', '2' ) || fourCC == R_MakeFourCC( 'B', 'C', '5', 'U' ) ) {
@@ -1478,6 +1495,21 @@ static bool R_TryResolvePreferredDDSImageSource( const idStr &candidateName, idS
 		return true;
 	}
 
+	if ( info.format == DDS_STORED_FORMAT_BC6H_UF16 || info.format == DDS_STORED_FORMAT_BC6H_SF16 ) {
+		// HDR data. It always takes the direct path: up as it is where the
+		// renderer has BPTC, else decoded there to RGBA16F, which keeps its
+		// range. Only an image program (CPU, 8-bit) decodes it through LoadDDS,
+		// clamped to [0, 1].
+		ddsName = candidateName;
+		if ( timestamp != NULL ) {
+			*timestamp = ddsTimestamp;
+		}
+		if ( precompressedDDS != NULL ) {
+			*precompressedDDS = allowPrecompressedDDS;
+		}
+		return true;
+	}
+
 	if ( info.format == DDS_STORED_FORMAT_BC4 || info.format == DDS_STORED_FORMAT_BC5 ) {
 		// Texture packs ship BC5 normal maps and BC4 masks. No renderer format
 		// stands for them, so LoadDDS always decodes them; the result is cached
@@ -1740,6 +1772,44 @@ static bool R_ResolveImageSourceFile( const char *imageName, idStr &path ) {
 
 /*
 =============
+R_DescribeLooseImageSources
+
+Names the files on disk that make a texture pack's DDS look out of date. A pk4
+member never does: its stamp orders as 0, so only a loose file, with a real
+modification time, can be newer than a DDS inside a pack.
+=============
+*/
+int R_DescribeLooseImageSources( const char *imageProgram, idStr &paths ) {
+	paths.Clear();
+	idStrList inputs;
+	R_ImageProgramInputNames( imageProgram, inputs );
+	int found = 0;
+	for ( int i = 0; i < inputs.Num(); i++ ) {
+		idStr path;
+		if ( !R_ResolveImageSourceFile( inputs[i], path ) ) {
+			continue;
+		}
+		ID_TIME_T stamp = FILE_NOT_FOUND_TIMESTAMP;
+		fileSystem->ReadFileContentStamp( path.c_str(), NULL, &stamp );
+		if ( stamp == FILE_NOT_FOUND_TIMESTAMP || FS_IsPakMemberContentStamp( stamp ) ) {
+			continue;
+		}
+		idFile *file = fileSystem->OpenFileRead( path.c_str(), false );
+		if ( file == NULL ) {
+			continue;
+		}
+		if ( found > 0 ) {
+			paths += ", ";
+		}
+		paths += file->GetFullPath();
+		fileSystem->CloseFile( file );
+		found++;
+	}
+	return found;
+}
+
+/*
+=============
 R_RetailProgramInputReplaced
 
 Quake 4's progimg/ files are image programs computed from Quake 4's own
@@ -1915,6 +1985,8 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 		if ( !R_DDSStoredFormatIsDirect( info.format ) ) {
 			break;	// BC4, BC5 and uncompressed data are LoadDDS's to decode
 		}
+		const bool bc6h = info.format == DDS_STORED_FORMAT_BC6H_UF16 || info.format == DDS_STORED_FORMAT_BC6H_SF16;
+		const bool decodeBC6H = bc6h && !ImageTools_GetCompressionCaps().bptcTextureCompressionAvailable;
 		if ( info.format == DDS_STORED_FORMAT_BC7 && !ImageTools_GetCompressionCaps().bptcTextureCompressionAvailable ) {
 			idLib::Warning( "Image file '%s' uses BC7/BPTC DDS data, but the active renderer does not support BPTC texture compression", name.c_str() );
 			break;
@@ -1957,10 +2029,31 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 			case DDS_STORED_FORMAT_BC7:
 				textureFormat = FMT_BC7;
 				break;
+			case DDS_STORED_FORMAT_BC6H_UF16:
+				textureFormat = FMT_BC6H_UF16;
+				break;
+			case DDS_STORED_FORMAT_BC6H_SF16:
+				textureFormat = FMT_BC6H_SF16;
+				break;
 			default:
 				break;
 		}
 		if ( textureFormat == FMT_NONE || selectedLevels <= 0 ) {
+			break;
+		}
+
+		if ( decodeBC6H ) {
+			// No BPTC: decode to RGBA16F, which every renderer samples, rather
+			// than to 8-bit through LoadDDS, which would clip the HDR range
+			if ( !R_LoadBC6HAsHalfFloat( image, buffer, levelOffsets.Ptr() + firstLevel, selectedWidth, selectedHeight, selectedLevels,
+					info.format == DDS_STORED_FORMAT_BC6H_SF16 ) ) {
+				idLib::Warning( "Image file '%s' could not be decoded from BC6H", name.c_str() );
+				break;
+			}
+			// the file buffer is released on return; the binary image owns the halves
+	        if (contentObserved) image.ObserveFileContent(actualContent);
+	        if (reduction) *reduction = selected;
+			loaded = true;
 			break;
 		}
 
@@ -1983,6 +2076,56 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 	} while ( false );
 
 	return loaded;
+}
+
+/*
+=============
+R_LoadBC6HAsHalfFloat
+
+Decodes the selected BC6H levels of a DDS file to RGBA16F, for a renderer with
+no BPTC. Same picture and range, eight times the memory. levelOffsets points
+at the first selected level's offset into fileBuffer.
+=============
+*/
+static bool R_LoadBC6HAsHalfFloat( idBinaryImage &image, const byte *fileBuffer, const int *levelOffsets, int width, int height, int numLevels, bool isSigned ) {
+	idList<int> halfOffsets;
+	idList<int> halfSizes;
+	halfOffsets.SetNum( numLevels );
+	halfSizes.SetNum( numLevels );
+	int64 totalBytes = 0;
+	for ( int level = 0; level < numLevels; level++ ) {
+		const int64 w = Max( 1, width >> level );
+		const int64 h = Max( 1, height >> level );
+		halfOffsets[ level ] = (int)totalBytes;
+		halfSizes[ level ] = (int)( w * h * 8 );
+		totalBytes += w * h * 8;
+		if ( totalBytes > 0x7fffffff ) {
+			return false;
+		}
+	}
+	byte *halves = (byte *)Mem_Alloc( (int)totalBytes );
+	if ( halves == NULL ) {
+		return false;
+	}
+	for ( int level = 0; level < numLevels; level++ ) {
+		const int w = Max( 1, width >> level );
+		const int h = Max( 1, height >> level );
+		const int paddedW = ( w + 3 ) & ~3;
+		const int paddedH = ( h + 3 ) & ~3;
+		unsigned short *out = (unsigned short *)( halves + halfOffsets[ level ] );
+		if ( paddedW == w && paddedH == h ) {
+			BC6H_DecodeImage( fileBuffer + levelOffsets[ level ], isSigned, out, w, h );
+			continue;
+		}
+		idTempArray<unsigned short> padded( paddedW * paddedH * 4 );
+		BC6H_DecodeImage( fileBuffer + levelOffsets[ level ], isSigned, padded.Ptr(), paddedW, paddedH );
+		for ( int y = 0; y < h; y++ ) {
+			memcpy( out + y * w * 4, padded.Ptr() + y * paddedW * 4, w * 4 * sizeof( unsigned short ) );
+		}
+	}
+	// Load2DFromOwnedCompressedData takes any level layout; the name is history
+	image.Load2DFromOwnedCompressedData( width, height, numLevels, FMT_RGBA16F, CFM_DEFAULT, halves, halfOffsets.Ptr(), halfSizes.Ptr() );
+	return true;
 }
 
 /*
@@ -2095,6 +2238,24 @@ bool R_ImageDDS_RunSelfTest() {
 		common->Warning( "Image DDS self-test failed: truncated BC7 mip data was accepted" );
 		return false;
 	}
+
+	// BC6H: the same 16-byte blocks, so the same layout; typeless reads as
+	// unsigned, and both variants go up as they are
+	const int bc6hFormats[3] = { DDS_DXGI_FORMAT_BC6H_TYPELESS, DDS_DXGI_FORMAT_BC6H_UF16, DDS_DXGI_FORMAT_BC6H_SF16 };
+	for ( int i = 0; i < 3; i++ ) {
+		R_WriteLittleUInt32( header + DDS_HEADER_BYTES, (uint32)bc6hFormats[i] );
+		const ddsStoredFormat_t expected = i == 2 ? DDS_STORED_FORMAT_BC6H_SF16 : DDS_STORED_FORMAT_BC6H_UF16;
+		if ( !R_ParseDDSFileInfo( header, sizeof( header ), completeFileSize, info ) ||
+			 info.format != expected || info.numLevels != 4 || !R_DDSStoredFormatIsDirect( info.format ) ) {
+			common->Warning( "Image DDS self-test failed: valid DX10 BC6H metadata (DXGI format %d) was rejected", bc6hFormats[i] );
+			return false;
+		}
+		if ( R_ParseDDSFileInfo( header, sizeof( header ), completeFileSize - 1, info ) ) {
+			common->Warning( "Image DDS self-test failed: truncated BC6H mip data was accepted" );
+			return false;
+		}
+	}
+	R_WriteLittleUInt32( header + DDS_HEADER_BYTES, DDS_DXGI_FORMAT_BC7_UNORM );
 
 	memset( header, 0, DDS_HEADER_BYTES );
 	R_WriteLittleUInt32( header + 0, R_MakeFourCC( 'D', 'D', 'S', ' ' ) );
@@ -2418,6 +2579,8 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		DDS_COMPRESSION_BC7,
 		DDS_COMPRESSION_BC4,
 		DDS_COMPRESSION_BC5,
+		DDS_COMPRESSION_BC6H_UF16,
+		DDS_COMPRESSION_BC6H_SF16,
 		DDS_COMPRESSION_NONE
 	} compression;
 	bool storedRXGBNormalMap = false;
@@ -2435,6 +2598,9 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 			case DDS_STORED_FORMAT_BC7:	compression = DDS_COMPRESSION_BC7; blockSize = 16; break;
 			case DDS_STORED_FORMAT_BC4:	compression = DDS_COMPRESSION_BC4; blockSize = 8; break;
 			case DDS_STORED_FORMAT_BC5:	compression = DDS_COMPRESSION_BC5; blockSize = 16; break;
+			// HDR clamped to [0, 1]: this path feeds 8-bit consumers only
+			case DDS_STORED_FORMAT_BC6H_UF16:	compression = DDS_COMPRESSION_BC6H_UF16; blockSize = 16; break;
+			case DDS_STORED_FORMAT_BC6H_SF16:	compression = DDS_COMPRESSION_BC6H_SF16; blockSize = 16; break;
 			case DDS_STORED_FORMAT_RXGB:
 				compression = DDS_COMPRESSION_DXT5;
 				blockSize = 16;
@@ -2501,6 +2667,8 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		R_DecodeBC4BC5( buffer + dataOffset, compression == DDS_COMPRESSION_BC5, decodedRgba, paddedWidth, paddedHeight );
 	} else if ( compression == DDS_COMPRESSION_BC7 ) {
 		BC7_DecodeImage( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );
+	} else if ( compression == DDS_COMPRESSION_BC6H_UF16 || compression == DDS_COMPRESSION_BC6H_SF16 ) {
+		BC6H_DecodeImageRGBA8( buffer + dataOffset, compression == DDS_COMPRESSION_BC6H_SF16, decodedRgba, paddedWidth, paddedHeight );
 	} else if ( compression == DDS_COMPRESSION_DXT1 ) {
 		decoder.DecompressImageDXT1( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );
 	} else if ( compression == DDS_COMPRESSION_DXT3 ) {

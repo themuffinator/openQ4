@@ -1852,6 +1852,7 @@ typedef struct {
 	GLint			shadowCascadeBiasScale;
 	GLint			shadowCascadeCount;
 	GLint			shadowCascadeBlend;
+	GLint			shadowWholeLightCascade;
 	GLint			shadowDebugMode;
 	GLint			shadowReceiverDebugReason;
 	GLint			translucentShadowEnabled;
@@ -2046,7 +2047,9 @@ typedef struct {
 	GLint			pointShadowDepthMode;
 	GLint			casterDepthOffset;
 	GLint			alphaMap;
+	GLint			pointShadowLayer;	// the layered variant's face uniform, -1 otherwise
 	bool			depthCompareMode;
+	bool			layered;
 } pointShadowCasterProgram_t;
 
 typedef struct {
@@ -2265,6 +2268,12 @@ typedef struct {
 	int					staticHysteresisPasses;
 	int					pointDepthComparePasses;
 	int					projectedAtlasTilesRendered;
+	// projected caster draws (one per surface per cascade tile) and their indexes
+	int					projectedCasterDraws;
+	int					projectedCasterIndexes;
+	// whole-light cascades served from their cached still scenery / drawn and stored
+	int					wholeLightReuses;
+	int					wholeLightPublishes;
 	int					projectedAtlasTilesAllocated;
 	int					projectedCacheSlotsUsed;
 	int					projectedCacheSlotsTotal;
@@ -3571,7 +3580,7 @@ static int RB_ShadowMapMapNameHash( const viewDef_t *viewDef ) {
 		? idStr::Hash( viewDef->renderWorld->mapName.c_str() ) : 0;
 }
 
-static int RB_ShadowMapBuildPassSignatureForView( const viewLight_t *vLight, const viewDef_t *viewDef, const shadowMapPassKind_t passKind, const bool pointLight ) {
+static int RB_ShadowMapBuildPassSignatureForView( const viewLight_t *vLight, const viewDef_t *viewDef, const shadowMapPassKind_t passKind, const bool pointLight, const bool wholeLightOnly = false ) {
 	int hash = static_cast<int>( 2166136261u );
 	const int cascadeCount = RB_ShadowMapCascadeCountForLight( vLight );
 	const idRenderWorldLocal *renderWorld =
@@ -3619,7 +3628,26 @@ static int RB_ShadowMapBuildPassSignatureForView( const viewLight_t *vLight, con
 		shadowMapProjectedLightState_t projectedState;
 		R_BuildShadowMapProjectedLightState( vLight, viewDef,
 			RB_ShadowMapTileSizeForLight( vLight ), projectedState );
-		hash = R_ShadowMapProjectedStateHash( hash, projectedState );
+		if ( wholeLightOnly ) {
+			// The whole-light cascade depends on the light alone, not on the
+			// view-fitted cascades beside it, so camera motion keeps it.
+			const int whole = projectedState.wholeLightCascade;
+			hash = RB_ShadowMapHashInt( hash, 0x57484c43 );
+			hash = RB_ShadowMapHashInt( hash, whole );
+			hash = RB_ShadowMapHashInt( hash, projectedState.tileSize );
+			if ( whole >= 0 && whole < SHADOWMAP_PROJECTED_MAX_CASCADES ) {
+				for ( int plane = 0; plane < 4; ++plane ) {
+					for ( int component = 0; component < 4; ++component ) {
+						hash = RB_ShadowMapHashFloat( hash, projectedState.clipPlanes[whole][plane][component] );
+					}
+				}
+				hash = RB_ShadowMapHashFloat( hash, projectedState.worldTexelSize[whole] );
+				hash = RB_ShadowMapHashFloat( hash, projectedState.texelDepthBias[whole] );
+				hash = RB_ShadowMapHashFloat( hash, projectedState.depthRange[whole] );
+			}
+		} else {
+			hash = R_ShadowMapProjectedStateHash( hash, projectedState );
+		}
 	}
 	if ( vLight != NULL ) {
 		for ( int i = 0; i < 3; i++ ) {
@@ -5583,6 +5611,7 @@ static const char *programBaseName = "glprogs/shadow_interaction";
 	g_shadowMapProgram.shadowCascadeBiasScale = glGetUniformLocationARB( programObject, "uShadowCascadeBiasScale[0]" );
 	g_shadowMapProgram.shadowCascadeCount = glGetUniformLocationARB( programObject, "uShadowCascadeCount" );
 	g_shadowMapProgram.shadowCascadeBlend = glGetUniformLocationARB( programObject, "uShadowCascadeBlend" );
+	g_shadowMapProgram.shadowWholeLightCascade = glGetUniformLocationARB( programObject, "uShadowWholeLightCascade" );
 	g_shadowMapProgram.shadowDebugMode = glGetUniformLocationARB( programObject, "uShadowDebugMode" );
 	g_shadowMapProgram.shadowReceiverDebugReason = glGetUniformLocationARB( programObject, "uShadowReceiverDebugReason" );
 	g_shadowMapProgram.translucentShadowEnabled = glGetUniformLocationARB( programObject, "uTranslucentShadowEnabled" );
@@ -5992,7 +6021,29 @@ static const char *programBaseName = "glprogs/shadow_point_interaction";
 	return true;
 }
 
-static bool RB_PointShadowMapLoadCasterProgram( void ) {
+// FPS-08: the driver charges for every render-target switch, and a cube drawn
+// face by face makes six (twelve when composing). The layered variant attaches
+// the whole cube once and names each face from the vertex shader through
+// gl_Layer, which only these extensions allow outside a geometry shader.
+static int g_pointShadowLayeredRejectedGeneration = -1;
+
+static const char *RB_PointShadowMapLayerExtension( void ) {
+	if ( GLEW_ARB_shader_viewport_layer_array ) {
+		return "GL_ARB_shader_viewport_layer_array";
+	}
+	if ( GLEW_AMD_vertex_shader_layer ) {
+		return "GL_AMD_vertex_shader_layer";
+	}
+	return NULL;
+}
+
+static bool RB_PointShadowMapLayeredWanted( void ) {
+	return r_shadowMapPointLayered.GetBool() && glFramebufferTexture != NULL
+		&& RB_PointShadowMapLayerExtension() != NULL
+		&& g_pointShadowLayeredRejectedGeneration != tr.videoRestartCount;
+}
+
+static bool RB_PointShadowMapLoadCasterProgramVariant( const bool layered ) {
 static const char *programBaseName = "glprogs/shadow_point_caster";
 
 	if ( !glConfig.GLSLProgramAvailable ) {
@@ -6000,7 +6051,8 @@ static const char *programBaseName = "glprogs/shadow_point_caster";
 	}
 
 	const bool depthCompareMode = RB_PointShadowMapDepthCompareEnabled();
-	if ( g_pointShadowCasterProgram.programObject != 0 && g_pointShadowCasterProgram.programGeneration == tr.videoRestartCount && g_pointShadowCasterProgram.depthCompareMode == depthCompareMode ) {
+	if ( g_pointShadowCasterProgram.programObject != 0 && g_pointShadowCasterProgram.programGeneration == tr.videoRestartCount
+			&& g_pointShadowCasterProgram.depthCompareMode == depthCompareMode && g_pointShadowCasterProgram.layered == layered ) {
 		return g_pointShadowCasterProgram.programValid;
 	}
 
@@ -6026,11 +6078,35 @@ static const char *programBaseName = "glprogs/shadow_point_caster";
 		return false;
 	}
 
+	// An older shader without the layer write would draw every face into the
+	// first; the caller then falls back to drawing face by face.
+	const char *vertexVersionEnd = layered ? strchr( vertexBuffer, '\n' ) : NULL;
+	if ( layered && ( vertexVersionEnd == NULL || strstr( vertexBuffer, "OPENQ4_POINT_SHADOW_LAYERED" ) == NULL ) ) {
+		fileSystem->FreeFile( vertexBuffer );
+		fileSystem->FreeFile( fragmentBuffer );
+		return false;
+	}
+
 	GLhandleARB vertexShader = glCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
 	GLhandleARB fragmentShader = glCreateShaderObjectARB( GL_FRAGMENT_SHADER_ARB );
 	const GLcharARB *vertexSource = (const GLcharARB *)vertexBuffer;
 	const GLcharARB *fragmentSource = (const GLcharARB *)fragmentBuffer;
-	glShaderSourceARB( vertexShader, 1, &vertexSource, NULL );
+	if ( layered ) {
+		const idStr layerHeader = va( "#extension %s : require\n#define OPENQ4_POINT_SHADOW_LAYERED 1\n", RB_PointShadowMapLayerExtension() );
+		const GLcharARB *vertexSources[3] = {
+			(const GLcharARB *)vertexBuffer,
+			(const GLcharARB *)layerHeader.c_str(),
+			(const GLcharARB *)( vertexVersionEnd + 1 )
+		};
+		const GLint vertexLengths[3] = {
+			static_cast<GLint>( vertexVersionEnd - vertexBuffer + 1 ),
+			static_cast<GLint>( layerHeader.Length() ),
+			-1
+		};
+		glShaderSourceARB( vertexShader, 3, vertexSources, vertexLengths );
+	} else {
+		glShaderSourceARB( vertexShader, 1, &vertexSource, NULL );
+	}
 	if ( depthCompareMode ) {
 		// The compare variant writes radial depth to gl_FragDepth; the default
 		// variant must not reference gl_FragDepth at all so the rasterized
@@ -6123,9 +6199,25 @@ static const char *programBaseName = "glprogs/shadow_point_caster";
 	g_pointShadowCasterProgram.casterDepthOffset = glGetUniformLocationARB( programObject, "uShadowCasterDepthOffset" );
 	g_pointShadowCasterProgram.depthCompareMode = depthCompareMode;
 	g_pointShadowCasterProgram.alphaMap = glGetUniformLocationARB( programObject, "uAlphaMap" );
+	g_pointShadowCasterProgram.layered = layered;
+	g_pointShadowCasterProgram.pointShadowLayer = layered ? glGetUniformLocationARB( programObject, "uPointShadowLayer" ) : -1;
+	if ( layered && g_pointShadowCasterProgram.pointShadowLayer < 0 ) {
+		RB_PointShadowMapFreeCasterProgram();
+		return false;
+	}
 
-	common->Printf( "Loaded GLSL program '%s'\n", programBaseName );
+	common->Printf( "Loaded GLSL program '%s'%s\n", programBaseName, layered ? " (layered cube)" : "" );
 	return true;
+}
+
+static bool RB_PointShadowMapLoadCasterProgram( void ) {
+	const bool layered = RB_PointShadowMapLayeredWanted();
+	if ( RB_PointShadowMapLoadCasterProgramVariant( layered ) || !layered ) {
+		return g_pointShadowCasterProgram.programValid;
+	}
+	common->Warning( "The layered point shadow caster did not build; drawing shadow cube faces one at a time" );
+	g_pointShadowLayeredRejectedGeneration = tr.videoRestartCount;
+	return RB_PointShadowMapLoadCasterProgramVariant( false );
 }
 
 static bool RB_PointTranslucentShadowMapLoadCasterProgram( void ) {
@@ -6991,7 +7083,7 @@ static void RB_ShadowMapStatsReport( void ) {
 	}
 
 	common->Printf(
-		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f]\n",
+		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f] casterDraws=%d casterIndexes=%d farSlot=%d/%d\n",
 		g_shadowMapStats.shadowMapUpdates,
 		g_shadowMapStats.composePasses,
 		g_shadowMapStats.subviewUpdates,
@@ -7012,7 +7104,11 @@ static void RB_ShadowMapStatsReport( void ) {
 		g_shadowMapStats.gpuTimerSamples,
 		g_shadowMapStats.gpuTimerPending,
 		g_shadowMapStats.minWorldTexelSize,
-		g_shadowMapStats.maxWorldTexelSize );
+		g_shadowMapStats.maxWorldTexelSize,
+		g_shadowMapStats.projectedCasterDraws,
+		g_shadowMapStats.projectedCasterIndexes,
+		g_shadowMapStats.wholeLightReuses,
+		g_shadowMapStats.wholeLightPublishes );
 	common->Printf(
 		"SM timings: cpu(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuSync(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuQuery(map=%.2f/%d reuse=%.2f/%d mask=%.2f/%d receiverFallback=%.2f/%d stencilFallback=%.2f/%d pending=%d:%d/%d/%d/%d/%d)\n",
 		g_shadowMapStats.cpuPhaseMilliseconds[SHADOWMAP_TIMING_MAP_RENDER],
@@ -7909,6 +8005,8 @@ static bool RB_ShadowMapDrawCasterChain( const drawSurf_t *surf, const int casca
 			// Culled from this tile, not missing from the map.
 			continue;
 		}
+		g_shadowMapStats.projectedCasterDraws++;
+		g_shadowMapStats.projectedCasterIndexes += casterGeo->numIndexes;
 
 		RB_ShadowMapTouchCache( ambientCache );
 		RB_ShadowMapTouchCache( casterGeo->indexCache );
@@ -8570,6 +8668,43 @@ static void RB_ShadowMapRestoreViewViewport( void ) {
 	glScissor( x, y, width, height );
 }
 
+// The whole-light cascade of a cascaded light (r_shadowMapCascadeFarMap) is
+// the light's base projection: unlike the view-fitted cascades it does not
+// move with the camera, so its still scenery is cached in an atlas cell of
+// its own and only moving casters are drawn over it each frame, as id Tech 6
+// caches static shadow geometry and composites dynamic casters over it. On
+// Air Defense 1 that slot was 161 of a frame's 439 cascade caster draws.
+// It applies to passes drawn into the scratch target; a cascaded pass that is
+// itself cached (r_shadowMapCacheCSM) keeps its whole block.
+static const int SHADOWMAP_WHOLE_LIGHT_PASS_KIND_OFFSET = 16;
+// cache pass kind of the pass RB_ShadowMapRunPass is drawing fresh, or -1
+static int g_shadowMapWholeLightPassKind = -1;
+
+static bool RB_ShadowMapWholeLightCacheable( const viewLight_t *vLight ) {
+	return r_shadowMapCascadeFarCache.GetBool() && r_shadowMapStaticCache.GetBool()
+		&& vLight != NULL && RB_ShadowMapLightIndex( vLight ) >= 0
+		&& vLight->shadowMapStaticCasterCount > 0
+		&& !R_ShadowMapMovingLightSkipsCache( vLight, backEnd.frameCount )
+		&& g_shadowMapWholeLightPassKind >= 0
+		&& glBlitFramebuffer != NULL
+		&& g_shadowMapAtlasRenderTexture != NULL && g_shadowMapAtlasDepthImage != NULL
+		&& g_shadowMapRenderTexture != NULL && g_shadowMapRenderTexture != g_shadowMapAtlasRenderTexture
+		&& RB_ShadowMapProjectedCacheSlotLimit() > 0;
+}
+
+// Copy one square depth tile between the scratch target and the atlas (blit
+// obeys scissor, so it is disabled around the copy), then rebind the target.
+static void RB_ShadowMapCopyDepthTile( idRenderTexture *from, const int fromX, const int fromY,
+		idRenderTexture *to, const int toX, const int toY, const int size ) {
+	glDisable( GL_SCISSOR_TEST );
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, from->GetDeviceHandle() );
+	glBindFramebuffer( GL_DRAW_FRAMEBUFFER, to->GetDeviceHandle() );
+	glBlitFramebuffer( fromX, fromY, fromX + size, fromY + size,
+		toX, toY, toX + size, toY + size, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
+	glBindFramebuffer( GL_FRAMEBUFFER, g_shadowMapRenderTexture->GetDeviceHandle() );
+	glEnable( GL_SCISSOR_TEST );
+}
+
 static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf_t *secondaryCasters, const drawSurf_t *tertiaryCasters, const drawSurf_t *quaternaryCasters,
 	const shadowMapRenderMode_t renderMode = SHADOWMAP_RENDER_FULL, const projectedShadowMapCacheEntry_t *composeFrom = NULL ) {
 	if ( !RB_ShadowMapEnsureResources( backEnd.vLight ) ) {
@@ -8671,6 +8806,25 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	RB_ShadowMapResetCasterCull();
 	const bool useHashedAlpha = RB_ShadowMapHashedAlphaEnabled();
 
+	// the whole-light cascade's cached still scenery (see RB_ShadowMapWholeLightCacheable)
+	const int wholeLightCascade = g_projectedShadowMapState.wholeLightCascade;
+	projectedShadowMapCacheEntry_t *wholeLightEntry = NULL;
+	bool wholeLightPublish = false;
+	int wholeLightSignature = 0;
+	if ( !composeMode && drawStaticChains && wholeLightCascade >= 0
+			&& RB_ShadowMapWholeLightCacheable( backEnd.vLight ) ) {
+		const shadowMapPassKind_t cacheKind = static_cast<shadowMapPassKind_t>( g_shadowMapWholeLightPassKind );
+		const shadowMapPassKind_t wholeKind = static_cast<shadowMapPassKind_t>(
+			g_shadowMapWholeLightPassKind + SHADOWMAP_WHOLE_LIGHT_PASS_KIND_OFFSET );
+		wholeLightSignature = RB_ShadowMapBuildPassSignatureForView( backEnd.vLight, backEnd.viewDef, cacheKind, false, true );
+		wholeLightEntry = RB_ShadowMapFindProjectedCacheEntry( RB_ShadowMapLightIndex( backEnd.vLight ), wholeKind, wholeLightSignature );
+		if ( wholeLightEntry == NULL ) {
+			wholeLightEntry = RB_ShadowMapAllocProjectedCacheEntry(
+				RB_ShadowMapAtlasSpanForBlock( g_projectedShadowMapState.tileSize ) );
+			wholeLightPublish = wholeLightEntry != NULL;
+		}
+	}
+
 	for ( int cascadeIndex = 0; cascadeIndex < g_projectedShadowMapState.cascadeCount; cascadeIndex++ ) {
 		float clipMatrix[16];
 		// cascade tile offsets are relative to the light's slot in the shared
@@ -8692,9 +8846,42 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 
 		backEnd.currentSpace = NULL;
 		RB_SetSurfaceWinding( backEnd.currentSpace );
-		if ( drawStaticChains ) {
-			allCastersRendered &= RB_ShadowMapDrawCasterChain( primaryCasters, cascadeIndex, useHashedAlpha );
-			allCastersRendered &= RB_ShadowMapDrawCasterChain( secondaryCasters, cascadeIndex, useHashedAlpha );
+		const bool wholeLightTile = cascadeIndex == wholeLightCascade && wholeLightEntry != NULL;
+		if ( wholeLightTile && !wholeLightPublish ) {
+			// still scenery from the cache; only moving casters are drawn
+			RB_ShadowMapCopyDepthTile( g_shadowMapAtlasRenderTexture,
+				wholeLightEntry->atlasCellX * g_shadowMapAtlasCellSize,
+				wholeLightEntry->atlasCellY * g_shadowMapAtlasCellSize,
+				g_shadowMapRenderTexture, tileX, tileY, g_projectedShadowMapState.tileSize );
+			wholeLightEntry->lastUsedFrame = tr.frameCount;
+			g_shadowMapStats.wholeLightReuses++;
+		} else if ( drawStaticChains ) {
+			const bool staticOk = RB_ShadowMapDrawCasterChain( primaryCasters, cascadeIndex, useHashedAlpha )
+				& RB_ShadowMapDrawCasterChain( secondaryCasters, cascadeIndex, useHashedAlpha );
+			allCastersRendered &= staticOk;
+			if ( wholeLightTile ) {
+				// store the still scenery before moving casters join it
+				if ( staticOk ) {
+					RB_ShadowMapCopyDepthTile( g_shadowMapRenderTexture, tileX, tileY, g_shadowMapAtlasRenderTexture,
+						wholeLightEntry->atlasCellX * g_shadowMapAtlasCellSize,
+						wholeLightEntry->atlasCellY * g_shadowMapAtlasCellSize, g_projectedShadowMapState.tileSize );
+					wholeLightEntry->valid = true;
+					wholeLightEntry->lightIndex = RB_ShadowMapLightIndex( backEnd.vLight );
+					wholeLightEntry->passKind = g_shadowMapWholeLightPassKind + SHADOWMAP_WHOLE_LIGHT_PASS_KIND_OFFSET;
+					wholeLightEntry->lightClass = static_cast<int>( RB_ShadowMapLightClass( backEnd.vLight ) );
+					wholeLightEntry->signature = wholeLightSignature;
+					wholeLightEntry->tileSize = g_projectedShadowMapState.tileSize;
+					wholeLightEntry->atlasDiv = 1;
+					wholeLightEntry->cascadeCount = 1;
+					wholeLightEntry->lastUsedFrame = tr.frameCount;
+					wholeLightEntry->lastUpdatedFrame = tr.frameCount;
+					wholeLightEntry->atlasStorageGeneration = g_shadowMapAtlasDepthImage->GetStorageGeneration();
+					wholeLightEntry->state = g_projectedShadowMapState;
+					g_shadowMapStats.wholeLightPublishes++;
+				} else {
+					wholeLightEntry->valid = false;
+				}
+			}
 		}
 		if ( drawDynamicChains ) {
 			allCastersRendered &= RB_ShadowMapDrawCasterChain( tertiaryCasters, cascadeIndex, useHashedAlpha );
@@ -8753,6 +8940,39 @@ static bool RB_RenderShadowMap( const drawSurf_t *primaryCasters, const drawSurf
 	// One drawable caster cannot stand in for a different missing caster.
 	// This also applies to dynamics composed over valid cached static depth.
 	return allCastersRendered;
+}
+
+// The layered path copies a cached cube into the scratch cube with
+// glCopyImageSubData, all six faces per image in one call, which needs the two
+// cubes' images to match exactly; the per-face blit converts, this does not.
+static bool RB_PointShadowMapCanCopyCube( idRenderTexture *from, idRenderTexture *to ) {
+	if ( glCopyImageSubData == NULL || !( GLEW_ARB_copy_image || GLEW_VERSION_4_3 ) || from == NULL || to == NULL ) {
+		return false;
+	}
+	if ( from->GetNumColorImages() != to->GetNumColorImages() || from->GetDepthImage() == NULL || to->GetDepthImage() == NULL ) {
+		return false;
+	}
+	for ( int i = 0; i < to->GetNumColorImages(); i++ ) {
+		if ( from->GetColorImage( i )->GetOpts().format != to->GetColorImage( i )->GetOpts().format ) {
+			return false;
+		}
+	}
+	return from->GetDepthImage()->GetOpts().format == to->GetDepthImage()->GetOpts().format
+		&& from->GetWidth() == to->GetWidth() && from->GetHeight() == to->GetHeight();
+}
+
+static void RB_PointShadowMapCopyCubeImage( idImage *from, idImage *to, const int width, const int height ) {
+	glCopyImageSubData( from->GetDeviceHandle(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
+		to->GetDeviceHandle(), GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0, width, height, 6 );
+}
+
+static void RB_PointShadowMapCopyCube( idRenderTexture *from, idRenderTexture *to ) {
+	const int width = to->GetWidth();
+	const int height = to->GetHeight();
+	for ( int i = 0; i < to->GetNumColorImages(); i++ ) {
+		RB_PointShadowMapCopyCubeImage( from->GetColorImage( i ), to->GetColorImage( i ), width, height );
+	}
+	RB_PointShadowMapCopyCubeImage( from->GetDepthImage(), to->GetDepthImage(), width, height );
 }
 
 // The render modes are RB_RenderShadowMap's. A composed cube starts as a copy
@@ -8820,10 +9040,18 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 	const int shadowMapWidth = g_pointShadowMapRenderTexture->GetWidth();
 	const int shadowMapHeight = g_pointShadowMapRenderTexture->GetHeight();
 
+	// One layered bind serves all six faces (and a compose copies the cached
+	// cube in one call per image), instead of a render-target switch per face.
+	bool layered = g_pointShadowCasterProgram.layered && g_pointShadowCasterProgram.pointShadowLayer >= 0
+		&& ( !composeMode || RB_PointShadowMapCanCopyCube( composeFrom->renderTexture, g_pointShadowMapRenderTexture ) );
+
 	// probe framebuffer completeness before touching pass state: an
 	// incomplete point shadow target fails the pass into the stencil
 	// fallback instead of FatalError'ing the whole session
-	g_pointShadowMapRenderTexture->MakeCurrent( 0 );
+	if ( !layered || !g_pointShadowMapRenderTexture->MakeCurrentLayered() ) {
+		layered = false;
+		g_pointShadowMapRenderTexture->MakeCurrent( 0 );
+	}
 	if ( g_pointShadowMapRenderTexture->IsKnownIncomplete() ) {
 		if ( g_pointShadowMapRenderTexture->GetNumColorImages() == 0 ) {
 			// A cube target without a colour attachment should be complete on
@@ -8854,6 +9082,10 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 		glUniform1fARB( g_pointShadowCasterProgram.pointShadowDepthMode, RB_PointShadowMapDepthModeValue() );
 	}
 	RB_ShadowMapSetCasterDepthOffsetUniform( g_pointShadowCasterProgram.casterDepthOffset );
+	if ( g_pointShadowCasterProgram.pointShadowLayer >= 0 ) {
+		// face by face, a layered program's layer write must name the only image
+		glUniform1iARB( g_pointShadowCasterProgram.pointShadowLayer, 0 );
+	}
 	if ( g_pointShadowCasterProgram.alphaMap >= 0 ) {
 		glUniform1iARB( g_pointShadowCasterProgram.alphaMap, 0 );
 	}
@@ -8890,11 +9122,23 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 
 	const GLbitfield composeCopyMask = GL_DEPTH_BUFFER_BIT
 		| ( g_pointShadowMapRenderTexture->GetNumColorImages() > 0 ? GL_COLOR_BUFFER_BIT : 0 );
+	if ( layered ) {
+		glViewport( 0, 0, shadowMapWidth, shadowMapHeight );
+		glScissor( 0, 0, shadowMapWidth, shadowMapHeight );
+		if ( composeMode ) {
+			RB_PointShadowMapCopyCube( composeFrom->renderTexture, g_pointShadowMapRenderTexture );
+		} else {
+			// a layered clear covers every face
+			glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+		}
+	}
 	for ( int cubeFace = 0; cubeFace < 6; cubeFace++ ) {
 		float lightModelViewMatrix[16];
 		RB_PointShadowMapBuildModelViewMatrix( backEnd.vLight->globalLightOrigin, cubeFace, lightModelViewMatrix );
 
-		if ( composeMode ) {
+		if ( layered ) {
+			glUniform1iARB( g_pointShadowCasterProgram.pointShadowLayer, cubeFace );
+		} else if ( composeMode ) {
 			// Attach this face of the cached cube first: binding the scratch
 			// target afterwards leaves it the draw framebuffer.
 			if ( !composeFrom->renderTexture->MakeCurrent( cubeFace ) ) {
@@ -8902,21 +9146,23 @@ static bool RB_RenderPointShadowMap( const drawSurf_t *primaryCasters, const dra
 				break;
 			}
 		}
-		if ( !g_pointShadowMapRenderTexture->MakeCurrent( cubeFace ) ) {
-			allCastersRendered = false;
-			break;
-		}
-		glViewport( 0, 0, shadowMapWidth, shadowMapHeight );
-		glScissor( 0, 0, shadowMapWidth, shadowMapHeight );
-		if ( composeMode ) {
-			// A blit obeys the scissor box, which covers the whole face here.
-			const GLuint scratchHandle = g_pointShadowMapRenderTexture->GetDeviceHandle();
-			glBindFramebuffer( GL_READ_FRAMEBUFFER, composeFrom->renderTexture->GetDeviceHandle() );
-			glBlitFramebuffer( 0, 0, shadowMapWidth, shadowMapHeight,
-				0, 0, shadowMapWidth, shadowMapHeight, composeCopyMask, GL_NEAREST );
-			glBindFramebuffer( GL_READ_FRAMEBUFFER, scratchHandle );
-		} else {
-			glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+		if ( !layered ) {
+			if ( !g_pointShadowMapRenderTexture->MakeCurrent( cubeFace ) ) {
+				allCastersRendered = false;
+				break;
+			}
+			glViewport( 0, 0, shadowMapWidth, shadowMapHeight );
+			glScissor( 0, 0, shadowMapWidth, shadowMapHeight );
+			if ( composeMode ) {
+				// A blit obeys the scissor box, which covers the whole face here.
+				const GLuint scratchHandle = g_pointShadowMapRenderTexture->GetDeviceHandle();
+				glBindFramebuffer( GL_READ_FRAMEBUFFER, composeFrom->renderTexture->GetDeviceHandle() );
+				glBlitFramebuffer( 0, 0, shadowMapWidth, shadowMapHeight,
+					0, 0, shadowMapWidth, shadowMapHeight, composeCopyMask, GL_NEAREST );
+				glBindFramebuffer( GL_READ_FRAMEBUFFER, scratchHandle );
+			} else {
+				glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+			}
 		}
 
 		backEnd.currentSpace = NULL;
@@ -11606,6 +11852,10 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 	if ( g_shadowMapProgram.shadowCascadeBlend >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.shadowCascadeBlend, idMath::ClampFloat( 0.0f, 0.5f, r_shadowMapCascadeBlend.GetFloat() ) );
 	}
+	if ( g_shadowMapProgram.shadowWholeLightCascade >= 0 ) {
+		glUniform1fARB( g_shadowMapProgram.shadowWholeLightCascade,
+			static_cast<float>( g_projectedShadowMapState.wholeLightCascade + 1 ) );
+	}
 	if ( g_shadowMapProgram.shadowDebugMode >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.shadowDebugMode, (float)RB_ShadowMapDebugMode() );
 	}
@@ -12835,9 +13085,11 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 
 	shadowMapTimedPhase_t renderTimer;
 	RB_ShadowMapBeginTimedPhase( renderTimer, vLight, passKind, SHADOWMAP_TIMING_MAP_RENDER );
+	g_shadowMapWholeLightPassKind = pointLight ? -1 : static_cast<int>( RB_ShadowMapCachePassKind( vLight, passKind ) );
 	bool renderOk = pointLight
 		? RB_RenderPointShadowMap( primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, freshRenderMode )
 		: RB_RenderShadowMap( primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, freshRenderMode );
+	g_shadowMapWholeLightPassKind = -1;
 	const float renderMilliseconds = RB_ShadowMapEndTimedPhase( renderTimer );
 	g_shadowMapStats.cpuRenderMilliseconds += renderMilliseconds;
 	RB_ShadowMapCompleteCacheUpdate( schedule, vLight, passKind, pointLight, renderOk );
@@ -16468,6 +16720,10 @@ static void RB_SharedWorldInteractionGLBeginMappedReceiver(
 			pass.projected.state.cascadeCount );
 		glUniform1fARB( g_shadowMapProgram.shadowCascadeBlend,
 			pass.projected.cascadeBlend );
+		if ( g_shadowMapProgram.shadowWholeLightCascade >= 0 ) {
+			glUniform1fARB( g_shadowMapProgram.shadowWholeLightCascade,
+				static_cast<float>( pass.projected.state.wholeLightCascade + 1 ) );
+		}
 		glUniform1fARB( g_shadowMapProgram.shadowDebugMode, 0.0f );
 		glUniform1fARB( g_shadowMapProgram.shadowReceiverDebugReason, 0.0f );
 		glUniform1fARB( g_shadowMapProgram.translucentShadowEnabled,

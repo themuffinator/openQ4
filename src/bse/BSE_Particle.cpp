@@ -1099,7 +1099,14 @@ bool rvSpriteParticle::Render(const rvBSE* effect, rvParticleTemplate* pt, const
 	EvaluateRotation(pt->mpRotateEnvelope, evalTime, mOneOverDuration, &rotation);
 
 	float s, c;
-	idMath::SinCos(rotation, s, c);
+	if (rotation == 0.0f) {
+		// sin(+-0) is +-0 and cos(+-0) is 1 exactly, so an unturned sprite skips both calls.
+		s = rotation;
+		c = 1.0f;
+	}
+	else {
+		idMath::SinCos(rotation, s, c);
+	}
 	idVec3 right = (view[1] * c - view[2] * s) * size[0];
 	idVec3 up = (view[1] * s + view[2] * c) * size[1];
 

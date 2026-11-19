@@ -603,7 +603,8 @@ public:
     idUserInterface* guiRetainedReleasing = nullptr; int retainedReleaseUntil = 0;
     idUserInterface* retainedSubpageFrom = nullptr; bool retainedSubpageDeeper = false; int retainedSubpageBegan = 0, retainedSubpageUntil = 0;
     int retainedDetailTarget = 0; idStr retainedDetailCampaign;
-    bool OpenRetainedCampaignSkill(); bool OpenRetainedCampaignChapters(); void BeginRetainedCampaignSkill(idUserInterface*, const char*, bool = false, bool = false);
+    bool OpenRetainedCampaignSkill(int awakeningTitle = -1); bool OpenRetainedCampaignChapters(); void BeginRetainedCampaignSkill(idUserInterface*, const char*, bool = false, bool = false);
+    const char* PendingCampaign(const idUserInterface*) const { return nullptr; }
     idUserInterface* guiLoading = nullptr; bool retainedLoadingActive = false;
     int retainedLoadingTip = -1, retainedLoadingTipSlot = 0, retainedLoadingTipAt = 0; void PublishRetainedLoadingTip(bool);
     void BeginRetainedSubpage(idUserInterface*, bool, retainedSubpage_t = RETAINED_SUBPAGE_CAMPAIGN); void UpdateRetainedSubpage();

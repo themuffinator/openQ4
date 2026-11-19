@@ -535,6 +535,9 @@ public:
 	void					Spawn( void );
 	void					Think( void );
 
+							// the entity whose interactive GUI the crosshair is on, or NULL
+	idEntity *				GetFocusGuiEntity( void ) const { return focusUI != NULL ? focusEnt.GetEntity() : NULL; }
+
 	// save games
 	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
 	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
@@ -669,7 +672,8 @@ public:
 	float					VRCrouchLift( const vrFrameState_t &frame ) const;
 	// How far a weapon's zoom narrows each eye now, eased with the zoom.
 	float					VRZoomScale( void );
-	// A pulse in the local player's weapon hand, other hand, or both.
+	// A pulse in the local player's weapon hand, other hand, or both; without
+	// a headset, a gamepad rumble (weapon hand high motor, other hand low).
 	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const;
 	// The body in the headset (vr_body). BeginVRBody poses the trunk and legs
 	// for this draw; the view weapon then asks where each of its forearms

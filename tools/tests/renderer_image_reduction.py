@@ -35,7 +35,7 @@ void* Mem_Alloc(size_t bytes){if(++allocCalls==failAt){if(throwAllocation)throw 
 void Mem_Free(void*p){if(!p)return;TEST(allocations.erase(p)==1);std::free(p);}
 void* R_StaticAlloc(size_t n){return Mem_Alloc(n);}void R_StaticFree(void*p){Mem_Free(p);}
 struct idMath {static float Pow(float a,float b){return std::pow(a,b);}static byte Ftob(float x){return byte(std::clamp(x,0.f,255.f));}};
-enum textureFormat_t{FMT_NONE,FMT_DXT1,FMT_DXT5,FMT_BC7,FMT_RGBA8,FMT_SRGBA8,FMT_OTHER,FMT_ETC2_RGB8,FMT_ETC2_RGBA8,FMT_EAC_RG11,FMT_LUM8,FMT_INT8,FMT_ALPHA,FMT_L8A8,FMT_RGB565};
+enum textureFormat_t{FMT_NONE,FMT_DXT1,FMT_DXT5,FMT_BC7,FMT_BC6H_UF16,FMT_BC6H_SF16,FMT_RGBA8,FMT_SRGBA8,FMT_OTHER,FMT_ETC2_RGB8,FMT_ETC2_RGBA8,FMT_EAC_RG11,FMT_LUM8,FMT_INT8,FMT_ALPHA,FMT_L8A8,FMT_RGB565};
 enum textureColor_t{CFM_DEFAULT,CFM_NORMAL_DXT5,CFM_YCOCG_DXT5,CFM_GREEN_ALPHA};enum {TT_2D=1,TT_CUBIC=2};
 using textureUsage_t=int;enum {TD_DEFAULT,TD_BUMP,TD_FONT,TD_LIGHT,TD_PBR_COLOR};
 const int MAX_BINARY_IMAGE_DIMENSION=32768,MAX_BINARY_IMAGE_LEVELS=32,MAX_BINARY_IMAGE_DATA_SIZE=1<<30;
@@ -77,6 +77,8 @@ struct FileSystem{idFile file;bool missing=false;int open=0;idFile*OpenFileRead(
 FileSystem*fileSystem=&fs;
 struct Caps{bool textureCompressionAvailable=true,bptcTextureCompressionAvailable=true;}caps;
 const Caps&ImageTools_GetCompressionCaps(){return caps;}
+// BC6H without BPTC decodes to RGBA16F (Image_files.cpp); these fixtures carry no BC6H
+static bool R_LoadBC6HAsHalfFloat(idBinaryImage&,const byte*,const int*,int,int,int,bool){TEST(false);return false;}
 static imageDownsizePolicy_t livePolicy{};static int policyReads=0;
 void R_GetImageDownsizePolicy(const char*,textureUsage_t,bool,imageDownsizePolicy_t&out){++policyReads;out=livePolicy;}
 struct idDxtEncoder{void Fill(const byte*src,byte*dst,int w,int h,int d){if(++encodeCalls==failEncodeAt)throw std::runtime_error("encoder refusal");TEST(w>=4&&h>=4&&w%4==0&&h%4==0);for(int i=0;i<w*h*4;++i)TEST(src[i]==src[i%4]);memset(dst,src[0],size_t(w)*h/d);}

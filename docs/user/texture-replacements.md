@@ -32,9 +32,10 @@ Set it, then load a map or run `reloadImages all`:
 - `1` (default) uses any supported replacement (see [Formats](#formats)) and
   also reuses the precomputed textures in Quake 4's own PK4s. **This is the
   right setting for a BC7 pack.** The performance presets keep it at 1.
-- `2` uses only BC7, BC4 and BC5 replacements, and ignores DXT and RXGB files,
-  including the ones in Quake 4's PK4s. Use it only if you want everything else
-  to come from the uncompressed originals. (**Not in 0.14.1:** BC4 and BC5.)
+- `2` uses only BC7, BC6H, BC4 and BC5 replacements, and ignores DXT and RXGB
+  files, including the ones in Quake 4's PK4s. Use it only if you want
+  everything else to come from the uncompressed originals. (**Not in 0.14.1:**
+  BC6H, BC4 and BC5.)
 - `0` turns off all DDS replacements, including your own packs.
 
 **BC7 needs graphics support.** Run `gfxInfo` and check the
@@ -146,12 +147,23 @@ openQ4 accepts single 2D DDS textures in these formats, with a classic header
 | BC7 | `BC7`, `BC7L`, `BC70` | `BC7_UNORM`, `BC7_UNORM_SRGB` | as it is where BC7 is supported, else decoded |
 | BC4 | `ATI1`, `BC4U` | `BC4_UNORM` | decoded, as greyscale |
 | BC5 | `ATI2`, `BC5U` | `BC5_UNORM` | decoded, as a normal map (Z rebuilt) |
+| BC6H (HDR) | `BC6H` | `BC6H_UF16`, `BC6H_SF16`, `BC6H_TYPELESS` | as it is where BC7 is supported, else decoded to 16-bit floating point |
 | BC2 / DXT3 | `DXT3` | `BC2_UNORM`, `BC2_UNORM_SRGB` | decoded; only when a material names the `.dds` |
 | Uncompressed 24/32-bit | none | `R8G8B8A8_UNORM`, `B8G8R8A8_UNORM`, `B8G8R8X8_UNORM` (and `_SRGB`) | decoded; only when a material names the `.dds` |
 
 **Not in 0.14.1:** BC1 and BC3 behind a DX10 header (what `texconv` writes for
-an sRGB format, and with `-dx10`), BC4, BC5 and uncompressed DDS files. 0.14.1
-skipped them. An `_SRGB` variant loads exactly like the plain one, as Quake 4's
+an sRGB format, and with `-dx10`), BC4, BC5, BC6H and uncompressed DDS files.
+0.14.1 skipped them.
+
+**BC6H** holds high dynamic range colour (values above 1.0, such as a bright
+sky or a light's glow) at the size of BC7, an eighth of uncompressed 16-bit
+floating point. It has no alpha channel and no sRGB variant: the values are
+used as stored. Graphics that support BC7 support BC6H too (`gfxInfo` reports
+both as `BC7/BPTC`); elsewhere openQ4 decodes it to 16-bit floating point, which
+keeps the range but uses eight times the video memory. A BC6H file that feeds a
+bump map or another texture openQ4 builds itself is clipped to 0-1, since those
+are 8-bit. Export with `texconv -f BC6H_UF16` (or `BC6H_SF16` for signed data),
+NVTT or Compressonator. An `_SRGB` variant loads exactly like the plain one, as Quake 4's
 own textures do. Signed (`_SNORM`) formats, texture arrays, cube maps,
 volume textures, invalid sizes and files with missing mipmap levels are rejected
 safely.
@@ -185,12 +197,25 @@ grace for timestamp rounding.
 
 Files inside a PK4 have no timestamp, so they count as older than any loose
 file. A packed replacement is never stale against an original that is also
-packed, but a loose copy of the original texture, such as an extracted `.tga`
-left in `q4base`, `baseoq4` or the mod's folder, makes it look out of date.
-openQ4 then loads the loose original, uncompressed, which can multiply a map's
-texture memory and hide the pack. With `image_showPrecompressedTextures 1` the
-log names each one as `Ignoring stale DDS replacement`. Move loose texture
-folders out of the game's folders when you install a packed texture pack.
+packed. A pack's DDS named after the texture itself also wins over a loose
+copy of the original, such as an extracted `.tga` left in `q4base`, `baseoq4`
+or the mod's folder.
+
+A pack's finished image-program result (a `progimg/...` or `dds/addnormals/...`
+file) can still look out of date when every file the program is built from is
+loose on disk. openQ4 then rebuilds it from those loose files, uncompressed.
+With `image_showPrecompressedTextures 1` the log names each one as
+`Ignoring stale DDS replacement ...: newer loose source <full path>`, so you
+can see which folder holds the file. Move leftover loose texture folders out
+of the game's folders when you install a packed texture pack.
+
+**In 0.14.1** any loose copy of an original texture made a pack's BC7 file
+for it look stale, and the log did not say where the loose file was. It can
+only be in a folder searched before Quake 4's own packs: the mod's folder,
+`baseoq4` or `q4base` in the Quake 4 folder, or the mod's or `baseoq4` folder
+under the save path (`%LOCALAPPDATA%\openQ4` on Windows).
+Look for the texture's name without an extension, since the loose copy can be
+a `.tga`, `.jpg` or `.png`.
 
 ## Compressing textures that are not DDS
 
@@ -235,7 +260,7 @@ no DDS replacement for 'textures/stone/wall01':
 ```
 
 - `listImages` shows each loaded image's format (`DXT1`, `DXT5`, `BC7`,
-  `RGBA8` for uncompressed) and size; `listImages uncompressed` lists only the
+  `BC6H_UF16`, `RGBA8` for uncompressed) and size; `listImages uncompressed` lists only the
   uncompressed ones, the first place to look when a pack uses too much memory.
   **Not in 0.14.1:** the totals are correct past 2 GB, and each size counts the
   mipmap levels actually stored.

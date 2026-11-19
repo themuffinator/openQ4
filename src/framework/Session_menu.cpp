@@ -5444,7 +5444,9 @@ static void Session_SetCampaignPageSkill( idUserInterface *gui, int skill, bool 
 // commands alike: a difficulty, turbo, START, a chapter and its start, and
 // BACK to the campaigns (onto CHAPTERS from the retained CHAPTERS page).
 static void Session_HandleCampaignPageRequest( idSessionLocal &session, idUserInterface *gui, const char *request, bool retained ) {
-    const char *campaign = Session_AwakeningPageActive() ? "awakening" : "quake4";
+    // A page opened ahead of its campaign's switch starts that campaign.
+    const char *pending = session.PendingCampaign( gui );
+    const char *campaign = pending != NULL ? pending : Session_AwakeningPageActive() ? "awakening" : "quake4";
     const bool chaptersBack = !idStr::Icmp( request, "campaignChaptersBack" );
     if ( !idStr::Icmp( request, "campaignSkillBack" ) || chaptersBack ) {
         if ( retained ) session.BeginRetainedCampaignSkill( gui, "", true, chaptersBack ); else session.OpenCampaignSelector( true );
@@ -6135,6 +6137,7 @@ void idSessionLocal::GuiFrameEvents() {
 	UpdateRetainedHome();
 	RetainedHomeFrameEvent();
 	UpdateRetainedSubpage();
+	UpdatePendingCampaignRemount();
 	UpdateRetainedPage();
 	UpdateRetainedMultiplayerPage();
 	UpdateRetainedJoinGame();
@@ -7334,6 +7337,14 @@ static bool Session_CampaignNeedsReload( const char *game, const char *base ) {
 }
 #endif
 
+static idCVar com_campaignRemount( "com_campaignRemount", "1", CVAR_SYSTEM | CVAR_BOOL,
+    "switch between Quake 4 and The Awakening in place at the menu; 0 reloads the engine for each switch" );
+static idCVar com_campaignSwitchExec( "com_campaignSwitchExec", "", CVAR_SYSTEM,
+    "a cfg executed after each in-place campaign switch, for test harnesses" );
+// How long the difficulty page opened ahead of a switch runs before the switch:
+// its arrival (150 ms) and focus (300 ms) timelines.
+static const int CAMPAIGN_REMOUNT_SETTLE_MSEC = 400;
+
 void idSessionLocal::SelectCampaign( const char *campaign, bool start, bool chapters ) {
 #ifndef ID_DEDICATED
     const bool awakening = !idStr::Icmp( campaign, "awakening" );
@@ -7354,18 +7365,45 @@ void idSessionLocal::SelectCampaign( const char *campaign, bool start, bool chap
     // Consume one-shot command-line overrides before a full engine restart.
     common->StartupVariable( "si_gameType", true );
     if ( Session_CampaignNeedsReload( gameDir, gameBase ) ) {
-        cvarSystem->SetCVarString( "fs_game", gameDir );
-        cvarSystem->SetCVarString( "fs_game_base", gameBase );
+        if ( campaignRemounting ) {
+            // The switch just ran and the mount still differs (the filesystem
+            // refused the directories): stay on this campaign's page rather
+            // than switching again and again.
+            common->Warning( "The %s campaign could not be mounted (fs_game '%s', fs_game_base '%s')", campaign,
+                cvarSystem->GetCVarString( "fs_game" ), cvarSystem->GetCVarString( "fs_game_base" ) );
+            campaignRemounting = false;
+            OpenCampaignSelector( true );
+            return;
+        }
         cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
-        cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
-        idCmdArgs continuation;
-        continuation.AppendArg( "campaignSelect" );
-        continuation.AppendArg( campaign );
-        if ( start ) continuation.AppendArg( "start" );
-        else if ( chapters ) continuation.AppendArg( "chapters" );
-        cmdSystem->SetupReloadEngineMenu( continuation );
+        if ( start ) {
+            // START on a page opened ahead of the switch: this request makes it
+            pendingRemountPage = NULL;
+            pendingRemountQueued = false;
+        }
+        if ( CanRemountCampaign() ) {
+            if ( !start && !chapters && !arena && OpenRetainedCampaignSkill( awakening ? 1 : 0 ) ) {
+                // The campaign's difficulty page scrolls in at once, titled for
+                // it, and the switch runs once the page rests
+                // (UpdatePendingCampaignRemount): the brief hold falls on a
+                // still page instead of cutting the transition. The page
+                // holds nothing of the campaign's content; CHAPTERS does, so
+                // that page opens after the switch.
+                pendingRemountPage = guiActive;
+                pendingRemountCampaign = campaign;
+                pendingRemountAt = common->GetPresentationTime() + CAMPAIGN_REMOUNT_SETTLE_MSEC;
+                return;
+            }
+            // In place, between frames: never inside the interface's own
+            // dispatch, whose GUIs the switch may load again.
+            cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "campaignRemount %s%s\n", campaign,
+                start ? " start" : chapters ? " chapters" : "" ) );
+            return;
+        }
+        ReloadEngineForCampaign( campaign, gameDir, gameBase, start, chapters );
         return;
     }
+    campaignRemounting = false;
     common->Printf( "CAMPAIGN_SELECTED id=%s gameDir=%s module=%s\n", campaign, gameDir,
         cvarSystem->GetCVarString( "com_activeGameModule" ) );
     if ( start && !arena ) {
@@ -7400,6 +7438,143 @@ void idSessionLocal::SelectCampaign( const char *campaign, bool start, bool chap
 #endif
 }
 
+/*
+==============
+idSessionLocal::CanRemountCampaign
+
+Whether a campaign switch can change the game directories in place
+(Com_RemountCampaign) rather than reload the engine: single player at the
+menu, with no level, demo, server or connection running. com_campaignRemount 0
+always reloads the engine, as every switch did before.
+==============
+*/
+bool idSessionLocal::CanRemountCampaign() const {
+#ifdef ID_DEDICATED
+    return false;
+#else
+    return com_campaignRemount.GetBool() && game != NULL && !mapSpawned && !insideExecuteMapChange &&
+        !loadingSaveGame && !readDemo && !writeDemo && !IsDemoPlaybackActive() && !com_editorActive &&
+        !idAsyncNetwork::IsActive() && !com_SingleDeclFile.GetBool() &&
+        !idStr::Icmp( cvarSystem->GetCVarString( "com_activeGameModule" ), "game_sp" ) &&
+        !cvarSystem->GetCVarString( "com_nextGameModule" )[0];
+#endif
+}
+
+void idSessionLocal::ReloadEngineForCampaign( const char *campaign, const char *gameDir, const char *gameBase, bool start, bool chapters ) {
+    cvarSystem->SetCVarString( "fs_game", gameDir );
+    cvarSystem->SetCVarString( "fs_game_base", gameBase );
+    cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
+    cvarSystem->SetCVarString( "com_nextGameModule", "game_sp" );
+    idCmdArgs continuation;
+    continuation.AppendArg( "campaignSelect" );
+    continuation.AppendArg( campaign );
+    if ( start ) continuation.AppendArg( "start" );
+    else if ( chapters ) continuation.AppendArg( "chapters" );
+    cmdSystem->SetupReloadEngineMenu( continuation );
+}
+
+/*
+==============
+idSessionLocal::RemountCampaign
+
+The queued half of a campaign switch (campaignRemount): mount the campaign's
+game directories in place, then carry on into its page or its first level as
+SelectCampaign would have. Anything that changed since the request was queued
+takes the engine reload instead.
+==============
+*/
+void idSessionLocal::RemountCampaign( const char *campaign, bool start, bool chapters, idUserInterface *page ) {
+#ifndef ID_DEDICATED
+    const bool awakening = !idStr::Icmp( campaign, "awakening" );
+    const bool arena = !idStr::Icmp( campaign, "arena" );
+    idStr gameDir, gameBase;
+    Session_CampaignGameDirs( awakening, arena, gameDir, gameBase );
+    if ( !Session_CampaignNeedsReload( gameDir, gameBase ) ) {
+        SelectCampaign( campaign, start, chapters );
+        return;
+    }
+    if ( !CanRemountCampaign() ) {
+        ReloadEngineForCampaign( campaign, gameDir, gameBase, start, chapters );
+        return;
+    }
+    cvarSystem->SetCVarString( "si_gameType", "singleplayer" );
+    if ( !Com_RemountCampaign( gameDir, gameBase ) ) {
+        // part way through: the engine reload finishes the switch
+        ReloadEngineForCampaign( campaign, gameDir, gameBase, start, chapters );
+        return;
+    }
+    CampaignRemounted();
+    if ( page != NULL && guiActive == page ) {
+        // the difficulty page already on screen keeps the difficulty and
+        // turbo choice it holds; it only learns the mounted campaign
+        page->SetStateString( "campaign_title", Session_AwakeningPageActive() ? "#str_230040" : "#str_230039" );
+        page->StateChanged( common->GetPresentationTime() );
+        common->Printf( "CAMPAIGN_SELECTED id=%s gameDir=%s module=%s\n", campaign, fileSystem->GetActiveGameDir(),
+            cvarSystem->GetCVarString( "com_activeGameModule" ) );
+    } else {
+        campaignRemounting = true;
+        SelectCampaign( campaign, start, chapters );
+    }
+    if ( com_campaignSwitchExec.GetString()[0] ) {
+        // test harnesses carry on from here, as g_autoExecAfterMapLoad after a load
+        cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "exec %s\n", com_campaignSwitchExec.GetString() ) );
+    }
+#endif
+}
+
+/*
+==============
+idSessionLocal::UpdatePendingCampaignRemount
+
+The difficulty page of a campaign not yet mounted is on screen: once it has
+come to rest, queue the switch (campaignRemount), which fills the page in place.
+Leaving the page first, by Back or anything else, cancels the switch: nothing
+of the other campaign was mounted.
+==============
+*/
+void idSessionLocal::UpdatePendingCampaignRemount() {
+#ifndef ID_DEDICATED
+    if ( pendingRemountPage == NULL || pendingRemountQueued ) {
+        return;
+    }
+    if ( guiActive != pendingRemountPage || retainedSubpageFrom != NULL || mapSpawned ) {
+        if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
+            common->Printf( "CAMPAIGN_SWITCH cancelled to=%s: the page was left first\n", pendingRemountCampaign.c_str() );
+        }
+        pendingRemountPage = NULL;
+        pendingRemountCampaign.Clear();
+        return;
+    }
+    if ( common->GetPresentationTime() < pendingRemountAt ) {
+        return;
+    }
+    pendingRemountQueued = true;
+    cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "campaignRemount %s\n", pendingRemountCampaign.c_str() ) );
+#endif
+}
+
+/*
+==============
+idSessionLocal::CampaignRemounted
+
+The session after a campaign remount: the game module, the decls and the
+filesystem are the new campaign's, the open page is still on screen. Forget what
+was worked out for the old campaign and bring the menu music back (the switch
+stopped every sound; the menu's music is now the new campaign's).
+==============
+*/
+void idSessionLocal::CampaignRemounted() {
+#ifndef ID_DEDICATED
+    retainedPauseStrogg = -1;
+    // The main menu's own timeline plays it only while that menu runs; the
+    // page on screen is a sub-page, so start it here as its "music" command
+    // does. The campaign's sound shaders choose the track.
+    if ( menuSoundWorld != NULL && !mapSpawned ) {
+        menuSoundWorld->PlayShaderDirectly( "main_menu", 2 );
+    }
+#endif
+}
+
 // The CHAPTERS page: the active campaign's levels, the chosen one focused.
 bool idSessionLocal::OpenRetainedCampaignChapters() {
 #ifdef ID_DEDICATED
@@ -7415,7 +7590,7 @@ bool idSessionLocal::OpenRetainedCampaignChapters() {
 #endif
 }
 
-bool idSessionLocal::OpenRetainedCampaignSkill() {
+bool idSessionLocal::OpenRetainedCampaignSkill( int awakeningTitle ) {
 #ifdef ID_DEDICATED
     return false;
 #else
@@ -7424,7 +7599,8 @@ bool idSessionLocal::OpenRetainedCampaignSkill() {
     if ( !gui ) return false;
     Session_SetCampaignPageSkill( gui, cvarSystem->GetCVarInteger( "g_skill" ), false );
     gui->SetStateBool( "turbo", false );
-    gui->SetStateString( "campaign_title", Session_AwakeningPageActive() ? "#str_230040" : "#str_230039" );
+    const bool awakening = awakeningTitle < 0 ? Session_AwakeningPageActive() : awakeningTitle != 0;
+    gui->SetStateString( "campaign_title", awakening ? "#str_230040" : "#str_230039" );
     SetGUI( gui, NULL );
     gui->StateChanged( common->GetPresentationTime() );
     return true;

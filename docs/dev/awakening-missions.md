@@ -1518,3 +1518,66 @@ scenes: both sit behind the level's cold-damage and Valkaryne sequences. No
 scene was watched or heard, so the pacing of the three added replies and the
 level of Cryofac's music against its ambience are unreviewed. Linux and macOS
 were not run.
+
+## Cryofac's opening, door seals and second ice wall — 18 November 2026
+
+Three faults a player reported in m08. All three are entity repairs on the
+recovered map, applied when Cryofac runs a corrected program
+(`g_awakeningLateMissions 1`, the default) and only where the map still has its
+recovered values. The mission script is unchanged, so no new script revision
+was needed and saves of every revision load as before.
+
+- **The squad starts inside the parked speeders.** Three speeders stand where
+  the opening places Tak and Navajas. Both marines spawned inside a bike's
+  collision and were pushed up onto it (z 799 and 791 on the first frame
+  against a floor at 768). Navajas's first mark, `navajas_intropos_1`, lies 22
+  units inside the third bike: he walked into its flank, never arrived, and
+  `Intro()` waited on him until the 30-second scripted-move watchdog gave up.
+  Tak, with his own move finished, wandered off to follow the player in the
+  meantime. `tak` moves to `-2224 -6480 768`, `navajas` to `-2096 -6470 768`
+  and `navajas_intropos_1` to `-2120 -6408 768`: the nearest clear floor beside
+  the same bikes, measured against each bike's rotated collision. Facings and
+  the rest of the route are unchanged.
+- **The cryodoor seals answer the player.** The six `cryodoor_N_panel` seals
+  (`generic_seal.gui`) target nothing. The doors open from script when Tak
+  works the console (`TakOpenDoor`) or, for cryodoor 4, on approach. A
+  player's press still played the seal's open animation beside a door that
+  stayed shut. They now spawn `gui_noninteractive`, so the crosshair does not
+  take them. Tak's lift panel (`tak_elevA_panel`) has the same lack of target,
+  but no probe placement could focus it with the corrections off, so it was
+  left alone.
+- **Napalm on most of the second ice wall did nothing.** The wall is two ice
+  meshes (`door_ice_2a`, `door_ice_2b`) over one napalm-only damage box
+  (`door_ice_damage_2`, `damage_filter goob`). A grid of shot traces from the
+  approach shows the box exposed only in a strip down the middle (x -2080 to
+  -1760, z 840 to 900). Shots on the western third, the bottom row and the top
+  edge strike the meshes, which take no damage. Glob splash usually reaches the
+  box anyway, which hid it; the flamethrower mod has no splash and never
+  melted the wall from the west. After the map spawns, both meshes forward
+  their damage to the box (`SetDamageEntity`), so the box's filter and health
+  decide as before. `RemoveDoorIce2` still removes all three. The first ice
+  door needs nothing: its box fills the doorway and the melting model has no
+  collision.
+
+### Validation
+
+Windows x64 OpenGL, hidden, no input, `developer 1`, the user-supplied alpha
+content, `.tmp/runtime/awakening-missions` (the client, renderers and packs of
+the current build, with the rebuilt single-player module).
+
+| Probe | Before | After |
+| --- | --- | --- |
+| Marine positions every 2 s from map start | Spawn at z 799/791; Navajas stuck 35.4 units from `navajas_intropos_1`; watchdog abandons the move at 30 s; both reach `intropos_2` after about 34 s | Spawn on the floor (768.25); both reach `intropos_2` within 6 s and `intropos_3` within 14 s; no watchdog warning |
+| `openq4_viewReport` focus, aimed at each seal from its walkway | With `g_awakeningLateMissions 0`: all six seals take focus | `focus none` for all six; the lift call panel `elevator7_call_2` still takes focus |
+| Flamethrower, 2.5 s from the west of the ice wall (x -2260) | Wall stands | Wall removed |
+| Rocket at the same spot, then the flamethrower | — | The rocket leaves the wall; the flamethrower removes it |
+| Saved on the new module, restored in a fresh process, flamethrower from the west | — | Wall removed: the forwarding is saved state |
+
+`openq4_viewReport` now ends with `focus <entity>` (the entity whose
+interactive GUI the crosshair is on, or `none`).
+`tools/tests/awakening_content_repairs.py` pins the three repairs.
+
+Limits. Saves made in Cryofac before this change keep their own entity state:
+their marines are wherever the save left them, their seals stay focusable and
+the west of the ice wall stays inert until the map is restarted. No scene was
+watched with a player moving; Linux and macOS were not run.
