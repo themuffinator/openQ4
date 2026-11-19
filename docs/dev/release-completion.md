@@ -7,6 +7,20 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A renderer switch no longer turns the screen white, 19 November 2026
+
+- **The game keeps responding while it restarts the renderer.** **Restart
+  Renderer**, for example to switch between Vulkan and OpenGL, reloads the game
+  for several seconds. During that reload the game stopped answering Windows, so
+  after five seconds Windows marked it Not Responding and covered it with a
+  blank window: in fullscreen, a white screen until the load finished. The
+  loading screen now stays up throughout.
+- **Starting the game is quicker too.** The Arena campaign no longer opens every
+  Arena map file while the game loads, which added about six seconds to the
+  first start or to the first renderer restart.
+- **What to do.** Nothing. A white screen after a renderer switch was the game
+  still loading, not a crash.
+
 ## Russian gameplay text, 19 November 2026
 
 - **More of the game in Russian.** HUD and multiplayer messages, key names,

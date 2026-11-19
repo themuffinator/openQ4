@@ -1414,8 +1414,11 @@ void idArenaCampaign::Init() {
 		for ( int tierIndex = 0; tierIndex < state->tiers.Num(); tierIndex++ ) {
 			for ( int matchIndex = 0; matchIndex < state->tiers[tierIndex].matches.Num(); matchIndex++ ) {
 				const arenaMatch_t &match = state->tiers[tierIndex].matches[matchIndex];
-				const idDict *mapDecl = NULL;
-				ArenaMapSupportsMatch( match, &mapDecl );
+				// The levelshot needs only the map's decl. Asking whether the
+				// map supports the match opens its .map file, which costs up to
+				// half a second per map the first time, all of it inside the
+				// load, with no loading frame or window pump.
+				const idDict *mapDecl = ArenaFindMapDecl( match.map );
 				sessLocal.QueueRetainedLevelshot( ArenaLevelshot( match, mapDecl ).c_str(), true );
 			}
 		}

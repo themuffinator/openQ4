@@ -437,7 +437,9 @@ void R_RenderGuiSurf( idUserInterface *gui, drawSurf_t *drawSurf, int entityGui 
 	// The generated quads become ordinary 3D drawSurfs. Preserve that origin
 	// explicitly so shared in-world ownership cannot claim root UI by sort.
 	tr.inWorldGuiEmissionDepth++;
-	emitted->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack );
+	// the GUI plane's texture axes reflect it; only a mirrored host turns it
+	emitted->EmitToCurrentView( modelMatrix, drawSurf->space->weaponDepthHack,
+		R_SpaceWindsReflected( drawSurf->space ) );
 	tr.inWorldGuiEmissionDepth--;
 	tr.guiModel->Clear();
 	R_UpdateGuiScreenRectState( gui, drawSurf );

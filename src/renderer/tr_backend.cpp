@@ -250,15 +250,9 @@ draw by its negativeScale instead and keeps the default front face.
 ====================
 */
 void RB_SetSurfaceWinding( const viewEntity_t *space ) {
-	bool reflected = false;
-	if ( space != NULL ) {
-		const float *m = space->modelMatrix;
-		const float determinant = m[0] * ( m[5] * m[10] - m[6] * m[9] )
-			- m[1] * ( m[4] * m[10] - m[6] * m[8] )
-			+ m[2] * ( m[4] * m[9] - m[5] * m[8] );
-		reflected = determinant < 0.0f;
-	}
-	R_GLStateCache().SetFrontFace( reflected ? GL_CW : GL_CCW );
+	// a surface GUI's space carries its texture axes' reflection, which its
+	// quads are wound for: it turns only for a mirrored host
+	R_GLStateCache().SetFrontFace( R_SpaceWindsReflected( space ) ? GL_CW : GL_CCW );
 }
 
 /*

@@ -74,6 +74,8 @@ If you have questions concerning this license or the applicable additional terms
 #include <SDL3/SDL_cpuinfo.h>
 // The refresh of the display the game window is on, 0 when unknown (sdl3_backend.cpp).
 float Sys_SDL_GetWindowRefreshHz( void );
+// Reads the operating system's window messages into SDL's queue during a load (sdl3_backend.cpp).
+void Sys_SDL_KeepWindowResponsive( void );
 #endif
 
 #define	MAX_PRINT_MSG_SIZE	4096
@@ -6792,6 +6794,12 @@ bool openQ4_UpdateInitialization( void ) {
 		if ( gap > 50 && cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
 			common->Printf( "INITIALIZATION_HOOK_GAP msec=%.1f\n", gap );
 		}
+#if defined( USE_SDL3 )
+		// An engine reload shows its new window long before the frame loop
+		// pumps again; a window that reads no messages for five seconds is
+		// ghosted as Not Responding (white, in fullscreen).
+		Sys_SDL_KeepWindowResponsive();
+#endif
 	}
 	if ( initializationDrawing || initializationMessage.IsEmpty() ||
 		!initializationPacing.Due( InitializationMilliseconds(), openQ4_GetRequestedPresentationCap() ) ||

@@ -361,7 +361,35 @@ typedef struct viewEntity_s {
 	const idMaterial *	shaderRegisterMemoMaterials[4];
 	const float *		shaderRegisterMemoRegs[4];
 	int					numShaderRegisterMemos;
+
+	// openQ4: a GUI drawn on a surface. Its model matrix maps the GUI's
+	// y-down 640x480 plane through the surface's texture axes, a reflection
+	// for the usual mapping, and the GUI's quads are wound to suit it; the
+	// space winds by the host surface's own reflection alone.
+	bool				surfaceGuiSpace;
+	bool				surfaceGuiHostReflected;
 } viewEntity_t;
+
+// openQ4: whether a surface space winds the other way round on screen: a
+// model matrix of negative determinant (a mirrored model), or a surface GUI
+// on a mirrored host. The legacy GL and Vulkan per-surface passes turn the
+// front face for it.
+ID_INLINE bool R_ModelMatrixReflects( const float *m ) {
+	const float determinant = m[0] * ( m[5] * m[10] - m[6] * m[9] )
+		- m[1] * ( m[4] * m[10] - m[6] * m[8] )
+		+ m[2] * ( m[4] * m[9] - m[5] * m[8] );
+	return determinant < 0.0f;
+}
+
+ID_INLINE bool R_SpaceWindsReflected( const viewEntity_t *space ) {
+	if ( space == NULL ) {
+		return false;
+	}
+	if ( space->surfaceGuiSpace ) {
+		return space->surfaceGuiHostReflected;
+	}
+	return R_ModelMatrixReflects( space->modelMatrix );
+}
 
 
 const int	MAX_CLIP_PLANES	= 1;				// we may expand this to six for some subview issues

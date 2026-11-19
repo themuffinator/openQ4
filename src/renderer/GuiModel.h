@@ -67,7 +67,9 @@ public:
 	// CRC of the geometry, colors and materials, for change detection.
 	unsigned int	ContentChecksum() const;
 
-	void	EmitToCurrentView( float modelMatrix[16], bool depthHack );
+	// a GUI on a surface; hostReflected is whether the host surface's space
+	// is itself mirrored, which alone decides the quads' winding
+	void	EmitToCurrentView( float modelMatrix[16], bool depthHack, bool hostReflected );
 	void	EmitFullScreen();
 	bool	HasSceneFeedback() const;
 
@@ -84,7 +86,7 @@ private:
 	bool	ReadSurfacesFromDemo( idDemoFile *demo );
 	void	AdvanceSurf();
 	void	EmitSurface( guiModelSurface_t *surf, float modelMatrix[16], float modelViewMatrix[16], bool depthHack,
-				const struct viewEntity_s *sharedSpace = NULL );
+				const struct viewEntity_s *sharedSpace = NULL, bool surfaceGui = false, bool hostReflected = false );
 
 	guiModelSurface_t		*surf;
 

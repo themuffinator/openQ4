@@ -5311,6 +5311,29 @@ static bool SDL3_EventTargetsGameWindow(const SDL_Event &event) {
 	return gameWindowID != 0 && eventWindowID == gameWindowID;
 }
 
+// A long load on the main thread (an engine reload, such as a renderer switch)
+// runs without the frame loop's pump. Windows calls a window that has read no
+// message for five seconds Not Responding and covers it with a ghost, which on
+// a fullscreen window is a white screen; desktop compositors elsewhere ask to
+// force-quit it. This only moves the operating system's messages into SDL's
+// queue. Nothing reads them here: the frame loop handles every event, in order,
+// once the load ends. Throttled, because the loading hook runs per file read.
+void Sys_SDL_KeepWindowResponsive(void) {
+	static bool pumping = false;
+	static Uint64 lastPumpMsec = 0;
+	if (pumping || !s_sdlVideoReferenceHeld || s_sdlWindow == NULL || !SDL_IsMainThread() || NativeInput_OwnsPump()) {
+		return;
+	}
+	const Uint64 now = SDL_GetTicks();
+	if (now - lastPumpMsec < 50) {
+		return;
+	}
+	lastPumpMsec = now;
+	pumping = true;
+	SDL_PumpEvents();
+	pumping = false;
+}
+
 bool Sys_SDL_PumpEvents(void) {
     if (NativeInput_OwnsPump()) return true; // Before housekeeping and both legacy Poll loops.
 #if defined(OPENQ4_SDL3_POSIX_HOST)

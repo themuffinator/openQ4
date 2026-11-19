@@ -740,7 +740,7 @@ EmitSurface
 ================
 */
 void idGuiModel::EmitSurface( guiModelSurface_t *surf, float modelMatrix[16], float modelViewMatrix[16], bool depthHack,
-		const viewEntity_t *sharedSpace ) {
+		const viewEntity_t *sharedSpace, bool surfaceGui, bool hostReflected ) {
 	srfTriangles_t	*tri;
 
 	if ( surf->numVerts == 0 ) {
@@ -796,6 +796,8 @@ void idGuiModel::EmitSurface( guiModelSurface_t *surf, float modelMatrix[16], fl
 		memcpy( privateSpace->modelMatrix, modelMatrix, sizeof( privateSpace->modelMatrix ) );
 		memcpy( privateSpace->modelViewMatrix, modelViewMatrix, sizeof( privateSpace->modelViewMatrix ) );
 		privateSpace->weaponDepthHack = depthHack;
+		privateSpace->surfaceGuiSpace = surfaceGui;
+		privateSpace->surfaceGuiHostReflected = hostReflected;
 		guiSpace = privateSpace;
 	}
 
@@ -808,14 +810,14 @@ void idGuiModel::EmitSurface( guiModelSurface_t *surf, float modelMatrix[16], fl
 EmitToCurrentView
 ====================
 */
-void idGuiModel::EmitToCurrentView( float modelMatrix[16], bool depthHack ) {
+void idGuiModel::EmitToCurrentView( float modelMatrix[16], bool depthHack, bool hostReflected ) {
 	float	modelViewMatrix[16];
 
-	myGlMultMatrix( modelMatrix, tr.viewDef->worldSpace.modelViewMatrix, 
+	myGlMultMatrix( modelMatrix, tr.viewDef->worldSpace.modelViewMatrix,
 			modelViewMatrix );
 
 	for ( int i = 0 ; i < surfaces.Num() ; i++ ) {
-		EmitSurface( &surfaces[i], modelMatrix, modelViewMatrix, depthHack );
+		EmitSurface( &surfaces[i], modelMatrix, modelViewMatrix, depthHack, NULL, true, hostReflected );
 	}
 }
 
