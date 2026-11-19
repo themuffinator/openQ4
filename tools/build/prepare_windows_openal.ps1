@@ -77,7 +77,9 @@ function Assert-WorkspacePath {
 
     $resolvedPath = [System.IO.Path]::GetFullPath($Path)
     $resolvedRoot = [System.IO.Path]::GetFullPath($RepoRoot)
-    $normalizedRoot = [System.IO.Path]::TrimEndingDirectorySeparator($resolvedRoot)
+    # CI runs this under Windows PowerShell 5.1, whose .NET Framework has no
+    # Path.TrimEndingDirectorySeparator.
+    $normalizedRoot = $resolvedRoot.TrimEnd([char[]]@('\', '/'))
     $rootPrefix = $normalizedRoot + [System.IO.Path]::DirectorySeparatorChar
     if (
         -not $resolvedPath.Equals($normalizedRoot, [System.StringComparison]::OrdinalIgnoreCase) -and
@@ -99,6 +101,38 @@ function Remove-WorkspaceDirectory {
 
     Assert-WorkspacePath -Path $Path -RepoRoot $RepoRoot
     Remove-Item -LiteralPath $Path -Recurse -Force
+}
+
+# OpenAL Soft 1.25.2 passes &std::unique_ptr<...>::operator* to
+# std::views::transform. The standard leaves forming a pointer to a standard
+# library member function unspecified, and MSVC 19.52's STL rejects it
+# (C3889 in alc/alc.cpp). A lambda does the same dereference. The repair is
+# exact and idempotent, and fails if the pinned source ever reads differently.
+function Repair-OpenAlSource {
+    param(
+        [string]$SourceDir,
+        [string]$Version
+    )
+
+    if ($Version -ne "1.25.2") {
+        return
+    }
+
+    $path = Join-Path $SourceDir "alc\alc.cpp"
+    $original = "std::views::transform(&ContextBase::EffectSlotCluster::operator*)"
+    $repaired = "std::views::transform([](ContextBase::EffectSlotCluster const &cluster) -> auto& { return *cluster; })"
+    $text = [System.IO.File]::ReadAllText($path)
+    if ($text.Contains($repaired)) {
+        return
+    }
+
+    $first = $text.IndexOf($original, [System.StringComparison]::Ordinal)
+    if ($first -lt 0 -or $text.IndexOf($original, $first + 1, [System.StringComparison]::Ordinal) -ge 0) {
+        throw "OpenAL Soft $Version alc/alc.cpp does not contain the expected EffectSlotCluster transform exactly once."
+    }
+
+    [System.IO.File]::WriteAllText($path, $text.Replace($original, $repaired), (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "Repaired OpenAL Soft $Version alc/alc.cpp for MSVC (EffectSlotCluster transform)"
 }
 
 function Invoke-CmdChain {
@@ -222,6 +256,8 @@ try {
     if (-not (Test-Path (Join-Path $sourceDir "CMakeLists.txt"))) {
         throw "OpenAL Soft source directory is missing a CMakeLists.txt file: '$sourceDir'"
     }
+
+    Repair-OpenAlSource -SourceDir $sourceDir -Version $Version
 
     $vsDevCmd = Get-VsDevCmdPath -TargetArch $vsTargetArch
 
