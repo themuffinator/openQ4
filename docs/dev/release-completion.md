@@ -7,6 +7,30 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Your controller rumbles when you fire and when you are hit (#244), 19 November 2026
+
+- **Every shot and every hit now rumbles a gamepad.** Rumble used to come
+  only from loud sounds such as explosions, and the next quiet frame cut off
+  anything else, so your own weapons never rumbled. Now each shot gives a
+  short kick, harder for a shotgun blast, the lightning gun and gauntlet hum
+  while they run, and taking damage thumps both motors, harder for bigger
+  hits. Explosions and other loud sounds rumble as before, and the stronger
+  of the two wins. Works in single-player, The Awakening and multiplayer.
+- **What to do.** Replace the game executable and both game modules
+  together. The **Rumble** setting under **Controls** (`in_joystickRumble`)
+  still turns all of it off, and **Rumble Strength** scales it.
+  `in_joystickRumbleLog 1` prints each pulse to the console.
+- For mod authors: the game API is now 61 (`idSys::ControllerRumblePulse`),
+  so game modules built for 60 do not load.
+- Evidence: hidden clients from `.install`, private save paths, no OS input
+  (`in_presentationViewProbeAttack` held fire, the `damage` cheat dealt the
+  hits), `in_joystickRumbleLog 1`. In `game/airdefense1` and on an `mp/q4dm1`
+  listen server, every shotgun blast pulsed 0.50/1.00 for 40 ms, every
+  machine-gun round 0.28/0.55, and 10 and 40 points of damage pulsed both
+  motors at 0.50 and 1.00 for 90 ms; with `in_joystickRumble 0` the same
+  pulses were held back. No controller was attached, so the motors
+  themselves were not felt.
+
 ## Smoke, sparks and muzzle flashes cost less to run, 18 November 2026
 
 - **Less processor time per frame in fights.** Every frame the effects system

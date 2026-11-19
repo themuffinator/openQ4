@@ -14109,12 +14109,21 @@ float idPlayer::VRCrouchLift( const vrFrameState_t &frame ) const {
 ===============
 idPlayer::VRVibrate
 
-openQ4 VR: a pulse in the local player's controllers. Prediction reruns a
-multiplayer client's frames, so only a new frame pulses.
+openQ4: a pulse in the local player's controllers. Prediction reruns a
+multiplayer client's frames, so only a new frame pulses. Without a headset
+it rumbles a gamepad instead (#244): the weapon hand is the sharp
+high-frequency motor, the other hand the heavy low-frequency one, and
+in_joystickRumble turns it off with the sound-driven rumble.
 ===============
 */
 void idPlayer::VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const {
-	if ( vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
+	if ( gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
+		return;
+	}
+	if ( vrSystem == NULL || !vrSystem->IsActive() ) {
+		const float high = weaponHand ? amplitude : amplitude * 0.5f;
+		const float low = otherHand ? amplitude : amplitude * 0.5f;
+		sys->ControllerRumblePulse( low, high, durationMsec );
 		return;
 	}
 	vrFrameState_t frame;

@@ -99,22 +99,25 @@ static const int SOUND_RUMBLE_DURATION_MSEC = 120;
 static const float SOUND_RUMBLE_STOP_THRESHOLD = 0.01f;
 static const float SOUND_RUMBLE_HIGH_MOTOR_SCALE = 0.75f;
 
+// The sound's share of the controller rumble; gameplay pulses (weapon fire,
+// hits) are mixed on top by Sys_UpdateJoystickRumble, so a quiet frame no
+// longer cancels them.
 static void Sound_UpdateControllerRumble( float amplitude )
 {
 	if( !s_controllerRumble.GetBool() )
 	{
-		Sys_SetJoystickRumble( 0.0f, 0.0f, 0 );
+		Sys_UpdateJoystickRumble( 0.0f, 0.0f, 0 );
 		return;
 	}
 
 	const float strength = idMath::ClampFloat( 0.0f, 1.0f, amplitude );
 	if( strength <= SOUND_RUMBLE_STOP_THRESHOLD )
 	{
-		Sys_SetJoystickRumble( 0.0f, 0.0f, 0 );
+		Sys_UpdateJoystickRumble( 0.0f, 0.0f, 0 );
 		return;
 	}
 
-	Sys_SetJoystickRumble( strength, strength * SOUND_RUMBLE_HIGH_MOTOR_SCALE, SOUND_RUMBLE_DURATION_MSEC );
+	Sys_UpdateJoystickRumble( strength, strength * SOUND_RUMBLE_HIGH_MOTOR_SCALE, SOUND_RUMBLE_DURATION_MSEC );
 }
 
 /*

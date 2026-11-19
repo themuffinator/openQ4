@@ -700,7 +700,8 @@ public:
 	float					VRCrouchLift( const vrFrameState_t &frame ) const;
 	// How far a weapon's zoom narrows each eye now, eased with the zoom.
 	float					VRZoomScale( void );
-	// A pulse in the local player's weapon hand, other hand, or both.
+	// A pulse in the local player's weapon hand, other hand, or both; without
+	// a headset, a gamepad rumble (weapon hand high motor, other hand low).
 	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const;
 	// The body in the headset (vr_body). BeginVRBody poses the trunk and legs
 	// for this draw; the view weapon then asks where each of its forearms
