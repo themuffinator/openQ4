@@ -4,6 +4,7 @@
 #include "tr_local.h"
 #include "ShadowMapProjected.h"
 
+
 void R_ShadowMapResetProjectedLightState( shadowMapProjectedLightState_t &state ) {
 	memset( &state, 0, sizeof( state ) );
 	state.projectionPad = 0.0f;
@@ -516,6 +517,48 @@ void R_ShadowMapProjectedTexelDepthSteps( const shadowMapProjectedLightState_t &
 			? R_ShadowMapTexelDepthStep( state.worldTexelSize[cascadeIndex], state.depthRange[cascadeIndex] )
 			: 0.0f;
 	}
+}
+
+// The part of a clip row's normal that lies across the depth row's normal:
+// the row's change per world unit for a move that keeps w constant.
+static float R_ShadowMapRowAcrossDepthLength( const idVec3 &row, const idVec3 &depthAxis ) {
+	const float axisLengthSqr = depthAxis.LengthSqr();
+	if ( axisLengthSqr <= 0.0f ) {
+		return row.Length();
+	}
+	return ( row - depthAxis * ( ( row * depthAxis ) / axisLengthSqr ) ).Length();
+}
+
+// World texel per unit of w for a perspective cascade. A point at depth w
+// moved across the depth row by d changes S by |S across| * d / w; one texel
+// is 2 / tileSize of clip space, so it spans w * 2 / ( tileSize * |S across| )
+// world units, and the coarser of S and T sets the texel. A cascade crop
+// scales S and T and adds multiples of the depth row, which the measure
+// ignores, so the same formula holds for the base map and every crop. An
+// orthographic map has no depth row normal (w is the constant 1): 0.
+static float R_ShadowMapPerspectiveTexelPerDepth( const idPlane clipPlanes[4], const int tileSize ) {
+	const idVec3 depthAxis = clipPlanes[3].Normal();
+	if ( tileSize <= 0 || depthAxis.LengthSqr() <= idMath::FLOAT_EPSILON ) {
+		return 0.0f;
+	}
+	const float sAcross = R_ShadowMapRowAcrossDepthLength( clipPlanes[0].Normal(), depthAxis );
+	const float tAcross = R_ShadowMapRowAcrossDepthLength( clipPlanes[1].Normal(), depthAxis );
+	const float across = Min( sAcross, tAcross );
+	if ( across <= idMath::FLOAT_EPSILON ) {
+		return 0.0f;
+	}
+	return 2.0f / ( static_cast<float>( tileSize ) * across );
+}
+
+float R_ShadowMapProjectedNormalOffsetWorld( const shadowMapProjectedLightState_t &state, const int cascadeIndex, const float normalOffsetScale, const bool depthScaled ) {
+	if ( cascadeIndex < 0 || cascadeIndex >= SHADOWMAP_PROJECTED_MAX_CASCADES ) {
+		return 0.0f;
+	}
+	const float scale = Max( 0.0f, normalOffsetScale );
+	if ( depthScaled && scale > 0.0f && state.texelPerDepth[cascadeIndex] > 0.0f ) {
+		return -( state.texelPerDepth[cascadeIndex] * scale );
+	}
+	return state.worldTexelSize[cascadeIndex] * scale;
 }
 
 static void R_ShadowMapTransformPointToClip( const idVec3 &point, const idPlane clipPlanes[4], idVec4 &clip ) {
@@ -1064,6 +1107,176 @@ bool R_ShadowMapDistantPointProjectionSelfTest( void ) {
 	return true;
 }
 
+// The world size of one texel at a point, measured through the planes: how
+// far S and T move for two steps across the depth row, which leave w alone.
+static float R_ShadowMapMeasuredTexelAtPoint( const idPlane clipPlanes[4], const int tileSize, const idVec3 &point ) {
+	idVec3 depthAxis = clipPlanes[3].Normal();
+	if ( tileSize <= 0 || depthAxis.Normalize() <= idMath::FLOAT_EPSILON ) {
+		return 0.0f;
+	}
+	idVec3 across[2];
+	depthAxis.NormalVectors( across[0], across[1] );
+	idVec4 origin;
+	R_ShadowMapTransformPointToClip( point, clipPlanes, origin );
+	if ( origin.w <= 0.0f ) {
+		return 0.0f;
+	}
+	const float step = 64.0f;
+	float sRate = 0.0f;
+	float tRate = 0.0f;
+	for ( int axis = 0; axis < 2; ++axis ) {
+		idVec4 moved;
+		R_ShadowMapTransformPointToClip( point + across[axis] * step, clipPlanes, moved );
+		const float s = ( moved.x / moved.w - origin.x / origin.w ) / step;
+		const float t = ( moved.y / moved.w - origin.y / origin.w ) / step;
+		sRate += s * s;
+		tRate += t * t;
+	}
+	const float rate = idMath::Sqrt( Min( sRate, tRate ) );
+	return rate > 0.0f ? 2.0f / ( static_cast<float>( tileSize ) * rate ) : 0.0f;
+}
+
+/*
+=================
+R_ShadowMapDistantNormalOffsetSelfTest
+
+Air Defense 1's sun (light_146): its receivers' normal offset follows the
+texel at their own depth, measured through the map's planes, for the single
+map, every fitted cascade and the whole-light cascade; it never exceeds the
+far-plane size the offset had before; switched off it keeps that size; and a
+parallel light, whose texel does not grow, keeps one offset.
+=================
+*/
+bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
+	struct cvarRestore_t {
+		idCVar &cvar;
+		idStr value;
+		cvarRestore_t( idCVar &c ) : cvar( c ), value( c.GetString() ) {}
+		~cvarRestore_t() { cvar.SetString( value.c_str() ); }
+	};
+	cvarRestore_t restoreCSM( r_shadowMapCSM ), restoreCount( r_shadowMapCascadeCount ),
+		restoreFar( r_shadowMapCascadeFarMap ), restoreDistance( r_shadowMapCascadeDistance ),
+		restoreLambda( r_shadowMapCascadeLambda ), restoreBlend( r_shadowMapCascadeBlend ),
+		restoreStabilize( r_shadowMapCascadeStabilize ), restorePoint( r_shadowMapPointLights ),
+		restoreZNear( r_znear ), restorePad( r_shadowMapProjectionPad );
+	r_shadowMapCascadeCount.SetInteger( 4 );
+	r_shadowMapCascadeFarMap.SetBool( true );
+	r_shadowMapCascadeDistance.SetFloat( 1536.0f );
+	r_shadowMapCascadeLambda.SetFloat( 0.75f );
+	r_shadowMapCascadeBlend.SetFloat( 0.15f );
+	r_shadowMapCascadeStabilize.SetBool( true );
+	r_shadowMapPointLights.SetBool( true );
+	r_znear.SetFloat( 3.0f );
+	r_shadowMapProjectionPad.SetFloat( 0.15f );
+
+	idRenderLightLocal lightDef;
+	memset( &lightDef.parms, 0, sizeof( lightDef.parms ) );
+	renderLight_t &parms = lightDef.parms;
+	parms.pointLight = true;
+	parms.origin.Set( 9424.0f, -12256.0f, 1352.0f );
+	parms.lightRadius.Set( 7392.0f, 6944.0f, 3184.0f );
+	parms.lightCenter.Set( -8096.0f, -9096.0f, 7384.0f );
+	parms.axis.Identity();
+	viewLight_t light;
+	memset( &light, 0, sizeof( light ) );
+	light.lightDef = &lightDef;
+	light.pointLight = true;
+	light.lightRadius = parms.lightRadius;
+	light.globalLightOrigin = parms.origin + parms.lightCenter * parms.axis;
+
+	viewDef_t view;
+	memset( &view, 0, sizeof( view ) );
+	view.renderView.vieworg.Set( 10200.0f, -6800.0f, 40.0f );
+	view.renderView.viewaxis = idAngles( 10.0f, 262.0f, 0.0f ).ToMat3();
+	view.renderView.fov_x = 90.0f;
+	view.renderView.fov_y = 59.0f;
+
+	// the volume's corners and centre, the player start and the wreckage
+	idVec3 receivers[11];
+	for ( int corner = 0; corner < 8; ++corner ) {
+		receivers[corner] = parms.origin + idVec3(
+			( corner & 1 ) ? parms.lightRadius.x : -parms.lightRadius.x,
+			( corner & 2 ) ? parms.lightRadius.y : -parms.lightRadius.y,
+			( corner & 4 ) ? parms.lightRadius.z : -parms.lightRadius.z );
+	}
+	receivers[8] = parms.origin;
+	receivers[9].Set( 10324.0f, -6964.0f, -36.0f );
+	receivers[10].Set( 9800.0f, -7200.0f, 80.0f );
+
+	float singleFar = 0.0f;
+	float singlePlayer = 0.0f;
+	float singleWorld = 0.0f;
+	int checked = 0;
+	for ( int layout = 0; layout < 2; ++layout ) {
+		const bool cascaded = layout == 1;
+		r_shadowMapCSM.SetBool( cascaded );
+		shadowMapProjectedLightState_t state;
+		R_BuildShadowMapProjectedLightState( &light, cascaded ? &view : NULL, cascaded ? 1024 : 2048, state );
+		if ( !state.valid || state.cascadeCount != ( cascaded ? 4 : 1 ) || state.cascadeFallback ) {
+			common->Printf( "ShadowMap distant normal offset self-test failed: layout %d valid=%d cascades=%d fallback=%d\n",
+				layout, state.valid ? 1 : 0, state.cascadeCount, state.cascadeFallback ? 1 : 0 );
+			return false;
+		}
+		for ( int cascade = 0; cascade < state.cascadeCount; ++cascade ) {
+			const float perDepth = state.texelPerDepth[cascade];
+			if ( !( perDepth > 0.0f ) ) {
+				common->Printf( "ShadowMap distant normal offset self-test failed: layout %d cascade %d has no texel growth\n", layout, cascade );
+				return false;
+			}
+			for ( int i = 0; i < 11; ++i ) {
+				idVec4 clip;
+				R_ShadowMapTransformPointToClip( receivers[i], state.clipPlanes[cascade], clip );
+				const float measured = R_ShadowMapMeasuredTexelAtPoint( state.clipPlanes[cascade], state.tileSize, receivers[i] );
+				const float predicted = perDepth * clip.w;
+				if ( !( measured > 0.0f ) || idMath::Fabs( predicted - measured ) > measured * 0.005f ) {
+					common->Printf( "ShadowMap distant normal offset self-test failed: layout %d cascade %d receiver %d texel %.4f measured %.4f\n",
+						layout, cascade, i, predicted, measured );
+					return false;
+				}
+				if ( !cascaded ) {
+					if ( i < 8 ) {
+						singleFar = Max( singleFar, predicted );
+					} else if ( i == 9 ) {
+						singlePlayer = predicted;
+					}
+				}
+				++checked;
+			}
+			const float depthScaled = R_ShadowMapProjectedNormalOffsetWorld( state, cascade, 0.5f, true );
+			const float farSized = R_ShadowMapProjectedNormalOffsetWorld( state, cascade, 0.5f, false );
+			if ( depthScaled != -0.5f * perDepth || farSized != 0.5f * state.worldTexelSize[cascade] ) {
+				common->Printf( "ShadowMap distant normal offset self-test failed: layout %d cascade %d offsets %.6f/%.4f\n",
+					layout, cascade, depthScaled, farSized );
+				return false;
+			}
+		}
+		if ( !cascaded ) {
+			singleWorld = state.worldTexelSize[0];
+		}
+	}
+	// the offset never grows: at the volume's far corner it is the far-plane
+	// size the light had, and nearer the source it shrinks
+	if ( !( singleFar <= singleWorld * 1.0001f ) || !( singlePlayer < singleWorld * 0.85f ) ) {
+		common->Printf( "ShadowMap distant normal offset self-test failed: single map texel far %.2f player %.2f against %.2f\n",
+			singleFar, singlePlayer, singleWorld );
+		return false;
+	}
+
+	parms.parallel = true;
+	light.parallel = true;
+	r_shadowMapCSM.SetBool( false );
+	shadowMapProjectedLightState_t parallelState;
+	R_BuildShadowMapProjectedLightState( &light, NULL, 2048, parallelState );
+	if ( !parallelState.valid || parallelState.texelPerDepth[0] != 0.0f
+			|| R_ShadowMapProjectedNormalOffsetWorld( parallelState, 0, 1.0f, true ) != parallelState.worldTexelSize[0] ) {
+		common->Printf( "ShadowMap distant normal offset self-test failed: a parallel light's offset follows depth\n" );
+		return false;
+	}
+	common->Printf( "ShadowMap distant normal offset self-test passed: %d receiver texels, single map %.1f at the player against %.1f\n",
+		checked, singlePlayer, singleWorld );
+	return true;
+}
+
 // Which triangles a caster keeps, and the handedness test that picks the
 // face to discard. The projector is storage2's alarm light, the one the rule
 // was measured on: discarding the rasterizer's back face keeps the triangles
@@ -1226,7 +1439,27 @@ int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_
 	return hash;
 }
 
+static void R_BuildShadowMapProjectedLightStateFit( const viewLight_t *vLight, const viewDef_t *viewDef, const int tileSize, shadowMapProjectedLightState_t &state );
+
 void R_BuildShadowMapProjectedLightState( const viewLight_t *vLight, const viewDef_t *viewDef, const int tileSize, shadowMapProjectedLightState_t &state ) {
+	R_BuildShadowMapProjectedLightStateFit( vLight, viewDef, tileSize, state );
+	// A distant point light's map is a perspective view from a source far
+	// outside its volume, so its texel grows with distance from the source:
+	// Air Defense 1's sun spans 25 world units a texel at the far corner and
+	// 19 at the player. Record the growth so the receivers can size their
+	// normal offset at their own depth. Spotlights keep one size: their
+	// receivers have always been offset by the texel at the authored target.
+	if ( !state.valid || vLight == NULL || vLight->lightDef == NULL
+			|| !R_ShadowMapUsesDistantPointProjection( vLight->lightDef->parms ) ) {
+		return;
+	}
+	for ( int cascadeIndex = 0; cascadeIndex < state.cascadeCount; cascadeIndex++ ) {
+		state.texelPerDepth[cascadeIndex] =
+			R_ShadowMapPerspectiveTexelPerDepth( state.clipPlanes[cascadeIndex], state.tileSize );
+	}
+}
+
+static void R_BuildShadowMapProjectedLightStateFit( const viewLight_t *vLight, const viewDef_t *viewDef, const int tileSize, shadowMapProjectedLightState_t &state ) {
 	R_ShadowMapResetProjectedLightState( state );
 	if ( vLight == NULL || tileSize <= 0 ) {
 		return;

@@ -103,9 +103,45 @@ keeps at least half of that occlusion.
 three ways instead of four costs up to a point at tank, reverse and opening.
 The single-map column is the map as the preset draws it and repeats in every
 launch. Launches that seemed to score 96% at the opening were a fault in the
-capture script (next section).
+capture script (see "Single map: why two launches scored higher" below).
 
-### Single map: why two launches scored higher (19 November 2026)
+**Cached whole-light slot (OpenGL, `r_shadowMapCascadeFarCache`, default 1).**
+The whole-light cascade does not move with the camera, so its still scenery is
+kept in an atlas cell of its own (a projected cache entry in a separate pass-kind
+namespace, keyed by the pass signature with the fitted projection replaced by
+the whole-light cascade's planes, texel and depth contract). Each frame the cell
+is copied into the cascade's tile and only moving casters are drawn over it.
+A changed caster set, a moving light or a disabled static cache draws it fresh.
+Cached and freshly drawn frames match outside the animated HUD (3 pixels by one
+level over nine poses). Vulkan redraws the slot with the other cascades; its
+whole cascade set costs a fraction of a millisecond.
+
+Cost, Air Defense 1 opening, view turning, per frame. Caster draws come from the
+`casterDraws=` field added to the `SM metrics` report and do not depend on load:
+
+| Layout | Caster draws | Caster indexes |
+| --- | ---: | ---: |
+| Single map (0.14.1 Quality) | 17 | 27k |
+| Four fitted cascades (0.14.1 Maximum layout) | 359 | 333k |
+| Three fitted + whole-light, slot redrawn | 447 | 379k |
+| Three fitted + whole-light, slot cached (new default) | 296 | 279k |
+
+Vulkan's projected map rendering measured 0.09 ms for the single map and 0.23 ms
+for the new layout (three interleaved repeats each). OpenGL timer queries were
+not repeatable on the shared machine on 19 November (two other projects'
+clients held the GPU); the quietest earlier run put four fitted cascades at
++0.6 to +1.4 ms of shadow GPU time over the single map at 2560 x 1440, and the
+cached layout issues 18% fewer caster draws than that layout. The FPS-02
+Quality/Ultra budgets still need re-measuring on the reference machine.
+
+`rendererShadowProjectedDiagnosticSelfTest` runs
+`R_ShadowMapCascadeWholeLightSelfTest` on light_146's parameters: layouts of
+four fitted, three plus whole-light and one plus whole-light; fitted crops
+holding receivers inside the reach; the last cascade equal to the base
+projection; every receiver past the reach inside the light covered; and a
+distinct cache identity. The planner fixtures pin fitted-only cascades.
+
+## Single map: why two launches scored higher (19 November 2026)
 
 During the #239 measurements, two of seven launches scored the single map far
 higher: 96% at the opening, 99.9-100% at the wreckage. The interaction, caster
@@ -154,47 +190,87 @@ at this resolution the player is two texels wide.
 Removing the bias is not a fix. It is the acne guard, and without it the
 opening shows more than three times as many falsely darkened pixels
 (653 to 2,174). Cascades are the fix, and they are the default on Quality and
-Ultra: cascade 0's texel is 0.73 units, so its offset is too.
+Ultra: cascade 0's texel is 0.73 units, so its offset is too. Sizing the
+offset by each receiver's depth, the next section, recovers part of the rest.
 
 To repeat these comparisons, reset every cvar any mode sets before each mode,
 and compare launches only when their pose lists match. A ground pose run first
 changes the eye height of every pose after it by 12 units.
 
-**Cached whole-light slot (OpenGL, `r_shadowMapCascadeFarCache`, default 1).**
-The whole-light cascade does not move with the camera, so its still scenery is
-kept in an atlas cell of its own (a projected cache entry in a separate pass-kind
-namespace, keyed by the pass signature with the fitted projection replaced by
-the whole-light cascade's planes, texel and depth contract). Each frame the cell
-is copied into the cascade's tile and only moving casters are drawn over it.
-A changed caster set, a moving light or a disabled static cache draws it fresh.
-Cached and freshly drawn frames match outside the animated HUD (3 pixels by one
-level over nine poses). Vulkan redraws the slot with the other cascades; its
-whole cascade set costs a fraction of a millisecond.
+## Normal offset sized at each receiver's depth for distant lights (19 November 2026)
 
-Cost, Air Defense 1 opening, view turning, per frame. Caster draws come from the
-`casterDraws=` field added to the `SM metrics` report and do not depend on load:
+A distant point light's map (light_146, and any source far outside its
+radius box) is a perspective view from its source, so one texel covers more
+ground the farther a receiver is from that source. The normal offset was one
+distance per cascade, `r_shadowMapNormalOffsetScale` texels measured where
+the volume is widest, at its far corner. Air Defense 1's single map pushed
+every receiver 25 units, where the texel at the player is 19.3 units; each
+fitted cascade overshot by the same ratio, the player's depth against the far
+corner's (18,850 against 24,530 units from the source).
 
-| Layout | Caster draws | Caster indexes |
-| --- | ---: | ---: |
-| Single map (0.14.1 Quality) | 17 | 27k |
-| Four fitted cascades (0.14.1 Maximum layout) | 359 | 333k |
-| Three fitted + whole-light, slot redrawn | 447 | 379k |
-| Three fitted + whole-light, slot cached (new default) | 296 | 279k |
+Each receiver's offset now follows its own texel. The projected state records
+`texelPerDepth` per cascade: the world texel per unit of light depth `w`,
+`(2 / tileSize) / |S across the depth row|`, taking the coarser of S and T.
+A cascade crop scales S and T and adds multiples of the depth row, so the one
+formula holds for the single map, every fitted crop and the whole-light slot.
+At the volume's far corner it equals the old size; nearer the source it is
+smaller, so no receiver's offset grows. Spotlights, parallel lights and
+ordinary point lights are unchanged; point cube maps already scale their
+offset by radial distance.
 
-Vulkan's projected map rendering measured 0.09 ms for the single map and 0.23 ms
-for the new layout (three interleaved repeats each). OpenGL timer queries were
-not repeatable on the shared machine on 19 November (two other projects'
-clients held the GPU); the quietest earlier run put four fitted cascades at
-+0.6 to +1.4 ms of shadow GPU time over the single map at 2560 x 1440, and the
-cached layout issues 18% fewer caster draws than that layout. The FPS-02
-Quality/Ultra budgets still need re-measuring on the reference machine.
+The receivers read it from the existing offset value, which can never be
+negative, so the sign carries it: a value below zero is the offset per unit
+of `w`, and the shader multiplies it by the receiver's own `w` (its shadow
+row 3). GL `shadow_interaction.vs`, Vulkan `interaction_shadow.vert` and the
+three upload sites (`R_ShadowMapProjectedNormalOffsetWorld`) share it. The
+Vulkan shadow block is full at 32 vec4s, so it gains no field. The classic
+interaction domain snapshots the switch with the pass's other receiver
+settings and hashes it into the pass identity. The opt-in modern visible path
+(`r_rendererModernVisible`) keeps the far-corner size: its descriptor record
+is full and its texel also feeds the footprint bias and the ARB2 parity
+checks.
+
+`r_shadowMapDistantNormalOffsetDepth 1` (default) turns it on; `0` restores
+the far-corner size.
+
+Measured at one frozen moment per pose, nine Air Defense 1 poses, 2560 x 1440,
+Quality, both settings in the same launch:
+
+| Pose | Single map, far-corner offset | Single map, depth offset | Cascades, far-corner offset | Cascades, depth offset |
+| --- | ---: | ---: | ---: | ---: |
+| Standing at the start | 0.5% | 0.5% | 90.7% | 91.3% |
+| Opening | 40.7% | 41.3% | 95.1% | 95.3% |
+| Wreckage | 5.9% | 6.5% | 100% | 100% |
+| Tank | 80.0% | 83.0% | 94.7% | 96.3% |
+| Ridge | 69.9% | 73.0% | 90.6% | 92.4% |
+| Crater | 71.0% | 77.5% | 88.1% | 91.1% |
+| Reverse | 80.5% | 83.2% | 93.8% | 95.0% |
+| Vista | 80.4% | 84.9% | 89.0% | 91.0% |
+| Distant | 93.0% | 94.0% | 89.7% | 90.6% |
+| **All poses** | **27.6%** | **29.0%** | **96.4%** | **97.0%** |
+
+(OpenGL. Vulkan: single map 27.9% to 29.3%, cascades 96.5% to 97.1%.) No pose
+loses. The falsely darkened pixels fall too, because an offset that is too
+large also moves the lookup into a neighbour's shadow: on OpenGL, 17,002 to
+13,841 for the single map and 19,026 to 18,007 for the cascades; on Vulkan,
+14,710 to 12,927 and 19,484 to 18,114. The wreckage stays dark for the single
+map: its contact shadows sit within the 19-unit texel itself.
 
 `rendererShadowProjectedDiagnosticSelfTest` runs
-`R_ShadowMapCascadeWholeLightSelfTest` on light_146's parameters: layouts of
-four fitted, three plus whole-light and one plus whole-light; fitted crops
-holding receivers inside the reach; the last cascade equal to the base
-projection; every receiver past the reach inside the light covered; and a
-distinct cache identity. The planner fixtures pin fitted-only cascades.
+`R_ShadowMapDistantNormalOffsetSelfTest` on light_146: 55 receiver texels
+(the volume's corners and centre, the player start and the wreckage, through
+the single map, three fitted cascades and the whole-light slot) agree within
+0.5% with the texel measured by stepping across the depth row; the depth
+offset never exceeds the far-corner size; switched off, the offset keeps that
+size; and a parallel light keeps one offset.
+
+With the new default, the terrain check and the eleven-stop Air Defense 1
+route below pass on OpenGL and Vulkan against a packs-only asset view (the
+Steam folder's `baseoq4` and loose recompiled maps are refused). No lit terrain
+pixel in Sandstorm or Air Defense 1 darkens past the gate, the route's lit
+areas move by at most 0.22 display levels, its shadow contrast stays at
+82-99.5% of stencil, the entrance railing keeps 99.0% (OpenGL) and 99.1%
+(Vulkan) support, and cached and fresh frames differ by at most 0.01 RMS.
 
 ## Reproduction
 

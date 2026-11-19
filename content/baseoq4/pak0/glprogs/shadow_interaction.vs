@@ -52,8 +52,15 @@ vec3 TangentSpaceVector( vec3 objectVector ) {
 // sampled point off the surface fixes self-shadow acne structurally where
 // pure depth-space bias would have to grow until contact shadows detach.
 // The shadow rows are localized planes, so the offset is model-space.
+// A negative uShadowNormalOffsetWorld is the offset per unit of the
+// receiver's light depth (row 3): a distant point light's texel grows with
+// distance from its source (R_ShadowMapProjectedNormalOffsetWorld).
 vec4 BuildShadowCoord( vec4 position, vec3 normalOffsetDir, float sinTheta, int index ) {
-	vec4 offsetPosition = vec4( position.xyz + normalOffsetDir * ( uShadowNormalOffsetWorld[index] * sinTheta ), 1.0 );
+	float offsetWorld = uShadowNormalOffsetWorld[index];
+	if ( offsetWorld < 0.0 ) {
+		offsetWorld = -offsetWorld * max( dot( position, uShadowRow3[index] ), 0.0 );
+	}
+	vec4 offsetPosition = vec4( position.xyz + normalOffsetDir * ( offsetWorld * sinTheta ), 1.0 );
 	return vec4(
 		dot( offsetPosition, uShadowRow0[index] ),
 		dot( offsetPosition, uShadowRow1[index] ),

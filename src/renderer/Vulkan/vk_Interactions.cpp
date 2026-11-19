@@ -854,9 +854,11 @@ static bool VK_ClassicInteraction_BuildMappedShadowBlock(
 	for ( int cascadeIndex = 0;
 			cascadeIndex < SHADOWMAP_PROJECTED_MAX_CASCADES;
 			++cascadeIndex ) {
+		// < 0: per unit of the receiver's light depth (interaction_shadow.vert)
 		block.normalOffsetWorld[ cascadeIndex ] =
-			projected.worldTexelSize[ cascadeIndex ]
-				* mapPass.projected.normalOffsetScale;
+			R_ShadowMapProjectedNormalOffsetWorld( projected, cascadeIndex,
+				mapPass.projected.normalOffsetScale,
+				mapPass.projected.distantNormalOffsetDepth );
 	}
 	block.viewDepthRow[ 0 ] = -primitive.modelViewMatrix[ 2 ];
 	block.viewDepthRow[ 1 ] = -primitive.modelViewMatrix[ 6 ];
@@ -3807,9 +3809,10 @@ static int VK_Inter_WriteShadowSlice( const viewEntity_t *space ) {
 	for ( int cascadeIndex = 0 ;
 			cascadeIndex < SHADOWMAP_PROJECTED_MAX_CASCADES ;
 			cascadeIndex++ ) {
+		// < 0: per unit of the receiver's light depth (interaction_shadow.vert)
 		block.normalOffsetWorld[ cascadeIndex ] =
-				projected.worldTexelSize[ cascadeIndex ]
-				* normalOffsetScale;
+				R_ShadowMapProjectedNormalOffsetWorld( projected, cascadeIndex,
+				normalOffsetScale, r_shadowMapDistantNormalOffsetDepth.GetBool() );
 	}
 
 	// Column-major matrix row 2 negated, so dot(localPosition,row) is the

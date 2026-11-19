@@ -3145,6 +3145,10 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (whole-light cascade)\n" );
 		return false;
 	}
+	if ( !R_ShadowMapDistantNormalOffsetSelfTest() ) {
+		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (distant normal offset)\n" );
+		return false;
+	}
 
 	if ( !rg_modernShadowPlannerInitialized || !rg_modernShadowPlannerFeatures.scenePackets ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test passed (planner unavailable)\n" );

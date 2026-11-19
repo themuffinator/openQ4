@@ -11794,10 +11794,13 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 		glUniform1fvARB( g_shadowMapProgram.shadowTexelDepthStep, SHADOWMAP_MAX_CASCADES, texelDepthSteps );
 	}
 	if ( g_shadowMapProgram.shadowNormalOffsetWorld >= 0 ) {
+		// < 0: per unit of the receiver's light depth (shadow_interaction.vs)
 		float normalOffsets[SHADOWMAP_MAX_CASCADES];
 		const float normalOffsetScale = Max( 0.0f, r_shadowMapNormalOffsetScale.GetFloat() );
 		for ( int cascadeIndex = 0; cascadeIndex < SHADOWMAP_MAX_CASCADES; cascadeIndex++ ) {
-			normalOffsets[cascadeIndex] = g_projectedShadowMapState.worldTexelSize[cascadeIndex] * normalOffsetScale;
+			normalOffsets[cascadeIndex] = R_ShadowMapProjectedNormalOffsetWorld(
+				g_projectedShadowMapState, cascadeIndex, normalOffsetScale,
+				r_shadowMapDistantNormalOffsetDepth.GetBool() );
 		}
 		glUniform1fvARB( g_shadowMapProgram.shadowNormalOffsetWorld, SHADOWMAP_MAX_CASCADES, normalOffsets );
 	}
@@ -16675,10 +16678,12 @@ static void RB_SharedWorldInteractionGLBeginMappedReceiver(
 			texelDepthSteps );
 		glUniform1fvARB( g_shadowMapProgram.shadowTexelDepthStep,
 			SHADOWMAP_MAX_CASCADES, texelDepthSteps );
+		// < 0: per unit of the receiver's light depth (shadow_interaction.vs)
 		float normalOffsets[SHADOWMAP_MAX_CASCADES] = {};
 		for ( int i = 0; i < SHADOWMAP_MAX_CASCADES; ++i ) {
-			normalOffsets[i] = pass.projected.state.worldTexelSize[i]
-				* pass.projected.normalOffsetScale;
+			normalOffsets[i] = R_ShadowMapProjectedNormalOffsetWorld(
+				pass.projected.state, i, pass.projected.normalOffsetScale,
+				pass.projected.distantNormalOffsetDepth );
 		}
 		glUniform1fvARB( g_shadowMapProgram.shadowNormalOffsetWorld,
 			SHADOWMAP_MAX_CASCADES, normalOffsets );

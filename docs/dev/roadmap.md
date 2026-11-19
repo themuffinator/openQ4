@@ -1238,8 +1238,13 @@ diagnostics establish whole-frame ownership or production performance.
   [cascaded sunlight](shadowmapping-outdoor-terrain.md#cascaded-sunlight-on-quality-and-ultra-19-november-2026-239).
   OpenGL keeps the whole-light slot's still scenery cached and draws only
   moving casters over it (296 caster draws a frame against 359 for the old
-  four-cascade layout). Remaining: re-measure the FPS-02 Quality/Ultra budgets
-  with cascades on, on a quiet reference machine.
+  four-cascade layout). Distant lights now size each receiver's normal offset
+  by the texel at its depth (`r_shadowMapDistantNormalOffsetDepth`): 96.4% to
+  97.0% with cascades, 27.6% to 29.0% with one map, and fewer falsely darkened
+  pixels on both backends. See
+  [depth-sized offset](shadowmapping-outdoor-terrain.md#normal-offset-sized-at-each-receivers-depth-for-distant-lights-19-november-2026).
+  Remaining: re-measure the FPS-02 Quality/Ultra budgets with cascades on, on
+  a quiet reference machine.
 - [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
