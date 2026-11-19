@@ -101,9 +101,64 @@ keeps at least half of that occlusion.
 
 (OpenGL; Vulkan agrees within one point everywhere.) Splitting the reach
 three ways instead of four costs up to a point at tank, reverse and opening.
-Single-map results vary between launches at some poses (opening 39% or 96%)
-with identical interactions, casters and cache reports; the cause is open and
-cascades are unaffected.
+The single-map column is the map as the preset draws it and repeats in every
+launch. Launches that seemed to score 96% at the opening were a fault in the
+capture script (next section).
+
+### Single map: why two launches scored higher (19 November 2026)
+
+During the #239 measurements, two of seven launches scored the single map far
+higher: 96% at the opening, 99.9-100% at the wreckage. The interaction, caster
+and cache reports matched the low launches. The renderer was not at fault.
+Before each mode, the capture script reset a fixed list of cvars, and the
+receiver and caster bias cvars were not on it. A mode that zeroed one, such as
+`r_shadowMapNormalOffsetScale`, left it zeroed for every later mode and pose
+in that launch. The two high launches were the two that compared bias
+settings. Their single-map captures after the first pose had no bias, so the
+reports still matched: bias moves no casters and no interactions. The only
+field that differed, `expanded=`, counts casters whose stencil volume lies
+outside this view. It follows the camera and animated entities, not the map.
+
+Evidence, Quality with `r_shadowMapCSM 0`, 2560 x 1440. Each column is one
+mode in a single launch, captured at the same frozen moment:
+
+| Pose | Preset | Preset again | Normal offset 0 | Every bias 0 | Old script, after a bias mode |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Opening | 37.8% | 37.9% | 43.9% | 93.0% | 93.1% |
+| Wreckage | 5.6% | 5.6% | 99.9% | 99.9% | 99.9% |
+| Standing at the start | 0.9% | 0.9% | 0.9% | 13.6% | 13.5% |
+
+(OpenGL. Vulkan gives 39.0%, 39.1%, 43.9% and 93.0% at the opening and 5.8%,
+5.8%, 100% and 100% at the wreckage. "Every bias 0" also zeroes
+`r_shadowMapTexelBiasScale`, `r_shadowMapBias`, `r_shadowMapNormalBias` and
+`r_shadowMapPolygonOffset`. In the old-script launch, the first single-map
+capture, taken before any bias mode, scored 0.7% standing at the start.)
+
+The single map is deterministic. With every cvar reset, six launches (five
+OpenGL, one Vulkan) scored 37.7-41.4% at the opening, 5.5-5.8% at the
+wreckage and 0.7-0.9% standing. Repeat captures within a launch matched.
+Small differences between launches come from the storm and cannon-flash
+lights.
+
+The low scores are the single map's bias contract working as designed. The
+normal offset pushes each receiver about one map texel along its normal:
+25 world units, from the light's far-plane width (19.3 at the player's depth).
+That detaches contact shadows within about a texel of their caster. The
+wreckage's shadows are nearly all such contacts. Zeroing the offset alone
+restores them. In another launch whose poses sat 12 units higher, offset
+scales of 1, 0.5, 0.25 and 0.1 kept 23%, 69%, 79% and 80% at the wreckage.
+The opening needs every term removed at once: no single term moves it by more
+than about six points. Standing at the start stays near 1% with any bias, because
+at this resolution the player is two texels wide.
+
+Removing the bias is not a fix. It is the acne guard, and without it the
+opening shows more than three times as many falsely darkened pixels
+(653 to 2,174). Cascades are the fix, and they are the default on Quality and
+Ultra: cascade 0's texel is 0.73 units, so its offset is too.
+
+To repeat these comparisons, reset every cvar any mode sets before each mode,
+and compare launches only when their pose lists match. A ground pose run first
+changes the eye height of every pose after it by 12 units.
 
 **Cached whole-light slot (OpenGL, `r_shadowMapCascadeFarCache`, default 1).**
 The whole-light cascade does not move with the camera, so its still scenery is
