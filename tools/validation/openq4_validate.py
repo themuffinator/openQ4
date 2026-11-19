@@ -581,6 +581,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "repository_path_portability.py",
         root / "tools" / "tests" / "pinned_archive_headers.py",
         root / "tools" / "tests" / "filesystem_find_file_contract.py",
+        root / "tools" / "tests" / "filesystem_duplicate_pak_contract.py",
         root / "tools" / "tests" / "filesystem_length_probe_contract.py",
         root / "tools" / "tests" / "generated_image_pak_content_stamp.py",
         root / "tools" / "tests" / "pure_image_cache_eviction_contract.py",
