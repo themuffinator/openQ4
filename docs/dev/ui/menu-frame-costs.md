@@ -164,11 +164,39 @@ The before column for the Awakening pages is after the first pass above;
 for the Quake 4 pages it is the build before the round. The native tests
 run 120 of 120, the compiler-backed ones in the MSVC environment.
 
-## Found, not fixed
+## Lists and fields at rest, later still
 
-- **Create Server and Join Game still lay out every frame**: they show a
-  scrollbar (the map and server lists) and, on Create Server, number fields.
-  Those keep their pass a frame; narrowing them is separate work.
+Create Server and Join Game still laid out every frame: a shown scrollbar
+(their map and server lists) or number field kept the pass, as it did on
+Demos, Load and Save.
+
+- **Only a field being edited or a held pointer keeps a pass a frame.** A
+  number or text field at rest shows its value, which changes only with the
+  state, so its view now paints with the value widgets after a state change.
+  While a field is edited (its caret, its typing) or the pointer is held (a
+  drag), the frame still lays out every time.
+- **A scrollbar follows its list without one.** Its thumb follows input,
+  focus and layout, which already settle; RmlUi's own motion (a smooth
+  scroll) asks for its next update (`GetNextUpdateDelay`), and the frame lays
+  out when that is due.
+- **`Runtime::InvalidateLayout`** tells the runtime that something outside it
+  changed a document's elements, so the next frame lays out. In the product
+  only the runtime changes a menu's elements (`Runtime::SetProperty` refuses
+  a canonical document); `openq4-ui-scrollbar-runtime` resizes and hides its
+  content directly and now says so.
+
+| Page at rest (best of three) | Frame p50, before the round | Now | Layout passes a frame |
+| --- | ---: | ---: | --- |
+| Create Server | 0.79 ms | 0.05 ms | 1 -> 0 |
+| Join Game | 0.48 ms | 0.07 ms | 1 -> 0 |
+| Demos | 0.22 ms | 0.03 ms | 1 -> 0 |
+| Load Game | 0.23 ms | 0.02 ms | 1 -> 0 |
+
+In the engine, Create Server's tabs, game types, password entry and ban list
+and Join Game's sorting, filters and player search behaved as before
+(`v6`; no refused operation).
+
+## Found, not fixed
 - **Every Awakening page still carries 2.3 MB of snow and frost** and loads
   about 100 ms slower than its Quake 4 twin. Merging the flakes into a few
   paths cut the pause's load by a third, but made each recompile slower
@@ -200,7 +228,10 @@ console verbs only.
   `game` scenario's Gun Position step now opens VIEW WEAPON first, where the
   settings tree audit moved the row.
 
-Tests: the native `openq4-retained-ui` (with `CheckVectorFadeReplay`),
+Tests: all 120 native UI tests, the compiler-backed ones in the MSVC
+environment, and the DISPLAY page's 28 per-language tests. Two image
+recovery tests (`openq4-ui-image-recovery-owner` and `-lifecycle`) exit 3
+there; they build renderer sources this round does not touch. Earlier: the native `openq4-retained-ui` (with `CheckVectorFadeReplay`),
 `openq4-ui-retained-*`, HUD and vector tests; `ui_retained_gate.py`'s static
 checks (its compiled half fails on main, on session symbols this round did
 not touch).

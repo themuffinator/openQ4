@@ -15,9 +15,10 @@ does not restore the withdrawn release. See
   each. It now costs well under a millisecond, so those menus run at your
   full frame rate and the paused game behind them stays light. The snow
   falls as before.
-- **The settings pages are lighter too.** Game Options, Display and Audio
-  rebuilt their whole layout on every frame while you looked at them; they now
-  do so only when a setting changes.
+- **The settings and server pages are lighter too.** Game Options, Display,
+  Audio, Create Server, Join Game, Demos and Load/Save rebuilt their whole
+  layout on every frame while you looked at them; they now do so only when
+  something on them changes.
 - **Dialogs are lighter.** A confirmation box (Quit, Exit Game, a warning)
   no longer rebuilds its pulsing glow and lays out the page behind it on
   every frame; the glow looks the same.

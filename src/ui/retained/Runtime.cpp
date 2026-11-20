@@ -1957,11 +1957,18 @@ struct Runtime::Impl {
 	std::vector<Rml::Vector2f> focusLayout;
 	bool focusLayoutVisible = false;
 	std::vector<std::string> controls;
-	// Every control but a button. A number field's caret and a scrollbar need
-	// a layout pass every frame they show (liveLayoutWidgets); a toggle, a
-	// slider or a list paints only what its value changed (valueWidgets).
-	std::vector<Rml::Element*> layoutWidgets, liveLayoutWidgets, valueWidgets;
+	// Every control but a button: their views paint what a state change
+	// changed, and a shown one rules out replaying a recorded frame.
+	std::vector<Rml::Element*> layoutWidgets;
 	std::uint64_t valuePaintRevision = ~std::uint64_t{0}; // The state revision the value widgets last checked.
+	double rmlUpdateDue = 0; // When RmlUi last asked to be updated again (runtime seconds).
+	// Whether the focused control is a number field being edited.
+	bool NumberEditing() const {
+		const auto& id=interaction.Focused();
+		if (id.empty()) return false;
+		const auto view=interaction.Widget(id);
+		return view && view->number && view->number->active;
+	}
 	float pointerX = 0, pointerY = 0;
 	float windowPointerX = 0, windowPointerY = 0;
 	bool pointerPresent = false;
@@ -3398,7 +3405,7 @@ void Runtime::Shutdown() {
 	impl->ReleaseModelScenes();
 	impl->canonicalElements.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->liveLayoutWidgets.clear(); impl->valueWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0};
+	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
 	impl->hud = nullptr;
 	impl->paintDirty=true;
 	impl->changedProjections.clear();
@@ -3420,7 +3427,7 @@ void Runtime::CloseDocument() {
 
 	impl->sourcePath.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->liveLayoutWidgets.clear(); impl->valueWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0};
+	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
 	impl->hud = nullptr;
 	impl->valueView.Reset();
 	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
@@ -3508,11 +3515,7 @@ bool Runtime::LoadCanonical(std::unique_ptr<Document> candidate, const std::stri
 		auto* element = built == impl->canonicalElements.end() ? nullptr : built->second;
 		if (node->control) {
 			impl->controls.push_back(node->id);
-			if (node->control->role!=ControlRole::Button && element) {
-				impl->layoutWidgets.push_back(element);
-				const auto role=node->control->role;
-				(role==ControlRole::Toggle || role==ControlRole::Slider || role==ControlRole::Choice ? impl->valueWidgets : impl->liveLayoutWidgets).push_back(element);
-			}
+			if (node->control->role!=ControlRole::Button && element) impl->layoutWidgets.push_back(element);
 		}
 		if (element) {
 			// Canonical subtrees preserve paint order when opacity crosses 1 and
@@ -4071,28 +4074,40 @@ bool Runtime::Layout(const Viewport& viewport,double seconds) {
 	// just like HUD artwork. A resting button menu has no native CSS animation
 	// or editor caret that requires a style/layout walk on every frame. Keep
 	// interaction and widget settling below independent of this decision.
-	// A settings page at rest (its toggles, sliders and lists closed and
-	// unchanged) is such a menu too. Their values change only with the state:
-	// after a state change the value view paints what changed (a value, a
-	// list's rows), and only then does the frame take a layout pass. Pointer,
-	// focus and an opened list settle below as before. A shown number field
-	// or scrollbar keeps a layout pass a frame. (Painting on every pass
-	// instead repainted each closed list whenever decoration moved.)
+	// A settings page at rest is such a menu too: its toggles, sliders, lists
+	// and number fields change only with the state, so after a state change
+	// their views paint what changed (a value, a list's rows, a field's text)
+	// and only then does the frame take a layout pass. A scrollbar moves with
+	// input, focus and layout, which settle below, or with RmlUi's own scroll
+	// motion, which asks for its next update. Pointer, focus and an opened
+	// list settle below as before. Only a number field being edited (its
+	// caret, its typing) and a held pointer (a drag) keep a layout pass a
+	// frame. (Painting the views on
+	// every pass instead repainted each closed list whenever decoration moved.)
 	const auto shown=[](const auto* element){return element->IsVisible(true);};
-	const bool explicitLayout=impl->canonical && std::none_of(impl->liveLayoutWidgets.begin(),impl->liveLayoutWidgets.end(),shown);
-	bool layoutUpdated=!explicitLayout || viewportChanged || impl->presentationDirty;
+	const bool rmlDue=impl->canonical && impl->time>=impl->rmlUpdateDue;
+	const bool explicitLayout=impl->canonical && !impl->NumberEditing() && !impl->interaction.PointerHeld();
+	bool layoutUpdated=!explicitLayout || viewportChanged || impl->presentationDirty || rmlDue;
 	if (layoutUpdated) {
 		++impl->Stats().layoutUpdates;
 		impl->context->Update(explicitLayout); impl->presentationDirty=false;
 		impl->paintDirty=true;
 	} else if (impl->state.Revision()!=std::exchange(impl->valuePaintRevision,impl->state.Revision()) &&
-		std::any_of(impl->valueWidgets.begin(),impl->valueWidgets.end(),shown) &&
-		impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
+		std::any_of(impl->layoutWidgets.begin(),impl->layoutWidgets.end(),shown)) {
+		bool painted=impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
 			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; },
-			impl->presentationPass)) {
-		++impl->Stats().layoutUpdates; layoutUpdated=true;
-		impl->context->Update(explicitLayout);
-		impl->paintDirty=true;
+			impl->presentationPass);
+		painted|=impl->numberView.Paint(impl->interaction,viewport.DpRatio(),impl->time,impl->motion.ReducedMotion());
+		if (painted) {
+			++impl->Stats().layoutUpdates; layoutUpdated=true;
+			impl->context->Update(explicitLayout);
+			impl->paintDirty=true;
+		}
+	}
+	if (layoutUpdated) {
+		// RmlUi's own motion (a smooth scroll) asks for its next update.
+		const double delay=impl->context->GetNextUpdateDelay();
+		impl->rmlUpdateDue=std::isfinite(delay) ? impl->time+std::max(0.0,delay) : std::numeric_limits<double>::infinity();
 	}
 	// Owned widget wrappers remain derived layout. Bounded settling lets a
 	// newly opened popup measure its authored rows before its first rendering,
@@ -4287,6 +4302,7 @@ bool Runtime::SetText(const std::string& id, const std::string& text) {
 }
 bool Runtime::IsLoaded() const { return impl->document != nullptr; }
 void Runtime::InvalidatePaint() { impl->paintDirty = true; }
+void Runtime::InvalidateLayout() { impl->presentationDirty = true; impl->paintDirty = true; }
 RuntimeStatistics Runtime::Statistics() const {
 	auto statistics = impl->Stats();
 	if (impl->services) {

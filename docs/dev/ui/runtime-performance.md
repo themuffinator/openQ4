@@ -2114,7 +2114,9 @@ leaf's fade updates its layer's opacity without a layout pass. The Awakening
 pause fell to 0.24 ms and 167 draws a frame in the benchmark. A shown toggle,
 slider or list no longer forces a style and layout pass every frame: its
 view repaints after a state change, so GAME OPTIONS, DISPLAY and AUDIO take
-none at rest; a shown number field or scrollbar still does.
+none at rest. Number fields and scrollbars at rest take none either (Create
+Server 0.79 to 0.05 ms); only a field being edited, a held pointer or
+RmlUi's own requested update keeps one a frame.
 
 ## Remaining requirements
 

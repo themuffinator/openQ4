@@ -191,6 +191,7 @@ menu with its opening animations playing:
 | Low | Retained | The Demos, Load and Save lists cut a long name or map mid-letter at 100 % text. | An ellipsis at every text size, as Join Game's rows. |
 | Medium | Retained | GAME OPTIONS, DISPLAY, AUDIO and Create Server laid out the whole page every frame at rest (a shown toggle, slider or list forced it); the Awakening copies about 1 to 2 ms. | A toggle, slider or list repaints after a state change only: the settings pages take no layout pass at rest (0.05 to 0.3 ms a frame). |
 
-Left open: Create Server and Join Game still lay out every frame (their
-scrollbars and number fields), and the Awakening documents' size
+| Low | Retained | Create Server, Join Game, Demos and Load laid out every frame for their scrollbars and number fields. | Only a field being edited or a held pointer keeps a pass a frame: 0.02 to 0.07 ms at rest. |
+
+Left open: the Awakening documents' size
 ([found, not fixed](menu-frame-costs.md#found-not-fixed)).

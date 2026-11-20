@@ -3274,9 +3274,10 @@ Completion must advance through the existing dependencies:
   layout pass: the Awakening pause fell to 0.24 ms and 167 draws. A shown
   toggle, slider or list no longer lays the page out every frame (GAME
   OPTIONS, DISPLAY, AUDIO at rest): its view repaints after a state change, so
-  the settings pages, Awakening's included, take 0.05-0.3 ms a frame. Open:
-  Create Server and Join Game still lay out every frame (scrollbars, number
-  fields), and the Awakening documents' 2.3 MB of snow and frost.
+  the settings pages, Awakening's included, take 0.05-0.3 ms a frame; number
+  fields and scrollbars at rest do the same (Create Server 0.79 to 0.05 ms,
+  Join Game 0.48 to 0.07 ms). Only an edited field or a held pointer lays out
+  every frame. Open: the Awakening documents' 2.3 MB of snow and frost.
   Progress, 4 November: [moving weapon scopes](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026)
   retain local meshes for their faint animated furniture. At 1080p the isolated
   rail/nail scope CPU medians fall from 6.99/8.80 ms to 0.018/0.037 ms; continuous

@@ -482,6 +482,11 @@ public:
 	// The next frame paints afresh rather than replaying the last one: a frame
 	// drawn out of sight without its artwork (a warm pass) must never replay.
 	void InvalidatePaint();
+	// The document's elements were changed outside the runtime (a test or a
+	// tool editing them directly): the next frame lays the page out afresh.
+	// A page at rest otherwise takes no layout pass, and the runtime's own
+	// changes (bindings, motion, widget views) already request one.
+	void InvalidateLayout();
 	RuntimeStatistics Statistics() const;
 private:
     struct Canvas;
