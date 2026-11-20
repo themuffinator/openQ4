@@ -7,6 +7,20 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Servers that find the same pak twice let players in again, 19 November 2026
+
+- **You can join a server whose Quake 4 paks are installed twice.** A package
+  that ships the 1.4.2 patch paks in its own `q4base`, run against a full
+  retail install that has them too, mounted every patch pak twice. The server's
+  pure list then named those paks twice, and every client refused it and kept
+  retrying, so nobody could get past connecting. An identical second copy of a
+  pak is now ignored, and file lookups resolve exactly as before.
+- **A warning for real conflicts.** Two paks with the same name in the same game
+  folder but different contents are both still used, the higher-priority one
+  winning as before, and the console now says which two files disagree.
+- **What to do.** Nothing. Replace the client and the dedicated server; a server
+  needs the update for players to join it in this setup.
+
 ## A renderer switch no longer turns the screen white, 19 November 2026
 
 - **The game keeps responding while it restarts the renderer.** **Restart

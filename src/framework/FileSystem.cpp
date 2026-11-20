@@ -1738,6 +1738,7 @@ private:
 	bool					PackHasFile( const pack_t *pak, const char *relativePath ) const;
 	bool					IsOpenQ4CorePackCopy( const pack_t *pak ) const;
 	void					FreePack( pack_t *pack ) const;
+	void					DropMountedPakCopies( const pack_t *pak, const char *dir );
 	void					StageStartupAddonPaks( void );
 
 	static size_t			CurlWriteFunction( void *ptr, size_t size, size_t nmemb, void *stream );
@@ -5442,6 +5443,7 @@ void idFileSystemLocal::AddGameDirectory( const char *path, const char *dir ) {
 			FreePack( pak );
 			continue;
 		}
+		DropMountedPakCopies( pak, dir );
 		// insert the pak after the directory it comes from
 		search = new searchpath_t;
 		search->dir = NULL;
@@ -5449,6 +5451,62 @@ void idFileSystemLocal::AddGameDirectory( const char *path, const char *dir ) {
 		search->next = searchPaths->next;
 		searchPaths->next = search;
 		common->Printf( "Loaded pk4 %s with checksum 0x%x\n", pakfile.c_str(), pak->checksum );
+	}
+}
+
+/*
+================
+idFileSystemLocal::DropMountedPakCopies
+
+  The same pak can be reachable from more than one search root, for example
+  the Quake 4 1.4.2 patch paks shipped in an openQ4 package's own q4base and
+  again in a full retail install under fs_basepath. Mounting both put the
+  pak's checksum in a server's pure list twice, and clients refuse such a
+  list, so nobody could join.
+
+  Called before pak is inserted at the top of the search order. A mounted
+  pak with the same name in the same game folder and the same checksum is an
+  identical copy that can only ever be shadowed by pak, so it is dropped
+  quietly and every file still resolves to the content it did before. The
+  name and folder must match too: required retail paks are looked up by
+  their own name in q4base, so a renamed copy, or one in a mod folder, must
+  not stand in for the canonical entry. Those stay mounted, and
+  UpdatePureServerChecksums lists their checksum once. A pak with the same
+  name in the same game folder but a different checksum is a genuine
+  conflict: warn and keep both, and pak takes precedence as it always has.
+================
+*/
+void idFileSystemLocal::DropMountedPakCopies( const pack_t *pak, const char *dir ) {
+	idStr newName;
+	pak->pakFilename.ExtractFileName( newName );
+
+	// searchPaths is the directory pak comes from; everything below it is
+	// already mounted and ranks lower than pak will.
+	searchpath_t **link = &searchPaths->next;
+	while ( *link ) {
+		searchpath_t *sp = *link;
+		if ( sp->pack == NULL ) {
+			link = &sp->next;
+			continue;
+		}
+		idStr oldName;
+		sp->pack->pakFilename.ExtractFileName( oldName );
+		if ( oldName.Icmp( newName ) || !FS_PakPathIsInGameDir( sp->pack->pakFilename.c_str(), dir ) ) {
+			link = &sp->next;
+			continue;
+		}
+		if ( sp->pack->checksum == pak->checksum ) {
+			if ( fs_debug.GetInteger() ) {
+				common->Printf( "Dropping pk4 %s: identical to %s\n", sp->pack->pakFilename.c_str(), pak->pakFilename.c_str() );
+			}
+			*link = sp->next;
+			FreePack( sp->pack );
+			delete sp;
+			continue;
+		}
+		common->Warning( "%s and %s have the same name but different contents; using %s",
+			sp->pack->pakFilename.c_str(), pak->pakFilename.c_str(), pak->pakFilename.c_str() );
+		link = &sp->next;
 	}
 }
 
@@ -6886,6 +6944,15 @@ void idFileSystemLocal::SetRestrictions( void ) {
 #endif
 }
 
+static bool PackListHasChecksum( const idList<pack_t *> &paks, int checksum ) {
+	for ( int i = 0; i < paks.Num(); i++ ) {
+		if ( paks[ i ]->checksum == checksum ) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /*
 =====================
 idFileSystemLocal::UpdatePureServerChecksums
@@ -6907,6 +6974,12 @@ void idFileSystemLocal::UpdatePureServerChecksums( void ) {
 			continue;
 		}
 		if ( status == PURE_NEUTRAL && !search->pack->referenced ) {
+			continue;
+		}
+		// An identical copy that stayed mounted (a renamed pak, or one in
+		// another game folder) ranks below the copy already listed and can
+		// only be shadowed by it. Clients refuse a list naming a checksum twice.
+		if ( PackListHasChecksum( serverPaks, search->pack->checksum ) ) {
 			continue;
 		}
 		serverPaks.Append( search->pack );
