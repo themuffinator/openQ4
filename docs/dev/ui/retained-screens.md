@@ -2275,6 +2275,12 @@ in-match plates that named the wrong pages. The retained pages now read:
   as are `si_overtime`, `si_mercyLimit` and `si_roundLimit`, which read 0 at
   the menu before. Overtime takes its title-case label, "Overtime Period
   (Seconds)".
+- **What players may show and the weapon order** (the same day, by user
+  request): Create Server's RULES gains Highlight Limit (`si_maxBrightskin`
+  as Off, Low, Medium or High, the session mapping the levels 0, 0.35, 0.7
+  and 1) and Allow Forced Models (`si_forcedModels`); Player Setup's PLAYER
+  tab and the in-match Settings page's PLAYER section gain Weapon Order,
+  which opens WEAPON ORDER over the page ([multiplayer menus](multiplayer-menus.md#the-settings-page)).
 - **PLAYER SETUP, a HUD tab.** The MP-15 HUD options (Hit Sound, Crosshair
   Names, Crosshair Ammo, Item Timers, Team Locations, Local Clock) and the
   MP-16 spectating ones (Spectator Speed, Follow View), which the console
@@ -2304,7 +2310,7 @@ the map is never out of sight); folding OPPONENTS and TEAMMATES into one
 table on Player Setup (its 45 dp rows have no room for two columns); and
 votes for modifiers and presets, which have no vote flags yet (MP-12).
 
-Twenty-seven strings (`#str_232600` to `#str_232626`) are new in all twelve
+Thirty-three strings (`#str_232600` to `#str_232632`) are new in all twelve
 languages. The classic menus (`ui_retained 0`) keep the stock layout.
 `openq4-ui-retained-screens` (`mp-pages`, `mp-vote-match`, `mp-card`,
 `mp-settings-welcome`) checks the tabs, rows, gates, sections and the new

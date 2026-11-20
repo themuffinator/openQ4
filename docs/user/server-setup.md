@@ -31,7 +31,8 @@ of them and kept the rest behind **Advanced Server Options**.
   the team settings (**Auto Balance**, **Shuffle Teams**, **Team Damage** and
   **Timeouts per Team**, which dim outside team modes), **Weapon Stay**,
   **Buying**, the **Overtime Period (Seconds)**, the **Mercy Lead**, **Item
-  Timers** (who sees respawn timers), **Allow Spectators** and the
+  Timers** (who sees respawn timers), **Highlight Limit** and **Allow Forced
+  Models** (what players may show each other), **Allow Spectators** and the
   **Spectator Lock**. **Not in 0.14.1**
 - **Modifiers** (**Not in 0.14.1**) changes how any game type plays:
   a **Preset**, **Instagib**, **Quad Hog**, **Vampiric Damage**, **Weapons
@@ -355,6 +356,8 @@ Bot settings are listed under [Bots](#bots).
 
 **Not in 0.14.1.** `si_itemTimers` chooses who sees item respawn timers (`0` nobody, `1` spectators, `2` everyone),
 `si_maxBrightskin` caps brightskins, rimlights and outlines, and `si_forcedModels 0` turns forced player models off.
+On **Create Server → Rules** they are **Item Timers**, **Highlight Limit** (Off, Low, Medium or High, which is
+no limit) and **Allow Forced Models**.
 See [Multiplayer Client Options](multiplayer-client-options.md#for-server-operators).
 
 ## Maps, rotation and the map queue

@@ -356,7 +356,8 @@ page opens on its section's first control:
   `mpSettingsClan`); the model, a
   list of the models the mode and the player's team allow; the rail color,
   the seven stock swatches, the one the player's tint matches by hue standing
-  taller; and the handicap, a slider from 1 to 100.
+  taller; the handicap, a slider from 1 to 100; and Weapon Order, which
+  opens WEAPON ORDER (below).
   Beside them, **Controls, Game Options, Display and Audio**: plates that
   leave for the main menu's pages, as the classic page's buttons do (decision
   D13). Display was the stock page's System, and Audio, a page of its own
@@ -372,6 +373,18 @@ page opens on its section's first control:
   SPECTATING, the spectator's speed and the follow view (MP-16). The main
   menu's Player Setup has the same rows on its HUD tab
   (`retained_player_setup.HUD_ROWS`).
+
+WEAPON ORDER (20 November 2026), the same dialog as Player Setup's, edits
+`ui_weaponOrder`, which a list of names in a console field had been: Use
+Weapon Order switches the order on (the session writes the order shown) or
+off (it blanks the setting); the weapons stand by rank, ten rows; a row's
+Accept picks its weapon, which lights, and a second row's Accept moves it
+there, while the picked row's own puts it back; RESET sets the default
+order, the strongest first, and CLOSE returns to the row. The session owns
+the order (`Session_WeaponOrderRequest`): it parses the setting by name,
+`weapon_` name, `_mp` name or alias, appends the weapons it does not name,
+and publishes `order.on`, `order.row<i>` and `order.picked`. A slot number
+the setting names is dropped once the dialog moves a weapon.
 
 The model lists and the swatches belong to the game, which builds the lists as
 the classic page does and sets the model for a row (`retained appearance

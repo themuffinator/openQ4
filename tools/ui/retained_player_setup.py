@@ -152,6 +152,102 @@ def hud_rows(doc: Document, width: float, value_x: float, row_h: float, prefix: 
     return built
 
 
+# The weapon order (ui_weaponOrder, MP-15): the weapons a player would rather
+# hold, best first. The session owns the list (Session_WeaponOrderRequest): it
+# publishes the order's weapons by rank (order.row<i>), whether an order is
+# set (order.on) and the weapon picked to move (order.picked).
+WEAPON_ORDER_ROWS = 10                        # RETAINED_WEAPON_ORDER in the session
+WEAPON_ORDER_LABEL, WEAPON_ORDER_TITLE = "#str_232627", "#str_232628"
+WEAPON_ORDER_USE, WEAPON_ORDER_HINT, WEAPON_ORDER_RESET = "#str_232629", "#str_232630", "#str_42075"
+WEAPON_ORDER_TOP, WEAPON_ORDER_LIST_TOP = 70.0, 82.0     # u: the dialog's top, and its list's under the switch and the hint
+WEAPON_ORDER_ROW_H, WEAPON_ORDER_WIDTH = 20.0, 400.0     # u
+
+
+def weapon_order_link(doc: Document, ident: str, width: float, row_h: float) -> dict:
+    """The row that opens WEAPON ORDER: a setting row's plate and label with
+    the chevron pointing on (retained_create_server.link_row)."""
+    from retained_create_server import link_row
+    doc.session("weaponOrderOpen", "weaponOrderOpen")
+    doc.events["weaponOrderShow"] = [{"op": "action", "action": "weaponOrderOpen"}, {"op": "call", "event": "weaponOrderModalShow"}]
+    return link_row(doc, ident, WEAPON_ORDER_LABEL, width, row_h, "weaponOrderShow")
+
+
+def weapon_order_modal(doc: Document) -> dict:
+    """WEAPON ORDER (the multiplayer menu tree audit, 20 November 2026): Use
+    Weapon Order, a switch (blank ui_weaponOrder leaves pickups to Auto Switch
+    and an empty weapon to Quake 4's choice); a line saying how to move one;
+    the weapons by rank, a row's Accept picking its weapon (lit) and a second
+    row's Accept moving it there, Accept on the picked row putting it back;
+    RESET for the default order and CLOSE. The rows dim while no order is
+    set. The session writes the setting at each move."""
+    from build_retained_screens import confirmation
+    from retained_mp_menus import value_row
+    from retained_saves import PLACEHOLDER, bind_selected, row_plates, row_states
+    doc.state.update({"order.on": {"type": "boolean", "initial": False}, "order.picked": {"type": "number", "initial": -1},
+                      "order.pick": {"type": "number", "initial": -1}})
+    doc.session("weaponOrderPick", "weaponOrderPick")
+    doc.session("weaponOrderReset", "weaponOrderReset")
+    doc.actions["weaponOrderEnable"] = {"operation": "session.menuValue", "input": "boolean",
+                                        "arguments": {"command": "weaponOrderEnable", "value": {"input": "value"}}}
+    width_dp = U * WEAPON_ORDER_WIDTH
+    left, list_w = 22.0, WEAPON_ORDER_WIDTH - 44.0
+    on = {"state": "order.on"}
+    switch = value_row(doc, "order-use", WEAPON_ORDER_USE, "toggle", U * list_w, U * list_w * 0.6, value=on, action="weaponOrderEnable",
+                       row_h=U * 24)
+    switch["properties"].update(absolute(left=U * left, top=U * 18))
+    hint = label("order-hint", WEAPON_ORDER_HINT, {**absolute(left=U * left, top=U * 46, width=U * list_w, height=U * 32),
+                 **typeface("lowpixel", 14, 16, [1, 1, 1, 0.6]), "white-space": keyword("normal"), "overflow": keyword("hidden")})
+    rows = []
+    width, height = U * list_w, U * WEAPON_ORDER_ROW_H
+    tints = ([1, 1, 1, 0.55], [1, 1, 1, 0.9])
+    for index in range(WEAPON_ORDER_ROWS):
+        ident = f"order-row-{index}"
+        doc.state[f"order.row{index}"] = {"type": "string", "initial": ""}
+        rank = label(f"{ident}-rank", PLACEHOLDER, {**absolute(left=U * 4, top=0, width=U * 24, height=height),
+                     **typeface("lowpixel", 15.8, height, tints[0]), "white-space": keyword("nowrap"), "pointer-events": keyword("none")})
+        doc.bind(f"{ident}-rank.text", f"{ident}-rank", "text", {"op": "numberText", "args": [index + 1]})
+        name = label(f"{ident}-name", PLACEHOLDER, {**absolute(left=U * 30, top=0, width=width - U * 34, height=height),
+                     **typeface("lowpixel", 15.8, height, tints[1]), "white-space": keyword("nowrap"), "overflow": keyword("hidden"),
+                     "pointer-events": keyword("none")})
+        doc.bind(f"{ident}-name.text", f"{ident}-name", "text", {"state": f"order.row{index}"})
+        bind_selected(doc, ident, {"op": "==", "args": [{"state": "order.picked"}, index]})
+        event = f"orderRow{index}"
+        doc.events[event] = [{"op": "setState", "values": {"order.pick": index}}, {"op": "action", "action": "weaponOrderPick"}]
+        ids = row_states(doc, ident, (f"{ident}-name", f"{ident}-rank"), (tints[1], tints[0]))
+        node = group(ident, {"position": keyword("relative"), "display": keyword("block"), "width": length(width), "height": length(height),
+                             "flex-shrink": number(0), "opacity": number(1)}, [*row_plates(ident, width, height, selectable=True), rank, name],
+                     control={"role": "button", "label": WEAPON_ORDER_LABEL, "event": event, "states": ids})
+        doc.bind(f"{ident}.enabled", ident, "enabled", on)
+        doc.bind(f"{ident}.opacity", ident, "opacity", {"op": "select", "args": [on, 1, 0.38]})
+        rows.append(node)
+    column = group("order-column", {**absolute(left=U * left, top=U * WEAPON_ORDER_LIST_TOP, width=width,
+                                               height=height * WEAPON_ORDER_ROWS),
+                                    "display": keyword("flex"), "flex-direction": keyword("column")}, rows)
+    list_end = WEAPON_ORDER_LIST_TOP + WEAPON_ORDER_ROW_H * WEAPON_ORDER_ROWS
+    height_u = list_end + 8 + 49
+    doc.events["weaponOrderResetPressed"] = [{"op": "action", "action": "weaponOrderReset"}]
+    modal = confirmation(doc, "weaponOrderModal", WEAPON_ORDER_TITLE, PLACEHOLDER, None, yes_event="weaponOrderResetPressed", wide_title=True,
+                         height_u=height_u, top_u=(480 - height_u) / 2, actions_u=list_end + 8, contents=[switch, hint, column],
+                         yes_key=WEAPON_ORDER_RESET, no_key="#str_200923", width_dp=width_dp, initial="order-use")
+    return modal
+
+
+def check_weapon_order_fits() -> None:
+    """The dialog's texts fit in every language: its title in the wide title
+    slot, the switch's label in its column, the hint in its two lines and the
+    weapons' names in their rows."""
+    import build_retained_screens as b
+    over = {}
+    width_dp, list_w = U * WEAPON_ORDER_WIDTH, U * (WEAPON_ORDER_WIDTH - 44)
+    for key, face, size, room in ((WEAPON_ORDER_TITLE, "marine", 20, width_dp * (1 - 7 / 512) - 6 - (width_dp * 14 / 512 + 17)),
+                                  (WEAPON_ORDER_USE, "lowpixel", 15, list_w * 0.6 - 29), (WEAPON_ORDER_HINT, "lowpixel", 14, 2 * list_w)):
+        for language, text in table_text(key).items():
+            if text_width(face, text, size) > room:
+                over[(key, language)] = round(text_width(face, text, size))
+    if over:
+        raise SystemExit(f"WEAPON ORDER's texts past their room: {over}")
+
+
 def stack_rail(doc: Document, row: dict) -> None:
     """The rail colour row above 100 % text: its label across the row on a
     line that grows with the text, the swatches, furniture, under it from the
@@ -243,6 +339,9 @@ def player_setup(doc: Document) -> dict:
     rows.append(value_row(doc, "setup-handicap", "#str_223001", "slider", WIDTH, VALUE_X, value=cvar_state(doc, "ui_handicap", "number"),
                           action=setting_action(doc, "ui_handicap", "number"), slider=(1, 100, 1, 0), row_h=ROW_H, wrap=True))
     own.append("setup-handicap")
+    # WEAPON ORDER opens over the page (multiplayer_document adds the dialog).
+    rows.append(weapon_order_link(doc, "setup-weaponorder", WIDTH, ROW_H))
+    own.append("setup-weaponorder")
     sides = {1: [], 2: []}
     # OPPONENTS' first row forces a model on every other player outside team
     # modes (g_forceModel), from the same catalog page as the player's own

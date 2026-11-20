@@ -5388,7 +5388,7 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     assert 'vote' not in handoffs
     adapter = (ROOT / 'src/ui/UserInterfaceRetained.cpp').read_text(encoding='utf-8', errors='replace')
     # (The Create Server page's verbs are check_create_server's.)
-    value_verbs = {verb for verb in cpp_allowlist(adapter, 'bool SessionMenuValueCommand(') if not verb.startswith(('create', 'audio', 'game', 'controls'))}
+    value_verbs = {verb for verb in cpp_allowlist(adapter, 'bool SessionMenuValueCommand(') if not verb.startswith(('create', 'audio', 'game', 'controls', 'weaponOrder'))}
     fields = re.findall(r'"(mpVote[A-Za-z]+)"', re.search(r'RETAINED_MP_VOTE_FIELDS\[\] = \{([^}]*)\};', menu).group(1))
     appearance = re.findall(r'"(mp[A-Za-z]+)"', re.search(r'RETAINED_MP_APPEARANCE_VALUES\[\] = \{([^}]*)\};', menu).group(1))
     choices = re.findall(r'"(mp[A-Za-z]+)"', re.search(r'RETAINED_MP_MATCH_CHOICES\[\] = \{([^}]*)\};', menu).group(1))

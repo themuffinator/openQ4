@@ -1828,4 +1828,10 @@
 	"#str_232624"	"Cara o cruz"
 	"#str_232625"	"Todos listos"
 	"#str_232626"	"REGLAS"
+	"#str_232627"	"Orden de armas"
+	"#str_232628"	"ORDEN DE ARMAS"
+	"#str_232629"	"Usar orden"
+	"#str_232630"	"Elige un arma y luego su lugar. Al recoger solo cambia a un arma más alta que la tuya."
+	"#str_232631"	"Límite de resaltado"
+	"#str_232632"	"Permitir modelos forzados"
 }

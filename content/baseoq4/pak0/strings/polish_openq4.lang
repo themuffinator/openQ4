@@ -1884,4 +1884,10 @@
 	"#str_232624"	"Rzut monetą"
 	"#str_232625"	"Wszyscy gotowi"
 	"#str_232626"	"ZASADY"
+	"#str_232627"	"Kolejność broni"
+	"#str_232628"	"KOLEJNOŚĆ BRONI"
+	"#str_232629"	"Użyj kolejności"
+	"#str_232630"	"Wybierz broń, potem jej miejsce. Podniesienie zmienia tylko na broń wyżej w kolejności."
+	"#str_232631"	"Limit podświetlenia"
+	"#str_232632"	"Wymuszone modele"
 }

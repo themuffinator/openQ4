@@ -1828,4 +1828,10 @@
 	"#str_232624"	"Érmefeldobás"
 	"#str_232625"	"Mindenki kész"
 	"#str_232626"	"SZABÁLYOK"
+	"#str_232627"	"Fegyversorrend"
+	"#str_232628"	"FEGYVERSORREND"
+	"#str_232629"	"Sorrend használata"
+	"#str_232630"	"Válassz fegyvert, majd a helyét. Felvételkor csak magasabb helyen állóra vált."
+	"#str_232631"	"Kiemelési korlát"
+	"#str_232632"	"Kényszerített modellek"
 }

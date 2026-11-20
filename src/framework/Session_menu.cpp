@@ -6883,7 +6883,14 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createTimeouts",		"timeouts",		"si_timeouts",				0, 10,	false },
 	{ "createSpectatorLock",	"spectatorlock",	"si_spectatorLock",		0, 2,	false },
 	{ "createInactivity",	"inactivity",	"g_inactivity",				0, 600,	false },
+	// What players may show each other (MP-15): the strongest brightskin,
+	// rimlight and outline (si_maxBrightskin, Off, Low, Medium or no limit:
+	// Session_RetainedCreateValue) and forced models.
+	{ "createMaxBrightskin",	"maxbrightskin",	"si_maxBrightskin",		0, 3,	false },	// Session_RetainedCreateValue
+	{ "createForcedModels",	"forcedmodels",	"si_forcedModels",			0, 1,	true },
 };
+// si_maxBrightskin's levels, the appearance rows' Off, Low, Medium and High.
+static const float RETAINED_CREATE_BRIGHTSKIN_LEVELS[] = { 0.0f, 0.35f, 0.7f, 1.0f };
 static const int RETAINED_CREATE_SETTING_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_SETTINGS ) / sizeof( RETAINED_CREATE_SETTINGS[0] ) );
 // The page's text fields: the verb a field asks with once its text is in its
 // page state, that state, the CVar the session writes and the most bytes it
@@ -9221,9 +9228,146 @@ the page and returns to it; BACK returns the title, from the page dock as from
 a stock page. A page or a change of level under way takes no further request.
 ===============
 */
+#ifndef ID_DEDICATED
+// The weapon order dialog (WEAPON ORDER, on Player Setup and the multiplayer
+// card's Settings page): the weapons ui_weaponOrder ranks, by the game's
+// weapon names and their stock labels, in the default order Use Weapon Order
+// starts from (the strongest first). The game reads the setting itself
+// (src/mpgame/mp/WeaponOrder.h); a name or alias it lists that the dialog
+// does not know keeps its place no longer once the dialog moves a weapon.
+// RETAINED_WEAPON_ORDER is WEAPON_ORDER_ROWS in tools/ui/retained_player_setup.py.
+typedef struct retainedWeaponOrder_s {
+	const char *	name;
+	const char *	alias;
+	const char *	label;
+} retainedWeaponOrder_t;
+static const retainedWeaponOrder_t RETAINED_WEAPON_ORDER[] = {
+	{ "dmg",				"bfg",	"#str_200113" },
+	{ "railgun",			"rg",	"#str_200111" },
+	{ "rocketlauncher",		"rl",	"#str_200110" },
+	{ "lightninggun",		"lg",	"#str_200112" },
+	{ "napalmgun",			"nap",	"#str_222001" },
+	{ "hyperblaster",		"hb",	"#str_200107" },
+	{ "nailgun",			"ng",	"#str_200109" },
+	{ "grenadelauncher",	"gl",	"#str_200108" },
+	{ "shotgun",			"sg",	"#str_200105" },
+	{ "machinegun",			"mg",	"#str_200106" },
+};
+static const int RETAINED_WEAPON_ORDER_COUNT = static_cast<int>( sizeof( RETAINED_WEAPON_ORDER ) / sizeof( RETAINED_WEAPON_ORDER[0] ) );
+static int retainedWeaponOrderPicked = -1;
+
+// The order ui_weaponOrder gives, as rows of RETAINED_WEAPON_ORDER: the
+// weapons it names in its order (by name, "weapon_" name, "_mp" name or
+// alias), then the others in the default order. False when it is blank.
+static bool Session_WeaponOrder( int order[ RETAINED_WEAPON_ORDER_COUNT ] ) {
+	const idCmdArgs args( cvarSystem->GetCVarString( "ui_weaponOrder" ), false );
+	bool listed[ RETAINED_WEAPON_ORDER_COUNT ] = {};
+	int count = 0;
+	for ( int token = 0; token < args.Argc(); token++ ) {
+		idStr name = args.Argv( token );
+		name.ToLower();
+		name.StripLeadingOnce( "weapon_" );
+		name.StripTrailingOnce( "_mp" );
+		for ( int i = 0; i < RETAINED_WEAPON_ORDER_COUNT; i++ ) {
+			if ( !listed[ i ] && ( name == RETAINED_WEAPON_ORDER[ i ].name || name == RETAINED_WEAPON_ORDER[ i ].alias ) ) {
+				listed[ i ] = true;
+				order[ count++ ] = i;
+				break;
+			}
+		}
+	}
+	const bool any = args.Argc() > 0;
+	for ( int i = 0; i < RETAINED_WEAPON_ORDER_COUNT; i++ ) {
+		if ( !listed[ i ] ) {
+			order[ count++ ] = i;
+		}
+	}
+	return any;
+}
+
+static void Session_SetWeaponOrder( const int order[ RETAINED_WEAPON_ORDER_COUNT ] ) {
+	idStr text;
+	for ( int i = 0; i < RETAINED_WEAPON_ORDER_COUNT; i++ ) {
+		if ( i > 0 ) {
+			text += " ";
+		}
+		text += RETAINED_WEAPON_ORDER[ order[ i ] ].name;
+	}
+	cvarSystem->SetCVarString( "ui_weaponOrder", text.c_str() );
+}
+
+// The dialog's state: whether an order is set, the weapons by rank and the
+// one picked to move.
+static void Session_PublishWeaponOrder( idUserInterface *gui ) {
+	int order[ RETAINED_WEAPON_ORDER_COUNT ];
+	const bool on = Session_WeaponOrder( order );
+	gui->SetStateBool( "order.on", on );
+	for ( int i = 0; i < RETAINED_WEAPON_ORDER_COUNT; i++ ) {
+		gui->SetStateString( va( "order.row%d", i ), common->GetLocalizedString( RETAINED_WEAPON_ORDER[ order[ i ] ].label ) );
+	}
+	gui->SetStateInt( "order.picked", on ? retainedWeaponOrderPicked : -1 );
+	gui->StateChanged( common->GetPresentationTime() );
+}
+
+// The dialog's requests, on whichever page shows it: weaponOrderOpen
+// publishes it with nothing picked; weaponOrderPick takes the row in
+// order.pick: the first picks it, a second row moves the picked weapon there
+// and the picked row again puts it back; weaponOrderEnable sets an order (the
+// one shown) or clears the setting; weaponOrderReset sets the default order.
+static bool Session_WeaponOrderRequest( idUserInterface *gui, const char *request ) {
+	if ( gui == NULL || request == NULL || idStr::Icmpn( request, "weaponOrder", 11 ) != 0 ) {
+		return false;
+	}
+	int order[ RETAINED_WEAPON_ORDER_COUNT ];
+	const bool on = Session_WeaponOrder( order );
+	if ( !idStr::Icmp( request, "weaponOrderOpen" ) ) {
+		retainedWeaponOrderPicked = -1;
+	} else if ( !idStr::Icmp( request, "weaponOrderPick" ) ) {
+		const int row = gui->State().GetInt( "order.pick", "-1" );
+		if ( on && row >= 0 && row < RETAINED_WEAPON_ORDER_COUNT ) {
+			if ( retainedWeaponOrderPicked < 0 || retainedWeaponOrderPicked >= RETAINED_WEAPON_ORDER_COUNT ) {
+				retainedWeaponOrderPicked = row;
+			} else if ( retainedWeaponOrderPicked == row ) {
+				retainedWeaponOrderPicked = -1;
+			} else {
+				const int moved = order[ retainedWeaponOrderPicked ];
+				const int step = row > retainedWeaponOrderPicked ? 1 : -1;
+				for ( int i = retainedWeaponOrderPicked; i != row; i += step ) {
+					order[ i ] = order[ i + step ];
+				}
+				order[ row ] = moved;
+				retainedWeaponOrderPicked = -1;
+				Session_SetWeaponOrder( order );
+			}
+		}
+	} else if ( !idStr::Icmpn( request, "weaponOrderEnable ", 18 ) ) {
+		retainedWeaponOrderPicked = -1;
+		if ( atoi( request + 18 ) != 0 ) {
+			Session_SetWeaponOrder( order );
+		} else {
+			cvarSystem->SetCVarString( "ui_weaponOrder", "" );
+		}
+	} else if ( !idStr::Icmp( request, "weaponOrderReset" ) ) {
+		retainedWeaponOrderPicked = -1;
+		for ( int i = 0; i < RETAINED_WEAPON_ORDER_COUNT; i++ ) {
+			order[ i ] = i;
+		}
+		Session_SetWeaponOrder( order );
+	} else {
+		return false;
+	}
+	Session_PublishWeaponOrder( gui );
+	return true;
+}
+#endif
+
 void idSessionLocal::HandleRetainedMultiplayerPageRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
 	if ( retainedMpPageDest != 0 || retainedSubpageFrom != NULL || guiMainMenu == NULL ) {
+		return;
+	}
+	// Player Setup's WEAPON ORDER dialog.
+	if ( Session_WeaponOrderRequest( gui, request ) ) {
 		return;
 	}
 	if ( !idStr::Icmpn(request,openq4::ui::PlayerSetupRequestPrefix,sizeof(openq4::ui::PlayerSetupRequestPrefix)-1) ) {
@@ -9694,6 +9838,17 @@ static int Session_RetainedCreateValue( const retainedCreateSetting_t &setting )
 	if ( !idStr::Icmp( setting.verb, "createPreset" ) ) {
 		return Session_RetainedCreatePreset();
 	}
+	if ( !idStr::Icmp( setting.verb, "createMaxBrightskin" ) ) {
+		// The nearest level: a console value between two shows the nearer.
+		const float limit = cvarSystem->GetCVarFloat( "si_maxBrightskin" );
+		int nearest = 0;
+		for ( int i = 1; i < 4; ++i ) {
+			if ( idMath::Fabs( limit - RETAINED_CREATE_BRIGHTSKIN_LEVELS[ i ] ) < idMath::Fabs( limit - RETAINED_CREATE_BRIGHTSKIN_LEVELS[ nearest ] ) ) {
+				nearest = i;
+			}
+		}
+		return nearest;
+	}
 	return idMath::ClampInt( setting.minimum, setting.maximum, cvarSystem->GetCVarInteger( setting.cvar ) );
 }
 
@@ -9712,6 +9867,10 @@ static void Session_SetRetainedCreateValue( const retainedCreateSetting_t &setti
 	}
 	if ( !idStr::Icmp( setting.verb, "createPreset" ) ) {
 		Session_SetRetainedCreatePreset( value );
+		return;
+	}
+	if ( !idStr::Icmp( setting.verb, "createMaxBrightskin" ) ) {
+		cvarSystem->SetCVarFloat( "si_maxBrightskin", RETAINED_CREATE_BRIGHTSKIN_LEVELS[ idMath::ClampInt( 0, 3, value ) ] );
 		return;
 	}
 	cvarSystem->SetCVarInteger( setting.cvar, value );
@@ -11958,6 +12117,10 @@ is refused, as the card's own verbs are anywhere else.
 void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
 	if ( gui == NULL || request == NULL || gui != guiRetainedMultiplayer || !RetainedMultiplayerCovers() || game == NULL ) {
+		return;
+	}
+	// The Settings page's WEAPON ORDER dialog.
+	if ( Session_WeaponOrderRequest( gui, request ) ) {
 		return;
 	}
 	if ( !idStr::Icmp( request, "mpSummaryChat" ) ) {

@@ -12,8 +12,10 @@ Set the HUD options and how you spectate in the menus, on **Multiplayer →
 Player Setup → HUD**, or in a match on the in-match menu's **Settings → HUD**:
 **Hit Sound**, **Crosshair Names**, **Crosshair Ammo**, **Item Timers**,
 **Team Locations**, **Local Clock**, **Spectator Speed** and **Follow View**.
-Everything else here, and the same settings, can be typed in the console (`~`)
-or put in your `autoexec.cfg`. They are saved with your profile.
+Your weapon order is on **Player Setup → Player → Weapon Order** and the
+in-match **Settings → Player**. Everything else here, and the same settings,
+can be typed in the console (`~`) or put in your `autoexec.cfg`. They are
+saved with your profile.
 
 ## Chat tokens
 
@@ -69,7 +71,11 @@ Hits on team mates and on yourself stay silent.
 
 ## Weapon preference order
 
-`ui_weaponOrder` lists the weapons you would rather hold, best first:
+`ui_weaponOrder` lists the weapons you would rather hold, best first. In the
+menus, **Weapon Order** opens a list of the weapons by rank: turn on **Use
+Weapon Order**, pick a weapon, then pick the place it goes (pick it again to
+put it back), or press **Reset** for the default order. Turning it off leaves
+the setting blank. In the console:
 
 ```
 seta ui_weaponOrder "rg rl lg hb ng gl sg mg"
@@ -141,7 +147,8 @@ clock is unchanged.
 
 Brightskins, rimlights, outlines and forced models change how other players
 look on your screen only. A server can limit them for everyone who plays on
-it:
+it, with **Highlight Limit** and **Allow Forced Models** on **Create Server →
+Rules** or these settings:
 
 | Server setting | Default | Effect |
 | --- | --- | --- |

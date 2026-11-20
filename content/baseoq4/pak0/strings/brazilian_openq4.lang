@@ -1828,4 +1828,10 @@
 	"#str_232624"	"Cara ou coroa"
 	"#str_232625"	"Todos prontos"
 	"#str_232626"	"REGRAS"
+	"#str_232627"	"Ordem de armas"
+	"#str_232628"	"ORDEM DE ARMAS"
+	"#str_232629"	"Usar ordem"
+	"#str_232630"	"Escolha uma arma e depois onde ela fica. Ao pegar, só troca para uma arma acima da sua."
+	"#str_232631"	"Limite de destaque"
+	"#str_232632"	"Permitir modelos forçados"
 }

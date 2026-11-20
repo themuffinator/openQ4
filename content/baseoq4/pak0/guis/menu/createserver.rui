@@ -126,6 +126,8 @@
   "create.timeouts": {"type": "number", "initial": 0},
   "create.spectatorlock": {"type": "number", "initial": 0},
   "create.inactivity": {"type": "number", "initial": 0},
+  "create.maxbrightskin": {"type": "number", "initial": 0},
+  "create.forcedmodels": {"type": "boolean", "initial": false},
   "create.password": {"type": "string", "initial": ""},
   "create.rconpassword": {"type": "string", "initial": ""},
   "create.mapcycle": {"type": "string", "initial": ""},
@@ -469,6 +471,16 @@
    "operation": "session.menuValue",
    "input": "number",
    "arguments": {"command": "createInactivity", "value": {"input": "value"}}
+  },
+  "createMaxBrightskin": {
+   "operation": "session.menuValue",
+   "input": "number",
+   "arguments": {"command": "createMaxBrightskin", "value": {"input": "value"}}
+  },
+  "createForcedModels": {
+   "operation": "session.menuValue",
+   "input": "boolean",
+   "arguments": {"command": "createForcedModels", "value": {"input": "value"}}
   },
   "enter.create-name": {
    "input": "string",
@@ -13713,6 +13725,18 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.tab"}, 1]}, "block", "none"]}
   },
   {
+   "id": "create-maxbrightskin.tab",
+   "node": "create-maxbrightskin",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.tab"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "create-forcedmodels.tab",
+   "node": "create-forcedmodels",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "create.tab"}, 1]}, "block", "none"]}
+  },
+  {
    "id": "create-spectators.tab",
    "node": "create-spectators",
    "property": "display",
@@ -25950,6 +25974,721 @@
       ]
      },
      {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-head.width",
+   "node": "create-maxbrightskin-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [1.45, {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 532.5, 241.0]}]
+       },
+       349.45
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 532.5, 241.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-head.height",
+   "node": "create-maxbrightskin-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+         }
+        ]
+       },
+       52.2
+      ]
+     },
+     {
+      "op": "select",
+      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin.height",
+   "node": "create-maxbrightskin",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {
+            "op": "+",
+            "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+           },
+           36.0
+          ]
+         }
+        ]
+       },
+       52.2
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+       },
+       36.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-focus.height",
+   "node": "create-maxbrightskin-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {
+            "op": "+",
+            "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+           },
+           36.0
+          ]
+         }
+        ]
+       },
+       52.2
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+       },
+       36.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-value.left",
+   "node": "create-maxbrightskin-value",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [1.45, {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 270.0]}]
+       },
+       391.5
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 270.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-value.top",
+   "node": "create-maxbrightskin-value",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 0]
+         }
+        ]
+       },
+       0.0
+      ]
+     },
+     {
+      "op": "select",
+      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 0]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-value.height",
+   "node": "create-maxbrightskin-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+         }
+        ]
+       },
+       52.2
+      ]
+     },
+     {
+      "op": "select",
+      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-value.line-height",
+   "node": "create-maxbrightskin-value",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [1.45, {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 18.0, 36.0]}]
+       },
+       52.2
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 18.0, 36.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-value.width",
+   "node": "create-maxbrightskin-value",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [1.45, {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 518.5, 269.5]}]
+       },
+       390.775
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 518.5, 269.5]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-value.text-overflow",
+   "node": "create-maxbrightskin-value",
+   "property": "text-overflow",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
+  },
+  {
+   "id": "text.create-maxbrightskin-chevron.top",
+   "node": "create-maxbrightskin-chevron",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {
+            "op": "+",
+            "args": [
+             {"op": "+", "args": [-3.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+             {"op": "*", "args": [9.0, {"state": "view.text"}]}
+            ]
+           },
+           15.0
+          ]
+         }
+        ]
+       },
+       21.75
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [
+         {"op": "+", "args": [-3.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+         {"op": "*", "args": [9.0, {"state": "view.text"}]}
+        ]
+       },
+       15.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-option-0.height",
+   "node": "create-maxbrightskin-option-0",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {"op": "*", "args": [1.45, {"op": "*", "args": [22.0, {"state": "view.text"}]}]},
+       31.9
+      ]
+     },
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-option-1.height",
+   "node": "create-maxbrightskin-option-1",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {"op": "*", "args": [1.45, {"op": "*", "args": [22.0, {"state": "view.text"}]}]},
+       31.9
+      ]
+     },
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-option-2.height",
+   "node": "create-maxbrightskin-option-2",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {"op": "*", "args": [1.45, {"op": "*", "args": [22.0, {"state": "view.text"}]}]},
+       31.9
+      ]
+     },
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-maxbrightskin-option-3.height",
+   "node": "create-maxbrightskin-option-3",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {"op": "*", "args": [1.45, {"op": "*", "args": [22.0, {"state": "view.text"}]}]},
+       31.9
+      ]
+     },
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels-head.width",
+   "node": "create-forcedmodels-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [1.45, {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 532.5, 241.0]}]
+       },
+       349.45
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 532.5, 241.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels-head.height",
+   "node": "create-forcedmodels-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+         }
+        ]
+       },
+       52.2
+      ]
+     },
+     {
+      "op": "select",
+      "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}, 36.0]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels.height",
+   "node": "create-forcedmodels",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {
+            "op": "+",
+            "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+           },
+           36.0
+          ]
+         }
+        ]
+       },
+       52.2
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+       },
+       36.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels-focus.height",
+   "node": "create-forcedmodels-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {
+            "op": "+",
+            "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+           },
+           36.0
+          ]
+         }
+        ]
+       },
+       52.2
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [{"op": "*", "args": [18.0, {"state": "view.text"}]}, {"op": "*", "args": [18.0, {"state": "view.text"}]}]
+       },
+       36.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels-box.left",
+   "node": "create-forcedmodels-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [1.45, {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 270.0]}]
+       },
+       391.5
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 270.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels-box.top",
+   "node": "create-forcedmodels-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {
+            "op": "+",
+            "args": [
+             {"op": "+", "args": [-7.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+             {"op": "*", "args": [9.0, {"state": "view.text"}]}
+            ]
+           },
+           11.0
+          ]
+         }
+        ]
+       },
+       15.95
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [
+         {"op": "+", "args": [-7.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+         {"op": "*", "args": [9.0, {"state": "view.text"}]}
+        ]
+       },
+       11.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels-checked.left",
+   "node": "create-forcedmodels-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [1.45, {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 270.0]}]
+       },
+       391.5
+      ]
+     },
+     {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, 21, 270.0]}
+    ]
+   }
+  },
+  {
+   "id": "text.create-forcedmodels-checked.top",
+   "node": "create-forcedmodels-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "*",
+        "args": [
+         1.45,
+         {
+          "op": "select",
+          "args": [
+           {"op": ">", "args": [{"state": "view.text"}, 1]},
+           {
+            "op": "+",
+            "args": [
+             {"op": "+", "args": [-7.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+             {"op": "*", "args": [9.0, {"state": "view.text"}]}
+            ]
+           },
+           11.0
+          ]
+         }
+        ]
+       },
+       15.95
+      ]
+     },
+     {
+      "op": "select",
+      "args": [
+       {"op": ">", "args": [{"state": "view.text"}, 1]},
+       {
+        "op": "+",
+        "args": [
+         {"op": "+", "args": [-7.0, {"op": "*", "args": [18.0, {"state": "view.text"}]}]},
+         {"op": "*", "args": [9.0, {"state": "view.text"}]}
+        ]
+       },
+       11.0
+      ]
+     }
     ]
    }
   },
@@ -46468,6 +47207,210 @@
    "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 11.6, 8]}
   },
   {
+   "id": "tall.create-maxbrightskin.width",
+   "node": "create-maxbrightskin",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 819.975, 565.5]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-focus.width",
+   "node": "create-maxbrightskin-focus",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 5.8, 4]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-head.left",
+   "node": "create-maxbrightskin-head",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.45, 21]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-label.font-size",
+   "node": "create-maxbrightskin-label",
+   "property": "font-size",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 20.3, 14]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-label.line-height",
+   "node": "create-maxbrightskin-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 18.85, 13.0]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-value.font-size",
+   "node": "create-maxbrightskin-value",
+   "property": "font-size",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 20.3, 14]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-chevron.left",
+   "node": "create-maxbrightskin-chevron",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 785.175, 541.5]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-chevron.width",
+   "node": "create-maxbrightskin-chevron",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 17.4, 12]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-chevron.height",
+   "node": "create-maxbrightskin-chevron",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 8.7, 6]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-viewport.margin-left",
+   "node": "create-maxbrightskin-viewport",
+   "property": "margin-left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 2.9, 2]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-viewport.margin-top",
+   "node": "create-maxbrightskin-viewport",
+   "property": "margin-top",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 2.9, 2]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-0-label.padding-left",
+   "node": "create-maxbrightskin-option-0-label",
+   "property": "padding-left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 11.6, 8]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-0-label.font-size",
+   "node": "create-maxbrightskin-option-0-label",
+   "property": "font-size",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 21.75, 15]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-0-label.line-height",
+   "node": "create-maxbrightskin-option-0-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 31.9, 22.0]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-1-label.padding-left",
+   "node": "create-maxbrightskin-option-1-label",
+   "property": "padding-left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 11.6, 8]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-1-label.font-size",
+   "node": "create-maxbrightskin-option-1-label",
+   "property": "font-size",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 21.75, 15]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-1-label.line-height",
+   "node": "create-maxbrightskin-option-1-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 31.9, 22.0]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-2-label.padding-left",
+   "node": "create-maxbrightskin-option-2-label",
+   "property": "padding-left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 11.6, 8]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-2-label.font-size",
+   "node": "create-maxbrightskin-option-2-label",
+   "property": "font-size",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 21.75, 15]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-2-label.line-height",
+   "node": "create-maxbrightskin-option-2-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 31.9, 22.0]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-3-label.padding-left",
+   "node": "create-maxbrightskin-option-3-label",
+   "property": "padding-left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 11.6, 8]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-3-label.font-size",
+   "node": "create-maxbrightskin-option-3-label",
+   "property": "font-size",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 21.75, 15]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-option-3-label.line-height",
+   "node": "create-maxbrightskin-option-3-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 31.9, 22.0]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-scroll-track.width",
+   "node": "create-maxbrightskin-scroll-track",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 11.6, 8]}
+  },
+  {
+   "id": "tall.create-maxbrightskin-scroll-thumb.width",
+   "node": "create-maxbrightskin-scroll-thumb",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 11.6, 8]}
+  },
+  {
+   "id": "tall.create-forcedmodels.width",
+   "node": "create-forcedmodels",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 819.975, 565.5]}
+  },
+  {
+   "id": "tall.create-forcedmodels-focus.width",
+   "node": "create-forcedmodels-focus",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 5.8, 4]}
+  },
+  {
+   "id": "tall.create-forcedmodels-head.left",
+   "node": "create-forcedmodels-head",
+   "property": "left",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 30.45, 21]}
+  },
+  {
+   "id": "tall.create-forcedmodels-label.font-size",
+   "node": "create-forcedmodels-label",
+   "property": "font-size",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 20.3, 14]}
+  },
+  {
+   "id": "tall.create-forcedmodels-label.line-height",
+   "node": "create-forcedmodels-label",
+   "property": "line-height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 18.85, 13.0]}
+  },
+  {
+   "id": "tall.create-forcedmodels-box.width",
+   "node": "create-forcedmodels-box",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 20.3, 14]}
+  },
+  {
+   "id": "tall.create-forcedmodels-box.height",
+   "node": "create-forcedmodels-box",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 20.3, 14]}
+  },
+  {
+   "id": "tall.create-forcedmodels-checked.width",
+   "node": "create-forcedmodels-checked",
+   "property": "width",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 20.3, 14]}
+  },
+  {
+   "id": "tall.create-forcedmodels-checked.height",
+   "node": "create-forcedmodels-checked",
+   "property": "height",
+   "value": {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.76]}, 20.3, 14]}
+  },
+  {
    "id": "tall.create-spectators.width",
    "node": "create-spectators",
    "property": "width",
@@ -65884,6 +66827,294 @@
     },
     {
      "node": "create-inactivity-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-maxbrightskin.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "create-maxbrightskin-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-maxbrightskin-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-maxbrightskin-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-maxbrightskin.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "create-maxbrightskin-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-maxbrightskin.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "create-maxbrightskin-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-maxbrightskin.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "create-maxbrightskin-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-maxbrightskin.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "create-maxbrightskin-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-maxbrightskin-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-forcedmodels.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "create-forcedmodels-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-forcedmodels-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "create-forcedmodels-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-forcedmodels.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "create-forcedmodels-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-forcedmodels.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "create-forcedmodels-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-forcedmodels.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "create-forcedmodels-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "create-forcedmodels.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "create-forcedmodels-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "create-forcedmodels-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -108681,6 +109912,962 @@
             "lineStep": 22.0,
             "minimumThumb": 24
            }
+          }
+         },
+         {
+          "id": "create-maxbrightskin",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "none"},
+           "width": {"type": "length", "value": 565.5, "unit": "dp"},
+           "height": {"type": "length", "value": 36.0, "unit": "dp"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0}
+          },
+          "children": [
+           {
+            "id": "create-maxbrightskin-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.01061}, {"fraction": 0.027778}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+               {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+               "widthDp": 1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-maxbrightskin-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.01061}, {"fraction": 0.027778}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+               {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+               "to": [{"fraction": 1}, {"fraction": 0.0}],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-maxbrightskin-focus",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 36.0, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.19444444444444445}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027777777777777776}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.9722222222222222}]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.9722222222222222}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "create-maxbrightskin-head",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 21, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 241.0, "unit": "dp"},
+             "height": {"type": "length", "value": 36.0, "unit": "dp"},
+             "display": {"type": "keyword", "value": "flex"},
+             "flex-direction": {"type": "keyword", "value": "row"},
+             "align-items": {"type": "keyword", "value": "center"}
+            },
+            "children": [
+             {
+              "id": "create-maxbrightskin-label",
+              "type": "text",
+              "properties": {
+               "text": {"type": "text", "value": "#str_232631"},
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "block"},
+               "flex-shrink": {"type": "number", "value": 1},
+               "min-width": {"type": "length", "value": 0, "unit": "dp"},
+               "font-family": {"type": "font", "value": "lowpixel"},
+               "font-size": {"type": "length", "value": 14, "unit": "dp"},
+               "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+               "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+               "white-space": {"type": "keyword", "value": "normal"},
+               "overflow": {"type": "keyword", "value": "hidden"}
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-maxbrightskin-value",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_230030"},
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 270.0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 269.5, "unit": "dp"},
+             "height": {"type": "length", "value": 36.0, "unit": "dp"},
+             "font-family": {"type": "font", "value": "lowpixel"},
+             "font-size": {"type": "length", "value": 14, "unit": "dp"},
+             "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+             "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+             "white-space": {"type": "keyword", "value": "nowrap"},
+             "overflow": {"type": "keyword", "value": "hidden"},
+             "text-overflow": {"type": "keyword", "value": "clip"}
+            }
+           },
+           {
+            "id": "create-maxbrightskin-chevron",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 541.5, "unit": "dp"},
+             "top": {"type": "length", "value": 15.0, "unit": "dp"},
+             "width": {"type": "length", "value": 12, "unit": "dp"},
+             "height": {"type": "length", "value": 6, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "chevron",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 1.0}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-maxbrightskin-popup",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 262.0, "unit": "dp"},
+             "top": {"type": "length", "value": 36.0, "unit": "dp"},
+             "width": {"type": "length", "value": 291.5, "unit": "dp"},
+             "height": {"type": "length", "value": 92.0, "unit": "dp"},
+             "display": {"type": "keyword", "value": "none"}
+            },
+            "children": [
+             {
+              "id": "create-maxbrightskin-popup-frame",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"}
+              },
+              "paths": [
+               {
+                "id": "rim",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                 "widthDp": 4,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               },
+               {
+                "id": "body",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.698, 0.8039, 0.2627, 0.2]}},
+                 "widthDp": 1,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "create-maxbrightskin-viewport",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "block"},
+               "width": {"type": "length", "value": 273.5, "unit": "dp"},
+               "height": {"type": "length", "value": 88.0, "unit": "dp"},
+               "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+               "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+              },
+              "children": [
+               {
+                "id": "create-maxbrightskin-content",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"}
+                },
+                "children": [
+                 {
+                  "id": "create-maxbrightskin-option-0",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-maxbrightskin-option-0-selected",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-0-highlight",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-0-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_41207"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                     "white-space": {"type": "keyword", "value": "nowrap"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "create-maxbrightskin-option-1",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-maxbrightskin-option-1-selected",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-1-highlight",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-1-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_41207"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                     "white-space": {"type": "keyword", "value": "nowrap"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "create-maxbrightskin-option-2",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-maxbrightskin-option-2-selected",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-2-highlight",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-2-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_41207"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                     "white-space": {"type": "keyword", "value": "nowrap"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "create-maxbrightskin-option-3",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "create-maxbrightskin-option-3-selected",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-3-highlight",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "paths": [
+                     {
+                      "id": "band",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "create-maxbrightskin-option-3-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_41207"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                     "white-space": {"type": "keyword", "value": "nowrap"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             },
+             {
+              "id": "create-maxbrightskin-scroll-track",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 279.5, "unit": "dp"},
+               "top": {"type": "length", "value": 2, "unit": "dp"},
+               "width": {"type": "length", "value": 8, "unit": "dp"},
+               "height": {"type": "length", "value": 88.0, "unit": "dp"}
+              },
+              "children": [
+               {
+                "id": "create-maxbrightskin-scroll-trough",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"}
+                },
+                "paths": [
+                 {
+                  "id": "trough",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.375}, {"fraction": 0.0}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 0.0}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 1}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.375}, {"fraction": 1}]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.12]}}
+                 }
+                ]
+               },
+               {
+                "id": "create-maxbrightskin-scroll-thumb",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 8, "unit": "dp"},
+                 "height": {"type": "length", "value": 24, "unit": "dp"}
+                },
+                "children": [
+                 {
+                  "id": "create-maxbrightskin-scroll-ink",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "thumb",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.125}, {"fraction": 0.0}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 0.0}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 1}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.125}, {"fraction": 1}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.9]}}
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ],
+          "control": {
+           "role": "choice",
+           "label": "#str_232631",
+           "action": "createMaxBrightskin",
+           "value": {"state": "create.maxbrightskin"},
+           "states": {
+            "default": "create-maxbrightskin.default",
+            "hover": "create-maxbrightskin.hover",
+            "focus": "create-maxbrightskin.focus",
+            "pressed": "create-maxbrightskin.pressed",
+            "disabled": "create-maxbrightskin.disabled"
+           },
+           "parts": {
+            "popup": "create-maxbrightskin-popup",
+            "viewport": "create-maxbrightskin-viewport",
+            "content": "create-maxbrightskin-content",
+            "value": "create-maxbrightskin-value"
+           },
+           "visibleRows": 4,
+           "options": [
+            {
+             "id": "create-maxbrightskin-option-0",
+             "node": "create-maxbrightskin-option-0",
+             "label": "#str_41207",
+             "value": 0,
+             "parts": {
+              "label": "create-maxbrightskin-option-0-label",
+              "selected": "create-maxbrightskin-option-0-selected",
+              "highlight": "create-maxbrightskin-option-0-highlight"
+             },
+             "labelIndex": 0
+            },
+            {
+             "id": "create-maxbrightskin-option-1",
+             "node": "create-maxbrightskin-option-1",
+             "label": "#str_41207",
+             "value": 1,
+             "parts": {
+              "label": "create-maxbrightskin-option-1-label",
+              "selected": "create-maxbrightskin-option-1-selected",
+              "highlight": "create-maxbrightskin-option-1-highlight"
+             },
+             "labelIndex": 1
+            },
+            {
+             "id": "create-maxbrightskin-option-2",
+             "node": "create-maxbrightskin-option-2",
+             "label": "#str_41207",
+             "value": 2,
+             "parts": {
+              "label": "create-maxbrightskin-option-2-label",
+              "selected": "create-maxbrightskin-option-2-selected",
+              "highlight": "create-maxbrightskin-option-2-highlight"
+             },
+             "labelIndex": 2
+            },
+            {
+             "id": "create-maxbrightskin-option-3",
+             "node": "create-maxbrightskin-option-3",
+             "label": "#str_41207",
+             "value": 3,
+             "parts": {
+              "label": "create-maxbrightskin-option-3-label",
+              "selected": "create-maxbrightskin-option-3-selected",
+              "highlight": "create-maxbrightskin-option-3-highlight"
+             },
+             "labelIndex": 3
+            }
+           ],
+           "placementBounds": "screen",
+           "scrollbar": {
+            "track": "create-maxbrightskin-scroll-track",
+            "thumb": "create-maxbrightskin-scroll-thumb",
+            "lineStep": 22.0,
+            "minimumThumb": 24
+           }
+          }
+         },
+         {
+          "id": "create-forcedmodels",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "none"},
+           "width": {"type": "length", "value": 565.5, "unit": "dp"},
+           "height": {"type": "length", "value": 36.0, "unit": "dp"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0}
+          },
+          "children": [
+           {
+            "id": "create-forcedmodels-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.01061}, {"fraction": 0.027778}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+               {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+               "widthDp": 1,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-forcedmodels-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.01061}, {"fraction": 0.027778}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+               {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+               "to": [{"fraction": 1}, {"fraction": 0.0}],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-forcedmodels-focus",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 36.0, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.19444444444444445}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027777777777777776}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.9722222222222222}]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.9722222222222222}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "create-forcedmodels-head",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 21, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 241.0, "unit": "dp"},
+             "height": {"type": "length", "value": 36.0, "unit": "dp"},
+             "display": {"type": "keyword", "value": "flex"},
+             "flex-direction": {"type": "keyword", "value": "row"},
+             "align-items": {"type": "keyword", "value": "center"}
+            },
+            "children": [
+             {
+              "id": "create-forcedmodels-label",
+              "type": "text",
+              "properties": {
+               "text": {"type": "text", "value": "#str_232632"},
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "block"},
+               "flex-shrink": {"type": "number", "value": 1},
+               "min-width": {"type": "length", "value": 0, "unit": "dp"},
+               "font-family": {"type": "font", "value": "lowpixel"},
+               "font-size": {"type": "length", "value": 14, "unit": "dp"},
+               "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+               "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+               "white-space": {"type": "keyword", "value": "normal"},
+               "overflow": {"type": "keyword", "value": "hidden"}
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-forcedmodels-box",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 270.0, "unit": "dp"},
+             "top": {"type": "length", "value": 11.0, "unit": "dp"},
+             "width": {"type": "length", "value": 14, "unit": "dp"},
+             "height": {"type": "length", "value": 14, "unit": "dp"}
+            },
+            "paths": [
+             {
+              "id": "box",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+               {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "create-forcedmodels-checked",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 270.0, "unit": "dp"},
+             "top": {"type": "length", "value": 11.0, "unit": "dp"},
+             "width": {"type": "length", "value": 14, "unit": "dp"},
+             "height": {"type": "length", "value": 14, "unit": "dp"},
+             "display": {"type": "keyword", "value": "none"}
+            },
+            "children": [
+             {
+              "id": "create-forcedmodels-mark",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"}
+              },
+              "paths": [
+               {
+                "id": "mark",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                 {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+               }
+              ]
+             }
+            ]
+           }
+          ],
+          "control": {
+           "role": "toggle",
+           "label": "#str_232632",
+           "action": "createForcedModels",
+           "value": {"state": "create.forcedmodels"},
+           "states": {
+            "default": "create-forcedmodels.default",
+            "hover": "create-forcedmodels.hover",
+            "focus": "create-forcedmodels.focus",
+            "pressed": "create-forcedmodels.pressed",
+            "disabled": "create-forcedmodels.disabled"
+           },
+           "parts": {"checked": "create-forcedmodels-checked"}
           }
          },
          {

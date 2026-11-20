@@ -1828,4 +1828,10 @@
 	"#str_232624"	"Münzwurf"
 	"#str_232625"	"Alle bereit"
 	"#str_232626"	"REGELN"
+	"#str_232627"	"Waffenreihenfolge"
+	"#str_232628"	"WAFFENREIHENFOLGE"
+	"#str_232629"	"Reihenfolge nutzen"
+	"#str_232630"	"Waffe wählen, dann ihren Platz. Beim Aufheben wird nur zu einer höher platzierten gewechselt."
+	"#str_232631"	"Hervorhebungs-Limit"
+	"#str_232632"	"Erzwungene Modelle"
 }

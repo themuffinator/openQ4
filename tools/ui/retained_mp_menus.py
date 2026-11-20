@@ -2221,6 +2221,10 @@ def settings_page(doc: Document, index: int, ident: str, width: float, height: f
                          action=setting_action(doc, "ui_handicap", "number"), slider=(1, 100, 1, 0), wrap=True)
     rows, player_controls = player_rows(doc, index, left_w, value_x, (handicap, "settings-handicap"))
     controls += player_controls
+    # WEAPON ORDER opens over the card (escape_document adds the dialog).
+    from retained_player_setup import weapon_order_link
+    rows.append(weapon_order_link(doc, "settings-weaponorder", left_w, VOTE_ROW_H))
+    controls.append("settings-weaponorder")
     player = [group("settings-player", {**absolute(left=0, top=0, width=left_w, height=len(rows) * VOTE_ROW_H),
                                         "display": keyword("flex"), "flex-direction": keyword("column")}, rows)]
     plates, plate_controls = settings_plates(doc, "settings", right_x, 0, min(right_w, 320))
@@ -3528,7 +3532,9 @@ def escape_document() -> dict:
     disconnect = confirmation(doc, "disconnectModal", DISCONNECT, DISCONNECT_BODY, "mpDisconnect")
     # Every way out hides the card and its modals at once; the backdrop
     # releases behind them.
-    chrome = group("chrome", {**FULL, "display": keyword("block")}, [card, disconnect, *match_modals(doc), *admin_modals(doc)])
+    from retained_player_setup import weapon_order_modal
+    chrome = group("chrome", {**FULL, "display": keyword("block")},
+                   [card, disconnect, *match_modals(doc), *admin_modals(doc), weapon_order_modal(doc)])
     doc.bind("chrome.display", "chrome", "display", {"op": "select", "args": [{"state": "card.released"}, "none", "block"]})
     root = group("screen", {**FULL, "font-family": b.font("marine"), "font-size": length(16), "color": colour([1, 1, 1, 0.8])},
                  [*backdrop(doc), chrome])

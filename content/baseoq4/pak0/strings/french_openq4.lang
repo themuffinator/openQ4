@@ -1837,4 +1837,10 @@
 	"#str_232624"	"Pile ou face"
 	"#str_232625"	"Tous prêts"
 	"#str_232626"	"RÈGLES"
+	"#str_232627"	"Ordre des armes"
+	"#str_232628"	"ORDRE DES ARMES"
+	"#str_232629"	"Utiliser l'ordre"
+	"#str_232630"	"Choisissez une arme, puis sa place. Un ramassage ne change que pour une arme mieux classée."
+	"#str_232631"	"Limite de surbrillance"
+	"#str_232632"	"Modèles forcés permis"
 }

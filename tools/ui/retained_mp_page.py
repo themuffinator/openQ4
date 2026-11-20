@@ -120,8 +120,10 @@ def multiplayer_document() -> dict:
     for shot in shots:
         binding = next(b for b in doc.bindings if b["node"] == shot["id"] and b["property"] == "display")
         binding["value"] = {"op": "select", "args": [{"state": "setup.open"}, "none", binding["value"]]}
-    from retained_player_setup import player_setup
+    from retained_player_setup import check_weapon_order_fits, player_setup, weapon_order_modal
     content["children"].append(player_setup(doc))
+    check_weapon_order_fits()
+    weapon_order = weapon_order_modal(doc)
     for ident in ("navigation", "details"):
         content_node = next(node for node in content["children"] if node["id"]==ident)
         content_node["properties"]["display"] = keyword("block" if ident=="details" else "flex")
@@ -229,4 +231,6 @@ def multiplayer_document() -> dict:
         *lit_field("field", 0.7), *bands, content, titles,
         # The pages' prompt bar, as legends: the page's own BACK is its button.
         page_prompts(doc, in_canvas=False),
+        # Player Setup's WEAPON ORDER, over everything.
+        weapon_order,
     ])))

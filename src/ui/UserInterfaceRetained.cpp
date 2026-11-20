@@ -265,7 +265,8 @@ bool SessionMenuCommand(const std::string& command) {
         "joinConnect","joinSearch","joinSearchClear","joinSortNext",
         "mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction",
         "mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction","mpVoteYes","mpVoteNo","mpCallVote",
-        "mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","mpMatch","mpMatchSelect","mpSummaryChat",
+        "mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","weaponOrderOpen","weaponOrderPick",
+		"weaponOrderReset","mpMatch","mpMatchSelect","mpSummaryChat",
         "mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
         "mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan","mpBuy",
         "arenaRestart","arenaLeave"};
@@ -353,7 +354,7 @@ bool SessionMenuValueCommand(const std::string& command) {
 		"createRuleset","createGrapple","createInstagib",
 		"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
 		"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
-		"createTimeouts","createSpectatorLock","createInactivity",
+		"createTimeouts","createSpectatorLock","createInactivity","createMaxBrightskin","createForcedModels","weaponOrderEnable",
 		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 		"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};

@@ -139,6 +139,12 @@ SETTINGS = (
     ("timeouts", "createTimeouts", "#str_41658", "slider", 0, 10, None),
     ("spectatorlock", "createSpectatorLock", "#str_232605", "choice", 0, 2, None),
     ("inactivity", "createInactivity", "#str_232607", "choice", 0, 600, None),
+    # What players may show each other (MP-15): the strongest brightskin,
+    # rimlight and outline they may put on others (si_maxBrightskin, by the
+    # appearance rows' levels) and whether they may force others' models
+    # (si_forcedModels).
+    ("maxbrightskin", "createMaxBrightskin", "#str_232631", "choice", 0, 3, None),
+    ("forcedmodels", "createForcedModels", "#str_232632", "toggle", 0, 1, None),
 )
 # The page's tabs over its settings column (the multiplayer menu tree audit,
 # 20 November 2026): the stock page showed eleven rows and hid the rest in
@@ -154,7 +160,8 @@ CREATE_TABS = (
                               "create-mapqueue")),
     ("rules", "#str_41704", ("create-ruleset", "create-grapple", "create-autobalance", "create-shuffle", "create-teamdamage",
                              "create-weaponstay", "create-buying", "create-overtime", "create-mercy", "create-itemtimers",
-                             "create-spectators", "create-spectatorlock", "create-timeouts")),
+                             "create-maxbrightskin", "create-forcedmodels", "create-spectators", "create-spectatorlock",
+                             "create-timeouts")),
     ("modifiers", "#str_231986", ("create-preset", "create-instagib", "create-quadhog", "create-vampiric", "create-frenzy",
                                   "create-weaponarena", "create-powerups", "create-weaponrespawn", "create-selfdamage",
                                   "create-knockback", "create-falldamage")),
@@ -184,6 +191,8 @@ CHOICES = {
     "spectatorlock": ("#str_232606", (0, 1, 2)),
     # g_inactivity in seconds: off, one, two, five or ten minutes.
     "inactivity": ("#str_232608", (0, 60, 120, 300, 600)),
+    # Off, Low, Medium or High (no limit), as the appearance rows name them.
+    "maxbrightskin": ("#str_41207", (0, 1, 2, 3)),
 }
 # The game types each row serves, by index: the limit row's three, Tourney's
 # round limit, and the team modes in which Auto Balance and Team Damage apply

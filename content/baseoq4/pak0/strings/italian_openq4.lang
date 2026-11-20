@@ -1837,4 +1837,10 @@
 	"#str_232624"	"Testa o croce"
 	"#str_232625"	"Tutti pronti"
 	"#str_232626"	"REGOLE"
+	"#str_232627"	"Ordine armi"
+	"#str_232628"	"ORDINE ARMI"
+	"#str_232629"	"Usa l'ordine"
+	"#str_232630"	"Scegli un'arma, poi il suo posto. Raccogliendo si passa solo a un'arma più in alto."
+	"#str_232631"	"Limite evidenziazione"
+	"#str_232632"	"Consenti modelli forzati"
 }

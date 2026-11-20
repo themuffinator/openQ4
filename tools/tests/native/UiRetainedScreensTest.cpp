@@ -281,7 +281,8 @@ static const std::set<std::string> SessionCommands = {"continue","singlePlayer",
 	"joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers","joinSortGameType","joinSortMap",
 	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
 	"mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction","mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction",
-	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","mpMatch","mpMatchSelect",
+	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","weaponOrderOpen","weaponOrderPick",
+		"weaponOrderReset","mpMatch","mpMatchSelect",
 	"mpSummaryChat","mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
 	"mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan","mpBuy"};
 // The value controls' verbs, which carry the control's new value.
@@ -297,7 +298,7 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 	"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
 	"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
-		"createTimeouts","createSpectatorLock","createInactivity",
+		"createTimeouts","createSpectatorLock","createInactivity","createMaxBrightskin","createForcedModels","weaponOrderEnable",
 	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
@@ -1755,6 +1756,30 @@ static void CheckSettings(ScreenHost& host, const char* escapePath, const char* 
 		Check(runtime.FocusControl("settings-mpSettingsAudio",2.42),"focus Audio");
 		press(runtime,MenuInput::Accept,2.43);
 		Check(taken(runtime,"mpSettingsAudio").operation == "session.menu","Audio leaves for the main menu's page");
+		// WEAPON ORDER: the row under the handicap asks the session for the
+		// order and opens the dialog; a row's Accept names its row to the
+		// session, which lights the picked one; the rows wait for an order.
+		Check(Near(bounds("settings-weaponorder").y,bounds("settings-handicap").y+26,.01f),"Weapon Order follows the handicap");
+		Check(runtime.RunEvent("weaponOrderShow",2.44,effects,error) && effects.actions.size() == 1 &&
+			effects.actions[0].action == "weaponOrderOpen","Weapon Order asks the session for the order");
+		runtime.Frame(viewport,2.65);
+		Check(text("weaponOrderModal","display") == "block" && runtime.GetControlState("order-row-0") == ControlState::Disabled,
+			"the dialog opens, its rows waiting for an order");
+		Check(runtime.SetState({{"order.on",true},{"order.row0",std::string("Railgun")},{"order.row1",std::string("Rocket Launcher")}},error,2.651),
+			"the session publishes an order");
+		runtime.Frame(viewport,2.652);
+		Check(text("order-row-1-name","text") == "Rocket Launcher" && runtime.GetControlState("order-row-1") != ControlState::Disabled,
+			"the weapons stand by rank");
+		Check(runtime.RunEvent("orderRow1",2.653,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "weaponOrderPick" &&
+			std::get<double>(runtime.GetState().at("order.pick")) == 1,"a row's Accept names its row to the session");
+		Check(runtime.SetState({{"order.picked",1.0}},error,2.654),"the session picks it");
+		runtime.Frame(viewport,2.655);
+		Check(text("order-row-1-selected","display") == "block" && text("order-row-0-selected","display") == "none","the picked weapon is lit");
+		Check(runtime.RunEvent("weaponOrderResetPressed",2.656,effects,error) && effects.actions.size() == 1 &&
+			effects.actions[0].action == "weaponOrderReset","RESET asks for the default order");
+		Check(runtime.RunEvent("weaponOrderModalHide",2.657,effects,error),"CLOSE");
+		runtime.Frame(viewport,2.99);
+		Check(text("weaponOrderModal","display") == "none","the dialog closes");
 		// The Voice page: its toggles and sliders set their settings; the
 		// push-to-talk key shows when bound; testing requires separate consent.
 		Check(runtime.RunEvent("tab_voice",3,effects,error),"to the Voice tab");
@@ -5192,7 +5217,8 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 		"createControlTime","createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit",
 		"createUsePass","createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup",
 		"createVoice","createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
-		"createMapRotation","createMapQueue","createItemTimers","createTimeouts","createSpectatorLock","createInactivity"};
+		"createMapRotation","createMapQueue","createItemTimers","createTimeouts","createSpectatorLock","createInactivity",
+		"createMaxBrightskin","createForcedModels"};
 	for (const char* verb : verbs) {
 		const auto found = document.Model().actions.find(verb);
 		Check(found != document.Model().actions.end() && found->second.operation == "session.menuValue" &&
@@ -5299,6 +5325,8 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 	Check(runtime.GetControlState("create-autobalance") != ControlState::Disabled && runtime.GetControlState("create-timeouts") != ControlState::Disabled &&
 		runtime.GetControlState("create-grapple") != ControlState::Disabled && runtime.GetControlState("create-spectatorlock") != ControlState::Disabled,
 		"in a team mode under the Classic rules every row there applies");
+	Check(text("create-maxbrightskin","display") == "block" && text("create-forcedmodels","display") == "block",
+		"RULES holds what players may show each other");
 	Check(runtime.RunEvent("onTabPrevious",1.5,effects,error) && runtime.RunEvent("onTabPrevious",1.51,effects,error) &&
 		runtime.FocusedControl() == "tab-server","Q from MATCH wraps to SERVER");
 	runtime.Frame(viewport,1.55);

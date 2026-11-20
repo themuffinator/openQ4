@@ -26,6 +26,12 @@ does not restore the withdrawn release. See
   Local Clock, Spectator Speed and Follow View. In a match, the in-match
   menu's **Settings** page has the same rows under **HUD**, beside
   **Player** and **Appearance**.
+- **Rank your weapons in the menus.** **Player Setup → Player → Weapon
+  Order** (and the in-match **Settings → Player**) lists the weapons by rank:
+  pick one, then pick where it goes. A pickup switches only to a weapon you
+  rank above the one in your hands. Hosts get **Highlight Limit** and **Allow
+  Forced Models** on **Create Server → Rules**, which cap what players may
+  put on each other's screens.
 - **The in-match menu reaches Audio.** Its Settings page offers Controls,
   Game Options, **Display** (it said System) and **Audio**, which it couldn't
   reach before.

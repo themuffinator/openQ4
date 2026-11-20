@@ -1828,4 +1828,10 @@
 	"#str_232624"	"Coin Toss"
 	"#str_232625"	"Ready Everyone"
 	"#str_232626"	"RULES"
+	"#str_232627"	"Weapon Order"
+	"#str_232628"	"WEAPON ORDER"
+	"#str_232629"	"Use Weapon Order"
+	"#str_232630"	"Pick a weapon, then pick where it goes. A pickup switches only to a weapon ranked above yours."
+	"#str_232631"	"Highlight Limit"
+	"#str_232632"	"Allow Forced Models"
 }
