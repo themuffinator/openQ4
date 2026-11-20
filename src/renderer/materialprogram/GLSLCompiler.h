@@ -11,7 +11,11 @@
 namespace oq4material {
 
 constexpr int MaxParameters = 32;
-constexpr int MaxTextures = 8;
+// Sampler bindings of set 1, one per shaderTexture slot (MAX_SHADER_TEXTURES).
+constexpr int MaxTextures = 16;
+// gl_TextureMatrix entries: the compatibility profile's eight texture
+// coordinate units, independent of the sampler count.
+constexpr int MaxTextureMatrices = 8;
 constexpr size_t MaxSourceBytes = 1024 * 1024;
 
 // std140 ABI, independent of the engine's idMath types and of Vulkan handles.
@@ -20,7 +24,7 @@ struct UniformBlock {
     std::array<float, 4> parameters[MaxParameters];
     std::array<float, 16> modelView;
     std::array<float, 16> projection;
-    std::array<float, 16> textureMatrix[MaxTextures];
+    std::array<float, 16> textureMatrix[MaxTextureMatrices];
     std::array<float, 4> stageColor;
     // Use vertex color array, AlphaCompare value, threshold, framebuffer height.
     std::array<float, 4> controls;

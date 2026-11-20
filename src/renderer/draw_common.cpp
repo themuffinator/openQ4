@@ -638,6 +638,77 @@ idImage *RB_ResolveGLSLShaderTextureImage( const newShaderStage_t *stage, int sl
 	}
 }
 
+/*
+==================
+RB_GLSLShaderTextureBindOrder / RB_BindGLSLShaderTexture / RB_UnbindGLSLShaderTexture
+
+A GLSL stage names up to MAX_SHADER_TEXTURES samplers, more than the
+MAX_MULTITEXTURE_UNITS units backEnd.glState tracks: the tracker also drives
+fixed-function and client texture-coordinate state, which stops at eight units
+on common drivers (GL_MAX_TEXTURE_COORDS). A slot within the tracked units binds
+through GL_SelectTexture and idImage::Bind as ever; one past them is bound to its
+image unit directly (idImage::BindUntracked) and unbound after the draw.
+
+Setting a texture's sampler state binds it to the selected tracked unit, so the
+slots past the tracked units are bound first, through unit 0, before the tracked
+slots take their units: RB_GLSLShaderTextureBindOrder gives the slot to bind at
+each step.
+==================
+*/
+int RB_GLSLShaderTextureBindOrder( int numShaderTextures, int index ) {
+	const int untracked = Max( 0, numShaderTextures - MAX_MULTITEXTURE_UNITS );
+	return index < untracked ? MAX_MULTITEXTURE_UNITS + index : index - untracked;
+}
+
+void RB_BindGLSLShaderTexture( const newShaderStage_t *stage, int slot, idImage *image, bool selectClient ) {
+	if ( stage == NULL || image == NULL || slot < 0 || slot >= stage->numShaderTextures ) {
+		return;
+	}
+	if ( slot < MAX_MULTITEXTURE_UNITS ) {
+		if ( selectClient ) {
+			GL_SelectTexture( slot );
+		} else {
+			GL_SelectTextureNoClient( slot );
+		}
+		image->SetSamplerState( stage->shaderTextureFilters[slot], stage->shaderTextureRepeats[slot] );
+		image->Bind();
+	} else {
+		if ( slot >= glConfig.backendCaps.maxTextureImageUnits ) {
+			static bool warned = false;
+			if ( !warned ) {
+				common->Warning( "GLSL program '%s' samples texture unit %d; this context has %d",
+					stage->glslProgramName, slot, glConfig.backendCaps.maxTextureImageUnits );
+				warned = true;
+			}
+			return;
+		}
+		if ( selectClient ) {
+			GL_SelectTexture( 0 );
+		} else {
+			GL_SelectTextureNoClient( 0 );
+		}
+		image->SetSamplerState( stage->shaderTextureFilters[slot], stage->shaderTextureRepeats[slot] );
+		image->BindUntracked( slot );
+	}
+	RB_GLSLStageSampler( stage, stage->shaderTextureLocations[slot], slot );
+}
+
+void RB_UnbindGLSLShaderTexture( int slot, bool selectClient ) {
+	if ( slot < 0 ) {
+		return;
+	}
+	if ( slot < MAX_MULTITEXTURE_UNITS ) {
+		if ( selectClient ) {
+			GL_SelectTexture( slot );
+		} else {
+			GL_SelectTextureNoClient( slot );
+		}
+		globalImages->BindNull();
+	} else if ( slot < glConfig.backendCaps.maxTextureImageUnits ) {
+		R_BindUntrackedTextureUnit( slot, 0, 0 );
+	}
+}
+
 static inline void RB_SetStageVertexColorPointer( const drawSurf_t *surf, int stage, idDrawVert *ac ) {
 	if ( surf->decalColorCache != NULL && stage >= 0 && stage < surf->decalColorStageCount && surf->decalColorStride > 0 ) {
 		void *colorData = vertexCache.Position( surf->decalColorCache );
@@ -12219,15 +12290,13 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					RB_GLSLStageUniform( newStage, location, numRegisters, parm );
 				}
 
-				for ( int i = 0; i < newStage->numShaderTextures; i++ ) {
+				for ( int order = 0; order < newStage->numShaderTextures; order++ ) {
+					const int i = RB_GLSLShaderTextureBindOrder( newStage->numShaderTextures, order );
 					idImage *image = RB_ResolveGLSLShaderTextureImage( newStage, i, NULL );
 					if ( image == NULL ) {
 						continue;
 					}
-					GL_SelectTexture( i );
-					image->SetSamplerState( newStage->shaderTextureFilters[i], newStage->shaderTextureRepeats[i] );
-					image->Bind();
-					RB_GLSLStageSampler( newStage, newStage->shaderTextureLocations[i], i );
+					RB_BindGLSLShaderTexture( newStage, i, image, true );
 				}
 				if ( useExplicitSMAAFullscreenQuad ) {
 					RB_PoisonPostAAGLSLStateForValidation();
@@ -12241,8 +12310,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 						RB_FinishStageTexturing( pStage, surf, ac );
 						for ( int i = 1; i < newStage->numShaderTextures; i++ ) {
 							if ( RB_ResolveGLSLShaderTextureImage( newStage, i, NULL ) != NULL ) {
-								GL_SelectTexture( i );
-								globalImages->BindNull();
+								RB_UnbindGLSLShaderTexture( i, true );
 							}
 						}
 						GL_SelectTexture( 0 );
@@ -12273,8 +12341,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 
 				for ( int i = 1; i < newStage->numShaderTextures; i++ ) {
 					if ( RB_ResolveGLSLShaderTextureImage( newStage, i, NULL ) != NULL ) {
-						GL_SelectTexture( i );
-						globalImages->BindNull();
+						RB_UnbindGLSLShaderTexture( i, true );
 					}
 				}
 

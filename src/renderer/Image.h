@@ -176,6 +176,11 @@ public:
 	// automatically enables or disables cube mapping
 	// May perform file loading if the image was not preloaded.
 	void		Bind();
+	// Makes this image active on a texture image unit past the units
+	// backEnd.glState tracks (MAX_MULTITEXTURE_UNITS), for GLSL samplers
+	// only: no fixed-function enable and no tracker entry, and the active
+	// unit is left as the tracker has it.
+	void		BindUntracked( int texUnit );
 
 	// Should be called at least once
 	void		SetSamplerState(textureFilter_t tf, textureRepeat_t tr);

@@ -271,7 +271,12 @@ typedef enum {
 	SVC_INVERSE_MODULATE
 } stageVertexColor_t;
 
-static const int	MAX_FRAGMENT_IMAGES = 8;
+static const int	MAX_FRAGMENT_IMAGES = 8;		// ARB fragmentMap units
+// GLSL shaderTexture samplers per stage. OpenGL binds those past the tracked
+// units (MAX_MULTITEXTURE_UNITS) directly (RB_BindGLSLShaderTexture); 16 is
+// the fragment image units GL 3.x and Vulkan (maxPerStageDescriptorSamplers)
+// guarantee.
+static const int	MAX_SHADER_TEXTURES = 16;
 static const int	MAX_VERTEX_PARMS = 8;
 static const int	MAX_FRAGMENT_PARMS = 8;
 static const int	MAX_GLSL_SHADER_PARMS = 32;
@@ -375,12 +380,12 @@ typedef struct {
 	int					shaderParmLocations[MAX_GLSL_SHADER_PARMS];
 
 	int					numShaderTextures;
-	char				shaderTextureNames[MAX_FRAGMENT_IMAGES][MAX_GLSL_SHADER_PARM_NAME];
-	int					shaderTextureLocations[MAX_FRAGMENT_IMAGES];
-	glslShaderTextureBinding_t shaderTextureBindings[MAX_FRAGMENT_IMAGES];
-	idImage* shaderTextureImages[MAX_FRAGMENT_IMAGES];
-	textureFilter_t		shaderTextureFilters[MAX_FRAGMENT_IMAGES];
-	textureRepeat_t		shaderTextureRepeats[MAX_FRAGMENT_IMAGES];
+	char				shaderTextureNames[MAX_SHADER_TEXTURES][MAX_GLSL_SHADER_PARM_NAME];
+	int					shaderTextureLocations[MAX_SHADER_TEXTURES];
+	glslShaderTextureBinding_t shaderTextureBindings[MAX_SHADER_TEXTURES];
+	idImage* shaderTextureImages[MAX_SHADER_TEXTURES];
+	textureFilter_t		shaderTextureFilters[MAX_SHADER_TEXTURES];
+	textureRepeat_t		shaderTextureRepeats[MAX_SHADER_TEXTURES];
 } newShaderStage_t;
 
 typedef struct {

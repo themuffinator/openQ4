@@ -11458,7 +11458,7 @@ bool VK_Exec_BuildAuthoredMaterialUniforms( const viewDef_t *viewDef, const draw
     else if ( drawSurf->space->weaponDepthHack ) { block.projection[14] *= 0.25f; }
     myGlMultMatrix( block.modelView.data(), block.projection.data(), block.modelViewProjection.data() );
     VK_FixupClipSpaceZ( block.modelViewProjectionVulkan.data(), block.modelViewProjection.data() );
-    for ( int i = 0; i < oq4material::MaxTextures; ++i ) {
+    for ( int i = 0; i < oq4material::MaxTextureMatrices; ++i ) {
         for ( int j = 0; j < 4; ++j ) { block.textureMatrix[i][j * 5] = 1.0f; }
     }
     if ( din == NULL && stage->texture.hasMatrix ) { RB_GetShaderTextureMatrix( drawSurf->shaderRegisters, &stage->texture, block.textureMatrix[0].data() ); }
@@ -12298,7 +12298,7 @@ static bool VK_Exec_BuildARBMaterialUniforms( const viewDef_t *viewDef, const dr
 	myGlMultMatrix( block.modelView.data(), block.projection.data(), block.modelViewProjection.data() );
 	VK_FixupClipSpaceZ( block.modelViewProjectionVulkan.data(), block.modelViewProjection.data() );
 	// The ARB material path loads no texture matrix.
-	for ( int i = 0; i < oq4material::MaxTextures; i++ ) {
+	for ( int i = 0; i < oq4material::MaxTextureMatrices; i++ ) {
 		for ( int j = 0; j < 4; j++ ) {
 			block.textureMatrix[ i ][ j * 5 ] = 1.0f;
 		}

@@ -205,7 +205,7 @@ gl_FragColor=vec4(vec3(lighting),1.0); }
     Reject("parameter_width", request, "component count mismatch");
     request = Basic(); request.parameters[0].components = 5;
     Reject("parameter_invalid_width", request, "invalid or duplicate");
-    request = Basic(); request.textures[0].slot = 8;
+    request = Basic(); request.textures[0].slot = material::MaxTextures;
     Reject("texture_limit", request, "invalid or duplicate");
     request = Basic(); request.parameters.push_back({"image", 2});
     Reject("binding_collision", request, "name collision");

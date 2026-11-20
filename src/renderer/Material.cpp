@@ -1713,8 +1713,8 @@ void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) 
 		return;
 	}
 
-	if ( newStage->numShaderTextures >= MAX_FRAGMENT_IMAGES ) {
-		common->Warning( "material '%s' exceeded shaderTexture limit (%d)", GetName(), MAX_FRAGMENT_IMAGES );
+	if ( newStage->numShaderTextures >= MAX_SHADER_TEXTURES ) {
+		common->Warning( "material '%s' exceeded shaderTexture limit (%d)", GetName(), MAX_SHADER_TEXTURES );
 		SetMaterialFlag( MF_DEFAULTED );
 		return;
 	}
@@ -4408,7 +4408,7 @@ void idMaterial::ResolveUse() {
 					stage->newStage->fragmentProgramImages[j]->AddUseCount( useCount );
 				}
 			}
-			for ( int j = 0; j < MAX_FRAGMENT_IMAGES; j++ ) {
+			for ( int j = 0; j < MAX_SHADER_TEXTURES; j++ ) {
 				if ( stage->newStage->shaderTextureImages[j] != NULL ) {
 					stage->newStage->shaderTextureImages[j]->AddUseCount( useCount );
 				}
