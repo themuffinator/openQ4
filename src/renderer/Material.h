@@ -360,6 +360,11 @@ typedef struct {
 	bool				glslProgramLoaded;
 	bool				glslProgramValid;
 	int					glslProgramGeneration;
+	// A material's stage shares one linked program with every other material
+	// stage that names the same sources (draw_common.cpp, R_ValidateGLSLProgram);
+	// the stages the back end builds for itself keep their own.
+	bool				glslProgramShareable;
+	int					glslSharedProgram;		// 1 + index into the shared programs, 0 = none
 	bool				customLighting;
 
 	int					numShaderParms;

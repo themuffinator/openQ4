@@ -444,26 +444,9 @@ void idMaterial::FreeData() {
 				stages[i].texture.cinematic = NULL;
 			}
 			if ( stages[i].newStage != NULL ) {
-				// the handles are only valid in the GL context generation that compiled
-				// them; after a full restart they may alias live objects in the new
-				// context (partial restarts keep the context, so the generation matches)
-				if ( stages[i].newStage->glslProgramObject != 0
-						&& stages[i].newStage->glslProgramGeneration == tr.glContextGeneration
-						&& glConfig.isInitialized ) {
-					if ( stages[i].newStage->glslVertexShaderObject != 0 ) {
-						glDetachObjectARB(
-							(GLhandleARB)stages[i].newStage->glslProgramObject,
-							(GLhandleARB)stages[i].newStage->glslVertexShaderObject );
-						glDeleteObjectARB( (GLhandleARB)stages[i].newStage->glslVertexShaderObject );
-					}
-					if ( stages[i].newStage->glslFragmentShaderObject != 0 ) {
-						glDetachObjectARB(
-							(GLhandleARB)stages[i].newStage->glslProgramObject,
-							(GLhandleARB)stages[i].newStage->glslFragmentShaderObject );
-						glDeleteObjectARB( (GLhandleARB)stages[i].newStage->glslFragmentShaderObject );
-					}
-					glDeleteObjectARB( (GLhandleARB)stages[i].newStage->glslProgramObject );
-				}
+				// releases the stage's program, its own or its share of a shared
+				// one; handles from an older GL context generation are not deleted
+				R_FreeGLSLProgram( stages[i].newStage );
 				Mem_Free( stages[i].newStage );
 				stages[i].newStage = NULL;
 			}
@@ -2482,6 +2465,7 @@ void idMaterial::ParseStage( idLexer &src, const textureRepeat_t trpDefault ) {
 			if ( src.ReadTokenOnLine( &token ) ) {
 				if ( !newStage.glslProgram ) {
 					newStage.glslProgram = true;
+					newStage.glslProgramShareable = true;
 					idStr::Copynz( newStage.glslProgramName, token.c_str(), sizeof( newStage.glslProgramName ) );
 				} else {
 					common->Warning( "multiple glslProgram declarations in material '%s'", GetName() );

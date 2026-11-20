@@ -868,6 +868,13 @@ the [development roadmap](../roadmap.md) for current scope.
 - Material authors can reload supported GLSL effects with `reloadGLSLprograms`
   on OpenGL and Vulkan, including after repairing a broken shader. The existing
   `reloadARBprograms` command now reloads GLSL material effects too.
+- On OpenGL, materials that use the same GLSL effect now share one compiled
+  program instead of compiling a copy each as they first come into view (a
+  level whose 300 materials use one effect now compiles it once, not 300
+  times). A draw also skips re-sending effect settings that are unchanged since
+  the last draw with that program.
+  `listGLSLPrograms` lists the shared programs; `r_glslSharePrograms 0` and
+  `r_glslSkipRedundantUniforms 0` restore the old behaviour for comparison.
 - The Vulkan renderer now carries on when the graphics driver resets during
   play: the renderer restarts itself (up to three times per session) instead of
   leaving a frozen window. A lost window surface is rebuilt in place, a display

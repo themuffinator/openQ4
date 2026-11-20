@@ -541,6 +541,15 @@ bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
 	return false;
 }
 
+void R_FreeGLSLProgram( newShaderStage_t *stage ) {
+	( void )stage;
+}
+
+void R_ListGLSLPrograms_f( const idCmdArgs &args ) {
+	( void )args;
+	common->Printf( "listGLSLPrograms: material GLSL programs are not available on OpenGL ES\n" );
+}
+
 void RB_AddDebugLine( const idVec4 &color, const idVec3 &start, const idVec3 &end, const int lifeTime, const bool depthTest ) {
 	( void )color; ( void )start; ( void )end; ( void )lifeTime; ( void )depthTest;
 }

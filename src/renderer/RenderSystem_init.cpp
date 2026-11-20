@@ -6557,6 +6557,7 @@ void R_InitCommands( void ) {
 	cmdSystem->AddCommand( "reportShaderPrograms", R_ReportShaderPrograms_f, CMD_FL_RENDERER, "shows ARB plus material/shadow GLSL shader program status" );
 	cmdSystem->AddCommand( "reloadARBprograms", R_ReloadARBPrograms_f, CMD_FL_RENDERER, "reloads ARB and authored GLSL material programs" );
 	cmdSystem->AddCommand( "reloadGLSLprograms", R_ReloadGLSLPrograms_f, CMD_FL_RENDERER, "reloads authored GLSL material programs" );
+	cmdSystem->AddCommand( "listGLSLPrograms", R_ListGLSLPrograms_f, CMD_FL_RENDERER, "lists the GLSL programs material stages share, and the uniform writes made and skipped" );
 	cmdSystem->AddCommand( "regenerateWorld", R_RegenerateWorld_f, CMD_FL_RENDERER, "regenerates all interactions" );
 	cmdSystem->AddCommand( "showInteractionMemory", R_ShowInteractionMemory_f, CMD_FL_RENDERER, "shows memory used by interactions" );
 	cmdSystem->AddCommand( "showTriSurfMemory", R_ShowTriSurfMemory_f, CMD_FL_RENDERER, "shows memory used by triangle surfaces" );
