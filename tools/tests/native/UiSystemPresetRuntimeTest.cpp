@@ -60,7 +60,7 @@ struct View {
  // Reduced motion still cross-fades the pages, over 80 ms: Settle outlasts it.
  void Settle(){for(int i=0;i<6;++i)Frame();}
  void Show(const char* id){Event(("tab_"+TabOf(id)).c_str());Settle();Check(runtime.GetState().at("page.tab")==StateValue(double(TabIndex(TabOf(id)))),"the tab event makes the control's tab current");}
- static int TabIndex(const std::string& tab){return tab=="graphics"?0:tab=="screen"?1:tab=="image"?2:-1;}
+ static int TabIndex(const std::string& tab){return tab=="graphics"?0:tab=="screen"?1:tab=="image"?2:tab=="effects"?3:-1;}
  bool Focus(const char* id){Show(id);return runtime.FocusControl(id,time);}
  // Two displays, as the settings service publishes them, show the device and
  // span rows; the size and rate rows read their own lists.
@@ -75,27 +75,31 @@ struct View {
  void Accept(const ControlAction& p){Check(runtime.CanDispatchControlAction(p,time),"proposal still eligible");ActionInvocation a;Check(runtime.ResolveAction(p.action,a,error,&*p.proposal),"actual typed argument resolved");auto prior=Widget().accepted;Check(Dispatch(a).code==SettingsCode::Ok,"transaction generated edit succeeds");Check(SettingsValueEqual(prior,Widget().accepted),"operation alone cannot change authoritative widget");Sync();Check(runtime.AcknowledgeControlProposal(p.node,p.proposalToken,true),"ACK after real transaction readback");Frame();Check(SettingsValueEqual(Widget().accepted,*p.proposal),"choice paints accepted typed readback");}
  Runtime::EventEffects Event(const char* name){Runtime::EventEffects e;Check(runtime.RunEvent(name,time,e,error),error.c_str());return e;}
 };
-// The page's three tabs and each one's keyboard order: document order, down
+// The page's four tabs and each one's keyboard order: document order, down
 // the first column and on down the second. Restart Renderer joins GRAPHICS
 // only while a renderer change waits for it (Tabs checks it there).
 struct PageTab { const char* id; std::vector<const char*> order; };
 static const PageTab PageTabs[]={
  {"graphics",{"settings_preset","settings_autodetect","settings_backend","settings_gpu","settings_renderer","settings_ui_scale","settings_text_scale","settings_ui_aspect","settings_reset_sizes"}},
- {"screen",{"settings_display_device","settings_multiscreen","settings_fullscreen","settings_borderless","settings_fullscreen_policy","settings_msaa","settings_vsync",
-  "settings_window_width","settings_window_height","settings_display_mode","settings_custom_width","settings_custom_height","settings_display_refresh"}},
- {"image",{"settings_brightness","settings_brightness_number","settings_shadows","settings_specular","settings_bump","settings_sky","settings_bloom","settings_ssao",
-  "settings_tonemap","settings_postaa","settings_resolution_scale","settings_ambient_enabled","settings_ambient","settings_ambient_number","settings_crt","settings_irradiance",
-  "settings_lightgrid_preload"}}};
+ {"screen",{"settings_display_device","settings_multiscreen","settings_fullscreen","settings_borderless","settings_fullscreen_policy","settings_vsync",
+  "settings_framecap","settings_window_width","settings_window_height","settings_display_mode","settings_custom_width","settings_custom_height","settings_display_refresh"}},
+ {"image",{"settings_brightness","settings_brightness_number","settings_resolution_scale","settings_msaa","settings_postaa","settings_anisotropy","settings_specular",
+  "settings_bump","settings_sky","settings_ambient_enabled","settings_ambient","settings_ambient_number"}},
+ // Shadow Maps and Character Self-Shadows wait for Enable Shadows, which the
+ // host starts off (Tabs checks them).
+ {"effects",{"settings_shadows","settings_irradiance","settings_lightgrid_preload","settings_bloom","settings_ssao","settings_tonemap","settings_motionblur",
+  "settings_crt"}}};
 static std::string PageDisplay(View& v,const PageTab& tab){auto shown=v.runtime.PresentedValue(("settings-page-"+std::string(tab.id)).c_str(),"display");Check(shown.has_value(),tab.id);return shown->text;}
 // The tabs: each tab_<id> event makes its tab current at once and focuses its
 // first row; Next and Down keep within the tab; a hidden tab's rows cannot act;
 // onTabNext and onTabPrevious wrap around the strip; the pages cross-fade.
 static void Tabs(View& v){
- Check(v.Tab()==0&&PageDisplay(v,PageTabs[0])=="block"&&PageDisplay(v,PageTabs[1])=="none"&&PageDisplay(v,PageTabs[2])=="none","the page opens on GRAPHICS alone");
- for(const auto* tab:{"tab-graphics","tab-screen","tab-image"})Check(v.runtime.CanActivateControl(tab,v.time),"every tab of the strip answers");
+ Check(v.Tab()==0&&PageDisplay(v,PageTabs[0])=="block"&&PageDisplay(v,PageTabs[1])=="none"&&PageDisplay(v,PageTabs[2])=="none"&&
+  PageDisplay(v,PageTabs[3])=="none","the page opens on GRAPHICS alone");
+ for(const auto* tab:{"tab-graphics","tab-screen","tab-image","tab-effects"})Check(v.runtime.CanActivateControl(tab,v.time),"every tab of the strip answers");
  v.Displays();
- for(const unsigned index:{1u,2u,0u}){const auto& tab=PageTabs[index];
-  // GRAPHICS, the current tab, is reached by wrapping from IMAGE.
+ for(const unsigned index:{1u,2u,3u,0u}){const auto& tab=PageTabs[index];
+  // GRAPHICS, the current tab, is reached by wrapping from EFFECTS.
   if(index)v.Event(("tab_"+std::string(tab.id)).c_str());else v.Event("onTabNext");v.Settle();
   Check(v.Tab()==index,"the tab event makes its tab current");
   for(const auto& other:PageTabs)if(PageDisplay(v,other)!=(&other==&tab?"block":"none"))std::fprintf(stderr,"tab %s: page %s display=%s leaving=%g\n",tab.id,other.id,PageDisplay(v,other).c_str(),std::get<double>(v.runtime.GetState().at("page.leaving")));
@@ -115,8 +119,8 @@ static void Tabs(View& v){
    Check(!v.runtime.CanActivateControl(id,v.time)&&!v.runtime.FocusControl(id,v.time),"a hidden tab's rows can neither act nor take focus");
   Check(v.runtime.TakeActions().empty(),"switching and walking a tab edits nothing");
  }
- Check(v.Event("onTabPrevious").actions.empty()&&v.Tab()==2,"onTabPrevious wraps from GRAPHICS to IMAGE");v.Settle();
- Check(v.Event("onTabNext").actions.empty()&&v.Tab()==0,"onTabNext wraps from IMAGE to GRAPHICS");v.Settle();
+ Check(v.Event("onTabPrevious").actions.empty()&&v.Tab()==3,"onTabPrevious wraps from GRAPHICS to EFFECTS");v.Settle();
+ Check(v.Event("onTabNext").actions.empty()&&v.Tab()==0,"onTabNext wraps from EFFECTS to GRAPHICS");v.Settle();
  Check(v.Event("tab_graphics").actions.empty()&&v.Tab()==0,"the current tab's event changes nothing");
  // Restart Renderer joins GRAPHICS while a renderer change waits for it.
  Check(v.runtime.SetState({{"settings.render.pending",true},{"settings.render.canRestart",true}},v.error,v.time),v.error.c_str());v.Frame();
@@ -131,17 +135,23 @@ static void Tabs(View& v){
  Check(leaving&&arriving&&leaving->data[0]<1&&arriving->data[0]<1&&!v.runtime.CanActivateControl("settings_preset",v.time),"mid-fade the leaving page fades out and no longer acts");
  for(int i=0;i<10;++i)v.Frame();
  Check(PageDisplay(v,PageTabs[0])=="none"&&PageDisplay(v,PageTabs[2])=="block"&&v.runtime.PresentedValue("settings-page-image","opacity")->data[0]==1,"after 150 ms only the new page shows");
- // Character Self-Shadows (#238) sits under Enable Shadows and acts only while shadows are on;
- // the order above walks it with shadows off.
- auto shadows=[&](bool on){Check(v.runtime.SetState({{"settings.draft.r_shadows",on}},v.error,v.time),v.error.c_str());v.Frame();
-  Check(v.runtime.FocusControl("settings_shadows",v.time),"Enable Shadows focuses");v.Key(MenuInput::Next);v.Frame();};
- shadows(true);Check(v.runtime.FocusedControl()=="settings_character_self_shadow","with shadows on Next reaches Character Self-Shadows");
- v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_specular","Character Self-Shadows comes before specular");
- shadows(false);Check(v.runtime.FocusedControl()=="settings_specular"&&!v.runtime.FocusControl("settings_character_self_shadow",v.time),
-  "with shadows off Character Self-Shadows is skipped and takes no focus");
- v.runtime.SetReducedMotion(true,v.time);v.Event("tab_graphics");v.Frame();
- Check(v.Tab()==0&&!v.runtime.CanActivateControl("settings_brightness",v.time)&&v.runtime.CanActivateControl("settings_preset",v.time),"the tab switches at once");
- for(int i=0;i<5;++i)v.Frame();Check(PageDisplay(v,PageTabs[2])=="none","reduced motion bounds the fade to 80 ms");
+ // Shadow Maps sits under Enable Shadows and acts only while shadows are on;
+ // Character Self-Shadows (#238) follows it and acts only while shadow maps
+ // are on as well. The order above walks EFFECTS with shadows off.
+ v.runtime.SetReducedMotion(true,v.time);
+ auto shadows=[&](bool on,bool maps){Check(v.runtime.SetState({{"settings.draft.r_shadows",on},{"settings.draft.r_useShadowMap",maps}},v.error,v.time),v.error.c_str());v.Frame();
+  Check(v.Focus("settings_shadows"),"Enable Shadows focuses");v.Key(MenuInput::Next);v.Frame();};
+ shadows(true,false);Check(v.runtime.FocusedControl()=="settings_shadowmaps","with shadows on Next reaches Shadow Maps");
+ v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_irradiance"&&!v.runtime.FocusControl("settings_character_self_shadow",v.time),
+  "without shadow maps Character Self-Shadows is skipped and takes no focus");
+ shadows(true,true);Check(v.runtime.FocusedControl()=="settings_shadowmaps","Shadow Maps still follows Enable Shadows");
+ v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_character_self_shadow","with shadow maps on Next reaches Character Self-Shadows");
+ v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_irradiance","Character Self-Shadows comes before Irradiance Volumes");
+ shadows(false,true);Check(v.runtime.FocusedControl()=="settings_irradiance"&&!v.runtime.FocusControl("settings_shadowmaps",v.time)&&
+  !v.runtime.FocusControl("settings_character_self_shadow",v.time),"with shadows off both are skipped and take no focus");
+ v.Event("tab_graphics");v.Frame();
+ Check(v.Tab()==0&&!v.runtime.CanActivateControl("settings_shadows",v.time)&&v.runtime.CanActivateControl("settings_preset",v.time),"the tab switches at once");
+ for(int i=0;i<5;++i)v.Frame();Check(PageDisplay(v,PageTabs[3])=="none","reduced motion bounds the fade to 80 ms");
 }
 static void Semantics(const std::string& source,const std::string& locale){View v(source,locale);auto baseline=v.host.live;Check(v.Alias("draftPreset")=="balanced"&&v.Alias("baselinePreset")=="balanced","exact initial aliases");Tabs(v);v.Open();v.Key(MenuInput::End);v.Frame();{const auto last=v.Box("settings_preset-option-8"),list=v.Box("settings_preset-viewport");Check(v.Widget().highlight=="settings_preset-option-8"&&last.y>=list.y-.5f&&last.y+last.height<=list.y+list.height+.5f,"End reaches the ninth profile, wholly visible");}v.Key(MenuInput::Back);v.Frame();Check(!v.Widget().popupOpen&&v.runtime.TakeActions().empty()&&SettingsValuesEqual(v.tx.Draft(),baseline),"Back cancels highlight without writing");
  std::set<std::string> footprint(PerformancePresetTargets().begin(),PerformancePresetTargets().end());unsigned i=0;for(auto& p:PerformancePresets()){auto proposal=v.Select(i++);Check(std::get<std::string>(*proposal.proposal)==p.name,"all nine exact canonical names");auto before=v.tx.Draft();v.Accept(proposal);for(auto& [k,x]:v.Patch(p))Check(SettingsValueEqual(v.tx.Draft().at(k),x),"generated target accepted");for(auto& [k,x]:before)if(!footprint.contains(k))Check(SettingsValueEqual(v.tx.Draft().at(k),x),"all23 unrelated custom values preserved");Check(v.Alias("draftPreset")==p.name&&v.Alias("baselinePreset")=="balanced","draft alias changes, baseline stays exact");}

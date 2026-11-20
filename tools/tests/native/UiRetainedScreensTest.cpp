@@ -4709,12 +4709,12 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(diagnostics.empty() && document.Model().id == "openq4.controls" && document.Model().canvasHeight == 720,
 		"the CONTROLS page validates on the 4:3 canvas");
 	CheckSessionActions(document);
-	for (int row = 0; row < 50; ++row) {
+	for (int row = 0; row < 51; ++row) {
 		const auto* node = document.Model().FindNode("controls_bind_"+std::to_string(row));
 		Check(node && node->control && node->control->role == ControlRole::Button && node->control->action == "controlsBind",
 			"each binding row asks the session to wait for a key");
 	}
-	Check(!document.Model().FindNode("controls_bind_50"),"the stock page's 49 bindings and the Classic ruleset's hook, no more");
+	Check(!document.Model().FindNode("controls_bind_51"),"the stock page's 49 bindings, the Classic ruleset's hook and Last Weapon, no more");
 	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other","tab-mouse","tab-controller"})
 		Check(document.Model().FindNode(tab) != nullptr,"the stock tabs, then the devices'");
 	CheckCvarRows(document,{{"controls_freelook","in_freeLook"},{"controls_togglezoom","in_toggleZoom"},
@@ -4743,7 +4743,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		{"controls.0.keys.key1",std::string("UPARROW")},{"controls.0.keys.key1.glyph",0.0},{"controls.0.keys.key1.arrow",1.0},
 		{"controls.0.keys.keyCount",2.0},{"controls.0.keys.pad0",std::string("A")},{"controls.0.keys.pad0.glyph",1.0},
 		{"controls.0.keys.padCount",1.0},{"controls.0.keys.more",std::string("+1")},
-		{"controls.49.keys.key0",std::string("V")},{"controls.49.keys.keyCount",1.0}},error,0.1),
+		{"controls.50.keys.key0",std::string("V")},{"controls.50.keys.keyCount",1.0}},error,0.1),
 		"the session publishes the keys");
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
@@ -4806,8 +4806,8 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(tab() == 5 && runtime.FocusedControl() == "controls_controller","the tabs wrap to the last, CONTROLLER");
 	Check(runtime.RunEvent("tab_other",0.801,effects,error),"choose OTHER");
 	runtime.Frame(viewport,0.811);
-	Check(tab() == 3 && runtime.FocusedControl() == "controls_bind_37","OTHER opens on its first binding");
-	Check(text("controls_bind_49-key0-cap-name","text") == "V" && text("controls_bind_49-key0","display") == "flex",
+	Check(tab() == 3 && runtime.FocusedControl() == "controls_bind_38","OTHER opens on its first binding");
+	Check(text("controls_bind_50-key0-cap-name","text") == "V" && text("controls_bind_50-key0","display") == "flex",
 		"the last tab shows its keys");
 	// TOUCH LAYOUT closes the Other tab only where the session reports the
 	// built-in touch controls (Android); it asks for the layout editor.
@@ -4820,7 +4820,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		Check(runtime.SetState({{"controls.touchLayout",true}},error,0.82),"the session reports the touch controls");
 		runtime.Frame(viewport,0.83);
 		Check(text("controls_touch_layout","display") == "block","TOUCH LAYOUT shows with the touch controls");
-		const auto last = bounds("controls_bind_49"), touchRow = bounds("controls_touch_layout");
+		const auto last = bounds("controls_bind_50"), touchRow = bounds("controls_touch_layout");
 		Check(std::abs(touchRow.x-last.x) < .5f && touchRow.y > last.y,"TOUCH LAYOUT follows the last binding in its column");
 		Check(runtime.FocusControl("controls_touch_layout",0.84),"TOUCH LAYOUT takes focus");
 		runtime.TakeActions();
@@ -4829,14 +4829,14 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		Check(actions.size() == 1 && actions[0].action == "controlsTouchLayout","Accept on TOUCH LAYOUT asks for the editor");
 		Check(runtime.SetState({{"controls.touchLayout",false}},error,0.86),"the touch controls go");
 		runtime.Frame(viewport,0.87);
-		Check(runtime.FocusControl("controls_bind_37",0.88),"focus returns to the tab");
+		Check(runtime.FocusControl("controls_bind_38",0.88),"focus returns to the tab");
 	}
-	// MOUSE: the aim settings lead, then the mouse's own; a setting row sets
-	// its CVar, Free Look off.
+	// MOUSE: AIM and MOUSE INPUT, then ACCELERATION beside them; a setting row
+	// sets its CVar, Free Look off.
 	Check(runtime.RunEvent("onTabNext",0.89,effects,error),"the next tab");
 	runtime.Frame(viewport,0.9);
 	Check(tab() == 4 && runtime.FocusedControl() == "controls_freelook","MOUSE opens on Free Look");
-	Check(!runtime.FocusControl("controls_bind_37",0.91),"the bindings rest while MOUSE is current");
+	Check(!runtime.FocusControl("controls_bind_38",0.91),"the bindings rest while MOUSE is current");
 	runtime.TakeActions();
 	press(MenuInput::Accept,0.92);
 	auto invocation = TakeOneAction(runtime,"set.in_freeLook");
@@ -4874,16 +4874,21 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		Check(settled && std::get<double>(settled->accepted) == 7.25 && (!settled->number || !settled->number->conflict),
 			"and the field settles on it without a conflict");
 	}
-	// The sensitivity ends the first column; Down goes on to the second.
+	// CPI follows the sensitivity it scales; ACCELERATION stands beside.
 	press(MenuInput::Down,0.984);
-	Check(runtime.FocusedControl() == "controls_mcpi","Down goes on to the second column");
-	const auto aim = bounds("controls_freelook"), cpi = bounds("controls_mcpi");
-	Check(cpi.x > aim.x+aim.width && std::abs(cpi.y-aim.y) < .5f,"the mouse's rows stand in two columns");
+	Check(runtime.FocusedControl() == "controls_mcpi","Down goes on to the CPI under the sensitivity");
+	const auto aim = bounds("controls_freelook"), sensitivity = bounds("controls_msensitivity"), cpi = bounds("controls_mcpi");
+	const auto accel = bounds("controls_maccel");
+	Check(std::abs(cpi.x-sensitivity.x) < .5f && cpi.y > sensitivity.y,"CPI stands under the sensitivity");
+	Check(accel.x > aim.x+aim.width && std::abs(accel.y-aim.y) < .5f,"the mouse's rows stand in two columns");
 	// CONTROLLER: its first row, and its prompt style a list of the stock values.
 	Check(runtime.RunEvent("onTabNext",0.99,effects,error),"the next tab");
 	runtime.Frame(viewport,1.0);
 	Check(tab() == 5 && runtime.FocusedControl() == "controls_controller","CONTROLLER opens on Controller");
 	Check(!runtime.FocusControl("controls_freelook",1.01),"MOUSE's rows rest while CONTROLLER is current");
+	const auto sticks = bounds("controls_controller"), trigger = bounds("controls_trigger"), gyro = bounds("controls_gyro");
+	Check(trigger.x > sticks.x+sticks.width && std::abs(trigger.y-sticks.y) < .5f && std::abs(gyro.x-trigger.x) < .5f &&
+		gyro.y > trigger.y,"STICKS beside TRIGGERS AND RUMBLE, GYRO AND TOUCH under them");
 	Check(runtime.FocusControl("controls_promptstyle",1.02),"focus the prompt style");
 	runtime.TakeActions();
 	press(MenuInput::Right,1.03);
@@ -4894,16 +4899,17 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "controlsBack","Back asks the session to return");
 	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,1.2);
-	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_49");
+	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_50");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"controls_bind_43","controls_bind_44","controls_bind_49","controls-other-rows",1.3);
-	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_43","controls_bind_44","controls_bind_49",1.4);
+	CheckSettingsPortrait(runtime,document,"controls_bind_44","controls_bind_45","controls_bind_50","controls-other-rows",1.3);
+	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_44","controls_bind_45","controls_bind_50",1.4);
 	host.cvars = saved;
 }
 
-// The retained GAME OPTIONS page (tools/ui/retained_game.py): three tabs of
-// at most two columns, the mouse and controller rows now on CONTROLS; a row naming a CVar reads it back and sets it with
+// The retained GAME OPTIONS page (tools/ui/retained_game.py): five tabs of
+// at most two columns (GENERAL, HUD, VIEW WEAPON, ACCESSIBILITY, VIRTUAL
+// REALITY), the mouse and controller rows now on CONTROLS; a row naming a CVar reads it back and sets it with
 // settings.player.set; the rows the stock page computes ask the session; the
 // custom crosshair follows Crosshair's setting.
 static void CheckGamePage(ScreenHost& host, const char* path) {
@@ -4915,7 +4921,7 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	CheckSessionActions(document);
 	CheckCvarRows(document,{{"game_autoreload","ui_autoReload"},{"game_gunfov","cl_gunfov"},{"game_weaponkick","g_weaponMuzzleKick"},
 		{"game_crosshaircolor","g_crosshairColor"},{"game_hudscale","ui_hudScale"},{"game_console","con_allowConsole"},
-		{"game_vrsnap","vr_snapTurnAngle"}});
+		{"game_vrsnap","vr_snapTurnAngle"},{"game_viewkick","g_viewKick"},{"game_vr","vr_enable"},{"game_vrcrouch","vr_physicalCrouch"}});
 	for (const char* moved : {"game_freelook","game_togglezoom","game_scopesensitivity","game_msensitivity","game_controller","game_promptstyle"})
 		Check(!document.Model().FindNode(moved),"the mouse, controller and aim rows are on CONTROLS");
 	for (const char* setting : {"set.in_freeLook","set.sensitivity","set.in_joystick"})
@@ -4946,14 +4952,15 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
 	Check(tab() == 0 && runtime.FocusedControl() == "game_autoreload","the page opens on GENERAL's first row");
-	// GENERAL: its own rows in the first column, GAMEPLAY and VIEW WEAPON in
-	// the second; Down from the first column's last row goes on to the second,
-	// and Up from the first row reaches the tab.
-	const auto general = bounds("game_autoreload"), gameplay = bounds("game_corpsesink");
-	Check(gameplay.x > general.x+general.width,"the sections stand in two columns");
-	Check(runtime.FocusControl("game_screenshake",0.51),"focus the first column's last row");
+	// GENERAL: GAMEPLAY in the first column, INTERFACE and ITEMS AND PLAYERS
+	// in the second; Down from the first column's last row goes on to the
+	// second, and Up from the first row reaches the tab.
+	const auto gameplay = bounds("game_autoreload"), interface = bounds("game_language"), players = bounds("game_simpleitems");
+	Check(interface.x > gameplay.x+gameplay.width,"the sections stand in two columns");
+	Check(std::abs(players.x-interface.x) < .5f && players.y > interface.y,"ITEMS AND PLAYERS follows INTERFACE");
+	Check(runtime.FocusControl("game_skipcinematics",0.51),"focus the first column's last row");
 	press(MenuInput::Down,0.52);
-	Check(runtime.FocusedControl() == "game_corpsesink","Down goes on to the second column");
+	Check(runtime.FocusedControl() == "game_language","Down goes on to the second column");
 	Check(runtime.FocusControl("game_autoreload",0.53),"focus the first row");
 	press(MenuInput::Up,0.54);
 	Check(runtime.FocusedControl() == "tab-general","Up from the first row reaches the tab");
@@ -4969,9 +4976,9 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,1.26);
 	Check(tab() == 1 && runtime.FocusedControl() == "game_hudlayout","HUD follows GENERAL, on its first row");
 	Check(!runtime.FocusControl("game_autoreload",1.27),"GENERAL's rows rest while another tab is current");
-	// VIEW WEAPON stands under CROSSHAIR in HUD's second column.
-	const auto crosshair = bounds("game_crosshairanimated"), gunfov = bounds("game_gunfov_row");
-	Check(std::abs(gunfov.x-crosshair.x) < .5f && gunfov.y > crosshair.y,"VIEW WEAPON follows CROSSHAIR");
+	// CROSSHAIR stands beside HUD; VIEW WEAPON has its own tab.
+	const auto hud = bounds("game_hudlayout"), crosshair = bounds("game_customcrosshair");
+	Check(crosshair.x > hud.x+hud.width,"CROSSHAIR stands in HUD's second column");
 	Check(runtime.FocusControl("game_crosshaircolor",1.3),"focus the crosshair colour");
 	press(MenuInput::Accept,1.31); runtime.Frame(viewport,1.35);
 	press(MenuInput::Down,1.4); press(MenuInput::Accept,1.45);
@@ -4984,6 +4991,25 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	Check(runtime.FocusControl("game_crosshair",1.61),"the custom crosshair unlocks");
 	press(MenuInput::Right,1.62);
 	Check(std::get<double>(taken("gameCrosshair").arguments.at("value")) == 4,"Right asks the session for the next crosshair");
+	// VIEW WEAPON: where the weapon stands, then how it is viewed.
+	Check(runtime.RunEvent("onTabNext",1.63,effects,error),"the next tab");
+	runtime.Frame(viewport,1.631);
+	Check(tab() == 2 && runtime.FocusedControl() == "game_showgun","VIEW WEAPON follows HUD, on Show Gun");
+	const auto showgun = bounds("game_showgun"), gunz = bounds("game_gunz"), gunfov = bounds("game_gunfov_row");
+	Check(std::abs(gunz.x-showgun.x) < .5f && gunz.y > showgun.y && gunfov.x > showgun.x+showgun.width,
+		"the offsets stand under Show Gun, the field of view beside them");
+	// ACCESSIBILITY: the motion settings beside the visibility ones.
+	Check(runtime.RunEvent("onTabNext",1.635,effects,error),"the next tab");
+	runtime.Frame(viewport,1.636);
+	Check(tab() == 3 && runtime.FocusedControl() == "game_viewkick","ACCESSIBILITY follows VIEW WEAPON, on View Kick");
+	const auto kick = bounds("game_viewkick"), flashing = bounds("game_reducedflashing");
+	Check(flashing.x > kick.x+kick.width && bounds("game_cinematicshake").y > kick.y,"MOTION and VISIBILITY stand in two columns");
+	// VIRTUAL REALITY: an on and off setting is a toggle.
+	Check(runtime.RunEvent("onTabNext",1.64,effects,error),"the next tab");
+	runtime.Frame(viewport,1.641);
+	Check(tab() == 4 && runtime.FocusedControl() == "game_vr","VIRTUAL REALITY follows ACCESSIBILITY, on VR Mode");
+	press(MenuInput::Accept,1.642);
+	Check(std::get<bool>(taken("set.vr_enable").arguments.at("value")),"Accept turns VR Mode on as a toggle");
 	// Corpse Time shows Custom but never offers it.
 	Check(runtime.RunEvent("tab_general",1.65,effects,error),"back to GENERAL");
 	runtime.Frame(viewport,1.66);
@@ -5007,8 +5033,8 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	const auto panel = bounds("game-panel"), row = bounds("game_enhancedphysics");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"game_screenshake","game_corpsesink","game_enhancedphysics","game-general-rows",2.2);
-	CheckSettingsTextScale(host,runtime,document,"game-general","game_screenshake","game_corpsesink","game_enhancedphysics",2.3);
+	CheckSettingsPortrait(runtime,document,"game_skipcinematics","game_language","game_forcemodel","game-general-rows",2.2);
+	CheckSettingsTextScale(host,runtime,document,"game-general","game_skipcinematics","game_language","game_forcemodel",2.3);
 	host.cvars = saved;
 }
 

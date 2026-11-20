@@ -3,11 +3,14 @@ sections 7, 9 and 13.7; UI-01): the stock page's key bindings
 (guis/menu/settings/controls.gui) in the settings sub-page
 (retained_settings_rows), the stock page's four tabs as its tabs: movement,
 weapons, attack and look, and other, each in two columns. Two tabs follow
-them for the devices themselves (issue #220): MOUSE, which leads with the
-aim settings (Free Look, Toggle Zoom and Scope Sensitivity), and CONTROLLER,
-the stock GAME OPTIONS page's MOUSE INPUT and CONTROLLER sections. Their rows
-set CVars as the GAME OPTIONS page's do (retained_settings_rows.cvar_row);
-the key hint stands only on the binding tabs.
+them for the devices themselves (issue #220): MOUSE, AIM and MOUSE INPUT
+beside ACCELERATION, and CONTROLLER, STICKS and PROMPTS beside TRIGGERS AND
+RUMBLE and GYRO AND TOUCH: the stock GAME OPTIONS page's MOUSE INPUT and
+CONTROLLER sections, sorted under headings so that a setting stands with
+those it works with (Sensitivity beside CPI, the low battery rumble under
+Rumble). Their rows set CVars as the GAME OPTIONS page's do
+(retained_settings_rows.cvar_row); the key hint stands only on the binding
+tabs, the device tabs' headings on their heading line.
 
 Each row names an action and draws the keys bound to it as glyphs
 (retained_key_glyphs): up to two keyboard or mouse keys, then up to two
@@ -38,8 +41,8 @@ from build_retained_screens import (ORANGE, U, Document, absolute, group, keywor
                                     number, path, rgb, solid, text_width, typeface, vector)
 from retained_key_glyphs import bound_keys, em
 from retained_mp_menus import PLACEHOLDER, any_text, row_face, row_states
-from retained_settings_rows import (COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, row_chrome, rows_value_column,
-                                    settings_subpage, slider, toggle, value_column)
+from retained_settings_rows import (COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, row_chrome,
+                                    rows_value_column, settings_subpage, slider, toggle, value_column)
 
 PREFIX = "controls"
 # Each section: its id, heading (the stock tab) and rows (label, binding), in
@@ -71,46 +74,53 @@ SECTIONS = (
     )),
 )
 BINDINGS = tuple(binding for _section, _heading, rows in SECTIONS for _label, binding in rows)
-# The device tabs: each its id, label, rows that set CVars and the rows that
-# fill the first of its two columns. The aim settings apply to every device's
-# look but Free Look is the mouse's, so the three lead MOUSE.
+# The device tabs: each its id, label and two columns of headings and the
+# rows that set CVars. The aim settings apply to every device's look but Free
+# Look is the mouse's, so they lead MOUSE.
 DEVICES = (
     ("mouse", "#str_231777", (
-        toggle("controls_freelook", "#str_200133", "in_freeLook"),
-        toggle("controls_togglezoom", "#str_41108", "in_toggleZoom"),
-        slider("controls_scopesensitivity", "#str_229972", "pm_zoomedSlow", 1, 100, 1),
-        choice("controls_invertmouse", "#str_200139", "m_pitch", "#str_200059", ("0.022", "-0.022")),
-        slider("controls_msmooth", "#str_200140", "m_smooth", 1, 8, 1),
-        slider("controls_msensitivity", "#str_200141", "sensitivity", 0.01, 30, 0.01, 2),
-        slider("controls_mcpi", "#str_229936", "m_cpi", 0, 32000, 50),
-        slider("controls_mfilter", "#str_229937", "m_filter", 0, 31, 1),
-        slider("controls_maccel", "#str_229938", "cl_mouseAccel", -5, 5, 0.01, 2),
-        slider("controls_macceloffset", "#str_229939", "cl_mouseAccelOffset", 0, 50, 0.1, 1),
-        slider("controls_maccelpower", "#str_229940", "cl_mouseAccelPower", 1, 8, 0.05, 2),
-        slider("controls_msenscap", "#str_229941", "cl_mouseSensCap", 0, 100, 0.1, 1),
-    ), 6),
+        (heading("#str_232555"),
+         toggle("controls_freelook", "#str_200133", "in_freeLook"),
+         choice("controls_invertmouse", "#str_200139", "m_pitch", "#str_200059", ("0.022", "-0.022")),
+         toggle("controls_togglezoom", "#str_41108", "in_toggleZoom"),
+         slider("controls_scopesensitivity", "#str_229972", "pm_zoomedSlow", 1, 100, 1),
+         heading("#str_229935"),
+         slider("controls_msensitivity", "#str_200141", "sensitivity", 0.01, 30, 0.01, 2),
+         slider("controls_mcpi", "#str_229936", "m_cpi", 0, 32000, 50),
+         slider("controls_msmooth", "#str_200140", "m_smooth", 1, 8, 1),
+         slider("controls_mfilter", "#str_229937", "m_filter", 0, 31, 1)),
+        (heading("#str_232556"),
+         slider("controls_maccel", "#str_229938", "cl_mouseAccel", -5, 5, 0.01, 2),
+         slider("controls_macceloffset", "#str_229939", "cl_mouseAccelOffset", 0, 50, 0.1, 1),
+         slider("controls_maccelpower", "#str_229940", "cl_mouseAccelPower", 1, 8, 0.05, 2),
+         slider("controls_msenscap", "#str_229941", "cl_mouseSensCap", 0, 100, 0.1, 1)),
+    )),
     ("controller", "#str_229924", (
-        toggle("controls_controller", "#str_229925", "in_joystick"),
-        choice("controls_southpaw", "#str_229930", "in_joystickSouthpaw", "#str_229934", (0, 1)),
-        slider("controls_deadzone", "#str_229926", "in_joystickDeadZone", 0, 0.95, 0.01, 2),
-        slider("controls_looksensitivity", "#str_229931", "in_joystickLookSensitivity", 0.1, 4, 0.05, 2),
-        slider("controls_wheelsensitivity", "#str_42840", "in_weaponWheelSensitivity", 0.25, 16, 0.25, 2),
-        slider("controls_wheeloffset", "#str_230140", "ui_weaponWheelOffset", -40, 40, 1),
-        slider("controls_lookcurve", "#str_229932", "in_joystickLookCurve", 1, 3, 0.05, 2),
-        toggle("controls_invertlook", "#str_229933", "in_joystickInvertLook"),
-        slider("controls_trigger", "#str_229927", "in_joystickTriggerThreshold", 0, 1, 0.01, 2),
-        toggle("controls_rumble", "#str_229928", "in_joystickRumble"),
-        slider("controls_rumblescale", "#str_229929", "in_joystickRumbleScale", 0, 2, 0.05, 2),
-        toggle("controls_gyro", "#str_229964", "in_gyro"),
-        slider("controls_gyrosensitivity", "#str_229965", "in_gyroSensitivity", 0, 8, 0.05, 2),
-        choice("controls_touchpad", "#str_229966", "in_touchpadMode", "#str_229967", (0, 1, 2, 3)),
-        slider("controls_touchpadsensitivity", "#str_229968", "in_touchpadSensitivity", 0, 8, 0.05, 2),
-        toggle("controls_touchscreen", "#str_229969", "in_touchscreen"),
-        slider("controls_batterythreshold", "#str_229970", "in_joystickLowBatteryRumbleThreshold", 0, 100, 1),
-        slider("controls_batteryscale", "#str_229971", "in_joystickLowBatteryRumbleScale", 0, 2, 0.05, 2),
-        choice("controls_promptstyle", "#str_231526", "in_promptStyle", "#str_231527", (0, 1, 2, 3, 4, 5)),
-        choice("controls_swapconfirm", "#str_231528", "in_swapConfirmBack", "#str_231529", (0, 1, 2)),
-    ), 9),
+        (heading("#str_232557"),
+         toggle("controls_controller", "#str_229925", "in_joystick"),
+         choice("controls_southpaw", "#str_229930", "in_joystickSouthpaw", "#str_229934", (0, 1)),
+         slider("controls_deadzone", "#str_229926", "in_joystickDeadZone", 0, 0.95, 0.01, 2),
+         slider("controls_looksensitivity", "#str_229931", "in_joystickLookSensitivity", 0.1, 4, 0.05, 2),
+         slider("controls_lookcurve", "#str_229932", "in_joystickLookCurve", 1, 3, 0.05, 2),
+         toggle("controls_invertlook", "#str_229933", "in_joystickInvertLook"),
+         slider("controls_wheelsensitivity", "#str_42840", "in_weaponWheelSensitivity", 0.25, 16, 0.25, 2),
+         slider("controls_wheeloffset", "#str_230140", "ui_weaponWheelOffset", -40, 40, 1),
+         heading("#str_232560"),
+         choice("controls_promptstyle", "#str_231526", "in_promptStyle", "#str_231527", (0, 1, 2, 3, 4, 5)),
+         choice("controls_swapconfirm", "#str_231528", "in_swapConfirmBack", "#str_231529", (0, 1, 2))),
+        (heading("#str_232558"),
+         slider("controls_trigger", "#str_229927", "in_joystickTriggerThreshold", 0, 1, 0.01, 2),
+         toggle("controls_rumble", "#str_229928", "in_joystickRumble"),
+         slider("controls_rumblescale", "#str_229929", "in_joystickRumbleScale", 0, 2, 0.05, 2),
+         slider("controls_batterythreshold", "#str_229970", "in_joystickLowBatteryRumbleThreshold", 0, 100, 1),
+         slider("controls_batteryscale", "#str_229971", "in_joystickLowBatteryRumbleScale", 0, 2, 0.05, 2),
+         heading("#str_232559"),
+         toggle("controls_gyro", "#str_229964", "in_gyro"),
+         slider("controls_gyrosensitivity", "#str_229965", "in_gyroSensitivity", 0, 8, 0.05, 2),
+         choice("controls_touchpad", "#str_229966", "in_touchpadMode", "#str_229967", (0, 1, 2, 3)),
+         slider("controls_touchpadsensitivity", "#str_229968", "in_touchpadSensitivity", 0, 8, 0.05, 2),
+         toggle("controls_touchscreen", "#str_229969", "in_touchscreen")),
+    )),
 )
 TOUCH_LAYOUT_ROW, TOUCH_LAYOUT_LABEL = "controls_touch_layout", "#str_231762"
 CAPTURE = "controls.capture"              # the row waiting for a key, or -1
@@ -128,9 +138,14 @@ def keys_column(labels) -> float:
     return max(value_column(labels), min(round(one_line + 0.5), round(U * COLUMN_W - 12 - KEYS_ROOM)))
 
 
+def device_rows():
+    """Every device tab's rows that set CVars, in reading order."""
+    return (item for _ident, _key, columns in DEVICES for column in columns for item in column if item[0] != "heading")
+
+
 def setting_rows() -> list:
     """Every device row: (cvar, kind, values or range)."""
-    return cvar_settings(row for _ident, _key, rows, _split in DEVICES for row in rows)
+    return cvar_settings(device_rows())
 
 
 def bind_row(doc: Document, row: int, label_key: str, value_x: float) -> dict:
@@ -202,10 +217,10 @@ def controls_document() -> dict:
         half = (len(built) + 1) // 2
         tabs.append((section, heading_key, [built[:half], built[half:]]))
     # The device tabs share one value column, as GAME OPTIONS' rows do.
-    value_x = rows_value_column(row for _ident, _key, rows, _split in DEVICES for row in rows)
-    for ident, key, rows, split in DEVICES:
-        built = [cvar_row(doc, row, value_x) for row in rows]
-        tabs.append((ident, key, [built[:split], built[split:]]))
+    value_x = rows_value_column(device_rows())
+    for ident, key, columns in DEVICES:
+        tabs.append((ident, key, [[item if item[0] == "heading" else cvar_row(doc, item, value_x) for item in column]
+                                  for column in columns]))
     # The west face button clears the focused row, as Delete does.
     doc.events["onSecondary"] = [{"op": "action", "action": "controlsClear"}]
     # The prompt bar (section 13.4): Accept reads CHANGE on a row; while the

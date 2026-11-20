@@ -19,9 +19,9 @@ Choose a preset on **Settings → Display → Graphics → Performance Preset** 
 
 **Not in 0.14.1:** in 0.14.1 only Maximum used cascades, so on Quality and Ultra the shadows of characters and nearby objects outdoors were blocky or missing.
 
-The change applies at once; you don't need to restart the renderer. **Settings → Display → Image Quality → Enable Shadows** turns all shadows off or on, whichever kind the preset uses.
+The change applies at once; you don't need to restart the renderer. **Settings → Display → Effects → Enable Shadows** (**Image Quality** in 0.14.1) turns all shadows off or on, whichever kind the preset uses.
 
-To use shadow maps with any other preset, open the console and enter:
+To use shadow maps with any other preset, turn on **Settings → Display → Effects → Shadow Maps** under Enable Shadows and press **Apply Changes** (not in 0.14.1), or open the console and enter:
 
 ```cfg
 seta r_shadows 1
@@ -115,7 +115,7 @@ seta r_shadowMapPointFilterMode 1
 
 **Not in 0.14.1.** In the original game, characters never cast shadows on themselves or on each other. Raven marked their materials to stay out of those shadows, because the original hard-edged shadows drew jagged, faceted bands across their low-polygon bodies. openQ4 keeps that look by default.
 
-Turn on **Character Self-Shadows** under **Settings > Display > Image Quality**, or set `r_shadowMapCharacterSelfShadow 1`, to let monsters, marines and other animated characters shadow themselves under lights drawn with shadow maps: an arm darkens the chest it hangs in front of, and the underside of a shoulder pad falls into shade. They also shadow each other and the props and machines that used to stay clear of their shadows. It changes nothing under the original stencil shadows, and nothing for the players' own bodies and weapons. It needs shadow maps, so it does nothing below the Enhanced preset; on Enhanced, the point lights still use the original shadows. It can be switched on or off at any time and takes effect once you apply the change. The menu row is greyed out while **Enable Shadows** is off.
+Turn on **Character Self-Shadows** under **Settings > Display > Effects** (**Image Quality** in 0.14.1); it needs **Shadow Maps** on, or set `r_shadowMapCharacterSelfShadow 1`, to let monsters, marines and other animated characters shadow themselves under lights drawn with shadow maps: an arm darkens the chest it hangs in front of, and the underside of a shoulder pad falls into shade. They also shadow each other and the props and machines that used to stay clear of their shadows. It changes nothing under the original stencil shadows, and nothing for the players' own bodies and weapons. It needs shadow maps, so it does nothing below the Enhanced preset; on Enhanced, the point lights still use the original shadows. It can be switched on or off at any time and takes effect once you apply the change. The menu row is greyed out while **Enable Shadows** is off.
 
 ## Shadows through see-through surfaces
 
@@ -169,7 +169,7 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 
 ## Troubleshooting
 
-- **No shadows at all.** Check **Settings → Display → Image Quality → Enable Shadows** (`r_shadows 1`), then `r_useShadowMap 1`, or pick Quality or higher.
+- **No shadows at all.** Check **Settings → Display → Effects → Enable Shadows** (`r_shadows 1`), then **Shadow Maps** (`r_useShadowMap 1`), or pick Quality or higher. In 0.14.1 Enable Shadows is on **Image Quality** and shadow maps are console-only.
 - **Shadows shimmer as you move.** Keep `r_shadowMapCascadeStabilize 1` and `r_shadowMapStaticCache 1`.
 - **Shadows float away from the objects casting them.** For point lights, first confirm `r_shadowMapCasterCulling 2` and `r_shadowMapPointMaxWorldBias 4`, then lower `r_shadowMapPointFilterRadius`, `r_shadowMapPointBias` or `r_shadowMapPointNormalBias` in small steps. For spotlights, lower `r_shadowMapBias`, `r_shadowMapNormalBias`, `r_shadowMapTexelBiasScale`, `r_shadowMapPolygonFactor` or `r_shadowMapPolygonOffset` in small steps.
 - **Speckles or stripes on surfaces (shadow acne).** Raise the matching bias a very little. If it only happens with a wide soft edge, raise the shadow resolution or narrow `r_shadowMapFilterRadius` first.

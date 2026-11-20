@@ -30,8 +30,8 @@ hardware, so please report how it runs on yours (see
    monitor.
 2. Start your headset's software (for example SteamVR or the Meta Quest Link
    app) and make it your system's active OpenXR runtime.
-3. Start openQ4, open **Settings → Game Options → Virtual Reality** and set
-   **VR Mode** to Enabled. The headset shows the menu on a floating screen.
+3. Start openQ4, open **Settings → Game Options → Virtual Reality** and turn
+   **VR Mode** on (Enabled in the classic menus). The headset shows the menu on a floating screen.
 4. Stand (or sit) where you want to play, face forwards, and hold the
    weapon-hand thumbstick in for a second to recentre.
 5. Point at the menu with your right controller: a dot shows where it points,
@@ -66,8 +66,8 @@ on the same tab. If nothing appears in the headset, see
 ## Turning VR on
 
 1. Start your headset and its OpenXR runtime (for example SteamVR).
-2. In openQ4, open **Settings → Game Options → Virtual Reality** and set
-   **VR Mode** to Enabled. VR starts at once. The setting is saved, so the next
+2. In openQ4, open **Settings → Game Options → Virtual Reality** and turn
+   **VR Mode** on (Enabled in the classic menus). VR starts at once. The setting is saved, so the next
    launch starts in VR too.
 
 In the headset, point at a tab and pull the trigger to open it, or squeeze the
@@ -79,7 +79,7 @@ crouching, the play space and (**not in 0.14.1**) your own body. The tables in
 this guide list every setting, including those you can only set in the console.
 
 When VR is on, the desktop window shows what your left eye sees. To turn VR off,
-set **VR Mode** back to Disabled (you can point at it in the headset).
+turn **VR Mode** off again (Disabled in the classic menus; you can point at it in the headset).
 
 From the console, `vr_enable 1` and `vr_enable 0` do the same, and you can
 launch with `+set vr_enable 1`.

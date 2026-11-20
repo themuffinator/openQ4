@@ -92,7 +92,8 @@ class Presets(unittest.TestCase):
         self.assertEqual(tuple(system.PROFILES),PROFILES)
         self.assertEqual(self.page['extensions']['openq4']['presets'],system.EXTENSIONS['presets'])
     def test_graphics_tab_placement_and_order(self):
-        self.assertEqual([n['id'] for n in self.nodes['settings-body']['children']],['settings-page-graphics','settings-page-screen','settings-page-image'])
+        self.assertEqual([n['id'] for n in self.nodes['settings-body']['children']],['settings-page-graphics','settings-page-screen','settings-page-image',
+                                                                                    'settings-page-effects'])
         # The column's heading leads it; the preset is the tab's first row.
         self.assertEqual([n['id'] for n in self.nodes['settings-graphics-column-0']['children']],
                          ['settings-graphics-head-0','settings_preset','settings_autodetect','settings_backend','settings_gpu','settings_renderer',

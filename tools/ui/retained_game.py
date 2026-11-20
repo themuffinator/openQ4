@@ -1,11 +1,20 @@
 """The retained GAME OPTIONS settings page (docs/dev/ui-visual-design.md
 sections 7, 9 and 13.7; UI-01): the stock page's rows
 (guis/menu/settings/game.gui) in the settings sub-page
-(retained_settings_rows), its six sections on three tabs of at most two
-columns: GENERAL (general | gameplay), HUD (HUD | crosshair and view weapon)
-and VIRTUAL REALITY. The stock page's mouse and controller sections, with
-Free Look, Toggle Zoom and Scope Sensitivity, are the CONTROLS page's MOUSE
-and CONTROLLER tabs (retained_controls, issue #220).
+(retained_settings_rows), in nine sections on five tabs of at most two
+columns: GENERAL (gameplay | interface, items and players), HUD (HUD |
+crosshair), VIEW WEAPON (its place | its view), ACCESSIBILITY (motion |
+visibility) and VIRTUAL REALITY. The stock page's mouse and controller
+sections, with Free Look, Toggle Zoom and Scope Sensitivity, are the CONTROLS
+page's MOUSE and CONTROLLER tabs (retained_controls, issue #220).
+
+The stock page grouped its rows by where they were added; the tabs group
+them by what they change (the settings tree audit of 20 November 2026). The
+comfort settings that were spread over three sections (view kick, screen and
+cinematic shake, reduced flashing, the opaque menu backing) share
+ACCESSIBILITY; Show Gun and Gun Position join the view weapon's offsets and
+field of view; Language, Console Access and Screenshot Format leave the
+gameplay rows for INTERFACE.
 
 Each row applies at once, as the stock page's controls do. A row that names
 a CVar reads it back through the page's CVar state and sets it with the
@@ -35,19 +44,37 @@ def verb_choice(ident: str, label: str, verb: str, key: str, count: int, enabled
     return ("verb_choice", ident, label, verb, (key, count, enabled))
 
 
-# Each section: its id, heading and rows, in the stock page's order.
+# Each section: its id, heading and rows.
 SECTIONS = (
-    ("general", "#str_231542", (
+    ("gameplay", "#str_231544", (
         toggle("game_autoreload", "#str_200134", "ui_autoReload"),
         choice("game_autoswitch", "#str_200135", "ui_autoSwitch", "#str_232540", (0, 1, 2)),
         toggle("game_decals", "#str_200136", "g_decals"),
-        toggle("game_showgun", "#str_200138", "ui_showGun"),
-        verb_choice("game_gunposition", "#str_223007", "gameGunPosition", "#str_223008", 3),
+        choice("game_corpsesink", "#str_229917", "g_corpseSink", "#str_229921", (0, 1, 2)),
+        verb_choice("game_corpsetime", "#str_229918", "gameCorpseTime", "#str_229919", 8, enabled=7),
+        toggle("game_enhancedphysics", "#str_231720", "g_enhancedPhysics"),
+        toggle("game_skipcinematics", "#str_229951", "g_autoSkipCinematics"),
+    )),
+    ("interface", "#str_230018", (
+        verb_choice("game_language", "#str_229907", "gameLanguage", "#str_229908", LANGUAGES),
+        choice("game_console", "#str_229922", "con_allowConsole", "#str_229923", (0, 1)),
+        choice("game_screenshotformat", "#str_231775", "r_screenshotFormat", "#str_231776", (0, 1)),
+    )),
+    ("players", "#str_232545", (
         choice("game_simpleitems", "#str_41215", "g_simpleItems", "#str_41216", (0, 1, 2, 3)),
         choice("game_opponentweapons", "#str_41217", "g_mpFlatOpponentWeapons", "#str_41218", (0, 1)),
         ("verb_toggle", "game_forcemodel", "#str_223006", "gameForceModel", None),
-        slider("game_viewkick", "#str_231773", "g_viewKick", 0, 1, 0.1, 1),
-        slider("game_screenshake", "#str_231774", "g_screenShake", 0, 1, 0.1, 1),
+    )),
+    ("hud", "#str_231235", (
+        choice("game_hudlayout", "#str_231236", "ui_hudLayout", "#str_231237", (0, 1, 2, 3)),
+        slider("game_hudscale", "#str_231238", "ui_hudScale", 0.5, 2, 0.05, 2),
+        choice("game_hudwidth", "#str_231239", "ui_hudWidth", "#str_231240", (0, 1, 2)),
+        slider("game_hudinset", "#str_231241", "ui_hudSafeInset", 0, 10, 0.5, 1),
+        slider("game_hudopacity", "#str_231270", "ui_hudOpacity", 0.25, 1, 0.05, 2),
+        toggle("game_objectives", "#str_231247", "g_objectivesToggle"),
+        toggle("game_damagedirection", "#str_231271", "ui_hudDamageDirection"),
+        toggle("game_pickups", "#str_231272", "ui_hudPickups"),
+        toggle("game_weaponstrip", "#str_231273", "ui_hudWeaponStrip"),
     )),
     ("crosshair", "#str_231543", (
         choice("game_customcrosshair", "#str_200307", "g_crosshairCustom", "#str_200296", ("0", "1")),
@@ -57,54 +84,46 @@ SECTIONS = (
         toggle("game_hitmarker", "#str_229979", "hud_hitMarker"),
         toggle("game_crosshairanimated", "#str_231763", "hud_crosshairAnimated"),
     )),
-    ("hud", "#str_231235", (
-        choice("game_hudlayout", "#str_231236", "ui_hudLayout", "#str_231237", (0, 1, 2, 3)),
-        slider("game_hudscale", "#str_231238", "ui_hudScale", 0.5, 2, 0.05, 2),
-        choice("game_hudwidth", "#str_231239", "ui_hudWidth", "#str_231240", (0, 1, 2)),
-        slider("game_hudinset", "#str_231241", "ui_hudSafeInset", 0, 10, 0.5, 1),
-        toggle("game_objectives", "#str_231247", "g_objectivesToggle"),
-        slider("game_hudopacity", "#str_231270", "ui_hudOpacity", 0.25, 1, 0.05, 2),
-        toggle("game_damagedirection", "#str_231271", "ui_hudDamageDirection"),
-        toggle("game_pickups", "#str_231272", "ui_hudPickups"),
-        toggle("game_weaponstrip", "#str_231273", "ui_hudWeaponStrip"),
-        toggle("game_reducedflashing", "#str_231274", "ui_reducedFlashing"),
-        toggle("game_opaquebacking", "#str_231592", "ui_retainedOpaqueBacking"),
-    )),
-    ("gameplay", "#str_231544", (
-        choice("game_corpsesink", "#str_229917", "g_corpseSink", "#str_229921", (0, 1, 2)),
-        verb_choice("game_corpsetime", "#str_229918", "gameCorpseTime", "#str_229919", 8, enabled=7),
-        verb_choice("game_language", "#str_229907", "gameLanguage", "#str_229908", LANGUAGES),
-        choice("game_console", "#str_229922", "con_allowConsole", "#str_229923", (0, 1)),
-        choice("game_screenshotformat", "#str_231775", "r_screenshotFormat", "#str_231776", (0, 1)),
-        toggle("game_skipcinematics", "#str_229951", "g_autoSkipCinematics"),
-        slider("game_cinematicshake", "#str_230157", "ui_cinematicShake", 0, 1, 0.1, 1),
-        toggle("game_enhancedphysics", "#str_231720", "g_enhancedPhysics"),
-    )),
+    # The weapon's place on screen (VIEW_PLACE rows), then how it is viewed.
     ("viewweapon", "#str_229952", (
-        slider("game_gunfov", "#str_229953", "cl_gunfov", 0, 179, 1),
-        choice("game_gunfovadjust", "#str_229954", "cl_gunfov_adjust", "#str_229955", (0, 1)),
+        toggle("game_showgun", "#str_200138", "ui_showGun"),
+        verb_choice("game_gunposition", "#str_223007", "gameGunPosition", "#str_223008", 3),
         slider("game_gunx", "#str_229956", "cl_gun_x", -5, 5, 0.05, 2),
         slider("game_guny", "#str_229957", "cl_gun_y", -5, 5, 0.05, 2),
         slider("game_gunz", "#str_229958", "cl_gun_z", -5, 5, 0.05, 2),
+        slider("game_gunfov", "#str_229953", "cl_gunfov", 0, 179, 1),
+        choice("game_gunfovadjust", "#str_229954", "cl_gunfov_adjust", "#str_229955", (0, 1)),
         toggle("game_weaponkick", "#str_229982", "g_weaponMuzzleKick"),
     )),
+    ("motion", "#str_232543", (
+        slider("game_viewkick", "#str_231773", "g_viewKick", 0, 1, 0.1, 1),
+        slider("game_screenshake", "#str_231774", "g_screenShake", 0, 1, 0.1, 1),
+        slider("game_cinematicshake", "#str_230157", "ui_cinematicShake", 0, 1, 0.1, 1),
+    )),
+    ("visibility", "#str_232544", (
+        toggle("game_reducedflashing", "#str_231274", "ui_reducedFlashing"),
+        toggle("game_opaquebacking", "#str_231592", "ui_retainedOpaqueBacking"),
+    )),
+    # On and off settings are toggles here as everywhere else; the stock
+    # page listed them as Disabled and Enabled.
     ("vr", "#str_230120", (
-        choice("game_vr", "#str_230121", "vr_enable", "#str_200246", (0, 1)),
+        toggle("game_vr", "#str_230121", "vr_enable"),
         choice("game_vraim", "#str_230122", "vr_aimMode", "#str_230123", (1, 0)),
         choice("game_vrhand", "#str_230124", "vr_leftHanded", "#str_230125", (0, 1)),
         choice("game_vrturn", "#str_230126", "vr_turnMode", "#str_230127", (0, 1)),
         choice("game_vrsnap", "#str_230128", "vr_snapTurnAngle", "#str_230129", (30, 45, 60, 90)),
         choice("game_vrmove", "#str_230130", "vr_moveDirection", "#str_230131", (0, 1)),
-        choice("game_vrroomscale", "#str_230132", "vr_roomScale", "#str_200246", (0, 1)),
+        toggle("game_vrroomscale", "#str_230132", "vr_roomScale"),
         choice("game_vrlaser", "#str_230133", "vr_aimLaser", "#str_230134", (0, 1, 2)),
         choice("game_vrhaptics", "#str_230135", "vr_hapticStrength", "#str_230136", ("0", "0.5", "1")),
-        choice("game_vrtwohanded", "#str_230137", "vr_twoHanded", "#str_200246", (0, 1)),
+        toggle("game_vrtwohanded", "#str_230137", "vr_twoHanded"),
         choice("game_vrvignette", "#str_230138", "vr_comfortVignette", "#str_230136", ("0", "0.5", "1")),
-        choice("game_vrcrouch", "#str_230139", "vr_physicalCrouch", "#str_200246", (0, 1)),
+        toggle("game_vrcrouch", "#str_230139", "vr_physicalCrouch"),
         choice("game_vrplayspace", "#str_231760", "vr_playSpace", "#str_231761", (0, 1, 2)),
         choice("game_vrbody", "#str_232514", "vr_body", "#str_232515", (0, 1, 2)),
     )),
 )
+VIEW_PLACE = 5                             # the view weapon's rows that place it: Show Gun to the Z offset
 # The session's verbs, in the order HandleRetainedGameRequest takes them.
 VERBS = ("gameGunPosition", "gameForceModel", "gameCrosshair", "gameCorpseTime", "gameLanguage")
 
@@ -118,8 +137,10 @@ def setting_rows() -> list:
 # whole sections under their headings, or a run of one section's rows
 # (section, first, end) where the tab is that section alone.
 TABS = (
-    ("general", "#str_231542", (("general",), ("gameplay",))),
-    ("hud", "#str_231235", (("hud",), ("crosshair", "viewweapon"))),
+    ("general", "#str_231542", (("gameplay",), ("interface", "players"))),
+    ("hud", "#str_231235", (("hud",), ("crosshair",))),
+    ("viewweapon", "#str_229952", (("viewweapon", 0, VIEW_PLACE), ("viewweapon", VIEW_PLACE, None))),
+    ("accessibility", "#str_232542", (("motion",), ("visibility",))),
     ("vr", "#str_230120", (("vr", 0, 6), ("vr", 6, None))),
 )
 

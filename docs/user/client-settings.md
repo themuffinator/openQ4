@@ -8,16 +8,16 @@ This page shows where openQ4's most useful options live, so you can set the game
 
 - **Performance preset.** openQ4 picks one for your hardware on first launch. Change it under **Settings → Display → Performance Preset**, or press **Auto-Detect** to pick again. If your PC is near the [minimum requirements](getting-started.md#system-requirements), start low.
 - **Screen.** Choose fullscreen or a borderless window, the resolution and, with several monitors, the **Display Device**.
-- **Mouse and controller.** Set mouse sensitivity, controller stick dead zone and look sensitivity under **Settings → Game Options**.
+- **Mouse and controller.** Set mouse sensitivity, controller stick dead zone and look sensitivity on the **Mouse** and **Controller** tabs of **Settings → Controls** (**Settings → Game Options** in 0.14.1).
 - **Volume and subtitles.** Set music and dialogue volume and turn on subtitles under **Settings → Audio**.
 
 ## What each Settings tab holds
 
 | Tab | What you'll find |
 |---|---|
-| **Controls** | Key and button bindings for movement, weapons, attack and look, and everything else (chat, quick chat, voice chat, the weapon wheel, quick save and load). |
-| **Game Options** | Gameplay comfort: auto reload and weapon switch, gun position and field of view, corpses and decals, language, cinematics, the HUD and crosshair, mouse feel, and controller options including gyro, touchpad and rumble. |
-| **Display** | Performance preset and Auto-Detect, renderer and graphics card, interface and text size, monitor, fullscreen and window size, V-Sync, anti-aliasing, resolution scale, and effects such as shadows, bloom, ambient occlusion, HDR and the CRT filter. Press **Apply Changes** to use them: most take effect without a restart, and screen changes ask you to keep or revert them. |
+| **Controls** | Key and button bindings for movement, weapons, attack and look, and everything else (chat, quick chat, voice chat, the weapon wheel, quick save and load), then mouse feel (aim, sensitivity, acceleration) and controller options (sticks, triggers and rumble, gyro and touch, button prompts). |
+| **Game Options** | Gameplay: auto reload and weapon switch, corpses and decals, language, cinematics and multiplayer looks; the HUD and crosshair; the view weapon's position and field of view; and accessibility: camera kick and shake, reduced flashing and the opaque menu backing. |
+| **Display** | Performance preset and Auto-Detect, renderer and graphics card, interface and text size, monitor, fullscreen and window size, V-Sync and the frame rate cap, resolution scale, anti-aliasing and texture filtering, and effects such as shadows and shadow maps, bloom, ambient occlusion, HDR, motion blur and the CRT filter. Press **Apply Changes** to use them: most take effect without a restart, and screen changes ask you to keep or revert them. |
 | **Audio** | Volume, music and dialogue volume, sound device, speaker layout and headphone mode, and dialogue subtitles. |
 
 The classic menus have the same options in a different layout, and call the **Display** tab **System**.

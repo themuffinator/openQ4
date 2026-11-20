@@ -7,6 +7,32 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Settings that are easier to find, 20 November 2026
+
+- **Every setting sits with the ones it works with.** The new interface's
+  settings pages were reorganised after a review of every option:
+  - **Game Options** has five tabs: **General** (gameplay, interface, and
+    pickup and opponent looks), **HUD** (the HUD beside the crosshair),
+    **View Weapon** (Show Gun and Gun Position now beside the offsets and
+    weapon field of view) and a new **Accessibility** tab for View Kick,
+    Screen Shake, Cinematic Shake, Reduced Flashing and Opaque Menu Backing,
+    which used to be spread over three sections. **Virtual Reality** follows.
+  - **Display** gains an **Effects** tab for lighting and post-processing, and
+    both anti-aliasing settings (MSAA and Post AA) now share **Image Quality**.
+  - **Controls → Mouse** and **Controller** have headings (Aim, Mouse Input,
+    Acceleration; Sticks, Triggers and Rumble, Gyro and Touch, Prompts), and
+    sensitivity now sits next to CPI. **Audio** gives subtitles their own
+    heading.
+- **Four settings you could only reach through a preset or the console are
+  now in the menu:** **Frame Rate Cap** (Display → Screen), **Anisotropic
+  Filtering** (Display → Image Quality), **Shadow Maps** and **Motion Blur**
+  (Display → Effects). A preset still sets all four; change one afterwards and
+  the rest of the preset is kept.
+- **VR on/off options are switches.** VR Mode, Room Scale, Two-Handed Grip and
+  Physical Crouch use the same on/off switch as every other on/off setting.
+- **What to do.** Nothing: your settings are kept. The classic menus
+  (`ui_retained 0`) keep their original layout.
+
 ## Servers that find the same pak twice let players in again, 19 November 2026
 
 - **You can join a server whose Quake 4 paks are installed twice.** A package

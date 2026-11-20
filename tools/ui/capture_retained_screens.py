@@ -1206,6 +1206,35 @@ SCENARIOS = {
         'screenshot "screenshots/game-mp-game.tga"', 'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_retainedGui report',
         'openq4_guiGet desktop::active', 'openq4_guiGet desktop::curr', 'screenshot "screenshots/game-mp-game-back.tga"',
     ]),
+    # The settings tree (UI-01): every tab of every settings sub-page, as the
+    # settings tree audit of 20 November 2026 laid them out, each reached by
+    # its tab event from the SETTINGS page and left with Back.
+    'settings-tree': (None, [
+        'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 2000',
+        *[command for button, page, first, tabs in (
+            ('set_b_controls', 'controls', 'move', ('mouse', 'controller')),
+            ('set_b_gameoptions', 'game', 'general', ('hud', 'viewweapon', 'accessibility', 'vr')),
+            ('set_b_system', 'display', 'graphics', ('screen', 'image', 'effects')),
+            ('set_b_audio', 'audio', 'audio', ()))
+          for command in (f'openq4_guiAction {button}', 'waitMsec 1500', 'openq4_retainedGui report',
+                          f'screenshot "screenshots/tree-{page}-{first}.tga"',
+                          *[part for tab in tabs for part in (f'openq4_retainedGui event tab_{tab}', 'waitMsec 500',
+                                                               f'screenshot "screenshots/tree-{page}-{tab}.tga"')],
+                          'openq4_retainedGui event onBack', 'waitMsec 2500')],
+        'ui_retainedStatus',
+    ]),
+    # The DISPLAY rows the audit added (Frame Rate Cap, Anisotropic Filtering,
+    # Shadow Maps, Motion Blur) edit the draft, and APPLY CHANGES sets their
+    # CVars: each is stepped, applied and read back.
+    'settings-tree-apply': (None, [
+        'waitMsec 15000', 'com_maxfps', 'image_anisotropy', 'r_useShadowMap', 'r_motionBlur',
+        'openq4_guiAction main_b_settings', 'waitMsec 2000', 'openq4_guiAction set_b_system', 'waitMsec 2000',
+        *[command for tab, row, step in (('screen', 'settings_framecap', 'right'), ('image', 'settings_anisotropy', 'left'),
+                                         ('effects', 'settings_shadowmaps', 'accept'), ('effects', 'settings_motionblur', 'accept'))
+          for command in (f'openq4_retainedGui event tab_{tab}', 'waitMsec 500', f'openq4_retainedGui focus {row}',
+                          *menu_step(step), 'waitMsec 400', 'openq4_retainedGui event apply', 'waitMsec 2500')],
+        'screenshot "screenshots/tree-apply.tga"', 'com_maxfps', 'image_anisotropy', 'r_useShadowMap', 'r_motionBlur',
+    ]),
     # The retained CONTROLS page (UI-01): the CONTROLS button opens the page on Move
     # Forward; Accept waits for a key and testControlsKey stands in for F,
     # which joins the row's keys; a second wait ends with Escape, binding
@@ -1336,6 +1365,19 @@ SCENARIOS = {
         'openq4_retainedGui event tab_controller', 'waitMsec 400', 'screenshot "screenshots/controls-pause-controller.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 1500', 'ui_retainedStatus', 'openq4_retainedGui report',
         'screenshot "screenshots/controls-pause-back.tga"',
+    ]),
+    # The settings tree over the paused game: GAME OPTIONS' ACCESSIBILITY tab,
+    # then DISPLAY's Shadow Maps applied in the level, and play resumed.
+    'settings-tree-pause': ('game/airdefense1', [
+        'openq4_assertMenuActivation 10000', 'waitMsec 1200', 'r_useShadowMap', 'openq4_retainedGui focus nav_settings',
+        *menu_step('accept'), 'waitMsec 1200', 'openq4_retainedGui focus game', *menu_step('accept'), 'waitMsec 1500',
+        'openq4_retainedGui event tab_accessibility', 'waitMsec 500', 'screenshot "screenshots/tree-pause-accessibility.tga"',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_retainedGui focus display', *menu_step('accept'),
+        'waitMsec 1500', 'openq4_retainedGui event tab_effects', 'waitMsec 500', 'openq4_retainedGui focus settings_shadowmaps',
+        *menu_step('accept'), 'openq4_retainedGui event apply', 'waitMsec 2500', 'r_useShadowMap',
+        'screenshot "screenshots/tree-pause-effects.tga"', 'openq4_retainedGui event onBack', 'waitMsec 1500',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_retainedGui focus nav_resume', *menu_step('accept'),
+        'waitMsec 1500', 'ui_retainedStatus', 'screenshot "screenshots/tree-pause-resumed.tga"',
     ]),
     'settings-strogg': ('game/recomp', [
         'openq4_assertMenuActivation 10000', 'waitMsec 1200', 'openq4_retainedGui focus nav_settings', *menu_step('accept'),

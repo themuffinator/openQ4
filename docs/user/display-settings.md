@@ -10,13 +10,16 @@ This guide covers how openQ4 looks and how smoothly it runs: performance presets
 - **Fullscreen or window.** Press `Alt+Enter` to switch at any time, or set it on **Settings → Display → Screen**.
 - **Changes apply straight away.** You don't need to restart the game; only a new renderer or graphics card needs **Restart Renderer**. Resolution, window, fullscreen, monitor and MSAA changes ask you to keep or revert them; if you don't answer, your previous display comes back.
 
-The Display page has three tabs:
+The Display page has four tabs (in 0.14.1, three: MSAA was on **Screen**, and the lighting and effects rows were on **Image Quality**):
 
 | Tab | What it holds |
 |---|---|
 | **Graphics** | Performance Preset, Auto-Detect, Rendering Backend, Rendering Device, Restart Renderer, UI Scale, Text Size, UI Aspect |
-| **Screen** | Display Device, Expand Across Displays, Fullscreen, Borderless Window, Fullscreen Policy, MSAA, V-Sync, window size, Display Resolution, custom fullscreen size, Refresh Rate |
-| **Image Quality** | Brightness, Resolution Scale, shadows, character self-shadows, specular, bump maps, detailed sky, Bloom, SSAO, HDR Tonemap, Post AA Mode, ambient light, CRT Emulation, Irradiance Volumes, Preload Light Grids |
+| **Screen** | Display Device, Expand Across Displays, Fullscreen, Borderless Window, Fullscreen Policy, V-Sync, Frame Rate Cap, window size, Display Resolution, custom fullscreen size, Refresh Rate |
+| **Image Quality** | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering, specular, bump maps, detailed sky, ambient light |
+| **Effects** | Lighting: shadows, Shadow Maps, character self-shadows, Irradiance Volumes, Preload Light Grids. Post-processing: Bloom, SSAO, HDR Tonemap, Motion Blur, CRT Emulation |
+
+**Frame Rate Cap**, **Anisotropic Filtering**, **Shadow Maps** and **Motion Blur** are not in 0.14.1, where only the presets and the console set them. Choosing a preset still sets all four; change one afterwards and the rest of the preset stays as it was.
 
 ## Performance presets
 
@@ -167,7 +170,7 @@ Temporal AA works with modes 1 and 2; modes 0 and 3 keep their own look. With th
 
 Anti-aliasing smooths jagged edges. openQ4 offers three kinds, which you can combine:
 
-- **MSAA** (multisample anti-aliasing, on **Settings → Display → Screen → MSAA**) smooths the edges of geometry. Each step costs frame time:
+- **MSAA** (multisample anti-aliasing, on **Settings → Display → Image Quality → MSAA**; on **Screen** in 0.14.1) smooths the edges of geometry. Each step costs frame time:
   - **2x** is a cheap improvement for modest graphics cards.
   - **4x** is a good balance; Ultra uses it with SMAA.
   - **8x** looks better again and costs noticeably more. It is the most the Vulkan renderer draws, and what Maximum uses (not in 0.14.1).
@@ -190,7 +193,7 @@ Notes:
 
 **Settings → Display → Screen → V-Sync** locks frames to your display's refresh to stop tearing. It applies as soon as you press **Apply Changes**, with no restart and no keep-or-revert question.
 
-Each preset sets a **frame-rate cap**; there is no menu control for it. In the console, `com_maxfps` sets the cap (`0` removes it). With V-Sync on and a variable-refresh display (G-Sync, FreeSync), cap a few frames under the refresh rate, for example `com_maxfps 237` on a 240 Hz display, so frames never wait for the next refresh. A minimized or hidden window draws at most 60 frames a second.
+Each preset sets a **frame-rate cap**. Change it on **Settings → Display → Screen → Frame Rate Cap** (not in 0.14.1): 30 to 360 frames a second, or **Unlimited**. In the console, `com_maxfps` sets any cap (`0` removes it); the menu shows no choice for a cap it doesn't list. With V-Sync on and a variable-refresh display (G-Sync, FreeSync), cap a few frames under the refresh rate, for example `com_maxfps 237` on a 240 Hz display, so frames never wait for the next refresh. A minimized or hidden window draws at most 60 frames a second.
 
 On a Steam Deck, openQ4 applies a Deck-friendly cap while `com_maxfps` is still at its default of 240; any other value you set is kept. See the [Steam Deck guide](steam-deck.md#performance).
 
@@ -311,7 +314,7 @@ The pixelated modes skip anisotropic filtering so that `image_anisotropy` can't 
 
 ## Motion blur
 
-Motion blur (`r_motionBlur 1`, on in the Maximum preset) smears the scene along its own motion: the camera turning or moving, and moving characters, vehicles and objects. It works with or without temporal AA, resolution scaling, MSAA, bloom, tone mapping and SSAO, on OpenGL and Vulkan.
+Motion blur (**Settings → Display → Effects → Motion Blur**, not in 0.14.1; `r_motionBlur 1`, on in the Maximum preset) smears the scene along its own motion: the camera turning or moving, and moving characters, vehicles and objects. It works with or without temporal AA, resolution scaling, MSAA, bloom, tone mapping and SSAO, on OpenGL and Vulkan.
 
 - **The same blur at any frame rate.** By default the blur matches the motion of one 60 Hz frame (`r_motionBlurShutterMsec 16.667`), so 144 Hz and uncapped play look like 60 Hz play. `r_motionBlurShutterMsec 0` restores the original behaviour, where blur shrinks as the frame rate rises.
 - **Your weapon stays sharp.** It blurs only with its own animation (sway, recoil, reloads), never because you turn. Characters blur with their animation as well as their movement. `r_motionBlurObjectVectors 0` blurs by camera motion alone.
@@ -363,7 +366,7 @@ seta gui_textBackgroundPadding 2
 
 ## View weapon position and field of view
 
-These settings move and frame the weapon you hold on screen. They only change what you see, never gameplay. They are on **Settings → Game Options → HUD**, under **View Weapon** (in 0.14.1, on the **General** tab).
+These settings move and frame the weapon you hold on screen. They only change what you see, never gameplay. They are on **Settings → Game Options → View Weapon**, with **Show Gun** and **Gun Position** (in 0.14.1, on the **General** tab).
 
 | Setting | Default | What it does |
 |---|---:|---|

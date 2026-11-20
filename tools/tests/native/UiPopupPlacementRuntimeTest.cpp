@@ -269,7 +269,7 @@ static void ProductionPopup(const std::string& source,const std::string& locales
         auto key=[&](MenuInput input){runtime.MenuAction(input,true,time);runtime.MenuAction(input,false,time);};frame();
         for(unsigned layout=0;layout<(std::string(locale)=="english"?2u:1u);++layout) {
         if(layout){vp.width=800;vp.height=600;vp.displayScale=1;frame();}
-        for(const char* id:{"settings_preset","settings_display_device","settings_multiscreen","settings_display_mode","settings_display_refresh","settings_postaa","settings_resolution_scale","settings_vsync","settings_renderer"}) {
+        for(const char* id:{"settings_preset","settings_display_device","settings_multiscreen","settings_display_mode","settings_display_refresh","settings_postaa","settings_resolution_scale","settings_vsync","settings_renderer","settings_framecap","settings_anisotropy"}) {
             // The engine opens a dropdown while revealing the newly focused row is
             // still scrolling the panel, and pumps pointer motion before the next
             // paint. Neither may retire the opening before it is ever seen.

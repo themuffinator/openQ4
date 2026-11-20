@@ -240,7 +240,7 @@ static void SystemCandidate(const std::string& source) {
         unsigned scrolled=0;
         for(const auto* id:{"settings_preset","settings_backend","settings_gpu","settings_renderer","settings_ui_scale","settings_text_scale",
                             "settings_display_device","settings_multiscreen","settings_fullscreen_policy","settings_msaa","settings_vsync","settings_display_mode","settings_display_refresh",
-                            "settings_postaa","settings_resolution_scale"}) {
+                            "settings_postaa","settings_resolution_scale","settings_framecap","settings_anisotropy"}) {
             // A row acts only while its tab is current: run the tab_<id> event of the page holding it.
             std::string tab;for(auto* e=document->GetElementById(id);e;e=e->GetParentNode())if(e->GetId().starts_with("settings-page-")){tab=e->GetId().substr(14);break;}
             Runtime::EventEffects effects;Check(!tab.empty()&&runtime.RunEvent("tab_"+tab,time,effects,error),"SYSTEM choice's tab shows");for(int i=0;i<10;++i)frame();
@@ -254,8 +254,8 @@ static void SystemCandidate(const std::string& source) {
             Check(!document->GetElementById(std::string(id)+"-popup-scroll-thumb")&&!document->GetElementById(std::string(id)+"-popup-scroll-base"),"the list's scrollbar is the shared list's track and thumb");
             const auto accepted=w.accepted;const auto highlight=w.highlight;
             if(w.scroll->geometry.usable) {
-                ++scrolled;const double before=w.popupOffsetDp;runtime.PointerWheel(w.scroll->geometry.offset<w.scroll->geometry.range?1:-1,time);frame();
-                Check(widget(id).popupOffsetDp!=before,"SYSTEM wheel changes actual popup offset");
+                ++scrolled;const double before=w.popupOffsetDp;runtime.PointerWheel(w.scroll->geometry.offset<w.scroll->geometry.range-.5?1:-1,time);frame();
+                if(widget(id).popupOffsetDp==before)std::fprintf(stderr,"wheel %s offset=%g range=%g before=%g\n",id,w.scroll->geometry.offset,w.scroll->geometry.range,before);Check(widget(id).popupOffsetDp!=before,"SYSTEM wheel changes actual popup offset");
             }
             Check(widget(id).accepted==accepted&&widget(id).highlight==highlight&&runtime.TakeActions().empty(),"SYSTEM popup scrolling does not draft settings");
             // End reveals the last option, and the reveal settles with the list's

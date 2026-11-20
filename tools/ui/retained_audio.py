@@ -1,9 +1,10 @@
 """The retained AUDIO settings page (docs/dev/ui-visual-design.md sections 7,
 9 and 13.7; UI-01): the stock page's rows (guis/menu/settings/audio.gui),
-LEVELS, DEVICES and EFFECTS, in the settings sub-page
+LEVELS, DEVICES, EFFECTS and SUBTITLES, in the settings sub-page
 (retained_settings_rows). They fit one screen, so the page has no tabs:
-LEVELS and DEVICES in the first column, EFFECTS in the second, under Create
-Server's header band.
+LEVELS and DEVICES in the first column, EFFECTS and SUBTITLES in the second,
+under Create Server's header band. The subtitle rows have their own heading:
+under EFFECTS they read as sound effects.
 
 The page applies each change at once, as the stock page does, through the
 session (session.menuValue verbs, idSessionLocal::HandleRetainedAudioRequest):
@@ -39,6 +40,8 @@ SECTIONS = (
          (("#str_229980", 0, 0), ("#str_229980", 1, 1), ("#str_229980", 2, 2))),
         ("choice", "audio_hrtf", "#str_229981", "audioHrtf", "audio.hrtf",
          (("#str_229980", 0, 0), ("#str_229980", 1, 1), ("#str_229980", 2, 2))),
+    )),
+    ("subtitles", "#str_232554", (
         ("toggle", "audio_subtitles", "#str_231308", "audioSubtitles", "audio.subtitles", None),
         ("slider", "audio_subtitle_size", "#str_231309", "audioSubtitleSize", "audio.subtitleSize", (100, 200, 10)),
         ("slider", "audio_subtitle_background", "#str_231310", "audioSubtitleBackground", "audio.subtitleBackground", (0, 100, 10)),
@@ -50,7 +53,7 @@ VERBS = tuple(row[3] for _section, _heading, rows in SECTIONS for row in rows)
 
 
 # The columns: the sections each holds, by their place in SECTIONS.
-COLUMNS = ((0, 1), (2,))
+COLUMNS = ((0, 1), (2, 3))
 
 
 def audio_document() -> dict:

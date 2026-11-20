@@ -412,11 +412,11 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"r_screenshotFormat",{0,0,1,true,{},{0,1}}},{"g_autoSkipCinematics",{1}},{"ui_cinematicShake",{0,0,1,false}},{"g_screenShake",{0,0,1,false}},{"g_enhancedPhysics",{1}},
 		{"cl_gunfov",{0,0,179,false}},{"cl_gunfov_adjust",{0,0,1,true,{},{0,1}}},
 		{"cl_gun_x",{0,-5,5,false}},{"cl_gun_y",{0,-5,5,false}},{"cl_gun_z",{0,-5,5,false}},{"g_weaponMuzzleKick",{1}},{"g_viewKick",{0,0,1,false}},
-		{"vr_enable",{0,0,1,true,{},{0,1}}},{"vr_aimMode",{0,0,1,true,{},{1,0}}},{"vr_leftHanded",{0,0,1,true,{},{0,1}}},
+		{"vr_enable",{1}},{"vr_aimMode",{0,0,1,true,{},{1,0}}},{"vr_leftHanded",{0,0,1,true,{},{0,1}}},
 		{"vr_turnMode",{0,0,1,true,{},{0,1}}},{"vr_snapTurnAngle",{0,30,90,true,{},{30,45,60,90}}},
-		{"vr_moveDirection",{0,0,1,true,{},{0,1}}},{"vr_roomScale",{0,0,1,true,{},{0,1}}},{"vr_aimLaser",{0,0,2,true,{},{0,1,2}}},
-		{"vr_hapticStrength",{2,0,0,false,{"0","0.5","1"}}},{"vr_twoHanded",{0,0,1,true,{},{0,1}}},
-		{"vr_comfortVignette",{2,0,0,false,{"0","0.5","1"}}},{"vr_physicalCrouch",{0,0,1,true,{},{0,1}}},
+		{"vr_moveDirection",{0,0,1,true,{},{0,1}}},{"vr_roomScale",{1}},{"vr_aimLaser",{0,0,2,true,{},{0,1,2}}},
+		{"vr_hapticStrength",{2,0,0,false,{"0","0.5","1"}}},{"vr_twoHanded",{1}},
+		{"vr_comfortVignette",{2,0,0,false,{"0","0.5","1"}}},{"vr_physicalCrouch",{1}},
 		{"vr_playSpace",{0,0,2,true,{},{0,1,2}}},{"vr_body",{0,0,2,true,{},{0,1,2}}}};
 	const auto found = settings.find(cvar);
 	return found == settings.end() ? nullptr : &found->second;

@@ -1,9 +1,15 @@
 """The retained SYSTEM settings page (docs/dev/ui-visual-design.md sections 6,
 7, 9 and 13.7; UI-01; docs/dev/ui/system-settings-contract.md): the
 SETTINGS page's DISPLAY section as a sub-page (retained_settings_rows), its
-settings on three tabs of at most two columns: GRAPHICS (performance and
-rendering back end | interface sizes), SCREEN (display | display sizing) and
-IMAGE QUALITY (image quality | rendering).
+settings on four tabs of at most two columns: GRAPHICS (performance and
+rendering back end | interface sizes), SCREEN (display and frame pacing |
+display sizing), IMAGE QUALITY (resolution, anti-aliasing and filtering |
+rendering) and EFFECTS (lighting | post-processing). Both anti-aliasing rows
+stand on IMAGE QUALITY, and the four settings the performance presets set
+that players most often change by hand have rows of their own: Frame Rate
+Cap, Anisotropic Filtering, Shadow Maps and Motion Blur (the settings tree
+audit of 20 November 2026). They edit catalog settings the presets already
+fill, so the settings catalog is unchanged.
 
 Unlike the other settings pages, nothing here applies at once. Every row edits
 the settings service's draft (settings.system.edit and its kin, the service's
@@ -551,7 +557,8 @@ def system_document() -> dict:
               "#str_229944", "#str_230017", "#str_229912", "#str_229915", "#str_200147", "#str_229909", "#str_229910", "#str_41093",
               "#str_41092", "#str_229946", "#str_229947", "#str_229975", "#str_229948", "#str_229949", "#str_229945", "#str_200148",
               "#str_200160", "#str_200161", "#str_200162", "#str_223009", "#str_41082", "#str_41088", "#str_41084", "#str_41094",
-              "#str_223002", "#str_223003", "#str_41090", "#str_41107", "#str_42820", "#str_41103", "#str_232513")
+              "#str_223002", "#str_223003", "#str_41090", "#str_41107", "#str_42820", "#str_41103", "#str_232513", "#str_232548",
+              "#str_232550", "#str_232552", "#str_232553")
     x = value_column(labels)
     draft = lambda key: st(f"settings.draft.{key}")
     edit = lambda key: f"edit.{key}"
@@ -636,6 +643,11 @@ def system_document() -> dict:
     doc.bind("settings_msaa-status.text", "settings_msaa-status", "text", st("settings.msaa.status"))
     vsync = choice(doc, "settings_vsync", "#str_41092", x, edit("r_swapInterval"), draft("r_swapInterval"), listed("#str_200059", (0, 1)))
     gate(doc, "settings_vsync", EDITABLE)
+    # The presets' frame cap (com_maxfps, 0 uncapped); a cap the list lacks
+    # (Auto-Detect's display refresh on a power-limited device) shows none.
+    framecap = choice(doc, "settings_framecap", "#str_232548", x, edit("com_maxfps"), draft("com_maxfps"),
+                      listed("#str_232549", (30, 60, 75, 90, 120, 144, 165, 240, 360, 0)))
+    gate(doc, "settings_framecap", EDITABLE)
     windowed = no(draft("r_fullscreen"))
     exclusive = no(draft("r_fullscreenDesktop"))
     sizing_live = both(LIVE)
@@ -657,23 +669,25 @@ def system_document() -> dict:
     for ident in ("settings_display_mode", "settings_display_refresh"):
         gate(doc, ident, both(QUIET, EXCLUSIVE_LISTS), opacity=dim(EXCLUSIVE_LISTS, 0.45))
 
-    # IMAGE QUALITY: the image's settings and the renderer's.
+    # IMAGE QUALITY: resolution, anti-aliasing and filtering, and the
+    # surfaces the renderer draws; EFFECTS: the lighting and post-processing.
     brightness = slider_pair(doc, "settings_brightness", "#str_200148", x, "r_brightness", 0.5, 2, 0.1, 2)
-    image_rows = [brightness]
+    toggles = {}
     for ident, key, setting, action in (
             ("settings_shadows", "#str_200160", "r_shadows", None), ("settings_specular", "#str_200161", "r_skipSpecular", "-enabled"),
             ("settings_bump", "#str_200162", "r_skipBump", "-enabled"), ("settings_sky", "#str_223009", "r_skipSky", "-enabled"),
             ("settings_bloom", "#str_41082", "r_bloom", None), ("settings_ssao", "#str_41088", "r_ssao", None),
-            ("settings_tonemap", "#str_41084", "r_hdrToneMap", None)):
+            ("settings_tonemap", "#str_41084", "r_hdrToneMap", None), ("settings_shadowmaps", "#str_232552", "r_useShadowMap", None),
+            ("settings_motionblur", "#str_232553", "r_motionBlur", None)):
         value = draft(setting) if action is None else no(draft(setting))
-        image_rows.append(row(doc, ident, key, "toggle", x, value=value, action=edit(setting) + (action or "")))
-        if ident == "settings_shadows":
-            # #238: animated characters shadow themselves under shadow-mapped
-            # lights; it means nothing while shadows are off.
-            image_rows.append(row(doc, "settings_character_self_shadow", "#str_232513", "toggle", x,
-                                  value=draft("r_shadowMapCharacterSelfShadow"), action=edit("r_shadowMapCharacterSelfShadow")))
+        toggles[ident] = row(doc, ident, key, "toggle", x, value=value, action=edit(setting) + (action or ""))
+    # #238: animated characters shadow themselves under shadow-mapped lights;
+    # it means nothing while shadows or shadow maps are off.
+    self_shadow = row(doc, "settings_character_self_shadow", "#str_232513", "toggle", x,
+                      value=draft("r_shadowMapCharacterSelfShadow"), action=edit("r_shadowMapCharacterSelfShadow"))
+    anisotropy = choice(doc, "settings_anisotropy", "#str_232550", x, edit("image_anisotropy"), draft("image_anisotropy"),
+                        listed("#str_232551", (1, 2, 4, 8, 16)))
     postaa = choice(doc, "settings_postaa", "#str_41094", x, edit("r_postAA"), draft("r_postAA"), listed("#str_41095", (0, 1, 2, 3, 4)))
-    image_rows.append(postaa)
     ambient_on = row(doc, "settings_ambient_enabled", "#str_223002", "toggle", x, value=op(">", draft("r_forceAmbient"), 0),
                      action="edit.ambient-enabled")
     ambient = slider_pair(doc, "settings_ambient", "#str_223003", x, "r_forceAmbient", 0, 1, 0.025, 3)
@@ -698,10 +712,14 @@ def system_document() -> dict:
     renderer_status["properties"]["display"] = keyword("none")
     doc.bind("settings_renderer-status.display", "settings_renderer-status", "display", op("select", op(
         "&&", st("settings.renderer.fallback"), op("==", draft("r_renderer"), st("settings.baseline.r_renderer"))), "block", "none"))
-    gate(doc, "settings_character_self_shadow", both(EDITABLE, draft("r_shadows")), opacity=dim(both(EDITABLE, draft("r_shadows"))))
+    shadow_maps = both(EDITABLE, draft("r_shadows"))
+    gate(doc, "settings_shadowmaps", shadow_maps, opacity=dim(shadow_maps))
+    self_shadowing = both(shadow_maps, draft("r_useShadowMap"))
+    gate(doc, "settings_character_self_shadow", self_shadowing, opacity=dim(self_shadowing))
     for ident in ("settings_brightness", "settings_brightness_number", "settings_shadows", "settings_specular", "settings_bump",
                   "settings_sky", "settings_bloom", "settings_ssao", "settings_tonemap", "settings_postaa", "settings_ambient_enabled",
-                  "settings_ambient", "settings_ambient_number", "settings_crt", "settings_irradiance"):
+                  "settings_ambient", "settings_ambient_number", "settings_crt", "settings_irradiance", "settings_anisotropy",
+                  "settings_motionblur"):
         gate(doc, ident, EDITABLE, None if ident.endswith("_number") else 0.4)
 
     tabs = [
@@ -709,11 +727,16 @@ def system_document() -> dict:
             [heading("#str_41098"), preset, autodetect, backend, gpu, renderer, renderer_status, restart, active, notice],
             [heading("#str_230018"), ui_scale, text_scale, aspect, reset, fit]]),
         ("screen", "#str_41099", [
-            [heading("#str_229900"), device, span, span_status, fullscreen, borderless, policy, msaa, msaa_help, msaa_status, vsync],
+            [heading("#str_229900"), device, span, span_status, fullscreen, borderless, policy, vsync, framecap],
             [heading("#str_229943"), width, height, mode, hint, custom_w, custom_h, refresh]]),
         ("image", "#str_41101", [
-            [heading("#str_41101"), *image_rows, scale],
-            [heading("#str_41102"), ambient_on, ambient, crt, irradiance, preload, preload_help, preload_status]]),
+            [heading("#str_41101"), brightness, scale, msaa, msaa_help, msaa_status, postaa, anisotropy],
+            [heading("#str_41102"), toggles["settings_specular"], toggles["settings_bump"], toggles["settings_sky"], ambient_on, ambient]]),
+        ("effects", "#str_229963", [
+            [heading("#str_232546"), toggles["settings_shadows"], toggles["settings_shadowmaps"], self_shadow, irradiance, preload,
+             preload_help, preload_status],
+            [heading("#str_232547"), toggles["settings_bloom"], toggles["settings_ssao"], toggles["settings_tonemap"],
+             toggles["settings_motionblur"], crt]]),
     ]
 
     # APPLY CHANGES under the columns' trailing end, the service's message
@@ -797,8 +820,8 @@ def finish(document: dict) -> dict:
 
 
 EXTENSIONS = {
-    "scope": "The SYSTEM settings page, generated by tools/ui/retained_system.py: a SETTINGS sub-page whose GRAPHICS, SCREEN and "
-             "IMAGE QUALITY tabs edit the settings service's draft, applied with APPLY CHANGES and confirmed with Keep or Revert. "
+    "scope": "The SYSTEM settings page, generated by tools/ui/retained_system.py: a SETTINGS sub-page whose GRAPHICS, SCREEN, "
+             "IMAGE QUALITY and EFFECTS tabs edit the settings service's draft, applied with APPLY CHANGES and confirmed with Keep or Revert. "
              "Every stock setting works here, so ui_retained opens it; ui_retainedSystem opens it without ui_retained.",
     "sourceContract": "docs/dev/ui/system-settings-contract.md",
     "visualContract": "docs/dev/ui-visual-design.md",
