@@ -14,7 +14,7 @@ namespace {
 
 constexpr int MaxLocalParameters = 96;   // ARB_vertex_program minimum
 constexpr int MaxEnvParameters = 96;
-constexpr int MaxTextureUnits = MaxTextures;
+constexpr int MaxTextureUnits = 8;       // ARB fragmentMap units (MAX_FRAGMENT_IMAGES)
 constexpr int MaxTexCoords = 8;
 constexpr int MaxArrayElements = 256;
 

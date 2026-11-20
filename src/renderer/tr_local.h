@@ -807,6 +807,9 @@ void R_ReloadGLSLPrograms_f( const idCmdArgs &args );
 void R_ListGLSLPrograms_f( const idCmdArgs &args );
 bool RB_BindGLSLShaderParm( glslShaderParmBinding_t binding, int location, const shaderStage_t *stage, const drawInteraction_t *din );
 idImage *RB_ResolveGLSLShaderTextureImage( const newShaderStage_t *stage, int slot, const drawInteraction_t *din );
+int RB_GLSLShaderTextureBindOrder( int numShaderTextures, int index );
+void RB_BindGLSLShaderTexture( const newShaderStage_t *stage, int slot, idImage *image, bool selectClient );
+void RB_UnbindGLSLShaderTexture( int slot, bool selectClient );
 
 // this does various checks before calling the idDeclSkin
 const idMaterial *R_RemapShaderBySkin( const idMaterial *shader, const idDeclSkin *customSkin, const idMaterial *customShader );
@@ -1985,6 +1988,7 @@ bool R_CheckExtension( const char *name );
 // uploads, sampler-state changes) or a later filtered Bind() can silently
 // leave the wrong texture bound
 void R_BindTextureForDirectAccess( unsigned int target, int texnum );
+void R_BindUntrackedTextureUnit( int texUnit, unsigned int target, unsigned int texture );
 
 const int RENDERER_SHADOW_TEXTURE_MOMENT_COUNT = 3;
 

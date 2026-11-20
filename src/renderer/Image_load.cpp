@@ -1436,6 +1436,42 @@ void idImage::Bind() {
 
 /*
 ================
+R_BindUntrackedTextureUnit
+
+Binds a texture to a unit past the tracked ones (idImage::BindUntracked), or
+with texture 0 unbinds the unit's 2D and cube targets. The active unit is
+restored to the tracked one, so GL_SelectTexture's filter stays true.
+================
+*/
+void R_BindUntrackedTextureUnit( int texUnit, unsigned int target, unsigned int texture ) {
+	if ( texture != 0 && glConfig.backendCaps.hasDSA && glBindTextureUnit != NULL ) {
+		glBindTextureUnit( static_cast<GLuint>( texUnit ), texture );
+		return;
+	}
+	glActiveTextureARB( GL_TEXTURE0_ARB + texUnit );
+	if ( texture != 0 ) {
+		glBindTexture( target, texture );
+	} else {
+		glBindTexture( GL_TEXTURE_2D, 0 );
+		glBindTexture( GL_TEXTURE_CUBE_MAP_EXT, 0 );
+	}
+	glActiveTextureARB( GL_TEXTURE0_ARB + Max( 0, backEnd.glState.currenttmu ) );
+}
+
+void idImage::BindUntracked( int texUnit ) {
+	if ( !IsLoaded() ) {
+		ActuallyLoadImage( true );
+	}
+	// As Bind: only 2D and cube images are bound.
+	if ( opts.textureType == TT_2D ) {
+		R_BindUntrackedTextureUnit( texUnit, GL_TEXTURE_2D, texnum );
+	} else if ( opts.textureType == TT_CUBIC ) {
+		R_BindUntrackedTextureUnit( texUnit, GL_TEXTURE_CUBE_MAP_EXT, texnum );
+	}
+}
+
+/*
+================
 MakePowerOfTwo
 ================
 */

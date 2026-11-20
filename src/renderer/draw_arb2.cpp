@@ -11211,24 +11211,20 @@ static void RB_ARB2_UploadCustomGLSLShaderParms( const shaderStage_t *stage, con
 }
 
 static void RB_ARB2_BindCustomGLSLShaderTextures( const newShaderStage_t *newStage, const drawInteraction_t *din ) {
-	for ( int textureIndex = 0; textureIndex < newStage->numShaderTextures; textureIndex++ ) {
+	for ( int order = 0; order < newStage->numShaderTextures; order++ ) {
+		const int textureIndex = RB_GLSLShaderTextureBindOrder( newStage->numShaderTextures, order );
 		idImage *image = RB_ResolveGLSLShaderTextureImage( newStage, textureIndex, din );
 		if ( image == NULL ) {
 			continue;
 		}
-
-		GL_SelectTextureNoClient( textureIndex );
-		image->SetSamplerState( newStage->shaderTextureFilters[textureIndex], newStage->shaderTextureRepeats[textureIndex] );
-		image->Bind();
-		RB_GLSLStageSampler( newStage, newStage->shaderTextureLocations[textureIndex], textureIndex );
+		RB_BindGLSLShaderTexture( newStage, textureIndex, image, false );
 	}
 }
 
 static void RB_ARB2_UnbindCustomGLSLShaderTextures( const newShaderStage_t *newStage ) {
 	for ( int textureIndex = newStage->numShaderTextures - 1; textureIndex >= 0; textureIndex-- ) {
 		if ( textureIndex == 0 || RB_ResolveGLSLShaderTextureImage( newStage, textureIndex, NULL ) != NULL ) {
-			GL_SelectTextureNoClient( textureIndex );
-			globalImages->BindNull();
+			RB_UnbindGLSLShaderTexture( textureIndex, false );
 		}
 	}
 	GL_SelectTexture( 0 );
