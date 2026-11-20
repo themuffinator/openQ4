@@ -1045,6 +1045,7 @@ static void HashProjectedShadowState( std::uint64_t &hash,
 	HashFloat( hash, projected.texelBiasScale );
 	HashBool( hash, projected.depthCompare );
 	HashBool( hash, projected.receiverPlaneBias );
+	HashBool( hash, projected.distantNormalOffsetDepth );
 }
 
 static std::uint64_t HashShadowMapPass(
@@ -2124,6 +2125,8 @@ static bool BuildShadowMapPasses(
 		projected.depthCompare = r_shadowMapDepthCompare.GetBool();
 		projected.receiverPlaneBias =
 			r_shadowMapReceiverPlaneBias.GetBool();
+		projected.distantNormalOffsetDepth =
+			r_shadowMapDistantNormalOffsetDepth.GetBool();
 	}
 	if ( classification.pointLight ) {
 		const float pointValues[] = {

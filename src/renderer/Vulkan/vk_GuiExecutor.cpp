@@ -762,11 +762,8 @@ bool VK_Exec_SurfaceMirrored( const drawSurf_t *drawSurf ) {
 	if ( drawSurf == NULL || drawSurf->space == NULL ) {
 		return false;
 	}
-	const float *m = drawSurf->space->modelMatrix;
-	const float determinant = m[0] * ( m[5] * m[10] - m[6] * m[9] )
-		- m[1] * ( m[4] * m[10] - m[6] * m[8] )
-		+ m[2] * ( m[4] * m[9] - m[5] * m[8] );
-	return determinant < 0.0f;
+	// a surface GUI turns only for a mirrored host (tr_local.h)
+	return R_SpaceWindsReflected( drawSurf->space );
 }
 
 /*

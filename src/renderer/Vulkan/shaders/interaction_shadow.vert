@@ -96,10 +96,18 @@ vec3 TangentSpaceVector(vec3 objectVector) {
         dot(inNormal, objectVector));
 }
 
+// A negative normalOffsetWorld is the offset per unit of the receiver's light
+// depth (row 3): a distant point light's texel grows with distance from its
+// source (R_ShadowMapProjectedNormalOffsetWorld).
 vec4 BuildShadowCoord(vec4 position, vec3 normalOffsetDir,
         float sinTheta, int cascadeIndex) {
+    float offsetWorld = shadow.normalOffsetWorld[cascadeIndex];
+    if (offsetWorld < 0.0) {
+        offsetWorld = -offsetWorld
+            * max(dot(position, shadow.shadowRow3[cascadeIndex]), 0.0);
+    }
     vec4 offsetPosition = vec4(position.xyz + normalOffsetDir
-        * (shadow.normalOffsetWorld[cascadeIndex] * sinTheta), 1.0);
+        * (offsetWorld * sinTheta), 1.0);
     return vec4(
         dot(offsetPosition, shadow.shadowRow0[cascadeIndex]),
         dot(offsetPosition, shadow.shadowRow1[cascadeIndex]),

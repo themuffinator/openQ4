@@ -256,6 +256,8 @@ typedef struct classicInteractionDomainShadowProjectedState_s {
 	float		texelBiasScale;
 	bool		depthCompare;
 	bool		receiverPlaneBias;
+	// r_shadowMapDistantNormalOffsetDepth (R_ShadowMapProjectedNormalOffsetWorld)
+	bool		distantNormalOffsetDepth;
 } classicInteractionDomainShadowProjectedState_t;
 
 typedef struct classicInteractionDomainShadowPointState_s {

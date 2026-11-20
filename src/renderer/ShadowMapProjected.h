@@ -57,6 +57,12 @@ typedef struct shadowMapProjectedLightState_s {
 	float				biasScale[SHADOWMAP_PROJECTED_MAX_CASCADES];
 	float				texelDepthBias[SHADOWMAP_PROJECTED_MAX_CASCADES];
 	float				worldTexelSize[SHADOWMAP_PROJECTED_MAX_CASCADES];
+	// World texel per unit of the receiver's light depth w (the cascade's
+	// fourth clip row), for distant point lights, whose perspective texel
+	// grows with distance from the source; 0 for every other light. At the
+	// far corner of the light volume it equals worldTexelSize for the whole
+	// map. See R_ShadowMapProjectedNormalOffsetWorld.
+	float				texelPerDepth[SHADOWMAP_PROJECTED_MAX_CASCADES];
 	float				sliceNear[SHADOWMAP_PROJECTED_MAX_CASCADES];
 	float				sliceFar[SHADOWMAP_PROJECTED_MAX_CASCADES];
 	float				depthRange[SHADOWMAP_PROJECTED_MAX_CASCADES];
@@ -99,6 +105,15 @@ float R_ShadowMapTexelDepthBias( float worldTexelSize, float depthRange );
 float R_ShadowMapTexelDepthStep( float worldTexelSize, float depthRange );
 // The step for every cascade of a projected state, zero for unused cascades.
 void R_ShadowMapProjectedTexelDepthSteps( const shadowMapProjectedLightState_t &state, float steps[SHADOWMAP_PROJECTED_MAX_CASCADES] );
+// The normal offset of a cascade's receivers in the receiver shaders' form,
+// normalOffsetScale shadow texels: a value >= 0 is a world distance, a value
+// < 0 is a world distance per unit of the receiver's light depth w (shadow
+// row 3), which the shader multiplies by w. Distant point lights take the
+// second form when depthScaled (r_shadowMapDistantNormalOffsetDepth): their
+// texel grows with distance from the source, and one distance sized for the
+// far end of the volume pushed nearer receivers further than a texel.
+float R_ShadowMapProjectedNormalOffsetWorld( const shadowMapProjectedLightState_t &state, int cascadeIndex, float normalOffsetScale, bool depthScaled );
+extern idCVar r_shadowMapDistantNormalOffsetDepth;
 float R_ShadowMapQuantizeCascadeExtent( float rawExtent, int tileSize );
 float R_ShadowMapSnapCascadeCenter( float rawCenter, float quantizedExtent, int tileSize );
 int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_t &state );
@@ -106,6 +121,7 @@ int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_
 bool R_ShadowMapCascadeStabilitySelfTest( void );
 bool R_ShadowMapCascadeWholeLightSelfTest( void );
 bool R_ShadowMapDistantPointProjectionSelfTest( void );
+bool R_ShadowMapDistantNormalOffsetSelfTest( void );
 bool R_ShadowMapCasterFacesSelfTest( void );
 void R_BuildShadowMapProjectedLightState( const viewLight_t *vLight, const viewDef_t *viewDef, int tileSize, shadowMapProjectedLightState_t &state );
 

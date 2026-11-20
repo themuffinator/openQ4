@@ -21,6 +21,20 @@ does not restore the withdrawn release. See
 - **What to do.** Nothing. Replace the client and the dedicated server; a server
   needs the update for players to join it in this setup.
 
+## A renderer switch no longer turns the screen white, 19 November 2026
+
+- **The game keeps responding while it restarts the renderer.** **Restart
+  Renderer**, for example to switch between Vulkan and OpenGL, reloads the game
+  for several seconds. During that reload the game stopped answering Windows, so
+  after five seconds Windows marked it Not Responding and covered it with a
+  blank window: in fullscreen, a white screen until the load finished. The
+  loading screen now stays up throughout.
+- **Starting the game is quicker too.** The Arena campaign no longer opens every
+  Arena map file while the game loads, which added about six seconds to the
+  first start or to the first renderer restart.
+- **What to do.** Nothing. A white screen after a renderer switch was the game
+  still loading, not a crash.
+
 ## Russian gameplay text, 19 November 2026
 
 - **More of the game in Russian.** HUD and multiplayer messages, key names,
@@ -31,6 +45,20 @@ does not restore the withdrawn release. See
 - **Subtitles.** Campaign subtitles are still English, unless your copy of
   Quake 4 includes its own Russian subtitles.
 - **What to do.** Nothing. Choose **Русский** under Settings → Game Options.
+
+## Sunlight shadows stay attached to nearby objects, 19 November 2026
+
+- **Shadows from sunlight sit closer to what casts them.** To avoid speckles,
+  shadow maps look up each surface's shadow slightly off the surface. For
+  sunlight and other distant lights that nudge was sized for the far end of
+  the whole outdoor area, about 30% too large near you, so small and close
+  shadows came loose or vanished. It is now sized for each surface's own
+  distance from the light. On nine outdoor views of Air Defense 1, the share
+  of the original game's shadow that appears rose from 96.4% to 97.0% on
+  Quality, and fewer surfaces are wrongly darkened, on OpenGL and Vulkan
+  alike.
+- **What to do.** Nothing. `r_shadowMapDistantNormalOffsetDepth 0` restores
+  the old size.
 
 ## Sharp character and object shadows outdoors on Quality and Ultra (#239), 19 November 2026
 

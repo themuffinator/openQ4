@@ -101,9 +101,9 @@ keeps at least half of that occlusion.
 
 (OpenGL; Vulkan agrees within one point everywhere.) Splitting the reach
 three ways instead of four costs up to a point at tank, reverse and opening.
-Single-map results vary between launches at some poses (opening 39% or 96%)
-with identical interactions, casters and cache reports; the cause is open and
-cascades are unaffected.
+The single-map column is the map as the preset draws it and repeats in every
+launch. Launches that seemed to score 96% at the opening were a fault in the
+capture script (see "Single map: why two launches scored higher" below).
 
 **Cached whole-light slot (OpenGL, `r_shadowMapCascadeFarCache`, default 1).**
 The whole-light cascade does not move with the camera, so its still scenery is
@@ -140,6 +140,137 @@ four fitted, three plus whole-light and one plus whole-light; fitted crops
 holding receivers inside the reach; the last cascade equal to the base
 projection; every receiver past the reach inside the light covered; and a
 distinct cache identity. The planner fixtures pin fitted-only cascades.
+
+## Single map: why two launches scored higher (19 November 2026)
+
+During the #239 measurements, two of seven launches scored the single map far
+higher: 96% at the opening, 99.9-100% at the wreckage. The interaction, caster
+and cache reports matched the low launches. The renderer was not at fault.
+Before each mode, the capture script reset a fixed list of cvars, and the
+receiver and caster bias cvars were not on it. A mode that zeroed one, such as
+`r_shadowMapNormalOffsetScale`, left it zeroed for every later mode and pose
+in that launch. The two high launches were the two that compared bias
+settings. Their single-map captures after the first pose had no bias, so the
+reports still matched: bias moves no casters and no interactions. The only
+field that differed, `expanded=`, counts casters whose stencil volume lies
+outside this view. It follows the camera and animated entities, not the map.
+
+Evidence, Quality with `r_shadowMapCSM 0`, 2560 x 1440. Each column is one
+mode in a single launch, captured at the same frozen moment:
+
+| Pose | Preset | Preset again | Normal offset 0 | Every bias 0 | Old script, after a bias mode |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Opening | 37.8% | 37.9% | 43.9% | 93.0% | 93.1% |
+| Wreckage | 5.6% | 5.6% | 99.9% | 99.9% | 99.9% |
+| Standing at the start | 0.9% | 0.9% | 0.9% | 13.6% | 13.5% |
+
+(OpenGL. Vulkan gives 39.0%, 39.1%, 43.9% and 93.0% at the opening and 5.8%,
+5.8%, 100% and 100% at the wreckage. "Every bias 0" also zeroes
+`r_shadowMapTexelBiasScale`, `r_shadowMapBias`, `r_shadowMapNormalBias` and
+`r_shadowMapPolygonOffset`. In the old-script launch, the first single-map
+capture, taken before any bias mode, scored 0.7% standing at the start.)
+
+The single map is deterministic. With every cvar reset, six launches (five
+OpenGL, one Vulkan) scored 37.7-41.4% at the opening, 5.5-5.8% at the
+wreckage and 0.7-0.9% standing. Repeat captures within a launch matched.
+Small differences between launches come from the storm and cannon-flash
+lights.
+
+The low scores are the single map's bias contract working as designed. The
+normal offset pushes each receiver about one map texel along its normal:
+25 world units, from the light's far-plane width (19.3 at the player's depth).
+That detaches contact shadows within about a texel of their caster. The
+wreckage's shadows are nearly all such contacts. Zeroing the offset alone
+restores them. In another launch whose poses sat 12 units higher, offset
+scales of 1, 0.5, 0.25 and 0.1 kept 23%, 69%, 79% and 80% at the wreckage.
+The opening needs every term removed at once: no single term moves it by more
+than about six points. Standing at the start stays near 1% with any bias, because
+at this resolution the player is two texels wide.
+
+Removing the bias is not a fix. It is the acne guard, and without it the
+opening shows more than three times as many falsely darkened pixels
+(653 to 2,174). Cascades are the fix, and they are the default on Quality and
+Ultra: cascade 0's texel is 0.73 units, so its offset is too. Sizing the
+offset by each receiver's depth, the next section, recovers part of the rest.
+
+To repeat these comparisons, reset every cvar any mode sets before each mode,
+and compare launches only when their pose lists match. A ground pose run first
+changes the eye height of every pose after it by 12 units.
+
+## Normal offset sized at each receiver's depth for distant lights (19 November 2026)
+
+A distant point light's map (light_146, and any source far outside its
+radius box) is a perspective view from its source, so one texel covers more
+ground the farther a receiver is from that source. The normal offset was one
+distance per cascade, `r_shadowMapNormalOffsetScale` texels measured where
+the volume is widest, at its far corner. Air Defense 1's single map pushed
+every receiver 25 units, where the texel at the player is 19.3 units; each
+fitted cascade overshot by the same ratio, the player's depth against the far
+corner's (18,850 against 24,530 units from the source).
+
+Each receiver's offset now follows its own texel. The projected state records
+`texelPerDepth` per cascade: the world texel per unit of light depth `w`,
+`(2 / tileSize) / |S across the depth row|`, taking the coarser of S and T.
+A cascade crop scales S and T and adds multiples of the depth row, so the one
+formula holds for the single map, every fitted crop and the whole-light slot.
+At the volume's far corner it equals the old size; nearer the source it is
+smaller, so no receiver's offset grows. Spotlights, parallel lights and
+ordinary point lights are unchanged; point cube maps already scale their
+offset by radial distance.
+
+The receivers read it from the existing offset value, which can never be
+negative, so the sign carries it: a value below zero is the offset per unit
+of `w`, and the shader multiplies it by the receiver's own `w` (its shadow
+row 3). GL `shadow_interaction.vs`, Vulkan `interaction_shadow.vert` and the
+three upload sites (`R_ShadowMapProjectedNormalOffsetWorld`) share it. The
+Vulkan shadow block is full at 32 vec4s, so it gains no field. The classic
+interaction domain snapshots the switch with the pass's other receiver
+settings and hashes it into the pass identity. The opt-in modern visible path
+(`r_rendererModernVisible`) keeps the far-corner size: its descriptor record
+is full and its texel also feeds the footprint bias and the ARB2 parity
+checks.
+
+`r_shadowMapDistantNormalOffsetDepth 1` (default) turns it on; `0` restores
+the far-corner size.
+
+Measured at one frozen moment per pose, nine Air Defense 1 poses, 2560 x 1440,
+Quality, both settings in the same launch:
+
+| Pose | Single map, far-corner offset | Single map, depth offset | Cascades, far-corner offset | Cascades, depth offset |
+| --- | ---: | ---: | ---: | ---: |
+| Standing at the start | 0.5% | 0.5% | 90.7% | 91.3% |
+| Opening | 40.7% | 41.3% | 95.1% | 95.3% |
+| Wreckage | 5.9% | 6.5% | 100% | 100% |
+| Tank | 80.0% | 83.0% | 94.7% | 96.3% |
+| Ridge | 69.9% | 73.0% | 90.6% | 92.4% |
+| Crater | 71.0% | 77.5% | 88.1% | 91.1% |
+| Reverse | 80.5% | 83.2% | 93.8% | 95.0% |
+| Vista | 80.4% | 84.9% | 89.0% | 91.0% |
+| Distant | 93.0% | 94.0% | 89.7% | 90.6% |
+| **All poses** | **27.6%** | **29.0%** | **96.4%** | **97.0%** |
+
+(OpenGL. Vulkan: single map 27.9% to 29.3%, cascades 96.5% to 97.1%.) No pose
+loses. The falsely darkened pixels fall too, because an offset that is too
+large also moves the lookup into a neighbour's shadow: on OpenGL, 17,002 to
+13,841 for the single map and 19,026 to 18,007 for the cascades; on Vulkan,
+14,710 to 12,927 and 19,484 to 18,114. The wreckage stays dark for the single
+map: its contact shadows sit within the 19-unit texel itself.
+
+`rendererShadowProjectedDiagnosticSelfTest` runs
+`R_ShadowMapDistantNormalOffsetSelfTest` on light_146: 55 receiver texels
+(the volume's corners and centre, the player start and the wreckage, through
+the single map, three fitted cascades and the whole-light slot) agree within
+0.5% with the texel measured by stepping across the depth row; the depth
+offset never exceeds the far-corner size; switched off, the offset keeps that
+size; and a parallel light keeps one offset.
+
+With the new default, the terrain check and the eleven-stop Air Defense 1
+route below pass on OpenGL and Vulkan against a packs-only asset view (the
+Steam folder's `baseoq4` and loose recompiled maps are refused). No lit terrain
+pixel in Sandstorm or Air Defense 1 darkens past the gate, the route's lit
+areas move by at most 0.22 display levels, its shadow contrast stays at
+82-99.5% of stencil, the entrance railing keeps 99.0% (OpenGL) and 99.1%
+(Vulkan) support, and cached and fresh frames differ by at most 0.01 RMS.
 
 ## Reproduction
 

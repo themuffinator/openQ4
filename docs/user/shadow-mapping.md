@@ -267,6 +267,7 @@ Shadow artifacts usually come in two kinds: speckles or stripes on a lit surface
 | `r_shadowMapNormalBias` | `0.00075` | `0..0.05` | Extra spotlight bias on sloped surfaces. |
 | `r_shadowMapTexelBiasScale` | `0.45` | `0..8` | Bias that scales with how much ground each shadow pixel covers. `r_shadowMapBias` acts as its minimum. |
 | `r_shadowMapNormalOffsetScale` | `1.0` | `0..8` | Nudges the shadow lookup off sloped surfaces. Helps with stripes, but too high moves contact edges, especially on large lights. |
+| `r_shadowMapDistantNormalOffsetDepth` | `1` | `0..1` | For sunlight and other distant lights, sizes that nudge to the shadow pixel at each surface's distance from the light, so nearby shadows stay attached. `0` uses one size, the one for the far end of the light. **Not in 0.14.1.** |
 | `r_shadowMapReceiverPlaneBias` | `0` | `0..1` | An experimental alternative bias. Leave it off for normal play. |
 | `r_shadowMapPolygonFactor` | `0.25` | `0..16` | Pushes shadow-casting surfaces back in proportion to their slope while the shadow is drawn. |
 | `r_shadowMapPolygonOffset` | `0.5` | `0..64` | Pushes shadow-casting surfaces back by a fixed amount while the shadow is drawn. |
