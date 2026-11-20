@@ -4,7 +4,7 @@
   "date": "2026-11-17",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "3f3665233dc9f5de7e031202bb561fde12942e48",
+    "engine_revision": "9c9807476a2f9a5926d2a8b3429e0bec1fcbae56",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -132,7 +132,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/vector-paths.md",
       "scope": "Native paths, fills, stroke unions and linear paints; all required primitive variants, production artwork and editor unfinished.",
-      "sha256": "608b78816ec75d669aed15213678182b39307c569fc1ebe8adfb266cae24b723"
+      "sha256": "a55c3baaff4fb98bed523c29cfbd1940f5fa9070c504803a74fd8f3721c1d223"
     },
     "coverage-foundation": {
       "kind": "implementation_checkpoint",
@@ -174,7 +174,7 @@
       "kind": "implementation_checkpoint",
       "path": "docs/dev/ui/runtime-performance.md",
       "scope": "Debug CPU fixture counters; release GPU/frame pacing/resource budgets unqualified.",
-      "sha256": "a7f8287f788db3a3947e91f4fa2750049f96d1d3b73c287400398399eb0472a1"
+      "sha256": "08dbe5a2a8648afb0a35da485264d95a3000c873fd2c4add7033618ac3508b0a"
     },
     "instance-persistence-foundation": {
       "kind": "qualified_foundation_checkpoint",

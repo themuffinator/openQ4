@@ -151,7 +151,12 @@ and resource lifetime remain in control. The subsequent
 path compilation and reuses whole-pixel translations. It also patches the pinned
 tessellator to double precision for stable thin rails during fractional motion.
 An element moving by translation alone keeps compilations at quarter-pixel
-phases. While it slides, its cache region is its own box, which does not move in
+phases; one that keeps sliding (eight renders in a row, a looping drift)
+compiles at half-pixel phases, all four of which its cache of eight holds
+([menu frame costs](menu-frame-costs.md)). A vector of 16 paths or more
+uploads its consecutive meshes that draw alike as one geometry, so it is a
+draw or two rather than one a path; a smaller one keeps a geometry per path.
+While it slides, its cache region is its own box, which does not move in
 that translated space, rather than the visible part of the view: a fast scroller
 several views tall would otherwise cross a new 256-pixel block, and recompile,
 every few frames. The box may be at most four views in area; a fully

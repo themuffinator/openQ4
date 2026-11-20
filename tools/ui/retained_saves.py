@@ -276,10 +276,11 @@ def grow_rows(doc: Document, column: dict) -> None:
                 # The lights and the rule are drawn in fractions of the row.
                 in_fractions(child, props["width"]["value"], height)
             elif child.get("type") == "text" and "row-" in child["id"]:
-                # A name or map past its column ends in an ellipsis.
-                props["text-overflow"] = keyword("clip")
-                doc.bind(f"text.{child['id']}.text-overflow", child["id"], "text-overflow",
-                         {"op": "select", "args": [{"op": ">", "args": [TEXT, 1]}, "ellipsis", "clip"]})
+                # A name or map past its column ends in an ellipsis at every
+                # text size, as Join Game's and the stock lists' do (a save's
+                # name is the player's; AIR DEFENSE BUNKER outruns a demo's
+                # map column even at 100 %).
+                props["text-overflow"] = keyword("ellipsis")
             doc.bind(f"text.{child['id']}.height", child["id"], "height", text_times(height))
 
 

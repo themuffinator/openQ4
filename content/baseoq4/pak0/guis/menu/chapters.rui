@@ -3166,12 +3166,6 @@
    }
   },
   {
-   "id": "text.row-0-name.text-overflow",
-   "node": "row-0-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-0-name.height",
    "node": "row-0-name",
    "property": "height",
@@ -3203,12 +3197,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-0-location.text-overflow",
-   "node": "row-0-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-0-location.height",
@@ -3374,12 +3362,6 @@
    }
   },
   {
-   "id": "text.row-1-name.text-overflow",
-   "node": "row-1-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-1-name.height",
    "node": "row-1-name",
    "property": "height",
@@ -3411,12 +3393,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-1-location.text-overflow",
-   "node": "row-1-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-1-location.height",
@@ -3582,12 +3558,6 @@
    }
   },
   {
-   "id": "text.row-2-name.text-overflow",
-   "node": "row-2-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-2-name.height",
    "node": "row-2-name",
    "property": "height",
@@ -3619,12 +3589,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-2-location.text-overflow",
-   "node": "row-2-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-2-location.height",
@@ -3790,12 +3754,6 @@
    }
   },
   {
-   "id": "text.row-3-name.text-overflow",
-   "node": "row-3-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-3-name.height",
    "node": "row-3-name",
    "property": "height",
@@ -3827,12 +3785,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-3-location.text-overflow",
-   "node": "row-3-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-3-location.height",
@@ -3998,12 +3950,6 @@
    }
   },
   {
-   "id": "text.row-4-name.text-overflow",
-   "node": "row-4-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-4-name.height",
    "node": "row-4-name",
    "property": "height",
@@ -4035,12 +3981,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-4-location.text-overflow",
-   "node": "row-4-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-4-location.height",
@@ -4206,12 +4146,6 @@
    }
   },
   {
-   "id": "text.row-5-name.text-overflow",
-   "node": "row-5-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-5-name.height",
    "node": "row-5-name",
    "property": "height",
@@ -4243,12 +4177,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-5-location.text-overflow",
-   "node": "row-5-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-5-location.height",
@@ -4414,12 +4342,6 @@
    }
   },
   {
-   "id": "text.row-6-name.text-overflow",
-   "node": "row-6-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-6-name.height",
    "node": "row-6-name",
    "property": "height",
@@ -4451,12 +4373,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-6-location.text-overflow",
-   "node": "row-6-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-6-location.height",
@@ -4622,12 +4538,6 @@
    }
   },
   {
-   "id": "text.row-7-name.text-overflow",
-   "node": "row-7-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-7-name.height",
    "node": "row-7-name",
    "property": "height",
@@ -4659,12 +4569,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-7-location.text-overflow",
-   "node": "row-7-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-7-location.height",
@@ -4830,12 +4734,6 @@
    }
   },
   {
-   "id": "text.row-8-name.text-overflow",
-   "node": "row-8-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-8-name.height",
    "node": "row-8-name",
    "property": "height",
@@ -4867,12 +4765,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-8-location.text-overflow",
-   "node": "row-8-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-8-location.height",
@@ -5038,12 +4930,6 @@
    }
   },
   {
-   "id": "text.row-9-name.text-overflow",
-   "node": "row-9-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-9-name.height",
    "node": "row-9-name",
    "property": "height",
@@ -5075,12 +4961,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-9-location.text-overflow",
-   "node": "row-9-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-9-location.height",
@@ -5246,12 +5126,6 @@
    }
   },
   {
-   "id": "text.row-10-name.text-overflow",
-   "node": "row-10-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-10-name.height",
    "node": "row-10-name",
    "property": "height",
@@ -5283,12 +5157,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-10-location.text-overflow",
-   "node": "row-10-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-10-location.height",
@@ -5454,12 +5322,6 @@
    }
   },
   {
-   "id": "text.row-11-name.text-overflow",
-   "node": "row-11-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-11-name.height",
    "node": "row-11-name",
    "property": "height",
@@ -5491,12 +5353,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-11-location.text-overflow",
-   "node": "row-11-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-11-location.height",
@@ -5662,12 +5518,6 @@
    }
   },
   {
-   "id": "text.row-12-name.text-overflow",
-   "node": "row-12-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-12-name.height",
    "node": "row-12-name",
    "property": "height",
@@ -5699,12 +5549,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-12-location.text-overflow",
-   "node": "row-12-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-12-location.height",
@@ -5870,12 +5714,6 @@
    }
   },
   {
-   "id": "text.row-13-name.text-overflow",
-   "node": "row-13-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-13-name.height",
    "node": "row-13-name",
    "property": "height",
@@ -5907,12 +5745,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-13-location.text-overflow",
-   "node": "row-13-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-13-location.height",
@@ -6078,12 +5910,6 @@
    }
   },
   {
-   "id": "text.row-14-name.text-overflow",
-   "node": "row-14-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-14-name.height",
    "node": "row-14-name",
    "property": "height",
@@ -6115,12 +5941,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-14-location.text-overflow",
-   "node": "row-14-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-14-location.height",
@@ -6286,12 +6106,6 @@
    }
   },
   {
-   "id": "text.row-15-name.text-overflow",
-   "node": "row-15-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-15-name.height",
    "node": "row-15-name",
    "property": "height",
@@ -6323,12 +6137,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-15-location.text-overflow",
-   "node": "row-15-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-15-location.height",
@@ -6494,12 +6302,6 @@
    }
   },
   {
-   "id": "text.row-16-name.text-overflow",
-   "node": "row-16-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-16-name.height",
    "node": "row-16-name",
    "property": "height",
@@ -6531,12 +6333,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-16-location.text-overflow",
-   "node": "row-16-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-16-location.height",
@@ -6702,12 +6498,6 @@
    }
   },
   {
-   "id": "text.row-17-name.text-overflow",
-   "node": "row-17-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-17-name.height",
    "node": "row-17-name",
    "property": "height",
@@ -6739,12 +6529,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-17-location.text-overflow",
-   "node": "row-17-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-17-location.height",
@@ -6910,12 +6694,6 @@
    }
   },
   {
-   "id": "text.row-18-name.text-overflow",
-   "node": "row-18-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-18-name.height",
    "node": "row-18-name",
    "property": "height",
@@ -6947,12 +6725,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-18-location.text-overflow",
-   "node": "row-18-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-18-location.height",
@@ -7118,12 +6890,6 @@
    }
   },
   {
-   "id": "text.row-19-name.text-overflow",
-   "node": "row-19-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-19-name.height",
    "node": "row-19-name",
    "property": "height",
@@ -7155,12 +6921,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-19-location.text-overflow",
-   "node": "row-19-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-19-location.height",
@@ -7326,12 +7086,6 @@
    }
   },
   {
-   "id": "text.row-20-name.text-overflow",
-   "node": "row-20-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-20-name.height",
    "node": "row-20-name",
    "property": "height",
@@ -7363,12 +7117,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-20-location.text-overflow",
-   "node": "row-20-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-20-location.height",
@@ -7534,12 +7282,6 @@
    }
   },
   {
-   "id": "text.row-21-name.text-overflow",
-   "node": "row-21-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-21-name.height",
    "node": "row-21-name",
    "property": "height",
@@ -7571,12 +7313,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-21-location.text-overflow",
-   "node": "row-21-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-21-location.height",
@@ -7742,12 +7478,6 @@
    }
   },
   {
-   "id": "text.row-22-name.text-overflow",
-   "node": "row-22-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-22-name.height",
    "node": "row-22-name",
    "property": "height",
@@ -7779,12 +7509,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-22-location.text-overflow",
-   "node": "row-22-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-22-location.height",
@@ -7950,12 +7674,6 @@
    }
   },
   {
-   "id": "text.row-23-name.text-overflow",
-   "node": "row-23-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-23-name.height",
    "node": "row-23-name",
    "property": "height",
@@ -7987,12 +7705,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-23-location.text-overflow",
-   "node": "row-23-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-23-location.height",
@@ -8158,12 +7870,6 @@
    }
   },
   {
-   "id": "text.row-24-name.text-overflow",
-   "node": "row-24-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-24-name.height",
    "node": "row-24-name",
    "property": "height",
@@ -8195,12 +7901,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-24-location.text-overflow",
-   "node": "row-24-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-24-location.height",
@@ -8366,12 +8066,6 @@
    }
   },
   {
-   "id": "text.row-25-name.text-overflow",
-   "node": "row-25-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-25-name.height",
    "node": "row-25-name",
    "property": "height",
@@ -8403,12 +8097,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-25-location.text-overflow",
-   "node": "row-25-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-25-location.height",
@@ -8574,12 +8262,6 @@
    }
   },
   {
-   "id": "text.row-26-name.text-overflow",
-   "node": "row-26-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-26-name.height",
    "node": "row-26-name",
    "property": "height",
@@ -8611,12 +8293,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-26-location.text-overflow",
-   "node": "row-26-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-26-location.height",
@@ -8782,12 +8458,6 @@
    }
   },
   {
-   "id": "text.row-27-name.text-overflow",
-   "node": "row-27-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-27-name.height",
    "node": "row-27-name",
    "property": "height",
@@ -8819,12 +8489,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-27-location.text-overflow",
-   "node": "row-27-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-27-location.height",
@@ -8990,12 +8654,6 @@
    }
   },
   {
-   "id": "text.row-28-name.text-overflow",
-   "node": "row-28-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-28-name.height",
    "node": "row-28-name",
    "property": "height",
@@ -9027,12 +8685,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-28-location.text-overflow",
-   "node": "row-28-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-28-location.height",
@@ -9198,12 +8850,6 @@
    }
   },
   {
-   "id": "text.row-29-name.text-overflow",
-   "node": "row-29-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-29-name.height",
    "node": "row-29-name",
    "property": "height",
@@ -9235,12 +8881,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-29-location.text-overflow",
-   "node": "row-29-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-29-location.height",
@@ -9406,12 +9046,6 @@
    }
   },
   {
-   "id": "text.row-30-name.text-overflow",
-   "node": "row-30-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-30-name.height",
    "node": "row-30-name",
    "property": "height",
@@ -9443,12 +9077,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-30-location.text-overflow",
-   "node": "row-30-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-30-location.height",
@@ -9614,12 +9242,6 @@
    }
   },
   {
-   "id": "text.row-31-name.text-overflow",
-   "node": "row-31-name",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
-  },
-  {
    "id": "text.row-31-name.height",
    "node": "row-31-name",
    "property": "height",
@@ -9651,12 +9273,6 @@
      {"op": "*", "args": [30.0, {"state": "view.text"}]}
     ]
    }
-  },
-  {
-   "id": "text.row-31-location.text-overflow",
-   "node": "row-31-location",
-   "property": "text-overflow",
-   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.text"}, 1]}, "ellipsis", "clip"]}
   },
   {
    "id": "text.row-31-location.height",
@@ -45559,7 +45175,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -45580,7 +45196,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -45887,7 +45503,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -45908,7 +45524,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -46215,7 +45831,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -46236,7 +45852,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -46543,7 +46159,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -46564,7 +46180,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -46871,7 +46487,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -46892,7 +46508,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -47199,7 +46815,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -47220,7 +46836,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -47527,7 +47143,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -47548,7 +47164,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -47855,7 +47471,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -47876,7 +47492,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -48183,7 +47799,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -48204,7 +47820,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -48511,7 +48127,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -48532,7 +48148,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -48839,7 +48455,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -48860,7 +48476,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -49167,7 +48783,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -49188,7 +48804,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -49495,7 +49111,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -49516,7 +49132,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -49823,7 +49439,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -49844,7 +49460,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -50151,7 +49767,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -50172,7 +49788,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -50479,7 +50095,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -50500,7 +50116,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -50807,7 +50423,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -50828,7 +50444,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -51135,7 +50751,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -51156,7 +50772,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -51463,7 +51079,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -51484,7 +51100,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -51791,7 +51407,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -51812,7 +51428,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -52119,7 +51735,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -52140,7 +51756,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -52447,7 +52063,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -52468,7 +52084,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -52775,7 +52391,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -52796,7 +52412,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -53103,7 +52719,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -53124,7 +52740,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -53431,7 +53047,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -53452,7 +53068,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -53759,7 +53375,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -53780,7 +53396,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -54087,7 +53703,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -54108,7 +53724,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -54415,7 +54031,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -54436,7 +54052,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -54743,7 +54359,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -54764,7 +54380,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -55071,7 +54687,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -55092,7 +54708,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -55399,7 +55015,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -55420,7 +55036,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -55727,7 +55343,7 @@
                "white-space": {"type": "keyword", "value": "nowrap"},
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -55748,7 +55364,7 @@
                "overflow": {"type": "keyword", "value": "hidden"},
                "pointer-events": {"type": "keyword", "value": "none"},
                "display": {"type": "keyword", "value": "none"},
-               "text-overflow": {"type": "keyword", "value": "clip"}
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {

@@ -63,17 +63,22 @@ private:
 	std::vector<VectorPath> paths;
 	// One compiled form of the paths: meshes in output pixels for a
 	// signature (size, transform, sub-pixel phase, cache region), and their
-	// uploaded geometry at one opacity.
+	// uploaded geometry at one opacity. Consecutive meshes that draw the same
+	// way upload as one geometry, so a vector of many paths (a snow layer, a
+	// band's frost) is a draw or two rather than one per path.
 	struct Compilation {
 		std::array<double,12> signature{};
 		std::vector<VectorMesh> meshes;
 		std::vector<PathBlend> blends; // Parallel to meshes.
 		std::vector<Rml::Geometry> geometry;
+		std::vector<bool> multiplied; // Parallel to geometry: drawn with the multiply texture.
 		double opacity = -1;
 	};
 	// Most recent first. A resting element keeps one exact compilation; an
-	// element moving by translation alone keeps a few quarter-pixel phases.
+	// element moving by translation alone keeps a few quarter-pixel phases,
+	// or half-pixel ones once it has kept sliding (SlidingHalfPhaseRenders).
 	std::vector<Compilation> cache;
+	int slidingRenders = 0; // Consecutive renders that moved by translation alone.
 	Rml::Texture multiply, coverage;
 	Host* host = nullptr;
 	LinearMaskInterface* linearMasks = nullptr;

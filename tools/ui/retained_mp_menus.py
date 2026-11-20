@@ -1567,8 +1567,11 @@ def value_row(doc: Document, ident: str, label_key: str | None, kind: str, width
             "states": row_states(doc, ident, label_key is not None)}
     if kind == "choice":
         # Lists take the 14 dp face: the stock maps' names run long, in capitals.
-        value_node = label(f"{ident}-value", PLACEHOLDER, {**absolute(left=value_x, top=0, width=value_w - 14, height=row_h),
-                           **typeface("lowpixel", 14, row_h, rgb(VALUE)), "white-space": keyword("nowrap"), "overflow": keyword("hidden")})
+        # A value too long for its room (a sound device's name) ends in an
+        # ellipsis 8 dp short of the chevron, never cut against it.
+        value_node = label(f"{ident}-value", PLACEHOLDER, {**absolute(left=value_x, top=0, width=value_w - 20, height=row_h),
+                           **typeface("lowpixel", 14, row_h, rgb(VALUE)), "white-space": keyword("nowrap"), "overflow": keyword("hidden"),
+                           "text-overflow": keyword("ellipsis")})
         chevron = vector(f"{ident}-chevron", absolute(left=width - 24, top=10 + middle, width=12, height=6), [
             path("chevron", [(0, 0), (6, 6), (12, 0)], closed=False, stroke=stroke(solid(rgb(VALUE)), 1.5))])
         popup, options = choice_popup(ident, entries, value_w + 8)

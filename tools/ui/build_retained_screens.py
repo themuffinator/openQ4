@@ -1439,9 +1439,13 @@ def modal_energy(doc: "Document", ident: str, commands: list, width: float, heig
     - a faint light along the whole outline, 3 dp of it showing outside the
       black frame, that swells and settles once a turn;
     - two pulses that run around the outline, each a bright head with a tail
-      a tenth of a turn long: the outline drawn hot under a mask of two
-      wedges that turns about the dialog's centre, the outline inside it
-      turning back so it stays put (the emblem's old glint, sharpened);
+      a tenth of a turn long: the outline drawn hot under a mask of a
+      wedge that turns about the dialog's centre, the outline inside it
+      turning back so it stays put (the emblem's old glint, sharpened). Each
+      pulse turns its own copy under a mask of one wedge: a turning mask of
+      one convex wedge with a three-stop gradient on whole 8-bit levels is
+      the GPU's linear mask, where one of two wedges was tessellated again
+      on every frame;
     - a wave of the glow's own light that falls through the dialog once a
       turn, faint through the frame's fill and plain in its slot, its notch
       and the margins.
@@ -1466,7 +1470,7 @@ def modal_energy(doc: "Document", ident: str, commands: list, width: float, heig
 
     def pulse(name: str, at: float) -> dict:
         return path(name, [(reach, reach), spoke(at - tail), spoke(at - tail / 2), spoke(at)],
-                    fill=linear(spoke(at - tail), spoke(at), [(0, [1, 1, 1, 0]), (0.72, [1, 1, 1, 0.5]), (1, [1, 1, 1, 1])]))
+                    fill=linear(spoke(at - tail), spoke(at), [(0, [1, 1, 1, 0]), (0.72, [1, 1, 1, 128 / 255]), (1, [1, 1, 1, 1])]))
 
     whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
     halo = vector(f"{ident}-energy-halo", {**absolute(left=0, top=0, width=width, height=height), "opacity": number(0.35)}, [
@@ -1476,21 +1480,23 @@ def modal_energy(doc: "Document", ident: str, commands: list, width: float, heig
                                             "transform": transform(ty=-band)}, [
         path("wave", whole, fill=linear((0, 0), (0, {"fraction": 1}), [(0, rgb(glow_tint, 0)), (0.6, rgb(glow_tint, 0.7)),
                                                                         (1, rgb(glow_tint, 0))]), blend="additive")])
-    runner = group(f"{ident}-energy-run", {**absolute(left=round(cx - reach, 3), top=round(cy - reach, 3), width=side, height=side),
-                                           "transform": rotation(0)}, [
-        vector(f"{ident}-energy-line", {**absolute(left=0, top=0, width=side, height=side), "transform": rotation(0)}, [
-            {"id": "line", "commands": outline(reach - cx, reach - cy), "stroke": stroke(solid(rgb(hot, 0.9)), rim_w + 6),
-             "blend": "additive"}])],
-        mask={"paths": [pulse("first", 0), pulse("second", math.pi)]})
+    def runner(suffix: str, name: str, at: float) -> dict:
+        return group(f"{ident}-energy-run{suffix}", {**absolute(left=round(cx - reach, 3), top=round(cy - reach, 3), width=side, height=side),
+                                                     "transform": rotation(0)}, [
+            vector(f"{ident}-energy-line{suffix}", {**absolute(left=0, top=0, width=side, height=side), "transform": rotation(0)}, [
+                {"id": "line", "commands": outline(reach - cx, reach - cy), "stroke": stroke(solid(rgb(hot, 0.9)), rim_w + 6),
+                 "blend": "additive"}])],
+            mask={"paths": [pulse(name, at)]})
     if "motion_reduced" not in doc.state:
         doc.state["motion_reduced"] = {"type": "boolean", "initial": False, "cvar": "ui_retainedReducedMotion"}
-    node = group(f"{ident}-energy", {**FULL, "display": keyword("none"), "pointer-events": keyword("none")}, [halo, sweep, runner])
+    runners = [runner("", "first", 0), runner("-second", "second", math.pi)]
+    node = group(f"{ident}-energy", {**FULL, "display": keyword("none"), "pointer-events": keyword("none")}, [halo, sweep, *runners])
     doc.bind(f"{ident}-energy.display", f"{ident}-energy", "display",
              {"op": "select", "args": [{"op": "&&", "args": [shown, {"op": "!", "args": [{"state": "motion_reduced"}]}]}, "block", "none"]})
     period = ENERGY_PERIOD_MS
     doc.timelines.add(f"{ident}Energy", period, [
-        track(f"{ident}-energy-run", "transform", [(0, rotation(0)), (period, rotation(360))]),
-        track(f"{ident}-energy-line", "transform", [(0, rotation(0)), (period, rotation(-360))]),
+        *[track(f"{ident}-energy-{part}{suffix}", "transform", [(0, rotation(0)), (period, rotation(turn))])
+          for suffix in ("", "-second") for part, turn in (("run", 360), ("line", -360))],
         track(f"{ident}-energy-halo", "opacity", [(0, number(0.35)), (period / 2, number(1)), (period, number(0.35))]),
         track(f"{ident}-energy-wave", "transform", [(0, transform(ty=-band)), (start, transform(ty=-band)),
                                                     (start + run, transform(ty=height)), (period, transform(ty=height))]),

@@ -1098,6 +1098,57 @@ static void CheckMenuFadeReplay(TestHost& host) {
 	Check(runtime.SetState({{"buttonAlpha",0.0}},error,time),"change the interactive button's opacity");
 	Check(runtime.Frame({},time) && runtime.Statistics().layoutUpdates>0,"interactive opacity keeps full layout and interaction validation");
 }
+// A dialog's glow pulses beside its buttons: a vector leaf's opacity is its
+// isolated layer's composite, so a fade neither restyles nor relays out the
+// document, overlapping paths still take the alpha once, and a replayed frame
+// matches a full one. With and without the host's layer cache.
+static void CheckVectorFadeReplay(TestHost& host) {
+	const char* source=R"json({"format":"retained-ui","version":1,"id":"vector-fade",
+	 "state":{"alpha":{"type":"number","initial":0.5}},
+	 "bindings":[{"id":"fade","node":"glow","property":"opacity","value":{"state":"alpha"}}],
+	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","unit":"dp","value":300},"height":{"type":"length","unit":"dp","value":100},"background-color":{"type":"color","value":[0,1,0,1]}},"children":[
+	 {"id":"button","type":"group","properties":{"background-color":{"type":"color","value":[1,0,0,1]},"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","unit":"dp","value":10},"top":{"type":"length","unit":"dp","value":10},"width":{"type":"length","unit":"dp","value":50},"height":{"type":"length","unit":"dp","value":50}},"control":{"role":"button","action":"fixture.activate","label":"#str_200013","states":{"default":"rest","hover":"rest","focus":"rest","pressed":"rest","disabled":"rest"}}},
+	 {"id":"glow","type":"vector","properties":{"position":{"type":"keyword","value":"absolute"},"left":{"type":"length","unit":"dp","value":100},"top":{"type":"length","unit":"dp","value":0},"width":{"type":"length","unit":"dp","value":100},"height":{"type":"length","unit":"dp","value":50},"opacity":{"type":"number","value":0.5}},
+	 "paths":[
+	 {"id":"fill","commands":[{"id":"a","op":"move","points":[[10,10]]},{"id":"b","op":"line","points":[[90,10]]},{"id":"c","op":"line","points":[[90,40]]},{"id":"d","op":"line","points":[[10,40]]},{"id":"z","op":"close"}],"fill":{"type":"solid","color":{"type":"color","value":[1,0,0,1]}}},
+	 {"id":"rail","commands":[{"id":"a","op":"move","points":[[40,10]]},{"id":"b","op":"line","points":[[90,10]]},{"id":"c","op":"line","points":[[90,40]]},{"id":"d","op":"line","points":[[40,40]]},{"id":"z","op":"close"}],"fill":{"type":"solid","color":{"type":"color","value":[0,0,1,1]}}}]}]},
+	 "timelines":[{"id":"rest","durationMs":1,"tracks":[{"node":"button","property":"background-color","keys":[{"atMs":0,"value":{"type":"color","value":[1,0,0,1]}},{"atMs":1,"value":{"type":"color","value":[1,0,0,1]}}]}]}]})json";
+	const auto near=[](float actual,float expected){return std::abs(actual-expected)<.002f;};
+	for (const bool cached : {false,true}) {
+		Runtime runtime(host); std::vector<Diagnostic> diagnostics; std::string error;
+		Check(runtime.LoadDocument(source,"vector-fade.rui",diagnostics),"load a pulsing vector beside an interactive button");
+		host.cacheLayers=cached;
+		host.samplePoints={{120.25f,20.25f},{160.25f,20.25f}};
+		runtime.PointerMove(20,20,0);
+		for (int frame=0;frame<4;++frame) { host.ClearSamples(); Check(runtime.Frame({},frame*.1),"settle the hovered menu and glow"); }
+		double time=.4,previousAlpha=.5;
+		for (double alpha:{.25,.75,.125,.5,0.0,.25,1.0,.5}) {
+			Check(runtime.SetState({{"alpha",alpha}},error,time),"pulse the vector glow with a stationary pointer");
+			host.ClearSamples(); Check(runtime.Frame({},time),"draw the pulsing glow");
+			const bool reusable=previousAlpha>0 && previousAlpha<1 && alpha>0 && alpha<1;
+			Check(runtime.Statistics().layoutUpdates==0,"a vector leaf's fade does not relay out the controls beside it");
+			// An uncached plate's composite is not recorded; a cached one (the
+			// engine's) replays from its layer at the live alpha.
+			Check(runtime.Statistics().frameReplays==(cached && reusable ? 1 : 0) && (!cached || !reusable || runtime.Statistics().layerCacheHits==1),
+				"a cached vector fade replays the frame from its layer");
+			const float a=static_cast<float>(alpha);
+			Check(near(host.layers[0].pixels[0].r,a) && near(host.layers[0].pixels[0].g,1-a) && near(host.layers[0].pixels[0].b,0) &&
+				near(host.layers[0].pixels[1].r,0) && near(host.layers[0].pixels[1].g,1-a) && near(host.layers[0].pixels[1].b,a),
+				"the pulsing vector's overlapping paths take the live alpha once");
+			Check(runtime.GetControlState("button")==ControlState::Hover,"a pulsing vector preserves hover state");
+			const auto replayed=host.layers[0].pixels;
+			host.replayFrames=false; host.ClearSamples(); Check(runtime.Frame({},time),"draw the glow without replay");
+			for (size_t i=0;i<replayed.size();++i) {
+				const auto& r=replayed[i]; const auto& f=host.layers[0].pixels[i];
+				Check(near(r.r,f.r) && near(r.g,f.g) && near(r.b,f.b) && near(r.a,f.a),"replayed and full vector fades agree");
+			}
+			host.replayFrames=true; host.ClearSamples(); Check(runtime.Frame({},time),"record the current glow again");
+			previousAlpha=alpha;
+			time+=.1;
+		}
+	}
+	host.samplePoints.clear(); host.cacheLayers=false;
+}
 static void CheckDecorativeTransforms(TestHost& host) {
 	const char* source=R"json({"format":"retained-ui","version":1,"id":"decorative-transforms",
 	 "root":{"id":"root","type":"group","children":[
@@ -2424,6 +2475,7 @@ int main(int argc, char** argv) {
 	CheckQuietButtonLayout(host);
 	CheckDecorativeTransforms(host);
 	CheckMenuFadeReplay(host);
+	CheckVectorFadeReplay(host);
 	CheckCoverageRaster();
 	CheckHiddenPresentation(host);
 	CheckCompoundPlateCache(host);

@@ -3264,6 +3264,16 @@ Completion must advance through the existing dependencies:
   bounded-resource checks. Keep whole-frame and isolated UI measurements separate.
   Begin with the SYSTEM/editor vertical slice; do not defer architecture/cost
   decisions until all screens have been converted.
+  Progress, 20 November: [menus in motion](ui/menu-frame-costs.md) were
+  measured with their opening animations playing. The Awakening pages'
+  drifting snow recompiled every frame (9.9-12.7 ms of CPU, about 2,100 draws a
+  frame) and an open dialog tessellated its glow's turning mask and relaid out
+  the page behind it every frame. A sliding vector now compiles at half-pixel
+  phases its cache holds, many-path vectors draw as one or two geometries, each
+  glow pulse turns under a GPU linear mask and a vector leaf's fade skips the
+  layout pass: the Awakening pause fell to 0.24 ms and 167 draws. Open: about
+  1 ms of style work for the snow on the Awakening GAME OPTIONS and DISPLAY
+  pages, and the Awakening documents' 2.3 MB of snow and frost.
   Progress, 4 November: [moving weapon scopes](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026)
   retain local meshes for their faint animated furniture. At 1080p the isolated
   rail/nail scope CPU medians fall from 6.99/8.80 ms to 0.018/0.037 ms; continuous

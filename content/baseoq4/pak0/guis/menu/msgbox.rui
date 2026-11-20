@@ -1369,6 +1369,22 @@
      ]
     },
     {
+     "node": "msg-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "msg-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "msg-energy-halo",
      "property": "opacity",
      "keys": [
@@ -1861,11 +1877,75 @@
                 "to": [321.555, -19.293],
                 "stops": [
                  {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                 {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                 {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                  {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                 ]
                }
+              }
+             ]
+            }
+           },
+           {
+            "id": "msg-energy-run-second",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": -41.555, "unit": "dp"},
+             "top": {"type": "length", "value": -189.555, "unit": "dp"},
+             "width": {"type": "length", "value": 643.11, "unit": "dp"},
+             "height": {"type": "length", "value": 643.11, "unit": "dp"},
+             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+            },
+            "children": [
+             {
+              "id": "msg-energy-line-second",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 643.11, "unit": "dp"},
+               "height": {"type": "length", "value": 643.11, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
+              "paths": [
+               {
+                "id": "line",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[49.211, 193.117]]},
+                 {"id": "p1", "op": "line", "points": [[56.867, 193.117]]},
+                 {"id": "p2", "op": "line", "points": [[73.867, 210.117]]},
+                 {"id": "p3", "op": "line", "points": [[448.93, 210.117]]},
+                 {"id": "p4", "op": "line", "points": [[465.93, 193.117]]},
+                 {"id": "p5", "op": "line", "points": [[580.899, 193.117]]},
+                 {"id": "p6", "op": "line", "points": [[593.899, 206.117]]},
+                 {"id": "p7", "op": "line", "points": [[593.899, 231.117]]},
+                 {"id": "p8", "op": "line", "points": [[597.899, 235.117]]},
+                 {"id": "p9", "op": "line", "points": [[597.899, 283.117]]},
+                 {"id": "p10", "op": "line", "points": [[593.899, 287.117]]},
+                 {"id": "p11", "op": "line", "points": [[593.899, 448.211]]},
+                 {"id": "p12", "op": "line", "points": [[535.899, 448.211]]},
+                 {"id": "p13", "op": "line", "points": [[529.899, 442.211]]},
+                 {"id": "p14", "op": "line", "points": [[453.899, 442.211]]},
+                 {"id": "p15", "op": "line", "points": [[447.899, 448.211]]},
+                 {"id": "p16", "op": "line", "points": [[87.211, 448.211]]},
+                 {"id": "p17", "op": "line", "points": [[49.211, 410.211]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                 "widthDp": 9.0,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                },
+                "blend": "additive"
+               }
+              ]
+             }
+            ],
+            "mask": {
+             "paths": [
               {
                "id": "second",
                "commands": [
@@ -1881,7 +1961,7 @@
                 "to": [321.555, 662.403],
                 "stops": [
                  {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                 {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                 {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                  {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                 ]
                }

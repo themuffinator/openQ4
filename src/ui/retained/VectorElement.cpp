@@ -42,6 +42,21 @@ bool SameCompilation(const std::array<double,12>& current, const std::array<doub
 }
 namespace {
 VectorCompileBatch* deferredCompilations = nullptr;
+// An element that keeps sliding (a looping drift such as falling snow) visits
+// every quarter-pixel phase in both axes, sixteen in all, more than its cache
+// keeps, so it recompiled on nearly every frame. After this many consecutive
+// sliding renders it compiles at half-pixel phases instead: four, which the
+// cache holds, so a steady drift compiles only as it crosses into another
+// cache region. A short move (a step, a settle) keeps quarter-pixel phases.
+constexpr int SlidingHalfPhaseRenders = 8;
+// A vector of this many paths or more (a snow layer, a band's frost, a grid)
+// uploads consecutive meshes that draw alike as one geometry: one draw rather
+// than one per path. A smaller one (a plate of a few overlapping paths) keeps
+// a geometry per path, which is how a layer recognises a compound plate that
+// needs, and may cache, its isolated alpha (Runtime.cpp).
+constexpr size_t MergedGeometryPaths = 16;
+// One RmlUi geometry holds at most this many vertices (Runtime.cpp).
+constexpr size_t MergedGeometryVertices = 262144;
 }
 void DeferVectorCompilations(VectorCompileBatch* batch) { deferredCompilations = batch; }
 size_t VectorCompileBatch::Paths() const {
@@ -79,14 +94,14 @@ void VectorGeometry::Configure(const std::vector<VectorPath>& source, Host& owne
 	paths = source; host = &owner; statistics = &measurements;
 	sharedPaths.reset(); ++compileGeneration;
 	replayMask.reset();
-	cache.clear(); valid = renderReady = false;
+	cache.clear(); valid = renderReady = false; slidingRenders = 0;
 	hitGeometry.clear(); hitPrepared = hitValid = hitArea = false;
 }
 void VectorGeometry::CopyArtworkFrom(const VectorGeometry& source) {
 	paths = source.paths; host = source.host; statistics = source.statistics; linearMasks=source.linearMasks; multiply = {}; coverage = {};
 	self.reset(); sharedPaths.reset(); ++compileGeneration;
 	replayMask.reset();
-	cache.clear(); valid = renderReady = false;
+	cache.clear(); valid = renderReady = false; slidingRenders = 0;
 	hitGeometry.clear(); hitPrepared = hitValid = hitArea = false;
 }
 void VectorElement::CopyArtworkFrom(const VectorElement& source) {
@@ -178,7 +193,7 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 		const auto& entry=cache.front();
 		manager->SetTransform(cachedLocalMesh ? &cachedTransform : nullptr);
 		for (size_t i=0;i<entry.geometry.size();++i) {
-			if (entry.blends[i]==PathBlend::Multiply) entry.geometry[i].Render(cachedTranslation,multiply);
+			if (entry.multiplied[i]) entry.geometry[i].Render(cachedTranslation,multiply);
 			else if (cachedPartition) entry.geometry[i].Render(cachedTranslation,coverage);
 			else entry.geometry[i].Render(cachedTranslation);
 		}
@@ -342,18 +357,21 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 	}
 	// An element that moved by translation alone since its last render (a
 	// scrolling trace, a sliding group) would compile for a new sub-pixel phase
-	// every frame. While it moves it compiles at quarter-pixel phases, keeps
-	// the last few, and places the remaining fraction at submission. A resting
-	// element compiles at its exact phase.
+	// every frame. While it moves it compiles at quarter-pixel phases (half-pixel
+	// ones once it has kept sliding), keeps the last few, and places the
+	// remaining fraction at submission. A resting element compiles at its exact
+	// phase.
 	bool moving = false;
 	if (valid) {
 		moving = !SameCompilation(signature,previous);
 		for (size_t i = 0; moving && i < signature.size(); ++i) if (i != 6 && i != 7 && signature[i] != previous[i]) moving = false;
 	}
 	previous = signature; valid = true;
+	slidingRenders = moving ? std::min(slidingRenders+1,SlidingHalfPhaseRenders) : 0;
 	double residualX = 0, residualY = 0;
 	if (moving) {
-		const double phaseX = std::floor(options.transform.tx*4)/4, phaseY = std::floor(options.transform.ty*4)/4;
+		const double steps = slidingRenders >= SlidingHalfPhaseRenders ? 2 : 4;
+		const double phaseX = std::floor(options.transform.tx*steps)/steps, phaseY = std::floor(options.transform.ty*steps)/steps;
 		residualX = options.transform.tx-phaseX; residualY = options.transform.ty-phaseY;
 		options.transform.tx = signature[6] = phaseX; options.transform.ty = signature[7] = phaseY;
 	}
@@ -380,13 +398,32 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 	}
 	for (const auto& mesh : entry->meshes) statistics->visibleVectorCacheBytes += mesh.vertices.capacity()*sizeof(VectorVertex)+mesh.indices.capacity()*sizeof(int);
 	if (opacity != entry->opacity) {
-		entry->geometry.clear(); entry->opacity = opacity;
+		entry->geometry.clear(); entry->multiplied.clear(); entry->opacity = opacity;
+		// Paths paint in source order, and so do the triangles of one draw:
+		// consecutive meshes that draw alike (normal and additive paths alike,
+		// additive light being premultiplied with zero alpha) join one geometry.
+		const bool merge = entry->meshes.size() >= MergedGeometryPaths;
+		Rml::Mesh mesh;
+		bool runMultiplied = false;
+		auto flush = [&] {
+			if (mesh.vertices.empty()) return;
+			const auto upload = statistics->Now();
+			entry->geometry.push_back(manager->MakeGeometry(std::move(mesh)));
+			entry->multiplied.push_back(runMultiplied);
+			mesh = Rml::Mesh();
+			++statistics->vectorUploads;
+			statistics->vectorUploadMilliseconds += std::chrono::duration<double,std::milli>(statistics->Now()-upload).count();
+		};
 		for (size_t index = 0; index < entry->meshes.size(); ++index) {
 			const auto& cached = entry->meshes[index];
 			const auto blend = entry->blends[index];
+			const bool multiplied = blend == PathBlend::Multiply;
+			if (cached.vertices.size() > MergedGeometryVertices) continue; // The runtime refuses it whole, as before.
+			if (!mesh.vertices.empty() && (!merge || multiplied != runMultiplied || mesh.vertices.size()+cached.vertices.size() > MergedGeometryVertices)) flush();
+			runMultiplied = multiplied;
 			const auto upload = statistics->Now();
-			Rml::Mesh mesh;
-			mesh.vertices.reserve(cached.vertices.size());
+			const int base = static_cast<int>(mesh.vertices.size());
+			mesh.vertices.reserve(mesh.vertices.size()+cached.vertices.size());
 			auto channel = [&](double value) { return static_cast<Rml::byte>(std::round(std::clamp(value*opacity,0.0,1.0)*255)); };
 			auto unit = [](double value) { return static_cast<Rml::byte>(std::round(std::clamp(value,0.0,1.0)*255)); };
 			for (const auto& v : cached.vertices) {
@@ -401,11 +438,11 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 				}
 				mesh.vertices.push_back({{static_cast<float>(v.x),static_cast<float>(v.y)},colour,{0,0}});
 			}
-			mesh.indices.assign(cached.indices.begin(),cached.indices.end());
-			entry->geometry.push_back(manager->MakeGeometry(std::move(mesh)));
-			++statistics->vectorUploads;
+			mesh.indices.reserve(mesh.indices.size()+cached.indices.size());
+			for (const int i : cached.indices) mesh.indices.push_back(base+i);
 			statistics->vectorUploadMilliseconds += std::chrono::duration<double,std::milli>(statistics->Now()-upload).count();
 		}
+		flush();
 	}
 	const auto& geometryBlends = entry->blends;
 	if (!multiply && std::find(geometryBlends.begin(),geometryBlends.end(),PathBlend::Multiply) != geometryBlends.end())
@@ -647,8 +684,15 @@ void VectorElement::Configure(const Node& node, Host& owner, RuntimeStatistics& 
 	paint.Configure(node.paths,owner,measurements);
 	mask.Configure(node.mask ? *node.mask : std::vector<VectorPath>{},owner,measurements);
 	coordinatesImage=HasImageCoordinates(node);
-	replayOpacity=node.children.empty() && node.paths.empty() && !hasMask && !node.control && (node.type=="text" || node.type=="image" || coordinatesImage) ?
-		std::make_shared<float>(1.f) : nullptr;
+	// A leaf's opacity is its isolated layer's composite, which reads the live
+	// value, so a fade need not restyle and relay out the document. That holds
+	// for a picture (text, an image) and for plain artwork: a vector's paths
+	// draw into the layer at full opacity, overlapping or not (a dialog's
+	// pulsing glow beside its buttons).
+	const bool leaf=node.children.empty() && !hasMask && !node.control;
+	const bool picture=node.paths.empty() && (node.type=="text" || node.type=="image" || coordinatesImage);
+	const bool artwork=node.type=="vector" && !node.paths.empty() && !node.legacyText && !coordinatesImage && !node.properties.contains("image");
+	replayOpacity=leaf && (picture || artwork) ? std::make_shared<float>(1.f) : nullptr;
 	replayText=replayOpacity && node.type=="text" && !node.properties.contains("image");
 	additiveImage=node.properties.contains("image-blend") && node.properties.at("image-blend").text=="additive";
 	imageSource=node.properties.contains("image") ? node.properties.at("image").text : "";

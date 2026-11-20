@@ -4052,7 +4052,7 @@ static void CheckListTextScale(ScreenHost& host, const char* path, const char* n
 			Check(Near(box.height,row.height,.6f),"a row's cells and lights grow with it");
 		}
 		const auto overflow = runtime.PresentedValue(document.Model().FindNode("row-0")->children.back().id,"text-overflow");
-		Check(overflow && overflow->text == (text > 1 ? "ellipsis" : "clip"),"above 100 % a cell's value past its column ends in an ellipsis");
+		Check(overflow && overflow->text == "ellipsis","at every text size a cell's value past its column ends in an ellipsis");
 		// The details: in order, each on its own line, above the first plate,
 		// under the picture, which keeps its aspect.
 		const auto shot = bounds(picture);

@@ -7,6 +7,23 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Smoother menus, especially The Awakening's, 20 November 2026
+
+- **The Awakening's menus no longer cost a frame's worth of processor time.**
+  The falling snow behind The Awakening's pause and settings menus was
+  redrawn from scratch on almost every frame, about 10 ms of processor time
+  each. It now costs well under a millisecond, so those menus run at your
+  full frame rate and the paused game behind them stays light. The snow
+  falls as before.
+- **Dialogs are lighter.** A confirmation box (Quit, Exit Game, a warning)
+  no longer rebuilds its pulsing glow and lays out the page behind it on
+  every frame; the glow looks the same.
+- **Long names end in "…" instead of being cut mid-letter.** A long sound
+  device name no longer runs under its list's arrow, and a long map or save
+  name in the Demos, Load and Save lists ends in an ellipsis.
+- **What to do.** Nothing: update openQ4 as usual; your settings are kept.
+- Details: [menu frame costs](ui/menu-frame-costs.md).
+
 ## Multiplayer menus that show everything in one place, 20 November 2026
 
 - **Create Server has no hidden second page.** Every server setting is now on

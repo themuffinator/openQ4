@@ -1287,7 +1287,7 @@ SCENARIOS = {
         'openq4_retainedGui focus game', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 175', 'screenshot "screenshots/subpages-game-change.tga"', 'waitMsec 1200', 'ui_retainedStatus',
         'openq4_retainedGui report', 'screenshot "screenshots/subpages-game.tga"',
-        *[step for name in ('hud', 'vr') for step in (
+        *[step for name in ('hud', 'viewweapon', 'accessibility', 'vr') for step in (
             'openq4_retainedGui event onTabNext', 'waitMsec 400', 'openq4_retainedGui report',
             f'screenshot "screenshots/subpages-game-{name}.tga"')],
         'openq4_retainedGui focus game_vrsnap', 'waitMsec 100', 'openq4_retainedGui choice open game_vrsnap', 'waitMsec 400',

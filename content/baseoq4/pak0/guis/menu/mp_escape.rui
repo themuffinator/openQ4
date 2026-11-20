@@ -140831,6 +140831,22 @@
      ]
     },
     {
+     "node": "disconnectModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "disconnectModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "disconnectModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -141545,6 +141561,22 @@
     },
     {
      "node": "matchForceReadyModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchForceReadyModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchForceReadyModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -142273,6 +142305,22 @@
      ]
     },
     {
+     "node": "matchForfeitModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchForfeitModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "matchForfeitModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -142987,6 +143035,22 @@
     },
     {
      "node": "matchAbortModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchAbortModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchAbortModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -143715,6 +143779,22 @@
      ]
     },
     {
+     "node": "matchRosterRemoveModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchRosterRemoveModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "matchRosterRemoveModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -144429,6 +144509,22 @@
     },
     {
      "node": "matchRosterSubstituteModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchRosterSubstituteModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchRosterSubstituteModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -145157,6 +145253,22 @@
      ]
     },
     {
+     "node": "matchParticipantRemoveModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchParticipantRemoveModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "matchParticipantRemoveModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -145871,6 +145983,22 @@
     },
     {
      "node": "matchRulesCommitModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchRulesCommitModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchRulesCommitModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -146599,6 +146727,22 @@
      ]
     },
     {
+     "node": "matchSeriesStartModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchSeriesStartModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "matchSeriesStartModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -147313,6 +147457,22 @@
     },
     {
      "node": "matchSeriesCancelModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchSeriesCancelModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchSeriesCancelModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -148041,6 +148201,22 @@
      ]
     },
     {
+     "node": "matchSeriesAdvanceModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchSeriesAdvanceModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "matchSeriesAdvanceModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -148755,6 +148931,22 @@
     },
     {
      "node": "matchVetoBanModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchVetoBanModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchVetoBanModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -149483,6 +149675,22 @@
      ]
     },
     {
+     "node": "matchVetoPickModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchVetoPickModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "matchVetoPickModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -150197,6 +150405,22 @@
     },
     {
      "node": "matchVetoDeciderModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchVetoDeciderModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchVetoDeciderModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -150925,6 +151149,22 @@
      ]
     },
     {
+     "node": "matchVetoSideMarineModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchVetoSideMarineModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "matchVetoSideMarineModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -151639,6 +151879,22 @@
     },
     {
      "node": "matchVetoSideStroggModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "matchVetoSideStroggModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "matchVetoSideStroggModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -158359,6 +158615,22 @@
      ]
     },
     {
+     "node": "banModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "banModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "banModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -159080,6 +159352,22 @@
      ]
     },
     {
+     "node": "adminKickModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "adminKickModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "adminKickModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -159794,6 +160082,22 @@
     },
     {
      "node": "adminBanModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "adminBanModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "adminBanModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -162499,6 +162803,22 @@
     },
     {
      "node": "weaponOrderModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "weaponOrderModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "weaponOrderModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -214912,14 +215232,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 247.0, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 202.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 196.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -227512,14 +227833,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 247.0, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 202.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 196.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -233707,14 +234029,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 247.0, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 202.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 196.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -234568,14 +234891,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 247.0, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 202.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 196.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -236306,14 +236630,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 247.0, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 202.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 196.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -257176,14 +257501,15 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 181, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 186.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 180.0, "unit": "dp"},
                    "height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
                    "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                    "white-space": {"type": "keyword", "value": "nowrap"},
-                   "overflow": {"type": "keyword", "value": "hidden"}
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
                   }
                  },
                  {
@@ -261637,14 +261963,15 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 165, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 239.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 233.0, "unit": "dp"},
                    "height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
                    "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                    "white-space": {"type": "keyword", "value": "nowrap"},
-                   "overflow": {"type": "keyword", "value": "hidden"}
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
                   }
                  },
                  {
@@ -280433,14 +280760,15 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 185, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 182.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 176.0, "unit": "dp"},
                    "height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
                    "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                    "white-space": {"type": "keyword", "value": "nowrap"},
-                   "overflow": {"type": "keyword", "value": "hidden"}
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
                   }
                  },
                  {
@@ -285375,14 +285703,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 139.147, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 214.853, "unit": "dp"},
+                 "width": {"type": "length", "value": 208.853, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -290043,14 +290372,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -292524,14 +292854,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -295037,14 +295368,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -295741,14 +296073,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -296477,14 +296810,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -297181,14 +297515,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -297917,14 +298252,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -298981,14 +299317,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -300077,14 +300414,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -300781,14 +301119,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -301517,14 +301856,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -302581,14 +302921,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 8, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 313.137, "unit": "dp"},
+               "width": {"type": "length", "value": 307.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -303678,14 +304019,15 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 158.726, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 321.137, "unit": "dp"},
+               "width": {"type": "length", "value": 315.137, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},
                "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"}
+               "overflow": {"type": "keyword", "value": "hidden"},
+               "text-overflow": {"type": "keyword", "value": "ellipsis"}
               }
              },
              {
@@ -304657,14 +304999,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 160, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 194.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 188.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -305392,14 +305735,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 160, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 194.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 188.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -306697,14 +307041,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 160, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 194.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 188.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -307817,14 +308162,15 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 160, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 269.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 263.0, "unit": "dp"},
                  "height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "font-family": {"type": "font", "value": "lowpixel"},
                  "font-size": {"type": "length", "value": 14, "unit": "dp"},
                  "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                  "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                  "white-space": {"type": "keyword", "value": "nowrap"},
-                 "overflow": {"type": "keyword", "value": "hidden"}
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
                 }
                },
                {
@@ -318576,14 +318922,15 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 163, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 232.5, "unit": "dp"},
+                   "width": {"type": "length", "value": 226.5, "unit": "dp"},
                    "height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
                    "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                    "white-space": {"type": "keyword", "value": "nowrap"},
-                   "overflow": {"type": "keyword", "value": "hidden"}
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
                   }
                  },
                  {
@@ -330344,14 +330691,15 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 163, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 232.5, "unit": "dp"},
+                   "width": {"type": "length", "value": 226.5, "unit": "dp"},
                    "height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
                    "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                    "white-space": {"type": "keyword", "value": "nowrap"},
-                   "overflow": {"type": "keyword", "value": "hidden"}
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
                   }
                  },
                  {
@@ -335747,14 +336095,15 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 149, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 246.5, "unit": "dp"},
+                   "width": {"type": "length", "value": 240.5, "unit": "dp"},
                    "height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
                    "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
                    "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
                    "white-space": {"type": "keyword", "value": "nowrap"},
-                   "overflow": {"type": "keyword", "value": "hidden"}
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
                   }
                  },
                  {
@@ -340075,11 +340424,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "disconnectModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "disconnectModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -340095,7 +340508,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -341157,11 +341570,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchForceReadyModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchForceReadyModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -341177,7 +341654,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -342239,11 +342716,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchForfeitModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchForfeitModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -342259,7 +342800,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -343321,11 +343862,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchAbortModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchAbortModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -343341,7 +343946,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -344403,11 +345008,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchRosterRemoveModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchRosterRemoveModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -344423,7 +345092,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -345485,11 +346154,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchRosterSubstituteModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchRosterSubstituteModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -345505,7 +346238,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -346567,11 +347300,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchParticipantRemoveModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchParticipantRemoveModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -346587,7 +347384,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -347649,11 +348446,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchRulesCommitModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchRulesCommitModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -347669,7 +348530,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -348731,11 +349592,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchSeriesStartModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchSeriesStartModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -348751,7 +349676,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -349813,11 +350738,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchSeriesCancelModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchSeriesCancelModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -349833,7 +350822,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -350895,11 +351884,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchSeriesAdvanceModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchSeriesAdvanceModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -350915,7 +351968,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -351977,11 +353030,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchVetoBanModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchVetoBanModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -351997,7 +353114,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -353059,11 +354176,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchVetoPickModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchVetoPickModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -353079,7 +354260,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -354141,11 +355322,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchVetoDeciderModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchVetoDeciderModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -354161,7 +355406,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -355223,11 +356468,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchVetoSideMarineModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchVetoSideMarineModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -355243,7 +356552,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -356305,11 +357614,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "matchVetoSideStroggModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "matchVetoSideStroggModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -356325,7 +357698,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -357374,11 +358747,75 @@
                   "to": [421.969, -25.318],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }
+                }
+               ]
+              }
+             },
+             {
+              "id": "banModal-energy-run-second",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -69.869, "unit": "dp"},
+               "top": {"type": "length", "value": -211.969, "unit": "dp"},
+               "width": {"type": "length", "value": 843.938, "unit": "dp"},
+               "height": {"type": "length", "value": 843.938, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "children": [
+               {
+                "id": "banModal-energy-line-second",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 843.938, "unit": "dp"},
+                 "height": {"type": "length", "value": 843.938, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                 },
+                "paths": [
+                 {
+                  "id": "line",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[79.497, 215.531]]},
+                   {"id": "p1", "op": "line", "points": [[89.124, 215.531]]},
+                   {"id": "p2", "op": "line", "points": [[106.124, 232.531]]},
+                   {"id": "p3", "op": "line", "points": [[586.521, 232.531]]},
+                   {"id": "p4", "op": "line", "points": [[603.521, 215.531]]},
+                   {"id": "p5", "op": "line", "points": [[751.441, 215.531]]},
+                   {"id": "p6", "op": "line", "points": [[764.441, 228.531]]},
+                   {"id": "p7", "op": "line", "points": [[764.441, 253.531]]},
+                   {"id": "p8", "op": "line", "points": [[768.441, 257.531]]},
+                   {"id": "p9", "op": "line", "points": [[768.441, 305.531]]},
+                   {"id": "p10", "op": "line", "points": [[764.441, 309.531]]},
+                   {"id": "p11", "op": "line", "points": [[764.441, 626.625]]},
+                   {"id": "p12", "op": "line", "points": [[706.441, 626.625]]},
+                   {"id": "p13", "op": "line", "points": [[700.441, 620.625]]},
+                   {"id": "p14", "op": "line", "points": [[624.441, 620.625]]},
+                   {"id": "p15", "op": "line", "points": [[618.441, 626.625]]},
+                   {"id": "p16", "op": "line", "points": [[117.497, 626.625]]},
+                   {"id": "p17", "op": "line", "points": [[79.497, 588.625]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                   "widthDp": 9.0,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               }
+              ],
+              "mask": {
+               "paths": [
                 {
                  "id": "second",
                  "commands": [
@@ -357394,7 +358831,7 @@
                   "to": [421.969, 869.256],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }
@@ -365878,11 +367315,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "adminKickModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "adminKickModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -365898,7 +367399,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -366978,11 +368479,75 @@
                     "to": [272.776, -16.367],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
+                  }
+                 ]
+                }
+               },
+               {
+                "id": "adminBanModal-energy-run-second",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": -32.776, "unit": "dp"},
+                 "top": {"type": "length", "value": -170.776, "unit": "dp"},
+                 "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                },
+                "children": [
+                 {
+                  "id": "adminBanModal-energy-line-second",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "height": {"type": "length", "value": 545.552, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                   },
+                  "paths": [
+                   {
+                    "id": "line",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[39.338, 174.338]]},
+                     {"id": "p1", "op": "line", "points": [[45.901, 174.338]]},
+                     {"id": "p2", "op": "line", "points": [[62.901, 191.338]]},
+                     {"id": "p3", "op": "line", "points": [[379.526, 191.338]]},
+                     {"id": "p4", "op": "line", "points": [[396.526, 174.338]]},
+                     {"id": "p5", "op": "line", "points": [[493.214, 174.338]]},
+                     {"id": "p6", "op": "line", "points": [[506.214, 187.338]]},
+                     {"id": "p7", "op": "line", "points": [[506.214, 212.338]]},
+                     {"id": "p8", "op": "line", "points": [[510.214, 216.338]]},
+                     {"id": "p9", "op": "line", "points": [[510.214, 264.338]]},
+                     {"id": "p10", "op": "line", "points": [[506.214, 268.338]]},
+                     {"id": "p11", "op": "line", "points": [[506.214, 369.432]]},
+                     {"id": "p12", "op": "line", "points": [[448.214, 369.432]]},
+                     {"id": "p13", "op": "line", "points": [[442.214, 363.432]]},
+                     {"id": "p14", "op": "line", "points": [[366.214, 363.432]]},
+                     {"id": "p15", "op": "line", "points": [[360.214, 369.432]]},
+                     {"id": "p16", "op": "line", "points": [[77.338, 369.432]]},
+                     {"id": "p17", "op": "line", "points": [[39.338, 331.432]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                     "widthDp": 9.0,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    },
+                    "blend": "additive"
+                   }
+                  ]
+                 }
+                ],
+                "mask": {
+                 "paths": [
                   {
                    "id": "second",
                    "commands": [
@@ -366998,7 +368563,7 @@
                     "to": [272.776, 561.919],
                     "stops": [
                      {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                     {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                      {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                     ]
                    }
@@ -368065,11 +369630,75 @@
                   "to": [405.247, -24.315],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }
+                }
+               ]
+              }
+             },
+             {
+              "id": "weaponOrderModal-energy-run-second",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -105.247, "unit": "dp"},
+               "top": {"type": "length", "value": -150.997, "unit": "dp"},
+               "width": {"type": "length", "value": 810.494, "unit": "dp"},
+               "height": {"type": "length", "value": 810.494, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "children": [
+               {
+                "id": "weaponOrderModal-energy-line-second",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 810.494, "unit": "dp"},
+                 "height": {"type": "length", "value": 810.494, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                 },
+                "paths": [
+                 {
+                  "id": "line",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[113.45, 154.559]]},
+                   {"id": "p1", "op": "line", "points": [[121.653, 154.559]]},
+                   {"id": "p2", "op": "line", "points": [[138.653, 171.559]]},
+                   {"id": "p3", "op": "line", "points": [[542.935, 171.559]]},
+                   {"id": "p4", "op": "line", "points": [[559.935, 154.559]]},
+                   {"id": "p5", "op": "line", "points": [[684.044, 154.559]]},
+                   {"id": "p6", "op": "line", "points": [[697.044, 167.559]]},
+                   {"id": "p7", "op": "line", "points": [[697.044, 192.559]]},
+                   {"id": "p8", "op": "line", "points": [[701.044, 196.559]]},
+                   {"id": "p9", "op": "line", "points": [[701.044, 244.559]]},
+                   {"id": "p10", "op": "line", "points": [[697.044, 248.559]]},
+                   {"id": "p11", "op": "line", "points": [[697.044, 654.153]]},
+                   {"id": "p12", "op": "line", "points": [[639.044, 654.153]]},
+                   {"id": "p13", "op": "line", "points": [[633.044, 648.153]]},
+                   {"id": "p14", "op": "line", "points": [[557.044, 648.153]]},
+                   {"id": "p15", "op": "line", "points": [[551.044, 654.153]]},
+                   {"id": "p16", "op": "line", "points": [[151.45, 654.153]]},
+                   {"id": "p17", "op": "line", "points": [[113.45, 616.153]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                   "widthDp": 9.0,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               }
+              ],
+              "mask": {
+               "paths": [
                 {
                  "id": "second",
                  "commands": [
@@ -368085,7 +369714,7 @@
                   "to": [405.247, 834.809],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }

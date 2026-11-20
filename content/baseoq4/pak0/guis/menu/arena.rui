@@ -15693,6 +15693,22 @@
      ]
     },
     {
+     "node": "resultModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "resultModal-energy-line-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
      "node": "resultModal-energy-halo",
      "property": "opacity",
      "keys": [
@@ -16457,6 +16473,22 @@
     },
     {
      "node": "resetModal-energy-line",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, -360]}}
+     ]
+    },
+    {
+     "node": "resetModal-energy-run-second",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 360]}}
+     ]
+    },
+    {
+     "node": "resetModal-energy-line-second",
      "property": "transform",
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
@@ -30995,11 +31027,75 @@
                   "to": [363.234, -21.794],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }
+                }
+               ]
+              }
+             },
+             {
+              "id": "resultModal-energy-run-second",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -66.234, "unit": "dp"},
+               "top": {"type": "length", "value": -175.734, "unit": "dp"},
+               "width": {"type": "length", "value": 726.468, "unit": "dp"},
+               "height": {"type": "length", "value": 726.468, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "children": [
+               {
+                "id": "resultModal-energy-line-second",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 726.468, "unit": "dp"},
+                 "height": {"type": "length", "value": 726.468, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                 },
+                "paths": [
+                 {
+                  "id": "line",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[74.355, 179.296]]},
+                   {"id": "p1", "op": "line", "points": [[82.476, 179.296]]},
+                   {"id": "p2", "op": "line", "points": [[99.476, 196.296]]},
+                   {"id": "p3", "op": "line", "points": [[499.375, 196.296]]},
+                   {"id": "p4", "op": "line", "points": [[516.375, 179.296]]},
+                   {"id": "p5", "op": "line", "points": [[639.113, 179.296]]},
+                   {"id": "p6", "op": "line", "points": [[652.113, 192.296]]},
+                   {"id": "p7", "op": "line", "points": [[652.113, 217.296]]},
+                   {"id": "p8", "op": "line", "points": [[656.113, 221.296]]},
+                   {"id": "p9", "op": "line", "points": [[656.113, 269.296]]},
+                   {"id": "p10", "op": "line", "points": [[652.113, 273.296]]},
+                   {"id": "p11", "op": "line", "points": [[652.113, 545.39]]},
+                   {"id": "p12", "op": "line", "points": [[594.113, 545.39]]},
+                   {"id": "p13", "op": "line", "points": [[588.113, 539.39]]},
+                   {"id": "p14", "op": "line", "points": [[512.113, 539.39]]},
+                   {"id": "p15", "op": "line", "points": [[506.113, 545.39]]},
+                   {"id": "p16", "op": "line", "points": [[112.355, 545.39]]},
+                   {"id": "p17", "op": "line", "points": [[74.355, 507.39]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                   "widthDp": 9.0,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               }
+              ],
+              "mask": {
+               "paths": [
                 {
                  "id": "second",
                  "commands": [
@@ -31015,7 +31111,7 @@
                   "to": [363.234, 748.262],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }
@@ -32564,11 +32660,75 @@
                   "to": [277.059, -16.624],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }
+                }
+               ]
+              }
+             },
+             {
+              "id": "resetModal-energy-run-second",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": -37.059, "unit": "dp"},
+               "top": {"type": "length", "value": -164.559, "unit": "dp"},
+               "width": {"type": "length", "value": 554.118, "unit": "dp"},
+               "height": {"type": "length", "value": 554.118, "unit": "dp"},
+               "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+              },
+              "children": [
+               {
+                "id": "resetModal-energy-line-second",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 554.118, "unit": "dp"},
+                 "height": {"type": "length", "value": 554.118, "unit": "dp"},
+                 "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                 },
+                "paths": [
+                 {
+                  "id": "line",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[43.621, 168.121]]},
+                   {"id": "p1", "op": "line", "points": [[50.184, 168.121]]},
+                   {"id": "p2", "op": "line", "points": [[67.184, 185.121]]},
+                   {"id": "p3", "op": "line", "points": [[383.809, 185.121]]},
+                   {"id": "p4", "op": "line", "points": [[400.809, 168.121]]},
+                   {"id": "p5", "op": "line", "points": [[497.497, 168.121]]},
+                   {"id": "p6", "op": "line", "points": [[510.497, 181.121]]},
+                   {"id": "p7", "op": "line", "points": [[510.497, 206.121]]},
+                   {"id": "p8", "op": "line", "points": [[514.497, 210.121]]},
+                   {"id": "p9", "op": "line", "points": [[514.497, 258.121]]},
+                   {"id": "p10", "op": "line", "points": [[510.497, 262.121]]},
+                   {"id": "p11", "op": "line", "points": [[510.497, 384.215]]},
+                   {"id": "p12", "op": "line", "points": [[452.497, 384.215]]},
+                   {"id": "p13", "op": "line", "points": [[446.497, 378.215]]},
+                   {"id": "p14", "op": "line", "points": [[370.497, 378.215]]},
+                   {"id": "p15", "op": "line", "points": [[364.497, 384.215]]},
+                   {"id": "p16", "op": "line", "points": [[81.621, 384.215]]},
+                   {"id": "p17", "op": "line", "points": [[43.621, 346.215]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.949, 0.6353, 0.9]}},
+                   "widthDp": 9.0,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  },
+                  "blend": "additive"
+                 }
+                ]
+               }
+              ],
+              "mask": {
+               "paths": [
                 {
                  "id": "second",
                  "commands": [
@@ -32584,7 +32744,7 @@
                   "to": [277.059, 570.742],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [1, 1, 1, 0]}},
-                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5]}},
+                   {"at": 0.72, "color": {"type": "color", "value": [1, 1, 1, 0.5019607843137255]}},
                    {"at": 1, "color": {"type": "color", "value": [1, 1, 1, 1]}}
                   ]
                  }
