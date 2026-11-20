@@ -43,7 +43,7 @@ idCVar g_version(					"g_version",				gameVersion.string,	CVAR_GAME | CVAR_ROM, 
 idCVar gamedate(					"gamedate",					__DATE__,		CVAR_GAME | CVAR_ROM, "" );
 
 // server info
-idCVar si_name(						"si_name",					"Quake 4 Server",	CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_CASE_SENSITIVE | CVAR_SPECIAL_CONCAT, "name of the server" );
+idCVar si_name(						"si_name",					"openQ4 Server",	CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_CASE_SENSITIVE | CVAR_SPECIAL_CONCAT, "name of the server" );
 // openQ4: the server's message on the loading screen's server card, wrapped to three lines (256 bytes)
 idCVar si_motd(						"si_motd",					"",					CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_CASE_SENSITIVE | CVAR_SPECIAL_CONCAT, "server message shown to players while they load the map" );
 // RITUAL BEGIN
