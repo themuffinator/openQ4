@@ -11193,6 +11193,7 @@ static void RB_ARB2_UploadCustomGLSLShaderParms( const shaderStage_t *stage, con
 		}
 
 		if ( RB_BindGLSLShaderParm( newStage->shaderParmBindings[parmIndex], location, stage, din ) ) {
+			RB_GLSLStageForgetUniform( newStage, location );
 			continue;
 		}
 
@@ -11205,21 +11206,7 @@ static void RB_ARB2_UploadCustomGLSLShaderParms( const shaderStage_t *stage, con
 		for ( int component = 0; component < numRegisters && component < 4; component++ ) {
 			parm[component] = regs[ newStage->shaderParmRegisters[parmIndex][component] ];
 		}
-
-		switch ( numRegisters ) {
-		case 1:
-			glUniform1fvARB( location, 1, parm );
-			break;
-		case 2:
-			glUniform2fvARB( location, 1, parm );
-			break;
-		case 3:
-			glUniform3fvARB( location, 1, parm );
-			break;
-		default:
-			glUniform4fvARB( location, 1, parm );
-			break;
-		}
+		RB_GLSLStageUniform( newStage, location, numRegisters, parm );
 	}
 }
 
@@ -11233,9 +11220,7 @@ static void RB_ARB2_BindCustomGLSLShaderTextures( const newShaderStage_t *newSta
 		GL_SelectTextureNoClient( textureIndex );
 		image->SetSamplerState( newStage->shaderTextureFilters[textureIndex], newStage->shaderTextureRepeats[textureIndex] );
 		image->Bind();
-		if ( newStage->shaderTextureLocations[textureIndex] >= 0 ) {
-			glUniform1iARB( newStage->shaderTextureLocations[textureIndex], textureIndex );
-		}
+		RB_GLSLStageSampler( newStage, newStage->shaderTextureLocations[textureIndex], textureIndex );
 	}
 }
 

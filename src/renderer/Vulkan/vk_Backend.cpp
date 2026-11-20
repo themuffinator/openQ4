@@ -1634,6 +1634,26 @@ void R_ReloadGLSLPrograms_f( const idCmdArgs &args ) {
 	VK_MaterialPrograms_Reload();
 }
 
+// Vulkan keeps a stage's pipelines in its native caches, already shared by
+// program name (vk_MaterialPrograms.cpp); the stage holds no GL handles.
+void R_FreeGLSLProgram( newShaderStage_t *stage ) {
+	if ( stage == NULL ) {
+		return;
+	}
+	stage->glslProgramObject = 0;
+	stage->glslVertexShaderObject = 0;
+	stage->glslFragmentShaderObject = 0;
+	stage->glslSharedProgram = 0;
+	stage->glslProgramLoaded = false;
+	stage->glslProgramValid = false;
+	stage->glslProgramGeneration = 0;
+}
+
+void R_ListGLSLPrograms_f( const idCmdArgs &args ) {
+	(void)args;
+	common->Printf( "listGLSLPrograms: Vulkan shares material programs by name in its own cache (reportShaderPrograms)\n" );
+}
+
 void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
 	R_RenderThread_Sync( "material program stats" );
 	const bool detailed = args.Argc() < 2 || idStr::Icmp( args.Argv( 1 ), "summary" ) != 0;

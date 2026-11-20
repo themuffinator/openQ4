@@ -792,10 +792,19 @@ bool R_SubmittedTakingScreenshot( void );
 // this allows a global override of all materials
 bool R_GlobalShaderOverride( const idMaterial **shader );
 bool R_ValidateGLSLProgram( newShaderStage_t *stage );
+void R_FreeGLSLProgram( newShaderStage_t *stage );
+// Uniform uploads for a material stage's GLSL program, skipped when the program
+// already holds the value (draw_common.cpp, shared GLSL programs). Every write to
+// a material stage's program goes through these: a value set any other way would
+// leave the record stale.
+void RB_GLSLStageUniform( const newShaderStage_t *stage, int location, int numComponents, const float *value );
+void RB_GLSLStageSampler( const newShaderStage_t *stage, int location, int unit );
+void RB_GLSLStageForgetUniform( const newShaderStage_t *stage, int location );
 bool R_FindGLSLSourcePair( const char *programName, idStr &vertexPath, idStr &fragmentPath,
     std::string &vertexSource, std::string &fragmentSource, int *vertexBytes = NULL, int *fragmentBytes = NULL,
     bool *foundAnySource = NULL );
 void R_ReloadGLSLPrograms_f( const idCmdArgs &args );
+void R_ListGLSLPrograms_f( const idCmdArgs &args );
 bool RB_BindGLSLShaderParm( glslShaderParmBinding_t binding, int location, const shaderStage_t *stage, const drawInteraction_t *din );
 idImage *RB_ResolveGLSLShaderTextureImage( const newShaderStage_t *stage, int slot, const drawInteraction_t *din );
 

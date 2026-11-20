@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include <cstring>
+#include <functional>
 
 #include "tr_local.h"
 #include "draw_pbr.h"
@@ -672,38 +673,225 @@ static bool RB_UseAlphaToCoverage( const idMaterial *shader ) {
 	return colorImage->GetOpts().numMSAASamples > 1;
 }
 
+/*
+Shared GLSL programs.
+
+A material stage names its program by file, and many stages name the same one:
+a converted Quake Champions map has 87-228 stages on one surface program. Each
+stage used to compile and link a copy of its own as materials first came into
+view. Material stages now share one linked program per source pair (keyed by
+the paths and the text, so a reload with changed text links again); the stages
+the back end builds for itself (SSAO, bloom and the rest) keep their own,
+because they set their uniforms directly.
+
+A shared program also records the last value written to each uniform, so a draw
+uploads only the parameters that differ from the last draw with that program.
+Uniform values live in the program object, so the record holds across
+glUseProgram changes as long as every write to the program goes through
+RB_GLSLStageUniform / RB_GLSLStageSampler; a uniform written any other way is
+forgotten with RB_GLSLStageForgetUniform.
+
+r_glslSharePrograms 0 links one program per stage again (for programs loaded
+after the change: reloadGLSLprograms); r_glslSkipRedundantUniforms 0 uploads
+every value on every draw. listGLSLPrograms prints what is held.
+*/
+static idCVar r_glslSharePrograms( "r_glslSharePrograms", "1", CVAR_RENDERER | CVAR_BOOL,
+	"1 = material stages naming the same GLSL sources share one linked program; applies to programs loaded afterwards (reloadGLSLprograms)" );
+static idCVar r_glslSkipRedundantUniforms( "r_glslSkipRedundantUniforms", "1", CVAR_RENDERER | CVAR_BOOL,
+	"1 = skip uploading a material GLSL uniform that already holds the value" );
+
+typedef struct {
+	idStr				key;				// vertex path, fragment path, source hash (and the stage, when unshared)
+	GLhandleARB			program;
+	GLhandleARB			vertexShader;
+	GLhandleARB			fragmentShader;
+	int					generation;			// tr.glContextGeneration it was linked in
+	int					refs;				// stages holding it
+	bool				valid;				// false: the sources failed, and the failure is shared too
+	int					uploads;			// uniform writes made and skipped (statistics)
+	int					skipped;
+	idList<float>		values;				// 4 per location
+	idList<byte>		components;			// 0 = unknown, 1..4 floats, 5 = a sampler unit
+} rbSharedGLSLProgram_t;
+
+static idList<rbSharedGLSLProgram_t *> rbSharedGLSLPrograms;
+static int rbGLSLProgramLinks;				// programs linked since start-up
+static const int RB_GLSL_UNIFORM_CACHE_LOCATIONS = 1024;
+
+static void RB_DeleteGLSLObjects( GLhandleARB program, GLhandleARB vertexShader, GLhandleARB fragmentShader, int generation ) {
+	// only delete handles compiled in the current context generation; handles
+	// from a destroyed context died with it and their names may alias live
+	// objects in this one (partial restarts keep the context, so the
+	// generation matches and the delete still runs)
+	if ( program == 0 || !glConfig.isInitialized || generation != tr.glContextGeneration ) {
+		return;
+	}
+	if ( vertexShader != 0 ) {
+		glDetachObjectARB( program, vertexShader );
+		glDeleteObjectARB( vertexShader );
+	}
+	if ( fragmentShader != 0 ) {
+		glDetachObjectARB( program, fragmentShader );
+		glDeleteObjectARB( fragmentShader );
+	}
+	glDeleteObjectARB( program );
+}
+
+static rbSharedGLSLProgram_t *RB_SharedGLSLProgram( const newShaderStage_t *stage ) {
+	if ( stage == NULL || stage->glslSharedProgram <= 0 || stage->glslSharedProgram > rbSharedGLSLPrograms.Num() ) {
+		return NULL;
+	}
+	return rbSharedGLSLPrograms[stage->glslSharedProgram - 1];
+}
+
+static void RB_ReleaseSharedGLSLProgram( int handle ) {
+	if ( handle <= 0 || handle > rbSharedGLSLPrograms.Num() ) {
+		return;
+	}
+	rbSharedGLSLProgram_t *shared = rbSharedGLSLPrograms[handle - 1];
+	if ( shared == NULL || --shared->refs > 0 ) {
+		return;
+	}
+	if ( shared->valid ) {
+		RB_DeleteGLSLObjects( shared->program, shared->vertexShader, shared->fragmentShader, shared->generation );
+	}
+	delete shared;
+	rbSharedGLSLPrograms[handle - 1] = NULL;
+}
+
 static void RB_FreeGLSLProgram( newShaderStage_t *stage ) {
 	if ( stage == NULL ) {
 		return;
 	}
 
-	// only delete handles compiled in the current context generation; handles
-	// from a destroyed context died with it and their names may alias live
-	// objects in this one (partial restarts keep the context, so the
-	// generation matches and the delete still runs)
-	if ( stage->glslProgramObject != 0 && glConfig.isInitialized
-			&& stage->glslProgramGeneration == tr.glContextGeneration ) {
-		if ( stage->glslVertexShaderObject != 0 ) {
-			glDetachObjectARB(
-				(GLhandleARB)stage->glslProgramObject,
-				(GLhandleARB)stage->glslVertexShaderObject );
-			glDeleteObjectARB( (GLhandleARB)stage->glslVertexShaderObject );
-		}
-		if ( stage->glslFragmentShaderObject != 0 ) {
-			glDetachObjectARB(
-				(GLhandleARB)stage->glslProgramObject,
-				(GLhandleARB)stage->glslFragmentShaderObject );
-			glDeleteObjectARB( (GLhandleARB)stage->glslFragmentShaderObject );
-		}
-		glDeleteObjectARB( (GLhandleARB)stage->glslProgramObject );
+	if ( stage->glslSharedProgram != 0 ) {
+		RB_ReleaseSharedGLSLProgram( stage->glslSharedProgram );
+	} else {
+		RB_DeleteGLSLObjects( (GLhandleARB)stage->glslProgramObject, (GLhandleARB)stage->glslVertexShaderObject,
+			(GLhandleARB)stage->glslFragmentShaderObject, stage->glslProgramGeneration );
 	}
 
 	stage->glslProgramObject = 0;
 	stage->glslVertexShaderObject = 0;
 	stage->glslFragmentShaderObject = 0;
+	stage->glslSharedProgram = 0;
 	stage->glslProgramLoaded = false;
 	stage->glslProgramValid = false;
 	stage->glslProgramGeneration = 0;
+}
+
+void R_FreeGLSLProgram( newShaderStage_t *stage ) {
+	RB_FreeGLSLProgram( stage );
+}
+
+// Records a write to a shared program's uniform; false when the program already
+// holds the value and the write can be skipped.
+static bool RB_SharedGLSLUniformChanged( const newShaderStage_t *stage, int location, int components, const float *value ) {
+	rbSharedGLSLProgram_t *shared = RB_SharedGLSLProgram( stage );
+	if ( shared == NULL || location < 0 || location >= RB_GLSL_UNIFORM_CACHE_LOCATIONS ) {
+		return true;
+	}
+	if ( location >= shared->components.Num() ) {
+		const int oldNum = shared->components.Num();
+		shared->components.SetNum( location + 1 );
+		shared->values.SetNum( ( location + 1 ) * 4 );
+		for ( int i = oldNum; i <= location; i++ ) {
+			shared->components[i] = 0;
+		}
+	}
+	float *held = &shared->values[location * 4];
+	const int count = components == 5 ? 1 : components;
+	if ( r_glslSkipRedundantUniforms.GetBool() && shared->components[location] == components
+			&& memcmp( held, value, count * sizeof( float ) ) == 0 ) {
+		shared->skipped++;
+		return false;
+	}
+	shared->components[location] = (byte)components;
+	memcpy( held, value, count * sizeof( float ) );
+	shared->uploads++;
+	return true;
+}
+
+void RB_GLSLStageUniform( const newShaderStage_t *stage, int location, int numComponents, const float *value ) {
+	if ( location < 0 || numComponents <= 0 ) {
+		return;
+	}
+	numComponents = Min( numComponents, 4 );
+	if ( !RB_SharedGLSLUniformChanged( stage, location, numComponents, value ) ) {
+		return;
+	}
+	switch ( numComponents ) {
+	case 1:
+		glUniform1fvARB( location, 1, value );
+		break;
+	case 2:
+		glUniform2fvARB( location, 1, value );
+		break;
+	case 3:
+		glUniform3fvARB( location, 1, value );
+		break;
+	default:
+		glUniform4fvARB( location, 1, value );
+		break;
+	}
+}
+
+void RB_GLSLStageSampler( const newShaderStage_t *stage, int location, int unit ) {
+	if ( location < 0 ) {
+		return;
+	}
+	const float value = (float)unit;
+	if ( RB_SharedGLSLUniformChanged( stage, location, 5, &value ) ) {
+		glUniform1iARB( location, unit );
+	}
+}
+
+void RB_GLSLStageForgetUniform( const newShaderStage_t *stage, int location ) {
+	rbSharedGLSLProgram_t *shared = RB_SharedGLSLProgram( stage );
+	if ( shared != NULL && location >= 0 && location < shared->components.Num() ) {
+		shared->components[location] = 0;
+	}
+}
+
+// The shared program linked in this context for a key, or 0.
+static int RB_FindSharedGLSLProgram( const idStr &key ) {
+	for ( int i = 0; i < rbSharedGLSLPrograms.Num(); i++ ) {
+		const rbSharedGLSLProgram_t *shared = rbSharedGLSLPrograms[i];
+		// one linked in a context that is gone is not reused: its handles died
+		// with it, and the stages still holding it link again in this one
+		if ( shared != NULL && shared->generation == tr.glContextGeneration && shared->key == key ) {
+			return i + 1;
+		}
+	}
+	return 0;
+}
+
+static int RB_AddSharedGLSLProgram( rbSharedGLSLProgram_t *shared ) {
+	for ( int i = 0; i < rbSharedGLSLPrograms.Num(); i++ ) {
+		if ( rbSharedGLSLPrograms[i] == NULL ) {
+			rbSharedGLSLPrograms[i] = shared;
+			return i + 1;
+		}
+	}
+	rbSharedGLSLPrograms.Append( shared );
+	return rbSharedGLSLPrograms.Num();
+}
+
+void R_ListGLSLPrograms_f( const idCmdArgs &args ) {
+	(void)args;
+	int programs = 0, stages = 0;
+	for ( int i = 0; i < rbSharedGLSLPrograms.Num(); i++ ) {
+		const rbSharedGLSLProgram_t *shared = rbSharedGLSLPrograms[i];
+		if ( shared == NULL ) {
+			continue;
+		}
+		programs++;
+		stages += shared->refs;
+		common->Printf( "%5d stages  %s%s: %d uniform writes, %d skipped\n", shared->refs,
+			shared->key.c_str(), shared->valid ? "" : " (failed)", shared->uploads, shared->skipped );
+	}
+	common->Printf( "%d material GLSL programs held by %d stages; %d programs linked since start-up\n",
+		programs, stages, rbGLSLProgramLinks );
 }
 
 static void RB_PrintGLSLInfoLog( GLhandleARB object, const char *label, const char *name ) {
@@ -724,6 +912,66 @@ static void RB_PrintGLSLInfoLog( GLhandleARB object, const char *label, const ch
 	logBuffer[ idMath::ClampInt( 0, logLength, written ) ] = '\0';
 	common->Warning( "GLSL %s error in '%s':\n%s", label, name, logBuffer );
 	Mem_Free( logBuffer );
+}
+
+// Compiles and links one program; false (with the info log printed) when the
+// sources do not compile or link.
+static bool RB_LinkGLSLProgram( const char *name, const std::string &vertexBuffer, const std::string &fragmentBuffer,
+		GLhandleARB &programOut, GLhandleARB &vertexOut, GLhandleARB &fragmentOut ) {
+	programOut = vertexOut = fragmentOut = 0;
+	GLhandleARB vertexShader = glCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
+	GLhandleARB fragmentShader = glCreateShaderObjectARB( GL_FRAGMENT_SHADER_ARB );
+
+	const GLcharARB *vertexSource = (const GLcharARB *)vertexBuffer.c_str();
+	const GLcharARB *fragmentSource = (const GLcharARB *)fragmentBuffer.c_str();
+	glShaderSourceARB( vertexShader, 1, &vertexSource, NULL );
+	glShaderSourceARB( fragmentShader, 1, &fragmentSource, NULL );
+	glCompileShaderARB( vertexShader );
+	glCompileShaderARB( fragmentShader );
+
+	GLint status = GL_FALSE;
+	glGetObjectParameterivARB( vertexShader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
+	if ( status == GL_FALSE ) {
+		RB_PrintGLSLInfoLog( vertexShader, "vertex shader compile", name );
+		glDeleteObjectARB( vertexShader );
+		glDeleteObjectARB( fragmentShader );
+		return false;
+	}
+
+	glGetObjectParameterivARB( fragmentShader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
+	if ( status == GL_FALSE ) {
+		RB_PrintGLSLInfoLog( fragmentShader, "fragment shader compile", name );
+		glDeleteObjectARB( vertexShader );
+		glDeleteObjectARB( fragmentShader );
+		return false;
+	}
+
+	GLhandleARB programObject = glCreateProgramObjectARB();
+	glAttachObjectARB( programObject, vertexShader );
+	glAttachObjectARB( programObject, fragmentShader );
+	glBindAttribLocationARB( programObject, 0, "attr_Position" );
+	glBindAttribLocationARB( programObject, 8, "attr_TexCoord0" );
+	glBindAttribLocationARB( programObject, 9, "attr_Tangent" );
+	glBindAttribLocationARB( programObject, 10, "attr_Bitangent" );
+	glBindAttribLocationARB( programObject, 11, "attr_Normal" );
+	glLinkProgramARB( programObject );
+	rbGLSLProgramLinks++;
+
+	glGetObjectParameterivARB( programObject, GL_OBJECT_LINK_STATUS_ARB, &status );
+	if ( status == GL_FALSE ) {
+		RB_PrintGLSLInfoLog( programObject, "program link", name );
+		glDetachObjectARB( programObject, vertexShader );
+		glDetachObjectARB( programObject, fragmentShader );
+		glDeleteObjectARB( vertexShader );
+		glDeleteObjectARB( fragmentShader );
+		glDeleteObjectARB( programObject );
+		return false;
+	}
+
+	programOut = programObject;
+	vertexOut = vertexShader;
+	fragmentOut = fragmentShader;
+	return true;
 }
 
 bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
@@ -757,63 +1005,49 @@ bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
 		return false;
 	}
 
-	GLhandleARB vertexShader = glCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
-	GLhandleARB fragmentShader = glCreateShaderObjectARB( GL_FRAGMENT_SHADER_ARB );
-
-	const GLcharARB *vertexSource = (const GLcharARB *)vertexBuffer.c_str();
-	const GLcharARB *fragmentSource = (const GLcharARB *)fragmentBuffer.c_str();
-	glShaderSourceARB( vertexShader, 1, &vertexSource, NULL );
-	glShaderSourceARB( fragmentShader, 1, &fragmentSource, NULL );
-	glCompileShaderARB( vertexShader );
-	glCompileShaderARB( fragmentShader );
-
-	GLint status = GL_FALSE;
-	glGetObjectParameterivARB( vertexShader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
-	if ( status == GL_FALSE ) {
-		RB_PrintGLSLInfoLog( vertexShader, "vertex shader compile", stage->glslProgramName );
-		glDeleteObjectARB( vertexShader );
-		glDeleteObjectARB( fragmentShader );
-		stage->glslProgramLoaded = true;
-		stage->glslProgramValid = false;
-		return false;
+	bool linkedHere = false;
+	GLhandleARB programObject = 0;
+	if ( stage->glslProgramShareable ) {
+		// One program per source pair: the paths and a hash of the text. With
+		// sharing off, the stage's own address keeps its program its own while
+		// it still gets the uniform record.
+		const std::size_t hash = std::hash<std::string>()( vertexBuffer ) ^ ( std::hash<std::string>()( fragmentBuffer ) * 31u );
+		idStr key = va( "%s + %s #%08x", vertexPath.c_str(), fragmentPath.c_str(), (unsigned int)( hash & 0xffffffffu ) );
+		if ( !r_glslSharePrograms.GetBool() ) {
+			key += va( " stage %p", (void *)stage );
+		}
+		int handle = RB_FindSharedGLSLProgram( key );
+		if ( handle == 0 ) {
+			rbSharedGLSLProgram_t *shared = new rbSharedGLSLProgram_t;
+			shared->key = key;
+			shared->generation = tr.glContextGeneration;
+			shared->refs = 0;
+			shared->uploads = shared->skipped = 0;
+			shared->valid = RB_LinkGLSLProgram( stage->glslProgramName, vertexBuffer, fragmentBuffer,
+				shared->program, shared->vertexShader, shared->fragmentShader );
+			handle = RB_AddSharedGLSLProgram( shared );
+			linkedHere = shared->valid;
+		}
+		rbSharedGLSLProgram_t *shared = rbSharedGLSLPrograms[handle - 1];
+		shared->refs++;
+		stage->glslSharedProgram = handle;
+		if ( !shared->valid ) {
+			stage->glslProgramValid = false;
+			return false;
+		}
+		programObject = shared->program;
+		stage->glslProgramObject = (int)programObject;
+	} else {
+		GLhandleARB vertexShader = 0, fragmentShader = 0;
+		if ( !RB_LinkGLSLProgram( stage->glslProgramName, vertexBuffer, fragmentBuffer, programObject, vertexShader, fragmentShader ) ) {
+			stage->glslProgramValid = false;
+			return false;
+		}
+		linkedHere = true;
+		stage->glslProgramObject = (int)programObject;
+		stage->glslVertexShaderObject = (int)vertexShader;
+		stage->glslFragmentShaderObject = (int)fragmentShader;
 	}
-
-	glGetObjectParameterivARB( fragmentShader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
-	if ( status == GL_FALSE ) {
-		RB_PrintGLSLInfoLog( fragmentShader, "fragment shader compile", stage->glslProgramName );
-		glDeleteObjectARB( vertexShader );
-		glDeleteObjectARB( fragmentShader );
-		stage->glslProgramLoaded = true;
-		stage->glslProgramValid = false;
-		return false;
-	}
-
-	GLhandleARB programObject = glCreateProgramObjectARB();
-	glAttachObjectARB( programObject, vertexShader );
-	glAttachObjectARB( programObject, fragmentShader );
-	glBindAttribLocationARB( programObject, 0, "attr_Position" );
-	glBindAttribLocationARB( programObject, 8, "attr_TexCoord0" );
-	glBindAttribLocationARB( programObject, 9, "attr_Tangent" );
-	glBindAttribLocationARB( programObject, 10, "attr_Bitangent" );
-	glBindAttribLocationARB( programObject, 11, "attr_Normal" );
-	glLinkProgramARB( programObject );
-
-	glGetObjectParameterivARB( programObject, GL_OBJECT_LINK_STATUS_ARB, &status );
-	if ( status == GL_FALSE ) {
-		RB_PrintGLSLInfoLog( programObject, "program link", stage->glslProgramName );
-		glDetachObjectARB( programObject, vertexShader );
-		glDetachObjectARB( programObject, fragmentShader );
-		glDeleteObjectARB( vertexShader );
-		glDeleteObjectARB( fragmentShader );
-		glDeleteObjectARB( programObject );
-		stage->glslProgramLoaded = true;
-		stage->glslProgramValid = false;
-		return false;
-	}
-
-	stage->glslProgramObject = (int)programObject;
-	stage->glslVertexShaderObject = (int)vertexShader;
-	stage->glslFragmentShaderObject = (int)fragmentShader;
 	stage->glslProgramLoaded = true;
 	stage->glslProgramValid = true;
 	stage->glslProgramGeneration = tr.glContextGeneration;
@@ -835,8 +1069,10 @@ bool R_ValidateGLSLProgram( newShaderStage_t *stage ) {
 		}
 	}
 
-	common->Printf( "Loaded GLSL program '%s' (%s, %s)\n",
-		stage->glslProgramName, vertexPath.c_str(), fragmentPath.c_str() );
+	if ( linkedHere ) {
+		common->Printf( "Loaded GLSL program '%s' (%s, %s)\n",
+			stage->glslProgramName, vertexPath.c_str(), fragmentPath.c_str() );
+	}
 
 	return true;
 }
@@ -11967,6 +12203,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					}
 
 					if ( RB_BindGLSLShaderParm( newStage->shaderParmBindings[i], location, pStage, NULL ) ) {
+						RB_GLSLStageForgetUniform( newStage, location );
 						continue;
 					}
 
@@ -11979,21 +12216,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					for ( int j = 0; j < numRegisters && j < 4; j++ ) {
 						parm[j] = regs[ newStage->shaderParmRegisters[i][j] ];
 					}
-
-					switch ( numRegisters ) {
-					case 1:
-						glUniform1fvARB( location, 1, parm );
-						break;
-					case 2:
-						glUniform2fvARB( location, 1, parm );
-						break;
-					case 3:
-						glUniform3fvARB( location, 1, parm );
-						break;
-					default:
-						glUniform4fvARB( location, 1, parm );
-						break;
-					}
+					RB_GLSLStageUniform( newStage, location, numRegisters, parm );
 				}
 
 				for ( int i = 0; i < newStage->numShaderTextures; i++ ) {
@@ -12004,9 +12227,7 @@ void RB_STD_T_RenderShaderPasses( const drawSurf_t *surf ) {
 					GL_SelectTexture( i );
 					image->SetSamplerState( newStage->shaderTextureFilters[i], newStage->shaderTextureRepeats[i] );
 					image->Bind();
-					if ( newStage->shaderTextureLocations[i] >= 0 ) {
-						glUniform1iARB( newStage->shaderTextureLocations[i], i );
-					}
+					RB_GLSLStageSampler( newStage, newStage->shaderTextureLocations[i], i );
 				}
 				if ( useExplicitSMAAFullscreenQuad ) {
 					RB_PoisonPostAAGLSLStateForValidation();
