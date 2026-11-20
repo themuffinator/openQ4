@@ -3271,9 +3271,12 @@ Completion must advance through the existing dependencies:
   the page behind it every frame. A sliding vector now compiles at half-pixel
   phases its cache holds, many-path vectors draw as one or two geometries, each
   glow pulse turns under a GPU linear mask and a vector leaf's fade skips the
-  layout pass: the Awakening pause fell to 0.24 ms and 167 draws. Open: about
-  1 ms of style work for the snow on the Awakening GAME OPTIONS and DISPLAY
-  pages, and the Awakening documents' 2.3 MB of snow and frost.
+  layout pass: the Awakening pause fell to 0.24 ms and 167 draws. A shown
+  toggle, slider or list no longer lays the page out every frame (GAME
+  OPTIONS, DISPLAY, AUDIO at rest): its view repaints after a state change, so
+  the settings pages, Awakening's included, take 0.05-0.3 ms a frame. Open:
+  Create Server and Join Game still lay out every frame (scrollbars, number
+  fields), and the Awakening documents' 2.3 MB of snow and frost.
   Progress, 4 November: [moving weapon scopes](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026)
   retain local meshes for their faint animated furniture. At 1080p the isolated
   rail/nail scope CPU medians fall from 6.99/8.80 ms to 0.018/0.037 ms; continuous

@@ -1171,7 +1171,7 @@ SCENARIOS = {
     ]),
     # The retained GAME OPTIONS page (UI-01): the GAME OPTIONS button opens it
     # on GENERAL's first row; the HUD tab's custom crosshair turns on and steps
-    # to the next one; the gun position applies; the language
+    # to the next one; VIEW WEAPON's gun position applies; GENERAL's language
     # list switches to German, which reloads the language and the menus; Back
     # returns to the settings screen.
     'game': (None, [
@@ -1181,8 +1181,9 @@ SCENARIOS = {
         'g_crosshairCustom', 'openq4_retainedGui focus game_customcrosshair', *menu_step('accept'), *menu_step('down'),
         *menu_step('accept'), 'g_crosshairCustom', 'openq4_retainedGui focus game_crosshair', *menu_step('right'),
         'g_crosshairCustomFile', 'waitMsec 400', 'screenshot "screenshots/game-crosshair.tga"',
-        'openq4_retainedGui event tab_general', 'waitMsec 400',
+        'openq4_retainedGui event tab_viewweapon', 'waitMsec 400',
         'openq4_retainedGui focus game_gunposition', *menu_step('accept'), *menu_step('down'), *menu_step('accept'), 'g_gunY',
+        'openq4_retainedGui event tab_general', 'waitMsec 400',
         'openq4_retainedGui focus game_language', *menu_step('accept'), *[step for _ in range(6) for step in menu_step('down')],
         *menu_step('accept'), 'waitMsec 3000', 'sys_lang', 'openq4_retainedGui report', 'ui_retainedStatus',
         'screenshot "screenshots/game-language.tga"',

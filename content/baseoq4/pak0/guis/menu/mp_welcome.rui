@@ -68863,7 +68863,7 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 139.147, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 228.853, "unit": "dp"},
+               "width": {"type": "length", "value": 232.853, "unit": "dp"},
                "height": {"type": "length", "value": 26.0, "unit": "dp"},
                "font-family": {"type": "font", "value": "lowpixel"},
                "font-size": {"type": "length", "value": 14, "unit": "dp"},

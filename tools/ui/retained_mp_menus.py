@@ -1568,8 +1568,9 @@ def value_row(doc: Document, ident: str, label_key: str | None, kind: str, width
     if kind == "choice":
         # Lists take the 14 dp face: the stock maps' names run long, in capitals.
         # A value too long for its room (a sound device's name) ends in an
-        # ellipsis 8 dp short of the chevron, never cut against it.
-        value_node = label(f"{ident}-value", PLACEHOLDER, {**absolute(left=value_x, top=0, width=value_w - 20, height=row_h),
+        # ellipsis 4 dp short of the chevron, never cut against it. (8 dp
+        # cut the Hungarian GPU choice, which every language's must hold.)
+        value_node = label(f"{ident}-value", PLACEHOLDER, {**absolute(left=value_x, top=0, width=value_w - 16, height=row_h),
                            **typeface("lowpixel", 14, row_h, rgb(VALUE)), "white-space": keyword("nowrap"), "overflow": keyword("hidden"),
                            "text-overflow": keyword("ellipsis")})
         chevron = vector(f"{ident}-chevron", absolute(left=width - 24, top=10 + middle, width=12, height=6), [

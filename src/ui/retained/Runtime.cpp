@@ -1957,7 +1957,11 @@ struct Runtime::Impl {
 	std::vector<Rml::Vector2f> focusLayout;
 	bool focusLayoutVisible = false;
 	std::vector<std::string> controls;
-	std::vector<Rml::Element*> layoutWidgets;
+	// Every control but a button. A number field's caret and a scrollbar need
+	// a layout pass every frame they show (liveLayoutWidgets); a toggle, a
+	// slider or a list paints only what its value changed (valueWidgets).
+	std::vector<Rml::Element*> layoutWidgets, liveLayoutWidgets, valueWidgets;
+	std::uint64_t valuePaintRevision = ~std::uint64_t{0}; // The state revision the value widgets last checked.
 	float pointerX = 0, pointerY = 0;
 	float windowPointerX = 0, windowPointerY = 0;
 	bool pointerPresent = false;
@@ -2234,11 +2238,22 @@ struct Runtime::Impl {
 		if (!stateError.empty()) { error = stateError; return false; }
 		return UpdateInteraction(seconds,false,true);
 	}
+    // A semantic decision (focus this control, open that list) reads its
+    // target's computed visibility and projection. A quiet page takes no
+    // layout pass a frame, so a style changed since (a display, a transform)
+    // is applied before the decision rather than on the next layout.
+    void RefreshStylesForDecision() {
+        if (!context || !document || viewport.width <= 0 || viewport.height <= 0) return;
+        ContextClock clock(*services,time,strictPreparation?&preparationFailed:nullptr);
+        ApplyMotion(); context->Update();
+        context->GetRootElement()->UpdateGeometryForProjection();
+    }
     bool PrepareChoicePopup(double seconds) {
         if (!canonical || !document || viewport.width <= 0 || viewport.height <= 0 ||
             !std::isfinite(seconds) || seconds < 0) return false;
         ReadStateSources();
         if (!stateError.empty()) return false;
+        RefreshStylesForDecision();
         return UpdateInteraction(seconds,false,true);
     }
 	bool RefreshNumberFocusLayout(std::string& error) {
@@ -3383,7 +3398,7 @@ void Runtime::Shutdown() {
 	impl->ReleaseModelScenes();
 	impl->canonicalElements.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear();
+	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->liveLayoutWidgets.clear(); impl->valueWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0};
 	impl->hud = nullptr;
 	impl->paintDirty=true;
 	impl->changedProjections.clear();
@@ -3405,7 +3420,7 @@ void Runtime::CloseDocument() {
 
 	impl->sourcePath.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear();
+	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->liveLayoutWidgets.clear(); impl->valueWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0};
 	impl->hud = nullptr;
 	impl->valueView.Reset();
 	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
@@ -3493,7 +3508,11 @@ bool Runtime::LoadCanonical(std::unique_ptr<Document> candidate, const std::stri
 		auto* element = built == impl->canonicalElements.end() ? nullptr : built->second;
 		if (node->control) {
 			impl->controls.push_back(node->id);
-			if (node->control->role!=ControlRole::Button && element) impl->layoutWidgets.push_back(element);
+			if (node->control->role!=ControlRole::Button && element) {
+				impl->layoutWidgets.push_back(element);
+				const auto role=node->control->role;
+				(role==ControlRole::Toggle || role==ControlRole::Slider || role==ControlRole::Choice ? impl->valueWidgets : impl->liveLayoutWidgets).push_back(element);
+			}
 		}
 		if (element) {
 			// Canonical subtrees preserve paint order when opacity crosses 1 and
@@ -4052,12 +4071,27 @@ bool Runtime::Layout(const Viewport& viewport,double seconds) {
 	// just like HUD artwork. A resting button menu has no native CSS animation
 	// or editor caret that requires a style/layout walk on every frame. Keep
 	// interaction and widget settling below independent of this decision.
-	const bool explicitLayout=impl->canonical && std::none_of(impl->layoutWidgets.begin(),impl->layoutWidgets.end(),
-		[](const auto* element){return element->IsVisible(true);});
-	const bool layoutUpdated=!explicitLayout || viewportChanged || impl->presentationDirty;
+	// A settings page at rest (its toggles, sliders and lists closed and
+	// unchanged) is such a menu too. Their values change only with the state:
+	// after a state change the value view paints what changed (a value, a
+	// list's rows), and only then does the frame take a layout pass. Pointer,
+	// focus and an opened list settle below as before. A shown number field
+	// or scrollbar keeps a layout pass a frame. (Painting on every pass
+	// instead repainted each closed list whenever decoration moved.)
+	const auto shown=[](const auto* element){return element->IsVisible(true);};
+	const bool explicitLayout=impl->canonical && std::none_of(impl->liveLayoutWidgets.begin(),impl->liveLayoutWidgets.end(),shown);
+	bool layoutUpdated=!explicitLayout || viewportChanged || impl->presentationDirty;
 	if (layoutUpdated) {
 		++impl->Stats().layoutUpdates;
 		impl->context->Update(explicitLayout); impl->presentationDirty=false;
+		impl->paintDirty=true;
+	} else if (impl->state.Revision()!=std::exchange(impl->valuePaintRevision,impl->state.Revision()) &&
+		std::any_of(impl->valueWidgets.begin(),impl->valueWidgets.end(),shown) &&
+		impl->valueView.Paint(impl->interaction,impl->state.ControlValues(),viewport.width,viewport.height,viewport.DpRatio(),
+			[&](const std::string& id) { const auto value = impl->PresentedProperty({id,"opacity"}); return value ? value->data[0] : 1.0; },
+			impl->presentationPass)) {
+		++impl->Stats().layoutUpdates; layoutUpdated=true;
+		impl->context->Update(explicitLayout);
 		impl->paintDirty=true;
 	}
 	// Owned widget wrappers remain derived layout. Bounded settling lets a
@@ -4371,6 +4405,7 @@ bool Runtime::FocusControl(const std::string& id, double seconds) {
     if(!Mutate())return false;
 
 	impl->SetPointerNavigation(false); impl->pendingFocus.clear(); impl->fling = {}; impl->detailPin.clear();
+	if (impl->canonical) impl->RefreshStylesForDecision();
 	if(!impl->UpdateInteraction(seconds,false,true))return false; const bool result = impl->interaction.Focus(id);
 	if (result) impl->RevealFocus();
 	impl->Feedback(seconds); return result;

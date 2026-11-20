@@ -87,6 +87,7 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 	for (int i = 1; i <= 240; ++i) runtime.Frame(viewport,start+i/60.0);
 	if (!event.empty() && !runtime.RunEvent(event,start+4,effects,error)) throw std::runtime_error(event+": "+error);
 	std::vector<double> frame, update, render, compile, paths, uploads, draws, vertices, layers, elisions;
+	double layouts = 0; // Style and layout passes: a frame that only moves decoration needs none.
 	for (int i = 1; i <= frames; ++i) {
 		// Exercise the game-driven motion as well as authored idle timelines.
 		// A stationary nailgun compass otherwise hides its worst rendering cost.
@@ -104,15 +105,16 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 		uploads.push_back(static_cast<double>(stats.vectorUploads)); draws.push_back(static_cast<double>(stats.drawCalls));
 		vertices.push_back(static_cast<double>(stats.submittedVertices)); layers.push_back(static_cast<double>(stats.layerPushes));
 		elisions.push_back(static_cast<double>(stats.layerElisions));
+		layouts += static_cast<double>(stats.layoutUpdates);
 	}
 	if (!host.error.empty()) throw std::runtime_error("Screen logged an error: "+host.error);
 	std::printf("{\"scenario\":\"screen\",\"document\":\"%s\",\"event\":\"%s\",\"width\":%d,\"height\":%d,\"frames\":%d,\"load_ms\":%.6f,\"cold_ms\":%.6f,"
 		"\"first_ms\":%.6f,\"p50_ms\":%.6f,\"p95_ms\":%.6f,\"max_ms\":%.6f,"
 		"\"update_p50_ms\":%.6f,\"render_p50_ms\":%.6f,\"vector_compile_p50_ms\":%.6f,\"paths_compiled_p50\":%.0f,\"uploads_p50\":%.0f,"
-		"\"draw_calls_p50\":%.0f,\"submitted_vertices_p50\":%.0f,\"layer_pushes_p50\":%.0f,\"layer_elisions_p50\":%.0f}\n",
+		"\"draw_calls_p50\":%.0f,\"submitted_vertices_p50\":%.0f,\"layer_pushes_p50\":%.0f,\"layer_elisions_p50\":%.0f,\"layout_updates_mean\":%.3f}\n",
 		path.c_str(),event.c_str(),width,height,frames,loadMs,cold,frame.front(),Percentile(frame,.5),Percentile(frame,.95),Percentile(frame,1),
 		Percentile(update,.5),Percentile(render,.5),
-		Percentile(compile,.5),Percentile(paths,.5),Percentile(uploads,.5),Percentile(draws,.5),Percentile(vertices,.5),Percentile(layers,.5),Percentile(elisions,.5));
+		Percentile(compile,.5),Percentile(paths,.5),Percentile(uploads,.5),Percentile(draws,.5),Percentile(vertices,.5),Percentile(layers,.5),Percentile(elisions,.5),layouts/frames);
 	runtime.CloseDocument(); runtime.Shutdown();
 }
 

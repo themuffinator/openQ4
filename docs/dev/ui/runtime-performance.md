@@ -2111,7 +2111,10 @@ every frame. A vector that keeps sliding now compiles at half-pixel phases
 its cache holds, a vector of 16 paths or more draws its paths as one or two
 geometries, each glow pulse turns under one linear-mask wedge, and a vector
 leaf's fade updates its layer's opacity without a layout pass. The Awakening
-pause fell to 0.24 ms and 167 draws a frame in the benchmark.
+pause fell to 0.24 ms and 167 draws a frame in the benchmark. A shown toggle,
+slider or list no longer forces a style and layout pass every frame: its
+view repaints after a state change, so GAME OPTIONS, DISPLAY and AUDIO take
+none at rest; a shown number field or scrollbar still does.
 
 ## Remaining requirements
 

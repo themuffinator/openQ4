@@ -185,11 +185,12 @@ menu with its opening animations playing:
 
 | Severity | Interface | Was | Now |
 | --- | --- | --- | --- |
-| High | Retained | The Awakening pause and settings pages recompiled their drifting snow every frame: about 10 ms of CPU and 2,100 draws a frame. | A sliding vector compiles at half-pixel phases its cache holds; many-path vectors are a draw or two: 0.24 to 0.27 ms on the pause, SETTINGS and CONTROLS, 1 to 2.6 ms on the other three. |
+| High | Retained | The Awakening pause and settings pages recompiled their drifting snow every frame: about 10 ms of CPU and 2,100 draws a frame. | A sliding vector compiles at half-pixel phases its cache holds; many-path vectors are a draw or two: 0.24 to 0.27 ms on the pause, SETTINGS and CONTROLS (the other three, below). |
 | Medium | Retained | An open dialog tessellated its glow's turning mask and relaid out the page behind it every frame. | Each pulse turns under a GPU linear mask; a vector leaf's fade needs no layout pass. |
-| Low | Retained | A long dropdown value (a sound device) ran under its chevron, cut mid-letter. | It ends in an ellipsis 8 dp short of the chevron. |
+| Low | Retained | A long dropdown value (a sound device) ran under its chevron, cut mid-letter. | It ends in an ellipsis 4 dp short of the chevron. |
 | Low | Retained | The Demos, Load and Save lists cut a long name or map mid-letter at 100 % text. | An ellipsis at every text size, as Join Game's rows. |
+| Medium | Retained | GAME OPTIONS, DISPLAY, AUDIO and Create Server laid out the whole page every frame at rest (a shown toggle, slider or list forced it); the Awakening copies about 1 to 2 ms. | A toggle, slider or list repaints after a state change only: the settings pages take no layout pass at rest (0.05 to 0.3 ms a frame). |
 
-Left open: about 1 ms of style work for the snow on the Awakening GAME
-OPTIONS and DISPLAY pages, and the Awakening documents' size
+Left open: Create Server and Join Game still lay out every frame (their
+scrollbars and number fields), and the Awakening documents' size
 ([found, not fixed](menu-frame-costs.md#found-not-fixed)).

@@ -102,7 +102,7 @@ load, which slowed even the phases this round does not touch.
 
 - **A long dropdown value ends in an ellipsis.** A sound device's name ran
   under its list's chevron, cut mid-letter against it ("Default Device
-  (OpenAL Soft on Hea"). A list's value now ends 8 dp short of the chevron, in
+  (OpenAL Soft on Hea"). A list's value now ends 4 dp short of the chevron, in
   an ellipsis (`value_row`, `tools/ui/retained_mp_menus.py`), on every
   settings page and multiplayer page that builds its rows there.
 - **A list's name or map ends in an ellipsis at every text size.** The Demos
@@ -116,12 +116,59 @@ load, which slowed even the phases this round does not touch.
   the scenario's two tab steps stopped on VIEW WEAPON, its list never opened
   and every later step ran one page out (`tools/ui/capture_retained_screens.py`).
 
+## Settings pages at rest, later the same day
+
+The first pass left about 1 ms a frame on the Awakening GAME OPTIONS and
+DISPLAY pages, which looked like the snow's drift taking the style path. The
+benchmark now reports layout passes a frame (`layout_updates_mean`), and it
+showed something wider: **GAME OPTIONS, DISPLAY, AUDIO and Create Server laid
+out the whole page on every frame, at rest, in either campaign.** A frame
+skipped the style and layout pass only when no control other than a button
+showed, because a toggle's, slider's or list's view was repainted in the
+settle that follows a layout pass. The Awakening copies paid more because
+the pass also walks their snow and frost.
+
+- **A toggle, slider or list at rest needs no layout pass.** Their values
+  change only with the state, so after a state change the value view paints
+  what changed, and only then does the frame lay out
+  (`valueWidgets`, `src/ui/retained/Runtime.cpp`). A shown number field
+  (its caret) or scrollbar keeps a pass a frame, as before.
+- **Not on every presentation pass.** The first version painted the value
+  widgets every frame; a closed list repaints whenever the presentation pass
+  changes, which the drifting snow does every frame, so every list on the
+  page repainted (1.4 ms). The check now runs only after a state change.
+- **Focusing a control and opening, closing or scrolling a list bring the
+  page's styles up to date first** (`RefreshStylesForDecision`): a style
+  changed outside the runtime since the last layout (a test that hides a
+  list's element directly) is applied before the decision. Two native tests
+  (`openq4-ui-choice-scroll-runtime`, `openq4-ui-focus-reveal`) caught that
+  case.
+- **The dropdown ellipsis keeps 4 dp before the chevron, not 8.** 8 dp left
+  Hungarian's GPU choice, "Automatikus (nagy teljesítmény)", 1.5 dp short of
+  the room every language's options must have (`openq4-ui-system-presets`).
+
+Best of three benchmark runs (`layout_updates_mean` 0.04 after an opening
+event is its first frame):
+
+| Page | Layout passes a frame, before | After | Frame p50, before | After |
+| --- | ---: | ---: | ---: | ---: |
+| GAME OPTIONS, at rest | 1.00 | 0.00 | 0.55 ms | 0.05 ms |
+| DISPLAY, at rest | 1.00 | 0.00 | 0.51 ms | 0.05 ms |
+| AUDIO, at rest | 1.00 | 0.00 | 0.17 ms | 0.06 ms |
+| Awakening GAME OPTIONS, `onActivate` | 1.00 | 0.04 | 2.60 ms | 0.16 ms |
+| Awakening DISPLAY, `onActivate` | 1.00 | 0.04 | 2.29 ms | 0.20 ms |
+| Awakening AUDIO, `onActivate` | 1.00 | 0.04 | 1.05 ms | 0.23 ms |
+| Awakening CONTROLS, `onActivate` | 0.04 | 0.04 | 0.27 ms | 0.23 ms |
+
+The before column for the Awakening pages is after the first pass above;
+for the Quake 4 pages it is the build before the round. The native tests
+run 120 of 120, the compiler-backed ones in the MSVC environment.
+
 ## Found, not fixed
 
-- **The Awakening GAME OPTIONS and DISPLAY pages still spend about 1 ms a
-  frame on the snow.** Without its drift the update costs 0.35 ms; with it,
-  1.31 ms. The drift's transform takes the style path there rather than the
-  projection-only one; the pause and the SETTINGS hub do not.
+- **Create Server and Join Game still lay out every frame**: they show a
+  scrollbar (the map and server lists) and, on Create Server, number fields.
+  Those keep their pass a frame; narrowing them is separate work.
 - **Every Awakening page still carries 2.3 MB of snow and frost** and loads
   about 100 ms slower than its Quake 4 twin. Merging the flakes into a few
   paths cut the pause's load by a third, but made each recompile slower
@@ -147,7 +194,11 @@ console verbs only.
   (`.install`, the build before this round), `p-after` and `p-final`
   (`retained.py`, scenarios `p-title` and `p-pause` in `extra.py`).
 - Pages captured for review: `v1` (seventeen scenarios), `v2` after the
-  refinements.
+  refinements; `v4` and `v5` after the settings pages stopped laying out at
+  rest (GAME OPTIONS' custom crosshair, its next crosshair, Gun Position and
+  German applied and repainted; AUDIO; the sub-page and tree walks). The
+  `game` scenario's Gun Position step now opens VIEW WEAPON first, where the
+  settings tree audit moved the row.
 
 Tests: the native `openq4-retained-ui` (with `CheckVectorFadeReplay`),
 `openq4-ui-retained-*`, HUD and vector tests; `ui_retained_gate.py`'s static

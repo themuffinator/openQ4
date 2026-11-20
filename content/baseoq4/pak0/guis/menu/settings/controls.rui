@@ -60584,8 +60584,8 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     371.8164,
-     {"op": "*", "args": [181.791, {"state": "view.text"}]}
+     379.9976,
+     {"op": "*", "args": [185.791, {"state": "view.text"}]}
     ]
    }
   },
@@ -66389,8 +66389,8 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     371.8164,
-     {"op": "*", "args": [181.791, {"state": "view.text"}]}
+     379.9976,
+     {"op": "*", "args": [185.791, {"state": "view.text"}]}
     ]
    }
   },
@@ -68495,8 +68495,8 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     371.8164,
-     {"op": "*", "args": [181.791, {"state": "view.text"}]}
+     379.9976,
+     {"op": "*", "args": [185.791, {"state": "view.text"}]}
     ]
    }
   },
@@ -69093,8 +69093,8 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     371.8164,
-     {"op": "*", "args": [181.791, {"state": "view.text"}]}
+     379.9976,
+     {"op": "*", "args": [185.791, {"state": "view.text"}]}
     ]
    }
   },
@@ -71849,8 +71849,8 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     371.8164,
-     {"op": "*", "args": [181.791, {"state": "view.text"}]}
+     379.9976,
+     {"op": "*", "args": [185.791, {"state": "view.text"}]}
     ]
    }
   },
@@ -157305,7 +157305,7 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 216.709, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 181.791, "unit": "dp"},
+                   "width": {"type": "length", "value": 185.791, "unit": "dp"},
                    "height": {"type": "length", "value": 36.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -166224,7 +166224,7 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 216.709, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 181.791, "unit": "dp"},
+                   "width": {"type": "length", "value": 185.791, "unit": "dp"},
                    "height": {"type": "length", "value": 36.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -170758,7 +170758,7 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 216.709, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 181.791, "unit": "dp"},
+                   "width": {"type": "length", "value": 185.791, "unit": "dp"},
                    "height": {"type": "length", "value": 36.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -171680,7 +171680,7 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 216.709, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 181.791, "unit": "dp"},
+                   "width": {"type": "length", "value": 185.791, "unit": "dp"},
                    "height": {"type": "length", "value": 36.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
@@ -176995,7 +176995,7 @@
                    "position": {"type": "keyword", "value": "absolute"},
                    "left": {"type": "length", "value": 216.709, "unit": "dp"},
                    "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 181.791, "unit": "dp"},
+                   "width": {"type": "length", "value": 185.791, "unit": "dp"},
                    "height": {"type": "length", "value": 36.0, "unit": "dp"},
                    "font-family": {"type": "font", "value": "lowpixel"},
                    "font-size": {"type": "length", "value": 14, "unit": "dp"},
