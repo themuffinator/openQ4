@@ -1625,11 +1625,11 @@ there only `ui_retainedMultiplayer 1` offers the page.
   server spawns.
 - **Fallback.** In game, or where the page is not installed, cannot load or
   stops drawing, CREATE SERVER opens the stock page.
-- **Captures.** `createserver` goes deeper, chooses CTF, opens ADVANCED
-  OPTIONS, turns Use Password on and types a password, which shows as its
+- **Captures.** `createserver` goes deeper, chooses CTF, shows the SERVER
+  tab, turns Use Password on and types a password, which shows as its
   mask while editing and once the session has taken it, opens the seeded
-  ban list, removes the second ban and closes it, closes the dialog and
-  climbs back; `createserverstart` chooses Team DM and starts a listen server
+  ban list, removes the second ban and closes it, shows RULES and MODIFIERS
+  and climbs back; `createserverstart` chooses Team DM and starts a listen server
   on the loopback, following the reloaded module.
 
 ## Spectate on Join Game (3 November 2026)
@@ -2240,6 +2240,76 @@ test still named 36 to 48. `openq4-ui-retained-game` checks that the moved
 rows and their settings are gone, and that View Weapon stands under Crosshair.
 The gate keeps each stock GAME OPTIONS setting on one page and pins the
 binding-row-only Delete.
+
+## The multiplayer menu tree audit (20 November 2026)
+
+A review of every multiplayer page, its options and their widgets, against
+what multiplayer now offers (MP-12 to MP-16), found settings the console
+alone reached, a second level that hid most of Create Server, and two
+in-match plates that named the wrong pages. The retained pages now read:
+
+- **CREATE SERVER, one level.** The stock page showed eleven settings and
+  kept the rest behind ADVANCED OPTIONS, a dialog that had grown four tabs.
+  Every setting now stands on the page under the multiplayer card's tab
+  strip over the settings column (Q and E, or the shoulder buttons): MATCH
+  (the game type first, its limits, the round limit in the round modes,
+  Max and Min Players, Fill With Bots and Bot Skill, Warmup, Ready Up, Map
+  Rotation and Map Requests), RULES (the ruleset and its hook, the team
+  settings, Weapon Stay, Buying, the overtime period, the mercy lead, Item
+  Timers, Allow Spectators and the Spectator Lock), MODIFIERS (the preset,
+  the modifiers, the arena, powerups, weapon respawn and the three scales)
+  and SERVER (name, type, Dedicated, the passwords, voting, voice, Idle
+  Timeout, Pure, server mods, the rate and the ban list, which opens PLAYER
+  BAN LIST over the page). Thirteen rows show; a longer tab scrolls. Each
+  arrival shows MATCH. Rows dim where they cannot act: the team rows outside
+  team modes, the hook under Quake 4's rules, the spectator lock with no
+  spectators, the rules a fixed loadout overrides; the map cycle script's
+  name shows only while Map Rotation runs it. Time Limit, Max and Min
+  Players, the round limit and Timeouts per Team are sliders (they were
+  typed fields, which a controller could only reach through the on-screen
+  keyboard); the open-ended counts stay fields. New rows: Map Rotation
+  (`g_mapRotation`), Map Requests (`g_mapQueue`), Item Timers
+  (`si_itemTimers`), Timeouts per Team (`si_timeouts`), Spectator Lock
+  (`si_spectatorLock`) and Idle Timeout (`g_inactivity`), declared for the
+  menu with game_mp's defaults (`Session_DeclareMultiplayerMenuGameCVars`)
+  as are `si_overtime`, `si_mercyLimit` and `si_roundLimit`, which read 0 at
+  the menu before. Overtime takes its title-case label, "Overtime Period
+  (Seconds)".
+- **PLAYER SETUP, a HUD tab.** The MP-15 HUD options (Hit Sound, Crosshair
+  Names, Crosshair Ammo, Item Timers, Team Locations, Local Clock) and the
+  MP-16 spectating ones (Spectator Speed, Follow View), which the console
+  alone set, as `settings.player.set` rows. The rows grew to 612 dp from
+  40 dp in so the four tabs fit Brazilian Portuguese, still clear of the
+  preview's bay; a tall view caps their scale at the column's width.
+- **The in-match Settings page, three sections** (PLAYER, APPEARANCE, HUD)
+  on the Match page's inner strip, the triggers stepping them; its plates
+  are Controls, Game Options, Display and Audio (System named the page the
+  main menu calls Display, and Audio had no way there). The Welcome card's
+  Settings page sets the four plates two by two.
+- **The Vote page** offers the casual votes: Skip to Next Map, Random Map,
+  the round limit, the overtime period, the ruleset, Instagib, Ready
+  Everyone and a coin toss, grouped with the stock fields by what they
+  change, in a column that scrolls. The game's `retainedVoteField_t` carries
+  them after the kick, so the Admin page's fields are unchanged.
+- **The Server page** names the rules the match is played by (the ruleset
+  and the modifiers) and hides MAP ROTATION's heading when the server lists
+  no rotation.
+- **The Match page's reasons** stand on their row's middle line; they hung
+  from the row's top.
+
+Considered and left: a fifth Create Server tab for players and access (five
+tabs need 669 dp in Brazilian Portuguese, past the column's 566 dp); moving
+the map list into a tab (the levelshot and list stay beside every tab, so
+the map is never out of sight); folding OPPONENTS and TEAMMATES into one
+table on Player Setup (its 45 dp rows have no room for two columns); and
+votes for modifiers and presets, which have no vote flags yet (MP-12).
+
+Twenty-seven strings (`#str_232600` to `#str_232626`) are new in all twelve
+languages. The classic menus (`ui_retained 0`) keep the stock layout.
+`openq4-ui-retained-screens` (`mp-pages`, `mp-vote-match`, `mp-card`,
+`mp-settings-welcome`) checks the tabs, rows, gates, sections and the new
+vote rows; `mp_bot_server_menu.py` checks every menu-declared CVar's default
+against game_mp's.
 
 ## The settings tree audit (20 November 2026)
 

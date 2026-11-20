@@ -907,9 +907,10 @@ SCENARIOS = {
     # The Create Server sub-page (FLOW-050), the default: CREATE SERVER on the
     # Multiplayer page goes deeper and the sub-page presents at 350 ms under
     # the MULTIPLAYER crumb, the game type's maps listed and the chosen one's
-    # levelshot shown. Choosing CTF lists its maps again, ADVANCED OPTIONS
-    # opens the popup's options (a password typed, the seeded ban list opened
-    # and one ban removed), and BACK climbs out onto CREATE SERVER.
+    # levelshot shown. Choosing CTF lists its maps again, the SERVER tab shows
+    # the server's settings (a password typed, the seeded ban list opened and
+    # one ban removed), RULES and MODIFIERS theirs, and BACK climbs out onto
+    # CREATE SERVER.
     'createserver': (None, [
         'waitMsec 4000',
         'openq4_retainedGui focus nav_multiplayer', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
@@ -923,7 +924,7 @@ SCENARIOS = {
         'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0',
         'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 600', 'si_gameType', 'si_map',
         'screenshot "screenshots/createserver-ctf.tga"',
-        'openq4_retainedGui event advancedModalShow', 'waitMsec 500', 'openq4_retainedGui report',
+        'openq4_retainedGui event tab_server', 'waitMsec 500', 'openq4_retainedGui report',
         'screenshot "screenshots/createserver-advanced.tga"',
         # Use password unlocks Set password; a typed password shows as its
         # mask while editing and once the session has taken it.
@@ -945,8 +946,8 @@ SCENARIOS = {
         # RULES, then MODIFIERS: Instagib turned on sets si_instagib and dims the
         # rules it overrides (and, on RULES, Weapon Stay and buying, which have
         # nothing to act on under it); turned off again after.
-        'openq4_retainedGui event advancedTab2', 'waitMsec 400', 'screenshot "screenshots/createserver-rules.tga"',
-        'openq4_retainedGui event advancedTab3', 'waitMsec 400', 'openq4_retainedGui focus "create-instagib"',
+        'openq4_retainedGui event tab_rules', 'waitMsec 400', 'screenshot "screenshots/createserver-rules.tga"',
+        'openq4_retainedGui event tab_modifiers', 'waitMsec 400', 'openq4_retainedGui focus "create-instagib"',
         'screenshot "screenshots/createserver-modifiers.tga"',
         'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 400', 'si_instagib',
         'screenshot "screenshots/createserver-instagib.tga"',
@@ -963,7 +964,7 @@ SCENARIOS = {
         'openq4_retainedGui menu home 1', 'openq4_retainedGui menu home 0', 'openq4_retainedGui menu down 1', 'openq4_retainedGui menu down 0', 
         'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0', 'waitMsec 600',
         'si_preset', 'si_weaponArena', 'si_powerups', 'si_selfDamage', 'si_fallDamage',
-        'openq4_retainedGui event advancedModalHide', 'waitMsec 600',
+        'openq4_retainedGui event tab_match', 'waitMsec 600',
         'openq4_retainedGui focus create_back', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 150', 'screenshot "screenshots/createserver-back.tga"', 'waitMsec 1200', 'openq4_retainedGui report',
         'screenshot "screenshots/createserver-returned.tga"',

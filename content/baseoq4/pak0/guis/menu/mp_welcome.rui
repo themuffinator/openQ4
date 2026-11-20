@@ -67,6 +67,7 @@
   "mp.rule4": {"type": "string", "initial": ""},
   "mp.rule5": {"type": "string", "initial": ""},
   "mp.rule6": {"type": "string", "initial": ""},
+  "mp.rule7": {"type": "string", "initial": ""},
   "mp.rotation0": {"type": "string", "initial": ""},
   "mp.rotation1": {"type": "string", "initial": ""},
   "mp.rotation2": {"type": "string", "initial": ""},
@@ -1523,7 +1524,8 @@
   "mpRail": {"operation": "session.menu", "arguments": {"command": "mpRail"}},
   "mpSettingsControls": {"operation": "session.menu", "arguments": {"command": "mpSettingsControls"}},
   "mpSettingsGame": {"operation": "session.menu", "arguments": {"command": "mpSettingsGame"}},
-  "mpSettingsSystem": {"operation": "session.menu", "arguments": {"command": "mpSettingsSystem"}}
+  "mpSettingsSystem": {"operation": "session.menu", "arguments": {"command": "mpSettingsSystem"}},
+  "mpSettingsAudio": {"operation": "session.menu", "arguments": {"command": "mpSettingsAudio"}}
  },
  "events": {
   "join_slot_0": [
@@ -2351,6 +2353,13 @@
   {"id": "server-rule-4.text", "node": "server-rule-4", "property": "text", "value": {"state": "mp.rule4"}},
   {"id": "server-rule-5.text", "node": "server-rule-5", "property": "text", "value": {"state": "mp.rule5"}},
   {"id": "server-rule-6.text", "node": "server-rule-6", "property": "text", "value": {"state": "mp.rule6"}},
+  {"id": "server-rule-7.text", "node": "server-rule-7", "property": "text", "value": {"state": "mp.rule7"}},
+  {
+   "id": "server-rotation-label.display",
+   "node": "server-rotation-label",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "mp.rotation_count"}, 0]}, "block", "none"]}
+  },
   {
    "id": "server-rotation-0.text",
    "node": "server-rotation-0",
@@ -16882,6 +16891,12 @@
    "value": {"op": "==", "args": [{"state": "card.tab"}, 3]}
   },
   {
+   "id": "settings-mpSettingsAudio.enabled",
+   "node": "settings-mpSettingsAudio",
+   "property": "enabled",
+   "value": {"op": "==", "args": [{"state": "card.tab"}, 3]}
+  },
+  {
    "id": "page-settings.display",
    "node": "page-settings",
    "property": "display",
@@ -21727,10 +21742,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -21785,10 +21800,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -21843,10 +21858,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [6.55, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [6.55, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22007,10 +22022,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22065,10 +22080,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22123,10 +22138,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [6.55, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [6.55, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22287,10 +22302,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]}}
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22345,10 +22360,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [5.55, 0, 1.03, 1.03, 0]}}
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22403,10 +22418,10 @@
      "keys": [
       {
        "atMs": 0,
-       "value": {"type": "transform", "unit": "dp", "value": [6.55, 1, 1.03, 1.03, 0]},
+       "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]},
        "easing": [0.16, 1, 0.3, 1]
       },
-      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [6.55, 1, 1.03, 1.03, 0]}}
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]}}
      ]
     }
    ]
@@ -22457,6 +22472,286 @@
     },
     {
      "node": "settings-mpSettingsSystem-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings-mpSettingsAudio.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "settings-mpSettingsAudio-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.28}},
+      {"atMs": 300, "value": {"type": "number", "value": 0.28}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.28}},
+      {"atMs": 300, "value": {"type": "number", "value": 0.28}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker-hot",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings-mpSettingsAudio-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.8]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.8]}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "transform",
+     "keys": [
+      {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}},
+      {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings-mpSettingsAudio.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "settings-mpSettingsAudio-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 1, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings-mpSettingsAudio.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "settings-mpSettingsAudio-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 80, "value": {"type": "transform", "unit": "dp", "value": [5.647, 0, 1.03, 1.03, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings-mpSettingsAudio.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "settings-mpSettingsAudio-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 60, "value": {"type": "transform", "unit": "dp", "value": [6.647, 1, 1.03, 1.03, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings-mpSettingsAudio.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "settings-mpSettingsAudio-plate",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.28}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0.28}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.28}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0.28}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-marker-hot",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.8]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.8]}}
+     ]
+    },
+    {
+     "node": "settings-mpSettingsAudio-label",
      "property": "transform",
      "keys": [
       {
@@ -29374,6 +29669,41 @@
           }
          },
          {
+          "id": "server-rule-7-label",
+          "type": "text",
+          "properties": {
+           "text": {"type": "text", "value": "#str_232626"},
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 453.75, "unit": "dp"},
+           "top": {"type": "length", "value": 196, "unit": "dp"},
+           "width": {"type": "length", "value": 157.628, "unit": "dp"},
+           "height": {"type": "length", "value": 22, "unit": "dp"},
+           "font-family": {"type": "font", "value": "lowpixel"},
+           "font-size": {"type": "length", "value": 14, "unit": "dp"},
+           "line-height": {"type": "length", "value": 22, "unit": "dp"},
+           "color": {"type": "color", "value": [0.545, 0.588, 0.294, 1]},
+           "white-space": {"type": "keyword", "value": "nowrap"}
+          }
+         },
+         {
+          "id": "server-rule-7",
+          "type": "text",
+          "properties": {
+           "text": {"type": "text", "value": "#str_230030"},
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 617.378, "unit": "dp"},
+           "top": {"type": "length", "value": 196, "unit": "dp"},
+           "width": {"type": "length", "value": 207.622, "unit": "dp"},
+           "height": {"type": "length", "value": 22, "unit": "dp"},
+           "font-family": {"type": "font", "value": "lowpixel"},
+           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+           "line-height": {"type": "length", "value": 22, "unit": "dp"},
+           "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+           "white-space": {"type": "keyword", "value": "nowrap"},
+           "overflow": {"type": "keyword", "value": "hidden"}
+          }
+         },
+         {
           "id": "server-rotation-label",
           "type": "text",
           "properties": {
@@ -29387,7 +29717,8 @@
            "font-size": {"type": "length", "value": 14, "unit": "dp"},
            "line-height": {"type": "length", "value": 20, "unit": "dp"},
            "color": {"type": "color", "value": [0.545, 0.588, 0.294, 1]},
-           "white-space": {"type": "keyword", "value": "nowrap"}
+           "white-space": {"type": "keyword", "value": "nowrap"},
+           "display": {"type": "keyword", "value": "none"}
           }
          },
          {
@@ -72138,9 +72469,9 @@
           "type": "group",
           "properties": {
            "position": {"type": "keyword", "value": "absolute"},
-           "left": {"type": "length", "value": 0, "unit": "dp"},
+           "left": {"type": "length", "value": 0.0, "unit": "dp"},
            "top": {"type": "length", "value": 166.0, "unit": "dp"},
-           "width": {"type": "length", "value": 400.0, "unit": "dp"},
+           "width": {"type": "length", "value": 406.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"}
           },
           "children": [
@@ -72151,7 +72482,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 400.0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "opacity": {"type": "number", "value": 0.28}
             },
@@ -72160,8 +72491,8 @@
               "id": "fill",
               "commands": [
                {"id": "p0", "op": "move", "points": [[0, 5.0]]},
-               {"id": "p1", "op": "line", "points": [[400.0, 5.0]]},
-               {"id": "p2", "op": "line", "points": [[400.0, 40.0]]},
+               {"id": "p1", "op": "line", "points": [[406.5, 5.0]]},
+               {"id": "p2", "op": "line", "points": [[406.5, 40.0]]},
                {"id": "p3", "op": "line", "points": [[20.0, 40.0]]},
                {"id": "p4", "op": "line", "points": [[0, 20.0]]},
                {"id": "close", "op": "close"}
@@ -72169,7 +72500,7 @@
               "fill": {
                "type": "linear",
                "from": [0, 0],
-               "to": [400.0, 0],
+               "to": [406.5, 0],
                "stops": [
                 {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
                 {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
@@ -72183,13 +72514,13 @@
                {"id": "p0", "op": "move", "points": [[0.75, 5.0]]},
                {"id": "p1", "op": "line", "points": [[0.75, 20.0]]},
                {"id": "p2", "op": "line", "points": [[20.0, 39.25]]},
-               {"id": "p3", "op": "line", "points": [[400.0, 39.25]]}
+               {"id": "p3", "op": "line", "points": [[406.5, 39.25]]}
               ],
               "stroke": {
                "paint": {
                 "type": "linear",
                 "from": [0, 0],
-                "to": [400.0, 0],
+                "to": [406.5, 0],
                 "stops": [
                  {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
                  {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
@@ -72211,7 +72542,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 400.0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "opacity": {"type": "number", "value": 0}
             },
@@ -72222,7 +72553,7 @@
                {"id": "p0", "op": "move", "points": [[3.5, 8.0]]},
                {"id": "p1", "op": "line", "points": [[3.5, 21.5]]},
                {"id": "p2", "op": "line", "points": [[21.5, 36.5]]},
-               {"id": "p3", "op": "line", "points": [[380.0, 36.5]]}
+               {"id": "p3", "op": "line", "points": [[386.5, 36.5]]}
               ],
               "stroke": {
                "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
@@ -72290,7 +72621,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 26, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 370.0, "unit": "dp"},
+             "width": {"type": "length", "value": 376.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "font-family": {"type": "font", "value": "marine"},
              "font-size": {"type": "length", "value": 20, "unit": "dp"},
@@ -72319,9 +72650,9 @@
           "type": "group",
           "properties": {
            "position": {"type": "keyword", "value": "absolute"},
-           "left": {"type": "length", "value": 0, "unit": "dp"},
-           "top": {"type": "length", "value": 216.0, "unit": "dp"},
-           "width": {"type": "length", "value": 400.0, "unit": "dp"},
+           "left": {"type": "length", "value": 418.5, "unit": "dp"},
+           "top": {"type": "length", "value": 166.0, "unit": "dp"},
+           "width": {"type": "length", "value": 406.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"}
           },
           "children": [
@@ -72332,7 +72663,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 400.0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "opacity": {"type": "number", "value": 0.28}
             },
@@ -72341,8 +72672,8 @@
               "id": "fill",
               "commands": [
                {"id": "p0", "op": "move", "points": [[0, 5.0]]},
-               {"id": "p1", "op": "line", "points": [[400.0, 5.0]]},
-               {"id": "p2", "op": "line", "points": [[400.0, 40.0]]},
+               {"id": "p1", "op": "line", "points": [[406.5, 5.0]]},
+               {"id": "p2", "op": "line", "points": [[406.5, 40.0]]},
                {"id": "p3", "op": "line", "points": [[20.0, 40.0]]},
                {"id": "p4", "op": "line", "points": [[0, 20.0]]},
                {"id": "close", "op": "close"}
@@ -72350,7 +72681,7 @@
               "fill": {
                "type": "linear",
                "from": [0, 0],
-               "to": [400.0, 0],
+               "to": [406.5, 0],
                "stops": [
                 {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
                 {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
@@ -72364,13 +72695,13 @@
                {"id": "p0", "op": "move", "points": [[0.75, 5.0]]},
                {"id": "p1", "op": "line", "points": [[0.75, 20.0]]},
                {"id": "p2", "op": "line", "points": [[20.0, 39.25]]},
-               {"id": "p3", "op": "line", "points": [[400.0, 39.25]]}
+               {"id": "p3", "op": "line", "points": [[406.5, 39.25]]}
               ],
               "stroke": {
                "paint": {
                 "type": "linear",
                 "from": [0, 0],
-                "to": [400.0, 0],
+                "to": [406.5, 0],
                 "stops": [
                  {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
                  {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
@@ -72392,7 +72723,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 400.0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "opacity": {"type": "number", "value": 0}
             },
@@ -72403,7 +72734,7 @@
                {"id": "p0", "op": "move", "points": [[3.5, 8.0]]},
                {"id": "p1", "op": "line", "points": [[3.5, 21.5]]},
                {"id": "p2", "op": "line", "points": [[21.5, 36.5]]},
-               {"id": "p3", "op": "line", "points": [[380.0, 36.5]]}
+               {"id": "p3", "op": "line", "points": [[386.5, 36.5]]}
               ],
               "stroke": {
                "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
@@ -72471,7 +72802,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 26, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 370.0, "unit": "dp"},
+             "width": {"type": "length", "value": 376.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "font-family": {"type": "font", "value": "marine"},
              "font-size": {"type": "length", "value": 20, "unit": "dp"},
@@ -72500,9 +72831,9 @@
           "type": "group",
           "properties": {
            "position": {"type": "keyword", "value": "absolute"},
-           "left": {"type": "length", "value": 0, "unit": "dp"},
-           "top": {"type": "length", "value": 266.0, "unit": "dp"},
-           "width": {"type": "length", "value": 400.0, "unit": "dp"},
+           "left": {"type": "length", "value": 0.0, "unit": "dp"},
+           "top": {"type": "length", "value": 216.0, "unit": "dp"},
+           "width": {"type": "length", "value": 406.5, "unit": "dp"},
            "height": {"type": "length", "value": 45, "unit": "dp"}
           },
           "children": [
@@ -72513,7 +72844,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 400.0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "opacity": {"type": "number", "value": 0.28}
             },
@@ -72522,8 +72853,8 @@
               "id": "fill",
               "commands": [
                {"id": "p0", "op": "move", "points": [[0, 5.0]]},
-               {"id": "p1", "op": "line", "points": [[400.0, 5.0]]},
-               {"id": "p2", "op": "line", "points": [[400.0, 40.0]]},
+               {"id": "p1", "op": "line", "points": [[406.5, 5.0]]},
+               {"id": "p2", "op": "line", "points": [[406.5, 40.0]]},
                {"id": "p3", "op": "line", "points": [[20.0, 40.0]]},
                {"id": "p4", "op": "line", "points": [[0, 20.0]]},
                {"id": "close", "op": "close"}
@@ -72531,7 +72862,7 @@
               "fill": {
                "type": "linear",
                "from": [0, 0],
-               "to": [400.0, 0],
+               "to": [406.5, 0],
                "stops": [
                 {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
                 {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
@@ -72545,13 +72876,13 @@
                {"id": "p0", "op": "move", "points": [[0.75, 5.0]]},
                {"id": "p1", "op": "line", "points": [[0.75, 20.0]]},
                {"id": "p2", "op": "line", "points": [[20.0, 39.25]]},
-               {"id": "p3", "op": "line", "points": [[400.0, 39.25]]}
+               {"id": "p3", "op": "line", "points": [[406.5, 39.25]]}
               ],
               "stroke": {
                "paint": {
                 "type": "linear",
                 "from": [0, 0],
-                "to": [400.0, 0],
+                "to": [406.5, 0],
                 "stops": [
                  {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
                  {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
@@ -72573,7 +72904,7 @@
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 400.0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "opacity": {"type": "number", "value": 0}
             },
@@ -72584,7 +72915,7 @@
                {"id": "p0", "op": "move", "points": [[3.5, 8.0]]},
                {"id": "p1", "op": "line", "points": [[3.5, 21.5]]},
                {"id": "p2", "op": "line", "points": [[21.5, 36.5]]},
-               {"id": "p3", "op": "line", "points": [[380.0, 36.5]]}
+               {"id": "p3", "op": "line", "points": [[386.5, 36.5]]}
               ],
               "stroke": {
                "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
@@ -72648,11 +72979,11 @@
             "id": "settings-mpSettingsSystem-label",
             "type": "text",
             "properties": {
-             "text": {"type": "text", "value": "#str_200085"},
+             "text": {"type": "text", "value": "#str_229900"},
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 26, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
-             "width": {"type": "length", "value": 370.0, "unit": "dp"},
+             "width": {"type": "length", "value": 376.5, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"},
              "font-family": {"type": "font", "value": "marine"},
              "font-size": {"type": "length", "value": 20, "unit": "dp"},
@@ -72665,7 +72996,7 @@
           ],
           "control": {
            "role": "button",
-           "label": "#str_200085",
+           "label": "#str_229900",
            "states": {
             "default": "settings-mpSettingsSystem.default",
             "hover": "settings-mpSettingsSystem.hover",
@@ -72674,6 +73005,187 @@
             "disabled": "settings-mpSettingsSystem.disabled"
            },
            "action": "mpSettingsSystem"
+          }
+         },
+         {
+          "id": "settings-mpSettingsAudio",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 418.5, "unit": "dp"},
+           "top": {"type": "length", "value": 216.0, "unit": "dp"},
+           "width": {"type": "length", "value": 406.5, "unit": "dp"},
+           "height": {"type": "length", "value": 45, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "settings-mpSettingsAudio-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
+             "height": {"type": "length", "value": 45, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0.28}
+            },
+            "paths": [
+             {
+              "id": "fill",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 5.0]]},
+               {"id": "p1", "op": "line", "points": [[406.5, 5.0]]},
+               {"id": "p2", "op": "line", "points": [[406.5, 40.0]]},
+               {"id": "p3", "op": "line", "points": [[20.0, 40.0]]},
+               {"id": "p4", "op": "line", "points": [[0, 20.0]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [406.5, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
+                {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.49]}},
+                {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0]}}
+               ]
+              }
+             },
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0.75, 5.0]]},
+               {"id": "p1", "op": "line", "points": [[0.75, 20.0]]},
+               {"id": "p2", "op": "line", "points": [[20.0, 39.25]]},
+               {"id": "p3", "op": "line", "points": [[406.5, 39.25]]}
+              ],
+              "stroke": {
+               "paint": {
+                "type": "linear",
+                "from": [0, 0],
+                "to": [406.5, 0],
+                "stops": [
+                 {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
+                 {"at": 0.33, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 1.0]}},
+                 {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0]}}
+                ]
+               },
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "settings-mpSettingsAudio-focus",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 406.5, "unit": "dp"},
+             "height": {"type": "length", "value": 45, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "inset",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[3.5, 8.0]]},
+               {"id": "p1", "op": "line", "points": [[3.5, 21.5]]},
+               {"id": "p2", "op": "line", "points": [[21.5, 36.5]]},
+               {"id": "p3", "op": "line", "points": [[386.5, 36.5]]}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 1.2,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "settings-mpSettingsAudio-marker",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 14, "unit": "dp"},
+             "top": {"type": "length", "value": 14, "unit": "dp"},
+             "width": {"type": "length", "value": 8, "unit": "dp"},
+             "height": {"type": "length", "value": 8, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0.28}
+            },
+            "paths": [
+             {
+              "id": "mark",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[8, 0]]},
+               {"id": "p2", "op": "line", "points": [[8, 8]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5647, 0.6039, 0.2863, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "settings-mpSettingsAudio-marker-hot",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 14, "unit": "dp"},
+             "top": {"type": "length", "value": 14, "unit": "dp"},
+             "width": {"type": "length", "value": 8, "unit": "dp"},
+             "height": {"type": "length", "value": 8, "unit": "dp"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "mark",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[8, 0]]},
+               {"id": "p2", "op": "line", "points": [[8, 8]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "settings-mpSettingsAudio-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_229901"},
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 26, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 376.5, "unit": "dp"},
+             "height": {"type": "length", "value": 45, "unit": "dp"},
+             "font-family": {"type": "font", "value": "marine"},
+             "font-size": {"type": "length", "value": 20, "unit": "dp"},
+             "line-height": {"type": "length", "value": 45, "unit": "dp"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.8]},
+             "white-space": {"type": "keyword", "value": "nowrap"},
+             "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_229901",
+           "states": {
+            "default": "settings-mpSettingsAudio.default",
+            "hover": "settings-mpSettingsAudio.hover",
+            "focus": "settings-mpSettingsAudio.focus",
+            "pressed": "settings-mpSettingsAudio.pressed",
+            "disabled": "settings-mpSettingsAudio.disabled"
+           },
+           "action": "mpSettingsAudio"
           }
          }
         ]

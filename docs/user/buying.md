@@ -112,7 +112,7 @@ respawn. Team powerups restart on a teammate who respawns while they run.
 
 ## Hosting a buying server
 
-In **Multiplayer → Create Server → Advanced Server Options → Rules**, set
+In **Multiplayer → Create Server → Rules**, set
 **Buying** to **Off**, **Quake 4** or **The Awakening**. The in-match menu's
 **Vote** and **Admin** pages offer the same choice, and changing it restarts
 the map. From the console:

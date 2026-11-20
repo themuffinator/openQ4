@@ -1311,15 +1311,19 @@ def join_page(doc: Document, index: int, ident: str, width: float, height: float
 # -------------------------------------------------------------- Server page
 
 ROTATION_SLOTS = 16
-RULES = ("#str_231023", "#str_231024", "#str_231025", "#str_200038", "#str_231026", "#str_231027", "#str_231028")
+# The rules in two columns: mode, map, limits and players; friendly fire,
+# team balance, the next map and the rules the match is played by (the
+# ruleset and the modifiers, the multiplayer menu tree audit).
+RULES = ("#str_231023", "#str_231024", "#str_231025", "#str_200038", "#str_231026", "#str_231027", "#str_231028", "#str_232626")
 HEADING = [0.545, 0.588, 0.294, 1]   # #8B964B, the multiplayer headings' olive
 
 
 def server_page(doc: Document, index: int, ident: str, width: float, height: float) -> tuple[dict, str]:
     """The Server page (section 14.18): the name and address, the server's
     message in #FFFF8D, the rules in two columns (mode, map, limits, players,
-    friendly fire, balance and next map) and the map rotation, the current map
-    in orange. It has no actions; its tab keeps the focus."""
+    friendly fire, balance, next map, and the ruleset with the modifiers) and
+    the map rotation, the current map in orange, its heading only where the
+    server lists one. It has no actions; its tab keeps the focus."""
     page_width = width - 2 * INSET
     doc.state.update({
         "mp.server.name": {"type": "string", "initial": ""},
@@ -1359,7 +1363,9 @@ def server_page(doc: Document, index: int, ident: str, width: float, height: flo
         doc.bind(f"server-rule-{rule}.text", f"server-rule-{rule}", "text", {"state": f"mp.rule{rule}"})
         rules.append(value)
     heading = label("server-rotation-label", "#str_231029", {**absolute(left=0, top=228, width=page_width, height=20),
-                    **typeface("lowpixel", 14, 20, HEADING), "white-space": keyword("nowrap")})
+                    **typeface("lowpixel", 14, 20, HEADING), "white-space": keyword("nowrap"), "display": keyword("none")})
+    doc.bind("server-rotation-label.display", "server-rotation-label", "display",
+             {"op": "select", "args": [{"op": ">", "args": [{"state": "mp.rotation_count"}, 0]}, "block", "none"]})
     rotation = []
     columns, pitch_x = 4, page_width / 4
     for slot in range(ROTATION_SLOTS):
@@ -1386,19 +1392,37 @@ def server_page(doc: Document, index: int, ident: str, width: float, height: flo
 # key, the verb, the label and the control: a choice of a list the game
 # publishes (its option slots), a yes or no, or a limit's slider (minimum,
 # maximum, step). A list's rows are mp.vote.<key><row> with their count in
-# mp.vote.<key>_count; the kick choice leads with no one (-1).
+# mp.vote.<key>_count; the kick choice leads with no one (-1). A "list" is a
+# choice of the openQ4 table's names (its key and how many it offers).
+#
+# The rows stand by what they change (the multiplayer menu tree audit, 20
+# November 2026), which is not the game's order: the map and the ways to
+# leave it, the game type and its limits, the rules, the teams, then the
+# one-off calls. Before, the page offered only the stock vote's fields; the
+# casual votes (MP-12: skipping to the next map, a random map, the round
+# limit, the overtime period, the ruleset, Instagib, readying everyone and a
+# coin toss) were the console's alone. The column scrolls when the drafted
+# game type shows more rows than it holds.
 VOTE_ROWS = (
     ("map", "mpVoteMap", "#str_200209", ("choice", MAP_CATALOG)),
+    ("nextmap", "mpVoteNextMap", "#str_232622", ("toggle",)),
+    ("randommap", "mpVoteRandomMap", "#str_232623", ("toggle",)),
+    ("restart", "mpVoteRestart", "#str_200208", ("toggle",)),
     ("gametype", "mpVoteGameType", "#str_200210", ("choice", 16)),
     ("timelimit", "mpVoteTimeLimit", "#str_200211", ("slider", 0, 60, 1)),
     ("fraglimit", "mpVoteFragLimit", "#str_200060", ("slider", 0, 100, 1)),
     ("capturelimit", "mpVoteCaptureLimit", "#str_200215", ("slider", 1, 50, 1)),
     ("tourneylimit", "mpVoteTourneyLimit", "#str_200214", ("slider", 1, 20, 1)),
     ("controltime", "mpVoteControlTime", "#str_222013", ("slider", 10, 600, 10)),
+    ("roundlimit", "mpVoteRoundLimit", "#str_41404", ("slider", 0, 30, 1)),
+    ("overtime", "mpVoteOvertime", "#str_41642", ("slider", 0, 600, 30)),
+    ("ruleset", "mpVoteRuleset", "#str_42220", ("list", "#str_42221", 2)),
+    ("instagib", "mpVoteInstagib", "#str_231960", ("toggle",)),
+    ("buying", "mpVoteBuying", "#str_231901", ("choice", 3)),
     ("balance", "mpVoteBalance", "#str_200212", ("toggle",)),
     ("shuffle", "mpVoteShuffle", "#str_201044", ("toggle",)),
-    ("restart", "mpVoteRestart", "#str_200208", ("toggle",)),
-    ("buying", "mpVoteBuying", "#str_231901", ("choice", 3)),
+    ("readyall", "mpVoteReadyAll", "#str_232625", ("toggle",)),
+    ("cointoss", "mpVoteCoinToss", "#str_232624", ("toggle",)),
     ("kick", "mpVoteKick", "#str_200207", ("choice", PLAYER_ROWS)),
 )
 VOTE_RUNNING, VOTE_CALL, VOTE_NONE_RUNNING = "#str_231043", "#str_231044", "#str_231047"
@@ -1752,12 +1776,15 @@ def vote_row(doc: Document, key: str, verb: str, label_key: str, control: tuple,
     doc.state.update({
         f"{state_key}.row_shown": {"type": "boolean", "initial": False},
         f"{state_key}.row_allowed": {"type": "boolean", "initial": True},
-        state_key: {"type": "boolean", "initial": False} if boolean else {"type": "number", "initial": -1 if kind == "choice" else 0},
+        state_key: {"type": "boolean", "initial": False} if boolean else {"type": "number", "initial": -1 if kind in ("choice", "list") else 0},
     })
     doc.actions[verb] = {"operation": "session.menuValue", "input": "boolean" if boolean else "number",
                          "arguments": {"command": verb, "value": {"input": "value"}}}
     entries, count, slider = None, None, None
-    if kind == "choice":
+    if kind == "list":
+        entries = [((control[1], option), option) for option in range(control[2])]
+        kind = "choice"
+    elif kind == "choice":
         slots = control[1]
         for row in range(slots):
             doc.state[f"{state_key}{row}"] = {"type": "string", "initial": ""}
@@ -1769,7 +1796,7 @@ def vote_row(doc: Document, key: str, verb: str, label_key: str, control: tuple,
         slider = (*control[1:], 0)
     row = value_row(doc, f"vote-row-{key}", label_key, kind, width, value_x, value={"state": state_key}, action=verb,
                     entries=entries, count=count, slider=slider, allowed={"state": f"{state_key}.row_allowed"},
-                    shown={"state": f"{state_key}.row_shown"})
+                    shown={"state": f"{state_key}.row_shown"}, wrap=True)
     if key == "kick":
         doc.state["mp.vote.kick_catalog"] = {"type": "string", "initial": ""}
         row["control"]["context"] = {"state": "mp.vote.kick_catalog"}
@@ -1800,10 +1827,12 @@ def check_vote_labels(width: float, value_x: float) -> None:
     ballot's label and keycap past its plate, in any language."""
     room = value_x - 29
     over = {}
+    # A row's label takes two lines where it needs them (and its lock, the
+    # rest of the second line).
     for _key, _verb, label_key, _control in VOTE_ROWS:
         for language, text in any_text(label_key).items():
-            if b.text_width("lowpixel", text, 15) > room:
-                over[(label_key, language)] = round(b.text_width("lowpixel", text, 15))
+            if wrapped_width(text) > room - 20:
+                over[(label_key, language)] = round(wrapped_width(text))
     # A ballot's label leaves room for its keycap (or, unavailable, its lock);
     # Call Vote's for its lock.
     for key, room in (("#str_200906", VOTE_LEFT_W - 46 - 50), ("#str_200907", VOTE_LEFT_W - 46 - 50),
@@ -1836,9 +1865,11 @@ def check_vote_labels(width: float, value_x: float) -> None:
 def vote_page(doc: Document, index: int, ident: str, width: float, height: float) -> tuple[dict, list]:
     """The Vote page (section 14.18): the running vote first, with who called
     it, what it changes, the time left, the yes and no tally, and Yes and No
-    with the keys bound to them; then the call-a-vote rows (map, game type,
-    the limits the drafted game type uses, balance, shuffle, restart, buying
-    and kick) and Call Vote, unavailable with its reason while a vote runs or
+    with the keys bound to them; then the call-a-vote rows (VOTE_ROWS: the
+    map, the next or a random map, a restart, the game type and the limits it
+    uses, the overtime period, the ruleset, Instagib, buying, balance,
+    shuffle, readying everyone, a coin toss and kick) in a column that
+    scrolls, and Call Vote, unavailable with its reason while a vote runs or
     nothing would change. The page opens on Yes while the player can vote,
     and on its first row otherwise."""
     page_width = width - 2 * INSET
@@ -1903,9 +1934,9 @@ def vote_page(doc: Document, index: int, ident: str, width: float, height: float
     doc.bind("vote-locked.display", "vote-locked", "display", {"op": "select", "args": [{"state": "mp.vote.locked"}, "block", "none"]})
     right.append(locked)
     rows = [vote_row(doc, key, verb, label_key, control, right_w, value_x) for key, verb, label_key, control in VOTE_ROWS]
-    # At most nine rows show at once (team modes with a buy menu).
+    # Nine rows show at once; the column scrolls through the rest.
     right.append(group("vote-rows", {**absolute(left=0, top=VOTE_HEAD_H, width=right_w, height=9 * VOTE_ROW_H),
-                                     "display": keyword("flex"), "flex-direction": keyword("column")}, rows))
+                                     "display": keyword("flex"), "flex-direction": keyword("column"), "overflow": keyword("auto")}, rows))
     doc.session("mpCallVote", "mpCallVote")
     call_top = page_height - SLOT_PITCH + 4
     right.append(action_plate(doc, "vote-call", "mp.vote.call", min(right_w, SLOT_W), call_top, "vote_call",
@@ -1915,7 +1946,7 @@ def vote_page(doc: Document, index: int, ident: str, width: float, height: float
     current = {"op": "==", "args": [{"state": "card.tab"}, index]}
     for key, _verb, _label, control in VOTE_ROWS:
         enabled = {"op": "&&", "args": [current, {"state": f"mp.vote.{key}.row_allowed"}]}
-        if control[0] == "choice" and key != "kick":
+        if control[0] == "choice" and key != "kick":  # a list's names are the page's own
             enabled = {"op": "&&", "args": [enabled, {"op": ">", "args": [{"state": f"mp.vote.{key}_count"}, 0]}]}
         doc.bind(f"vote-row-{key}.enabled", f"vote-row-{key}", "enabled", enabled)
     page = page_group(doc, index, ident, width, height, [*left, column], controls)
@@ -1950,7 +1981,10 @@ APPEARANCE_ROWS = (
 MODEL_SLOTS, MODEL_ROWS = 3, 24       # RETAINED_MODEL_SLOTS and RETAINED_MODEL_ROWS in the game
 MODEL_VERBS = ("mpModelSelf", "mpModelEnemy", "mpModelTeam")
 CROSSHAIRS = 20                       # the stock picker's crosshairs (mtr_crosshair1-20)
-SETTINGS_PLATES = (("mpSettingsControls", "#str_200083"), ("mpSettingsGame", "#str_200084"), ("mpSettingsSystem", "#str_200085"))
+# The main menu's settings pages, under the names the SETTINGS page gives them
+# (Display was the stock System; Audio joined them with the retained pages).
+SETTINGS_PLATES = (("mpSettingsControls", "#str_200083"), ("mpSettingsGame", "#str_200084"), ("mpSettingsSystem", "#str_229900"),
+                   ("mpSettingsAudio", "#str_229901"))
 CLASSIC_EDIT = "#str_231012"          # the hand-off note: the page opens in the classic menu
 
 
@@ -2034,14 +2068,16 @@ def rail_row(doc: Document, ident: str, width: float, value_x: float) -> tuple[d
                          "flex-shrink": number(0)}, [plate, caption, *swatches]), controls
 
 
-def settings_plates(doc: Document, ident: str, left: float, top: float, width: float) -> tuple[list, list]:
-    """Controls, Game Options and System: each leaves for the main menu's
-    page (decision D13)."""
+def settings_plates(doc: Document, ident: str, left: float, top: float, width: float, columns: int = 1) -> tuple[list, list]:
+    """Controls, Game Options, Display and Audio: each leaves for the main
+    menu's page (decision D13), in `columns` columns 12 dp apart."""
     plates, controls = [], []
+    plate_w = (width - 12 * (columns - 1)) / columns
     for index, (verb, key) in enumerate(SETTINGS_PLATES):
         doc.session(verb, verb)
         node = f"{ident}-{verb}"
-        plates.append(in_game_plate(doc, node, key, left, top + 50 * index, width=width, action=verb))
+        plates.append(in_game_plate(doc, node, key, left + (index % columns) * (plate_w + 12), top + 50 * (index // columns),
+                                    width=plate_w, action=verb))
         controls.append(node)
     return plates, controls
 
@@ -2093,13 +2129,54 @@ def check_settings_labels(width: float, value_x: float, right_w: float, cell_w: 
         raise SystemExit(f"Settings page labels past their room: {over}")
 
 
+SETTINGS_SECTIONS = (("player", "#str_200255"), ("appearance", "#str_232620"), ("hud", "#str_231235"))
+HUD_HEADING, SPECTATING_HEADING = "#str_231235", "#str_232621"
+
+
+def settings_section_tab(doc: Document, position: int, section: str, key: str) -> tuple[dict, str]:
+    """One of the Settings page's sections on its inner strip, as the Match
+    and Admin pages draw theirs: its name, orange with focus, over a bar while
+    it is the section shown."""
+    ident = f"settings-tab-{section}"
+    selected = {"op": "==", "args": [{"state": "card.settings_section"}, position]}
+    caption = label(f"{ident}-label", key, {"position": keyword("relative"), "display": keyword("block"),
+                    **typeface("lowpixel", 16, MATCH_STRIP_H, [1, 1, 1, 0.7]), "white-space": keyword("nowrap")})
+    bar = vector(f"{ident}-bar", {**absolute(left=0, top=MATCH_STRIP_H - 3, width=0, height=3), "width": length(100, "%"),
+                                  "display": keyword("none")},
+                 [path("bar", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, 3), (0, 3)], fill=solid(rgb(ORANGE)))])
+    doc.bind(f"{ident}-bar.display", f"{ident}-bar", "display", {"op": "select", "args": [selected, "block", "none"]})
+    states = doc.states(ident, {
+        "default": [(f"{ident}-label", "color", colour([1, 1, 1, 0.7]))],
+        "hover": [(f"{ident}-label", "color", colour([1, 1, 1, 1]))],
+        "focus": [(f"{ident}-label", "color", colour(rgb(ORANGE)))],
+        "pressed": [(f"{ident}-label", "color", colour(rgb(ORANGE)))],
+        "disabled": [(f"{ident}-label", "color", colour([1, 1, 1, 0.7]))],
+    })
+    event = f"settings_section_{section}"
+    doc.events[event] = [{"op": "setState", "values": {"card.settings_section": position}}, {"op": "focus", "control": ident}]
+    node = group(ident, {"position": keyword("relative"), "display": keyword("block"), "height": length(MATCH_STRIP_H),
+                         "padding-left": length(10), "padding-right": length(10), "margin-right": length(4), "flex-shrink": number(0)},
+                 [caption, bar], control={"role": "button", "label": key, "event": event, "states": states})
+    return node, ident
+
+
 def settings_page(doc: Document, index: int, ident: str, width: float, height: float) -> tuple[dict, list]:
-    """The Settings page (section 14.18): the player's name, clan, model, rail
-    color and handicap, then Controls, Game Options and System, which leave
-    for the main menu's pages; beside them the appearance of opponents and
-    teammates: the model forced on them, their outline, rim light, effect
-    color, brightskin and its color, and the outline's width, the teammates'
-    column only in team modes."""
+    """The Settings page (section 14.18), in three sections on an inner strip
+    as the Match and Admin pages' (the multiplayer menu tree audit, 20
+    November 2026), the tabs of the main menu's Player Setup:
+    - PLAYER: the player's name, clan, model, rail color and handicap; beside
+      them Controls, Game Options, Display and Audio, which leave for the
+      main menu's settings pages (decision D13);
+    - APPEARANCE: the opponents' and teammates' appearance, the model forced
+      on them, their outline, rim light, effect color, brightskin and its
+      color, and the outline's width, the teammates' column only in team
+      modes;
+    - HUD: the multiplayer HUD's options, and how a spectator follows a
+      player (Player Setup's HUD tab).
+    Before, the page held the player and the appearance table side by side
+    and had no room for the HUD's options, and its System plate named the
+    page the main menu now calls Display, with no way to Audio. The triggers
+    step the sections; the page opens on its section's first control."""
     page_width = width - 2 * INSET
     page_height = height - PAGE_TOP - PROMPT_BOTTOM - PROMPT_H - 16
     left_w = 380.0
@@ -2107,29 +2184,61 @@ def settings_page(doc: Document, index: int, ident: str, width: float, height: f
     right_w = page_width - right_x
     value_x = label_column(("#str_200219", "#str_200220", "#str_200221", "#str_200981", "#str_223001"))
     table_x = label_column(("#str_41204", *(row[0] for row in APPEARANCE_ROWS), "#str_41211"))
-    cell_w = round((right_w - table_x - 6) / 2, 3)
+    cell_w = round((page_width - table_x - 6) / 2, 3)
     check_settings_labels(left_w, value_x, right_w, cell_w)
+    doc.state["card.settings_section"] = {"type": "number", "initial": 0}
+    tabs, controls = [], []
+    for position, (section, key) in enumerate(SETTINGS_SECTIONS):
+        node, tab_id = settings_section_tab(doc, position, section, key)
+        tabs.append(node)
+        controls.append(tab_id)
+    keys = tuple(key for _, key in SETTINGS_SECTIONS)
+    strip = group("settings-strip", {**absolute(left=0, top=0, width=page_width, height=MATCH_STRIP_H), "display": keyword("flex"),
+                                     "flex-direction": keyword("row"), "align-items": keyword("center")},
+                  [*tabs, section_triggers(doc, "settings-triggers", keys, page_width)])
+    rule = vector("settings-strip-rule", absolute(left=0, top=MATCH_STRIP_H, width=page_width, height=1), [
+        path("rule", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, 1), (0, 1)], fill=solid(rgb(OLIVE, 0.5)))])
+    section_top = MATCH_STRIP_H + MATCH_STRIP_GAP
+    section_height = page_height - section_top
+    current = {"op": "==", "args": [{"state": "card.tab"}, index]}
+    for name, step in (("onSectionPrevious", -1), ("onSectionNext", 1)):
+        steps: list = []
+        for position in reversed(range(len(SETTINGS_SECTIONS))):
+            target = SETTINGS_SECTIONS[(position + step) % len(SETTINGS_SECTIONS)][0]
+            steps = [{"op": "if", "condition": {"op": "==", "args": [{"state": "card.settings_section"}, position]},
+                      "then": [{"op": "call", "event": f"settings_section_{target}"}], **({"else": steps} if steps else {})}]
+        doc.events.setdefault(name, []).append({"op": "if", "condition": current, "then": steps})
+
+    def section_group(section: str, position: int, children: list) -> dict:
+        node = group(f"settings-section-{section}", {**absolute(left=0, top=section_top, width=page_width, height=section_height),
+                                                     "display": keyword("none")}, children)
+        doc.bind(f"settings-section-{section}.display", f"settings-section-{section}", "display",
+                 {"op": "select", "args": [{"op": "==", "args": [{"state": "card.settings_section"}, position]}, "block", "none"]})
+        return node
+
+    # PLAYER: the player's rows, and the main menu's settings pages beside them.
     handicap = value_row(doc, "settings-handicap", "#str_223001", "slider", left_w, value_x, value=cvar_state(doc, "ui_handicap", "number"),
                          action=setting_action(doc, "ui_handicap", "number"), slider=(1, 100, 1, 0), wrap=True)
-    rows, controls = player_rows(doc, index, left_w, value_x, (handicap, "settings-handicap"))
-    left = [heading_text("settings-heading-player", "#str_200255", 0, 0, left_w),
-            group("settings-player", {**absolute(left=0, top=VOTE_HEAD_H, width=left_w, height=len(rows) * VOTE_ROW_H),
-                                      "display": keyword("flex"), "flex-direction": keyword("column")}, rows)]
-    plates, plate_controls = settings_plates(doc, "settings", 0, VOTE_HEAD_H + len(rows) * VOTE_ROW_H + 12, left_w)
-    left += plates
+    rows, player_controls = player_rows(doc, index, left_w, value_x, (handicap, "settings-handicap"))
+    controls += player_controls
+    player = [group("settings-player", {**absolute(left=0, top=0, width=left_w, height=len(rows) * VOTE_ROW_H),
+                                        "display": keyword("flex"), "flex-direction": keyword("column")}, rows)]
+    plates, plate_controls = settings_plates(doc, "settings", right_x, 0, min(right_w, 320))
+    player += plates
     controls += plate_controls
-    # The appearance table: a row's label, then the opponents' and the
-    # teammates' cells, the teammates' only in team modes.
+
+    # APPEARANCE: a row's label, then the opponents' and the teammates'
+    # cells, the teammates' only in team modes.
     team_mode = {"state": "mp.model2.row_shown"}
-    right = [heading_text("settings-heading-opponents", "#str_42037", right_x + table_x, 0, cell_w),
-             heading_text("settings-heading-teammates", "#str_42038", right_x + table_x + cell_w + 6, 0, cell_w)]
+    appearance = [heading_text("settings-heading-opponents", "#str_42037", table_x, 0, cell_w),
+                  heading_text("settings-heading-teammates", "#str_42038", table_x + cell_w + 6, 0, cell_w)]
     doc.bind("settings-heading-teammates.display", "settings-heading-teammates", "display",
              {"op": "select", "args": [team_mode, "block", "none"]})
-    right[1]["properties"]["display"] = keyword("none")
+    appearance[1]["properties"]["display"] = keyword("none")
     table_rows = [("#str_41204", None)] + [(row[0], row) for row in APPEARANCE_ROWS]
     for row_index, (label_key, row) in enumerate(table_rows):
         top = VOTE_HEAD_H + row_index * VOTE_ROW_H
-        right.append(row_label(f"settings-row-{row_index}", label_key, right_x + 21, top, table_x - 29))
+        appearance.append(row_label(f"settings-row-{row_index}", label_key, 21, top, table_x - 29))
         for side in range(2):
             node = f"settings-row-{row_index}-{'opponents' if side == 0 else 'teammates'}"
             if row is None:
@@ -2142,24 +2251,49 @@ def settings_page(doc: Document, index: int, ident: str, width: float, height: f
                 cell = value_row(doc, node, None, "choice", cell_w, 8, value=cvar_state(doc, cvar, "string"),
                                  action=setting_action(doc, cvar, "string"), entries=entries, accessible=label_key,
                                  shown=team_mode if side == 1 else None)
-            cell["properties"].update(absolute(left=right_x + table_x + side * (cell_w + 6), top=top))
-            right.append(cell)
+            cell["properties"].update(absolute(left=table_x + side * (cell_w + 6), top=top))
+            appearance.append(cell)
             controls.append(node)
     width_top = VOTE_HEAD_H + len(table_rows) * VOTE_ROW_H + 8
-    outline_width = value_row(doc, "settings-outline-width", "#str_41211", "choice", right_w, table_x,
+    outline_width = value_row(doc, "settings-outline-width", "#str_41211", "choice", table_x + cell_w, table_x,
                               value=cvar_state(doc, "cl_player_outline_width", "string"),
                               action=setting_action(doc, "cl_player_outline_width", "string"),
                               entries=[(("#str_41214", option), value) for option, value in enumerate(OUTLINE_WIDTHS)], wrap=True)
-    outline_width["properties"].update(absolute(left=right_x, top=width_top))
-    right.append(outline_width)
+    outline_width["properties"].update(absolute(left=0, top=width_top))
+    appearance.append(outline_width)
     controls.append("settings-outline-width")
-    note = label("settings-team-note", "#str_41212", {**absolute(left=right_x, top=width_top + VOTE_ROW_H + 12, width=right_w, height=36),
+    note = label("settings-team-note", "#str_41212", {**absolute(left=0, top=width_top + VOTE_ROW_H + 12, width=page_width, height=36),
                  **typeface("lowpixel", 14, 18, [1, 1, 1, 0.6]), "white-space": keyword("normal"), "overflow": keyword("hidden"),
                  "display": keyword("block")})
     doc.bind("settings-team-note.display", "settings-team-note", "display", {"op": "select", "args": [team_mode, "none", "block"]})
-    right.append(note)
-    page = page_group(doc, index, ident, width, height, [*left, *right], controls)
-    return page, "settings-name"
+    appearance.append(note)
+
+    # HUD: the HUD's options, and spectating beside them.
+    from retained_player_setup import HUD_ROWS, hud_rows
+    hud_keys = tuple(key for _cvar, key, _kind, _spec in HUD_ROWS)
+    # The label column holds every language in two lines and English in one.
+    hud_x = max(label_column(hud_keys), math.ceil(max(b.text_width("lowpixel", any_text(key)["english"], 15) for key in hud_keys)) + 29)
+    split = next(index for index, (cvar, *_rest) in enumerate(HUD_ROWS) if cvar == "ui_spectatorSpeed")
+    hud_rows_left = hud_rows(doc, left_w, hud_x, VOTE_ROW_H, "settings-hud", placement="card", rows=HUD_ROWS[:split])
+    spectate = hud_rows(doc, right_w, hud_x, VOTE_ROW_H, "settings-hud", placement="card", rows=HUD_ROWS[split:])
+    hud = [heading_text("settings-heading-hud", HUD_HEADING, 0, 0, left_w),
+           group("settings-hud", {**absolute(left=0, top=VOTE_HEAD_H, width=left_w, height=len(hud_rows_left) * VOTE_ROW_H),
+                                  "display": keyword("flex"), "flex-direction": keyword("column")}, hud_rows_left),
+           heading_text("settings-heading-spectating", SPECTATING_HEADING, right_x, 0, right_w),
+           group("settings-spectate", {**absolute(left=right_x, top=VOTE_HEAD_H, width=right_w, height=len(spectate) * VOTE_ROW_H),
+                                       "display": keyword("flex"), "flex-direction": keyword("column")}, spectate)]
+    controls += [row["id"] for row in hud_rows_left + spectate]
+
+    sections = [section_group("player", 0, player), section_group("appearance", 1, appearance), section_group("hud", 2, hud)]
+    page = page_group(doc, index, ident, width, height, [strip, rule, *sections], controls)
+    # The page opens on its section's first control: the name, the forced
+    # model or the hit sound.
+    first = {0: "settings-name", 1: "settings-row-0-opponents", 2: hud_rows_left[0]["id"]}
+    focus: list = []
+    for position in reversed(range(len(SETTINGS_SECTIONS))):
+        focus = [{"op": "if", "condition": {"op": "==", "args": [{"state": "card.settings_section"}, position]},
+                  "then": [{"op": "focus", "control": first[position]}], **({"else": focus} if focus else {})}]
+    return page, focus
 
 
 def voice_page(doc: Document, index: int, ident: str, width: float, height: float) -> tuple[dict, str]:
@@ -2233,8 +2367,8 @@ def welcome_settings_page(doc: Document, index: int, ident: str, width: float, h
     """The Welcome card's Settings page (section 14.18): name and clan, the
     model, the rail color swatches and the crosshair, a slider through the
     stock picker's crosshairs (0 for each weapon's own) with the chosen one
-    beside it; then Controls, Game Options and System, which stand for All
-    settings."""
+    beside it; then Controls, Game Options, Display and Audio, two by two,
+    which stand for All settings."""
     page_width = width - 2 * INSET
     left_w = 400.0
     value_x = label_column(("#str_200219", "#str_200220", "#str_200221", "#str_200981", "#str_200307"))
@@ -2255,7 +2389,7 @@ def welcome_settings_page(doc: Document, index: int, ident: str, width: float, h
                       height=VOTE_ROW_H), **typeface("lowpixel", 15, VOTE_ROW_H, [1, 1, 1, 0.6]), "white-space": keyword("nowrap"),
                       "display": keyword("block")})
     doc.bind("settings-crosshair-weapon.display", "settings-crosshair-weapon", "display", {"op": "select", "args": [custom, "none", "block"]})
-    plates, plate_controls = settings_plates(doc, "settings", 0, VOTE_HEAD_H + len(rows) * VOTE_ROW_H + 12, left_w)
+    plates, plate_controls = settings_plates(doc, "settings", 0, VOTE_HEAD_H + len(rows) * VOTE_ROW_H + 12, page_width, columns=2)
     children = [heading_text("settings-heading-player", "#str_200255", 0, 0, left_w),
                 group("settings-player", {**absolute(left=0, top=VOTE_HEAD_H, width=left_w, height=len(rows) * VOTE_ROW_H),
                                           "display": keyword("flex"), "flex-direction": keyword("column")}, rows),
@@ -2481,12 +2615,23 @@ def match_action_row(doc: Document, name: str, accessible: str, width: float, va
     doc.bind(f"{ident}-lock.display", f"{ident}-lock", "display", {"op": "select", "args": [unavailable, "block", "none"]})
     head = group(f"{ident}-head", {**absolute(left=21, top=0, width=value_x - 29, height=height), "display": keyword("flex"),
                                    "flex-direction": keyword("row"), "align-items": keyword("center")}, [caption, lock])
-    reason = label(f"{ident}-reason", PLACEHOLDER, {**absolute(left=value_x, top=(height - lines * LABEL_LINE) / 2 if lines > 2 else 0,
-                                                              width=width - value_x - 8, height=height if lines <= 2 else lines * LABEL_LINE),
-                   **typeface("lowpixel", 14, LABEL_LINE, rgb(ERROR)), "white-space": keyword("normal"), "overflow": keyword("hidden"),
-                   "display": keyword("none"), "opacity": number(1)})
+    if lines > 2:
+        reason = label(f"{ident}-reason", PLACEHOLDER, {**absolute(left=value_x, top=(height - lines * LABEL_LINE) / 2,
+                                                                  width=width - value_x - 8, height=lines * LABEL_LINE),
+                       **typeface("lowpixel", 14, LABEL_LINE, rgb(ERROR)), "white-space": keyword("normal"), "overflow": keyword("hidden"),
+                       "display": keyword("none"), "opacity": number(1)})
+    else:
+        # A one-line reason stands on the row's middle line, beside its label,
+        # and a two-line one fills the row (it hung from the row's top).
+        reason = label(f"{ident}-reason", PLACEHOLDER, {"position": keyword("relative"), "display": keyword("none"), "min-width": length(0),
+                       "max-height": length(height), **typeface("lowpixel", 14, LABEL_LINE, rgb(ERROR)), "white-space": keyword("normal"),
+                       "overflow": keyword("hidden"), "opacity": number(1)})
     doc.bind(f"{ident}-reason.text", f"{ident}-reason", "text", {"state": f"{key}.reason"})
     doc.bind(f"{ident}-reason.display", f"{ident}-reason", "display", {"op": "select", "args": [unavailable, "block", "none"]})
+    if lines <= 2:
+        reason = group(f"{ident}-reason-box", {**absolute(left=value_x, top=0, width=width - value_x - 8, height=height), "display": keyword("flex"),
+                                                "flex-direction": keyword("row"), "align-items": keyword("center"),
+                                                "pointer-events": keyword("none")}, [reason])
     spec = {"role": "button", "label": accessible, "event": event, "states": row_states(doc, ident)}
     place = absolute(left=0, top=top, width=width, height=height) if top is not None else {
         "position": keyword("relative"), "width": length(width), "height": length(height),

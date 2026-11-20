@@ -332,7 +332,7 @@ def validate_menu() -> None:
     menu = read(ROOT / "src/framework/Session_menu.cpp")
     generator = read(ROOT / "tools/ui/retained_create_server.py")
     document = read(ROOT / "content/baseoq4/pak0/guis/menu/createserver.rui")
-    tabs = re.search(r"ADVANCED_TABS = \((.*?)\n\)\n", generator, re.S).group(1)
+    tabs = re.search(r"CREATE_TABS = \((.*?)\n\)\n", generator.replace("\r\n", "\n"), re.S).group(1)
     for verb, state, cvar, maximum, boolean, kind in (
             ("createQuadHog", "quadhog", "si_quadHog", 1, "true", "toggle"),
             ("createVampiric", "vampiric", "si_vampiric", 1, "true", "toggle"),
@@ -346,10 +346,10 @@ def validate_menu() -> None:
             raise AssertionError(f"RETAINED_CREATE_SETTINGS must carry {verb} for {cvar}, 0 to {maximum}")
         if not re.search(r'\("%s", "%s", "#str_\d+", "%s", 0, %d, ' % (state, verb, kind, maximum), generator):
             raise AssertionError(f"the Create Server page must offer {state} as a {kind}, 0 to {maximum}")
-        require(tabs, f'"create-{state}"', "ADVANCED_TABS")
+        require(tabs, f'"create-{state}"', "CREATE_TABS")
         require(document, f'"{verb}"', "createserver.rui (regenerate with build_retained_screens.py)")
     for state in ("weaponarena", "preset"):
-        require(tabs, f'"create-{state}"', "ADVANCED_TABS")
+        require(tabs, f'"create-{state}"', "CREATE_TABS")
     # The retained runtime refuses a document that asks for a verb it does not
     # know, and the stock screen then stays in use: every row's verb is listed.
     runtime = read(ROOT / "src/ui/UserInterfaceRetained.cpp")

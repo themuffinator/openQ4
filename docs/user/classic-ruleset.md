@@ -13,8 +13,9 @@ before.
 
 ## Turning it on
 
-Hosting from the menus: **Multiplayer → Create Server → Advanced Options →
-Rules**, then set **Ruleset** to **Classic**. **Grappling Hook** on the same tab
+Hosting from the menus: **Multiplayer → Create Server → Rules**, then set
+**Ruleset** to **Classic**. **Grappling Hook** on the same tab, which dims under
+Quake 4's ruleset,
 chooses where the hook is allowed: **Off**, **Flag Modes** (the default, as in
 Threewave CTF) or **All Modes**.
 

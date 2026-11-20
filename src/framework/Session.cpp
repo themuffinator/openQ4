@@ -11056,7 +11056,7 @@ void idSessionLocal::RunGameTic() {
 ===============
 Session_DeclareMultiplayerMenuGameCVars
 
-The create-server menu edits multiplayer settings that only game_mp declares,
+The create-server menu and Player Setup edit multiplayer settings that only game_mp declares,
 but it is reachable while game_sp is loaded - the module is not swapped until
 spawnServer. A GUI widget resolves its cvar once, when the gui is parsed, and
 idChoiceWindow::InitVars warns and then does nothing at all when the name is
@@ -11073,10 +11073,31 @@ static void Session_DeclareMultiplayerMenuGameCVars( void ) {
 	struct menuGameCVar_t {
 		const char *name;
 		const char *value;
+		int flags;
 	};
+	// The Create Server page's host settings and the multiplayer HUD and
+	// spectating options Player Setup edits (the multiplayer menu tree audit,
+	// 20 November 2026), each with game_mp's default and kind.
 	static const menuGameCVar_t menuGameCVars[] = {
-		{ "bot_minPlayers",	"0" },
-		{ "bot_skill",		"3" }
+		{ "bot_minPlayers",			"0",	CVAR_INTEGER },
+		{ "bot_skill",				"3",	CVAR_INTEGER },
+		{ "g_mapRotation",			"1",	CVAR_INTEGER },
+		{ "g_mapQueue",				"1",	CVAR_BOOL },
+		{ "si_itemTimers",			"1",	CVAR_INTEGER | CVAR_SERVERINFO },
+		{ "si_timeouts",			"0",	CVAR_INTEGER | CVAR_SERVERINFO },
+		{ "si_spectatorLock",		"0",	CVAR_INTEGER | CVAR_SERVERINFO },
+		{ "si_overtime",			"120",	CVAR_INTEGER | CVAR_SERVERINFO },
+		{ "si_mercyLimit",			"0",	CVAR_INTEGER | CVAR_SERVERINFO },
+		{ "si_roundLimit",			"8",	CVAR_INTEGER | CVAR_SERVERINFO },
+		{ "g_inactivity",			"0",	CVAR_INTEGER },
+		{ "hud_hitSound",			"1",	CVAR_INTEGER },
+		{ "hud_crosshairAmmo",		"0",	CVAR_BOOL },
+		{ "hud_crosshairNames",		"1",	CVAR_INTEGER },
+		{ "hud_itemTimers",			"1",	CVAR_BOOL },
+		{ "hud_teamLocations",		"1",	CVAR_BOOL },
+		{ "hud_localClock",			"0",	CVAR_INTEGER },
+		{ "ui_spectatorSpeed",		"100",	CVAR_INTEGER | CVAR_USERINFO },
+		{ "g_spectatorFollowView",	"0",	CVAR_INTEGER }
 	};
 
 	for ( int i = 0; i < (int)( sizeof( menuGameCVars ) / sizeof( menuGameCVars[0] ) ); i++ ) {
@@ -11084,7 +11105,7 @@ static void Session_DeclareMultiplayerMenuGameCVars( void ) {
 			continue;
 		}
 		cvarSystem->SetCVarString( menuGameCVars[i].name, menuGameCVars[i].value,
-			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE );
+			CVAR_GAME | CVAR_ARCHIVE | menuGameCVars[i].flags );
 	}
 }
 #endif

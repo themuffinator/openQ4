@@ -197,13 +197,18 @@ The running vote comes first, beside the call a player can make:
   closes the menu, as the stock buttons do. With no vote running the column
   says so.
 - **The call.** NEW VOTE lists the fields the drafted game type uses, one
-  setting row each: the map and the game type, each a list that unfolds under
-  its row; the time limit and the mode's own limit (frags, captures, the
-  tournament's rounds or the Dead Zone's control time), each a slider that
-  Left and Right step (Page Up and Page Down by ten); team balance and
-  shuffle in team modes, restart, and buying where the mode has a buy menu,
-  each a check box; and the player to kick, a list that leads with "No one".
-  At most nine rows show. A field the server forbids (`si_voteFlags`) stays,
+  setting row each, by what they change: the map, a list that unfolds under
+  its row, then Skip to Next Map, Random Map and Restart Map as check boxes;
+  the game type, a list; the time limit, the mode's own limit (frags,
+  captures, the tournament's rounds or the Dead Zone's control time), the
+  round limit in the round modes and the overtime period, each a slider that
+  Left and Right step (Page Up and Page Down by ten); the ruleset (Quake 4 or
+  Classic), Instagib, and buying where the mode has a buy menu; team balance
+  and shuffle in team modes; Ready Everyone while a warmup waits for players
+  to ready up, and a coin toss; and the player to kick, a list that leads
+  with "No one". Nine rows show and the column scrolls through the rest. The
+  casual votes (MP-12) joined the page on 20 November 2026; before, only the
+  console called them. A field the server forbids (`si_voteFlags`) stays,
   dimmed with a padlock after its label, and the heading says it is locked by
   the server. Call Vote follows, unavailable with its reason while voting is
   off on the server, in a managed match (whose votes are Match Control
@@ -338,8 +343,11 @@ team rows or the series history's a list's link opens the stock page
 
 ### The Settings page
 
-The player's appearance, the other players' and the way to the rest of the
-settings:
+The player's appearance, the other players', the multiplayer HUD and the way
+to the rest of the settings, in three sections on an inner strip as the Match
+and Admin pages' (since 20 November 2026; they were two columns side by side,
+with no room for the HUD's options). The triggers step the sections, and the
+page opens on its section's first control:
 
 - **Player.** The name and the clan tag, text fields of the stock fields'
   23 and 12 characters (the clan may be empty) holding the settings colour
@@ -349,13 +357,21 @@ settings:
   list of the models the mode and the player's team allow; the rail color,
   the seven stock swatches, the one the player's tint matches by hue standing
   taller; and the handicap, a slider from 1 to 100.
-- **Controls, Game Options and System.** Plates that leave for the main
-  menu's pages, as the classic page's buttons do (decision D13).
-- **Opponents and teammates.** A table: the model forced on them (Off or a
+  Beside them, **Controls, Game Options, Display and Audio**: plates that
+  leave for the main menu's pages, as the classic page's buttons do (decision
+  D13). Display was the stock page's System, and Audio, a page of its own
+  since the retained settings, had no way there (`mpSettingsAudio`, the main
+  menu's `fromMp_toAudio`).
+- **Appearance.** A table: the model forced on them (Off or a
   model), their outline, rim light and brightskin (Off, Low, Medium or High),
   the effect and brightskin colors (eight each), then the outline's width for
   both. The teammates' column shows only in team modes; elsewhere a note says
   why. Each list holds the classic page's own values.
+- **HUD.** The multiplayer HUD's options (MP-15): Hit Sound, Crosshair Names,
+  Crosshair Ammo, Item Timers, Team Locations and Local Clock; beside them
+  SPECTATING, the spectator's speed and the follow view (MP-16). The main
+  menu's Player Setup has the same rows on its HUD tab
+  (`retained_player_setup.HUD_ROWS`).
 
 The model lists and the swatches belong to the game, which builds the lists as
 the classic page does and sets the model for a row (`retained appearance
@@ -482,8 +498,9 @@ without device input.
 
 The server's name and address, its message (`si_motd`, three lines) in
 #FFFF8D, the rules in two columns (mode, map, limits, players, friendly fire,
-team balance and the next map in `si_mapCycle`) and the map rotation, the
-current map in orange. Each column's labels take the width of the longest in
+team balance, the next map in `si_mapCycle` and the rules: the ruleset and
+the modifiers the server runs) and the map rotation, the current map in
+orange, its heading only where the server lists one. Each column's labels take the width of the longest in
 any language. The page has no actions; its tab keeps the focus.
 
 ### The Admin page

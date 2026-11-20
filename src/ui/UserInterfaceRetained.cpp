@@ -265,7 +265,7 @@ bool SessionMenuCommand(const std::string& command) {
         "joinConnect","joinSearch","joinSearchClear","joinSortNext",
         "mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction",
         "mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction","mpVoteYes","mpVoteNo","mpCallVote",
-        "mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpMatch","mpMatchSelect","mpSummaryChat",
+        "mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","mpMatch","mpMatchSelect","mpSummaryChat",
         "mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
         "mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan","mpBuy",
         "arenaRestart","arenaLeave"};
@@ -341,7 +341,8 @@ std::optional<std::string> SessionMenuPlayerRequest(const ActionInvocation& invo
 bool SessionMenuValueCommand(const std::string& command) {
 	static const std::set<std::string> commands = {"mpVoteMap","mpVoteGameType","mpVoteTimeLimit","mpVoteFragLimit",
 		"mpVoteCaptureLimit","mpVoteTourneyLimit","mpVoteControlTime","mpVoteBalance","mpVoteShuffle","mpVoteRestart",
-		"mpVoteBuying","mpVoteKick","mpModelSelf","mpModelEnemy","mpModelTeam","mpCrosshair","mpMatchRole","mpMatchScope","mpMatchRuleValue",
+		"mpVoteBuying","mpVoteKick","mpVoteNextMap","mpVoteRandomMap","mpVoteRoundLimit","mpVoteOvertime","mpVoteRuleset",
+		"mpVoteInstagib","mpVoteReadyAll","mpVoteCoinToss","mpModelSelf","mpModelEnemy","mpModelTeam","mpCrosshair","mpMatchRole","mpMatchScope","mpMatchRuleValue",
 		"mpMatchSeriesProfile",
 		"mpAdminMap","mpAdminGameType","mpAdminTimeLimit","mpAdminFragLimit","mpAdminCaptureLimit","mpAdminTourneyLimit",
 		"mpAdminControlTime","mpAdminBalance","mpAdminShuffle","mpAdminRestart","mpAdminBuying",
@@ -351,7 +352,8 @@ bool SessionMenuValueCommand(const std::string& command) {
 		"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 		"createRuleset","createGrapple","createInstagib",
 		"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
-		"createFallDamage","createWeaponRespawn","createPreset",
+		"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
+		"createTimeouts","createSpectatorLock","createInactivity",
 		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 		"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
@@ -377,6 +379,11 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		"1 0.1 0.85","1 1 1"};
 	static const std::map<std::string,PlayerSetting> settings = {
 		{"ui_handicap",{0,1,100,true}},
+		// Player Setup's HUD tab and the card's Settings page: the multiplayer
+		// HUD's options and how a spectator follows a player.
+		{"hud_hitSound",{0,0,3,true,{},{0,1,2,3}}},{"hud_crosshairNames",{0,0,2,true,{},{0,1,2}}},{"hud_crosshairAmmo",{1}},
+		{"hud_itemTimers",{1}},{"hud_teamLocations",{1}},{"hud_localClock",{0,0,2,true,{},{0,1,2}}},
+		{"ui_spectatorSpeed",{0,25,300,true}},{"g_spectatorFollowView",{0,0,2,true,{},{0,1,2}}},
 		// Join Game's list view: rows or tiles.
 		{"ui_browserView",{0,0,1,true,{},{0,1}}},
 		{"cl_player_outline_enemy",{2,0,0,false,levels}},{"cl_player_outline_team",{2,0,0,false,levels}},

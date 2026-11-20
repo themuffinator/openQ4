@@ -136,8 +136,8 @@ def validate_menu() -> None:
     menu = read(ROOT / "src/framework/Session_menu.cpp")
     require(menu, '{ "createInstagib",\t\t"instagib",\t\t"si_instagib",', "RETAINED_CREATE_SETTINGS")
     generator = read(ROOT / "tools/ui/retained_create_server.py")
-    require(generator, '("instagib", "createInstagib", "#str_231960", "toggle", 0, 1, None)', "create-server ADVANCED rows")
-    modifiers = re.search(r'\("#str_231986", \((.*?)\)\),', generator, re.S)
+    require(generator, '("instagib", "createInstagib", "#str_231960", "toggle", 0, 1, None)', "create-server SETTINGS rows")
+    modifiers = re.search(r'\("modifiers", "#str_231986", \((.*?)\)\),', generator, re.S)
     if modifiers is None or '"create-instagib"' not in modifiers.group(1):
         raise AssertionError("create-server MODIFIERS tab must carry create-instagib")
     document = read(ROOT / "content/baseoq4/pak0/guis/menu/createserver.rui")

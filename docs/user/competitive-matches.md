@@ -398,8 +398,12 @@ and cast votes; bots do not, and they do not raise the number needed to pass.
 Who can vote is fixed until the vote ends, even if players disconnect.
 
 **Not in 0.14.1.** Call a vote with `callvote` (or `cv`) and cast yours with
-`vote yes` or `vote no`; the Vote page and the old `clientCallVote` still
-work. The votes are:
+`vote yes` or `vote no`, or from the in-match menu's **Vote** page, which
+offers every vote below but `scorelimit`: the map, **Skip to Next Map** and
+**Random Map**, the game type and its limits, the **Overtime Period**, the
+**Ruleset**, **Instagib**, buying, balance and shuffle, **Ready Everyone**,
+a **Coin Toss** and kicking a player. The old `clientCallVote` still works.
+The votes are:
 
 | Vote | What passes |
 |---|---|

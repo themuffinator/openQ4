@@ -12,22 +12,28 @@ climbs out again onto CREATE SERVER.
 The content is the stock p_mp_create's, over the stock page backing: MAP
 SELECTION over the chosen map's levelshot (183x137 u at 45,75 u in the 1 u
 #414624 border) and the maps the chosen game type plays (42,219 u, 20 u rows,
-a page of MAP_ROWS at a time); SERVER OPTIONS from 228,73 u as section 7
-setting rows on the stock 24 u pitch, the value column 180 u in; ADVANCED
-OPTIONS under them, which opens the stock popup's options as a dialog; the
-enlarged CREATE SERVER plate at 244,397 u; the prompt bar in the bottom band,
-its BACK where the stock BACK plate stood at 532,441 u.
+a page of MAP_ROWS at a time); beside them, from 228,51 u, the settings under
+the multiplayer card's tab strip, MATCH, RULES, MODIFIERS and SERVER, as
+section 7 setting rows on the stock 24 u pitch, the value column 180 u in;
+the enlarged CREATE SERVER plate at 244,397 u; the prompt bar in the bottom
+band, its BACK where the stock BACK plate stood at 532,441 u.
+
+The stock page showed eleven settings and hid the rest in ADVANCED OPTIONS, a
+popup that grew four tabs of its own. The multiplayer menu tree audit (20
+November 2026) put them all on the page under its tabs, the game type first,
+the bots beside the player counts, and added the host settings later rounds
+had left to the console (the map rotation and map requests, item timers,
+team timeouts, the spectator lock and idle players).
 
 The session owns every setting: it publishes create.* and each control asks
 for a change through its own verb (RETAINED_CREATE_SETTINGS), which the
 session checks against the CVar's range before it writes it. The game type
 picks the limit row (Frag Limit, Capture Limit or Control Time) and whether
-the slot under Allow Voting is Team Damage or Tourney Round Limit; Auto
-Balance and Team Damage lock outside team modes, as the stock rows dimmed.
-The advanced options' passwords are masked text fields, and VIEW LOCAL
-SERVER BAN LIST opens PLAYER BAN LIST over them, nested in their dialog as
-the stock popup opened over its own. With nothing of the stock page missing
-(RETAINED_CREATE_SERVER_MISSING is empty) the page is the default.
+Tourney's round limit shows; the team rows lock outside team modes, as the
+stock rows dimmed. The passwords are masked text fields, and VIEW LOCAL
+SERVER BAN LIST opens PLAYER BAN LIST over the page. With nothing of the
+stock page missing (RETAINED_CREATE_SERVER_MISSING is empty) the page is the
+default.
 """
 from __future__ import annotations
 
@@ -53,23 +59,24 @@ MAP_ROWS = 64                             # RETAINED_CREATE_MAP_ROWS in the sess
 # mp_create_header stood from 37 u, under the stepped top band and over the
 # page's title in its notch; it starts where the settings pages' strip does
 # (STRIP_TOP, 46 u) and keeps its foot, the headings centred in what is left.
-HEADER = (44.0, 46.0, 587.0, 28.0)
+HEADER = (44.0, 46.0, 180.0, 28.0)
 MAPS_HEAD = (58.0, 52.0, 185.0)           # mp_create_mapsel
-OPTIONS_HEAD = (256.0, 52.0, 329.0)       # mp_create_servopt
 SHOT = (45.0, 75.0, 183.0, 137.0)         # mp_create_mapshot
 MAP_LIST = (42.0, 219.0, 186.0, 210.0)    # mp_create_maplist: 20 u items, the scrollbar in its last 16 u
 MAP_ROW_H = 20.0
 OPTIONS = (228.0, 73.0, 377.0)            # mp_create_b1-b12: 377 u on a 24 u pitch
 ROW_PITCH = 24.0
 VALUE_X = 180.0                           # mp_create_val*: 408 u, 180 u into the row
-ADVANCED_BUTTON_TOP = 367.0               # mp_create_advbtn
+TABS_TOP = 51.0                           # u: the settings' tab strip, its baseline 2 u over the rows
 START = (244.0, 397.0, 275.0, 37.0)       # mp_create_serverbtn
 NAME_BYTES = 25                           # mp_create_val1: maxchars 25
 
 # The setting rows: (state, verb, label, kind, minimum, maximum, message).
 # A choice's entries come from CHOICES; a number row says `message` outside
-# its range. The session's RETAINED_CREATE_SETTINGS holds the same verbs,
-# states and ranges.
+# its range; a slider runs from its minimum to its maximum in whole steps.
+# The session's RETAINED_CREATE_SETTINGS holds the same verbs, states and
+# ranges. The stock page and its advanced popup held them on two levels; the
+# page now holds every one of them under its tabs (CREATE_TABS).
 SETTINGS = (
     ("lan", "createLan", "#str_200947", "choice", 0, 1, None),
     ("dedicated", "createDedicated", "#str_200053", "toggle", 0, 1, None),
@@ -78,16 +85,12 @@ SETTINGS = (
     ("fraglimit", "createFragLimit", "#str_200060", "number", 0, 999, "#str_231123"),
     ("capturelimit", "createCaptureLimit", "#str_200215", "number", 1, 999, "#str_231124"),
     ("controltime", "createControlTime", "#str_222013", "number", 1, 999, "#str_231124"),
-    ("timelimit", "createTimeLimit", "#str_200061", "number", 0, 60, "#str_231125"),
-    ("maxplayers", "createMaxPlayers", "#str_200046", "number", 1, 16, "#str_231126"),
-    ("minplayers", "createMinPlayers", "#str_201007", "number", 1, 16, "#str_231126"),
+    ("timelimit", "createTimeLimit", "#str_200061", "slider", 0, 60, None),
+    ("maxplayers", "createMaxPlayers", "#str_200046", "slider", 1, 16, None),
+    ("minplayers", "createMinPlayers", "#str_201007", "slider", 1, 16, None),
     ("voting", "createVoting", "#str_201025", "toggle", 0, 1, None),
     ("teamdamage", "createTeamDamage", "#str_200058", "toggle", 0, 1, None),
     ("tourneylimit", "createTourneyLimit", "#str_200214", "number", 1, 999, "#str_231124"),
-)
-# The stock advanced popup's options, less the two password fields and the
-# ban list (RETAINED_CREATE_SERVER_MISSING).
-ADVANCED = (
     ("usepass", "createUsePass", "#str_200067", "toggle", 0, 1, None),
     ("servermods", "createServerMods", "#str_200071", "toggle", 0, 1, None),
     ("weaponstay", "createWeaponStay", "#str_200967", "toggle", 0, 1, None),
@@ -104,9 +107,9 @@ ADVANCED = (
     # openQ4's match rules a host sets most (si_shuffle, si_overtime,
     # si_mercyLimit, si_roundLimit), under the Match Control page's labels.
     ("shuffle", "createShuffle", "#str_201044", "toggle", 0, 1, None),
-    ("overtime", "createOvertime", "#str_41310", "number", 0, 999, "#str_231123"),   # seconds; the long label outgrows the column in Russian
+    ("overtime", "createOvertime", "#str_41642", "number", 0, 999, "#str_231123"),   # seconds
     ("mercy", "createMercy", "#str_41638", "number", 0, 999, "#str_231123"),
-    ("roundlimit", "createRoundLimit", "#str_41404", "number", 0, 60, "#str_231125"),
+    ("roundlimit", "createRoundLimit", "#str_41404", "slider", 0, 60, None),
     # openQ4's Classic multiplayer ruleset (si_ruleset) and its grappling hook.
     ("ruleset", "createRuleset", "#str_42220", "choice", 0, 1, None),
     ("grapple", "createGrapple", "#str_42222", "choice", 0, 2, None),
@@ -124,22 +127,42 @@ ADVANCED = (
     ("falldamage", "createFallDamage", "#str_231974", "number", 0, 999, "#str_231123"),
     ("weaponrespawn", "createWeaponRespawn", "#str_231975", "number", 0, 999, "#str_231123"),
     ("preset", "createPreset", "#str_231976", "choice", 0, 11, None),
+    # The host settings later rounds added, which only the console set before
+    # (the multiplayer menu tree audit, 20 November 2026): what follows a
+    # finished match and whether players may queue maps (the map database's
+    # g_mapRotation and g_mapQueue), who sees item timers (si_itemTimers),
+    # casual team timeouts (si_timeouts), the spectator lock
+    # (si_spectatorLock) and moving idle players to spectators (g_inactivity).
+    ("maprotation", "createMapRotation", "#str_232600", "choice", 0, 3, None),
+    ("mapqueue", "createMapQueue", "#str_232602", "toggle", 0, 1, None),
+    ("itemtimers", "createItemTimers", "#str_232603", "choice", 0, 2, None),
+    ("timeouts", "createTimeouts", "#str_41658", "slider", 0, 10, None),
+    ("spectatorlock", "createSpectatorLock", "#str_232605", "choice", 0, 2, None),
+    ("inactivity", "createInactivity", "#str_232607", "choice", 0, 600, None),
 )
-# The advanced dialog's tabs (user note, 11 November 2026: its sixteen rows
-# outgrew the view): each tab's name and its rows, in order. SERVER holds who
-# may join and what the server runs; MATCH how a match gathers and who fills
-# it; RULES what changes play.
-ADVANCED_TABS = (
-    ("#str_231007", ("create-usepass", "create-password", "create-rconpassword", "create-pure", "create-servermods", "create-rate",
-                     "create-mapcycle", "create-banlist")),
-    ("#str_231004", ("create-ready", "create-warmup", "create-spectators", "create-voice", "create-shuffle", "create-bots",
-                     "create-botskill")),
-    ("#str_41704", ("create-ruleset", "create-grapple", "create-weaponstay", "create-buying", "create-overtime",
-                    "create-mercy", "create-roundlimit", "create-selfdamage", "create-knockback", "create-falldamage")),
-    ("#str_231986", ("create-preset", "create-instagib", "create-quadhog", "create-vampiric", "create-frenzy",
-                     "create-weaponarena", "create-powerups", "create-weaponrespawn")),
+# The page's tabs over its settings column (the multiplayer menu tree audit,
+# 20 November 2026): the stock page showed eleven rows and hid the rest in
+# ADVANCED OPTIONS, a dialog of four tabs. Each tab's name and its rows, in
+# order. MATCH holds what the match is: the game type first, its limits, who
+# plays it and what map comes next; RULES how it is played; MODIFIERS what
+# changes it; SERVER who may join and how the server runs. A row a game type
+# does not use gives its place; one that cannot act on it dims.
+CREATE_TABS = (
+    ("match", "#str_231004", ("create-gametype", "create-fraglimit", "create-capturelimit", "create-controltime", "create-timelimit",
+                              "create-tourneylimit", "create-roundlimit", "create-maxplayers", "create-minplayers", "create-bots",
+                              "create-botskill", "create-warmup", "create-ready", "create-maprotation", "create-mapcycle",
+                              "create-mapqueue")),
+    ("rules", "#str_41704", ("create-ruleset", "create-grapple", "create-autobalance", "create-shuffle", "create-teamdamage",
+                             "create-weaponstay", "create-buying", "create-overtime", "create-mercy", "create-itemtimers",
+                             "create-spectators", "create-spectatorlock", "create-timeouts")),
+    ("modifiers", "#str_231986", ("create-preset", "create-instagib", "create-quadhog", "create-vampiric", "create-frenzy",
+                                  "create-weaponarena", "create-powerups", "create-weaponrespawn", "create-selfdamage",
+                                  "create-knockback", "create-falldamage")),
+    ("server", "#str_231007", ("create-name", "create-lan", "create-dedicated", "create-usepass", "create-password",
+                               "create-rconpassword", "create-voting", "create-voice", "create-inactivity", "create-pure",
+                               "create-servermods", "create-rate", "create-banlist")),
 )
-ADVANCED_TAB_H = 32.0   # u: the tab strip and the gap under it
+TAB_ROWS = 13           # the rows the column shows at once; a longer tab scrolls
 # Each choice's stock list and its values.
 CHOICES = {
     "lan": ("#str_200056", (0, 1)),
@@ -156,6 +179,11 @@ CHOICES = {
     # Custom, then the built-in presets in the game's order (RETAINED_CREATE_PRESETS).
     "preset": (("#str_231977", "#str_231980", "#str_231960", "#str_231962", "#str_231964", "#str_231966", "#str_231981",
                 "#str_231982", "#str_231983", "#str_231988", "#str_231984", "#str_231985"), tuple(range(12))),
+    "maprotation": ("#str_232601", (0, 1, 2, 3)),
+    "itemtimers": ("#str_232604", (0, 1, 2)),
+    "spectatorlock": ("#str_232606", (0, 1, 2)),
+    # g_inactivity in seconds: off, one, two, five or ten minutes.
+    "inactivity": ("#str_232608", (0, 60, 120, 300, 600)),
 }
 # The game types each row serves, by index: the limit row's three, Tourney's
 # round limit, and the team modes in which Auto Balance and Team Damage apply
@@ -165,17 +193,8 @@ CAPTURE_TYPES = (3, 4, 10, 11)
 CONTROL_TYPES = (5,)
 TEAM_TYPES = (2, 3, 4, 5, 7, 8, 9, 10, 11)
 TOURNEY_TYPES = (1,)
+ROUND_TYPES = (7, 8, 9)       # the round modes, which end on si_roundLimit (GTF_ROUNDLIMIT)
 
-# The stock advanced popup (pop_createAdv): 428 u wide from 106,23 u; its rows
-# 377 u on the 24 u pitch from 25 u in, VIEW LOCAL SERVER BAN LIST the last as
-# the stock link sat on that pitch. The stock value column ran past its rows;
-# here it starts 220 u in, where every language's label and choice fit. Its
-# height follows its rows: CLOSE ADVANCED OPTIONS 4 u under the last and 49 u
-# for it and the foot, and it rises from 23 u to stay centered on the 480 u
-# screen once it outgrows that.
-ADVANCED_TOP, ADVANCED_WIDTH = 23.0, 428.0
-ADVANCED_GAP, ADVANCED_FOOT = 4.0, 49.0
-ADVANCED_ROWS_TOP, ADVANCED_VALUE_X = 25.0, 220.0
 MAPCYCLE_BYTES = 200                       # pop_createAdv_mapcycle_val: maxchars 200
 # The password rows after Use password, as the stock popup orders them: the
 # game's password (shown only while Use password is on) and the remote console
@@ -188,13 +207,15 @@ PASSWORD_BYTES = 16
 # PLAYER BAN LIST (stock pop_p_createAdv_banlist): the game's ban list under
 # NAME and GUID, BAN_ROWS rows at most on the stock 20 u pitch, REMOVE BAN and
 # CLOSE where YES and NO stand; the MODS dialog's construction, as wide as
-# ADVANCED OPTIONS or wider where a language's REMOVE BAN or CLOSE needs it,
+# the stock ADVANCED OPTIONS popup (BAN_MIN_WIDTH) or wider where a
+# language's REMOVE BAN or CLOSE needs it,
 # the list 22 u in from each side and the GUID column at its half, as the
 # stock list's tab stops halved it.
 BAN_ROWS = 32                              # RETAINED_CREATE_BAN_ROWS in the session
 BAN_TOP, BAN_HEIGHT = 83.0, 280.0          # u
 BAN_LIST_LEFT, BAN_LIST_TOP, BAN_LIST_H = 22.0, 25.0, 195.0
 BAN_ROW_H = 20.0
+BAN_MIN_WIDTH = 428.0                      # u: the stock pop_createAdv the list opened over
 
 
 def setting_action(doc: Document, verb: str, kind: str) -> str:
@@ -267,11 +288,14 @@ def setting_rows(doc: Document, settings: tuple, width: float, value_x: float, r
     for state, verb, label_key, kind, minimum, maximum, message in settings:
         key = f"create.{state}"
         doc.state[key] = {"type": "boolean", "initial": False} if kind == "toggle" else {"type": "number", "initial": minimum}
-        action = setting_action(doc, verb, kind)
+        action = setting_action(doc, verb, "number" if kind == "slider" else kind)
         ident = f"create-{state}"
         if kind == "number":
             row = match_number_row(doc, ident, label_key, width, value_x, value={"state": key}, action=action, maximum=maximum,
                                    message=message, minimum=minimum, row_h=row_h)
+        elif kind == "slider":
+            row = value_row(doc, ident, label_key, "slider", width, value_x, value={"state": key}, action=action,
+                            slider=(minimum, maximum, 1, 0), row_h=row_h, wrap=True)
         else:
             entries = None
             if kind == "choice":
@@ -279,7 +303,7 @@ def setting_rows(doc: Document, settings: tuple, width: float, value_x: float, r
                 # A stock list by index, or each option's own key.
                 entries = [(names[index] if isinstance(names, tuple) else (names, index), value) for index, value in enumerate(values)]
             row = value_row(doc, ident, label_key, kind, width, value_x, value={"state": key}, action=action, entries=entries,
-                            row_h=row_h, placement=placement)
+                            row_h=row_h, placement=placement, wrap=True)
         rows.append(row)
         controls[state] = ident
     return rows
@@ -336,14 +360,14 @@ def map_row(doc: Document, index: int, row_w: float) -> dict:
                  control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids})
 
 
-def password_row(doc: Document, state: str, verb: str, label_key: str, event: str) -> dict:
+def password_row(doc: Document, state: str, verb: str, label_key: str, event: str, width: float, value_x: float, row_h: float) -> dict:
     """A password row: a masked text field that may be empty, committing into
     create.<state> and asking `verb`, which the session takes as its CVar."""
     doc.state[f"create.{state}"] = {"type": "string", "initial": ""}
     doc.session(verb, verb)
     doc.events[event] = [{"op": "action", "action": verb}]
-    return text_row(doc, f"create-{state}", label_key, U * 377, U * ADVANCED_VALUE_X, f"create.{state}", event, PASSWORD_BYTES,
-                    U * ROW_PITCH, allow_empty=True, masked=True)
+    return text_row(doc, f"create-{state}", label_key, width, value_x, f"create.{state}", event, PASSWORD_BYTES,
+                    row_h, allow_empty=True, masked=True)
 
 
 def link_row(doc: Document, ident: str, label_key: str, width: float, row_h: float, event: str) -> dict:
@@ -369,10 +393,10 @@ def ban_dialog_size() -> tuple[float, float]:
     """PLAYER BAN LIST's width and its action plates' (dp): each plate takes
     the longest REMOVE BAN or CLOSE of any language and 50 dp, at least the
     stock 180 dp, and the dialog both plates beside each other with its 30 and
-    33 dp margins and a 12 dp gap, at least ADVANCED OPTIONS' width."""
+    33 dp margins and a 12 dp gap, at least the stock popup's width."""
     longest = max(text_width("marine", text, 20) for key in ("#str_200922", "#str_200923") for text in table_text(key).values())
     action_w = round(max(180.0, longest + 50), 1)
-    return round(max(U * ADVANCED_WIDTH, 2 * action_w + 30 + 33 + 12), 1), action_w
+    return round(max(U * BAN_MIN_WIDTH, 2 * action_w + 30 + 33 + 12), 1), action_w
 
 
 def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None = None, pick_verb: str = "createBanPick",
@@ -448,18 +472,59 @@ def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None =
     return modal
 
 
-def advanced_dialog(doc: Document) -> dict:
-    """ADVANCED OPTIONS: the stock popup's options in the stock modal
-    construction grown to its size, titled ADVANCED SERVER OPTIONS, with the
-    password and map cycle text fields and CLOSE ADVANCED OPTIONS in place of
-    YES and NO. Set password dims and hides its text while Use password is
-    off, as the stock popup hid its field."""
-    width = U * ADVANCED_WIDTH
+def settings_tabs(doc: Document, width: float, value_x: float, row_h: float) -> tuple[list, dict]:
+    """The settings column under its tab strip (the multiplayer menu tree
+    audit, 20 November 2026): every setting of the stock page and its
+    ADVANCED OPTIONS popup, with the password and map cycle text fields and
+    VIEW LOCAL SERVER BAN LIST, each row shown on its tab alone
+    (CREATE_TABS). The strip is the multiplayer card's (retained_mp_menus.
+    tab_strip): the shown tab rises in the tab green, the Q and E keycaps at
+    its ends, or a controller's shoulder buttons, step through the tabs and
+    take the focus to the tab shown, and each opening starts on MATCH.
+
+    Rows follow what they act on: the limit row is the chosen game type's
+    (Frag Limit, Capture Limit or Control Time), Tourney's round limit
+    shows in Tourney alone and the Round Limit in the round modes (Clan
+    Arena, Freeze Tag, Red Rover); the team rows (Auto Balance, Shuffle Teams, Team
+    Damage, Timeouts per Team) dim outside team modes; Set password dims and
+    hides its text while Use password is off; the grappling hook dims under
+    Quake 4's ruleset; the map cycle script's name shows only while Map
+    Rotation runs it; the spectator lock dims while spectators are off; a
+    fixed loadout (Instagib, a weapon arena) dims the rules it overrides.
+    Returns the strip's nodes and the column."""
     controls = {}
-    rows = setting_rows(doc, ADVANCED, U * 377, U * ADVANCED_VALUE_X, U * ROW_PITCH, controls, "advancedModal-dialog")
-    rows[1:1] = [password_row(doc, *password) for password in PASSWORDS]
+    rows = setting_rows(doc, SETTINGS, width, value_x, row_h, controls, "screen")
+    by_state = {state: row for (state, *_), row in zip(SETTINGS, rows)}
+    doc.events["nameEntered"] = [{"op": "action", "action": "createName"}]
+    rows.append(text_row(doc, "create-name", "#str_200052", width, value_x, "create.name", "nameEntered", NAME_BYTES, row_h))
+    rows += [password_row(doc, *password, width, value_x, row_h) for password in PASSWORDS]
+    doc.state["create.mapcycle"] = {"type": "string", "initial": ""}
+    doc.session("createMapCycle", "createMapCycle")
+    doc.events["mapCycleEntered"] = [{"op": "action", "action": "createMapCycle"}]
+    rows.append(text_row(doc, "create-mapcycle", "#str_200072", width, value_x, "create.mapcycle", "mapCycleEntered",
+                         MAPCYCLE_BYTES, row_h, allow_empty=True))
+    # VIEW LOCAL SERVER BAN LIST asks for the list, then opens it over the
+    # page; its CLOSE comes back to this row.
+    doc.session("createBanList", "createBanList")
+    doc.events["banListOpen"] = [{"op": "action", "action": "createBanList"}, {"op": "call", "event": "banModalShow"}]
+    rows.append(link_row(doc, "create-banlist", "#str_200948", width, row_h, "banListOpen"))
+
+    # What each row acts on.
+    team, tourney = among(TEAM_TYPES), among(TOURNEY_TYPES)
+    for state, types in (("fraglimit", FRAG_TYPES), ("capturelimit", CAPTURE_TYPES), ("controltime", CONTROL_TYPES)):
+        show_when(doc, by_state[state], controls[state], among(types))
+    show_when(doc, by_state["tourneylimit"], controls["tourneylimit"], tourney)
+    show_when(doc, by_state["roundlimit"], controls["roundlimit"], among(ROUND_TYPES))
+    script = {"op": "==", "args": [{"state": "create.maprotation"}, 3]}
+    mapcycle = next(row for row in rows if row["id"] == "create-mapcycle")
+    show_when(doc, mapcycle, "create-mapcycle", script)
+    for state in ("autobalance", "shuffle", "teamdamage", "timeouts"):
+        lock_unless(doc, controls[state], team)
     using = {"state": "create.usepass"}
     lock_unless(doc, "create-password", using)
+    doc.bind("create-password-viewport.display", "create-password-viewport", "display", {"op": "select", "args": [using, "block", "none"]})
+    lock_unless(doc, "create-grapple", {"op": "==", "args": [{"state": "create.ruleset"}, 1]})
+    lock_unless(doc, "create-spectatorlock", {"state": "create.spectators"})
     # A fixed loadout (Instagib, a weapon arena) spawns no weapons and sells
     # nothing, so Weapon Stay, buying and Weapons Frenzy have nothing to act
     # on while one is on. Instagib also switches off the rules it overrides,
@@ -471,99 +536,80 @@ def advanced_dialog(doc: Document) -> dict:
     for ident in ("create-vampiric", "create-weaponarena", "create-powerups"):
         lock_unless(doc, ident, not_instagib)
     lock_unless(doc, "create-quadhog", {"op": "&&", "args": [not_instagib, {"op": "==", "args": [{"state": "create.gametype"}, 0]}]})
-    doc.bind("create-password-viewport.display", "create-password-viewport", "display", {"op": "select", "args": [using, "block", "none"]})
-    doc.state["create.mapcycle"] = {"type": "string", "initial": ""}
-    doc.session("createMapCycle", "createMapCycle")
-    doc.events["mapCycleEntered"] = [{"op": "action", "action": "createMapCycle"}]
-    rows.append(text_row(doc, "create-mapcycle", "#str_200072", U * 377, U * ADVANCED_VALUE_X, "create.mapcycle", "mapCycleEntered",
-                         MAPCYCLE_BYTES, U * ROW_PITCH, allow_empty=True))
-    # VIEW LOCAL SERVER BAN LIST asks for the list, then opens it over this
-    # dialog; its CLOSE comes back to this row.
-    doc.session("createBanList", "createBanList")
-    doc.events["banListOpen"] = [{"op": "action", "action": "createBanList"}, {"op": "call", "event": "banModalShow"}]
-    rows.append(link_row(doc, "create-banlist", "#str_200948", U * 377, U * ROW_PITCH, "banListOpen"))
-    # The rows in their tabs' order, each shown on its tab alone; the tabs are
-    # three plates over the rows, the shown one underlined. The dialog is as
-    # tall as its longest tab.
-    from retained_mp_menus import in_game_plate
+
+    # The rows in their tabs' order, each shown on its tab alone.
     by_id = {row["id"]: row for row in rows}
-    assert sorted(by_id) == sorted(ident for _, idents in ADVANCED_TABS for ident in idents), sorted(by_id)
-    rows = [by_id[ident] for _, idents in ADVANCED_TABS for ident in idents]
-    doc.state["create.advanced_tab"] = {"type": "number", "initial": 0}
-    tab_w = round((U * 377 - 12) / len(ADVANCED_TABS), 3)
-    tabs = []
-    for tab, (key, idents) in enumerate(ADVANCED_TABS):
-        on_tab = {"op": "==", "args": [{"state": "create.advanced_tab"}, tab]}
+    assert sorted(by_id) == sorted(ident for _, _, idents in CREATE_TABS for ident in idents), sorted(by_id)
+    rows = [by_id[ident] for _, _, idents in CREATE_TABS for ident in idents]
+    doc.state["create.tab"] = {"type": "number", "initial": 0}
+    for tab, (_name, _key, idents) in enumerate(CREATE_TABS):
+        on_tab = {"op": "==", "args": [{"state": "create.tab"}, tab]}
         for ident in idents:
+            # A row its game type or another setting shows keeps that
+            # condition on its tab; every other row shows on its tab alone.
+            own = next((binding for binding in doc.bindings if binding["node"] == ident and binding["property"] == "display"), None)
+            if own is not None:
+                own["value"] = {"op": "select", "args": [on_tab, own["value"], "none"]}
+                by_id[ident]["properties"]["display"] = keyword("none")
+                continue
             shown = by_id[ident]["properties"].get("display", keyword("block"))["value"]
             by_id[ident]["properties"]["display"] = keyword(shown if tab == 0 else "none")
             doc.bind(f"{ident}.tab", ident, "display", {"op": "select", "args": [on_tab, shown, "none"]})
-        doc.events[f"advancedTab{tab}"] = [{"op": "setState", "values": {"create.advanced_tab": tab}}]
-        plate = in_game_plate(doc, f"advanced-tab-{tab}", key, tab * (tab_w + 6), 0, width=tab_w, event=f"advancedTab{tab}")
-        # The tab's label at the largest size, up to the plates' 20 dp, that fits it in every language.
-        caption = next(node for node in plate["children"] if node["id"].endswith("-label"))
-        widest = max(text_width("marine", text, 1) for text in table_text(key).values())
-        caption["properties"]["font-size"] = length(min(20.0, int((tab_w - 36) / widest * 2) / 2))
-        mark = vector(f"advanced-tab-{tab}-shown", {**absolute(left=20, top=38, width=tab_w - 40, height=3), "display": keyword("none"),
-                                                    "pointer-events": keyword("none")},
-                      [path("bar", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, 3), (0, 3)], fill=solid(rgb(ORANGE)))])
-        doc.bind(f"advanced-tab-{tab}-shown.display", f"advanced-tab-{tab}-shown", "display", {"op": "select", "args": [on_tab, "block", "none"]})
-        plate["children"].append(mark)
-        tabs.append(plate)
-    strip = group("advanced-tabs", absolute(left=U * 25, top=U * ADVANCED_ROWS_TOP, width=U * 377, height=45), tabs)
-    most = max(len(idents) for _, idents in ADVANCED_TABS)
-    rows_end = ADVANCED_ROWS_TOP + ADVANCED_TAB_H + ROW_PITCH * most
-    height_u = rows_end + ADVANCED_GAP + ADVANCED_FOOT
-    top_u = min(ADVANCED_TOP, (480 - height_u) / 2)
+    from retained_mp_menus import tab_strip
+    shows = lambda tab: {"op": "==", "args": [{"state": "create.tab"}, tab]}  # noqa: E731
+    count = len(CREATE_TABS)
+    focus_shown = [{"op": "if", "condition": shows(tab), "then": [{"op": "focus", "control": f"tab-{name}"}]}
+                   for tab, (name, _key, _idents) in enumerate(CREATE_TABS)]
+    for tab, (name, _key, _idents) in enumerate(CREATE_TABS):
+        doc.events[f"tab_{name}"] = [{"op": "setState", "values": {"create.tab": tab}}]
+    for event, step in (("onTabNext", 1), ("onTabPrevious", -1)):
+        target = (count - 1 + step) % count
+        for tab in reversed(range(count - 1)):
+            target = {"op": "select", "args": [shows(tab), (tab + step) % count, target]}
+        doc.events[event] = [{"op": "setState", "values": {"create.tab": target}}, *focus_shown]
+    strip = tab_strip(doc, width, [(name, key, None) for name, key, _idents in CREATE_TABS], top=0, state="create.tab")
     # Above 100 % text each row's value stands under its label (section 2's
-    # reflow) and the rows scroll in the dialog's room.
+    # reflow) and the rows scroll in the column's room.
     for row in rows:
-        stack_row(doc, row, U * 377, U * ADVANCED_VALUE_X, U * ROW_PITCH)
-    column = group("advanced-rows", {**absolute(left=U * 25, top=U * (ADVANCED_ROWS_TOP + ADVANCED_TAB_H), width=U * 377,
-                                                height=U * ROW_PITCH * most),
-                                     "display": keyword("flex"), "flex-direction": keyword("column"), "overflow": keyword("auto")}, rows)
-    close_w = round(min(width - 66, max(210.0, max(text_width("marine", text, 20) for text in table_text("#str_200075").values()) + 50)), 1)
-    modal = confirmation(doc, "advancedModal", "#str_200066", PLACEHOLDER, None, close_key="#str_200075", wide_title=True,
-                         height_u=height_u, top_u=top_u, actions_u=rows_end + ADVANCED_GAP, contents=[strip, column],
-                         width_dp=width, close_w=close_w, initial="create-usepass")
-    # Each opening starts on SERVER, where its first focus is.
-    doc.events["advancedModalShow"].insert(0, {"op": "setState", "values": {"create.advanced_tab": 0}})
-    from build_retained_screens import fixed_text as keep_size
-    keep_size(doc, strip)
-    # PLAYER BAN LIST nests in this dialog's scope, as the stock popup opened
-    # over its own: it stands over it, and closing it returns the focus here.
-    bans = ban_list_modal(doc)
-    # Above 100 % text the bans' rows grow with it (section 2's reflow); the
-    # headings are furniture and keep their size.
-    from build_retained_screens import fixed_text, walk_nodes
-    nodes = {node["id"]: node for node in walk_nodes(bans)}
-    grow_rows(doc, nodes["ban-column"])
-    for ident in ("ban-head-name", "ban-head-guid"):
-        fixed_text(doc, nodes[ident])
-    modal["children"].append(bans)
-    return modal
+        if row["control"]["role"] != "button":
+            stack_row(doc, row, width, value_x, row_h)
+    column = group("create-options", {**absolute(left=U * OPTIONS[0], top=U * OPTIONS[1], width=width, height=row_h * TAB_ROWS),
+                                      "display": keyword("flex"), "flex-direction": keyword("column"), "overflow": keyword("auto")},
+                   rows)
+    return strip, column
 
 
 def check_create_fits() -> None:
-    """Every shipped language's labels fit: the headings, a row's label in its
-    column, a choice's names and the plates' labels, on one line; the number
-    rows check their own messages."""
-    one_line = [("#str_200050", "lowpixel", 14, U * MAPS_HEAD[2]), ("#str_200051", "lowpixel", 14, U * OPTIONS_HEAD[2]),
-                ("#str_200026", "marine", 23.7, U * 215), ("#str_200065", "marine", 20, U * 377 - 30),
+    """Every shipped language's labels fit: the headings and the plates'
+    labels on one line, a row's label in its column on two lines, and a
+    choice's names in its value column; the number rows check their own
+    messages and the tab strip its tabs."""
+    one_line = [("#str_200050", "lowpixel", 14, U * MAPS_HEAD[2]), ("#str_200026", "marine", 23.7, U * 215),
                 ("#str_231127", "marine", 16, U * (MAP_LIST[2] - 16 - 18)),
-                ("#str_231128", "marine", 16, U * (MAP_LIST[2] - 16 - 18)), ("#str_200052", "lowpixel", 15, U * VALUE_X - 29)]
-    one_line += [(label_key, "lowpixel", 15, U * VALUE_X - 29) for _, _, label_key, *_ in SETTINGS]
-    one_line += [(label_key, "lowpixel", 15, U * ADVANCED_VALUE_X - 29) for _, _, label_key, *_ in ADVANCED]
-    one_line += [(label_key, "lowpixel", 15, U * ADVANCED_VALUE_X - 29) for label_key in ("#str_200072", *(key for _, _, key, _ in PASSWORDS))]
+                ("#str_231128", "marine", 16, U * (MAP_LIST[2] - 16 - 18))]
     # VIEW LOCAL SERVER BAN LIST in its row, and PLAYER BAN LIST's title (the
     # wide title slot) and empty line.
     ban_w, _ = ban_dialog_size()
-    one_line += [("#str_200948", "lowpixel", 15, U * 377 - 60), ("#str_231130", "lowpixel", 15, ban_w - 2 * U * BAN_LIST_LEFT),
+    one_line += [("#str_200948", "lowpixel", 15, U * OPTIONS[2] - 60), ("#str_231130", "lowpixel", 15, ban_w - 2 * U * BAN_LIST_LEFT),
                  ("#str_200921", "marine", 20, ban_w * (1 - 7 / 512) - 6 - (ban_w * 14 / 512 + 17))]
     check_fits(tuple(one_line), ())
+    from retained_mp_menus import wrapped_width
+    labels = [key for _, _, key, *_ in SETTINGS] + ["#str_200052", "#str_200072", *(key for _, _, key, _ in PASSWORDS)]
+    over = {(key, language): round(wrapped_width(text)) for key in labels for language, text in table_text(key).items()
+            if wrapped_width(text) > U * VALUE_X - 29}
+    if over:
+        raise SystemExit(f"Create Server labels past their two lines: {over}")
+    value_w = (U * OPTIONS[2] - U * VALUE_X - 12) - 14
     for state, (names, values) in CHOICES.items():
-        value_w = (U * 377 - U * (ADVANCED_VALUE_X if state in ("rate", "bots", "botskill") else VALUE_X) - 12) - 14
-        for language, text in table_text(names).items():
+        if isinstance(names, tuple):
+            texts = {}
+            for key in names:
+                for language, text in table_text(key).items():
+                    texts.setdefault(language, []).append(text)
+            lists = {language: ";".join(items) for language, items in texts.items()}
+        else:
+            lists = table_text(names)
+        for language, text in lists.items():
             items = text.split(";")
             if len(items) < len(values):
                 raise SystemExit(f"{names} in {language} lists {len(items)} of {len(values)} names")
@@ -575,9 +621,12 @@ def check_create_fits() -> None:
 def create_server_document() -> dict:
     """The Create Server sub-page in the sub-page state (sections 8 and 9): the
     top band one notch on, the bottom band docked, MULTIPLAYER as the crumb
-    and CREATE SERVER at the step's foot; the stock content over its backing.
+    and CREATE SERVER at the step's foot; MAP SELECTION, the chosen map's
+    levelshot over the maps the chosen game type plays, beside the settings
+    under their MATCH, RULES, MODIFIERS and SERVER tabs; CREATE SERVER under
+    them, over the stock page backing.
     onActivate    every arrival: the content and backing fade in over 150 ms
-                  (content.in) and CREATE SERVER takes the focus;
+                  (content.in), MATCH shows and CREATE SERVER takes the focus;
     subpageLeave  Back, 300 ms: its title drops at once, it sweeps 640 u toward
                   the leading edge with its content fading over 250 ms, the
                   top band steps back at once and the crumb returns to the
@@ -610,8 +659,6 @@ def create_server_document() -> dict:
         header_band("create-header", *HEADER),
         label("create-head-maps", "#str_200050", {**absolute(left=U * MAPS_HEAD[0], top=U * MAPS_HEAD[1], width=U * MAPS_HEAD[2],
                                                              height=U * 16), **heading}),
-        label("create-head-options", "#str_200051", {**absolute(left=U * OPTIONS_HEAD[0], top=U * OPTIONS_HEAD[1],
-                                                                width=U * OPTIONS_HEAD[2], height=U * 16), **heading}),
     ]
     left, top, list_w, list_h = MAP_LIST
     row_w = list_w - 16
@@ -628,48 +675,38 @@ def create_server_document() -> dict:
     scrollbar = objectives_scrollbar(doc, "maps_scroll", "maps-list", OLIVE, ORANGE, U * (left + list_w) - 16, U * top, U * list_h,
                                      line_step=U * MAP_ROW_H, key="#str_200050")
 
-    # The server options: section 7 rows on the stock pitch, the game type
-    # choosing the limit row and the slot under Allow Voting.
-    controls = {}
-    rows = setting_rows(doc, SETTINGS, U * OPTIONS[2], U * VALUE_X, U * ROW_PITCH, controls, "screen")
-    by_state = {state: row for (state, *_), row in zip(SETTINGS, rows)}
-    doc.events["nameEntered"] = [{"op": "action", "action": "createName"}]
-    name = text_row(doc, "create-name", "#str_200052", U * OPTIONS[2], U * VALUE_X, "create.name", "nameEntered", NAME_BYTES, U * ROW_PITCH)
-    team, tourney = among(TEAM_TYPES), among(TOURNEY_TYPES)
-    for state, types in (("fraglimit", FRAG_TYPES), ("capturelimit", CAPTURE_TYPES), ("controltime", CONTROL_TYPES)):
-        show_when(doc, by_state[state], controls[state], among(types))
-    show_when(doc, by_state["teamdamage"], controls["teamdamage"], {"op": "!", "args": [tourney]})
-    show_when(doc, by_state["tourneylimit"], controls["tourneylimit"], tourney)
-    lock_unless(doc, controls["autobalance"], team)
-    lock_unless(doc, controls["teamdamage"], team)
-    # Above 100 % text each row's value stands under its label (section 2's
-    # reflow) and the rows scroll in the options' room.
-    for row in [name, *rows]:
-        stack_row(doc, row, U * OPTIONS[2], U * VALUE_X, U * ROW_PITCH)
-    column = group("create-options", {**absolute(left=U * OPTIONS[0], top=U * OPTIONS[1], width=U * OPTIONS[2],
-                                                 height=U * ROW_PITCH * 11),
-                                      "display": keyword("flex"), "flex-direction": keyword("column"), "overflow": keyword("auto")},
-                   [name, *rows])
-    advanced = action_plate(doc, "create_advanced", "#str_200065", U * OPTIONS[0], U * ADVANCED_BUTTON_TOP - 5, event="advancedModalShow",
-                            width=U * OPTIONS[2])
+    # The settings under their tabs, the strip in the header's room.
+    strip, column = settings_tabs(doc, U * OPTIONS[2], U * VALUE_X, U * ROW_PITCH)
+    tabs = group("create-tabs", absolute(left=U * OPTIONS[0], top=U * TABS_TOP, width=U * OPTIONS[2], height=U * (OPTIONS[1] - TABS_TOP)), strip)
     start = primary_plate(doc, "create_start", "#str_200026", *START, action="createStart", label_box=(43.0, 6.0, 215.0, 25.0), text=23.7,
                           marker=(13.0, 9.5, 18.0))
     back = page_prompts(doc, "create_back", action="back")
 
-    modal = advanced_dialog(doc)
-    # Above 100 % text the maps' rows and the options grow; the headings,
-    # ADVANCED OPTIONS and CREATE SERVER are furniture and keep their size.
-    from build_retained_screens import fixed_text
-    for node in [*headings, *shot, scrollbar, advanced, start]:
+    # PLAYER BAN LIST stands over the page, and closing it returns the focus
+    # to VIEW LOCAL SERVER BAN LIST.
+    bans = ban_list_modal(doc)
+    # Above 100 % text the bans' rows grow with it (section 2's reflow); the
+    # headings are furniture and keep their size.
+    from build_retained_screens import fixed_text, walk_nodes
+    nodes = {node["id"]: node for node in walk_nodes(bans)}
+    grow_rows(doc, nodes["ban-column"])
+    for ident in ("ban-head-name", "ban-head-guid"):
+        fixed_text(doc, nodes[ident])
+    # Each arrival starts on MATCH.
+    activate = [{"op": "setState", "values": {"create.tab": 0}}, {"op": "focus", "control": "create_start"}]
+    # Above 100 % text the maps' rows and the settings grow; the headings,
+    # the tabs and CREATE SERVER are furniture and keep their size.
+    for node in [*headings, *shot, scrollbar, tabs, start]:
         fixed_text(doc, node)
     return tall_create_page(subpage_document(doc, "create", "#str_200002", "#str_200026", "create_start",
-                                             [*headings, *shot, viewport, scrollbar, column, advanced, start, back], [modal]))
+                                             [*headings, *shot, viewport, scrollbar, tabs, column, start, back], [bans],
+                                             activate=activate))
 
 
 # A tall view's Create Server page (retained_tall): MAP SELECTION, the chosen
-# map's levelshot with the map list beside it, then SERVER OPTIONS with its
-# rows across the column, ADVANCED OPTIONS and CREATE SERVER, 1.45 times the
-# landscape size, which keeps CREATE SERVER above the bottom band at 3:4.
+# map's levelshot with the map list beside it, then the settings' tabs with
+# their rows across the column and CREATE SERVER, 1.45 times the landscape
+# size, which keeps CREATE SERVER above the bottom band at 3:4.
 TALL_GROW = 1.45
 
 
@@ -697,13 +734,12 @@ def tall_create_page(result: dict) -> dict:
     tall.bind("maps_scroll", "left", list_left + list_w + 4)
     tall.top("maps_scroll", shot_top)
     tall.bind("maps_scroll", "height", shot_h)
-    options_head = shot_top + shot_h + 18
-    tall.block(("create-head-options",), (U * OPTIONS_HEAD[0], U * OPTIONS_HEAD[1]), (MARGIN + 4, options_head), TALL_GROW)
-    options_top = options_head + U * 16 * TALL_GROW + 6
+    tabs_top = shot_top + shot_h + 18
+    tall.block(("create-tabs",), (U * OPTIONS[0], U * TABS_TOP), (MARGIN, tabs_top), TALL_GROW)
+    options_top = tabs_top + U * (OPTIONS[1] - TABS_TOP) * TALL_GROW
     tall.block(("create-options",), (U * OPTIONS[0], U * OPTIONS[1]), (MARGIN, options_top), TALL_GROW)
-    advanced_top = options_top + U * ROW_PITCH * 11 * TALL_GROW + 10
-    tall.block(("create_advanced",), (U * OPTIONS[0], U * ADVANCED_BUTTON_TOP - 5), (MARGIN, advanced_top), TALL_GROW)
-    tall.block(("create_start",), (U * START[0], U * START[1]), (MARGIN, advanced_top + 45 * TALL_GROW + 10), 1.3)
+    start_top = options_top + U * ROW_PITCH * TAB_ROWS * TALL_GROW + 10
+    tall.block(("create_start",), (U * START[0], U * START[1]), (MARGIN, start_top), 1.3)
     tall.dialogs(TALL_GROW)
     tall.shade("create-backing", BACKING_ALPHA)
     return result

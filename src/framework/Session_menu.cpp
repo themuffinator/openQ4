@@ -183,7 +183,10 @@ static const int RETAINED_MP_TEAM_SLOTS = 3;
 // against its field's rules.
 static const char *const RETAINED_MP_VOTE_FIELDS[] = {
 	"mpVoteMap", "mpVoteGameType", "mpVoteTimeLimit", "mpVoteFragLimit", "mpVoteCaptureLimit", "mpVoteTourneyLimit",
-	"mpVoteControlTime", "mpVoteBalance", "mpVoteShuffle", "mpVoteRestart", "mpVoteBuying", "mpVoteKick"
+	"mpVoteControlTime", "mpVoteBalance", "mpVoteShuffle", "mpVoteRestart", "mpVoteBuying", "mpVoteKick",
+	// The casual callvote fields (MP-12), after the kick as the game orders them.
+	"mpVoteNextMap", "mpVoteRandomMap", "mpVoteRoundLimit", "mpVoteOvertime", "mpVoteRuleset", "mpVoteInstagib",
+	"mpVoteReadyAll", "mpVoteCoinToss"
 };
 // The Admin page's drafted server settings, whose controls request "<verb>
 // <value>", in the order of the game's retainedVoteField_t without the kick;
@@ -4436,6 +4439,17 @@ void idSessionLocal::HandleMainMenuCommands( const char *menuCommand ) {
 			return;
 		}
 
+		// The multiplayer menu's AUDIO route: the retained page over the main
+		// menu as it comes up, else the stock AUDIO page.
+		if ( !idStr::Icmp( cmd, "openRetainedAudioFromMp" ) ) {
+			if ( !OpenRetainedAudio() && guiMainMenu != NULL ) {
+				guiMainMenu->SetStateBool( "retainedAudio", false );
+				guiMainMenu->StateChanged( common->GetPresentationTime() );
+				guiMainMenu->HandleNamedEvent( "fromMp_toAudioStock" );
+			}
+			return;
+		}
+
 		if ( !idStr::Icmp( cmd, "openRetainedGame" ) ) {
 			OpenRetainedGameRoute( false );
 			return;
@@ -6858,6 +6872,17 @@ static const retainedCreateSetting_t RETAINED_CREATE_SETTINGS[] = {
 	{ "createFallDamage",	"falldamage",	"si_fallDamage",			0, 999,	false },
 	{ "createWeaponRespawn",	"weaponrespawn",	"si_weaponRespawn",		0, 999,	false },
 	{ "createPreset",		"preset",		"si_preset",				0, 11,	false },	// Session_RetainedCreateValue
+	// The host settings the multiplayer menu tree audit (20 November 2026)
+	// brought onto the page from the console: the map database's rotation and
+	// map requests, who sees item timers, casual team timeouts, the spectator
+	// lock and moving idle players to spectators (seconds: the page offers
+	// off, one, two, five and ten minutes).
+	{ "createMapRotation",	"maprotation",	"g_mapRotation",			0, 3,	false },
+	{ "createMapQueue",		"mapqueue",		"g_mapQueue",				0, 1,	true },
+	{ "createItemTimers",	"itemtimers",	"si_itemTimers",			0, 2,	false },
+	{ "createTimeouts",		"timeouts",		"si_timeouts",				0, 10,	false },
+	{ "createSpectatorLock",	"spectatorlock",	"si_spectatorLock",		0, 2,	false },
+	{ "createInactivity",	"inactivity",	"g_inactivity",				0, 600,	false },
 };
 static const int RETAINED_CREATE_SETTING_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_SETTINGS ) / sizeof( RETAINED_CREATE_SETTINGS[0] ) );
 // The page's text fields: the verb a field asks with once its text is in its
@@ -12183,6 +12208,8 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		command = "mainMenu fromMp_toGameoptions";
 	} else if ( !idStr::Icmp( request, "mpSettingsSystem" ) ) {
 		command = "mainMenu fromMp_toSystem";
+	} else if ( !idStr::Icmp( request, "mpSettingsAudio" ) ) {
+		command = "mainMenu fromMp_toAudio";
 	} else if ( !idStr::Icmp( request, "mpClose" ) ) {
 		command = "close";
 	} else if ( !idStr::Icmp( request, "mpMainMenu" ) ) {

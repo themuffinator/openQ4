@@ -1412,10 +1412,14 @@ private:
 	// that differ from the server's. The map is drafted by its path; its
 	// choice lists the maps the drafted game type plays, and the kick choice
 	// the other players. The session's RETAINED_MP_VOTE_FIELDS and the
-	// document's rows follow this order.
+	// document's rows follow this order. The casual callvote fields (MP-12)
+	// follow the kick, so the Admin page's fields stay the ones before it:
+	// skipping to the next map, a random map, the round limit, the overtime
+	// period, the ruleset, Instagib, readying everyone and a coin toss.
 	enum retainedVoteField_t {
 		RVF_MAP, RVF_GAMETYPE, RVF_TIMELIMIT, RVF_FRAGLIMIT, RVF_CAPTURELIMIT, RVF_TOURNEYLIMIT, RVF_CONTROLTIME,
-		RVF_BALANCE, RVF_SHUFFLE, RVF_RESTART, RVF_BUYING, RVF_KICK, RVF_COUNT
+		RVF_BALANCE, RVF_SHUFFLE, RVF_RESTART, RVF_BUYING, RVF_KICK,
+		RVF_NEXTMAP, RVF_RANDOMMAP, RVF_ROUNDLIMIT, RVF_OVERTIME, RVF_RULESET, RVF_INSTAGIB, RVF_READYALL, RVF_COINTOSS, RVF_COUNT
 	};
 	static const int RETAINED_VOTE_MAPS = 128;
 	static const int RETAINED_VOTE_LINES = 6;

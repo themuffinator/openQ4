@@ -7,6 +7,36 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Multiplayer menus that show everything in one place, 20 November 2026
+
+- **Create Server has no hidden second page.** Every server setting is now on
+  the page in four tabs, **Match**, **Rules**, **Modifiers** and **Server**,
+  instead of a few rows plus an **Advanced Server Options** pop-up. The game
+  type comes first, the bots sit beside the player counts, and a setting the
+  chosen game type can't use dims or steps aside. Time limit, player counts,
+  round limit and team timeouts are sliders, so a controller no longer needs
+  the on-screen keyboard for them.
+- **Host settings you could only type in the console are in the menu:** Map
+  Rotation (same map, in order, shuffled or your map cycle script), Map
+  Requests (`mymap`), Item Timers, Timeouts per Team, Spectator Lock and an
+  Idle Timeout that moves inactive players to the spectators. Overtime and
+  Round Limit now show the game's real defaults before you first host.
+- **Player Setup has a HUD tab** for the multiplayer HUD and spectating:
+  Hit Sound, Crosshair Names, Crosshair Ammo, Item Timers, Team Locations,
+  Local Clock, Spectator Speed and Follow View. In a match, the in-match
+  menu's **Settings** page has the same rows under **HUD**, beside
+  **Player** and **Appearance**.
+- **The in-match menu reaches Audio.** Its Settings page offers Controls,
+  Game Options, **Display** (it said System) and **Audio**, which it couldn't
+  reach before.
+- **Vote for more from the menu:** skip to the next map, a random map, the
+  round limit, the overtime period, the ruleset, Instagib, readying everyone
+  and a coin toss, grouped with the other votes by what they change.
+- **The Server page names the rules** a match is played by, the ruleset and
+  any modifiers, and Match Control's lock reasons line up with their rows.
+- **What to do.** Nothing: your settings are kept. The classic menus
+  (`ui_retained 0`) keep their original layout.
+
 ## Settings that are easier to find, 20 November 2026
 
 - **Every setting sits with the ones it works with.** The new interface's

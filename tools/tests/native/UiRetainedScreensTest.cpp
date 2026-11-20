@@ -59,7 +59,11 @@ struct ScreenHost final : Host {
 		{"ui_hudOpacity",1.0},{"ui_hudDamageDirection",true},{"ui_hudPickups",true},{"ui_hudWeaponStrip",true},
 		{"ui_reducedFlashing",false},
 		// Join Game's list view: rows.
-		{"ui_browserView",0.0}};
+		{"ui_browserView",0.0},
+		// The multiplayer HUD's options and spectating at their defaults
+		// (Player Setup's HUD tab, the card's Settings page).
+		{"hud_hitSound",1.0},{"hud_crosshairNames",1.0},{"hud_crosshairAmmo",false},{"hud_itemTimers",true},{"hud_teamLocations",true},
+		{"hud_localClock",0.0},{"ui_spectatorSpeed",100.0},{"g_spectatorFollowView",0.0}};
 	bool ReadCVar(const std::string& name, size_t type, StateValue& value) override {
 		if (type == 2 && name == "sys_lang") { value = language; return true; }
 		if (const auto found = cvars.find(name); found != cvars.end()) {
@@ -277,12 +281,13 @@ static const std::set<std::string> SessionCommands = {"continue","singlePlayer",
 	"joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers","joinSortGameType","joinSortMap",
 	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
 	"mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction","mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction",
-	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpMatch","mpMatchSelect",
+	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","mpMatch","mpMatchSelect",
 	"mpSummaryChat","mpAdminPass","mpAdminSelect","mpAdminKick","mpAdminBan","mpAdminSwitch","mpAdminBans","mpAdminBanPick","mpAdminUnban",
 	"mpAdminApply","mpAdminConsole","mpRefereeLogin","mpSettingsName","mpSettingsClan","mpBuy"};
 // The value controls' verbs, which carry the control's new value.
 static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGameType","mpVoteTimeLimit","mpVoteFragLimit",
-	"mpVoteCaptureLimit","mpVoteTourneyLimit","mpVoteControlTime","mpVoteBalance","mpVoteShuffle","mpVoteRestart","mpVoteBuying","mpVoteKick",
+	"mpVoteCaptureLimit","mpVoteTourneyLimit","mpVoteControlTime","mpVoteBalance","mpVoteShuffle","mpVoteRestart","mpVoteBuying","mpVoteKick","mpVoteNextMap","mpVoteRandomMap","mpVoteRoundLimit","mpVoteOvertime","mpVoteRuleset",
+		"mpVoteInstagib","mpVoteReadyAll","mpVoteCoinToss",
 	"mpModelSelf","mpModelEnemy","mpModelTeam","mpCrosshair","mpMatchRole","mpMatchScope","mpMatchRuleValue",
 	"mpMatchSeriesProfile","mpAdminMap","mpAdminGameType","mpAdminTimeLimit","mpAdminFragLimit","mpAdminCaptureLimit","mpAdminTourneyLimit",
 	"mpAdminControlTime","mpAdminBalance","mpAdminShuffle","mpAdminRestart","mpAdminBuying",
@@ -291,13 +296,15 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup","createVoice",
 	"createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
 	"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
-	"createFallDamage","createWeaponRespawn","createPreset",
+	"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
+		"createTimeouts","createSpectatorLock","createInactivity",
 	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
 	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 // The player settings the multiplayer card's Settings and Voice pages and the
 // GAME OPTIONS page change.
-static const std::set<std::string> PlayerSettings = {"ui_handicap","cl_player_outline_enemy","cl_player_outline_team",
+static const std::set<std::string> PlayerSettings = {"ui_handicap","hud_hitSound","hud_crosshairNames","hud_crosshairAmmo","hud_itemTimers",
+	"hud_teamLocations","hud_localClock","ui_spectatorSpeed","g_spectatorFollowView","cl_player_outline_enemy","cl_player_outline_team",
 	"cl_player_rimlight_enemy","cl_player_rimlight_team","cl_player_visibility_enemy_color","cl_player_visibility_team_color",
 	"cl_player_brightskin_enemy","cl_player_brightskin_team","cl_player_brightskin_enemy_color","cl_player_brightskin_team_color",
 	"cl_player_outline_width","s_voiceChatSend","s_voiceChatReceive","s_voiceChatEcho","s_voiceVolume","s_micInputLevel",
@@ -789,11 +796,14 @@ static void CheckVote(ScreenHost& host, const char* path) {
 		{"mp.vote.balance",true},{"mp.vote.shuffle",false},{"mp.vote.restart",false},{"mp.vote.buying",0.0},
 		{"mp.vote.kick_catalog",std::string("0,1:4097,2:4098")},{"mp.vote.kick_count",3.0},{"mp.vote.kick0",std::string("Anderson")},{"mp.vote.kick1",std::string("Rhodes")},{"mp.vote.kick",-1.0},
 		{"mp.vote.locked",true}};
-	const char* const keys[] = {"map","gametype","timelimit","fraglimit","capturelimit","tourneylimit","controltime","balance","shuffle",
-		"restart","buying","kick"};
+	// The page's order: the map and the ways to leave it, the game type and
+	// its limits, the rules, the teams, then the one-off calls.
+	const char* const keys[] = {"map","nextmap","randommap","restart","gametype","timelimit","fraglimit","capturelimit","tourneylimit",
+		"controltime","roundlimit","overtime","ruleset","instagib","buying","balance","shuffle","readyall","cointoss","kick"};
 	for (const char* key : keys) {
 		const std::string field = key;
-		page["mp.vote."+field+".row_shown"] = field != "capturelimit" && field != "tourneylimit" && field != "controltime";
+		page["mp.vote."+field+".row_shown"] = field != "capturelimit" && field != "tourneylimit" && field != "controltime" &&
+			field != "roundlimit" && field != "readyall";
 		page["mp.vote."+field+".row_allowed"] = field != "buying";
 	}
 	Check(runtime.SetState(page,error,1),"publish the Vote page");
@@ -816,7 +826,9 @@ static void CheckVote(ScreenHost& host, const char* path) {
 		Check(text(row,"display") == "block" && Near(box.height,26,.01f) && (!shown || Near(box.y,previous,.01f)),"shown rows stack");
 		previous = box.y+box.height; ++shown;
 	}
-	Check(shown == 9 && previous <= bounds("vote-call-slot").y+.5f,"nine rows fit above Call Vote");
+	const auto rows = bounds("vote-rows");
+	Check(shown == 15 && Near(rows.height,9*26,.01f) && rows.y+rows.height <= bounds("vote-call-slot").y+.5f && previous > rows.y+rows.height &&
+		text("vote-rows","overflow") == "auto","nine rows show above Call Vote and the column scrolls through the rest");
 	Check(Near(number("vote-row-buying","opacity"),.38f,.001f) && text("vote-row-buying-lock","display") == "block" &&
 		Near(number("vote-row-map","opacity"),1,.001f) && text("vote-row-map-lock","display") == "none","a locked row dims with its lock");
 	Check(text("vote-locked","display") == "block" && !runtime.FocusControl("vote-row-buying",1.41),"it says why and takes no focus");
@@ -1678,9 +1690,12 @@ static void CheckSettings(ScreenHost& host, const char* escapePath, const char* 
 			Check(Near(box.y,previous+26,.01f) && Near(box.height,26,.01f),"the player's rows stack");
 			previous = box.y;
 		}
-		const auto system = bounds("settings-mpSettingsSystem"), pageBox = bounds("page-settings");
-		Check(bounds("settings-mpSettingsControls").y >= previous+26 && system.y+system.height <= pageBox.y+pageBox.height+.5f,
-			"Controls, Game Options and System follow inside the page");
+		// Controls, Game Options, Display and Audio stand beside them, inside the page.
+		const auto audio = bounds("settings-mpSettingsAudio"), pageBox = bounds("page-settings"), name = bounds("settings-name");
+		Check(bounds("settings-mpSettingsControls").x >= name.x+name.width && audio.y+audio.height <= pageBox.y+pageBox.height+.5f &&
+			audio.y > bounds("settings-mpSettingsSystem").y,"Controls, Game Options, Display and Audio stand beside the player's rows");
+		Check(text("settings-section-appearance","display") == "none" && text("settings-section-hud","display") == "none",
+			"PLAYER shows its section alone");
 		// Name and clan are the card's own fields: Enter sets each.
 		Check(runtime.RunEvent("settings_name_entered",1.5,effects,error) && effects.actions.size() == 1 &&
 			std::get<std::string>(effects.actions[0].arguments.at("command")) == "mpSettingsName","Enter sets the name");
@@ -1698,6 +1713,10 @@ static void CheckSettings(ScreenHost& host, const char* escapePath, const char* 
 		auto invocation = taken(runtime,"set.ui_handicap");
 		Check(invocation.operation == "settings.player.set" && std::get<std::string>(invocation.arguments.at("cvar")) == "ui_handicap" &&
 			std::get<double>(invocation.arguments.at("value")) == 99,"Left lowers the handicap");
+		// The triggers step to APPEARANCE, the opponents' and teammates' table.
+		Check(runtime.RunEvent("onSectionNext",1.75,effects,error) && runtime.FocusedControl() == "settings-tab-appearance","the trigger shows APPEARANCE");
+		runtime.Frame(viewport,1.78);
+		Check(text("settings-section-appearance","display") == "block" && text("settings-section-player","display") == "none","APPEARANCE shows its table");
 		Check(runtime.FocusControl("settings-row-1-opponents",1.8) && runtime.OpenChoicePopup("settings-row-1-opponents",1.8),"the opponents' outline unfolds");
 		runtime.Frame(viewport,1.85);
 		press(runtime,MenuInput::Down,1.9);
@@ -1718,10 +1737,24 @@ static void CheckSettings(ScreenHost& host, const char* escapePath, const char* 
 		Check(text("settings-row-1-teammates","display") == "none" && text("settings-heading-teammates","display") == "none" &&
 			text("settings-team-note","display") == "block" && !runtime.FocusControl("settings-row-0-teammates",2.31),
 			"outside team modes only the opponents' column shows");
-		// System leaves for the main menu's page.
-		Check(runtime.FocusControl("settings-mpSettingsSystem",2.4),"focus System");
+		// HUD: the multiplayer HUD's options and spectating, each its setting.
+		Check(runtime.RunEvent("settings_section_hud",2.32,effects,error),"the HUD section");
+		runtime.Frame(viewport,2.33);
+		Check(text("settings-section-hud","display") == "block" && runtime.FocusControl("settings-hud-crosshairammo",2.34),"focus Crosshair Ammo");
+		press(runtime,MenuInput::Accept,2.35);
+		invocation = taken(runtime,"set.hud_crosshairAmmo");
+		Check(invocation.operation == "settings.player.set" && std::get<bool>(invocation.arguments.at("value")),"a HUD option sets its setting");
+		const auto speed = bounds("settings-hud-spectatorspeed"), hit = bounds("settings-hud-hitsound");
+		Check(speed.x > hit.x+hit.width && Near(speed.y,hit.y,.01f),"spectating stands beside the HUD's options");
+		// Display and Audio leave for the main menu's pages.
+		Check(runtime.RunEvent("settings_section_player",2.38,effects,error),"back to PLAYER");
+		runtime.Frame(viewport,2.39);
+		Check(runtime.FocusControl("settings-mpSettingsSystem",2.4),"focus Display");
 		press(runtime,MenuInput::Accept,2.41);
-		Check(taken(runtime,"mpSettingsSystem").operation == "session.menu","System leaves for the main menu's page");
+		Check(taken(runtime,"mpSettingsSystem").operation == "session.menu","Display leaves for the main menu's page");
+		Check(runtime.FocusControl("settings-mpSettingsAudio",2.42),"focus Audio");
+		press(runtime,MenuInput::Accept,2.43);
+		Check(taken(runtime,"mpSettingsAudio").operation == "session.menu","Audio leaves for the main menu's page");
 		// The Voice page: its toggles and sliders set their settings; the
 		// push-to-talk key shows when bound; testing requires separate consent.
 		Check(runtime.RunEvent("tab_voice",3,effects,error),"to the Voice tab");
@@ -3897,9 +3930,9 @@ static void CheckJoinGamePage(ScreenHost& host, const char* path) {
 // control asks the session with its own verb; the game type picks the limit
 // row and the slot under Allow Voting and locks Auto Balance and Team Damage
 // outside team modes; the map list shows the maps the session publishes, the
-// chosen one lit; ADVANCED OPTIONS opens the stock popup's options as a dialog.
+// chosen one lit; the settings stand under MATCH, RULES, MODIFIERS and SERVER.
 // PLAYER BAN LIST: VIEW LOCAL SERVER BAN LIST asks for the list and opens it
-// over ADVANCED OPTIONS, nested in its scope; a row's first Accept chooses
+// over the page; a row's first Accept chooses
 // its ban, REMOVE BAN (enabled once one is chosen) removes it, and closing the
 // list returns the focus to the row that opened it.
 static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
@@ -3914,17 +3947,17 @@ static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
 	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a ban list node is laid out"); return b; };
 	Check(runtime.RunEvent("onActivate",0.5,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.7);
-	Check(runtime.RunEvent("advancedModalShow",0.8,effects,error),"ADVANCED OPTIONS opens");
+	Check(runtime.RunEvent("tab_server",0.8,effects,error),"the SERVER tab");
 	runtime.Frame(viewport,1.05);
-	// VIEW LOCAL SERVER BAN LIST is the dialog's last row, after the map cycle.
-	Check(Near(bounds("create-banlist").y,bounds("create-mapcycle").y+36,1) && runtime.FocusControl("create-banlist",1.1),
-		"VIEW LOCAL SERVER BAN LIST follows the map cycle on the row pitch");
+	// VIEW LOCAL SERVER BAN LIST is SERVER's last row, on the row pitch.
+	Check(Near(bounds("create-banlist").y,bounds("create-rate").y+36,1) && runtime.FocusControl("create-banlist",1.1),
+		"VIEW LOCAL SERVER BAN LIST follows Max Rate on the row pitch");
 	Check(runtime.RunEvent("banListOpen",1.2,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "createBanList",
 		"the row asks the session for the list");
 	runtime.Frame(viewport,1.45);
 	Check(text("banModal","display") == "block" && text("banModal-contents","display") == "block" && runtime.FocusedControl() == "banModal_no",
-		"the list opens over the dialog on CLOSE");
-	Check(!runtime.FocusControl("create-usepass",1.46),"the dialog beneath takes no focus while the list stands over it");
+		"the list opens over the page on CLOSE");
+	Check(!runtime.FocusControl("create-usepass",1.46),"the page beneath takes no focus while the list stands over it");
 	Check(text("ban-empty","display") == "block" && text("ban-row-0","display") == "none" &&
 		runtime.GetControlState("banModal_yes") == ControlState::Disabled,"an empty list says so, with nothing to remove");
 	Check(runtime.SetState({{"create.ban_count",2.0},{"create.ban0.name",std::string("Griefer")},{"create.ban0.guid",std::string("ABCDEFGHIJK")},
@@ -3946,8 +3979,8 @@ static void CheckCreateServerBanList(ScreenHost& host, const char* path) {
 	Check(text("banModal","display") == "block","REMOVE BAN keeps the list open");
 	Check(runtime.RunEvent("banModalHide",1.9,effects,error),"CLOSE");
 	runtime.Frame(viewport,2.3);
-	Check(text("banModal","display") == "none" && text("advancedModal","display") == "block" && runtime.FocusedControl() == "create-banlist",
-		"closing the list returns to the row that opened it, the dialog still open");
+	Check(text("banModal","display") == "none" && runtime.FocusedControl() == "create-banlist",
+		"closing the list returns to the row that opened it");
 }
 
 // A menu level stands in its column in a portrait view its column fills at
@@ -5158,7 +5191,8 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 	const char* const verbs[] = {"createLan","createDedicated","createGameType","createAutoBalance","createFragLimit","createCaptureLimit",
 		"createControlTime","createTimeLimit","createMaxPlayers","createMinPlayers","createVoting","createTeamDamage","createTourneyLimit",
 		"createUsePass","createServerMods","createWeaponStay","createPure","createRate","createReady","createSpectators","createWarmup",
-		"createVoice","createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit"};
+		"createVoice","createBuying","createBots","createBotSkill","createShuffle","createOvertime","createMercy","createRoundLimit",
+		"createMapRotation","createMapQueue","createItemTimers","createTimeouts","createSpectatorLock","createInactivity"};
 	for (const char* verb : verbs) {
 		const auto found = document.Model().actions.find(verb);
 		Check(found != document.Model().actions.end() && found->second.operation == "session.menuValue" &&
@@ -5209,95 +5243,101 @@ static void CheckCreateServerPage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,0.7);
 	// The 4:3 canvas at 1280x720: x = 160 dp, 1 u = 1.5 dp.
 	const float x0 = 160, u = 1.5f;
-	const auto shot = bounds("create-shot-back"), list = bounds("maps-list"), name = bounds("create-name"), start = bounds("create_start");
+	const auto shot = bounds("create-shot-back"), list = bounds("maps-list"), gametype = bounds("create-gametype"), start = bounds("create_start");
 	Check(Near(shot.x,x0+45*u,1) && Near(shot.y,75*u,1) && Near(shot.width,183*u,1) && Near(list.x,x0+42*u,1) && Near(list.y,219*u,1),
 		"the levelshot and the map list stand where the stock page's do");
-	Check(Near(name.x,x0+228*u,1) && Near(name.y,73*u,1) && Near(name.height,24*u,.5f) && Near(start.x,x0+244*u,1) && Near(start.y,397*u,1),
-		"the options start at 228,73 u on the 24 u pitch and CREATE SERVER stands at 244,397 u");
-	const auto lan = bounds("create-lan"), frag = bounds("create-fraglimit");
-	Check(Near(lan.y,(73+24)*u,1) && Near(frag.y,(73+24*5)*u,1),"each option takes the next 24 u row");
+	Check(Near(gametype.x,x0+228*u,1) && Near(gametype.y,73*u,1) && Near(gametype.height,24*u,.5f) && Near(start.x,x0+244*u,1) &&
+		Near(start.y,397*u,1),"MATCH starts with the game type at 228,73 u on the 24 u pitch and CREATE SERVER stands at 244,397 u");
+	const auto strip = bounds("tab-match");
+	Check(strip.y+strip.height <= 73*u+.5f && strip.x >= x0+228*u-.5f,"the tab strip stands over the settings column");
+	const auto frag = bounds("create-fraglimit"), time = bounds("create-timelimit");
+	Check(Near(frag.y,(73+24)*u,1) && Near(time.y,(73+48)*u,1),"each setting takes the next 24 u row");
+	Check(text("create-name","display") == "none" && text("create-usepass","display") == "none" && text("create-bots","display") == "block" &&
+		text("create-ruleset","display") == "none" && text("create-maprotation","display") == "block","MATCH shows the match's rows alone");
 	Check(text("map-1-name","text") == "SANDSTORM" && text("map-1-selected","display") == "block" && text("map-0-selected","display") == "none" &&
 		text("map-3","display") == "none","the published maps fill the list with the chosen one lit");
 	Check(text("crumb","text") == "#str_200002" && text("title","text") == "#str_200026" && Near(bounds("title").x,x0+136*u,1),
 		"MULTIPLAYER is the crumb and CREATE SERVER titles the sub-page at the step's foot");
 	Check(Near(value("band-top","transform",0),(323+97)*u,.05f),"the top band stands one notch on");
-	// The game type picks the rows: DM shows Frag Limit and Team Damage,
-	// locked with Auto Balance; CTF shows Capture Limit, unlocked; DeadZone
-	// Control Time; Tourney its round limit in Team Damage's place.
+	// The game type picks the limit row: DM Frag Limit, CTF Capture Limit,
+	// DeadZone Control Time, Tourney its round limit too. The map cycle
+	// script's name shows only while Map Rotation runs it.
 	Check(text("create-fraglimit","display") == "block" && text("create-capturelimit","display") == "none" &&
-		text("create-teamdamage","display") == "block" && text("create-tourneylimit","display") == "none" &&
-		runtime.GetControlState("create-autobalance") == ControlState::Disabled &&
-		runtime.GetControlState("create-teamdamage") == ControlState::Disabled,"Deathmatch: Frag Limit, and the team settings locked");
+		text("create-tourneylimit","display") == "none" && text("create-mapcycle","display") == "none",
+		"Deathmatch: Frag Limit, no tournament rounds, no map cycle script");
 	Check(runtime.SetState({{"create.gametype",3.0}},error,0.8),"CTF");
 	runtime.Frame(viewport,0.85);
-	Check(text("create-fraglimit","display") == "none" && text("create-capturelimit","display") == "block" &&
-		runtime.GetControlState("create-autobalance") != ControlState::Disabled,"CTF: Capture Limit, and Auto Balance applies");
+	Check(text("create-fraglimit","display") == "none" && text("create-capturelimit","display") == "block","CTF: Capture Limit");
 	Check(runtime.SetState({{"create.gametype",5.0}},error,0.9),"DeadZone");
 	runtime.Frame(viewport,0.95);
 	Check(text("create-controltime","display") == "block" && text("create-capturelimit","display") == "none","DeadZone: Control Time");
-	Check(runtime.SetState({{"create.gametype",1.0}},error,1.0),"Tourney");
+	Check(runtime.SetState({{"create.gametype",1.0},{"create.maprotation",3.0}},error,1.0),"Tourney, and the map cycle script");
 	runtime.Frame(viewport,1.05);
-	Check(text("create-tourneylimit","display") == "block" && text("create-teamdamage","display") == "none" &&
-		text("create-fraglimit","display") == "block","Tourney: its round limit in Team Damage's place");
+	Check(text("create-tourneylimit","display") == "block" && text("create-fraglimit","display") == "block" &&
+		text("create-mapcycle","display") == "block","Tourney: its round limit; the script rotation names its script");
 	// A map row's first Accept asks for its map; Accept on the chosen one moves
 	// on to CREATE SERVER.
 	Check(runtime.RunEvent("mapRow2",1.1,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "createMap",
 		"a map row asks for its map");
 	Check(runtime.RunEvent("mapRow1",1.2,effects,error) && effects.actions.empty() && runtime.FocusedControl() == "create_start",
 		"Accept on the chosen map moves on to CREATE SERVER");
-	// ADVANCED OPTIONS opens the stock popup's options, its contents at 200 ms.
-	Check(runtime.RunEvent("advancedModalShow",1.3,effects,error),"ADVANCED OPTIONS opens its dialog");
+	// The tabs: E steps MATCH to RULES and takes the focus to the tab shown,
+	// Q steps back, and from MATCH Q wraps to SERVER.
+	Check(runtime.RunEvent("onTabNext",1.3,effects,error) && runtime.FocusedControl() == "tab-rules","E shows RULES");
+	runtime.Frame(viewport,1.35);
+	Check(text("create-ruleset","display") == "block" && text("create-gametype","display") == "none" && Near(bounds("create-ruleset").y,73*u,1),
+		"RULES shows the rules' rows from the column's top");
+	// Outside team modes the team rows lock (Tourney here); the grappling
+	// hook acts under the Classic ruleset alone; the spectator lock needs
+	// spectators.
+	Check(runtime.GetControlState("create-autobalance") == ControlState::Disabled && runtime.GetControlState("create-shuffle") == ControlState::Disabled &&
+		runtime.GetControlState("create-teamdamage") == ControlState::Disabled && runtime.GetControlState("create-timeouts") == ControlState::Disabled &&
+		runtime.GetControlState("create-grapple") == ControlState::Disabled && runtime.GetControlState("create-spectatorlock") == ControlState::Disabled,
+		"Tourney under Quake 4's rules with no spectators: the team rows, the hook and the lock are locked");
+	Check(runtime.SetState({{"create.gametype",3.0},{"create.ruleset",1.0},{"create.spectators",true}},error,1.4),"Classic CTF with spectators");
+	runtime.Frame(viewport,1.45);
+	Check(runtime.GetControlState("create-autobalance") != ControlState::Disabled && runtime.GetControlState("create-timeouts") != ControlState::Disabled &&
+		runtime.GetControlState("create-grapple") != ControlState::Disabled && runtime.GetControlState("create-spectatorlock") != ControlState::Disabled,
+		"in a team mode under the Classic rules every row there applies");
+	Check(runtime.RunEvent("onTabPrevious",1.5,effects,error) && runtime.RunEvent("onTabPrevious",1.51,effects,error) &&
+		runtime.FocusedControl() == "tab-server","Q from MATCH wraps to SERVER");
 	runtime.Frame(viewport,1.55);
-	Check(text("advancedModal","display") == "block" && text("advancedModal-contents","display") == "block" &&
-		text("create-usepass","display") == "block" && text("create-mapcycle","display") == "block" &&
-		text("create-bots","display") == "none" && text("create-overtime","display") == "none",
-		"the dialog shows the advanced options' SERVER tab");
+	Check(text("create-name","display") == "block" && Near(bounds("create-name").y,73*u,1) && text("create-ruleset","display") == "none",
+		"SERVER starts with the server's name");
 	// The password rows follow Use password, as the stock popup's do; Set
 	// password dims and hides its text while Use password is off.
 	const auto usepass = bounds("create-usepass"), password = bounds("create-password"), rcon = bounds("create-rconpassword");
-	Check(Near(password.y,usepass.y+24*u,1) && Near(rcon.y,usepass.y+48*u,1) && Near(bounds("create-pure").y,usepass.y+72*u,1),
-		"Set password and the remote console password follow Use password");
-	// MATCH and RULES show their own rows, and each opening starts on SERVER.
-	Check(runtime.RunEvent("advancedTab1",1.552,effects,error),"the MATCH tab");
-	runtime.Frame(viewport,1.554);
-	Check(text("create-bots","display") == "block" && text("create-shuffle","display") == "block" && text("create-usepass","display") == "none",
-		"MATCH shows the match's rows");
-	Check(runtime.RunEvent("advancedTab2",1.556,effects,error),"the RULES tab");
-	runtime.Frame(viewport,1.558);
-	Check(text("create-overtime","display") == "block" && text("create-roundlimit","display") == "block" && text("create-bots","display") == "none",
-		"RULES shows the rules' rows");
-	// MODIFIERS holds the preset and the modifier layer. Instagib locks the
-	// rules it overrides, and Quad Hog is a Deathmatch rule (the game type is
-	// Tourney here).
-	Check(text("create-selfdamage","display") == "block" && text("create-instagib","display") == "none","the percentages are rules");
-	Check(runtime.RunEvent("advancedTab3",1.5582,effects,error),"the MODIFIERS tab");
-	runtime.Frame(viewport,1.5584);
-	Check(text("create-preset","display") == "block" && text("create-instagib","display") == "block" &&
-		text("create-weaponarena","display") == "block" && text("create-overtime","display") == "none",
-		"MODIFIERS shows the preset and the modifiers");
-	Check(runtime.GetControlState("create-vampiric") != ControlState::Disabled && runtime.GetControlState("create-frenzy") != ControlState::Disabled &&
-		runtime.GetControlState("create-quadhog") == ControlState::Disabled,"Quad Hog is locked outside Deathmatch");
-	Check(runtime.SetState({{"create.instagib",true}},error,1.5585),"Instagib");
-	runtime.Frame(viewport,1.5586);
-	Check(runtime.GetControlState("create-vampiric") == ControlState::Disabled && runtime.GetControlState("create-frenzy") == ControlState::Disabled &&
-		runtime.GetControlState("create-weaponarena") == ControlState::Disabled && runtime.GetControlState("create-powerups") == ControlState::Disabled,
-		"Instagib locks the rules it overrides");
-	Check(runtime.SetState({{"create.instagib",false},{"create.weaponarena",6.0}},error,1.5587),"a weapon arena");
-	runtime.Frame(viewport,1.5588);
-	Check(runtime.GetControlState("create-frenzy") == ControlState::Disabled && runtime.GetControlState("create-vampiric") != ControlState::Disabled,
-		"a weapon arena locks Weapons Frenzy and nothing else here");
-	Check(runtime.SetState({{"create.weaponarena",0.0}},error,1.5589),"no arena");
-	Check(runtime.RunEvent("advancedTab0",1.559,effects,error),"the SERVER tab");
-	runtime.Frame(viewport,1.5595);
+	Check(Near(password.y,usepass.y+24*u,1) && Near(rcon.y,usepass.y+48*u,1),"Set password and the remote console password follow Use password");
 	Check(runtime.GetControlState("create-password") == ControlState::Disabled && text("create-password-viewport","display") == "none" &&
 		runtime.GetControlState("create-rconpassword") != ControlState::Disabled,"without Use password, Set password is locked and its text hidden");
 	Check(runtime.SetState({{"create.usepass",true}},error,1.56),"Use password");
 	runtime.Frame(viewport,1.57);
 	Check(runtime.GetControlState("create-password") != ControlState::Disabled && text("create-password-viewport","display") == "block",
 		"with Use password, Set password takes its text");
-	Check(runtime.RunEvent("advancedModalHide",1.6,effects,error),"CLOSE ADVANCED OPTIONS");
+	// MODIFIERS holds the preset, the modifier layer and the percentages.
+	// Instagib locks the rules it overrides, and Quad Hog is a Deathmatch rule.
+	Check(runtime.RunEvent("tab_modifiers",1.58,effects,error),"the MODIFIERS tab");
+	runtime.Frame(viewport,1.59);
+	Check(text("create-preset","display") == "block" && text("create-instagib","display") == "block" &&
+		text("create-selfdamage","display") == "block" && text("create-name","display") == "none",
+		"MODIFIERS shows the preset, the modifiers and the scales");
+	Check(runtime.GetControlState("create-vampiric") != ControlState::Disabled && runtime.GetControlState("create-frenzy") != ControlState::Disabled &&
+		runtime.GetControlState("create-quadhog") == ControlState::Disabled,"Quad Hog is locked outside Deathmatch");
+	Check(runtime.SetState({{"create.instagib",true}},error,1.6),"Instagib");
+	runtime.Frame(viewport,1.61);
+	Check(runtime.GetControlState("create-vampiric") == ControlState::Disabled && runtime.GetControlState("create-frenzy") == ControlState::Disabled &&
+		runtime.GetControlState("create-weaponarena") == ControlState::Disabled && runtime.GetControlState("create-powerups") == ControlState::Disabled,
+		"Instagib locks the rules it overrides");
+	Check(runtime.SetState({{"create.instagib",false},{"create.weaponarena",6.0}},error,1.62),"a weapon arena");
+	runtime.Frame(viewport,1.63);
+	Check(runtime.GetControlState("create-frenzy") == ControlState::Disabled && runtime.GetControlState("create-vampiric") != ControlState::Disabled,
+		"a weapon arena locks Weapons Frenzy and nothing else here");
+	Check(runtime.SetState({{"create.weaponarena",0.0}},error,1.64),"no arena");
+	// Each arrival starts on MATCH with CREATE SERVER focused.
+	Check(runtime.RunEvent("onActivate",1.7,effects,error),"the page arrives again");
 	runtime.Frame(viewport,2.0);
-	Check(text("advancedModal","display") == "none","the dialog closes");
+	Check(text("create-gametype","display") == "block" && text("create-preset","display") == "none" && runtime.FocusedControl() == "create_start",
+		"an arrival shows MATCH");
 	Check(runtime.RunEvent("onBack",2.1,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "back","Back asks to climb out");
 	// Back: the title drops at once and the band steps back while the crumb
 	// holds; the crumb returns over the last 150 ms; the page sweeps out.
@@ -6077,21 +6117,21 @@ static void CheckMenusTextScale(ScreenHost& host, char** argv) {
 		{{"objectives-empty-text","objectives-empty"}},{"objectives-list","objectives_back"},{.827f,.827f,.827f}});
 }
 
-// The multiplayer pages' remaining text scale: Create Server's options and
-// its advanced dialog, Join Game's status, empty state and entry dialogs,
+// The multiplayer pages' remaining text scale: Create Server's MATCH and
+// SERVER tabs, Join Game's status, empty state and entry dialogs,
 // and Player Setup, whose value stands under its label above 100 %.
 static void CheckMultiplayerTextScale(ScreenHost& host, char** argv) {
 	StateValues create{{"create.map_count",3.0},{"create.map_first",0.0},{"create.map_selected",0.0},{"create.gametype",0.0}};
 	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.rui",create,{"onActivate"},
-		{{{"create-gametype-head","create-gametype-value"},1},{{"create-name-head","create-name-viewport"},1},
-		 {{"create-dedicated-head","create-dedicated-box"},1},{{"create-fraglimit-head","create-fraglimit-viewport"},1}},
-		{{"create-gametype-value","create-gametype"},{"create-gametype-chevron","create-gametype"},{"create-dedicated-box","create-dedicated"},
-		 {"create-fraglimit-viewport","create-fraglimit"},{"create-name-viewport","create-name"},{"create-name-head","create-name"}},
-		{"create_start","create_advanced","create_back","create-options"}});
-	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.rui",create,{"onActivate","advancedModalShow"},
-		{{{"advanced-rows","advancedModal_close"}},{{"create-rate-head","create-rate-value"},1}},
+		{{{"create-gametype-head","create-gametype-value"},1},{{"create-warmup-head","create-warmup-box"},1},
+		 {{"create-fraglimit-head","create-fraglimit-viewport"},1}},
+		{{"create-gametype-value","create-gametype"},{"create-gametype-chevron","create-gametype"},{"create-warmup-box","create-warmup"},
+		 {"create-fraglimit-viewport","create-fraglimit"},{"create-gametype-head","create-gametype"}},
+		{"create_start","create_back","create-options"}});
+	CheckTextScaleCase(host,{argv[27],"guis/menu/createserver.rui",create,{"onActivate","tab_server"},
+		{{{"create-name-head","create-name-viewport"},1},{{"create-rate-head","create-rate-value"},1}},
 		{{"create-rate-value","create-rate"},{"create-banlist-label","create-banlist"},{"create-banlist-chevron","create-banlist"},
-		 {"advanced-rows","advancedModal-dialog"},{"create-mapcycle-viewport","create-mapcycle"}},{"advancedModal_close"}});
+		 {"create-name-viewport","create-name"},{"create-name-head","create-name"}},{"create_start","create_back","create-options"}});
 	StateValues join{{"join.count",0.0},{"join.listed",0.0},{"join.scanning",false},{"join.status",std::string("No servers found")}};
 	CheckTextScaleCase(host,{argv[28],"guis/menu/joingame.rui",join,{"onActivate"},
 		{{{"servers-list","join-gametype-value","join-status"},0,1},{{"join-empty-heading","join-empty","join_emptynew"}}},

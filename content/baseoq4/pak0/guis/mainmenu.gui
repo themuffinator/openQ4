@@ -717,6 +717,26 @@ windowDef Desktop
 		set "desktop::dest" "22" ;
 	}
 
+	// The multiplayer menu's AUDIO route, as its SYSTEM route: the retained
+	// page over the menu as it comes up; a page that cannot open sends
+	// fromMp_toAudioStock, the stock AUDIO page.
+	onNamedEvent fromMp_toAudio {
+		if ("gui::retainedAudio" == 1) {
+			set "desktop::dest" "0" ;
+			resettime "anim_retainedAudioFromMp" "0" ;
+		} else {
+			set "desktop::active" "1" ;
+			resettime "anim_in" "0" ;
+			set "desktop::dest" "36" ;
+		}
+	}
+
+	onNamedEvent fromMp_toAudioStock {
+		set "desktop::active" "1" ;
+		resettime "anim_in" "0" ;
+		set "desktop::dest" "36" ;
+	}
+
 	onNamedEvent fromRestart_toLoad {
 		set "desktop::active" "1" ;
 		resettime "anim_in" "0" ;
@@ -13455,6 +13475,17 @@ windowDef Desktop
 
 			onTime 0 {
 				set "cmd" "openRetainedControlsFromMp" ;
+				set "notime" "1" ;
+			}
+		}
+		windowDef anim_retainedAudioFromMp
+		{
+			rect	0,0,1,1
+			visible	1
+			notime	1
+
+			onTime 0 {
+				set "cmd" "openRetainedAudioFromMp" ;
 				set "notime" "1" ;
 			}
 		}

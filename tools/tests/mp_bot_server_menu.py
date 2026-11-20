@@ -129,7 +129,10 @@ def validate_engine_declares_menu_cvars() -> None:
     # Only declare what the module has not; an unconditional write would stomp
     # the value game_mp already registered.
     require(declare, "cvarSystem->Find(", "Session_DeclareMultiplayerMenuGameCVars")
-    require(declare, "CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE", "Session_DeclareMultiplayerMenuGameCVars")
+    require(declare, "CVAR_GAME | CVAR_ARCHIVE | menuGameCVars[i].flags", "Session_DeclareMultiplayerMenuGameCVars")
+    for _, cvar_name, _ in BOT_ROWS:
+        if re.search(rf'\{{ "{re.escape(cvar_name)}",\s*"\d+",\s*CVAR_INTEGER \}}', declare) is None:
+            raise AssertionError(f"Session_DeclareMultiplayerMenuGameCVars declares {cvar_name} without CVAR_INTEGER")
 
     # ...and it has to run before the gui is parsed, because idChoiceWindow
     # resolves its cvar exactly once, in InitVars.
@@ -203,16 +206,23 @@ def validate_row_widgets() -> None:
             f"but bot_skill clamps to {low}-{high}"
         )
 
-    fill_default = re.search(r'idCVar bot_minPlayers\(\s*"bot_minPlayers",\s*"([^"]*)"', declared)
-    skill_default = re.search(r'idCVar bot_skill\(\s*"bot_skill",\s*"([^"]*)"', declared)
-    if fill_default is None or skill_default is None:
-        raise AssertionError("mpgame no longer declares bot_minPlayers/bot_skill defaults")
-
     session = read(ROOT / "src" / "framework" / "Session.cpp")
+    declare = session[session.index("static void Session_DeclareMultiplayerMenuGameCVars"):]
+    declare = declare[: declare.index("\n}\n")]
+    entries = re.findall(r'\{ "(\w+)",\s*"([^"]*)",\s*([A-Z_ |]+) \}', declare)
+    if {name for name, _, _ in entries} < {cvar for _, cvar, _ in BOT_ROWS}:
+        raise AssertionError("Session_DeclareMultiplayerMenuGameCVars no longer declares the bot rows' cvars")
     # A mismatched reset value makes idInternalCVar::Update warn about a cvar
-    # given two initial values every time the module swaps in.
-    require(session, f'{{ "bot_minPlayers",\t"{fill_default.group(1)}" }}', "Session.cpp menu cvar defaults")
-    require(session, f'{{ "bot_skill",\t\t"{skill_default.group(1)}" }}', "Session.cpp menu cvar defaults")
+    # given two initial values every time the module swaps in, so each menu
+    # declaration carries game_mp's default (the bots' and the other
+    # multiplayer settings the menus edit).
+    sources = "".join(read(path) for path in sorted((GAME_LIBS_ROOT / "src" / "mpgame").rglob("*.cpp")))
+    for name, value, kind in entries:
+        found = re.search(rf'idCVar\s+{re.escape(name)}\(\s*"{re.escape(name)}",\s*"([^"]*)"', sources)
+        if found is None:
+            raise AssertionError(f"mpgame no longer declares {name}, which the menus declare for it")
+        if found.group(1) != value:
+            raise AssertionError(f"Session.cpp declares {name} as {value!r}; game_mp's default is {found.group(1)!r}")
 
 
 def validate_popup_layout() -> None:

@@ -18,10 +18,26 @@ from retained_saves import table_text
 
 MODEL_ROWS = 128  # Bounded choice page, not a limit on the installed catalog.
 ROTATION_LABEL = "#str_231547"
-# The rows are 540 dp wide: the tab strip's three labels and its keycaps need
-# 528 dp in the widest language (Brazilian Portuguese), and the preview's
-# figure starts 70 dp past them.
-WIDTH, VALUE_X, ROW_H = 540.0, 190.0, 45.0
+# The rows are 612 dp wide from 40 dp in: the tab strip's four labels and its
+# keycaps need 605 dp in the widest language (Brazilian Portuguese), and the
+# preview's bay starts 13 dp past them. At 540 dp from 87 dp in they held the
+# three tabs before HUD (the multiplayer menu tree audit, 20 November 2026).
+WIDTH, VALUE_X, ROW_H = 612.0, 190.0, 45.0
+FIELDS_LEFT, HEADING_LEFT = 40.0, 49.0     # dp: the rows' column and the heading over it
+# The HUD tab: the multiplayer HUD's options (MP-15, docs/user/multiplayer-
+# client-options.md) and how a spectator follows a player (MP-16), which only
+# the console set before. Each row: its CVar, label, kind and, for a choice,
+# its names' list and values; a slider its range and step.
+HUD_ROWS = (
+    ("hud_hitSound", "#str_232609", "choice", ("#str_232610", (0, 1, 2, 3))),
+    ("hud_crosshairNames", "#str_232611", "choice", ("#str_232612", (0, 1, 2))),
+    ("hud_crosshairAmmo", "#str_232613", "toggle", None),
+    ("hud_itemTimers", "#str_232603", "toggle", None),
+    ("hud_teamLocations", "#str_232614", "toggle", None),
+    ("hud_localClock", "#str_232615", "choice", ("#str_232616", (0, 1, 2))),
+    ("ui_spectatorSpeed", "#str_232617", "slider", (25, 300, 5)),
+    ("g_spectatorFollowView", "#str_232618", "choice", ("#str_232619", (0, 1, 2))),
+)
 # The page stands from 72 u, under the docked top band: from 130 u its rows
 # ran under the bottom band, and two tabs' last rows and BACK had to be
 # scrolled to.
@@ -109,6 +125,31 @@ def rail_row(doc: Document) -> tuple[dict, list[str]]:
         controls.append(ident)
     return group("setup-rail", {"position": keyword("relative"), "width": length(WIDTH), "height": length(52),
                                  "flex-shrink": number(0)}, children), controls
+
+
+def hud_rows(doc: Document, width: float, value_x: float, row_h: float, prefix: str, placement: str = "setup-fields",
+             wrap: bool = True, rows: tuple = HUD_ROWS) -> list:
+    """The HUD tab's rows (HUD_ROWS), each set through settings.player.set
+    and read back from its CVar, as the appearance rows are; the multiplayer
+    card's Settings page shows the same rows (`rows`, a part of them) under
+    `prefix`."""
+    built = []
+    for cvar, key, kind, spec in rows:
+        ident = f"{prefix}-{cvar.split('_', 1)[1].lower()}"
+        numeric = kind != "toggle"
+        value = cvar_state(doc, cvar, "number" if numeric else "boolean")
+        action = setting_action(doc, cvar, "number" if numeric else "boolean")
+        if kind == "choice":
+            names, values = spec
+            built.append(value_row(doc, ident, key, "choice", width, value_x, value=value, action=action,
+                                  entries=[((names, option), value) for option, value in enumerate(values)], row_h=row_h,
+                                  placement=placement, wrap=wrap))
+        elif kind == "slider":
+            built.append(value_row(doc, ident, key, "slider", width, value_x, value=value, action=action, slider=(*spec, 0),
+                                  row_h=row_h, wrap=wrap))
+        else:
+            built.append(value_row(doc, ident, key, "toggle", width, value_x, value=value, action=action, row_h=row_h, wrap=wrap))
+    return built
 
 
 def stack_rail(doc: Document, row: dict) -> None:
@@ -235,11 +276,14 @@ def player_setup(doc: Document) -> dict:
                                                         "overflow": keyword("hidden"), "display": keyword("block")})
     rows.append(team_note)
     sides[2].append("setup-team-note")
-    value_rows = [ident for ident in sides[1] + sides[2] if ident != "setup-team-note"] + ["setup-handicap"]
+    hud = hud_rows(doc, WIDTH, VALUE_X, ROW_H, "setup")
+    rows += hud
+    hud_ids = [row["id"] for row in hud]
+    value_rows = [ident for ident in sides[1] + sides[2] if ident != "setup-team-note"] + ["setup-handicap", *hud_ids]
     # Each row shows on its tab alone.
     doc.state["setup.tab"] = {"type": "number", "initial": 0}
     by_id = {row["id"]: row for row in rows}
-    for tab, idents in ((0, own), (1, sides[1]), (2, sides[2])):
+    for tab, idents in ((0, own), (1, sides[1]), (2, sides[2]), (3, hud_ids)):
         for ident in idents:
             row = by_id[ident]
             shown = row["properties"].get("display", keyword("block"))["value"]
@@ -260,17 +304,25 @@ def player_setup(doc: Document) -> dict:
     # Three plates with an underline stood here first; their labels had to
     # shrink to 13 dp to fit the longest translations.
     from retained_mp_menus import TAB_RISE, tab_strip
-    names = (("player", "#str_200255"), ("opponents", "#str_42037"), ("teammates", "#str_42038"))
+    names = (("player", "#str_200255"), ("opponents", "#str_42037"), ("teammates", "#str_42038"), ("hud", "#str_231235"))
     shows = lambda tab: {"op": "==", "args": [{"state": "setup.tab"}, tab]}  # noqa: E731
     focus_shown = [{"op": "if", "condition": shows(tab), "then": [{"op": "focus", "control": f"tab-{ident}"}]}
                    for tab, (ident, _key) in enumerate(names)]
     for tab, (ident, _key) in enumerate(names):
         doc.events[f"tab_{ident}"] = [{"op": "setState", "values": {"setup.tab": tab}}]
-    for event, order in (("onTabNext", (1, 2, 0)), ("onTabPrevious", (2, 0, 1))):
+    for event, step in (("onTabNext", 1), ("onTabPrevious", -1)):
         assert event not in doc.events, event
-        target = {"op": "select", "args": [shows(0), order[0], {"op": "select", "args": [shows(1), order[1], order[2]]}]}
+        target = (len(names) - 1 + step) % len(names)
+        for tab in reversed(range(len(names) - 1)):
+            target = {"op": "select", "args": [shows(tab), (tab + step) % len(names), target]}
         doc.events[event] = [{"op": "if", "condition": {"state": "setup.open"},
                               "then": [{"op": "setState", "values": {"setup.tab": target}}, *focus_shown]}]
+    from retained_mp_menus import TAB_SIZE, strip_chrome, tab_slot
+    import build_retained_screens as b
+    for language in b.LANGUAGES:
+        needed = sum(tab_slot(text_width("marine", b.engine_text(key)[language], TAB_SIZE)) for _, key in names) * 1.02 + strip_chrome()
+        if needed > WIDTH:
+            raise SystemExit(f"Player Setup's tabs need {needed:.0f} dp in {language}, past its {WIDTH:g} dp rows")
     strip = tab_strip(doc, WIDTH, [(ident, key, None) for ident, key in names], top=0, state="setup.tab")
     rows.insert(0, group("setup-tabs", {"position": keyword("relative"), "width": length(WIDTH), "height": length(TAB_RISE + 8),
                                         "flex-shrink": number(0)}, strip))
@@ -299,7 +351,7 @@ def player_setup(doc: Document) -> dict:
             stack_rail(doc, row)
         else:
             fixed_text(doc, row)
-    fields = group("setup-fields", {**absolute(left=U*58, top=U*(SETUP_TOP+28), width=WIDTH+16, height=U*FIELDS_H),
+    fields = group("setup-fields", {**absolute(left=FIELDS_LEFT, top=U*(SETUP_TOP+28), width=WIDTH+16, height=U*FIELDS_H),
                                       "overflow": keyword("auto"), "display": keyword("flex"), "flex-direction": keyword("column"),
                                       "row-gap": length(6)}, rows)
     model = {"id": "setup-preview", "type": "model", "properties": {**absolute(left=0, top=0, width=CANVAS_W, height=720),
@@ -311,7 +363,7 @@ def player_setup(doc: Document) -> dict:
                  {"model": "weapon_machinegun_world", "joint": "PST_ATTACHER", "anim": "idle", "animClass": "weapon_blaster_gui"}],
                  "origin": [-50, 0, -40], "rotation": [0, {"state": "setup.rotation"}, 0], "camera": [-160, 65, -5],
                  "lights": [{"origin": [-100, -50, -60], "colour": [.45, .25, .125]}, {"origin": [-120, 120, 120], "colour": [.8, .9, 1]}]}}
-    heading = label("setup-heading", "#str_231122", {**absolute(left=U*67, top=U*SETUP_TOP, width=WIDTH, height=32),
+    heading = label("setup-heading", "#str_231122", {**absolute(left=HEADING_LEFT, top=U*SETUP_TOP, width=WIDTH, height=32),
                                                      **typeface("marine", 20, 32, rgb(OLIVE))})
     current = label("setup-current-model", "#str_230030", {**absolute(left=U*421, top=U*380, width=U*200, height=48),
                                                           **typeface("lowpixel", 16, 22, rgb(VALUE)), "overflow": keyword("hidden"),
@@ -337,7 +389,7 @@ def player_setup(doc: Document) -> dict:
     doc.bind("setup-current-model.text", "setup-current-model", "text",
              {"op": "select", "args": [forced_shown, {"state": "setup.force_name"}, {"state": "setup.model_name"}]})
     bay = preview_bay()
-    notice = label("setup-notice", "#str_230030", {**absolute(left=U*67, top=U*413, width=U*520, height=40),
+    notice = label("setup-notice", "#str_230030", {**absolute(left=HEADING_LEFT, top=U*413, width=U*520, height=40),
                                                    **typeface("lowpixel", 14, 20, rgb(VALUE)), "overflow": keyword("hidden")})
     doc.bind("setup-notice.text", "setup-notice", "text", {"state": "setup.notice"})
     # The heading is furniture; the model's name and the notice are content,
@@ -382,7 +434,8 @@ def tall_player_setup(doc: Document, pane: dict, rows: list) -> None:
     # The rows' scale: as large as leaves the figure its least room, from the
     # landscape size up to 1.6 times it.
     fixed = TALL_SETUP_TOP + 8 + 4 + 8 + TALL_PREVIEW_LEAST + TALL_SETUP_BOTTOM
-    scale = {"op": "max", "args": [1, {"op": "min", "args": [TALL_SETUP_MOST, {"op": "/", "args": [
+    scale = {"op": "max", "args": [1, {"op": "min", "args": [round(min(TALL_SETUP_MOST, (CANVAS_W - 2 * TALL_MARGIN) / (WIDTH + 16)), 4),
+                                                             {"op": "/", "args": [
         text_sum(-fixed, VIEW_HEIGHT), round(head_h + rows_h + notice_h + label_h, 4)]}]}]}
     times = lambda value: {"op": "*", "args": [scale, value]}  # noqa: E731
     tall_bind(doc, pane, "height", VIEW_HEIGHT)

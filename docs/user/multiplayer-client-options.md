@@ -8,8 +8,12 @@ show each other. None of them changes the rules of the game. Each has its own
 setting, and each works in the Remastered, Minimal, Competitive and Classic HUD
 layouts unless it says otherwise.
 
-Type the settings in the console (`~`), or put them in your `autoexec.cfg`.
-They are saved with your profile.
+Set the HUD options and how you spectate in the menus, on **Multiplayer →
+Player Setup → HUD**, or in a match on the in-match menu's **Settings → HUD**:
+**Hit Sound**, **Crosshair Names**, **Crosshair Ammo**, **Item Timers**,
+**Team Locations**, **Local Clock**, **Spectator Speed** and **Follow View**.
+Everything else here, and the same settings, can be typed in the console (`~`)
+or put in your `autoexec.cfg`. They are saved with your profile.
 
 ## Chat tokens
 

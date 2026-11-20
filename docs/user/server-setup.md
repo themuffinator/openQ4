@@ -16,7 +16,35 @@ explanation instead of leaving anyone waiting. See
 ## Hosting from the game
 
 Open **Multiplayer → Create Server** to host a listen server: you play on it
-while it serves the other players.
+while it serves the other players. Pick a map on the left; the settings on the
+right are in four tabs (switch with Q and E, or a controller's shoulder
+buttons). Before the 20 November 2026 development build the page showed a few
+of them and kept the rest behind **Advanced Server Options**.
+
+- **Match** starts with the **Gametype**, then its limits, **Max Players** and
+  **Min Players**, **Fill With Bots** and **Bot Skill** (see [Bots](#bots)),
+  **Warmup**, **Ready Up**, and what follows a match: **Map Rotation**
+  (**Same Map**, **In Order**, **Shuffled** or your **Map Cycle Script**) and
+  **Map Requests**, which lets players queue a map with `mymap`. See
+  [Maps, rotation and the map queue](#maps-rotation-and-the-map-queue). **Not in 0.14.1**
+- **Rules** holds how the match plays: the **Ruleset** and its grappling hook,
+  the team settings (**Auto Balance**, **Shuffle Teams**, **Team Damage** and
+  **Timeouts per Team**, which dim outside team modes), **Weapon Stay**,
+  **Buying**, the **Overtime Period (Seconds)**, the **Mercy Lead**, **Item
+  Timers** (who sees respawn timers), **Allow Spectators** and the
+  **Spectator Lock**. **Not in 0.14.1**
+- **Modifiers** (**Not in 0.14.1**) changes how any game type plays:
+  a **Preset**, **Instagib**, **Quad Hog**, **Vampiric Damage**, **Weapons
+  Frenzy**, a **Weapon Arena**, the **Powerups** switch, weapon respawn and
+  the self-damage, knockback and fall-damage scales. See
+  [Modifiers and presets](#modifiers-and-presets).
+- **Server** holds the server's name, who can join and how it runs, below.
+- **Buying** (**Not in 0.14.1**), on the **Rules** tab, replaces the weapon,
+  armour and ammunition pickups with a buy menu: **Off**, **Quake 4**'s rules or
+  **The Awakening**'s, with its prices, weapon mods and FC Armor Regen. See
+  [Buying in multiplayer](buying.md).
+
+On the **Server** tab:
 
 - **Server Type** decides who can join. **Internet** lists the server on the
   master servers and accepts players from anywhere; **LAN** keeps it off the
@@ -26,18 +54,10 @@ while it serves the other players.
   takes its place. Type server commands there, such as `spawnServer mp/q4dm2`,
   `kick` and `quit`, and close the window to stop the server. To play on it
   from the same computer, start openQ4 again and join from the server browser.
-- **Advanced Server Options** holds the match rules and bots. In the new
-  interface its **Match** tab has **Fill With Bots**, **Bot Skill** and
-  **Shuffle Teams**, and its **Rules** tab has **Overtime**, **Mercy Lead**
-  and **Round Limit**. See [Bots](#bots).
-- The **Modifiers** tab (**Not in 0.14.1**) changes how any game type plays:
-  a **Preset**, **Instagib**, **Quad Hog**, **Vampiric Damage**, **Weapons
-  Frenzy**, a **Weapon Arena** and the **Powerups** switch. See
-  [Modifiers and presets](#modifiers-and-presets).
-- **Buying** (**Not in 0.14.1**), on the **Rules** tab, replaces the weapon,
-  armour and ammunition pickups with a buy menu: **Off**, **Quake 4**'s rules or
-  **The Awakening**'s, with its prices, weapon mods and FC Armor Regen. See
-  [Buying in multiplayer](buying.md).
+- **Idle Timeout** (**Not in 0.14.1**) moves a player who sends no input for
+  one, two, five or ten minutes to the spectators (`g_inactivity`).
+- The passwords, **Allow Voting**, **Voice Chat**, **Pure Server**, **Max
+  Rate** and **View Local Server Ban List** are here too.
 
 ## Instagib
 
@@ -56,8 +76,7 @@ Flag, Duel, Clan Arena, Freeze Tag and the rest, and with the
 - Buying is off, and team damage still follows the server's **Team Damage**
   setting.
 
-Turn it on with **Instagib** on the **Modifiers** tab of **Advanced Server
-Options**, or with `si_instagib 1` on a dedicated server. The match name shows
+Turn it on with **Instagib** on Create Server's **Modifiers** tab, or with `si_instagib 1` on a dedicated server. The match name shows
 it, for example "Instagib Deathmatch". If you change `si_instagib` during a
 match, it takes effect at the next map or restart. Run `rescanSI` to restart
 the match with the new setting straight away.
@@ -65,8 +84,8 @@ the match with the new setting straight away.
 ## Modifiers and presets
 
 **Not in 0.14.1.** A modifier changes the rules of whatever game type you are
-playing. Turn them on from the **Modifiers** tab of **Advanced Server
-Options**, with the settings below, or with the `modifier` command on a
+playing. Turn them on from Create Server's **Modifiers** tab, with the
+settings below, or with the `modifier` command on a
 running server. The match name shows what is on, for example "Quad Hog
 Deathmatch" or "Deathmatch (Rocket Launcher)", and so do the server browser
 and its details card.
@@ -505,8 +524,8 @@ queue and the pick are off and a map's `set` lines are not applied.
 openQ4's bots play any multiplayer map with no per-map setup, so your server
 stays busy when it is quiet. Set **Fill With Bots** (`bot_minPlayers`) to the
 number of players you want and the server adds bots to reach it, freeing a
-slot each time a real player joins. Both bot settings are on
-**Create Server → Advanced Server Options**; **Bot Skill** uses the Arena
+slot each time a real player joins. Both bot settings are on Create Server's
+**Match** tab, beside the player counts; **Bot Skill** uses the Arena
 campaign's names: Training, Rookie, Veteran, Nightmare and Impossible.
 
 Bots run entirely on the server. Players need nothing extra and see them as

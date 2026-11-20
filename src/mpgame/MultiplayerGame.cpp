@@ -18298,6 +18298,15 @@ void idMultiplayerGame::ResetRetainedVoteDraft( void ) {
 	retainedVoteDraft[ RVF_RESTART ] = 0;
 	retainedVoteDraft[ RVF_BUYING ] = MP_BuyingModeFromServerInfo( si );
 	retainedVoteDraft[ RVF_KICK ] = -1;
+	// The casual fields: the server's values, and no one-off action chosen.
+	retainedVoteDraft[ RVF_NEXTMAP ] = 0;
+	retainedVoteDraft[ RVF_RANDOMMAP ] = 0;
+	retainedVoteDraft[ RVF_ROUNDLIMIT ] = si.GetInt( "si_roundLimit" );
+	retainedVoteDraft[ RVF_OVERTIME ] = si.GetInt( "si_overtime" );
+	retainedVoteDraft[ RVF_RULESET ] = si.GetInt( "si_ruleset" ) ? 1 : 0;
+	retainedVoteDraft[ RVF_INSTAGIB ] = si.GetBool( "si_instagib" ) ? 1 : 0;
+	retainedVoteDraft[ RVF_READYALL ] = 0;
+	retainedVoteDraft[ RVF_COINTOSS ] = 0;
 	retainedVoteKickIdentity = 0;
 	retainedVoteKickStale = false;
 	retainedVoteMapsRequested = false;
@@ -18366,7 +18375,9 @@ bool idMultiplayerGame::SetRetainedVoteKick( int row, const char *catalog ) {
 // The vote flag each drafted field changes, in retainedVoteField_t order.
 static const int retainedVoteFlags[] = {
 	VOTEFLAG_MAP, VOTEFLAG_GAMETYPE, VOTEFLAG_TIMELIMIT, VOTEFLAG_FRAGLIMIT, VOTEFLAG_CAPTURELIMIT, VOTEFLAG_TOURNEYLIMIT,
-	VOTEFLAG_CONTROLTIME, VOTEFLAG_TEAMBALANCE, VOTEFLAG_SHUFFLE, VOTEFLAG_RESTART, VOTEFLAG_BUYING, VOTEFLAG_KICK
+	VOTEFLAG_CONTROLTIME, VOTEFLAG_TEAMBALANCE, VOTEFLAG_SHUFFLE, VOTEFLAG_RESTART, VOTEFLAG_BUYING, VOTEFLAG_KICK,
+	VOTEFLAG_NEXTMAP, VOTEFLAG_RANDOMMAP, VOTEFLAG_ROUNDLIMIT, VOTEFLAG_OVERTIME, VOTEFLAG_RULESET, VOTEFLAG_INSTAGIB,
+	VOTEFLAG_READYALL, VOTEFLAG_COINTOSS
 };
 
 /*
@@ -18389,11 +18400,17 @@ bool idMultiplayerGame::RetainedDraftFieldShown( int voteGameType, int field ) {
 		case RVF_BALANCE:
 		case RVF_SHUFFLE: return MPGameTypeHasAny( type, GTF_TEAM );
 		case RVF_BUYING: return MPGameTypeHasAny( type, GTF_BUYING );
+		case RVF_ROUNDLIMIT: return MPGameTypeHasAny( type, GTF_ROUNDLIMIT );
 		default: return field >= 0 && field < RVF_COUNT;
 	}
 }
 
+// Ready Everyone shows only while a warmup waits for players to ready up,
+// the only time the server takes it (VoteReadyAllAvailable).
 bool idMultiplayerGame::RetainedVoteFieldShown( int field ) const {
+	if ( field == RVF_READYALL && !VoteReadyAllAvailable() ) {
+		return false;
+	}
 	return RetainedDraftFieldShown( retainedVoteDraft[ RVF_GAMETYPE ], field );
 }
 
@@ -18412,9 +18429,11 @@ refuses a whole vote for one unchanged field, so nothing else is sent.
 ================
 */
 int idMultiplayerGame::RetainedVoteChanges( voteStruct_t &data ) {
+	static_assert( sizeof( retainedVoteFlags ) / sizeof( retainedVoteFlags[0] ) == RVF_COUNT, "every drafted vote field has its flag" );
 	data.m_fieldFlags = 0;
 	data.m_kick = data.m_gameType = data.m_timeLimit = data.m_fragLimit = data.m_tourneyLimit = 0;
 	data.m_captureLimit = data.m_buying = data.m_teamBalance = data.m_controlTime = 0;
+	data.m_roundLimit = data.m_ruleset = data.m_instagib = data.m_overtime = 0;
 	data.m_map.Clear();
 	RetainedVoteChoices();
 	if ( retainedVoteKickStale ) return 0;
@@ -18462,6 +18481,27 @@ int idMultiplayerGame::RetainedVoteChanges( voteStruct_t &data ) {
 	if ( changes( RVF_KICK ) && retainedVoteDraft[ RVF_KICK ] >= 0 ) {
 		data.m_kick = retainedVoteDraft[ RVF_KICK ];
 		data.m_fieldFlags |= VOTEFLAG_KICK;
+	}
+	// The casual fields (MP-12): a value that differs from the server's, or a
+	// one-off action chosen, as the console's callvote words ask for them.
+	struct casual_t { int field; const char *key; int flag; int voteStruct_t::*member; };
+	static const casual_t casual[] = {
+		{ RVF_ROUNDLIMIT, "si_roundLimit", VOTEFLAG_ROUNDLIMIT, &voteStruct_t::m_roundLimit },
+		{ RVF_OVERTIME, "si_overtime", VOTEFLAG_OVERTIME, &voteStruct_t::m_overtime },
+		{ RVF_RULESET, "si_ruleset", VOTEFLAG_RULESET, &voteStruct_t::m_ruleset },
+		{ RVF_INSTAGIB, "si_instagib", VOTEFLAG_INSTAGIB, &voteStruct_t::m_instagib },
+	};
+	for ( const casual_t &field : casual ) {
+		const int current = field.field == RVF_INSTAGIB ? ( si.GetBool( field.key ) ? 1 : 0 ) : si.GetInt( field.key );
+		if ( changes( field.field ) && retainedVoteDraft[ field.field ] != current ) {
+			data.*field.member = retainedVoteDraft[ field.field ];
+			data.m_fieldFlags |= field.flag;
+		}
+	}
+	for ( const int field : { RVF_NEXTMAP, RVF_RANDOMMAP, RVF_READYALL, RVF_COINTOSS } ) {
+		if ( changes( field ) && retainedVoteDraft[ field ] ) {
+			data.m_fieldFlags |= retainedVoteFlags[ field ];
+		}
 	}
 	return data.m_fieldFlags;
 }
@@ -18531,6 +18571,8 @@ bool idMultiplayerGame::SetRetainedVoteField( int field, int value ) {
 	}
 	RetainedVoteChoices();
 	const idCVar *ranges[ RVF_COUNT ] = { NULL, NULL, &si_timeLimit, &si_fragLimit, &si_captureLimit, &si_tourneyLimit, &si_controlTime };
+	ranges[ RVF_ROUNDLIMIT ] = &si_roundLimit;
+	ranges[ RVF_OVERTIME ] = &si_overtime;
 	switch ( field ) {
 		case RVF_MAP:
 			if ( value < 0 || value >= retainedVoteMaps.Num() ) {
@@ -18550,6 +18592,8 @@ bool idMultiplayerGame::SetRetainedVoteField( int field, int value ) {
 		case RVF_CAPTURELIMIT:
 		case RVF_TOURNEYLIMIT:
 		case RVF_CONTROLTIME:
+		case RVF_ROUNDLIMIT:
+		case RVF_OVERTIME:
 			if ( value < ranges[ field ]->GetMinValue() || value > ranges[ field ]->GetMaxValue() ) {
 				return false;
 			}
@@ -18564,6 +18608,12 @@ bool idMultiplayerGame::SetRetainedVoteField( int field, int value ) {
 		case RVF_BALANCE:
 		case RVF_SHUFFLE:
 		case RVF_RESTART:
+		case RVF_NEXTMAP:
+		case RVF_RANDOMMAP:
+		case RVF_RULESET:
+		case RVF_INSTAGIB:
+		case RVF_READYALL:
+		case RVF_COINTOSS:
 			if ( value != 0 && value != 1 ) {
 				return false;
 			}
@@ -18763,14 +18813,15 @@ void idMultiplayerGame::PublishRetainedVote( idUserInterface *card, bool &change
 	publish( "mp.vote.call.reason", refusal != NULL ? common->GetLocalizedString( refusal ) : "" );
 	publish( "mp.vote.call.detail", "" );
 	static const char *const fields[ RVF_COUNT ] = { "map", "gametype", "timelimit", "fraglimit", "capturelimit", "tourneylimit",
-		"controltime", "balance", "shuffle", "restart", "buying", "kick" };
+		"controltime", "balance", "shuffle", "restart", "buying", "kick",
+		"nextmap", "randommap", "roundlimit", "overtime", "ruleset", "instagib", "readyall", "cointoss" };
 	bool locked = false;
 	for ( int field = 0; field < RVF_COUNT; field++ ) {
 		const bool shown = RetainedVoteFieldShown( field ), allowed = RetainedVoteFieldAllowed( field );
 		locked |= shown && !allowed;
 		publish( va( "mp.vote.%s.row_shown", fields[ field ] ), shown ? "1" : "0" );
 		publish( va( "mp.vote.%s.row_allowed", fields[ field ] ), allowed ? "1" : "0" );
-		if ( field >= RVF_TIMELIMIT && field <= RVF_BUYING ) {
+		if ( ( field >= RVF_TIMELIMIT && field <= RVF_BUYING ) || field > RVF_KICK ) {
 			publish( va( "mp.vote.%s", fields[ field ] ), va( "%d", retainedVoteDraft[ field ] ) );
 		}
 	}
@@ -20020,6 +20071,20 @@ void idMultiplayerGame::PublishRetainedMenu( idUserInterface *card ) {
 	publish( "mp.rule4", si.GetBool( "si_teamDamage" ) ? on : off );
 	publish( "mp.rule5", si.GetBool( "si_autobalance" ) ? on : off );
 	publish( "mp.rule6", nextTitle.Length() ? nextTitle.c_str() : "-" );
+	// The rules the match is played by: the ruleset, then the modifiers the
+	// server runs ("Classic, Instagib, Quad Hog"), as the browser shows them.
+	{
+		mpModifierState_t modifiers;
+		rvMPModifiers::FromTokens( si.GetString( "si_modifiers" ), modifiers );
+		idStr labels;
+		rvMPModifiers::Labels( modifiers, labels );
+		idStr rules = common->GetLocalizedString( si.GetInt( "si_ruleset" ) ? "#str_42761" : "#str_42760" );
+		if ( labels.Length() ) {
+			rules += ", ";
+			rules += labels;
+		}
+		publish( "mp.rule7", rules.c_str() );
+	}
 	// openQ4: the rotation a server lists in si_mapCycle, as the map database
 	// holds it: installed maps only, each once.  Host and clients see the same.
 	const mpMapDatabase &mapDatabase = mpMapHost.Database();
