@@ -105,6 +105,10 @@ idCVar	com_showLevelLoadTimes( "com_showLevelLoadTimes", "1", CVAR_SYSTEM | CVAR
 static idCVar com_saveGameProfile( "com_saveGameProfile", "0", CVAR_SYSTEM | CVAR_INTEGER, "save profiling: 0 off, 1 phase timings, 2 per-class detail, 3 dictionary and commit detail", 0, 3 );
 static idCVar com_saveGameCommitOnWorker( "com_saveGameCommitOnWorker", "0", CVAR_SYSTEM | CVAR_BOOL, "experimental checkpoint file transaction on a worker; frame-time qualification pending" );
 static idCVar com_saveGameCopyOnWorker( "com_saveGameCopyOnWorker", "0", CVAR_SYSTEM | CVAR_BOOL, "experimental checkpoint copy on storage worker; overall frame-time qualification pending" );
+static idCVar com_loadingWarmFirstFrame( "com_loadingWarmFirstFrame", "1", CVAR_SYSTEM | CVAR_BOOL,
+	"single player: draw a level's first view once, unseen, before the loading screen hands over, so the first frame of play does no one-time work" );
+static idCVar com_saveGameAutosaveOnWorker( "com_saveGameAutosaveOnWorker", "1", CVAR_SYSTEM | CVAR_BOOL,
+	"write a level's start autosave on the checkpoint storage worker and finish it on a later frame, so the hand-off from the loading screen does not wait for the disk" );
 idCVar	com_skipLogoVideos( "com_skipLogoVideos", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "skip startup logo videos and go straight to the main menu" );
 idCVar	com_showLevelshotBounds( "com_showLevelshotBounds", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "draw a centered 4:3 frame guide for levelshot composition" );
 idCVar	s_muteUnfocused( "s_muteUnfocused", "1", CVAR_ARCHIVE | CVAR_BOOL, "mute all audio when the application is out of focus" );
@@ -4806,6 +4810,37 @@ void idSessionLocal::StartWipe( const char *_wipeMaterial, bool hold ) {
 
 /*
 ================
+idSessionLocal::WarmFirstGameFrame
+
+Draws the player's view once into a capture, as a save preview does, while the
+loading screen still owns the screen: nothing is presented, and the next
+loading frame draws over it. Single player only; a network client has no
+snapshot to draw yet.
+================
+*/
+int idSessionLocal::WarmFirstGameFrame() {
+#ifdef ID_DEDICATED
+	return 0;
+#else
+	if ( IsDedicatedServer() || !com_loadingWarmFirstFrame.GetBool() || idAsyncNetwork::IsActive() || IsMultiplayer() ||
+			readDemo || timeDemo != TD_NO || com_skipGameDraw.GetBool() || renderSystem == NULL || !renderSystem->IsOpenGLRunning() ) {
+		return 0;
+	}
+	const int start = Sys_Milliseconds();
+	{
+		sessionCaptureDrawGuard_t warmDraw( *this );
+		sessionRenderCropGuard_t warmCrop( renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight() );
+		common->SetRenderableGameFrame( true );
+		game->Draw( 0 );
+		// Runs the queued view through the back end without a present.
+		renderSystem->CaptureRenderToImage( "_scratch" );
+	}
+	return Max( 1, Sys_Milliseconds() - start );
+#endif
+}
+
+/*
+================
 idSessionLocal::CompleteWipe
 ================
 */
@@ -8164,6 +8199,15 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	Sys_ReleaseFreeHeapMemory();
 	const int heapReleaseMsec = Sys_Milliseconds() - phaseStart;
 
+	// The first frame of play does one-time work: programs linked and render
+	// targets made on first use, the driver's first draws, the HUD's first
+	// raster. Done here, behind the loading screen, it no longer stalls the
+	// hand-off into the level.
+	const int warmFrameMsec = WarmFirstGameFrame();
+	if ( warmFrameMsec > 0 ) {
+		PacifierUpdate();
+	}
+
 	common->Printf ("-----------------------------------\n");
 
 	int	msec = Sys_Milliseconds() - start;
@@ -8202,6 +8246,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 				settleFrameMsec[9] );
 		}
 		common->Printf( "Map heap release: %d msec\n", heapReleaseMsec );
+		common->Printf( "Map first-frame warm-up: %d msec\n", warmFrameMsec );
 	}
 
 	// let the game trigger interaction generation after the first game frame
@@ -8384,7 +8429,11 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	insideExecuteMapChange = false;
 	retainedLoadingActive = false;
 
-	Sys_SetPhysicalWorkMemory( -1, -1 );
+	// openQ4: Doom 3 raised the process's working set for the load and reset it
+	// here with Sys_SetPhysicalWorkMemory( -1, -1 ). Only the reset survived,
+	// and on Windows it empties the working set: 100 ms of trimming between the
+	// loading screen and the level, then page faults through the first frames.
+	// The heap release above already returns what the load freed.
 
 	// set the game sound world for playback
 	SetPlayingSoundWorld( sw );
@@ -9097,6 +9146,12 @@ bool idSessionLocal::SaveGame( const char *saveName, saveType_t saveType ) {
 	profile.Mark( "setup" );
 	// Write screenshot
 	const bool deferredPreview = saveType == ST_CHECKPOINT && renderSystem->BeginSavePreview();
+	// The autosave a level starts with goes the checkpoint's way: the payload is
+	// written, flushed and read back on the storage worker, and the save
+	// finishes on a later frame. Its flush used to hold the hand-off from the
+	// loading screen to the level. Named autosaves (a renderer restart, an app
+	// going to the background) stay synchronous: their callers need them done.
+	const bool deferredAutosave = saveType == ST_AUTO && !explicitSaveName && com_saveGameAutosaveOnWorker.GetBool();
 	const auto previewStorage = deferredPreview ? std::make_shared<sessionSavePreviewJob_t>() : nullptr;
 	if ( previewStorage ) previewStorage->path = fileSystem->RelativePathToOSPath( tempPreviewFile.c_str(), "fs_savepath" );
 	if ( saveType != ST_AUTO && !deferredPreview ) {
@@ -9206,7 +9261,7 @@ bool idSessionLocal::SaveGame( const char *saveName, saveType_t saveType ) {
 	game->SaveGame( fileOut, saveType );
 	profile.Mark( "serialize" );
 	std::shared_ptr<sessionSaveStorageJob_t> storage;
-	if ( deferredPreview && jobSystem.IsInitialized() && !jobSystem.IsSynchronous() &&
+	if ( ( deferredPreview || deferredAutosave ) && jobSystem.IsInitialized() && !jobSystem.IsSynchronous() &&
 		fileOut->Length() > 0 && static_cast<size_t>( fileOut->Length() ) <=
 		openq4::DurableFileMaxBytes - SESSION_OPENQ4_SAVEGAME_INTEGRITY_BYTES ) {
 		storage = std::make_shared<sessionSaveStorageJob_t>();
@@ -9398,7 +9453,8 @@ bool idSessionLocal::SaveGame( const char *saveName, saveType_t saveType ) {
 			if ( !previewReady && !commit ) Session_RemoveRelativeSaveFile( previewFile );
 			if ( com_saveGameProfile.GetInteger() >= 3 ) profile.Mark( "commit-preview" );
 
-			if ( !deferredPreview ) syncNextGameFrame = true;
+			// A deferred save never held a frame, so there is no gap to resync.
+			if ( !deferredPreview && !( deferredAutosave && storage ) ) syncNextGameFrame = true;
 			soundSystem->SetMute( insideExecuteMapChange );
 			if ( com_saveGameProfile.GetInteger() >= 3 ) profile.Mark( "commit-sound" );
 
@@ -9420,6 +9476,17 @@ bool idSessionLocal::SaveGame( const char *saveName, saveType_t saveType ) {
 		}
 		return complete();
 	};
+	if ( deferredAutosave && storage ) {
+		// Nothing to capture: the save finishes once its storage job has.
+		sessionPendingCheckpointPreview.Clear();
+		sessionPendingCheckpointSince = Sys_Milliseconds();
+		sessionPendingCheckpointPreviewReady = true;
+		sessionPendingCheckpointStorage = storage;
+		sessionPendingCheckpointPreviewStorage = nullptr;
+		sessionPendingCheckpoint = finish;
+		soundSystem->SetMute( insideExecuteMapChange );
+		return true;
+	}
 	if ( deferredPreview ) {
 		sessionPendingCheckpointPreview = tempPreviewFile;
 		sessionPendingCheckpointSince = Sys_Milliseconds();

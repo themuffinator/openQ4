@@ -1635,7 +1635,15 @@ costs. Their measured cost, up to the 512 MiB cap, is in the
 [durability guarantee](#durability-guarantee); re-measure there before changing
 the transaction or integrity model. Checkpoint saves of 16 MiB or less persist
 and read back their payload on a job worker; the experimental
-`com_saveGameCommitOnWorker 1` also moves their three-file commit there.
+`com_saveGameCommitOnWorker 1` also moves their three-file commit there. Since
+21 November 2026 the autosave a level starts with takes the same storage worker
+(`com_saveGameAutosaveOnWorker`, default 1): the game thread pays only the
+snapshot (about 15-25 ms in Air Defense 1), and the save validates and commits
+on a later frame, as a checkpoint does. Its flush used to hold the hand-off from
+the loading screen into the level for 50-120 ms. Loading, quitting, another
+save and the save menus wait for it as they wait for a pending checkpoint. Named
+autosaves (before a renderer restart, when an app goes to the background) stay
+synchronous, since their callers need them on disk at once.
 
 ## Developer console scripts
 

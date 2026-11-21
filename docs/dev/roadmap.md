@@ -2365,10 +2365,14 @@ image on both backends.
   389 frames at a 16.7 ms median (p95 22-23 ms, worst 54-60 ms) in the same
   time, and startup a 17 ms median (p95 30-33 ms), on both renderers.
   `com_loadingFrameTrace 1` reports each period, `2` the call path behind each
-  gap. Still open in this class: building a retained document (50-80 ms, not
-  divisible), single large reads and animations (40-60 ms), and the hand-off
-  into the level: the start-of-level autosave's flush and the first frame's
-  program loads (0.3-0.7 s).
+  gap. The hand-off into a single-player level, 200-380 ms with the last
+  loading frame on screen, now has no gap over about 50 ms: the Windows working-set
+  trim after each load is gone (100-130 ms, and most of multiplayer's 720 ms),
+  the start-of-level autosave writes on the checkpoint storage worker, and the
+  level's first view is drawn once, unseen, behind the loading screen
+  (`LOADING_HANDOFF` in the trace). Still open in this class: building a
+  retained document (50-80 ms, not divisible), single large reads and
+  animations (40-60 ms), and a multiplayer client's first frame (120-240 ms).
 - [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07
   attribution found the Quality frame CPU-bound on one thread (tic, scene front end and
   Vulkan recording in turn); the render-thread prototype's first stage gained 0.5 ms

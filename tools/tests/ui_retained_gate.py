@@ -4796,7 +4796,7 @@ def check_loading_hold(compiler: str, directory: Path) -> None:
     # while the retained screen still presents the load.
     change = function_body(session_lf, 'void idSessionLocal::ExecuteMapChange(')
     assert '\tif ( !BeginRetainedLoadingHold() ) {\n\t\tStartWipe( "gfx/wipes/fade_blend" );\n\t}' in change
-    assert change.index('ClearRetainedLoadingHold();') < change.index('BeginRetainedLoadingHold()') < change.index('retainedLoadingActive = false;\n\n\tSys_SetPhysicalWorkMemory')
+    assert change.index('ClearRetainedLoadingHold();') < change.index('BeginRetainedLoadingHold()') < change.index('retainedLoadingActive = false;\n\n\t// openQ4: Doom 3 raised the process')
     # Drawn above the game and its menu, under the wipe and the console.
     draw = function_body(session_lf, 'void idSessionLocal::Draw(')
     held = draw.index('guiLoadingHold->Redraw( presentationTime );')

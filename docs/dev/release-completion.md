@@ -17,6 +17,12 @@ does not restore the withdrawn release. See
   while the level's opening cinematic was skipped; it now keeps moving
   throughout. On a slow computer the screens drop to half the rate rather
   than slow the load down.
+- **No pause between the loading screen and the level.** The last loading
+  frame used to hold for a quarter to a third of a second before the level
+  faded in, longer in multiplayer. The fade now starts at once: the game no
+  longer empties its memory working set after a load, the level's opening
+  autosave is written in the background, and the level's first view is drawn
+  once, unseen, before the loading screen hands over.
 - **No slower to start or load.** Drawing more frames takes time, so work
   the screens used to wait on is quicker now: the game's scripts compile in
   about half the time, fonts are drawn on all processor cores, and the maps of

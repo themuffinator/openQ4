@@ -242,9 +242,21 @@ def check_sources(session: str) -> None:
     if not crop < save.index("game->Draw( 0 );") < save.index("CaptureRenderToFile( tempPreviewFile"):
         raise AssertionError("SaveGame's preview must draw and capture inside its crop")
 
-    # Every session-side crop is one of the two guarded captures. A new one must
+    # The load's unseen first-frame warm-up draws into a crop the same way.
+    warm = function_body(session, "int idSessionLocal::WarmFirstGameFrame(")
+    guard = GUARD_DECLARATION.search(warm)
+    crop = warm.find("sessionRenderCropGuard_t warmCrop(")
+    if guard is None or crop < 0:
+        raise AssertionError("WarmFirstGameFrame must hold sessionCaptureDrawGuard_t across sessionRenderCropGuard_t")
+    between = warm[guard.end():crop]
+    if not guard.start() < crop or "{" in between or "}" in between:
+        raise AssertionError("WarmFirstGameFrame's guard must precede its crop guard in the same block")
+    if not crop < warm.index("game->Draw( 0 );") < warm.index('CaptureRenderToImage( "_scratch" );'):
+        raise AssertionError("WarmFirstGameFrame must draw and capture inside its crop")
+
+    # Every session-side crop is one of the guarded captures. A new one must
     # hold sessionCaptureDrawGuard_t and be added here.
-    if session.count("CropRenderSize(") != 2 or len(SESSION_CROP_GUARD.findall(session)) != 1:
+    if session.count("CropRenderSize(") != 2 or len(SESSION_CROP_GUARD.findall(session)) != 2:
         raise AssertionError("Session.cpp gained a render crop: hold sessionCaptureDrawGuard_t across it and pin it here")
 
 

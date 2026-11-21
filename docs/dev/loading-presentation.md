@@ -103,6 +103,43 @@ session's fallback loading screen (shown until the first menu or level) draws
 the same view on instead of building a new one in its first frame, and the
 animation does not restart.
 
+## The hand-off into the level
+
+When a single-player load ended, the last loading frame stayed on screen for
+200-380 ms before the fade into the level began. Timing each step showed three
+parts:
+
+- **The working-set trim (100-130 ms).** Doom 3 raised the process's working
+  set for a load and reset it afterwards with `Sys_SetPhysicalWorkMemory( -1,
+  -1 )`. Only the reset survived, and on Windows it empties the working set,
+  after which the first frames page everything back in. It is gone; the heap
+  release earlier in the load already returns what the load freed. This alone
+  also took the multiplayer hand-off from about 720 ms to 120-240 ms.
+- **The start-of-level autosave (50-120 ms).** Its payload write, flush and
+  read-back now run on the checkpoint storage worker and it finishes on a
+  later frame ([savegame reliability](savegame-reliability.md#performance-characteristics)).
+  The hand-off keeps only the 15-25 ms snapshot.
+- **The first frame of play (26-86 ms).** Programs linked and render targets
+  made on first use, the driver's first draws and the HUD's first raster.
+  `idSessionLocal::WarmFirstGameFrame` draws the player's view once, unseen,
+  at the end of a single-player load, the way a save preview draws into a
+  capture, and the loading screen draws over it. It costs 10-15 ms behind the
+  loading screen, and the first frame of play falls to 8-14 ms. A multiplayer
+  load skips it: a client has no snapshot to draw yet
+  (`com_loadingWarmFirstFrame 0` turns it off).
+
+`com_loadingFrameTrace` now also reports the first two seconds after each
+period ends (`LOADING_HANDOFF`, with its longest gaps). Air Defense 1 on the
+reference laptop, warm launches (seven before, three after on each renderer,
+the last on a busier machine):
+
+| Hand-off | Before | After |
+| --- | ---: | ---: |
+| Longest gap, OpenGL | 250-382 ms | 33-45 ms |
+| Longest gap, Vulkan | 198-342 ms | 26-50 ms |
+
+The fade into the level and its first frames run at 16.7 ms (p95 18-19 ms).
+
 ## Measuring
 
 `com_loadingFrameTrace 1` reports every blocking period when the next frame of
@@ -181,10 +218,9 @@ A multiplayer listen server's `mp/q4dm1` load presented 230 frames in 4.3 s at a
   Making the build itself cheaper is the lever.
 - **One large file or animation** (a big `md5anim`, a cube map's DDS on a cold
   disk) is a single read or parse of 40-60 ms.
-- **The level-start autosave** writes and flushes its files after the load
-  (0.3-0.7 s warm, 1.4 s cold), between the last loading frame and the fade into
-  the level. Its writes belong on the save system's worker path, which today
-  serves checkpoints only.
+- **A multiplayer hand-off** still draws its first frame cold (120-240 ms
+  under the held loading screen): a client cannot draw before its first
+  snapshot, so it gets no warm-up.
 - **The first startup frame** waits about 120 ms in the OpenGL driver.
 - **A first launch** restarts the renderer for its detected preset after
   startup, with no frame for about three seconds.

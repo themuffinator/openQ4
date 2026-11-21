@@ -623,6 +623,9 @@ public:
 	// called by Draw when the scene to scene wipe is still running
 	void				DrawWipeModel();
 	void				StartWipe( const char *materialName, bool hold = false);
+	// Draws the level's first view once, unseen, before the loading screen
+	// hands over; returns the milliseconds it took (0 when skipped).
+	int					WarmFirstGameFrame();
 	void				CompleteWipe();
 	void				ClearWipe();
 

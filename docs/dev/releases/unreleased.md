@@ -14,7 +14,8 @@ the [development roadmap](../roadmap.md) for current scope.
   game starts or a level loads, instead of about 25 frames a second on average
   with pauses of up to three seconds. The game's scripts compile in about half
   the time and fonts are drawn on every processor core, so the extra frames
-  cost nothing: startup and loads take as long as before.
+  cost nothing: startup and loads take as long as before. The level now fades
+  in the moment its loading screen ends, without the old pause.
 
 - **The Awakening pauses in its own frozen style.** While you play the
   expansion's campaign with the new interface, the pause menu, its Save,
@@ -485,7 +486,14 @@ the [development roadmap](../roadmap.md) for current scope.
   every 16.7 ms, the longest gap about 60 ms. The game's scripts compile in
   about half the time, font atlases are rasterised on all cores, and building
   the impact material maps no longer searches every material for every pixel.
-  Saved games and compiled scripts are unchanged. `com_loadingFrameTrace 1`
+  Saved games and compiled scripts are unchanged. The pause between the
+  loading screen and the level (200-380 ms in single player, about 720 ms in
+  multiplayer) is down to about 50 ms at most in single player and
+  120-240 ms in multiplayer: the game no longer empties its memory working set
+  after a load, the level's opening autosave is written in the background
+  (`com_saveGameAutosaveOnWorker`), and the level's first view is drawn once,
+  unseen, before the loading screen hands over (`com_loadingWarmFirstFrame`).
+  `com_loadingFrameTrace 1`
   reports how smoothly each load presented; see
   [loading presentation](../loading-presentation.md).
 - **Not in 0.14.1:** the experimental volumetric lighting

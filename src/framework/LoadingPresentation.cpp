@@ -21,14 +21,20 @@ namespace {
 
 struct LoadingTrace {
 	bool active = false;		// a period is collecting frames
-	bool closing = false;		// ended; the next present closes the report
+	bool closing = false;		// ended; measuring the hand-off before the report
 	bool sampling = false;
 	idStr kind;
 	double begin = 0, end = 0, lastFrame = 0, firstFrame = 0;
 	std::vector<float> intervals, draws;
 	struct Gap { float msec; float at; };
 	std::vector<Gap> gaps;
+	// The hand-off: frames in the first HandoffMsec after the period ended,
+	// which is where the menu or the level takes over from the screen.
+	std::vector<float> handoffIntervals;
+	std::vector<Gap> handoffGaps;
+	double handoffLast = 0, tail = -1;
 };
+const double HandoffMsec = 2000.0;
 LoadingTrace trace;
 
 float Percentile( std::vector<float> values, float p ) {
@@ -44,8 +50,8 @@ void EmitLine( const char *line, void * ) {
 	common->Printf( "%s", line );
 }
 
-void CloseTrace( double nextFrameEnd ) {
-	const float tail = nextFrameEnd > 0 ? static_cast<float>( nextFrameEnd - trace.end ) : -1.0f;
+void CloseTrace() {
+	const float tail = static_cast<float>( trace.tail );
 	int over25 = 0, over50 = 0, over100 = 0;
 	float maxGap = 0;
 	for ( float v : trace.intervals ) {
@@ -66,6 +72,24 @@ void CloseTrace( double nextFrameEnd ) {
 	for ( size_t i = 0; i < trace.gaps.size() && i < 12; ++i ) {
 		common->Printf( "LOADING_GAP kind=%s msec=%.1f at=+%.0f\n", trace.kind.c_str(), trace.gaps[i].msec, trace.gaps[i].at );
 	}
+	if ( !trace.handoffIntervals.empty() ) {
+		float handoffMax = 0;
+		int handoffOver50 = 0;
+		for ( float v : trace.handoffIntervals ) {
+			handoffMax = Max( handoffMax, v );
+			handoffOver50 += v > 50.0f;
+		}
+		common->Printf( "LOADING_HANDOFF kind=%s frames=%zu interval p50=%.1f p95=%.1f max=%.1f over50=%d\n",
+			trace.kind.c_str(), trace.handoffIntervals.size(), Percentile( trace.handoffIntervals, 0.5f ),
+			Percentile( trace.handoffIntervals, 0.95f ), handoffMax, handoffOver50 );
+		std::sort( trace.handoffGaps.begin(), trace.handoffGaps.end(), []( const LoadingTrace::Gap &a, const LoadingTrace::Gap &b ) {
+			return a.msec > b.msec;
+		} );
+		for ( size_t i = 0; i < trace.handoffGaps.size() && i < 8; ++i ) {
+			common->Printf( "LOADING_HANDOFF_GAP kind=%s msec=%.1f at=+%.0f\n", trace.kind.c_str(),
+				trace.handoffGaps[i].msec, trace.handoffGaps[i].at );
+		}
+	}
 	if ( trace.sampling ) {
 		Sys_StallSampler_Report( 16, com_loadingStallFocus.GetString(), EmitLine, NULL );
 	}
@@ -80,7 +104,7 @@ double LoadingPresentation_Now( void ) {
 
 void LoadingPresentation_Begin( const char *kind ) {
 	if ( trace.closing ) {
-		CloseTrace( 0 );
+		CloseTrace();
 	}
 	if ( com_loadingFrameTrace.GetInteger() <= 0 ) {
 		trace = LoadingTrace();
@@ -116,7 +140,20 @@ void LoadingPresentation_Presented( double startMsec, double endMsec ) {
 		Sys_StallSampler_Presented();
 	}
 	if ( trace.closing ) {
-		CloseTrace( endMsec );
+		// Intervals from the end of the period: the first is the tail.
+		const double from = trace.handoffLast > 0 ? trace.handoffLast : trace.end;
+		const float interval = static_cast<float>( endMsec - from );
+		if ( trace.tail < 0 ) {
+			trace.tail = interval;
+		}
+		trace.handoffIntervals.push_back( interval );
+		if ( interval > 25.0f ) {
+			trace.handoffGaps.push_back( { interval, static_cast<float>( from - trace.end ) } );
+		}
+		trace.handoffLast = endMsec;
+		if ( endMsec - trace.end >= HandoffMsec ) {
+			CloseTrace();
+		}
 		return;
 	}
 	if ( trace.lastFrame > 0 ) {
