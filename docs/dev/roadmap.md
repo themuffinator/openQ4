@@ -2,7 +2,8 @@
 
 > **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.14.1 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
-Updated 8 November 2026 with the frame-rate recovery category (FPS). The progress
+Updated 8 November 2026 with the frame-rate recovery category (FPS) and
+21 November 2026 with the controller experience category (PAD). The progress
 review below otherwise dates from 4 November and uses the integrated source and
 recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`. The MP-02
 closeout and task counts additionally include its later integrated safety
@@ -22,8 +23,8 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **44 / 153 (28.8%)** | **109 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
-| Estimated category progress | **20 categories: 3 at 100%, 15 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
+| Formally closed roadmap tasks | **45 / 163 (27.6%)** | **118 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-09 and PAD-01 through PAD-10, not partial substeps. |
+| Estimated category progress | **21 categories: 3 at 100%, 16 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
@@ -63,6 +64,7 @@ exact; the estimate column is deliberately approximate.
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **90%** | 3 / 6 | CPU overruns on two of five workloads per platform (bounds proposed as exceptions, not accepted; `sp-ragdolls` on Linux now 65 %); the full Linux pass repeated on the build with exact math (cut short on 17 November); a windowed review in motion and the default decision. |
 | [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **55%** | 3 / 26 | Human play, physical workflows and deferred peer qualification; the 15 November reference-parity items (casual match flow, pools, modifiers, HUD, spectating, identity, moderation, discovery, movement), the demo container, workflow, storage and robustness items, MP-25 splitscreen and MP-26 Horde; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
+| [Controller experience](#controller-experience) — PAD | **35%** | 0 / 10 | The active controller chosen by use, modern stick aim, aim assistance, standalone gyro, on-screen keyboard, a complete layout, setup panel, trigger and light feedback, and physical family qualification; PAD-10 optional. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
@@ -180,6 +182,8 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | [#185: GOG offline installation on macOS](https://github.com/themuffinator/openQ4/issues/185) | PLAT-04/REL-01: provide extraction/path guidance and qualify the reporter's installer/package combination; do not imply that openQ4 imports Windows installers. |
 | [#186: subtitles](https://github.com/themuffinator/openQ4/issues/186) | AUD-07/UI-02/UI-04: define supported dialogue text, timing, localization and accessible display coverage. |
 | [#187: dialogue volume](https://github.com/themuffinator/openQ4/issues/187) | AUD-06/UI-01: independent spoken-dialogue gain with real mixer classification and persistent settings. |
+| [#220: mouse and controller settings under Controls](https://github.com/themuffinator/openQ4/issues/220) | UI-01/PAD-06: the Mouse and Controller tabs, with Free Look, Toggle Zoom and Scope Sensitivity, moved to Settings > Controls in the development tree; not in 0.14.1. Close once a published build carries it. |
+| [#244: rumble missing from weapon fire](https://github.com/themuffinator/openQ4/issues/244) | PAD-08: per-shot pulses, the lightning gun and gauntlet hum and damage thumps, mixed with sound-driven rumble, are in the development tree, as the issue's triage reply says. Await the reporter's retest on an Elite Series 2. |
 | [#173: high-DPI menu cursor PR](https://github.com/themuffinator/openQ4/pull/173) | UI-02/PLAT-05: the widescreen clamp half landed on main on 16 November, credited to the contributor: a menu's cursor bounds no longer depend on the aspect mode of the GUI drawn last. The absolute-position routing was not taken: it conflicts with #207 and its zero-delta motion breaks the controller-to-mouse handoff. Remaining: requalify Retina sticking against current routing, keeping a non-zero motion signal and explicit console ownership. |
 | [#180: GUI save migration PR](https://github.com/themuffinator/openQ4/pull/180) | Q4-05/Q4-07/UI-09: landed on main in `2677fb87b` (29 October) and closed on 31 October; main's push verification at `b9c663758` passed on every platform. Contributor Linux restore/update evidence is retained; Windows, macOS and ARM64 historical-save qualification remains a distinct gate. |
 | [#189: medic approach watchdog PR](https://github.com/themuffinator/openQ4/pull/189) | Q4-02: bounded stall recovery, SP/MP parity, restore behavior and normal heal/progression regression; does not by itself prove #184 resolved. Merged on 31 October in `fcaaeb198`, with the `release-completion.md` conflict resolved by keeping both entries. The SP and MP objects compile cleanly on Windows, the watchdog contract passes, and main's push verification at `f0a86b0ec` passed all eight jobs. |
@@ -219,10 +223,10 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | Stage | Work to conduct | Exit condition |
 | --- | --- | --- |
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
-| 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09, MP-12, MP-17 through MP-22, MP-24 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
+| 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09, MP-12, MP-17 through MP-22, MP-24, AUD-01 through AUD-07, PAD-01 through PAD-03, PAD-05 and PAD-06; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-09 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26, VK-08, REN-09, REN-10 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026, REN-11 on 21 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
-| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, RT-07, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26, PAD-04, PAD-07, PAD-08, PAD-10, VK-08, REN-09, REN-10 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026, REN-11 on 21 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, RT-07, PAD-09, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
 the current timing and workload baseline; UI cutover depends on its complete
@@ -254,6 +258,7 @@ to a final project-wide phase. Important dependencies are:
 | Shadowed volumetrics, GTAO and parallax occlusion (REN-09 through REN-11) | REN-10 and REN-11 closed 21 November 2026. REN-09 samples the REN-03 shadow maps and replaces the REN-06 froxel leaf; REN-10 keeps SSAO and its REN-05 controls as the fallback and comparison. Each is default-off with exact rollback, and FPS-01's budgets price every tier before a preset enables it; a new preset setting carries the SYSTEM catalog ripple. |
 | HDR display output (VK-08) | VK-05's exposure domain and tone curves first. The 6 November display-referred decision for stock content stands, so VK-08 changes the output transform and interface composition, not scene composition. Vulkan only: OpenGL, GLES and VR stay SDR and report it, and HDR output off always presents the unchanged SDR path. A new display setting carries the SYSTEM catalog ripple; qualification needs a physical HDR display. |
 | Server discovery (MP-19) | A decision on a project-controlled master or list service before the Internet source can be qualified on a fresh install; Steam lobbies and matchmaking remain STEAM/OPT-09. |
+| Controller experience (PAD-01 through PAD-10) | PAD-01's every-pad device layer is the one MP-25's seats use, and PAD-08's player LEDs follow those seats. PAD-02 and PAD-04 share one look transform with HF-03's late look. PAD-03's input-source flag and multiplayer setting follow MP-08's protocol and MP-21's demo registry, and stay off in the competitive rulesets. PAD-05's keyboard is the fallback STEAM-05 defers to Steam's keyboard where it reaches it. PAD-09 is the controller record UI-02, the PLAT signoffs, AND-02 and the MP human checks cite. Mouse and keyboard behavior never changes. |
 
 ## Governance and baseline evidence
 
@@ -6063,7 +6068,8 @@ Completion substeps:
   local players.** Multiplayer only; the single-player game, the Awakening
   campaign and SP Arena gain no local players. Today a game has one local
   client (`idAsyncServer::localClientNum`), the SDL3 backend opens one gamepad
-  and replaces it when another connects, and the renderer, HUD and sound
+  and ignores any other until it is removed (PAD-01 replaces that with every
+  pad open), and the renderer, HUD and sound
   listener assume one full-screen player view. Deliver a splitscreen that
   plays as well as a single view:
   - **Session and network:** one to four local players, each an ordinary
@@ -6633,6 +6639,238 @@ the non-verbal remainder is marked for players rather than counted as covered.
   are screams, laughter and pain, and the 64 multiplayer announcers stay
   uncaptioned.
   [Script-line evidence](audio-voice-evidence.md#script-lines-and-helmet-radio-captions-17-november-2026).
+
+## Controller experience
+
+Sources: [input settings](../user/input-settings.md), [Steam Deck guide](../user/steam-deck.md),
+[Deck QA](steam-deck-qa.md), [input key matrix](input-key-matrix.md),
+[input routing](ui/input-routing.md), `src/sys/sdl3/sdl3_backend.cpp`,
+`src/framework/UsercmdGen.cpp`, `src/sys/sys_local.cpp` (rumble mixing) and
+`content/baseoq4/pak0/default.cfg`.
+
+Reviewed 21 November 2026 from the point of view of a player who uses only a
+controller. The SDL3 layer is broad: HIDAPI drivers for Xbox, PlayStation,
+Switch, Steam and Deck controllers, a stable `JOY1`-`JOY32` button mapping,
+hotplug, a radial dead zone with move and look curves, Southpaw, trigger
+hysteresis, the retained menus' full controller navigation, per-family button
+prompts with Confirm/Back swapping, the weapon and quick-chat wheels, motor
+rumble with strength and low-battery caps, gyro and touchpad input, the Steam
+Deck profile and a "Controller disconnected" notice in the menus. What it lacks
+is mostly what makes a pad feel first-class in a modern shooter: the right
+controller taking charge, stick aim that reaches full speed and turns quickly,
+assistance, gyro that does not borrow the mouse settings, typing without a
+keyboard, a complete default layout and setup tools, and evidence from real
+controllers. Every item honors five rules:
+
+1. **Mouse and keyboard unchanged.** Nothing here changes mouse or keyboard
+   input, their settings or their bindings.
+2. **Existing profiles keep their feel.** New defaults reach fresh profiles
+   only. Archived values and binds are never rewritten except by an explicit
+   preset, reset or a migration that recognizes untouched shipped values.
+3. **One look path.** The usercmd and the HF-03 late-look presentation use one
+   stick and gyro transform, so the drawn view never disagrees with the aim.
+4. **Contained and localized.** SDL3 stays the platform layer and game modules
+   see input only through usercmds and the engine interface. New text uses
+   `#str_*` entries in every language table; new rows follow the
+   [UI visual design](ui-visual-design.md) and the settings-row checklist, and
+   appear in the stock menus wherever those already have the setting's page.
+5. **Asset-free tests first.** SDL3 virtual joysticks (`SDL_AttachVirtualJoystick`,
+   with sensors and touchpads) drive contracts and gameplay harnesses without
+   hardware; physical acceptance is PAD-09 and is never inferred from them.
+
+### PAD completion checkpoints
+
+**Estimate: 35%; 0/10 tasks closed.** The device layer, menus and prompts are
+substantial, working implementation; the open tasks are missing player-facing
+behavior plus physical qualification, and PAD-10 is optional.
+
+| Task / state | Completed points and evidence | Remaining completion subpoints |
+| --- | --- | --- |
+| PAD-01 — Partial | Hotplug, gamepads preferred over plain joysticks, held state released on disconnect, the menus' persistent disconnect notice and `listControllers`. | Every pad open with the active one chosen by use, a device choice, pause on loss in single-player gameplay, a HUD notice in multiplayer and low-battery notices. |
+| PAD-02 — Partial | Radial inner dead zone, move and look curves, Southpaw, invert, zoom scaling and the wheel's own sensitivity. | Outer and per-stick dead zones, separate horizontal and vertical speed in degrees per second, turn boost, walk-independent turning, presets and a shared usercmd/late-look transform. |
+| PAD-03 — Not started | Raven's Xbox assistance exists in source but compiles only for `_XENON`/`_XBOX`. | Decision on forms and inputs, single-player assistance including world-GUI controls, and a multiplayer server policy. |
+| PAD-04 — Partial | Gyro reaches play as mouse counts with a dead zone, axis choice, inversion and the Deck profile's values. | Own sensitivity in real-world units, turning spaces, calibration, activation and ratchet, smoothing and menu rows. |
+| PAD-05 — Not started | Text fields accept a system on-screen keyboard where SDL shows one (Deck through Steam, Android, touch devices). | A retained on-screen keyboard for every text field when no system keyboard exists. |
+| PAD-06 — Partial | Two controller buttons per action, family glyphs on the Controls page and the Controller tab under Controls (#220). | Controller reach for every multiplayer and save action, layout presets, separate resets and menu rows for console-only settings. |
+| PAD-07 — Not started | Console `listControllers`; Android setup has a live look-speed test. | A desktop test and setup panel, first-connection guidance and a Steam Input hint. |
+| PAD-08 — Partial | Motor rumble from screen-shaking sounds plus (development tree, #244) per-shot pulses, held-weapon hum and damage thumps. | Trigger motors, DualSense adaptive triggers, lightbar and player LEDs, directional damage and per-feature switches. |
+| PAD-09 — Not started | The [Deck QA checklist](steam-deck-qa.md) lists Deck items; no physical controller run is recorded. | One controller checklist run per family and platform through menus, SP and MP play. |
+| PAD-10 — Not started (optional) | None. | Decide flick stick, co-pilot and HD haptics before any implementation. |
+
+### PAD task evidence and acceptance
+
+- [ ] **PAD-01 — P1, implementation: the controller in your hands is the one in
+  charge.** Today `SDL3_OpenFirstController` opens the first gamepad, and a
+  gamepad that connects while one is open is ignored until the first is
+  removed; only a plain joystick yields to a new gamepad. A Steam Deck with an
+  external pad, a wired and a Bluetooth pad, or a remapper (Steam Input,
+  DS4Windows, reWASD) presenting a virtual pad beside the physical one can leave
+  the wrong device active, so the player's presses do nothing or the prompts
+  show the wrong buttons, and turning `in_joystick` off and on is the only way
+  out. Deliver: open every gamepad and make the active one the last to press a
+  button or move a stick past its dead zone; prompts, the glyph family,
+  Confirm/Back, rumble, gyro, touchpad and battery follow it, and the outgoing
+  device's held buttons and axes release on handover. Add an archived device
+  choice (Automatic, or a saved device chosen from the connected list) as a
+  Controller row, and list every device in `listControllers` with the active
+  one marked. This device layer is the one MP-25's seats build on, not a
+  second implementation. When the active controller goes away during
+  single-player gameplay and no other controller takes over, open the pause
+  menu with the existing notice; reconnecting never resumes play by itself.
+  In multiplayer, show the notice on the HUD and do not pause. Show one notice
+  when the active controller's battery reaches the low-battery threshold
+  (SDL's battery events) and another when it starts charging. Gates: a virtual
+  joystick contract with two pads (connect, use-to-switch, release on handover,
+  loss of the inactive and the active pad, reconnect keeping the choice); an SP
+  gameplay harness pausing on loss; an MP HUD notice capture; a battery notice
+  from the virtual device's power state; physical runs under PAD-09.
+- [ ] **PAD-02 — P1, implementation: stick aim that reaches full speed and
+  turns quickly.** Today both sticks share one radial inner dead zone (`0.18`)
+  with no outer dead zone, so a worn stick that never reports full deflection
+  never reaches full speed. One look sensitivity covers both axes. Full-stick
+  turning is `in_yawspeed` × Look Sensitivity × the run scale, about 158°/s with
+  defaults and always-run, and clicking the stick to walk drops it to about
+  105°/s because the run state (`in_anglespeedkey`) scales stick turning as it
+  does the keyboard turn keys. Without turn acceleration a 180° turn takes more
+  than a second. Deliver: inner and outer dead zones per stick (radial, with an
+  axial option for movement); horizontal and vertical look speed shown in
+  degrees per second; an optional turn boost that adds yaw after the stick
+  holds near full deflection for a short ramp, off while zoomed; stick turning
+  independent of walk and run (the keyboard turn keys keep retail scaling); and
+  response presets (Classic, today's values; Precise; Dynamic) that set curve,
+  dead zones and boost together and show Custom after any edit. Zoom scaling
+  (`pm_zoomedSlow`) and the wheels' routing stay. `JoystickMove` and the late-look
+  path in `UsercmdGen.cpp` repeat the same look arithmetic today; replace both
+  with one function. Classic stays for existing profiles; whether fresh profiles
+  get another preset is decided after a human feel review. Gates: asset-free
+  transform tests (dead zones, outer clamp, boost ramp, walk independence,
+  late look equal to the usercmd); a virtual-joystick turn-rate measurement in
+  SP gameplay; a feel review on two controller families.
+- [ ] **PAD-03 — P1, decision and implementation: aim assistance for
+  controllers.** Raven's Xbox assistance (`pm_AimAssist*`: a target frustum,
+  turn slowdown over an enemy and a muzzle bend) compiles only under
+  `_XENON`/`_XBOX`, so PC controller players have none, while the archived
+  `pm_AimAssist` (default `2`) does nothing. Decide first: reuse or replace that
+  code; which forms (slowdown near a target, light pull while the stick moves,
+  never a snap to the target); which inputs receive it (sticks; gyro off by
+  default; never the mouse); how the input source reaches the game so saves,
+  demos and the server see the same decision (a usercmd flag is a protocol and
+  demo change under MP-08 and MP-21); and the multiplayer policy. Deliver in
+  single-player and SP Arena: Off, Low, Standard and High on the Controller
+  tab; applied to live enemies in range and in sight, never allies, corpses or
+  scripted actors; and slowdown over interactive world-GUI controls while the
+  crosshair is the cursor, for Quake 4's terminals and lift panels. In
+  multiplayer: a server setting (off, or allowed up to a cap), off in the
+  competitive rulesets, shown in the server details and the browser, and
+  unaffected bots. Gates: the recorded decision; game-side contracts (no effect
+  from mouse or gyro, strength bounds, nothing through walls); campaign and
+  Arena runs with a controller harness; the server cap replicated and enforced;
+  existing demos playing back unchanged.
+- [ ] **PAD-04 — P2, implementation: gyro aiming on its own terms.** Today gyro
+  motion becomes mouse counts and joins the mouse path, so Mouse Sensitivity,
+  Mouse CPI, Smooth Mouse, View Filter and mouse acceleration all change gyro
+  aim. It reads one sensor axis for turning (local yaw, which feels wrong when
+  the controller is tilted), has no calibration for controllers SDL does not
+  calibrate, and cannot be paused (ratchet) or limited to zooming. Inversion and
+  axes are console-only, and gyro does not move the menu pointer. Deliver: gyro
+  input into the shared look transform with its own sensitivity in real-world
+  terms (degrees of view per degree of turn, optionally separate vertically),
+  independent of every mouse setting; Yaw, Roll and Player Space turning; a
+  hold-still calibration stored per controller, with slow bias correction at
+  rest; activation choices (always; off while a bound button is held, or on
+  only while held; while zoomed) and a `_gyro` binding; small-motion smoothing
+  and tightening below a threshold; rows for all of it; and an optional gyro
+  menu pointer. Migrate the Deck profile's values to the new units only where
+  they are still the shipped ones. Gates: sensor traces replayed through SDL
+  virtual sensors giving the expected view change while the mouse settings vary;
+  calibration removing an injected bias; activation and ratchet tests; review on
+  DualSense, Switch Pro and Deck.
+- [ ] **PAD-05 — P1, implementation: typing with only a controller.** Text
+  fields (save names, player name, chat, the server address, password and
+  filter, Create Server's name, the console) take text only from a keyboard or
+  a system keyboard where SDL shows one: Deck game mode through Steam, Android
+  and touch tablets. A desktop player on a couch, or any non-Steam install,
+  cannot name a save or join a password-protected server. STEAM-05 covers
+  Steam's keyboard and waits on STEAM-01. Deliver: a retained on-screen keyboard
+  (vector art to the UI specification, controller and touch operation, layouts
+  covering every shipped language's characters, shift, accents and symbols,
+  with face-button shortcuts for backspace and space), shown when a text field
+  takes focus by controller and `SDL_HasScreenKeyboardSupport` reports no
+  system keyboard; and field defaults that save typing (a prefilled save name,
+  recent server addresses). STEAM-05 later prefers Steam's keyboard where it
+  reaches it. The stock interface either uses the same keyboard or is
+  documented as keyboard-only. Gates: UI register rows; a harness naming a
+  save, setting a player name and joining a password-protected local server
+  with controller events only; captures in each shipped language; Deck game
+  mode still showing Steam's keyboard.
+- [ ] **PAD-06 — P1, implementation: a complete layout and settings.** Today the
+  default controller layout gives multiplayer Vote Yes and No, Ready, chat, team
+  chat, voice chat, the buy menu, spectating and quick save and load no button
+  (they sit on `F1`-`F9`, `T`, `Y` and `B`), so the vote notice and Ready prompt
+  name keys a pad player cannot press. Scores and objectives take three inputs
+  (View, D-pad up and the touchpad), and D-pad right selects the previous weapon.
+  Toggle Crouch, Toggle Run, Always Run, Move Curve and the gyro inversion and
+  axes are console settings only, and Load Defaults resets keyboard and
+  controller bindings together. Deliver: context actions that put those
+  commands on the controller without spending buttons permanently (for example
+  the D-pad votes while a vote is open, Ready and Spectate on the held
+  scoreboard, and voice chat on a free input in multiplayer), with prompts
+  naming those buttons; a decision on D-pad weapon direction for fresh
+  profiles; layout presets on the Controller tab (Classic, today's layout, and
+  at least one bumper-jump and one one-handed accessibility layout), applied
+  only when chosen; Reset Controller and Reset Keyboard and Mouse beside Load
+  Defaults; and rows for the console-only settings above, with hold or toggle
+  choices for zoom, crouch and run. Gates: fresh-profile binding contracts;
+  existing configs left untouched; votes, Ready, buying, chat and quick
+  save/load reached with controller events in SP and MP harnesses; localized
+  rows in every shipped language.
+- [ ] **PAD-07 — P2, implementation: controller setup and test panel.** Add a
+  Test panel to Controls > Controller: both sticks with their dead zones and
+  outer limits drawn, trigger travel against Trigger Press, buttons lit as the
+  active family's glyphs, the gyro trace and calibration state, a rumble test
+  for each motor present, battery and connection, matching the Android setup's
+  live look-speed test. The first connection of a controller family shows a
+  one-time notice naming Prompt Style and Swap Confirm and Back. When SDL
+  reports a Steam Input virtual pad (`SDL_GetGamepadSteamHandle`) and the gyro
+  or touchpad is not reaching the game, say so and point to the Steam Deck
+  guide. Gates: UI register rows; virtual-joystick state reaching the panel;
+  captures of each family's glyph set.
+- [ ] **PAD-08 — P2, implementation: haptics and lights.** Motor rumble comes
+  from screen-shaking sounds plus, in the development tree, per-shot pulses,
+  the lightning gun and gauntlet hum and damage thumps (#244), mixed in
+  `sys_local.cpp` under the Rumble, strength and low-battery settings. Add, where
+  SDL reports the capability: Xbox trigger motors (`SDL_RumbleGamepadTriggers`)
+  for firing; DualSense adaptive trigger resistance per weapon through
+  `SDL_SendGamepadEffect`; lightbar or LED colour (team colour in multiplayer,
+  a health or fixed colour in single-player, `SDL_SetGamepadLED`); player-number
+  LEDs (`SDL_SetGamepadPlayerIndex`, shared with MP-25's seats); and left/right
+  motor balance from the direction of damage. Each has its own switch under the
+  existing Rumble master; menus, pause, suspend and loss stop everything.
+  Gates: capability-gated contracts (devices without the feature unchanged); a
+  virtual device receiving the expected calls; the #244 reporter's retest on an
+  Elite Series 2; physical DualSense and Xbox review under PAD-09.
+- [ ] **PAD-09 — P1, qualification: controller families on real hardware.**
+  Write one controller checklist in `docs/dev/` that UI-02, the platform signoffs,
+  AND-02 and the multiplayer human checks cite instead of repeating. Families:
+  Xbox Series and One (USB, Bluetooth, wireless adapter) and Elite paddles,
+  DualShock 4, DualSense and Edge, Switch Pro and a Joy-Con pair, a generic
+  XInput pad, Steam Deck controls, a Steam Input virtual pad and one flight
+  stick on the raw-joystick path. Platforms: Windows x64, Linux x64, Deck game
+  and desktop modes, and the macOS preview. For each: detection, hotplug and
+  handover, prompts and Confirm/Back, menus with `ui_retained 1` and `0`,
+  rumble, triggers and lights, gyro and touchpad, and battery; then SP play
+  through combat, a hovertank and a walker section, world terminals, the weapon
+  wheel and naming a save, an MP match with voting, Ready, chat, buying and the
+  quick-chat wheel, and SP Arena. Bind each record to its build per GOV-03.
+  Close when each first-class platform has a recorded pass for the Xbox,
+  PlayStation and Nintendo or Deck families and every failure links to an
+  issue or task.
+- [ ] **PAD-10 — P3, decision: advanced and assistive input.** Decide whether to
+  offer flick stick (the right stick points the view's direction, then turns
+  with rotation), co-pilot play (two controllers driving one player, for
+  assisted play) and HD haptics on DualSense and Switch controllers, each with
+  its dependencies on PAD-02, PAD-04 and PAD-08. No implementation is credited
+  before the decision.
 
 ## Desktop platforms and packaging
 
