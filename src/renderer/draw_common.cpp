@@ -2791,6 +2791,7 @@ enum rbSSAOUniformIndex_t {
 	RB_SSAO_UNIFORM_MULTIPLY,
 	RB_SSAO_UNIFORM_HALF_INFO,
 	RB_SSAO_UNIFORM_BLUR_AXIS,
+	RB_SSAO_UNIFORM_AO_INFO,
 	RB_SSAO_UNIFORM_COUNT
 };
 
@@ -2931,7 +2932,8 @@ static void RB_InitSSAOStage( void ) {
 		{ "fieldInvSize", 2 },
 		{ "ssaoMultiply", 1 },
 		{ "halfInfo", 4 },
-		{ "blurAxis", 2 }
+		{ "blurAxis", 2 },
+		{ "aoInfo", 4 }
 	};
 
 	rbSSAOStage.numShaderParms = RB_SSAO_UNIFORM_COUNT;
@@ -3086,6 +3088,11 @@ static void RB_DrawSSAOPass( float mode, idImage *sceneImage, idImage *depthImag
 		static const GLfloat noHalfInfo[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 		glUniform4fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_HALF_INFO], 1, halfInfo != NULL ? halfInfo : noHalfInfo );
 	}
+	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_AO_INFO] >= 0 ) {
+		GLfloat aoInfo[4];
+		R_SSAOMethodInfo( backEnd.viewDef, aoInfo );
+		glUniform4fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_AO_INFO], 1, aoInfo );
+	}
 	if ( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_BLUR_AXIS] >= 0 ) {
 		static const GLfloat noBlurAxis[2] = { 0.0f, 0.0f };
 		glUniform2fvARB( rbSSAOStage.shaderParmLocations[RB_SSAO_UNIFORM_BLUR_AXIS], 1, blurAxis != NULL ? blurAxis : noBlurAxis );
@@ -3192,16 +3199,19 @@ static bool RB_DrawSSAOOcclusion( idImage *depthImage, idImage *finalDepthImage,
 	glViewport( 0, 0, targetWidth, targetHeight );
 	RB_DrawSSAOPass( 3.0f, NULL, depthImage, finalDepthImage, NULL, NULL,
 		targetWidth, targetHeight, targetWidth, targetHeight, false, halfInfo, true );
-	static const GLfloat horizontal[2] = { 1.0f, 0.0f };
-	static const GLfloat vertical[2] = { 0.0f, 1.0f };
-	backEnd.renderTexture = rbSSAOFilterRenderTexture;
-	rbSSAOFilterRenderTexture->MakeCurrent();
-	RB_DrawSSAOPass( 5.0f, NULL, depthImage, finalDepthImage, NULL, rbSSAOOcclusionImage,
-		targetWidth, targetHeight, targetWidth, targetHeight, false, halfInfo, true, horizontal );
-	backEnd.renderTexture = rbSSAOOcclusionRenderTexture;
-	rbSSAOOcclusionRenderTexture->MakeCurrent();
-	RB_DrawSSAOPass( 5.0f, NULL, depthImage, finalDepthImage, NULL, rbSSAOFilterImage,
-		targetWidth, targetHeight, targetWidth, targetHeight, false, halfInfo, true, vertical );
+	if ( R_SSAOFiltered() ) {
+		// The brute-force reference (r_ssaoMethod 2) stays unfiltered.
+		static const GLfloat horizontal[2] = { 1.0f, 0.0f };
+		static const GLfloat vertical[2] = { 0.0f, 1.0f };
+		backEnd.renderTexture = rbSSAOFilterRenderTexture;
+		rbSSAOFilterRenderTexture->MakeCurrent();
+		RB_DrawSSAOPass( 5.0f, NULL, depthImage, finalDepthImage, NULL, rbSSAOOcclusionImage,
+			targetWidth, targetHeight, targetWidth, targetHeight, false, halfInfo, true, horizontal );
+		backEnd.renderTexture = rbSSAOOcclusionRenderTexture;
+		rbSSAOOcclusionRenderTexture->MakeCurrent();
+		RB_DrawSSAOPass( 5.0f, NULL, depthImage, finalDepthImage, NULL, rbSSAOFilterImage,
+			targetWidth, targetHeight, targetWidth, targetHeight, false, halfInfo, true, vertical );
+	}
 
 	backEnd.renderTexture = sceneTarget;
 	if ( sceneTarget != NULL ) {
@@ -3425,8 +3435,9 @@ static void RB_STD_SSAO( void ) {
 		static bool logged = false;
 		if ( !logged ) {
 			logged = true;
-			common->Printf( "OpenGL: first SSAO pass drew (%s resolution, filtered)\n",
-				halfInfo[0] < halfInfo[2] ? "half" : "full" );
+			static const char *const methods[3] = { "SSAO", "GTAO", "reference" };
+			common->Printf( "OpenGL: first SSAO pass drew (%s, %s resolution, %s)\n", methods[R_SSAOMethod()],
+				halfInfo[0] < halfInfo[2] ? "half" : "full", R_SSAOFiltered() ? "filtered" : "unfiltered" );
 		}
 		return;
 	}

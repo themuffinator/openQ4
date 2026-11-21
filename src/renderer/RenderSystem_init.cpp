@@ -389,7 +389,7 @@ idCVar r_ssaoMaxDistance( "r_ssaoMaxDistance", "220.0", CVAR_RENDERER | CVAR_ARC
 idCVar r_ssaoSamples( "r_ssaoSamples", "20", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "number of SSAO spiral samples", 4, 32, idCmdSystem::ArgCompletion_Integer<4,32> );
 idCVar r_ssaoDebug( "r_ssaoDebug", "0", CVAR_RENDERER | CVAR_BOOL, "visualize SSAO only" );
 idCVar r_ssaoResolution( "r_ssaoResolution", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
-	"SSAO resolution: 0 automatic (full at the maximum r_ssaoSamples, half below), 1 full, 2 half", 0, 2,
+	"SSAO resolution: 0 automatic (full at the maximum r_ssaoSamples, half below), 1 full, 2 half; r_ssaoMethod 2 is always full", 0, 2,
 	idCmdSystem::ArgCompletion_Integer<0,2> );
 
 /*
@@ -404,11 +404,65 @@ Both renderers read it (OpenGL since FPS-04).
 ====================
 */
 bool R_SSAOHalfResolution() {
+	if ( R_SSAOMethod() == 2 ) {
+		// The reference is the comparison every other result is measured against.
+		return false;
+	}
 	switch ( r_ssaoResolution.GetInteger() ) {
 		case 1: return false;
 		case 2: return true;
 		default: return r_ssaoSamples.GetInteger() < 32;
 	}
+}
+
+/*
+====================
+R_SSAOMethod
+
+The ambient occlusion kernel of the occlusion pass (REN-10). 0 is the SSAO
+obscurance estimate the presets ship with. 1 is ground-truth ambient
+occlusion (GTAO): a horizon search per slice and the cosine-weighted visible
+arc between the horizons, the visibility native PBR's multi-bounce and
+specular occlusion expect. 2 is a brute-force reference, cosine-weighted rays
+marched through the depth buffer at full resolution and unfiltered, many
+times GTAO's cost, for comparisons only. All three share the occlusion
+target, filter, resolve and native PBR field, so the application (classic
+factor, indirect-only PBR occlusion), MSAA, dynamic resolution, subviews and
+both backends are the same.
+====================
+*/
+idCVar r_ssaoMethod( "r_ssaoMethod", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
+	"ambient occlusion method when r_ssao is on: 0 SSAO, 1 GTAO (ground-truth ambient occlusion), 2 brute-force reference (developer comparison, very slow)",
+	0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar r_ssaoMultiBounceAlbedo( "r_ssaoMultiBounceAlbedo", "0.3", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
+	"GTAO: the grey albedo classic surfaces bounce the light their occluders trap with (native PBR uses its own albedo); 0 turns multi-bounce off", 0.0f, 1.0f );
+
+int R_SSAOMethod() {
+	return idMath::ClampInt( 0, 2, r_ssaoMethod.GetInteger() );
+}
+
+bool R_SSAOFiltered() {
+	return R_SSAOMethod() != 2;
+}
+
+/*
+====================
+R_SSAOMethodInfo
+
+x the method, y the pattern turn: under temporal AA (a jittered view) GTAO
+turns its sixteen sample patterns by a quarter pattern per frame, so the
+history accumulates sixty-four slice directions instead of sixteen; without
+it the patterns hold still and nothing crawls. z the classic multi-bounce
+albedo, GTAO only.
+====================
+*/
+void R_SSAOMethodInfo( const viewDef_t *viewDef, float info[4] ) {
+	const int method = R_SSAOMethod();
+	const bool temporal = method == 1 && viewDef != NULL && viewDef->temporalJitterEnabled;
+	info[0] = static_cast<float>( method );
+	info[1] = temporal ? 0.25f * static_cast<float>( tr.frameCount & 3 ) : 0.0f;
+	info[2] = method >= 1 ? idMath::ClampFloat( 0.0f, 1.0f, r_ssaoMultiBounceAlbedo.GetFloat() ) : 0.0f;
+	info[3] = 0.0f;
 }
 idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "enable subtle camera motion blur post-process" );
 idCVar r_motionBlurStrength( "r_motionBlurStrength", "0.45", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "motion blur strength multiplier", 0.0f, 2.0f );

@@ -1543,6 +1543,7 @@ typedef struct vkPostSSAOBlock_s {
 	float	params2[ 4 ];		// x max distance, y sample count, zw the filter pass's texel step
 	float	modeInfo[ 4 ];		// x mode (0 unfiltered, 1 field, 2 apply, 3 occlusion, 4 resolve, 5 filter), y field rows flipped
 	float	halfInfo[ 4 ];		// xy occlusion target size, zw view size
+	float	methodInfo[ 4 ];	// R_SSAOMethodInfo: x method, y temporal pattern turn, z classic multi-bounce albedo
 } vkPostSSAOBlock_t;
 
 static void VK_Post_FillSSAOBlock( vkPostSSAOBlock_t &block, const viewDef_t *viewDef,
@@ -1564,6 +1565,7 @@ static void VK_Post_FillSSAOBlock( vkPostSSAOBlock_t &block, const viewDef_t *vi
 	block.modeInfo[ 0 ] = mode;
 	block.modeInfo[ 1 ] = flip ? 1.0f : 0.0f;
 	block.modeInfo[ 3 ] = r_vkSSAODeferredNormal.GetBool() ? 1.0f : 0.0f;
+	R_SSAOMethodInfo( viewDef, block.methodInfo );
 }
 
 static bool VK_Post_SSAOFieldValid( const viewDef_t *viewDef ) {
@@ -1633,7 +1635,8 @@ static bool VK_Post_DrawSSAOOcclusion( const viewDef_t *viewDef, VkShaderModule 
 		drawn = VK_Post_DrawTarget( pipeline, sets, 5, uniformOffset );
 	}
 	// The separable tent: horizontally into the filter target, vertically back.
-	for ( int axis = 0; axis < 2 && drawn; axis++ ) {
+	// The brute-force reference (r_ssaoMethod 2) stays unfiltered.
+	for ( int axis = 0; axis < 2 && drawn && R_SSAOFiltered(); axis++ ) {
 		idRenderTexture *target = axis == 0 ? vkPostScene.ssaoFilterTarget : vkPostScene.ssaoOcclusionTarget;
 		idImage *source = axis == 0 ? vkPostScene.ssaoOcclusion : vkPostScene.ssaoFilter;
 		drawn = false;

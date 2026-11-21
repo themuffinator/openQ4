@@ -1390,6 +1390,11 @@ extern idCVar r_ssaoSamples;			// SSAO spiral sample count
 extern idCVar r_ssaoDebug;				// visualize SSAO only
 extern idCVar r_ssaoResolution;			// 0 automatic, 1 full, 2 half resolution
 bool R_SSAOHalfResolution();			// r_ssaoResolution resolved against r_ssaoSamples
+extern idCVar r_ssaoMethod;				// 0 SSAO, 1 GTAO, 2 brute-force reference (REN-10)
+extern idCVar r_ssaoMultiBounceAlbedo;	// GTAO: grey albedo classic surfaces bounce trapped light with, 0 off
+int R_SSAOMethod();						// r_ssaoMethod clamped
+bool R_SSAOFiltered();					// the occlusion target takes the separable filter (not the reference)
+void R_SSAOMethodInfo( const struct viewDef_s *viewDef, float info[4] );	// ssao.fs aoInfo / post_ssao.frag methodInfo
 extern idCVar r_motionBlur;				// enable camera motion blur post-process
 extern idCVar r_motionBlurStrength;		// motion blur strength multiplier
 extern idCVar r_motionBlurMaxPixels;	// maximum motion blur radius in pixels

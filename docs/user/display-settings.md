@@ -43,6 +43,7 @@ What the effects are:
 - **Light grids** add openQ4's bounced light to maps that ship one. **Not in 0.14.1:** Minimum and Low Power turn them off and use the original game's lighting, and their 30 FPS cap stretches the reduced scene instead of rebuilding it with [temporal upscaling](temporal-presentation.md#automatic-upscaling-default).
 - **Bloom** adds a glow around bright lights. **SSAO** (ambient occlusion) adds soft shading in corners and creases. **Tone mapping** balances very bright and dark areas. Presets below Enhanced leave these off.
 - Ultra and Maximum draw SSAO at full resolution. Enhanced and Quality draw it at half resolution, which is cheaper and looks the same in play. On OpenGL, half resolution is not in 0.14.1: there, 0.14.1 draws it at full resolution on every preset.
+- **Not in 0.14.1:** SSAO's shading is smooth instead of grainy on every preset. For a more physically accurate look, set `r_ssaoMethod 1` in the console to use GTAO (ground-truth ambient occlusion): corners shade more like real light does, edges around objects stay clean, and PBR surfaces get coloured bounce light and reflections that dim in creases. It costs the same as SSAO or a little less. `r_ssaoMethod 0` goes back to SSAO.
 - The flashlight casts shadows on every preset that draws shadows. Lights carried by projectiles cast them only from Quality up, as on the original game's top setting.
 
 Brightness, exposure, CRT emulation and the experimental rendering modes are separate controls that presets leave alone. Choosing a lower preset restores all of its values, including those for effects you have switched off.
@@ -497,6 +498,8 @@ Settings ("console variables") can be typed in the console or added to your conf
 | `r_resolutionScaleMode` | `1` | How a scene below 100% is stretched; see [Resolution scale](#resolution-scale). |
 | `r_resolutionScaleSharpness` | `0.4` | Sharpening for scale mode `2` (`0` to `1.5`). |
 | `r_ssaoResolution` | `0` | SSAO resolution: `0` automatic (full at the highest SSAO sample count, as on Ultra and Maximum, half below), `1` full, `2` half. On OpenGL, not in 0.14.1. |
+| `r_ssaoMethod` | `0` | **Not in 0.14.1:** how ambient occlusion is computed when SSAO is on: `0` SSAO, `1` GTAO (ground-truth ambient occlusion: physically based, slightly softer, and PBR surfaces get coloured bounce light and shinier reflections in creases), `2` a very slow reference image for comparisons. |
+| `r_ssaoMultiBounceAlbedo` | `0.3` | **Not in 0.14.1:** with GTAO, how much light the surfaces of the original game bounce back into creases (`0` off, up to `1`). |
 
 `r_postAA` values:
 

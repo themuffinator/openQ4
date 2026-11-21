@@ -251,7 +251,7 @@ to a final project-wide phase. Important dependencies are:
 | Multiplayer splitscreen (MP-25) | Multiplayer only: the single-player game and the Awakening campaign never gain local players. Each local player is an ordinary client on the wire, so MP-08's protocol, MP-17's identity, MP-18's per-client caps and MP-22's client recording apply per player without a second path. Per-viewport HUD and menus build on the retained interface (UI-03/UI-04/UI-09); per-viewport cost is measured against FPS-01's budgets before any preset enables effects in splitscreen. |
 | Horde (MP-26) | Monster snapshot state is a protocol change: it follows MP-08's packet budget and MP-21's registry and keeps every older demo playable. Wildcard waves reuse MP-14's modifier layer, maps and presets go through MP-13 and MP-14, bots as fighters build on MP-09, and Horde stays unranked under MP-17. The stock Quake 4 roster only; Awakening content stays scoped to its campaign. |
 | Vulkan ray tracing (RT-02 through RT-07) | RT-01's hardware, budget, licence and translation decisions first. Ray tracing builds on VK-03 admission, VK-06 resource counters and the existing TAAU, motion vectors and GPU skinning paths; RT-06 follows the VK-05/VK-07/VK-08 capture and HDR work and VR-01 stereo. `r_rayTracing 0` always runs the unchanged Vulkan path, and no other renderer depends on it. |
-| Shadowed volumetrics, GTAO and parallax occlusion (REN-09 through REN-11) | REN-11 closed 21 November 2026. REN-09 samples the REN-03 shadow maps and replaces the REN-06 froxel leaf; REN-10 keeps SSAO and its REN-05 controls as the fallback and comparison. Each is default-off with exact rollback, and FPS-01's budgets price every tier before a preset enables it; a new preset setting carries the SYSTEM catalog ripple. |
+| Shadowed volumetrics, GTAO and parallax occlusion (REN-09 through REN-11) | REN-10 and REN-11 closed 21 November 2026. REN-09 samples the REN-03 shadow maps and replaces the REN-06 froxel leaf; REN-10 keeps SSAO and its REN-05 controls as the fallback and comparison. Each is default-off with exact rollback, and FPS-01's budgets price every tier before a preset enables it; a new preset setting carries the SYSTEM catalog ripple. |
 | HDR display output (VK-08) | VK-05's exposure domain and tone curves first. The 6 November display-referred decision for stock content stands, so VK-08 changes the output transform and interface composition, not scene composition. Vulkan only: OpenGL, GLES and VR stay SDR and report it, and HDR output off always presents the unchanged SDR path. A new display setting carries the SYSTEM catalog ripple; qualification needs a physical HDR display. |
 | Server discovery (MP-19) | A decision on a project-controlled master or list service before the Internet source can be qualified on a fresh install; Steam lobbies and matchmaking remain STEAM/OPT-09. |
 
@@ -1125,7 +1125,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 | REN-09 — Not started | The REN-06 froxel leaf (unshadowed screen-space depth fog) and the REN-03 shadow maps it will sample. | Froxel volume with light falloff/projection and shadow-map sampling, stencil-light policy, temporal reprojection, translucent ordering, both backends, budgets. |
-| REN-10 — Not started | Half/full-resolution SSAO with indirect-only application and GL/Vulkan parity controls (REN-05, FPS-04). | GTAO horizon search, multi-bounce and specular occlusion, temporal accumulation, brute-force reference comparison, cost against SSAO, preset decision. |
+| REN-10 — Closed | GTAO (`r_ssaoMethod 1`) and a brute-force reference (`2`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. Closer to the reference than SSAO with fewer halos, backend parity, exact rollback, cost at or below SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
 | REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | VR headset confirmation and physical Linux/macOS/Android belong to platform qualification; a preset decision waits for authored content. |
 
 ### REN task evidence and acceptance
@@ -1785,8 +1785,29 @@ diagnostics establish whole-frame ownership or production performance.
   byte-identical rollback with the leaf off; requested and effective state
   reported; per-tier cost measured against the FPS-01 budgets before any preset
   enables it.
-- [ ] **REN-10 — P2, implementation: ground-truth ambient occlusion (GTAO).**
-  Add GTAO beside the current SSAO: horizon search over the depth buffer,
+- [x] **REN-10 — P2, implementation: ground-truth ambient occlusion (GTAO).**
+  Closed 21 November 2026. `r_ssaoMethod` selects the kernel of SSAO's
+  occlusion pass: `0` SSAO (default), `1` GTAO (per-slice horizon search and
+  the analytic cosine-weighted visible arc; slices turn evenly about the view
+  direction), `2` a brute-force reference (256 cosine-weighted rays per pixel
+  through the depth buffer, full resolution, unfiltered). All three share the
+  occlusion target, separable filter, resolve and native PBR field, so the
+  indirect-only application, resolution policy, MSAA, dynamic resolution,
+  subviews, the view weapon and both backends are common. Native PBR folds
+  GTAO's visibility through its coloured multi-bounce and specular occlusion;
+  classic surfaces bounce with `r_ssaoMultiBounceAlbedo`. Under temporal AA
+  the patterns turn a quarter pattern per frame. Evidence:
+  [GTAO](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)
+  and `tools/tests/renderer_ao_reference.py`: on three stock poses GTAO is
+  15-50% closer to the reference than SSAO at Quality and Ultra, darkens
+  silhouettes a third to a half as much and crawls no more under motion;
+  OpenGL and Vulkan agree to 0.001-0.01 levels; SSAO after GTAO is
+  byte-identical; the PBR laboratory's `gtao-*` controls pass 10/10 on OpenGL,
+  the native owner and Vulkan. GTAO costs the same as SSAO or up to a third
+  less at each tier on both backends. VR headsets, GLES/mobile hardware and
+  the temporal turn (screenshot frames carry no jitter) were not observed;
+  whether presets move to GTAO is the owner's decision.
+  Original scope: add GTAO beside the current SSAO: horizon search over the depth buffer,
   cosine-weighted visibility, a multi-bounce colour approximation and a
   specular occlusion term for PBR surfaces. Run at half or full resolution with
   depth-aware upsampling, and accumulate over frames through the TAA jitter and

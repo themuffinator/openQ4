@@ -72,7 +72,7 @@ BASE = {
     'r_pbrAnalyticEnvironment': '1',
     'r_bloom': '0', 'r_ssao': '0', 'r_postAA': '0', 'r_motionBlur': '0',
     'r_ssaoRadius': '36', 'r_ssaoIntensity': '1.35', 'r_ssaoDebug': '0', 'r_ssaoMaxDistance': '220',
-    'r_ssaoResolution': '0',
+    'r_ssaoResolution': '0', 'r_ssaoMethod': '0',
     'r_hdrToneMap': '0', 'r_hdrAutoExposure': '0', 'r_hdrSceneTarget': '1',
     'r_hdrExposure': '1', 'r_hdrHighlightDesaturation': '0', 'r_hdrGamutCompression': '0',
     'r_hdrWhitePoint':'6', 'r_hdrLift':'0', 'r_hdrPostGamma':'1', 'r_hdrGain':'1',
@@ -208,6 +208,19 @@ CASES = {
     'ssao-debug-classic': {**SSAO_SETTINGS, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
     'ssao-classic-half': {**SSAO_HALF, 'r_pbrMaterials': '0'},
     'ssao-debug-classic-half': {**SSAO_HALF, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
+    # REN-10: the same controls with GTAO (r_ssaoMethod 1), whose visibility
+    # native PBR folds through multi-bounce and specular occlusion.
+    **{'gtao' + name[4:]: {**settings, 'r_ssaoMethod': '1'} for name, settings in (
+        ('ssao-ownership', {**SSAO_FADED, 'r_pbrDebug': '7'}),
+        ('ssao-off', dict(SSAO_FADED)),
+        ('ssao-on', dict(SSAO_SETTINGS)),
+        ('ssao-direct-off', {**SSAO_FADED, 'r_pbrIBL': '0'}),
+        ('ssao-direct-on', {**SSAO_SETTINGS, 'r_pbrIBL': '0'}),
+        ('ssao-classic', {**SSAO_SETTINGS, 'r_pbrMaterials': '0'}),
+        ('ssao-debug', {**SSAO_SETTINGS, 'r_ssaoDebug': '1'}),
+        ('ssao-debug-classic', {**SSAO_SETTINGS, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'}),
+        ('ssao-classic-half', {**SSAO_HALF, 'r_pbrMaterials': '0'}),
+        ('ssao-debug-classic-half', {**SSAO_HALF, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'}))},
     'albedo': {'r_pbrDebug': '1'},
     'normals': {'r_pbrDebug': '2'},
     **{f'normal-{name}': {'r_pbrDebug':'2'} for name in ('xyz','rg','agb','zero','flat')},
@@ -348,7 +361,7 @@ LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','p
 LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('native','off','fallback-native'))
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
-LEGACY_CASES.update(('ssao-classic','ssao-debug-classic','ssao-classic-half','ssao-debug-classic-half'))
+LEGACY_CASES.update(f'{method}-{name}' for method in ('ssao','gtao') for name in ('classic','debug-classic','classic-half','debug-classic-half'))
 # The classic skin leaves the specimen, the only PBR surface in view, classic.
 LEGACY_CASES.update(case for case in CASES if case.startswith('skin-') and '-classic' in case)
 CASE_COMMANDS = {'shader-reload':['rendererShaderLibraryReload'], 'image-reload':['reloadImages all'],
@@ -1131,8 +1144,8 @@ def display_referred_owner(row: dict) -> bool:
     return native_gl_owner(row) or (row.get('backend') == 'vk' and row.get('pbrLinearScene') == '0')
 
 
-def compare_ssao_captures(results: list[dict]) -> None:
-    """SSAO darkens native PBR indirect light only (Stage D).
+def compare_ssao_captures(results: list[dict], prefix: str = 'ssao') -> None:
+    """SSAO, or GTAO with prefix gtao (REN-10), darkens native PBR indirect light only (Stage D).
 
     Native PBR pixels (green in the ownership capture) keep their direct light
     exactly: with the environment off, SSAO changes none of them. With it on,
@@ -1141,21 +1154,21 @@ def compare_ssao_captures(results: list[dict]) -> None:
     and the debug view shows the same occlusion with and without it.
     """
     by_case = {r['case']: r for r in results}
-    names = ('ssao-ownership', 'ssao-off', 'ssao-on', 'ssao-direct-off', 'ssao-direct-on',
-             'ssao-classic', 'ssao-debug', 'ssao-debug-classic')
+    names = (f'{prefix}-ownership', f'{prefix}-off', f'{prefix}-on', f'{prefix}-direct-off', f'{prefix}-direct-on',
+             f'{prefix}-classic', f'{prefix}-debug', f'{prefix}-debug-classic')
     if not all(name in by_case for name in names):
         return
     images = {name: capture_rgb(Path(by_case[name]['screenshot'])) for name in names}
     if any(image is None for image in images.values()):
-        by_case['ssao-on']['failures'].append('SSAO controls are missing captures')
+        by_case[f'{prefix}-on']['failures'].append('SSAO controls are missing captures')
         return
-    owner = images['ssao-ownership']
+    owner = images[f'{prefix}-ownership']
     # Opaque native PBR shows pure green; translucent native PBR blends its
     # green over the room and belongs to neither set.
     owned = [i for i in range(0, len(owner), 3) if owner[i:i + 3] == bytes((0, 255, 0))]
     classic = [i for i in range(0, len(owner), 3)
                if not ( owner[i + 1] >= 48 and owner[i + 1] > 2 * owner[i] and owner[i + 1] > 2 * owner[i + 2] )]
-    row = by_case['ssao-on']
+    row = by_case[f'{prefix}-on']
     if len(owned) < 4096:
         row['failures'].append('the SSAO scene shows too few native PBR pixels')
         return
@@ -1163,17 +1176,17 @@ def compare_ssao_captures(results: list[dict]) -> None:
     def channels(i):
         return range(i, i + 3)
 
-    direct_on, direct_off = images['ssao-direct-on'], images['ssao-direct-off']
+    direct_on, direct_off = images[f'{prefix}-direct-on'], images[f'{prefix}-direct-off']
     direct_changed = sum(1 for i in owned if any(direct_on[c] != direct_off[c] for c in channels(i)))
-    on, off = images['ssao-on'], images['ssao-off']
+    on, off = images[f'{prefix}-on'], images[f'{prefix}-off']
     above = sum(1 for i in owned if any(on[c] > off[c] + 1 for c in channels(i)))
     below = sum(1 for i in owned if any(on[c] + 1 < direct_on[c] for c in channels(i)))
     darkened = sum(1 for i in owned if any(on[c] + 2 <= off[c] for c in channels(i)))
-    with_pbr, without_pbr = images['ssao-on'], images['ssao-classic']
+    with_pbr, without_pbr = images[f'{prefix}-on'], images[f'{prefix}-classic']
     # The field is stored in half floats: allow the last bit of rounding.
     classic_changed = sum(1 for i in classic if any(abs(with_pbr[c] - without_pbr[c]) > 1 for c in channels(i)))
-    classic_darkened = sum(1 for i in classic if any(with_pbr[c] + 2 <= images['ssao-off'][c] for c in channels(i)))
-    debug, debug_classic = images['ssao-debug'], images['ssao-debug-classic']
+    classic_darkened = sum(1 for i in classic if any(with_pbr[c] + 2 <= images[f'{prefix}-off'][c] for c in channels(i)))
+    debug, debug_classic = images[f'{prefix}-debug'], images[f'{prefix}-debug-classic']
     debug_changed = sum(1 for i in range(0, len(debug), 3)
                         if any(abs(debug[c] - debug_classic[c]) > 1 for c in channels(i)))
     def intel_vulkan(case_row) -> bool:
@@ -1205,27 +1218,27 @@ def compare_ssao_captures(results: list[dict]) -> None:
         row['failures'].append(f'SSAO darkened only {classic_darkened} classic pixels')
     if debug_changed > debug_limit:
         row['failures'].append(f'the SSAO debug view differs on {debug_changed} pixels with native PBR')
-    compare_ssao_half_resolution(by_case, images['ssao-off'])
+    compare_ssao_half_resolution(by_case, images[f'{prefix}-off'], prefix)
 
 
-def compare_ssao_half_resolution(by_case: dict, unoccluded: bytes) -> None:
+def compare_ssao_half_resolution(by_case: dict, unoccluded: bytes, prefix: str = 'ssao') -> None:
     """Half-resolution SSAO approximates the full-resolution field (REN-05)."""
-    names = ('ssao-classic', 'ssao-debug-classic', 'ssao-classic-half', 'ssao-debug-classic-half')
+    names = (f'{prefix}-classic', f'{prefix}-debug-classic', f'{prefix}-classic-half', f'{prefix}-debug-classic-half')
     if not all(name in by_case for name in names):
         return
     images = {name: capture_rgb(Path(by_case[name]['screenshot'])) for name in names}
-    row = by_case['ssao-classic-half']
+    row = by_case[f'{prefix}-classic-half']
     if any(image is None for image in images.values()):
         row['failures'].append('the half-resolution SSAO control is missing captures')
         return
-    full, half = images['ssao-debug-classic'], images['ssao-debug-classic-half']
+    full, half = images[f'{prefix}-debug-classic'], images[f'{prefix}-debug-classic-half']
     count = len(full)
     mean = sum(abs(a - b) for a, b in zip(full, half)) / count
     bias = sum(b - a for a, b in zip(full, half)) / count
     darkened_full = sum(1 for i in range(0, count, 3)
-                        if any(images['ssao-classic'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
+                        if any(images[f'{prefix}-classic'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
     darkened_half = sum(1 for i in range(0, count, 3)
-                        if any(images['ssao-classic-half'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
+                        if any(images[f'{prefix}-classic-half'][c] + 2 <= unoccluded[c] for c in range(i, i + 3)))
     ratio = abs(darkened_half - darkened_full) / max(1, darkened_full)
     row['ssaoHalfResolution'] = {'debugMeanAbs': round(mean, 4), 'debugMeanSigned': round(bias, 4),
                                  'classicDarkenedFull': darkened_full, 'classicDarkenedHalf': darkened_half,
@@ -2004,7 +2017,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
     # SSAO occludes only PBR's indirect light, which the classic light loop's
     # native owner does: the modern visible path declines those frames to it.
     ssao_declined = (active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False)
-                     and case.startswith('ssao-'))
+                     and case.startswith(('ssao-', 'gtao-')))
     if ssao_declined:
         visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
         if not re.search(r'\bblocked=1\b', visible) or 'reason=pbr-ssao-indirect-only' not in visible:
@@ -2566,6 +2579,7 @@ def main() -> int:
     compare_material_captures(results)
     compare_native_baked_captures(results)
     compare_ssao_captures(results)
+    compare_ssao_captures(results, 'gtao')
     compare_transparency_captures(results)
     compare_post_captures(results)
     compare_msaa_captures(results)
