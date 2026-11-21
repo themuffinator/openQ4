@@ -2331,6 +2331,11 @@ image on both backends.
   Effects' per-frame work fell to 0.77 of before in the combat wave (servicing
   0.43, the expiry walk 0.03) and to 0.47 in hub2. Fused surface bounds and
   two-ahead prefetching were measured slower and dropped.
+  GPU particles, 21 November ([report section 17](performance-report.md#17-what-gpu-particles-could-save-fps-08-21-november-2026)):
+  drawing effects costs 2-4 ms of the combat wave's CPU frame (`bse_render`
+  A/B on both renderers). GPU evaluation would remove only the CPU particle
+  geometry, 46% of that or about 1-1.3 ms; the soft-particle draws and depth
+  copy stay. Physics particles must stay on the CPU for stock behavior.
 - [ ] **FPS-09 — P1, qualification: regression gate.** Put the suite in the release
   checklist (`docs/dev/release-completion.md`, the manual release workflow): the core
   scenarios on the reference machine before every release and on every renderer,
