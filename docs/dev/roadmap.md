@@ -1126,7 +1126,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 | REN-09 — Not started | The REN-06 froxel leaf (unshadowed screen-space depth fog) and the REN-03 shadow maps it will sample. | Froxel volume with light falloff/projection and shadow-map sampling, stencil-light policy, temporal reprojection, translucent ordering, both backends, budgets. |
 | REN-10 — Not started | Half/full-resolution SSAO with indirect-only application and GL/Vulkan parity controls (REN-05, FPS-04). | GTAO horizon search, multi-bounce and specular occlusion, temporal accumulation, brute-force reference comparison, cost against SSAO, preset decision. |
-| REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | VR headset confirmation and physical Linux/macOS/Android belong to platform qualification; a preset decision waits for authored content. |
+| REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | Linux (Mesa GL and Vulkan) and the Android emulator (GLES declines cleanly) pass. VR headset confirmation and physical Linux GPUs, macOS and Android devices belong to platform qualification; a preset decision waits for authored content. |
 
 ### REN task evidence and acceptance
 
@@ -1826,9 +1826,13 @@ diagnostics establish whole-frame ownership or production performance.
   with the feature off and on. Cost at 2560x1440 with a traced surface filling
   the frame: +1.3 ms (GL) and +1.5 ms (Vulkan) for the default ray, measured
   against FPS-01's Ultra budgets; no stock scenario or preset is affected.
-  VR stereo was not run on a headset, and physical Linux/macOS/Android belong
-  to platform qualification (PLAT/AND); a preset decision waits for authored
-  content.
+  Linux (Mesa llvmpipe GL and lavapipe Vulkan, WSL) passes the same
+  laboratory with the same figures; on the Android x86_64 emulator the GLES
+  renderer, which has no native PBR owner, declines cleanly
+  (`android_emulator_smoke.py --mode parallax`: identical frames off and on, no
+  parallax draws, no warnings). VR stereo was not run on a headset, and physical
+  Linux GPUs, macOS and Android devices belong to platform qualification
+  (PLAT/AND); a preset decision waits for authored content.
 
 ## Frame-rate recovery and performance budgets
 

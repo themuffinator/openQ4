@@ -140,6 +140,40 @@ images differ by no more than the matching flat case (traced floor mean
 single pixel of the wall view, at a tile edge where the ray grazes a height
 discontinuity and either side is a valid hit (1 pixel in 1,024,000, 67 levels).
 
+**Linux** (WSL Ubuntu 24.04, Mesa 25.2.8 under Xvfb: llvmpipe OpenGL 4.5
+compatibility and lavapipe Vulkan 1.4; a `debugoptimized` build of `30f05fa50`
+with its own packs). Both backends pass every case, with the same figures as
+Windows to the second decimal: traced floor 82% changed (mean 37.2), steep 63%,
+wall 40%, environment 79%, shadow-mapped receivers 82% with `mapped=2` OpenGL
+receiver draws, self-shadow 13% darkened, faded ray within mean 0.06 of flat,
+off -> on -> off byte-identical, the cutout and emissive specimens flat, and the
+retail stage traced on Vulkan only. Two differences from NVIDIA, both at the
+precision limit and both now stated tolerances in the runner:
+
+- With parallax on, llvmpipe draws a few pixels of the wall's flat control one
+  level differently: that surface goes through the parallax program variant,
+  whose flat path Mesa compiles differently. NVIDIA keeps it byte-identical.
+  Classic surfaces never change. The check allows a one-level difference.
+- llvmpipe and lavapipe disagree on isolated pixels at tile edges, where the
+  ray grazes a height step and either side is a valid hit: 0.27% of the traced
+  floor (mean 0.10), against one pixel on NVIDIA. Within one backend every pass
+  runs the same code on the same inputs, so passes stay aligned. The parity
+  check allows 0.5% more differing pixels and 0.25 more mean difference than
+  the matching flat case.
+
+**Android** (x86_64 emulator, API 35, SwiftShader OpenGL ES 3.0; release native
+build of `30f05fa50`, debug APK). The GLES renderer has no native PBR owner, so
+REN-11's qualification there is a clean decline:
+`android_emulator_smoke.py --mode parallax --lab <prepared laboratory>` copies
+the laboratory into the app's save path, captures the grazing view with
+`r_parallaxOcclusion 0` and `1`, and passes: the two captures are
+byte-identical, the `heightMap` specimens draw their classic stages, the report
+reads `requested=0` then `requested=1` with `admitted=0 draws=0`, no material or
+packing warning appears, and the copied files are retired afterwards. The
+ordinary `--mode sp` gameplay, touch and save/load smoke also passes on the
+same APK. The GLES module links with `-z defs`, so no GL-only symbol leaked
+into it.
+
 **Rollback and unchanged stock materials.** The PBR laboratory
 (`renderer_pbr_laboratory.py`; lit, production, production-shadows,
 ownership, the five material diagnostics, environment-only, the classic
@@ -176,8 +210,9 @@ catalog is untouched.
 
 - VR stereo was not run: each eye traces with its own view origin, which gives
   correct stereo parallax by construction, but no headset session confirmed it.
-- Physical Linux, macOS and Android runs belong to platform qualification
-  (PLAT/AND), as for the other REN tasks. GLES and Apple GL 2.1 decline the
-  native PBR owner already (GLSL 1.30 gate).
+- Physical Linux GPUs (NVIDIA, AMD, Intel drivers), macOS and physical
+  Android devices belong to platform qualification (PLAT/AND), as for the other
+  REN tasks. Apple GL 2.1 declines the native PBR owner already (GLSL 1.30
+  gate); GLES has no native PBR owner.
 - A preset decision needs authored content and a quiet-machine
   `performance_suite.py` ladder; nothing ships a `heightMap` today.

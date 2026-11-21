@@ -23,6 +23,14 @@ refresh rate (XR_FB_display_refresh_rate), holds the CPU/GPU level
 (XR_EXT_performance_settings) and reports a scripted thermal warning. The
 runtime's event log and layer captures are the evidence; this qualifies the
 emulator's SwiftShader GLES only, never a headset.
+
+--mode parallax (REN-11) loads the parallax laboratory that
+tools/tests/renderer_parallax_occlusion.py --prepare built (--lab, its runtime
+root; the files are copied into the app's save path and retired afterwards)
+and captures its grazing view with r_parallaxOcclusion 0 and 1. The GLES
+renderer has no native PBR owner, so heightMap materials must draw their
+classic stages either way: the two captures are identical, the report follows
+the cvar with no parallax draws, and nothing warns about the materials.
 """
 from __future__ import annotations
 
@@ -62,6 +70,31 @@ LIFECYCLE_LAYOUT = ("1|" + ";".join(["-160,-120,125,35,0", "*,*,100,35,1", UNTOU
                                      "*,*,100,20,0", UNTOUCHED, UNTOUCHED, UNTOUCHED])
                     + "|" + ";".join([UNTOUCHED] * 9))
 LIFECYCLE_CAPTURES = ("emulator-spawn.tga", "emulator-moved.tga", "emulator-restored.tga")
+PARALLAX_CAPTURES = ("emulator-parallax-off.tga", "emulator-parallax-on.tga")
+PARALLAX_MAP = "tools/openq4_parallax_lab"
+# The laboratory's grazing camera (generate_parallax_validation_map.CAMERAS).
+PARALLAX_GAMEPLAY = """god
+notarget
+noclip
+g_stopTime 1
+set g_showHud 0
+set ui_showGun 0
+setviewpos 0 -60 72 10 90 0
+set r_parallaxOcclusion 0
+wait 30
+echo EMULATOR_GAMEPLAY_READY
+echo EMULATOR_PARALLAX_OFF
+gfxInfo
+screenshot "screenshots/emulator-parallax-off.tga"
+set r_parallaxOcclusion 1
+wait 30
+echo EMULATOR_PARALLAX_ON
+gfxInfo
+screenshot "screenshots/emulator-parallax-on.tga"
+echo EMULATOR_PARALLAX_END
+echo EMULATOR_SMOKE_COMPLETE
+quit
+"""
 LIFECYCLE_TAIL = """echo EMULATOR_BACKGROUND_REQUEST
 waitMsec 600000
 """
@@ -307,10 +340,38 @@ set vr_enable 1
 wait 10
 devmap game/airdefense1""")
         scripts["emulator_smoke.cfg"] = VR_GAMEPLAY
+    elif mode == "parallax":
+        scripts.pop("emulator_restored.cfg")
+        scripts["autoexec.cfg"] = scripts["autoexec.cfg"].replace(
+            "set in_touchControls 1\n", "set in_touchControls 0\nset r_parallaxOcclusion 0\n").replace(
+            "devmap game/hangar1", f"devmap {PARALLAX_MAP}")
+        scripts["emulator_smoke.cfg"] = PARALLAX_GAMEPLAY
     elif mode != "sp":
         raise ValueError("Unknown emulator game mode")
     scripts["emulator_smoke.cfg"] = "com_activeGameModule\n" + scripts["emulator_smoke.cfg"]
     return scripts
+
+
+def parallax_lab_files(lab: Path | None) -> dict[str, bytes]:
+    """The parallax laboratory's generated assets and compiled map, keyed by
+    their path under baseoq4 (the app's save path is a search path)."""
+    if lab is None:
+        raise ValueError("Parallax mode needs --lab, a prepared parallax laboratory runtime")
+    manifest = json.loads((lab / "parallax-lab.json").read_text(encoding="utf-8"))
+    if manifest.get("id") != "openq4-parallax-laboratory":
+        raise ValueError("--lab is not a parallax laboratory runtime")
+    names = [name for name in manifest["sha256"] if name.startswith("baseoq4/")]
+    compiled = sorted((lab / "baseoq4" / "maps" / "tools").glob("openq4_parallax_lab.*"))
+    names += [p.relative_to(lab).as_posix() for p in compiled if p.suffix != ".map"]
+    if not any(name.endswith(".proc") for name in names):
+        raise ValueError("--lab has no compiled map; run renderer_parallax_occlusion.py --prepare")
+    files = {}
+    for name in names:
+        data = (lab / name).read_bytes()
+        if name in manifest["sha256"] and hashlib.sha256(data).hexdigest() != manifest["sha256"][name]:
+            raise ValueError(f"Laboratory file does not match its manifest: {name}")
+        files[name.removeprefix("baseoq4/")] = data
+    return files
 
 
 def lifecycle_relaunch_autoexec() -> str:
@@ -385,7 +446,9 @@ class Probe:
         self.mode = args.mode
         self.scripts = scripts_for_mode(self.mode, getattr(args, "server", None))
         self.captures = {"sp": CAPTURES, "rotate": ROTATE_CAPTURES, "lifecycle": LIFECYCLE_CAPTURES,
-                         "resume": (), "vr": ()}.get(self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
+                         "resume": (), "vr": (), "parallax": PARALLAX_CAPTURES}.get(
+                             self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
+        self.lab_files = parallax_lab_files(getattr(args, "lab", None)) if self.mode == "parallax" else {}
         self.xr_files = vr_runtime_files() if self.mode == "vr" else {}
         self.xr_markers = ("vr_marker_ingame.txt", "vr_marker_turn.txt") if self.mode == "vr" else ()
         slot = SUSPEND_SLOT if self.mode == "lifecycle" else SLOT
@@ -752,6 +815,16 @@ class Probe:
             if self.read("logs/openq4.log") != old_log:
                 raise ValueError("Log changed during preparation")
             self.adb("shell", "run-as", PACKAGE, "rm", self.path("logs/openq4.log"))
+        for name, data in self.lab_files.items():
+            existing = self.read(name)
+            if existing is not None and existing != data:
+                raise ValueError(f"Existing laboratory file differs and must be reviewed: {name}")
+            directory = name.rsplit("/", 1)[0]
+            self.adb("shell", "run-as", PACKAGE, "mkdir", "-p", self.path(directory))
+            self.created[name] = data
+            self.put(name, data)
+        if self.lab_files:
+            self.report["parallax_lab_files"] = {n: hashlib.sha256(d).hexdigest() for n, d in self.lab_files.items()}
         for name, text in self.scripts.items():
             data = text.encode()
             # Track attempted writes too: a failed readback must not leave an
@@ -943,6 +1016,8 @@ class Probe:
             return self.assess_resume()
         if self.mode == "vr":
             return self.assess_vr()
+        if self.mode == "parallax":
+            return self.assess_parallax()
         log = (self.out / "openq4.log").read_text(errors="replace")
         for marker in ("EMULATOR_GAMEPLAY_READY", "EMULATOR_TOUCH_RELEASED", "EMULATOR_SMOKE_COMPLETE",
                        *(("EMULATOR_SAVE_RESTORED",) if self.mode != "mp" else ()),
@@ -1001,6 +1076,49 @@ class Probe:
                            + (" and same-build save/load" if self.mode != "mp" else "; local listen server, no remote peers")
                            + ("; AVD rotation setting, landscape-portrait-landscape mid-match" if self.mode == "rotate" else "")
                            + "; visual review separate")
+
+    def assess_parallax(self):
+        """GLES declines parallax cleanly: same image off and on, no parallax draws."""
+        log = (self.out / "openq4.log").read_text(errors="replace")
+        for marker in ("EMULATOR_PARALLAX_OFF", "EMULATOR_PARALLAX_ON", "EMULATOR_PARALLAX_END", "EMULATOR_SMOKE_COMPLETE"):
+            if marker not in log:
+                raise ValueError(f"Missing engine completion marker: {marker}")
+        if re.search(r"(?:^|\n)(?:ERROR:|FATAL|Fatal)", log):
+            raise ValueError("Engine reports a fatal error")
+        if PARALLAX_MAP not in log:
+            raise ValueError("The parallax laboratory map was not loaded")
+        warnings = [line for line in log.splitlines() if "parallax_lab" in line and "WARNING" in line
+                    or re.search(r"heightMap|packORMH|heightScale|heightReference", line) and "WARNING" in line]
+        self.report["parallax_warnings"] = warnings
+        if warnings:
+            raise ValueError(f"The laboratory materials warned: {warnings[0]}")
+        reports = {}
+        for marker, requested in (("EMULATOR_PARALLAX_OFF", "0"), ("EMULATOR_PARALLAX_ON", "1")):
+            section = log.split(marker, 1)[1]
+            line = re.search(r"Renderer parallax occlusion: ([^\n]*)", section)
+            if not line:
+                raise ValueError(f"No parallax report after {marker}")
+            reports[marker] = line.group(1).strip()
+            if f"requested={requested} " not in reports[marker] + " ":
+                raise ValueError(f"Parallax report does not follow the cvar: {reports[marker]}")
+            if not re.search(r"\bdraws=0\b", reports[marker]):
+                raise ValueError(f"GLES has no native PBR owner, yet reported parallax draws: {reports[marker]}")
+        self.report["parallax_reports"] = reports
+        captures = {}
+        pixels = {}
+        for name in self.captures:
+            path = self.out / name
+            if not path.is_file() or path.stat().st_size < 18:
+                raise ValueError(f"Missing engine capture: {name}")
+            data = path.read_bytes()
+            captures[name] = {"sha256": sha(path), "width": int.from_bytes(data[12:14], "little"),
+                              "height": int.from_bytes(data[14:16], "little")}
+            pixels[name] = data[18 + data[0]:]
+        if pixels[PARALLAX_CAPTURES[0]] != pixels[PARALLAX_CAPTURES[1]]:
+            raise ValueError("The GLES frame changed with r_parallaxOcclusion although no owner can trace it")
+        self.report.update(status="pass", engine_pid=self.pid, captures=captures,
+                           scope="Parallax laboratory on GLES: heightMap materials keep their classic stages; "
+                                 "frame identical with r_parallaxOcclusion 0 and 1; visual review separate")
 
     def assess_lifecycle(self):
         first = (self.out / "first-run-openq4.log").read_text(errors="replace")
@@ -1162,7 +1280,9 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--mode", choices=("sp", "mp", "rotate", "lifecycle", "resume", "vr"), default="sp")
+    parser.add_argument("--mode", choices=("sp", "mp", "rotate", "lifecycle", "resume", "vr", "parallax"), default="sp")
+    parser.add_argument("--lab", type=Path,
+                        help="parallax mode: a parallax laboratory runtime prepared by renderer_parallax_occlusion.py")
     parser.add_argument("--xr-runtime", type=Path,
                         help="vr mode: the libopenq4-xr-test-runtime.so the APK was packed with (Gradle -Popenq4XrTestRuntime)")
     parser.add_argument("--timeout", type=int, default=420)
@@ -1179,6 +1299,10 @@ def main():
         parser.error("--xr-runtime belongs to VR mode, which needs it")
     if args.xr_runtime is not None:
         args.xr_runtime = args.xr_runtime.resolve()
+    if (args.mode == "parallax") != (args.lab is not None):
+        parser.error("--lab belongs to parallax mode, which needs it")
+    if args.lab is not None:
+        args.lab = args.lab.resolve()
     for name in ("adb", "apk", "stage", "build_tools", "certificate", "assets"):
         setattr(args, name, getattr(args, name).resolve())
     probe = Probe(args)
@@ -1197,7 +1321,8 @@ def main():
             probe.write_report()
     scope = {"sp": "SP gameplay/save", "mp": "MP gameplay", "rotate": "SP rotation/portrait deck/save",
              "lifecycle": "SP touch layout/suspension save/process death/restore", "resume": "MP background/resume",
-             "vr": "OpenXR stereo on the test runtime"}[args.mode]
+             "vr": "OpenXR stereo on the test runtime",
+             "parallax": "parallax laboratory (GLES declines cleanly)"}[args.mode]
     print(f"PASS: silent emulator {scope} probe; inspect the retained engine captures.", flush=True)
 
 
