@@ -508,10 +508,32 @@ void Sys_ShowSplash(void) {
 	UpdateWindow(s_wcd.hWndSplash);
 }
 
+// The game window is shown while the splash still holds the foreground, so the
+// game window takes it over instead of Windows handing it to another program,
+// and the splash is then owned by the game window: an owned window always sits
+// above its owner, so the splash stays visible over the not yet drawn game
+// window without being raised above other programs.
+void Sys_KeepSplashAboveWindow(void *nativeWindow) {
+	if (!s_wcd.hWndSplash || !IsWindow(s_wcd.hWndSplash)) {
+		return;
+	}
+	HWND owner = static_cast<HWND>(nativeWindow);
+	if (owner != NULL && !IsWindow(owner)) {
+		owner = NULL;
+	}
+	SetWindowLongPtr(s_wcd.hWndSplash, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(owner));
+	if (owner != NULL) {
+		SetWindowPos(s_wcd.hWndSplash, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+	}
+}
+
 void Sys_DestroySplash(void) {
 	if (s_wcd.hWndSplash) {
-		ShowWindow(s_wcd.hWndSplash, SW_HIDE);
-		DestroyWindow(s_wcd.hWndSplash);
+		// Windows destroys an owned splash along with its owner.
+		if (IsWindow(s_wcd.hWndSplash)) {
+			ShowWindow(s_wcd.hWndSplash, SW_HIDE);
+			DestroyWindow(s_wcd.hWndSplash);
+		}
 		s_wcd.hWndSplash = NULL;
 	}
 }

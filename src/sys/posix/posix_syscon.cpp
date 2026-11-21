@@ -1952,8 +1952,20 @@ void Sys_ShowSplash( void ) {
 #endif
 }
 
+// SDL has no portable way to stack one top-level window above another, and
+// raising the splash would take focus from the game window on macOS. Wayland
+// shows nothing of the game window until its first frame, so the splash stays
+// visible there anyway; elsewhere the game window covers it as before.
+void Sys_KeepSplashAboveWindow( void *nativeWindow ) {
+	(void)nativeWindow;
+}
+
 void Sys_DestroySplash( void ) {
 #if defined( USE_SDL3 )
+	// The engine retires the splash after every loading frame it presents.
+	if ( s_splashWindow.window == NULL && s_splashWindow.renderer == NULL && s_splashWindow.texture == NULL ) {
+		return;
+	}
 	Posix_SplashDestroy();
 #endif
 }

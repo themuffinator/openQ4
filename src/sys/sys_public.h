@@ -519,6 +519,10 @@ void			Sys_ShowWindow( bool show );
 bool			Sys_IsWindowVisible( void );
 void			Sys_ShowConsole( int visLevel, bool quitOnClose );
 void			Sys_ShowSplash( void );
+// Stacks the splash above the newly shown game window, so it stays on screen
+// until the engine presents its first frame and retires it with
+// Sys_DestroySplash. NULL releases that stacking before the window goes away.
+void			Sys_KeepSplashAboveWindow( void *nativeWindow );
 void			Sys_DestroySplash( void );
 
 

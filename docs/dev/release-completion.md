@@ -7,6 +7,17 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## The game no longer vanishes while it starts, 21 November 2026
+
+- **The splash stays until the game has something to show (Windows).** When the game
+  opened its window it closed the splash at once, but drew nothing in the new
+  window for a second or more while the renderer finished loading. For that
+  moment the game looked as if it had disappeared, or another program came to
+  the front, before the startup screen appeared. The splash now stays above the
+  game window until the startup screen's first frame is on screen, and the game
+  window keeps the focus it had when you launched it.
+- **What to do.** Nothing.
+
 ## A smooth glow on the loading screen's bands, 21 November 2026
 
 - **No more stripes under the loading bands.** On the new interface

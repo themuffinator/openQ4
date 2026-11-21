@@ -376,7 +376,8 @@ def validate_sdl3_video_ownership() -> None:
     require_before(console_release, "SDL_DestroyRenderer", "SDL_QuitSubSystem( SDL_INIT_VIDEO )", "POSIX console renderer-before-video teardown")
     require_before(console_release, "SDL_DestroyWindow", "SDL_QuitSubSystem( SDL_INIT_VIDEO )", "POSIX console window-before-video teardown")
     require(gl_finish_teardown, "if (s_sdlVideoReferenceHeld && !s_teardownPreserveWindow)", "SDL3 game video release ownership guard")
-    require_before(gl_finish_teardown, "SDL_DestroyWindow(s_sdlWindow)", "SDL_QuitSubSystem(SDL_INIT_VIDEO)", "SDL3 game window-before-video teardown")
+    require_before(gl_finish_teardown, "SDL3_DestroyGameWindow()", "SDL_QuitSubSystem(SDL_INIT_VIDEO)", "SDL3 game window-before-video teardown")
+    require(function_body(backend, "static void SDL3_DestroyGameWindow(void) {"), "SDL_DestroyWindow(s_sdlWindow);", "SDL3 game window destroy helper")
 
 
 def validate_posix_signal_guards() -> None:

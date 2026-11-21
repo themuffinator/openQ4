@@ -161,7 +161,22 @@ def validate_shared_backend_contract() -> None:
     require(screen_parms, "reapplyDecoratedWindowPlacement", "post-composition decorated placement pass")
     require(screen_parms, 'SDL3_SyncWindowAfterScreenChange("chrome-aware window placement")', "chrome-aware placement synchronization")
     require_before(screen_parms, "SDL_SetWindowFullscreen(s_sdlWindow, true)", "SDL_ShowWindow(s_sdlWindow)", "fullscreen startup shows window only after mode transition")
-    require_before(screen_parms, "Sys_DestroySplash();", "SDL_ShowWindow(s_sdlWindow)", "startup splash is destroyed at render-window handoff")
+    # The splash outlives the handoff: the game window is shown while the splash
+    # still holds the foreground, the splash is stacked above it, and the engine
+    # retires it once the first loading frame has been presented.
+    reject(screen_parms, "Sys_DestroySplash();", "startup splash must survive the render-window handoff")
+    require_before(screen_parms, "SDL_ShowWindow(s_sdlWindow)", "Sys_KeepSplashAboveWindow(SDL3_NativeWindowForSplash());",
+                   "splash is stacked above the shown render window")
+    require_before(screen_parms, "Sys_KeepSplashAboveWindow(SDL3_NativeWindowForSplash());", "Sys_SDL_KeepWindowResponsive();",
+                   "render window takes its first paint at the handoff")
+    destroy_game_window = function_body(source, "static void SDL3_DestroyGameWindow(void) {")
+    require_before(destroy_game_window, "Sys_KeepSplashAboveWindow(NULL);", "SDL_DestroyWindow(s_sdlWindow);",
+                   "an owned splash is released before its owner is destroyed")
+    reject(source, "\tSDL_DestroyWindow(s_sdlWindow);\n\t\ts_sdlWindow = NULL;",
+           "game-window destroys go through SDL3_DestroyGameWindow")
+    loading_message = function_body(read("src/framework/Common.cpp"), "void idCommonLocal::PrintLoadingMessage( const char *msg ) {")
+    for frame_end in loading_message.split("renderSystem->EndFrame( NULL, NULL );")[1:]:
+        require(frame_end.lstrip()[:40], "Sys_DestroySplash();", "first presented loading frame retires the splash")
     require(leave_fullscreen, "SDL_SetWindowFullscreen(s_sdlWindow, false)", "fullscreen exit")
 
     require(refresh_placement, "SDL3_ClientOriginToFrameOrigin(x, y, frameX, frameY)", "frame-origin window position persistence")

@@ -4773,6 +4773,9 @@ static void SDL3_MinimizeOnFullscreenFocusLoss(void) {
 // The SYSTEM page's exclusive rule, defined with the strict window service.
 static bool SDL3_StrictFullscreenMode(SDL_DisplayID display, int width, int height, int refresh, SDL_DisplayMode &selected);
 
+void Sys_SDL_KeepWindowResponsive(void);
+static void *SDL3_NativeWindowForSplash(void);
+
 static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 	if (!s_sdlWindow) {
 		return false;
@@ -4992,10 +4995,17 @@ static bool SDL3_ApplyScreenParms(glimpParms_t parms) {
 			common->DPrintf("SDL3: failed to hide render window: %s\n", SDL_GetError());
 		}
 	} else {
-		Sys_DestroySplash();
+		// The renderer still has its programs to load before the engine presents
+		// the first frame, and a shown window that has never been drawn reads as
+		// the game vanishing. Show it while the splash still holds the foreground
+		// and keep the splash above it; the first presented frame retires it.
 		if (!SDL_ShowWindow(s_sdlWindow)) {
 			common->DPrintf("SDL3: failed to show render window: %s\n", SDL_GetError());
 		}
+		Sys_KeepSplashAboveWindow(SDL3_NativeWindowForSplash());
+		// Let the window take its first paint now; the renderer reads no
+		// messages until the first frame.
+		Sys_SDL_KeepWindowResponsive();
 	}
 
 	if (!parms.hiddenWindow) {
@@ -5050,6 +5060,24 @@ static void SDL3_InitDesktopMode(void) {
 		win32.desktopWidth = 1920;
 		win32.desktopHeight = 1080;
 	}
+}
+
+// The platform handle the splash is stacked against (Windows only).
+static void *SDL3_NativeWindowForSplash(void) {
+#if defined(OPENQ4_SDL3_POSIX_HOST)
+	return NULL;
+#else
+	const SDL_PropertiesID props = s_sdlWindow ? SDL_GetWindowProperties(s_sdlWindow) : 0;
+	return props != 0 ? SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL) : NULL;
+#endif
+}
+
+// A splash stacked above the game window must be released before that window
+// is destroyed: Windows would destroy it along with its owner.
+static void SDL3_DestroyGameWindow(void) {
+	Sys_KeepSplashAboveWindow(NULL);
+	SDL_DestroyWindow(s_sdlWindow);
+	s_sdlWindow = NULL;
 }
 
 static void SDL3_UpdateNativeWindowHandles(void) {
@@ -7031,8 +7059,7 @@ static bool SDL3_WindowServices_CreateWindowForFramebuffer(const renderFramebuff
 	if (s_sdlWindow != NULL && s_sdlWindowSurfaceKind != requestedSurfaceKind) {
 		common->Printf("SDL3: preserved window is for a different rendering API; recreating\n");
 		SDL3_RetireNativeWindowPublication();
-		SDL_DestroyWindow(s_sdlWindow);
-		s_sdlWindow = NULL;
+		SDL3_DestroyGameWindow();
 	}
 
 	const bool reusePreserved = s_sdlWindow != NULL;
@@ -7088,8 +7115,7 @@ static bool SDL3_WindowServices_CreateWindowForFramebuffer(const renderFramebuff
 static void SDL3_WindowServices_DestroyAttemptWindow(void) {
 	if (s_sdlWindow != NULL) {
 		SDL3_RetireNativeWindowPublication();
-		SDL_DestroyWindow(s_sdlWindow);
-		s_sdlWindow = NULL;
+		SDL3_DestroyGameWindow();
 	}
 }
 
@@ -7137,8 +7163,7 @@ static void SDL3_WindowServices_BeginWindowTeardown(void) {
 static void SDL3_WindowServices_FinishWindowTeardown(void) {
 	if (s_sdlWindow && !s_teardownPreserveWindow) {
 		SDL3_RetireNativeWindowPublication();
-		SDL_DestroyWindow(s_sdlWindow);
-		s_sdlWindow = NULL;
+		SDL3_DestroyGameWindow();
 	}
 
 	if (s_sdlVideoReferenceHeld && !s_teardownPreserveWindow) {

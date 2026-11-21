@@ -6843,6 +6843,7 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 		initializationSubmit = InitializationMilliseconds();
 		settingsFrame.Submitting();
 		renderSystem->EndFrame( NULL, NULL );
+		Sys_DestroySplash(); // the game window now has a frame to show
 		settingsFrame.Presented();
 		RetainedUI_FrameSubmitted();
 		UI_SettingsFrame( false );
@@ -6908,6 +6909,7 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 	renderSystem->SetColor( idVec4( 1.0f, 1.0f, 1.0f, 1.0f ) );
 	settingsFrame.Submitting();
 	renderSystem->EndFrame( NULL, NULL );
+	Sys_DestroySplash(); // the game window now has a frame to show
 	settingsFrame.Presented();
 	RetainedUI_FrameSubmitted();
 	UI_SettingsFrame( false ); // Startup/loading may observe recovery, never perform device or file work.
@@ -7969,6 +7971,9 @@ void idCommonLocal::Init( int argc, const char **argv, const char *cmdline ) {
 		if ( com_WriteSingleDeclFile.GetBool() ) {
 			declManager->WriteDeclFile();
 		}
+
+		// Normally gone with the first presented loading frame.
+		Sys_DestroySplash();
 
 		Printf( "--- Common Initialization Complete ---\n" );
 
