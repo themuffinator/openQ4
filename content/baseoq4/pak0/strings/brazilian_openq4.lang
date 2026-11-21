@@ -1834,4 +1834,6 @@
 	"#str_232630"	"Escolha uma arma e depois onde ela fica. Ao pegar, só troca para uma arma acima da sua."
 	"#str_232631"	"Limite de destaque"
 	"#str_232632"	"Permitir modelos forçados"
+	"#str_232633"	"Oclusão de Ambiente"
+	"#str_232634"	"Desativado;SSAO;HBAO;GTAO"
 }

@@ -1843,4 +1843,6 @@
 	"#str_232630"	"Scegli un'arma, poi il suo posto. Raccogliendo si passa solo a un'arma più in alto."
 	"#str_232631"	"Limite evidenziazione"
 	"#str_232632"	"Consenti modelli forzati"
+	"#str_232633"	"Occlusione ambientale"
+	"#str_232634"	"Off;SSAO;HBAO;GTAO"
 }

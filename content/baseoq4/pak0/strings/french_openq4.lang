@@ -1843,4 +1843,6 @@
 	"#str_232630"	"Choisissez une arme, puis sa place. Un ramassage ne change que pour une arme mieux classée."
 	"#str_232631"	"Limite de surbrillance"
 	"#str_232632"	"Modèles forcés permis"
+	"#str_232633"	"Occlusion ambiante"
+	"#str_232634"	"Off;SSAO;HBAO;GTAO"
 }

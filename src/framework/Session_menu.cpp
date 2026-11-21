@@ -84,6 +84,10 @@ extern glconfig_t glConfig;
 
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
 idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 );
+// The stock Display page's Ambient Occlusion choice: 0 off, else r_ssaoMethod + 1
+// (SSAO, HBAO, GTAO). SyncMainMenuAmbientOcclusionChoice keeps it in step with
+// r_ssao and r_ssaoMethod, which the presets and the console also change.
+idCVar gui_set_sys_ao( "gui_set_sys_ao", "0", CVAR_GUI | CVAR_INTEGER, "display menu ambient occlusion choice: 0 off, 1 SSAO, 2 HBAO, 3 GTAO", 0, 3 );
 idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 7 );
 idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 83 );
 // The opt-ins are unarchived, so each lasts until the player quits, and
@@ -507,6 +511,9 @@ static const float MAINMENU_CORPSE_TIME_PRESET_VALUES[] = {
 
 static bool ApplyMainMenuSettingsScrollPage( idUserInterface *gui, const char *pageName, bool requireVisiblePage );
 static void SyncMainMenuSettingsScrollPages( idUserInterface *gui );
+// The stock Display page's last synced Ambient Occlusion choice; -1 before a sync.
+static int mainMenuAmbientOcclusionChoice = -1;
+static void SyncMainMenuAmbientOcclusionChoice( void );
 
 static int MenuControllerAbs( int value ) {
 	return value < 0 ? -value : value;
@@ -3961,6 +3968,9 @@ idSessionLocal::SetMainMenuGuiVars
 ===============
 */
 void idSessionLocal::SetMainMenuGuiVars( bool refreshCatalogs ) {
+	// Show the renderer's ambient occlusion state, not a pick from an earlier menu.
+	mainMenuAmbientOcclusionChoice = -1;
+	SyncMainMenuAmbientOcclusionChoice();
 	guiMainMenu->SetStateBool( "retainedSystem", RetainedSystemAvailable() );
 	guiMainMenu->SetStateBool( "retainedAudio", RetainedAudioAvailable() );
 	guiMainMenu->SetStateBool( "retainedGame", RetainedGameAvailable() );
@@ -6018,7 +6028,37 @@ static void ScrollMainMenuSettingsFocusIntoView( idUserInterface *gui ) {
 	lastFocus.Clear();
 }
 
+/*
+==================
+SyncMainMenuAmbientOcclusionChoice
+
+One choice on the stock Display page stands for two renderer settings: Off is
+r_ssao 0, and SSAO, HBAO and GTAO are r_ssao 1 with r_ssaoMethod 0, 1 or 2. A
+pick the menu wrote since the last sync is applied (Off keeps the method, so
+turning it back on restores it); otherwise the choice follows the renderer
+settings, which a preset, the retained page or the console may have changed.
+The console-only reference (r_ssaoMethod 3) reads as GTAO.
+==================
+*/
+static void SyncMainMenuAmbientOcclusionChoice( void ) {
+	const int live = cvarSystem->GetCVarBool( "r_ssao" ) ? idMath::ClampInt( 0, 2, cvarSystem->GetCVarInteger( "r_ssaoMethod" ) ) + 1 : 0;
+	const int shown = gui_set_sys_ao.GetInteger();
+	if ( mainMenuAmbientOcclusionChoice >= 0 && shown != mainMenuAmbientOcclusionChoice ) {
+		cvarSystem->SetCVarBool( "r_ssao", shown > 0 );
+		if ( shown > 0 ) {
+			cvarSystem->SetCVarInteger( "r_ssaoMethod", shown - 1 );
+		}
+		mainMenuAmbientOcclusionChoice = shown;
+		return;
+	}
+	if ( shown != live ) {
+		gui_set_sys_ao.SetInteger( live );
+	}
+	mainMenuAmbientOcclusionChoice = live;
+}
+
 static void SyncMainMenuSettingsScrollPages( idUserInterface *gui ) {
+	SyncMainMenuAmbientOcclusionChoice();
 	if ( gui == NULL ) {
 		return;
 	}

@@ -109,15 +109,17 @@ does not restore the withdrawn release. See
   unchanged.
 - **PBR surfaces on Quality and Enhanced use the cheaper half-resolution
   SSAO too**, like everything else on those presets.
-- **New: two more kinds of ambient occlusion.** Set `r_ssaoMethod 2` in the
-  console for GTAO (ground-truth ambient occlusion), which follows how light
+- **New: two more kinds of ambient occlusion, picked in the menu.**
+  **Settings → Display → Effects → Ambient Occlusion** now offers **Off**,
+  **SSAO**, **HBAO** and **GTAO** (the console's `r_ssao` and `r_ssaoMethod`).
+  GTAO (ground-truth ambient occlusion) follows how light
   really reaches a surface: it is measurably closer to a brute-force
   reference than SSAO, keeps the outlines of objects free of dark halos, and
   gives PBR surfaces coloured bounce light and reflections that dim in
-  creases. `r_ssaoMethod 1` gives HBAO (horizon-based ambient occlusion), the
-  familiar look of many games, about as accurate as SSAO. Both cost about
-  the same as SSAO, or less on the higher presets. SSAO stays the default;
-  `r_ssaoMethod 0` returns to it exactly.
+  creases. HBAO (horizon-based ambient occlusion) is the familiar look of
+  many games, about as accurate as SSAO. Both cost about the same as SSAO, or
+  less on the higher presets. SSAO stays the default, and the presets turn
+  ambient occlusion on or off while keeping the kind you picked.
 - **What to do.** Nothing: update openQ4 as usual; your settings are kept.
 - Details: [filtered SSAO occlusion](presentation-owners.md#filtered-ssao-occlusion-21-november-2026),
   [GTAO](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026).

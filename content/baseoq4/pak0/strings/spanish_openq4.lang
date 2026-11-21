@@ -1834,4 +1834,6 @@
 	"#str_232630"	"Elige un arma y luego su lugar. Al recoger solo cambia a un arma más alta que la tuya."
 	"#str_232631"	"Límite de resaltado"
 	"#str_232632"	"Permitir modelos forzados"
+	"#str_232633"	"Oclusión ambiental"
+	"#str_232634"	"Off;SSAO;HBAO;GTAO"
 }

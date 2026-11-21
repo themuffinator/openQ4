@@ -141,6 +141,8 @@
   "settings.baseline.s_maxSoundsPerShader": {"type": "number", "initial": 0},
   "settings.draft.s_numberOfSpeakers": {"type": "number", "initial": 0},
   "settings.baseline.s_numberOfSpeakers": {"type": "number", "initial": 0},
+  "settings.draft.r_ssaoMethod": {"type": "number", "initial": 0},
+  "settings.baseline.r_ssaoMethod": {"type": "number", "initial": 0},
   "settings.draft.r_shadowMapPointSize": {"type": "number", "initial": 512},
   "settings.baseline.r_shadowMapPointSize": {"type": "number", "initial": 512},
   "settings.draft.r_shadowMapFilterTaps": {"type": "number", "initial": 9},
@@ -528,6 +530,21 @@
    "input": "boolean",
    "operation": "settings.system.edit",
    "arguments": {"r_forceAmbient": {"op": "select", "args": [{"input": "value"}, 0.7, 0]}}
+  },
+  "edit.ambient-occlusion": {
+   "input": "number",
+   "operation": "settings.system.edit",
+   "arguments": {
+    "r_ssao": {"op": ">", "args": [{"input": "value"}, 0]},
+    "r_ssaoMethod": {
+     "op": "select",
+     "args": [
+      {"op": ">", "args": [{"input": "value"}, 0]},
+      {"op": "-", "args": [{"input": "value"}, 1]},
+      {"state": "settings.draft.r_ssaoMethod"}
+     ]
+    }
+   }
   },
   "applyExit": {"operation": "settings.system.applyExit", "arguments": {}},
   "focusNumberDraft": {"operation": "ui.numberDrafts.focus", "arguments": {}},
@@ -25635,8 +25652,8 @@
    }
   },
   {
-   "id": "tall.settings_ssao-box.left",
-   "node": "settings_ssao-box",
+   "id": "tall.settings_ssao-value.left",
+   "node": "settings_ssao-value",
    "property": "left",
    "value": {
     "op": "select",
@@ -25648,93 +25665,366 @@
    }
   },
   {
-   "id": "tall.settings_ssao-box.top",
-   "node": "settings_ssao-box",
-   "property": "top",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     22.4983,
-     {"op": "*", "args": [11.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_ssao-box.width",
-   "node": "settings_ssao-box",
+   "id": "tall.settings_ssao-value.width",
+   "node": "settings_ssao-value",
    "property": "width",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
+     453.0106,
+     {"op": "*", "args": [221.489, {"state": "view.text"}]}
     ]
    }
   },
   {
-   "id": "tall.settings_ssao-box.height",
-   "node": "settings_ssao-box",
+   "id": "tall.settings_ssao-value.height",
+   "node": "settings_ssao-value",
    "property": "height",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
     ]
    }
   },
   {
-   "id": "tall.settings_ssao-checked.left",
-   "node": "settings_ssao-checked",
+   "id": "tall.settings_ssao-value.font-size",
+   "node": "settings_ssao-value",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-value.line-height",
+   "node": "settings_ssao-value",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-chevron.left",
+   "node": "settings_ssao-chevron",
    "property": "left",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     370.2211,
-     {"op": "*", "args": [181.011, {"state": "view.text"}]}
+     831.4129,
+     {"op": "*", "args": [406.5, {"state": "view.text"}]}
     ]
    }
   },
   {
-   "id": "tall.settings_ssao-checked.top",
-   "node": "settings_ssao-checked",
+   "id": "tall.settings_ssao-chevron.top",
+   "node": "settings_ssao-chevron",
    "property": "top",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     22.4983,
-     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+     30.6794,
+     {"op": "*", "args": [15.0, {"state": "view.text"}]}
     ]
    }
   },
   {
-   "id": "tall.settings_ssao-checked.width",
-   "node": "settings_ssao-checked",
+   "id": "tall.settings_ssao-chevron.width",
+   "node": "settings_ssao-chevron",
    "property": "width",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
+     24.5436,
+     {"op": "*", "args": [12, {"state": "view.text"}]}
     ]
    }
   },
   {
-   "id": "tall.settings_ssao-checked.height",
-   "node": "settings_ssao-checked",
+   "id": "tall.settings_ssao-chevron.height",
+   "node": "settings_ssao-chevron",
    "property": "height",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
+     12.2718,
+     {"op": "*", "args": [6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-viewport.margin-left",
+   "node": "settings_ssao-viewport",
+   "property": "margin-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-viewport.margin-top",
+   "node": "settings_ssao-viewport",
+   "property": "margin-top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-0.height",
+   "node": "settings_ssao-option-0",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-0-label.padding-left",
+   "node": "settings_ssao-option-0-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-0-label.font-size",
+   "node": "settings_ssao-option-0-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-0-label.line-height",
+   "node": "settings_ssao-option-0-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-1.height",
+   "node": "settings_ssao-option-1",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-1-label.padding-left",
+   "node": "settings_ssao-option-1-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-1-label.font-size",
+   "node": "settings_ssao-option-1-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-1-label.line-height",
+   "node": "settings_ssao-option-1-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-2.height",
+   "node": "settings_ssao-option-2",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-2-label.padding-left",
+   "node": "settings_ssao-option-2-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-2-label.font-size",
+   "node": "settings_ssao-option-2-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-2-label.line-height",
+   "node": "settings_ssao-option-2-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-3.height",
+   "node": "settings_ssao-option-3",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-3-label.padding-left",
+   "node": "settings_ssao-option-3-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-3-label.font-size",
+   "node": "settings_ssao-option-3-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-option-3-label.line-height",
+   "node": "settings_ssao-option-3-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-scroll-track.width",
+   "node": "settings_ssao-scroll-track",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_ssao-scroll-thumb.width",
+   "node": "settings_ssao-scroll-thumb",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
     ]
    }
   },
@@ -31530,150 +31820,6 @@
    ]
   },
   {
-   "id": "settings_ssao.default",
-   "durationMs": 300,
-   "tracks": [
-    {
-     "node": "settings_ssao-focus",
-     "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
-    },
-    {
-     "node": "settings_ssao-wash",
-     "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
-    },
-    {
-     "node": "settings_ssao-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
-      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_ssao.hover",
-   "durationMs": 1,
-   "tracks": [
-    {
-     "node": "settings_ssao-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_ssao-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
-     ]
-    },
-    {
-     "node": "settings_ssao-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_ssao.focus",
-   "durationMs": 80,
-   "tracks": [
-    {
-     "node": "settings_ssao-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_ssao-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_ssao-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_ssao.pressed",
-   "durationMs": 60,
-   "tracks": [
-    {
-     "node": "settings_ssao-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_ssao-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_ssao-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_ssao.disabled",
-   "durationMs": 150,
-   "tracks": [
-    {
-     "node": "settings_ssao-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_ssao-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_ssao-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
-     ]
-    }
-   ]
-  },
-  {
    "id": "settings_tonemap.default",
    "durationMs": 300,
    "tracks": [
@@ -32097,6 +32243,150 @@
     },
     {
      "node": "settings_motionblur-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_ssao.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "settings_ssao-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings_ssao-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings_ssao-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_ssao.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "settings_ssao-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_ssao-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "settings_ssao-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_ssao.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "settings_ssao-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_ssao-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_ssao-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_ssao.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "settings_ssao-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_ssao-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_ssao-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_ssao.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "settings_ssao-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_ssao-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_ssao-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -67830,7 +68120,7 @@
                       "id": "settings_ssao-label",
                       "type": "text",
                       "properties": {
-                       "text": {"type": "text", "value": "#str_41088"},
+                       "text": {"type": "text", "value": "#str_232633"},
                        "position": {"type": "keyword", "value": "relative"},
                        "display": {"type": "keyword", "value": "block"},
                        "flex-shrink": {"type": "number", "value": 1},
@@ -67846,24 +68136,41 @@
                     ]
                    },
                    {
-                    "id": "settings_ssao-box",
+                    "id": "settings_ssao-value",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_230030"},
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 221.489, "unit": "dp"},
+                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+                     "white-space": {"type": "keyword", "value": "nowrap"},
+                     "overflow": {"type": "keyword", "value": "hidden"},
+                     "text-overflow": {"type": "keyword", "value": "ellipsis"}
+                    }
+                   },
+                   {
+                    "id": "settings_ssao-chevron",
                     "type": "vector",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
-                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
-                     "width": {"type": "length", "value": 14, "unit": "dp"},
-                     "height": {"type": "length", "value": 14, "unit": "dp"}
+                     "left": {"type": "length", "value": 406.5, "unit": "dp"},
+                     "top": {"type": "length", "value": 15.0, "unit": "dp"},
+                     "width": {"type": "length", "value": 12, "unit": "dp"},
+                     "height": {"type": "length", "value": 6, "unit": "dp"}
                     },
                     "paths": [
                      {
-                      "id": "box",
+                      "id": "chevron",
                       "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
-                       {"id": "close", "op": "close"}
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 1.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]}
                       ],
                       "stroke": {
                        "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
@@ -67876,19 +68183,19 @@
                     ]
                    },
                    {
-                    "id": "settings_ssao-checked",
+                    "id": "settings_ssao-popup",
                     "type": "group",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
-                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
-                     "width": {"type": "length", "value": 14, "unit": "dp"},
-                     "height": {"type": "length", "value": 14, "unit": "dp"},
+                     "left": {"type": "length", "value": 173.011, "unit": "dp"},
+                     "top": {"type": "length", "value": 36.0, "unit": "dp"},
+                     "width": {"type": "length", "value": 245.489, "unit": "dp"},
+                     "height": {"type": "length", "value": 92.0, "unit": "dp"},
                      "display": {"type": "keyword", "value": "none"}
                     },
                     "children": [
                      {
-                      "id": "settings_ssao-mark",
+                      "id": "settings_ssao-popup-frame",
                       "type": "vector",
                       "properties": {
                        "position": {"type": "keyword", "value": "absolute"},
@@ -67899,15 +68206,451 @@
                       },
                       "paths": [
                        {
-                        "id": "mark",
+                        "id": "rim",
                         "commands": [
-                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
-                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
-                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
-                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
                          {"id": "close", "op": "close"}
                         ],
-                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                        "stroke": {
+                         "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                         "widthDp": 4,
+                         "minimumPixels": 1,
+                         "join": "miter",
+                         "cap": "butt"
+                        }
+                       },
+                       {
+                        "id": "body",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                        "stroke": {
+                         "paint": {"type": "solid", "color": {"type": "color", "value": [0.698, 0.8039, 0.2627, 0.2]}},
+                         "widthDp": 1,
+                         "minimumPixels": 1,
+                         "join": "miter",
+                         "cap": "butt"
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "settings_ssao-viewport",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 227.489, "unit": "dp"},
+                       "height": {"type": "length", "value": 88.0, "unit": "dp"},
+                       "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+                       "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "settings_ssao-content",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "children": [
+                         {
+                          "id": "settings_ssao-option-0",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_ssao-option-0-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-0-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-0-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_232634"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
+                         },
+                         {
+                          "id": "settings_ssao-option-1",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_ssao-option-1-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-1-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-1-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_232634"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
+                         },
+                         {
+                          "id": "settings_ssao-option-2",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_ssao-option-2-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-2-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-2-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_232634"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
+                         },
+                         {
+                          "id": "settings_ssao-option-3",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_ssao-option-3-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-3-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_ssao-option-3-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_232634"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     },
+                     {
+                      "id": "settings_ssao-scroll-track",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 233.489, "unit": "dp"},
+                       "top": {"type": "length", "value": 2, "unit": "dp"},
+                       "width": {"type": "length", "value": 8, "unit": "dp"},
+                       "height": {"type": "length", "value": 88.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "settings_ssao-scroll-trough",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "trough",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[{"fraction": 0.375}, {"fraction": 0.0}]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 0.0}]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[{"fraction": 0.375}, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.12]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "settings_ssao-scroll-thumb",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 8, "unit": "dp"},
+                         "height": {"type": "length", "value": 24, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "settings_ssao-scroll-ink",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"}
+                          },
+                          "paths": [
+                           {
+                            "id": "thumb",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.125}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.125}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.9]}}
+                           }
+                          ]
+                         }
+                        ]
                        }
                       ]
                      }
@@ -67915,10 +68658,17 @@
                    }
                   ],
                   "control": {
-                   "role": "toggle",
-                   "label": "#str_41088",
-                   "action": "edit.r_ssao",
-                   "value": {"state": "settings.draft.r_ssao"},
+                   "role": "choice",
+                   "label": "#str_232633",
+                   "action": "edit.ambient-occlusion",
+                   "value": {
+                    "op": "select",
+                    "args": [
+                     {"state": "settings.draft.r_ssao"},
+                     {"op": "+", "args": [{"op": "min", "args": [{"state": "settings.draft.r_ssaoMethod"}, 2]}, 1]},
+                     0
+                    ]
+                   },
                    "states": {
                     "default": "settings_ssao.default",
                     "hover": "settings_ssao.hover",
@@ -67926,7 +68676,70 @@
                     "pressed": "settings_ssao.pressed",
                     "disabled": "settings_ssao.disabled"
                    },
-                   "parts": {"checked": "settings_ssao-checked"},
+                   "parts": {
+                    "popup": "settings_ssao-popup",
+                    "viewport": "settings_ssao-viewport",
+                    "content": "settings_ssao-content",
+                    "value": "settings_ssao-value"
+                   },
+                   "visibleRows": 4,
+                   "options": [
+                    {
+                     "id": "settings_ssao-option-0",
+                     "node": "settings_ssao-option-0",
+                     "label": "#str_232634",
+                     "value": 0,
+                     "parts": {
+                      "label": "settings_ssao-option-0-label",
+                      "selected": "settings_ssao-option-0-selected",
+                      "highlight": "settings_ssao-option-0-highlight"
+                     },
+                     "labelIndex": 0
+                    },
+                    {
+                     "id": "settings_ssao-option-1",
+                     "node": "settings_ssao-option-1",
+                     "label": "#str_232634",
+                     "value": 1,
+                     "parts": {
+                      "label": "settings_ssao-option-1-label",
+                      "selected": "settings_ssao-option-1-selected",
+                      "highlight": "settings_ssao-option-1-highlight"
+                     },
+                     "labelIndex": 1
+                    },
+                    {
+                     "id": "settings_ssao-option-2",
+                     "node": "settings_ssao-option-2",
+                     "label": "#str_232634",
+                     "value": 2,
+                     "parts": {
+                      "label": "settings_ssao-option-2-label",
+                      "selected": "settings_ssao-option-2-selected",
+                      "highlight": "settings_ssao-option-2-highlight"
+                     },
+                     "labelIndex": 2
+                    },
+                    {
+                     "id": "settings_ssao-option-3",
+                     "node": "settings_ssao-option-3",
+                     "label": "#str_232634",
+                     "value": 3,
+                     "parts": {
+                      "label": "settings_ssao-option-3-label",
+                      "selected": "settings_ssao-option-3-selected",
+                      "highlight": "settings_ssao-option-3-highlight"
+                     },
+                     "labelIndex": 3
+                    }
+                   ],
+                   "placementBounds": "settings-body",
+                   "scrollbar": {
+                    "track": "settings_ssao-scroll-track",
+                    "thumb": "settings_ssao-scroll-thumb",
+                    "lineStep": 22.0,
+                    "minimumThumb": 24
+                   },
                    "navigation": {"down": "settings_tonemap", "up": "settings_bloom", "left": "settings_shadowmaps", "right": "settings_ssao"}
                   }
                  },

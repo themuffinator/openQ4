@@ -74,7 +74,7 @@ CATALOG = {
         "com_machineSpec", "com_maxfps", "image_anisotropy", "image_downSizeBumpLimit", "image_downSizeLimit",
         "image_downSizeSpecularLimit", "image_usePrecompressedTextures", "r_rendererUploadFrameBuffers", "r_rendererUploadMegs",
         "r_shadowMapMaxUpdatesPerView", "r_shadowMapCascadeCount", "r_shadowMapPointFilterMode", "image_picmip", "r_shadowMapSize",
-        "s_maxEmitterChannels", "s_maxSoundsPerShader", "s_numberOfSpeakers")},
+        "s_maxEmitterChannels", "s_maxSoundsPerShader", "s_numberOfSpeakers", "r_ssaoMethod")},
     "r_shadowMapPointSize": ("number", 512), "r_shadowMapFilterTaps": ("number", 9), "r_shadowMapPointFilterTaps": ("number", 9),
     "r_shadowMapFilterMode": ("number", 2), "r_shadowMapAtlasSize": ("number", 4096), "r_ssaoSamples": ("number", 20),
     "r_bloomMipCount": ("number", 5), "r_motionBlurSamples": ("number", 8), "ui_retainedScale": ("number", 1),
@@ -218,6 +218,13 @@ def page_actions(doc: Document) -> None:
                                    "arguments": {key: no({"input": "value"})}} for key in ("r_skipSpecular", "r_skipBump", "r_skipSky")},
         "edit.ambient-enabled": {"input": "boolean", "operation": "settings.system.edit",
                                  "arguments": {"r_forceAmbient": op("select", {"input": "value"}, 0.7, 0)}},
+        # Ambient Occlusion: 0 Off, else r_ssaoMethod + 1 (SSAO, HBAO, GTAO). Off
+        # keeps the method, so turning it back on restores the choice.
+        "edit.ambient-occlusion": {"input": "number", "operation": "settings.system.edit",
+                                   "arguments": {"r_ssao": op(">", {"input": "value"}, 0),
+                                                 "r_ssaoMethod": op("select", op(">", {"input": "value"}, 0),
+                                                                    op("-", {"input": "value"}, 1),
+                                                                    st("settings.draft.r_ssaoMethod"))}},
         "applyExit": {"operation": "settings.system.applyExit", "arguments": {}},
         "focusNumberDraft": {"operation": "ui.numberDrafts.focus", "arguments": {}},
         "preset": {"input": "string", "operation": "settings.system.preset", "arguments": {"name": {"input": "value"}}},
@@ -676,11 +683,16 @@ def system_document() -> dict:
     for ident, key, setting, action in (
             ("settings_shadows", "#str_200160", "r_shadows", None), ("settings_specular", "#str_200161", "r_skipSpecular", "-enabled"),
             ("settings_bump", "#str_200162", "r_skipBump", "-enabled"), ("settings_sky", "#str_223009", "r_skipSky", "-enabled"),
-            ("settings_bloom", "#str_41082", "r_bloom", None), ("settings_ssao", "#str_41088", "r_ssao", None),
+            ("settings_bloom", "#str_41082", "r_bloom", None),
             ("settings_tonemap", "#str_41084", "r_hdrToneMap", None), ("settings_shadowmaps", "#str_232552", "r_useShadowMap", None),
             ("settings_motionblur", "#str_232553", "r_motionBlur", None)):
         value = draft(setting) if action is None else no(draft(setting))
         toggles[ident] = row(doc, ident, key, "toggle", x, value=value, action=edit(setting) + (action or ""))
+    # Ambient Occlusion (REN-10): Off, SSAO, HBAO or GTAO in one choice over r_ssao
+    # and r_ssaoMethod. The console-only reference (method 3) reads as GTAO.
+    toggles["settings_ssao"] = choice(doc, "settings_ssao", "#str_232633", x, "edit.ambient-occlusion",
+                                      op("select", draft("r_ssao"), op("+", op("min", draft("r_ssaoMethod"), 2), 1), 0),
+                                      listed("#str_232634", (0, 1, 2, 3)))
     # #238: animated characters shadow themselves under shadow-mapped lights;
     # it means nothing while shadows or shadow maps are off.
     self_shadow = row(doc, "settings_character_self_shadow", "#str_232513", "toggle", x,

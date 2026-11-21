@@ -1834,4 +1834,6 @@
 	"#str_232630"	"Vyberte zbraň a pak její místo. Sebraná zbraň se vezme jen, je-li výš než ta v ruce."
 	"#str_232631"	"Limit zvýraznění"
 	"#str_232632"	"Povolit vynucené modely"
+	"#str_232633"	"Okolní zastínění"
+	"#str_232634"	"Vypnuto;SSAO;HBAO;GTAO"
 }

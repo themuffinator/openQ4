@@ -3646,6 +3646,10 @@ STOCK_SYSTEM_SESSION_ROWS = {'set_sys_screensize': 'r_mode', 'set_sys_specular':
                              'set_sys_sky': 'r_skipSky', 'set_sys_ambient': 'r_forceAmbient'}
 # Stock SYSTEM controls that navigate the page instead of changing a setting.
 STOCK_SYSTEM_PAGE_CONTROLS = {'set_sys_section_choice'}
+# Menu CVars a stock control binds in place of the settings it stands for, which
+# Session_menu.cpp keeps in step: the Ambient Occlusion choice (REN-10) is
+# r_ssao and r_ssaoMethod.
+STOCK_SYSTEM_MENU_CVARS = {'gui_set_sys_ao': ('r_ssao', 'r_ssaoMethod')}
 
 
 def stock_system_settings() -> set[str]:
@@ -3660,7 +3664,13 @@ def stock_system_settings() -> set[str]:
         span = gui[definition.end():definitions[index + 1].start() if index + 1 < len(definitions) else len(gui)]
         cvar = re.search(r'\bcvar\s+"?(\w+)"?', span)
         row = re.match(r'(set_sys_\w+?)_val', definition.group(1))
-        if cvar:
+        if cvar and cvar.group(1) in STOCK_SYSTEM_MENU_CVARS:
+            menu = (ROOT / 'src/framework/Session_menu.cpp').read_text(encoding='utf-8')
+            sync = function_body(menu, 'static void SyncMainMenuAmbientOcclusionChoice( void ) {')
+            for name in STOCK_SYSTEM_MENU_CVARS[cvar.group(1)]:
+                assert f'"{name}"' in sync, f'{cvar.group(1)} no longer keeps {name} in step'
+            settings.update(STOCK_SYSTEM_MENU_CVARS[cvar.group(1)])
+        elif cvar:
             if cvar.group(1) != 'gui_set_sys_scroll':
                 settings.add(cvar.group(1))
         elif row and row.group(1) in STOCK_SYSTEM_SESSION_ROWS:

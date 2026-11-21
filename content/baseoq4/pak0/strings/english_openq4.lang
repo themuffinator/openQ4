@@ -1834,4 +1834,6 @@
 	"#str_232630"	"Pick a weapon, then pick where it goes. A pickup switches only to a weapon ranked above yours."
 	"#str_232631"	"Highlight Limit"
 	"#str_232632"	"Allow Forced Models"
+	"#str_232633"	"Ambient Occlusion"
+	"#str_232634"	"Off;SSAO;HBAO;GTAO"
 }

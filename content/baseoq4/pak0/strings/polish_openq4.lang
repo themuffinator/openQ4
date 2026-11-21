@@ -1890,4 +1890,6 @@
 	"#str_232630"	"Wybierz broń, potem jej miejsce. Podniesienie zmienia tylko na broń wyżej w kolejności."
 	"#str_232631"	"Limit podświetlenia"
 	"#str_232632"	"Wymuszone modele"
+	"#str_232633"	"Okluzja otoczenia"
+	"#str_232634"	"Wył.;SSAO;HBAO;GTAO"
 }

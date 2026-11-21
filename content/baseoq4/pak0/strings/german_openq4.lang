@@ -1834,4 +1834,6 @@
 	"#str_232630"	"Waffe wählen, dann ihren Platz. Beim Aufheben wird nur zu einer höher platzierten gewechselt."
 	"#str_232631"	"Hervorhebungs-Limit"
 	"#str_232632"	"Erzwungene Modelle"
+	"#str_232633"	"Ambient Occlusion"
+	"#str_232634"	"Aus;SSAO;HBAO;GTAO"
 }

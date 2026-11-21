@@ -1834,4 +1834,6 @@
 	"#str_232630"	"Válassz fegyvert, majd a helyét. Felvételkor csak magasabb helyen állóra vált."
 	"#str_232631"	"Kiemelési korlát"
 	"#str_232632"	"Kényszerített modellek"
+	"#str_232633"	"Környezeti takarás"
+	"#str_232634"	"Ki;SSAO;HBAO;GTAO"
 }

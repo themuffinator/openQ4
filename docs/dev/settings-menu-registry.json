@@ -1995,20 +1995,20 @@
       "id": "system.ssao",
       "pane": "System",
       "section": "Post Effects",
-      "path": "Settings > System > Post Effects > SSAO",
+      "path": "Settings > System > Post Effects > Ambient Occlusion",
       "source": "system",
       "container": "set_sys_ssao",
       "widgets": [
         "set_sys_ssao_val"
       ],
       "widget_type": "choice",
-      "label_key": "#str_41088",
-      "choices_key": "#str_200059",
+      "label_key": "#str_232633",
+      "choices_key": "#str_232634",
       "target_type": "cvar",
-      "target": "r_ssao",
+      "target": "gui_set_sys_ao",
       "default": "0",
       "restart_required": false,
-      "accessibility": "Standard focusable choiceDef row."
+      "accessibility": "Standard focusable choiceDef row. Off, SSAO, HBAO or GTAO: Session_menu.cpp keeps gui_set_sys_ao in step with r_ssao and r_ssaoMethod."
     },
     {
       "id": "system.tone_mapping",

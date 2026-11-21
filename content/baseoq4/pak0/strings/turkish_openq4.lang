@@ -1834,4 +1834,6 @@
 	"#str_232630"	"Bir silah seç, sonra yerini seç. Alınca yalnızca daha üstteki silaha geçilir."
 	"#str_232631"	"Vurgu sınırı"
 	"#str_232632"	"Zorunlu modellere izin ver"
+	"#str_232633"	"Ortam Perdeleme"
+	"#str_232634"	"Kapalı;SSAO;HBAO;GTAO"
 }

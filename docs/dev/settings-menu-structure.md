@@ -33,7 +33,7 @@ With `ui_retained 1` (the default) the Settings screen opens the retained SETTIN
 | Display | Graphics | Performance Preset, Auto-Detect, Rendering Backend and Device, Renderer Fallback, Restart Renderer | Interface: UI Scale, Text Size, UI Aspect, Reset UI Sizes |
 | Display | Screen | Display: Display Device, Expand Across Displays, Fullscreen, Borderless, Fullscreen Policy, V-Sync, Frame Rate Cap | Display Sizing: window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | Display | Image Quality | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering | Rendering: Specular, Bump Mapping, Sky, Ambient Light, Ambient Brightness |
-| Display | Effects | Lighting: Shadows, Shadow Maps, Character Self-Shadows, Irradiance Volumes, Preload Light Grids | Post-Processing: Bloom, SSAO, Tone Mapping, Motion Blur, CRT Filter |
+| Display | Effects | Lighting: Shadows, Shadow Maps, Character Self-Shadows, Irradiance Volumes, Preload Light Grids | Post-Processing: Bloom, Ambient Occlusion, Tone Mapping, Motion Blur, CRT Filter |
 | Audio | (one page) | Levels, Devices | Effects: EAX, Surround Speakers, Headphone HRTF. Subtitles: the five subtitle rows |
 
 The retained pages also offer rows the classic page lacks: Frame Rate Cap (`com_maxfps`: 30, 60, 75, 90, 120, 144, 165, 240, 360 or Unlimited), Anisotropic Filtering (`image_anisotropy`: Off, 2x, 4x, 8x, 16x), Shadow Maps (`r_useShadowMap`, available while Shadows is on) and Motion Blur (`r_motionBlur`), all of which the performance presets set; Character Self-Shadows needs Shadow Maps. VR Mode, Room Scale, Two-Handed Grip and Physical Crouch are toggles there. The rest of this document describes the classic pages (`ui_retained 0`), whose layout is unchanged.
@@ -350,7 +350,7 @@ The pane has two display layouts:
 | Preload Light Grids | `choiceDef` | `set_sys_preload_val` | `r_lightGridPreload` | `No;Yes` | Preloads baked lighting on the next map load. Help explains smoother traversal, longer loads, and higher VRAM use. |
 | Irradiance Volumes | `choiceDef` | `set_sys_irradiance_val` | `r_useLightGrid` | `No;Yes` | Enables baked light-grid indirect diffuse when available. |
 | Bloom | `choiceDef` | `set_sys_bloom_val` | `r_bloom` | `No;Yes` | Boolean picker. |
-| SSAO | `choiceDef` | `set_sys_ssao_val` | `r_ssao` | `No;Yes` | Boolean picker. |
+| Ambient Occlusion | `choiceDef` | `set_sys_ssao_val` | `gui_set_sys_ao` (`r_ssao`, `r_ssaoMethod`) | `Off;SSAO;HBAO;GTAO` | Off is `r_ssao 0`; the others are `r_ssao 1` with `r_ssaoMethod` 0, 1 or 2. `Session_menu.cpp` keeps the menu cvar in step both ways; the retained page writes both cvars from one choice. |
 | Tone Mapping | `choiceDef` | `set_sys_tonemap_val` | `r_hdrToneMap` | `No;Yes` | Boolean picker. |
 | CRT Filter | `choiceDef` | `set_sys_crt_val` | `r_crt` | `No;Yes` | Boolean picker. |
 

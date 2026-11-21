@@ -16,7 +16,7 @@ int main(){
  Seed();SystemSettingsHost host;std::string error;StateValues original;
  Check(host.Read(original,error),"complete host baseline");
  const std::set<std::string> keys(openq4::PerformancePresetTargets().begin(),openq4::PerformancePresetTargets().end());
- Check(keys.size()==55&&original.size()==77,"catalog union");
+ Check(keys.size()==55&&original.size()==78,"catalog union");
  for(const auto& preset:openq4::PerformancePresets()){
   SettingsTransaction tx(host);Check(tx.Begin(7).code==SettingsCode::Ok,"begin real host");
   Check(tx.Edit(7,{{"r_brightness",1.375},{"r_forceAmbient",0.1375}}).code==SettingsCode::Ok,"custom outside draft");
@@ -27,9 +27,9 @@ int main(){
    Check(SettingsValueEqual(tx.Draft().at(key),keys.contains(key)?patch.at(key):value),"55 replacements and exact outside preservation");
    if(!keys.contains(key))++untouched;
   }
-  Check(untouched==22&&SettingsValuesEqual(tx.Baseline(),original),"22 outside keys and baseline preserved");
+  Check(untouched==23&&SettingsValuesEqual(tx.Baseline(),original),"23 outside keys and baseline preserved");
   Check(writes==0,"draft preset never invokes setter");
-  StateValues readback;Check(host.Read(readback,error)&&SettingsValuesEqual(original,readback),"all 77 live unchanged");
+  StateValues readback;Check(host.Read(readback,error)&&SettingsValuesEqual(original,readback),"all 78 live unchanged");
   Check((SystemSettingsHost::ChangedEffects(tx.Baseline(),tx.Draft())&(SystemSettingPresetExpansion|SystemSettingImageReload|SystemSettingAudioRestart|SystemSettingRendererResources))!=0,"profile remains real unsupported effect footprint");
  }
  SettingsTransaction tx(host);Check(tx.Begin(1).code==SettingsCode::Ok,"detection owner");

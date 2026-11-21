@@ -301,6 +301,9 @@ const std::vector<SystemSettingDescriptor>& SystemSettingsHost::Catalog() {
 		Number("r_screenFraction", 10, 200, "#str_41091", SystemSettingImmediate, {10,25,50,75,85,100,125,150,200}),
 		Boolean("r_shadows", "#str_200160"), Boolean("r_skipBump", "#str_200162"),
 		Boolean("r_skipSky", "#str_223009"), Boolean("r_skipSpecular", "#str_200161"), Boolean("r_ssao", "#str_41088"),
+		// The Ambient Occlusion choice (Off, SSAO, HBAO, GTAO) writes r_ssao and this
+		// together; 3, the brute-force reference, is console-only.
+		Number("r_ssaoMethod", 0, 3, "#str_232633"),
 		// Both back ends apply the interval to the running device: OpenGL on its
 		// next swap, Vulkan by rebuilding its swapchain.
 		Number("r_swapInterval", 0, 1, "#str_41092", SystemSettingImmediate, {0,1}),
