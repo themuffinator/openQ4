@@ -1617,6 +1617,8 @@ idRenderModel *idRenderWorldLocal::ParseModel( Lexer *src ) {
 // jmarshall end
 
 	for ( i = 0 ; i < numSurfaces ; i++ ) {
+		// An area's model can hold hundreds of surfaces.
+		common->LoadingCheckpoint();
 		src->ExpectTokenString( "{" );
 
 		src->ExpectAnyToken( &token );
@@ -2453,6 +2455,8 @@ bool idRenderWorldLocal::InitFromMap( const char *name ) {
 
 	// parse the file
 	while ( 1 ) {
+		// The loading screen keeps presenting between the world's models.
+		common->LoadingCheckpoint();
 		if ( !src->ReadToken( &token ) ) {
 			break;
 		}

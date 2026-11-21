@@ -12,7 +12,7 @@
 #include <iterator>
 #include "src/ui/retained/Input.h"
 #include "src/ui/retained/State.h"
-#include "src/framework/InitializationPresentation.h"
+#include "src/framework/LoadingFramePacer.h"
 
 using namespace openq4::ui;
 static void Check(bool condition, const char* message) {
@@ -85,22 +85,63 @@ static void CheckCoverageRaster() {
 	rectangle(0,0,1,1,1,0,1); rectangle(8000,8000,1,1,1,0,1);
 	Check(!RasterizeCoverage(vertices,indices,bitmap,8192),"sparse oversized bounds obey the independent bitmap storage budget");
 }
+static bool WholePeriods(double interval, double refresh) {
+	const double period=1000.0/refresh, rest=std::fmod(interval,period);
+	return (std::min)(rest,period-rest)<1e-6;
+}
 static void CheckInitializationPacing() {
-	openq4::InitializationPresentation pacing;
-	Check(!pacing.Due(1000,60),"startup cannot redraw before its first frame");
-	pacing.Presented(0,100); // Cold compilation is paid once.
-	Check(!pacing.Due(116,0) && pacing.Due(117,0),"startup caps uncapped presentation at 60 Hz");
-	Check(!pacing.Due(116,240) && pacing.Due(117,240),"startup caps high presentation at 60 Hz");
-	Check(!pacing.Due(149,20) && pacing.Due(150,20),"startup respects a lower presentation cap");
-	pacing.Presented(150,152);
-	Check(!pacing.Due(166,60) && pacing.Due(167,60),"warm inexpensive frames keep a 60 Hz start-to-start cadence");
-	pacing.Presented(167,207); // 40 ms: smoothed to 11.5 ms of cost.
-	Check(!pacing.Due(218,60) && pacing.Due(219,60),"one blocked present is smoothed instead of stalling the entrance");
-	for (int i = 0; i < 40; ++i) pacing.Presented(2000+i*100,2020+i*100);
-	Check(!pacing.Due(5995,60) && pacing.Due(6001,60),"slow startup redraws reserve four fifths of later time for loading");
-	Check(!pacing.Due(5900,60),"a backwards clock cannot cause a redraw burst");
-	pacing.Presented(9000,9001);
-	Check(!pacing.Due(9001,60),"a late checkpoint never produces catch-up frames");
+	// The startup and loading screens share one pacer.
+	openq4::LoadingFramePacer pacing;
+	pacing.Configure(60,0); pacing.Reset();
+	Check(pacing.Due(1000),"a blocking period presents its first offer at once");
+	pacing.Presented(1000,1001);
+	Check(!pacing.Due(1016) && pacing.Due(1016.5),"frames follow at the display's refresh, start to start");
+	pacing.Presented(1016.5,1018.5);
+	Check(!pacing.Due(1032.5) && pacing.Due(1033),"an on-time frame keeps the cadence");
+	pacing.Presented(1037,1039); // Almost 4 ms late: still the cadence's frame.
+	Check(!pacing.Due(1049) && pacing.Due(1049.6),"a slightly late frame keeps the cadence instead of drifting");
+	pacing.Presented(1200,1202); // A stall: the cadence restarts from here.
+	Check(!pacing.Due(1216) && pacing.Due(1216.5),"a late checkpoint never produces catch-up frames");
+	Check(!pacing.Due(1100),"a backwards clock cannot cause a redraw burst");
+	openq4::LoadingFramePacer cold; cold.Configure(60,0); cold.Reset();
+	cold.Presented(0,100); // Building the screen's view is paid once.
+	Check(cold.Cost()==0 && std::abs(cold.Interval()-1000.0/60)<1e-6,"a period's first frame does not slow its cadence");
+	for (double refresh:{120.0,144.0,165.0,240.0}) {
+		openq4::LoadingFramePacer high; high.Configure(refresh,0); high.Reset();
+		const double rate=1000.0/high.Interval();
+		Check(rate<=openq4::LoadingFramePacer::MaxRateHz+1e-3 && rate>=openq4::LoadingFramePacer::MaxRateHz/2,
+			"high refresh presents an even divisor at most the loading ceiling");
+		Check(WholePeriods(high.Interval(),refresh),"the interval is whole refresh periods");
+	}
+	openq4::LoadingFramePacer capped; capped.Configure(60,30); capped.Reset();
+	Check(std::abs(capped.Interval()-1000.0/30)<1e-6,"a lower presentation cap is honoured");
+	openq4::LoadingFramePacer slow; slow.Configure(60,0); slow.Reset();
+	double t=0;
+	for (int i=0;i<60;++i) { while(!slow.Due(t)) t+=0.25; slow.Presented(t,t+12); t+=12; }
+	Check(slow.Cost()<=slow.Interval()*openq4::LoadingFramePacer::MaxPresentationShare+1e-6,
+		"expensive frames slow the cadence so presentation keeps its share of wall time");
+	Check(WholePeriods(slow.Interval(),60),"a slowed cadence stays on whole refresh periods");
+	openq4::LoadingFramePacer edge; edge.Configure(60,0); edge.Reset();
+	const auto feed=[&](double spent,int n) { for (int i=0;i<n;++i) { while(!edge.Due(t)) t+=0.25; edge.Presented(t,t+spent); t+=spent; } };
+	feed(1,1); feed(7.5,40);
+	Check(std::abs(edge.Interval()-2000.0/60)<1e-6,"a cost over the share slows the cadence by a refresh period");
+	feed(6.4,40);
+	Check(std::abs(edge.Interval()-2000.0/60)<1e-6,"a cost near the boundary keeps the slower cadence instead of alternating");
+	feed(4,40);
+	Check(std::abs(edge.Interval()-1000.0/60)<1e-6,"a cost well inside the share returns to the display's rate");
+	openq4::LoadingFramePacer stage; stage.Configure(60,0); stage.Reset();
+	stage.Presented(0,1); stage.Presented(5,6); // A stage change presents ahead of the cadence.
+	Check(!stage.Due(16) && stage.Due(16.5),"a frame ahead of the cadence skips no later frame");
+	openq4::LoadingFramePacer work; work.Configure(60,0); work.Reset();
+	work.Presented(0,1); work.Presented(5,20);
+	Check(!work.Due(26) && work.Due(26.7),"the work always gets time between frames");
+	openq4::LoadingFramePacer spike; spike.Configure(60,0); spike.Reset();
+	t=0;
+	const auto present=[&](double spent) { while(!spike.Due(t)) t+=0.25; spike.Presented(t,t+spent); t+=spent; };
+	present(1); present(120); // A cold present right after the first frame.
+	for (int i=0;i<10;++i) present(2);
+	present(150);
+	Check(std::abs(spike.Interval()-1000.0/60)<1e-6,"one slow present never slows the cadence");
 }
 static void CheckTypedActionDescriptors() {
 	const std::string source = R"json({

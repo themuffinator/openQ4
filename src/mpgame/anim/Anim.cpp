@@ -1738,6 +1738,8 @@ idMD5Anim *idAnimManager::GetAnim( const char *name ) {
 			anim = NULL;
 		}
 		animations.Set( filename, anim );
+		// openQ4: a model's anims load one after another inside its parse.
+		common->LoadingCheckpoint();
 	}
 
 	return anim;

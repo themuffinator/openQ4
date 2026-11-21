@@ -7,6 +7,25 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Smooth startup and loading screens, 21 November 2026
+
+- **The startup and loading screens no longer stutter.** While the game
+  starts and while a level loads, both screens now animate at your display's
+  refresh rate (60 frames a second on a 60 Hz display, 72 on a 144 Hz one) in
+  even steps. They used to manage about 25 frames a second on average, with
+  pauses, and loading Air Defense 1 froze the screen for up to three seconds
+  while the level's opening cinematic was skipped; it now keeps moving
+  throughout. On a slow computer the screens drop to half the rate rather
+  than slow the load down.
+- **No slower to start or load.** Drawing more frames takes time, so work
+  the screens used to wait on is quicker now: the game's scripts compile in
+  about half the time, fonts are drawn on all processor cores, and the maps of
+  which material a shot hits no longer search every material for every pixel.
+  Startup and level loads take about as long as before.
+- **What to do.** Nothing. If a load still stutters for you,
+  `com_loadingFrameTrace 1` writes how smoothly each load presented to the
+  console and log, which helps with a bug report.
+
 ## The game no longer vanishes while it starts, 21 November 2026
 
 - **The splash stays until the game has something to show (Windows).** When the game

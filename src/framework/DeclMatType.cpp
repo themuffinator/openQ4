@@ -3,6 +3,8 @@
 
 #include "../imagetools/ImageTools.h"
 
+#include <unordered_map>
+
 static idCVar mat_useHitMaterials( "mat_useHitMaterials", "1", CVAR_SYSTEM | CVAR_BOOL, "use cached .hit material type maps when available" );
 static idCVar mat_writeHitMaterials( "mat_writeHitMaterials", "0", CVAR_SYSTEM | CVAR_BOOL, "write generated .hit material type maps to fs_savepath" );
 
@@ -103,13 +105,24 @@ byte *MT_GetMaterialTypeArray( idStr image, int &width, int &height ) {
 
 	const int pixelCount = width * height;
 	byte *array = static_cast<byte *>( Mem_Alloc( pixelCount ) );
+	// The answer depends only on the pixel's tint, and a hit map repeats a
+	// handful of tints: each distinct tint searches the material types once
+	// (a 512x512 map otherwise made millions of declaration lookups).
+	std::unordered_map<int, byte> materialTypeForTint;
 	for ( int i = 0; i < pixelCount; ++i ) {
 		const byte *pixel = pic + ( i * 4 );
+		const int tint = MT_PackTint( pixel );
+		const auto known = materialTypeForTint.find( tint );
+		if ( known != materialTypeForTint.end() ) {
+			array[i] = known->second;
+			continue;
+		}
 		const rvDeclMatType *materialType = MT_FindMaterialTypeByTint( pixel );
 		if ( materialType == NULL ) {
 			materialType = MT_FindMaterialTypeByClosestTint( pixel );
 		}
 		array[i] = materialType != NULL ? static_cast<byte>( materialType->Index() ) : 0;
+		materialTypeForTint.emplace( tint, array[i] );
 	}
 
 	R_StaticFree( pic );

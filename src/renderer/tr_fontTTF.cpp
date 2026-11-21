@@ -44,6 +44,10 @@ along with openQ4 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "TrueType.h"
 #include "RetainedFontCache.h"
 
+#include <atomic>
+#include <thread>
+#include <vector>
+
 namespace {
 
 // Glyph metrics live in "atlas pixels at the slot's point size", the same unit
@@ -498,6 +502,52 @@ static idList<q4TTFPageSet *> ttfPageSets;
 
 /*
 ================
+R_TTFForEachGlyphBlock
+
+Runs body( first, last ) over [0, count) in blocks of glyphs, on worker threads
+and the calling thread together. Rasterising a face's glyphs is most of a font
+registration (the 2,900-glyph faces take tens of milliseconds a size, at
+startup and in level loads), each glyph is independent and the face is only
+read, so the blocks run at once. The caller merges results in index order.
+================
+*/
+template< typename body_t >
+static void R_TTFForEachGlyphBlock( int count, body_t &&body ) {
+	static const int blockGlyphs = 32;
+	const unsigned int hardware = std::thread::hardware_concurrency();
+	const int workers = count >= blockGlyphs * 4
+		? idMath::ClampInt( 0, 7, hardware > 1 ? static_cast<int>( hardware ) - 1 : 0 ) : 0;
+	if ( workers == 0 ) {
+		body( 0, count );
+		return;
+	}
+	std::atomic<int> nextBlock( 0 );
+	const auto run = [&]() {
+		for ( ;; ) {
+			const int first = nextBlock.fetch_add( blockGlyphs );
+			if ( first >= count ) {
+				return;
+			}
+			body( first, Min( count, first + blockGlyphs ) );
+		}
+	};
+	std::vector<std::thread> threads;
+	threads.reserve( static_cast<size_t>( workers ) );
+	for ( int i = 0; i < workers; i++ ) {
+		try {
+			threads.emplace_back( run );
+		} catch ( ... ) {
+			break;
+		}
+	}
+	run();
+	for ( std::thread &thread : threads ) {
+		thread.join();
+	}
+}
+
+/*
+================
 R_TTFFindPageSet
 
 Keyed by the atlas name, which already encodes face and point size.
@@ -783,23 +833,33 @@ static bool R_TTFPackAtlas( idTrueTypeFont &face, const char *fontName, int poin
 	int tallest = 0;
 	int rendered = 0;
 
+	// Each glyph writes only its own slot; the totals below are summed in order.
+	idList<byte> rasterized;
+	rasterized.SetNum( count );
+	memset( rasterized.Ptr(), 0, count );
+	R_TTFForEachGlyphBlock( count, [&]( int first, int last ) {
+		for ( int i = first; i < last; i++ ) {
+			const int codepoint = (int)codePoints[i];
+			const int glyphIndex = face.GlyphForCodepoint( codepoint );
+
+			ttGlyphMetrics_t metrics;
+			if ( !face.GetGlyphMetrics( glyphIndex, metrics ) ) {
+				continue;
+			}
+			rasters[i].advance = metrics.advance;
+			rasters[i].valid = true;
+			rasters[i].covered = ( glyphIndex != 0 );
+
+			if ( glyphIndex == 0 && codepoint != 0 ) {
+				// Not covered by this face; leave a blank slot but keep the advance.
+				continue;
+			}
+			rasterized[i] = face.RasterizeGlyph( glyphIndex, scale, rasters[i].bitmap ) ? 1 : 0;
+		}
+	} );
+
 	for ( int i = 0; i < count; i++ ) {
-		const int codepoint = (int)codePoints[i];
-		const int glyphIndex = face.GlyphForCodepoint( codepoint );
-
-		ttGlyphMetrics_t metrics;
-		if ( !face.GetGlyphMetrics( glyphIndex, metrics ) ) {
-			continue;
-		}
-		rasters[i].advance = metrics.advance;
-		rasters[i].valid = true;
-		rasters[i].covered = ( glyphIndex != 0 );
-
-		if ( glyphIndex == 0 && codepoint != 0 ) {
-			// Not covered by this face; leave a blank slot but keep the advance.
-			continue;
-		}
-		if ( !face.RasterizeGlyph( glyphIndex, scale, rasters[i].bitmap ) ) {
+		if ( !rasterized[i] ) {
 			continue;
 		}
 		if ( rasters[i].bitmap.pixels == NULL ) {

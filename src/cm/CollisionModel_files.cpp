@@ -385,6 +385,9 @@ void idCollisionModelManagerLocal::ParseVertices( Lexer *src, idCollisionModelLo
 	model->maxVertices = model->numVertices;
 	model->vertices = (cm_vertex_t *) Mem_Alloc( model->maxVertices * sizeof( cm_vertex_t ) );
 	for ( i = 0; i < model->numVertices; i++ ) {
+		if ( ( i & 255 ) == 0 ) {
+			common->LoadingCheckpoint();
+		}
 		src->Parse1DMatrix( 3, model->vertices[i].p.ToFloatPtr() );
 		model->vertices[i].side = 0;
 		model->vertices[i].sideSet = 0;
@@ -414,6 +417,9 @@ void idCollisionModelManagerLocal::ParseEdges( Lexer *src, idCollisionModelLocal
 	model->maxEdges = model->numEdges;
 	model->edges = (cm_edge_t *) Mem_Alloc( model->maxEdges * sizeof( cm_edge_t ) );
 	for ( i = 0; i < model->numEdges; i++ ) {
+		if ( ( i & 255 ) == 0 ) {
+			common->LoadingCheckpoint();
+		}
 		src->ExpectTokenString( "(" );
 		model->edges[i].vertexNum[0] = src->ParseInt();
 		model->edges[i].vertexNum[1] = src->ParseInt();
@@ -495,6 +501,7 @@ void idCollisionModelManagerLocal::ParsePolygons( Lexer *src, idCollisionModelLo
 	}
 
 	while ( !src->CheckTokenString( "}" ) ) {
+		common->LoadingCheckpoint();
 		// parse polygon
 		numEdges = src->ParseInt();
 		if ( numEdges < 1 || numEdges > 65536 ) {

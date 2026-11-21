@@ -1096,7 +1096,14 @@ void idVarDefName::AddDef( idVarDef *def ) {
 idVarDefName::RemoveDef
 ============
 */
+// openQ4: the compiler's index of immediates by value (Script_Compiler.cpp)
+// is dropped whenever an immediate is freed.
+int openq4ScriptImmediateGeneration = 0;
+
 void idVarDefName::RemoveDef( idVarDef *def ) {
+	if ( name == "<IMMEDIATE>" ) {
+		openq4ScriptImmediateGeneration++;
+	}
 	if ( defs == def ) {
 		defs = def->next;
 	} else {

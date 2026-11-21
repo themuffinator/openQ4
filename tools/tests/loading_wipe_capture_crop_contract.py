@@ -54,8 +54,12 @@ struct {
     }
 } cvarSystemValue,*cvarSystem=&cvarSystemValue;
 void Sys_GenerateEvents(){}
-float Session_GetBlockingLoadFrameIntervalMsec(){return 16.0f;}
-constexpr float SESSION_PACIFIER_DRAW_BUDGET_RATIO=4.0f;
+@PACER@
+double LoadingPresentation_Now(){return clockMsec;}
+void LoadingPresentation_Presented(double,double){}
+int com_frameRealTime=0;
+int Session_FindPresentationCap(){return 60;}
+void openQ4_BeginPacedPresentationFrame(){}
 void Session_BeginBlockingLoadPresentationFrame(){}
 int com_ticNumber=500;
 int com_editors=0;
@@ -99,7 +103,8 @@ struct Renderer {
 } rendererValue,*renderSystem=&rendererValue;
 struct idSessionLocal {
     bool insideExecuteMapChange=true,insidePacifierUpdate=false,insideUpdateScreen=false;
-    int lastPacifierTime=0,lastPacifierDrawMsec=0,bytesNeededForMapLoad=100;
+    int lastPacifierTime=0,bytesNeededForMapLoad=100;
+    openq4::LoadingFramePacer loadingFramePacer;
     bool loadingAssetQueueActive=false;
     int loadingAssetQueueTotal=0,loadingAssetQueueLoaded=0;
     float loadingAssetQueueStartPct=0.0f;
@@ -266,7 +271,8 @@ def main() -> None:
         "void idSessionLocal::PacifierUpdate(",
         "void idSessionLocal::UpdateScreen(",
     ))
-    harness = HARNESS.replace("@GUARD@", guard)
+    pacer = (ROOT / "src/framework/LoadingFramePacer.h").read_text(encoding="utf-8").replace("#pragma once", "")
+    harness = HARNESS.replace("@GUARD@", guard).replace("@PACER@", pacer)
 
     compiler = shutil.which("clang++") or shutil.which("g++")
     if not compiler:

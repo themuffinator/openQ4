@@ -238,9 +238,13 @@ Declared targets, pending physical qualification:
 Cases to qualify: caps 30/60/120/144/165/240/360 and `0`, vsync and VRR where
 available, low-FPS catch-up (fewer draws than ticks), menus and loading, hidden
 windows, and the preset caps. The declared policy, pinned by
-`presentation_hf_contract.py`, is as follows. Loading screens redraw at the
-lower of `com_maxfps` and 60 Hz, never faster, and back off when a redraw is
-slow. Uncapped, they redraw at most once per tick. A window that shows nothing
+`presentation_hf_contract.py`, is as follows. Loading screens and the startup
+screen present on a steady cadence at the display's refresh rate, or its
+largest whole divisor of at most 90 Hz (144 Hz presents 72), never faster than
+a lower `com_maxfps`, and slow by whole refresh periods while a redraw would
+take more than 40% of the time ([loading presentation](loading-presentation.md)).
+A dedicated server's load pacifier runs at the lower of `com_maxfps` and 60 Hz,
+at most once per tick uncapped. A window that shows nothing
 (hidden, minimized, not created yet, or an app in the background) presents at
 most 60 Hz on every platform, uncapped included; the state comes from SDL's
 window flags (`Sys_SDL_IsGameWindowShown`, `openq4::PresentationCapForWindow`).

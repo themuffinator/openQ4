@@ -327,6 +327,8 @@ static int com_editors=0;
 static bool Sys_IsWindowVisible(){return true;}
 static void Sys_GrabMouseCursor(bool){Check(false,"input path forbidden in test");}
 static void RetainedUI_FrameSubmitted(){++completedFrames;}
+static double LoadingPresentation_Now(){return 0.0;}
+static void LoadingPresentation_Presented(double,double){}
 // no headset session: the VR frame bracket around the update is inert (VRSystem.h)
 struct FrameVRSystem {
     void BeginFrame(){} void DrawMenuPointer(){} void EndFrame(){}

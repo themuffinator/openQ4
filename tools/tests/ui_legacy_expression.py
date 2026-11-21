@@ -79,7 +79,7 @@ struct DeclManager {
  const idDecl* FindType(int,const char* name,bool makeDefault){Check(!makeDefault,"term lookup must not default a table");++lookups;char normalized[1024];idDeclManagerLocal::MakeNameCanonical(name,normalized,1023);last=normalized;return tableAvailable&&last=="/"?&table:nullptr;}
  const idDecl* DeclByIndex(int,int index){Check(index==7,"table identity retained");return &table;}
 } declObject;static DeclManager* declManager=&declObject;constexpr int DECL_TABLE=0;
-struct Common {int warnings=0;void Warning(const char*,...){++warnings;}void FatalError(const char*,...){throw std::runtime_error("unexpected native fatal");}} commonObject;static Common* common=&commonObject;
+struct Common {int warnings=0;void Warning(const char*,...){++warnings;}void FatalError(const char*,...){throw std::runtime_error("unexpected native fatal");}void LoadingCheckpoint(){}} commonObject;static Common* common=&commonObject;
 constexpr int MAX_EXPRESSION_OPS=256,MAX_EXPRESSION_REGISTERS=512,SCRIPT_COUNT=2,WIN_DESKTOP=1;
 #define VAR_GUIPREFIX "gui::"
 #define VAR_GUIPREFIX_LEN 5

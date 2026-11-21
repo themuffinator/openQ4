@@ -4,6 +4,10 @@
 
 #include "../Game_local.h"
 
+#include <cstring>
+#include <string>
+#include <unordered_map>
+
 #define FUNCTION_PRIORITY	2
 #define INT_PRIORITY		2
 #define NOT_PRIORITY		5
@@ -357,11 +361,117 @@ idCompiler::FindImmediate
 tries to find an existing immediate with the same value
 ============
 */
+extern int openq4ScriptImmediateGeneration;
+
+namespace {
+// openQ4: every immediate a script names was looked for along the whole list
+// of immediates, so compiling the game's scripts grew with the square of their
+// constants (most of their compile time at startup). Only GetImmediate creates
+// immediates, and only when this search finds none, so each value has at most
+// one def and an index by value returns the def the search would. Values are
+// keyed as the search compares them: floats by ==, so -0 is 0, and a NaN,
+// equal to nothing, is never indexed (nor a string longer than a def holds).
+// Freeing any immediate rebuilds the index from the list, so it always holds
+// every indexable immediate and a value it lacks has none.
+std::unordered_map<std::string, idVarDef *> openq4ImmediateIndex;
+int openq4ImmediateIndexGeneration = -1;
+
+void ImmediateKeyFloat( std::string &key, float value ) {
+	if ( value == 0.0f ) {
+		value = 0.0f;
+	}
+	key.append( reinterpret_cast<const char *>( &value ), sizeof( value ) );
+}
+
+bool ImmediateKey( const idTypeDef *type, const eval_t *eval, const char *string, std::string &key ) {
+	key.assign( reinterpret_cast<const char *>( &type ), sizeof( type ) );
+	switch ( type->Type() ) {
+	case ev_field:
+	case ev_argsize:
+	case ev_jumpoffset:
+	case ev_virtualfunction:
+		key.append( reinterpret_cast<const char *>( &eval->_int ), sizeof( eval->_int ) );
+		return true;
+	case ev_entity:
+		key.append( reinterpret_cast<const char *>( &eval->entity ), sizeof( eval->entity ) );
+		return true;
+	case ev_string: {
+		// SetString stores at most MAX_STRING_LEN - 1 characters, and the
+		// search compares the stored text: a longer string never matches.
+		const size_t length = std::strlen( string );
+		if ( length >= MAX_STRING_LEN ) {
+			return false;
+		}
+		key.append( string, length );
+		return true;
+	}
+	case ev_float:
+		if ( eval->_float != eval->_float ) {
+			return false;
+		}
+		ImmediateKeyFloat( key, eval->_float );
+		return true;
+	case ev_vector:
+		for ( int i = 0; i < 3; i++ ) {
+			if ( eval->vector[ i ] != eval->vector[ i ] ) {
+				return false;
+			}
+			ImmediateKeyFloat( key, eval->vector[ i ] );
+		}
+		return true;
+	default:
+		return false;
+	}
+}
+
+void ImmediateIndexValidate() {
+	if ( openq4ImmediateIndexGeneration == openq4ScriptImmediateGeneration ) {
+		return;
+	}
+	openq4ImmediateIndex.clear();
+	openq4ImmediateIndexGeneration = openq4ScriptImmediateGeneration;
+	std::string key;
+	for ( idVarDef *def = gameLocal.program.GetDefList( "<IMMEDIATE>" ); def != NULL; def = def->Next() ) {
+		const idTypeDef *type = def->TypeDef();
+		eval_t eval;
+		memset( &eval, 0, sizeof( eval ) );
+		const char *string = "";
+		switch ( type->Type() ) {
+		case ev_field:			eval._int = *def->value.intPtr; break;
+		case ev_argsize:		eval._int = def->value.argSize; break;
+		case ev_jumpoffset:		eval._int = def->value.jumpOffset; break;
+		case ev_virtualfunction:	eval._int = def->value.virtualFunction; break;
+		case ev_entity:			eval.entity = *def->value.intPtr; break;
+		case ev_string:			string = def->value.stringPtr; break;
+		case ev_float:			eval._float = *def->value.floatPtr; break;
+		case ev_vector:
+			eval.vector[ 0 ] = def->value.vectorPtr->x;
+			eval.vector[ 1 ] = def->value.vectorPtr->y;
+			eval.vector[ 2 ] = def->value.vectorPtr->z;
+			break;
+		default:
+			continue;
+		}
+		// The list runs newest first, and the search returns the first match.
+		if ( ImmediateKey( type, &eval, string, key ) ) {
+			openq4ImmediateIndex.emplace( key, def );
+		}
+	}
+}
+}
+
 idVarDef *idCompiler::FindImmediate( const idTypeDef *type, const eval_t *eval, const char *string ) const {
 	idVarDef	*def;
 	etype_t		etype;
 
 	etype = type->Type();
+
+	ImmediateIndexValidate();
+	std::string key;
+	if ( ImmediateKey( type, eval, string, key ) ) {
+		const auto found = openq4ImmediateIndex.find( key );
+		return found != openq4ImmediateIndex.end() ? found->second : NULL;
+	}
 
 	// check for a constant with the same value
 	for( def = gameLocal.program.GetDefList( "<IMMEDIATE>" ); def != NULL; def = def->Next() ) {
@@ -450,6 +560,11 @@ idVarDef *idCompiler::GetImmediate( idTypeDef *type, const eval_t *eval, const c
 			def->SetString( string, true );
 		} else {
 			def->SetValue( *eval, true );
+		}
+		// The search found none, so this is the value's only immediate.
+		std::string key;
+		if ( ImmediateKey( type, eval, string, key ) ) {
+			openq4ImmediateIndex[ key ] = def;
 		}
 	}
 
@@ -1924,6 +2039,10 @@ idCompiler::ParseStatement
 ============
 */
 void idCompiler::ParseStatement( void ) {
+	// openQ4: compiling the game's scripts takes seconds; the startup and
+	// loading screens keep presenting between statements.
+	common->LoadingCheckpoint();
+
 	if ( CheckToken( ";" ) ) {
 		// skip semicolons, which are harmless and ok syntax
 		return;

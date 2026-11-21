@@ -68,50 +68,59 @@ def require_order(haystack: str, first: str, second: str, context: str) -> None:
 
 def validate_interval_floor() -> None:
     """The loading-screen redraw rate must have a ceiling that a high com_maxfps
-    cannot raise. A progress animation gains nothing above it, and every redraw is
-    wall clock taken from the load."""
+    cannot raise. Client loading screens follow the display through the shared
+    LoadingFramePacer, capped at MaxRateHz; the dedicated server's pacifier keeps
+    its own floored interval."""
+    pacer = read("src/framework/LoadingFramePacer.h")
+    require(pacer, "static constexpr double MaxRateHz = 90.0;", "LoadingFramePacer redraw ceiling")
+    require(pacer, "std::ceil( refresh / MaxRateHz - Epsilon )", "LoadingFramePacer whole-period divisor")
+    # A lower presentation cap is honoured, a higher one never raises the rate.
+    require(pacer, "while ( value < capInterval - Epsilon ) {", "LoadingFramePacer lower cap")
+    refuse(pacer, "com_maxfps", "LoadingFramePacer (raw com_maxfps)")
+
     source = read("src/framework/Session.cpp")
     body = function_body(source, "static float Session_GetBlockingLoadFrameIntervalMsec( void ) {")
-
-    require(source, "SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ", "Session.cpp blocking-load redraw ceiling")
-    require(body, "SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ", "blocking-load interval ceiling use")
+    require(source, "SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ", "Session.cpp dedicated pacifier ceiling")
+    require(body, "SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ", "dedicated pacifier interval ceiling use")
 
     # Both the capped and uncapped returns must be floored by the ceiling, otherwise
-    # a high cap (or a high user-cmd rate) drives the loading screen again.
+    # a high cap (or a high user-cmd rate) drives the pacifier again.
     for fragment in ("Max( ceilingMsec, 1000.0f / static_cast<float>( presentationCap ) )",
                      "Max( ceilingMsec, common->GetUserCmdMsecFloat() )"):
-        require(body, fragment, "blocking-load interval floor")
+        require(body, fragment, "dedicated pacifier interval floor")
 
     # The unfloored form is what regressed; make sure it cannot come back.
     refuse(body, "return 1000.0f / static_cast<float>( presentationCap );",
-           "blocking-load interval (unfloored com_maxfps divisor)")
+           "dedicated pacifier interval (unfloored com_maxfps divisor)")
 
 
 def validate_draw_cost_is_charged() -> None:
-    """PacifierUpdate must stamp lastPacifierTime AFTER the redraw and back the
-    interval off by the measured redraw cost. Together these bound loading-screen
-    presentation to a fixed fraction of load wall clock for any present cost."""
+    """PacifierUpdate must consult the pacer before drawing and report the redraw's
+    measured cost after it. The pacer slows the cadence by whole refresh periods
+    while a frame would take more than its share of wall time, and always leaves
+    the work time between frames, so presentation stays a bounded fraction of the
+    load's wall clock for any present cost."""
     source = read("src/framework/Session.cpp")
     body = function_body(source, "void idSessionLocal::PacifierUpdate() {")
 
-    require(body, "SESSION_PACIFIER_DRAW_BUDGET_RATIO", "pacifier draw-cost backoff")
-    require(body, "lastPacifierDrawMsec", "pacifier measured draw cost")
-
-    # The gate must test the backed-off interval, not the raw one.
-    require(body, "static_cast<float>( elapsedMs ) < pacifierIntervalMs", "pacifier gate uses backed-off interval")
-
-    # The stamp must come after UpdateScreen(), or the redraw pays for its own interval.
-    require_order(body, "UpdateScreen();", "lastPacifierTime = Sys_Milliseconds();",
-                  "PacifierUpdate stamp ordering")
-
-    # The pre-fix stamp read the presentation clock before the draw.
+    require(body, "if ( !loadingFramePacer.Due( offerMsec ) ) {", "pacifier gate uses the pacer")
+    require_order(body, "loadingFramePacer.Due( offerMsec )", "UpdateScreen();", "PacifierUpdate gate before the redraw")
+    # The cost is reported after the redraw, from the offer to the end of the present.
+    require_order(body, "UpdateScreen();", "loadingFramePacer.Presented( offerMsec, LoadingPresentation_Now() );",
+                  "PacifierUpdate cost report ordering")
     refuse(body, "lastPacifierTime = presentationTime;", "PacifierUpdate (pre-draw stamp)")
 
-    # Gate and stamp must read the same clock.
-    require(body, "const int time = Sys_Milliseconds();", "pacifier gate clock")
+    pacer = read("src/framework/LoadingFramePacer.h")
+    require(pacer, "static constexpr double MaxPresentationShare = 0.4;", "LoadingFramePacer presentation share")
+    require(pacer, "next = ( std::max )( next, end + interval * MinWorkShare );", "LoadingFramePacer work share")
+    # The first frame's one-time cost must not slow a period's cadence.
+    require(pacer, "if ( frames++ > 0 ) {", "LoadingFramePacer first-frame exemption")
 
     header = read("src/framework/Session_local.h")
-    require(header, "int					lastPacifierDrawMsec;", "Session_local.h pacifier draw-cost member")
+    require(header, "openq4::LoadingFramePacer	loadingFramePacer;", "Session_local.h pacer member")
+
+    reset = function_body(source, "void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {")
+    require_order(reset, "loadingFramePacer.Reset();", "LoadLoadingGui( mapString );", "each load starts a fresh pacer")
 
 
 def validate_read_count_granularity() -> None:

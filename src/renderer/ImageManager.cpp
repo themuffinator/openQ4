@@ -628,6 +628,9 @@ public:
 		entries.resize( static_cast<size_t>( images.Num() ) );
 		for ( int i = 0; i < images.Num(); ++i ) {
 			images[ i ].image->PredictDirectDDSPayload( entries[ static_cast<size_t>( i ) ].qpath );
+			// Each prediction opens the image's file and reads its header: a
+			// level's worth takes seconds on a cold disk.
+			common->LoadingCheckpoint();
 		}
 		const unsigned int hardware = std::thread::hardware_concurrency();
 		const int workerCount = idMath::ClampInt( 1, LEVEL_IMAGE_PREFETCH_MAX_WORKERS,
@@ -769,7 +772,13 @@ private:
 				entry.done = true;
 				readHere = wantData;
 			} else {
-				workDone.wait( lock, [&entry] { return entry.done; } );
+				// A worker is reading this file. The loading screen keeps
+				// presenting meanwhile, outside the lock the workers take.
+				while ( !workDone.wait_for( lock, std::chrono::milliseconds( 2 ), [&entry] { return entry.done; } ) ) {
+					lock.unlock();
+					common->LoadingCheckpoint();
+					lock.lock();
+				}
 			}
 		}
 		if ( readHere ) {

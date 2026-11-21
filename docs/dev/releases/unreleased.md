@@ -9,6 +9,13 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **Startup and loading screens that never stutter.** Both screens now
+  animate at your display's refresh rate, in even steps, for the whole time the
+  game starts or a level loads, instead of about 25 frames a second on average
+  with pauses of up to three seconds. The game's scripts compile in about half
+  the time and fonts are drawn on every processor core, so the extra frames
+  cost nothing: startup and loads take as long as before.
+
 - **The Awakening pauses in its own frozen style.** While you play the
   expansion's campaign with the new interface, the pause menu, its Save,
   Load and Restart Level pages and the settings pages it opens wear The
@@ -471,6 +478,16 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- The startup and loading screens animate at the display's refresh rate (or
+  half or a third of it on high-refresh displays, at most 90 frames a second)
+  throughout startup and level loads. Loading Air Defense 1 used to present a
+  frame every 22 ms (median) with pauses of up to 2.3 s; it now presents one
+  every 16.7 ms, the longest gap about 60 ms. The game's scripts compile in
+  about half the time, font atlases are rasterised on all cores, and building
+  the impact material maps no longer searches every material for every pixel.
+  Saved games and compiled scripts are unchanged. `com_loadingFrameTrace 1`
+  reports how smoothly each load presented; see
+  [loading presentation](../loading-presentation.md).
 - **Not in 0.14.1:** the experimental volumetric lighting
   (`r_rendererFroxelVolumetrics 1`) is now lit by the lights in view instead
   of a fixed glow. Each lamp, spotlight and the sun lights the haze with its

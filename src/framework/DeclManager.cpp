@@ -2792,7 +2792,8 @@ const idDecl *idDeclManagerLocal::FindType( declType_t type, const char *name, b
 	decl->AllocateSelf();
 
 	// if it hasn't been parsed yet, parse it now
-	if ( decl->declState == DS_UNPARSED ) {
+	const bool parsedNow = decl->declState == DS_UNPARSED;
+	if ( parsedNow ) {
 		decl->ParseLocal( noCaching );
 		if ( noCaching ) {
 			decl->self->List();
@@ -2811,6 +2812,12 @@ const idDecl *idDeclManagerLocal::FindType( declType_t type, const char *name, b
 	}
 
 	idDeclReferenceObserver::Notify( decl->self );
+	// Startup and level loads parse thousands of declarations, one inside
+	// another; a parse just finished is a point where nothing is half-built
+	// that the loading screen draws.
+	if ( parsedNow ) {
+		common->LoadingCheckpoint();
+	}
 	return decl->self;
 }
 

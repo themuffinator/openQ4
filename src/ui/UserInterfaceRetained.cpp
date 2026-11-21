@@ -4,6 +4,7 @@
 #include "UserInterfaceRetained.h"
 #include "RetainedHud.h"
 #include <span>
+#include <thread>
 #include "GuiStateNumber.h"
 #include "Rectangle.h"
 #ifndef ID_DEDICATED
@@ -2652,6 +2653,12 @@ bool UI_RetainedTakePrefetched(const std::string& path, int size, std::string& s
 	// made again by the load from the file as it is, which reports its
 	// diagnostics.
 	ID_TIME_T contentStamp = FILE_NOT_FOUND_TIMESTAMP;
+	// The parse may still be running on its worker: the startup or loading
+	// screen keeps presenting while this waits for it.
+	while (!entry->job->TryWait()) {
+		common->LoadingCheckpoint();
+		std::this_thread::yield();
+	}
 	if (!entry->job->Wait() || !entry->read || !entry->loaded || size != entry->size ||
 		fileSystem->ReadFileContentStamp(path.c_str(),nullptr,&contentStamp) != size ||
 		contentStamp == FILE_NOT_FOUND_TIMESTAMP || contentStamp != entry->contentStamp) return false;

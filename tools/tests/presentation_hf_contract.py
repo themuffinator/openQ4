@@ -187,8 +187,11 @@ def check_frame_rate_policy(common: str | None = None) -> None:
     update = function(read("src/framework/Session.cpp"), "void idSessionLocal::UpdateFramePacingStats( int requestedWaitMsec, int actualWaitMsec, int gameTicsToRun )", context)
     require(update, "openQ4_GetPresentationFrameStartMsec()", f"{context}: intervals use the limiter's high-resolution stamp")
     require(update, "frameIntervalBins[ openq4::FramePacingBin( frameDeltaMsec ) ]", f"{context}: intervals are binned finely")
-    begin = function(common, "void openQ4_BeginPresentationFrame( void )", context)
+    begin = function(common, "static void Common_BeginPresentationFrame( bool throttle )", context)
     require_before(begin, "Common_ThrottlePresentationFrame();", "commonPresentationFrameStartClock = Common_GetPresentationClockNow();", f"{context}: the stamp follows the wait")
+    require(function(common, "void openQ4_BeginPresentationFrame( void )", context), "Common_BeginPresentationFrame( true );", f"{context}: ordinary frames wait for the limiter")
+    # a frame the loading pacer admitted starts the clock without the limiter's sleep
+    require(function(common, "void openQ4_BeginPacedPresentationFrame( void )", context), "Common_BeginPresentationFrame( false );", f"{context}: paced loading frames skip the limiter")
     # the engine's 240 Hz budget is the one the runtime harness judges
     harness = read("tools/tests/presentation_look_runtime.py")
     budgets = re.search(r'BUDGETS = \{240: \{"intervalP95": ([\d.]+), "intervalP99": ([\d.]+)', harness)
@@ -215,10 +218,21 @@ def check_frame_rate_policy(common: str | None = None) -> None:
     require_before(frame, "Common_PresentationStallProbe();", "Sys_GenerateEvents();", f"{context}: the hitch lands in an ordinary frame")
     require(common, 'com_maxfps( "com_maxfps", "240"', f"{context}: 240 default cap")
     session = read("src/framework/Session.cpp")
-    require(session, "static const float SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ = 60.0f;", f"{context}: loading redraw ceiling")
+    # Client loading and startup screens: the shared pacer, at the display's
+    # refresh or a whole divisor of it, never above 90 Hz or a lower cap.
+    pacer = read("src/framework/LoadingFramePacer.h")
+    require(pacer, "static constexpr double MaxRateHz = 90.0;", f"{context}: loading redraw ceiling")
+    require(pacer, "while ( value < capInterval - Epsilon ) {", f"{context}: loading honours a lower cap only")
+    require(pacer, "static constexpr double MaxPresentationShare = 0.4;", f"{context}: loading backs off by its presentation share")
+    pacifier = function(session, "void idSessionLocal::PacifierUpdate()", context)
+    require(pacifier, "loadingFramePacer.Due( offerMsec )", f"{context}: level loads use the shared pacer")
+    common_init = read("src/framework/Common.cpp")
+    require(common_init, "initializationPacing.Due( InitializationMilliseconds() )", f"{context}: startup uses the shared pacer")
+    # The dedicated server's pacifier keeps its floored 60 Hz interval.
+    require(session, "static const float SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ = 60.0f;", f"{context}: dedicated pacifier ceiling")
     load = function(session, "static float Session_GetBlockingLoadFrameIntervalMsec( void )", context)
-    require(load, "return Max( ceilingMsec, 1000.0f / static_cast<float>( presentationCap ) );", f"{context}: loading honours a lower cap only")
-    require(load, "return Max( ceilingMsec, common->GetUserCmdMsecFloat() );", f"{context}: uncapped loading at most once per tick")
+    require(load, "return Max( ceilingMsec, 1000.0f / static_cast<float>( presentationCap ) );", f"{context}: dedicated pacifier honours a lower cap only")
+    require(load, "return Max( ceilingMsec, common->GetUserCmdMsecFloat() );", f"{context}: uncapped dedicated pacifier at most once per tick")
     presets = read("src/framework/PerformancePreset.cpp")
     caps = {}
     for name, fps in re.findall(r'\{ "(\w+)", \d+, "[\w-]+",\s*\d+, \d+, \d+, (\d+),', presets):

@@ -62,6 +62,7 @@ If you have questions concerning this license or the applicable additional terms
 #include <memory>
 #include <chrono>
 #include "DurableFile.h"
+#include "LoadingPresentation.h"
 #include "SaveGameTransaction.h"
 #include <filesystem>
 #if defined( USE_SDL3 )
@@ -146,22 +147,16 @@ static int Session_FindPresentationCap( void ) {
 	return openQ4_GetRequestedPresentationCap();
 }
 
-// A blocking-load progress animation gains nothing from redrawing at the gameplay
-// presentation cap, and every redraw is wall clock stolen from the load itself.
-// Never redraw the loading screen faster than this, however high com_maxfps goes.
+#ifdef ID_DEDICATED
+// A dedicated map load presents nothing; its pacifier only keeps connected
+// clients alive, and gains nothing from running faster than this, however high
+// com_maxfps goes. (Client loading screens are paced by LoadingFramePacer.)
 static const float SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ = 60.0f;
 
-// Back the pacifier interval off to at least this multiple of the last redraw's
-// measured cost, bounding loading-screen presentation at 1/(1+ratio) of load wall
-// clock on any present path.
-static const float SESSION_PACIFIER_DRAW_BUDGET_RATIO = 4.0f;
-
 static float Session_GetBlockingLoadFrameIntervalMsec( void ) {
-	// Honour a *lower* gameplay cap - the user asked for fewer frames - but never let
-	// a high cap drive the loading screen faster than the ceiling above. Tying this
-	// directly to com_maxfps made load wall clock scale as W / (1 - R/P), which
-	// diverges as the cap rises and stops converging entirely once one redraw costs
-	// more than the interval it is throttled by.
+	// Honour a *lower* cap, but never let a high cap drive the pacifier faster
+	// than the ceiling above: tying it directly to com_maxfps made load wall
+	// clock scale as W / (1 - R/P).
 	const float ceilingMsec = 1000.0f / SESSION_MAX_BLOCKING_LOAD_REDRAW_HZ;
 	const int presentationCap = Session_FindPresentationCap();
 	if ( presentationCap > 0 ) {
@@ -172,6 +167,7 @@ static float Session_GetBlockingLoadFrameIntervalMsec( void ) {
 	// Keep the legacy one-tic pacing as the conservative fallback in that mode.
 	return Max( ceilingMsec, common->GetUserCmdMsecFloat() );
 }
+#endif
 
 static void Session_BeginBlockingLoadPresentationFrame( void ) {
 	if ( Session_FindPresentationCap() > 0 ) {
@@ -4413,7 +4409,7 @@ void idSessionLocal::Clear() {
 	timeDemo = TD_NO;
 	waitingOnBind = false;
 	lastPacifierTime = 0;
-	lastPacifierDrawMsec = 0;
+	loadingFramePacer.Reset();
 	loadingAssetQueueActive = false;
 	loadingAssetQueueTotal = 0;
 	loadingAssetQueueLoaded = 0;
@@ -7915,8 +7911,10 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	ClearRetainedLoadingHold();
 
 	// Start each load from a clean pacifier budget so a hitch recorded during the
-	// previous map change cannot keep throttling this one.
-	lastPacifierDrawMsec = 0;
+	// previous map change cannot keep throttling this one, on the display the
+	// window is on now.
+	loadingFramePacer.Configure( openQ4_GetDisplayRefreshHz(), Session_FindPresentationCap() );
+	loadingFramePacer.Reset();
 
 	// close console and remove any prints from the notify lines
 	console->Close();
@@ -8022,6 +8020,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	// and draw the loading gui instead of game draws
 	openq4::NativeInputBeforeSessionChange();
 	insideExecuteMapChange = true;
+	LoadingPresentation_Begin( "map" );
 
 	// if this works out we will probably want all the sizes in a def file although this solution will 
 	// work for new maps etc. after the first load. we can also drop the sizes into the default.cfg
@@ -8357,6 +8356,8 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 		idKeyInput::ClearStates();
 		Sys_ClearInputEvents();
 	}
+
+	LoadingPresentation_End();
 
 	// capture the current screen and start a wipe, unless a multiplayer join
 	// keeps the loading screen up for the Welcome card: its fade replaces it
@@ -10249,27 +10250,25 @@ void idSessionLocal::PacifierUpdate() {
 		return;
 	}
 
-	const int time = Sys_Milliseconds();
-	const float minPacifierIntervalMs = Session_GetBlockingLoadFrameIntervalMsec();
-
-	// Charge the previous redraw's own cost against the interval. lastPacifierTime is
-	// stamped after the redraw completes, so this gate measures loading work only; a
-	// slow present path therefore stretches the gap between redraws instead of
-	// consuming the load. Without both halves the gate is already satisfied the
-	// instant a redraw finishes whenever a redraw outlasts its interval, and every
-	// asset read then presents a full frame.
-	const float pacifierIntervalMs = Max( minPacifierIntervalMs,
-		static_cast<float>( lastPacifierDrawMsec ) * SESSION_PACIFIER_DRAW_BUDGET_RATIO );
-
-	int elapsedMs = time - lastPacifierTime;
-	if ( lastPacifierTime != 0 && static_cast<float>( elapsedMs ) < pacifierIntervalMs ) {
+	// Most offers come between items of loading work and end here. The pacer
+	// presents on a steady cadence at the display's rate and charges each
+	// redraw's measured cost, from the offer to the end of the present, so a
+	// slow present path slows the cadence instead of consuming the load.
+	const double offerMsec = LoadingPresentation_Now();
+	if ( !loadingFramePacer.Due( offerMsec ) ) {
 		return;
 	}
+	const float pacifierIntervalMs = static_cast<float>( loadingFramePacer.Interval() );
 
-	Session_BeginBlockingLoadPresentationFrame();
+	// The pacer admitted this frame; the frame limiter must not sleep on it.
+	if ( Session_FindPresentationCap() > 0 ) {
+		openQ4_BeginPacedPresentationFrame();
+	} else {
+		com_frameRealTime = Sys_Milliseconds();
+	}
 
 	const int presentationTime = common->GetPresentationTime();
-	elapsedMs = presentationTime - lastPacifierTime;
+	int elapsedMs = presentationTime - lastPacifierTime;
 	if ( static_cast<float>( elapsedMs ) < pacifierIntervalMs ) {
 		elapsedMs = static_cast<int>( idMath::Ceil( pacifierIntervalMs ) );
 	}
@@ -10325,12 +10324,8 @@ void idSessionLocal::PacifierUpdate() {
 
 	Sys_GenerateEvents();
 
-	const int drawStartMsec = Sys_Milliseconds();
 	UpdateScreen();
-	lastPacifierDrawMsec = Max( 0, Sys_Milliseconds() - drawStartMsec );
-
-	// Stamp after the redraw, on the same clock the gate above reads, so the redraw's
-	// own cost is never counted as part of the interval it is throttled by.
+	loadingFramePacer.Presented( offerMsec, LoadingPresentation_Now() );
 	lastPacifierTime = Sys_Milliseconds();
 
 	idAsyncNetwork::client.PacifierUpdate();
@@ -10619,6 +10614,7 @@ void idSessionLocal::UpdateScreen( bool outOfSequence ) {
 	renderSystem->SetLoadingScreenSwapIntervalBypass( insideExecuteMapChange );
 
 	UI_SettingsRenderFrame settingsFrame;
+	const double presentStart = LoadingPresentation_Now();
 	// a running VR session paces this update on the headset and hands the
 	// renderer this frame's swapchain images
 	vrSystem->BeginFrame();
@@ -10636,6 +10632,7 @@ void idSessionLocal::UpdateScreen( bool outOfSequence ) {
 	}
 	settingsFrame.Presented();
 	RetainedUI_FrameSubmitted();
+	LoadingPresentation_Presented( presentStart, LoadingPresentation_Now() );
 	vrSystem->EndFrame();
 
 	insideUpdateScreen = false;

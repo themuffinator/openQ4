@@ -54,6 +54,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "SessionPresetCheck.h"
 #include "CVarAssignmentCapture.h"
 #include "InitializationPresentation.h"
+#include "LoadingPresentation.h"
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -624,6 +625,14 @@ int openQ4_GetRequestedPresentationCap( void ) {
 	return Common_GetRequestedPresentationCap();
 }
 
+float openQ4_GetDisplayRefreshHz( void ) {
+#if defined( USE_SDL3 )
+	return Sys_SDL_GetWindowRefreshHz();
+#else
+	return 0.0f;
+#endif
+}
+
 static void Common_ThrottlePresentationFrame( void ) {
 	const int cap = Common_GetRequestedPresentationCap();
 
@@ -723,11 +732,11 @@ static void Common_ThrottlePresentationFrame( void ) {
 	commonNextPresentationFrameClock += frameClockUnits;
 }
 
-void openQ4_BeginPresentationFrame( void ) {
+static void Common_BeginPresentationFrame( bool throttle ) {
     static std::uint64_t nativeInputPresentation = 0;
     if (nativeInputPresentation != UINT64_MAX) ++nativeInputPresentation;
     NativeInput_BeginFrame(nativeInputPresentation);
-	if ( idAsyncNetwork::serverDedicated.GetInteger() == 1 ) {
+	if ( idAsyncNetwork::serverDedicated.GetInteger() == 1 || !throttle ) {
 		Common_ResetPresentationThrottle();
 	} else {
 		Common_ThrottlePresentationFrame();
@@ -735,6 +744,16 @@ void openQ4_BeginPresentationFrame( void ) {
 
 	com_frameRealTime = Sys_Milliseconds();
 	commonPresentationFrameStartClock = Common_GetPresentationClockNow();
+}
+
+void openQ4_BeginPresentationFrame( void ) {
+	Common_BeginPresentationFrame( true );
+}
+
+void openQ4_BeginPacedPresentationFrame( void ) {
+	// The loading-frame pacer already decided this frame is due; the limiter
+	// keeping its own schedule on top would sleep the load away.
+	Common_BeginPresentationFrame( false );
 }
 
 double openQ4_GetPresentationFrameStartMsec( void ) {
@@ -1131,6 +1150,7 @@ public:
 	virtual void				Printf( const char *fmt, ... ) id_attribute((format(printf,2,3)));
 	virtual void				VPrintf( const char *fmt, va_list arg );
 	virtual void				PrintFramePacingSnapshot( const char *reason );
+	virtual void				LoadingCheckpoint( void );
 	virtual void				DPrintf( const char *fmt, ... ) id_attribute((format(printf,2,3)));
 	virtual void				Warning( const char *fmt, ... ) id_attribute((format(printf,2,3)));
 	virtual void				DWarning( const char *fmt, ...) id_attribute((format(printf,2,3)));
@@ -1627,6 +1647,19 @@ idCommonLocal::PrintFramePacingSnapshot
 */
 void idCommonLocal::PrintFramePacingSnapshot( const char *reason ) {
 	openQ4_PrintFramePacingSnapshot( reason );
+}
+
+/*
+==================
+idCommonLocal::LoadingCheckpoint
+==================
+*/
+void idCommonLocal::LoadingCheckpoint( void ) {
+	if ( !Common_OnMainThread() || session == NULL ) {
+		return;
+	}
+	// The startup screen is offered first; a level load's screen otherwise.
+	session->PacifierUpdate();
 }
 
 /*
@@ -6751,7 +6784,7 @@ namespace {
 thread_local bool initializationActive = false;
 bool initializationDrawing = false;
 idStr initializationMessage;
-openq4::InitializationPresentation initializationPacing;
+openq4::LoadingFramePacer initializationPacing;
 int initializationFrames = 0;
 double initializationLastFrame = 0, initializationMaxGap = 0, initializationDrawMsec = 0;
 // Trace-only: where loading starves presentation, and what each frame costs.
@@ -6763,17 +6796,24 @@ struct InitializationScope {
 	InitializationScope() {
 		initializationMessage.Clear();
 		initializationPacing = {};
+		initializationPacing.Configure( openQ4_GetDisplayRefreshHz(), openQ4_GetRequestedPresentationCap() );
+		initializationPacing.Reset();
 		initializationFrames = 0;
 		initializationLastFrame = initializationMaxGap = initializationDrawMsec = 0;
 		initializationStart = initializationLastHook = InitializationMilliseconds();
 		initializationMaxHookGap = initializationSubmit = 0;
 		initializationActive = true;
+		LoadingPresentation_Begin( "init" );
 	}
 	void Finish() {
 		if ( !initializationActive ) return;
 		initializationActive = false;
+		LoadingPresentation_End();
 		initializationMessage.Clear();
-		RetainedUI_EndInitialization();
+		// The view stays: until the session presents a menu or a level, its
+		// fallback loading screen draws the same view on, the animation
+		// continuous, instead of building a new one in its first frame
+		// (idSessionLocal::Draw ends it, as does the interface's shutdown).
 		if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
 			common->Printf( "INITIALIZATION_PRESENTATION frames=%d drawMsec=%.3f maxGapMsec=%.3f maxHookGapMsec=%.3f totalMsec=%.3f\n",
 				initializationFrames, initializationDrawMsec, initializationMaxGap, initializationMaxHookGap,
@@ -6802,7 +6842,7 @@ bool openQ4_UpdateInitialization( void ) {
 #endif
 	}
 	if ( initializationDrawing || initializationMessage.IsEmpty() ||
-		!initializationPacing.Due( InitializationMilliseconds(), openQ4_GetRequestedPresentationCap() ) ||
+		!initializationPacing.Due( InitializationMilliseconds() ) ||
 		!RetainedUI_CanUpdateInitialization() ) return true;
 	commonLocal.PrintLoadingMessage( initializationMessage.c_str() );
 	if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
@@ -6827,6 +6867,7 @@ void idCommonLocal::PrintLoadingMessage( const char *msg ) {
 				if ( initializationFrames++ ) initializationMaxGap = Max( initializationMaxGap, end - initializationLastFrame );
 				initializationLastFrame = end;
 				initializationDrawMsec += end - start;
+				LoadingPresentation_Presented( start, end );
 				if ( cvarSystem->GetCVarBool( "ui_retainedTrace" ) ) {
 					common->Printf( "INITIALIZATION_FRAME at=%.1f build=%.2f present=%.2f\n", end - initializationStart,
 						( initializationSubmit > start ? initializationSubmit : end ) - start,

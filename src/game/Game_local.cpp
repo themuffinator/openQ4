@@ -5020,6 +5020,13 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		gameDebug.EndFrame( );
 		gameLogLocal.EndFrame( );
 
+		// openQ4: skipping a cinematic runs thousands of frames in this call
+		// (the settle frames of a level load among them); between two of them
+		// the loading screen keeps presenting.
+		if ( skipCinematic ) {
+			common->LoadingCheckpoint();
+		}
+
 	} while( ( inCinematic || ( time < cinematicStopTime ) ) && skipCinematic );
 
 	ret.syncNextGameFrame = skipCinematic;
@@ -6864,6 +6871,8 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 	}
 
 	for ( i = 1 ; i < numEntities ; i++ ) {
+		// openQ4: the loading screen keeps presenting between map entities.
+		common->LoadingCheckpoint();
 
 		if ( profileMapSpawn ) {
 			mapCopyTimer.Start();

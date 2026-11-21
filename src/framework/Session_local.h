@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #define __SESSIONLOCAL_H__
 #include "NativeInputPublications.h"
 #include "PresentationPacing.h"
+#include "LoadingFramePacer.h"
 
 /*
 
@@ -673,10 +674,10 @@ public:
 	// we don't want to redraw the loading screen for every single
 	// console print that happens
 	int					lastPacifierTime;
-	// Measured cost of the last blocking-load redraw. The pacifier interval backs
-	// off to a multiple of this so loading-screen presentation can never consume an
+	// Paces blocking-load redraws on a steady cadence and charges each redraw's
+	// measured cost, so loading-screen presentation can never consume an
 	// unbounded share of the load's wall clock on a slow present path.
-	int					lastPacifierDrawMsec;
+	openq4::LoadingFramePacer	loadingFramePacer;
 	bool				loadingAssetQueueActive;
 	int					loadingAssetQueueTotal;
 	int					loadingAssetQueueLoaded;

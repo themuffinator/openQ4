@@ -192,12 +192,17 @@ struct openq4AsyncTimingStats_t {
 
 void				openQ4_GetAsyncTimingStats( openq4AsyncTimingStats_t &stats, int maxSamples = 60 );
 void				openQ4_BeginPresentationFrame( void );
+// A frame a blocking load's LoadingFramePacer admitted: the presentation clock
+// and input frame begin as above, without the limiter's sleep.
+void				openQ4_BeginPacedPresentationFrame( void );
 // Main-thread cooperative startup redraw; true while startup owns presentation.
 bool                openQ4_UpdateInitialization( void );
 // The presentation cap the throttle actually paces to. Callers that budget work
 // against a frame period must use this rather than com_maxfps directly, or their
 // budget and the throttle's period disagree and they sleep away the difference.
 int					openQ4_GetRequestedPresentationCap( void );
+// The refresh rate of the display the game window is on, 0 when unknown.
+float				openQ4_GetDisplayRefreshHz( void );
 // When the limiter released the current presentation frame, in milliseconds on
 // the high-resolution clock (Sys_GetClockTicks); 0 before the first frame.
 double				openQ4_GetPresentationFrameStartMsec( void );
@@ -363,6 +368,15 @@ public:
 
 	// Directly sample a keystate.
 	virtual int					KeyState(int key) = 0;
+
+	// Last in the interface, so a game module built before it keeps every
+	// other call in place.
+	// Long synchronous work (startup, a level load) calls this between items so
+	// the initialization or loading screen keeps presenting on its cadence. It
+	// returns at once off the main thread, outside such work and when no frame
+	// is due, so it is cheap enough for every item of a long loop; call it only
+	// where nothing is half-built that a loading-screen redraw could touch.
+	virtual void				LoadingCheckpoint( void ) = 0;
 
 	const char* GetLocalizedString(const char* key, int langIndex) { return GetLanguageDict()->GetString(key); }
 	const char* GetLocalizedString(const char* key) { return GetLanguageDict()->GetString(key); }

@@ -78,7 +78,9 @@ def prefetch_contract():
  assert 'fileSystem->OpenFileRead( entry.qpath.c_str() )' in pump and 'Mem_Alloc( bytes )' in pump,'the main thread opens and allocates'
  assert 'nextToOpen - consumeIndex < LEVEL_IMAGE_PREFETCH_MAX_OPEN' in pump and 'outstandingBytes < LEVEL_IMAGE_PREFETCH_MAX_BYTES' in pump,'bounded window'
  settle=method(manager,'void Settle( levelImagePrefetchEntry_t &entry, bool wantData )')
- assert settle.index('workDone.wait( lock, [&entry] { return entry.done; } );')<settle.index('fileSystem->CloseFile( entry.file );'),'files close on the main thread after their read'
+ assert settle.index('workDone.wait_for( lock, std::chrono::milliseconds( 2 ), [&entry] { return entry.done; } )')<settle.index('fileSystem->CloseFile( entry.file );'),'files close on the main thread after their read'
+ # the loading screen presents while a worker reads, outside the workers' lock
+ assert settle.index('lock.unlock();')<settle.index('common->LoadingCheckpoint();')<settle.index('lock.lock();'),'the wait presents outside the lock'
  end=method(manager,'void End()')
  assert end.index('R_SetDDSPrefetchSource( NULL );')<end.index('worker.join();'),'the hook is withdrawn before workers stop'
  load=method(manager,'int idImageManager::LoadLevelImages(')

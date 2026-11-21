@@ -1938,7 +1938,7 @@ image on both backends.
 | FPS-04 — Closed | OpenGL now draws SSAO at half resolution below 32 samples (Quality, Enhanced) with Vulkan's two passes, blends it into the multisampled scene instead of copying the scene, and reads the scene once for bloom and the tone map; at Ultra it resolves the scene twice a frame instead of four times, like Vulkan. Hidden-window GPU ladders in five scenes on both backends: the OpenGL Ultra frame 0.4-0.7 ms shorter and its chain 0.7-1.1 ms cheaper, OpenGL Quality SSAO 0.4-0.55 ms cheaper; per-scene Ultra chain budgets (1.5-5.0 ms) and per-pass shares of the 13.3 ms Ultra frame declared and met on both backends, where four of five old OpenGL chains were over. Pictures unchanged within one level; PBR laboratory SSAO controls 10/10 on both. [Report section 12](performance-report.md#12-post-processing-chain-fps-04). | Closed. Outside the gate: bloom's full-resolution first level and Ultra's SSAO resolution, a user decision. OpenGL's SSAO depth copies were cut afterwards ([report section 12.8](performance-report.md#128-opengls-ssao-depth-copies-follow-up): hub2 and storage2 0.6-1.05 ms faster on OpenGL, pictures unchanged). |
 | FPS-05 — Closed | Sample counts 0/2/4/8/16, the LDR target and SMAA/TAA alternatives priced at Ultra on both backends in five scenes (hidden-window GPU ladders): 16x on OpenGL costs 6.0-10.9 ms over 4x and Vulkan never draws more than 8, 8x costs 0.75-2.5 ms over 4x, 4x + SMAA is within -0.7..+0.3 ms of SMAA alone on OpenGL and 0.6-1.6 ms on Vulkan. Policy: Ultra 4x + SMAA ultra (confirmed), Quality 2x, Enhanced none, Maximum 8x instead of a 16x request, so every preset draws one image on both renderers; no preset asks for more than 8 (self-test); the count does not change with resolution. `gfxInfo` names the Vulkan clamp and the resolves per frame, `r_multiSamplesEffective` holds the drawn count, and the settings menu's MSAA row names the trade-off and the clamp in twelve languages. [Report section 13](performance-report.md#13-msaa-and-the-hdr-scene-target-fps-05). | Closed. |
 | FPS-06 — Not started | Equal-settings deltas attributed: in storage2 the retained HUD's layer composition (17 two-dimensional views and 34 render-target commands per frame against the classic HUD's 7 and 17; about 0.4 ms of main-thread time); on Vulkan the soft-particle depth capture (1.3 ms in airdefense1). The 2 October build equals 0.13.2 and the 15 October build carries the storage2 step, bracketing the 8 October retained-HUD commit (bisection); interpolation, light grid, reverb, portal cull and the five new Vulkan backend features cost nothing measurable. | Bisection pass 2 for the remainder, the retained HUD composed in one pass, the Vulkan soft-particle capture made cheap, closure within 3% average and 10% p99 of 0.13.2 on every suite scene on both backends. |
-| FPS-07 — Not started | Hitch classes recorded: 2-3 s cold draw stalls at Ultra, periodic 100 ms hub2 frames, a 393 ms storage2 frame, first-use events. | Attribution per class, fixes or declared budgets, clean first-use catalog on both backends. |
+| FPS-07 — Partial | Hitch classes recorded: 2-3 s cold draw stalls at Ultra, periodic 100 ms hub2 frames, a 393 ms storage2 frame, first-use events. Level loads and startup: one display-rate pacer, checkpoints in every long stretch and the stall sampler behind `com_loadingFrameTrace 2`; Air Defense 1 now loads at a 16.7 ms median, worst 54-60 ms against 1.6-2.3 s ([loading presentation](loading-presentation.md)). | Attribution per class, fixes or declared budgets, clean first-use catalog on both backends; for loads, retained document builds and the hand-off into the level (start-of-level autosave flush, first-frame program loads). |
 | FPS-08 — Not started | The Awakening's outdoor battle ([report section 14](performance-report.md#14-the-awakenings-outdoor-battle-fps-08-evidence-17-november-2026)): game 22% and drawing 33% of the process; two exact clip-world fixes (contents gathered by mask, sector contents refreshed lazily) cut about 10% of game time, and one-pass light-interaction cull bits (bit-identical, natively tested) cut that renderer work by about 30%. HF-07 attribution: the Quality frame is CPU-bound on one thread; Vulkan render-thread stage 1 landed and gains nothing at the GPU-bound Ultra (within 0.4 ms, longer tails). Constant material registers restored on both renderers (they were never marked constant, so every surface evaluated its registers every view): 69-87% of register set-ups now take the parse-time block, saving 5-22 µs per frame in hub2, convoy2 and the airdefense1 arena, which whole-frame timings cannot resolve; see [Constant material registers](material-constant-registers.md). | Front-end and submission cost, stage 2 overlap, game-tic cost; shared with HF-07 and REN-07. |
 | FPS-09 — Not started | Prevention plan written (report section 9). | Suite in the release checklist, budgets as gates, cvar-default diff and attribution checks in CI. |
 
@@ -2347,6 +2347,28 @@ image on both backends.
   dropping them every tic; the local HUD is published once a frame, not once
   a prediction pass; entities that are neither networked nor map entities
   skip the snapshot PVS test. None of these was measured.
+  Level loads and startup, 21 November ([loading presentation](loading-presentation.md)):
+  the startup and loading screens presented only when the work offered a
+  frame, through two pacers that held them near 30 and 60 Hz, so an Air
+  Defense 1 load showed 157 frames in 6.5 s (a 22 ms median between frames,
+  p95 93 ms) with a freeze of up to 2.8 s while the opening cinematic was
+  skipped, and startup a 25 ms median (p95 65 ms). One pacer
+  (`LoadingFramePacer`) now presents both at the display's refresh or a whole
+  divisor of it of at most 90 Hz, holding presentation under 40% of the time;
+  `idCommon::LoadingCheckpoint` offers frames between the items of every long
+  stretch the stall sampler named (declarations, map entities, the cinematic
+  skip, script statements, stock menus, `.proc` and collision parsing, image
+  headers, zip seeks); waits for worker parses keep presenting; paced frames
+  skip the frame limiter's sleep; and the hit-material search, the script
+  compiler's constant lookup and font atlas rasterisation that filled the gaps
+  are indexed or parallel, with identical results. The same load now shows
+  389 frames at a 16.7 ms median (p95 22-23 ms, worst 54-60 ms) in the same
+  time, and startup a 17 ms median (p95 30-33 ms), on both renderers.
+  `com_loadingFrameTrace 1` reports each period, `2` the call path behind each
+  gap. Still open in this class: building a retained document (50-80 ms, not
+  divisible), single large reads and animations (40-60 ms), and the hand-off
+  into the level: the start-of-level autosave's flush and the first frame's
+  program loads (0.3-0.7 s).
 - [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07
   attribution found the Quality frame CPU-bound on one thread (tic, scene front end and
   Vulkan recording in turn); the render-thread prototype's first stage gained 0.5 ms

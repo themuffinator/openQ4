@@ -1613,6 +1613,9 @@ int idFile_InZip::Seek( long offset, fsOrigin_t origin ) {
 				if ( res < ZIP_SEEK_BUF_SIZE ) {
 					return -1;
 				}
+				// A seek inflates everything before the target again, which
+				// for a model's later chunks is most of a large file.
+				common->LoadingCheckpoint();
 			}
 			res = i + unzReadCurrentFile( z, buf, offset - i );
 			return ( res == offset ) ? 0 : -1;
