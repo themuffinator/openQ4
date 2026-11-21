@@ -208,9 +208,10 @@ CASES = {
     'ssao-debug-classic': {**SSAO_SETTINGS, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
     'ssao-classic-half': {**SSAO_HALF, 'r_pbrMaterials': '0'},
     'ssao-debug-classic-half': {**SSAO_HALF, 'r_ssaoDebug': '1', 'r_pbrMaterials': '0'},
-    # REN-10: the same controls with GTAO (r_ssaoMethod 1), whose visibility
-    # native PBR folds through multi-bounce and specular occlusion.
-    **{'gtao' + name[4:]: {**settings, 'r_ssaoMethod': '1'} for name, settings in (
+    # REN-10: the same controls with HBAO (r_ssaoMethod 1) and GTAO (2), whose
+    # visibility native PBR folds through multi-bounce and specular occlusion.
+    **{method + name[4:]: {**settings, 'r_ssaoMethod': value} for method, value in (('hbao', '1'), ('gtao', '2'))
+       for name, settings in (
         ('ssao-ownership', {**SSAO_FADED, 'r_pbrDebug': '7'}),
         ('ssao-off', dict(SSAO_FADED)),
         ('ssao-on', dict(SSAO_SETTINGS)),
@@ -361,7 +362,7 @@ LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','p
 LEGACY_CASES.update(f'{kind}-{mode}' for kind in ('fog','blend') for mode in ('native','off','fallback-native'))
 LEGACY_CASES.update(('lightgrid-native','lightgrid-off'))
 LEGACY_CASES.update(('lightgrid-pbr-master-off','lightgrid-pbr-native'))
-LEGACY_CASES.update(f'{method}-{name}' for method in ('ssao','gtao') for name in ('classic','debug-classic','classic-half','debug-classic-half'))
+LEGACY_CASES.update(f'{method}-{name}' for method in ('ssao','hbao','gtao') for name in ('classic','debug-classic','classic-half','debug-classic-half'))
 # The classic skin leaves the specimen, the only PBR surface in view, classic.
 LEGACY_CASES.update(case for case in CASES if case.startswith('skin-') and '-classic' in case)
 CASE_COMMANDS = {'shader-reload':['rendererShaderLibraryReload'], 'image-reload':['reloadImages all'],
@@ -1145,7 +1146,7 @@ def display_referred_owner(row: dict) -> bool:
 
 
 def compare_ssao_captures(results: list[dict], prefix: str = 'ssao') -> None:
-    """SSAO, or GTAO with prefix gtao (REN-10), darkens native PBR indirect light only (Stage D).
+    """SSAO, or HBAO and GTAO with prefixes hbao and gtao (REN-10), darkens native PBR indirect light only (Stage D).
 
     Native PBR pixels (green in the ownership capture) keep their direct light
     exactly: with the environment off, SSAO changes none of them. With it on,
@@ -2017,7 +2018,7 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
     # SSAO occludes only PBR's indirect light, which the classic light loop's
     # native owner does: the modern visible path declines those frames to it.
     ssao_declined = (active_pbr and args.backend == 'gl' and not getattr(args, 'gl_native', False)
-                     and case.startswith(('ssao-', 'gtao-')))
+                     and case.startswith(('ssao-', 'hbao-', 'gtao-')))
     if ssao_declined:
         visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
         if not re.search(r'\bblocked=1\b', visible) or 'reason=pbr-ssao-indirect-only' not in visible:
@@ -2579,6 +2580,7 @@ def main() -> int:
     compare_material_captures(results)
     compare_native_baked_captures(results)
     compare_ssao_captures(results)
+    compare_ssao_captures(results, 'hbao')
     compare_ssao_captures(results, 'gtao')
     compare_transparency_captures(results)
     compare_post_captures(results)

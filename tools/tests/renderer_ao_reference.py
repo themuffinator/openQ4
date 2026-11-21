@@ -5,12 +5,13 @@ Opt-in, local and hardware-bound. For each backend and stock pose it launches
 the staged client once (hidden window, frozen game time, no synthesized input)
 and captures r_ssaoDebug views of:
 
-- SSAO (r_ssaoMethod 0) and GTAO (r_ssaoMethod 1) at the Quality budget
+- SSAO (r_ssaoMethod 0), HBAO (1) and GTAO (2) at the Quality budget
   (12 samples, automatic half resolution) and the Ultra budget (32, full);
-- the brute-force reference (r_ssaoMethod 2: 256 cosine-weighted rays per
+- the brute-force reference (r_ssaoMethod 3: 256 cosine-weighted rays per
   pixel marched through the depth buffer, full resolution, unfiltered);
-- SSAO again after GTAO and the reference ran in the same process (rollback);
-- the same three at a pose moved one and a half units sideways (motion);
+- SSAO again after the other methods ran in the same process (rollback);
+- the Quality captures and the reference at a pose moved one and a half units
+  sideways (motion);
 - the lit frame without AO, whose luminance edges mark silhouettes.
 
 Checks, per pose and tier:
@@ -21,7 +22,11 @@ Checks, per pose and tier:
 - crawl: the part of GTAO's change under the small move that the reference's
   own change does not explain is no larger than SSAO's;
 - rollback: SSAO after the other methods is byte-identical to SSAO before;
-- parity: GTAO on OpenGL and Vulkan agree within 2 levels on average.
+- parity: HBAO and GTAO on OpenGL and Vulkan agree within 2 levels on average.
+
+HBAO is measured and reported beside them; it weights directions evenly
+rather than by cosine, so it is expected to read darker than the reference
+and carries no accuracy gate.
 
 Writable state is isolated per launch under --output-dir; the executable is
 reused in place. A JSON report and a Markdown summary are written there.
@@ -56,14 +61,18 @@ CASES = [
     ('off', {'r_ssao': '0', 'r_ssaoDebug': '0'}, False),
     ('ssao-quality', {'r_ssaoMethod': '0', **QUALITY}, False),
     ('ssao-ultra', {'r_ssaoMethod': '0', **ULTRA}, False),
-    ('gtao-quality', {'r_ssaoMethod': '1', **QUALITY}, False),
-    ('gtao-ultra', {'r_ssaoMethod': '1', **ULTRA}, False),
-    ('reference', {'r_ssaoMethod': '2', **ULTRA}, False),
+    ('hbao-quality', {'r_ssaoMethod': '1', **QUALITY}, False),
+    ('hbao-ultra', {'r_ssaoMethod': '1', **ULTRA}, False),
+    ('gtao-quality', {'r_ssaoMethod': '2', **QUALITY}, False),
+    ('gtao-ultra', {'r_ssaoMethod': '2', **ULTRA}, False),
+    ('reference', {'r_ssaoMethod': '3', **ULTRA}, False),
     ('ssao-quality-rollback', {'r_ssaoMethod': '0', **QUALITY}, False),
     ('ssao-quality-moved', {'r_ssaoMethod': '0', **QUALITY}, True),
-    ('gtao-quality-moved', {'r_ssaoMethod': '1', **QUALITY}, True),
-    ('reference-moved', {'r_ssaoMethod': '2', **ULTRA}, True),
-    ('gtao-quality-lit', {'r_ssaoMethod': '1', 'r_ssaoDebug': '0', **QUALITY}, False),
+    ('hbao-quality-moved', {'r_ssaoMethod': '1', **QUALITY}, True),
+    ('gtao-quality-moved', {'r_ssaoMethod': '2', **QUALITY}, True),
+    ('reference-moved', {'r_ssaoMethod': '3', **ULTRA}, True),
+    ('hbao-quality-lit', {'r_ssaoMethod': '1', 'r_ssaoDebug': '0', **QUALITY}, False),
+    ('gtao-quality-lit', {'r_ssaoMethod': '2', 'r_ssaoDebug': '0', **QUALITY}, False),
     ('ssao-quality-lit', {'r_ssaoMethod': '0', 'r_ssaoDebug': '0', **QUALITY}, False),
 ]
 BASE = {
@@ -80,6 +89,7 @@ BASE = {
     'r_ssaoRadius': '36', 'r_ssaoIntensity': '1.35', 'r_ssaoPower': '1.6', 'r_ssaoMaxDistance': '220',
 }
 TIERS = ('quality', 'ultra')
+METHODS = ('ssao', 'hbao', 'gtao')
 PARITY_MEAN_LEVELS = 2.0
 
 
@@ -141,12 +151,14 @@ def judge(result: dict) -> dict:
     if missing:
         return {'failures': [f'missing captures: {", ".join(missing)}']}
     reference = images['reference']
-    covered = (reference < 254.5) | (images['gtao-ultra'] < 254.5) | (images['ssao-ultra'] < 254.5)
+    covered = reference < 254.5
+    for method in METHODS:
+        covered |= images[f'{method}-ultra'] < 254.5
     band = silhouette_band(images['off']) & covered
     metrics, failures = {}, []
     reference_motion = np.abs(images['reference-moved'] - reference)[covered].mean()
     for tier in TIERS:
-        for method in ('ssao', 'gtao'):
+        for method in METHODS:
             image = images[f'{method}-{tier}']
             metrics[f'{method}-{tier}'] = {
                 'meanAbsError': round(float(np.abs(image - reference)[covered].mean()), 3),
@@ -161,7 +173,7 @@ def judge(result: dict) -> dict:
     # reference's own change does not explain.
     reference_change = images['reference-moved'] - reference
     crawl = {}
-    for method in ('ssao', 'gtao'):
+    for method in METHODS:
         change = images[f'{method}-quality-moved'] - images[f'{method}-quality']
         crawl[method] = round(float(np.abs(change - reference_change)[covered].mean()), 3)
     metrics['crawl'] = {**crawl, 'referenceChange': round(float(reference_motion), 3)}
@@ -170,7 +182,7 @@ def judge(result: dict) -> dict:
     identical = bool(np.array_equal(images['ssao-quality'], images['ssao-quality-rollback']))
     metrics['rollbackIdentical'] = identical
     if not identical:
-        failures.append('SSAO after GTAO and the reference is not byte-identical')
+        failures.append('SSAO after HBAO, GTAO and the reference is not byte-identical')
     metrics['coveredPixels'] = int(covered.sum())
     metrics['bandPixels'] = int(band.sum())
     return {'metrics': metrics, 'failures': failures}
@@ -191,7 +203,7 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     backends = {'gl': 'gl', 'vk': 'vulkan'}
     report = {'runtime': str(args.runtime_root), 'poses': {}, 'failures': []}
-    gtao = {}
+    kernels = {}
     for pose in args.poses.split(','):
         for backend in args.backends.split(','):
             result = launch(args.runtime_root.resolve(), args.basepath.resolve(), backends[backend], pose,
@@ -199,29 +211,36 @@ def main() -> int:
             verdict = judge(result) if result['code'] == 0 else {'failures': [f'engine exited {result["code"]}']}
             report['poses'].setdefault(pose, {})[backend] = {'seconds': result['seconds'], **verdict}
             report['failures'] += [f'{pose}/{backend}: {failure}' for failure in verdict['failures']]
-            if 'gtao-quality' in result['images'] and 'gtao-ultra' in result['images']:
-                gtao[(pose, backend)] = (result['images']['gtao-quality'], result['images']['gtao-ultra'])
+            for method in ('hbao', 'gtao'):
+                if all(f'{method}-{tier}' in result['images'] for tier in TIERS):
+                    kernels[(pose, backend, method)] = tuple(result['images'][f'{method}-{tier}'] for tier in TIERS)
             print(f'{pose}/{backend}: {json.dumps(verdict)}', flush=True)
-        if (pose, 'gl') in gtao and (pose, 'vk') in gtao:
-            parity = {}
+        parity = {}
+        for method in ('hbao', 'gtao'):
+            if (pose, 'gl', method) not in kernels or (pose, 'vk', method) not in kernels:
+                continue
             for index, tier in enumerate(TIERS):
-                difference = np.abs(gtao[(pose, 'gl')][index] - gtao[(pose, 'vk')][index])
-                parity[tier] = {'meanAbs': round(float(difference.mean()), 3),
-                                'over1Level': int((difference > 1).sum())}
-                if parity[tier]['meanAbs'] > PARITY_MEAN_LEVELS:
-                    report['failures'].append(f'{pose}: GTAO {tier} differs by {parity[tier]["meanAbs"]} levels between OpenGL and Vulkan')
+                difference = np.abs(kernels[(pose, 'gl', method)][index] - kernels[(pose, 'vk', method)][index])
+                parity[f'{method}-{tier}'] = {'meanAbs': round(float(difference.mean()), 3),
+                                              'over1Level': int((difference > 1).sum())}
+                if parity[f'{method}-{tier}']['meanAbs'] > PARITY_MEAN_LEVELS:
+                    report['failures'].append(f'{pose}: {method.upper()} {tier} differs by '
+                                              f'{parity[f"{method}-{tier}"]["meanAbs"]} levels between OpenGL and Vulkan')
+        if parity:
             report['poses'][pose]['parity'] = parity
     (args.output_dir / 'report.json').write_text(json.dumps(report, indent=2))
     lines = ['# REN-10 ambient occlusion against the brute-force reference', '',
-             '| Pose | Backend | Tier | SSAO error | GTAO error | SSAO halo | GTAO halo |', '|---|---|---|---:|---:|---:|---:|']
+             '| Pose | Backend | Tier | SSAO error | HBAO error | GTAO error | SSAO halo | HBAO halo | GTAO halo |',
+             '|---|---|---|---:|---:|---:|---:|---:|---:|']
     for pose, rows in report['poses'].items():
         for backend in ('gl', 'vk'):
             metrics = rows.get(backend, {}).get('metrics')
             if not metrics:
                 continue
             for tier in TIERS:
-                s, g = metrics[f'ssao-{tier}'], metrics[f'gtao-{tier}']
-                lines.append(f'| {pose} | {backend} | {tier} | {s["meanAbsError"]} | {g["meanAbsError"]} | {s["haloDarkening"]} | {g["haloDarkening"]} |')
+                s, h, g = (metrics[f'{method}-{tier}'] for method in METHODS)
+                lines.append(f'| {pose} | {backend} | {tier} | {s["meanAbsError"]} | {h["meanAbsError"]} | {g["meanAbsError"]} '
+                             f'| {s["haloDarkening"]} | {h["haloDarkening"]} | {g["haloDarkening"]} |')
     lines += ['', 'Failures: ' + ('none' if not report['failures'] else '; '.join(report['failures']))]
     (args.output_dir / 'summary.md').write_text('\n'.join(lines) + '\n')
     print('\n'.join(lines))

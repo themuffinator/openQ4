@@ -1635,7 +1635,7 @@ static bool VK_Post_DrawSSAOOcclusion( const viewDef_t *viewDef, VkShaderModule 
 		drawn = VK_Post_DrawTarget( pipeline, sets, 5, uniformOffset );
 	}
 	// The separable tent: horizontally into the filter target, vertically back.
-	// The brute-force reference (r_ssaoMethod 2) stays unfiltered.
+	// The brute-force reference (r_ssaoMethod 3) stays unfiltered.
 	for ( int axis = 0; axis < 2 && drawn && R_SSAOFiltered(); axis++ ) {
 		idRenderTexture *target = axis == 0 ? vkPostScene.ssaoFilterTarget : vkPostScene.ssaoOcclusionTarget;
 		idImage *source = axis == 0 ? vkPostScene.ssaoOcclusion : vkPostScene.ssaoFilter;

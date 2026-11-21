@@ -1300,15 +1300,43 @@ average (it was about 2.1; the limit is 4) with no bias (under 0.002).
 
 ### Ground-truth ambient occlusion (REN-10), 21 November 2026
 
-`r_ssaoMethod` (archived, default `0`) selects the kernel of the occlusion
-pass: `0` SSAO, the shipped obscurance estimate; `1` GTAO; `2` a brute-force
-reference for comparisons. All three write the same occlusion target and go
-through the same filter, resolve and native PBR field, so the application
-(the classic multiply, indirect-only PBR occlusion), the resolution policy,
-MSAA, dynamic resolution, subviews, the view weapon (a foreground model,
-untouched) and both renderers are shared. `0` is SSAO exactly: the SSAO
-capture taken after GTAO and the reference ran in the same process is
-byte-identical to the one before.
+`r_ssaoMethod` (archived, default `0`; `ssaoMethod_t` in `tr_local.h`)
+selects the kernel of the occlusion pass: `0` SSAO, the shipped obscurance
+estimate; `1` HBAO; `2` GTAO; `3` a brute-force reference for comparisons.
+All four write the same occlusion target and go through the same filter,
+resolve and native PBR field, so the application (the classic multiply,
+indirect-only PBR occlusion), the resolution policy, MSAA, dynamic
+resolution, subviews, the view weapon (a foreground model, untouched) and
+both renderers are shared. `0` is SSAO exactly: the SSAO capture taken after
+the other methods ran in the same process is byte-identical to the one
+before.
+
+**Naming.** The controls keep their `r_ssao*` names. SSAO, screen-space
+ambient occlusion, is the family: HBAO and GTAO are SSAO techniques that
+read the same depth buffer, and `r_ssao`, `r_ssaoRadius`, `r_ssaoSamples`,
+`r_ssaoResolution`, `r_ssaoMaxDistance` and `r_ssaoDebug` mean the same for
+every method. Only method `0`'s own estimator is "SSAO" in the narrow sense;
+the cvar help and these notes call it the obscurance estimate where the
+difference matters. Renaming the family would change the presets (a SYSTEM
+catalog ripple), the Display menu rows and their language-table entries, saved
+configs and every test, for no change in behaviour.
+
+**HBAO** (`HorizonBasedOcclusion`, after Bavoil, Sainz and Dimitrov 2008).
+Per screen direction it marches out to the radius and, each time a sample
+rises above the highest horizon so far (its elevation measured above the
+pixel's tangent plane, raised by a sine of 0.1 so a surface never occludes
+itself), adds the rise in the horizon's sine, attenuated by
+1 - (distance / radius)^2; the result is one minus the mean over directions.
+Directions are weighted evenly, not by cosine, and the bias and attenuation
+discount near and far occluders, so HBAO is an estimate like SSAO's:
+`r_ssaoIntensity` and `r_ssaoPower` set its strength (without them it reads
+4-9 levels lighter than the reference). `r_ssaoSamples` is the depth budget:
+four directions of up to eight steps below 24 samples (Quality's 12 is four of
+three), eight at 24 and above (Ultra's 32 is eight of four). Steps are evenly
+spaced, offset by whole pixels and stop at the view's edge; the sixteen
+patterns turn the directions by a sixteenth of the angle between them, so the
+filter averages 64 or 128 directions. Multi-bounce stays GTAO's: the fit
+expects a visibility.
 
 **GTAO** (`GroundTruthOcclusion` in `glprogs/ssao.fs` and `post_ssao.frag`,
 after Jimenez et al. 2016). Per slice through the view direction it finds the
@@ -1348,9 +1376,9 @@ resolve, so they bounce with one grey albedo, `r_ssaoMultiBounceAlbedo`
 factor alike (`ClassicOcclusionFactor`), which keeps classic pixels identical
 with and without native PBR. SSAO is unchanged.
 
-**Temporal accumulation.** In a jittered view (temporal AA) GTAO turns its
-patterns by a quarter pattern per frame (`R_SSAOMethodInfo`), so the history
-accumulates sixty-four slice directions; without temporal AA the patterns
+**Temporal accumulation.** In a jittered view (temporal AA) HBAO and GTAO
+turn their patterns by a quarter pattern per frame (`R_SSAOMethodInfo`), so
+the history accumulates four times the directions; without temporal AA the patterns
 hold still and nothing crawls. Screenshot frames render without jitter by
 design, so captures never show the turn: it is checked by its code path only.
 
@@ -1369,36 +1397,39 @@ stock poses, both renderers). Mean absolute difference from the reference in
 darkening beyond the reference within four pixels of a silhouette in the lit
 frame:
 
-| Pose | Tier | SSAO error | GTAO error | SSAO halo | GTAO halo |
-| --- | --- | ---: | ---: | ---: | ---: |
-| storage2 | Quality | 7.15 | 4.67 | 3.7-4.1 | 1.1-1.4 |
-| storage2 | Ultra | 6.95 | 3.73 | 3.6-4.0 | 1.1-1.2 |
-| hub2 | Quality | 5.92 | 4.17 | 2.5-2.6 | 1.2 |
-| hub2 | Ultra | 5.85 | 3.38 | 2.6-2.8 | 1.0 |
-| hub2, looking down | Quality | 3.44 | 2.94 | 1.0 | 0.6 |
-| hub2, looking down | Ultra | 3.40 | 2.46 | 1.0 | 0.6 |
+| Pose | Tier | SSAO error | HBAO error | GTAO error | SSAO halo | HBAO halo | GTAO halo |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| storage2 | Quality | 7.14 | 6.21 | 4.67 | 3.7-4.1 | 2.4-2.8 | 1.2-1.3 |
+| storage2 | Ultra | 6.95 | 6.09 | 3.73 | 3.6-3.9 | 3.4-3.9 | 1.1-1.2 |
+| hub2 | Quality | 5.90 | 5.91 | 4.16 | 2.5-2.6 | 2.8-2.9 | 1.2 |
+| hub2 | Ultra | 5.83 | 6.09 | 3.37 | 2.6-2.8 | 3.5-3.7 | 1.0 |
+| hub2, looking down | Quality | 3.42 | 3.35 | 2.93 | 1.0 | 1.8 | 0.6 |
+| hub2, looking down | Ultra | 3.39 | 3.58 | 2.45 | 1.0 | 2.4 | 0.6 |
 
 GTAO is 15-50% closer to the reference than SSAO everywhere and darkens
-silhouettes a third to a half as much. Crawl, the part of a method's change
+silhouettes a third to a half as much. HBAO, at the shipped
+`r_ssaoIntensity` 1.35 and `r_ssaoPower` 1.6, is as close as SSAO overall
+(closer in storage2, up to 0.26 levels further in hub2) with somewhat more
+silhouette darkening; at intensity 1 and power 1 it had the least halo of all
+(0.2-0.5) but read 4-9 levels lighter than the reference. Crawl, the part of a method's change
 under a 1.5-unit sideways move that the reference's own change does not
 explain, is 2.5 against SSAO's 3.5 levels in storage2, 2.4 against 2.7 in
-hub2, and 1.6 for both looking down. OpenGL and Vulkan GTAO agree to
-0.001-0.01 levels on average. GTAO with 4x MSAA (effective 4) and at 75%
+hub2, and 1.6 for both looking down (HBAO 3.1, 2.6 and 1.6). OpenGL and
+Vulkan agree to 0.001-0.01 levels on average for HBAO and GTAO alike. GTAO with 4x MSAA (effective 4) and at 75%
 resolution scale draws on both renderers with no validation messages and
 agrees across them to 0.006 levels.
 
-The PBR laboratory runs every SSAO control with GTAO too (`gtao-*`, 10/10
-on OpenGL, the native OpenGL owner and Vulkan): native PBR keeps its direct
-light exactly, its indirect light darkens (about 6000 pixels against SSAO's
-4600), classic pixels and the debug view match a classic-only frame exactly,
-and forced half resolution differs from full by 0.93 levels on average with
-no bias.
+The PBR laboratory runs every SSAO control with HBAO and GTAO too
+(`hbao-*`, `gtao-*`, 20/20 on OpenGL, the native OpenGL owner and Vulkan):
+native PBR keeps its direct light exactly, its indirect light darkens,
+classic pixels and the debug view match a classic-only frame exactly, and
+forced half resolution stays within the half-resolution limits with no bias.
 
 Not covered here: VR stereo draws each eye as its own view through the same
-passes, and the GTAO kernel uses only the GLSL 1.10 constructs SSAO already
-uses, so it is available wherever SSAO is; neither VR headsets nor the
-GLES/mobile tiers were run. A preset decision between SSAO and GTAO is the
-owner's, after the cost below.
+passes, and the HBAO and GTAO kernels use only the GLSL 1.10 constructs
+SSAO already uses, so they are available wherever SSAO is; neither VR
+headsets nor the GLES/mobile tiers were run. A preset decision between the
+methods is the owner's, after the cost below.
 
 **Cost** (2560x1440, hidden window at 60 Hz on a GPU other sessions were
 using, so the low end of each distribution is the uncontended cost). Vulkan:
@@ -1407,17 +1438,18 @@ and the resolve), two launches each. OpenGL has no SSAO pass timer: the 5th
 percentile of the whole GPU frame in alternating windows of one launch,
 against SSAO off.
 
-| Pose | Tier | Vulkan SSAO | Vulkan GTAO | OpenGL SSAO | OpenGL GTAO |
-| --- | --- | ---: | ---: | ---: | ---: |
-| hub2 | Quality | 0.41 | 0.34 | +1.14 | +1.14 |
-| storage2 | Quality | 0.52 | 0.44 | +1.84 | +1.25 |
-| hub2 | Ultra | 1.88 | 1.35 | +2.23 | +1.97 |
-| storage2 | Ultra | 2.74 | 1.86 | +3.33 | +2.32 |
+| Pose | Tier | Vulkan SSAO | Vulkan HBAO | Vulkan GTAO | OpenGL SSAO | OpenGL HBAO | OpenGL GTAO |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| hub2 | Quality | 0.38 | 0.37 | 0.33 | +1.08 | +1.27 | +1.07 |
+| storage2 | Quality | 0.51 | 0.46 | 0.43 | +1.66 | +1.50 | +1.68 |
+| hub2 | Ultra | 1.81 | 1.46 | 1.35 | +2.34 | +1.95 | +1.96 |
+| storage2 | Ultra | 2.79 | 2.16 | 1.88 | +2.92 | +2.51 | +2.45 |
 
 GTAO costs the same as SSAO or up to a third less at the same sample
-budget: its steps run along two lines from the pixel instead of a spiral
-around it, which the texture cache prefers. It therefore fits every FPS-01
-tier SSAO fits. The reference costs several frames' worth and never belongs
+budget: its steps run along lines from the pixel instead of a spiral around
+it, which the texture cache prefers. HBAO lies between them on Vulkan and at
+Ultra on OpenGL, and within 0.2 ms of SSAO at Quality on OpenGL. Both fit
+every FPS-01 tier SSAO fits. The reference costs several frames' worth and never belongs
 in a preset. The filter itself, measured the same way against the old
 unfiltered SSAO before this work, costs about 0.3 ms on Vulkan at both tiers.
 

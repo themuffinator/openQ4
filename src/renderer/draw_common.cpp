@@ -3200,7 +3200,7 @@ static bool RB_DrawSSAOOcclusion( idImage *depthImage, idImage *finalDepthImage,
 	RB_DrawSSAOPass( 3.0f, NULL, depthImage, finalDepthImage, NULL, NULL,
 		targetWidth, targetHeight, targetWidth, targetHeight, false, halfInfo, true );
 	if ( R_SSAOFiltered() ) {
-		// The brute-force reference (r_ssaoMethod 2) stays unfiltered.
+		// The brute-force reference (r_ssaoMethod 3) stays unfiltered.
 		static const GLfloat horizontal[2] = { 1.0f, 0.0f };
 		static const GLfloat vertical[2] = { 0.0f, 1.0f };
 		backEnd.renderTexture = rbSSAOFilterRenderTexture;
@@ -3435,7 +3435,7 @@ static void RB_STD_SSAO( void ) {
 		static bool logged = false;
 		if ( !logged ) {
 			logged = true;
-			static const char *const methods[3] = { "SSAO", "GTAO", "reference" };
+			static const char *const methods[SSAO_METHOD_COUNT] = { "SSAO", "HBAO", "GTAO", "reference" };
 			common->Printf( "OpenGL: first SSAO pass drew (%s, %s resolution, %s)\n", methods[R_SSAOMethod()],
 				halfInfo[0] < halfInfo[2] ? "half" : "full", R_SSAOFiltered() ? "filtered" : "unfiltered" );
 		}

@@ -27,7 +27,7 @@ layout(std140, set = 6, binding = 0) uniform SSAOBlock {
     vec4 params2;			// x: max distance, y: sample count, zw: the filter pass's texel step (mode 5)
     vec4 modeInfo;			// x: mode, y: the field's rows run opposite to this target's
     vec4 halfInfo;			// xy: occlusion target size, zw: view size in pixels
-    vec4 methodInfo;		// x: r_ssaoMethod (0 SSAO, 1 GTAO, 2 reference), y: temporal pattern turn, z: classic multi-bounce albedo
+    vec4 methodInfo;		// x: r_ssaoMethod (0 SSAO, 1 HBAO, 2 GTAO, 3 reference), y: temporal pattern turn, z: classic multi-bounce albedo (GTAO)
 } block;
 
 #define invTexSize			block.texInfo.xy
@@ -132,10 +132,10 @@ float PatternIndex( vec2 texel ) {
 	return 4.0 * Bayer2( mod( texel, 2.0 ) ) + Bayer2( mod( floor( texel * 0.5 ), 2.0 ) );
 }
 
-// ---- r_ssaoMethod 1 and 2 (REN-10). aoInfo.x selects the kernel, aoInfo.y
-// turns the sample patterns by a fraction of one pattern per frame under
-// temporal AA, aoInfo.z is the grey albedo classic surfaces bounce light with
-// (0 off).
+// ---- r_ssaoMethod 1 to 3 (REN-10): 1 HBAO, 2 GTAO, 3 the brute-force
+// reference. aoInfo.x selects the kernel, aoInfo.y turns the sample patterns
+// by a fraction of one pattern per frame under temporal AA (HBAO and GTAO),
+// aoInfo.z is the grey albedo classic surfaces bounce light with (GTAO; 0 off).
 
 const float kPi = 3.14159265;
 const float kHalfPi = 1.57079633;
@@ -158,6 +158,71 @@ vec2 ProjectViewPosition( vec3 position ) {
 	vec2 ndc = vec2( position.x / ( -position.z * projectionInfo.x ) - projectionInfo.z,
 		position.y / ( -position.z * projectionInfo.y ) - projectionInfo.w );
 	return ndc * 0.5 + 0.5;
+}
+
+// Horizon-based ambient occlusion (Bavoil, Sainz and Dimitrov 2008,
+// "Image-Space Horizon-Based Ambient Occlusion"): per screen direction, march
+// outward and, each time a sample rises above the highest horizon so far
+// (its elevation measured above the pixel's tangent plane), add the rise in
+// the horizon's sine, attenuated by 1 - (distance / radius)^2. The result is
+// one minus the mean over directions. Directions are weighted evenly, not by
+// cosine, so a raised horizon darkens more than GTAO's (sin h against
+// sin^2 h for a horizon at elevation h all round), while the angle bias and
+// the attenuation discount near and far occluders; r_ssaoIntensity and
+// r_ssaoPower set the strength, as for SSAO. r_ssaoSamples is the depth budget: four directions of up to
+// eight steps below 24 samples (Quality's 12 is four of three), eight at 24
+// and above (Ultra's 32 is eight of four). The sixteen patterns turn the
+// directions by a sixteenth of the angle between them and offset the steps,
+// so the filter averages 64 (Quality) or 128 (Ultra) directions. The tangent
+// plane is biased up by a sine of 0.1 so a surface never occludes itself.
+const float kHBAOAngleBias = 0.1;
+
+float HorizonBasedOcclusion( vec2 uv, vec3 centerPos, vec3 normal, float radiusPixels, float patternIndex ) {
+	float directionCount = ssaoSampleCount >= 24.0 ? 8.0 : 4.0;
+	float stepCount = clamp( floor( ssaoSampleCount / directionCount ), 2.0, 8.0 );
+	float stepOffset = fract( ( mod( patternIndex * 7.0, 16.0 ) + 0.5 ) / 16.0 + aoInfo.y * 0.618034 );
+	float radiusSq = ssaoRadius * ssaoRadius;
+	float occlusion = 0.0;
+	for ( int d = 0; d < 8; ++d ) {
+		if ( float( d ) >= directionCount ) {
+			break;
+		}
+		float phi = ( float( d ) + ( patternIndex + 0.5 + aoInfo.y ) / 16.0 ) / directionCount * kTwoPi;
+		vec2 direction = vec2( cos( phi ), sin( phi ) );
+		float horizon = kHBAOAngleBias;
+		float directional = 0.0;
+		for ( int i = 0; i < 8; ++i ) {
+			if ( float( i ) >= stepCount ) {
+				break;
+			}
+			// Even spacing out to the radius; whole-pixel offsets keep each
+			// reconstructed position on the texel its depth came from.
+			float t = ( float( i ) + stepOffset ) / stepCount;
+			vec2 sampleUv = uv + floor( direction * ( t * radiusPixels + 1.0 ) + 0.5 ) * invTexSize;
+			if ( sampleUv.x < 0.0 || sampleUv.y < 0.0 || sampleUv.x > 1.0 || sampleUv.y > 1.0 ) {
+				break;
+			}
+			float sampleDepth = SampleDepth( sampleUv );
+			if ( sampleDepth >= 0.99999 ) {
+				continue;
+			}
+			vec3 delta = ReconstructViewPosition( sampleUv, sampleDepth ) - centerPos;
+			float distanceSq = dot( delta, delta );
+			if ( distanceSq > radiusSq || distanceSq < 0.0001 ) {
+				continue;
+			}
+			float elevation = dot( normal, delta ) * inversesqrt( distanceSq );
+			if ( elevation > horizon ) {
+				directional += ( elevation - horizon ) * ( 1.0 - distanceSq / radiusSq );
+				horizon = elevation;
+			}
+		}
+		occlusion += directional;
+	}
+	// Like SSAO, and unlike GTAO, HBAO is an estimate rather than a
+	// visibility: r_ssaoIntensity and r_ssaoPower set its strength.
+	float ao = clamp( 1.0 - occlusion / directionCount * ssaoIntensity, 0.0, 1.0 );
+	return pow( ao, max( ssaoPower, 0.001 ) );
 }
 
 // Ground-truth ambient occlusion: per slice through the view direction, the
@@ -286,7 +351,7 @@ float ReferenceOcclusion( vec3 centerPos, vec3 normal, float patternIndex ) {
 // fit (PBRMath.h PBRMultiBounceAO) with one grey albedo. Native PBR applies it
 // per channel with its own albedo, and specular occlusion, to the field.
 float ClassicOcclusionFactor( float ao ) {
-	if ( aoInfo.x < 0.5 || aoInfo.z <= 0.0 ) {
+	if ( aoInfo.z <= 0.0 ) {
 		return ao;
 	}
 	float v = clamp( ao, 0.0, 1.0 );
@@ -315,8 +380,9 @@ vec3 ComputeAmbientOcclusion( vec2 uv, vec3 centerPos, float patternIndex ) {
 	float radiusPixels = clamp( ssaoRadius * projectionScale / max( viewDepth, 1.0 ), 2.0, 96.0 );
 
 	if ( aoInfo.x > 0.5 ) {
-		float visibility = aoInfo.x > 1.5 ? ReferenceOcclusion( centerPos, centerNormal, patternIndex )
-			: GroundTruthOcclusion( uv, centerPos, centerNormal, radiusPixels, patternIndex );
+		float visibility = aoInfo.x > 2.5 ? ReferenceOcclusion( centerPos, centerNormal, patternIndex )
+			: aoInfo.x > 1.5 ? GroundTruthOcclusion( uv, centerPos, centerNormal, radiusPixels, patternIndex )
+			: HorizonBasedOcclusion( uv, centerPos, centerNormal, radiusPixels, patternIndex );
 		return vec3( mix( 1.0, visibility, fade ), slope );
 	}
 	float rotation = ( patternIndex + 0.5 ) * ( kTwoPi / 16.0 );

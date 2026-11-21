@@ -1390,9 +1390,18 @@ extern idCVar r_ssaoSamples;			// SSAO spiral sample count
 extern idCVar r_ssaoDebug;				// visualize SSAO only
 extern idCVar r_ssaoResolution;			// 0 automatic, 1 full, 2 half resolution
 bool R_SSAOHalfResolution();			// r_ssaoResolution resolved against r_ssaoSamples
-extern idCVar r_ssaoMethod;				// 0 SSAO, 1 GTAO, 2 brute-force reference (REN-10)
+// r_ssaoMethod: the kernel of the occlusion pass (REN-10). The r_ssao* names
+// cover all of them: each is screen-space ambient occlusion.
+enum ssaoMethod_t {
+	SSAO_METHOD_SSAO = 0,		// the shipped obscurance estimate
+	SSAO_METHOD_HBAO = 1,		// horizon-based ambient occlusion
+	SSAO_METHOD_GTAO = 2,		// ground-truth ambient occlusion
+	SSAO_METHOD_REFERENCE = 3,	// brute-force reference, developer comparison only
+	SSAO_METHOD_COUNT
+};
+extern idCVar r_ssaoMethod;				// ssaoMethod_t
 extern idCVar r_ssaoMultiBounceAlbedo;	// GTAO: grey albedo classic surfaces bounce trapped light with, 0 off
-int R_SSAOMethod();						// r_ssaoMethod clamped
+int R_SSAOMethod();						// r_ssaoMethod clamped to ssaoMethod_t
 bool R_SSAOFiltered();					// the occlusion target takes the separable filter (not the reference)
 void R_SSAOMethodInfo( const struct viewDef_s *viewDef, float info[4] );	// ssao.fs aoInfo / post_ssao.frag methodInfo
 extern idCVar r_motionBlur;				// enable camera motion blur post-process

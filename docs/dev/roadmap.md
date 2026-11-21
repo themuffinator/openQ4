@@ -1131,7 +1131,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 | REN-09 — Not started | The REN-06 froxel leaf (unshadowed screen-space depth fog) and the REN-03 shadow maps it will sample. | Froxel volume with light falloff/projection and shadow-map sampling, stencil-light policy, temporal reprojection, translucent ordering, both backends, budgets. |
-| REN-10 — Closed | GTAO (`r_ssaoMethod 1`) and a brute-force reference (`2`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. Closer to the reference than SSAO with fewer halos, backend parity, exact rollback, cost at or below SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
+| REN-10 — Closed | HBAO (`r_ssaoMethod 1`), GTAO (`2`) and a brute-force reference (`3`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. GTAO closer to the reference than SSAO with fewer halos, HBAO as close as SSAO; backend parity, exact rollback, cost at or near SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
 | REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | Linux (Mesa GL and Vulkan) and the Android emulator (GLES declines cleanly) pass. VR headset confirmation and physical Linux GPUs, macOS and Android devices belong to platform qualification; a preset decision waits for authored content. |
 
 ### REN task evidence and acceptance
@@ -1793,24 +1793,29 @@ diagnostics establish whole-frame ownership or production performance.
   enables it.
 - [x] **REN-10 — P2, implementation: ground-truth ambient occlusion (GTAO).**
   Closed 21 November 2026. `r_ssaoMethod` selects the kernel of SSAO's
-  occlusion pass: `0` SSAO (default), `1` GTAO (per-slice horizon search and
-  the analytic cosine-weighted visible arc; slices turn evenly about the view
-  direction), `2` a brute-force reference (256 cosine-weighted rays per pixel
-  through the depth buffer, full resolution, unfiltered). All three share the
+  occlusion pass: `0` SSAO (default), `1` HBAO (horizon rises above the
+  tangent plane, evenly weighted per direction, strength from
+  `r_ssaoIntensity`/`r_ssaoPower`; added at the owner's request), `2` GTAO
+  (per-slice horizon search and the analytic cosine-weighted visible arc;
+  slices turn evenly about the view direction), `3` a brute-force reference
+  (256 cosine-weighted rays per pixel through the depth buffer, full
+  resolution, unfiltered). The `r_ssao*` names stay: every method is
+  screen-space ambient occlusion. All four share the
   occlusion target, separable filter, resolve and native PBR field, so the
   indirect-only application, resolution policy, MSAA, dynamic resolution,
   subviews, the view weapon and both backends are common. Native PBR folds
   GTAO's visibility through its coloured multi-bounce and specular occlusion;
   classic surfaces bounce with `r_ssaoMultiBounceAlbedo`. Under temporal AA
-  the patterns turn a quarter pattern per frame. Evidence:
+  HBAO's and GTAO's patterns turn a quarter pattern per frame. Evidence:
   [GTAO](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)
   and `tools/tests/renderer_ao_reference.py`: on three stock poses GTAO is
   15-50% closer to the reference than SSAO at Quality and Ultra, darkens
   silhouettes a third to a half as much and crawls no more under motion;
   OpenGL and Vulkan agree to 0.001-0.01 levels; SSAO after GTAO is
-  byte-identical; the PBR laboratory's `gtao-*` controls pass 10/10 on OpenGL,
-  the native owner and Vulkan. GTAO costs the same as SSAO or up to a third
-  less at each tier on both backends. VR headsets, GLES/mobile hardware and
+  byte-identical; the PBR laboratory's `hbao-*` and `gtao-*` controls pass
+  20/20 on OpenGL, the native owner and Vulkan. GTAO costs the same as SSAO
+  or up to a third less at each tier on both backends; HBAO is as accurate as
+  SSAO and costs between the two (within 0.2 ms of SSAO at Quality on OpenGL). VR headsets, GLES/mobile hardware and
   the temporal turn (screenshot frames carry no jitter) were not observed;
   whether presets move to GTAO is the owner's decision.
   Original scope: add GTAO beside the current SSAO: horizon search over the depth buffer,
