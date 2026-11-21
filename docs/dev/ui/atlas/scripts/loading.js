@@ -227,8 +227,17 @@ function buildRemastered(lay, D) {
   const te = [[VL - 60, Y(28.8)], [X(268.8), Y(28.8)], [X(290), Y(9.3)], [VR + 60, Y(9.3)]];
   const be = [[VL - 60, YB(468.5)], [X(165), YB(468.5)], [X(207.5), YB(426)], [VR + 60, YB(426)]];
   const band = (edge, outer) => { const g = svgEl("g", {}, svg);
-    // *_edgeadd: eight additive #181D0A strokes along the inner edge, 20-160 u wide (0.98 at the edge, gone by 80 u)
-    for (let i = 8; i >= 1; i--) svgEl("path", { d: poly(edge), fill: "none", stroke: "#181D0A", "stroke-opacity": .1715, "stroke-width": 20 * i, "stroke-linejoin": "round", style: ADD }, g);
+    // *_edgeadd: additive #181D0A x1.4 ramping from 0.98 at the inner edge to nothing 80 u away, on both sides;
+    // one gradient column per edge segment, its ramp measured straight down or up from that segment
+    for (let i = 0; i + 1 < edge.length; i++) {
+      const [[x0, y0], [x1, y1]] = [edge[i], edge[i + 1]], slope = (y1 - y0) / (x1 - x0), reach = 80 / (slope * slope + 1);
+      for (const s of [1, -1]) {
+        const gid = id("sp"), lg = svgEl("linearGradient", { id: gid, gradientUnits: "userSpaceOnUse", x1: x0, y1: y0, x2: x0 - s * reach * slope, y2: y0 + s * reach }, ui.defs);
+        svgEl("stop", { offset: 0, "stop-color": "#22290E", "stop-opacity": .98 }, lg);
+        svgEl("stop", { offset: 1, "stop-color": "#22290E", "stop-opacity": 0 }, lg);
+        svgEl("path", { d: poly([[x0, y0], [x1, y1], [x1, y1 + s * 80], [x0, y0 + s * 80]]) + "Z", fill: `url(#${gid})`, style: ADD }, g);
+      }
+    }
     svgEl("path", { d: poly(edge) + `L${VR + 60} ${outer}L${VL - 60} ${outer}Z`, fill: "#000", "fill-opacity": .8 }, g);
     const flare = [svgEl("path", { d: poly(edge), fill: "none", stroke: PROG, "stroke-opacity": .4, "stroke-width": 5, "stroke-linejoin": "round", style: ADD, opacity: 0 }, g),
       svgEl("path", { d: poly(edge), fill: "none", stroke: "#FFC070", "stroke-opacity": .8, "stroke-width": .8, style: ADD, opacity: 0 }, g)];

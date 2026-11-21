@@ -7,6 +7,15 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## A smooth glow on the loading screen's bands, 21 November 2026
+
+- **No more stripes under the loading bands.** On the new interface
+  (`ui_retained 1`), the green light that spills from the top and bottom bands
+  into the level picture now fades evenly, instead of in a stack of visible
+  steps. It keeps the same colour and brightness at the edge and is gone at the
+  same distance, and it takes less drawing than before.
+- **What to do.** Nothing.
+
 ## Shadowed volumetric lighting, 21 November 2026
 
 - **Light shafts that stop at their shadows.** With the experimental

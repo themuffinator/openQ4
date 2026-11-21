@@ -4455,140 +4455,130 @@
       },
       "paths": [
        {
-        "id": "spill-8",
+        "id": "spill-1-below",
         "commands": [
          {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
          {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
+         {"id": "p2", "op": "line", "points": [[403.2, 163.2]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0, "dp": -1400.0}, 163.2]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 240.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, 43.2],
+         "to": [0.0, 163.2],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-7",
+        "id": "spill-1-above",
         "commands": [
          {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
          {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
+         {"id": "p2", "op": "line", "points": [[403.2, -76.8]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0, "dp": -1400.0}, -76.8]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 210.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, 43.2],
+         "to": [0.0, -76.8],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-6",
+        "id": "spill-2-below",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
-         {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
+         {"id": "p0", "op": "move", "points": [[403.2, 43.2]]},
+         {"id": "p1", "op": "line", "points": [[435.0, 13.95]]},
+         {"id": "p2", "op": "line", "points": [[435.0, 133.95]]},
+         {"id": "p3", "op": "line", "points": [[403.2, 163.2]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 180.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [403.2, 43.2],
+         "to": [462.991, 108.204],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-5",
+        "id": "spill-2-above",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
-         {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
+         {"id": "p0", "op": "move", "points": [[403.2, 43.2]]},
+         {"id": "p1", "op": "line", "points": [[435.0, 13.95]]},
+         {"id": "p2", "op": "line", "points": [[435.0, -106.05]]},
+         {"id": "p3", "op": "line", "points": [[403.2, -76.8]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 150.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [403.2, 43.2],
+         "to": [343.409, -21.804],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-4",
+        "id": "spill-3-below",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
-         {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
+         {"id": "p0", "op": "move", "points": [[435.0, 13.95]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 133.95]]},
+         {"id": "p3", "op": "line", "points": [[435.0, 133.95]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 120.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, 13.95],
+         "to": [0.0, 133.95],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-3",
+        "id": "spill-3-above",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
-         {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
+         {"id": "p0", "op": "move", "points": [[435.0, 13.95]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, -106.05]]},
+         {"id": "p3", "op": "line", "points": [[435.0, -106.05]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 90.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, 13.95],
+         "to": [0.0, -106.05],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
-       },
-       {
-        "id": "spill-2",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
-         {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
-        ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 60.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
-        },
-        "blend": "additive"
-       },
-       {
-        "id": "spill-1",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, 43.2]]},
-         {"id": "p1", "op": "line", "points": [[403.2, 43.2]]},
-         {"id": "p2", "op": "line", "points": [[435.0, 13.95]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, 13.95]]}
-        ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 30.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
-        },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
         "id": "band",
@@ -4679,140 +4669,130 @@
       },
       "paths": [
        {
-        "id": "spill-8",
+        "id": "spill-1-below",
         "commands": [
          {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
          {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
+         {"id": "p2", "op": "line", "points": [[247.5, {"fraction": 1, "dp": 102.75}]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": 102.75}]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 240.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, {"fraction": 1, "dp": -17.25}],
+         "to": [0.0, {"fraction": 1, "dp": 102.75}],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-7",
+        "id": "spill-1-above",
         "commands": [
          {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
          {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
+         {"id": "p2", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -137.25}]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -137.25}]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 210.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, {"fraction": 1, "dp": -17.25}],
+         "to": [0.0, {"fraction": 1, "dp": -137.25}],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-6",
+        "id": "spill-2-below",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
+         {"id": "p0", "op": "move", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
+         {"id": "p1", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
+         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": 39.0}]]},
+         {"id": "p3", "op": "line", "points": [[247.5, {"fraction": 1, "dp": 102.75}]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 180.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [247.5, {"fraction": 1, "dp": -17.25}],
+         "to": [307.5, {"fraction": 1, "dp": 42.75}],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-5",
+        "id": "spill-2-above",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
+         {"id": "p0", "op": "move", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
+         {"id": "p1", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
+         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -201.0}]]},
+         {"id": "p3", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -137.25}]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 150.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [247.5, {"fraction": 1, "dp": -17.25}],
+         "to": [187.5, {"fraction": 1, "dp": -77.25}],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-4",
+        "id": "spill-3-below",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
+         {"id": "p0", "op": "move", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": 39.0}]]},
+         {"id": "p3", "op": "line", "points": [[311.25, {"fraction": 1, "dp": 39.0}]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 120.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, {"fraction": 1, "dp": -81.0}],
+         "to": [0.0, {"fraction": 1, "dp": 39.0}],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
-        "id": "spill-3",
+        "id": "spill-3-above",
         "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
+         {"id": "p0", "op": "move", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -201.0}]]},
+         {"id": "p3", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -201.0}]]},
+         {"id": "close", "op": "close"}
         ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 90.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
+        "fill": {
+         "type": "linear",
+         "from": [0, {"fraction": 1, "dp": -81.0}],
+         "to": [0.0, {"fraction": 1, "dp": -201.0}],
+         "stops": [
+          {"at": 0, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0.98]}},
+          {"at": 1, "color": {"type": "color", "value": [0.1317, 0.1592, 0.0549, 0]}}
+         ]
         },
-        "blend": "additive"
-       },
-       {
-        "id": "spill-2",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
-        ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 60.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
-        },
-        "blend": "additive"
-       },
-       {
-        "id": "spill-1",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[{"fraction": 0, "dp": -1400.0}, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p1", "op": "line", "points": [[247.5, {"fraction": 1, "dp": -17.25}]]},
-         {"id": "p2", "op": "line", "points": [[311.25, {"fraction": 1, "dp": -81.0}]]},
-         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": 1400.0}, {"fraction": 1, "dp": -81.0}]]}
-        ],
-        "stroke": {
-         "paint": {"type": "solid", "color": {"type": "color", "value": [0.0941, 0.1137, 0.0392, 0.1715]}},
-         "widthDp": 30.0,
-         "minimumPixels": 0,
-         "join": "round",
-         "cap": "butt"
-        },
-        "blend": "additive"
+        "blend": "additive",
+        "antialias": false
        },
        {
         "id": "band",

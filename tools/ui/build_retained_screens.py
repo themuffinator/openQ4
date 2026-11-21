@@ -4968,20 +4968,48 @@ def loading_document() -> dict:
     top_edge = [(edge(0), U * 28.8), (U * 268.8, U * 28.8), (U * 290, U * 9.3), (edge(1), U * 9.3)]
     bottom_edge = [(edge(0), foot(468.5)), (U * 165, foot(468.5)), (U * 207.5, foot(426)), (edge(1), foot(426))]
 
-    def spill(edge_points, down: bool) -> list:
+    def spill(edge_points) -> list:
         # The *_edgeadd companions add #181D0A from the inner edge into the
-        # picture: 0.98 at the edge to 0.55 at 35 u, gone by 80 u.
+        # picture: 0.98 at the edge to 0.55 at 35 u, gone by 80 u, which is a
+        # straight ramp. Each edge segment gets one gradient-filled column on
+        # each side whose parameter is the vertical distance from that
+        # segment, so neighbouring columns meet with equal values and the ramp
+        # stays continuous. The band covers the outer half at 0.80. Stacked
+        # strokes of rising width drew the same ramp in visible 10 u steps.
+        depth = U * 80
+        tint = [round(min(1.0, channel * 1.4), 4) for channel in rgb(LOAD_SPILL)[:3]]
+        ramp = [(0, tint + [0.98]), (1, tint + [0])]
+        # A bottom edge follows the view height: every y carries the same fraction.
+        fractions = {y["fraction"] if isinstance(y, dict) else 0 for _, y in edge_points}
+        assert len(fractions) == 1, "a spill edge must use one vertical anchor"
+        fraction = fractions.pop()
+        heights = [y["dp"] if isinstance(y, dict) else y for _, y in edge_points]
+
+        def at(x, height):
+            return (x, {"fraction": fraction, "dp": round(height, 3)} if fraction else height)
+
         paths = []
-        steps = 8
-        for index in range(steps, 0, -1):
-            width = 2 * U * 80 * index / steps
-            paths.append(path(f"spill-{index}", edge_points, closed=False, blend="additive",
-                              stroke=stroke(solid(rgb(LOAD_SPILL, round(0.98 / steps * 1.4, 4))), width, minimum=0, join="round")))
+        for index in range(len(edge_points) - 1):
+            (x0, _), (x1, _) = edge_points[index], edge_points[index + 1]
+            y0, y1 = heights[index], heights[index + 1]
+            # The far ends stand at the view edges; only level segments reach them.
+            if isinstance(x0, dict) or isinstance(x1, dict):
+                assert y0 == y1, "a spill segment reaching a view edge must be level"
+                slope, origin = 0.0, 0
+            else:
+                slope, origin = (y1 - y0) / (x1 - x0), x0
+            # t = side * (y - edge(x)) / depth along the segment's column.
+            reach = depth / (slope * slope + 1)
+            for side, name in ((1, "below"), (-1, "above")):
+                paint = linear(at(origin, y0), at(origin - side * reach * slope, y0 + side * reach), ramp)
+                paths.append({**path(f"spill-{index + 1}-{name}",
+                                     [at(x0, y0), at(x1, y1), at(x1, y1 + side * depth), at(x0, y0 + side * depth)],
+                                     fill=paint, blend="additive"), "antialias": False})
         return paths
 
-    top_band = vector("load-top", dict(FULL), spill(top_edge, True) + [
+    top_band = vector("load-top", dict(FULL), spill(top_edge) + [
         path("band", [(edge(1), -400), (edge(0), -400)] + top_edge, fill=solid([0, 0, 0, 0.8]))])
-    bottom_band = vector("load-bottom", dict(FULL), spill(bottom_edge, False) + [
+    bottom_band = vector("load-bottom", dict(FULL), spill(bottom_edge) + [
         path("band", bottom_edge + [(edge(1), foot(480 + 400 / U)), (edge(0), foot(480 + 400 / U))], fill=solid([0, 0, 0, 0.8]))])
     shot = picture("load-shot", "", {**FULL, "transform": transform()})
     doc.bind("load-shot.image", "load-shot", "image", {"state": "loading_levelshot"})
