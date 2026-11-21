@@ -72,8 +72,24 @@ typedef enum {
 typedef enum {
 	CF_2D,			// not a cube map
 	CF_NATIVE,		// _px, _nx, _py, etc, directly sent to GL
-	CF_CAMERA		// _forward, _back, etc, rotated and flipped as needed before sending to GL
+	CF_CAMERA,		// _forward, _back, etc, rotated and flipped as needed before sending to GL
+	// Not cube maps. A material asks for a volume (`volumeMap`) or a 2D
+	// texture array (`arrayMap`) for a GLSL program's sampler3D or
+	// sampler2DArray. The stock image sources supply neither: a request no
+	// loader answers gets a black stand-in of its type (MakeLayeredDefault),
+	// so the loader's `cubeFiles != CF_2D` cube paths never see these.
+	CF_VOLUME,
+	CF_ARRAY
 } cubeFiles_t;
+
+ID_INLINE bool R_CubeFilesIsCube( cubeFiles_t cubeFiles ) {
+	return cubeFiles == CF_NATIVE || cubeFiles == CF_CAMERA;
+}
+
+// Whether this renderer can hold `format` in a TT_3D
+// image. OpenGL gives GL_TEXTURE_3D only BPTC among the block formats (RGTC
+// and S3TC are 2D block formats there); Vulkan asks the device.
+bool R_ImageFormatAllowedInVolume( textureFormat_t format );
 
 static const unsigned int IMAGEFLAG_NOMIPS = BIT( 0 );
 static const unsigned int IMAGEFLAG_FILTER_NEUTRAL_ALPHA = BIT( 1 );
@@ -240,6 +256,7 @@ public:
 	void		AddUseCount( int count ) { useCount += count; }
 	int			GetUseCount() const { return useCount; }
 	void		ActuallyLoadImage(bool fromBackEnd);
+	void		MakeLayeredDefault( cubeFiles_t request );
 	// The DDS file ActuallyLoadImage will read whole, when it reads one, so a
 	// level load can fetch it ahead. A wrong guess costs only that read.
 	bool		PredictDirectDDSPayload(idStr& path) const;
@@ -305,6 +322,13 @@ public:
 	// Explicit diagnostic readback of mip zero. Only single-sample RGBA8 2D
 	// images are accepted; rows are bottom-up, with no filtering or color transfer.
 	bool		ReadPixelsRGBA8( idList<byte> &pixels );
+	// One level of a TT_3D or TT_2D_ARRAY image as the GPU holds it,
+	// unconverted: every slice or layer in order, rows in upload order, texels
+	// as they were uploaded, whole 4x4 blocks for a block format; for
+	// comparing a texture with its source.
+	// With decodeRGBA8, a block-format level comes back decoded by the driver
+	// to RGBA8 instead (OpenGL only), to check a CPU decode against.
+	bool		ReadLevelBytes( int level, idList<byte> &bytes, bool decodeRGBA8 = false );
 	uint64_t	GetStorageGeneration() const { return storageGeneration; }
 
 	// _policyName is the logical image name the downsize policy is classified

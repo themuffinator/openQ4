@@ -86,6 +86,66 @@ bool idImage::ReadPixelsRGBA8( idList<byte> &pixels ) {
 	return true;
 }
 
+// One level of a volume or array, every slice or layer,
+// as the GPU holds it. Block formats come back as their blocks.
+bool R_ImageFormatAllowedInVolume( textureFormat_t format ) {
+	return BytesPerBlockForFormat( format ) <= 0 || IsBPTCFormat( format );
+}
+
+bool idImage::ReadLevelBytes( int level, idList<byte> &bytes, bool decodeRGBA8 ) {
+	bytes.Clear();
+#if defined( OPENQ4_RENDERER_GLES_MODULE )
+	return false;
+#else
+	if ( !IsLoaded() || ( opts.textureType != TT_3D && opts.textureType != TT_2D_ARRAY )
+			|| level < 0 || level >= opts.numLevels || glGetTexImage == NULL ) {
+		return false;
+	}
+	const GLenum target = opts.textureType == TT_3D ? GL_TEXTURE_3D : GL_TEXTURE_2D_ARRAY;
+	const int expectedWidth = Max( 1, opts.width >> level );
+	const int expectedHeight = Max( 1, opts.height >> level );
+	const int expectedDepth = R_ImageLevelDepth( opts.textureType, opts.depth, level );
+	idGLPixelTransferScope transfer;
+	R_GLStateCache().BindTexture( 0, target, texnum );
+	GLint width = 0, height = 0, depth = 0;
+	glGetTexLevelParameteriv( target, level, GL_TEXTURE_WIDTH, &width );
+	glGetTexLevelParameteriv( target, level, GL_TEXTURE_HEIGHT, &height );
+	glGetTexLevelParameteriv( target, level, GL_TEXTURE_DEPTH, &depth );
+	if ( width != expectedWidth || height != expectedHeight || depth != expectedDepth ) {
+		return false;
+	}
+	glPixelStorei( GL_PACK_ALIGNMENT, 1 );
+	if ( IsCompressed() && decodeRGBA8 ) {
+		bytes.SetNum( width * height * depth * 4 );
+		glGetTexImage( target, level, GL_RGBA, GL_UNSIGNED_BYTE, bytes.Ptr() );
+	} else if ( IsCompressed() ) {
+		GLint size = 0;
+		glGetTexLevelParameteriv( target, level, GL_TEXTURE_COMPRESSED_IMAGE_SIZE, &size );
+		if ( size <= 0 || glGetCompressedTexImage == NULL ) {
+			return false;
+		}
+		bytes.SetNum( size );
+		glGetCompressedTexImage( target, level, bytes.Ptr() );
+	} else {
+		// read back in the layout it was uploaded in (AllocImage's dataFormat
+		// and dataType), so the bytes compare with the upload's
+		const int texelBytes = BitsForFormat( opts.format ) / 8;
+		if ( texelBytes <= 0 || opts.format == FMT_DEPTH || opts.format == FMT_DEPTH_STENCIL ) {
+			return false;
+		}
+		bytes.SetNum( width * height * depth * texelBytes );
+		glGetTexImage( target, level, dataFormat, dataType, bytes.Ptr() );
+	}
+	const GLenum error = glGetError();
+	if ( error != GL_NO_ERROR ) {
+		common->Warning( "OpenGL image readback failed: 0x%x", error );
+		bytes.Clear();
+		return false;
+	}
+	return true;
+#endif
+}
+
 #ifndef GL_SRGB8
 #define GL_SRGB8 0x8C41
 #endif
@@ -138,6 +198,16 @@ static int R_CompressedTextureSizeInBytes( textureFormat_t format, int width, in
 	return (int)compressedSize;
 }
 
+// The GL target an image of each type binds to.
+static GLenum R_GLTextureTarget( textureType_t type ) {
+	switch ( type ) {
+		case TT_CUBIC:		return GL_TEXTURE_CUBE_MAP_EXT;
+		case TT_3D:			return GL_TEXTURE_3D;
+		case TT_2D_ARRAY:	return GL_TEXTURE_2D_ARRAY;
+		default:			return GL_TEXTURE_2D;
+	}
+}
+
 /*
 ========================
 idImage::SubImageUpload
@@ -184,6 +254,12 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 	} else if ( opts.textureType == TT_CUBIC ) {
 		target = GL_TEXTURE_CUBE_MAP_EXT;
 		uploadTarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT + z;
+	} else if ( opts.textureType == TT_3D || opts.textureType == TT_2D_ARRAY ) {
+		// Z is the slice or layer, uploaded one at a time
+		target = uploadTarget = R_GLTextureTarget( opts.textureType );
+		if ( z < 0 || z >= R_ImageLevelDepth( opts.textureType, opts.depth, mipLevel ) ) {
+			return;
+		}
 	} else {
 		assert( !"invalid opts.textureType" );
 		target = GL_TEXTURE_2D;
@@ -229,8 +305,13 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 #ifdef DEBUG
 	GL_CheckErrors();
 #endif
+	const bool layered = opts.textureType == TT_3D || opts.textureType == TT_2D_ARRAY;
 	if ( IsCompressed() ) {
-		glCompressedTexSubImage2DARB( uploadTarget, mipLevel, x, y, width, height, internalFormat, compressedSize, pic );
+		if ( layered ) {
+			glCompressedTexSubImage3D( uploadTarget, mipLevel, x, y, z, width, height, 1, internalFormat, compressedSize, pic );
+		} else {
+			glCompressedTexSubImage2DARB( uploadTarget, mipLevel, x, y, width, height, internalFormat, compressedSize, pic );
+		}
 	} else {
 
 		// make sure the pixel store alignment is correct so that lower mips get created
@@ -245,7 +326,11 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 			glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 		}
 
-		glTexSubImage2D( uploadTarget, mipLevel, x, y, width, height, dataFormat, dataType, uploadPic );
+		if ( layered ) {
+			glTexSubImage3D( uploadTarget, mipLevel, x, y, z, width, height, 1, dataFormat, dataType, uploadPic );
+		} else {
+			glTexSubImage2D( uploadTarget, mipLevel, x, y, width, height, dataFormat, dataType, uploadPic );
+		}
 	}
 #ifdef DEBUG
 	GL_CheckErrors();
@@ -287,6 +372,10 @@ void idImage::SetTexParameters() {
 			break;
 		case TT_CUBIC:
 			target = GL_TEXTURE_CUBE_MAP_EXT;
+			break;
+		case TT_3D:
+		case TT_2D_ARRAY:
+			target = R_GLTextureTarget( opts.textureType );
 			break;
 		default:
 			idLib::FatalError( "%s: bad texture type %d", GetName(), opts.textureType );
@@ -454,13 +543,19 @@ void idImage::SetTexParameters() {
 		default:
 			common->FatalError( "%s: bad texture repeat %d", GetName(), repeat );
 	}
+	// A volume wraps its third coordinate as its second
+	if ( opts.textureType == TT_3D ) {
+		GLint wrapT = GL_REPEAT;
+		glGetTexParameteriv( target, GL_TEXTURE_WRAP_T, &wrapT );
+		glTexParameteri( target, GL_TEXTURE_WRAP_R, wrapT );
+	}
 }
 
 void idImage::RefreshSamplerState() {
 	if ( !IsLoaded() ) {
 		return;
 	}
-	R_BindTextureForDirectAccess( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
+	R_BindTextureForDirectAccess( R_GLTextureTarget( opts.textureType ), texnum );
 	SetTexParameters();
 }
 
@@ -707,6 +802,9 @@ void idImage::AllocImage() {
 		target = GL_TEXTURE_CUBE_MAP_EXT;
 		uploadTarget = GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT;
 		numSides = 6;
+	} else if ( opts.textureType == TT_3D || opts.textureType == TT_2D_ARRAY ) {
+		target = uploadTarget = R_GLTextureTarget( opts.textureType );
+		numSides = 1;
 	} else {
 		assert( !"opts.textureType" );
 		target = uploadTarget = GL_TEXTURE_2D;
@@ -740,8 +838,52 @@ void idImage::AllocImage() {
 	// Compressed images are only ever re-specified by PurgeImage + AllocImage,
 	// which creates a new texture object.
 	int fullChainLevels = 1;
-	for ( int size = Max( opts.width, opts.height ); size > 1; size >>= 1 ) {
+	for ( int size = Max( Max( opts.width, opts.height ), opts.textureType == TT_3D ? opts.depth : 1 ); size > 1; size >>= 1 ) {
 		fullChainLevels++;
+	}
+
+	// A volume or array allocates every level at once,
+	// immutable where the context has texture storage, and uploads nothing.
+	if ( opts.textureType == TT_3D || opts.textureType == TT_2D_ARRAY ) {
+		const int depth = Max( 1, opts.depth );
+		if ( opts.numLevels < 1 || opts.numLevels > fullChainLevels ) {
+			R_ImagePolicyObserveError( "Requested GL layered image has an invalid level count" );
+			common->Warning( "%s: %d levels for a %dx%dx%d image", GetName(), opts.numLevels, opts.width, opts.height, depth );
+			glDeleteTextures( 1, (GLuint *)&texnum );
+			texnum = TEXTURE_NOT_LOADED;
+			return;
+		}
+		if ( glConfig.backendCaps.hasTextureStorage ) {
+			glTexStorage3D( target, opts.numLevels, internalFormat, opts.width, opts.height, depth );
+		} else {
+			for ( int level = 0; level < opts.numLevels; level++ ) {
+				const int w = Max( 1, opts.width >> level );
+				const int h = Max( 1, opts.height >> level );
+				const int d = R_ImageLevelDepth( opts.textureType, depth, level );
+				if ( IsCompressed() ) {
+					glCompressedTexImage3D( target, level, internalFormat, w, h, d, 0,
+						R_CompressedTextureSizeInBytes( opts.format, w, h ) * d, NULL );
+				} else {
+					glTexImage3D( target, level, internalFormat, w, h, d, 0, dataFormat, dataType, NULL );
+				}
+			}
+		}
+		const GLenum storageError = glGetError();
+		if ( storageError != GL_NO_ERROR ) {
+			// RGTC and S3TC are 2D block formats: core GL gives TEXTURE_3D
+			// only BPTC among them, so a driver may refuse a compressed volume.
+			R_ImagePolicyObserveError( "Requested GL layered image storage was refused" );
+			common->Warning( "%s: OpenGL refused %dx%dx%d %s storage (0x%x)", GetName(), opts.width, opts.height, depth,
+				opts.textureType == TT_3D ? "volume" : "array", storageError );
+			glDeleteTextures( 1, (GLuint *)&texnum );
+			texnum = TEXTURE_NOT_LOADED;
+			return;
+		}
+		glTexParameteri( target, GL_TEXTURE_MAX_LEVEL, opts.numLevels - 1 );
+		SetTexParameters();
+		GL_CheckErrors();
+		imageOperation.Succeeded();
+		return;
 	}
 	const bool immutableStorage = IsCompressed() && glConfig.backendCaps.hasTextureStorage
 		&& opts.numLevels >= 1 && opts.numLevels <= fullChainLevels
@@ -826,6 +968,8 @@ void idImage::PurgeImage() {
 	for ( int i = 0 ; i < MAX_MULTITEXTURE_UNITS ; i++ ) {
 		backEnd.glState.tmu[i].current2DMap = TEXTURE_NOT_LOADED;
 		backEnd.glState.tmu[i].currentCubeMap = TEXTURE_NOT_LOADED;
+		backEnd.glState.tmu[i].current3DMap = TEXTURE_NOT_LOADED;
+		backEnd.glState.tmu[i].current2DArrayMap = TEXTURE_NOT_LOADED;
 	}
 }
 

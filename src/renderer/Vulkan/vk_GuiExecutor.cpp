@@ -2873,6 +2873,11 @@ static VkDescriptorSet VK_GuiExecutor_GetImageDescriptor( unsigned int texnum ) 
 	if ( entry == NULL || entry->view == VK_NULL_HANDLE ) {
 		return VK_NULL_HANDLE;
 	}
+	// Every shader behind this cache samples 2D or cube
+	// images; a volume or array reaches only authored material programs.
+	if ( entry->viewType == VK_IMAGE_VIEW_TYPE_3D || entry->viewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY ) {
+		return VK_NULL_HANDLE;
+	}
 
 	vkDescriptorCacheEntry_t &cached = vkExec.descriptorCache[ texnum ];
 	if ( cached.set != VK_NULL_HANDLE && cached.generation == entry->generation ) {
@@ -16811,6 +16816,101 @@ bool VK_Exec_ReadLinearScreenshot( idImage *image, idList<float> &values ) {
 bool VK_Exec_ReadImageScreenshot( idImage *image, idList<byte> &pixels ) {
 	R_RenderThread_Sync( "readback" );
 	return VK_Exec_ReadImage( image, NULL, &pixels, true );
+}
+
+/*
+====================
+VK_Exec_ReadImageLevel
+
+Copies one level of a volume (every slice) or array
+(every layer) to a host buffer, unconverted, and resumes the frame as
+VK_Exec_ReadImage does. Uploads are never flipped, so rows stay in upload
+order; whole 4x4 blocks for a block format, tightly packed.
+====================
+*/
+bool VK_Exec_ReadImageLevel( idImage *image, int level, int levelBytes, idList<byte> &bytes ) {
+	R_RenderThread_Sync( "readback" );
+	bytes.Clear();
+	vkImageEntry_t *entry = image != NULL ? VK_Image_GetEntry( image->GetDeviceHandle() ) : NULL;
+	if ( entry == NULL || levelBytes <= 0
+			|| ( entry->viewType != VK_IMAGE_VIEW_TYPE_3D && entry->viewType != VK_IMAGE_VIEW_TYPE_2D_ARRAY )
+			|| entry->droppedLevels != 0 || level < 0 || level >= entry->numMips
+			|| ( entry->usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT ) == 0
+			|| ( !vkExec.frameOpen && !VK_GuiExecutor_BeginFrame() ) ) {
+		return false;
+	}
+	const bool volume = entry->viewType == VK_IMAGE_VIEW_TYPE_3D;
+	VkBufferCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	info.size = (VkDeviceSize)levelBytes;
+	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	VmaAllocationCreateInfo create = {};
+	create.usage = VMA_MEMORY_USAGE_AUTO;
+	create.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	VkBuffer buffer = VK_NULL_HANDLE;
+	VmaAllocation allocation = NULL;
+	VmaAllocationInfo mapped = {};
+	if ( vmaCreateBuffer( vkCtx.allocator, &info, &create, &buffer, &allocation, &mapped ) != VK_SUCCESS ) {
+		return false;
+	}
+	VK_Exec_EndMainRendering();
+	VK_Exec_TransitionImage( entry, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+	VkBufferImageCopy copy = {};
+	copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy.imageSubresource.mipLevel = (uint32_t)level;
+	copy.imageSubresource.layerCount = (uint32_t)entry->numLayers;
+	copy.imageExtent.width = (uint32_t)Max( 1, entry->width >> level );
+	copy.imageExtent.height = (uint32_t)Max( 1, entry->height >> level );
+	copy.imageExtent.depth = (uint32_t)( volume ? Max( 1, entry->depth >> level ) : 1 );
+	vkCmdCopyImageToBuffer( vkExec.cmd, entry->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &copy );
+	VK_Exec_TransitionImage( entry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	VkBufferMemoryBarrier2 barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+	barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+	barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+	barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+	barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.buffer = buffer;
+	barrier.size = VK_WHOLE_SIZE;
+	VkDependencyInfo dependency = {};
+	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	dependency.bufferMemoryBarrierCount = 1;
+	dependency.pBufferMemoryBarriers = &barrier;
+	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
+	const int slot = vkExec.frameSlot;
+	R_RendererMetrics_ResetGpuFrameTiming( "Vulkan image readback" );
+	if ( !VK_GuiExecutor_SubmitFrame( false )
+			|| vkWaitForFences( vkCtx.device, 1, &vkCtx.frameFences[slot], VK_TRUE, UINT64_MAX ) != VK_SUCCESS ) {
+		VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, buffer, allocation );
+		return false;
+	}
+	const bool passed = mapped.pMappedData != NULL
+		&& vmaInvalidateAllocation( vkCtx.allocator, allocation, 0, VK_WHOLE_SIZE ) == VK_SUCCESS;
+	if ( passed ) {
+		bytes.SetNum( levelBytes );
+		memcpy( bytes.Ptr(), mapped.pMappedData, (size_t)levelBytes );
+	}
+	vmaDestroyBuffer( vkCtx.allocator, buffer, allocation );
+	VK_Exec_ConsumeHDRReadback( slot );
+	VkCommandBufferBeginInfo begin = {};
+	begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	if ( vkResetCommandBuffer( vkExec.cmd, 0 ) != VK_SUCCESS
+			|| vkBeginCommandBuffer( vkExec.cmd, &begin ) != VK_SUCCESS
+			|| vkResetFences( vkCtx.device, 1, &vkCtx.frameFences[slot] ) != VK_SUCCESS ) {
+		common->Warning( "Vulkan: failed to resume rendering after image readback" );
+		bytes.Clear();
+		return false;
+	}
+	vkExec.frameOpen = true;
+	vkExec.mainScopeOpen = false;
+	VK_Exec_TransitionActiveTargetToAttachments();
+	const bool resumed = VK_Exec_BeginMainRendering( false );
+	if ( !resumed ) {
+		bytes.Clear();
+	}
+	return passed && resumed;
 }
 
 static bool VK_Exec_TestColorResolveCase( VkShaderModule vertex, VkShaderModule fragment, int samples ) {

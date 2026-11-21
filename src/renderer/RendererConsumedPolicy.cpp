@@ -147,7 +147,8 @@ imageConsumedLoad_t::~imageConsumedLoad_t() {
     }
     const idImageOpts& opts = image.opts;
     candidate.width = opts.width; candidate.height = opts.height; candidate.levels = opts.numLevels;
-    candidate.layers = opts.textureType == TT_CUBIC ? 6 : opts.textureType == TT_2D ? 1 : 0;
+    candidate.layers = opts.textureType == TT_CUBIC ? 6 :
+        (opts.textureType == TT_2D || opts.textureType == TT_3D || opts.textureType == TT_2D_ARRAY) ? 1 : 0;
     if (!candidate.layers || opts.numLevels < 1 || opts.numLevels > 30 || opts.width < 1 || opts.height < 1) {
         image.consumedPolicy = candidate; return;
     }
@@ -214,6 +215,10 @@ void imageConsumedLoad_t::Operation(const idImage* target, bool upload, bool suc
         return;
     }
     const idImageOpts& opts = target->opts;
+    // A volume or array uploads each slice or layer on its
+    // own; its receipt is slice or layer 0 of every level, as a 2D image's.
+    if ((opts.textureType == TT_3D || opts.textureType == TT_2D_ARRAY) && layer > 0 &&
+        layer < R_ImageLevelDepth(opts.textureType, opts.depth, mip)) return;
     if (!scope->allocated || scope->candidate.storage != target->storageGeneration ||
         mip < 0 || mip >= opts.numLevels || mip >= 30 || layer < 0 || layer >= 6 ||
         width != Max(1, opts.width >> mip) || height != Max(1, opts.height >> mip)) {

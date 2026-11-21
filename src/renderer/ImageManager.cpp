@@ -1575,6 +1575,96 @@ void idImageManager::BindNull() {
 
 /*
 ===============
+R_TestLayeredImages_f
+
+testLayeredImages: builds volumes (TT_3D) and 2D texture arrays (TT_2D_ARRAY)
+in several formats and sizes, uploads a known pattern to every slice or layer
+of every level and reads each level back from the GPU unconverted
+(idImage::ReadLevelBytes), on whichever renderer is running. A volume's depth
+halves with its levels, an array's layers do not; odd and non-power-of-two
+sizes check the level arithmetic. A block-format volume is tried only where
+the renderer can hold one (R_ImageFormatAllowedInVolume).
+===============
+*/
+static void R_TestLayeredImages_f( const idCmdArgs &args ) {
+	struct layeredCase_t {
+		const char *		name;
+		textureType_t		type;
+		textureFormat_t		format;
+		int					width, height, depth, levels;
+	};
+	static const layeredCase_t cases[] = {
+		{ "volume RGBA8 8x8x8, 4 levels",		TT_3D,			FMT_RGBA8,		8, 8, 8, 4 },
+		{ "volume LUM8 6x5x3",					TT_3D,			FMT_LUM8,		6, 5, 3, 1 },
+		{ "volume RGBA16F 4x4x4, 3 levels",		TT_3D,			FMT_RGBA16F,	4, 4, 4, 3 },
+		{ "volume DXT1 8x8x4, 2 levels",		TT_3D,			FMT_DXT1,		8, 8, 4, 2 },
+		{ "array RGBA8 8x8, 5 layers, 4 levels",	TT_2D_ARRAY,	FMT_RGBA8,		8, 8, 5, 4 },
+		{ "array RGBA16F 7x3, 2 layers",		TT_2D_ARRAY,	FMT_RGBA16F,	7, 3, 2, 1 },
+		{ "array DXT1 8x8, 3 layers, 2 levels",	TT_2D_ARRAY,	FMT_DXT1,		8, 8, 3, 2 },
+	};
+	int passed = 0, run = 0;
+	for ( int c = 0; c < (int)( sizeof( cases ) / sizeof( cases[0] ) ); c++ ) {
+		const layeredCase_t &test = cases[c];
+		const int blockBytes = BytesPerBlockForFormat( test.format );
+		if ( blockBytes > 0 && !ImageTools_GetCompressionCaps().textureCompressionAvailable ) {
+			common->Printf( "testLayeredImages: %s: skipped, this renderer samples no S3TC\n", test.name );
+			continue;
+		}
+		if ( test.type == TT_3D && !R_ImageFormatAllowedInVolume( test.format ) ) {
+			common->Printf( "testLayeredImages: %s: skipped, this renderer holds no such volume\n", test.name );
+			continue;
+		}
+		run++;
+		idImageOpts opts;
+		opts.textureType = test.type;
+		opts.format = test.format;
+		opts.width = test.width;
+		opts.height = test.height;
+		opts.depth = test.depth;
+		opts.numLevels = test.levels;
+		idImage *image = globalImages->ScratchImage( va( "_testLayeredImage%d", c ), &opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
+		if ( image == NULL || !image->IsLoaded() ) {
+			common->Printf( "testLayeredImages: %s: FAILED, not allocated\n", test.name );
+			continue;
+		}
+		int levelsSame = 0;
+		for ( int level = 0; level < test.levels; level++ ) {
+			const int w = Max( 1, test.width >> level ), h = Max( 1, test.height >> level );
+			const int d = R_ImageLevelDepth( test.type, test.depth, level );
+			const int sliceBytes = blockBytes > 0 ? ( ( w + 3 ) >> 2 ) * ( ( h + 3 ) >> 2 ) * blockBytes : w * h * BitsForFormat( test.format ) / 8;
+			idList<byte> expected;
+			expected.SetNum( sliceBytes * d );
+			for ( int i = 0; i < expected.Num(); i++ ) {
+				// distinct per level, slice and byte; RGBA16F bytes stay finite
+				// halves (exponent below 31) so no driver canonicalises a NaN
+				byte value = (byte)( i * 37 + level * 101 + ( i / sliceBytes ) * 53 + c * 11 );
+				if ( test.format == FMT_RGBA16F && ( i & 1 ) ) {
+					value &= 0x3f;
+				}
+				expected[i] = value;
+			}
+			for ( int z = 0; z < d; z++ ) {
+				image->SubImageUpload( level, 0, 0, z, w, h, expected.Ptr() + z * sliceBytes );
+			}
+			idList<byte> gpu;
+			const bool read = image->ReadLevelBytes( level, gpu );
+			const bool same = read && gpu.Num() == expected.Num() && memcmp( gpu.Ptr(), expected.Ptr(), expected.Num() ) == 0;
+			levelsSame += same ? 1 : 0;
+			if ( !same ) {
+				common->Printf( "  level %d (%dx%dx%d): %s\n", level, w, h, d,
+					!read ? "no readback" : va( "%d bytes read, %d expected%s", gpu.Num(), expected.Num(), gpu.Num() == expected.Num() ? ", contents differ" : "" ) );
+			}
+		}
+		image->PurgeImage();
+		const bool ok = levelsSame == test.levels;
+		passed += ok ? 1 : 0;
+		common->Printf( "testLayeredImages: %s: %d of %d levels identical bit for bit, %s\n", test.name, levelsSame, test.levels, ok ? "passed" : "FAILED" );
+	}
+	common->Printf( "testLayeredImages: %d of %d cases passed%s\n", passed, run, passed == run ? "" : ", FAILED" );
+}
+
+/*
+===============
 Init
 ===============
 */
@@ -1590,6 +1680,7 @@ void idImageManager::Init() {
 	cmdSystem->AddCommand( "listImages", R_ListImages_f, CMD_FL_RENDERER, "lists images" );
 	cmdSystem->AddCommand( "imageDDSSelfTest", R_ImageDDSSelfTest_f, CMD_FL_RENDERER, "validates DDS naming, BC7 and BC6H metadata handling and DXT3 decoding" );
 	cmdSystem->AddCommand( "combineCubeImages", R_CombineCubeImages_f, CMD_FL_RENDERER, "combines six images for roq compression" );
+	cmdSystem->AddCommand( "testLayeredImages", R_TestLayeredImages_f, CMD_FL_RENDERER, "uploads volumes and texture arrays and reads every level back from the GPU" );
 
 	// swallow the born-modified state of the reduction cvars so the first
 	// rendered frame does not reload every image for a change nobody made

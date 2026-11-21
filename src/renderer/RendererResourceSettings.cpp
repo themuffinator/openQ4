@@ -369,7 +369,9 @@ bool VerifyImage(Attempt& a, const idImage* image, char* error, int errorSize) {
         return Error(error, errorSize, "An image newly defaulted during checked resource reload");
     if (image->IsFileBacked()) {
         const idImageOpts& opts = image->GetOpts();
-        if (opts.numLevels <= 0 || opts.numLevels > 31 || (opts.textureType != TT_2D && opts.textureType != TT_CUBIC))
+        // A volume's or array's receipt is its slice or layer 0
+        if (opts.numLevels <= 0 || opts.numLevels > 31 || (opts.textureType != TT_2D && opts.textureType != TT_CUBIC &&
+            opts.textureType != TT_3D && opts.textureType != TT_2D_ARRAY))
             return Error(error, errorSize, "A file image has unsupported mip or layer metadata");
         const uint32_t expected = (uint32_t(1) << opts.numLevels) - 1;
         for (int side = 0; side < (opts.textureType == TT_CUBIC ? 6 : 1); ++side)

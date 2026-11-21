@@ -42,8 +42,14 @@ typedef struct vkImageEntry_s {
 	// numMips describe the smaller image, and SubImageUpload drops the uploads
 	// of the missing levels and stores the rest this many levels higher.
 	int				droppedLevels;
-	int				numLayers;		// 6 for cube maps
+	int				numLayers;		// 6 for cube maps, the layer count for arrays
 	bool			isCube;
+	// The sampled view's type (2D, CUBE, 3D or 2D_ARRAY)
+	// and a volume's slice count at level 0 (1 for every other type). Only
+	// authored material programs sample a 3D or 2D_ARRAY image; the shared
+	// image descriptor cache refuses them.
+	VkImageViewType	viewType;
+	int				depth;
 	bool			everUploaded;	// first upload transitions from UNDEFINED
 	bool			lastUploadSucceeded; // all-or-nothing generated image admission
 	// True when stored rows run top-down relative to GL image coordinates.

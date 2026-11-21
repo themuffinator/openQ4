@@ -52,6 +52,12 @@ public:
 	bool				Load2DFromMemory( int width, int height, const byte * pic_const, int numLevels, textureFormat_t & textureFormat, textureColor_t & colorFormat, bool gammaMips, bool filterNeutralAlpha = false );
 	void				Load2DFromOwnedCompressedData( int width, int height, int numLevels, textureFormat_t textureFormat, textureColor_t colorFormat, byte *fileBuffer, const int *levelOffsets, const int *levelSizes );
 	bool				LoadCubeFromMemory( int width, const byte * pics[6], int numLevels, textureFormat_t & textureFormat, bool gammaMips );
+	// A volume (TT_3D) or texture array (TT_2D_ARRAY) in one owned
+	// buffer, one entry per level per slice or layer, level-major
+	void				LoadLayeredFromOwnedCompressedData( textureType_t textureType, int width, int height, int depth, int numLevels, textureFormat_t textureFormat, textureColor_t colorFormat, byte *fileBuffer, const int *offsets, const int *sizes );
+	// slices or layers at level 0 of a TT_3D or TT_2D_ARRAY image, 1 otherwise;
+	// bimageFile_t has no field for it, so generated cache files never hold one
+	int					GetDepth() const { return fileDepth; }
 
 	void				Clear();
     bool GetContentIdentity(imageBinaryContent_t& out) const;
@@ -129,6 +135,7 @@ private:
 
 	idList< idBinaryImageData> images;
 	byte *				loadedFileData;
+	int					fileDepth = 1;
     int loadedFileBytes = 0;
     imageFileContent_t fileContent{};
 
