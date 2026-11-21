@@ -34,6 +34,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "RendererResourceSettings.h"
 #include "DisplayPresentation.h"
 #include "../imagetools/LegacyScopeMask.h"
+#ifdef OPENQ4_RENDERER_VK_MODULE
+#include "Vulkan/vk_Image.h"
+#endif
 
 #include <condition_variable>
 #include <deque>
@@ -392,37 +395,42 @@ idImageManager::CheckCvars
 Image reduction cvars change the pixels a texture is built from, so they take
 effect through a reload. Sampling cvars only reapply loaded TF_DEFAULT samplers.
 Doing both here makes console changes visible without a vid_restart.
+
+Only the images a change reaches are reloaded: each file-backed image keeps the
+reduction key its last load was built under (idImage::ReductionInputsChanged).
+A preset that moves the bump limit reloads the bump maps, not the whole
+catalogue, and the interface, fonts and nopicmip images, whose policy is empty
+whatever the settings, are never touched by one.
+
+A change made during a level load, or while a checked image-policy attempt owns
+resource mutation, stays pending: the flags are left set and the first frame
+after either reloads what is stale. Clearing them early lost the change for
+every image the load kept resident (the interface, models referenced outside
+the level), which kept the size or block format of the old settings until the
+next vid_restart.
 ===============
 */
 void idImageManager::CheckCvars() {
+	if ( !R_ImageReductionCvarsChanged( false ) && !R_ImageSamplerCvarsChanged( false ) ) {
+		return;
+	}
+	if ( insideLevelLoad || R_ImagePolicyActive() ) {
+		return;
+	}
 	const bool reductionChanged = R_ImageReductionCvarsChanged( true );
 	const bool samplerChanged = R_ImageSamplerCvarsChanged( true );
-	if ( !reductionChanged && !samplerChanged ) {
-		return;
-	}
-
-	// vid_restart already purges and reloads everything, and a level load is
-	// about to touch every image anyway, so do not duplicate that work here.
-	if ( insideLevelLoad ) {
-		return;
-	}
 
 	if ( reductionChanged ) {
-		common->Printf( "Texture reduction changed, reloading images...\n" );
-		// Only file-backed images are built from the reduction cvars. Reloading
-		// the rest reallocated every generated TTF glyph atlas with no texels,
-		// and nothing re-rasterises them without a vid_restart, so all menu and
-		// HUD text disappeared the moment a video quality preset moved
-		// image_downSize/image_downSizeBump/image_downSizeSpecular.
-		ReloadImages( true, true );
-		return;
+		ReloadReductionChangedImages();
 	}
 
-	common->Printf( "Texture sampling changed, updating samplers...\n" );
-	for ( int i = 0; i < images.Num(); i++ ) {
-		idImage *image = images[i];
-		if ( image != NULL && image->IsLoaded() && image->GetFilter() == TF_DEFAULT ) {
-			image->RefreshSamplerState();
+	if ( samplerChanged ) {
+		common->Printf( "Texture sampling changed, updating samplers...\n" );
+		for ( int i = 0; i < images.Num(); i++ ) {
+			idImage *image = images[i];
+			if ( image != NULL && image->IsLoaded() && image->GetFilter() == TF_DEFAULT ) {
+				image->RefreshSamplerState();
+			}
 		}
 	}
 }
@@ -1771,6 +1779,84 @@ static bool R_RendererDeviceAwaitsRestart() {
 	renderDisplayPresentation_t presentation{};
 	R_GetDisplayPresentation( &presentation );
 	return presentation.available == 0 && presentation.outcome >= RDP_INIT_FAILED;
+}
+
+/*
+===============
+idImageManager::ReloadReductionChangedImages
+
+Reloads the resident file-backed images whose reduction key moved, in name
+order. The level load's file prefetch is not used: right after a load the files
+sit in the operating system's cache, and its worker threads made a 318-image
+reload slower, 1.0 to 3.1 s against 1.3 to 1.5 s without them (OpenGL,
+Air Defense 1, a busy machine). Generated and persistent images are built from no file and keep their content:
+before, the reload regenerated every intrinsic image and reallocated persistent
+targets empty. Purged and never-loaded images are left alone; they load under
+the new settings when they are next bound. Returns the number reloaded.
+===============
+*/
+// Vulkan stores an image that did not fit in video memory without its top
+// levels. A reduction elsewhere may free the room for them, so such an image is
+// reloaded by any reduction change, as every image was before.
+static bool R_ImageHeldBelowRequest( idImage *image ) {
+#ifdef OPENQ4_RENDERER_VK_MODULE
+	const vkImageEntry_t *entry = VK_Image_GetEntry( image->GetDeviceHandle() );
+	return entry != NULL && entry->droppedLevels > 0;
+#else
+	(void)image;
+	return false;
+#endif
+}
+
+int idImageManager::ReloadReductionChangedImages() {
+	if ( !R_ImagePolicyOperationAllowed() ) {
+		return 0;
+	}
+	R_RenderThread_Sync( "image registry" );
+	// a reload exists to observe the files in place now; never let it consult
+	// (or leave behind) memoized probe results
+	R_SetDDSProbeCacheActive( false );
+
+	const int startMsec = Sys_Milliseconds();
+	idList<sortedImage_t> stale;
+	int unchanged = 0;
+	for ( int i = 0; i < images.Num(); i++ ) {
+		idImage *image = images[i];
+		// Scratch pages and render targets are authored in memory, so there is
+		// nothing on disk to rebuild them from. idImage::Reload answers a
+		// persistent image by reallocating it with no data, which is correct
+		// after a device loss and destructive at any other time.
+		if ( image == NULL || !image->IsFileBacked() || R_IsMutableRenderImage( image ) || !image->IsLoaded() ) {
+			continue;
+		}
+		if ( !R_ImagePolicyShouldReload( image ) ) {
+			continue;
+		}
+		if ( !image->ReductionInputsChanged() && !R_ImageHeldBelowRequest( image ) ) {
+			unchanged++;
+			continue;
+		}
+		sortedImage_t &entry = stale.Alloc();
+		entry.image = image;
+		entry.size = 0;
+		entry.index = i;
+	}
+	if ( stale.Num() > 1 ) {
+		qsort( stale.Ptr(), stale.Num(), sizeof( sortedImage_t ), R_QsortImageName );
+	}
+
+	int reloaded = 0;
+	for ( int i = 0; i < stale.Num(); i++ ) {
+		// a failed device reloads everything when it restarts
+		if ( R_RendererDeviceAwaitsRestart() ) {
+			break;
+		}
+		stale[i].image->Reload( true );
+		reloaded++;
+	}
+	common->Printf( "Texture reduction changed: reloaded %d images in %d ms, %d unaffected\n",
+		reloaded, Sys_Milliseconds() - startMsec, unchanged );
+	return reloaded;
 }
 
 int idImageManager::LoadLevelImages( bool pacifier ) {

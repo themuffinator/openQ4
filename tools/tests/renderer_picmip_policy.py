@@ -260,10 +260,36 @@ def test_reduction_changes_reload_images_without_a_restart():
         "image_downSizeBumpLimit",
     ):
         assert_true(f"&{cvar}" in image_manager, f"{cvar} changes should trigger an image reload")
+    check = image_manager[image_manager.index("void idImageManager::CheckCvars() {"):]
+    check = check[:check.index("\n}\n")]
     assert_true(
-        "ReloadImages( true, true );" in image_manager,
-        "a reduction change should force a reload of every file-backed image",
+        "ReloadReductionChangedImages();" in check and "ReloadImages(" not in check,
+        "a reduction change should reload only the images it reaches, not the whole catalogue",
     )
+    reload = image_manager[image_manager.index("int idImageManager::ReloadReductionChangedImages() {"):]
+    reload = reload[:reload.index("\n}\n")]
+    assert_true(
+        "!image->IsFileBacked() || R_IsMutableRenderImage( image ) || !image->IsLoaded()" in reload,
+        "generated, persistent, scratch and unloaded images are never rebuilt by a settings change",
+    )
+    assert_true(
+        "!image->ReductionInputsChanged() && !R_ImageHeldBelowRequest( image )" in reload
+        and "image->Reload( true );" in reload,
+        "an image is reloaded when its reduction key moved, or Vulkan held it below its request",
+    )
+    image_load = read_repo_file(Path("src/renderer/Image_load.cpp"))
+    load = image_load[image_load.index("void idImage::ActuallyLoadImage( bool fromBackEnd ) {"):]
+    assert_true(
+        load.index("imageConsumedLoad_t consumedLoad(*this);") < load.index("loadedReductionKey = CurrentReductionKey();")
+        < load.index("loadedReductionKey = reductionKey_t();"),
+        "every file-backed load records its key; a prepared recovery candidate leaves it unknown",
+    )
+    key = image_load[image_load.index("idImage::reductionKey_t idImage::CurrentReductionKey() const {"):]
+    key = key[:key.index("\n}\n")]
+    for snippet in ("R_GetImageDownsizePolicy( GetName(), usage, allowDownSize, key.policy );",
+                    "R_DecodedImageCompression( usage, cubeFiles, allowDownSize, GetName(), color );",
+                    "image_usePrecompressedTextures.GetInteger();"):
+        assert_true(snippet in key, f"the reduction key should hold {snippet}")
     assert_true(
         "void idImageManager::ReloadImages( bool all, bool fileBackedOnly ) {" in image_manager,
         "a reload should be able to restrict itself to images that have a file behind them",
@@ -274,8 +300,10 @@ def test_reduction_changes_reload_images_without_a_restart():
         "reallocates it with no texels - which empties the generated glyph atlases",
     )
     assert_true(
-        "if ( insideLevelLoad ) {" in image_manager,
-        "a level load already touches every image, so the reload must not double up on it",
+        check.index("if ( insideLevelLoad || R_ImagePolicyActive() ) {")
+        < check.index("R_ImageReductionCvarsChanged( true );"),
+        "a change during a level load or a checked attempt stays pending, flags still set, "
+        "so the images the load kept resident are reloaded after it",
     )
 
     # Every cvar is born CVAR_MODIFIED, so without a startup prime the first

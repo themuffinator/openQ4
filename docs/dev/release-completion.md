@@ -7,6 +7,21 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Quicker texture setting changes, 21 November 2026
+
+- **Texture settings apply faster.** Changing texture quality on the Display
+  page, through a Performance Preset or from the console now reloads only the
+  textures the change affects. Lowering normal-map detail in Air Defense 1
+  reloads 318 textures instead of all 1,942, which takes 1.5 to 3 s
+  instead of 4 to 7 s. The menus, the HUD and their fonts are no longer reloaded by a
+  texture-quality change at all.
+- **A change made while a level loads is no longer lost.** Textures kept from
+  before the load, such as the interface and your own models, used to keep
+  their old size or compression until the renderer restarted; they now follow
+  the new setting as soon as the load ends.
+- **What to do.** Nothing: update openQ4 as usual.
+- Details: [applying display settings without a device restart](ui/settings-live-apply.md#stage-7-reload-only-what-a-texture-change-reaches).
+
 ## Quicker menu responses, 21 November 2026
 
 - **Menus answer a press sooner.** Moving along a list, switching a tab or

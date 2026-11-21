@@ -331,6 +331,37 @@ static textureFormat_t R_DecodedImageCompression( textureUsage_t usage, cubeFile
 
 /*
 ========================
+idImage::CurrentReductionKey / ReductionInputsChanged
+
+Everything a texture setting changes about a file-backed load: the resolved
+downsize/picmip policy (the generated cache key is derived from the same
+policy), the block format R_DecodedImageCompression picks for decoded pixels,
+and the precompressed-texture switch, which chooses the file read. Two equal
+keys build the same image from the same files, so a settings change reloads
+only the images whose key moved: a bump-limit change leaves every diffuse,
+specular, light and interface image alone, and nothing touches the 2D
+namespaces and nopicmip images, whose policy is empty whatever the settings.
+========================
+*/
+extern idCVar image_usePrecompressedTextures;
+
+idImage::reductionKey_t idImage::CurrentReductionKey() const {
+	reductionKey_t key;
+	R_GetImageDownsizePolicy( GetName(), usage, allowDownSize, key.policy );
+	textureColor_t color = CFM_DEFAULT;
+	key.decodedFormat = R_DecodedImageCompression( usage, cubeFiles, allowDownSize, GetName(), color );
+	key.decodedColor = key.decodedFormat != FMT_NONE ? color : CFM_DEFAULT;
+	key.usePrecompressed = image_usePrecompressedTextures.GetInteger();
+	key.known = true;
+	return key;
+}
+
+bool idImage::ReductionInputsChanged() const {
+	return !( loadedReductionKey == CurrentReductionKey() );
+}
+
+/*
+========================
 R_ImageOpaqueSplitFormat
 
 The half-size format an opaque image can take instead of the one its usage
@@ -855,6 +886,10 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	}
 
 	imageConsumedLoad_t consumedLoad(*this);
+	// The settings this load reads; they cannot change while it runs. A
+	// prepared recovery candidate below was built before teardown, maybe under
+	// other settings, so it leaves the key unknown and the next change reloads it.
+	loadedReductionKey = CurrentReductionKey();
     // A held recovery preparation owns complete CPU candidates read and hashed
     // before teardown. Never fall back to a different VFS source after taking
     // such a candidate, including on an allocation/upload refusal.
@@ -878,6 +913,7 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
             }
             loadedSourceName=descriptor.file.qpath;
             generatedCacheContent = source == ICS_GENERATED;
+            loadedReductionKey = reductionKey_t();
             consumedLoad.Loaded(source);
             return;
         }

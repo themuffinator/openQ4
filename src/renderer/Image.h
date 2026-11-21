@@ -246,6 +246,11 @@ public:
 	// from the image's source. A pure lock reloads such images (see
 	// idImageManager::ReloadGeneratedCacheImages).
 	bool		HoldsGeneratedCacheContent() const { return generatedCacheContent && IsLoaded(); }
+	// The reduction settings (downsize/picmip policy, decoded block format and
+	// the precompressed-texture switch) this image would be built under now
+	// differ from the ones its last load was built under. Unknown counts as
+	// changed. idImageManager::CheckCvars reloads only these images.
+	bool		ReductionInputsChanged() const;
 
 	void		SetReferencedOutsideLevelLoad() { referencedOutsideLevelLoad = true; }
 	bool		IsReferencedOutsideLevelLoad() const { return referencedOutsideLevelLoad; }
@@ -382,6 +387,22 @@ private:
 	uint64_t consumedLoadRevision = 0;
 	const uint64_t		imagePolicyIdentity;
 	bool				generatedCacheContent = false;	// set by the last ActuallyLoadImage that uploaded content
+	// What ActuallyLoadImage built the image under; see ReductionInputsChanged.
+	struct reductionKey_t {
+		imageDownsizePolicy_t	policy;
+		int						decodedFormat = 0;	// R_DecodedImageCompression's answer
+		int						decodedColor = 0;
+		int						usePrecompressed = 0;
+		bool					known = false;
+		bool operator==( const reductionKey_t &other ) const {
+			return known && other.known && policy.maxDimension == other.policy.maxDimension
+				&& policy.mipShift == other.policy.mipShift && policy.minDimension == other.policy.minDimension
+				&& decodedFormat == other.decodedFormat && decodedColor == other.decodedColor
+				&& usePrecompressed == other.usePrecompressed;
+		}
+	};
+	reductionKey_t		CurrentReductionKey() const;
+	reductionKey_t		loadedReductionKey;
 
 
 };
@@ -508,8 +529,10 @@ public:
 	bool				ReloadGeneratedCacheImages();
 	void ClearCheckedImagePolicyChanges(); // Only after an exact checked restart.
 
-	// reloads every image when a texture reduction cvar changed this frame
+	// reloads the images a texture reduction cvar change reaches, and
+	// reapplies samplers when a sampling cvar changed
 	void				CheckCvars();
+	int					ReloadReductionChangedImages();
 
 	// swallows the born-modified state of those cvars during startup
 	void				PrimeCvars();

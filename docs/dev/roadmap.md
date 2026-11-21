@@ -3095,6 +3095,11 @@ Completion must advance through the existing dependencies:
   (both directions between OpenGL and Vulkan ran in Air Defense 1). A GPU
   change, the Awakening campaign and multiplayer were not run; multiplayer
   is not carried.
+  Stage 7, 21 November: a texture setting reloads only the images it reaches
+  (each load keeps the reduction key it was built under), through the level
+  load's file prefetch, and leaves generated and persistent images alone. A
+  change during a level load is no longer lost for the images the load kept.
+  The reload still blocks its frame; spreading it across frames is left.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual
