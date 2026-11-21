@@ -1,0 +1,137 @@
+name: VR headset report
+description: Tell us how openQ4's VR runs on your headset, good or bad. Clean runs are as valuable as bugs.
+title: "[VR]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing VR. openQ4's VR has been built and checked against a simulated headset, but **no one has yet confirmed it on real hardware**, so every report from a real headset helps, including "it all worked".
+
+        Before you start, the [VR guide](https://github.com/themuffinator/openQ4/blob/main/docs/user/vr.md#quick-start) gets you into the game in five steps. To give us the most useful log:
+
+        1. Start openQ4 with `+set vr_debug 1` (or enter `vr_debug 1` in the console before you reproduce a problem).
+        2. While the problem shows, open the console and enter `vr_status`, then copy what it prints.
+        3. Attach `openq4.log` from your save folder (`<save folder>/baseoq4/logs/openq4.log`; the [display settings guide](https://github.com/themuffinator/openQ4/blob/main/docs/user/display-settings.md) says where that is on your system).
+
+        Please paste text rather than screenshots where you can. One report per headset and renderer is ideal.
+  - type: input
+    id: version
+    attributes:
+      label: openQ4 version
+      description: The version printed at the top of the log or the console, or the release you downloaded.
+      placeholder: "0.15.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: report_kind
+    attributes:
+      label: What kind of report is this?
+      options:
+        - It works - a clean session I want to report
+        - Something is broken or wrong
+        - Comfort or readability feedback
+        - Performance observation
+    validations:
+      required: true
+  - type: input
+    id: headset
+    attributes:
+      label: Headset and controllers
+      placeholder: "Valve Index with Index controllers / Quest 3 over Link with Touch Plus / HP Reverb G2"
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: OpenXR runtime
+      options:
+        - SteamVR
+        - Meta Quest Link or Air Link
+        - Virtual Desktop
+        - Monado (Linux)
+        - Windows Mixed Reality (through SteamVR)
+        - Other (say which below)
+    validations:
+      required: true
+  - type: input
+    id: runtime_version
+    attributes:
+      label: Runtime version
+      placeholder: "SteamVR 2.8.6 / Meta Horizon Link v72"
+    validations:
+      required: false
+  - type: dropdown
+    id: renderer
+    attributes:
+      label: Renderer
+      description: Settings → Display, or `r_renderApi` in the console. Trying both is very helpful.
+      options:
+        - OpenGL
+        - Vulkan
+        - Tried both
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system, GPU and driver
+      placeholder: "Windows 11 24H2, RTX 3070, driver 591.74 / Ubuntu 24.04 Wayland, RX 7800 XT, Mesa 25.2"
+    validations:
+      required: true
+  - type: checkboxes
+    id: tried
+    attributes:
+      label: What did you try?
+      description: Tick everything you played, so we know what your report covers.
+      options:
+        - label: Menus with the controller pointer
+        - label: Single-player campaign (say which level below)
+        - label: Multiplayer (joined or hosted a match)
+        - label: Room-scale walking or physical crouching
+        - label: Seated play
+        - label: Two-handed grip, reloads, the flashlight
+        - label: Your Body (arms, legs and torso)
+        - label: Left-handed (Weapon Hand set to Left)
+        - label: Vehicles or turrets
+        - label: Cinematics and loading screens
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: How did it go?
+      description: >-
+        For a clean run, say what you played and for how long. For a problem, say what you did, what you
+        expected and what happened. Comfort notes are welcome: was the HUD readable, did the world feel the
+        right size, did anything make you uncomfortable?
+    validations:
+      required: true
+  - type: input
+    id: frame_rate
+    attributes:
+      label: Frame rate
+      description: Optional. Your headset's refresh rate, and whether openQ4 held it (SteamVR's frame timing or the Quest's overlay will tell you).
+      placeholder: "90 Hz, held it except during the first fight in Air Defense 1"
+    validations:
+      required: false
+  - type: textarea
+    id: vr_status
+    attributes:
+      label: vr_status output
+      description: Enter `vr_status` in the console and paste what it prints.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: openq4.log
+      description: Paste the log, or drag the file in here. Launch with `+set vr_debug 1` so it records VR's session events.
+      render: text
+    validations:
+      required: false
+  - type: checkboxes
+    id: evidence_consent
+    attributes:
+      label: Evidence record
+      options:
+        - label: I played this on a real headset, and you may reference this report in openQ4's VR qualification record.
+          required: false

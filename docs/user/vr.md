@@ -440,7 +440,7 @@ turrets and vehicles seat you as described in
 
 ## Meta Quest without a PC
 
-> **Not in 0.14.1.** It arrives in the next release.
+> **Not in 0.14.1, and not published yet.** It can only be built from source for now.
 
 openQ4's Android version can also be built as a **standalone Meta Quest app**
 (Quest 2, Quest Pro, Quest 3 and 3S). Setup, where you add your Quake 4 files,
@@ -517,7 +517,10 @@ for each eye separately if you suspect a problem there.
 ## Reporting a problem
 
 Please report how VR runs on your headset, good or bad, on the project's
-[issue tracker](https://github.com/themuffinator/openQ4/issues). Include:
+[issue tracker](https://github.com/themuffinator/openQ4/issues). The
+[VR headset report form](https://github.com/themuffinator/openQ4/issues/new?template=vr-headset-report.yml)
+asks for everything below. A report that it all worked is as useful as a bug.
+Include:
 
 - your headset, controllers and OpenXR runtime (with its version), and whether
   you used OpenGL or Vulkan;

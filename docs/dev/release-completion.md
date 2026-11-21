@@ -7,6 +7,12 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+**Candidate release, 21 November 2026:** the entries after 0.14.1 are being
+curated as **0.15.0, the Multiplayer Edition** (a minor version: network
+protocol 2.42 and render demo v14 do not interoperate with 0.14.1). The
+player-facing draft is [releases/v0.15.0.md](releases/v0.15.0.md); keep it in
+step with any entry added before the release is cut. Nothing is published yet.
+
 ## Smooth startup and loading screens, 21 November 2026
 
 - **The startup and loading screens no longer stutter.** While the game
