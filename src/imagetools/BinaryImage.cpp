@@ -143,7 +143,7 @@ idBinaryImage::Clear
 ========================
 */
 void idBinaryImage::Clear() {
-    fileContent = {}; loadedFileBytes = 0;
+    fileContent = {}; loadedFileBytes = 0; fileDepth = 1;
 	images.Clear();
 	if ( loadedFileData != NULL ) {
 		Mem_Free( loadedFileData );
@@ -538,6 +538,52 @@ void idBinaryImage::Load2DFromOwnedCompressedData( int width, int height, int nu
 
 		levelWidth = Max( 1, levelWidth >> 1 );
 		levelHeight = Max( 1, levelHeight >> 1 );
+	}
+}
+
+/*
+========================
+idBinaryImage::LoadLayeredFromOwnedCompressedData
+
+As Load2DFromOwnedCompressedData, for a volume (TT_3D) or a 2D texture
+array (TT_2D_ARRAY). Every slice or layer of every level is one image, at
+destZ = its slice or layer, and offsets / sizes hold one entry for each,
+level-major: level 0's R_ImageLevelDepth( type, depth, 0 ) entries, then
+level 1's, and so on. A volume's slice count halves with each level, an
+array's layer count does not. Every backend uploads each image to its slice
+or layer, as it uploads a cube face to its face.
+========================
+*/
+void idBinaryImage::LoadLayeredFromOwnedCompressedData( textureType_t textureType, int width, int height, int depth, int numLevels, textureFormat_t textureFormat, textureColor_t colorFormat, byte *fileBuffer, const int *offsets, const int *sizes ) {
+	Clear();
+	assert( textureType == TT_3D || textureType == TT_2D_ARRAY );
+
+	fileData.textureType = textureType;
+	fileData.format = textureFormat;
+	fileData.colorFormat = colorFormat;
+	fileData.width = width;
+	fileData.height = height;
+	fileData.numLevels = numLevels;
+	fileDepth = Max( 1, depth );
+
+	int count = 0;
+	for ( int level = 0; level < numLevels; level++ ) {
+		count += R_ImageLevelDepth( textureType, fileDepth, level );
+	}
+	// Reserve all image entries before taking ownership, as above.
+	images.SetNum( count );
+	loadedFileData = fileBuffer;
+	int index = 0;
+	for ( int level = 0; level < numLevels; level++ ) {
+		const int levelDepth = R_ImageLevelDepth( textureType, fileDepth, level );
+		for ( int z = 0; z < levelDepth; z++, index++ ) {
+			idBinaryImageData &img = images[ index ];
+			img.level = level;
+			img.destZ = z;
+			img.width = Max( 1, width >> level );
+			img.height = Max( 1, height >> level );
+			img.SetExternalData( loadedFileData + offsets[ index ], sizes[ index ] );
+		}
 	}
 }
 
@@ -1073,7 +1119,7 @@ bool idBinaryImage::GetContentIdentity(imageBinaryContent_t& out) const {
 void idBinaryImage::SwapContent(idBinaryImage& other) noexcept {
     images.Swap(other.images);
     idSwap(fileData,other.fileData); idSwap(loadedFileData,other.loadedFileData);
-    idSwap(loadedFileBytes,other.loadedFileBytes); idSwap(fileContent,other.fileContent);
+    idSwap(loadedFileBytes,other.loadedFileBytes); idSwap(fileContent,other.fileContent); idSwap(fileDepth,other.fileDepth);
 }
 bool idBinaryImage::LoadExactContentFile(const imageFileContent_t& requested) {
     const imageFileContent_t expected=requested;

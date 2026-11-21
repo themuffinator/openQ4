@@ -32,8 +32,30 @@ If you have questions concerning this license or the applicable additional terms
 enum textureType_t {
 	TT_DISABLED,
 	TT_2D,
-	TT_CUBIC
+	TT_CUBIC,
+	// Volumes and 2D texture arrays, sampled only by GLSL programs (sampler3D,
+	// sampler2DArray). idImageOpts::depth is the volume's slice count, which
+	// halves with each level, or the array's layer count, which does not. Every
+	// level of every slice or layer is uploaded on its own, as a cube face is:
+	// SubImageUpload's z is the slice or layer. Desktop GL 3.0 / ES 3.0
+	// (GL_TEXTURE_3D, GL_TEXTURE_2D_ARRAY) and Vulkan (VK_IMAGE_TYPE_3D, array
+	// layers). The fixed-function texture enables never see them.
+	TT_3D,
+	TT_2D_ARRAY
 };
+
+// Slices (TT_3D) or layers (TT_2D_ARRAY) one level of an image holds: a
+// volume's depth halves with its levels, an array's layers do not.
+ID_INLINE int R_ImageLevelDepth( textureType_t type, int depth, int level ) {
+	if ( type == TT_3D ) {
+		const int levelDepth = depth >> level;
+		return levelDepth > 1 ? levelDepth : 1;
+	}
+	if ( type == TT_2D_ARRAY ) {
+		return depth > 1 ? depth : 1;
+	}
+	return type == TT_CUBIC ? 6 : 1;
+}
 
 /*
 ================================================
@@ -178,6 +200,7 @@ public:
 	textureColor_t		colorFormat;
 	int					width;
 	int					height;			// not needed for cube maps
+	int					depth;			// TT_3D slices or TT_2D_ARRAY layers at level 0; 1 otherwise
 	int					numLevels;		// if 0, will be 1 for NEAREST / LINEAR filters, otherwise based on size
 	bool				gammaMips;		// if true, mips will be generated with gamma correction
 	bool				readback;		// 360 specific - cpu reads back from this texture, so allocate with cached memory
@@ -200,6 +223,7 @@ ID_INLINE idImageOpts::idImageOpts() {
 	colorFormat		= CFM_DEFAULT;
 	width			= 0;
 	height			= 0;
+	depth			= 1;
 	numLevels		= 0;
 	textureType		= TT_2D;
 	gammaMips		= false;
@@ -222,9 +246,9 @@ ID_INLINE bool idImageOpts::operator==( const idImageOpts & opts ) {
 	// Compare members, not bytes: no constructor or copy initializes the padding
 	// after readback and isPersistant, so memcmp could call equal options
 	// different and make callers reallocate an unchanged image.
-	static_assert( sizeof( idImageOpts ) == 36, "compare every idImageOpts member here" );
+	static_assert( sizeof( idImageOpts ) == 40, "compare every idImageOpts member here" );
 	return textureType == opts.textureType && format == opts.format && colorFormat == opts.colorFormat
-		&& width == opts.width && height == opts.height && numLevels == opts.numLevels
+		&& width == opts.width && height == opts.height && depth == opts.depth && numLevels == opts.numLevels
 		&& gammaMips == opts.gammaMips && readback == opts.readback
 		&& numMSAASamples == opts.numMSAASamples && isPersistant == opts.isPersistant;
 }

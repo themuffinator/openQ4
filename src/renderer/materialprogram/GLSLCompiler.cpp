@@ -173,6 +173,9 @@ std::string Builtin(const std::string &name, bool vertex) {
         {"texture2DProjLod", "textureProjLod"},
         {"texture2DGradARB", "textureGrad"}, {"textureCubeGradARB", "textureGrad"},
         {"texture2DProjGradARB", "textureProjGrad"},
+        // Volumes (GLSL 1.10) and arrays (EXT_texture_array)
+        {"texture3D", "texture"}, {"texture3DLod", "textureLod"},
+        {"texture2DArray", "texture"}, {"texture2DArrayLod", "textureLod"},
         {"dFdy", "oq4DfdY"},
         {"ftransform", "oq4Transform"}, {"main", "oq4AuthoredMain"},
     };
@@ -209,11 +212,14 @@ bool Translate(const std::string &source, bool vertex, const std::map<std::strin
             continue;
         }
         if (token.text.rfind("#extension", 0) == 0) {
-            if (token.text.find("GL_ARB_shader_texture_lod") == std::string::npos) {
+            // Core 450 implements the explicit LOD/gradient operations and 2D
+            // texture arrays (sampler2DArray in GLSL 1.20).
+            if (token.text.find("GL_ARB_shader_texture_lod") == std::string::npos
+                && token.text.find("GL_EXT_texture_array") == std::string::npos) {
                 error = "unsupported material extension: " + token.text;
                 return false;
             }
-            continue; // Core 450 implements the explicit LOD/gradient operations.
+            continue;
         }
         if (token.text.rfind("oq4", 0) == 0) { error = "reserved compiler identifier: " + token.text; return false; }
         if (depth == 0 && (token.text == "uniform" || token.text == "attribute" || token.text == "varying")) {
@@ -225,7 +231,7 @@ bool Translate(const std::string &source, bool vertex, const std::map<std::strin
                 if (++i >= tokens.size() || !Identifier(tokens[i].text)) { error = "invalid interface name"; return false; }
                 const std::string name = tokens[i].text;
                 if (qualifier == "uniform") {
-                    if (type == "sampler2D" || type == "samplerCube") {
+                    if (type == "sampler2D" || type == "samplerCube" || type == "sampler3D" || type == "sampler2DArray") {
                         const auto binding = textures.find(name);
                         if (binding == textures.end()) { error = "sampler has no shaderTexture binding: " + name; return false; }
                         rewrite.samplers[name] = type;
@@ -473,6 +479,8 @@ bool CompileGLSL(const CompileRequest &request, CompileResult &result) {
         const uint32_t bit = 1u << textures.at(sampler.first);
         result.textureMask |= bit;
         if (sampler.second == "samplerCube") { result.cubeTextureMask |= bit; }
+        if (sampler.second == "sampler3D") { result.volumeTextureMask |= bit; }
+        if (sampler.second == "sampler2DArray") { result.arrayTextureMask |= bit; }
     }
     result.vertexSource = Wrap(vs, true, builtins);
     result.fragmentSource = Wrap(fs, false, builtins);

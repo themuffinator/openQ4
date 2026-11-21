@@ -5212,6 +5212,7 @@ static void R_ModernGLExecutor_RestoreLegacyStateInvariants( void ) {
 		backEnd.glState.tmu[unit].current2DMap = -1;
 		backEnd.glState.tmu[unit].current3DMap = -1;
 		backEnd.glState.tmu[unit].currentCubeMap = -1;
+		backEnd.glState.tmu[unit].current2DArrayMap = -1;
 	}
 	backEnd.glState.faceCulling = -1;
 	backEnd.glState.currenttmu = -1;

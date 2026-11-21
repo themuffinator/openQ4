@@ -1754,6 +1754,16 @@ void idMaterial::ParseShaderTexture( idLexer &src, newShaderStage_t *newStage ) 
 			cubeMap = CF_CAMERA;
 			continue;
 		}
+		// a volume for a sampler3D, a 2D texture array for a sampler2DArray
+		// (cubeFiles_t says which loaders supply them)
+		if ( !token.Icmp( "volumeMap" ) ) {
+			cubeMap = CF_VOLUME;
+			continue;
+		}
+		if ( !token.Icmp( "arrayMap" ) ) {
+			cubeMap = CF_ARRAY;
+			continue;
+		}
 		if ( !token.Icmp( "nearest" ) ) {
 			tf = TF_NEAREST;
 			explicitFilter = true;

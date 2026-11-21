@@ -164,6 +164,21 @@ uniform sampler2D image;
 void main() { gl_FragColor=texture2DLod(image,gl_TexCoord[0].xy,1.5); }
 )";
     Accept("explicit_lod", request);
+    request.fragmentSource = R"(#version 120
+#extension GL_EXT_texture_array : enable
+uniform sampler3D volume;
+uniform sampler2DArray layers;
+void main() { vec3 uvw=gl_TexCoord[0].xyz;
+gl_FragColor=texture3D(volume,uvw)+texture2DArray(layers,uvw); }
+)";
+    request.textures = {{"volume", 2}, {"layers", 5}};
+    {
+        const material::CompileResult layered = Accept("volume_and_array", request);
+        Require(layered.textureMask == ((1u << 2) | (1u << 5)), "volume and array binding metadata");
+        Require(layered.volumeTextureMask == (1u << 2) && layered.arrayTextureMask == (1u << 5)
+            && layered.cubeTextureMask == 0, "volume and array texture metadata");
+    }
+    request.textures = {{"image", 0}};
     request.fragmentSource = "#version 120\nvoid main(){gl_FragColor=vec4(gl_FragCoord.xy/256.0,0.0,1.0);}";
     Accept("fragment_coordinates", request);
     request.fragmentSource = R"(#version 120

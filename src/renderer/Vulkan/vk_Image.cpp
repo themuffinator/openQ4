@@ -975,6 +975,44 @@ void VK_Image_PrintTextureBudget( void ) {
 			(double)vkTextureBudgetStats.requestedBytes / ( 1024.0 * 1024.0 ) );
 }
 
+// One level of a volume or array, as the GPU holds it.
+bool R_ImageFormatAllowedInVolume( textureFormat_t format ) {
+	if ( !vkCtx.initialized ) {
+		return false;
+	}
+	idImageOpts probe;
+	probe.textureType = TT_3D;
+	probe.format = format;
+	vkFormatInfo_t info;
+	if ( !VK_Image_GetFormatInfo( probe, TD_DEFAULT, info ) ) {
+		return false;
+	}
+	VkImageFormatProperties properties;
+	memset( &properties, 0, sizeof( properties ) );
+	return vkGetPhysicalDeviceImageFormatProperties( vkCtx.physicalDevice, info.format, VK_IMAGE_TYPE_3D, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, 0, &properties ) == VK_SUCCESS;
+}
+
+bool idImage::ReadLevelBytes( int level, idList<byte> &bytes, bool decodeRGBA8 ) {
+	bytes.Clear();
+	if ( !IsLoaded() || ( opts.textureType != TT_3D && opts.textureType != TT_2D_ARRAY )
+			|| level < 0 || level >= opts.numLevels || decodeRGBA8 ) {
+		return false;
+	}
+	vkFormatInfo_t info;
+	if ( !VK_Image_GetFormatInfo( opts, usage, info ) || info.expandRgb565 ) {
+		return false;
+	}
+	const int width = Max( 1, opts.width >> level ), height = Max( 1, opts.height >> level );
+	const int depth = R_ImageLevelDepth( opts.textureType, opts.depth, level );
+	const int64 levelBytes = (int64)( ( width + info.blockDim - 1 ) / info.blockDim ) *
+			( ( height + info.blockDim - 1 ) / info.blockDim ) * info.bytesPerBlock * depth;
+	if ( levelBytes <= 0 || levelBytes > 0x7fffffff ) {
+		return false;
+	}
+	return VK_Exec_ReadImageLevel( this, level, (int)levelBytes, bytes );
+}
+
 /*
 ====================
 idImage::AllocImage
@@ -1014,6 +1052,12 @@ void idImage::AllocImage( void ) {
 	}
 
 	const bool isCube = opts.textureType == TT_CUBIC;
+	// A volume is a 3D image, an array a 2D image with
+	// opts.depth layers; both are sampled only, never rendered to.
+	const bool isVolume = opts.textureType == TT_3D;
+	const bool isArray = opts.textureType == TT_2D_ARRAY;
+	const bool isLayered = isVolume || isArray;
+	const int layeredDepth = isLayered ? Max( 1, opts.depth ) : 1;
 	const bool isDepth = opts.format == FMT_DEPTH || opts.format == FMT_DEPTH_STENCIL;
 	const VkImageAspectFlags sampledAspect = isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 	const VkImageAspectFlags attachmentAspect = opts.format == FMT_DEPTH_STENCIL
@@ -1023,9 +1067,9 @@ void idImage::AllocImage( void ) {
 	memset( &formatProperties, 0, sizeof( formatProperties ) );
 	vkGetPhysicalDeviceFormatProperties( vkCtx.physicalDevice, info.format, &formatProperties );
 	const VkFormatFeatureFlags optimalFeatures = formatProperties.optimalTilingFeatures;
-	const bool attachmentCapable = isDepth
+	const bool attachmentCapable = !isLayered && ( isDepth
 			? ( optimalFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT ) != 0
-			: ( optimalFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT ) != 0;
+			: ( optimalFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT ) != 0 );
 
 	VkImageUsageFlags imageUsage =
 			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -1047,7 +1091,23 @@ void idImage::AllocImage( void ) {
 	opts.numMSAASamples = VK_Image_SampleCountInteger( samples );
 	const int numMips = samples == VK_SAMPLE_COUNT_1_BIT
 			? ( opts.numLevels > 0 ? opts.numLevels : 1 ) : 1;
-	const int numLayers = isCube ? 6 : 1;
+	const int numLayers = isCube ? 6 : isArray ? layeredDepth : 1;
+	if ( isLayered ) {
+		// Block formats in 3D images are optional in Vulkan; ask before creating.
+		VkImageFormatProperties layeredProperties;
+		memset( &layeredProperties, 0, sizeof( layeredProperties ) );
+		const VkResult supported = vkGetPhysicalDeviceImageFormatProperties( vkCtx.physicalDevice, info.format,
+				isVolume ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, imageUsage, 0, &layeredProperties );
+		if ( supported != VK_SUCCESS || layeredProperties.maxMipLevels < (uint32_t)numMips
+				|| layeredProperties.maxExtent.width < (uint32_t)opts.width || layeredProperties.maxExtent.height < (uint32_t)opts.height
+				|| layeredProperties.maxExtent.depth < (uint32_t)( isVolume ? layeredDepth : 1 )
+				|| layeredProperties.maxArrayLayers < (uint32_t)numLayers ) {
+			R_ImagePolicyObserveError( "Requested Vulkan layered image format is unsupported" );
+			common->Warning( "Vulkan: %s: this device has no %dx%dx%d %s of format %d", GetName(), opts.width, opts.height,
+					layeredDepth, isVolume ? "volume" : "array", (int)opts.format );
+			return;
+		}
+	}
 
 	// A mipmapped material texture loaded from a file may give up its top
 	// levels to fit video memory (see VK_Image_ChooseDroppedLevels). Fonts,
@@ -1063,13 +1123,13 @@ void idImage::AllocImage( void ) {
 	VkImageCreateInfo ici;
 	memset( &ici, 0, sizeof( ici ) );
 	ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	ici.imageType = VK_IMAGE_TYPE_2D;
+	ici.imageType = isVolume ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
 	ici.format = info.format;
 	ici.extent.width = (uint32_t)opts.width;
 	ici.extent.height = (uint32_t)opts.height;
-	ici.extent.depth = 1;
+	ici.extent.depth = (uint32_t)( isVolume ? layeredDepth : 1 );
 	ici.mipLevels = (uint32_t)numMips;
-	ici.arrayLayers = isCube ? 6 : 1;
+	ici.arrayLayers = (uint32_t)numLayers;
 	ici.samples = samples;
 	ici.tiling = VK_IMAGE_TILING_OPTIMAL;
 	ici.usage = imageUsage;
@@ -1115,12 +1175,14 @@ void idImage::AllocImage( void ) {
 	memset( &ivci, 0, sizeof( ivci ) );
 	ivci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	ivci.image = entry.image;
-	ivci.viewType = isCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+	const VkImageViewType viewType = isCube ? VK_IMAGE_VIEW_TYPE_CUBE : isVolume ? VK_IMAGE_VIEW_TYPE_3D
+			: isArray ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+	ivci.viewType = viewType;
 	ivci.format = info.format;
 	ivci.components = info.swizzle;
 	ivci.subresourceRange.aspectMask = sampledAspect;
 	ivci.subresourceRange.levelCount = ici.mipLevels;
-	ivci.subresourceRange.layerCount = isCube ? 6 : 1;
+	ivci.subresourceRange.layerCount = (uint32_t)numLayers;
 	const VkResult viewResult = vkCreateImageView( vkCtx.device, &ivci, NULL, &entry.view );
 	if ( viewResult != VK_SUCCESS ) {
 		R_ImagePolicyObserveError( "Vulkan image resource creation failed", viewResult );
@@ -1155,6 +1217,8 @@ void idImage::AllocImage( void ) {
 	entry.droppedLevels = droppedLevels;
 	entry.numLayers = numLayers;
 	entry.isCube = isCube;
+	entry.viewType = viewType;
+	entry.depth = isVolume ? layeredDepth : 1;
 	entry.everUploaded = false;
 	entry.generation = vkImageGenerationCounter++;
 	entry.sampler = VK_Image_GetSampler( filter, repeat, entry.numMips > 1 );
@@ -1289,6 +1353,8 @@ bool VK_Image_MakeDepthCopyTarget( idImage *image, int width, int height,
 	entry->numMips = 1;
 	entry->numLayers = (int)numLayers;
 	entry->isCube = isCube;
+	entry->viewType = isCube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+	entry->depth = 1;
 	entry->everUploaded = false;
 	entry->generation = vkImageGenerationCounter++;
 	return true;
@@ -1307,6 +1373,7 @@ typedef struct vkUploadContext_s {
 	VkBuffer		staging;
 	int				mipLevel;
 	int				layer;
+	int				z;				// a volume's slice; 0 otherwise
 	int				x, y;
 	int				width, height;
 	uint32_t		bufferRowLengthTexels;
@@ -1347,6 +1414,7 @@ static void VK_Image_RecordUpload( VkCommandBuffer cmd, void *user ) {
 	region.imageSubresource.layerCount = 1;
 	region.imageOffset.x = ctx->x;
 	region.imageOffset.y = ctx->y;
+	region.imageOffset.z = ctx->z;
 	region.imageExtent.width = (uint32_t)ctx->width;
 	region.imageExtent.height = (uint32_t)ctx->height;
 	region.imageExtent.depth = 1;
@@ -1389,8 +1457,11 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 	// Reject malformed regions before allocating or recording a GPU copy.
 	// In particular, a sixth-face admission bit must never come from a copy
 	// to a nonexistent layer, mip, or a region outside that mip's storage.
+	// A volume's z is a slice of the level, whose slice count halves with it.
+	const int zLimit = entry->viewType == VK_IMAGE_VIEW_TYPE_3D
+			? Max( 1, entry->depth >> Max( 0, mipLevel ) ) : entry->numLayers;
 	if ( mipLevel < 0 || mipLevel >= entry->numMips || mipLevel >= 31
-			|| z < 0 || z >= entry->numLayers || x < 0 || y < 0
+			|| z < 0 || z >= zLimit || x < 0 || y < 0
 			|| pixelPitch < 0 || ( pixelPitch != 0 && pixelPitch < width ) ) {
 		return;
 	}
@@ -1511,7 +1582,9 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 	ctx.entry = entry;
 	ctx.staging = staging;
 	ctx.mipLevel = mipLevel;
-	ctx.layer = entry->isCube ? z : 0;
+	const bool volumeSlice = entry->viewType == VK_IMAGE_VIEW_TYPE_3D;
+	ctx.layer = ( entry->isCube || entry->viewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY ) ? z : 0;
+	ctx.z = volumeSlice ? z : 0;
 	ctx.x = x;
 	ctx.y = y;
 	ctx.width = copyWidth;

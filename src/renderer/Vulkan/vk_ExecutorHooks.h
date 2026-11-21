@@ -144,6 +144,9 @@ bool VK_Exec_TestReadFloatImage( idImage *image, idList<float> &values );
 bool VK_Exec_ReadLinearScreenshot( idImage *image, idList<float> &values );
 // Raw RGBA8 mip zero, normalized to the image API's bottom-up row order.
 bool VK_Exec_ReadImageScreenshot( idImage *image, idList<byte> &pixels );
+// One level of a volume or array, every slice or layer,
+// `levelBytes` long, as stored (whole blocks for a block format)
+bool VK_Exec_ReadImageLevel( idImage *image, int level, int levelBytes, idList<byte> &bytes );
 void VK_PostProcess_ResetLinearCapture();
 bool VK_PostProcess_LinearScreenshot( const char *fileName );
 void				VK_PostProcess_ConsumeHDRSample( unsigned int generation, int frame, float logLuminance );

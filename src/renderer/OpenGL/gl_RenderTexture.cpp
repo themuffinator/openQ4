@@ -123,6 +123,8 @@ static const char* R_TextureTypeName( textureType_t textureType ) {
 	switch ( textureType ) {
 		case TT_2D: return "2D";
 		case TT_CUBIC: return "CUBIC";
+		case TT_3D: return "3D";
+		case TT_2D_ARRAY: return "2D_ARRAY";
 		default: return "DISABLED";
 	}
 }

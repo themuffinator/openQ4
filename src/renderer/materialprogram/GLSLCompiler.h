@@ -72,11 +72,13 @@ struct CompileResult {
     std::string diagnostic;
     uint32_t textureMask = 0;
     uint32_t cubeTextureMask = 0;
+    uint32_t volumeTextureMask = 0;    // sampler3D slots
+    uint32_t arrayTextureMask = 0;     // sampler2DArray slots
     uint32_t vertexInputMask = 0;
 };
 
 // Compiles a compatibility GLSL 1.10/1.20 pair with named scalar/vector
-// parameters and 2D/cube textures. Does not read files, invoke an SDK, create
+// parameters and 2D, cube, 3D and 2D array textures. Does not read files, invoke an SDK, create
 // GPU objects, or retain source pointers. Failure always clears both modules.
 bool CompileGLSL(const CompileRequest &request, CompileResult &result);
 

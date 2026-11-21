@@ -762,6 +762,34 @@ On exit, the idImage will have a valid OpenGL texture number that can be bound
 */
 /*
 ==============
+idImage::MakeLayeredDefault
+
+The stand-in for a volume or texture array that did not
+load, 4x4x4 black (TT_3D) or 4x4 black in four layers (TT_2D_ARRAY), so the
+GLSL sampler that asked for it binds an image of its own type.
+==============
+*/
+void idImage::MakeLayeredDefault( cubeFiles_t request ) {
+	opts.textureType = request == CF_VOLUME ? TT_3D : TT_2D_ARRAY;
+	opts.format = FMT_RGBA8;
+	opts.colorFormat = CFM_DEFAULT;
+	opts.width = 4;
+	opts.height = 4;
+	opts.depth = 4;
+	opts.numLevels = 1;
+	opts.gammaMips = false;
+	AllocImage();
+	byte clear[4 * 4 * 4];
+	memset( clear, 0, sizeof( clear ) );
+	for ( int z = 0; z < opts.depth; z++ ) {
+		SubImageUpload( 0, 0, 0, z, opts.width, opts.height, clear );
+	}
+	defaulted = true;
+	generatedCacheContent = false;
+}
+
+/*
+==============
 PredictDirectDDSPayload
 
 Mirrors ActuallyLoadImage's direct-DDS decision without its staleness check;
@@ -866,8 +894,19 @@ void idImage::ActuallyLoadImage( bool fromBackEnd ) {
 	opts.colorFormat = CFM_DEFAULT;
 	opts.width = 0;
 	opts.height = 0;
+	opts.depth = 1;
 	opts.numLevels = 0;
 	opts.gammaMips = false;
+
+	// A volume or texture array request no loader above answered: none of
+	// the sources below holds one, so it gets a black stand-in of the kind
+	// asked for, and a sampler3D or sampler2DArray still binds.
+	if ( cubeFiles == CF_VOLUME || cubeFiles == CF_ARRAY ) {
+		idLib::Warning( "Image '%s' is named as a %s; no image source here supplies one",
+			GetName(), cubeFiles == CF_VOLUME ? "volume" : "texture array" );
+		MakeLayeredDefault( cubeFiles );
+		return;
+	}
 
 	bool sourceFileTimeKnown = false;
 	// read through the cvar system rather than the framework-owned idCVar
@@ -1431,6 +1470,22 @@ void idImage::Bind() {
 			}
 		}
 	}
+	// Volumes and arrays, for GLSL samplers only, so no
+	// fixed-function enable above ever names their targets
+	else if (opts.textureType == TT_3D) {
+		if (tmu->current3DMap != texnum) {
+			if ( R_BindTextureToUnit( texUnit, GL_TEXTURE_3D, texnum ) ) {
+				tmu->current3DMap = texnum;
+			}
+		}
+	}
+	else if (opts.textureType == TT_2D_ARRAY) {
+		if (tmu->current2DArrayMap != texnum) {
+			if ( R_BindTextureToUnit( texUnit, GL_TEXTURE_2D_ARRAY, texnum ) ) {
+				tmu->current2DArrayMap = texnum;
+			}
+		}
+	}
 
 }
 
@@ -1462,11 +1517,15 @@ void idImage::BindUntracked( int texUnit ) {
 	if ( !IsLoaded() ) {
 		ActuallyLoadImage( true );
 	}
-	// As Bind: only 2D and cube images are bound.
+	// As Bind: 2D, cube, volume and array images are bound.
 	if ( opts.textureType == TT_2D ) {
 		R_BindUntrackedTextureUnit( texUnit, GL_TEXTURE_2D, texnum );
 	} else if ( opts.textureType == TT_CUBIC ) {
 		R_BindUntrackedTextureUnit( texUnit, GL_TEXTURE_CUBE_MAP_EXT, texnum );
+	} else if ( opts.textureType == TT_3D ) {
+		R_BindUntrackedTextureUnit( texUnit, GL_TEXTURE_3D, texnum );
+	} else if ( opts.textureType == TT_2D_ARRAY ) {
+		R_BindUntrackedTextureUnit( texUnit, GL_TEXTURE_2D_ARRAY, texnum );
 	}
 }
 
@@ -1634,6 +1693,10 @@ void R_BindTextureForDirectAccess( unsigned int target, int texnum ) {
 		backEnd.glState.tmu[backEnd.glState.currenttmu].current2DMap = texnum;
 	} else if ( target == GL_TEXTURE_CUBE_MAP_EXT ) {
 		backEnd.glState.tmu[backEnd.glState.currenttmu].currentCubeMap = texnum;
+	} else if ( target == GL_TEXTURE_3D ) {
+		backEnd.glState.tmu[backEnd.glState.currenttmu].current3DMap = texnum;
+	} else if ( target == GL_TEXTURE_2D_ARRAY ) {
+		backEnd.glState.tmu[backEnd.glState.currenttmu].current2DArrayMap = texnum;
 	}
 	// other targets (e.g. multisample) are not tracked by the legacy filter
 	// and do not disturb the tracked 2D / cube bindings
@@ -2231,6 +2294,12 @@ void idImage::Print() const {
 		case TT_CUBIC:
 			common->Printf( "C" );
 			break;
+		case TT_3D:
+			common->Printf( "V" );
+			break;
+		case TT_2D_ARRAY:
+			common->Printf( "A" );
+			break;
 		default:
 			common->Printf( "<BAD TYPE:%i>", opts.textureType );
 			break;
@@ -2398,7 +2467,11 @@ void idImage::SetSamplerState( textureFilter_t tf, textureRepeat_t tr ) {
 	if ( !R_ImagePolicyContentMutation() ) return;
 	filter = tf;
 	repeat = tr;
-	R_BindTextureForDirectAccess( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP_EXT : GL_TEXTURE_2D, texnum );
+	// a texture name binds only to the target it was created with
+	const GLenum target = opts.textureType == TT_CUBIC ? GL_TEXTURE_CUBE_MAP_EXT
+		: opts.textureType == TT_3D ? GL_TEXTURE_3D
+		: opts.textureType == TT_2D_ARRAY ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
+	R_BindTextureForDirectAccess( target, texnum );
 	SetTexParameters();
 }
 

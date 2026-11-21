@@ -8947,6 +8947,7 @@ static void RB_RVSpecialEndCapture( idRenderTexture *previousRenderTexture ) {
 		backEnd.glState.tmu[i].current2DMap = -1;
 		backEnd.glState.tmu[i].current3DMap = -1;
 		backEnd.glState.tmu[i].currentCubeMap = -1;
+		backEnd.glState.tmu[i].current2DArrayMap = -1;
 		globalImages->whiteImage->Bind();
 	}
 

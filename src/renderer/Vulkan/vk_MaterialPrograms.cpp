@@ -630,9 +630,21 @@ bool BindProgram( Program *program, idImage *const images[oq4material::MaxTextur
         idImage *image = used ? images[i] : globalImages->whiteImage;
         if ( image == NULL ) { return Fail( *program, "missing shader texture" ); }
         const bool cube = (program->compiled.cubeTextureMask & (1u << i)) != 0;
-        if ( VK_Exec_ImageDescriptor( image->GetDeviceHandle(), !cube ) == VK_NULL_HANDLE ) { return Fail( *program, "shader texture is not resident" ); }
+        // A sampler3D or sampler2DArray slot takes an image
+        // of that view type; the shared descriptor cache never holds one.
+        const bool volume = (program->compiled.volumeTextureMask & (1u << i)) != 0;
+        const bool array = (program->compiled.arrayTextureMask & (1u << i)) != 0;
+        if ( used && ( volume || array ) ) {
+            if ( !image->IsLoaded() ) { image->ActuallyLoadImage( true ); }
+        } else if ( VK_Exec_ImageDescriptor( image->GetDeviceHandle(), !cube ) == VK_NULL_HANDLE ) {
+            return Fail( *program, "shader texture is not resident" );
+        }
         const vkImageEntry_t *entry = VK_Image_GetEntry( image->GetDeviceHandle() );
-        if ( entry == NULL || entry->isCube != cube || entry->samples != VK_SAMPLE_COUNT_1_BIT ) { return Fail( *program, "shader texture type/sample mismatch" ); }
+        const VkImageViewType wanted = cube ? VK_IMAGE_VIEW_TYPE_CUBE : volume ? VK_IMAGE_VIEW_TYPE_3D
+            : array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+        const bool typeMatches = entry != NULL && ( ( volume || array ) ? entry->viewType == wanted : entry->isCube == cube
+            && entry->viewType != VK_IMAGE_VIEW_TYPE_3D && entry->viewType != VK_IMAGE_VIEW_TYPE_2D_ARRAY );
+        if ( entry == NULL || entry->view == VK_NULL_HANDLE || !typeMatches || entry->samples != VK_SAMPLE_COUNT_1_BIT ) { return Fail( *program, "shader texture type/sample mismatch" ); }
         if ( used && !cube && entry->materialSampleFlipY ) { flipMask |= 1u << i; }
         descriptors[i].sampler = entry->sampler; descriptors[i].imageView = entry->view; descriptors[i].imageLayout = entry->layout;
     }
