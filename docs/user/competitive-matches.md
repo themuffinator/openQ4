@@ -2,6 +2,8 @@
 
 > This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
+> Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
+
 > **Experimental.** Multiplayer is still under active development. Expect rough
 > edges, bugs and behaviour that changes between versions.
 
@@ -11,8 +13,10 @@ ready-up, team rosters and roles, timeouts, votes, best-of series with map
 vetoes, and a saved match report with a multi-view demo. Players, captains,
 referees and organisers all use it through the in-game **Match Control** page.
 
-This guide starts with what you need as a player, then covers the match roles,
-game rules, and setting up and running a managed server.
+This guide starts with what you need as a player, then covers the match roles
+and setting up and running a managed server. Casual play, including
+spectating, voting, timeouts and the rules of each game type, is in the
+[multiplayer guide](multiplayer.md).
 
 **For leagues:** managed matches are still experimental. Keep your usual way of
 checking results rather than relying on openQ4's report alone.
@@ -67,6 +71,14 @@ forward, and deferring moves you behind the current challengers. When you are
 promoted to play, you still need to ready up. Disconnecting removes you from
 the queue.
 
+### Play a managed Duel
+
+Duel is winner-stays; see [Duel](multiplayer.md#duel). In a managed Duel, a
+forfeit retires the player who forfeited even if they were ahead, and a tie
+sends both finalists back to the queue. Players promoted from the queue must
+ready up. During a best-of series the same two players stay seated between
+maps, and aborting a match keeps both of them and the queue.
+
 ### Take a timeout
 
 In a managed Duel, choose **Request timeout** on **Status** to spend one of your
@@ -84,17 +96,8 @@ While the match is paused:
 A timeout is charged once, when the pause starts, however many times it is
 requested. A referee's technical pause does not use either side's timeouts.
 
-#### Timeouts on casual servers
-
-**Not in 0.14.1.** A casual team server can have timeouts too. The operator
-sets `si_timeouts` (how many each side gets, `0` for none) and
-`si_timeoutLength` (seconds). Any player on a team then types `timeout` in
-the console to pause the match for their side, and `timein` to end it early;
-the whole server sees who called it and when play resumes, after a short
-countdown. The host, a signed-in referee or the dedicated console can also
-`pause` the match without spending a timeout, and `timein` or `unpause` ends
-that pause. The clock, the timers and everything else freeze exactly as in a
-managed match. Duel servers keep their timeouts to managed matches for now.
+Casual team servers can offer timeouts too; see
+[Timeouts](multiplayer.md#timeouts).
 
 ### Vote on proposals
 
@@ -120,84 +123,15 @@ vote count, how many yes votes are needed and your own vote.
   caller's eligibility and the target must still allow it. It runs once, and
   fails if the caller has left.
 
-### Spectate
+### Spectate a managed match
 
-While you spectate, **Status** has **Previous**, **Next** and **Free Camera**
-buttons, or use these console commands:
-
-| Command | What it does |
-| --- | --- |
-| `follow next` or `follownext` | Follow the next player you are allowed to watch. |
-| `follow prev` or `followprev` | Follow the previous player. |
-| `follow free` or `followfree` | Fly freely, if the server allows it. |
-| `follow <client-slot>` | Follow the player now in that numbered slot. |
-| `follow <name>` | Follow a player by name. Part of a name is enough when only one player matches; colours are ignored. |
-| `followlist` | List the players you can follow, with slot, name, team and score. |
-| `follow auto <mode>` or `followauto <mode>` | Let the server move the camera for you (see below). |
-| `followview <first\|third\|chase\|next>` | Choose how you see the player you follow. |
-
-During a managed match's countdown and live play, ordinary spectators cannot
-follow players. Coaches can follow their own side, and broadcasters and
-referees have their own views. The server checks your permissions each time you
-switch, and never sends information your role may not see. A request to
-follow one player never ends up following someone else who has since taken
-their slot. Bots can be followed. Demo playback has its own camera controls.
-
-On a casual server a spectator is neutral and can follow anyone on either
-team. A player who is out for the round (eliminated, or waiting between
-Tourney fights) is not a spectator: they can follow their own team mates, and
-they see what their team sees and no more.
-
-#### Auto-follow
-
-`follow auto <mode>` hands the camera to the server, which moves it between the
-players you are allowed to watch:
-
-| Mode | The camera follows |
-| --- | --- |
-| `killer` | Whoever kills the player you are watching, a moment after the kill. |
-| `action` | The most interesting player: a flag carrier first, then powerups, recent kills and the lead. |
-| `leader` | The player with the top score. |
-| `powerup` | The player carrying the most powerups; it stays put while nobody has one. |
-| `flag` | A flag carrier; it stays put while the flags are home. |
-| `off` | Nobody: you choose again. |
-
-`follow auto` on its own means `action`. The camera holds each player for at
-least three seconds so it does not flicker. Choosing a player yourself, or
-pressing attack or jump, turns auto-follow off; the server tells you when it
-does. In Tourney the camera stays in the arena you are watching.
-
-#### Follow views
-
-`followview` changes only how your own screen shows the followed player. The
-setting is `g_spectatorFollowView` and is remembered.
-
-| View | What you see |
-| --- | --- |
-| `first` | Through the player's eyes, with their weapon and crosshair. This is the default. |
-| `third` | From behind the player, turning as they turn. |
-| `chase` | A camera that circles the player as you move your mouse. |
-
-`g_chaseCameraRange` (32 to 256, default 96) and `g_chaseCameraHeight` (-16 to
-96, default 12) set how far back and how high the third-person and chase
-cameras sit. The camera pulls in when a wall is in the way.
-
-Set `g_deathCamera 1` to watch your own death from the same camera, facing
-whoever killed you, instead of the tilted first-person view.
-
-#### Free camera speed
-
-`ui_spectatorSpeed` sets how fast you fly as a percentage of the server's
-speed, from 25 to 300 (default 100). For example, `ui_spectatorSpeed 50` is
-half speed for slow tracking shots. It takes effect within a few seconds of
-changing it.
-
-#### Spectator chat
-
-While a match is live, what a spectator says in all-chat reaches only other
-spectators unless the server sets `g_spectatorChat 1`. The server tells you
-when your line was kept from the players. Team chat from a spectator always
-goes to spectators only.
+The spectator buttons and `follow` commands are described under
+[Spectate](multiplayer.md#spectate) in the multiplayer guide. A managed match
+limits who may follow whom: during its countdown and live play, ordinary
+spectators cannot follow players. Coaches can follow their own side, and
+broadcasters and referees have their own views. The server checks your
+permissions each time you switch, and never sends information your role may
+not see.
 
 ### See the result
 
@@ -353,132 +287,6 @@ A referee can, when the match phase allows:
 Choose **Sign out** when you are done. Disconnecting or a new match also signs
 you out.
 
-## Game rules worth knowing
-
-These apply to casual games unless marked as managed.
-
-### Warmup and starting
-
-- With warmup on, `si_minPlayers` counts active humans and bots together, and
-  at least one human must be playing.
-- Only humans count towards the ready percentage (`si_warmupReadyPercentage`).
-  Duel needs both seated players ready; waiting spectators do not count.
-- Team games need players on both sides. With `si_teamForcePresent 1` both
-  teams need `si_teamSizeMin` players; with `0`, one side must reach it. Red
-  Rover handles its own round rosters.
-- `si_useReady 0` starts as soon as there are enough players, and `si_warmup 0`
-  skips warmup for practice. A `si_warmupReadyPercentage` of `0` also turns off
-  the ready percentage outside Duel; Duel still needs both players ready when
-  ready-up is on.
-
-### Ending a match
-
-- A tie at the frag or capture limit goes to sudden death. A tie when the clock
-  runs out gets overtime. If both teams pass the score limit, the leader wins.
-- Losing all the opponents ends live play, even with no time limit. If the last
-  human leaves, the match is aborted and any bots wait for players.
-- Tied scores share a place: `10, 10, 9` is first, first, third.
-
-### Duel
-
-Duel is winner-stays. Only the two seated players are ranked; the queue stays
-in the spectator list. Both finalists stay on the final scoreboard until the
-review ends, then the loser goes to the back of the queue and the next
-challenger takes the seat.
-
-In a managed Duel, a forfeit retires the player who forfeited even if they were
-ahead, and a tie sends both finalists back to the queue. Players promoted from
-the queue must ready up. During a best-of series the same two players stay
-seated between maps, and aborting a match keeps both of them and the queue.
-
-### Voting on casual servers
-
-Turn on option voting with `si_allowVoting 1`. Only active human players call
-and cast votes; bots do not, and they do not raise the number needed to pass.
-Who can vote is fixed until the vote ends, even if players disconnect.
-
-**Not in 0.14.1.** Call a vote with `callvote` (or `cv`) and cast yours with
-`vote yes` or `vote no`, or from the in-match menu's **Vote** page, which
-offers every vote below but `scorelimit`: the map, **Skip to Next Map** and
-**Random Map**, the game type and its limits, the **Overtime Period**, the
-**Ruleset**, **Instagib**, buying, balance and shuffle, **Ready Everyone**,
-a **Coin Toss** and kicking a player. The old `clientCallVote` still works.
-The votes are:
-
-| Vote | What passes |
-|---|---|
-| `map <name>`, `nextmap`, `random` | Change to that map, skip to the next map in the cycle, or draw a random installed map that supports the game type |
-| `gametype <type>`, `ruleset q4\|classic`, `instagib 0\|1` | Change the game type, play the [Classic ruleset](classic-ruleset.md) or Quake 4's, or turn [Instagib](server-setup.md#instagib) on or off; each restarts the match |
-| `timelimit <min>`, `fraglimit <n>`, `capturelimit <n>`, `scorelimit <n>`, `roundlimit <n>`, `overtime <sec>` | Change a limit; `scorelimit` is the limit the current game type scores by, and `overtime 0` uses sudden death |
-| `shuffle`, `balance 0\|1`, `autobalance 0\|1` | Shuffle the teams, or turn automatic balancing on or off |
-| `readyall` | Mark everyone ready, during a warmup that waits for ready players |
-| `kick <name>`, `restart`, `buying 0\|1\|2`, `controlTime <sec>` | Kick a player, restart the map, change the buying rules, change DeadZone's control time |
-| `cointoss` | Nothing changes; the server announces heads or tails for everyone |
-
-The operator chooses the rules of voting: `g_votePercent` (the share of the
-eligible players that must say yes, 51 by default, so a plain majority),
-`g_voteLimit` (how many votes one player may call on a map, unlimited by
-default), `si_spectatorVote` (whether spectators may vote, off by default)
-and `si_voteFlags` (which votes are forbidden). A vote fails as soon as the
-players who have not voted could no longer carry it. Each player waits thirty
-seconds after their vote ends before calling another.
-
-A spectator, for voting, is someone who chose to watch. A player who has been
-eliminated for the round, or who is looking at the end-of-match scoreboard,
-is still a player and can call and cast votes.
-
-A limit changed by a vote applies to the match being played where the game
-can apply it at once, and stays in force for the maps that follow. An
-`overtime` or `timelimit` vote passed during a live match takes full effect
-from the next match.
-
-### Spectators, idle players and disconnects
-
-**Not in 0.14.1.** Three casual-server policies, all off unless the operator
-turns them on:
-
-- `si_spectatorLock 1` keeps spectators out of a match while it is live; they
-  join when it ends. `2` also keeps players from leaving to spectate. Someone
-  who connects while the match is live is a spectator until it ends, and is
-  told so.
-- `g_inactivity <seconds>` warns a playing human who has sent no input for
-  that long, then moves them to spectators (or drops them when the server has
-  no spectators). Bots are never counted, and a pause does not count as idle
-  time.
-- `g_pauseOnDisconnect <seconds>` pauses a live team match when a playing human
-  loses their connection, so they can reconnect or a replacement can join,
-  instead of forfeiting an emptied side at once. Each side gets one such pause
-  a match. The pause ends as soon as the side has its player back, or on its
-  own when the time runs out, and the usual checks run then. A player the
-  server removed itself (a kick, an idle drop) does not pause the match. While
-  the pause lasts, that side may take a player in even with `si_spectatorLock`
-  on.
-
-### Round modes
-
-- Clan Arena, Freeze Tag and Red Rover reset the map between rounds while the
-  match carries on.
-- **Freeze Tag:** frozen bodies stay even after heavy damage. Stand within
-  `si_freezeThawRadius` of a frozen teammate, with a clear view of them, for
-  `si_freezeThawTime` seconds to thaw them and score a point. Stepping away
-  undoes some of the progress. `si_freezeThawThroughSurface 1` lets you thaw
-  through walls.
-- **Red Rover (managed):** a defeated player moves to the other side for the
-  rest of the round without counting as a team change. Roster seats and captain
-  roles stay, and the next round puts everyone back on their home side. Team
-  text and voice chat follow the side a player is on now.
-
-### Objective modes
-
-- **DeadZone:** control time counts only during live play. Dead or spectating
-  players, and players without a required token, cannot hold or contest the
-  zone. Any eligible opponent in the zone contests it, whoever entered first.
-- **One Flag** modes can use the original CTF maps. On a map with both team
-  bases but no neutral flag, openQ4 places the neutral flag at the spare pickup
-  spot nearest to both bases. A neutral flag placed by the mapper, or a map's
-  own One Flag layout, always comes first. Check flag placement when you choose
-  a competition map pool.
-
 ## Run a managed server
 
 ### Choose a profile
@@ -559,6 +367,10 @@ the game type. If the list is empty, it builds a pool from the maps of the
 server's [rotation](server-setup.md#maps-rotation-and-the-map-queue) that suit
 the game type. Map-cycle scripts in the game folder can include other
 scripts by relative path on every platform.
+
+One Flag modes can use the original CTF maps, where openQ4 places the neutral
+flag itself (see [Objective modes](multiplayer.md#objective-modes)). Check
+flag placement when you choose a competition map pool.
 
 ### Server operator commands
 

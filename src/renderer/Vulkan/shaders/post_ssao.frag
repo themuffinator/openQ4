@@ -27,6 +27,7 @@ layout(std140, set = 6, binding = 0) uniform SSAOBlock {
     vec4 params2;			// x: max distance, y: sample count, zw: the filter pass's texel step (mode 5)
     vec4 modeInfo;			// x: mode, y: the field's rows run opposite to this target's
     vec4 halfInfo;			// xy: occlusion target size, zw: view size in pixels
+    vec4 methodInfo;		// x: r_ssaoMethod (0 SSAO, 1 GTAO, 2 reference), y: temporal pattern turn, z: classic multi-bounce albedo
 } block;
 
 #define invTexSize			block.texInfo.xy
@@ -41,6 +42,7 @@ layout(std140, set = 6, binding = 0) uniform SSAOBlock {
 #define ssaoMaxDistance		block.params2.x
 #define ssaoSampleCount		block.params2.y
 #define blurAxis			block.params2.zw
+#define aoInfo				block.methodInfo
 // 0 unfiltered: darken the lit scene in one pass, the fallback when the
 // occlusion target cannot be created. 1 field: before lighting, write the
 // occlusion native PBR applies to its indirect light (r) and the factor for
@@ -130,6 +132,169 @@ float PatternIndex( vec2 texel ) {
 	return 4.0 * Bayer2( mod( texel, 2.0 ) ) + Bayer2( mod( floor( texel * 0.5 ), 2.0 ) );
 }
 
+// ---- r_ssaoMethod 1 and 2 (REN-10). aoInfo.x selects the kernel, aoInfo.y
+// turns the sample patterns by a fraction of one pattern per frame under
+// temporal AA, aoInfo.z is the grey albedo classic surfaces bounce light with
+// (0 off).
+
+const float kPi = 3.14159265;
+const float kHalfPi = 1.57079633;
+
+float FastAcos( float x ) {
+	float ax = min( abs( x ), 1.0 );
+	float r = ( -0.156583 * ax + kHalfPi ) * sqrt( 1.0 - ax );
+	return x >= 0.0 ? r : kPi - r;
+}
+
+// The cosine-weighted visible arc of one side of a slice, from the view
+// direction out to horizon angle h, with the normal at angle n in the slice
+// (Jimenez et al. 2016, "Practical Real-Time Strategies for Accurate Indirect
+// Occlusion").
+float IntegrateArc( float h, float n, float cosN, float sinN ) {
+	return 0.25 * ( -cos( 2.0 * h - n ) + cosN + 2.0 * h * sinN );
+}
+
+vec2 ProjectViewPosition( vec3 position ) {
+	vec2 ndc = vec2( position.x / ( -position.z * projectionInfo.x ) - projectionInfo.z,
+		position.y / ( -position.z * projectionInfo.y ) - projectionInfo.w );
+	return ndc * 0.5 + 0.5;
+}
+
+// Ground-truth ambient occlusion: per slice through the view direction, the
+// highest horizon on each side out to the radius, then the cosine-weighted
+// visibility between the two horizons, integrated analytically. r_ssaoSamples
+// is the depth budget: one slice of up to eight steps a side below 24 samples,
+// two slices at 24 and above. The sixteen patterns turn the slices by a
+// sixteenth of a half turn and offset the steps, so the filter averages
+// sixteen slice directions. Slices turn evenly about the view direction in view
+// space and are walked along their own line on the screen: even turns of the
+// screen direction are uneven about an off-centre pixel's view direction and
+// would darken open surfaces toward the screen's edges. Horizons fade to the surface's own over the last
+// fifth of the radius, so the result follows the radius as the brute-force
+// reference does.
+float GroundTruthOcclusion( vec2 uv, vec3 centerPos, vec3 normal, float radiusPixels, float patternIndex ) {
+	vec3 viewDir = normalize( -centerPos );
+	vec3 sliceX = normalize( vec3( viewDir.z, 0.0, -viewDir.x ) );
+	vec3 sliceY = cross( viewDir, sliceX );
+	float sliceCount = ssaoSampleCount >= 24.0 ? 2.0 : 1.0;
+	float stepCount = clamp( floor( ssaoSampleCount / ( 2.0 * sliceCount ) ), 2.0, 8.0 );
+	float stepOffset = fract( ( mod( patternIndex * 7.0, 16.0 ) + 0.5 ) / 16.0 + aoInfo.y * 0.618034 );
+	float falloff = 1.0 / ( ssaoRadius * 0.2 );
+	float visibility = 0.0;
+	for ( int slice = 0; slice < 2; ++slice ) {
+		if ( float( slice ) >= sliceCount ) {
+			break;
+		}
+		float phi = ( ( patternIndex + 0.5 + aoInfo.y ) / 16.0 + float( slice ) ) / sliceCount * kPi;
+		vec3 ortho = cos( phi ) * sliceX + sin( phi ) * sliceY;
+		vec2 direction = normalize( ( ProjectViewPosition( centerPos + ortho * ( 0.01 * -centerPos.z ) ) - uv ) / invTexSize );
+		vec3 axis = cross( ortho, viewDir );
+		vec3 projected = normal - axis * dot( normal, axis );
+		float projectedLength = length( projected );
+		float cosN = clamp( dot( projected, viewDir ) / max( projectedLength, 0.00001 ), -1.0, 1.0 );
+		float n = ( dot( projected, ortho ) >= 0.0 ? 1.0 : -1.0 ) * FastAcos( cosN );
+		float lowPositive = cos( n + kHalfPi );
+		float lowNegative = cos( n - kHalfPi );
+		float horizonPositive = lowPositive;
+		float horizonNegative = lowNegative;
+		for ( int i = 0; i < 8; ++i ) {
+			if ( float( i ) >= stepCount ) {
+				break;
+			}
+			float t = ( float( i ) + stepOffset ) / stepCount;
+			// Quadratic spacing: dense near the pixel, where occluders matter most;
+			// the first step clears the pixel itself. Whole-pixel offsets keep each
+			// reconstructed position on the texel its depth came from.
+			vec2 offset = floor( direction * ( t * t * radiusPixels + 1.0 ) + 0.5 ) * invTexSize;
+			for ( int side = 0; side < 2; ++side ) {
+				vec2 sampleUv = side == 0 ? uv + offset : uv - offset;
+				// Off the view there is nothing to see; a clamped edge texel would
+				// stand in as a false wall along the screen's border.
+				if ( sampleUv.x < 0.0 || sampleUv.y < 0.0 || sampleUv.x > 1.0 || sampleUv.y > 1.0 ) {
+					continue;
+				}
+				float sampleDepth = SampleDepth( sampleUv );
+				if ( sampleDepth >= 0.99999 ) {
+					continue;
+				}
+				vec3 delta = ReconstructViewPosition( sampleUv, sampleDepth ) - centerPos;
+				float distanceToSample = length( delta );
+				float cosH = dot( delta, viewDir ) / max( distanceToSample, 0.0001 );
+				float weight = clamp( ( ssaoRadius - distanceToSample ) * falloff, 0.0, 1.0 );
+				if ( side == 0 ) {
+					horizonPositive = max( horizonPositive, mix( lowPositive, cosH, weight ) );
+				} else {
+					horizonNegative = max( horizonNegative, mix( lowNegative, cosH, weight ) );
+				}
+			}
+		}
+		float h1 = n + clamp( FastAcos( horizonPositive ) - n, -kHalfPi, kHalfPi );
+		float h0 = n + clamp( -FastAcos( horizonNegative ) - n, -kHalfPi, kHalfPi );
+		float cn = cos( n );
+		float sn = sin( n );
+		visibility += projectedLength * ( IntegrateArc( h0, n, cn, sn ) + IntegrateArc( h1, n, cn, sn ) );
+	}
+	// One slice of an open surface the view meets at an angle can exceed 1;
+	// only the average over slice directions is 1. Keep it for the filter to
+	// average and clamp the resolved value (PixelOcclusion), or the clamp would
+	// darken every tilted surface.
+	return clamp( visibility / sliceCount, 0.0, 2.0 );
+}
+
+// The brute-force reference (developer comparison only, many times GTAO's
+// cost): 256 cosine-weighted rays per pixel marched in 24 steps out to the
+// radius through the depth buffer. A ray is occluded where it passes behind a
+// visible surface within the radius of the pixel, every such surface taken as
+// solid behind it. That is the scene GTAO's horizons describe, sampled directly
+// instead of through horizons; a surface farther away, such as a cable well in
+// front of a wall, occludes neither.
+float ReferenceOcclusion( vec3 centerPos, vec3 normal, float patternIndex ) {
+	vec3 helper = abs( normal.z ) < 0.999 ? vec3( 0.0, 0.0, 1.0 ) : vec3( 1.0, 0.0, 0.0 );
+	vec3 tangent = normalize( cross( normal, helper ) );
+	vec3 bitangent = cross( normal, tangent );
+	float rotation = ( patternIndex + 0.5 ) / 16.0;
+	float visible = 0.0;
+	for ( int ray = 0; ray < 256; ++ray ) {
+		float u = ( float( ray ) + 0.5 ) / 256.0;
+		float phi = fract( float( ray ) * 0.618033989 + rotation ) * 2.0 * kPi;
+		float r = sqrt( u );
+		vec3 direction = tangent * ( r * cos( phi ) ) + bitangent * ( r * sin( phi ) ) + normal * sqrt( max( 0.0, 1.0 - u ) );
+		float hit = 0.0;
+		for ( int i = 0; i < 24; ++i ) {
+			vec3 position = centerPos + direction * ( ssaoRadius * ( float( i ) + 0.5 ) / 24.0 );
+			vec2 sampleUv = ProjectViewPosition( position );
+			if ( sampleUv.x < 0.0 || sampleUv.y < 0.0 || sampleUv.x > 1.0 || sampleUv.y > 1.0 ) {
+				break;
+			}
+			float sampleDepth = SampleDepth( sampleUv );
+			if ( sampleDepth >= 0.99999 ) {
+				continue;
+			}
+			float surfaceDepth = -ViewSpaceZFromDepth( sampleDepth );
+			if ( -position.z > surfaceDepth * 1.002 + 0.05
+					&& length( ReconstructViewPosition( sampleUv, sampleDepth ) - centerPos ) < ssaoRadius ) {
+				hit = 1.0;
+				break;
+			}
+		}
+		visible += 1.0 - hit;
+	}
+	return visible / 256.0;
+}
+
+// Classic surfaces bounce the light their occluders trap: GTAO's multi-bounce
+// fit (PBRMath.h PBRMultiBounceAO) with one grey albedo. Native PBR applies it
+// per channel with its own albedo, and specular occlusion, to the field.
+float ClassicOcclusionFactor( float ao ) {
+	if ( aoInfo.x < 0.5 || aoInfo.z <= 0.0 ) {
+		return ao;
+	}
+	float v = clamp( ao, 0.0, 1.0 );
+	float x = aoInfo.z;
+	float bounced = ( ( v * ( 2.0404 * x - 0.3324 ) + ( 0.6417 - 4.7951 * x ) ) * v + ( 2.7552 * x + 0.6903 ) ) * v;
+	return clamp( bounced, v, 1.0 );
+}
+
 // r: AO, gb: the view depth's slope (zero where the distance fade leaves no
 // AO). The pattern index rotates the golden-angle spiral by one sixteenth of a
 // turn per index and moves its radii by a permuted sixteenth, so the sixteen
@@ -148,6 +313,12 @@ vec3 ComputeAmbientOcclusion( vec2 uv, vec3 centerPos, float patternIndex ) {
 	if ( block.modeInfo.w > 0.5 ) centerNormal = ReconstructNormal( uv, centerPos, slope );
 
 	float radiusPixels = clamp( ssaoRadius * projectionScale / max( viewDepth, 1.0 ), 2.0, 96.0 );
+
+	if ( aoInfo.x > 0.5 ) {
+		float visibility = aoInfo.x > 1.5 ? ReferenceOcclusion( centerPos, centerNormal, patternIndex )
+			: GroundTruthOcclusion( uv, centerPos, centerNormal, radiusPixels, patternIndex );
+		return vec3( mix( 1.0, visibility, fade ), slope );
+	}
 	float rotation = ( patternIndex + 0.5 ) * ( kTwoPi / 16.0 );
 	float radialOffset = ( mod( patternIndex * 7.0, 16.0 ) + 0.5 ) / 16.0;
 	float invSampleCount = 1.0 / max( ssaoSampleCount, 1.0 );
@@ -323,7 +494,7 @@ float PixelOcclusion( vec2 uv, float depth ) {
 	if ( viewDepth >= ssaoMaxDistance ) {
 		return 1.0;
 	}
-	return ResolvedOcclusion( uv, viewDepth );
+	return min( ResolvedOcclusion( uv, viewDepth ), 1.0 );
 }
 
 // Mode 1. The field reads the occlusion target exactly as the classic resolve
@@ -345,7 +516,7 @@ void FieldMain( vec2 uv ) {
 	// settle in front of the classic-only snapshot.
 	float classicDepth = texture( ClassicDepthBuffer, uv ).x;
 	bool classic = classicDepth < 0.99999 && !PixelIsForeground( uv, classicDepth );
-	outColor = vec4( ao, classic ? ao : 1.0, 1.0, 1.0 );
+	outColor = vec4( ao, classic ? ClassicOcclusionFactor( ao ) : 1.0, 1.0, 1.0 );
 }
 
 // Mode 2. The debug view shows the field's AO, white where no AO applies, as
@@ -373,7 +544,12 @@ void ResolveMain( vec2 uv ) {
 	if ( depth < 0.99999 && !PixelIsForeground( uv, depth ) ) {
 		ao = PixelOcclusion( uv, depth );
 	}
-	if ( ssaoMultiply > 0.5 || ssaoDebugView > 0.5 ) {
+	if ( ssaoDebugView > 0.5 ) {
+		outColor = vec4( ao, ao, ao, 1.0 );
+		return;
+	}
+	ao = ClassicOcclusionFactor( ao );
+	if ( ssaoMultiply > 0.5 ) {
 		outColor = vec4( ao, ao, ao, 1.0 );
 		return;
 	}
@@ -417,7 +593,7 @@ void main() {
 	}
 
 	vec3 centerPos = ReconstructViewPosition( uv, depth );
-	float ao = ComputeAmbientOcclusion( uv, centerPos, PatternIndex( floor( uv / invTexSize ) ) ).x;
+	float ao = min( ComputeAmbientOcclusion( uv, centerPos, PatternIndex( floor( uv / invTexSize ) ) ).x, 1.0 );
 
 	if ( ssaoDebugView > 0.5 ) {
 		outColor = vec4( vec3( ao ), 1.0 );

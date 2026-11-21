@@ -32,6 +32,7 @@ To change difficulty during a single-player game, choose **Restart Level** in th
 - [Shadow Mapping](shadow-mapping.md): shadow quality and tuning.
 - [Cel Shading](cel-shading.md): the cartoon-style look.
 - [DDS Texture Replacements](texture-replacements.md): installing texture packs.
+- [Multiplayer](multiplayer.md): Player Setup, the in-match menu and every multiplayer guide.
 - [Steam Deck](steam-deck.md): the Deck launcher and handheld controls.
 - [Languages](languages.md): menu and dialogue languages.
 

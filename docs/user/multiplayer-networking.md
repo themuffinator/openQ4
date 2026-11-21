@@ -2,6 +2,8 @@
 
 > This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
+> Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
+
 > **Experimental.** Multiplayer is still under active development. Expect rough
 > edges, bugs and behaviour that changes between versions.
 
@@ -10,17 +12,8 @@ address over IPv4 or IPv6, and choose how other players' movement and your own
 shots are shown on a connection with delay. To host a server, see the
 [server setup guide](server-setup.md).
 
-## Before you play
-
-- **Use the same openQ4 version everywhere.** The server and every client need
-  openQ4 0.14.1 and the same game files. Different openQ4 versions are not
-  guaranteed to play together: 0.13.0 and 0.14.1, for example, refuse each
-  other, with a pure server reporting missing packages and other servers
-  reporting that data is out of sync.
-- **Retail Quake 4 cannot play with openQ4.** Retail Quake 4 1.4.2 clients and
-  servers use a different network protocol (2.85), so neither side can join the
-  other. openQ4 refuses them with an explanation instead of hanging; see
-  [Retail Quake 4 servers](#retail-quake-4-servers).
+Everyone in a match needs the same openQ4 version, and retail Quake 4 cannot
+play with openQ4; see [Before you play](multiplayer.md#before-you-play).
 
 ## Find and join a server
 

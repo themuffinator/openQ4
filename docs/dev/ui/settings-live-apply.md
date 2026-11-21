@@ -1,8 +1,8 @@
 # Applying display settings without a device restart
 
-This note records the seven stages of making Settings > Display apply its
+This note records the eight stages of making Settings > Display apply its
 changes to the running renderer. It is the record for the changes of
-11 November 2026 (stages 1 to 6) and 21 November 2026 (stage 7) and supersedes, for the settings named here, what
+11 November 2026 (stages 1 to 6) and 21 November 2026 (stages 7 and 8) and supersedes, for the settings named here, what
 [effect execution](settings-effect-execution.md#combined-executor),
 [the resolution rows](system-resolution-rows.md) and
 [performance presets](performance-presets.md) say about one device restart
@@ -612,7 +612,9 @@ have freed the room for them.
 
 The stale images reload in name order on the renderer thread. The log line
 says how many were reloaded, how long it took and how many the change did not
-reach: `Texture reduction changed: reloaded N images in T ms, U unaffected`.
+reach: `Texture reduction changed: reloaded N images in T ms, U unaffected`
+(stage 8 replaced it with two lines, one when the change is queued and one
+when the last texture is reloaded).
 The level load's file prefetch (`idLevelImagePrefetch`) was tried and left
 out: right after a load the files sit in the operating system's cache, and
 its worker threads made the reload slower on the shared test machine (below).
@@ -667,11 +669,99 @@ source only), a texture pack, a machine whose files are not already cached,
 Vulkan with textures held below their request to fit video memory, and a
 visible window.
 
+## Stage 8: the reload spread across frames
+
+Stage 7 left the reload in the frame of the change: 1.2 to 1.4 s of no
+frames for a normal-map change in Air Defense 1, 4 to 7 s when the change
+reached every texture. The reload now runs a little each frame.
+
+### How it works
+
+- A change queues the images it reaches (`ReloadReductionChangedImages`,
+  still in name order) and reloads nothing itself. The log says
+  `Texture reduction changed: N textures to reload, U unaffected`.
+- Each frame, `CheckCvars` (at the end of the frame, where the reload always
+  ran) calls `ContinueReductionReloads` with `image_reloadFrameMsec`, default
+  4: it reloads queued images until that much time has passed, and always at
+  least one, so the queue drains at any frame rate.
+- Until its turn an image keeps its old pixels, which are complete. A frame
+  shows a mix of old and new sizes, never a missing or blank texture, and
+  nothing is purged ahead of its reload.
+- The queue holds images, not the change. Each image is checked again at its
+  turn and skipped if it is already current (a bind, a level load or a device
+  restart loaded it, or a later change brought its key back). A second change
+  before the queue drains builds a new queue from every image, and the log
+  says `Texture reduction changed again: K queued textures are checked again`.
+- The level load and a checked image-policy attempt pause the queue, as they
+  deferred the change in stage 7. `EndLevelLoad` then finishes any pending
+  change and the whole queue at once, behind the loading screen, so play
+  starts with every texture current.
+- A failed device drops the queue (its restart reloads everything);
+  `PurgeAllImages` and `Shutdown` drop it too, since it holds image pointers.
+- When the queue empties the log says how many textures were reloaded, over
+  how many frames and how long, how much of that was loading, the most one
+  frame spent, and the slowest texture:
+  `Texture reduction applied: reloaded N textures over F frames in T ms
+  (L ms of loading, at most M ms in one frame), C already current, U
+  unaffected`, then `Texture reduction: slowest texture <name>, X ms`.
+- `image_reloadFrameMsec 0` reloads the whole queue in the frame of the
+  change, as stage 7 did.
+
+### What a frame still costs
+
+The budget cannot split one texture. The slowest one sets the longest frame:
+the stock `downsize( models/mapobjects/strogg/stroggos/clouds, 1 )` image
+program takes 30 to 40 ms, and with `image_usePrecompressedTextures 0` an
+`addnormals( ..., heightmap( ... ) )` program computed from its sources takes
+0.15 to 0.7 s, a `downsize` of a large diffuse up to 1.4 s on Vulkan. Making
+those asynchronous (decode on a worker, upload at the frame) is what is left.
+
+Spreading also lengthens the whole reload, because the frames in between are
+drawn: on the busy test machine about 9 ms of frame per frame of reloading.
+
+### Engine checks, stage 8
+
+Hidden window, console verbs only, `game/airdefense1` under Enhanced, the
+worktree build of `0e1cc68ac` plus this change, both back ends. Other
+sessions' clients and builds ran throughout. Kit:
+`.tmp/live-apply/run.py <name> selective` and `textures`.
+
+| Change | Textures | Frames | Whole reload | Loading | Longest frame |
+| --- | --- | --- | --- | --- | --- |
+| Normal-map ceiling 128 on, OpenGL | 318 | 144 | 2.4 s | 1.0 s | 33 ms |
+| The same, Vulkan | 318 | 148 | 2.5 s | 1.0 s | 33 ms |
+| The same with `image_reloadFrameMsec 0`, OpenGL | 318 | 1 | 1.2 s | 1.2 s | 1,220 ms |
+| Ceiling 128 on every layer, both | 1,073 | 280 to 340 | 4.7 to 5.7 s | 1.4 to 1.9 s | 30 to 39 ms |
+| Precompressed textures off (decoded), both | 1,942 | 970 to 1,230 | 29 to 36 s | 18 to 21 s | 0.56 to 1.4 s |
+| Precompressed textures back on, both | 1,942 | 600 to 1,050 | 10 to 35 s | 4 to 11 s | 0.15 to 0.23 s |
+
+- The normal-map step reduced 15 of the 24 world normal maps by name and
+  nothing else, turning it off restored all 477 compared world images, and a
+  change that moves no policy queued nothing. The device generation never
+  moved.
+- The `textures` scenario of stage 1 passes on OpenGL with its waits
+  lengthened for the spread (each phase given 20 to 90 s): 335 of 477
+  reduced, all restored. A first run with shorter waits showed the second
+  change arriving while the first queue was still draining: the new queue
+  checked again what was left, skipped nothing it should have reloaded, and
+  the end state was the same.
+- Vulkan: the same scenario passed in the last of three runs with the long
+  waits. In one, the final ceiling-off step queued its 1,073 textures and had
+  not finished 60 s later (387 of 477 restored at the listing), with frames
+  still presenting and no warning; a timestamped repeat finished that step in
+  6.7 s and the last run in 20 s (757 frames). The swings follow the load from
+  other sessions on the machine, but the slow run is not explained.
+
+Not run: a change made during a level load (the source test pins the
+deferral and the finish in `EndLevelLoad`), a visible window, a measurement
+of the frame rate the player sees during the reload, and a machine to
+itself.
+
 ## What these stages do not do
 
-- The image reload still blocks the frame it runs in. Stage 7 shrinks it to
-  the images a change reaches and prefetches their files, but it is not
-  spread across frames.
+- One texture still loads within one frame: the slowest image program sets
+  the longest frame of a reload (30 to 40 ms with precompressed textures,
+  up to 1.4 s when they are off). Loading on a worker thread is left.
 - The in-place route has no readback of image dimensions. Its evidence is the
   exact settings readback, the same device generation and a later presented
   frame, as for the combined executor's restart.
@@ -706,6 +796,12 @@ device reopened.
 
 ## Tests
 
+- `tools/tests/renderer_picmip_policy.py` (stage 8): the per-frame check keeps
+  running while images are queued, a change builds a fresh queue and reloads
+  nothing itself, each frame reloads at least one image within
+  `image_reloadFrameMsec` and checks every image again at its turn, a failed
+  device, `PurgeAllImages` and `Shutdown` drop the queue, and `EndLevelLoad`
+  finishes a pending change after loading the level's images.
 - `tools/tests/renderer_picmip_policy.py` (stage 7): the cvar check defers
   during a level load and a checked attempt with the flags still set, reloads
   through `ReloadReductionChangedImages` and never the whole catalogue, skips

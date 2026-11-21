@@ -260,22 +260,55 @@ def test_reduction_changes_reload_images_without_a_restart():
         "image_downSizeBumpLimit",
     ):
         assert_true(f"&{cvar}" in image_manager, f"{cvar} changes should trigger an image reload")
-    check = image_manager[image_manager.index("void idImageManager::CheckCvars() {"):]
-    check = check[:check.index("\n}\n")]
+    def body(source, signature):
+        text = source[source.index(signature):]
+        return text[:text.index("\n}\n")]
+
+    check = body(image_manager, "void idImageManager::CheckCvars() {")
+    apply = body(image_manager, "void idImageManager::ApplyPendingImageCvars( bool finishReloads ) {")
     assert_true(
-        "ReloadReductionChangedImages();" in check and "ReloadImages(" not in check,
+        "ApplyPendingImageCvars( false );" in check and "ReloadImages(" not in check + apply
+        and "ReloadReductionChangedImages();" in apply,
         "a reduction change should reload only the images it reaches, not the whole catalogue",
     )
-    reload = image_manager[image_manager.index("int idImageManager::ReloadReductionChangedImages() {"):]
-    reload = reload[:reload.index("\n}\n")]
     assert_true(
-        "!image->IsFileBacked() || R_IsMutableRenderImage( image ) || !image->IsLoaded()" in reload,
-        "generated, persistent, scratch and unloaded images are never rebuilt by a settings change",
+        "PendingReductionReloads() <= 0" in check,
+        "the per-frame check keeps running while queued images remain, with no cvar change",
     )
     assert_true(
-        "!image->ReductionInputsChanged() && !R_ImageHeldBelowRequest( image )" in reload
-        and "image->Reload( true );" in reload,
-        "an image is reloaded when its reduction key moved, or Vulkan held it below its request",
+        "ContinueReductionReloads( finishReloads ? 0.0 : static_cast<double>( Max( 0, image_reloadFrameMsec.GetInteger() ) ) );" in apply,
+        "queued images reload within image_reloadFrameMsec a frame, or all at once when finishing",
+    )
+    needs = body(image_manager, "static bool R_ImageNeedsReductionReload( idImage *image ) {")
+    assert_true(
+        "!image->IsFileBacked() || R_IsMutableRenderImage( image ) || !image->IsLoaded()" in needs
+        and "!R_ImagePolicyShouldReload( image )" in needs
+        and "image->ReductionInputsChanged() || R_ImageHeldBelowRequest( image )" in needs,
+        "only resident file-backed images whose key moved, or that Vulkan held below their request, are reloaded",
+    )
+    queue = body(image_manager, "int idImageManager::ReloadReductionChangedImages() {")
+    assert_true(
+        "R_ImageNeedsReductionReload( image )" in queue and "ClearReductionReloads();" in queue
+        and "->Reload(" not in queue,
+        "a change builds a fresh queue from every image and reloads nothing itself",
+    )
+    step = body(image_manager, "bool idImageManager::ContinueReductionReloads( double budgetMsec ) {")
+    assert_true(
+        step.index("loadedThisFrame > 0 && budgetMsec > 0.0") < step.index("R_ImageNeedsReductionReload( image )")
+        < step.index("image->Reload( true );"),
+        "each frame reloads at least one image, stops at its budget, and checks every image again at its turn",
+    )
+    assert_true(
+        "R_RendererDeviceAwaitsRestart()" in step and "ClearReductionReloads();" in step,
+        "a failed device drops the queue: its restart reloads everything",
+    )
+    for signature in ("void idImageManager::PurgeAllImages() {", "void idImageManager::Shutdown() {"):
+        assert_true("ClearReductionReloads();" in body(image_manager, signature),
+                    f"{signature} must drop the queue of image pointers")
+    end_load = body(image_manager, "void idImageManager::EndLevelLoad() {")
+    assert_true(
+        end_load.index("LoadLevelImages( true );") < end_load.index("ApplyPendingImageCvars( true );"),
+        "a change pending over a level load is finished behind its loading screen",
     )
     image_load = read_repo_file(Path("src/renderer/Image_load.cpp"))
     load = image_load[image_load.index("void idImage::ActuallyLoadImage( bool fromBackEnd ) {"):]
@@ -301,7 +334,8 @@ def test_reduction_changes_reload_images_without_a_restart():
     )
     assert_true(
         check.index("if ( insideLevelLoad || R_ImagePolicyActive() ) {")
-        < check.index("R_ImageReductionCvarsChanged( true );"),
+        < check.index("ApplyPendingImageCvars( false );")
+        and "R_ImageReductionCvarsChanged( true );" not in check,
         "a change during a level load or a checked attempt stays pending, flags still set, "
         "so the images the load kept resident are reloaded after it",
     )

@@ -516,7 +516,7 @@ KEY_CVARS = (
     "com_performancePreset", "com_machineSpec", "com_videoRam", "com_maxfps", "r_swapInterval", "r_renderApi", "r_multiSamples", "r_postAA",
     "r_temporalAA", "r_screenFraction", "image_anisotropy", "r_useShadowMap", "r_shadowMapSize", "r_shadowMapPointSize",
     "r_shadowMapFilterMode", "r_shadowMapFilterTaps", "r_shadowMapCSM", "r_shadowMapAtlasSize", "r_bloom", "r_bloomMipCount",
-    "r_ssao", "r_ssaoSamples", "r_ssaoResolution", "r_hdrToneMap", "r_hdrSceneTarget", "r_motionBlur", "r_motionBlurSamples",
+    "r_ssao", "r_ssaoSamples", "r_ssaoResolution", "r_ssaoMethod", "r_hdrToneMap", "r_hdrSceneTarget", "r_motionBlur", "r_motionBlurSamples",
     "r_useLightGrid", "r_pbrMaterials", "r_portalsDistanceCull", "g_presentationInterpolation", "ui_retained", "ui_hudLayout",
     "r_vkRenderThread", "r_rendererModernVisible", "r_rendererForwardPlus", "s_useEAXReverb", "s_numberOfSpeakers",
     "r_fullscreen", "r_mode", "r_customWidth", "r_customHeight", "image_downSize", "image_usePrecompressedTextures",

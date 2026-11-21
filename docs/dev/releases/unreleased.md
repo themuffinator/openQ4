@@ -396,7 +396,7 @@ the [development roadmap](../roadmap.md) for current scope.
 - **Shadow maps come on with the top presets.** Choosing **Quality** or **Ultra** in Settings > System now turns shadow maps on. Shadows from projected lights, such as the flashlight, stay sharp where an object touches a surface and soften with distance. Lower presets keep Quake 4's original shadows.
 - **Sharper, smoother image at lower render scales.** When the 3D scene renders below your screen's resolution, as the **Performance**, **Low Power** and **Minimum** presets do, temporal anti-aliasing now rebuilds it at full resolution instead of stretching it. Edges stay smooth and fine detail returns. It also tracks animated characters and your weapon exactly while they move, so they no longer shimmer or lose their anti-aliasing. At native resolution nothing changes unless you turn it on with `r_temporalAA 1`. See [Temporal AA](../../user/temporal-presentation.md).
 - **Physically based materials for mods.** Maps and mods can now ship PBR materials that render by default on OpenGL and Vulkan, beside the stock surfaces. Their metalness, roughness and ambient occlusion shape how every light (shadows included), the map's ambient light and its baked light grids fall on them. Glow maps shine on their own, and SSAO darkens only their bounced light. Reflection probes can follow a room's walls and be captured in the game. Stock content has no PBR materials and looks exactly as before. See the [PBR materials guide](../../user/pbr-materials.md).
-- **Smarter multiplayer bots you can give orders to.** Bots plan safer routes around jump pads, ledges and hazardous floors, recover when knocked off their route, and make running jumps across gaps. They hear gunfire and footsteps, time armour and weapon respawns, back off from fights they can't win and go hunting while they have quad damage. In team games you can give the bots on your side orders in team chat, such as `kane defend`, `everyone follow me` or `sorg hold here`, and they answer in character. Navigation and decision-making also use less processor time. See [Giving bots orders](../../user/server-setup.md#giving-bots-orders).
+- **Smarter multiplayer bots you can give orders to.** Bots plan safer routes around jump pads, ledges and hazardous floors, recover when knocked off their route, and make running jumps across gaps. They hear gunfire and footsteps, time armour and weapon respawns, back off from fights they can't win and go hunting while they have quad damage. In team games you can give the bots on your side orders in team chat, such as `kane defend`, `everyone follow me` or `sorg hold here`, and they answer in character. Navigation and decision-making also use less processor time. See [Giving bots orders](../../user/multiplayer.md#give-bots-orders).
 - Bots account for their health and armour before taking drops or jump pads, and check the ground beyond a touchdown before continuing. Running jumps check their current position and momentum against the player's collision shape, and bots avoid walking through jump pads that have no safe landing route.
 - **German menus and gameplay text are now available.** Choose **Deutsch** in Settings > Game Options > Language for translated settings, objectives, terminals, Arena Campaign, demos and multiplayer controls.
 - **Five more languages: Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian.** Choose **Português (Brasil)**, **Čeština**, **Magyar**, **Türkçe** or **Українська** in Settings > Game Options > Language. Each translates the same menus, settings, objectives, terminals, Arena Campaign, demos and multiplayer messages as German. On its first launch openQ4 picks your system language. See the [languages guide](../../user/languages.md).
@@ -471,11 +471,25 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Changing texture quality no longer freezes the game. Lowering or raising
+  texture detail on the Display page, with a Performance Preset or from the
+  console used to reload every texture in one pause of 4 to 7 seconds in Air
+  Defense 1, menus and fonts included. Only the textures the change affects
+  reload now (318 of 1,942 for a normal-map change), a few each frame while you
+  keep playing or browsing the menu, and the interface is never reloaded by
+  it. A change made while a level loads also reaches the textures the load
+  kept, such as the interface and your own models, which used to keep the old
+  setting until the renderer restarted. `image_reloadFrameMsec 0` brings back
+  the single pause.
 - The player guides and the package README are rewritten in plain language
   and corrected against 0.14.1. Menu paths name the new interface's tabs,
   several wrong defaults and menu routes are fixed, anything newer than 0.14.1
   is marked **Not in 0.14.1**, and Getting Started explains how to capture a
   log file for a bug report.
+- A new [multiplayer guide](../../user/multiplayer.md) is the place to start
+  for online play: joining, bot matches, hosting, the game types, the in-match
+  menu, match rules, spectating, voting and bot orders, with a list of every
+  multiplayer guide by task. Each topic now lives in one guide.
 - The game no longer crashes when it cannot write its log file. With logging
   on (`logFile 1` or `2`), a failed write to the log, for example on a full or
   disconnected drive, made openQ4 report the failure into the same log, fail

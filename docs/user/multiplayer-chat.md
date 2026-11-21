@@ -2,6 +2,8 @@
 
 > This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
+> Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
+
 openQ4 gives you three ways to talk in a multiplayer match: text chat, a
 quick-chat wheel of ready-made phrases and push-to-talk voice chat. All three
 work in local games with bots too.
@@ -12,7 +14,7 @@ Press your **Chat** key to talk to everyone, or your **Team Chat** key to talk
 to your team. Existing bindings keep working. The key you press chooses the
 channel every time; in a game without teams, chat always opens on All. In a
 team game, team chat also gives your bots orders, such as `everyone follow me`;
-see [Giving bots orders](server-setup.md#giving-bots-orders).
+see [Give bots orders](multiplayer.md#give-bots-orders).
 
 ### What you see
 

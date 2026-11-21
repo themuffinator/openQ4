@@ -2004,6 +2004,86 @@ What remains in effects, about 7.5% of the combat scene: sprite and line
 evaluation (envelope table lookups, positions, `sinf`/`cosf`), the per-model
 vertex-cache release in `rvBSE::Render`, and per-frame owner updates.
 
+## 17. What GPU particles could save (FPS-08), 21 November 2026
+
+The question was whether moving BSE particles to the GPU would pay. Stock
+effects are small for a GPU (the combat wave keeps about 3,100 live
+particles, section 16), so the gain can only be CPU time. This section
+measures its upper bound: the CPU cost of drawing every effect.
+
+**Why only part of BSE could move.** A particle's position is a closed form
+of its age (`rvParticle::EvaluatePosition`: start position, velocity,
+acceleration, friction and offset envelopes), with no state carried between
+frames. Sprites, lines and oriented quads could therefore be written once at
+spawn and positioned by a vertex shader. Physics particles could not: they
+trace the world and render models (`game->Translation` with
+`CONTENTS_SOLID | CONTENTS_RENDERMODEL`), start impact effects and bounce, and
+a depth-buffer collision would see only what is on screen. Light, decal,
+model, debris, electricity and linked-trail segments also stay on the CPU.
+
+**Method.** The combat wave of section 15 (`game/airdefense1`, Quality,
+1280x720, hidden window, `benchmarkViewSweep`) alternated `bse_render 0` and
+`1` in 24 windows in ABBA order. Each window waited 400 ms and then captured
+60 frames with `profileFrameWork`. `bse_render 0` makes `rvBSE::Render`
+return before building any geometry and stops effect decals. Effect lights are
+presented during servicing (`rvSegment::Handle`), so they stay on and the
+difference is the drawing work alone. Each on window was compared with its
+neighbouring off windows on the median frame work (total less wait). One
+further run attached the sampler (section 15's method, with the same
+`listCvars`/`listCmds` markers) to split the difference. Other sessions held
+the machine at about 95% CPU throughout, so the absolute milliseconds are
+inflated; the shares are the steadier result.
+
+| Run | Off-window median work (ms) | Drawing effects, paired median (ms) | Range over pairs (ms) |
+| --- | ---: | ---: | --- |
+| OpenGL 1 (8 pairs, 90-frame windows) | 12.97 | +3.77 | +0.90 to +6.94 |
+| OpenGL 2 | 12.40 | +2.97 | -0.21 to +7.32 |
+| OpenGL 3 | 9.93 | +1.93 | -4.03 to +11.98 |
+| Vulkan 1 | 7.21 | +2.50 | -1.32 to +4.60 |
+| Vulkan 2 | 10.14 | +2.60 | -0.83 to +5.23 |
+
+Drawing effects costs about 2-4 ms of main-thread work per frame in this
+scene, 20-30% of it. Nearly all of it is in the draw phase; the session phase
+moves by under 0.2 ms.
+
+**Where it goes** (OpenGL, sampled; each cost over the game tic less BSE
+servicing, which `bse_render` does not change):
+
+| Work | Off | On | Share of the difference |
+| --- | ---: | ---: | ---: |
+| Main thread (tic, scene and backend) | 5.781 | 6.812 | 100% |
+| Front end, `R_AddEffectSurfaces` | 0.094 | 0.718 | 61% |
+| CPU particle geometry, `rvBSEManagerLocal::RenderEffect` | 0.002 | 0.472 | 46% |
+| of it: sprites / lines / envelope evaluation / vertex-cache release | | | 20 / 7 / 8 / 3% |
+| Backend, `RB_ExecuteBackEndCommands` | 3.312 | 3.818 | 49% |
+| of it: the soft-particle stage | 0.001 | 0.447 | 43% |
+| OpenGL driver (all callers) | 2.804 | 3.178 | 36% |
+
+Inside the soft-particle stage, 38% is the draws themselves, 30% the
+once-per-view depth copy (`backEnd.currentDepthCopied` already limits it to
+one), and 21% driver state. Vertex upload (`R_CreateAmbientCache`), BSE
+servicing and decals do not move. The front-end and backend rows overlap
+the driver row, so the shares do not add up to 100%.
+
+**What GPU particles would remove.** The CPU geometry row: about 46% of the
+drawing cost, roughly 1-1.3 ms per frame here, and less in quieter scenes
+(hub2 services most of its effects off screen, section 16). Particles would
+still be drawn and still need scene depth, so the backend half stays. Fewer,
+instanced draws could reduce it, but so could batching the soft-particle
+draws in the existing path. A full GPU simulation like DOOM (2016)'s, with
+depth-buffer collision and its own particle lighting, would also change how
+stock effects behave and look, which the stock-asset goal rules out. A
+vertex-shader path for simple sprite and line segments is the only form worth
+a prototype, judged against this bound. The Vulkan split was not sampled.
+
+Runtime: the staged `.install` of 21 November 15:09 (client
+`8b150828cba27f9d05a5d50c971d8a57e4ce44a05a3b664af37cfc6d35233088`,
+renderer-gl `442ea68d...`, renderer-vk `acc6f425...`), built from `main` at
+30f05fa50 or later; `src/bse` and `tr_light.cpp` are unchanged from there to
+7045268b4. The scenario and scripts are in `.tmp/gpu-particles/`
+(`combat_bse_render.cfg`, `ab.py`, `phases_render.py`); the raw runs were not
+kept.
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;

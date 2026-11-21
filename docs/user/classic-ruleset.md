@@ -2,6 +2,8 @@
 
 > This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
+> Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
+
 **Not in 0.14.1.** The Classic ruleset turns Quake 4 multiplayer into something
 that plays like Quake 2 deathmatch and Threewave CTF, on the stock Quake 4 maps
 and weapons. It is strongly inspired by Quake 2 rather than a copy of it: the
