@@ -1,6 +1,6 @@
 # Multiplayer chat
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 > Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
 
@@ -83,7 +83,7 @@ lower HUD; your own offsets can move chat over other HUD elements.
 
 ### Chat tokens
 
-**Not in 0.14.1.** `#h`, `#a`, `#w`, `#l` and `#n` in a chat line become your health, armour, weapon, location and nearby
+**New in 0.15.0.** `#h`, `#a`, `#w`, `#l` and `#n` in a chat line become your health, armour, weapon, location and nearby
 team mates as the line is sent. See [Multiplayer Client Options](multiplayer-client-options.md#chat-tokens).
 
 ### Chat console commands

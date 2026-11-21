@@ -1,10 +1,10 @@
 # Multiplayer Client Options
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 > Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
 
-**Not in 0.14.1.** These options change what you see, hear and say in a
+**New in 0.15.0.** These options change what you see, hear and say in a
 multiplayer match, and two of them let a server decide what its players may
 show each other. None of them changes the rules of the game. Each has its own
 setting, and each works in the Remastered, Minimal, Competitive and Classic HUD

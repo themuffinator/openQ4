@@ -1,6 +1,6 @@
 # Quake 4 and The Awakening campaigns
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 openQ4 plays two story campaigns: the original Quake 4 campaign and **The Awakening**, the recovered Quake 4 expansion. Both run on openQ4's own game code and keep their own saves. This guide covers choosing a campaign, installing The Awakening's files, saves and known issues. For the bot ladder on the multiplayer maps, see [Arena Campaign](arena-campaign.md); for what openQ4 changes inside the expansion, see [The Awakening on openQ4](awakening.md).
 
@@ -58,7 +58,7 @@ The Awakening is built from the expansion's unfinished alpha. All 13 maps load a
 
 ## Mods and The Awakening
 
-> **Not in 0.14.1.** It arrives in the next release. In 0.14.1, choosing a campaign unloads any mod you have loaded, and mods cannot play over The Awakening.
+> **New in 0.15.0.** In 0.14.1, choosing a campaign unloads any mod you have loaded, and mods cannot play over The Awakening.
 
 A mod can play over The Awakening as well as over Quake 4. Its files come first, then the expansion's, then openQ4's and Quake 4's, so a mod can replace anything the expansion supplies.
 
@@ -107,8 +107,8 @@ These console commands follow the same rules as the menus, including how they sw
 | `campaignList` | Reports whether The Awakening's content is present and complete, and lists any missing files. |
 | `fs_awakeningpath` | Where The Awakening's content lives, if not next to `q4base`. Saved; takes effect after a restart. |
 | `ui_chaptersQuake4`, `ui_chaptersAwakening` | Where each campaign's chapter unlocks are saved. You never need to set them by hand. |
-| `fs_awakeningActive` | **Not in 0.14.1:** read-only; `1` while The Awakening's files are loaded. |
-| `com_campaignRemount` | **Not in 0.14.1:** `1` (default) switches campaigns in place at the menu; `0` restarts the engine for every switch, as 0.14.1 does. |
+| `fs_awakeningActive` | **New in 0.15.0:** read-only; `1` while The Awakening's files are loaded. |
+| `com_campaignRemount` | **New in 0.15.0:** `1` (default) switches campaigns in place at the menu; `0` restarts the engine for every switch, as 0.14.1 does. |
 
 ## Credits
 

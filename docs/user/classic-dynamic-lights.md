@@ -1,6 +1,6 @@
 # Classic dynamic lights
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 In Quake II and Quake III, the action lit the world: muzzle flashes threw light across the room, rockets and plasma carried their glow down the corridor, and explosions flashed the walls. Quake 4's shipped effects mostly don't: apart from the single-player rocket and grenade trails, player projectiles carry no light, and no explosion in the game lights the room. openQ4 adds that classic layer back, in single-player and multiplayer. It is on by default.
 
@@ -19,7 +19,7 @@ Both are saved, so your choice survives a restart. `g_projectileLights 0` still 
 
 **Bright projectiles.** Rockets, plasma bolts and dark matter spheres carry a light. This only fills gaps: a projectile that already has its own light keeps it, and the single-player rocket and grenade, whose trails already light their surroundings, are left alone so their glow isn't doubled. Their multiplayer trails have no light, so those get the classic one.
 
-**Explosions.** A detonation flashes the surrounding walls and fades over 120 to 400 ms, depending on what went off. Exploding barrels and other breakables flash too. **Not in 0.14.1:** so do the explosions that only play an effect: dying turrets, flyers and tanks, vehicles, harvester parts and the scripted explosions in the levels. openQ4 counts an effect as an explosion when its name says so and it draws fire. Gore bursts, electrical deaths and smoke trails don't qualify, and an effect that already carries its own light keeps it.
+**Explosions.** A detonation flashes the surrounding walls and fades over 120 to 400 ms, depending on what went off. Exploding barrels and other breakables flash too. **New in 0.15.0:** so do the explosions that only play an effect: dying turrets, flyers and tanks, vehicles, harvester parts and the scripted explosions in the levels. openQ4 counts an effect as an explosion when its name says so and it draws fire. Gore bursts, electrical deaths and smoke trails don't qualify, and an effect that already carries its own light keeps it.
 
 Bullets, nails, debris and glass get nothing: they aren't bright, there are far too many of them to light, and Quake II and Quake III didn't light them either.
 
@@ -66,7 +66,7 @@ An entity definition can override what openQ4 picks for it:
 
 Each classic light is a real light in openQ4's renderer, not the cheap tint it was in Quake II. To keep the cost down, at most 24 flashes are alive at once (the oldest is reused when the pool is full), and flashes more than about 3000 units from you are skipped.
 
-**Shadows (Not in 0.14.1).** Classic lights cast shadows on the Quality, Ultra and Maximum presets, together with the game's own muzzle flashes and the lights in weapon and enemy effects. `g_dynamicLightShadows` controls all of them: `-1` follows the preset, `0` turns them off, `1` turns them on with any preset that draws shadows. The gun that fired, a projectile's own model and whatever blew up stay out of their own flash's shadows. See [Shadow mapping](shadow-mapping.md).
+**Shadows (New in 0.15.0).** Classic lights cast shadows on the Quality, Ultra and Maximum presets, together with the game's own muzzle flashes and the lights in weapon and enemy effects. `g_dynamicLightShadows` controls all of them: `-1` follows the preset, `0` turns them off, `1` turns them on with any preset that draws shadows. The gun that fired, a projectile's own model and whatever blew up stay out of their own flash's shadows. See [Shadow mapping](shadow-mapping.md).
 
 ## Seeing them without firing
 

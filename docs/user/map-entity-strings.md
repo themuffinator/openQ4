@@ -1,6 +1,6 @@
 # Map entity strings
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 Map entity strings let you change what spawns in a stock Quake 4 map (its
 lights, spawn points, items, triggers, scripts and other entities) without

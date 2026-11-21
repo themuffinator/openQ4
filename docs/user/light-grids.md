@@ -1,6 +1,6 @@
 # Light grids
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 Light grids, also called irradiance volumes, add soft bounced light to a map: the glow a lit floor throws onto nearby walls, and the fill light that lifts dark corners. The light is worked out ahead of time ("baked") for each map and stored in light-grid files. openQ4 ships light grids for the multiplayer maps and two single-player levels, including Air Defense Trenches. Maps without them look exactly as they always did.
 

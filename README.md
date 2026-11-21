@@ -14,7 +14,7 @@ An open-source engine and game-code replacement that runs the original retail ga
 [![Licensing](https://img.shields.io/badge/licence-GPL%20engine%20%7C%20SDK%20game%20code-blue.svg)](LICENSING.md)
 [![Proudly vibecoded](assets/docs/img/badge-proudly-vibecoded.svg)](AGENTS.md)
 
-<a href="https://github.com/themuffinator/openQ4/releases/latest"><img src="https://img.shields.io/badge/Download-openQ4%200.14.1-2d8f4e?style=for-the-badge&logo=github" alt="Download openQ4 0.14.1"></a>
+<a href="https://github.com/themuffinator/openQ4/releases/latest"><img src="https://img.shields.io/badge/Download-openQ4%200.15.0-2d8f4e?style=for-the-badge&logo=github" alt="Download openQ4 0.15.0"></a>
 <a href="https://discord.gg/T32mFejwR4"><img src="https://img.shields.io/badge/Join%20the-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the DarkMatter Discord"></a>
 
 [Quick start](#quick-start) · [Features](#features) · [Screenshots](#screenshots) · [Platforms](#platforms-and-requirements) · [Guides](#player-guides) · [Help](#getting-help) · [Build from source](BUILDING.md)
@@ -35,7 +35,7 @@ openQ4 replaces Quake 4's engine and game code with its own: an open-source engi
 ## Quick start
 
 1. Install **Quake 4** from Steam or GOG.
-2. Download [openQ4 0.14.1](https://github.com/themuffinator/openQ4/releases/tag/v0.14.1) for your system and extract it into its own folder.
+2. Download [openQ4 0.15.0](https://github.com/themuffinator/openQ4/releases/tag/v0.15.0) for your system and extract it into its own folder.
 3. Launch it:
    - **Windows:** run the installer, or `openQ4-client_x64.exe` from the ZIP.
    - **Linux:** download the AppImage (`x86_64` for most PCs, `aarch64` for ARM64), make it executable and run it.
@@ -47,26 +47,27 @@ openQ4 replaces Quake 4's engine and game code with its own: an open-source engi
 > [!TIP]
 > On first launch openQ4 picks a performance preset to suit your hardware, and after an update that changes the presets it offers a [system check](docs/user/display-settings.md#system-check). To change it, open **Settings → Display** and choose another preset, or press **Auto-Detect** to pick again.
 
-Upgrading? Install the whole package into a fresh folder rather than replacing individual files, and read [upgrading to 0.14.1](docs/user/release-status.md#installing-or-upgrading-to-0141) first: it covers your saves.
+Upgrading? Install the whole package into a fresh folder rather than replacing individual files, and read [upgrading to 0.15.0](docs/user/release-status.md#installing-or-upgrading-to-0150) first: it covers your saves.
 
 ## Features
 
-What you get in **0.14.1**, the latest release:
+What you get in **0.15.0**, the Multiplayer Edition and the latest release:
 
 - 🪐 **Two campaigns.** Play Quake 4 or [The Awakening](docs/user/awakening.md), the recovered expansion, from **Single Player → Campaign**, each with its own saves. You supply the expansion files.
 - 🖥️ **A new interface.** Rebuilt menus and settings, the Remastered HUD, weapon wheels, scopes and animated crosshairs, ready for controllers, touch, tall screens and larger text. The classic look is one setting away.
 - 🌗 **Modern lighting, each switchable**: stable [shadow maps](docs/user/shadow-mapping.md) on the higher presets, bloom, HDR, [temporal AA](docs/user/temporal-presentation.md), motion blur, [baked light grids](docs/user/light-grids.md), [cel shading](docs/user/cel-shading.md) and a CRT filter.
 - ⚡ **Built for modern displays.** Widescreen, ultrawide and portrait screens, smooth motion at 144 Hz and beyond, presets with Auto-Detect, and display changes that apply without a restart.
 - 🔺 **Your choice of renderer.** Vulkan is supported on Windows and chosen automatically, with OpenGL as the fallback.
-- 🎯 **Better multiplayer** (experimental): [bots that take orders](docs/user/multiplayer.md#give-bots-orders), quick and voice chat, objective markers, a server browser with favourites, [readable chat](docs/user/multiplayer-chat.md), a [buy menu](docs/user/buying.md) with Quake 4's or The Awakening's rules, [Instagib, Quad Hog, weapon arenas and presets](docs/user/server-setup.md#modifiers-and-presets) for any game type and [spectator cameras that follow the action](docs/user/multiplayer.md#spectate). Start with the [multiplayer guide](docs/user/multiplayer.md).
+- 🎯 **Multiplayer your way** (experimental): a Quake 2-style [Classic ruleset](docs/user/classic-ruleset.md) with a grappling hook, [bots that take orders](docs/user/multiplayer.md#give-bots-orders), quick and voice chat, objective markers, a server browser with favourites, [readable chat](docs/user/multiplayer-chat.md), a [buy menu](docs/user/buying.md) with Quake 4's or The Awakening's rules, [Instagib, Quad Hog, weapon arenas and presets](docs/user/server-setup.md#modifiers-and-presets) for any game type, [spectator cameras that follow the action](docs/user/multiplayer.md#spectate), and netcode that draws your shots the moment you fire. Start with the [multiplayer guide](docs/user/multiplayer.md).
 - 📼 **A demo library and player** for full matches and whole campaigns, with markers, fast seeking, Auto-Track and free-fly playback. See [demos](docs/user/multiview-demos.md).
 - 🏆 **More to play.** The experimental [Arena Campaign](docs/user/arena-campaign.md) offers bot matches across five tiers of the stock maps, with boss matches and saved progress.
 - 🔊 **Sound as designed.** [Room reverb](docs/user/gameplay-settings.md#room-reverb) for every map, subtitles and a separate dialogue volume.
 - 🌍 **Twelve languages**, including German, Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian. See [Languages](docs/user/languages.md).
 - 🌊 **Real liquids.** Swim, wade and drown in water, and take damage in slime and lava, in maps built for them. See [Liquids](docs/user/liquids.md).
-- 🧪 **Experimental extras**: [VR](docs/user/vr.md) through OpenXR, an [Android app](docs/user/android-setup.md), a [level editor](docs/user/level-editor.md), [PBR materials](docs/user/pbr-materials.md) for mods and [enhanced physics](docs/user/gameplay-settings.md#enhanced-physics) for ragdolls and debris.
+- 🥽 **VR through OpenXR** (experimental), with your own body in the headset. [Try it](docs/user/vr.md#quick-start) and [tell us how it runs](https://github.com/themuffinator/openQ4/issues/new?template=vr-headset-report.yml).
+- 🧪 **Experimental extras**: an [Android app](docs/user/android-setup.md), a [level editor](docs/user/level-editor.md), [PBR materials](docs/user/pbr-materials.md) for mods and [enhanced physics](docs/user/gameplay-settings.md#enhanced-physics) for ragdolls and debris.
 
-Read the full [0.14.1 release notes](docs/dev/releases/v0.14.1.md). Development continues toward 1.0; see the [roadmap](docs/dev/roadmap.md).
+Read the full [0.15.0 release notes](docs/dev/releases/v0.15.0.md). Development continues toward 1.0; see the [roadmap](docs/dev/roadmap.md).
 
 ## Screenshots
 
@@ -111,7 +112,7 @@ Details for each platform are in [Getting Started](docs/user/getting-started.md#
 
 ## Player guides
 
-These guides describe 0.14.1. Anything added since is marked **Not in 0.14.1**; [release status](docs/user/release-status.md) explains what each download includes.
+These guides describe 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**; [release status](docs/user/release-status.md) explains what each download includes.
 
 **Set up**
 - [Getting Started](docs/user/getting-started.md): install, first launch and common questions
@@ -124,8 +125,8 @@ These guides describe 0.14.1. Anything added since is marked **Not in 0.14.1**; 
 - [Arena Campaign](docs/user/arena-campaign.md) (experimental): tiers, unlocks, maps and bots
 - [Multiplayer Guide](docs/user/multiplayer.md) (experimental): joining and hosting, game types, spectating, voting and bot orders, with links to every multiplayer guide
 - [Multiplayer Networking](docs/user/multiplayer-networking.md) (experimental) · [Multiplayer Chat](docs/user/multiplayer-chat.md) · [Buying](docs/user/buying.md) · [Competitive Matches](docs/user/competitive-matches.md) (experimental)
-- [Classic Multiplayer Ruleset](docs/user/classic-ruleset.md) (**Not in 0.14.1**): Quake 2-style weapons, tiered armour, double jumps, Threewave CTF scoring and a grappling hook
-- [Multiplayer Client Options](docs/user/multiplayer-client-options.md) (**Not in 0.14.1**): chat tokens, hit sounds by damage, a weapon order, item timers and team locations
+- [Classic Multiplayer Ruleset](docs/user/classic-ruleset.md) (**New in 0.15.0**): Quake 2-style weapons, tiered armour, double jumps, Threewave CTF scoring and a grappling hook
+- [Multiplayer Client Options](docs/user/multiplayer-client-options.md) (**New in 0.15.0**): chat tokens, hit sounds by damage, a weapon order, item timers and team locations
 - [Demo Library and Multi-View Demos](docs/user/multiview-demos.md): browse, play back and record full matches
 
 **Look and feel**

@@ -1,10 +1,10 @@
 # Buying in multiplayer
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 > Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
 
-**Not in 0.14.1.** Some servers turn off the weapon, armour and ammunition
+**New in 0.15.0.** Some servers turn off the weapon, armour and ammunition
 pickups and let you buy your gear instead, with credits you earn in the match.
 A server sells by one of two sets of rules: **Quake 4**'s, the buy menu the
 retail game shipped, or **The Awakening**'s, the expansion's unfinished buy

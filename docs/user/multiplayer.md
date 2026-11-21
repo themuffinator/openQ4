@@ -1,6 +1,6 @@
 # Multiplayer guide
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 > **Experimental.** Multiplayer is still under active development. Expect rough
 > edges, bugs and behaviour that changes between versions.
@@ -18,9 +18,9 @@ by task.
   need the same openQ4 version and the same game files. Different versions are
   not guaranteed to play together: 0.13.0 and 0.14.1, for example, refuse each
   other, with a pure server reporting missing packages and other servers
-  reporting that data is out of sync. Builds after 0.14.1 also use a newer
-  network protocol (2.42, where 0.14.1 uses 2.41), so they and 0.14.1 leave
-  each other out of the server list. See
+  reporting that data is out of sync. 0.15.0 also uses a newer network
+  protocol (2.42, where 0.14.1 uses 2.41), so 0.15.0 and 0.14.1 leave each
+  other out of the server list. See
   [Older openQ4 versions](multiplayer-networking.md#older-openq4-versions).
 - **Retail Quake 4 cannot play with openQ4.** Retail Quake 4 1.4.2 clients and
   servers use a different network protocol (2.85), so neither side can join
@@ -126,17 +126,17 @@ end in each mode.
 A server can change the rules of any game type. Players pick the rules up
 from the server, and the match name in the server browser shows what is on.
 
-- **Rulesets** (**Not in 0.14.1**). The [Classic ruleset](classic-ruleset.md)
+- **Rulesets** (**New in 0.15.0**). The [Classic ruleset](classic-ruleset.md)
   plays like Quake 2 deathmatch and Threewave CTF, with Quake 2-style weapons,
   tiered armour, a stair double jump and a grappling hook.
-- **Modifiers** (**Not in 0.14.1**). [Instagib](server-setup.md#instagib),
+- **Modifiers** (**New in 0.15.0**). [Instagib](server-setup.md#instagib),
   Quad Hog, Vampiric Damage, Weapons Frenzy and weapon arenas, plus damage,
   knockback and respawn settings. See
   [Modifiers and presets](server-setup.md#modifiers-and-presets).
-- **Presets** (**Not in 0.14.1**). A named bundle of game type, ruleset,
+- **Presets** (**New in 0.15.0**). A named bundle of game type, ruleset,
   modifiers and limits, such as `rocketarena` or `instactf`. See
   [Presets](server-setup.md#presets).
-- **Buying** (**Not in 0.14.1**). Pickups give way to a buy menu, by Quake 4's
+- **Buying** (**New in 0.15.0**). Pickups give way to a buy menu, by Quake 4's
   rules or The Awakening's. See [Buying in multiplayer](buying.md).
 
 ## During a match
@@ -167,7 +167,7 @@ Press **Chat** to talk to everyone or **Team Chat** to talk to your team, hold
 **Quick Chat** for a wheel of ready-made phrases, and hold **Voice Chat** to
 speak once you have turned on microphone access. See
 [Multiplayer chat](multiplayer-chat.md). Chat tokens such as `#h` and `#l`
-put your health and location into a line (**Not in 0.14.1**); see
+put your health and location into a line (**New in 0.15.0**); see
 [Chat tokens](multiplayer-client-options.md#chat-tokens).
 
 ### Give bots orders
@@ -287,7 +287,7 @@ On a server that allows voting (`si_allowVoting 1`), only active human players
 call and cast votes; bots do not, and they do not raise the number needed to
 pass. Who can vote is fixed until the vote ends, even if players disconnect.
 
-**Not in 0.14.1.** Call a vote with `callvote` (or `cv`) and cast yours with
+**New in 0.15.0.** Call a vote with `callvote` (or `cv`) and cast yours with
 `vote yes` or `vote no`, or from the in-match menu's **Vote** page, which
 offers every vote below but `scorelimit`: the map, **Skip to Next Map** and
 **Random Map**, the game type and its limits, the **Overtime Period**, the
@@ -329,7 +329,7 @@ server allows it; see [The map queue](server-setup.md#the-map-queue).
 
 ### Timeouts
 
-**Not in 0.14.1.** A team server can give each side timeouts. The operator
+**New in 0.15.0.** A team server can give each side timeouts. The operator
 sets `si_timeouts` (how many each side gets, `0` for none) and
 `si_timeoutLength` (seconds). Any player on a team then types `timeout` in
 the console to pause the match for their side, and `timein` to end it early;
@@ -417,7 +417,7 @@ Markers on the HUD show where the flags and zones are and who holds them; see
 
 ### Spectators, idle players and disconnects
 
-**Not in 0.14.1.** Three server policies, all off unless the operator turns
+**New in 0.15.0.** Three server policies, all off unless the operator turns
 them on:
 
 - `si_spectatorLock 1` keeps spectators out of a match while it is live; they
@@ -444,7 +444,7 @@ the settings that are yours rather than the server's:
 
 - **Player:** your name, clan tag, player model, rail colour and
   [weapon order](multiplayer-client-options.md#weapon-preference-order)
-  (**Not in 0.14.1**).
+  (**New in 0.15.0**).
 - **HUD:** hit sounds, crosshair names and ammunition, item timers, team
   locations, a clock, and your spectator speed and follow view (**Not in
   0.14.1**). See [Multiplayer client options](multiplayer-client-options.md).
@@ -511,9 +511,9 @@ shows how to make one.
 - [Multiplayer client options](multiplayer-client-options.md) (**Not in
   0.14.1**): chat tokens, hit sounds by damage, weapon order, item timers and
   team locations.
-- [Buying in multiplayer](buying.md) (**Not in 0.14.1**): the buy menu, prices
+- [Buying in multiplayer](buying.md) (**New in 0.15.0**): the buy menu, prices
   and credits.
-- [Classic multiplayer ruleset](classic-ruleset.md) (**Not in 0.14.1**):
+- [Classic multiplayer ruleset](classic-ruleset.md) (**New in 0.15.0**):
   Quake 2-style weapons, tiered armour, Threewave CTF scoring and the
   grappling hook.
 - [Demos and multi-view demos](multiview-demos.md): watch, record and recover

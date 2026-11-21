@@ -1,6 +1,6 @@
 # Languages
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 openQ4 can show its menus and game text in twelve languages. Choose one with **Settings → Game Options → General → Language** (in the classic menus, the Game Options page's **Gameplay** section). The menus switch at once; there is no need to restart.
 
@@ -14,7 +14,7 @@ openQ4 can show its menus and game text in twelve languages. Choose one with **S
 | Hungarian | `hungarian` | The same as German |
 | Turkish | `turkish` | The same as German |
 | Ukrainian | `ukrainian` | The same as German |
-| Russian | `russian` | The same as German (**Not in 0.14.1**: 0.14.1 translates only the menus and openQ4's own settings) |
+| Russian | `russian` | The same as German (**New in 0.15.0**: 0.14.1 translates only the menus and openQ4's own settings) |
 | Polish | `polish` | Menus and openQ4's own settings; other game text is in English |
 
 On the very first launch openQ4 picks your system language if it is one of

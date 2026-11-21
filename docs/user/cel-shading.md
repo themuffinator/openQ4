@@ -1,6 +1,6 @@
 # Cel shading
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 Cel shading gives Quake 4 a cartoon look: lighting falls into flat bands of tone, and black ink outlines the shapes. It's off by default, so the game looks like stock Quake 4 until you turn it on. It works on OpenGL and Vulkan. There is no menu switch; you set it from the console.
 

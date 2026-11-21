@@ -1,6 +1,6 @@
 # Gameplay settings
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 This guide covers how the game plays, looks and sounds: difficulty and Turbo Mode, the HUD and crosshair, multiplayer hit feedback, field of view, subtitles and sound, and a few convenience options. For keys, mouse and controllers, see [Input settings](input-settings.md).
 
@@ -174,7 +174,7 @@ The weapon on screen has its own controls on **Settings → Game Options → Vie
 
 ## Dialogue subtitles
 
-Turn on **Settings → Audio → Dialogue Subtitles**, under **Subtitles**. Subtitles work in both interfaces, including The Awakening, and stay visible when dialogue or master volume is muted. Up to two speakers appear at once, and long lines advance in pages as the audio plays. When a line finishes, its last words stay up for half a second more, and a short line stays up for at least a second and a half, so you have time to read it; a line that is cut off clears at once. Pausing, saving and loading keep the caption at the current point in the line. **Subtitle Size**, **Subtitle Background**, **Speaker Names** and **Untranscribed Speech** sit beside it. **Speaker Names** puts the character's name before their line, for example *Medic Anderson: There. He's stabilized for the moment.*, and **Radio** before a radio line whose speaker is unknown. **Not in 0.14.1:** in 0.14.1 Speaker Names showed only the radio label, never a character's name. The emotion cues the game's dialogue text carries for its facial animation show as stage directions, for example *(Furrow) Let's not lose focus here.* **Not in 0.14.1:** 0.14.1 shows them raw, as `{furrow}`.
+Turn on **Settings → Audio → Dialogue Subtitles**, under **Subtitles**. Subtitles work in both interfaces, including The Awakening, and stay visible when dialogue or master volume is muted. Up to two speakers appear at once, and long lines advance in pages as the audio plays. When a line finishes, its last words stay up for half a second more, and a short line stays up for at least a second and a half, so you have time to read it; a line that is cut off clears at once. Pausing, saving and loading keep the caption at the current point in the line. **Subtitle Size**, **Subtitle Background**, **Speaker Names** and **Untranscribed Speech** sit beside it. **Speaker Names** puts the character's name before their line, for example *Medic Anderson: There. He's stabilized for the moment.*, and **Radio** before a radio line whose speaker is unknown. **New in 0.15.0:** in 0.14.1 Speaker Names showed only the radio label, never a character's name. The emotion cues the game's dialogue text carries for its facial animation show as stage directions, for example *(Furrow) Let's not lose focus here.* **New in 0.15.0:** 0.14.1 shows them raw, as `{furrow}`.
 
 The text comes from your installed game. Most lines use its lip-sync transcripts. Radio chatter and the other lines that have none show the line as written in the game's script, which its sound files carry; now and then the actor says a shorter or slightly different take. A marine heard over the helmet radio shows the same text as when you hear them face to face. The installed text is English only (the Steam release installs English, and The Awakening's is written in English), so other menu languages show English captions. Screams, laughter, pain sounds and multiplayer announcers have no words to show. With **Untranscribed Speech** on (the default) such a sound, or any other speech without text, shows **[untranscribed speech]**, after the speaker's name when it is known, so you can tell someone is making it; where that does not fit on one line, as in a narrow window at large text sizes, it shortens to **[speech]**. Turn it off to leave those blank. Stage directions in the script, such as *(pain grunt)*, are never shown as captions. Voice chat and sound effects are not transcribed. In portrait windows, cinematic captions sit below the picture, clear of title cards; at the largest text sizes they show one line at a time there, with a second speaker above the picture. A speaker name too wide for half the line is left out.
 
@@ -250,7 +250,7 @@ These are on by default and rarely need changing. Each takes effect after `s_res
 
 ### Weapon switching
 
-**Not in 0.14.1.** **Settings → Game Options → General → Auto Weapon Switch** (`ui_autoSwitch`) decides what happens when you pick up a weapon:
+**New in 0.15.0.** **Settings → Game Options → General → Auto Weapon Switch** (`ui_autoSwitch`) decides what happens when you pick up a weapon:
 
 - **Smart** (`2`, the default) switches only when it helps. In multiplayer a pickup takes over from the gauntlet, from the machinegun you spawn with, from a weapon that needs no ammunition such as the Classic ruleset's blaster, or from a weapon that has run dry, and never pulls a real weapon out of your hands mid-fight: running over a shotgun with the railgun up keeps the railgun. In single player you switch to a weapon the first time you get it, as Quake 4 always did.
 - **Always** (`1`) switches to every weapon you pick up in multiplayer, and to every new weapon in single player: Quake 4's original behaviour.
@@ -287,7 +287,7 @@ It is off by default; off runs the original physics exactly. A change takes effe
 
 ### Flashlights
 
-**Not in 0.14.1.** Your flashlight stays on your side of the wall. Held hard against a wall, a door or a thin panel, the gun used to reach through it, so the flashlight lit the room behind and left the wall in front of you dark. The marines' flashlight beams now shine from the flashlight under the barrel, widen out to the flashlight's reach as a soft cone, and stop at the first wall or person in the way; the original thin beam passed straight through walls. `g_flashlightBeam 0` brings the original beam back.
+**New in 0.15.0.** Your flashlight stays on your side of the wall. Held hard against a wall, a door or a thin panel, the gun used to reach through it, so the flashlight lit the room behind and left the wall in front of you dark. The marines' flashlight beams now shine from the flashlight under the barrel, widen out to the flashlight's reach as a soft cone, and stop at the first wall or person in the way; the original thin beam passed straight through walls. `g_flashlightBeam 0` brings the original beam back.
 
 ## Settings reference
 
@@ -332,7 +332,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 |---|---:|---|
 | `g_skill` | `1` | Difficulty, `0` Private to `4` Warlord. A saved game brings back its own. |
 | `g_turboMode` | `0` | Turbo Mode (single-player). |
-| `ui_autoSwitch` | `2` | Weapon pickups: `0` never switch, `1` always switch (Quake 4), `2` smart. **Not in 0.14.1:** Quake 4's switch was `0` or `1`, default `1`. |
+| `ui_autoSwitch` | `2` | Weapon pickups: `0` never switch, `1` always switch (Quake 4), `2` smart. **New in 0.15.0:** Quake 4's switch was `0` or `1`, default `1`. |
 | `g_fov` | `90` | Field of view, measured on a 4:3 screen. |
 | `g_autoSkipCinematics` | `0` | `1` skips cinematics as they start. |
 | `ui_cinematicShake` | `1` | Extra cinematic camera movement, `0` to `1`. |
@@ -344,7 +344,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `g_enhancedPhysics` | `0` | `1` uses the enhanced ragdoll and object physics from the next map; multiplayer follows the server. |
 | `g_classicDynamicLights` | `1` | Dynamic lights on muzzle flashes, bright projectiles and explosions. |
 | `g_classicDynamicLightScale` | `1` | Radius of those lights, `0.25` to `4`. |
-| `g_flashlightBeam` | `1` | Characters' visible flashlight beams: `1` widen to the light's reach and stop at walls, `0` the original thin beam. **Not in 0.14.1.** |
+| `g_flashlightBeam` | `1` | Characters' visible flashlight beams: `1` widen to the light's reach and stop at walls, `0` the original thin beam. **New in 0.15.0.** |
 
 ### Sound and subtitles
 
