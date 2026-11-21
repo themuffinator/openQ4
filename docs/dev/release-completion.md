@@ -7,6 +7,20 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Quicker menu responses, 21 November 2026
+
+- **Menus answer a press sooner.** Moving along a list, switching a tab or
+  opening a dialog in the new interface did milliseconds of work before the
+  next frame, more on the larger pages: 1.5 to 3 ms for each step down Join
+  Game's server list, 2.5 to 5 ms for a Controls tab and 4 to 9 ms to open
+  the multiplayer Escape card. The same steps now take a tenth of a
+  millisecond or less, a third of one on the Escape card, so holding an
+  arrow key or a stick through a long list stays smooth.
+- **The new HUD is lighter in a match.** The Remastered HUD's updates (health,
+  voice transmit, the scoreboard) cost a tenth to a twentieth of what they did.
+- **What to do.** Nothing: update openQ4 as usual.
+- Details: [event costs](ui/event-costs.md).
+
 ## Smoother menus, especially The Awakening's, 20 November 2026
 
 - **The Awakening's menus no longer cost a frame's worth of processor time.**

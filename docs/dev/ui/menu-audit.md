@@ -195,3 +195,9 @@ menu with its opening animations playing:
 
 Left open: the Awakening documents' size
 ([found, not fixed](menu-frame-costs.md#found-not-fixed)).
+
+A [fifth round](event-costs.md) on 21 November measured what a press costs:
+
+| Severity | Interface | Was | Now |
+| --- | --- | --- | --- |
+| Medium | Retained | Every event copied the page's whole state several times and searched its property tables for each input branch: 2.5 to 9 ms a press on Join Game, CONTROLS and the Escape card. | State tables are shared until written and input eligibility is read once per revision: 0.02 to 0.6 ms. |
