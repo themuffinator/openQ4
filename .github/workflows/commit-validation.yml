@@ -1272,6 +1272,12 @@ jobs:
     timeout-minutes: 150
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+      # The image now pairs the MSVC 14.52 STL, which refuses Clang older than
+      # 22 (STL1000), with LLVM 20, so the Python checks' clang++ fixtures
+      # failed to build. The driver override adds the STL's escape hatch to
+      # every clang invocation; the leading '#' keeps clang from echoing it.
+      # Remove it once the image ships Clang 22 or newer.
+      CCC_OVERRIDE_OPTIONS: "# +-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
 
     steps:
       - name: Checkout
