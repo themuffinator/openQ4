@@ -39,6 +39,20 @@ does not restore the withdrawn release. See
 - **What to do.** Nothing: update openQ4 as usual.
 - Details: [event costs](ui/event-costs.md).
 
+## Smooth ambient occlusion instead of dither, 21 November 2026
+
+- **SSAO no longer shows a dither pattern.** The soft shading SSAO adds in
+  corners and creases had turned into a visible grain, worst on the Quality
+  and Enhanced presets where it is drawn at half resolution. It is now
+  filtered so the shading is smooth, at every preset and on both OpenGL and
+  Vulkan, while keeping crisp edges where a wall meets a floor or a model
+  stands in front of a wall. The overall strength of the shading is
+  unchanged.
+- **PBR surfaces on Quality and Enhanced use the cheaper half-resolution
+  SSAO too**, like everything else on those presets.
+- **What to do.** Nothing: update openQ4 as usual; your settings are kept.
+- Details: [filtered SSAO occlusion](presentation-owners.md#filtered-ssao-occlusion-21-november-2026).
+
 ## Smoother menus, especially The Awakening's, 20 November 2026
 
 - **The Awakening's menus no longer cost a frame's worth of processor time.**

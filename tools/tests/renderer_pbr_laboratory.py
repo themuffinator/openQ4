@@ -121,11 +121,12 @@ if os.environ.get('OPENQ4_LAB_VK_DEVICE', '').strip():
 # room lies beyond SSAO's default fade distance. Every control keeps SSAO on,
 # so OpenGL draws all of them through its scene target; the unoccluded ones
 # fade it out at the nearest distance instead.
-# Full resolution: a view with native PBR's occlusion field always takes the
-# full-resolution pass (vk_PostProcess.cpp VK_Post_DrawSSAO, draw_common.cpp
-# RB_STD_SSAO), so its classic pixels compare with a classic-only frame only
-# when that frame does too. Automatic SSAO halves resolution below 32 samples
-# on both renderers (R_SSAOHalfResolution; OpenGL since FPS-04).
+# Full resolution: native PBR's occlusion field and the classic resolve filter
+# one occlusion target (draw_common.cpp RB_DrawSSAOOcclusion,
+# vk_PostProcess.cpp VK_Post_DrawSSAOOcclusion) at the resolution
+# R_SSAOHalfResolution picks, so the controls pin it to compare the classic
+# pixels of both frames on the same target. Automatic SSAO halves resolution
+# below 32 samples on both renderers.
 SSAO_SETTINGS = {'r_ssao': '1', 'r_ssaoRadius': '64', 'r_ssaoIntensity': '2', 'r_ssaoMaxDistance': '2048',
                  'r_ssaoResolution': '1'}
 SSAO_FADED = {**SSAO_SETTINGS, 'r_ssaoMaxDistance': '16'}

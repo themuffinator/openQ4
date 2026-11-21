@@ -1227,6 +1227,77 @@ locate the sky, and full-frame captures with the clip on lost the whole sky
 capture noise of at most 27 levels). An exact clip would need the main view's
 depth before the backdrop is drawn, which reorders the frame.
 
+### Filtered SSAO occlusion, 21 November 2026
+
+Players reported that SSAO had started to dither. Each pixel rotated its
+spiral of samples by interleaved-gradient noise, and nothing filtered the
+result: at full resolution the noise read as fine grain, and once Quality and
+Enhanced took the half-resolution pass (FPS-04) the noise was evaluated on
+every other pixel, where it aliases into a coarse ordered pattern that the
+2x2 upsample then blocked out. The debug view showed it plainly; at 12
+samples it was the dominant texture of every occluded surface.
+
+Both renderers now draw SSAO the same way at every resolution, and native
+PBR's occlusion field uses the same passes:
+
+1. **Occlusion target** (mode 3; `RB_DrawSSAOOcclusion`,
+   `VK_Post_DrawSSAOOcclusion`). An RGBA16F target of the view's size, or
+   half of it rounded up with `R_SSAOHalfResolution`. Each texel holds the raw
+   AO of one view pixel (the even pixel of its 2x2 block at half resolution),
+   that pixel's view depth (negative where sky or a foreground model takes
+   none) and the view depth's slope per view pixel, taken from the same
+   differences that reconstruct the normal. The spiral's rotation and radial
+   offset come from a 4x4 ordered (Bayer) index of the texel instead of noise:
+   neighbours differ as much as possible and every 4x4 window holds all
+   sixteen patterns once.
+2. **Filter** (mode 5, twice). A separable tent over five texels, weights
+   1/2, 1, 1, 1, 1/2, horizontally into a second target of the same size and
+   vertically back. The patterns repeat every four texels, so the two halves
+   weigh one pattern together and each of the sixteen counts exactly once:
+   the pattern cancels. Each tap also counts by how well its plane (depth plus
+   slope) predicts the centre texel's depth, within 3% of the depth or one
+   unit, so occlusion keeps to its surface across silhouettes and grazing
+   floors. Texels without AO pass through.
+3. **Resolve** (mode 4 for classic views, mode 1 for the field). At full
+   resolution a pixel reads its own texel; at half resolution it blends the
+   texels of the even pixels around it bilinearly (one, two or four), each
+   weighted by how well its plane predicts the pixel's depth, so occlusion
+   slides with every pixel instead of stepping with each texel; with no tap
+   on the pixel's surface, the closest in depth stands in. The classic
+   resolve multiplies the factor into every scene sample as before; the field
+   writes it for native PBR's indirect light and the classic factor, which
+   therefore stays identical to a classic-only frame.
+
+A single 5x5 tent in the resolve gave the same picture (within half a level of
+noise) but read 16-25 texels per view pixel; the separable passes read ten
+per occlusion texel plus one to four per view pixel, about a third as many at
+half resolution.
+
+`r_ssaoDebug` writes the resolved AO, white wherever none applies, on every
+path; the field's debug view now matches it (sky was the scene there). The
+validation references (`r_glSSAOReferenceComposition`,
+`r_vkSSAOReferenceComposition`) darken a scene copy with the same filtered
+occlusion. Mode 0, the unfiltered single pass, remains only as the fallback
+when the occlusion target cannot be created, and logs that once.
+
+Native PBR's field now follows `r_ssaoResolution` too, so Quality's PBR views
+take the half-resolution pass instead of a full-resolution one.
+
+Image check, OpenGL and Vulkan, 1280x800, frozen storage2 and hub2 poses,
+`r_ssaoDebug 1`. High-frequency noise (mean absolute difference from a 5x5
+box blur, over occluded pixels) fell from 6.1 to 1.5 levels at Quality and
+from 5.4 to 1.8 at Ultra in storage2, and from 3.6-3.9 to 0.7-1.1 in hub2.
+Mean occlusion moved by at most 0.03 levels: no bias. OpenGL and Vulkan agree
+to 0.01-0.02 levels on average (550-830 of a million pixels differ by more
+than one level, at silhouettes). Half resolution now follows full resolution
+smoothly along gradients.
+
+The PBR laboratory's SSAO controls pass 10/10 on OpenGL, OpenGL with the
+native PBR owner, and Vulkan: native PBR keeps its direct light exactly,
+classic pixels and the debug view match a classic-only frame exactly (0
+pixels), and forced half resolution now differs from full by 0.68 levels on
+average (it was about 2.1; the limit is 4) with no bias (under 0.002).
+
 ### Portal-sky mask, 5 November 2026
 
 The main view's depth is now available before the backdrop is drawn, without

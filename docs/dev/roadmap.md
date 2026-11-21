@@ -1309,6 +1309,12 @@ diagnostics establish whole-frame ownership or production performance.
   Remaining: lavapipe's one-byte difference (a WSL lavapipe run, blocked by
   free space on C:, where the WSL disk lives), mods authored outside the
   laboratory, and physical Linux/Apple.
+  Progress, 21 November: SSAO's dither is gone. Both renderers draw the raw
+  AO into an occlusion target (full or half resolution) with sixteen
+  interleaved sample patterns and resolve it with a depth-plane-aware tent
+  that cancels them; native PBR's field filters the same target, so its
+  classic pixels still match a classic-only frame and it now follows
+  `r_ssaoResolution`. See [filtered SSAO occlusion](presentation-owners.md#filtered-ssao-occlusion-21-november-2026).
 - [ ] **REN-06 — P2, qualification: probes, baked data and advanced effects.**
   Qualify probe capture orientation, generated-grid provenance and whether existing
   baked grids need regeneration after capture fixes. Broaden authored probe/decal
