@@ -28,6 +28,13 @@ typedef struct pbrNativeMaterial_s {
 	float		normalScale;
 	float		ao;
 	float		emissiveColor[3];
+	// Parallax occlusion mapping (REN-11): when set, dataImage carries the
+	// height in its alpha and a height h lies at h * parallaxScale +
+	// parallaxBias texture-coordinate units above the polygon. Every pass that
+	// lights the surface traces the same ray, so the passes stay aligned.
+	bool		parallax;
+	float		parallaxScale;
+	float		parallaxBias;
 } pbrNativeMaterial_t;
 
 float	R_PBRNative_RegisterValue( const drawSurf_t *surf, int registerIndex, float fallback );
@@ -53,5 +60,20 @@ bool	R_PBRNative_Material( const drawSurf_t *surf, bool translucentAdmitted, pbr
 // True when stageIndex is the classic additive glow stage the native owner
 // replaces with typed linear emission.
 bool	R_PBRNative_IsReplacedEmissionStage( const drawSurf_t *surf, int stageIndex );
+
+// Parallax for an admitted PBR surface with this data layout: the height must
+// ride in its bound ORM image. Counts the admission for the report.
+void	R_PBRNative_ResolveParallax( const drawSurf_t *surf, int dataFlags, const idImage *dataImage,
+		bool &parallax, float &scale, float &bias );
+// The shader inputs of a parallax surface, identical on both backends:
+// params = ( scale, bias, most samples, self-shadow ), all zero when flat;
+// fade = ( fade start, fade end, 0, 0 ) in world units.
+void	R_PBRNative_ParallaxParameters( const pbrNativeMaterial_t &material, float params[4], float fade[4] );
+// The same inputs for the retail Parallaxbump guide (Vulkan classic path):
+// its authored scale and bias, the ray when r_parallaxOcclusion is set.
+void	R_Parallax_RetailParameters( float scale, float bias, float params[4], float fade[4] );
+// Per-frame accounting for the requested/effective report (gfxInfo).
+void	R_Parallax_CountDraw( void );
+void	R_Parallax_PrintInfo( void );
 
 #endif

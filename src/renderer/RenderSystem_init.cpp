@@ -50,6 +50,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "RenderGraph.h"
 #include "RenderGraphResources.h"
 #include "MaterialResourceTable.h"
+#include "PBRNativeContract.h"
 #include "ClassicGuiDomain.h"
 #include "ClassicCinematicPostDomain.h"
 #include "ClassicSpecialFrameDomain.h"
@@ -345,6 +346,12 @@ static void R_MSAAResolvesLastFrame( int &color, int &depth ) {
 idCVar r_postAA( "r_postAA", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "post AA mode: 0 = off, 1 = SMAA 1x medium, 2 = SMAA 1x high, 3 = SMAA 1x ultra, 4 = SMAA 1x colour-edge prototype", 0, 4, idCmdSystem::ArgCompletion_Integer<0,4> );
 idCVar r_postAAStatePoisonTest( "r_postAAStatePoisonTest", "0", CVAR_RENDERER | CVAR_BOOL, "intentionally dirty GL texture/client state before SMAA post-AA draws for validation" );
 idCVar r_pbrMaterials( "r_pbrMaterials", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "draw explicitly PBR-authored materials as PBR; 0 keeps their classic stages. Stock materials are never PBR" );
+// Parallax occlusion mapping (REN-11): authored PBR heightMap materials and,
+// on Vulkan, the retail Parallaxbump guide. Off draws both exactly as before.
+idCVar r_parallaxOcclusion( "r_parallaxOcclusion", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "ray-marched parallax occlusion mapping for PBR materials with a heightMap, and on Vulkan for the retail Parallaxbump guide; 0 draws heightMap materials flat and keeps the retail single-step offset" );
+idCVar r_parallaxSamples( "r_parallaxSamples", "32", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "most height samples one parallax ray takes, at grazing angles; a quarter of it at normal incidence, falling with distance", 8, 64, idCmdSystem::ArgCompletion_Integer<8,64> );
+idCVar r_parallaxDistance( "r_parallaxDistance", "1536", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "view distance at which parallax has faded back to the flat surface; it fades over the last quarter", 64.0f, 16384.0f );
+idCVar r_parallaxShadows( "r_parallaxShadows", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "trace a self-shadow ray through the height field toward each light for parallax surfaces" );
 idCVar r_vkPBRSpecularAA( "r_vkPBRSpecularAA", "1", CVAR_RENDERER | CVAR_BOOL, "filter native Vulkan PBR roughness by shading-normal variance; disable only for comparison" );
 idCVar r_pbrGeneratedLegacyFallback( "r_pbrGeneratedLegacyFallback", "1", CVAR_RENDERER | CVAR_BOOL, "allow development-only classic fallback generation for PBR-only materials" );
 idCVar r_pbrDebug( "r_pbrDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "PBR debug view: 0=off, 1=albedo, 2=normal, 3=metallic, 4=roughness, 5=AO, 6=emissive, 7=state marker (green=PBR, magenta=contract mismatch)", 0, 7, idCmdSystem::ArgCompletion_Integer<0,7> );
@@ -5166,6 +5173,7 @@ void GfxInfo_f( const idCmdArgs &args ) {
 		RENDER_GRAPH_MAX_RESOURCE_ACCESSES );
 	R_RenderGraphResources_PrintGfxInfo();
 	R_MaterialResourceTable_PrintGfxInfo();
+	R_Parallax_PrintInfo();
 #if !defined( OPENQ4_RENDERER_VK_MODULE ) && !defined( OPENQ4_RENDERER_GLES_MODULE )
 	RB_GLPBR_PrintInfo();
 #endif

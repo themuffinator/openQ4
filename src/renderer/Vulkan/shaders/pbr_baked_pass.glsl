@@ -73,6 +73,7 @@ layout(location = 1) out vec4 outPBRColor;
 #endif
 
 void main() {
+    PBRParallaxBegin(pc.d.x < 5.5);
     outColor = vec4(pc.d.x > 5.5 ? EvaluateBakedClassic() : EvaluatePBREnvironment(), 0.0);
 }
 

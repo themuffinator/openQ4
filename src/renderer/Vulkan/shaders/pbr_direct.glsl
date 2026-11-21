@@ -4,6 +4,126 @@
 // pc.c.xyw carries the data-layout bits, normal encoding and specular-AA switch.
 // The classic specular-table sampler is unused by PBR and carries metallic.
 
+// Parallax occlusion mapping (REN-11). A PBR draw never reads the classic
+// cel-banding or specular-colour fields, so they carry the parallax inputs:
+// inter.celParams = (scale, bias, most samples, self-shadow) and
+// inter.specularColor.xy = fade (start, end); all zero when the surface is
+// flat. PBRParallaxBegin traces the ray once per fragment; every material
+// sample then reads the traced texel with the untraced coordinate's own
+// gradients, so the hit never selects a wrong mip. Flat surfaces sample
+// exactly as they always did.
+#include "../../ParallaxOcclusion.h"
+
+bool gPBRParallax = false;
+vec4 gPBRParallaxHit = vec4(0.0);
+vec2 gPBRBumpDx, gPBRBumpDy, gPBRAlbedoDx, gPBRAlbedoDy, gPBRDataDx, gPBRDataDy;
+
+// The retail guide keeps its height in the red channel of the RXGB bump
+// map; a PBR heightMap rides in the ORM alpha.
+bool gParallaxRetailHeight = false;
+
+float OpenQ4ParallaxHeight(vec2 uv, vec2 dx, vec2 dy) {
+    if (gParallaxRetailHeight) {
+        return textureGrad(bumpMap, uv, dx, dy).r;
+    }
+    return textureGrad(specularMap, uv, dx, dy).a;
+}
+
+vec3 PBRParallaxTangent(vec3 objectVector) {
+    return vec3(dot(SafeNormalize(vPBRTangent0), objectVector),
+        dot(SafeNormalize(vPBRTangent1), objectVector),
+        dot(SafeNormalize(vPBRNormal), objectVector));
+}
+
+// pbrDraw: this draw is a native PBR draw, whose block carries the inputs.
+void PBRParallaxBegin(bool pbrDraw) {
+    gPBRParallax = pbrDraw && inter.celParams.x > 0.0 && inter.celParams.z > 0.5;
+    if (!gPBRParallax) {
+        return;
+    }
+    gPBRBumpDx = dFdx(vBumpTexCoord);
+    gPBRBumpDy = dFdy(vBumpTexCoord);
+    gPBRAlbedoDx = dFdx(vDiffuseTexCoord);
+    gPBRAlbedoDy = dFdy(vDiffuseTexCoord);
+    gPBRDataDx = dFdx(vSpecularTexCoord);
+    gPBRDataDy = dFdy(vSpecularTexCoord);
+    gPBRParallaxHit = OpenQ4ParallaxTrace(vSpecularTexCoord, PBRParallaxTangent(vViewVector),
+        inter.celParams, inter.specularColor, length(vViewVector), gPBRDataDx, gPBRDataDy);
+}
+
+vec4 PBRBumpTexture(sampler2D map, vec2 texCoord) {
+    if (gPBRParallax) {
+        return textureGrad(map, texCoord + gPBRParallaxHit.xy, gPBRBumpDx, gPBRBumpDy);
+    }
+    return texture(map, texCoord);
+}
+
+vec4 PBRAlbedoTexture(sampler2D map, vec2 texCoord) {
+    if (gPBRParallax) {
+        return textureGrad(map, texCoord + gPBRParallaxHit.xy, gPBRAlbedoDx, gPBRAlbedoDy);
+    }
+    return texture(map, texCoord);
+}
+
+vec4 PBRDataTexture(sampler2D map, vec2 texCoord) {
+    if (gPBRParallax) {
+        return textureGrad(map, texCoord + gPBRParallaxHit.xy, gPBRDataDx, gPBRDataDy);
+    }
+    return texture(map, texCoord);
+}
+
+// The light's visibility through the height field; 1 without the option.
+float PBRParallaxShadow(vec3 objectLight) {
+    if (!gPBRParallax) {
+        return 1.0;
+    }
+    return OpenQ4ParallaxShadow(vSpecularTexCoord, gPBRParallaxHit,
+        PBRParallaxTangent(objectLight), inter.celParams, gPBRDataDx, gPBRDataDy);
+}
+
+// The retail Parallaxbump guide on classic draws (pc.d.x == 0): pc.c.xy carry
+// its authored scale and bias and pc.c.z enables it. With
+// r_parallaxOcclusion, pc.a.w is the ray's most samples and |pc.b.w| its fade
+// end, negative with the self-shadow; pc.a.w == 0 keeps the retail single
+// step exactly. The classic view and light vectors are already tangent-space.
+bool gRetailParallaxRay = false;
+
+vec2 RetailParallaxOffset() {
+    if (pc.a.w < 0.5) {
+        float height = texture(bumpMap, vBumpTexCoord).r;
+        return SafeNormalize(vViewVector).xy * (height * pc.c.x + pc.c.y);
+    }
+    gRetailParallaxRay = true;
+    gParallaxRetailHeight = true;
+    gPBRBumpDx = dFdx(vBumpTexCoord);
+    gPBRBumpDy = dFdy(vBumpTexCoord);
+    gPBRAlbedoDx = dFdx(vDiffuseTexCoord);
+    gPBRAlbedoDy = dFdy(vDiffuseTexCoord);
+    gPBRDataDx = dFdx(vSpecularTexCoord);
+    gPBRDataDy = dFdy(vSpecularTexCoord);
+    float fadeEnd = abs(pc.b.w);
+    gPBRParallaxHit = OpenQ4ParallaxTrace(vBumpTexCoord, vViewVector,
+        vec4(pc.c.x, pc.c.y, pc.a.w, pc.b.w < 0.0 ? 1.0 : 0.0),
+        vec4(fadeEnd * 0.75, fadeEnd, 0.0, 0.0), length(vViewVector), gPBRBumpDx, gPBRBumpDy);
+    return gPBRParallaxHit.xy;
+}
+
+// texCoord already carries the offset; the gradients are the untraced ones.
+vec4 RetailTexture(sampler2D map, vec2 texCoord, vec2 dx, vec2 dy) {
+    if (gRetailParallaxRay) {
+        return textureGrad(map, texCoord, dx, dy);
+    }
+    return texture(map, texCoord);
+}
+
+float RetailParallaxShadow() {
+    if (!gRetailParallaxRay || pc.a.z > 0.5) {
+        return 1.0;
+    }
+    return OpenQ4ParallaxShadow(vBumpTexCoord, gPBRParallaxHit, vLightVector,
+        vec4(pc.c.x, pc.c.y, pc.a.w, pc.b.w < 0.0 ? 1.0 : 0.0), gPBRBumpDx, gPBRBumpDy);
+}
+
 // Native ordered transparency: pc.a.w carries the authored blend stage's
 // alpha register, and the albedo image supplies the per-texel coverage the
 // classic stage would have sampled. Every other interaction draw is additive
@@ -12,7 +132,7 @@ float PBRTransparentAlpha(vec2 albedoTexCoord) {
     if (pc.a.w <= 0.0) {
         return 0.0;
     }
-    return clamp(texture(diffuseMap, albedoTexCoord).a * pc.a.w, 0.0, 1.0);
+    return clamp(PBRAlbedoTexture(diffuseMap, albedoTexCoord).a * pc.a.w, 0.0, 1.0);
 }
 
 vec3 PBRDirectNormal(vec2 texCoord) {
@@ -20,7 +140,7 @@ vec3 PBRDirectNormal(vec2 texCoord) {
     if (encoding == 0) {
         return vec3(0.0, 0.0, 1.0);
     }
-    vec4 value = texture(bumpMap, texCoord);
+    vec4 value = PBRBumpTexture(bumpMap, texCoord);
     vec3 normal;
     if (encoding == 2) {
         vec2 xy = (value.rg * 2.0 - 1.0) * pc.d.w;
@@ -103,20 +223,20 @@ vec3 PBRUniformEnvironmentLight(vec3 irradiance, vec3 albedo, float metallic, fl
 vec3 EvaluatePBRDirect(vec3 localNormal, vec2 albedoTexCoord,
         vec2 dataTexCoord, float shadowFactor) {
     // Color uses sRGB storage and decodes before filtering. Data stays linear.
-    vec3 albedo = texture(diffuseMap, albedoTexCoord).rgb;
+    vec3 albedo = PBRAlbedoTexture(diffuseMap, albedoTexCoord).rgb;
     int dataFlags = int(pc.c.x + 0.5);
     vec2 materialData = vec2(1.0);
     float aoTexel = 1.0;
     if ((dataFlags & 1) != 0) {
-        vec3 orm = texture(specularMap, dataTexCoord).rgb;
+        vec3 orm = PBRDataTexture(specularMap, dataTexCoord).rgb;
         materialData = orm.bg;
         aoTexel = orm.r;
     } else {
         if ((dataFlags & 2) != 0) {
-            materialData.x = texture(specularTableMap, dataTexCoord).r;
+            materialData.x = PBRDataTexture(specularTableMap, dataTexCoord).r;
         }
         if ((dataFlags & 4) != 0) {
-            materialData.y = texture(specularMap, dataTexCoord).r;
+            materialData.y = PBRDataTexture(specularMap, dataTexCoord).r;
         }
     }
     float metallic = clamp(materialData.x * pc.d.y, 0.0, 1.0);
@@ -148,7 +268,7 @@ vec3 EvaluatePBRDirect(vec3 localNormal, vec2 albedoTexCoord,
         // of the roughness map for this light stage only (flag 16), which
         // then leaves the scalar roughness.
         if ((dataFlags & 16) != 0) {
-            aoTexel = texture(specularMap, dataTexCoord).r;
+            aoTexel = PBRDataTexture(specularMap, dataTexCoord).r;
         }
         return PBRDisplayOutput(PBRUniformEnvironmentLight(radiance, albedo, metallic, roughness,
             PBRScreenAO(clamp(aoTexel * pc.b.x, 0.0, 1.0), dataFlags), objectNormal, viewDir, vPBRNormal) * vVertexColor);
@@ -173,5 +293,7 @@ vec3 EvaluatePBRDirect(vec3 localNormal, vec2 albedoTexCoord,
     vec3 diffuse = (vec3(1.0) - fresnel) * (1.0 - metallic)
         * albedo * (1.0 / 3.14159265);
     // Authored AO modulates indirect irradiance, never this direct light.
-    return PBRDisplayOutput((diffuse + specular) * radiance * ndotl * vVertexColor);
+    // The parallax self-shadow is direct visibility, like the shadow factor.
+    return PBRDisplayOutput((diffuse + specular) * radiance * ndotl * vVertexColor
+        * PBRParallaxShadow(vLightVector));
 }

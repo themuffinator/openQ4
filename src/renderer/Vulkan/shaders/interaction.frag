@@ -152,6 +152,7 @@ layout(location = 1) out vec4 outPBRColor;
 #endif
 
 void main() {
+    PBRParallaxBegin(pc.d.x > 0.5);
     if (pc.d.x > 4.5) {
         outColor = vec4(EvaluatePBRDebug(), PBRTransparentAlpha(vDiffuseTexCoord));
         return;
@@ -175,14 +176,13 @@ void main() {
         return;
     }
     if (pc.c.z > 0.5) {
-        float height = texture(bumpMap, bumpTexCoord).r;
-        vec2 offset = SafeNormalize(vViewVector).xy * (height * pc.c.x + pc.c.y);
+        vec2 offset = RetailParallaxOffset();
         bumpTexCoord += offset;
         diffuseTexCoord += offset;
         specularTexCoord += offset;
     }
 
-    vec4 bumpSample = texture(bumpMap, bumpTexCoord);
+    vec4 bumpSample = RetailTexture(bumpMap, bumpTexCoord, gPBRBumpDx, gPBRBumpDy);
     if (pc.d.x > 0.5) {
         vec3 localNormal = PBRDirectNormal(bumpTexCoord);
         outColor = vec4(EvaluatePBRDirect(localNormal,
@@ -200,11 +200,11 @@ void main() {
     light *= textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb;
     light *= textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb;
 
-    vec3 diffuse = texture(diffuseMap, diffuseTexCoord).rgb * inter.diffuseColor.rgb;
+    vec3 diffuse = RetailTexture(diffuseMap, diffuseTexCoord, gPBRAlbedoDx, gPBRAlbedoDy).rgb * inter.diffuseColor.rgb;
     diffuse = ApplyFlatDiffuseSweep(diffuse, vLightFalloffTexCoord.z);
 
     vec3 halfAngle = SafeNormalize(vHalfAngleVector);
-    vec3 specularSample = texture(specularMap, specularTexCoord).rgb;
+    vec3 specularSample = RetailTexture(specularMap, specularTexCoord, gPBRDataDx, gPBRDataDy).rgb;
     float specularTerm;
     if (EnhancedMaterialActive()) {
         specularTerm = EnhancedSpecularTerm(halfAngle, SafeNormalize(vViewVector), localNormal, specularSample);
@@ -215,6 +215,7 @@ void main() {
     specularTerm = CelSpecularTerm(specularTerm);
     vec3 specular = specularSample * inter.specularColor.rgb * specularTerm;
 
+    light *= RetailParallaxShadow();
     light = CelQuantizeLight(light);
     outColor = vec4((diffuse + specular) * light * vVertexColor, 0.0);
 }

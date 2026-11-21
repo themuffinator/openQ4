@@ -55,6 +55,7 @@ The example assumes you have made those textures; openQ4 does not ship them.
 | `metallicMap`, `roughnessMap`, `aoMap` | The same data as separate maps (each read from its red channel), instead of `ormMap`. openQ4 packs them together at load, so they look the same as a packed map; maps of different sizes are resized to the largest. |
 | `normalMap` | The PBR normal map, in the format named by `normalFormat`. |
 | `emissiveMap` | Glow colour (sRGB), multiplied by `emissiveColor r, g, b`. Values above 1 give a brighter-than-white glow. |
+| `heightMap` | Optional surface height (linear, read from its red channel; white is high) for parallax occlusion mapping. See [Height and parallax](#height-and-parallax). |
 
 Use either `ormMap` or the separate maps, never both.
 
@@ -73,6 +74,58 @@ swizzled one hold the same channels.
 | `tangentXYZ` | X, Y and Z stored in red, green and blue. |
 | `tangentRG` | X and Y in red and green; Z is worked out. |
 | `quake4AGB` | Quake 4's alpha/green/blue layout. |
+
+### Height and parallax
+
+A `heightMap` gives a flat surface real-looking depth: with parallax occlusion
+mapping on, raised parts hide what lies behind them at grazing angles, tiles
+sink into their grooves and, optionally, cast small shadows across the surface.
+The geometry itself stays flat, so the edge of the polygon and its depth
+(what it hides, what it collides with) do not change.
+
+```text
+pbr {
+    workflow metallicRoughness
+    albedoMap textures/my_mod/tiles_albedo
+    normalMap textures/my_mod/tiles_normal
+    normalFormat tangentXYZ
+    heightMap textures/my_mod/tiles_height
+    heightScale 0.04
+    heightReference 1
+}
+```
+
+| Keyword | Default | Meaning |
+| --- | --- | --- |
+| `heightMap` | none | The height image. Draw it at the same size and texture coordinates as the other maps. |
+| `heightScale` | 0.04 | How deep the full height range is, in texture repeats: 0.04 is 4% of one repeat of the texture. Up to 0.25. |
+| `heightReference` | 1 | Which height sits on the polygon itself: 1 puts white on the surface and sinks everything darker into it, which keeps the edges of the polygon steady; 0.5 puts mid-grey there. |
+
+Make the normal map from the same height, so the shading matches the relief.
+openQ4 stores the height in the alpha channel of the material data, so a
+material with a `heightMap` can use `ormMap` or no data maps at all; with
+separate `metallicMap`/`roughnessMap`/`aoMap` the height is used only when they
+pack together (they normally do).
+
+Parallax is off unless `r_parallaxOcclusion 1` is set; off, the material draws
+exactly like the same material without a `heightMap`. Every lighting pass of
+the surface, on both renderers, follows the same ray, so lights, reflections
+and shadows stay attached to the relief. Two kinds of material always draw flat,
+because one of their passes could not follow it: **cutouts** (their depth pass
+keeps the flat outline) and materials with an **`emissiveMap`**.
+`gfxInfo` reports what was asked for and what was drawn (`Renderer parallax
+occlusion: requested=… admitted=… flat=… draws=… lastDecline=…`).
+
+The `heightmap( image, scale )` image program that classic Quake 4 materials
+use to make bump maps is unrelated: it never moves texture coordinates.
+
+Raven's own `glsl/Parallaxbump.glsl` custom-lighting stage (the unfinished
+`parallax_bump` guide that a few Quake 4 test materials name; no shipped map
+uses it, and the game never shipped the guide or the program) keeps its height
+in the red channel of the bump map. Vulkan draws it with its single-step
+offset, and with `r_parallaxOcclusion 1` traces the same ray as `heightMap`,
+using the stage's own scale and bias. OpenGL has no implementation of that
+program, so such a stage does not draw there; use `heightMap` instead.
 
 ### Rules the renderer checks
 
@@ -225,6 +278,10 @@ These are console variables (cvars).
 | `r_ssao` | 0 | Screen-space ambient occlusion. |
 | `r_rendererModernVisible` | 0 | Experimental alternative OpenGL path with its own PBR. Leave it off unless you are testing it. A frame that uses SSAO with a PBR material stays on the normal path. |
 | `r_vkPBRSpecularAA` | 1 | Vulkan only: smooths highlight sparkle; `0` turns it off for comparisons. Not saved. |
+| `r_parallaxOcclusion` | 0 | Parallax occlusion mapping for materials with a `heightMap`. `0` draws them flat. |
+| `r_parallaxSamples` | 32 | Most height samples one pixel takes, at grazing angles (8 to 64); a quarter of that when viewed head-on, and fewer with distance. Fewer is faster and shows steps on steep relief. |
+| `r_parallaxDistance` | 1536 | Distance at which the relief has faded back to the flat surface; it fades over the last quarter. Beyond it parallax costs almost nothing. |
+| `r_parallaxShadows` | 0 | Lets the relief shadow itself from each light (not ambient light). Adds roughly half again to the cost of the ray. |
 
 **Inspection modes** (not saved; for checking materials, not for play):
 

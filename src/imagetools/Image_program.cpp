@@ -661,6 +661,74 @@ static bool R_ParseImageProgram_r(idLexer& src, byte** pic, int* width, int* hei
 		return true;
 	}
 
+	// openQ4: a material-data image that carries a height in its alpha, for
+	// parallax occlusion mapping. Red, green and blue come from the first
+	// source (an ORM image, or _white for scalar-only material data), alpha
+	// from the second source's red channel, at the larger source size. Every
+	// backend's per-light layout already binds the ORM image, so the height
+	// needs no slot of its own.
+	if (!token.Icmp("packORMH")) {
+		byte* sources[2] = { NULL, NULL };
+		int		widths[2] = { 0, 0 };
+		int		heights[2] = { 0, 0 };
+		bool	parsed = true;
+
+		MatchAndAppendToken(src, "(");
+		for (int i = 0; parsed && i < 2; i++) {
+			if (i > 0) {
+				MatchAndAppendToken(src, ",");
+			}
+			idToken source;
+			if (i == 0 && src.ReadToken(&source) && !source.Icmp("_white")) {
+				AppendToken(source);
+				continue;
+			}
+			if (i == 0) {
+				src.UnreadToken(&source);
+			}
+			parsed = R_ParseImageProgram_r(src, pic ? &sources[i] : NULL, &widths[i], &heights[i], timestamps, usage);
+		}
+
+		if (parsed && pic) {
+			// the height is required; without it there is nothing to pack
+			parsed = sources[1] != NULL;
+			const int outWidth = Max(widths[1], sources[0] != NULL ? widths[0] : 0);
+			const int outHeight = Max(heights[1], sources[0] != NULL ? heights[0] : 0);
+			for (int i = 0; parsed && i < 2; i++) {
+				if (sources[i] != NULL && (widths[i] != outWidth || heights[i] != outHeight)) {
+					byte* resampled = R_ResampleTexture(sources[i], widths[i], heights[i], outWidth, outHeight);
+					R_StaticFree(sources[i]);
+					sources[i] = resampled;
+					parsed = resampled != NULL;
+				}
+			}
+			if (parsed && outWidth > 0 && outHeight > 0) {
+				*pic = (byte*)R_StaticAlloc(outWidth * outHeight * 4);
+				for (int p = 0; p < outWidth * outHeight; p++) {
+					for (int c = 0; c < 3; c++) {
+						(*pic)[p * 4 + c] = sources[0] != NULL ? sources[0][p * 4 + c] : 255;
+					}
+					(*pic)[p * 4 + 3] = sources[1][p * 4];
+				}
+				*width = outWidth;
+				*height = outHeight;
+			} else {
+				parsed = false;
+			}
+		}
+		for (int i = 0; i < 2; i++) {
+			if (sources[i] != NULL) {
+				R_StaticFree(sources[i]);
+			}
+		}
+		if (!parsed) {
+			return false;
+		}
+
+		MatchAndAppendToken(src, ")");
+		return true;
+	}
+
 	if (!token.Icmp("makeAlpha")) {
 		int		i;
 

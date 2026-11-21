@@ -66,6 +66,7 @@
 #include "../MaterialResourceTable.h"
 #include "../ModernSpecularProbeAtlas.h"
 #include "../PBREnvironment.h"
+#include "../PBRNativeContract.h"
 
 extern idCVar r_vkShadowFallbackTest;
 extern idCVar r_vkPBRSpecularAA;
@@ -2256,6 +2257,11 @@ typedef struct vkPBRDirectInteraction_s {
 	float		roughness;
 	float		normalScale;
 	float		ao;
+	// Parallax occlusion (REN-11), resolved by the shared contract: the height
+	// rides in dataImage's alpha; z = h * parallaxScale + parallaxBias.
+	bool		parallax;
+	float		parallaxScale;
+	float		parallaxBias;
 } vkPBRDirectInteraction_t;
 
 static float VK_PBRRegisterValue( const drawSurf_t *surf, int registerIndex, float fallback ) {
@@ -2521,7 +2527,30 @@ static bool VK_PBRDirectMaterial( const drawSurf_t *surf,
 		VK_PBRRegisterValue( surf, info.normalScaleRegister, 1.0f ) );
 	out.ao = idMath::ClampFloat( 0.0f, 1.0f,
 		VK_PBRRegisterValue( surf, info.aoRegister, 1.0f ) );
+	R_PBRNative_ResolveParallax( surf, out.dataFlags, out.dataImage,
+		out.parallax, out.parallaxScale, out.parallaxBias );
 	return true;
+}
+
+/*
+====================
+VK_PBRWriteParallax
+
+A PBR draw never reads the classic cel-banding or specular-colour fields, so
+they carry the parallax inputs pbr_direct.glsl reads (zero when flat). Every
+pass of the surface writes the same values and so traces the same ray.
+====================
+*/
+static void VK_PBRWriteParallax( vkInteractionBlock_t &block, const vkPBRDirectInteraction_t &material ) {
+	pbrNativeMaterial_t contract;
+	memset( &contract, 0, sizeof( contract ) );
+	contract.parallax = material.parallax;
+	contract.parallaxScale = material.parallaxScale;
+	contract.parallaxBias = material.parallaxBias;
+	R_PBRNative_ParallaxParameters( contract, block.celParams, block.specularColor );
+	if ( material.parallax ) {
+		R_Parallax_CountDraw();
+	}
 }
 
 static bool VK_PBRDirectInteraction( const drawInteraction_t *din,
@@ -2716,6 +2745,7 @@ static bool VK_PBR_PrepareEnvironment( VkCommandBuffer cmd, const viewDef_t *vie
 		memcpy( s, matrix[0].ToFloatPtr(), sizeof( float ) * 4 );
 		memcpy( t, matrix[1].ToFloatPtr(), sizeof( float ) * 4 );
 	}
+	VK_PBRWriteParallax( block, material );
 	const int offset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
 	if ( VK_PBRPrepareFault( composite ? 3 : 11 ) || offset < 0 || ( baked != NULL && baked->failure == 3 ) ) {
 		return VK_PBRPrepareFailed( composite ? "coverage-uniform" : "environment-uniform" );
@@ -3412,6 +3442,9 @@ static void VK_DrawSingleInteractionMode( const drawInteraction_t *din,
 	block.celParams[ 1 ] = (float)R_CelBandCount();
 	block.celParams[ 2 ] = celBanded && r_celShadingSpecular.GetBool() ? 1.0f : 0.0f;
 	block.celParams[ 3 ] = celBanded ? R_CelBandSoftness() : 0.0f;
+	if ( nativePBR ) {
+		VK_PBRWriteParallax( block, pbr );
+	}
 
 	const int uboOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
 	if ( VK_PBRPrepareFault( 7 ) || uboOffset < 0 ) {
@@ -3452,6 +3485,17 @@ static void VK_DrawSingleInteractionMode( const drawInteraction_t *din,
 	push.c[ 0 ] = parallaxScale;
 	push.c[ 1 ] = parallaxBias;
 	push.c[ 2 ] = parallax && !nativePBR ? 1.0f : 0.0f;
+	if ( parallax && !nativePBR ) {
+		// The retail guide's ray (pbr_direct.glsl RetailParallaxOffset): a.w the
+		// most samples, |b.w| the fade end, negative with the self-shadow.
+		float retail[ 4 ], fade[ 4 ];
+		R_Parallax_RetailParameters( parallaxScale, parallaxBias, retail, fade );
+		if ( retail[ 2 ] > 0.0f ) {
+			push.a[ 3 ] = retail[ 2 ];
+			push.b[ 3 ] = retail[ 3 ] > 0.5f ? -fade[ 1 ] : fade[ 1 ];
+			R_Parallax_CountDraw();
+		}
+	}
 	const bool enhanced = !nativePBR && interPass.enhancedChain;
 	if ( nativePBR ) {
 		push.c[ 0 ] = (float)pbrDataFlags;

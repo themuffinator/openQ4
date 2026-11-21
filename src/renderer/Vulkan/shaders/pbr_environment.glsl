@@ -59,16 +59,16 @@ vec3 EvaluateBakedClassic() {
 #endif
 
 vec3 EvaluatePBREnvironment() {
-    vec3 albedo = texture(diffuseMap, vDiffuseTexCoord).rgb * inter.diffuseColor.rgb;
+    vec3 albedo = PBRAlbedoTexture(diffuseMap, vDiffuseTexCoord).rgb * inter.diffuseColor.rgb;
     int flags = int(pc.c.x + 0.5);
     float metallic = pc.d.y, roughness = pc.d.z, ao = pc.b.x;
     if ((flags & 1) != 0) {
-        vec3 orm = texture(specularMap, vSpecularTexCoord).rgb;
+        vec3 orm = PBRDataTexture(specularMap, vSpecularTexCoord).rgb;
         ao *= orm.r; roughness *= orm.g; metallic *= orm.b;
     } else {
-        if ((flags & 2) != 0) metallic *= texture(specularTableMap, vSpecularTexCoord).r;
-        if ((flags & 4) != 0) roughness *= texture(specularMap, vSpecularTexCoord).r;
-        if ((flags & 8) != 0) ao *= texture(lightProjectionMap, vSpecularTexCoord).r;
+        if ((flags & 2) != 0) metallic *= PBRDataTexture(specularTableMap, vSpecularTexCoord).r;
+        if ((flags & 4) != 0) roughness *= PBRDataTexture(specularMap, vSpecularTexCoord).r;
+        if ((flags & 8) != 0) ao *= PBRDataTexture(lightProjectionMap, vSpecularTexCoord).r;
     }
     metallic = clamp(metallic, 0.0, 1.0);
     roughness = PBRRoughness(roughness);

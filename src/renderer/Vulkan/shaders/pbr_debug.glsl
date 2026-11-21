@@ -8,7 +8,7 @@ vec3 EvaluatePBRDebug() {
         return vec3(0.0, 1.0, 0.0);
     }
     if (mode == 1) {
-        return texture(diffuseMap, vDiffuseTexCoord).rgb;
+        return PBRAlbedoTexture(diffuseMap, vDiffuseTexCoord).rgb;
     }
     if (mode == 2) {
         vec3 mapped = PBRDirectNormal(vBumpTexCoord);
@@ -21,14 +21,14 @@ vec3 EvaluatePBRDebug() {
     int flags = int(pc.c.x + 0.5);
     float metallic = pc.d.y, roughness = pc.d.z, ao = pc.b.x;
     if ((flags & 1) != 0) {
-        vec3 orm = texture(specularMap, vSpecularTexCoord).rgb;
+        vec3 orm = PBRDataTexture(specularMap, vSpecularTexCoord).rgb;
         ao *= orm.r;
         roughness *= orm.g;
         metallic *= orm.b;
     } else {
-        if ((flags & 2) != 0) metallic *= texture(specularTableMap, vSpecularTexCoord).r;
-        if ((flags & 4) != 0) roughness *= texture(specularMap, vSpecularTexCoord).r;
-        if ((flags & 8) != 0) ao *= texture(lightProjectionMap, vSpecularTexCoord).r;
+        if ((flags & 2) != 0) metallic *= PBRDataTexture(specularTableMap, vSpecularTexCoord).r;
+        if ((flags & 4) != 0) roughness *= PBRDataTexture(specularMap, vSpecularTexCoord).r;
+        if ((flags & 8) != 0) ao *= PBRDataTexture(lightProjectionMap, vSpecularTexCoord).r;
     }
     return vec3(mode == 3 ? clamp(metallic, 0.0, 1.0)
         : mode == 4 ? PBRRoughness(roughness) : clamp(ao, 0.0, 1.0));

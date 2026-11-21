@@ -21,6 +21,8 @@ typedef struct glPBRReceiverUniforms_s {
 	GLint	transparent;	// x authored stage alpha scale (0: additive), y coverage only
 	GLint	screenAO;		// x SSAO field bound, yz 1 / its size
 	GLint	screenAOMap;
+	GLint	parallax;		// REN-11: scale, bias, most samples, self-shadow; zero when flat
+	GLint	parallaxFade;	// x fade start, y fade end
 } glPBRReceiverUniforms_t;
 
 // True when this surface's lighting is owned by the native PBR draws in the
@@ -43,6 +45,10 @@ void		RB_GLPBR_DrawInteractionChain( const drawSurf_t *chain );
 // Shadow-mapped receivers compile their own sources as PBR variants: these
 // defines follow the version line and the libraries are appended.
 const char *RB_GLPBR_ReceiverDefines( bool unshadowed );
+// True when the PBR programs are built with parallax occlusion (REN-11):
+// r_parallaxOcclusion is set and the context samples with explicit gradients.
+// Program caches key on it, so toggling the cvar rebuilds them.
+bool		RB_GLPBR_ParallaxCompiled( void );
 const char *RB_GLPBR_VertexLibrary( void );
 const char *RB_GLPBR_FragmentLibrary( void );
 void		RB_GLPBR_LookupReceiverUniforms( GLhandleARB program, glPBRReceiverUniforms_t &uniforms );

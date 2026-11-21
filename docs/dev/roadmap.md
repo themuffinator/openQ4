@@ -22,7 +22,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **43 / 152 (28.3%)** | **109 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Formally closed roadmap tasks | **44 / 152 (28.9%)** | **108 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
 | Estimated category progress | **20 categories: 3 at 100%, 15 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -53,7 +53,7 @@ exact; the estimate column is deliberately approximate.
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
-| [Modern rendering engine](#modern-rendering-engine) — REN | **50%** | 2 / 11 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics, GTAO and parallax occlusion mapping (REN-09 to REN-11, not started). |
+| [Modern rendering engine](#modern-rendering-engine) — REN | **55%** | 3 / 11 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics and GTAO (REN-09, REN-10, not started). Parallax occlusion mapping (REN-11) closed 21 November 2026. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05). |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
@@ -221,7 +221,7 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09, MP-12, MP-17 through MP-22, MP-24 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-09 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26, REN-09 through REN-11 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26, REN-09, REN-10 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026, REN-11 on 21 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, RT-07, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
@@ -251,7 +251,7 @@ to a final project-wide phase. Important dependencies are:
 | Multiplayer splitscreen (MP-25) | Multiplayer only: the single-player game and the Awakening campaign never gain local players. Each local player is an ordinary client on the wire, so MP-08's protocol, MP-17's identity, MP-18's per-client caps and MP-22's client recording apply per player without a second path. Per-viewport HUD and menus build on the retained interface (UI-03/UI-04/UI-09); per-viewport cost is measured against FPS-01's budgets before any preset enables effects in splitscreen. |
 | Horde (MP-26) | Monster snapshot state is a protocol change: it follows MP-08's packet budget and MP-21's registry and keeps every older demo playable. Wildcard waves reuse MP-14's modifier layer, maps and presets go through MP-13 and MP-14, bots as fighters build on MP-09, and Horde stays unranked under MP-17. The stock Quake 4 roster only; Awakening content stays scoped to its campaign. |
 | Vulkan ray tracing (RT-02 through RT-07) | RT-01's hardware, budget, licence and translation decisions first. Ray tracing builds on VK-03 admission, VK-06 resource counters and the existing TAAU, motion vectors and GPU skinning paths; RT-06 follows the VK-05/VK-07 capture and HDR work and VR-01 stereo. `r_rayTracing 0` always runs the unchanged Vulkan path, and no other renderer depends on it. |
-| Shadowed volumetrics, GTAO and parallax occlusion (REN-09 through REN-11) | REN-09 samples the REN-03 shadow maps and replaces the REN-06 froxel leaf; REN-10 keeps SSAO and its REN-05 controls as the fallback and comparison. Each is default-off with exact rollback, and FPS-01's budgets price every tier before a preset enables it; a new preset setting carries the SYSTEM catalog ripple. |
+| Shadowed volumetrics, GTAO and parallax occlusion (REN-09 through REN-11) | REN-11 closed 21 November 2026. REN-09 samples the REN-03 shadow maps and replaces the REN-06 froxel leaf; REN-10 keeps SSAO and its REN-05 controls as the fallback and comparison. Each is default-off with exact rollback, and FPS-01's budgets price every tier before a preset enables it; a new preset setting carries the SYSTEM catalog ripple. |
 | Server discovery (MP-19) | A decision on a project-controlled master or list service before the Internet source can be qualified on a fresh install; Steam lobbies and matchmaking remain STEAM/OPT-09. |
 
 ## Governance and baseline evidence
@@ -1087,7 +1087,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 | REN-09 — Not started | The REN-06 froxel leaf (unshadowed screen-space depth fog) and the REN-03 shadow maps it will sample. | Froxel volume with light falloff/projection and shadow-map sampling, stencil-light policy, temporal reprojection, translucent ordering, both backends, budgets. |
 | REN-10 — Not started | Half/full-resolution SSAO with indirect-only application and GL/Vulkan parity controls (REN-05, FPS-04). | GTAO horizon search, multi-bounce and specular occlusion, temporal accumulation, brute-force reference comparison, cost against SSAO, preset decision. |
-| REN-11 — Not started | Retail `parallaxbump` single-step offset on both backends. | Ray-marched occlusion with refinement and fade, optional self-shadowing, PBR `heightMap` keyword, pass and stereo alignment, budgets. |
+| REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | VR headset confirmation and physical Linux/macOS/Android belong to platform qualification; a preset decision waits for authored content. |
 
 ### REN task evidence and acceptance
 
@@ -1754,23 +1754,36 @@ diagnostics establish whole-frame ownership or production performance.
   both backends agree within the REN-05 SSAO parity tolerances; rollback is
   exact; and its cost at each tier is priced against SSAO under FPS-01 before
   the owner decides whether presets move to it.
-- [ ] **REN-11 — P2, implementation: parallax occlusion mapping.** Stock
-  `parallaxbump` materials offset texture coordinates once from the height in
-  the red channel of their RXGB normal maps. Add ray-marched parallax occlusion
-  mapping: a sample count that scales with view angle and distance, a refining
-  step at the hit, gradient-correct sampling, a distance fade back to the flat
-  surface, and an optional self-shadow ray toward each light. Height sources:
-  the retail `parallaxbump` channel (an opt-in upgrade that keeps retail scale
-  and bias), and a new `heightMap` keyword for authored PBR materials.
-  `heightmap()` images that stock materials fold into normal maps are not POM
-  sources without a separate visual review of their scale. Every pass that
-  lights a surface (ambient, each interaction, PBR, both backends) must compute
-  the same offset so passes stay aligned; depth is not changed unless a later
-  decision adds pixel depth offset. Acceptance: stock `parallaxbump` surfaces
-  and a PBR laboratory material show correct occlusion at grazing angles on
-  OpenGL and Vulkan, with no swimming between passes or between VR eyes; stock
-  materials without a height source draw unchanged; rollback is exact; and cost
-  is measured on the heaviest stock parallax scene against the FPS-01 budgets.
+- [x] **REN-11 — P2, implementation: parallax occlusion mapping.** Closed 21
+  November 2026. Stock content turned out to have no parallax surface: two
+  pak002 test materials and nine Awakening-drop test materials name a
+  `parallax_bump` guide that no shipped guide defines, and no pak ships
+  `glsl/Parallaxbump.glsl`, so only Vulkan's native translation of that
+  program ever drew it and OpenGL skips the stage. The production height
+  source is therefore the new PBR `heightMap` keyword (`heightScale`,
+  `heightReference`), carried in the ORM alpha (`packORMH`). One kernel,
+  `src/renderer/ParallaxOcclusion.h`, serves both backends: a march whose
+  sample count scales with view angle and distance, secant refinement,
+  gradient-correct sampling of every map, a distance fade back to the flat
+  surface and an optional self-shadow ray toward each light. The shared
+  admission decides once per surface, so every pass that lights it (each
+  interaction, shadow-mapped receivers, ambient lights, environment, probes,
+  baked grids, diagnostics) traces the same ray; cutouts and emissive
+  materials draw flat, depth is never changed. The retail stage upgrades on
+  Vulkan with its own scale and bias. `r_parallaxOcclusion` (default 0),
+  `r_parallaxSamples`, `r_parallaxDistance`, `r_parallaxShadows`; `gfxInfo`
+  reports requested and effective state. Evidence:
+  [parallax occlusion](parallax-occlusion.md#qualification-21-november-2026):
+  the laboratory (`renderer_parallax_occlusion.py`) passes on GL and Vulkan,
+  traced specimens change while their flat controls stay byte-identical,
+  backends agree within the flat-surface noise, and the PBR laboratory is
+  byte-identical to an unmodified build in 12/12 captures on both backends,
+  with the feature off and on. Cost at 2560x1440 with a traced surface filling
+  the frame: +1.3 ms (GL) and +1.5 ms (Vulkan) for the default ray, measured
+  against FPS-01's Ultra budgets; no stock scenario or preset is affected.
+  VR stereo was not run on a headset, and physical Linux/macOS/Android belong
+  to platform qualification (PLAT/AND); a preset decision waits for authored
+  content.
 
 ## Frame-rate recovery and performance budgets
 

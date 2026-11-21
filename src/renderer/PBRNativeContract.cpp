@@ -201,6 +201,149 @@ bool R_PBRNative_TransparentStage( const drawSurf_t *surf, int *stageIndexOut, f
 	return true;
 }
 
+/*
+===============================================================================
+
+Parallax occlusion mapping (REN-11)
+
+A heightMap material's height rides in the alpha of its ORM image (packORMH).
+The decision is made here, once per admission, so the OpenGL and Vulkan owners
+and every pass of one surface see the same answer: a surface either traces the
+same ray in its ambient, environment, per-light and emission draws, or none of
+them does. A perforated surface keeps its depth fill's coverage at the flat
+texture coordinates, so offsetting its colour would shade texels the depth
+fill rejected; it draws flat.
+
+===============================================================================
+*/
+
+typedef struct {
+	int			frame;
+	int			admitted;		// admissions that traced a ray
+	int			flat;			// heightMap admissions that drew flat
+	int			draws;			// draws that traced a ray, all passes
+	const char *lastDecline;
+} parallaxFrameStats_t;
+
+static parallaxFrameStats_t g_parallaxStats;
+static parallaxFrameStats_t g_parallaxLastStats;
+
+static void R_Parallax_TouchStats( void ) {
+	if ( g_parallaxStats.frame != tr.frameCount ) {
+		if ( g_parallaxStats.frame != 0 ) {
+			g_parallaxLastStats = g_parallaxStats;
+		}
+		const char *decline = g_parallaxStats.lastDecline;
+		memset( &g_parallaxStats, 0, sizeof( g_parallaxStats ) );
+		g_parallaxStats.frame = tr.frameCount;
+		g_parallaxStats.lastDecline = decline;
+	}
+}
+
+static void R_Parallax_Decline( const char *reason ) {
+	R_Parallax_TouchStats();
+	g_parallaxStats.flat++;
+	g_parallaxStats.lastDecline = reason;
+}
+
+void R_PBRNative_ResolveParallax( const drawSurf_t *surf, int dataFlags, const idImage *dataImage,
+		bool &parallax, float &scale, float &bias ) {
+	parallax = false;
+	scale = 0.0f;
+	bias = 0.0f;
+	if ( surf == NULL || surf->material == NULL ) {
+		return;
+	}
+	const pbrMaterialInfo_t &info = surf->material->GetPBRInfo();
+	if ( !info.parallax || !r_parallaxOcclusion.GetBool() ) {
+		return;
+	}
+	if ( ( dataFlags & 1 ) == 0 || dataImage != info.orm.image ) {
+		R_Parallax_Decline( "no packed height" );
+		return;
+	}
+	if ( surf->material->Coverage() == MC_PERFORATED ) {
+		R_Parallax_Decline( "perforated coverage" );
+		return;
+	}
+	// Emission draws through its own pass with no tangent frame; tracing every
+	// other pass would slide the lit texels off the glow.
+	if ( info.emissive.present ) {
+		R_Parallax_Decline( "emissive" );
+		return;
+	}
+	const float heightScale = idMath::ClampFloat( 0.0f, 0.25f,
+		R_PBRNative_RegisterValue( surf, info.heightScaleRegister, 0.04f ) );
+	const float reference = idMath::ClampFloat( 0.0f, 1.0f,
+		R_PBRNative_RegisterValue( surf, info.heightReferenceRegister, 1.0f ) );
+	if ( !( heightScale > 0.0f ) ) {
+		R_Parallax_Decline( "zero heightScale" );
+		return;
+	}
+	R_Parallax_TouchStats();
+	g_parallaxStats.admitted++;
+	parallax = true;
+	scale = heightScale;
+	bias = -reference * heightScale;
+}
+
+static void R_Parallax_Fade( float fade[4] ) {
+	const float end = idMath::ClampFloat( 64.0f, 16384.0f, r_parallaxDistance.GetFloat() );
+	fade[0] = end * 0.75f;
+	fade[1] = end;
+	fade[2] = 0.0f;
+	fade[3] = 0.0f;
+}
+
+void R_PBRNative_ParallaxParameters( const pbrNativeMaterial_t &material, float params[4], float fade[4] ) {
+	params[0] = params[1] = params[2] = params[3] = 0.0f;
+	fade[0] = fade[1] = fade[2] = fade[3] = 0.0f;
+	if ( !material.parallax ) {
+		return;
+	}
+	params[0] = material.parallaxScale;
+	params[1] = material.parallaxBias;
+	params[2] = (float)idMath::ClampInt( 8, 64, r_parallaxSamples.GetInteger() );
+	params[3] = r_parallaxShadows.GetBool() ? 1.0f : 0.0f;
+	R_Parallax_Fade( fade );
+}
+
+void R_Parallax_RetailParameters( float scale, float bias, float params[4], float fade[4] ) {
+	params[0] = params[1] = params[2] = params[3] = 0.0f;
+	fade[0] = fade[1] = fade[2] = fade[3] = 0.0f;
+	if ( !r_parallaxOcclusion.GetBool() || !std::isfinite( scale ) || !std::isfinite( bias ) || scale <= 0.0f ) {
+		return;
+	}
+	params[0] = Min( scale, 0.25f );
+	params[1] = idMath::ClampFloat( -0.25f, 0.25f, bias );
+	params[2] = (float)idMath::ClampInt( 8, 64, r_parallaxSamples.GetInteger() );
+	params[3] = r_parallaxShadows.GetBool() ? 1.0f : 0.0f;
+	R_Parallax_Fade( fade );
+}
+
+void R_Parallax_CountDraw( void ) {
+	R_Parallax_TouchStats();
+	g_parallaxStats.draws++;
+}
+
+void R_Parallax_PrintInfo( void ) {
+	// The last complete frame. Counters roll only when something counts, so a
+	// frame that drew no parallax surface leaves older counts behind: report
+	// those as zero rather than as the current state.
+	parallaxFrameStats_t stats;
+	memset( &stats, 0, sizeof( stats ) );
+	if ( g_parallaxStats.frame == tr.frameCount - 1 ) {
+		stats = g_parallaxStats;				// the previous frame, complete
+	} else if ( g_parallaxStats.frame == tr.frameCount && g_parallaxLastStats.frame == tr.frameCount - 1 ) {
+		stats = g_parallaxLastStats;			// this frame is still drawing
+	}
+	stats.lastDecline = g_parallaxStats.lastDecline;
+	common->Printf( "Renderer parallax occlusion: requested=%d samples=%d distance=%.0f shadows=%d admitted=%d flat=%d draws=%d lastDecline=%s\n",
+		r_parallaxOcclusion.GetBool() ? 1 : 0, idMath::ClampInt( 8, 64, r_parallaxSamples.GetInteger() ),
+		idMath::ClampFloat( 64.0f, 16384.0f, r_parallaxDistance.GetFloat() ), r_parallaxShadows.GetBool() ? 1 : 0,
+		stats.admitted, stats.flat, stats.draws, stats.lastDecline != NULL ? stats.lastDecline : "none" );
+}
+
 bool R_PBRNative_Material( const drawSurf_t *surf, bool translucentAdmitted, pbrNativeMaterial_t &out ) {
 	memset( &out, 0, sizeof( out ) );
 	if ( !r_rendererModernQuality.GetBool() || !r_pbrMaterials.GetBool() || r_skipBump.GetBool()
@@ -283,6 +426,7 @@ bool R_PBRNative_Material( const drawSurf_t *surf, bool translucentAdmitted, pbr
 		out.emissiveColor[component] = Max( 0.0f,
 			R_PBRNative_RegisterValue( surf, info.emissiveColorRegisters[component], 0.0f ) );
 	}
+	R_PBRNative_ResolveParallax( surf, out.dataFlags, out.dataImage, out.parallax, out.parallaxScale, out.parallaxBias );
 	return true;
 }
 

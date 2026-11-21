@@ -7,6 +7,24 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Height maps that give PBR surfaces real depth, 21 November 2026
+
+- **Parallax occlusion for mod materials.** A PBR material can now carry a
+  `heightMap`: with `r_parallaxOcclusion 1`, raised parts of a flat surface
+  hide what lies behind them at grazing angles, tiles sink into their grooves,
+  and with `r_parallaxShadows 1` the relief shadows itself from each light.
+  Lights, reflections and shadows stay on the relief, on OpenGL and Vulkan
+  alike.
+- **Tunable cost.** `r_parallaxSamples` trades smoothness for speed, and the
+  relief fades back to the flat surface by `r_parallaxDistance`, where it
+  costs almost nothing.
+- **Nothing changes unless you ask.** It is off by default, and off draws every
+  material exactly as before. No shipped Quake 4 or Awakening map uses height
+  maps, so the stock campaigns look and run the same either way.
+- **What to do.** Nothing, unless you make materials: see
+  [height and parallax](../user/pbr-materials.md#height-and-parallax).
+- Evidence: [parallax occlusion](parallax-occlusion.md#qualification-21-november-2026).
+
 ## Smoother menus, especially The Awakening's, 20 November 2026
 
 - **The Awakening's menus no longer cost a frame's worth of processor time.**

@@ -2139,6 +2139,9 @@ static int		g_shadowMapPBRAttempt = -1;
 static int		g_pointShadowMapPBRAttempt = -1;
 static bool		g_shadowMapPBRAttemptCompare = false;
 static bool		g_pointShadowMapPBRAttemptCompare = false;
+// REN-11: whether the variant was built with parallax occlusion.
+static bool		g_shadowMapPBRAttemptParallax = false;
+static bool		g_pointShadowMapPBRAttemptParallax = false;
 // Set while a PBR variant runs its receiver pass over the owned surfaces.
 static const glPBRReceiverUniforms_t *g_activeReceiverPBRUniforms = NULL;
 static void RB_ShadowMapFreePBRPrograms( void );
@@ -11647,7 +11650,9 @@ static bool RB_ShadowMapLoadPBRVariant( bool point ) {
 	const bool compare = point ? RB_PointShadowMapDepthCompareEnabled() : RB_ShadowMapDepthCompareEnabled();
 	int &attempt = point ? g_pointShadowMapPBRAttempt : g_shadowMapPBRAttempt;
 	bool &attemptCompare = point ? g_pointShadowMapPBRAttemptCompare : g_shadowMapPBRAttemptCompare;
-	if ( attempt == tr.videoRestartCount && attemptCompare == compare ) {
+	bool &attemptParallax = point ? g_pointShadowMapPBRAttemptParallax : g_shadowMapPBRAttemptParallax;
+	const bool parallax = RB_GLPBR_ParallaxCompiled();
+	if ( attempt == tr.videoRestartCount && attemptCompare == compare && attemptParallax == parallax ) {
 		return point ? g_pointShadowMapPBRProgram.programValid : g_shadowMapPBRProgram.programValid;
 	}
 	g_receiverProgramDefines = RB_GLPBR_ReceiverDefines( false );
@@ -11680,6 +11685,7 @@ static bool RB_ShadowMapLoadPBRVariant( bool point ) {
 	g_receiverProgramFragmentLibrary = NULL;
 	attempt = tr.videoRestartCount;
 	attemptCompare = compare;
+	attemptParallax = parallax;
 	return valid;
 }
 

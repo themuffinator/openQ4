@@ -97,6 +97,17 @@ typedef struct {
 	bool				legacyFallbackMissing;
 	// Separate metallic/roughness/AO maps were packed into `orm` (packORM).
 	bool				packedSeparateData;
+	// Parallax occlusion mapping (REN-11). `height` is the authored heightMap
+	// (its red channel, white = high); a surface's height h lies at
+	// (h - reference) * scale texture-coordinate units above its polygon.
+	// When `parallax` is set the height travels in the alpha of `orm`
+	// (packORMH), which every native owner already binds; `parallaxAddedORM`
+	// records that `orm` was generated as white material data for it.
+	pbrMaterialTexture_t height;
+	int					heightScaleRegister;
+	int					heightReferenceRegister;
+	bool				parallax;
+	bool				parallaxAddedORM;
 } pbrMaterialInfo_t;
 
 // An authored specular probe is renderer metadata carried by a light material.

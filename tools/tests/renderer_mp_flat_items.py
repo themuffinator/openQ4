@@ -470,7 +470,8 @@ def test_vulkan_interactions_match_and_generated_payloads_exist():
         )
         reject(sweep, "specular", f"{fragment_name}'s sweep helper must be diffuse-only")
 
-        diffuse_at = fragment.find("vec3 diffuse = texture(")
+        # RetailTexture is texture() unless the retail Parallaxbump ray (REN-11) runs.
+        diffuse_at = fragment.find("vec3 diffuse = RetailTexture(diffuseMap,")
         sweep_at = fragment.find("diffuse = ApplyFlatDiffuseSweep(", diffuse_at)
         specular_at = fragment.find("vec3 specular =", sweep_at)
         assert_true(

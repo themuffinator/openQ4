@@ -21,6 +21,7 @@
 #include "tr_local.h"
 #include "draw_pbr.h"
 #include "PBRMath.h"
+#include "ParallaxOcclusion.h"
 #include "PBRNativeContract.h"
 #include "ModernSpecularProbeAtlas.h"
 #include "ModernClusteredLighting.h"
@@ -94,6 +95,67 @@ static const char *glPBRVertexLibrary =
 	"	vPBRTangent1 = PBRVertexNormalize( cross( normal, tangent ) * handedness, rawBitangent );\n"
 	"}\n";
 
+// Parallax occlusion mapping (REN-11), compiled in only for the program
+// variants built with r_parallaxOcclusion (RB_GLPBR_ParallaxDefines): without
+// OPENQ4_PBR_PARALLAX every material sample expands to the texture2D call it
+// always was. With it, the first material read of a fragment traces the
+// shared ray (ParallaxOcclusion.h) once, and every map then reads the traced
+// texel with its untraced coordinate's own gradients. The height rides in
+// the ORM alpha; uPBRParallax is zero for a flat surface.
+#define GL_PBR_PARALLAX_GLSL \
+	"#ifdef OPENQ4_PBR_PARALLAX\n" \
+	"uniform vec4 uPBRParallax;\n"		/* scale, bias, most samples, self-shadow */ \
+	"uniform vec4 uPBRParallaxFade;\n"	/* fade start, fade end (world units) */ \
+	"bool gPBRParallax;\n" \
+	"vec4 gPBRParallaxHit;\n" \
+	"vec2 gPBRBumpDx, gPBRBumpDy, gPBRAlbedoDx, gPBRAlbedoDy, gPBRDataDx, gPBRDataDy;\n" \
+	"float OpenQ4ParallaxHeight( vec2 uv, vec2 dx, vec2 dy ) {\n" \
+	"	return OPENQ4_TEXTURE_GRAD( uSpecularMap, uv, dx, dy ).a;\n" \
+	"}\n" \
+	"#define OPENQ4_PBR_PARALLAX_KERNEL 1\n" \
+	"#endif\n"
+
+// What uses the kernel; RB_GLPBR_AppendMaterialGLSL places the kernel itself
+// (its own string) between GL_PBR_PARALLAX_GLSL and this.
+#define GL_PBR_PARALLAX_USE_GLSL \
+	"#ifdef OPENQ4_PBR_PARALLAX\n" \
+	"vec3 PBRParallaxTangent( vec3 objectVector ) {\n" \
+	"	return vec3( dot( PBRSafeNormalize( vPBRTangent0 ), objectVector ),\n" \
+	"		dot( PBRSafeNormalize( vPBRTangent1 ), objectVector ), dot( PBRSafeNormalize( vPBRNormal ), objectVector ) );\n" \
+	"}\n" \
+	/* Once per fragment, before any material sample: OpenQ4PBRDirect and */ \
+	/* the environment main call it first (arguments evaluate in order). */ \
+	"void PBRParallaxBegin() {\n" \
+	"	gPBRParallaxHit = vec4( 0.0 );\n" \
+	"	gPBRParallax = uPBRParallax.x > 0.0 && uPBRParallax.z > 0.5;\n" \
+	"	if ( !gPBRParallax ) {\n" \
+	"		return;\n" \
+	"	}\n" \
+	"	gPBRBumpDx = dFdx( vBumpTexCoord );\n" \
+	"	gPBRBumpDy = dFdy( vBumpTexCoord );\n" \
+	"	gPBRAlbedoDx = dFdx( vDiffuseTexCoord );\n" \
+	"	gPBRAlbedoDy = dFdy( vDiffuseTexCoord );\n" \
+	"	gPBRDataDx = dFdx( vSpecularTexCoord );\n" \
+	"	gPBRDataDy = dFdy( vSpecularTexCoord );\n" \
+	"	gPBRParallaxHit = OpenQ4ParallaxTrace( vSpecularTexCoord, PBRParallaxTangent( vViewVector ),\n" \
+	"		uPBRParallax, uPBRParallaxFade, length( vViewVector ), gPBRDataDx, gPBRDataDy );\n" \
+	"}\n" \
+	"vec4 PBRParallaxTexture( sampler2D map, vec2 texCoord, vec2 dx, vec2 dy ) {\n" \
+	"	if ( gPBRParallax ) {\n" \
+	"		return OPENQ4_TEXTURE_GRAD( map, texCoord + gPBRParallaxHit.xy, dx, dy );\n" \
+	"	}\n" \
+	"	return texture2D( map, texCoord );\n" \
+	"}\n" \
+	"#define PBR_BUMP_TEXTURE( map, uv ) PBRParallaxTexture( map, uv, gPBRBumpDx, gPBRBumpDy )\n" \
+	"#define PBR_ALBEDO_TEXTURE( map, uv ) PBRParallaxTexture( map, uv, gPBRAlbedoDx, gPBRAlbedoDy )\n" \
+	"#define PBR_DATA_TEXTURE( map, uv ) PBRParallaxTexture( map, uv, gPBRDataDx, gPBRDataDy )\n" \
+	"#else\n" \
+	"#define PBRParallaxBegin()\n" \
+	"#define PBR_BUMP_TEXTURE( map, uv ) texture2D( map, uv )\n" \
+	"#define PBR_ALBEDO_TEXTURE( map, uv ) texture2D( map, uv )\n" \
+	"#define PBR_DATA_TEXTURE( map, uv ) texture2D( map, uv )\n" \
+	"#endif\n"
+
 // Material inputs shared by the per-light and environment programs.
 #define GL_PBR_MATERIAL_GLSL \
 	"uniform sampler2D uPBRMetallicMap;\n" \
@@ -110,11 +172,12 @@ static const char *glPBRVertexLibrary =
 	"vec3 PBRSafeNormalize( vec3 value ) {\n" \
 	"	return value * inversesqrt( max( dot( value, value ), 1.0e-8 ) );\n" \
 	"}\n" \
+	GL_PBR_PARALLAX_GLSL \
 	/* Ordered transparency: the albedo supplies the per-texel coverage the */ \
 	/* authored stage would have sampled. Additive draws keep zero alpha.   */ \
 	"float OpenQ4PBRAlpha() {\n" \
 	"	return uPBRTransparent.x > 0.0\n" \
-	"		? clamp( texture2D( uDiffuseMap, vDiffuseTexCoord ).a * uPBRTransparent.x, 0.0, 1.0 ) : 0.0;\n" \
+	"		? clamp( PBR_ALBEDO_TEXTURE( uDiffuseMap, vDiffuseTexCoord ).a * uPBRTransparent.x, 0.0, 1.0 ) : 0.0;\n" \
 	"}\n" \
 	/* 0 flat, 1 Quake 4 AGB, 2 tangent RG, 3 tangent XYZ (pbrNormalFormat_t + 1) */ \
 	"vec3 PBRMappedNormal( vec2 texCoord ) {\n" \
@@ -122,7 +185,7 @@ static const char *glPBRVertexLibrary =
 	"	if ( encoding < 0.5 ) {\n" \
 	"		return vec3( 0.0, 0.0, 1.0 );\n" \
 	"	}\n" \
-	"	vec4 value = texture2D( uBumpMap, texCoord );\n" \
+	"	vec4 value = PBR_BUMP_TEXTURE( uBumpMap, texCoord );\n" \
 	"	vec3 normal;\n" \
 	"	if ( abs( encoding - 2.0 ) < 0.5 ) {\n" \
 	"		vec2 xy = ( value.rg * 2.0 - 1.0 ) * uPBRMaterial.z;\n" \
@@ -145,15 +208,15 @@ static const char *glPBRVertexLibrary =
 	"	float roughness = uPBRMaterial.y;\n" \
 	"	float ao = uPBRMaterial.w;\n" \
 	"	if ( uPBRLayout.x > 0.5 ) {\n" \
-	"		vec3 orm = texture2D( uSpecularMap, dataTexCoord ).rgb;\n" \
+	"		vec3 orm = PBR_DATA_TEXTURE( uSpecularMap, dataTexCoord ).rgb;\n" \
 	"		ao *= orm.r;\n" \
 	"		roughness *= orm.g;\n" \
 	"		metallic *= orm.b;\n" \
 	"	} else {\n" \
-	"		if ( uPBRLayout.y > 0.5 ) metallic *= texture2D( uPBRMetallicMap, dataTexCoord ).r;\n" \
-	"		if ( uPBRLayout.z > 0.5 ) roughness *= texture2D( uSpecularMap, dataTexCoord ).r;\n" \
+	"		if ( uPBRLayout.y > 0.5 ) metallic *= PBR_DATA_TEXTURE( uPBRMetallicMap, dataTexCoord ).r;\n" \
+	"		if ( uPBRLayout.z > 0.5 ) roughness *= PBR_DATA_TEXTURE( uSpecularMap, dataTexCoord ).r;\n" \
 	"	}\n" \
-	"	if ( uPBRLayout.w > 0.5 ) ao *= texture2D( uPBRAOMap, dataTexCoord ).r;\n" \
+	"	if ( uPBRLayout.w > 0.5 ) ao *= PBR_DATA_TEXTURE( uPBRAOMap, dataTexCoord ).r;\n" \
 	"	return vec3( clamp( metallic, 0.0, 1.0 ), roughness, clamp( ao, 0.0, 1.0 ) );\n" \
 	"}\n" \
 	/* SSAO occludes indirect light only, as the lesser of its occlusion and */ \
@@ -180,6 +243,22 @@ static const char *glPBRVertexLibrary =
 	"		PBRLinearToSRGBExtended( radiance.g ), PBRLinearToSRGBExtended( radiance.b ) );\n" \
 	"}\n"
 
+// The material GLSL with the parallax kernel (its own string, shared with
+// Vulkan) between the declarations it needs and the code that uses it.
+static void RB_GLPBR_AppendMaterialGLSL( idStr &source ) {
+	static const char marker[] = "#define OPENQ4_PBR_PARALLAX_KERNEL 1\n#endif\n";
+	const char *material = GL_PBR_MATERIAL_GLSL;
+	const char *split = strstr( material, marker );
+	assert( split != NULL );
+	split += sizeof( marker ) - 1;
+	source.Append( material, (int)( split - material ) );
+	source += "#ifdef OPENQ4_PBR_PARALLAX\n";
+	source += OPENQ4_PARALLAX_GLSL;
+	source += "\n#endif\n";
+	source += GL_PBR_PARALLAX_USE_GLSL;
+	source += split;
+}
+
 static idStr glPBRFragmentLibrary;
 
 static void RB_GLPBR_BuildFragmentLibrary( void ) {
@@ -189,7 +268,7 @@ static void RB_GLPBR_BuildFragmentLibrary( void ) {
 	glPBRFragmentLibrary = "\n// openQ4 native PBR shading (draw_pbr.cpp)\n";
 	glPBRFragmentLibrary += OPENQ4_PBR_SCALAR_GLSL;
 	glPBRFragmentLibrary += "\n";
-	glPBRFragmentLibrary += GL_PBR_MATERIAL_GLSL;
+	RB_GLPBR_AppendMaterialGLSL( glPBRFragmentLibrary );
 	glPBRFragmentLibrary +=
 		// The classic light term is what a white classic surface shows; PBR
 		// receives pi times its decoded value as irradiance.
@@ -216,8 +295,9 @@ static void RB_GLPBR_BuildFragmentLibrary( void ) {
 		"	return ( diffuse + specular ) * irradiance * ( 1.0 / 3.14159265 );\n"
 		"}\n"
 		"vec3 OpenQ4PBRDirect( vec3 shadow ) {\n"
+		"	PBRParallaxBegin();\n"
 		// Color uses sRGB storage and decodes before filtering. Data stays linear.
-		"	vec3 albedo = texture2D( uDiffuseMap, vDiffuseTexCoord ).rgb;\n"
+		"	vec3 albedo = PBR_ALBEDO_TEXTURE( uDiffuseMap, vDiffuseTexCoord ).rgb;\n"
 		"	vec3 data = PBRMaterialData( vSpecularTexCoord );\n"
 		"	float metallic = data.x;\n"
 		"	vec3 radiance = PBRClassicLightIrradianceColor(\n"
@@ -257,12 +337,45 @@ static void RB_GLPBR_BuildFragmentLibrary( void ) {
 		"		* PBREnergyCompensationColor( f0, PBRSpecularAlbedo( ndotv, roughness ) );\n"
 		"	vec3 diffuse = ( vec3( 1.0 ) - fresnel ) * ( 1.0 - metallic ) * albedo * ( 1.0 / 3.14159265 );\n"
 		// Authored AO modulates indirect irradiance, never this direct light.
+		// The parallax self-shadow is direct visibility, like the shadow factor.
+		"#ifdef OPENQ4_PBR_PARALLAX\n"
+		"	if ( gPBRParallax ) {\n"
+		"		return PBRDisplayOutput( ( diffuse + specular ) * radiance * ndotl * vVertexColor\n"
+		"			* OpenQ4ParallaxShadow( vSpecularTexCoord, gPBRParallaxHit, PBRParallaxTangent( vLightVector ),\n"
+		"				uPBRParallax, gPBRDataDx, gPBRDataDy ) );\n"
+		"	}\n"
+		"#endif\n"
 		"	return PBRDisplayOutput( ( diffuse + specular ) * radiance * ndotl * vVertexColor );\n"
 		"}\n";
 }
 
+// The receivers are GLSL 1.10, which samples with explicit gradients only
+// through GL_ARB_shader_texture_lod; the environment program is GLSL 1.30.
+static bool RB_GLPBR_TextureGradAvailable( void ) {
+	return GLEW_ARB_shader_texture_lod != 0;
+}
+
+bool RB_GLPBR_ParallaxCompiled( void ) {
+	return r_parallaxOcclusion.GetBool() && RB_GLPBR_TextureGradAvailable();
+}
+
+#define GL_PBR_PARALLAX_RECEIVER_DEFINES \
+	"#extension GL_ARB_shader_texture_lod : require\n" \
+	"#define OPENQ4_PBR_PARALLAX 1\n" \
+	"#define OPENQ4_TEXTURE_GRAD texture2DGradARB\n"
+
 const char *RB_GLPBR_ReceiverDefines( bool unshadowed ) {
+	if ( RB_GLPBR_ParallaxCompiled() ) {
+		return unshadowed
+			? "#define OPENQ4_PBR 1\n#define OPENQ4_PBR_UNSHADOWED 1\n" GL_PBR_PARALLAX_RECEIVER_DEFINES
+			: "#define OPENQ4_PBR 1\n" GL_PBR_PARALLAX_RECEIVER_DEFINES;
+	}
 	return unshadowed ? "#define OPENQ4_PBR 1\n#define OPENQ4_PBR_UNSHADOWED 1\n" : "#define OPENQ4_PBR 1\n";
+}
+
+static const char *RB_GLPBR_EnvironmentDefines( void ) {
+	return RB_GLPBR_ParallaxCompiled()
+		? "#define OPENQ4_PBR_PARALLAX 1\n#define OPENQ4_TEXTURE_GRAD textureGrad\n" : NULL;
 }
 
 const char *RB_GLPBR_VertexLibrary( void ) {
@@ -295,6 +408,7 @@ typedef struct {
 	int		baked;				// environment draws that took a baked light grid's diffuse
 	const char *lastDecline;
 	const char *translucentView;	// why the last view did or did not own translucency
+	const char *lastParallaxDecline;	// a parallax surface drawn flat by this owner
 } glPBRFrameStats_t;
 
 static glPBRFrameStats_t g_glPBRStats;
@@ -309,6 +423,7 @@ static void RB_GLPBR_TouchStats( void ) {
 		g_glPBRStats.frame = backEnd.frameCount;
 		g_glPBRStats.lastDecline = "none";
 		g_glPBRStats.translucentView = "none";
+		g_glPBRStats.lastParallaxDecline = "none";
 	}
 }
 
@@ -332,6 +447,7 @@ typedef struct {
 	int			generation;
 	bool		attempted;
 	bool		valid;
+	bool		parallax;		// built with RB_GLPBR_ParallaxCompiled
 
 	GLint		localLightOrigin;
 	GLint		localViewOrigin;
@@ -465,6 +581,8 @@ void RB_GLPBR_LookupReceiverUniforms( GLhandleARB program, glPBRReceiverUniforms
 	uniforms.transparent = glGetUniformLocationARB( program, "uPBRTransparent" );
 	uniforms.screenAO = glGetUniformLocationARB( program, "uPBRScreenAO" );
 	uniforms.screenAOMap = glGetUniformLocationARB( program, "uPBRScreenAOMap" );
+	uniforms.parallax = glGetUniformLocationARB( program, "uPBRParallax" );
+	uniforms.parallaxFade = glGetUniformLocationARB( program, "uPBRParallaxFade" );
 	// Sampler units are program state: assign them once, at link.
 	GLhandleARB previous = glGetHandleARB( GL_PROGRAM_OBJECT_ARB );
 	glUseProgramObjectARB( program );
@@ -537,7 +655,8 @@ static void RB_GLPBR_LookupInteractionUniforms( glPBRProgram_t &program ) {
 }
 
 static bool RB_GLPBR_ProgramCurrent( const glPBRProgram_t &program ) {
-	return program.attempted && program.generation == tr.videoRestartCount;
+	return program.attempted && program.generation == tr.videoRestartCount
+		&& program.parallax == RB_GLPBR_ParallaxCompiled();
 }
 
 // The unshadowed and stencil-shadowed variant of the projected receiver.
@@ -549,6 +668,7 @@ static bool RB_GLPBR_LoadUnshadowedProgram( void ) {
 	RB_GLPBR_FreeProgram( program );
 	program.attempted = true;
 	program.generation = tr.videoRestartCount;
+	program.parallax = RB_GLPBR_ParallaxCompiled();
 	static const char *baseName = "glprogs/shadow_interaction";
 	char *vertexBuffer = NULL;
 	char *fragmentBuffer = NULL;
@@ -570,9 +690,11 @@ static bool RB_GLPBR_LoadUnshadowedProgram( void ) {
 	}
 	if ( !linked ) {
 		const int generation = program.generation;
+		const bool parallax = program.parallax;
 		RB_GLPBR_FreeProgram( program );
 		program.attempted = true;
 		program.generation = generation;
+		program.parallax = parallax;
 		return false;
 	}
 	RB_GLPBR_LookupInteractionUniforms( program );
@@ -654,7 +776,7 @@ static const char *RB_GLPBR_EnvironmentFragment( void ) {
 		"uniform sampler2D uProbeIndices;\n";	// two record indices per cluster, -1 for none
 	glPBREnvironmentFragment += OPENQ4_PBR_SCALAR_GLSL;
 	glPBREnvironmentFragment += "\n";
-	glPBREnvironmentFragment += GL_PBR_MATERIAL_GLSL;
+	RB_GLPBR_AppendMaterialGLSL( glPBREnvironmentFragment );
 	// The baked light grid, sampled exactly as the modern path and Vulkan do
 	// (ModernLightGridGLSL.h). That source maps view-relative positions to
 	// the world; this program passes world positions, so its basis is the
@@ -812,7 +934,7 @@ static const char *RB_GLPBR_EnvironmentFragment( void ) {
 		"		return vec3( 0.0, 1.0, 0.0 );\n"
 		"	}\n"
 		"	if ( mode == 1 ) {\n"
-		"		return texture2D( uDiffuseMap, vDiffuseTexCoord ).rgb;\n"
+		"		return PBR_ALBEDO_TEXTURE( uDiffuseMap, vDiffuseTexCoord ).rgb;\n"
 		"	}\n"
 		"	if ( mode == 2 ) {\n"
 		"		return PBREnvironmentWorld( PBRObjectNormal( vBumpTexCoord ) ) * 0.5 + 0.5;\n"
@@ -821,6 +943,7 @@ static const char *RB_GLPBR_EnvironmentFragment( void ) {
 		"	return vec3( mode == 3 ? data.x : mode == 4 ? PBRRoughness( data.y ) : data.z );\n"
 		"}\n"
 		"void main() {\n"
+		"	PBRParallaxBegin();\n"
 		"	float alpha = OpenQ4PBRAlpha();\n"
 		// A translucent surface owes the frame its coverage before any light:
 		// the background keeps 1 - alpha (black composited through the alpha).
@@ -833,7 +956,7 @@ static const char *RB_GLPBR_EnvironmentFragment( void ) {
 		"		gl_FragColor = vec4( EvaluatePBRDiagnostic( diagnostic ), alpha );\n"
 		"		return;\n"
 		"	}\n"
-		"	vec3 albedo = texture2D( uDiffuseMap, vDiffuseTexCoord ).rgb * uDiffuseColor.rgb;\n"
+		"	vec3 albedo = PBR_ALBEDO_TEXTURE( uDiffuseMap, vDiffuseTexCoord ).rgb * uDiffuseColor.rgb;\n"
 		"	vec3 data = PBRMaterialData( vSpecularTexCoord );\n"
 		"	float metallic = data.x;\n"
 		"	float roughness = PBRRoughness( data.y );\n"
@@ -895,11 +1018,14 @@ static bool RB_GLPBR_LoadEnvironmentProgram( void ) {
 	RB_GLPBR_FreeProgram( program );
 	program.attempted = true;
 	program.generation = tr.videoRestartCount;
-	if ( !RB_GLPBR_LinkProgram( program, glPBREnvironmentVertex, RB_GLPBR_EnvironmentFragment(), NULL, NULL,
-			RB_GLPBR_VertexLibrary(), NULL, "builtin/pbr_environment" ) ) {
+	program.parallax = RB_GLPBR_ParallaxCompiled();
+	if ( !RB_GLPBR_LinkProgram( program, glPBREnvironmentVertex, RB_GLPBR_EnvironmentFragment(), NULL,
+			RB_GLPBR_EnvironmentDefines(), RB_GLPBR_VertexLibrary(), NULL, "builtin/pbr_environment" ) ) {
+		const bool parallax = program.parallax;
 		RB_GLPBR_FreeProgram( program );
 		program.attempted = true;
 		program.generation = tr.videoRestartCount;
+		program.parallax = parallax;
 		return false;
 	}
 	RB_GLPBR_LookupInteractionUniforms( program );
@@ -1224,6 +1350,10 @@ static bool RB_GLPBR_Admit( const drawSurf_t *surf, pbrNativeMaterial_t *materia
 		reason = "gpu-posed-geometry";
 	} else if ( !R_PBRNative_Material( surf, g_glPBRTranslucentView, material ) ) {
 		reason = "material-contract";
+	} else if ( material.parallax && !RB_GLPBR_ParallaxCompiled() ) {
+		// No explicit-gradient sampling: every pass draws the surface flat.
+		material.parallax = false;
+		g_glPBRStats.lastParallaxDecline = "texture-lod";
 	} else if ( RB_GLPBR_Translucent( surf ) && !RB_GLPBR_LoadEnvironmentProgram() ) {
 		// Its coverage composite draws with the environment program.
 		reason = "resources";
@@ -1319,6 +1449,19 @@ static void RB_GLPBR_SetMaterialUniforms( const glPBRReceiverUniforms_t &uniform
 		// The classic framebuffer is display-referred on every OpenGL path
 		// this owner serves, with and without HDR tone mapping.
 		glUniform4fARB( uniforms.mode, static_cast<float>( material.normalFormat ), 1.0f, 1.0f, ambientLight ? 1.0f : 0.0f );
+	}
+	if ( uniforms.parallax >= 0 ) {
+		// Program state persists: a flat surface states its zeros. Every pass
+		// of one surface uploads the same values and traces the same ray.
+		float params[4], fade[4];
+		R_PBRNative_ParallaxParameters( material, params, fade );
+		glUniform4fvARB( uniforms.parallax, 1, params );
+		if ( uniforms.parallaxFade >= 0 ) {
+			glUniform4fvARB( uniforms.parallaxFade, 1, fade );
+		}
+		if ( material.parallax ) {
+			R_Parallax_CountDraw();
+		}
 	}
 	if ( uniforms.screenAO >= 0 ) {
 		// The field describes the opaque surface in front: a translucent or
@@ -1907,4 +2050,8 @@ void RB_GLPBR_PrintInfo( void ) {
 		r_pbrAnalyticEnvironment.GetBool() ? 1 : 0, g_glPBRProbeFrameViews,
 		stats.lastDecline != NULL ? stats.lastDecline : "none",
 		stats.translucentView != NULL ? stats.translucentView : "none" );
+	common->Printf( "OpenGL: native PBR parallax: requested=%d textureGrad=%d programs=%d lastDecline=%s\n",
+		r_parallaxOcclusion.GetBool() ? 1 : 0, RB_GLPBR_TextureGradAvailable() ? 1 : 0,
+		RB_GLPBR_ParallaxCompiled() && g_glPBRUnshadowed.valid && g_glPBRUnshadowed.parallax ? 1 : 0,
+		stats.lastParallaxDecline != NULL ? stats.lastParallaxDecline : "none" );
 }

@@ -86,6 +86,7 @@ layout(location = 1) out vec4 outPBRColor;
 #endif
 
 void main() {
+    PBRParallaxBegin(true);
     outColor = vec4(EvaluatePBREnvironment(), PBRTransparentAlpha(vDiffuseTexCoord));
 }
 
