@@ -4189,6 +4189,7 @@ void idSessionLocal::Clear() {
 	
 	insideUpdateScreen = false;
 	insidePacifierUpdate = false;
+	startupLoadingHandoff = false;
 	openq4::NativeInputBeforeSessionChange();
 	insideExecuteMapChange = false;
 	stopDepth = 0;
@@ -7966,7 +7967,18 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 		sw->UnPause();
 	}
 
-	if ( !noFadeWipe ) {
+	// A map change from the startup screen (a +map launch, a map command before
+	// any menu) hands that screen straight to the loading screen. It used to
+	// fade to black and hold black, the window unanswered, while the previous
+	// level unloaded and the loading screen built; the startup view now keeps
+	// presenting through that until the loading screen's first frame.
+	struct startupHandoffScope_t {
+		bool &active;
+		explicit startupHandoffScope_t( bool &flag ) : active( flag ) {}
+		~startupHandoffScope_t() { active = false; }
+	} startupHandoffScope( startupLoadingHandoff );
+	startupLoadingHandoff = !mapSpawned && guiActive == NULL && !IsDedicatedServer() && RetainedUI_HasInitializationView();
+	if ( !noFadeWipe && !startupLoadingHandoff ) {
 		// capture the current screen and start a wipe
 		StartWipe( "gfx/wipes/fade", true );
 
@@ -8054,6 +8066,7 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	// cause prints to force screen updates as a pacifier,
 	// and draw the loading gui instead of game draws
 	openq4::NativeInputBeforeSessionChange();
+	startupLoadingHandoff = false;
 	insideExecuteMapChange = true;
 	LoadingPresentation_Begin( "map" );
 
@@ -10286,7 +10299,7 @@ idSessionLocal::PacifierUpdate
 */
 void idSessionLocal::PacifierUpdate() {
 	if ( openQ4_UpdateInitialization() ) return;
-	if ( !insideExecuteMapChange || insidePacifierUpdate ) {
+	if ( !( insideExecuteMapChange || startupLoadingHandoff ) || insidePacifierUpdate ) {
 		return;
 	}
 	// Printing from a loading redraw or network send offers another pacifier
@@ -10314,6 +10327,12 @@ void idSessionLocal::PacifierUpdate() {
 	// never do pacifier screen updates while inside the
 	// drawing code, or we can have various recursive problems
 	if ( insideUpdateScreen ) {
+		return;
+	}
+	// Before its loading screen exists, a map change from the startup screen
+	// presents the startup view, only where the interface can draw it now
+	// (not inside another document's build).
+	if ( startupLoadingHandoff && !insideExecuteMapChange && !RetainedUI_CanUpdateInitialization() ) {
 		return;
 	}
 
@@ -10581,7 +10600,8 @@ void idSessionLocal::Draw() {
 		Session_DrawFallbackLoadingScreen();
 		if ( firstFallback ) {
 			fallbackMenuStartTime = Sys_Milliseconds();
-		} else if ( guiMainMenu != NULL && ( Sys_Milliseconds() - fallbackMenuStartTime ) >= fallbackMenuDelayMs ) {
+		} else if ( guiMainMenu != NULL && !startupLoadingHandoff && ( Sys_Milliseconds() - fallbackMenuStartTime ) >= fallbackMenuDelayMs ) {
+			// A map change already under way owns what comes next.
 			StartMenu();
 		}
 #endif

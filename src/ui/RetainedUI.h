@@ -70,6 +70,8 @@ void RetainedUI_PrecacheModelWorlds();
 // shares the native renderer host, and is retired when the session takes over.
 bool RetainedUI_DrawInitialization(const char* message);
 bool RetainedUI_CanUpdateInitialization();
+// The startup screen's view is still up (it stays until a menu or a level presents).
+bool RetainedUI_HasInitializationView();
 void RetainedUI_EndInitialization();
 
 struct sysEvent_s;

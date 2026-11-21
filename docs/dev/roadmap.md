@@ -2370,7 +2370,9 @@ image on both backends.
   trim after each load is gone (100-130 ms, and most of multiplayer's 720 ms),
   the start-of-level autosave writes on the checkpoint storage worker, and the
   level's first view is drawn once, unseen, behind the loading screen
-  (`LOADING_HANDOFF` in the trace). Still open in this class: building a
+  (`LOADING_HANDOFF` in the trace). A `+map` launch hands the startup view
+  straight to the loading screen instead of fading to black and holding black
+  (longest gap 23-43 ms, Cryofac included). Still open in this class: building a
   retained document (50-80 ms, not divisible), single large reads and
   animations (40-60 ms), and a multiplayer client's first frame (120-240 ms).
 - [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07

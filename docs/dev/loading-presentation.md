@@ -103,6 +103,27 @@ session's fallback loading screen (shown until the first menu or level) draws
 the same view on instead of building a new one in its first frame, and the
 animation does not restart.
 
+## From the startup screen to the first loading screen
+
+A launch with a level on the command line (`+map`, as the VS Code launches
+use) went from the startup screen to a 240 ms fade to black, then held black,
+with the window not answering, while the session unloaded, purged, reloaded
+its menus and built the loading screen: 224-352 ms in Air Defense 1, at least
+0.4 s in The Awakening's Cryofac, which builds its pause, save and restart
+pages then. When a map change starts with no menu and no level up and the
+startup view still alive (`startupLoadingHandoff`), it now skips the fade and
+keeps presenting the startup view through that work, handing straight to the
+loading screen's first frame. The menu's own fade into a load is unchanged.
+Offers draw the view only where the interface can (`RetainedUI_CanUpdateInitialization`),
+and the fallback screen's menu watchdog waits while the hand-off is under way.
+
+With the hand-off now measured to the next period's start: Air Defense 1
+presents 14-19 frames from the end of startup to the loading screen, longest gap
+23-43 ms, on OpenGL and Vulkan; Cryofac 18-20 frames, longest gap 37-39 ms. A
+multiplayer server started the same way still has two gaps of 77-164 ms
+where it builds its multiplayer menus (retained document builds, below), with
+the startup view on screen instead of black.
+
 ## The hand-off into the level
 
 When a single-player load ended, the last loading frame stayed on screen for
@@ -221,6 +242,10 @@ A multiplayer listen server's `mp/q4dm1` load presented 230 frames in 4.3 s at a
 - **A multiplayer hand-off** still draws its first frame cold (120-240 ms
   under the held loading screen): a client cannot draw before its first
   snapshot, so it gets no warm-up.
+- **Cold program compiles in the warm-up.** The first-frame warm-up moves a
+  level's first-use compiles behind the loading screen, where a slow one is
+  still a gap: Cryofac's shadow-map program takes 171 ms in the NVIDIA OpenGL
+  driver. Compiling programs asynchronously would remove it.
 - **The first startup frame** waits about 120 ms in the OpenGL driver.
 - **A first launch** restarts the renderer for its detected preset after
   startup, with no frame for about three seconds.

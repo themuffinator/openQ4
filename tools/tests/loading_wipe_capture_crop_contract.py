@@ -42,6 +42,7 @@ int clockMsec=100000;
 int Sys_Milliseconds(){return clockMsec;}
 bool retainedEnabled=false,reducedMotion=false,initializationActive=false;
 bool openQ4_UpdateInitialization(){return initializationActive;}
+bool RetainedUI_CanUpdateInitialization(){return true;}
 struct idStr {
     static int Icmp(const char *a,const char *b){
         while(*a && std::tolower(static_cast<unsigned char>(*a))==std::tolower(static_cast<unsigned char>(*b))){++a;++b;}
@@ -102,7 +103,7 @@ struct Renderer {
     void CaptureRenderToImage(const char*);
 } rendererValue,*renderSystem=&rendererValue;
 struct idSessionLocal {
-    bool insideExecuteMapChange=true,insidePacifierUpdate=false,insideUpdateScreen=false;
+    bool insideExecuteMapChange=true,insidePacifierUpdate=false,insideUpdateScreen=false,startupLoadingHandoff=false;
     int lastPacifierTime=0,bytesNeededForMapLoad=100;
     openq4::LoadingFramePacer loadingFramePacer;
     bool loadingAssetQueueActive=false;

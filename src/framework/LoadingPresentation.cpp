@@ -104,6 +104,15 @@ double LoadingPresentation_Now( void ) {
 
 void LoadingPresentation_Begin( const char *kind ) {
 	if ( trace.closing ) {
+		// The previous hand-off ends here: its last interval runs to this
+		// period's start, where the next screen takes over.
+		const double from = trace.handoffLast > 0 ? trace.handoffLast : trace.end;
+		const double now = LoadingPresentation_Now();
+		const float interval = static_cast<float>( now - from );
+		trace.handoffIntervals.push_back( interval );
+		if ( interval > 25.0f ) {
+			trace.handoffGaps.push_back( { interval, static_cast<float>( from - trace.end ) } );
+		}
 		CloseTrace();
 	}
 	if ( com_loadingFrameTrace.GetInteger() <= 0 ) {

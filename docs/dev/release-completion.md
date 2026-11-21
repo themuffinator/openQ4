@@ -17,6 +17,11 @@ does not restore the withdrawn release. See
   while the level's opening cinematic was skipped; it now keeps moving
   throughout. On a slow computer the screens drop to half the rate rather
   than slow the load down.
+- **No black screen between startup and the first level.** Starting the game
+  straight into a level (a shortcut or launcher with `+map`) used to fade the
+  startup screen to black and hold black for up to half a second before the
+  loading screen appeared. The startup screen now stays up and animating until
+  the loading screen takes over.
 - **No pause between the loading screen and the level.** The last loading
   frame used to hold for a quarter to a third of a second before the level
   faded in, longer in multiplayer. The fade now starts at once: the game no

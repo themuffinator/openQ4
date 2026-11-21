@@ -707,6 +707,10 @@ public:
 
 	bool				insideUpdateScreen;	// true while inside ::UpdateScreen() or a capture draw (sessionCaptureDrawGuard_t)
 	bool				insidePacifierUpdate;	// prevents recursive loading/network updates
+	// A map change that started from the startup screen, until its loading
+	// screen takes over: the startup view keeps presenting instead of a fade
+	// to black and a black hold.
+	bool				startupLoadingHandoff;
 
 	bool				loadingSaveGame;	// currently loading map from a SaveGame
 	idFile *			savegameFile;		// this is the savegame file to load from

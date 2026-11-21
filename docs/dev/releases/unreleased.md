@@ -15,7 +15,9 @@ the [development roadmap](../roadmap.md) for current scope.
   with pauses of up to three seconds. The game's scripts compile in about half
   the time and fonts are drawn on every processor core, so the extra frames
   cost nothing: startup and loads take as long as before. The level now fades
-  in the moment its loading screen ends, without the old pause.
+  in the moment its loading screen ends, without the old pause, and starting
+  straight into a level no longer shows a black screen between the startup
+  screen and the loading screen.
 
 - **The Awakening pauses in its own frozen style.** While you play the
   expansion's campaign with the new interface, the pause menu, its Save,

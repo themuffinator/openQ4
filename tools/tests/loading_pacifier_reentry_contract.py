@@ -25,6 +25,7 @@ int clockMsec=1000, redraws=0, callbackStage=-1;
 bool throwFromCallback=false;
 bool initializing=false;
 bool openQ4_UpdateInitialization(){return initializing;}
+bool RetainedUI_CanUpdateInitialization(){return true;}
 int Sys_Milliseconds(){return clockMsec;}
 void Sys_GenerateEvents(){}
 float Session_GetBlockingLoadFrameIntervalMsec(){return 16.0f;}
@@ -49,7 +50,7 @@ struct Network {
 };
 struct idAsyncNetwork {static inline Network client{1,0},server{2,0};};
 struct idSessionLocal {
-    bool insideExecuteMapChange=true,insidePacifierUpdate=false,insideUpdateScreen=false;
+    bool insideExecuteMapChange=true,insidePacifierUpdate=false,insideUpdateScreen=false,startupLoadingHandoff=false;
     int lastPacifierTime=0,bytesNeededForMapLoad=100;
     openq4::LoadingFramePacer loadingFramePacer;
     bool loadingAssetQueueActive=true;
