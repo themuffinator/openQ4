@@ -63,6 +63,7 @@ struct ScreenHost final : Host {
 	FontMetrics GetFontMetrics(const std::string&, int size) override { return {size*.8f,size*.2f,size*1.2f,size*.5f}; }
 	Glyph GetGlyph(const std::string&, int size, std::uint32_t) override { return {size*.6f,0,-size*.8f,size*.6f,static_cast<float>(size),0,0,1,1,"benchmark-font"}; }
 };
+std::uint64_t PrivateBytes();
 // The session's presentation of a root screen: its runtime load (timed),
 // onInit, the open timeline, a four second settle, then timed 60 Hz frames on
 // its view-height canvas. With `event`, the event runs after the settle and
@@ -74,6 +75,7 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 	Document model; std::vector<Diagnostic> diagnostics;
 	if (!model.Load(source,diagnostics)) throw std::runtime_error("Invalid screen document");
 	ScreenHost host; Runtime runtime(host);
+	const auto bytesBefore = PrivateBytes();
 	const auto loadStart = std::chrono::steady_clock::now();
 	if (!runtime.LoadDocument(source,path,diagnostics)) throw std::runtime_error("Cannot load screen runtime document");
 	const double loadMs = std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-loadStart).count();
@@ -111,11 +113,13 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 		layouts += static_cast<double>(stats.layoutUpdates);
 	}
 	if (!host.error.empty()) throw std::runtime_error("Screen logged an error: "+host.error);
-	std::printf("{\"scenario\":\"screen\",\"document\":\"%s\",\"event\":\"%s\",\"width\":%d,\"height\":%d,\"frames\":%d,\"load_ms\":%.6f,\"cold_ms\":%.6f,\"event_ms\":%.6f,"
+	// What the shown document holds after its frames (the view, its state and motion).
+	const auto heldKb = (PrivateBytes()-bytesBefore)/1024;
+	std::printf("{\"scenario\":\"screen\",\"held_kb\":%llu,\"document\":\"%s\",\"event\":\"%s\",\"width\":%d,\"height\":%d,\"frames\":%d,\"load_ms\":%.6f,\"cold_ms\":%.6f,\"event_ms\":%.6f,"
 		"\"first_ms\":%.6f,\"p50_ms\":%.6f,\"p95_ms\":%.6f,\"max_ms\":%.6f,"
 		"\"update_p50_ms\":%.6f,\"render_p50_ms\":%.6f,\"vector_compile_p50_ms\":%.6f,\"paths_compiled_p50\":%.0f,\"uploads_p50\":%.0f,"
 		"\"draw_calls_p50\":%.0f,\"submitted_vertices_p50\":%.0f,\"layer_pushes_p50\":%.0f,\"layer_elisions_p50\":%.0f,\"layout_updates_mean\":%.3f}\n",
-		path.c_str(),event.c_str(),width,height,frames,loadMs,cold,eventMs,frame.front(),Percentile(frame,.5),Percentile(frame,.95),Percentile(frame,1),
+		static_cast<unsigned long long>(heldKb),path.c_str(),event.c_str(),width,height,frames,loadMs,cold,eventMs,frame.front(),Percentile(frame,.5),Percentile(frame,.95),Percentile(frame,1),
 		Percentile(update,.5),Percentile(render,.5),
 		Percentile(compile,.5),Percentile(paths,.5),Percentile(uploads,.5),Percentile(draws,.5),Percentile(vertices,.5),Percentile(layers,.5),Percentile(elisions,.5),layouts/frames);
 	runtime.CloseDocument(); runtime.Shutdown();

@@ -3340,8 +3340,9 @@ Completion must advance through the existing dependencies:
   each input branch. State tables are now shared by copies until written,
   input eligibility is read once per state and motion revision and list rows
   compare RmlUi values: those events take 0.04, 0.11 and 0.34 ms and the
-  HUD's events about 0.01 ms. Open: the first animated frame's clone of a
-  document's authored values and the view build's spread-out cost.
+  HUD's events about 0.01 ms. A motion now holds only the values written
+  over its authored ones, so an animated page no longer keeps a second copy
+  of them (the Escape card 15 MB less). Open: the view build's spread-out cost.
   Progress, 4 November: [moving weapon scopes](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026)
   retain local meshes for their faint animated furniture. At 1080p the isolated
   rail/nail scope CPU medians fall from 6.99/8.80 ms to 0.018/0.037 ms; continuous

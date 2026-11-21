@@ -18,6 +18,9 @@ does not restore the withdrawn release. See
   arrow key or a stick through a long list stays smooth.
 - **The new HUD is lighter in a match.** The Remastered HUD's updates (health,
   voice transmit, the scoreboard) cost a tenth to a twentieth of what they did.
+- **Large menus use less memory.** An animated page no longer keeps a second
+  copy of its artwork's settings once it starts moving: the multiplayer
+  Escape card holds about 15 MB less, the match summary 10 MB less.
 - **What to do.** Nothing: update openQ4 as usual.
 - Details: [event costs](ui/event-costs.md).
 

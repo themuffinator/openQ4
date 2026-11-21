@@ -100,11 +100,40 @@ its quit dialog. The pause, SETTINGS sub-page, Join Game, Create Server,
 Escape card and admin scenarios completed with no refused operation, no
 retained warning and no stock fallback.
 
+## The first animated frame
+
+The motion kept its live values as one map: the authored values until the
+first sample wrote one, then a private copy of all of them. Every page that
+animated (its opening timeline, a focus glow) therefore held two copies of
+its authored values from its first frame on, and that frame paid for the
+copy.
+
+- **The live values are the writes over the authored values.** A motion
+  holds only the entries its samples and writes replaced; `Motion::Values()`
+  returns a view (`MotionValues`) that finds a written entry before the
+  authored one and walks every authored key once, in order, with its live
+  value, so ApplyMotion's complete pass still reads the authored values in
+  step. A write can only replace an authored value, as before, so both maps
+  keep the same key order. Transactional copies share the written entries
+  and clone only those.
+- **Results.** What a shown page holds after its frames
+  (`--screen` now prints `held_kb`), best of three interleaved runs:
+
+| Page | Held before | Now |
+| --- | ---: | ---: |
+| Escape card | 269 MB | 254 MB |
+| Match summary | 147 MB | 137 MB |
+| CONTROLS | 164 MB | 157 MB |
+| Join Game | 92 MB | 89 MB |
+| Awakening pause | 119 MB | 118 MB |
+
+  The first frame's time changed within run-to-run noise (the copy was a
+  few milliseconds at most), and frames at rest and the engine's pause
+  profile are unchanged. `openq4-ui-document` now checks the view's order
+  and lookups.
+
 ## Found, not fixed
 
-- **A document's first animated frame clones its authored values.** The
-  motion shares the document's authored values until the first sample
-  writes one, then copies all of them: 5 to 8 ms once on the Escape card.
 - **The view build is still the main thread's part of a load** (the Escape
   card about 300 ms, CONTROLS about 200 ms in the benchmark); page warming
   runs it while the previous page rests. Its samples are spread across
@@ -117,10 +146,12 @@ retained warning and no stock fallback.
 ## Evidence, 21 November 2026
 
 The kit is in `.tmp/rui-round/`: `loads.py` (every document's load split),
-`ab_events.py` (the interleaved event A/B), `subtree.py` (ranks cdb stack
-samples under a function), the samples (`samples-*.txt`), and the engine
-runs (`v1`, `retained.py` with the previous round's `extra.py` scenarios)
-on the runtime `.tmp/runtime/ui-menus`.
+`ab_events.py` (the interleaved event A/B), `ab_cold.py` (first frame and
+held memory), `baseline.sh` (builds the before benchmark from HEAD's copies
+of the changed sources), `subtree.py` (ranks cdb stack samples under a
+function), the samples (`samples-*.txt`), and the engine runs (`v1`, `v2`,
+and `v3` after the motion change; `retained.py` with the previous round's
+`extra.py` scenarios) on the runtime `.tmp/runtime/ui-menus`.
 
 Tests: 165 of the 174 native UI and HUD tests in the MSVC environment,
 including the transaction canaries (`openq4-ui-presentation-runtime`,

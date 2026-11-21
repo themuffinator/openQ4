@@ -3,13 +3,72 @@
 
 #include "Document.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
+#include <stdexcept>
 
 namespace openq4::ui {
 
 using PropertyKey = std::pair<std::string, std::string>;
 using PropertyValues = std::map<PropertyKey, Value>;
 enum class CancelPolicy { Hold, RestoreBase };
+
+// openQ4: a motion's live values, read as one map: the authored values with
+// the entries writes have replaced over them. A write only ever replaces an
+// authored value, so both maps hold their keys in the same order; a lookup
+// takes a written entry before the authored one, and a walk visits every
+// authored key once, in order, with its live value. A document's first
+// animated sample therefore writes the few values it animates instead of
+// copying all of its authored values first.
+class MotionValues {
+public:
+	using value_type = PropertyValues::value_type;
+	class const_iterator {
+	public:
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = PropertyValues::value_type;
+		using difference_type = std::ptrdiff_t;
+		using pointer = const value_type*;
+		using reference = const value_type&;
+		const_iterator() = default;
+		reference operator*() const { return written ? *over : *base; }
+		pointer operator->() const { return &**this; }
+		const_iterator& operator++() { if (written) ++over; ++base; Settle(); return *this; }
+		const_iterator operator++(int) { auto copy = *this; ++*this; return copy; }
+		bool operator==(const const_iterator& other) const { return base == other.base; }
+	private:
+		friend class MotionValues;
+		const_iterator(PropertyValues::const_iterator authored, PropertyValues::const_iterator authoredEnd,
+			PropertyValues::const_iterator replaced, PropertyValues::const_iterator replacedEnd)
+			: base(authored), baseEnd(authoredEnd), over(replaced), overEnd(replacedEnd) { Settle(); }
+		void Settle() { written = base != baseEnd && over != overEnd && over->first == base->first; }
+		PropertyValues::const_iterator base, baseEnd, over, overEnd;
+		bool written = false;
+	};
+	using iterator = const_iterator;
+	MotionValues(const PropertyValues& authored, const PropertyValues& written) : base(&authored), over(&written) {}
+	const_iterator begin() const { return {base->begin(),base->end(),over->begin(),over->end()}; }
+	const_iterator end() const { return {base->end(),base->end(),over->end(),over->end()}; }
+	const_iterator find(const PropertyKey& key) const {
+		const auto authored = base->find(key);
+		if (authored == base->end()) return end();
+		return {authored,base->end(),over->lower_bound(key),over->end()};
+	}
+	bool contains(const PropertyKey& key) const { return base->contains(key); }
+	const Value& at(const PropertyKey& key) const {
+		const auto found = find(key);
+		if (found == end()) throw std::out_of_range("Missing motion value");
+		return found->second;
+	}
+	std::size_t size() const { return base->size(); }
+	bool empty() const { return base->empty(); }
+	// The entries writes replaced (a subset of the keys, each with its live value).
+	const PropertyValues& Written() const { return *over; }
+private:
+	const PropertyValues* base;
+	const PropertyValues* over;
+};
 struct MotionPlayback {
 	std::string owner, node, property;
 	Value from;
@@ -38,7 +97,8 @@ public:
 	void Cancel(const std::string& id, CancelPolicy policy, double seconds);
 	void SetReducedMotion(bool enabled, double seconds);
 	bool ReducedMotion() const { return reducedMotion; }
-	const PropertyValues& Values() const;
+	// The live values: a view that is valid until this motion next changes.
+	MotionValues Values() const;
 	// The authored values, in Values()' key order.
 	const PropertyValues& Base() const { return *base; }
 	bool IsPlaying(const std::string& id) const;
@@ -94,11 +154,11 @@ private:
 	std::shared_ptr<const DocumentModel> model;
 	std::shared_ptr<const std::map<std::string, const Timeline*>> timelines = std::make_shared<const std::map<std::string, const Timeline*>>();
 	std::shared_ptr<const PropertyValues> base = std::make_shared<const PropertyValues>();
-	// The live values, shared by copies until one of them writes: an event's
-	// transactional copy that only plays timelines and sets state never
-	// duplicates a document's thousands of authored values, and a reset shares
-	// the authored values themselves until the first write.
-	std::shared_ptr<PropertyValues> values = std::make_shared<PropertyValues>();
+	// The values writes replaced over the authored ones (see MotionValues),
+	// shared by copies until one of them writes: an event's transactional copy
+	// clones only these, and a reset starts with none, so no write ever copies
+	// a document's thousands of authored values. Null reads as none.
+	std::shared_ptr<PropertyValues> values;
 	PropertyValues& Writable();
 	std::map<PropertyKey, Playing> playing;
 	double clock = 0;
