@@ -115,6 +115,9 @@ struct idCVarStub {
 };
 static idCVarStub fs_restrict, fs_debug, fs_copyfiles, fs_savepath, fs_cdpath, fs_basepath;
 static idCVarStub fs_caseSensitiveOS, fs_cacheLooseDirectories{ 1 };
+// production's idFileSystemLocal::fs_awakeningActive: the probes run with
+// baseoq4 as the game, so The Awakening's navigation guard stays off
+static idCVarStub fs_awakeningActive;
 
 struct CommonStub {
 	void FatalError( const char *, ... ) { throw std::runtime_error( "FatalError" ); }

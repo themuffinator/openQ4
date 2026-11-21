@@ -21,6 +21,10 @@ def main():
     source = (ROOT / "src/renderer/OpenGL/gl_Image.cpp").read_text(encoding="utf-8")
     start = source.index("void idImage::SubImageUpload(")
     production = source[start:source.index("\n/*", start)]
+    # The layered (TT_3D / TT_2D_ARRAY) upload path binds through the
+    # production target mapping, so the harness compiles that too.
+    target_start = source.index("static GLenum R_GLTextureTarget(")
+    target_mapping = source[target_start:source.index("\n}\n", target_start) + 3]
     harness = r'''
 #include <cassert>
 #include <cstring>
@@ -52,8 +56,10 @@ template<class T> struct idTempArray {
 };
 static bool Swap_IsBigEndian() { return false; }
 static int rowLength, alignment = 4, uploadedWidth, uploadedHeight, uploadedSize;
+static int uploadedZ = -1, uploadCalls;
+static GLenum uploadedTarget, boundTarget;
 static std::vector<byte> uploaded;
-static void R_BindTextureForDirectAccess(int, GLuint) {}
+static void R_BindTextureForDirectAccess(GLenum target, GLuint) { boundTarget = target; }
 int BitsForFormat(textureFormat_t format) { assert(format == FMT_RGB565); return 16; }
 static int R_CompressedTextureSizeInBytes(textureFormat_t, int w, int h) {
     return ((w + 3) / 4) * ((h + 3) / 4) * 8;
@@ -65,7 +71,13 @@ extern "C" void GL_APIENTRY glPixelStorei(GLenum name, GLint value) {
 }
 extern "C" void GL_APIENTRY glCompressedTexSubImage2D(GLenum, GLint, GLint, GLint,
         GLsizei width, GLsizei height, GLenum, GLsizei size, const void *) {
-    uploadedWidth = width; uploadedHeight = height; uploadedSize = size;
+    uploadedWidth = width; uploadedHeight = height; uploadedSize = size; uploadedZ = -1; ++uploadCalls;
+}
+extern "C" void GL_APIENTRY glCompressedTexSubImage3D(GLenum target, GLint, GLint, GLint, GLint z,
+        GLsizei width, GLsizei height, GLsizei depth, GLenum, GLsizei size, const void *) {
+    assert(depth == 1);
+    uploadedTarget = target; uploadedWidth = width; uploadedHeight = height; uploadedSize = size;
+    uploadedZ = z; ++uploadCalls;
 }
 extern "C" void GL_APIENTRY glTexSubImage2D(GLenum, GLint, GLint, GLint,
         GLsizei width, GLsizei height, GLenum format, GLenum type, const void *data) {
@@ -78,6 +90,13 @@ extern "C" void GL_APIENTRY glTexSubImage2D(GLenum, GLint, GLint, GLint,
         const byte *start = static_cast<const byte *>(data) + row * stride;
         uploaded.insert(uploaded.end(), start, start + width * 2);
     }
+    uploadedZ = -1; ++uploadCalls;
+}
+extern "C" void GL_APIENTRY glTexSubImage3D(GLenum target, GLint, GLint, GLint, GLint z,
+        GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void *data) {
+    assert(depth == 1);
+    glTexSubImage2D(target, 0, 0, 0, width, height, format, type, data);
+    uploadedTarget = target; uploadedZ = z;
 }
 struct idImage {
     idImageOpts opts;
@@ -86,7 +105,7 @@ struct idImage {
     bool IsCompressed() const { return opts.format != FMT_RGB565; }
     void SubImageUpload(int, int, int, int, int, int, const void *, int = 0) const;
 };
-''' + production + r'''
+''' + target_mapping + production + r'''
 int main() {
     idImage image;
     image.opts.width = image.opts.height = 8;
@@ -116,7 +135,28 @@ int main() {
     const byte tight[] = {0xf8,0x00, 0x07,0xe0, 0x00,0x1f, 0xff,0xff};
     image.SubImageUpload(0, 0, 0, 0, 2, 2, tight);
     assert(uploaded == expected);
-    puts("GLES image upload regression: passed (compressed mip/edge bounds, pitched/tight RGB565 bytes)");
+
+    // Layered images upload one slice or layer per call through the 3D entry
+    // points, bound to the layered target; a z past the level's depth is a no-op.
+    image.opts.textureType = TT_2D_ARRAY;
+    image.opts.depth = 3;
+    image.SubImageUpload(0, 0, 0, 2, 2, 2, tight);
+    assert(uploaded == expected && uploadedZ == 2);
+    assert(uploadedTarget == GL_TEXTURE_2D_ARRAY && boundTarget == GL_TEXTURE_2D_ARRAY);
+    int calls = uploadCalls;
+    image.SubImageUpload(0, 0, 0, 3, 2, 2, tight);
+    assert(uploadCalls == calls);
+    image.opts.textureType = TT_3D;
+    image.opts.format = FMT_DXT1;
+    image.opts.width = image.opts.height = 8;
+    image.opts.depth = 4;
+    image.SubImageUpload(2, 0, 0, 0, 4, 4, block);
+    assert(uploadedZ == 0 && uploadedTarget == GL_TEXTURE_3D && boundTarget == GL_TEXTURE_3D);
+    assert(uploadedWidth == 2 && uploadedHeight == 2 && uploadedSize == 8);
+    calls = uploadCalls;
+    image.SubImageUpload(2, 0, 0, 1, 4, 4, block); // level 2 of a 4-deep volume holds one slice
+    assert(uploadCalls == calls);
+    puts("GLES image upload regression: passed (compressed mip/edge bounds, pitched/tight RGB565 bytes, layered slices)");
 }
 '''
     temporary_root = ROOT / ".tmp"

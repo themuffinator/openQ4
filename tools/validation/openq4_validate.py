@@ -697,6 +697,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "mp_bot_hazards.py",
         root / "tools" / "tests" / "mp_bot_server_menu.py",
         root / "tools" / "tests" / "mp_instagib_contract.py",
+        root / "tools" / "tests" / "mp_casual_match_flow_contract.py",
+        root / "tools" / "tests" / "mp_classic_grapple_contract.py",
         root / "tools" / "tests" / "mp_modifiers_contract.py",
         root / "tools" / "tests" / "mp_map_database_contract.py",
         root / "tools" / "tests" / "mp_client_combat_effects.py",

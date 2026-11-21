@@ -506,6 +506,7 @@ jobs:
             tools/tests/renderer_shared_domain_targets.py \
             tools/tests/rigid_body_recovery_diagnostics.py \
             tools/tests/ai_medic_approach_watchdog.py \
+            tools/tests/ai_medic_combat_stance_restore.py \
             tools/tests/savegame_corruption_contract.py \
             tools/tests/savegame_gui_layout_contract.py \
             tools/tests/weapon_gui_event_queue_contract.py \
@@ -1079,6 +1080,7 @@ jobs:
           python tools/tests/renderer_shared_domain_targets.py
           python tools/tests/rigid_body_recovery_diagnostics.py
           python tools/tests/ai_medic_approach_watchdog.py
+          python tools/tests/ai_medic_combat_stance_restore.py
           python tools/tests/savegame_corruption_contract.py
           python tools/tests/savegame_gui_layout_contract.py
           python tools/tests/weapon_gui_event_queue_contract.py
@@ -1524,6 +1526,13 @@ jobs:
     timeout-minutes: 150
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+      # The VS 2026 image pairs the MSVC 14.52 STL, which refuses Clang older
+      # than 22 (STL1000), with LLVM 20. The Python checks compile their
+      # fixtures with clang++ against that STL, so every one of them failed to
+      # build. The driver override adds the STL's own escape hatch to every
+      # clang invocation; the leading '#' keeps clang from echoing the edit.
+      # Remove it once the image ships Clang 22 or newer.
+      CCC_OVERRIDE_OPTIONS: "# +-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
     steps:
       - name: Checkout
         uses: actions/checkout@v7

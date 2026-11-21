@@ -49,7 +49,7 @@ struct idBinaryImageData:bimageImage_t{
  void Alloc(int n){Free();dataSize=n;data=(byte*)Mem_Alloc(n);owns=true;}
  void SetExternalData(byte*p,int n){Free();data=p;dataSize=n;}
 };
-struct idBinaryImage{bimageFile_t fileData{};idList<idBinaryImageData>images;byte*loadedFileData=nullptr;int loadedFileBytes=0;imageFileContent_t fileContent{};void ObserveFileContent(const imageFileContent_t& v){fileContent=v;}
+struct idBinaryImage{bimageFile_t fileData{};idList<idBinaryImageData>images;byte*loadedFileData=nullptr;int fileDepth=1;int loadedFileBytes=0;imageFileContent_t fileContent{};void ObserveFileContent(const imageFileContent_t& v){fileContent=v;}
  ~idBinaryImage(){Clear();}void Clear();
  bool Load2DFromMemory(int,int,const byte*,int,textureFormat_t&,textureColor_t&,bool,bool);
  bool LoadCubeFromMemory(int,const byte*[6],int,textureFormat_t&,bool);

@@ -140,9 +140,9 @@ def unit(repository, changes=None):
         assert sources[file].count(old)==1,old
         sources[file]=sources[file].replace(old,new)
     support=base.SUPPORT.replace('struct idStr {','struct idStr {'+STR)
-    anchor='enum {TT_2D=1,TT_CUBIC=2};using textureUsage_t=int;'
+    anchor='enum {TT_2D=1,TT_CUBIC=2,TT_3D=3,TT_2D_ARRAY=4};using textureUsage_t=int;'
     assert support.count(anchor)==1, 'Review the shared recovery fixture enum declarations'
-    support=support.replace(anchor,anchor+'\nusing textureFilter_t=int;using textureRepeat_t=int;using cubeFiles_t=int;using byte=unsigned char;\nenum{TF_LINEAR=1,TR_CLAMP=2,TR_REPEAT=0,TD_LOOKUP_TABLE_RGBA=4,CF_2D=0,LEVEL_LOAD_RESOURCE_IMAGE=0,GL_TEXTURE_CUBE_MAP_EXT=0,GL_TEXTURE_2D=1,TF_DEFAULT=0,TD_DEFAULT=0};static int metadataNative=0;')
+    support=support.replace(anchor,anchor+'\nusing textureFilter_t=int;using textureRepeat_t=int;using cubeFiles_t=int;using byte=unsigned char;\nenum{TF_LINEAR=1,TR_CLAMP=2,TR_REPEAT=0,TD_LOOKUP_TABLE_RGBA=4,CF_2D=0,LEVEL_LOAD_RESOURCE_IMAGE=0,GL_TEXTURE_CUBE_MAP_EXT=0,GL_TEXTURE_2D=1,GL_TEXTURE_3D=5,GL_TEXTURE_2D_ARRAY=6,TF_DEFAULT=0,TD_DEFAULT=0};static int metadataNative=0;')
     support=support.replace('struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D;};','struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D,format=0;bool isPersistant=false;bool operator==(const idImageOpts&)const=default;};')
     support=support.replace('struct idImage {','struct idImage {'+IMAGE)
     support=support.replace('bool IsFileBacked()const{return file;}','bool IsFileBacked()const{return file&&!scratchImage&&!opts.isPersistant;}')

@@ -8066,8 +8066,8 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe ) {
 	// cause prints to force screen updates as a pacifier,
 	// and draw the loading gui instead of game draws
 	openq4::NativeInputBeforeSessionChange();
-	startupLoadingHandoff = false;
 	insideExecuteMapChange = true;
+	startupLoadingHandoff = false;
 	LoadingPresentation_Begin( "map" );
 
 	// if this works out we will probably want all the sizes in a def file although this solution will 

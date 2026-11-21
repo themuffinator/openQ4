@@ -502,6 +502,7 @@ jobs:
             tools/tests/renderer_shared_domain_targets.py \
             tools/tests/rigid_body_recovery_diagnostics.py \
             tools/tests/ai_medic_approach_watchdog.py \
+            tools/tests/ai_medic_combat_stance_restore.py \
             tools/tests/savegame_corruption_contract.py \
             tools/tests/savegame_gui_layout_contract.py \
             tools/tests/weapon_gui_event_queue_contract.py \
@@ -1075,6 +1076,7 @@ jobs:
           python tools/tests/renderer_shared_domain_targets.py
           python tools/tests/rigid_body_recovery_diagnostics.py
           python tools/tests/ai_medic_approach_watchdog.py
+          python tools/tests/ai_medic_combat_stance_restore.py
           python tools/tests/savegame_corruption_contract.py
           python tools/tests/savegame_gui_layout_contract.py
           python tools/tests/weapon_gui_event_queue_contract.py

@@ -7744,7 +7744,23 @@ def validate_gl_shadow_coverage_contract() -> None:
         require_compact(body, "if ( !RB_ShadowMapResolveCasterDrawData( surf, casterGeo, ambientCache ) ) { return false; }",
                         "any missing caster fails its ownership")
         render_body = braced_body(source, f"static bool {render}(", render)
-        for casters in ("primaryCasters", "secondaryCasters", "tertiaryCasters", "quaternaryCasters"):
+        if chain == "RB_ShadowMapDrawCasterChain":
+            # 82b5a343b: the projected light's still chains (primary and
+            # secondary) are drawn together, without short-circuiting, so the
+            # whole-light cache can store them before the moving chains join;
+            # their result still decides the map, and a partial still scene is
+            # never cached.
+            require_compact(render_body,
+                            f"const bool staticOk = {chain}( primaryCasters, cascadeIndex, useHashedAlpha ) "
+                            f"& {chain}( secondaryCasters, cascadeIndex, useHashedAlpha ); "
+                            "allCastersRendered &= staticOk;",
+                            "all four caster chains participate")
+            require_compact(render_body, "if ( wholeLightTile ) { // store the still scenery before moving casters join it if ( staticOk ) {",
+                            "a partial still scene is never cached")
+            dynamic = ("tertiaryCasters", "quaternaryCasters")
+        else:
+            dynamic = ("primaryCasters", "secondaryCasters", "tertiaryCasters", "quaternaryCasters")
+        for casters in dynamic:
             require(render_body, f"allCastersRendered &= {chain}( {casters},", "all four caster chains participate")
         require(render_body, "return allCastersRendered;", "partial maps are never published or sampled")
 
@@ -8253,9 +8269,16 @@ def validate_point_cache_parity_and_receiver_cost_contract() -> None:
             "entityDef->parms.hModel->IsStaticWorldModel() &&",
             "R_LightHasRealPrelightModel( lightDef->parms );",
             "const bool materialNoSelfShadow = !prelightOwnsShadows",
-            "&& shadowShader->TestMaterialFlag( MF_NOSELFSHADOW );",
+            "&& R_InteractionMaterialNoSelfShadow( entityDef, shadowShader, shadowMapCasterPolicyActive );",
         ),
         "static world under a prelit light keeps the prelight's global ownership",
+    )
+    # 3f1bec35e (#238): the material's noSelfShadow flag still decides
+    # ownership, except for opted-in skinned models under a mapped light.
+    require_compact(
+        braced_body(interaction, "static bool R_InteractionMaterialNoSelfShadow(", "material noSelfShadow ownership"),
+        "if ( !material->TestMaterialFlag( MF_NOSELFSHADOW ) ) { return false; }",
+        "a material without noSelfShadow never takes its ownership",
     )
     require_compact(
         read("src/game/gamesys/SysCvar.cpp"),

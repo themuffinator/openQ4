@@ -40,7 +40,8 @@ VK_SUPPORT = r'''
 static int checks=0,errors=0,started=0,succeeded=0,refused=0,native=0,destroyed=0,deferred=0,reductions=0,budgetDrop=0;
 static unsigned oomAbove=0; // vmaCreateImage refuses images wider than this
 #define TEST(x) do{++checks;if(!(x))throw std::runtime_error(#x);}while(0)
-static bool allowed=true,formatOK=true,batchOK=true;
+static bool allowed=true,formatOK=true,batchOK=true,layeredOK=true;
+static VkImageCreateInfo lastImage{};
 static int fail=0;
 template<class T> T Max(T a,T b){return std::max(a,b);}
 template<class T> T Min(T a,T b){return std::min(a,b);}
@@ -53,9 +54,10 @@ static Common* common=&commonObject;
 enum textureFilter_t {TF_DEFAULT,TF_LINEAR,TF_NEAREST};
 enum textureRepeat_t {TR_REPEAT,TR_CLAMP,TR_CLAMP_TO_BORDER,TR_CLAMP_TO_ZERO,TR_CLAMP_TO_ZERO_ALPHA,TR_MIRRORED_REPEAT};
 enum {TT_2D,TT_CUBIC,FMT_DEPTH,FMT_DEPTH_STENCIL,FMT_RGB565};
+enum {TT_3D=8,TT_2D_ARRAY=9};
 using textureUsage_t=int;
 enum {TD_SPECULAR,TD_DIFFUSE,TD_DEFAULT,TD_BUMP,TD_FONT,TD_HIGH_QUALITY=15,TD_PBR_COLOR,TD_MATERIAL_DATA};
-struct idImageOpts {int width=8,height=8,textureType=TT_2D,format=100,numLevels=4,numMSAASamples=0;};
+struct idImageOpts {int width=8,height=8,depth=1,textureType=TT_2D,format=100,numLevels=4,numMSAASamples=0;};
 struct idImage;
 struct renderImageOperation_t {
  bool done=false,permit;
@@ -64,7 +66,7 @@ struct renderImageOperation_t {
  bool Allowed()const{return permit;}void Succeeded(uint64_t=0){done=true;}
 };
 struct idImage {idImageOpts opts;int usage=0;bool allowDownSize=true;textureFilter_t filter=TF_DEFAULT;textureRepeat_t repeat=TR_REPEAT;unsigned texnum=99;uint64_t storageGeneration=0;
- bool IsFileBacked()const{return true;}void PurgeImage(){++native;texnum=99;}void AllocImage();void SubImageUpload(int,int,int,int,int,int,const void*,int)const;};
+ const char* GetName()const{return "image";}bool IsFileBacked()const{return true;}void PurgeImage(){++native;texnum=99;}void AllocImage();void SubImageUpload(int,int,int,int,int,int,const void*,int)const;};
 struct VmaAllocation_T{};using VmaAllocation=VmaAllocation_T*;
 struct VmaAllocationCreateInfo{int usage=0,flags=0;};
 struct VmaAllocationInfo{void* pMappedData=nullptr;};
@@ -78,11 +80,13 @@ static constexpr int VK_MAX_SAMPLERS=4;
 static vkSamplerKey_t vkSamplerKeys[VK_MAX_SAMPLERS]{};
 static VkSampler vkSamplers[VK_MAX_SAMPLERS]{};static int vkNumSamplers=0;
 VkResult vkCreateSampler(VkDevice,const VkSamplerCreateInfo*,const VkAllocationCallbacks*,VkSampler* out){++native;*out=(VkSampler)(uintptr_t)1;return fail==1?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
-VkResult vmaCreateImage(int,const VkImageCreateInfo* ici,const VmaAllocationCreateInfo*,VkImage* out,VmaAllocation* a,void*){++native;if(oomAbove&&ici->extent.width>oomAbove){*out=VK_NULL_HANDLE;return VK_ERROR_OUT_OF_DEVICE_MEMORY;}*out=(VkImage)(uintptr_t)1;*a=(VmaAllocation)(uintptr_t)1;return fail==2?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
+VkResult vmaCreateImage(int,const VkImageCreateInfo* ici,const VmaAllocationCreateInfo*,VkImage* out,VmaAllocation* a,void*){++native;lastImage=*ici;if(oomAbove&&ici->extent.width>oomAbove){*out=VK_NULL_HANDLE;return VK_ERROR_OUT_OF_DEVICE_MEMORY;}*out=(VkImage)(uintptr_t)1;*a=(VmaAllocation)(uintptr_t)1;return fail==2?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
 static int views=0;
 VkResult vkCreateImageView(VkDevice,const VkImageViewCreateInfo*,const VkAllocationCallbacks*,VkImageView* out){++native;++views;*out=(VkImageView)(uintptr_t)1;return fail==(views==1?3:4)?VK_ERROR_OUT_OF_DEVICE_MEMORY:VK_SUCCESS;}
 void vmaDestroyImage(int,VkImage,VmaAllocation){++destroyed;}
 void vkDestroyImageView(VkDevice,VkImageView,const VkAllocationCallbacks*){++destroyed;}
+// Volumes and arrays ask the device first (735878f06); layeredOK=false refuses.
+VkResult vkGetPhysicalDeviceImageFormatProperties(VkPhysicalDevice,VkFormat,VkImageType,VkImageTiling,VkImageUsageFlags,VkImageCreateFlags,VkImageFormatProperties* p){++native;*p={};p->maxExtent={4096,4096,256};p->maxMipLevels=13;p->maxArrayLayers=256;return layeredOK?VK_SUCCESS:VK_ERROR_FORMAT_NOT_SUPPORTED;}
 void vkGetPhysicalDeviceFormatProperties(VkPhysicalDevice,VkFormat,VkFormatProperties* p){++native;*p={};p->optimalTilingFeatures=VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT|VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT|VK_FORMAT_FEATURE_TRANSFER_SRC_BIT;}
 static unsigned char mapped[1024]{};
 VkResult vmaCreateBuffer(int,const VkBufferCreateInfo*,const VmaAllocationCreateInfo*,VkBuffer* b,VmaAllocation* a,VmaAllocationInfo* info){++native;*b=(VkBuffer)(uintptr_t)1;*a=(VmaAllocation)(uintptr_t)1;info->pMappedData=mapped;return fail==5?VK_ERROR_OUT_OF_HOST_MEMORY:VK_SUCCESS;}
@@ -107,7 +111,7 @@ bool VK_Device_BatchedUpload(void(*)(VkCommandBuffer,void*),void*,VkBuffer,VmaAl
 '''
 
 VK_MAIN = r'''
-static void Reset(){errors=started=succeeded=refused=native=destroyed=deferred=views=reductions=budgetDrop=0;oomAbove=0;allowed=formatOK=batchOK=true;fail=0;slot=0;vkCtx.initialized=true;vkCtx.presentationBlocked=false;vkNumSamplers=0;std::memset(vkImages,0,sizeof(vkImages));}
+static void Reset(){errors=started=succeeded=refused=native=destroyed=deferred=views=reductions=budgetDrop=0;oomAbove=0;allowed=formatOK=batchOK=layeredOK=true;lastImage={};fail=0;slot=0;vkCtx.initialized=true;vkCtx.presentationBlocked=false;vkNumSamplers=0;std::memset(vkImages,0,sizeof(vkImages));}
 int main(){try{
  Reset();{idImage i;i.AllocImage();TEST(succeeded==1&&refused==0&&errors==0);TEST(i.texnum==0);}
  for(int refusal=0;refusal<7;++refusal){Reset();idImage i;
@@ -154,6 +158,19 @@ int main(){try{
  Reset();oomAbove=4;{idImage i;i.usage=TD_FONT;i.AllocImage();TEST(refused==1&&reductions==0);}
  Reset();oomAbove=4;budgetDrop=3;{idImage i;i.opts.numLevels=1;i.AllocImage();TEST(refused==1&&reductions==0);}
  Reset();budgetDrop=3;{idImage i;i.opts.textureType=TT_CUBIC;i.AllocImage();TEST(vkImages[0].droppedLevels==3&&vkImages[0].numMips==1&&vkImages[0].numLayers==6);}
+ // A volume is one 3D image of depth slices, an array a 2D image of depth layers;
+ // an unsupported layered format is a counted refusal before any native image.
+ Reset();{idImage i;i.opts.textureType=TT_3D;i.opts.depth=4;i.AllocImage();const vkImageEntry_t& e=vkImages[0];
+  TEST(succeeded==1&&lastImage.imageType==VK_IMAGE_TYPE_3D&&lastImage.extent.depth==4&&lastImage.arrayLayers==1);
+  TEST(e.viewType==VK_IMAGE_VIEW_TYPE_3D&&e.depth==4&&e.numLayers==1&&(e.usage&VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)==0);
+  started=succeeded=refused=0;i.SubImageUpload(1,0,0,1,4,4,mapped,0);TEST(succeeded==1);
+  i.SubImageUpload(1,0,0,2,4,4,mapped,0);i.SubImageUpload(0,0,0,4,8,8,mapped,0);TEST(refused==2&&succeeded==1);}
+ Reset();{idImage i;i.opts.textureType=TT_2D_ARRAY;i.opts.depth=5;i.AllocImage();const vkImageEntry_t& e=vkImages[0];
+  TEST(succeeded==1&&lastImage.imageType==VK_IMAGE_TYPE_2D&&lastImage.extent.depth==1&&lastImage.arrayLayers==5);
+  TEST(e.viewType==VK_IMAGE_VIEW_TYPE_2D_ARRAY&&e.depth==1&&e.numLayers==5);
+  started=succeeded=refused=0;i.SubImageUpload(3,0,0,4,1,1,mapped,0);TEST(succeeded==1);i.SubImageUpload(0,0,0,5,8,8,mapped,0);TEST(refused==1);}
+ Reset();layeredOK=false;{idImage i;i.opts.textureType=TT_3D;i.opts.depth=4;i.AllocImage();TEST(refused==1&&succeeded==0&&errors==1&&!vkImages[0].inUse&&lastImage.sType==0);}
+ Reset();layeredOK=false;{idImage i;i.AllocImage();TEST(succeeded==1);}
  // The pressure ramp itself (RGBA8, MiB units).
  {const vkFormatInfo_t rgba{};const VkDeviceSize M=1u<<20,L=1000*M;
   TEST(VK_Image_EstimateBytes(rgba,2048,2048,12,1)==22369620ull&&VK_Image_EstimateBytes(rgba,4,4,3,6)==(16+4+1)*4*6);
@@ -378,6 +395,8 @@ def main():
             ('dropped-level-shift', 'mipLevel -= entry->droppedLevels;', '(void)0;'),
             ('budget-retry', 'droppedLevels++;', 'break;'),
             ('budget-usage', 'ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;', '(void)0;'),
+            ('layered-format-query', 'if ( supported != VK_SUCCESS ||', 'if ( false ||'),
+            ('volume-slice-limit', '? Max( 1, entry->depth >> Max( 0, mipLevel ) ) : entry->numLayers;', '? entry->depth : entry->numLayers;'),
         ]
         cases += [('vulkan', name, mutate(vk, old, new)) for name, old, new in changes]
         entries = units['entries']

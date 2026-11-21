@@ -688,6 +688,8 @@ def validate_validation_wiring() -> None:
     smoke_wiring_allowlist = {
         # Runtime probes require staged binaries/assets; generators feed Meson native tests.
         "airdefense_performance.py",
+        # Regenerates the reference digests in native/Bc7CodecTest.cpp; needs pip packages.
+        "bc7_reference.py",
         "checkpoint_performance.py",
         "generate_capture_resample_test.py",
         "generate_checkpoint_commit_test.py",
@@ -695,6 +697,15 @@ def validate_validation_wiring() -> None:
         "generate_checkpoint_storage_test.py",
         "generate_dict_identity_test.py",
         "generate_save_dict_test.py",
+        # Hidden listen-server smokes and hardware-bound capture harnesses: they
+        # launch the staged client, so the argument-free suite cannot run them.
+        "mp_casual_flow_smoke.py",
+        "mp_client_options_smoke.py",
+        # Generates PngFixtures.inc and runs the openq4-png-codec native test.
+        "png_codec.py",
+        "renderer_ao_reference.py",
+        "renderer_parallax_occlusion.py",
+        "renderer_pbr_showcase.py",
         # The update core's committed fixtures, and the helper test the
         # openq4-updater-helper-apply Meson test runs against the built helper.
         "update_core_fixtures.py",

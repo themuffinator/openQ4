@@ -548,6 +548,9 @@ struct idGameLocal {
     void MapClear(bool){entitiesAlive=false;}
     void ShutdownInstances(){}
     void ShutdownAsyncNetwork(){isServer=false;}
+    // multiplayer's per-map entityDef lookup cache (55ab256ff) is dropped at teardown
+    mutable int entityDefCacheClears=0;
+    void ClearEntityDefCache() const {++entityDefCacheClears;}
     void MapShutdown();
 } gameLocal;
 bool idMultiplayerGame::FinalizeMatchEvidence(bool aborted) {
@@ -572,9 +575,11 @@ int main() {
         assert(gameLocal.warnings==((mask==7) ? 1:0));
         assert(!gameLocal.entitiesAlive && gameLocal.mapFileName.empty());
         assert(gameLocal.gamestate==GAMESTATE_NOMAP);
+        assert(gameLocal.entityDefCacheClears==1);
         // Session unload and module shutdown may request teardown twice.
         gameLocal.MapShutdown();
         assert(gameLocal.mpGame.seals==expected);
+        assert(gameLocal.entityDefCacheClears==2);
     }
     puts("map shutdown lifetime: PASS (16 cases)");
 }

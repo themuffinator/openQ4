@@ -30,10 +30,19 @@ struct GUI {
 };
 struct mpMatchViewLifecycle_t {mpGameState_t phase=GAMEON;int pauseState=MP_MATCH_VIEW_PAUSE_RUNNING;};
 struct Present {bool present=false;};
+// MatchView.h's public roles and MPMatchViewRoleBit, which the casual caster
+// panel (MP-16) reads from the recipient's public role mask.
+typedef enum {MP_MATCH_VIEW_ROLE_NONE=0,MP_MATCH_VIEW_ROLE_PLAYER,MP_MATCH_VIEW_ROLE_CAPTAIN,MP_MATCH_VIEW_ROLE_COACH,
+    MP_MATCH_VIEW_ROLE_BROADCASTER,MP_MATCH_VIEW_ROLE_REFEREE,MP_MATCH_VIEW_ROLE_COUNT} mpMatchViewPublicRole_t;
+unsigned MPMatchViewRoleBit(mpMatchViewPublicRole_t role){
+    return role>MP_MATCH_VIEW_ROLE_NONE&&role<MP_MATCH_VIEW_ROLE_COUNT?(1u<<static_cast<unsigned>(role)):0u;}
 struct View {
-    struct Public {mpMatchViewLifecycle_t lifecycle;Present globalProposal,series;} publicState;
+    struct Public {mpMatchViewLifecycle_t lifecycle;Present globalProposal,series;struct {unsigned publicRoleMask=0;} recipient;} publicState;
     Present ownSideProposal;
+    int teamVitalCount=0;
 };
+int casterProjections=0;
+void ProjectCasterVitals(GUI*){++casterProjections;}
 void ProjectContext(GUI* gui,const View& clientMatchView) {
 @CONTEXT@
 }
@@ -82,8 +91,22 @@ int main() {
         CHECK(gui.values["match_context_series"]=="Series 1-0" && gui.values["match_context_timeouts"]=="Timeouts 1/2" &&
             gui.values["match_context_proposal"]=="Proposal");
     }
+    CHECK(casterProjections==0);
     gui.SetStateInt("match_context_visible",0);ProjectContext(&gui,view);
     CHECK(!gui.GetStateInt("match_context_compact") && gui.values["match_context_summary"].empty());
+    // The caster panel: only outside a managed record, only with disclosed
+    // vitals, and only for the broadcaster's role.
+    CHECK(casterProjections==0);
+    const unsigned broadcaster=MPMatchViewRoleBit(MP_MATCH_VIEW_ROLE_BROADCASTER);
+    const unsigned playerRole=MPMatchViewRoleBit(MP_MATCH_VIEW_ROLE_PLAYER);
+    for(int visible:{0,1}) for(int vitals:{0,2}) for(unsigned mask:{0u,playerRole,broadcaster,playerRole|broadcaster}) {
+        gui.SetStateInt("match_context_visible",visible);
+        view.teamVitalCount=vitals;view.publicState.recipient.publicRoleMask=mask;
+        const int before=casterProjections;ProjectContext(&gui,view);
+        CHECK(casterProjections-before==(!visible&&vitals>0&&(mask&broadcaster)?1:0));
+    }
+    view.teamVitalCount=0;view.publicState.recipient.publicRoleMask=0;
+    gui.SetStateInt("match_context_visible",0);
     idPlayer player;
     for(int held:{-1,0,1,999,1000,1001,3000,9100}) {
         player.minRespawnTime=gameLocal.time+held;ProjectRespawn(&gui,&player,GAMEON);

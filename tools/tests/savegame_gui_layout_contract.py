@@ -248,6 +248,7 @@ NEVER_SERIALIZED_GUIS = {
     "guis/mphud.gui",
     "guis/mpmain.gui",
     "guis/mpmsgmode.gui",
+    "guis/presetcheck.gui",
     "guis/scoreboard.gui",
     "guis/summary.gui",
 }

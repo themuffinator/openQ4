@@ -1,4 +1,9 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
+// The opt-in diagnostic dump below reads one variable with std::getenv, which
+// the Windows CRT marks deprecated; -Werror would otherwise reject the fixture.
+#if defined(_WIN32) && !defined(_CRT_SECURE_NO_WARNINGS)
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 #include "src/ui/retained/Input.h"
 #include <algorithm>
 #include <cstdio>
@@ -388,7 +393,13 @@ static void PromptButtonsReplayKeys() {
 	// With nothing focused, Accept has nothing to act on.
 	Check(interaction.Focus(""),"leave the page without focus");
 	Check(click("prompt.select","").empty(),"a click on SELECT without a focused control does nothing");
-	// The document contract: an input replaces the action or event and needs focusable false.
+}
+#ifndef OPENQ4_UI_INTERACTION_ONLY
+// The document contract: an input replaces the action or event and needs
+// focusable false. It loads JSON through the production Document, which the
+// Meson target links; tools/tests/ui_number_native.py compiles this file without
+// the JSON library and defines OPENQ4_UI_INTERACTION_ONLY to leave it out.
+static void PromptButtonDocumentContract() {
 	const auto load = [](const char* control) {
 		const std::string source = std::string(R"({"format":"retained-ui","version":1,"id":"prompt-schema",)") +
 			R"("actions":{"go":{"operation":"session.menu","arguments":{"command":"go"}}},"timelines":[)"
@@ -407,9 +418,13 @@ static void PromptButtonsReplayKeys() {
 		"an input replaces the action");
 	Check(!load((R"({"role":"button","label":"#str_1","input":"next","focusable":false,)" + states + "}").c_str()),"only accept and back replay");
 }
+#endif
 int main() {
 	PreviousFocusAndFreshLayout(); DefaultEligibilityAndAsyncChanges(); NestedAndDisjointScopes();
 	HeldSourcesAndRepeats(); IndependentNavigationPulse(); BackIdentityAndNoImplicitDismiss(); PendingSnapshotRestoration(); ActivationOwnership();
 	InvalidLayoutAndEmptyRestoration(); ManualScopeCompatibility(); PromptButtonsReplayKeys();
+#ifndef OPENQ4_UI_INTERACTION_ONLY
+	PromptButtonDocumentContract();
+#endif
 	std::printf("UiModalInteractionTest: %u checks passed (production Interaction/Input, no devices or rendering).\n",checks);
 }

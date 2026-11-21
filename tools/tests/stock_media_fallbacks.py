@@ -60,11 +60,18 @@ def test_images_try_authored_media_before_shape_compatible_stock_fallbacks() -> 
         if missing not in resolver or replacement not in resolver:
             raise AssertionError(f"missing retail image fallback {missing!r} -> {replacement!r}")
 
+    # The Awakening's corrections apply only while its content is mounted, as the
+    # game or beneath a single-player mod (FS_AwakeningActive, since 7926e2a42),
+    # so each one must sit inside that scope rather than anywhere in the resolver.
+    awakening_scope = "if ( FS_AwakeningActive() ) {"
+    if awakening_scope not in resolver:
+        raise AssertionError('Awakening image fallback missing or unscoped')
+    awakening = function_body(resolver, awakening_scope)
     for missing, replacement in (
         ('a4x_tactical/q4x_tt_body_s', 'q4x_tactical/q4x_tt_body_s'),
         ('gfx/effects/fire/p_fire2a', 'gfx/effects/fire/fire2a.tga'),
     ):
-        if missing not in resolver or replacement not in resolver or '"q4xbase"' not in resolver:
+        if missing not in awakening or replacement not in awakening:
             raise AssertionError('Awakening image fallback missing or unscoped')
     downsize = image_program.split('if (!token.Icmp("downsize")) {', 1)[1].split('// jmarshall end', 1)[0]
     if 'const bool loaded = R_ParseImageProgram_r' not in downsize or 'return loaded;' not in downsize:

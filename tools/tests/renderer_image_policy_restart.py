@@ -61,7 +61,7 @@ static void Boundary(const char* name){if(callback)callback(name);}
 static idCVar dependency;
 struct Cvars {const idCVar* Find(const char*){Boundary("dependency");return &dependency;} bool GetCVarBool(const char*){Boundary("packed");return packed;}} cvars;
 static Cvars* cvarSystem=&cvars;
-enum {TT_2D,TT_CUBIC};
+enum {TT_2D,TT_CUBIC,TT_3D,TT_2D_ARRAY};
 struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D;};
 struct idImage {
  uint64_t identity=R_ImagePolicyNewResourceIdentity();uint64_t GetImagePolicyIdentity()const{return identity;}

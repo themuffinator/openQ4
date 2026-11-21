@@ -618,8 +618,17 @@ def check_body() -> None:
     require(body, "\tconst idVec3 shifted = origin + ( normal * ( 2.0f * ( point * normal ) ) ) * axis;\n\tmirroredAxis = reflect * axis;",
             "VRBody_MirrorPlacement may write over its own arguments")
     # reflected models wind the other way round in every backend
-    require(read("src/renderer/tr_backend.cpp"), "R_GLStateCache().SetFrontFace( reflected ? GL_CW : GL_CCW );",
+    require(read("src/renderer/tr_backend.cpp"),
+            "R_GLStateCache().SetFrontFace( R_SpaceWindsReflected( space ) ? GL_CW : GL_CCW );",
             "GL legacy passes turn the front face for a reflected space")
+    # the shared winding rule: a model matrix of negative determinant turns
+    # (a surface GUI turns only for its mirrored host, 966d8ae6f)
+    local = read("src/renderer/tr_local.h")
+    require(local, "+ m[2] * ( m[4] * m[9] - m[5] * m[8] );\n\treturn determinant < 0.0f;",
+            "a mirrored model matrix winds reflected")
+    require(local, "\tif ( space->surfaceGuiSpace ) {\n\t\treturn space->surfaceGuiHostReflected;\n\t}\n"
+            "\treturn R_ModelMatrixReflects( space->modelMatrix );",
+            "every space but a surface GUI winds by its model matrix")
     render = read("src/renderer/tr_render.cpp")
     if render.count("\t\tRB_SetSurfaceWinding( drawSurf->space );\n\t\ttriFunc_( drawSurf );") != 3:
         raise AssertionError("the GL draw-surface loops set the winding before each surface draws")
