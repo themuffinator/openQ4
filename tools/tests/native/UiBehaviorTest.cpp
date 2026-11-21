@@ -185,6 +185,9 @@ void Dump(std::ostream& stream, const Value& value) {
 void Dump(std::ostream& stream, const PropertyValues& properties) {
 	for (const auto& [key,value] : properties) { stream << std::quoted(key.first) << std::quoted(key.second); Dump(stream,value); }
 }
+void Dump(std::ostream& stream, const MotionValues& properties) {
+	for (const auto& [key,value] : properties) { stream << std::quoted(key.first) << std::quoted(key.second); Dump(stream,value); }
+}
 std::string Fingerprint(const State& state, const Motion& motion) {
 	std::ostringstream stream; stream << std::setprecision(17) << state.Revision() << '|';
 	Dump(stream,state.Variables()); Dump(stream,state.Properties());

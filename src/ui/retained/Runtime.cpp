@@ -2092,6 +2092,10 @@ struct Runtime::Impl {
 	struct InteractionBranch {
 		const Node* node=nullptr;
 		Rml::Element* element=nullptr;
+		// The presented properties every interaction update reads, keyed once,
+		// and whether they let input through (display and pointer-events).
+		PropertyKey display,pointerEvents;
+		bool presented=true;
 		std::vector<InteractionBranch> children;
 	};
 	InteractionBranch inputBranches,modalBranches;
@@ -2108,6 +2112,8 @@ struct Runtime::Impl {
 		}
 		if ((modals ? bool(node.modal) : bool(node.control)) || !result.children.empty()) {
 			result.node=&node;
+			result.display={node.id,"display"};
+			if (!modals) result.pointerEvents={node.id,"pointer-events"};
 			interactionAncestors.insert(CanonicalElement(node.id));
 			if (!modals && (node.control || node.mask)) {
 				result.element=CanonicalElement(node.id);
@@ -2282,6 +2288,13 @@ struct Runtime::Impl {
 		return animated == motion.Values().end() ? std::nullopt : std::optional<Value>(animated->second);
 	}
 	std::optional<Value> PresentedProperty(const PropertyKey& key) const { return Property(state,motion,key); }
+	// The presented value without a copy; valid until the state or motion changes.
+	static const Value* PropertyPointer(const State& state, const Motion& motion, const PropertyKey& key) {
+		const auto bound = state.Properties().find(key);
+		if (bound != state.Properties().end()) return &bound->second;
+		const auto animated = motion.Values().find(key);
+		return animated == motion.Values().end() ? nullptr : &animated->second;
+	}
 	bool VisibleModals(const State& state, const Motion& motion, std::vector<std::string>& roots, std::string& error) const {
 		roots.clear(); error.clear();
 		if (!canonical || !interaction.HasAuthoredModals()) return true;
@@ -2289,7 +2302,7 @@ struct Runtime::Impl {
 		std::function<void(const InteractionBranch&,bool,const std::string&)> visit = [&](const InteractionBranch& branch, bool inherited, const std::string& parent) {
 			if (!branch.node) return;
 			const auto& node=*branch.node;
-			const auto display = Property(state,motion,{node.id,"display"});
+			const auto* display = PropertyPointer(state,motion,branch.display);
 			const bool visible = inherited && (!display || display->text != "none");
 			std::string scope = parent;
 			if (visible && node.modal) {
@@ -2332,16 +2345,32 @@ struct Runtime::Impl {
 		}
 	}
 	std::vector<std::string> openModals;
-	void CollectInputEligibility(const InteractionBranch& branch, bool inherited = true) {
+	// openQ4: a branch's display and pointer-events are presented values, so
+	// they change only with the state or the motion: an update at the same
+	// revisions (the settling passes of one frame, an event's refresh) reuses
+	// them instead of searching both tables for every branch again. A mask's
+	// area follows layout and is read on every update.
+	std::uint64_t eligibilityStateRevision=0,eligibilityMotionRevision=0;
+	bool eligibilityCached=false;
+	void CollectInputEligibility() {
+		const bool reread=!eligibilityCached || eligibilityStateRevision!=state.Revision() || eligibilityMotionRevision!=motion.Revision();
+		CollectInputEligibility(inputBranches,true,reread);
+		eligibilityCached=true; eligibilityStateRevision=state.Revision(); eligibilityMotionRevision=motion.Revision();
+	}
+	void CollectInputEligibility(InteractionBranch& branch, bool inherited, bool reread) {
 		if (!branch.node) return;
 		const auto& node=*branch.node;
-		const auto display = PresentedProperty({node.id,"display"});
-		const auto events = PresentedProperty({node.id,"pointer-events"});
+		if (reread) {
+			const auto* display = PropertyPointer(state,motion,branch.display);
+			const auto* events = PropertyPointer(state,motion,branch.pointerEvents);
+			branch.presented = (!display || display->text != "none") && (!events || events->text != "none");
+		}
 		auto* element = branch.element;
 		const bool maskArea = !node.mask || (element && static_cast<VectorElement*>(element)->HasMaskArea());
-		const bool allowed = inherited && maskArea && (!display || display->text != "none") && (!events || events->text != "none");
+		const bool allowed = inherited && maskArea && branch.presented;
+		// A load fixes the branches, so each update overwrites the same entries.
 		if (node.control) inputAllowed[node.id] = allowed;
-		for (const auto& child : branch.children) CollectInputEligibility(child,allowed);
+		for (auto& child : branch.children) CollectInputEligibility(child,allowed,reread);
 	}
 	void ApplyControlBindings() {
 		SyncModals(); // Capture the opener before enabled/readback changes clear it.
@@ -2928,7 +2957,7 @@ struct Runtime::Impl {
 			if (freshLayout) interactionLayoutDirty=false;
 			return true;
 		}
-		inputAllowed.clear(); CollectInputEligibility(inputBranches);
+		CollectInputEligibility();
         // Publish scrollbar metrics and projected bounds as one eligibility update.
         // Restored focus must never be tested against this instance's old bounds.
         std::string scrollError;scrollLayoutDirty|=scrollView.Sync(interaction,viewport.DpRatio(),freshLayout,scrollError,true);
@@ -3405,7 +3434,7 @@ void Runtime::Shutdown() {
 	impl->ReleaseModelScenes();
 	impl->canonicalElements.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
+	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
 	impl->hud = nullptr;
 	impl->paintDirty=true;
 	impl->changedProjections.clear();
@@ -3427,7 +3456,7 @@ void Runtime::CloseDocument() {
 
 	impl->sourcePath.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
+	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
 	impl->hud = nullptr;
 	impl->valueView.Reset();
 	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
@@ -3543,6 +3572,7 @@ bool Runtime::LoadCanonical(std::unique_ptr<Document> candidate, const std::stri
 		[owner=impl.get()](const std::string& id) { return owner->CanonicalElement(id); })) {
 		diagnostics.push_back({"/root",stateError}); CloseDocument(); return false;
 	}
+	impl->inputAllowed.clear(); impl->eligibilityCached=false;
 	impl->inputBranches=impl->BuildInteractionBranch(impl->canonical->Model().root,false);
 	impl->modalBranches=impl->BuildInteractionBranch(impl->canonical->Model().root,true);
 	impl->ReadStateSources(); impl->Feedback(impl->time);

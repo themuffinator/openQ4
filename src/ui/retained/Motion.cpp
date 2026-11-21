@@ -35,20 +35,22 @@ void Motion::Reset(std::shared_ptr<const DocumentModel> shared) {
 	for (const auto& timeline : shared->timelines) loaded->emplace(timeline.id,&timeline);
 	auto authored = std::make_shared<PropertyValues>();
 	BaseValues(shared->root,*authored);
-	// The live values are the authored ones until a write, which copies them.
+	// The live values are the authored ones until a write replaces one.
 	model = std::move(shared); timelines = std::move(loaded);
-	base = authored; values = std::move(authored);
+	base = std::move(authored); values.reset();
 	clock = 0; sampled = false;
 	changedKeys.clear(); changedAll = true;
 	Touch();
 }
 void Motion::Touch() { revision = ++motionRevisions; }
-const PropertyValues& Motion::Values() const {
+MotionValues Motion::Values() const {
 	static const PropertyValues none; // a moved-from Motion holds none
-	return values ? *values : none;
+	return {base ? *base : none,values ? *values : none};
 }
+// The written entries, private to this motion: every key written here must be
+// an authored one (MotionValues reads them in the authored order).
 PropertyValues& Motion::Writable() {
-	if (!values) values = std::make_shared<PropertyValues>(*base);
+	if (!values) values = std::make_shared<PropertyValues>();
 	else if (values.use_count() > 1) values = std::make_shared<PropertyValues>(*values);
 	return *values;
 }
@@ -213,7 +215,8 @@ MotionSnapshot Motion::Capture(double seconds) const {
 	candidate.Advance(seconds);
 	MotionSnapshot result;
 	result.reducedMotion = candidate.reducedMotion;
-	for (const auto& [key,value] : candidate.Values()) {
+	// Only a written entry can differ from its authored value.
+	for (const auto& [key,value] : candidate.Values().Written()) {
 		const auto& original = base->at(key);
 		if (value.type != original.type || value.data != original.data || value.unit != original.unit || value.text != original.text)
 			result.values.emplace(key,value);
@@ -247,7 +250,7 @@ bool Motion::Restore(const MotionSnapshot& snapshot, double seconds, std::string
 	if (!std::isfinite(seconds) || seconds < 0) return reject("Invalid restored presentation time");
 	Motion candidate = *this;
 	// Restore never replays a program: completions of the replaced playback go.
-	candidate.values = std::make_shared<PropertyValues>(*base); candidate.playing.clear(); candidate.completed.clear(); candidate.clock = seconds;
+	candidate.values = std::make_shared<PropertyValues>(); candidate.playing.clear(); candidate.completed.clear(); candidate.clock = seconds;
 	candidate.sampled = false;
 	candidate.reducedMotion = snapshot.reducedMotion;
 	std::set<PropertyKey> animated;

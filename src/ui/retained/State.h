@@ -25,6 +25,31 @@ struct StatePresentationSnapshot {
 	std::map<PropertyKey,PresentationPropertyOverride> properties;
 };
 
+// openQ4: a live value that copies of its owner share until one of them
+// writes it. Every event evaluates a transactional copy of the state, so a
+// copy must cost a reference, not the document's whole binding table; the
+// first write in that copy clones only the table it changes.
+template <class T> class SharedOnCopy {
+public:
+	SharedOnCopy() = default;
+	explicit SharedOnCopy(T value) : shared(std::make_shared<T>(std::move(value))) {}
+	const T& operator*() const { return shared ? *shared : Empty(); }
+	const T* operator->() const { return &**this; }
+	T& Write() {
+		if (!shared) shared = std::make_shared<T>();
+		else if (shared.use_count() > 1) shared = std::make_shared<T>(*shared);
+		return *shared;
+	}
+	SharedOnCopy& operator=(T&& value) {
+		if (shared && shared.use_count() == 1) *shared = std::move(value);
+		else shared = std::make_shared<T>(std::move(value));
+		return *this;
+	}
+private:
+	static const T& Empty() { static const T empty{}; return empty; }
+	std::shared_ptr<T> shared;
+};
+
 // Application and host batches commit together with all derived properties.
 // Evaluating expressions never executes commands or changes authored source.
 class State {
@@ -50,11 +75,11 @@ public:
 	// All members must be binding-owned properties. Stage multi-property writes
 	// together; overrideExpression=false never revives a disabled expression.
 	bool OverrideProperties(const PropertyValues& values, bool overrideExpression, std::string& error);
-	const StatePresentationSnapshot& Presentation() const { return presentation; }
-	const StateValues& Variables() const { return variables; }
-	const PropertyValues& Properties() const { return properties; }
-	const std::map<std::string,bool>& Enabled() const { return enabled; }
-	const std::map<std::string,ControlReadback>& ControlValues() const { return controlValues; }
+	const StatePresentationSnapshot& Presentation() const { return *presentation; }
+	const StateValues& Variables() const { return *variables; }
+	const PropertyValues& Properties() const { return *properties; }
+	const std::map<std::string,bool>& Enabled() const { return *enabled; }
+	const std::map<std::string,ControlReadback>& ControlValues() const { return *controlValues; }
 	const std::map<std::string,StateDeclaration>& Declarations() const { return *declarations; }
 	std::uint64_t Revision() const { return revision; }
 	// The bound properties whose values changed since the last call, appended
@@ -80,14 +105,15 @@ private:
 	std::shared_ptr<const std::map<std::string,std::vector<std::size_t>>> dependents =
 		std::make_shared<const std::map<std::string,std::vector<std::size_t>>>();
 	std::shared_ptr<const std::map<std::string,PresentationVariable>> presentationDeclarations = std::make_shared<const std::map<std::string,PresentationVariable>>();
-	StatePresentationSnapshot presentation;
-	StateValues variables;
-	PropertyValues properties;
-	std::map<std::string,bool> enabled;
+	// Live values: shared by copies until one of them writes (SharedOnCopy).
+	SharedOnCopy<StatePresentationSnapshot> presentation;
+	SharedOnCopy<StateValues> variables;
+	SharedOnCopy<PropertyValues> properties;
+	SharedOnCopy<std::map<std::string,bool>> enabled;
 	// The value controls (not buttons or scrollbars) by ID, in the model.
 	std::shared_ptr<const std::map<std::string,const Control*>> controlDeclarations = std::make_shared<const std::map<std::string,const Control*>>();
 	std::shared_ptr<const std::vector<const ModelSceneSpec*>> modelDeclarations = std::make_shared<const std::vector<const ModelSceneSpec*>>();
-	std::map<std::string,ControlReadback> controlValues;
+	SharedOnCopy<std::map<std::string,ControlReadback>> controlValues;
 	std::uint64_t revision = 0;
 	bool presentationDirty = false;
 	std::vector<PropertyKey> changedProperties;

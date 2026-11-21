@@ -1,8 +1,8 @@
 # Applying display settings without a device restart
 
-This note records the six stages of making Settings > Display apply its
+This note records the seven stages of making Settings > Display apply its
 changes to the running renderer. It is the record for the changes of
-11 November 2026 and supersedes, for the settings named here, what
+11 November 2026 (stages 1 to 6) and 21 November 2026 (stage 7) and supersedes, for the settings named here, what
 [effect execution](settings-effect-execution.md#combined-executor),
 [the resolution rows](system-resolution-rows.md) and
 [performance presets](performance-presets.md) say about one device restart
@@ -568,11 +568,110 @@ menu, a tiled screenshot larger than the window with a window view in it, VR
 on OpenGL, macOS and OpenGL ES (both keep the multisampled window), and a
 context without multisample textures.
 
+## Stage 7: reload only what a texture change reaches
+
+Until this stage any change to a texture setting (a reduction ceiling,
+`image_picmip`, the block-compression switches or
+`image_usePrecompressedTextures`) reloaded every image that was not a render
+target: the whole world, every model, the interface and its fonts, and every
+generated image, which was rebuilt from its generator for nothing. A preset
+that only lowered the normal-map ceiling paid for all of it.
+
+### Which images a change reaches
+
+Each file-backed load now records the reduction key it was built under
+(`idImage::CurrentReductionKey`, `Image_load.cpp`):
+
+- the resolved downsize and picmip policy, from the same
+  `R_GetImageDownsizePolicy` the loader and the generated cache key use;
+- the block format `R_DecodedImageCompression` gives decoded pixels, which
+  is what `image_useCompression` and `image_useNormalCompression` change;
+- `image_usePrecompressedTextures`, which chooses the file read.
+
+`idImageManager::CheckCvars` reloads, through
+`ReloadReductionChangedImages`, only the resident file-backed images whose key
+differs from the current one. Two equal keys read the same files under the
+same policy, so they build the same image. What that leaves out:
+
+- A ceiling for one layer leaves the others alone: the bump ceiling reloads
+  normal maps, the specular ceiling specular maps.
+- The interface, fonts and `nopicmip` materials have
+  an empty policy and no decoded block format whatever the settings, so only
+  the precompressed switch reaches them.
+- Generated, persistent and scratch images are built from no file. They were
+  regenerated, and a persistent target not on the mutable-name list was
+  reallocated with no texels; now they keep their content.
+- Purged and never-loaded images stay as they are and load under the new
+  settings when next bound.
+
+Two cases reload whatever the key says: a load from a held recovery
+candidate (built before a device teardown, possibly under other settings)
+leaves its key unknown, and an image Vulkan stored without its top levels to
+fit video memory is reloaded by any reduction change, since the reduction may
+have freed the room for them.
+
+The stale images reload in name order on the renderer thread. The log line
+says how many were reloaded, how long it took and how many the change did not
+reach: `Texture reduction changed: reloaded N images in T ms, U unaffected`.
+The level load's file prefetch (`idLevelImagePrefetch`) was tried and left
+out: right after a load the files sit in the operating system's cache, and
+its worker threads made the reload slower on the shared test machine (below).
+
+### A change during a level load is no longer lost
+
+`CheckCvars` cleared the changed flags and then returned during a level load,
+on the reasoning that the load would touch every image. It touches only the
+images it purges. Everything referenced outside the level (the interface,
+the player's models, anything kept from the previous map) kept the size and
+block format of the old settings until the next `vid_restart`.
+
+The check now leaves the flags set during a level load and while a checked
+image-policy attempt owns resource mutation (`R_ImagePolicyActive`), as the
+high-quality re-parse of stage 4 already did. The first frame after either
+compares keys: the images the load built already have the current key and are
+skipped, and the ones it kept are reloaded. When a reduction and a sampling
+cvar change together, the samplers are now reapplied to the images the
+reduction did not reload; the old path returned after the reload.
+
+### Engine checks, stage 7
+
+Hidden window, console verbs only, `game/airdefense1` under the Enhanced
+preset, the worktree build of `843d61764` plus this change. Other sessions'
+clients and builds ran on the machine throughout, so the times are
+indicative. Kit: `.tmp/live-apply/run.py <name> selective` and
+`textures`.
+
+| Step | Images reloaded | Not reached | OpenGL | Vulkan |
+| --- | --- | --- | --- | --- |
+| Normal-map ceiling 128 on | 318 | 1,624 | 1.4 s | 2.5 to 2.9 s |
+| Specular ceiling changed while specular reduction is off | 0 | 1,942 | 0 ms | 1 to 8 ms |
+| Normal-map ceiling off | 318 | 1,624 | 1.4 s | 2.9 s |
+| A 128 ceiling on every layer | 1,073 | 869 | 2.2 s | 3.0 s |
+| `image_usePrecompressedTextures` 1 again (reaches every image) | 1,942 | 0 | 4.1 s | 7.1 s |
+
+The last row is what every one of these steps cost before: each reloaded all
+1,942 file-backed images, plus every generated image.
+
+- **Normal maps alone.** With the bump ceiling, 15 of the 24 world normal
+  maps listed by name shrank and no other image changed size; turning it off
+  restored all 477 compared world images. The device generation did not move.
+- **Regression.** The `textures` scenario of stage 1 still passes on both back
+  ends: the 128 ceiling reduces 335 of 477 world textures, the precompressed
+  switch reloads once each way, and lifting the ceiling restores all 477.
+- **The prefetch.** The same normal-map step with the level load's prefetch
+  took 1.0 to 3.1 s on OpenGL over six runs (median 1.8 s), and 1.3 to 1.5 s
+  without it (median 1.4 s), so the reload does not use it.
+
+Not run: a change made during a level load (the deferral is checked in the
+source only), a texture pack, a machine whose files are not already cached,
+Vulkan with textures held below their request to fit video memory, and a
+visible window.
+
 ## What these stages do not do
 
-- The image reload still blocks while textures load. It is shorter than a
-  device restart because the device, fonts, generated images, vertex caches
-  and the world's derived data stay, but it is not spread across frames.
+- The image reload still blocks the frame it runs in. Stage 7 shrinks it to
+  the images a change reaches and prefetches their files, but it is not
+  spread across frames.
 - The in-place route has no readback of image dimensions. Its evidence is the
   exact settings readback, the same device generation and a later presented
   frame, as for the combined executor's restart.
@@ -607,6 +706,12 @@ device reopened.
 
 ## Tests
 
+- `tools/tests/renderer_picmip_policy.py` (stage 7): the cvar check defers
+  during a level load and a checked attempt with the flags still set, reloads
+  through `ReloadReductionChangedImages` and never the whole catalogue, skips
+  generated, persistent, scratch and unloaded images, reloads an image whose
+  key moved or that Vulkan held below its request, and every file-backed load
+  records its key while a prepared recovery candidate leaves it unknown.
 - `tools/tests/renderer_gl_window_view_contract.py` (stage 6): the policy and
   its latch, the sample counts, the window view's conditions, seed, resolve
   and placement in the view, the copy out of a multisampled stand-in, and the

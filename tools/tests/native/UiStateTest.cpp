@@ -76,6 +76,20 @@ int main(int argc, char** argv) {
 	Check(state.Set({{"scale",1.25}},error,true),"host owns readonly source");
 	Check(state.Properties().at({"scale-reading","text"}).text=="1.25","fixed decimal output");
 	Check(!state.Set({{"progress",1.0}},error,true),"host cannot overwrite application state");
+	{
+		// A copy shares the live tables until one side writes: a write in
+		// either never reaches the other, as a transactional event copy needs.
+		State copy = state; const auto before = state.Variables(); const auto beforeWidth = width();
+		Check(copy.Set({{"progress",30.0}},error),"copy accepts its own batch");
+		Check(Near(copy.Properties().at({"progress-fill","width"}).data[0],20) && Near(width(),beforeWidth) && state.Variables()==before,
+			"a copy's write leaves the original's values and properties");
+		Check(state.Set({{"progress",60.0}},error) && Near(width(),40) && Near(copy.Properties().at({"progress-fill","width"}).data[0],20),
+			"the original's write leaves the copy's properties");
+		State moved = std::move(copy);
+		Check(Near(moved.Properties().at({"progress-fill","width"}).data[0],20) && moved.Set({{"progress",90.0}},error) &&
+			Near(moved.Properties().at({"progress-fill","width"}).data[0],60) && Near(width(),40),"a moved copy keeps and writes its own tables");
+		Check(state.Set({{"progress",900.0}},error) && Near(width(),100),"the original resumes its own batches");
+	}
 	auto reject=[&](const std::string& pointer,const std::string& value,const char* message) {
 		Check(!document.ReplaceValue(pointer,value,diagnostics),message);
 		Check(!diagnostics.empty() && document.Source()==source,"failed expression edit preserves source");

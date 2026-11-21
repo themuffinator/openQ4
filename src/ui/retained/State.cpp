@@ -139,15 +139,15 @@ bool DocumentModel::ResolveAction(const std::string& id, const StateValues& vari
 }
 bool State::Evaluate(const StateValues& candidate, PropertyValues& props, std::map<std::string,bool>& controls,
 	StatePresentationSnapshot& output, std::map<std::string,ControlReadback>& readbacks, std::string& error) const {
-	output = presentation;
+	output = *presentation;
 	for (const auto& binding : *bindings) {
 		try {
 			if (binding.property == "enabled") {
 				controls[binding.node] = std::get<bool>(EvaluateExpression(binding.values.front(),candidate)); continue;
 			}
 			const PropertyKey key{binding.node,binding.property};
-			const auto override = presentation.properties.find(key);
-			if (override != presentation.properties.end() && override->second.expressionDisabled) {
+			const auto override = presentation->properties.find(key);
+			if (override != presentation->properties.end() && override->second.expressionDisabled) {
 				props[key] = override->second.value; continue;
 			}
 			Value value = binding.prototype;
@@ -304,12 +304,13 @@ bool State::Reset(std::shared_ptr<const DocumentModel> shared, std::string& erro
 		for (const auto& name : names) (*dependents)[name].push_back(index);
 	}
 	candidate.dependents = std::move(dependents);
-	for (const auto& [id,declaration] : model.presentationVariables)
-		candidate.presentation.variables[id] = {declaration.initial,false};
-	for (const auto& [id,declaration] : model.state) candidate.variables[id] = declaration.initial;
+	auto& cells = candidate.presentation.Write().variables;
+	for (const auto& [id,declaration] : model.presentationVariables) cells[id] = {declaration.initial,false};
+	auto& initial = candidate.variables.Write();
+	for (const auto& [id,declaration] : model.state) initial[id] = declaration.initial;
 	error.clear();
 	StatePresentationSnapshot presentation;
-	if (!candidate.Evaluate(candidate.variables,candidate.properties,candidate.enabled,presentation,candidate.controlValues,error)) return false;
+	if (!candidate.Evaluate(*candidate.variables,candidate.properties.Write(),candidate.enabled.Write(),presentation,candidate.controlValues.Write(),error)) return false;
 	candidate.presentation = std::move(presentation);
 	candidate.revision = 1; *this = std::move(candidate); return true;
 }
@@ -322,8 +323,8 @@ bool State::WouldChange(const StateValues& changes, bool hostSources) const {
 		const auto declaration = declarations->find(id);
 		if (declaration == declarations->end() || !declaration->second.HostSourced() == hostSources ||
 			value.index() != declaration->second.initial.index() || !ValidStateValue(value)) return true;
-		const auto current = variables.find(id);
-		if (current == variables.end() || current->second != value) return true;
+		const auto current = variables->find(id);
+		if (current == variables->end() || current->second != value) return true;
 	}
 	return false;
 }
@@ -338,7 +339,7 @@ bool State::SetCombined(const StateValues& application, const StateValues& hostS
 			if (value.index() != declaration->second.initial.index() || !ValidStateValue(value)) {
 				error = "Invalid state type/value for '"+id+"'"; return false;
 			}
-			changed = changed || variables.at(id) != value;
+			changed = changed || variables->at(id) != value;
 		}
 		return true;
 	};
@@ -349,10 +350,10 @@ bool State::SetCombined(const StateValues& application, const StateValues& hostS
 		// the variables that changed, in place once all of them succeed.
 		StateValues overlay;
 		for (const auto* batch : {&application,&hostSources}) for (const auto& [id,value] : *batch)
-			if (variables.at(id) != value) overlay[id] = value;
+			if (variables->at(id) != value) overlay[id] = value;
 		return SetIncremental(overlay,error);
 	}
-	StateValues candidate = variables;
+	StateValues candidate = *variables;
 	for (const auto* batch : {&application,&hostSources}) for (const auto& [id,value] : *batch) candidate[id] = value;
 	PropertyValues props;
 	std::map<std::string,bool> controls;
@@ -379,17 +380,17 @@ bool State::SetIncremental(const StateValues& overlay, std::string& error) {
 		const auto& binding = (*bindings)[index];
 		try {
 			if (binding.property == "enabled") {
-				controlUpdates.emplace_back(binding.node,std::get<bool>(EvaluateExpression(binding.values.front(),variables,{},nullptr,&overlay)));
+				controlUpdates.emplace_back(binding.node,std::get<bool>(EvaluateExpression(binding.values.front(),*variables,{},nullptr,&overlay)));
 				continue;
 			}
 			PropertyKey key{binding.node,binding.property};
 			// A disabled expression keeps its written value (no transient write
 			// is pending on this path).
-			const auto override = presentation.properties.find(key);
-			if (override != presentation.properties.end() && override->second.expressionDisabled) continue;
+			const auto override = presentation->properties.find(key);
+			if (override != presentation->properties.end() && override->second.expressionDisabled) continue;
 			Value value = binding.prototype;
 			for (size_t i = 0; i < binding.values.size(); ++i) {
-				const auto result = EvaluateExpression(binding.values[i],variables,{},nullptr,&overlay);
+				const auto result = EvaluateExpression(binding.values[i],*variables,{},nullptr,&overlay);
 				if (result.index() == 2) value.text = std::get<std::string>(result);
 				else value.data[i] = std::get<double>(result);
 			}
@@ -403,17 +404,24 @@ bool State::SetIncremental(const StateValues& overlay, std::string& error) {
 	StatePresentationSnapshot nextPresentation;
 	std::map<std::string,ControlReadback> readbacks;
 	if (derived) {
-		nextPresentation = presentation;
-		if (!EvaluateDerived(variables,&overlay,nextPresentation,readbacks,error)) return false;
+		nextPresentation = *presentation;
+		if (!EvaluateDerived(*variables,&overlay,nextPresentation,readbacks,error)) return false;
 	}
-	for (const auto& [id,value] : overlay) variables[id] = value;
+	if (!overlay.empty()) {
+		auto& values = variables.Write();
+		for (const auto& [id,value] : overlay) values[id] = value;
+	}
+	// Only a property whose value changes clones the table a copy shares.
 	for (auto& [key,value] : updates) {
-		auto& current = properties[key];
-		if (SameValue(current,value)) continue;
-		current = std::move(value);
+		const auto current = properties->find(key);
+		if (current != properties->end() && SameValue(current->second,value)) continue;
+		properties.Write()[key] = std::move(value);
 		if (!allPropertiesChanged) changedProperties.push_back(key);
 	}
-	for (const auto& [node,flag] : controlUpdates) enabled[node] = flag;
+	for (const auto& [node,flag] : controlUpdates) {
+		const auto current = enabled->find(node);
+		if (current == enabled->end() || current->second != flag) enabled.Write()[node] = flag;
+	}
 	if (derived) { presentation = std::move(nextPresentation); controlValues = std::move(readbacks); }
 	++revision;
 	if (changedProperties.size() > bindings->size()) MarkAllChanged();
@@ -444,9 +452,9 @@ bool State::Restore(const StateValues& application, const StateValues& hostSourc
 	State staged = *this;
 	// A v1 instance has no presentation table. Use declared defaults, not
 	// overrides left in the receiving live instance.
-	staged.presentation = {};
+	staged.presentation = StatePresentationSnapshot{};
 	for (const auto& [id,declaration] : *presentationDeclarations)
-		staged.presentation.variables[id] = {declaration.initial,false};
+		staged.presentation.Write().variables[id] = {declaration.initial,false};
 	if (restoredPresentation) {
 		if (restoredPresentation->variables.size() != presentationDeclarations->size()) { error = "Incomplete restored presentation variables"; return false; }
 		for (const auto& [id,cell] : restoredPresentation->variables) {
@@ -459,7 +467,7 @@ bool State::Restore(const StateValues& application, const StateValues& hostSourc
 		for (const auto& [key,item] : restoredPresentation->properties) {
 			if (!staged.OverrideProperties({{key,item.value}},item.expressionDisabled,error)) return false;
 		}
-		staged.presentation = *restoredPresentation;
+		staged.presentation = StatePresentationSnapshot(*restoredPresentation);
 	}
 	StatePresentationSnapshot evaluated;
 	if (!staged.Evaluate(candidate,props,controls,evaluated,readbacks,error)) return false;
@@ -475,8 +483,8 @@ bool State::Restore(const StateValues& application, const StateValues& hostSourc
 	staged.presentation = std::move(evaluated); ++staged.revision;
 	staged.presentationDirty = false;
 	staged.MarkAllChanged();
-	for (const auto& [id,cell] : staged.presentation.variables) staged.presentationDirty = staged.presentationDirty || cell.pending;
-	for (const auto& [key,item] : staged.presentation.properties) staged.presentationDirty = staged.presentationDirty || !item.expressionDisabled;
+	for (const auto& [id,cell] : staged.presentation->variables) staged.presentationDirty = staged.presentationDirty || cell.pending;
+	for (const auto& [key,item] : staged.presentation->properties) staged.presentationDirty = staged.presentationDirty || !item.expressionDisabled;
 	*this = std::move(staged);
 	return true;
 }
@@ -487,7 +495,7 @@ bool State::WritePresentationVariable(const std::string& id, const PresentationV
 	if (declaration == presentationDeclarations->end() || value.type != declaration->second.initial.type || !ValidPresentationValue(value)) {
 		error = "Invalid presentation variable write '"+id+"'"; return false;
 	}
-	auto& cell = presentation.variables.at(id);
+	auto& cell = presentation.Write().variables.at(id);
 	cell.value = value; cell.expressionDisabled = cell.expressionDisabled || overrideExpression;
 	cell.pending = !cell.expressionDisabled && !declaration->second.expressions.empty();
 	presentationDirty = presentationDirty || cell.pending;
@@ -502,10 +510,10 @@ bool State::OverrideProperties(const PropertyValues& values, bool overrideExpres
 		}
 	}
 	for (const auto& [key,value] : values) {
-		auto& item = presentation.properties[key]; item.value = value;
+		auto& item = presentation.Write().properties[key]; item.value = value;
 		item.expressionDisabled = item.expressionDisabled || overrideExpression;
 		presentationDirty = presentationDirty || !item.expressionDisabled;
-		properties[key] = value;
+		properties.Write()[key] = value;
 		if (!allPropertiesChanged) changedProperties.push_back(key);
 	}
 	if (changedProperties.size() > bindings->size()) MarkAllChanged();

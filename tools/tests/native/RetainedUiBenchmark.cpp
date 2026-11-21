@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions. GPL-3.0-or-later.
 #include "src/ui/retained/Runtime.h"
+#include "src/ui/retained/Hud.h"
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -62,6 +63,7 @@ struct ScreenHost final : Host {
 	FontMetrics GetFontMetrics(const std::string&, int size) override { return {size*.8f,size*.2f,size*1.2f,size*.5f}; }
 	Glyph GetGlyph(const std::string&, int size, std::uint32_t) override { return {size*.6f,0,-size*.8f,size*.6f,static_cast<float>(size),0,0,1,1,"benchmark-font"}; }
 };
+std::uint64_t PrivateBytes();
 // The session's presentation of a root screen: its runtime load (timed),
 // onInit, the open timeline, a four second settle, then timed 60 Hz frames on
 // its view-height canvas. With `event`, the event runs after the settle and
@@ -73,6 +75,7 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 	Document model; std::vector<Diagnostic> diagnostics;
 	if (!model.Load(source,diagnostics)) throw std::runtime_error("Invalid screen document");
 	ScreenHost host; Runtime runtime(host);
+	const auto bytesBefore = PrivateBytes();
 	const auto loadStart = std::chrono::steady_clock::now();
 	if (!runtime.LoadDocument(source,path,diagnostics)) throw std::runtime_error("Cannot load screen runtime document");
 	const double loadMs = std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-loadStart).count();
@@ -85,7 +88,9 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 	runtime.Frame(viewport,start);
 	const double cold = runtime.Statistics().frameMilliseconds;
 	for (int i = 1; i <= 240; ++i) runtime.Frame(viewport,start+i/60.0);
+	const auto eventStart = std::chrono::steady_clock::now();
 	if (!event.empty() && !runtime.RunEvent(event,start+4,effects,error)) throw std::runtime_error(event+": "+error);
+	const double eventMs = std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-eventStart).count();
 	std::vector<double> frame, update, render, compile, paths, uploads, draws, vertices, layers, elisions;
 	double layouts = 0; // Style and layout passes: a frame that only moves decoration needs none.
 	for (int i = 1; i <= frames; ++i) {
@@ -108,13 +113,116 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 		layouts += static_cast<double>(stats.layoutUpdates);
 	}
 	if (!host.error.empty()) throw std::runtime_error("Screen logged an error: "+host.error);
-	std::printf("{\"scenario\":\"screen\",\"document\":\"%s\",\"event\":\"%s\",\"width\":%d,\"height\":%d,\"frames\":%d,\"load_ms\":%.6f,\"cold_ms\":%.6f,"
+	// What the shown document holds after its frames (the view, its state and motion).
+	const auto heldKb = (PrivateBytes()-bytesBefore)/1024;
+	std::printf("{\"scenario\":\"screen\",\"held_kb\":%llu,\"document\":\"%s\",\"event\":\"%s\",\"width\":%d,\"height\":%d,\"frames\":%d,\"load_ms\":%.6f,\"cold_ms\":%.6f,\"event_ms\":%.6f,"
 		"\"first_ms\":%.6f,\"p50_ms\":%.6f,\"p95_ms\":%.6f,\"max_ms\":%.6f,"
 		"\"update_p50_ms\":%.6f,\"render_p50_ms\":%.6f,\"vector_compile_p50_ms\":%.6f,\"paths_compiled_p50\":%.0f,\"uploads_p50\":%.0f,"
 		"\"draw_calls_p50\":%.0f,\"submitted_vertices_p50\":%.0f,\"layer_pushes_p50\":%.0f,\"layer_elisions_p50\":%.0f,\"layout_updates_mean\":%.3f}\n",
-		path.c_str(),event.c_str(),width,height,frames,loadMs,cold,frame.front(),Percentile(frame,.5),Percentile(frame,.95),Percentile(frame,1),
+		static_cast<unsigned long long>(heldKb),path.c_str(),event.c_str(),width,height,frames,loadMs,cold,eventMs,frame.front(),Percentile(frame,.5),Percentile(frame,.95),Percentile(frame,1),
 		Percentile(update,.5),Percentile(render,.5),
 		Percentile(compile,.5),Percentile(paths,.5),Percentile(uploads,.5),Percentile(draws,.5),Percentile(vertices,.5),Percentile(layers,.5),Percentile(elisions,.5),layouts/frames);
+	runtime.CloseDocument(); runtime.Shutdown();
+}
+
+// A readout the game changes while a document rests: `key` alternates between
+// `a` and `b` on every frame, the way a HUD's clock, health or ammunition does
+// (worst case: a change each frame). A HUD document (one with hud.* layout
+// state) takes the peer's layout for the viewport and its join event first.
+// `event` runs after the settle. Reports the changed frames' costs.
+void StateChanges(const std::string& path, const std::string& key, const std::string& a, const std::string& b, int frames, const std::string& event) {
+	std::ifstream file(path,std::ios::binary);
+	if (!file) throw std::runtime_error("Cannot read state document");
+	const std::string source{std::istreambuf_iterator<char>(file),{}};
+	Document model; std::vector<Diagnostic> diagnostics;
+	if (!model.Load(source,diagnostics)) throw std::runtime_error("Invalid state document");
+	const auto declared = model.Model().state.find(key);
+	if (declared == model.Model().state.end()) throw std::runtime_error("The document declares no state "+key);
+	const auto parse = [&](const std::string& text) -> StateValue {
+		if (std::holds_alternative<bool>(declared->second.initial)) return text == "true" || text == "1";
+		if (std::holds_alternative<double>(declared->second.initial)) return std::stod(text);
+		return text;
+	};
+	const StateValue first = parse(a), second = parse(b);
+	ScreenHost host; Runtime runtime(host);
+	if (!runtime.LoadDocument(source,path,diagnostics)) throw std::runtime_error("Cannot load state runtime document");
+	Viewport viewport; viewport.width = 1280; viewport.height = 720;
+	viewport.canvasHeight = static_cast<float>(model.Model().canvasHeight);
+	const bool hud = model.Model().state.contains("hud.width");
+	Runtime::EventEffects effects; std::string error;
+	const double start = 1;
+	if (hud) {
+		viewport.canvasMinWidth = 960; viewport.fitScale = 1;
+		const auto layout = HudLayoutFor(1280.f,720.f,viewport.DpRatio(),{0,0,0,0},1,0,1);
+		StateValues values{{"hud.width",double(layout.width)},{"hud.height",double(layout.height)},{"hud.left",double(layout.left)},
+			{"hud.right",double(layout.right)},{"hud.top",double(layout.top)},{"hud.bottom",double(layout.bottom)},
+			{"hud.scale",double(layout.scale)},{"hud.centerScale",double(layout.centerScale)}};
+		if (model.Model().state.contains("gametype")) values.insert({"gametype",1.0});
+		if (!runtime.SetState(values,error,start)) throw std::runtime_error("HUD layout: "+error);
+		if (runtime.HasEvent("hudJoin") && !runtime.RunEvent("hudJoin",start,effects,error)) throw std::runtime_error("hudJoin: "+error);
+	} else {
+		if (runtime.HasEvent("onInit") && !runtime.RunEvent("onInit",start,effects,error)) throw std::runtime_error("onInit: "+error);
+		runtime.PlayTimeline("open",start);
+	}
+	for (int i = 0; i <= 240; ++i) runtime.Frame(viewport,start+i/60.0);
+	if (!event.empty() && !runtime.RunEvent(event,start+4,effects,error)) throw std::runtime_error(event+": "+error);
+	for (int i = 1; i <= 60; ++i) runtime.Frame(viewport,start+4+i/60.0);
+	std::vector<double> total, set, frame, update, render, compile, paths, draws;
+	double layouts = 0, scanned = 0;
+	for (int i = 1; i <= frames; ++i) {
+		const double now = start+5+i/60.0;
+		const auto before = std::chrono::steady_clock::now();
+		if (!runtime.SetState({{key,i%2 ? second : first}},error,now)) throw std::runtime_error(key+": "+error);
+		const auto changed = std::chrono::steady_clock::now();
+		runtime.Frame(viewport,now);
+		const auto after = std::chrono::steady_clock::now();
+		const auto stats = runtime.Statistics();
+		total.push_back(std::chrono::duration<double,std::milli>(after-before).count());
+		set.push_back(std::chrono::duration<double,std::milli>(changed-before).count());
+		frame.push_back(stats.frameMilliseconds); update.push_back(stats.updateMilliseconds); render.push_back(stats.renderMilliseconds);
+		compile.push_back(stats.vectorCompileMilliseconds); paths.push_back(static_cast<double>(stats.vectorPathsCompiled));
+		draws.push_back(static_cast<double>(stats.drawCalls));
+		layouts += static_cast<double>(stats.layoutUpdates); scanned += static_cast<double>(stats.motionInputsScanned);
+	}
+	if (!host.error.empty()) throw std::runtime_error("State document logged an error: "+host.error);
+	std::printf("{\"scenario\":\"state\",\"document\":\"%s\",\"key\":\"%s\",\"frames\":%d,\"total_p50_ms\":%.6f,\"total_p95_ms\":%.6f,\"set_p50_ms\":%.6f,"
+		"\"frame_p50_ms\":%.6f,\"update_p50_ms\":%.6f,\"render_p50_ms\":%.6f,\"vector_compile_p50_ms\":%.6f,\"paths_compiled_p50\":%.0f,"
+		"\"draw_calls_p50\":%.0f,\"layout_updates_mean\":%.3f,\"motion_inputs_scanned_mean\":%.1f}\n",
+		path.c_str(),key.c_str(),frames,Percentile(total,.5),Percentile(total,.95),Percentile(set,.5),Percentile(frame,.5),Percentile(update,.5),
+		Percentile(render,.5),Percentile(compile,.5),Percentile(paths,.5),Percentile(draws,.5),layouts/frames,scanned/frames);
+	runtime.CloseDocument(); runtime.Shutdown();
+}
+
+// The cost of an event a player's input raises (a focus move, a tab, a
+// modal), on a settled screen: the event runs `repeats` times with a frame
+// after each, and event_ms is RunEvent alone.
+void EventRepeats(const std::string& path, const std::string& event, int repeats) {
+	std::ifstream file(path,std::ios::binary);
+	if (!file) throw std::runtime_error("Cannot read event document");
+	const std::string source{std::istreambuf_iterator<char>(file),{}};
+	Document model; std::vector<Diagnostic> diagnostics;
+	if (!model.Load(source,diagnostics)) throw std::runtime_error("Invalid event document");
+	ScreenHost host; Runtime runtime(host);
+	if (!runtime.LoadDocument(source,path,diagnostics)) throw std::runtime_error("Cannot load event runtime document");
+	Viewport viewport; viewport.width = 1280; viewport.height = 720;
+	viewport.canvasHeight = static_cast<float>(model.Model().canvasHeight);
+	Runtime::EventEffects effects; std::string error;
+	const double start = 1;
+	if (runtime.HasEvent("onInit") && !runtime.RunEvent("onInit",start,effects,error)) throw std::runtime_error("onInit: "+error);
+	runtime.PlayTimeline("open",start);
+	for (int i = 0; i <= 240; ++i) runtime.Frame(viewport,start+i/60.0);
+	std::vector<double> eventMs, frameMs;
+	for (int i = 1; i <= repeats; ++i) {
+		const double now = start+4+i/60.0;
+		const auto before = std::chrono::steady_clock::now();
+		if (!runtime.RunEvent(event,now,effects,error)) throw std::runtime_error(event+": "+error);
+		eventMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count());
+		runtime.Frame(viewport,now);
+		frameMs.push_back(runtime.Statistics().frameMilliseconds);
+	}
+	if (!host.error.empty()) throw std::runtime_error("Event document logged an error: "+host.error);
+	std::printf("{\"scenario\":\"event\",\"document\":\"%s\",\"event\":\"%s\",\"repeats\":%d,\"event_p50_ms\":%.6f,\"event_min_ms\":%.6f,\"event_max_ms\":%.6f,\"frame_p50_ms\":%.6f}\n",
+		path.c_str(),event.c_str(),repeats,Percentile(eventMs,.5),Percentile(eventMs,0.0001),Percentile(eventMs,1),Percentile(frameMs,.5));
 	runtime.CloseDocument(); runtime.Shutdown();
 }
 
@@ -216,7 +324,21 @@ int main(int argc, char** argv) {
 			Screen(argv[2],frames,width,height,argc > 6 ? argv[6] : "",std::string(argv[1]) == "--scope");
 			return 0;
 		}
-		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.rui> [density=1.25] [frames=60] | --screen|--scope <document.rui> [frames] [width] [height] [event] | --load <document.rui> [repeats]");
+		if (argc >= 4 && std::string(argv[1]) == "--event") {
+			if (argc > 5) throw std::runtime_error("usage: openq4-retained-ui-benchmark --event <document.rui> <event> [repeats=60]");
+			const int repeats = argc > 4 ? std::stoi(argv[4]) : 60;
+			if (repeats < 1 || repeats > 100000) throw std::runtime_error("Invalid event repeat count");
+			EventRepeats(argv[2],argv[3],repeats);
+			return 0;
+		}
+		if (argc >= 6 && std::string(argv[1]) == "--state") {
+			if (argc > 8) throw std::runtime_error("usage: openq4-retained-ui-benchmark --state <document.rui> <key> <a> <b> [frames=240] [event]");
+			const int frames = argc > 6 ? std::stoi(argv[6]) : 240;
+			if (frames < 2 || frames > 36000) throw std::runtime_error("Invalid state frame count");
+			StateChanges(argv[2],argv[3],argv[4],argv[5],frames,argc > 7 ? argv[7] : "");
+			return 0;
+		}
+		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.rui> [density=1.25] [frames=60] | --screen|--scope <document.rui> [frames] [width] [height] [event] | --state <document.rui> <key> <a> <b> [frames] [event] | --event <document.rui> <event> [repeats] | --load <document.rui> [repeats]");
 		Viewport viewport;
 		viewport.displayScale = argc > 2 ? std::stof(argv[2]) : 1.25f;
 		const int frames = argc > 3 ? std::stoi(argv[3]) : 60;

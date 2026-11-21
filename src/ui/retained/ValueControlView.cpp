@@ -15,6 +15,8 @@
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <optional>
+#include <string_view>
 #include <locale>
 #include <sstream>
 
@@ -135,7 +137,23 @@ struct ValueControlView::Impl {
 		std::uint64_t paintedPass = 0;
 		bool paintedOpen = false;
 	};
-	struct Applied { std::string requested, actual; };
+	// What a write requested and what the element then held: a later write of
+	// the same request is skipped while the element still holds that value.
+	// openQ4: properties compare as RmlUi values, not as formatted strings,
+	// and the table is searched without building its key strings.
+	struct Applied { std::string requested, actual; std::optional<Rml::Property> property; };
+	struct AppliedLess {
+		using is_transparent = void;
+		template <class A, class B> bool operator()(const A& a, const B& b) const {
+			const int first = std::string_view(a.first).compare(std::string_view(b.first));
+			return first < 0 || (first == 0 && std::string_view(a.second) < std::string_view(b.second));
+		}
+	};
+	Applied& AppliedFor(const std::string& id, std::string_view property) {
+		const auto found = applied.find(std::pair<std::string_view,std::string_view>(id,property));
+		if (found != applied.end()) return found->second;
+		return applied.emplace(std::pair<std::string,std::string>(id,std::string(property)),Applied{}).first->second;
+	}
 	Rml::ElementDocument* document = nullptr;
 	int width = 0, height = 0;
 	float ratio = 1;
@@ -152,7 +170,7 @@ struct ValueControlView::Impl {
 	std::shared_ptr<const DocumentModel> model;
 	std::unordered_map<std::string_view,Rml::Element*> elements;
 	std::unordered_map<std::string_view,const std::map<std::string,Value>*> authored;
-	std::map<std::pair<std::string,std::string>,Applied> applied;
+	std::map<std::pair<std::string,std::string>,Applied,AppliedLess> applied;
 	Rml::Element* Element(const std::string& id) const { const auto found = elements.find(id); return found == elements.end() ? nullptr : found->second; }
 	const std::map<std::string,Value>& Authored(const std::string& id) const { return *authored.at(id); }
 	bool Property(const std::string& id, const std::string& property, const std::string& value) {
@@ -160,15 +178,16 @@ struct ValueControlView::Impl {
         // local-property readback and must not report perpetual layout changes.
         if(property=="overflow") {const bool x=Property(id,"overflow-x",value);return Property(id,"overflow-y",value)||x;}
 		auto* element = Element(id); if (!element) return false;
-		auto& previous = applied[{id,property}]; const auto* current = element->GetLocalProperty(property);
-		if (previous.requested == value && current && previous.actual == current->ToString()) return false;
+		auto& previous = AppliedFor(id,property); const auto* current = element->GetLocalProperty(property);
+		if (previous.requested == value && current && previous.property && *previous.property == *current) return false;
 		if (!element->SetProperty(property,value)) return false;
-		previous.requested = value; current = element->GetLocalProperty(property); previous.actual = current ? current->ToString() : std::string{};
+		previous.requested = value; current = element->GetLocalProperty(property);
+		if (current) previous.property = *current; else previous.property.reset();
 		return true;
 	}
 	bool Text(const std::string& id, const std::string& value) {
 		auto* element = Element(id); if (!element) return false;
-		auto& previous = applied[{id,"text"}];
+		auto& previous = AppliedFor(id,"text");
 		if (previous.requested == value && previous.actual == element->GetInnerRML()) return false;
 		element->SetInnerRML(Rml::StringUtilities::EncodeRml(value));
 		previous = {value,element->GetInnerRML()}; return true;

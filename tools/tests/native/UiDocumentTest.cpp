@@ -554,6 +554,24 @@ int main() {
 	Check(motion.Play("enter",10),"play by stable timeline ID");
 	motion.Advance(10.25);
 	Check(Near(opacity(),.25) && Near(left(),35),"250 ms frame stall samples absolute elapsed time");
+	{
+		// The live values are the authored ones with only the sampled entries
+		// written over them: a walk visits every authored key once, in order,
+		// with the live value, and a lookup finds the written one.
+		const auto values = motion.Values();
+		Check(values.size() == motion.Base().size() && !values.Written().empty() && values.Written().size() < values.size() &&
+			values.Written().contains({"panel","opacity"}),"a sample writes only what it animates over the authored values");
+		auto authored = motion.Base().begin(); bool ordered = true;
+		for (const auto& [key,value] : values) {
+			const auto written = values.Written().find(key);
+			ordered = ordered && authored != motion.Base().end() && authored->first == key &&
+				&value == (written != values.Written().end() ? &written->second : &authored->second);
+			++authored;
+		}
+		Check(ordered && authored == motion.Base().end() && values.find({"panel","missing"}) == values.end() &&
+			&values.find({"panel","opacity"})->second == &values.Written().at({"panel","opacity"}),
+			"the live values walk the authored keys in order and read written entries first");
+	}
 	motion.Advance(10.25+1.0/240);
 	Check(Near(opacity(),.25+1.0/240),"240 Hz presentation independent of game ticks");
 	motion.Advance(9); motion.Advance(std::numeric_limits<double>::quiet_NaN());

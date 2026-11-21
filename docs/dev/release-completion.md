@@ -25,6 +25,52 @@ does not restore the withdrawn release. See
   [height and parallax](../user/pbr-materials.md#height-and-parallax).
 - Evidence: [parallax occlusion](parallax-occlusion.md#qualification-21-november-2026).
 
+## Quicker texture setting changes, 21 November 2026
+
+- **Texture settings apply faster.** Changing texture quality on the Display
+  page, through a Performance Preset or from the console now reloads only the
+  textures the change affects. Lowering normal-map detail in Air Defense 1
+  reloads 318 textures instead of all 1,942, which takes 1.5 to 3 s
+  instead of 4 to 7 s. The menus, the HUD and their fonts are no longer reloaded by a
+  texture-quality change at all.
+- **A change made while a level loads is no longer lost.** Textures kept from
+  before the load, such as the interface and your own models, used to keep
+  their old size or compression until the renderer restarted; they now follow
+  the new setting as soon as the load ends.
+- **What to do.** Nothing: update openQ4 as usual.
+- Details: [applying display settings without a device restart](ui/settings-live-apply.md#stage-7-reload-only-what-a-texture-change-reaches).
+
+## Quicker menu responses, 21 November 2026
+
+- **Menus answer a press sooner.** Moving along a list, switching a tab or
+  opening a dialog in the new interface did milliseconds of work before the
+  next frame, more on the larger pages: 1.5 to 3 ms for each step down Join
+  Game's server list, 2.5 to 5 ms for a Controls tab and 4 to 9 ms to open
+  the multiplayer Escape card. The same steps now take a tenth of a
+  millisecond or less, a third of one on the Escape card, so holding an
+  arrow key or a stick through a long list stays smooth.
+- **The new HUD is lighter in a match.** The Remastered HUD's updates (health,
+  voice transmit, the scoreboard) cost a tenth to a twentieth of what they did.
+- **Large menus use less memory.** An animated page no longer keeps a second
+  copy of its artwork's settings once it starts moving: the multiplayer
+  Escape card holds about 15 MB less, the match summary 10 MB less.
+- **What to do.** Nothing: update openQ4 as usual.
+- Details: [event costs](ui/event-costs.md).
+
+## Smooth ambient occlusion instead of dither, 21 November 2026
+
+- **SSAO no longer shows a dither pattern.** The soft shading SSAO adds in
+  corners and creases had turned into a visible grain, worst on the Quality
+  and Enhanced presets where it is drawn at half resolution. It is now
+  filtered so the shading is smooth, at every preset and on both OpenGL and
+  Vulkan, while keeping crisp edges where a wall meets a floor or a model
+  stands in front of a wall. The overall strength of the shading is
+  unchanged.
+- **PBR surfaces on Quality and Enhanced use the cheaper half-resolution
+  SSAO too**, like everything else on those presets.
+- **What to do.** Nothing: update openQ4 as usual; your settings are kept.
+- Details: [filtered SSAO occlusion](presentation-owners.md#filtered-ssao-occlusion-21-november-2026).
+
 ## Smoother menus, especially The Awakening's, 20 November 2026
 
 - **The Awakening's menus no longer cost a frame's worth of processor time.**

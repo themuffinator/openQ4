@@ -1534,7 +1534,7 @@ def test_pbr_ssao_indirect_contract() -> None:
                   "bool RB_SSAOIndirectField( idImage **image, float invSize[2] ) {",
                   "rendered = RB_STD_FillDepthBufferFiltered( drawSurfs, numDrawSurfs, RB_SSAOClassicWorldDepthSurfFilter );",
                   "RB_PrepareSSAOIndirectField();\n\tRB_PrepareLightGridDepthTexture();",
-                  "RB_DrawSSAOPass( field ? 2.0f : 0.0f, sceneImage, depthImage, finalDepthImage, NULL,"):
+                  "RB_DrawSSAOPass( 2.0f, sceneImage, depthImage, finalDepthImage, NULL,\n\t\t\trbSSAOFieldImage,"):
         require(common, token, "OpenGL SSAO field")
     owner = read(ROOT / "src/renderer/draw_pbr.cpp")
     for token in ("static const int GL_PBR_UNIT_SCREEN_AO = 14;",

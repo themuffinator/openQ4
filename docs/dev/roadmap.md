@@ -22,7 +22,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **44 / 152 (28.9%)** | **108 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
+| Formally closed roadmap tasks | **44 / 153 (28.8%)** | **109 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09 and FPS-01 through FPS-09, not partial substeps. |
 | Estimated category progress | **20 categories: 3 at 100%, 15 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -51,7 +51,7 @@ exact; the estimate column is deliberately approximate.
 | --- | ---: | ---: | --- |
 | [Governance and baseline evidence](#governance-and-baseline-evidence) — GOV | **100%** | 3 / 3 | Maintain evidence/default alignment as later changes land. |
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
-| [Vulkan rendering](#vulkan-rendering) — VK | **70%** | 1 / 7 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks. |
+| [Vulkan rendering](#vulkan-rendering) — VK | **60%** | 1 / 8 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks; HDR display output (VK-08, not started). |
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **55%** | 3 / 11 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics and GTAO (REN-09, REN-10, not started). Parallax occlusion mapping (REN-11) closed 21 November 2026. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
@@ -221,7 +221,7 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09, MP-12, MP-17 through MP-22, MP-24 and AUD-01 through AUD-07; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
 | 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-09 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
-| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26, REN-09, REN-10 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026, REN-11 on 21 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
+| 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26, VK-08, REN-09, REN-10 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026, REN-11 on 21 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, RT-07, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
 Independent workstreams may proceed together. GPU/renderer optimization depends on
@@ -250,8 +250,9 @@ to a final project-wide phase. Important dependencies are:
 | Demo container, workflow, storage and robustness (MP-21 through MP-24) | MP-21's container and registry before MP-22's client recording and MP-23's MVD compression; MP-24's fixtures accompany every format change. MP-05 stays closed at its selected scope, and every version a release wrote keeps its reader. |
 | Multiplayer splitscreen (MP-25) | Multiplayer only: the single-player game and the Awakening campaign never gain local players. Each local player is an ordinary client on the wire, so MP-08's protocol, MP-17's identity, MP-18's per-client caps and MP-22's client recording apply per player without a second path. Per-viewport HUD and menus build on the retained interface (UI-03/UI-04/UI-09); per-viewport cost is measured against FPS-01's budgets before any preset enables effects in splitscreen. |
 | Horde (MP-26) | Monster snapshot state is a protocol change: it follows MP-08's packet budget and MP-21's registry and keeps every older demo playable. Wildcard waves reuse MP-14's modifier layer, maps and presets go through MP-13 and MP-14, bots as fighters build on MP-09, and Horde stays unranked under MP-17. The stock Quake 4 roster only; Awakening content stays scoped to its campaign. |
-| Vulkan ray tracing (RT-02 through RT-07) | RT-01's hardware, budget, licence and translation decisions first. Ray tracing builds on VK-03 admission, VK-06 resource counters and the existing TAAU, motion vectors and GPU skinning paths; RT-06 follows the VK-05/VK-07 capture and HDR work and VR-01 stereo. `r_rayTracing 0` always runs the unchanged Vulkan path, and no other renderer depends on it. |
+| Vulkan ray tracing (RT-02 through RT-07) | RT-01's hardware, budget, licence and translation decisions first. Ray tracing builds on VK-03 admission, VK-06 resource counters and the existing TAAU, motion vectors and GPU skinning paths; RT-06 follows the VK-05/VK-07/VK-08 capture and HDR work and VR-01 stereo. `r_rayTracing 0` always runs the unchanged Vulkan path, and no other renderer depends on it. |
 | Shadowed volumetrics, GTAO and parallax occlusion (REN-09 through REN-11) | REN-11 closed 21 November 2026. REN-09 samples the REN-03 shadow maps and replaces the REN-06 froxel leaf; REN-10 keeps SSAO and its REN-05 controls as the fallback and comparison. Each is default-off with exact rollback, and FPS-01's budgets price every tier before a preset enables it; a new preset setting carries the SYSTEM catalog ripple. |
+| HDR display output (VK-08) | VK-05's exposure domain and tone curves first. The 6 November display-referred decision for stock content stands, so VK-08 changes the output transform and interface composition, not scene composition. Vulkan only: OpenGL, GLES and VR stay SDR and report it, and HDR output off always presents the unchanged SDR path. A new display setting carries the SYSTEM catalog ripple; qualification needs a physical HDR display. |
 | Server discovery (MP-19) | A decision on a project-controlled master or list service before the Internet source can be qualified on a fresh install; Steam lobbies and matchmaking remain STEAM/OPT-09. |
 
 ## Governance and baseline evidence
@@ -629,7 +630,7 @@ Sources: [Vulkan gap history](archive/2026-10-18/plans/2026-09-20-vulkan-gap-clo
 
 ### VK completion checkpoints
 
-**Estimate: 70%; 1/7 tasks closed.** Windows NVIDIA/Intel qualification and bounded
+**Estimate: 60%; 1/8 tasks closed.** Windows NVIDIA/Intel qualification and bounded
 laboratory results earn implementation credit. Failed strict image/pacing checks
 and untested drivers remain open, with no tolerance or support-tier change.
 
@@ -642,6 +643,7 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls; classic stock stages stay display-referred by decision, with a byte-identical, qualified fallback. | Tiled/out-of-frame captures and authored-post combinations of admitted (PBR) views. |
 | VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
 | VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. Tiled (larger-than-window) captures, direct and through the game-owned post target, pass on OpenGL and on Vulkan with NVIDIA and Intel. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-08 — Not started | Only an 8-bit sRGB swapchain; the RGBA16F scene, stock and PBR tone curves and automatic exposure exist (VK-05). | HDR10/scRGB swapchain and metadata, SDL3 display state with live switching, a peak-targeted output transform, paper-white interface composition, settings and calibration, SDR captures, and review on a physical HDR display. |
 
 ### VK task evidence and acceptance
 
@@ -784,7 +786,7 @@ and untested drivers remain open, with no tolerance or support-tier change.
   portal, capture, nested and authored-post combinations. Verify radiance, alpha,
   image orientation, exposure, reset and whole-view fallback. Current production
   PBR is display-referred; internal linear HDR and HDR monitor output are separate
-  capabilities. Share temporal/shadow acceptance with REN-03/REN-04 and HF-06.
+  capabilities (HDR monitor output is VK-08). Share temporal/shadow acceptance with REN-03/REN-04 and HF-06.
   Progress, 23 October: [domain changes and late failures](vulkan-hdr.md#domain-changes-settling-and-admission-counts-23-october-2026-vk-05)
   now keep per-domain exposure, invalidate temporal history on a flip, settle a
   linear view that missed its output, and release the accumulation after a failed
@@ -921,6 +923,43 @@ and untested drivers remain open, with no tolerance or support-tier change.
   light-count images and their printed overdraw then match exactly at 0x and
   4x, and the weapon depth hack's depth view is within one level. At 4x, lit
   geometry edges still differ in up to 20 pixels, by up to 8 levels.
+- [ ] **VK-08 — P2, implementation: HDR display output.** Present on HDR10 and
+  scRGB displays. Today the swapchain is always 8-bit sRGB
+  (`VK_COLOR_SPACE_SRGB_NONLINEAR_KHR`) and both tone curves end at SDR white,
+  so the RGBA16F scene of VK-05 never reaches the display as HDR.
+  Swapchain: enable `VK_EXT_swapchain_colorspace` where present and choose HDR10
+  (10-bit, `HDR10_ST2084`) or scRGB (FP16, `EXTENDED_SRGB_LINEAR`) from what the
+  surface reports, with `VK_EXT_hdr_metadata` where the device offers it; every
+  other surface keeps the SDR swapchain. Display state: read SDL3's HDR state,
+  SDR white level and headroom for the window's display, and follow changes
+  (the operating system's HDR switch, a move to another monitor) by recreating
+  the swapchain, without `vid_restart` or an application restart.
+  Output transform: retarget the stock and PBR filmic curves to the display's
+  peak instead of 1.0, convert Rec.709 to Rec.2020 and PQ-encode for HDR10, and
+  scale scRGB so paper white lands where the user set it. The 6 November
+  decision stands: stock content stays display-referred, and its added range
+  comes from the curve's shoulder, not from re-blending classic stages in linear
+  light. Exposure, auto exposure, bloom and TAA keep their scene-domain
+  behaviour. Composition: authored post effects, SMAA, the HUD, menus and the
+  retained interface, subtitles, cinematics and loading screens stay SDR and are
+  placed at a paper-white level in the output pass; no SDR element exceeds it.
+  Settings: HDR output (automatic or off), peak brightness, paper white and a
+  calibration screen, following the [UI visual design](ui-visual-design.md) with
+  `#str_*` entries in every language table, and requested and effective state
+  with the reason for any fallback in `gfxInfo` and `rendererVulkanHDRInfo`.
+  Captures: screenshots, levelshots, save previews, `envshot` and light-grid and
+  probe bakes stay SDR and match the SDR presentation; an HDR capture format is
+  a separate decision. Boundaries: OpenGL, GLES and Apple GL stay SDR and say
+  so; VR presents SDR through OpenXR; MoltenVK, Linux and Steam Deck OLED
+  (gamescope) qualify only where their Vulkan surfaces report HDR colour
+  spaces, and otherwise fall back. Acceptance: on a physical HDR10 monitor
+  under Windows, and on the scRGB path, stock `airdefense1` and a PBR laboratory
+  scene show highlights above paper white without clipping or hue shifts; the
+  interface at paper white matches its SDR appearance; switching HDR in the
+  operating system and moving between SDR and HDR monitors recover cleanly with
+  no stale swapchain; HDR output off is byte-identical to the current SDR
+  presentation; captures are unchanged; and the output pass is priced under
+  FPS-01. Qualification needs an HDR display and the owner's review.
 
 ## Vulkan ray tracing
 
@@ -1045,7 +1084,7 @@ RT progress.
   speed.
 - [ ] **RT-06 — P2, integration: the rest of the renderer and the product.**
   Screenshots, `envshot`, tiled and multisampled captures (VK-07), HDR output
-  and exposure (VK-05), mirrors and remote cameras, VR stereo with per-eye cost
+  and exposure (VK-05, VK-08), mirrors and remote cameras, VR stereo with per-eye cost
   (VR-01), render demos and capture determinism, BSE effects, light-grid packs
   and multiplayer views work in each mode or fall back explicitly. Settings rows
   follow the [UI visual design](ui-visual-design.md), use `#str_*` entries in
@@ -1309,6 +1348,12 @@ diagnostics establish whole-frame ownership or production performance.
   Remaining: lavapipe's one-byte difference (a WSL lavapipe run, blocked by
   free space on C:, where the WSL disk lives), mods authored outside the
   laboratory, and physical Linux/Apple.
+  Progress, 21 November: SSAO's dither is gone. Both renderers draw the raw
+  AO into an occlusion target (full or half resolution) with sixteen
+  interleaved sample patterns and resolve it with a depth-plane-aware tent
+  that cancels them; native PBR's field filters the same target, so its
+  classic pixels still match a classic-only frame and it now follows
+  `r_ssaoResolution`. See [filtered SSAO occlusion](presentation-owners.md#filtered-ssao-occlusion-21-november-2026).
 - [ ] **REN-06 — P2, qualification: probes, baked data and advanced effects.**
   Qualify probe capture orientation, generated-grid provenance and whether existing
   baked grids need regeneration after capture fixes. Broaden authored probe/decal
@@ -3108,6 +3153,11 @@ Completion must advance through the existing dependencies:
   (both directions between OpenGL and Vulkan ran in Air Defense 1). A GPU
   change, the Awakening campaign and multiplayer were not run; multiplayer
   is not carried.
+  Stage 7, 21 November: a texture setting reloads only the images it reaches
+  (each load keeps the reduction key it was built under), through the level
+  load's file prefetch, and leaves generated and persistent images alone. A
+  change during a level load is no longer lost for the images the load kept.
+  The reload still blocks its frame; spreading it across frames is left.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual
@@ -3345,6 +3395,17 @@ Completion must advance through the existing dependencies:
   fields and scrollbars at rest do the same (Create Server 0.79 to 0.05 ms,
   Join Game 0.48 to 0.07 ms). Only an edited field or a held pointer lays out
   every frame. Open: the Awakening documents' 2.3 MB of snow and frost.
+  Progress, 21 November: [event costs](ui/event-costs.md) were measured with
+  a new `--event` benchmark mode. An event copied the document's whole state
+  several times (Join Game's row focus 1.5 ms, a CONTROLS tab 2.5 ms, the
+  Escape card's opening 4.2 ms on a quiet machine, up to twice that under
+  load) and every interaction update searched the page's property tables for
+  each input branch. State tables are now shared by copies until written,
+  input eligibility is read once per state and motion revision and list rows
+  compare RmlUi values: those events take 0.04, 0.11 and 0.34 ms and the
+  HUD's events about 0.01 ms. A motion now holds only the values written
+  over its authored ones, so an animated page no longer keeps a second copy
+  of them (the Escape card 15 MB less). Open: the view build's spread-out cost.
   Progress, 4 November: [moving weapon scopes](ui/runtime-performance.md#moving-weapon-scopes-4-november-2026)
   retain local meshes for their faint animated furniture. At 1080p the isolated
   rail/nail scope CPU medians fall from 6.99/8.80 ms to 0.018/0.037 ms; continuous
@@ -7122,7 +7183,7 @@ do not establish an accepted delivery scope for these ambitions. To advance one:
 | --- | --- |
 | OPT-01 | Higher authoritative simulation rates: separate physics/script/prediction/demo/content design after HF-01 through HF-07; do not change tick rate to claim higher FPS. |
 | OPT-02 | GPU skinning promotion for animation-heavy content: batch GL dispatches/persist source buffers and prove benefit. Current stock workloads did not justify default promotion. |
-| OPT-03 | True HDR10/scRGB output, sparse/virtual textures, broad GPU-driven/async-compute work, background shader compilation, shadowed light-injected volumetrics and raster world-space GI: require measured need, target content/hardware and classic rollback. Ray-traced shadows, reflections, indirect light and path tracing moved to RT-01 through RT-07 on 15 November 2026. |
+| OPT-03 | Sparse/virtual textures, broad GPU-driven/async-compute work, background shader compilation and raster world-space GI: require measured need, target content/hardware and classic rollback. Ray-traced shadows, reflections, indirect light and path tracing moved to RT-01 through RT-07 on 15 November 2026; shadowed volumetrics moved to REN-09, and HDR10/scRGB output to VK-08, on 21 November 2026. |
 | OPT-04 | Live relay/delayed broadcast, multi-POV/multi-window audio and web/brackets: separate security, capacity, backpressure and reconnect designs. Forced client screenshots remain rejected. Demo compression and export moved to MP-23/MP-22 and persistent identity to MP-17 on 15 November 2026. |
 | OPT-05 | Overload/Harvester/Domination/Attack and Defend: keep unavailable until authoritative objectives/scoring, networking, bots and UI exist. Race remains outside accepted scope; rulesets, modifiers and presets moved to MP-11/MP-14 on 15 November 2026. |
 | OPT-06 | Awakening's unreachable grapple/concussion/tether/gravgun/compass content: explicit content-completion project, not a blocker for the integrated SP campaign. No expansion multiplayer module. |
