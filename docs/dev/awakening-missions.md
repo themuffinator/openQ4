@@ -860,7 +860,8 @@ The following recovered-content gaps remain distinct from verified code fixes:
 - Complete physical traversal, normal weapon balance, the cold hazard
   sequence, escape timing, extraction framing/audio, and cross-platform runtime
   qualification remain Q4-04 gates. Focused callbacks and forced damage cannot
-  establish those results.
+  establish those results. The frost's timing and damage were later confirmed
+  at runtime; see [M09 frost hazard](#m09-frost-hazard--21-november-2026).
 - The Vulkan boss restore reported an unrelated renderer fallback for light
   498 (`lights/round`): a required shadow resource was unavailable and its
   receivers rendered without that shadow. This audit does not qualify Vulkan
@@ -1644,3 +1645,68 @@ script makes him aggressive (m01's trench script does; m02, m04 and m08 never
 do), so restart the level or load an earlier save. The armour a full repair
 gives was not read back, and no level was played through with a player moving;
 Linux and macOS were not run.
+
+## M09 frost hazard — 21 November 2026
+
+The user asked what M09's strategy is meant to be. The recovered map and script
+answer it: the level's pressure is a freezing fog that follows the player down
+each descent and then times the boss fight. It is three slabs, `fog01_hurt`,
+`fog02_hurt` and `fog03_hurt`, each a `trigger_hurt` 1,296 units square and 512
+thick, bound with its fog light to a mover (`mvr_fog01`–`03`). The damage def
+is `damage_triggerhurt_toxin`: 5 points a tick, `noArmor`. A slab is a band,
+not a fill: once it has passed, the space above it is safe again.
+
+| Stage | Started by | Movement | Then |
+| --- | --- | --- | --- |
+| First shaft | `main` (`moveIceCubeDown` → `navajasPlantsBomb`) | Lower edge 1,808 → 904 over 120 s | `trigger_once_99` (z 632) takes it down to 344 over another 120 s |
+| Second shaft | `animateNavajas`, after Navajas falls | Lower edge 584 → −448 over 120 s | `trigger_once_100` (z −640) takes it to −1,392, the floor's level, over 120 s; the exit door unlocks at `trigger_once_105` |
+| Finale | `initValk` | Lower edge −4,072 → −4,736 over 180 s | Stops 64 units above the −4,800 arena floor; the script's comment calls it the three minutes allowed for the boss |
+
+The first shaft's floors are about 256 units apart (z 1,408, 1,152, 896, 640,
+320). With the player's fall thresholds (`soft`/`hard`/`fatal_fall_delta` 30,
+45 and 65; delta is 0.2132 per unit dropped at the default gravity), a drop of
+more than about 141 units costs 10, more than 211 costs 30 and more than 305
+kills. One floor straight down is a hard fall and the 320-unit last drop is
+fatal, so the descent is the beam, pipe and machinery route recorded above, not
+a staircase. Nothing in the map signposts it.
+
+### Validation
+
+Windows x64 OpenGL, hidden, no input, `developer 1`, the user-supplied alpha
+content, default skill, `notarget`. The staged `.install` client, single-player
+module and GL renderer had the same hashes before and after the runs
+(`e36d2210…`, `51e7863c…`, `560e659b…`). One console script per run teleports
+the player onto static world floor inside the slab's footprint, fires the map's
+own triggers, and samples the mover's origin and the player's health every
+second; `g_debugDamage` logs each hit. The first shaft starts naturally. The
+second starts from `trigger_once_9`, the egg sequence that ends in Navajas's
+death, and the finale from its two intro triggers.
+
+| Check | Expected from the map | Observed |
+| --- | --- | --- |
+| First shaft, starting floor | Hurt once the lower edge reaches head height (feet + 77) | Moves at 7.7 units/s from about 2 s in; damage from about 42 s |
+| First shaft, z 640 floor | Safe while the slab rests at its first stop | No damage until `trigger_once_99`; it then moves at 4.7 units/s, with damage about 40 s later |
+| Second shaft, z 64 floor | Hurt about 52 s after the fog starts | Fog starts about 33 s into the egg sequence, moves at 8.7 units/s; damage about 52 s later |
+| Second shaft, bottom floor | Hurt about 110 s after `trigger_once_100` | Moves at 7.9 units/s; damage about 110 s later, and it stays |
+| Finale, main floor standing | Hurt about three minutes in | Starts about 12 s after the intro; damage from about 186 s |
+| Finale, crouching (`openq4_testInput … crouch`) | Below the slab | No damage for the 15 s crouch; it resumes on standing |
+| Finale, entrance ledge (−3,808, 736, −4,672) | Outside the footprint, though inside the band's height | No damage |
+
+Each hit cost 4 health and no armour. The fog's trigger is not the world, so
+`CalcDamagePoints` applies the skill scale (none on Normal), and on Easy and
+Normal `g_useDynamicProtection` then scales player damage down from 1.0. By the
+same code Hard multiplies it by 1.7 and turns dynamic protection off: about 8 a
+tick, not measured. Logs: `.tmp/awk/runs/m09frost_s1`, `m09frost_s2` and
+`m09frost_fin`.
+
+Two failed attempts are not results. Two probes sharing one savepath raced on
+the settings-recovery file lease and the second exited with a fatal error
+(OS error 32), so the runs were made one at a time. A first second-shaft spot at
+(−2,584, −112, 140) was not static floor and the player fell to z −2,617; the
+rerun used the cryo floor at (−2,688, −440, 64). Starting the second shaft early
+also logs a null `$mover_icecube` warning from the first shaft's still-running
+opening thread; that is the probe's shortcut, not a map fault.
+
+Limits. This confirms the hazard's timing, reach and damage, not a descent made
+with player movement against it, the Valkaryne's attacks, or balance. Hard and
+Nightmare were not run, and neither were Vulkan, Linux or macOS.

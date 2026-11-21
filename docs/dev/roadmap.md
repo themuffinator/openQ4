@@ -3973,6 +3973,12 @@ Completion substeps must keep three forms of evidence distinct:
   squad lines, 3 Markswell), and the 100 draft lines whose scenes the shipped
   maps lack. See the [register](awakening-missing-voice-lines.md) and the
   [voice generation breakdown](voice-generation-breakdown.md).
+  M09 frost, 21 November (hidden, input-free, Normal, OpenGL): all three
+  freezing-fog slabs move on the map's schedule, hurt once they reach head height,
+  ignore armour, and respond to their second-stage triggers; crouching clears the
+  finale's resting slab. A descent made against it with player movement, the
+  other skills and the other platforms remain. See
+  [M09 frost hazard](awakening-missions.md#m09-frost-hazard--21-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
