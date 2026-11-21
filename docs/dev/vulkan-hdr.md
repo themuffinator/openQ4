@@ -4,8 +4,8 @@ Status: implemented with local Windows stock-map and GPU correctness evidence;
 visual/platform qualification remains open. Vulkan is supported on qualified
 Windows x64 NVIDIA/Intel configurations; Linux and macOS remain experimental.
 This describes internal scene range
-and tone mapping, not HDR10/scRGB display output or full stock-material
-linearization.
+and tone mapping, not HDR10/scRGB display output (planned as roadmap VK-08)
+or full stock-material linearization.
 
 ## Controls and ownership
 
