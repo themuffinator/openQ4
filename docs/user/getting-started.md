@@ -181,4 +181,5 @@ Attach the log to a new [issue](https://github.com/themuffinator/openQ4/issues) 
 - Tune graphics and screen options: [Display Settings](display-settings.md).
 - Set up keys, mouse or controller: [Input Settings](input-settings.md).
 - Choose a campaign or install The Awakening: [Campaigns](campaigns.md).
+- Play online or against bots: [Multiplayer](multiplayer.md).
 - Host a game: [Server Setup](server-setup.md).

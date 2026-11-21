@@ -7,6 +7,21 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## One place to start for multiplayer, 21 November 2026
+
+- **A multiplayer guide.** The new [multiplayer guide](../user/multiplayer.md)
+  is the front door for players and hosts: what everyone needs before playing,
+  joining, bot matches, hosting for friends, the twelve game types, the
+  in-match menu's tabs, match rules, spectating, voting, timeouts, bot orders,
+  troubleshooting and a list of every multiplayer guide by task.
+- **Each topic lives in one place.** Casual spectating, voting, timeouts and
+  match rules moved out of the competitive guide, and bot orders out of the
+  server guide, so the competitive guide is about managed matches only. The
+  version and retail-compatibility rules are stated once, and every
+  multiplayer guide links back to the new one.
+- **What to do.** Nothing. Old links to the moved sections land on the guides
+  they came from, which point to the new places.
+
 ## Height maps that give PBR surfaces real depth, 21 November 2026
 
 - **Parallax occlusion for mod materials.** A PBR material can now carry a
@@ -700,7 +715,7 @@ does not restore the withdrawn release. See
   length.
 - **What to do.** Replace the engine and the multiplayer game module on the
   server and on clients. The network protocol is unchanged (2.42).
-- Guides: [competitive matches](../user/competitive-matches.md#voting-on-casual-servers)
+- Guides: [multiplayer guide](../user/multiplayer.md#vote)
   and [server setup](../user/server-setup.md#server-settings).
 - Evidence and what is still open: [multiplayer audit, 17 November](mp-audit-2026-11-17.md).
   The 125 static multiplayer tests pass; the kept limit, the ruleset change,
@@ -1428,7 +1443,7 @@ does not restore the withdrawn release. See
   All three are off unless the operator turns them on.
 - **Fix:** the HUD clock on a client no longer runs on through a timeout or
   pause; it stops with the match, as the host's did.
-- Guides: [competitive matches](../user/competitive-matches.md#voting-on-casual-servers)
+- Guides: [multiplayer guide](../user/multiplayer.md#vote)
   and [server setup](../user/server-setup.md#server-settings).
 - Evidence: on 15 November (OpenGL, q4dm1, two paused bots) it passed all eleven checkpoints: a coin-toss vote, a team timeout that expired into the resume countdown and back to play, a second ended early by `timein`, a refused third with the server reason printed at the console, a `roundlimit 5` vote once the cooldown (game time, which the pauses hold) had passed, `si_spectatorLock 2` holding the host in play, and `g_inactivity` moving it to spectators, which ended the match as abandoned with no human left. Contracts: `mp_casual_match_flow_contract.py`,
   `mp_vote_security_contract.py`, `mp_match_vote_electorate_contract.py`,
@@ -1547,7 +1562,7 @@ does not restore the withdrawn release. See
 - **Spectators are told when players cannot hear them.** While a match is live
   and the server keeps spectator chat among spectators, the server now says so.
 - Players: nothing to reinstall or rebind. The new commands are listed in the
-  [competitive matches guide](../user/competitive-matches.md#spectate).
+  [multiplayer guide](../user/multiplayer.md#spectate).
 - Development: `mp_match_spectator_follow_contract.py` runs the production
   follow, auto-follow and caster request paths against the real disclosure
   policy; `mp_spectator_casting_contract.py` runs the caster grant and every

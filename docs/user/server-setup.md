@@ -2,16 +2,17 @@
 
 > This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
+> Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
+
 This guide is for anyone hosting openQ4 multiplayer games, either from the
 game's menus while you play or as a dedicated server that runs on its own.
 Multiplayer is **experimental**: expect rough edges and changes between
 versions.
 
-Everyone on a server must run openQ4, and the same version as the server.
-Retail Quake 4 1.4.2 clients and servers (network protocol 2.85) cannot join
-openQ4 games, and openQ4 cannot join theirs; openQ4 refuses them with an
-explanation instead of leaving anyone waiting. See
-[Retail Quake 4 clients and servers](server-security.md#retail-quake-4-clients-and-servers).
+Everyone on a server must run openQ4, and the same version as the server;
+retail Quake 4 clients cannot join. See
+[Before you play](multiplayer.md#before-you-play) in the multiplayer guide,
+which also covers joining, game types and what players can do in a match.
 
 ## Hosting from the game
 
@@ -296,19 +297,9 @@ below. openQ4 does not route games through a proxy: the legacy `net_socks*` CVar
 
 Players on your local network use the server's local address; internet
 players use your public address or a host name. Add the port when the server
-is not on `28004`. Without a port, `28004` is used, and `:0` means the same.
-
-```text
-connect 192.168.1.50:28004
-connect play.example.net:28004
-connect [2001:db8::1]:28004
-connect [fe80::1%12]:28004
-```
-
-Put an IPv6 address in square brackets when a port follows it. A local
-`fe80::` address also needs its interface number after `%`. A host name with
-both IPv4 and IPv6 addresses connects over IPv4; use the bracketed IPv6
-address to force IPv6.
+is not on `28004`. Put an IPv6 address in square brackets when a port follows
+it, for example `connect [2001:db8::1]:28004`. Every address form is under
+[Connect by address](multiplayer-networking.md#connect-by-address).
 
 ## Server settings
 
@@ -344,7 +335,7 @@ address to force IPv6.
 | `g_votePercent` | Percentage of the players eligible when a vote starts that must vote yes for it to pass (default 51, a plain majority). **Not in 0.14.1** |
 | `g_voteLimit` | Most votes one player may call on a map; `0` for no limit. **Not in 0.14.1** |
 | `si_spectatorVote` | `1` lets spectators call and cast votes. A player who is out for the round or on the scoreboard is not a spectator and can always vote. **Not in 0.14.1** |
-| `si_timeouts`, `si_timeoutLength` | Team timeouts each side may call in a team match (`0` for none) and how long one lasts, in seconds. See [Timeouts on casual servers](competitive-matches.md#timeouts-on-casual-servers). **Not in 0.14.1** |
+| `si_timeouts`, `si_timeoutLength` | Team timeouts each side may call in a team match (`0` for none) and how long one lasts, in seconds. See [Timeouts](multiplayer.md#timeouts). **Not in 0.14.1** |
 | `si_spectatorLock` | During live play, `1` keeps spectators, and anyone who connects, from joining the game until it ends and `2` keeps players from leaving it too. **Not in 0.14.1** |
 | `g_inactivity` | Seconds a playing human may send no input before being moved to spectators (or dropped when `si_spectators` is off); `0` turns it off. **Not in 0.14.1** |
 | `g_pauseOnDisconnect` | Seconds a live team match pauses when a playing human loses their connection, so they can reconnect; `0` turns it off. One pause a side a match; it ends when the player is back, and a kick or an idle drop does not start one. **Not in 0.14.1** |
@@ -513,7 +504,7 @@ queue and the pick are off and a map's `set` lines are not applied.
 | `removebot` | Removes one bot, optionally by name |
 | `kickbots` | Removes every bot |
 | `botlist` | Lists the bots and their characters |
-| `callvote <vote> [value]`, `cv` | Calls a vote; `vote yes` or `vote no` casts yours. The votes are listed under [Voting on casual servers](competitive-matches.md#voting-on-casual-servers). **Not in 0.14.1** |
+| `callvote <vote> [value]`, `cv` | Calls a vote; `vote yes` or `vote no` casts yours. The votes are listed under [Vote](multiplayer.md#vote). **Not in 0.14.1** |
 | `timeout [marine\|strogg]` | Calls a team timeout; players call one for their own side, the dedicated console names the side. **Not in 0.14.1** |
 | `timein`, `unpause` | Ends the running timeout or pause early. **Not in 0.14.1** |
 | `pause` | Pauses the match with no timeout charged (host, referee or dedicated console); `timein` resumes. **Not in 0.14.1** |
@@ -553,26 +544,8 @@ menu or set once in your server config is still there next time. For the full
 command list, the character file format and how to add your own characters,
 see [Multiplayer bots](../dev/mp-bots.md).
 
-### Giving bots orders
-
-In a team game you can tell the bots on your side what to do in team chat.
-Start with a bot's name, or `everyone` for all of them, and follow it with the
-order:
-
-| Type | The bot |
-| --- | --- |
-| `kane follow me` | stays with you and fights beside you |
-| `everyone defend` | holds your team's base in Capture the Flag |
-| `sorg hold here` | holds the area where you are standing |
-| `kane attack` | goes for the enemy flag, or escorts whoever has it |
-| `everyone dismissed` | goes back to playing on its own |
-
-`escort me`, `cover me`, `guard`, `get the flag` and `free` work too, and you
-can name several bots at once: `sorg and bagby defend`. The bots answer in team
-chat so you know the order landed. An order lasts until you give another one or
-dismiss them, and it ends if the bot changes team or the map changes. A bot
-carrying the flag still takes it home, and a badly hurt bot still grabs health
-on the way.
+In team games, players give the bots on their side orders in team chat, such
+as `everyone defend`; see [Give bots orders](multiplayer.md#give-bots-orders).
 
 ## Competitive matches (preview)
 
@@ -585,6 +558,8 @@ for what works today.
 
 ## More information
 
+- [Multiplayer guide](multiplayer.md): joining, game types, match rules,
+  voting, spectating and every other multiplayer guide.
 - [Server and remote-console security](server-security.md): rcon passwords,
   the in-match Admin page, pure servers and mods.
 - [Multiplayer networking](multiplayer-networking.md): connection behaviour,

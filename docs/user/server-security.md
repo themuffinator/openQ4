@@ -2,6 +2,8 @@
 
 > This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
 
+> Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
+
 This guide is for server hosts. It covers administering your server remotely
 and safely, how pure servers and mods behave, and what openQ4 refuses to
 accept. For starting and configuring a server, see the
