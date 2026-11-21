@@ -785,6 +785,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_shared_domain_targets.py",
         root / "tools" / "tests" / "rigid_body_recovery_diagnostics.py",
         root / "tools" / "tests" / "ai_medic_approach_watchdog.py",
+        root / "tools" / "tests" / "ai_medic_combat_stance_restore.py",
         root / "tools" / "tests" / "savegame_corruption_contract.py",
         root / "tools" / "tests" / "savegame_gui_layout_contract.py",
         root / "tools" / "tests" / "weapon_gui_event_queue_contract.py",

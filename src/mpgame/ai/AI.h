@@ -1148,8 +1148,11 @@ private:
 	void					Event_FaceEntity					( idEntity *ent );
 	void					Event_WaitMove						( void );
 
+protected:
+	// rvAIMedic chains to these to note that a script now owns its stance.
 	void					Event_BecomePassive					( int ignoreEnemies );
 	void					Event_BecomeAggressive				( void );
+private:
 
 	void					Event_EnableDamage					( void );
 	void					Event_EnableClip					( void );

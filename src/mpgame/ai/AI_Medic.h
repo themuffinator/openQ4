@@ -69,6 +69,12 @@ private:
 	bool				wasAware;
 	bool				wasIgnoreEnemies;
 
+	// True while the medic is passive only because TakePatient made it so, and
+	// wasAware/wasIgnoreEnemies still hold what to give back. A script that
+	// calls becomePassive/becomeAggressive takes ownership and clears it. Not
+	// saved: Restore derives it from the patient.
+	bool				patientPassive;
+
 	// Approach watchdog. Transient: a restored medic starts measuring afresh.
 	float				approachDistance;
 	int					approachProgressTime;
@@ -78,6 +84,7 @@ private:
  	
 	void				TakePatient						( idPlayer* pPatient );
 	void				DropPatient						( void );
+	bool				RestorePatientCombatFlags		( void );
  	bool				CheckTakePatient				( idPlayer* actor );
  	bool				SituationAllowsPatient			( void );
  	bool				AvailableToTakePatient			( void );
@@ -89,6 +96,8 @@ private:
 	void				Event_DisableHeal				( void );
 	void				Event_EnableMovement			( void );
 	void				Event_DisableMovement			( void );
+	void				Event_BecomePassive				( int ignoreEnemies );
+	void				Event_BecomeAggressive			( void );
 
 	rvScriptFuncUtility	mPostHealScript;		// script to run after completing a heal
 

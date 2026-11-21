@@ -1581,3 +1581,66 @@ Limits. Saves made in Cryofac before this change keep their own entity state:
 their marines are wherever the save left them, their seals stay focusable and
 the west of the ice wall stays inert until the map is restarted. No scene was
 watched with a player moving; Linux and macOS were not run.
+
+## Tak ignores enemies after an interrupted repair — 21 November 2026
+
+Reported by the user: across the campaign Tak wanders while monsters attack
+and never returns fire, while every other marine fights.
+
+Tak is the squad's tech: `char_q4x_marine_tech` takes `spawnclass rvAIMedic`
+from `char_marine_tech_extras` but, unlike stock's unarmed techs, inherits
+`char_q4x_marine`'s machinegun (m01, m02, m04 and m08; m03's Tak is a plain
+marine). `rvAIMedic::TakePatient` makes the healer `becomePassive( 1 )`: not
+aware, ignoring enemies, enemy cleared. It remembered the stance from before,
+but the stock code handed it back only from `DropPatient` while the healer was
+unscripted. Two ordinary ways for a heal to end skipped that:
+
+- a scripted move (`aiScriptedMove`) starts a move, `OnStartMoving` calls
+  `DropPatient`, and the healer is already scripted;
+- a scripted face or animation calls `SetState`, and `OnStateThreadClear`
+  forgot the patient without calling `DropPatient` at all.
+
+The healer then stayed passive and blind to enemies for good. It also meant
+`SituationAllowsPatient` always passed (it returns true while ignoring
+enemies), so the next armour repair remembered the leaked stance as the one to
+restore. The Awakening's scripts move Tak constantly and repair armour at 35 or
+less, so a repair interrupted by the next scene was routine. Stock never showed
+it: its medics and techs carry no weapon.
+
+The fix (`src/game/ai/AI_Medic.cpp`, mirrored in `src/mpgame/`):
+
+- `patientPassive` records that the current passivity is the heal's.
+  `RestorePatientCombatFlags` gives the remembered awareness and ignore-enemies
+  back once; `DropPatient` calls it scripted or not, and `OnStateThreadClear`
+  calls it when another state takes the healer from its patient.
+- A script's or `trigger_ai`'s own `becomePassive`/`becomeAggressive` clears
+  the flag (rvAIMedic overrides both events and chains to idAI), so a scene
+  that makes Tak passive during a heal, as m01's trench script does, stays in
+  control.
+- A heal taken over another keeps the stance from before the first.
+- The flag is not saved: `Restore` derives it from the patient, so the save
+  payload is unchanged.
+
+### Validation
+
+Windows x64 OpenGL, hidden, no input, `developer 1`, the user-supplied alpha
+content, m02 Trianfac 12 s after the start with god and notarget. Each probe
+spawns a Strogg marine in clear view about 260 units from Tak and samples
+`$tak.getEnemy()` every 0.5 s. Before: the staged `.install` build. After:
+`.tmp/runtime/awakening-missions` (client, GL renderer and single-player module
+built from one tree, with `.install`'s packs).
+
+| Probe | Before | After |
+| --- | --- | --- |
+| No repair (control) | Enemy after 3 s; the Strogg dies | — |
+| `takePatient`, then `scriptedFace` 1.5 s later | Never an enemy in 12 s; the other marines kill the Strogg | Enemy at once; Tak kills it within 3 s |
+| `takePatient`, then `scriptedMove` to a mark | — | Enemy throughout (the scripted move holds his fire, as it does without a repair) |
+| `takePatient` left to finish, armour 0 | — | Enemy at once after the repair; the Strogg dies within 4 s |
+
+`tools/tests/ai_medic_combat_stance_restore.py` pins the fix in both trees.
+
+Limits. A save made while Tak already ignored enemies keeps that stance until a
+script makes him aggressive (m01's trench script does; m02, m04 and m08 never
+do), so restart the level or load an earlier save. The armour a full repair
+gives was not read back, and no level was played through with a player moving;
+Linux and macOS were not run.

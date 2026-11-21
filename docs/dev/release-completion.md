@@ -385,6 +385,20 @@ does not restore the withdrawn release. See
   5.6 to 8.8 s for the engine reload it replaces, and 22 s for the reload's
   first entry into The Awakening.
 
+## Tak fights again in The Awakening, 21 November 2026
+
+- **Tak returns fire.** After repairing (or setting off to repair) your armour,
+  Tak could stop fighting for the rest of the level: he followed you through
+  firefights without shooting while every other marine fought on. A repair
+  that a scene interrupted, by sending him somewhere or playing an animation,
+  never gave back the "ignore enemies" stance a repair puts him in. Every way
+  a repair ends now gives it back, and a scene that deliberately keeps him out
+  of a fight still does.
+- **What to do.** Replace the single-player game module. A save made while
+  Tak was already ignoring enemies keeps him that way until the level's script
+  next sends him into combat; load an earlier save or restart the level.
+- Details: [Tak ignores enemies after an interrupted repair](awakening-missions.md#tak-ignores-enemies-after-an-interrupted-repair--21-november-2026).
+
 ## The Awakening's Cryofac opening, door seals and ice wall, 18 November 2026
 
 - **The squad starts on its feet.** At the start of Cryofac, Tak and Navajas

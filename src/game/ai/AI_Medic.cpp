@@ -17,6 +17,8 @@ CLASS_DECLARATION( rvAITactical, rvAIMedic )
 	EVENT( AI_TakePatient,					rvAIMedic::TakePatient )
 	EVENT( AI_EnableMovement,				rvAIMedic::Event_EnableMovement )
 	EVENT( AI_DisableMovement,				rvAIMedic::Event_DisableMovement )
+	EVENT( AI_BecomePassive,				rvAIMedic::Event_BecomePassive )
+	EVENT( AI_BecomeAggressive,				rvAIMedic::Event_BecomeAggressive )
 END_CLASS
 
 /*
@@ -38,6 +40,7 @@ rvAIMedic::rvAIMedic ( void ) {
 	healDisabled = false;
 	wasAware = false;
 	wasIgnoreEnemies = false;
+	patientPassive = false;
 	healDebounceTime = 0;
 	approachDistance = 0.0f;
 	approachProgressTime = 0;
@@ -149,6 +152,9 @@ void rvAIMedic::Restore( idRestoreGame *savefile ) {
 
 	approachProgressTime = 0;
 	patientRetryTime = 0;
+
+	// A medic saved with a patient is passive because TakePatient made it so.
+	patientPassive = ( patient.GetEntity() != NULL );
 }
 
 /*
@@ -189,8 +195,52 @@ void rvAIMedic::Event_EnableMovement( void ) {
 rvAIMedic::Event_DisableMovement
 ==================
 */
-void rvAIMedic::Event_DisableMovement ( void ) {	
+void rvAIMedic::Event_DisableMovement ( void ) {
 	stationary = true;
+}
+
+/*
+==================
+rvAIMedic::Event_BecomePassive
+
+A script (or trigger_ai) that sets the medic's combat stance owns it from
+then on: a heal that ends afterwards must not hand back the stance from
+before it.
+==================
+*/
+void rvAIMedic::Event_BecomePassive ( int ignoreEnemies ) {
+	patientPassive = false;
+	idAI::Event_BecomePassive( ignoreEnemies );
+}
+
+/*
+==================
+rvAIMedic::Event_BecomeAggressive
+==================
+*/
+void rvAIMedic::Event_BecomeAggressive ( void ) {
+	patientPassive = false;
+	idAI::Event_BecomeAggressive();
+}
+
+/*
+==================
+rvAIMedic::RestorePatientCombatFlags
+
+Gives back the awareness TakePatient took away, once. Returns false when
+there was nothing to give back: no heal made the medic passive, or a script
+has set its stance since.
+==================
+*/
+bool rvAIMedic::RestorePatientCombatFlags ( void ) {
+	if ( !patientPassive ) {
+		return false;
+	}
+	patientPassive = false;
+	combat.fl.aware = wasAware;
+	combat.fl.ignoreEnemies = wasIgnoreEnemies;
+	ForceTacticalUpdate();
+	return true;
 }
 
 /*
@@ -281,10 +331,14 @@ void rvAIMedic::TakePatient( idPlayer* pPatient )
 		ClearEnemy();
 	}
 
-	wasAware = combat.fl.aware;
-	wasIgnoreEnemies = combat.fl.ignoreEnemies;
+	// A heal taken over another keeps the stance from before the first.
+	if ( !patientPassive ) {
+		wasAware = combat.fl.aware;
+		wasIgnoreEnemies = combat.fl.ignoreEnemies;
+	}
 	ProcessEvent( &AI_BecomePassive, true );
 	combat.fl.ignoreEnemies = true;
+	patientPassive = true;
 	ClearEnemy();
 	lookTarget = patient;
 	healing = false;
@@ -329,10 +383,13 @@ void rvAIMedic::DropPatient( void )
 	}
 	*/
 	healing = false;
+	// Give back the awareness TakePatient took, whether or not a script has
+	// the medic now. Stock returned it only when unscripted, so a heal broken
+	// off by a scripted move, face or anim left the medic passive and blind to
+	// enemies for good: harmless for stock's unarmed medics, but an armed tech
+	// (Tak, in The Awakening) then walked through firefights without shooting.
+	RestorePatientCombatFlags();
 	if ( !aifl.scripted ) {
-		ProcessEvent( &AI_BecomeAggressive );
-		combat.fl.aware = wasAware;
-		combat.fl.ignoreEnemies = wasIgnoreEnemies;
 		lookTarget = NULL;
 	} else if ( lookTarget == patient ) {
 		//if scripted, clear the looktarget only if it's the patient?  This could be wrong, though....
@@ -552,6 +609,9 @@ void rvAIMedic::OnStateThreadClear( const char *statename, int flags ) {
 			}
 			patient = NULL;
 			healing = false;
+			// The new state (usually a scripted sequence) does not end the
+			// heal through DropPatient, so give the combat stance back here.
+			RestorePatientCombatFlags();
 		}
 	}
 }
