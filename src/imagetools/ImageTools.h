@@ -5,6 +5,8 @@
 #define __IMAGETOOLS_H__
 
 #include <stddef.h>
+#include <string>
+#include <vector>
 
 /*
 ===============================================================================
@@ -27,6 +29,72 @@
 
 ===============================================================================
 */
+
+/*
+===============================================================================
+
+	Image file tape: the file reads of one image source, recorded on the main
+	thread and replayed on a worker.
+
+	The file system is the main thread's (an open updates the pure and cd-path
+	bookkeeping and the level-load cache), but decoding a source, running its
+	image program and compressing the result need nothing from it except the
+	bytes. A tape in RECORD mode lets each read (and each dds/ replacement
+	lookup) go to the file system and keeps a copy of what it returned, misses
+	included. In REPLAY mode the same reads are answered from the copy and
+	nothing touches the file system; a read the tape does not hold sets missed
+	and answers "not found", so a replay that wanders off the recorded path
+	fails instead of guessing, and its owner loads the image the ordinary way.
+
+	The scope is per thread and nests; with no scope the reads go straight to
+	the file system as before.
+
+===============================================================================
+*/
+enum imageFileTapeMode_t {
+	IMAGE_TAPE_RECORD = 1,
+	IMAGE_TAPE_REPLAY = 2
+};
+
+class idImageFileTape {
+public:
+	struct file_t {
+		std::string					name;
+		ID_TIME_T					timestamp = FILE_NOT_FOUND_TIMESTAMP;
+		int							length = -1;		// -1: not found
+		std::vector<unsigned char>	bytes;
+	};
+	struct resolve_t {
+		std::string					name;
+		bool						allowPrecompressed = false;
+		bool						result = false;
+		std::string					ddsName;
+		ID_TIME_T					timestamp = FILE_NOT_FOUND_TIMESTAMP;
+		bool						precompressed = false;
+		bool						superseded = false;
+	};
+
+	std::vector<file_t>				files;
+	std::vector<resolve_t>			resolves;
+	bool							missed = false;		// a replay asked for something not recorded
+	size_t							bytes = 0;
+
+	const file_t *					FindFile( const char *name ) const;
+	const resolve_t *				FindResolve( const char *name, bool allowPrecompressed ) const;
+};
+
+class idScopedImageFileTape {
+public:
+									idScopedImageFileTape( idImageFileTape *tape, imageFileTapeMode_t mode );
+									~idScopedImageFileTape();
+private:
+	idImageFileTape *				previousTape;
+	int								previousMode;
+};
+
+// true on a thread replaying a tape: an image worker, which must not touch the
+// file system or the renderer's per-frame counters
+bool	R_ImageFileTapeReplaying();
 
 // loads an image file into a static-allocated RGBA8 buffer; *pic receives
 // NULL when the image could not be loaded

@@ -3231,9 +3231,14 @@ Completion must advance through the existing dependencies:
   (`image_reloadFrameMsec`, default 4) instead of in one pause, and finishes
   behind the loading screen when a level load interrupts it. A normal-map
   change in Air Defense 1 went from one 1.2 to 1.4 s frame to 145 frames of
-  at most 33 ms. Left: one slow texture still costs its whole load in one
-  frame (up to 1.4 s with precompressed textures off), which needs loading on
-  a worker thread.
+  at most 33 ms.
+  Stage 9, the same day: a texture that decodes from its source (precompressed
+  textures off, image programs) is decoded, resampled and compressed on image
+  workers (`image_reloadWorkers`, default 2) from file reads the main thread
+  recorded, with byte-identical results. With precompressed textures off the
+  main thread's share fell from 15.5 to 27 s to 9 to 14 s, cache lookups aside.
+  Left: the file work itself (cache lookups, source reads, cache writes) stays
+  on the main thread, because the file system cannot open files off it.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

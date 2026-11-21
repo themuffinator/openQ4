@@ -74,6 +74,11 @@ does not restore the withdrawn release. See
   menus, the HUD and their fonts are no longer reloaded by a texture-quality
   change at all. To have it all in one pause instead, set
   `image_reloadFrameMsec 0`.
+- **Decoded textures load on other cores.** With precompressed textures off,
+  or for textures the game builds from several images, the decoding and
+  compression now run on two background threads, so the main thread does about
+  half the work it did and the game stays smoother while they load. The
+  textures come out exactly as before. `image_reloadWorkers 0` turns this off.
 - **A change made while a level loads is no longer lost.** Textures kept from
   before the load, such as the interface and your own models, used to keep
   their old size or compression until the renderer restarted; they now follow

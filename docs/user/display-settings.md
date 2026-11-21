@@ -275,7 +275,7 @@ Presets set texture sizes for you. Two console settings let you trade texture de
 | `image_downSizeBump` / `image_downSizeBumpLimit` | `0` / `256` | A separate ceiling for normal maps. |
 | `image_downSizeSpecular` / `image_downSizeSpecularLimit` | `0` / `64` | A separate ceiling for specular maps. |
 
-The ceiling applies first and `image_picmip` reduces from there, so raising `image_picmip` always halves the result. A material that declares `nopicmip` opts out of both. Textures reload by themselves when you change these settings; no `vid_restart` is needed. Only the textures a change affects reload, a few each frame (`image_reloadFrameMsec`, default `4` milliseconds a frame; `0` reloads them all at once, in one pause).
+The ceiling applies first and `image_picmip` reduces from there, so raising `image_picmip` always halves the result. A material that declares `nopicmip` opts out of both. Textures reload by themselves when you change these settings; no `vid_restart` is needed. Only the textures a change affects reload, a few each frame (`image_reloadFrameMsec`, default `4` milliseconds a frame; `0` reloads them all at once, in one pause). Textures decoded from their source files are decoded on background threads (`image_reloadWorkers`, default `2`; `0` decodes them on the main thread).
 
 For example, this halves world and model colour textures twice while leaving lighting detail, the HUD and menus untouched:
 

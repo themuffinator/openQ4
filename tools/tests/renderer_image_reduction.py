@@ -77,6 +77,7 @@ struct FileSystem{idFile file;bool missing=false;int open=0;idFile*OpenFileRead(
 FileSystem*fileSystem=&fs;
 struct Caps{bool textureCompressionAvailable=true,bptcTextureCompressionAvailable=true;}caps;
 const Caps&ImageTools_GetCompressionCaps(){return caps;}
+static bool R_ImageFileTapeReplaying(){return false;}
 // BC6H without BPTC decodes to RGBA16F (Image_files.cpp); these fixtures carry no BC6H
 static bool R_LoadBC6HAsHalfFloat(idBinaryImage&,const byte*,const int*,int,int,int,bool){TEST(false);return false;}
 static imageDownsizePolicy_t livePolicy{};static int policyReads=0;

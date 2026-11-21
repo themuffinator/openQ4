@@ -222,6 +222,133 @@ TARGA LOADING
 LoadTGA
 =============
 */
+/*
+================================================================================
+
+Image file tape (see ImageTools.h)
+
+================================================================================
+*/
+static thread_local idImageFileTape *imageFileTape = NULL;
+static thread_local int imageFileTapeMode = 0;
+
+const idImageFileTape::file_t *idImageFileTape::FindFile( const char *name ) const {
+	for ( const file_t &file : files ) {
+		if ( file.name == name ) {
+			return &file;
+		}
+	}
+	return NULL;
+}
+
+const idImageFileTape::resolve_t *idImageFileTape::FindResolve( const char *name, bool allowPrecompressed ) const {
+	for ( const resolve_t &resolve : resolves ) {
+		if ( resolve.allowPrecompressed == allowPrecompressed && resolve.name == name ) {
+			return &resolve;
+		}
+	}
+	return NULL;
+}
+
+idScopedImageFileTape::idScopedImageFileTape( idImageFileTape *tape, imageFileTapeMode_t mode )
+	: previousTape( imageFileTape ), previousMode( imageFileTapeMode ) {
+	imageFileTape = tape;
+	imageFileTapeMode = tape != NULL ? mode : 0;
+}
+
+idScopedImageFileTape::~idScopedImageFileTape() {
+	imageFileTape = previousTape;
+	imageFileTapeMode = previousMode;
+}
+
+bool R_ImageFileTapeReplaying() {
+	return imageFileTape != NULL && imageFileTapeMode == IMAGE_TAPE_REPLAY;
+}
+
+static bool R_ImageFileTapeRecording() {
+	return imageFileTape != NULL && imageFileTapeMode == IMAGE_TAPE_RECORD;
+}
+
+/*
+=============
+R_ReadImageSourceFile
+
+fileSystem->ReadFileContentStamp for the image source readers, through the
+tape when one is active. A recording read always takes the bytes, even when
+its caller only wants the timestamp, because the replay will want them. The
+buffer goes back through R_FreeImageSourceFile, never fileSystem->FreeFile.
+=============
+*/
+static int R_ReadImageSourceFile( const char *name, void **buffer, ID_TIME_T *timestamp ) {
+	if ( buffer != NULL ) {
+		*buffer = NULL;
+	}
+	if ( imageFileTape == NULL ) {
+		return fileSystem->ReadFileContentStamp( name, buffer, timestamp );
+	}
+	if ( imageFileTapeMode == IMAGE_TAPE_REPLAY ) {
+		const idImageFileTape::file_t *file = imageFileTape->FindFile( name );
+		if ( file == NULL ) {
+			imageFileTape->missed = true;
+			if ( timestamp != NULL ) {
+				*timestamp = FILE_NOT_FOUND_TIMESTAMP;
+			}
+			return -1;
+		}
+		if ( timestamp != NULL ) {
+			*timestamp = file->timestamp;
+		}
+		if ( file->length < 0 ) {
+			return -1;
+		}
+		if ( buffer != NULL ) {
+			// zero-terminated like the file system's buffers
+			byte *copy = static_cast<byte *>( Mem_Alloc( file->length + 1 ) );
+			if ( file->length > 0 ) {
+				memcpy( copy, file->bytes.data(), file->length );
+			}
+			copy[file->length] = 0;
+			*buffer = copy;
+		}
+		return file->length;
+	}
+
+	void *bytes = NULL;
+	ID_TIME_T stamp = FILE_NOT_FOUND_TIMESTAMP;
+	const int length = fileSystem->ReadFileContentStamp( name, &bytes, &stamp );
+	if ( imageFileTape->FindFile( name ) == NULL ) {
+		idImageFileTape::file_t file;
+		file.name = name;
+		file.timestamp = stamp;
+		file.length = bytes != NULL ? length : -1;
+		if ( bytes != NULL && length > 0 ) {
+			file.bytes.assign( static_cast<const unsigned char *>( bytes ), static_cast<const unsigned char *>( bytes ) + length );
+			imageFileTape->bytes += static_cast<size_t>( length );
+		}
+		imageFileTape->files.push_back( std::move( file ) );
+	}
+	if ( timestamp != NULL ) {
+		*timestamp = stamp;
+	}
+	if ( buffer != NULL ) {
+		*buffer = bytes;
+	} else if ( bytes != NULL ) {
+		fileSystem->FreeFile( bytes );
+	}
+	return bytes != NULL ? length : -1;
+}
+
+static void R_FreeImageSourceFile( void *buffer ) {
+	if ( buffer == NULL ) {
+		return;
+	}
+	if ( R_ImageFileTapeReplaying() ) {
+		Mem_Free( buffer );
+	} else {
+		fileSystem->FreeFile( buffer );
+	}
+}
+
 static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp ) {
 	int		columns, rows, numPixels, fileSize, numBytes;
 	byte	*pixbuf;
@@ -232,7 +359,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 	byte		*targa_rgba;
 
 	if ( !pic ) {
-		fileSystem->ReadFileContentStamp( name, NULL, timestamp );
+		R_ReadImageSourceFile( name, NULL, timestamp );
 		return;	// just getting timestamp
 	}
 
@@ -241,7 +368,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 	//
 	// load the file
 	//
-	fileSize = fileSystem->ReadFileContentStamp( name, (void **)&buffer, timestamp );
+	fileSize = R_ReadImageSourceFile( name, (void **)&buffer, timestamp );
 	if ( !buffer ) {
 		return;
 	}
@@ -249,7 +376,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 	buf_p = buffer;
 
 	if ( fileSize < 18 ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		common->Error( "LoadTGA( %s ): incomplete file\n", name );
 	}
 
@@ -274,7 +401,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 	targa_header.attributes = *buf_p++;
 
 	if ( fileSize < 18 + targa_header.id_length ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		common->Error( "LoadTGA( %s ): incomplete file\n", name );
 	}
 
@@ -293,7 +420,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 	// width * height * 4 can overflow a 32-bit int on crafted headers, wrapping the
 	// allocation below while the decode loops still write the full extent
 	if ( (int64)targa_header.width * targa_header.height * 4 > 0x7FFFFFFF ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		common->Error( "LoadTGA( %s ): dimensions too large (%i x %i)\n", name, targa_header.width, targa_header.height );
 	}
 
@@ -385,7 +512,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 				if ( buf_p >= buf_end ) {
 					R_StaticFree( targa_rgba );
 					*pic = NULL;
-					fileSystem->FreeFile( buffer );
+					R_FreeImageSourceFile( buffer );
 					common->Error( "LoadTGA( %s ): incomplete file\n", name );
 				}
 				packetHeader= *buf_p++;
@@ -394,7 +521,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 					if ( buf_p + ( targa_header.pixel_size >> 3 ) > buf_end ) {
 						R_StaticFree( targa_rgba );
 						*pic = NULL;
-						fileSystem->FreeFile( buffer );
+						R_FreeImageSourceFile( buffer );
 						common->Error( "LoadTGA( %s ): incomplete file\n", name );
 					}
 					switch( targa_header.pixel_size ) {
@@ -437,7 +564,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 					if ( buf_p + packetSize * ( targa_header.pixel_size >> 3 ) > buf_end ) {
 						R_StaticFree( targa_rgba );
 						*pic = NULL;
-						fileSystem->FreeFile( buffer );
+						R_FreeImageSourceFile( buffer );
 						common->Error( "LoadTGA( %s ): incomplete file\n", name );
 					}
 					for( j = 0; j < packetSize; j++ ) {
@@ -489,7 +616,7 @@ static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_T
 		}
 	}
 
-	fileSystem->FreeFile( buffer );
+	R_FreeImageSourceFile( buffer );
 }
 
 /*
@@ -547,6 +674,20 @@ static void LoadJPG( const char *filename, unsigned char **pic, int *width, int 
 		int		len;
 		idFile *f;
 
+		if ( imageFileTape != NULL ) {
+			void *raw = NULL;
+			len = R_ReadImageSourceFile( filename, pic ? &raw : NULL, timestamp );
+			if ( len < 0 || !pic ) {
+				R_FreeImageSourceFile( raw );
+				return;
+			}
+			fbuffer = (byte *)Mem_Alloc( len + 4096 );
+			fbufferLength = len;
+			memcpy( fbuffer, raw, len );
+			memset( fbuffer + len, 0, 4096 );
+			R_FreeImageSourceFile( raw );
+			f = NULL;
+		} else {
 		f = fileSystem->OpenFileRead( filename );
 		if ( !f ) {
 			return;
@@ -575,6 +716,7 @@ static void LoadJPG( const char *filename, unsigned char **pic, int *width, int 
 			return;
 		}
 		fileSystem->CloseFile( f );
+		}
   }
 
 
@@ -719,13 +861,13 @@ source or the default image.
 */
 static void LoadPNG( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp ) {
 	if ( !pic ) {
-		fileSystem->ReadFileContentStamp( name, NULL, timestamp );
+		R_ReadImageSourceFile( name, NULL, timestamp );
 		return;	// just getting timestamp
 	}
 	*pic = NULL;
 
 	byte *buffer = NULL;
-	const int fileSize = fileSystem->ReadFileContentStamp( name, (void **)&buffer, timestamp );
+	const int fileSize = R_ReadImageSourceFile( name, (void **)&buffer, timestamp );
 	if ( !buffer ) {
 		return;
 	}
@@ -738,14 +880,14 @@ static void LoadPNG( const char *name, byte **pic, int *width, int *height, ID_T
 	}
 	if ( result != PNG_OK ) {
 		common->Warning( "LoadPNG( %s ): %s", name, PNG_ResultString( result ) );
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		return;
 	}
 
 	const size_t rgbaBytes = (size_t)info.width * info.height * 4;
 	byte *rgba = (byte *)R_StaticAlloc( rgbaBytes );
 	result = PNG_DecodeRGBA8( buffer, (size_t)fileSize, rgba, rgbaBytes, NULL );
-	fileSystem->FreeFile( buffer );
+	R_FreeImageSourceFile( buffer );
 	if ( result != PNG_OK ) {
 		common->Warning( "LoadPNG( %s ): %s", name, PNG_ResultString( result ) );
 		R_StaticFree( rgba );
@@ -1837,7 +1979,7 @@ static bool R_RetailProgramInputReplaced( const char *imageProgram, idStr &repla
 R_ResolvePreferredDDSImageSource
 =============
 */
-bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIME_T *timestamp, bool allowPrecompressedDDS, bool *precompressedDDS, bool *retailResultSuperseded ) {
+static bool R_ResolvePreferredDDSImageSourceUntaped( const char *cname, idStr &ddsName, ID_TIME_T *timestamp, bool allowPrecompressedDDS, bool *precompressedDDS, bool *retailResultSuperseded ) {
 	if ( precompressedDDS != NULL ) {
 		*precompressedDDS = false;
 	}
@@ -1906,6 +2048,60 @@ bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIM
 		idLib::Printf( "no DDS replacement for '%s':\n%s", cname, rejections.c_str() );
 	}
 	return false;
+}
+
+/*
+=============
+R_ResolvePreferredDDSImageSource
+
+The dds/ replacement lookup probes the file system and memoizes its answers,
+so a tape records its outputs and a replay answers from them.
+=============
+*/
+bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIME_T *timestamp, bool allowPrecompressedDDS, bool *precompressedDDS, bool *retailResultSuperseded ) {
+	if ( imageFileTape == NULL ) {
+		return R_ResolvePreferredDDSImageSourceUntaped( cname, ddsName, timestamp, allowPrecompressedDDS, precompressedDDS, retailResultSuperseded );
+	}
+	const char *key = cname != NULL ? cname : "";
+	if ( imageFileTapeMode == IMAGE_TAPE_REPLAY ) {
+		const idImageFileTape::resolve_t *resolve = imageFileTape->FindResolve( key, allowPrecompressedDDS );
+		if ( resolve == NULL ) {
+			imageFileTape->missed = true;
+			return false;
+		}
+		ddsName = resolve->ddsName.c_str();
+		if ( timestamp != NULL ) {
+			*timestamp = resolve->timestamp;
+		}
+		if ( precompressedDDS != NULL ) {
+			*precompressedDDS = resolve->precompressed;
+		}
+		if ( retailResultSuperseded != NULL ) {
+			*retailResultSuperseded = resolve->superseded;
+		}
+		return resolve->result;
+	}
+	idImageFileTape::resolve_t resolve;
+	resolve.name = key;
+	resolve.allowPrecompressed = allowPrecompressedDDS;
+	idStr found;
+	resolve.result = R_ResolvePreferredDDSImageSourceUntaped( cname, found, &resolve.timestamp, allowPrecompressedDDS,
+		&resolve.precompressed, &resolve.superseded );
+	resolve.ddsName = found.c_str();
+	if ( imageFileTape->FindResolve( key, allowPrecompressedDDS ) == NULL ) {
+		imageFileTape->resolves.push_back( resolve );
+	}
+	ddsName = found;
+	if ( timestamp != NULL ) {
+		*timestamp = resolve.timestamp;
+	}
+	if ( precompressedDDS != NULL ) {
+		*precompressedDDS = resolve.precompressed;
+	}
+	if ( retailResultSuperseded != NULL ) {
+		*retailResultSuperseded = resolve.superseded;
+	}
+	return resolve.result;
 }
 
 static imageDDSPrefetchTake_t ddsPrefetchTake = NULL;
@@ -2537,27 +2733,27 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 	byte *buffer;
 
 	if ( !pic ) {
-		fileSystem->ReadFileContentStamp( name, NULL, timestamp );
+		R_ReadImageSourceFile( name, NULL, timestamp );
 		return;	// just getting timestamp
 	}
 
 	*pic = NULL;
 
-	fileSize = fileSystem->ReadFileContentStamp( name, (void **)&buffer, timestamp );
+	fileSize = R_ReadImageSourceFile( name, (void **)&buffer, timestamp );
 	if ( !buffer ) {
 		return;
 	}
 
 	// DDS magic + 124-byte header
 	if ( fileSize < 128 ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		return;
 	}
 
 	const uint32 magic = R_ReadLittleUInt32( buffer + 0 );
 	const uint32 headerSize = R_ReadLittleUInt32( buffer + 4 );
 	if ( magic != R_MakeFourCC( 'D', 'D', 'S', ' ' ) || headerSize != 124 ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		return;
 	}
 
@@ -2567,7 +2763,7 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 	const uint32 fourCC = R_ReadLittleUInt32( buffer + 84 );
 
 	if ( ddsWidth == 0 || ddsHeight == 0 || ( pixelFormatFlags & ( DDS_PIXELFORMAT_FOURCC | DDS_PIXELFORMAT_RGB ) ) == 0 ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		return;
 	}
 
@@ -2632,7 +2828,7 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		compression = DDS_COMPRESSION_DXT5;
 		storedRXGBNormalMap = true;
 	} else {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		return;
 	}
 
@@ -2645,7 +2841,7 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		: (int64)ddsWidth * ddsHeight * parsedInfo.bytesPerPixel;
 
 	if ( levelSize <= 0 || (int64)fileSize < ( dataOffset + levelSize ) ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		return;
 	}
 
@@ -2656,7 +2852,7 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 	const int64 realBytes = (int64)realWidth * realHeight * 4;
 	const int64 paddedBytes = (int64)paddedWidth * paddedHeight * 4;
 	if ( realBytes <= 0 || realBytes > 0x7FFFFFFF || paddedBytes <= 0 || paddedBytes > 0x7FFFFFFF ) {
-		fileSystem->FreeFile( buffer );
+		R_FreeImageSourceFile( buffer );
 		return;
 	}
 
@@ -2698,7 +2894,7 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		*height = realHeight;
 	}
 
-	fileSystem->FreeFile( buffer );
+	R_FreeImageSourceFile( buffer );
 }
 
 //===================================================================
@@ -2796,6 +2992,10 @@ static void R_LoadImageInternal( const char *cname, byte **pic, int *width, int 
 			// its timestamp, so don't open it a second time
 			if ( timestamp != NULL ) {
 				*timestamp = preferredDDSTime;
+			}
+			// unless a tape is recording: the replay decodes this file
+			if ( R_ImageFileTapeRecording() ) {
+				R_ReadImageSourceFile( preferredDDSName.c_str(), NULL, NULL );
 			}
 		} else {
 			LoadDDS( preferredDDSName.c_str(), pic, width, height, timestamp, decodeRXGBNormalMap );

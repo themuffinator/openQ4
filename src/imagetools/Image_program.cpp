@@ -346,7 +346,9 @@ static void R_ImageAdd(byte* data1, int width1, int height1, byte* data2, int wi
 
 
 // we build a canonical token form of the image program here
-static char parseBuffer[MAX_IMAGE_NAME];
+// One per thread: image workers parse image programs while the main thread
+// parses others (see idImageFileTape).
+static thread_local char parseBuffer[MAX_IMAGE_NAME];
 
 /*
 ===================

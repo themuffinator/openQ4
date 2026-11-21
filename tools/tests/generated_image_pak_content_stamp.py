@@ -217,10 +217,14 @@ def check_image_pipeline() -> None:
     for loader in ("static void LoadTGA( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp ) {",
                    "static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_TIME_T *timestamp, bool decodeRXGBNormalMap ) {"):
         body = function_body(files, loader)
-        require(body, "fileSystem->ReadFileContentStamp( name, NULL, timestamp );", f"{loader[:20]} probe")
-        require(body, "fileSystem->ReadFileContentStamp( name, (void **)&buffer, timestamp );", f"{loader[:20]} read")
+        require(body, "R_ReadImageSourceFile( name, NULL, timestamp );", f"{loader[:20]} probe")
+        require(body, "R_ReadImageSourceFile( name, (void **)&buffer, timestamp );", f"{loader[:20]} read")
         if "fileSystem->ReadFile(" in body:
             raise AssertionError(f"{loader[:20]} must not read its source stamp through ReadFile")
+    # the tape helper (an image worker's recorded reads) is a content-stamp read too
+    helper = function_body(files, "static int R_ReadImageSourceFile( const char *name, void **buffer, ID_TIME_T *timestamp ) {")
+    require(helper, "return fileSystem->ReadFileContentStamp( name, buffer, timestamp );", "untaped source read")
+    require(helper, "fileSystem->ReadFileContentStamp( name, &bytes, &stamp );", "recorded source read")
     require(function_body(files, "static void LoadJPG( const char *filename,"), "*timestamp = f->ContentStamp();", "LoadJPG")
     require(function_body(files, "static bool R_ReadDDSFileInfoUncached("), "*timestamp = file->ContentStamp();",
             "DDS header probe")

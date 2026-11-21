@@ -192,7 +192,10 @@ static void R_EncodeBlockLevel( const byte *src, byte *dst, int width, int heigh
 	const int blocksWide = width / 4;
 	const int blockRows = height / 4;
 	int bands = 1;
-	if ( (int64)blocksWide * blockRows >= R_PARALLEL_ENCODE_MIN_BLOCKS ) {
+	// An image worker (a tape replay) is already one of several parallel
+	// decodes; banding inside it oversubscribes the cores and slows the main
+	// thread's file reads, which a texture reload waits on.
+	if ( (int64)blocksWide * blockRows >= R_PARALLEL_ENCODE_MIN_BLOCKS && !R_ImageFileTapeReplaying() ) {
 		const int cores = (int)std::thread::hardware_concurrency();
 		bands = Min( Max( 1, cores ), R_PARALLEL_ENCODE_MAX_THREADS );
 		bands = Min( bands, Max( 1, blockRows / R_PARALLEL_ENCODE_MIN_BAND_ROWS ) );

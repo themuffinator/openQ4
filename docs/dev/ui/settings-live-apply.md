@@ -1,8 +1,8 @@
 # Applying display settings without a device restart
 
-This note records the eight stages of making Settings > Display apply its
+This note records the nine stages of making Settings > Display apply its
 changes to the running renderer. It is the record for the changes of
-11 November 2026 (stages 1 to 6) and 21 November 2026 (stages 7 and 8) and supersedes, for the settings named here, what
+11 November 2026 (stages 1 to 6) and 21 November 2026 (stages 7 to 9) and supersedes, for the settings named here, what
 [effect execution](settings-effect-execution.md#combined-executor),
 [the resolution rows](system-resolution-rows.md) and
 [performance presets](performance-presets.md) say about one device restart
@@ -757,11 +757,128 @@ deferral and the finish in `EndLevelLoad`), a visible window, a measurement
 of the frame rate the player sees during the reload, and a machine to
 itself.
 
+## Stage 9: decoding on image workers
+
+Stage 8 left one texture's whole load inside one frame. Where that load
+decodes a source (a TGA, PNG or JPG, an image program such as
+`addnormals( ..., heightmap( ... ) )` or `downsize( ... )`) the decode, the
+resampling and the block compression run on worker threads now.
+
+### Where the time was
+
+The completion line now splits the main thread's time by load phase. In Air
+Defense 1 the GPU upload is a small part of every reload (55 ms of 1.7 s for
+the 128 ceiling, 0.35 to 0.9 s of 18 to 23 s with precompressed textures off).
+Most of the rest is the file system: lookups of the generated cache (two per
+image, about 1.3 ms each when it misses), reading the sources, and writing the
+new cache entries. With precompressed textures on, almost every texture is a
+DDS read and copied as it is, so there is little to decode; with them off,
+every texture is decoded, and that is where a worker pays.
+
+### What runs where
+
+The file system belongs to the main thread: an open updates the pure and
+cd-path bookkeeping and the level-load cache, so no worker may open a file.
+The split follows from that.
+
+1. **Deferral, main thread** (`idImage::ReloadOrDefer`). The load runs as
+   `Reload( true )` would, without purging first. A DDS or a generated cache
+   entry finishes there as before. A load that reaches the decode of a 2D
+   source stops just before it: the files the decode will read are recorded
+   into an image file tape (`idImageFileTape`, imagetools), the job takes the
+   inputs the load had resolved (source, cache name, usage, filter, flags,
+   policy, the derived format), and the image is put back exactly as it was,
+   its current texture untouched.
+2. **Decode, worker** (`R_RunImageDecodeJob`). The worker replays the tape:
+   every read the decoders and image programs make, and every dds/ replacement
+   lookup, is answered from it, and nothing touches the file system. It runs
+   the same code the inline decode runs (the program, the reduction, the mip
+   count, the opaque split, the block compression) and keeps the result.
+3. **Publication, main thread** (`idImage::PublishDecodeJob`). The image is
+   reloaded with the worker's result standing in for the decode, then written
+   to the generated cache and uploaded as before. The result is used only if
+   the load reaches the decode with the same source, cache name, usage,
+   filter, flags, policy and format; otherwise the load decodes inline. The
+   two cache lookups the deferral just found missing are not repeated.
+
+Each frame publishes finished decodes, oldest first, then starts new images,
+within `image_reloadFrameMsec` as in stage 8. `image_reloadWorkers` (default 2,
+capped at the cores less one; 0 decodes on the main thread) sets the workers.
+They start with the first deferral and stop when the queue drains, at
+shutdown and on `PurgeAllImages`, so no thread idles through play. At most
+three deferrals per worker and 256 MB of recorded bytes are in flight.
+
+What keeps it safe:
+
+- A replay that asks for a file or lookup the tape does not hold fails the
+  job, and the image loads inline. An error raised off the main thread throws,
+  which also fails the job; the inline load then raises it as before.
+- The image-program parser's name buffer is per thread now; it was a static
+  shared by every parse.
+- A worker's block compression runs in one thread rather than in bands, the
+  renderer's allocation counters skip worker allocations, workers run below the
+  main thread's priority, and each takes the main thread's floating-point
+  control word.
+- `ReloadOrDefer` restores the options, usage, cache flags, timestamps,
+  reduction key and consumed-policy record a deferred load had written, and a
+  load that ended without storage purges the image as `Reload` would.
+- Not deferred: cube maps, fonts, the fallback after a failed precompressed
+  DDS, and every load outside the settings reload (level loads are unchanged).
+
+### Engine checks, stage 9
+
+Hidden window, console verbs only, `game/airdefense1` under Enhanced, the
+worktree build of `165268a08` plus this change. Other sessions' clients and
+builds ran on the machine, and the generated-cache lookups swung between about
+1 ms and 7 ms each with their load, so the main-thread figures below are given
+next to the cache figure they include. Kit: `.tmp/live-apply/run.py <name>
+decode` (precompressed textures off, then on again), `selective`, `textures`.
+
+Precompressed textures off, 1,942 textures, OpenGL:
+
+| Workers | Deferred | Main thread | of which cache lookups | Worker decoding | Longest frame |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 0 | 20.9 s, 23.1 s, 43.9 s | 5.4 s, 4.9 s, 16.9 s | none | 0.81 s, 0.66 s, 1.31 s |
+| 1 | 1,838 to 1,841 | 12.8 s, 14.6 s | 3.6 s, 3.8 s | 3.0 s, 7.1 s | 0.68 s, 0.44 s |
+| 2 | 1,836 to 1,842 | 12.1 s to 28.3 s | 1.0 s to 16.5 s | 4.3 s to 8.2 s | 0.20 s to 0.56 s |
+
+- Leaving out the cache lookups, which the machine's load moved more than
+  anything else, the main thread spent 15.5 to 27 s without workers and 9 to
+  14 s with them.
+- **The same pixels.** Each decode run writes every decoded texture to the
+  generated cache. The 1,924 files the workers-off run wrote and the 1,924 the
+  one-worker and two-worker runs wrote are identical byte for byte, so a
+  worker's decode, resampling and compression produce exactly what the inline
+  path does.
+- Every deferred decode was published from its worker (no fallback), and
+  turning precompressed textures back on restored all 477 compared world
+  textures.
+- With precompressed textures on, the 128 ceiling deferred 38 of 1,073
+  textures; the rest are DDS reads, unchanged.
+- **Vulkan**, precompressed textures off, back to back: without workers 18.6 s
+  of main thread and a longest frame of 1.43 s; with two, 10.1 s and 148 ms,
+  1,843 of 1,844 deferred decodes published from a worker, and the 1,924
+  generated cache files identical to the workers-off run. The `selective` check
+  (normal-map ceiling) passes on both renderers, and the `textures` regression
+  passes on Vulkan with workers: 335 of 477 reduced, all restored.
+
+What a frame still costs: the longest frames are now file work, a slow
+cache lookup or a large source read on the main thread (0.2 to 0.7 s on the
+busy machine), not decoding. Reading files on a worker needs a file system
+that can open files off the main thread, which it cannot.
+
+Not run: a level load during a deferred decode (the queue pauses and the
+level load's finish waits for the workers; the source test pins it), a texture
+pack, a cold disk, a machine to itself, and a visible window.
+
 ## What these stages do not do
 
-- One texture still loads within one frame: the slowest image program sets
-  the longest frame of a reload (30 to 40 ms with precompressed textures,
-  up to 1.4 s when they are off). Loading on a worker thread is left.
+- File work stays on the main thread: generated-cache lookups, source reads
+  and cache writes. On a loaded machine one of them can still hold a frame
+  for 0.2 to 0.7 s. Moving them needs a file system that can open files off
+  the main thread.
+- Level loads decode on the main thread as before; only the settings reload
+  uses the workers.
 - The in-place route has no readback of image dimensions. Its evidence is the
   exact settings readback, the same device generation and a later presented
   frame, as for the combined executor's restart.
@@ -796,6 +913,16 @@ device reopened.
 
 ## Tests
 
+- `tools/tests/renderer_picmip_policy.py` (stage 9): the tape is per thread, a
+  replay never reaches the file system and fails on a read it does not hold,
+  the source readers and the dds/ lookup go through it, a timestamp-only probe
+  records the replacement DDS, the program parser's buffer is per thread, the
+  deferral stops before the decode, a publication matches every input and
+  skips the cache lookups, `ReloadOrDefer` restores the image, the worker
+  replays and catches, and the pool stops at shutdown and on a purge.
+- `tools/tests/renderer_image_recovery_loader.py` and
+  `tools/tests/generated_image_pak_content_stamp.py` follow the reduction key
+  (stage 7) and the tape helper.
 - `tools/tests/renderer_picmip_policy.py` (stage 8): the per-frame check keeps
   running while images are queued, a change builds a fresh queue and reloads
   nothing itself, each frame reloads at least one image within

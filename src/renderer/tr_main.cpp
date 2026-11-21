@@ -411,12 +411,15 @@ renderer keeps its performance counters through these installed hooks.
 =================
 */
 static void R_ImageToolsOnStaticAlloc( size_t bytes ) {
+	// image workers decode off both threads; their allocations are not a frame's
+	if ( R_ImageFileTapeReplaying() ) { return; }
 	if ( R_RenderThread_OnRenderThread() ) { R_BackEndFrameData()->backendAllocCount++; R_BackEndFrameData()->backendStaticAllocBytes += bytes; return; }
 	tr.pc.c_alloc++;
 	tr.staticAllocCount += bytes;
 }
 
 static void R_ImageToolsOnStaticFree( void ) {
+	if ( R_ImageFileTapeReplaying() ) { return; }
 	if ( R_RenderThread_OnRenderThread() ) { R_BackEndFrameData()->backendFreeCount++; return; }
 	tr.pc.c_free++;
 }

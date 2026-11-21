@@ -40,6 +40,7 @@ class idImage {
 public:bimageFile_t opts{9,9,9,9,9,9};bool defaulted=true,scratchImage=false,generatedCacheContent=true;std::string loadedSourceName="original";void(*generatorFunction)(idImage*)=nullptr;
  void DeriveOpts(){throw std::runtime_error("unexpected scratch-image path");}
  const char* GetName()const{return "textures/input";}void ActuallyLoadImage(bool);
+ struct reductionKey_t{bool known=false;};reductionKey_t loadedReductionKey;reductionKey_t CurrentReductionKey()const{reductionKey_t k;k.known=true;return k;}
  void AllocImage(){++allocations;if(!allowed)return;TEST(opts.width==8&&opts.height==8&&opts.numLevels==4&&opts.format==7&&opts.textureType==1&&opts.colorFormat==0);}
  void SubImageUpload(int level,int x,int y,int side,int width,int height,const unsigned char* data){
   if(!allowed)return;TEST(x==0&&y==0&&side==0&&level==uploads&&width==(8>>level)&&height==(8>>level)&&data==binary.data[level].data());

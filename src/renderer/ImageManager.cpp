@@ -336,6 +336,9 @@ joined the list only a full renderer restart applied it.
 */
 extern idCVar image_usePrecompressedTextures;
 
+idCVar image_reloadWorkers( "image_reloadWorkers", "2", CVAR_RENDERER | CVAR_INTEGER,
+	"worker threads that decode, resample and compress textures for a texture setting change; the main thread "
+	"keeps the file reads and the upload. 0 decodes on the main thread", 0, 8 );
 idCVar image_reloadFrameMsec( "image_reloadFrameMsec", "4", CVAR_RENDERER | CVAR_INTEGER,
 	"milliseconds of texture reloading one frame may spend after a texture setting changes (at least one texture "
 	"a frame); 0 reloads every affected texture in the frame of the change", 0, 1000 );
@@ -1351,6 +1354,8 @@ idImage *idImageManager::GetImage( const char *_name ) const {
 	return NULL;
 }
 
+static void R_StopImageDecodeWorkers();
+
 /*
 ===============
 PurgeAllImages
@@ -1360,6 +1365,7 @@ void idImageManager::PurgeAllImages() {
 	R_RenderThread_Sync( "image registry" );
 	// the reload after a purge rebuilds every image under the settings in effect
 	ClearReductionReloads();
+	R_StopImageDecodeWorkers();
 	int		i;
 	idImage	*image;
 
@@ -1731,6 +1737,7 @@ Shutdown
 void idImageManager::Shutdown() {
 	R_ImagePolicyLifecycleChanged();
 	ClearReductionReloads();
+	R_StopImageDecodeWorkers();
 	images.DeleteContents( true );
 	imageHash.Clear();
 
@@ -1868,10 +1875,210 @@ static bool R_ImageNeedsReductionReload( idImage *image ) {
 // larger than the frame budget sets the longest frame the reload can cost.
 static idStr reductionSlowestName;
 static double reductionSlowestMsec = 0.0;
+// Where the reload's time went, from ActuallyLoadImage's phase accounting:
+// probes, generated-cache reads, source reads and decoding (direct DDS reads
+// included), and the GPU upload. Only the upload must stay on the renderer thread.
+static imageLoadPhaseTimings_t reductionPhases;
+// main-thread time by kind of step: loads finished inline, deferrals, publications
+static double reductionInlineMsec = 0.0, reductionDeferMsec = 0.0, reductionPublishMsec = 0.0;
+static imageLoadPhaseTimings_t reductionSlowestPhases;
+
+static void R_AddPhaseDelta( imageLoadPhaseTimings_t &total, const imageLoadPhaseTimings_t &before,
+		const imageLoadPhaseTimings_t &after ) {
+	total.probeMsec += after.probeMsec - before.probeMsec;
+	total.generatedMsec += after.generatedMsec - before.generatedMsec;
+	total.decodeMsec += after.decodeMsec - before.decodeMsec;
+	total.uploadMsec += after.uploadMsec - before.uploadMsec;
+	total.probeCount += after.probeCount - before.probeCount;
+	total.generatedCount += after.generatedCount - before.generatedCount;
+	total.decodeCount += after.decodeCount - before.decodeCount;
+	total.uploadCount += after.uploadCount - before.uploadCount;
+}
+
+/*
+===============
+idImageDecodeWorkers
+
+The threads that run imageDecodeJob_t for the settings reload. Started when a
+reload first defers a decode and stopped when its queue drains, at shutdown and
+by PurgeAllImages, so no thread idles through play. A job holds no image
+pointer; the main thread publishes or drops it. Each worker takes the main
+thread's floating-point control word, so its resampling and compression round
+as an inline decode would.
+===============
+*/
+#if defined( _M_X64 ) || defined( _M_IX86 ) || defined( __x86_64__ ) || defined( __i386__ )
+#include <xmmintrin.h>
+#define OPENQ4_IMAGE_WORKER_MXCSR 1
+#endif
+#if defined( __linux__ )
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#elif defined( __APPLE__ )
+#include <pthread.h>
+#endif
+
+// Below the main thread, which reads the files the decodes wait for. At equal
+// priority two busy decoders on a loaded machine made the main thread's file
+// lookups three to five times slower, which cost more than the decode saved.
+static void R_LowerImageWorkerPriority() {
+#if defined( _WIN32 )
+	SetThreadPriority( GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL );
+#elif defined( __linux__ )
+	setpriority( PRIO_PROCESS, static_cast<id_t>( syscall( SYS_gettid ) ), 10 );
+#elif defined( __APPLE__ )
+	pthread_set_qos_class_self_np( QOS_CLASS_UTILITY, 0 );
+#endif
+}
+
+class idImageDecodeWorkers {
+public:
+	~idImageDecodeWorkers() {
+		// Shutdown stops the workers. Joining from a static destructor can wait
+		// on the loader lock while a module unloads, so a survivor is let go.
+		for ( std::thread &worker : workers ) {
+			if ( worker.joinable() ) {
+				worker.detach();
+			}
+		}
+	}
+
+	void EnsureStarted( int count ) {
+		if ( count <= 0 || static_cast<int>( workers.size() ) == count ) {
+			return;
+		}
+		Stop();
+#ifdef OPENQ4_IMAGE_WORKER_MXCSR
+		controlWord = _mm_getcsr();
+#endif
+		stopping = false;
+		for ( int i = 0; i < count; i++ ) {
+			workers.emplace_back( &idImageDecodeWorkers::Work, this );
+		}
+	}
+
+	void Submit( const std::shared_ptr<imageDecodeJob_t> &job ) {
+		{
+			std::lock_guard<std::mutex> lock( mutex );
+			queue.push_back( job );
+		}
+		ready.notify_one();
+	}
+
+	// Blocks until the job is done. Only while the workers run.
+	void WaitFor( const std::shared_ptr<imageDecodeJob_t> &job ) {
+		std::unique_lock<std::mutex> lock( mutex );
+		done.wait( lock, [&] { return job->state.load() == imageDecodeJob_t::DONE || workers.empty(); } );
+	}
+
+	// Drops queued jobs, lets the running ones finish and joins every worker.
+	void Stop() {
+		{
+			std::lock_guard<std::mutex> lock( mutex );
+			stopping = true;
+			for ( const std::shared_ptr<imageDecodeJob_t> &job : queue ) {
+				job->decoded = false;
+				job->state.store( imageDecodeJob_t::DONE );
+			}
+			queue.clear();
+		}
+		ready.notify_all();
+		for ( std::thread &worker : workers ) {
+			if ( worker.joinable() ) {
+				worker.join();
+			}
+		}
+		workers.clear();
+		done.notify_all();
+	}
+
+	bool Running() const { return !workers.empty(); }
+
+private:
+	void Work() {
+#ifdef OPENQ4_IMAGE_WORKER_MXCSR
+		_mm_setcsr( controlWord );
+#endif
+		R_LowerImageWorkerPriority();
+		for ( ;; ) {
+			std::shared_ptr<imageDecodeJob_t> job;
+			{
+				std::unique_lock<std::mutex> lock( mutex );
+				ready.wait( lock, [this] { return stopping || !queue.empty(); } );
+				if ( queue.empty() ) {
+					return;
+				}
+				job = queue.front();
+				queue.pop_front();
+				job->state.store( imageDecodeJob_t::RUNNING );
+			}
+			R_RunImageDecodeJob( *job );
+			{
+				std::lock_guard<std::mutex> lock( mutex );
+				job->state.store( imageDecodeJob_t::DONE );
+			}
+			done.notify_all();
+		}
+	}
+
+	std::vector<std::thread>						workers;
+	std::deque<std::shared_ptr<imageDecodeJob_t>>	queue;
+	std::mutex										mutex;
+	std::condition_variable							ready;
+	std::condition_variable							done;
+	bool											stopping = false;
+	unsigned int									controlWord = 0;
+};
+
+static idImageDecodeWorkers imageDecodeWorkers;
+
+static void R_StopImageDecodeWorkers() {
+	imageDecodeWorkers.Stop();
+}
+
+struct reductionInFlight_t {
+	idImage *							image;
+	std::shared_ptr<imageDecodeJob_t>	job;
+};
+// Deferred images in the order they were deferred, published in the same order.
+static std::deque<reductionInFlight_t> reductionInFlight;
+// Recorded source bytes a deferral may hold at once, and deferrals per worker.
+static const size_t REDUCTION_IN_FLIGHT_BYTES = size_t( 256 ) << 20;
+static const int REDUCTION_IN_FLIGHT_PER_WORKER = 3;
+
+static int R_ReductionWorkerCount() {
+	const int requested = Max( 0, image_reloadWorkers.GetInteger() );
+	if ( requested == 0 ) {
+		return 0;
+	}
+	const unsigned int hardware = std::thread::hardware_concurrency();
+	const int available = hardware > 1 ? static_cast<int>( hardware ) - 1 : 1;
+	return Min( requested, available );
+}
+
+static size_t R_ReductionInFlightBytes() {
+	size_t bytes = 0;
+	for ( const reductionInFlight_t &entry : reductionInFlight ) {
+		if ( entry.job->state.load() != imageDecodeJob_t::DONE ) {
+			bytes += entry.job->tape.bytes;
+		}
+	}
+	return bytes;
+}
+
+int idImageManager::PendingReductionReloads() const {
+	return reductionReloads.Num() - reductionReloadNext + static_cast<int>( reductionInFlight.size() );
+}
 
 void idImageManager::ClearReductionReloads() {
+	// a worker still running a dropped job finishes it into nothing
+	reductionInFlight.clear();
 	reductionSlowestName.Clear();
 	reductionSlowestMsec = 0.0;
+	reductionPhases.Clear();
+	reductionSlowestPhases.Clear();
+	reductionInlineMsec = reductionDeferMsec = reductionPublishMsec = 0.0;
 	reductionReloads.Clear();
 	reductionReloadNext = 0;
 	reductionReloadStats = reductionReloadStats_t();
@@ -1927,46 +2134,134 @@ bool idImageManager::ContinueReductionReloads( double budgetMsec ) {
 	if ( R_RendererDeviceAwaitsRestart() ) {
 		common->Printf( "Texture reduction: %d queued textures left for the renderer restart\n", PendingReductionReloads() );
 		ClearReductionReloads();
+		imageDecodeWorkers.Stop();
 		return false;
 	}
 	R_RenderThread_Sync( "image registry" );
 
+	const bool finishing = budgetMsec <= 0.0;
+	const int workerCount = R_ReductionWorkerCount();
+	const size_t inFlightLimit = static_cast<size_t>( Max( 1, workerCount ) * REDUCTION_IN_FLIGHT_PER_WORKER );
 	const double frameStart = R_ReductionReloadClockMsec();
-	int loadedThisFrame = 0;
-	while ( reductionReloadNext < reductionReloads.Num() ) {
-		if ( loadedThisFrame > 0 && budgetMsec > 0.0 && R_ReductionReloadClockMsec() - frameStart >= budgetMsec ) {
-			break;
-		}
-		idImage *image = reductionReloads[ reductionReloadNext++ ];
-		if ( !R_ImageNeedsReductionReload( image ) ) {
-			reductionReloadStats.skipped++;
-			continue;
-		}
+	int workThisFrame = 0;
+	const auto overBudget = [&]() {
+		return workThisFrame > 0 && !finishing && R_ReductionReloadClockMsec() - frameStart >= budgetMsec;
+	};
+	// One step of main-thread work on one image, timed for the completion line.
+	double lastStepMsec = 0.0;
+	const auto timed = [&]( idImage *image, const auto &step ) {
 		const double imageStart = R_ReductionReloadClockMsec();
-		image->Reload( true );
+		const imageLoadPhaseTimings_t phasesBefore = imageLoadPhaseTimings;
+		step();
 		const double imageMsec = R_ReductionReloadClockMsec() - imageStart;
+		lastStepMsec = imageMsec;
+		R_AddPhaseDelta( reductionPhases, phasesBefore, imageLoadPhaseTimings );
 		if ( imageMsec > reductionSlowestMsec ) {
 			reductionSlowestMsec = imageMsec;
 			reductionSlowestName = image->GetName();
+			reductionSlowestPhases.Clear();
+			R_AddPhaseDelta( reductionSlowestPhases, phasesBefore, imageLoadPhaseTimings );
 		}
-		reductionReloadStats.reloaded++;
-		loadedThisFrame++;
+		workThisFrame++;
+	};
+
+	for ( ;; ) {
+		// Publish what the workers finished, in the order it was deferred.
+		while ( !reductionInFlight.empty() && !overBudget() ) {
+			if ( reductionInFlight.front().job->state.load() != imageDecodeJob_t::DONE ) {
+				if ( !finishing || !imageDecodeWorkers.Running() ) {
+					break;
+				}
+				imageDecodeWorkers.WaitFor( reductionInFlight.front().job );
+				continue;
+			}
+			const reductionInFlight_t entry = reductionInFlight.front();
+			reductionInFlight.pop_front();
+			if ( !R_ImageNeedsReductionReload( entry.image ) ) {
+				reductionReloadStats.skipped++;
+				continue;
+			}
+			if ( entry.job->decoded ) {
+				reductionReloadStats.workerDecoded++;
+				reductionReloadStats.workerMsec += entry.job->workerMsec;
+				reductionReloadStats.longestWorkerMsec = Max( reductionReloadStats.longestWorkerMsec, entry.job->workerMsec );
+			}
+			bool published = false;
+			timed( entry.image, [&]() { published = entry.image->PublishDecodeJob( entry.job ); } );
+			if ( published ) {
+				reductionReloadStats.workerPublished++;
+			}
+			reductionPublishMsec += lastStepMsec;
+			reductionReloadStats.reloaded++;
+		}
+
+		// Start the next images: a load that needs no decode (a DDS, the
+		// generated cache) finishes here; a 2D decode goes to a worker.
+		while ( reductionReloadNext < reductionReloads.Num() && !overBudget()
+				&& ( workerCount == 0 || reductionInFlight.size() < inFlightLimit )
+				&& R_ReductionInFlightBytes() < REDUCTION_IN_FLIGHT_BYTES ) {
+			idImage *image = reductionReloads[ reductionReloadNext++ ];
+			if ( !R_ImageNeedsReductionReload( image ) ) {
+				reductionReloadStats.skipped++;
+				continue;
+			}
+			if ( workerCount == 0 ) {
+				timed( image, [&]() { image->Reload( true ); } );
+				reductionInlineMsec += lastStepMsec;
+				reductionReloadStats.reloaded++;
+				continue;
+			}
+			std::shared_ptr<imageDecodeJob_t> job;
+			bool deferred = false;
+			timed( image, [&]() { deferred = image->ReloadOrDefer( job ); } );
+			( deferred ? reductionDeferMsec : reductionInlineMsec ) += lastStepMsec;
+			if ( deferred ) {
+				imageDecodeWorkers.EnsureStarted( workerCount );
+				imageDecodeWorkers.Submit( job );
+				reductionInFlight.push_back( { image, job } );
+				reductionReloadStats.deferred++;
+			} else {
+				reductionReloadStats.reloaded++;
+			}
+		}
+
+		if ( !finishing || PendingReductionReloads() <= 0 ) {
+			break;
+		}
+		if ( !reductionInFlight.empty() && !imageDecodeWorkers.Running() ) {
+			// nothing left to run them: load them inline
+			for ( reductionInFlight_t &entry : reductionInFlight ) {
+				entry.job->decoded = false;
+				entry.job->state.store( imageDecodeJob_t::DONE );
+			}
+		}
 	}
 	const double frameMsec = R_ReductionReloadClockMsec() - frameStart;
 	reductionReloadStats.workMsec += frameMsec;
 	reductionReloadStats.longestFrameMsec = Max( reductionReloadStats.longestFrameMsec, frameMsec );
 	reductionReloadStats.frames++;
 
-	if ( reductionReloadNext < reductionReloads.Num() ) {
+	if ( PendingReductionReloads() > 0 ) {
 		return true;
 	}
+	imageDecodeWorkers.Stop();
 	const double totalMsec = R_ReductionReloadClockMsec() - reductionReloadStats.startMsec;
 	common->Printf( "Texture reduction applied: reloaded %d textures over %d frames in %.0f ms "
 		"(%.0f ms of loading, at most %.1f ms in one frame), %d already current, %d unaffected\n",
 		reductionReloadStats.reloaded, reductionReloadStats.frames, totalMsec, reductionReloadStats.workMsec,
 		reductionReloadStats.longestFrameMsec, reductionReloadStats.skipped, reductionReloadStats.unaffected );
+	common->Printf( "Texture reduction workers: %d of %d textures deferred, %d decoded by a worker, %d published from it, %.0f ms of worker decoding (longest %.1f ms)\n",
+		reductionReloadStats.deferred, reductionReloadStats.reloaded, reductionReloadStats.workerDecoded,
+		reductionReloadStats.workerPublished, reductionReloadStats.workerMsec, reductionReloadStats.longestWorkerMsec );
+	common->Printf( "Texture reduction main thread: %.0f ms loading inline, %.0f ms deferring, %.0f ms publishing\n",
+		reductionInlineMsec, reductionDeferMsec, reductionPublishMsec );
+	common->Printf( "Texture reduction phases: probe %.0f ms (%d), cache %.0f ms (%d), read and decode %.0f ms (%d), upload %.0f ms (%d)\n",
+		reductionPhases.probeMsec, reductionPhases.probeCount, reductionPhases.generatedMsec, reductionPhases.generatedCount,
+		reductionPhases.decodeMsec, reductionPhases.decodeCount, reductionPhases.uploadMsec, reductionPhases.uploadCount );
 	if ( reductionSlowestName.Length() > 0 ) {
-		common->Printf( "Texture reduction: slowest texture %s, %.1f ms\n", reductionSlowestName.c_str(), reductionSlowestMsec );
+		common->Printf( "Texture reduction: slowest main-thread step %s, %.1f ms (probe %.1f, cache %.1f, read and decode %.1f, upload %.1f)\n",
+			reductionSlowestName.c_str(), reductionSlowestMsec, reductionSlowestPhases.probeMsec,
+			reductionSlowestPhases.generatedMsec, reductionSlowestPhases.decodeMsec, reductionSlowestPhases.uploadMsec );
 	}
 	ClearReductionReloads();
 	return false;

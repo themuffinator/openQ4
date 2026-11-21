@@ -490,7 +490,10 @@ the [development roadmap](../roadmap.md) for current scope.
   it. A change made while a level loads also reaches the textures the load
   kept, such as the interface and your own models, which used to keep the old
   setting until the renderer restarted. `image_reloadFrameMsec 0` brings back
-  the single pause.
+  the single pause. Textures decoded from their sources (precompressed textures
+  off, or textures built from several images) are decoded and compressed on
+  two background threads, with exactly the same result; `image_reloadWorkers 0`
+  keeps that work on the main thread.
 - The player guides and the package README are rewritten in plain language
   and corrected against 0.14.1. Menu paths name the new interface's tabs,
   several wrong defaults and menu routes are fixed, anything newer than 0.14.1
