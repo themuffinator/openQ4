@@ -463,6 +463,7 @@ jobs:
             tools/tests/renderer_temporal_qualification.py \
             tools/tests/renderer_temporal_stability.py \
             tools/tests/renderer_screen_space_effects_qualification.py \
+            tools/tests/renderer_volumetric_lighting.py \
             tools/tests/renderer_shared_domain_qualification.py \
             tools/tests/renderer_shadow_motion_qualification.py \
             tools/tests/renderer_native_ui_output.py \

@@ -2,6 +2,7 @@
 //
 
 #include "tr_local.h"
+#include "VolumetricLighting.h"
 #include "RendererMetrics.h"
 #include "TemporalPresentation.h"
 #include "MotionBlurCore.h"
@@ -69,16 +70,16 @@ idCVar r_temporalAASharpness( "r_temporalAASharpness", "0.5",
 
 idCVar r_rendererFroxelVolumetrics( "r_rendererFroxelVolumetrics", "0",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
-	"enable bounded view-aligned froxel volumetric integration in the native scene presentation tail" );
+	"volumetric lighting: interaction lights scatter through a haze, shadowed by their shadow maps (REN-09)" );
 idCVar r_froxelVolumetricDensity( "r_froxelVolumetricDensity", "0.00012",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
-	"base extinction density for optional froxel volumetrics", 0.00001f, 0.01f );
+	"volumetric lighting: thickness of the haze (extinction per game unit)", 0.00001f, 0.01f );
 idCVar r_froxelVolumetricMaxDistance( "r_froxelVolumetricMaxDistance", "2048",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
-	"maximum world-space distance integrated by optional froxel volumetrics", 64.0f, 8192.0f );
+	"volumetric lighting: how far from the eye the haze is integrated, in game units", 64.0f, 8192.0f );
 idCVar r_froxelVolumetricSlices( "r_froxelVolumetricSlices", "12",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,
-	"bounded view-depth slices integrated by optional froxel volumetrics", 4,
+	"volumetric lighting: march steps per light (more is smoother and slower)", 4,
 	ADVANCED_SCREEN_SPACE_FROXEL_MAX_SLICES );
 idCVar r_rendererSSR( "r_rendererSSR", "0",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
@@ -190,11 +191,15 @@ int R_TemporalPresentation_HistorySlot( void ) {
 	return R_TemporalPresentation_VREye() == 1 ? 1 : 0;
 }
 
+// REN-09 moved the froxel leaf out of the presentation tail: it scatters the
+// view's lights in the scene before translucent surfaces (VolumetricLighting.h)
+// and needs neither the resolve nor its history, so it no longer requests
+// this tail and runs in VR too.
 static advancedScreenSpaceConfig_t R_TemporalPresentation_BuildAdvancedScreenSpaceConfig( void ) {
 	const bool allowed = !R_TemporalPresentation_VRFrame();
 	return AdvancedScreenSpaceCore_Build(
 		allowed && r_rendererModernQuality.GetBool(),
-		allowed && r_rendererFroxelVolumetrics.GetBool(),
+		false,
 		allowed && r_rendererSSR.GetBool(),
 		allowed && r_rendererSSGI.GetBool(),
 		r_froxelVolumetricDensity.GetFloat(),
@@ -219,6 +224,7 @@ static bool R_TemporalPresentation_AdvancedScreenSpaceEqual(
 		&& lhs.ssgiIntensity == rhs.ssgiIntensity;
 }
 static int rg_lastCaptureMarkedFrame = -1;
+static unsigned int rg_volumetricSignatureLast = 0;
 
 static const int TEMPORAL_VIEW_HISTORY_SLOTS = 32;
 
@@ -720,6 +726,7 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 		rg_dynamicResolutionEnabledLastFrame = r_rendererDynamicResolution.GetBool();
 		rg_temporalAAEnabledLastFrame = R_TemporalPresentation_TemporalAAWanted();
 		rg_advancedScreenSpaceLast = advancedScreenSpace;
+		rg_volumetricSignatureLast = R_Volumetric_ConfigSignature();
 		rg_videoRestartCount = tr.videoRestartCount;
 	}
 
@@ -745,6 +752,13 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 		R_TemporalPresentation_InvalidateHistory(
 			"advanced screen-space configuration changed" );
 		rg_advancedScreenSpaceLast = advancedScreenSpace;
+	}
+	// The scattered light is part of the scene the history holds.
+	const unsigned int volumetricSignature = R_Volumetric_ConfigSignature();
+	if ( volumetricSignature != rg_volumetricSignatureLast ) {
+		R_TemporalPresentation_InvalidateHistory(
+			"volumetric lighting configuration changed" );
+		rg_volumetricSignatureLast = volumetricSignature;
 	}
 	if ( tr.videoRestartCount != rg_videoRestartCount ) {
 		R_TemporalPresentation_ClearScaleHistory();

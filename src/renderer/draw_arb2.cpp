@@ -39,6 +39,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Model_local.h"
 #include "ShadowMapClassification.h"
 #include "ShadowMapProjected.h"
+#include "VolumetricLighting.h"
 #include "ShadowMapArb2Parity.h"
 #include "ModernShadowPlanner.h"
 #include "ModernShadowMaps.h"
@@ -17292,6 +17293,61 @@ static bool RB_ARB2_DrawSharedInteractionView( const viewDef_t *viewDef,
 	return true;
 }
 
+/*
+==================
+RB_ShadowMapVolumetricParams
+
+REN-09: the map the light's GLOBAL receiver pass just sampled, in world
+space, for the volumetric march. Valid right after that pass, while its
+state and textures are current; false when it mapped nothing.
+==================
+*/
+static bool RB_ShadowMapVolumetricParams( const viewLight_t *vLight, volumetricShadowParams_t &params ) {
+	memset( &params, 0, sizeof( params ) );
+	if ( g_shadowMapGlobalPassMapped == SHADOWMAP_GLOBAL_MAPPED_POINT ) {
+		const bool depthCube = RB_PointShadowMapDepthCompareEnabled() && g_pointShadowMapDepthImage != NULL;
+		params.image = depthCube ? g_pointShadowMapDepthImage : g_pointShadowMapColorImage;
+		if ( params.image == NULL ) {
+			return false;
+		}
+		const int faceSize = g_pointShadowMapRenderTexture != NULL
+			? Max( 1, g_pointShadowMapRenderTexture->GetWidth() ) : RB_ShadowMapPointSizeValue();
+		const float farDistance = R_ShadowMapPointFarDistance( vLight );
+		const shadowMapPointReceiverSettings_t settings = R_ShadowMapPointStorageAdjustedReceiverSettings(
+			R_ShadowMapPointReceiverSettings( farDistance, faceSize ), farDistance, faceSize,
+			RB_PointShadowMapDepthCompareEnabled(), RB_PointShadowMapHighPrecisionEnabled() );
+		params.kind = VOLUMETRIC_SHADOW_POINT;
+		params.pointFar = Max( 1.0f, farDistance );
+		// A point in the medium has no surface slope: the receiver's constant
+		// and texel terms with the slope at zero.
+		params.pointBias = Max( Max( settings.constantBias, 0.0f ), settings.texelBiasScale / faceSize );
+		params.pointDepthMode = depthCube ? 1.0f : RB_PointShadowMapDepthModeValue();
+		return true;
+	}
+	if ( g_shadowMapGlobalPassMapped != SHADOWMAP_GLOBAL_MAPPED_PROJECTED
+			|| !g_projectedShadowMapState.valid || g_shadowMapDepthImage == NULL || g_shadowMapRenderTexture == NULL ) {
+		return false;
+	}
+	params.image = g_shadowMapDepthImage;
+	// The light's atlas slot composed as RB_GLSLShadowMap_CreateDrawInteractions does.
+	const float invAtlasWidth = 1.0f / Max( 1, g_shadowMapRenderTexture->GetWidth() );
+	const float invAtlasHeight = 1.0f / Max( 1, g_shadowMapRenderTexture->GetHeight() );
+	const float slotU0 = g_shadowMapActiveSlotOriginX * invAtlasWidth;
+	const float slotV0 = g_shadowMapActiveSlotOriginY * invAtlasHeight;
+	const float slotSpanU = ( g_projectedShadowMapState.tileSize * g_projectedShadowMapState.atlasDiv ) * invAtlasWidth;
+	const float slotSpanV = ( g_projectedShadowMapState.tileSize * g_projectedShadowMapState.atlasDiv ) * invAtlasHeight;
+	float composedRects[SHADOWMAP_MAX_CASCADES][4];
+	for ( int c = 0; c < SHADOWMAP_MAX_CASCADES; c++ ) {
+		const idVec4 &rect = g_projectedShadowMapState.atlasRect[c];
+		composedRects[c][0] = slotU0 + rect.x * slotSpanU;
+		composedRects[c][1] = slotV0 + rect.y * slotSpanV;
+		composedRects[c][2] = slotU0 + rect.z * slotSpanU;
+		composedRects[c][3] = slotV0 + rect.w * slotSpanV;
+	}
+	R_Volumetric_FillProjectedShadow( g_projectedShadowMapState, composedRects, params );
+	return true;
+}
+
 void RB_ARB2_DrawInteractions( void ) {
 	viewLight_t		*vLight;
 
@@ -17321,6 +17377,7 @@ void RB_ARB2_DrawInteractions( void ) {
 						*sharedView, sharedFailureDetail ) ) {
 					if ( RB_ARB2_DrawSharedInteractionView(
 							backEnd.viewDef, *sharedView ) ) {
+						RB_Volumetric_GL_DeclineView( "shared-interaction-stream" );
 						return;
 					}
 					// The draw function can reject only before its commit point.
@@ -17348,6 +17405,7 @@ void RB_ARB2_DrawInteractions( void ) {
 			common->Warning( "Apple OpenGL 2.1 compatibility path bypassing ARB2 light interactions to avoid issue #73 startup crash; scene lighting is degraded" );
 		}
 		RB_ARB2_RestoreBypassedInteractionState();
+		RB_Volumetric_GL_DeclineView( "apple-gl21-corridor" );
 		return;
 	}
 
@@ -17451,6 +17509,16 @@ void RB_ARB2_DrawInteractions( void ) {
 				RB_ShadowMapDrawReceiverFallbacks( vLight,
 					SHADOWMAP_PASS_GLOBAL, vLight->globalShadows,
 					vLight->localShadows, vLight->globalInteractions );
+			}
+
+			// REN-09: scatter through the map the GLOBAL receivers just used.
+			// A light with nothing that casts is unshadowed, not unmapped.
+			{
+				volumetricShadowParams_t volumetricShadow;
+				const bool mapped = RB_ShadowMapVolumetricParams( vLight, volumetricShadow );
+				const bool hasCasters = vLight->globalShadows != NULL || vLight->localShadows != NULL
+					|| vLight->shadowMapCasterCount > 0;
+				RB_Volumetric_GL_InjectLight( vLight, mapped ? &volumetricShadow : NULL, false, !mapped && hasCasters );
 			}
 
 			if ( !r_skipTranslucent.GetBool() ) {
@@ -17565,6 +17633,10 @@ void RB_ARB2_DrawInteractions( void ) {
 			RB_StencilShadowPass( vLight->localShadows );
 			RB_DrawMaterialInteractions( vLight->globalInteractions );
 		}
+
+		// REN-09: a stencil-shadowed light has no map to march through.
+		RB_Volumetric_GL_InjectLight( vLight, NULL,
+			r_shadows.GetBool() && ( vLight->globalShadows != NULL || vLight->localShadows != NULL ), false );
 
 		if ( r_skipTranslucent.GetBool() ) {
 			continue;

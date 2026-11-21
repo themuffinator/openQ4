@@ -7,6 +7,20 @@ later entries are unreleased development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
 
+## Shadowed volumetric lighting, 21 November 2026
+
+- **Light shafts that stop at their shadows.** With the experimental
+  volumetric lighting on (`r_rendererFroxelVolumetrics 1`), every light in view
+  lights the haze with its own colour, shape and fall-off, and with shadow maps
+  on its beams are blocked by what blocks its light: a pillar leaves a dark
+  shaft behind it and the sun's haze follows the buildings. It replaces the
+  plain haze, is drawn before glass, smoke and fire, and works on OpenGL and
+  Vulkan.
+- **What to do.** Nothing: it stays off by default, and turning it off leaves
+  the picture exactly as before. Try it with the Quality or Ultra preset, which
+  turn shadow maps on.
+- Details: [advanced screen-space lighting](../user/advanced-screen-space-lighting.md#volumetric-lighting),
+  [roadmap REN-09](roadmap.md#ren-task-evidence-and-acceptance).
 ## One place to start for multiplayer, 21 November 2026
 
 - **A multiplayer guide.** The new [multiplayer guide](../user/multiplayer.md)

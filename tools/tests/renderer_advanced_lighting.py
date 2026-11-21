@@ -515,11 +515,21 @@ def test_parity_stays_unpromoted_and_follow_ons_have_separate_gates() -> None:
     vk = read("src/renderer/Vulkan/shaders/temporal_resolve.frag")
     for source, label in ((gl, "OpenGL"), (vk, "Vulkan")):
         for token in (
-            "ApplyFroxelVolumetrics",
             "ApplyScreenSpaceReflection",
             "ApplyScreenSpaceGI",
         ):
             require(source, token, f"{label} screen-space implementation")
+        # REN-09 moved the froxel leaf out of the presentation tail.
+        if "ApplyFroxelVolumetrics" in source:
+            raise AssertionError(f"{label} resolve must not keep the unshadowed froxel haze")
+    require(temporal, "allowed && r_rendererModernQuality.GetBool(),\n\t\tfalse,",
+            "the froxel leaf no longer requests the presentation tail")
+    for path, token in (
+        ("src/renderer/draw_volumetric.cpp", "RB_Volumetric_GL_InjectLight"),
+        ("src/renderer/Vulkan/vk_PostProcess.cpp", "VK_PostProcess_DrawVolumetricLights"),
+        ("src/renderer/VolumetricLighting.cpp", "R_Volumetric_Requested"),
+    ):
+        require(read(path), token, "REN-09 shadowed volumetric implementation")
 
 
 def main() -> int:

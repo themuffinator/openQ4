@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "tr_local.h"
+#include "VolumetricLighting.h"
 #if !defined( OPENQ4_RENDERER_VK_MODULE ) && !defined( OPENQ4_RENDERER_GLES_MODULE )
 #include "draw_pbr.h"
 #endif
@@ -5803,6 +5804,7 @@ void GfxInfo_f( const idCmdArgs &args ) {
 		r_pbrGeneratedLegacyFallback.GetBool() ? 1 : 0,
 		r_pbrInferFromLegacyMaterials.GetBool() ? 1 : 0,
 		r_pbrDebug.GetInteger() );
+	R_Volumetric_PrintStatus();
 	R_ModernGLExecutor_PrintGfxInfo();
 #ifndef OPENQ4_RENDERER_VK_MODULE
 	RB_HDRPrintGfxInfo();
@@ -6575,6 +6577,7 @@ void R_InitCommands( void ) {
 #endif
 	cmdSystem->AddCommand( "rendererGpuTimerSelfTest", R_RendererGpuTimerSelfTest_f, CMD_FL_RENDERER, "run renderer GPU timer query self tests" );
 	cmdSystem->AddCommand( "rendererTemporalPresentationStatus", R_TemporalPresentation_PrintStatus_f, CMD_FL_RENDERER, "report dynamic-resolution and temporal-history state" );
+	R_Volumetric_RegisterCommands();
 	cmdSystem->AddCommand( "pbrProbeSettle", R_PBRProbeSettle_f, CMD_FL_RENDERER, "finish background reflection-probe filtering on the next frames, as a screenshot does" );
 	cmdSystem->AddCommand( "rendererMotionBlurStatus", R_TemporalPresentation_PrintMotionBlurStatus_f, CMD_FL_RENDERER, "report motion blur requested/effective settings and history decisions; \"reset\" clears the counters" );
 	cmdSystem->AddCommand( "rendererScenePacketSelfTest", R_RendererScenePacketSelfTest_f, CMD_FL_RENDERER, "run renderer front-end scene-packet self tests" );

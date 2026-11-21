@@ -353,50 +353,6 @@ vec3 ApplyScreenSpaceReflection(vec3 baseColor, vec2 cameraUV, float depth,
         hitWeight * fresnel * temporal.previousViewOrigin.w);
 }
 
-vec3 ApplyFroxelVolumetrics(vec3 baseColor, vec2 cameraUV, float depth) {
-    if (!ScreenEffectEnabled(1.0)) {
-        return baseColor;
-    }
-    vec2 ndc = cameraUV * 2.0 - 1.0;
-    vec3 viewRay = normalize(vec3(
-        -(ndc.x + temporal.currentReconstruct.z)
-            * temporal.currentReconstruct.x,
-        -(ndc.y + temporal.currentReconstruct.w)
-            * temporal.currentReconstruct.y,
-        -1.0));
-    vec3 worldRay = normalize(CurrentViewToWorldDirection(viewRay));
-    float travel = temporal.currentViewAxis1.w;
-    if (temporal.motionParams.z > 0.5 && depth < 0.99999) {
-        travel = min(travel, length(CurrentViewPosition(cameraUV, depth)));
-    }
-    float sliceCount = clamp(floor(temporal.currentViewAxis2.w + 0.5),
-        4.0, 16.0);
-    float sliceLength = travel / sliceCount;
-    float transmittance = 1.0;
-    vec3 scattering = vec3(0.0);
-    vec3 sunDirection = normalize(vec3(0.35, 0.25, 0.90));
-    for (int i = 0; i < 16; ++i) {
-        if (float(i) >= sliceCount) {
-            break;
-        }
-        float midpoint = (float(i) + 0.5) * sliceLength;
-        float worldHeight = temporal.currentViewOrigin.z
-            + worldRay.z * midpoint;
-        float heightDensity = exp(-clamp((worldHeight
-            - temporal.currentViewOrigin.z) * 0.0008, -1.5, 2.0));
-        float sliceTransmittance = exp(-temporal.currentViewAxis0.w
-            * heightDensity * sliceLength);
-        float phase = 0.55 + 0.45
-            * pow(max(dot(worldRay, sunDirection), 0.0), 2.0);
-        vec3 fogColor = vec3(0.17, 0.21, 0.26)
-            + vec3(0.08, 0.07, 0.04) * max(worldRay.z, 0.0);
-        scattering += transmittance * (1.0 - sliceTransmittance)
-            * fogColor * phase;
-        transmittance *= sliceTransmittance;
-    }
-    return baseColor * transmittance + scattering;
-}
-
 void main() {
     vec2 outputCameraUV = TextureToCameraUV(fragUV);
     vec2 sceneCameraUV = clamp(outputCameraUV
@@ -428,8 +384,6 @@ void main() {
             centerDepth, centerPosition, centerNormal);
         current.rgb = ApplyScreenSpaceReflection(current.rgb, sceneCameraUV,
             centerDepth, centerPosition, centerNormal);
-        current.rgb = ApplyFroxelVolumetrics(current.rgb, sceneCameraUV,
-            centerDepth);
     }
     // 3x3 neighbourhood: YCoCg mean/variance for the history clip box, and the
     // nearest depth, whose velocity is used so a moving silhouette carries its

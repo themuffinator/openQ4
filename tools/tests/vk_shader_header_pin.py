@@ -166,6 +166,13 @@ EXTRA_HEADERS = [
         "__VK_HDR_LUMINANCE_SPV_H__",
     ),
     ( POST_COMMITTED, POST_SHADERS, POST_GUARD ),
+    (
+        REPO_ROOT / "src/renderer/Vulkan/shaders/volumetric_shaders_spv.h",
+        [REPO_ROOT / "src/renderer/Vulkan/shaders" / name for name in
+         ("volumetric_inject.frag", "volumetric_inject_projected.frag",
+          "volumetric_inject_point.frag", "volumetric_composite.frag")],
+        "__VK_VOLUMETRIC_SHADERS_SPV_H__",
+    ),
     ( SCENE_COMMITTED, SCENE_SHADERS, SCENE_GUARD ),
     ( DEBUG_COMMITTED, DEBUG_SHADERS, DEBUG_GUARD ),
     (

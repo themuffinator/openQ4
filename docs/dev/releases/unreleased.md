@@ -471,6 +471,16 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- **Not in 0.14.1:** the experimental volumetric lighting
+  (`r_rendererFroxelVolumetrics 1`) is now lit by the lights in view instead
+  of a fixed glow. Each lamp, spotlight and the sun lights the haze with its
+  own colour and shape, and with shadow maps on (the Quality and Ultra
+  presets) its beams stop at whatever casts its shadows. Glass, smoke, fire and
+  other see-through effects now sit in front of the haze. It works on OpenGL
+  and Vulkan, stays off by default and changes nothing while off. New settings
+  tune its brightness, sunlight, resolution and the lights with stencil
+  shadows; `rendererVolumetricStatus` reports what it drew. See
+  [advanced screen-space lighting](../../user/advanced-screen-space-lighting.md#volumetric-lighting).
 - Changing texture quality no longer freezes the game. Lowering or raising
   texture detail on the Display page, with a Performance Preset or from the
   console used to reload every texture in one pause of 4 to 7 seconds in Air

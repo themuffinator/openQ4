@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include <functional>
 
 #include "tr_local.h"
+#include "VolumetricLighting.h"
 #include "draw_pbr.h"
 #include "OpenGL/FramebufferSamples.h"
 #include "CelShading.h"
@@ -5763,32 +5764,6 @@ static bool RB_EnsureTemporalResolveProgram( void ) {
 		"\tfloat fresnel = 0.04 + 0.96 * pow( 1.0 - facing, 5.0 );\n"
 		"\treturn mix( baseColor, hitColor, hitWeight * fresnel * ScreenEffects1.x );\n"
 		"}\n"
-		"vec3 ApplyFroxelVolumetrics( vec3 baseColor, vec2 uv, float depth ) {\n"
-		"\tif ( !ScreenEffectEnabled( 1.0 ) ) return baseColor;\n"
-		"\tvec2 ndc = uv * 2.0 - 1.0;\n"
-		"\tvec3 viewRay = normalize( vec3( -( ndc.x + CurrentReconstructInfo.z ) * CurrentReconstructInfo.x,\n"
-		"\t\t-( ndc.y + CurrentReconstructInfo.w ) * CurrentReconstructInfo.y, -1.0 ) );\n"
-		"\tvec3 worldRay = normalize( CurrentViewToWorldDirection( viewRay ) );\n"
-		"\tfloat travel = ScreenEffects0.z;\n"
-		"\tif ( MotionParams.z > 0.5 && depth < 0.99999 ) travel = min( travel, length( CurrentViewPosition( uv, depth ) ) );\n"
-		"\tfloat sliceCount = clamp( floor( ScreenEffects0.w + 0.5 ), 4.0, 16.0 );\n"
-		"\tfloat sliceLength = travel / sliceCount;\n"
-		"\tfloat transmittance = 1.0;\n"
-		"\tvec3 scattering = vec3( 0.0 );\n"
-		"\tvec3 sunDirection = normalize( vec3( 0.35, 0.25, 0.90 ) );\n"
-		"\tfor ( int i = 0; i < 16; ++i ) {\n"
-		"\t\tif ( float( i ) >= sliceCount ) break;\n"
-		"\t\tfloat midpoint = ( float( i ) + 0.5 ) * sliceLength;\n"
-		"\t\tfloat worldHeight = CurrentViewOrigin.z + worldRay.z * midpoint;\n"
-		"\t\tfloat heightDensity = exp( -clamp( ( worldHeight - CurrentViewOrigin.z ) * 0.0008, -1.5, 2.0 ) );\n"
-		"\t\tfloat sliceTransmittance = exp( -ScreenEffects0.y * heightDensity * sliceLength );\n"
-		"\t\tfloat phase = 0.55 + 0.45 * pow( max( dot( worldRay, sunDirection ), 0.0 ), 2.0 );\n"
-		"\t\tvec3 fogColor = vec3( 0.17, 0.21, 0.26 ) + vec3( 0.08, 0.07, 0.04 ) * max( worldRay.z, 0.0 );\n"
-		"\t\tscattering += transmittance * ( 1.0 - sliceTransmittance ) * fogColor * phase;\n"
-		"\t\ttransmittance *= sliceTransmittance;\n"
-		"\t}\n"
-		"\treturn baseColor * transmittance + scattering;\n"
-		"}\n"
 		"void main() {\n"
 		"\tvec2 outputUV = gl_TexCoord[0].st;\n"
 		"\tvec2 sceneUV = clamp( outputUV - CurrentJitter * MotionParams.w, vec2( 0.0 ), vec2( 1.0 ) );\n"
@@ -5809,7 +5784,6 @@ static bool RB_EnsureTemporalResolveProgram( void ) {
 		"\t\tvec3 centerNormal = centerDepth < 0.99999 ? DepthNormal( sceneUV, centerPosition ) : vec3( 0.0, 0.0, 1.0 );\n"
 		"\t\tcurrent.rgb = ApplyScreenSpaceGI( current.rgb, sceneUV, centerDepth, centerPosition, centerNormal );\n"
 		"\t\tcurrent.rgb = ApplyScreenSpaceReflection( current.rgb, sceneUV, centerDepth, centerPosition, centerNormal );\n"
-		"\t\tcurrent.rgb = ApplyFroxelVolumetrics( current.rgb, sceneUV, centerDepth );\n"
 		"\t}\n"
 		// 3x3 neighbourhood: YCoCg mean/variance for the history clip box, and
 		// the nearest depth, whose velocity is used so a moving silhouette
@@ -8881,6 +8855,7 @@ void RB_ShutdownScenePostProcess( void ) {
 	RB_FreeBuiltinMaterialGLSLPrograms();
 	RB_FreeColorMappingProgram();
 
+	RB_Volumetric_GL_Shutdown();
 	RB_DestroyPostProcessRenderTexture( rbSceneRenderTexture );
 	rbSceneRenderTextureSamples = -1;
 	RB_DestroyPostProcessRenderTexture( rbWindowViewRenderTexture );
@@ -17717,8 +17692,10 @@ void	RB_STD_DrawView( void ) {
 	RB_DisplaySpecialEffects( backEnd.viewDef->viewEntitys, false );
 
 	// main light renderer
+	RB_Volumetric_GL_BeginView( backEnd.viewDef );
 	if ( R_ModernGLExecutor_LegacyPassCanSkipForView( RENDER_PASS_ARB2_INTERACTION, backEnd.viewDef ) ) {
 		R_ModernGLExecutor_RecordLegacyPassSkipped( RENDER_PASS_ARB2_INTERACTION );
+		RB_Volumetric_GL_DeclineView( "modern-interaction-owner" );
 		if ( R_ModernGLExecutor_LegacyPassCanSkipForView( RENDER_PASS_SHADOW_MAP, backEnd.viewDef ) ) {
 			R_ModernGLExecutor_RecordLegacyPassSkipped( RENDER_PASS_SHADOW_MAP );
 		}
@@ -17826,6 +17803,10 @@ void	RB_STD_DrawView( void ) {
 	RB_STD_DrawCelOutlines( drawSurfs, processed );
 
 	RB_RecordARB2InteractionBypassFramePhase( RENDERER_STARTUP_PHASE_ARB2_INTERACTION_BYPASS_FRAME_TAIL );
+
+	// REN-09: the scattered light and the medium's attenuation over the
+	// opaque scene, before fog, blend lights and translucent surfaces.
+	RB_Volumetric_GL_Composite();
 
 	// fog and blend lights
 	const bool modernFogBlendOwned = R_ModernGLExecutor_LegacyPassCanSkipForView( RENDER_PASS_FOG_BLEND, backEnd.viewDef );

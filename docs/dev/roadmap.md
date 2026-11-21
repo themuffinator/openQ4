@@ -55,7 +55,7 @@ exact; the estimate column is deliberately approximate.
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **60%** | 1 / 8 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks; HDR display output (VK-08, not started). |
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
-| [Modern rendering engine](#modern-rendering-engine) — REN | **60%** | 4 / 11 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, not started). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026. |
+| [Modern rendering engine](#modern-rendering-engine) — REN | **60%** | 4 / 11 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **30%** | 2 / 9 | Preset re-tiering, shadow-map/post/MSAA cost, equal-settings regressions, hitches and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05). |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
@@ -1130,7 +1130,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
-| REN-09 — Not started | The REN-06 froxel leaf (unshadowed screen-space depth fog) and the REN-03 shadow maps it will sample. | Froxel volume with light falloff/projection and shadow-map sampling, stencil-light policy, temporal reprojection, translucent ordering, both backends, budgets. |
+| REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. | Moving-flashlight and moving-caster review in play, dynamic resolution, mirrors/remote views and VR runs, a visual tuning review, per-tier cost against FPS-01 on a quiet machine. |
 | REN-10 — Closed | HBAO (`r_ssaoMethod 1`), GTAO (`2`) and a brute-force reference (`3`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. GTAO closer to the reference than SSAO with fewer halos, HBAO as close as SSAO; backend parity, exact rollback, cost at or near SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
 | REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | Linux (Mesa GL and Vulkan) and the Android emulator (GLES declines cleanly) pass. VR headset confirmation and physical Linux GPUs, macOS and Android devices belong to platform qualification; a preset decision waits for authored content. |
 
@@ -1791,6 +1791,35 @@ diagnostics establish whole-frame ownership or production performance.
   byte-identical rollback with the leaf off; requested and effective state
   reported; per-tier cost measured against the FPS-01 budgets before any preset
   enables it.
+  Progress, 21 November 2026: implemented on both backends as per-light ray
+  marching rather than a 3D froxel grid, because OpenGL keeps only the current
+  light's shadow state (the march runs right after each light's GLOBAL receiver
+  pass) and Vulkan's maps are resident only until the next view: each admitted
+  light stage marches the view, jittered, through its world-space falloff and
+  projection images and its own shadow map (point cube; projected atlas tile;
+  cascaded sunlight, with the PCSS GLOBAL/LOCAL block pair on Vulkan) into a
+  half-resolution RGBA16F scattering target, then a depth-aware 3x3 filter
+  upsamples it and composites scene x transmittance + scattering before fog,
+  blend lights and translucent surfaces. Fog, blend and ambient lights never
+  scatter; stencil-shadowed lights add nothing unless
+  `r_volumetricStencilLights 1`, and a shadow-casting light with neither a map
+  nor volumes is skipped rather than leak. Sun-class lights (parallel, global,
+  distant point) take `r_volumetricSunIntensity`. Temporal handling is the TAA
+  history: the march offset turns per frame under a jittered view, and a
+  volumetric setting change resets the history. `rendererVolumetricStatus` (and
+  `gfxInfo`) reports requested and effective state per backend with each
+  light's outcome; GLSL 1.20/Apple GL 2.1, the shared interaction stream, the
+  HDR laboratory scene and GLES decline. `renderer_volumetric_lighting.py`
+  (opt-in, hardware-bound) passes on GL and Vulkan for Air Defense 1 outdoors (5
+  shadow-mapped lights), its swinging-light corridor (23 or 24, moving, so
+  effect and status only) and Process 1 (8), with the Quality shadow
+  configuration: frozen baselines identical, leaf-on master-off byte-identical
+  to master-off, GL/Vulkan mean change within 0.6 of each other on the frozen
+  scenes; it also passes with TAA and with 4x MSAA. Open: a moving flashlight
+  and moving casters in play, dynamic resolution, mirrors and remote views, VR
+  stereo, a visual review of the defaults (indoor beams are subtle at
+  `r_volumetricIntensity 12`), and cost: the GPU timings were taken beside three
+  other clients and are not budget evidence.
 - [x] **REN-10 — P2, implementation: ground-truth ambient occlusion (GTAO).**
   Closed 21 November 2026. `r_ssaoMethod` selects the kernel of SSAO's
   occlusion pass: `0` SSAO (default), `1` HBAO (horizon rises above the

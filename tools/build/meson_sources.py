@@ -132,6 +132,7 @@ RENDERER_VK_EXCLUDED_SOURCES = (
     "src/renderer/draw_arb2.cpp",
     "src/renderer/draw_common.cpp",
     "src/renderer/draw_pbr.cpp",
+    "src/renderer/draw_volumetric.cpp",
     "src/renderer/tr_backend.cpp",
     "src/renderer/tr_render.cpp",
     # tr_rendertools.cpp stays: its fixed-function debug drawing runs through
@@ -175,6 +176,7 @@ RENDERER_GLES_EXCLUDED_SOURCES = (
     "src/renderer/draw_arb2.cpp",
     "src/renderer/draw_common.cpp",
     "src/renderer/draw_pbr.cpp",
+    "src/renderer/draw_volumetric.cpp",
     "src/renderer/tr_render.cpp",
     "src/renderer/tr_rendertools.cpp",
     # the standalone clear probe is its own executable, not part of the module
