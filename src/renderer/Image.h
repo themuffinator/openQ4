@@ -532,7 +532,14 @@ public:
 	// reloads the images a texture reduction cvar change reaches, and
 	// reapplies samplers when a sampling cvar changed
 	void				CheckCvars();
+	// Queues the resident images a reduction change reaches; CheckCvars then
+	// reloads them within image_reloadFrameMsec a frame. Returns the count.
 	int					ReloadReductionChangedImages();
+	// Reloads queued images until the queue is empty or, when budgetMsec is
+	// above zero, that much time has passed (at least one image either way).
+	// True while images are still queued.
+	bool				ContinueReductionReloads( double budgetMsec );
+	int					PendingReductionReloads() const { return reductionReloads.Num() - reductionReloadNext; }
 
 	// swallows the born-modified state of those cvars during startup
 	void				PrimeCvars();
@@ -598,6 +605,24 @@ public:
 	idHashIndex			imageHash;
 
 	bool				insideLevelLoad;			// don't actually load images now
+
+	// The images a reduction change still has to reload, in name order, and
+	// the totals the completion line reports. Cleared at shutdown and by
+	// PurgeAllImages, whose reload rebuilds everything.
+	struct reductionReloadStats_t {
+		double	startMsec = 0.0;
+		double	workMsec = 0.0;
+		double	longestFrameMsec = 0.0;
+		int		frames = 0;
+		int		reloaded = 0;
+		int		skipped = 0;
+		int		unaffected = 0;
+	};
+	idList<idImage*>	reductionReloads;
+	int					reductionReloadNext = 0;
+	reductionReloadStats_t reductionReloadStats;
+	void				ClearReductionReloads();
+	void				ApplyPendingImageCvars( bool finishReloads );
 	bool				preloadingMapImages;		// unless this is set
 };
 

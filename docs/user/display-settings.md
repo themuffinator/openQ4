@@ -73,7 +73,7 @@ Maximum has no target. Faster or slower hardware, other resolutions and heavier 
 
 Choose the preset on **Settings → Display → Graphics** and press **Apply Changes**:
 
-- Effects switch at once, and textures reload in place, which takes a moment. No preset restarts the renderer.
+- Effects switch at once. Textures that the preset changes update over the next moments while the game keeps running, a few each frame, so nothing freezes. No preset restarts the renderer.
 - A preset that changes MSAA asks you to keep or revert. When OpenGL draws MSAA into the window itself (the default on macOS, or with `r_glWindowMultisample 1`), an MSAA change restarts the renderer.
 - The sound device restarts when the speaker layout or reverb setting changes. The per-sound sample limit only changes fully when the game next starts; the page tells you when that applies.
 - Anisotropic filtering (which keeps textures sharp at an angle) and MSAA are capped at what your graphics card supports.
@@ -274,7 +274,7 @@ Presets set texture sizes for you. Two console settings let you trade texture de
 | `image_downSizeBump` / `image_downSizeBumpLimit` | `0` / `256` | A separate ceiling for normal maps. |
 | `image_downSizeSpecular` / `image_downSizeSpecularLimit` | `0` / `64` | A separate ceiling for specular maps. |
 
-The ceiling applies first and `image_picmip` reduces from there, so raising `image_picmip` always halves the result. A material that declares `nopicmip` opts out of both. Textures reload by themselves when you change these settings; no `vid_restart` is needed.
+The ceiling applies first and `image_picmip` reduces from there, so raising `image_picmip` always halves the result. A material that declares `nopicmip` opts out of both. Textures reload by themselves when you change these settings; no `vid_restart` is needed. Only the textures a change affects reload, a few each frame (`image_reloadFrameMsec`, default `4` milliseconds a frame; `0` reloads them all at once, in one pause).
 
 For example, this halves world and model colour textures twice while leaving lighting detail, the HUD and menus untouched:
 

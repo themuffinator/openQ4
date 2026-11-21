@@ -471,6 +471,16 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Changing texture quality no longer freezes the game. Lowering or raising
+  texture detail on the Display page, with a Performance Preset or from the
+  console used to reload every texture in one pause of 4 to 7 seconds in Air
+  Defense 1, menus and fonts included. Only the textures the change affects
+  reload now (318 of 1,942 for a normal-map change), a few each frame while you
+  keep playing or browsing the menu, and the interface is never reloaded by
+  it. A change made while a level loads also reaches the textures the load
+  kept, such as the interface and your own models, which used to keep the old
+  setting until the renderer restarted. `image_reloadFrameMsec 0` brings back
+  the single pause.
 - The player guides and the package README are rewritten in plain language
   and corrected against 0.14.1. Menu paths name the new interface's tabs,
   several wrong defaults and menu routes are fixed, anything newer than 0.14.1

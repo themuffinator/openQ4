@@ -27,12 +27,15 @@ does not restore the withdrawn release. See
 
 ## Quicker texture setting changes, 21 November 2026
 
-- **Texture settings apply faster.** Changing texture quality on the Display
-  page, through a Performance Preset or from the console now reloads only the
-  textures the change affects. Lowering normal-map detail in Air Defense 1
-  reloads 318 textures instead of all 1,942, which takes 1.5 to 3 s
-  instead of 4 to 7 s. The menus, the HUD and their fonts are no longer reloaded by a
-  texture-quality change at all.
+- **Texture settings apply without freezing the game.** Changing texture
+  quality on the Display page, through a Performance Preset or from the
+  console used to stop the picture for 4 to 7 seconds in Air Defense 1 while
+  every texture reloaded. Now only the textures the change affects reload
+  (318 of 1,942 for a normal-map change), a few each frame, so the game and
+  the menu keep running and the new textures appear over a few seconds. The
+  menus, the HUD and their fonts are no longer reloaded by a texture-quality
+  change at all. To have it all in one pause instead, set
+  `image_reloadFrameMsec 0`.
 - **A change made while a level loads is no longer lost.** Textures kept from
   before the load, such as the interface and your own models, used to keep
   their old size or compression until the renderer restarted; they now follow

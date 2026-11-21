@@ -3157,7 +3157,13 @@ Completion must advance through the existing dependencies:
   (each load keeps the reduction key it was built under), through the level
   load's file prefetch, and leaves generated and persistent images alone. A
   change during a level load is no longer lost for the images the load kept.
-  The reload still blocks its frame; spreading it across frames is left.
+  Stage 8, the same day: the reload runs a few milliseconds each frame
+  (`image_reloadFrameMsec`, default 4) instead of in one pause, and finishes
+  behind the loading screen when a level load interrupts it. A normal-map
+  change in Air Defense 1 went from one 1.2 to 1.4 s frame to 145 frames of
+  at most 33 ms. Left: one slow texture still costs its whole load in one
+  frame (up to 1.4 s with precompressed textures off), which needs loading on
+  a worker thread.
 - [ ] **UI-02 — P1, implementation and qualification: text, input and accessibility.**
   Finish in-field IME/composition, shaping/kerning/fallback/styles, grapheme editing,
   caret/candidate placement, binding capture, accessibility exposure and contextual

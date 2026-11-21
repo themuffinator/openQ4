@@ -38,6 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Vulkan/vk_Image.h"
 #endif
 
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -335,6 +336,10 @@ joined the list only a full renderer restart applied it.
 */
 extern idCVar image_usePrecompressedTextures;
 
+idCVar image_reloadFrameMsec( "image_reloadFrameMsec", "4", CVAR_RENDERER | CVAR_INTEGER,
+	"milliseconds of texture reloading one frame may spend after a texture setting changes (at least one texture "
+	"a frame); 0 reloads every affected texture in the frame of the change", 0, 1000 );
+
 static bool R_ImageReductionCvarsChanged( bool clear ) {
 	idCVar *const reductionCvars[] = {
 		&image_picmip, &image_picmipFilter, &image_picmipMinSize,
@@ -411,12 +416,27 @@ next vid_restart.
 ===============
 */
 void idImageManager::CheckCvars() {
-	if ( !R_ImageReductionCvarsChanged( false ) && !R_ImageSamplerCvarsChanged( false ) ) {
+	const bool changed = R_ImageReductionCvarsChanged( false ) || R_ImageSamplerCvarsChanged( false );
+	if ( !changed && PendingReductionReloads() <= 0 ) {
 		return;
 	}
 	if ( insideLevelLoad || R_ImagePolicyActive() ) {
 		return;
 	}
+	ApplyPendingImageCvars( false );
+}
+
+/*
+===============
+idImageManager::ApplyPendingImageCvars
+
+Takes a pending cvar change (queueing the images a reduction change reaches,
+reapplying samplers for a sampling change) and then reloads queued images:
+within image_reloadFrameMsec from CheckCvars, all of them at the end of a level
+load, where the loading screen already holds the frame.
+===============
+*/
+void idImageManager::ApplyPendingImageCvars( bool finishReloads ) {
 	const bool reductionChanged = R_ImageReductionCvarsChanged( true );
 	const bool samplerChanged = R_ImageSamplerCvarsChanged( true );
 
@@ -432,6 +452,10 @@ void idImageManager::CheckCvars() {
 				image->RefreshSamplerState();
 			}
 		}
+	}
+
+	if ( PendingReductionReloads() > 0 ) {
+		ContinueReductionReloads( finishReloads ? 0.0 : static_cast<double>( Max( 0, image_reloadFrameMsec.GetInteger() ) ) );
 	}
 }
 
@@ -1334,6 +1358,8 @@ PurgeAllImages
 */
 void idImageManager::PurgeAllImages() {
 	R_RenderThread_Sync( "image registry" );
+	// the reload after a purge rebuilds every image under the settings in effect
+	ClearReductionReloads();
 	int		i;
 	idImage	*image;
 
@@ -1704,6 +1730,7 @@ Shutdown
 */
 void idImageManager::Shutdown() {
 	R_ImagePolicyLifecycleChanged();
+	ClearReductionReloads();
 	images.DeleteContents( true );
 	imageHash.Clear();
 
@@ -1785,14 +1812,25 @@ static bool R_RendererDeviceAwaitsRestart() {
 ===============
 idImageManager::ReloadReductionChangedImages
 
-Reloads the resident file-backed images whose reduction key moved, in name
-order. The level load's file prefetch is not used: right after a load the files
-sit in the operating system's cache, and its worker threads made a 318-image
-reload slower, 1.0 to 3.1 s against 1.3 to 1.5 s without them (OpenGL,
-Air Defense 1, a busy machine). Generated and persistent images are built from no file and keep their content:
-before, the reload regenerated every intrinsic image and reallocated persistent
-targets empty. Purged and never-loaded images are left alone; they load under
-the new settings when they are next bound. Returns the number reloaded.
+Queues the resident file-backed images whose reduction key moved, in name
+order; ContinueReductionReloads reloads them. Generated and persistent images
+are built from no file and keep their content. Purged and never-loaded images
+are left alone; they load under the new settings when they are next bound.
+
+The reload is spread across frames because it blocked the frame it ran in:
+1.4 s on OpenGL for the 318 normal maps of Air Defense 1, 4 to 7 s for every
+texture. Until an image's turn it keeps its old pixels, which are complete and
+valid, so a frame shows a mix of old and new sizes and never a missing
+texture. The queue holds the images, not the change: each one is checked
+again at its turn, so one loaded in the meantime (a level load, a bind, a
+device restart) or brought back to its key by a second change is skipped, and
+a second change before the queue drains simply builds a new queue.
+Returns the number queued.
+
+The level load's file prefetch is not used: right after a load the files sit
+in the operating system's cache, and its worker threads made a 318-image reload
+slower, 1.0 to 3.1 s against 1.3 to 1.5 s without them (OpenGL, Air Defense 1,
+a busy machine).
 ===============
 */
 // Vulkan stores an image that did not fit in video memory without its top
@@ -1808,6 +1846,37 @@ static bool R_ImageHeldBelowRequest( idImage *image ) {
 #endif
 }
 
+static double R_ReductionReloadClockMsec() {
+	return std::chrono::duration<double, std::milli>( std::chrono::steady_clock::now().time_since_epoch() ).count();
+}
+
+// Scratch pages and render targets are authored in memory, so there is nothing
+// on disk to rebuild them from. idImage::Reload answers a persistent image by
+// reallocating it with no data, which is correct after a device loss and
+// destructive at any other time.
+static bool R_ImageNeedsReductionReload( idImage *image ) {
+	if ( image == NULL || !image->IsFileBacked() || R_IsMutableRenderImage( image ) || !image->IsLoaded() ) {
+		return false;
+	}
+	if ( !R_ImagePolicyShouldReload( image ) ) {
+		return false;
+	}
+	return image->ReductionInputsChanged() || R_ImageHeldBelowRequest( image );
+}
+
+// The one texture that took longest, for the completion line: a single texture
+// larger than the frame budget sets the longest frame the reload can cost.
+static idStr reductionSlowestName;
+static double reductionSlowestMsec = 0.0;
+
+void idImageManager::ClearReductionReloads() {
+	reductionSlowestName.Clear();
+	reductionSlowestMsec = 0.0;
+	reductionReloads.Clear();
+	reductionReloadNext = 0;
+	reductionReloadStats = reductionReloadStats_t();
+}
+
 int idImageManager::ReloadReductionChangedImages() {
 	if ( !R_ImagePolicyOperationAllowed() ) {
 		return 0;
@@ -1817,46 +1886,90 @@ int idImageManager::ReloadReductionChangedImages() {
 	// (or leave behind) memoized probe results
 	R_SetDDSProbeCacheActive( false );
 
-	const int startMsec = Sys_Milliseconds();
+	if ( PendingReductionReloads() > 0 ) {
+		common->Printf( "Texture reduction changed again: %d queued textures are checked again\n", PendingReductionReloads() );
+	}
+	ClearReductionReloads();
 	idList<sortedImage_t> stale;
-	int unchanged = 0;
+	int unaffected = 0;
 	for ( int i = 0; i < images.Num(); i++ ) {
 		idImage *image = images[i];
-		// Scratch pages and render targets are authored in memory, so there is
-		// nothing on disk to rebuild them from. idImage::Reload answers a
-		// persistent image by reallocating it with no data, which is correct
-		// after a device loss and destructive at any other time.
-		if ( image == NULL || !image->IsFileBacked() || R_IsMutableRenderImage( image ) || !image->IsLoaded() ) {
-			continue;
+		if ( R_ImageNeedsReductionReload( image ) ) {
+			sortedImage_t &entry = stale.Alloc();
+			entry.image = image;
+			entry.size = 0;
+			entry.index = i;
+		} else if ( image != NULL && image->IsFileBacked() && image->IsLoaded() && !R_IsMutableRenderImage( image ) ) {
+			unaffected++;
 		}
-		if ( !R_ImagePolicyShouldReload( image ) ) {
-			continue;
-		}
-		if ( !image->ReductionInputsChanged() && !R_ImageHeldBelowRequest( image ) ) {
-			unchanged++;
-			continue;
-		}
-		sortedImage_t &entry = stale.Alloc();
-		entry.image = image;
-		entry.size = 0;
-		entry.index = i;
 	}
 	if ( stale.Num() > 1 ) {
 		qsort( stale.Ptr(), stale.Num(), sizeof( sortedImage_t ), R_QsortImageName );
 	}
-
-	int reloaded = 0;
+	reductionReloads.SetNum( stale.Num() );
 	for ( int i = 0; i < stale.Num(); i++ ) {
-		// a failed device reloads everything when it restarts
-		if ( R_RendererDeviceAwaitsRestart() ) {
+		reductionReloads[i] = stale[i].image;
+	}
+	reductionReloadStats.startMsec = R_ReductionReloadClockMsec();
+	reductionReloadStats.unaffected = unaffected;
+	common->Printf( "Texture reduction changed: %d textures to reload, %d unaffected\n", stale.Num(), unaffected );
+	return stale.Num();
+}
+
+bool idImageManager::ContinueReductionReloads( double budgetMsec ) {
+	if ( PendingReductionReloads() <= 0 ) {
+		return false;
+	}
+	if ( !R_ImagePolicyOperationAllowed() ) {
+		return true;
+	}
+	// a failed device reloads everything when it restarts
+	if ( R_RendererDeviceAwaitsRestart() ) {
+		common->Printf( "Texture reduction: %d queued textures left for the renderer restart\n", PendingReductionReloads() );
+		ClearReductionReloads();
+		return false;
+	}
+	R_RenderThread_Sync( "image registry" );
+
+	const double frameStart = R_ReductionReloadClockMsec();
+	int loadedThisFrame = 0;
+	while ( reductionReloadNext < reductionReloads.Num() ) {
+		if ( loadedThisFrame > 0 && budgetMsec > 0.0 && R_ReductionReloadClockMsec() - frameStart >= budgetMsec ) {
 			break;
 		}
-		stale[i].image->Reload( true );
-		reloaded++;
+		idImage *image = reductionReloads[ reductionReloadNext++ ];
+		if ( !R_ImageNeedsReductionReload( image ) ) {
+			reductionReloadStats.skipped++;
+			continue;
+		}
+		const double imageStart = R_ReductionReloadClockMsec();
+		image->Reload( true );
+		const double imageMsec = R_ReductionReloadClockMsec() - imageStart;
+		if ( imageMsec > reductionSlowestMsec ) {
+			reductionSlowestMsec = imageMsec;
+			reductionSlowestName = image->GetName();
+		}
+		reductionReloadStats.reloaded++;
+		loadedThisFrame++;
 	}
-	common->Printf( "Texture reduction changed: reloaded %d images in %d ms, %d unaffected\n",
-		reloaded, Sys_Milliseconds() - startMsec, unchanged );
-	return reloaded;
+	const double frameMsec = R_ReductionReloadClockMsec() - frameStart;
+	reductionReloadStats.workMsec += frameMsec;
+	reductionReloadStats.longestFrameMsec = Max( reductionReloadStats.longestFrameMsec, frameMsec );
+	reductionReloadStats.frames++;
+
+	if ( reductionReloadNext < reductionReloads.Num() ) {
+		return true;
+	}
+	const double totalMsec = R_ReductionReloadClockMsec() - reductionReloadStats.startMsec;
+	common->Printf( "Texture reduction applied: reloaded %d textures over %d frames in %.0f ms "
+		"(%.0f ms of loading, at most %.1f ms in one frame), %d already current, %d unaffected\n",
+		reductionReloadStats.reloaded, reductionReloadStats.frames, totalMsec, reductionReloadStats.workMsec,
+		reductionReloadStats.longestFrameMsec, reductionReloadStats.skipped, reductionReloadStats.unaffected );
+	if ( reductionSlowestName.Length() > 0 ) {
+		common->Printf( "Texture reduction: slowest texture %s, %.1f ms\n", reductionSlowestName.c_str(), reductionSlowestMsec );
+	}
+	ClearReductionReloads();
+	return false;
 }
 
 int idImageManager::LoadLevelImages( bool pacifier ) {
@@ -2017,6 +2130,14 @@ void idImageManager::EndLevelLoad() {
 	//R_ListImages_f( idCmdArgs( "sorted sorted", false ) );
 
 	R_SetDDSProbeCacheActive( false );
+
+	// A texture setting changed before or during the load, and the images the
+	// load kept still carry the old one. Finish them now, behind the loading
+	// screen, rather than over the first frames of play.
+	if ( ( R_ImageReductionCvarsChanged( false ) || R_ImageSamplerCvarsChanged( false ) || PendingReductionReloads() > 0 )
+			&& !R_ImagePolicyActive() ) {
+		ApplyPendingImageCvars( true );
+	}
 }
 
 /*
