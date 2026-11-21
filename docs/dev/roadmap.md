@@ -3,7 +3,8 @@
 > **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.14.1 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
 Updated 8 November 2026 with the frame-rate recovery category (FPS) and
-21 November 2026 with the controller experience category (PAD). The progress
+21 November 2026 with the controller experience category (PAD) and a staged
+splitscreen plan (MP-25). The progress
 review below otherwise dates from 4 November and uses the integrated source and
 recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`. The MP-02
 closeout and task counts additionally include its later integrated safety
@@ -252,7 +253,7 @@ to a final project-wide phase. Important dependencies are:
 | Portable saves (Q4-06) | Q4-05's restore validation and Q4-07's historical readers stay authoritative for existing saves. Cross-platform qualification on a target follows that target's platform evidence (PLAT/AND), and the stages run in their listed order. |
 | Casual match flow, moderation and ranking (MP-12, MP-17, MP-18) | MP-17's identity decision before bans keyed to identity, reconnect restoration and ratings; casual timeouts and votes reuse the managed `MatchTime()` pause and proposal pipeline rather than a second one. Address bans, flood control and the inactivity policy need no identity. |
 | Demo container, workflow, storage and robustness (MP-21 through MP-24) | MP-21's container and registry before MP-22's client recording and MP-23's MVD compression; MP-24's fixtures accompany every format change. MP-05 stays closed at its selected scope, and every version a release wrote keeps its reader. |
-| Multiplayer splitscreen (MP-25) | Multiplayer only: the single-player game and the Awakening campaign never gain local players. Each local player is an ordinary client on the wire, so MP-08's protocol, MP-17's identity, MP-18's per-client caps and MP-22's client recording apply per player without a second path. Per-viewport HUD and menus build on the retained interface (UI-03/UI-04/UI-09); per-viewport cost is measured against FPS-01's budgets before any preset enables effects in splitscreen. |
+| Multiplayer splitscreen (MP-25) | Multiplayer only: the single-player game and the Awakening campaign never gain local players. Each local player is an ordinary client on the wire, so MP-08's protocol, MP-17's identity, MP-18's per-client caps and MP-22's client recording apply per player without a second path. Per-viewport HUD and menus build on the retained interface (UI-03/UI-04/UI-09); per-viewport cost is measured against FPS-01's budgets before any preset enables effects in splitscreen. Seats build on PAD-01's device layer, and chat entry on PAD-05's keyboard. Stages 1 to 5 (listen server) need no protocol change. Stage 6's remote transport (decision D1) follows MP-08's packet budget and MP-21's registry. |
 | Horde (MP-26) | Monster snapshot state is a protocol change: it follows MP-08's packet budget and MP-21's registry and keeps every older demo playable. Wildcard waves reuse MP-14's modifier layer, maps and presets go through MP-13 and MP-14, bots as fighters build on MP-09, and Horde stays unranked under MP-17. The stock Quake 4 roster only; Awakening content stays scoped to its campaign. |
 | Vulkan ray tracing (RT-02 through RT-07) | RT-01's hardware, budget, licence and translation decisions first. Ray tracing builds on VK-03 admission, VK-06 resource counters and the existing TAAU, motion vectors and GPU skinning paths; RT-06 follows the VK-05/VK-07/VK-08 capture and HDR work and VR-01 stereo. `r_rayTracing 0` always runs the unchanged Vulkan path, and no other renderer depends on it. |
 | Shadowed volumetrics, GTAO and parallax occlusion (REN-09 through REN-11) | REN-10 and REN-11 closed 21 November 2026. REN-09 samples the REN-03 shadow maps and replaces the REN-06 froxel leaf; REN-10 keeps SSAO and its REN-05 controls as the fallback and comparison. Each is default-off with exact rollback, and FPS-01's budgets price every tier before a preset enables it; a new preset setting carries the SYSTEM catalog ripple. |
@@ -4509,7 +4510,8 @@ an option is turned on.
 **Estimate: 55%; 3/26 tasks closed.** The eleven original tasks stand where
 they were (80% against their own scope); the 15 November comparison added
 thirteen items that are mostly unstarted, MP-25 (splitscreen, added the
-same day) and MP-26 (Horde, added the same day) are not started. Most shipped systems work and have
+same day, with a staged plan since 21 November) and MP-26 (Horde, added the
+same day) are not started. Most shipped systems work and have
 substantial local evidence. MP-02's final long-match/catalog safety checks pass, with its timing
 contention caveat accepted for closeout; controlled timing remains unqualified.
 Simulated networking does not close physical peers. The 28 October
@@ -4542,7 +4544,7 @@ prediction/rewind defaults.
 | MP-22 — Not started | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
 | MP-23 — Partial | The render container packs its stream 4.78:1; joints are predicted (v12). | MVD compression and field encodings, 2D/sound/effect encodings, `demoStats`, budgets and targets met byte-exact. |
 | MP-24 — Partial | Native codec flips, truncations and hostile payloads; MVD cut points and recovery; damaged render files play on. | One fuzz corpus for every reader; MVD worker-thread, 64-bit and hours-long recordings; cheats-off, under-load, Vulkan/Linux/macOS/ARM64 recording and playback; cross-platform determinism; a listening check. |
-| MP-25 — Not started | One local client per game (`idAsyncServer::localClientNum`); the SDL3 backend opens one gamepad at a time; the sound world already takes a listener id; render views, subviews and the post chain draw one full-screen player view. | Two to four local players on a listen server or joining a remote server: per-player commands, devices and profiles; viewport layouts; per-viewport rendering, HUD, menus and sound; the join/leave flow; budgets per layout; play by people with real controllers. |
+| MP-25 — Not started; staged plan 21 November | Survey: the server already runs networkless local clients (bots through `InitLocalClient`), and `Draw( clientNum )` and `renderView_t`'s viewport rectangle exist. One human local client, one command generator, one open gamepad, one listener and one active GUI; `src/mpgame/` asks who is local on about 730 lines; whole-target post passes; temporal history slotted only for VR eyes. | Decisions D1-D6 (remote transport, seat identity, stock-interface policy, listener model, keyboard seat, automated seats); then the stages: seats and input, listen-server seats, split views, HUD and menus, audio, remote servers, spectating and demos, cost and qualification. |
 | MP-26 — Not started | The multiplayer module compiles Quake 4's AI, AAS and monster classes; `idAI` and `idActor` write no snapshot state and no mode spawns monsters. | Monsters networked within MP-08's budget; a wave director with scaling, champions, themes and boss waves; spawn anchors and the map decision; crowd targeting and pursuit; lives, rallies and rewards; HUD, Create Server and localized text; demo playback; play by people together. |
 
 Completion substeps:
@@ -6066,57 +6068,137 @@ Completion substeps:
   [capability matrix](engine-capability-matrix.md).
 - [ ] **MP-25 — P2, implementation: multiplayer splitscreen for up to four
   local players.** Multiplayer only; the single-player game, the Awakening
-  campaign and SP Arena gain no local players. Today a game has one local
-  client (`idAsyncServer::localClientNum`), the SDL3 backend opens one gamepad
-  and ignores any other until it is removed (PAD-01 replaces that with every
-  pad open), and the renderer, HUD and sound
-  listener assume one full-screen player view. Deliver a splitscreen that
-  plays as well as a single view:
-  - **Session and network:** one to four local players, each an ordinary
-    client with its own client number, user info, name, model, team and
-    usercmd stream, on a listen server, against bots, or joining a remote or
-    dedicated server (one connection carrying every local player or one
-    each, decided and documented against MP-08's packet budget; per-address
-    server limits count them correctly). Prediction, rewind and snapshots
-    per local player; a server option to refuse or cap guests; scoreboards,
-    votes, chat and team balance treat each as a player; a guest's identity
-    and stats follow MP-17.
-  - **Input and profiles:** every connected gamepad open at once (SDL3
-    instance ids, hot-plug and reconnect without reassigning a seat),
-    keyboard and mouse as one seat, a press-a-button-to-join lobby that binds
-    a device to a seat, per-seat bindings, sensitivity, inversion, aim assist
-    and rumble, guest profiles saved with the host's, and menu ownership (a
-    player's pause menu opens for their seat only).
-  - **Layouts and rendering:** full, two-way (horizontal or vertical, chosen
-    by aspect and resolution), three-way and four-way grids, a safe area per
-    viewport, field of view corrected for each viewport's aspect; one render
-    view per seat with its own subviews (mirrors, remote cameras), weapon
-    model, view effects, damage and death views, and screen-space post
-    effects confined to its rectangle on OpenGL and Vulkan; culling, shadow
-    and light caches shared across seats where it is safe; per-layout
-    resolution scale and effect presets so four seats hold the refresh class
-    FPS-02 sets for the active tier, measured, not assumed.
-  - **HUD, menus and text:** the retained HUD laid out per viewport at a
-    readable scale (crosshair, ammunition, chat, centerprints, kill feed, hit
-    markers, item timers, follow and spectator panels), a shared scoreboard
-    and intermission, per-seat notices, localized strings for every new
-    label, and the stock interface either supported or explicitly refused
-    while splitscreen is active.
-  - **Audio:** one listener per seat mixed into the output (nearest listener
-    or summed with gain limits, decided here), per-seat announcer and hit
-    tones without doubling shared world sounds, and voice chat routed per
-    seat.
-  - **Spectating and demos:** a local player can spectate or follow while the
-    others play; MVD and MP-22 client demos record each seat and play back one
-    viewport or the whole layout.
-  Gates: an asset-free contract for seat assignment, hot-plug and layout
-  selection; a native test for per-viewport views and listener mixing; two-,
-  three- and four-seat smokes against bots on a listen server and joining a
-  dedicated server on OpenGL and Vulkan, with captures of each layout at
-  16:9, 21:9 and 4:3; per-layout frame-time budgets recorded against FPS-01;
-  Windows, Linux and Steam Deck runs; people playing each layout with real
-  controllers through a [human qualification checklist](mp-human-qualification.md)
-  entry; and a splitscreen player guide in `docs/user/`.
+  campaign and SP Arena gain no local players. Deliver a splitscreen that
+  plays as well as a single view, on a listen server, against bots, and
+  joining a remote or dedicated server.
+
+  **Where the source stands (survey, 21 November 2026).** Each point names
+  the single-view assumption a stage below removes.
+  - **Server:** `idAsyncServer` already runs clients that have no network
+    connection. Bots enter through `InitLocalClient( clientNum, true )` on an
+    `NA_BOT` channel and take commands from `ServerSetBotUserCommand`; the one
+    human local client (`localClientNum`) takes
+    `usercmdGen->GetDirectUsercmd()` in `LocalClientInput`. A second human on
+    a listen server is that bot path fed by a seat's own command source, so
+    it needs no protocol change.
+  - **Game module:** `idGame::Draw( clientNum )` and
+    `idMultiplayerGame::Draw( clientNum )` already draw for a named client,
+    but `src/mpgame/` asks who is local on nearly 580 lines through
+    `GetLocalPlayer()` and on 156 through `localClientNum` (62 in
+    `MultiplayerGame.cpp`, 28 in `Player.cpp`). Those lines cover HUD
+    updates, private sounds, the view weapon, hit feedback, item timers, team
+    info and prediction.
+  - **Remote client:** `idAsyncClient` holds one `clientNum`, one channel and
+    one prediction (`ClientPrediction( clientNum, ... )`). Each snapshot
+    carries one player's private state, built from that player's PVS.
+  - **Input:** one `idUsercmdGen`, one key-binding table and global
+    `in_*`/`m_*`/`joy_*` settings. The SDL3 backend keeps one open gamepad,
+    and PAD-01 opens every pad.
+  - **Renderer:** `renderView_t` already carries an `x, y, width, height`
+    viewport. Temporal history already has slots (`temporalHistorySlot`: 0,
+    or 1 for a VR right eye, VR-05). The post chain runs whole-target passes
+    (`RB_BeginFullscreenPostProcessPass`). Resolution scale, dynamic
+    resolution, auto-exposure and HF-03's late look each keep one view's
+    state.
+  - **Sound and menus:** the game places one listener per frame, and its
+    `listenerId` (entity number + 1) also gates `SCHANNEL_PRIVATE` sounds.
+    The session holds one active GUI (`guiActive`).
+
+  **Decisions, settled and recorded before stage 2 starts:**
+  - **D1, remote transport.** Recommended: one connection carries every
+    seat. The server sends one snapshot built from the union of the seats'
+    PVS, with a private block per seat, and each client packet carries every
+    seat's commands. This is a protocol bump with an MP-21 registry entry.
+    The alternative is one connection per seat. It needs no protocol change,
+    but the client would hold several snapshot streams of one world at
+    different frames. Price four seats against MP-08's packet budget either
+    way.
+  - **D2, seat identity.** Each seat is a full server client slot with its
+    own client number, user info, name, model, team and score. Seats count
+    against the server's player limit, and per-address limits count them
+    correctly. A server option refuses or caps guests. A guest's identity and
+    stats follow MP-17.
+  - **D3, interface.** Recommended: splitscreen runs on the retained
+    interface only, and the stock interface refuses it with a localized
+    notice. The alternative is a scaled stock HUD per viewport, accepted only
+    if a measured capture shows it readable.
+  - **D4, audio.** Recommended: for each emitter, the nearest seat's listener
+    sets spatialization and gain, so shared world sounds never double. The
+    alternative is summed listeners with gain limits.
+  - **D5, keyboard and mouse.** Keyboard and mouse together form one seat.
+    Steam Deck's built-in controls are one seat.
+  - **D6, automated seats.** Automated runs drive extra seats with bots and
+    cheat-gated, seat-addressed in-engine probes in the manner of
+    `in_movementProbe`. They never synthesize device input.
+
+  **Stages.** Each stage closes on its own exit evidence. Stages 1 to 5
+  deliver listen-server splitscreen without a protocol change; stage 6 adds
+  remote servers.
+  1. **Seats and input.** A seat table maps each seat to its device, profile
+     and client number. It uses PAD-01's every-pad layer (SDL3 instance ids),
+     with a press-a-button-to-join lobby that binds a device to a seat.
+     Hot-plug and reconnect keep the seat. Each seat has its own command
+     source (one `idUsercmdGen` state per seat). Bindings, sensitivity,
+     inversion, aim assist and rumble become per-seat profile namespaces over
+     the global settings. Guest profiles are saved with the host's, and
+     PAD-08's player LEDs show the seat. Exit: an asset-free contract for
+     assignment, hot-plug, reconnect and profile namespaces, and two virtual
+     pads in PAD-01's harness bound to two seats.
+  2. **Listen-server seats.** Extra seats join as local clients through the
+     bot path, and `LocalClientInput` fills each seat's command. Classify
+     every `GetLocalPlayer()` and `localClientNum` use in `src/mpgame/` as
+     per seat (view, HUD, private sounds, view weapon, hit feedback), any
+     local seat, or host only. Route the per-seat uses through a current-seat
+     context that `Draw` and the HUD set. Scoreboards, votes, chat and team
+     balance treat each seat as a player. Exit: a game-module contract over
+     the classified call sites, and two to four seats playing against bots
+     on a listen server. A debug seat switch shows each seat full screen in
+     turn.
+  3. **Split views.** Layouts are viewport rectangles, each with its own safe
+     area: full, two-way (horizontal or vertical, chosen by aspect and
+     resolution), three-way and a four-way grid. Field of view is corrected
+     for each viewport's aspect. Each seat has one render view with its own
+     subviews (mirrors, remote cameras), view weapon, view effects, and
+     damage and death views. Post passes stay inside the seat's rectangle on
+     OpenGL and Vulkan. Temporal history, motion vectors, auto-exposure and
+     dynamic resolution are kept per seat, by widening the history slot to
+     seat times eye. Late look runs per seat or is off in splitscreen.
+     Culling, shadow and light caches are shared across seats where it is
+     safe. Exit: a native test of per-viewport views and confined post
+     passes, captures of each layout at 16:9, 21:9 and 4:3 on both backends,
+     and each seat's image matching its full-screen capture within a stated
+     tolerance.
+  4. **HUD, menus and text.** The retained HUD is laid out per viewport at a
+     readable minimum scale: crosshair, ammunition, chat, centerprints, kill
+     feed, hit markers, item timers, and the follow and spectator panels. A
+     pause or settings menu belongs to the seat that opened it, while the
+     other seats keep playing. Each seat enters chat through PAD-05's
+     on-screen keyboard. The scoreboard and intermission are shared, and
+     notices go to their seat. Every new label is localized, and D3's
+     interface policy applies. Exit: UI register rows, captures for each
+     layout, and passing retained-document validators.
+  5. **Audio.** D4's listener model with per-seat private channels for the
+     announcer, hit tones and pickups. Voice chat is routed per seat. Exit:
+     a native test of listener choice and gain, and a listening check in the
+     human checklist entry.
+  6. **Remote and dedicated servers.** D1's transport with per-seat
+     prediction, rewind (MP-07) and private snapshot state, plus D2's guest
+     caps and identity. Exit: clients with two to four seats join a dedicated
+     server under MP-08's simulated impairment, with bandwidth recorded
+     against the budget. Single-seat clients and older demos are unaffected.
+  7. **Spectating and demos.** A seat can spectate or follow while the others
+     play. MVD and MP-22 client demos record each seat and play back one
+     viewport or the whole layout, with MP-24 fixtures for any new record.
+  8. **Cost and qualification.** Record per-layout frame-time budgets against
+     FPS-01 on the reference machine. Choose per-layout resolution scale and
+     effect presets so four seats hold the refresh class FPS-02 sets for the
+     active tier, measured, not assumed. Run on Windows, Linux and Steam
+     Deck. People play each layout with real controllers through a
+     [human qualification checklist](mp-human-qualification.md) entry.
+     Publish a splitscreen player guide in `docs/user/` and release notes.
+  Close MP-25 when every stage exit holds on one build. That build must pass
+  two-, three- and four-seat smokes against bots on a listen server and
+  joining a dedicated server, on OpenGL and Vulkan.
 - [ ] **MP-26 — P2, implementation: Horde, a co-operative wave mode against
   Quake 4's Strogg.** Reference: Muff Mode's Horde for the Quake II Rerelease
   (MMREX, `DarkMatter-Productions/MuffMode`: `mm_horde*`, the
