@@ -377,12 +377,17 @@ if get_option('build_native_tests')
   test('openq4-bc6h-codec', openq4_bc6h_codec_test, timeout: 120)
 
   # Render demo block container: the codec, the stream of blocks cut at any
-  # byte or damaged anywhere, and the timeline its headers alone give
+  # byte or damaged anywhere, and the timeline its headers alone give.
+  # Most of its time is the 2264 truncations, each replaying the recording
+  # from its start. In a debug build that costs 40-90 s with libstdc++ (the
+  # Linux runners, ASan+UBSan included) but about 420 s with libc++ on the
+  # same host, whose unoptimised vector code runs per element: the macOS
+  # runners overran 300 s. The bound is a hang guard for every host.
   openq4_demo_block_codec_test = executable(
     'openq4-demo-block-codec-test', files('tools/tests/native/DemoBlockCodecTest.cpp'),
     include_directories: root_include_dir, install: false,
   )
-  test('openq4-demo-block-codec', openq4_demo_block_codec_test, timeout: 300)
+  test('openq4-demo-block-codec', openq4_demo_block_codec_test, timeout: 1200)
 
   openq4_save_dict_under_test = custom_target(
     'openq4-save-dict-under-test', input: files('src/game/gamesys/SaveGame.cpp', 'src/mpgame/gamesys/SaveGame.cpp'),
