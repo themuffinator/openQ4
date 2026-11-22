@@ -4472,6 +4472,18 @@ bool RendererClusterGrid_RunSelfTest( void ) {
 		viewDef_t shadowView;
 		viewLight_t shadowLights[2];
 		idRenderLightLocal shadowLightDefs[2];
+		// The planner keeps this block's view and lights; clear it before they
+		// leave scope, or the stress pass below copies descriptors whose
+		// viewLight points at reused stack (CopyPlannerShadowDescriptor reads
+		// it for the projected filter).
+		struct rendererClusterShadowPlannerRestore_t {
+			idScenePacketFrame &frame;
+			explicit rendererClusterShadowPlannerRestore_t( idScenePacketFrame &value ) : frame( value ) {}
+			~rendererClusterShadowPlannerRestore_t() {
+				frame.Clear();
+				R_ModernShadowPlanner_PrepareFrame( frame, false );
+			}
+		} restoreShadowPlanner( packetFrame );
 		R_ModernClusteredLighting_SetupSelfTestView( shadowView, shadowLights, shadowLightDefs, 2 );
 		const idMaterial *projectedLightShader = R_ModernShadowPlanner_SelfTestLightShader( "lights/defaultProjectedLight" );
 		if ( projectedLightShader == NULL ) {
