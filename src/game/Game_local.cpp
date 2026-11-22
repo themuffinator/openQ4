@@ -1018,6 +1018,7 @@ void idGameLocal::Init( void ) {
 // jnewquist: Tag scope and callees to track allocations using "new".
 	MEM_SCOPED_TAG(tag,MA_RENDER);
 // shouchard:  make sure ban list starts out in a known state
+	modBans = NULL;
 	banListLoaded = false;
 	banListChanged = false;
 	memset( clientGuids, 0, sizeof( clientGuids ) );

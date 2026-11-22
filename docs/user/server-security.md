@@ -54,6 +54,95 @@ field, or set `net_clientRemoteConsolePassword` at the console first. The
 field takes 16 characters, so for a longer password set the console variable
 first, then open **Admin** and choose **Accept** without typing in the field.
 
+## Bans, mutes and chat limits
+
+> **After 0.15.0.** This section describes the development build. 0.15.0 does
+> not have these commands; see [release status](release-status.md).
+
+In Quake 4, and in openQ4 up to 0.15.0, a ban never kept anyone out: the ban
+list stored an ID that the game never sends, and the Admin page's **Ban**
+button only kicked. Bans now work, by network address.
+
+Run these on the server: at a dedicated server's console, in the host's console
+on a server started from the game, or from your own game with `rcon` in front
+(`rcon ban 3 2h spamming`). Typed on an ordinary player's console they do
+nothing.
+
+| Command | What it does |
+|---|---|
+| `status` | Lists who is connected: slot, ping, whether they are playing, whether they are muted, their address and their name |
+| `ban <slot\|name\|address[/prefix]> [time] [reason]` | Bans an address or a range of addresses and removes every player in it |
+| `unban <row\|address[/prefix]>` | Lifts a ban, by its row in `banlist` or by its address |
+| `banlist` | Lists the bans with the time each has left; `banlist reload` reads the file again |
+| `mute <slot\|name> [time]` | Stops a player's text chat and voice-menu lines reaching anyone |
+| `unmute <slot\|name>` | Lifts a mute |
+| `kick <slot>`, `gameKick <slot\|name>` | Removes a player without banning them |
+
+The Admin page's **Ban** button now bans the chosen player's address for good,
+and the ban lists in the menus show addresses instead of IDs.
+
+**Times** are a number and a unit: `45s`, `30m`, `2h`, `7d`, `1w`. A number
+alone is minutes. `perm` never ends, and a ban without a time is permanent. A
+mute without a time lasts until you lift it or the server stops.
+
+**Ranges.** Add a prefix length to ban a whole block: `ban 203.0.113.0/24
+perm ban evasion`. Write an IPv6 address in square brackets, because the
+console would otherwise cut it apart at its colons. A home connection usually
+holds a whole IPv6 `/64`, so ban that rather than one IPv6 address:
+`ban [2001:db8:12:34::/64]`. To guard against
+a typo that would turn away much of the Internet, a range can be no wider than
+`/8` for IPv4 or `/16` for IPv6.
+
+**What a ban can and cannot do.** A ban follows the address, not the person.
+Someone whose address changes (a VPN, a new lease from their provider) can
+come back, and banning a shared address (a household, a campus, some mobile
+networks) turns away everyone behind it. Bans tied to the player rather than
+the address are planned.
+
+**The ban list** is `banlist.txt` in the server's save folder (next to its
+configuration, under `baseoq4`), a text file with one ban a line. You can edit
+it while the server is stopped, or edit it and type `banlist reload`. The list
+holds up to 512 bans, and bans that have run out are removed for you. If the
+folder holds a ban list from Quake 4, openQ4 keeps its entries as comment
+lines the first time it reads it; they never banned anyone.
+
+**Mutes.** A muted player is told they are muted and can still play. The mute
+follows their address, so leaving and joining again does not lift it. It covers
+text chat and the voice-menu lines. Microphone voice is separate: each player
+can silence another player's voice for themselves.
+
+**Chat limits.** A player may send four chat lines in any four seconds. One
+more silences them for ten seconds, and they are told why.
+
+| Setting | What it controls |
+|---|---|
+| `g_chatFloodMessages` | Chat lines a player may send within `g_chatFloodSeconds` (default `4`); `0` turns the limit off |
+| `g_chatFloodSeconds` | The length of that window in seconds (default `4`) |
+| `g_chatFloodWait` | Seconds a player who passed the limit stays silenced (default `10`) |
+| `g_reservedNames` | Names nobody may take, separated by `;` (default `admin;console;referee`). A player who asks for one gets it with `_` added |
+| `net_serverMaxClientsPerAddress` | Most players one address may hold (default `0`, no limit). Players behind one router share an address, so choose a number that still fits a household |
+| `g_adminLog` | `1` (default) writes the admin log described below; `0` turns it off |
+
+**Names.** A player's name can hold at most 32 characters that show, never
+control characters, and is never empty. Two players cannot share a name, even
+with different colours, and `server` is always reserved.
+
+**The admin log.** Every kick, ban, lifted ban, mute, chat-limit silence and
+refused connection is written to `logs/admin.ndjson` in the server's save
+folder, one line of JSON each:
+
+```text
+{"time":"2026-11-22T18:04:11Z","event":"ban","by":"console","range":"203.0.113.7/32","name":"Spammer","reason":"spamming","expires":"2026-11-22T20:04:11Z"}
+```
+
+`by` says who acted: `console` (the console or rcon), `admin` (the Admin
+page), `vote` (a kick vote), `menu` (a ban lifted from a menu) or `server` (an
+automatic action). A banned address that keeps trying is logged once a minute.
+`kick <slot>` typed at the console is the one action that is not logged yet;
+use `gameKick` or the Admin page when you want a record. The log holds
+players' network addresses, so keep it as private as the rest of the server's
+files.
+
 ## Legacy compatibility mode
 
 The old plain-text rcon is off on both sides by default. Turn it on only for an

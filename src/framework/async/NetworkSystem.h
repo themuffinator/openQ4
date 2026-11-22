@@ -189,7 +189,10 @@ public:
 // ddynerman: added some utility functions
 	// uses a static buffer, copy it before calling in game again
 	virtual const char* GetServerAddress(void);
-	virtual const char* GetClientAddress(int clientNum) { return 0; }
+	// openQ4 MP-18: a connected remote client's endpoint as Sys_NetAdrToString
+	// prints it; "" for a free slot, the listen server's own player and an
+	// inactive server. A bot reads "bot". Same slot in the game-module ABI.
+	virtual const char* GetClientAddress(int clientNum);
 	virtual	void			AddFriend(int clientNum) { }
 	virtual void			RemoveFriend(int clientNum) { }
 	// for MP games

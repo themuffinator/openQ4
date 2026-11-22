@@ -229,6 +229,8 @@ public:
 	float				GetClientIncomingCompression( int clientNum ) const;
 	float				GetClientIncomingPacketLoss( int clientNum ) const;
 	int					GetNumClients( void ) const;
+	// the endpoint of a remote client as text; false and "" for a free slot or the local client
+	bool				CopyClientAddress( int clientNum, char *out, int outSize ) const;
 	int					GetNumIdleClients( void ) const;
 	int					GetLocalClientNum( void ) const { return localClientNum; }
 	int					GetGameFrame( void ) const { return gameFrame; }

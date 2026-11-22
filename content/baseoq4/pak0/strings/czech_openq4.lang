@@ -1836,4 +1836,8 @@
 	"#str_232632"	"Povolit vynucené modely"
 	"#str_232633"	"Okolní zastínění"
 	"#str_232634"	"Vypnuto;SSAO;HBAO;GTAO"
+	"#str_232640"	"Z vaší adresy je připojeno příliš mnoho hráčů."
+	"#str_232641"	"Na tomto serveru jste ztlumeni. Váš chat se k nikomu nedostane."
+	"#str_232642"	"Posíláte zprávy příliš rychle. Počkejte několik sekund."
+	"#str_232643"	"Už nejste ztlumeni."
 }

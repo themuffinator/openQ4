@@ -444,12 +444,14 @@ def main() -> None:
         "case GAME_RELIABLE_MESSAGE_GETADMINBANLIST:",
         "case GAME_RELIABLE_MESSAGE_GETVOTEMAPS:",
     )
-    require_before(
+    require(
         ban_list,
         "if ( !isListenServer || clientNum != localClientNum )",
-        "ServerSendBanList( clientNum );",
         "ban-list sender authentication",
     )
+    # MP-18: the ban list holds players' addresses and never travels; the host
+    # reads the list it holds and a remote administrator uses 'rcon banlist'.
+    reject(network, "ServerSendBanList", "a ban list sent over the network")
 
     reliable_string = body(network, "static bool HasBoundedReliableString")
     require(reliable_string, "memchr", "reliable typed string terminator bound")

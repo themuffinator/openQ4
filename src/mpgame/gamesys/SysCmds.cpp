@@ -1147,6 +1147,7 @@ static void Cmd_Kick_f( const idCmdArgs &args ) {
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "say kicking out client %d '%s^0'\n", player->entityNumber, gameLocal.userInfo[ player->entityNumber ].GetString( "ui_name" ) ) );
 	// the kick deletes the player; a kick is not a lost connection (g_pauseOnDisconnect)
 	const int kickedClient = player->entityNumber;
+	gameLocal.ModerationLogClient( "kick", "console", kickedClient, "", 0 );
 	gameLocal.mpGame.BeginServerDrop( kickedClient );
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d\n", kickedClient ) );
 	gameLocal.mpGame.EndServerDrop( kickedClient );
@@ -4682,7 +4683,14 @@ void idGameLocal::InitConsoleCommands( void ) {
 // RAVEN BEGIN
 	// jshepard
 	cmdSystem->AddCommand( "forceTeamChange",				idMultiplayerGame::ForceTeamChange_f,			CMD_FL_GAME,		"force team change: forceTeamChange <id>" );
-	cmdSystem->AddCommand( "removeClientFromBanList",		idMultiplayerGame::RemoveClientFromBanList_f,	CMD_FL_GAME,		"removes a client id from the ban list: removeClientFromBanList <client id>" );
+	cmdSystem->AddCommand( "removeClientFromBanList",		idMultiplayerGame::RemoveClientFromBanList_f,	CMD_FL_GAME,		"lift a ban (the older name of unban): removeClientFromBanList <row of banlist|address[/prefix]>" );
+	// openQ4 MP-18: server moderation (mp/Moderation.h). They run on the server: its console, a listen host, or rcon.
+	cmdSystem->AddCommand( "ban",					idGameLocal::Ban_f,			CMD_FL_GAME,	"ban an address or a range and remove its players: ban <client slot|name|address[/prefix]> [time] [reason]" );
+	cmdSystem->AddCommand( "unban",					idGameLocal::Unban_f,		CMD_FL_GAME,	"lift a ban: unban <row of banlist|address[/prefix]>" );
+	cmdSystem->AddCommand( "banlist",				idGameLocal::BanList_f,		CMD_FL_GAME,	"list the bans; banlist reload reads banlist.txt again" );
+	cmdSystem->AddCommand( "mute",					idGameLocal::Mute_f,		CMD_FL_GAME,	"stop a player's text chat reaching anyone: mute <client slot|name> [time]" );
+	cmdSystem->AddCommand( "unmute",				idGameLocal::Mute_f,		CMD_FL_GAME,	"lift a text mute: unmute <client slot|name>" );
+	cmdSystem->AddCommand( "status",				idGameLocal::Status_f,		CMD_FL_GAME,	"list the connected clients with their address, ping and mute state" );
 
 #ifndef _XBOX
 // shouchard:  more voice chat stuff (non-XBOX)

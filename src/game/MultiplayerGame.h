@@ -254,10 +254,14 @@ typedef struct mpChatLine_s {
 	short			fade;			// starts high and decreases, line is removed once reached 0
 } mpChatLine_t;
 
+// openQ4 MP-18: a ban as the menus read it. Quake 4 kept a GUID here that no
+// client sends; guid is now the banned range ("192.0.2.0/24").
+#include "../mpgame/mp/Moderation.h"
 typedef struct mpBanInfo_s {
-	idStr			name;
-	char			guid[ CLIENT_GUID_LENGTH ];
-//	unsigned char	ip[ 15 ];
+	char			name[ MP_MOD_NAME_BYTES ];
+	char			guid[ MP_MOD_RANGE_TEXT_BYTES ];
+	char			reason[ MP_MOD_REASON_BYTES ];
+	mpModTime_t		expires;		// 0 never
 } mpBanInfo_t;
 
 class idPhysics_Player;

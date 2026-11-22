@@ -1845,4 +1845,8 @@
 	"#str_232632"	"Modèles forcés permis"
 	"#str_232633"	"Occlusion ambiante"
 	"#str_232634"	"Off;SSAO;HBAO;GTAO"
+	"#str_232640"	"Trop de joueurs sont connectés depuis votre adresse."
+	"#str_232641"	"Vous êtes réduit au silence sur ce serveur. Vos messages n'atteignent personne."
+	"#str_232642"	"Vous envoyez des messages trop vite. Patientez quelques secondes."
+	"#str_232643"	"Vous n'êtes plus réduit au silence."
 }

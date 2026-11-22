@@ -1892,4 +1892,8 @@
 	"#str_232632"	"Wymuszone modele"
 	"#str_232633"	"Okluzja otoczenia"
 	"#str_232634"	"Wył.;SSAO;HBAO;GTAO"
+	"#str_232640"	"Z twojego adresu połączyło się zbyt wielu graczy."
+	"#str_232641"	"Jesteś wyciszony na tym serwerze. Twój czat do nikogo nie dociera."
+	"#str_232642"	"Wysyłasz wiadomości zbyt szybko. Poczekaj kilka sekund."
+	"#str_232643"	"Nie jesteś już wyciszony."
 }

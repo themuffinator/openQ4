@@ -731,6 +731,9 @@ def validate_validation_wiring() -> None:
         # The map database's rotation, queue and pick on a staged dedicated
         # server with bots and one client; mp_map_database_contract.py is wired.
         "mp_map_rotation_smoke.py",
+        # Bans, mutes, the chat flood window and the per-address limit on a staged
+        # dedicated server with a bot and two clients; mp_moderation.py is wired.
+        "mp_moderation_smoke.py",
         # A 12-player match over a simulated small path MTU.
         "mp_path_mtu_soak.py",
         "mp_mod_admission_smoke.py",

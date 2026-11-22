@@ -1836,4 +1836,8 @@
 	"#str_232632"	"Zorunlu modellere izin ver"
 	"#str_232633"	"Ortam Perdeleme"
 	"#str_232634"	"Kapalı;SSAO;HBAO;GTAO"
+	"#str_232640"	"Adresinizden çok fazla oyuncu bağlı."
+	"#str_232641"	"Bu sunucuda susturuldunuz. Sohbetiniz kimseye ulaşmıyor."
+	"#str_232642"	"Çok hızlı mesaj gönderiyorsunuz. Birkaç saniye bekleyin."
+	"#str_232643"	"Artık susturulmuş değilsiniz."
 }

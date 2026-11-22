@@ -737,9 +737,17 @@ void idGameLocal::Init( void ) {
 // jnewquist: Tag scope and callees to track allocations using "new".
 	MEM_SCOPED_TAG(tag,MA_RENDER);
 // shouchard:  make sure ban list starts out in a known state
+	modBans = NULL;
 	banListLoaded = false;
 	banListChanged = false;
 	memset( clientGuids, 0, sizeof( clientGuids ) );
+	memset( clientModAddress, 0, sizeof( clientModAddress ) );
+	memset( modTextMuteUntil, 0, sizeof( modTextMuteUntil ) );
+	memset( &modMutes, 0, sizeof( modMutes ) );
+	memset( modChatFlood, 0, sizeof( modChatFlood ) );
+	memset( modNoticeTime, 0, sizeof( modNoticeTime ) );
+	memset( &modLastRefused, 0, sizeof( modLastRefused ) );
+	modLastRefusedTime = 0;
 // RAVEN END
 
 // RAVEN BEGIN
@@ -1404,6 +1412,21 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 		// server sanity
 		if ( !isClient ) {
 
+			// openQ4 MP-18: the name policy. No control characters, at most
+			// MP_MOD_NAME_VISIBLE_MAX characters that show, never empty, and none
+			// of the names g_reservedNames keeps for the people who run the server.
+			{
+				char cleanName[ MP_MOD_NAME_BYTES ];
+				if ( MPModCleanName( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), cleanName, sizeof( cleanName ), MP_MOD_NAME_VISIBLE_MAX ) ) {
+					idGameLocal::userInfo[ clientNum ].Set( "ui_name", cleanName );
+					modifiedInfo = true;
+				}
+				if ( !botManager.IsBot( clientNum ) && MPModNameIsReserved( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), g_reservedNames.GetString() ) ) {
+					idGameLocal::userInfo[ clientNum ].Set( "ui_name", va( "%s_", idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) ) );
+					modifiedInfo = true;
+				}
+			}
+
 			// don't let numeric nicknames, it can be exploited to go around kick and ban commands from the server
 			if ( idStr::IsNumeric( this->userInfo[ clientNum ].GetString( "ui_name" ) ) ) {
 #if UI_DEBUG
@@ -1431,7 +1454,8 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 // jnewquist: Use accessor for static class type 
 				if ( entities[ i ] && entities[ i ]->IsType( idPlayer::GetClassType() ) ) {
 // RAVEN END
-					if ( !idStr::Icmp( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), idGameLocal::userInfo[ i ].GetString( "ui_name" ) ) ) {
+					// openQ4 MP-18: one name whatever its colours; "^1Bob" used to pass beside "Bob"
+					if ( !idStr::IcmpNoEscape( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), idGameLocal::userInfo[ i ].GetString( "ui_name" ) ) ) {
 #if UI_DEBUG
 						common->Printf( "SetUserInfo: client %d changed name from %s to %s_ because of client %d\n", 
 							clientNum, idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), i );

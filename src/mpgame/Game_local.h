@@ -1545,22 +1545,41 @@ public:
 	int						RemoteExtrapolationMS( int clientNum, int leadMS ) const;
 	void					UpdateAdvertisedRemoteExtrapolation( void );
 
+	// openQ4 MP-18: bans are address ranges with an expiry and a reason, kept in
+	// banlist.txt (mp/Moderation.h, mp/ModerationFile.h)
 	void					LoadBanList();
 	void					SaveBanList();
 	void					FlushBanList();
-	bool					IsPlayerBanned( const char *name );
-	bool					IsGuidBanned( const char *guid );
-	void					AddGuidToBanList( const char *guid );
+	const mpModBan_t *		FindBan( const mpModAddress_t &address );
+	int						AddBan( const mpModAddress_t &address, int prefixBits, mpModTime_t durationSeconds, const char *name, const char *reason );
+	bool					RemoveBan( int index );
+	// the menus name a ban by its range text, where Quake 4 passed a GUID
 	void					RemoveGuidFromBanList( const char *guid );
+	void					AddGuidToBanList( const char *guid );
 	virtual void			RegisterClientGuid( int clientNum, const char *guid );
 
 	int						GetBanListCount();
-	const mpBanInfo_t*		GetBanListEntry( int entry );	// returns client name
+	const mpModBan_t *		GetBan( int entry );
+	const mpBanInfo_t*		GetBanListEntry( int entry );	// the row as the menus read it
 	const char*				GetGuidByClientNum( int clientNum );	// returns GUID
-	int						GetClientNumByGuid( const char* );		// returns clientNum
 
-// mekberg: get and send ban list
-	void					ServerSendBanList( int clientNum );
+	// a connected client's address; family 0 for a bot or the listen server's own player
+	const mpModAddress_t &	GetClientModAddress( int clientNum ) const;
+	void					ModerationClientConnect( int clientNum );
+	void					ModerationClientDisconnect( int clientNum );
+	bool					ModerationRefuseBanned( const char *endpoint );
+	int						ServerBan( const mpModAddress_t &address, int prefixBits, mpModTime_t durationSeconds, const char *name, const char *reason, const char *by );
+	bool					IsClientTextMuted( int clientNum );
+	bool					SetClientTextMute( int clientNum, bool mute, mpModTime_t durationSeconds, const char *by );
+	bool					ModerationAllowChat( int clientNum, bool fromNetwork );
+	void					ModerationWriteLog( mpModLogLine_t &line );
+	void					ModerationLogClient( const char *event, const char *by, int clientNum, const char *reason, mpModTime_t seconds );
+	void					ModerationLogBan( const char *event, const char *by, const mpModBan_t &ban );
+	static void				Ban_f( const idCmdArgs &args );
+	static void				Unban_f( const idCmdArgs &args );
+	static void				BanList_f( const idCmdArgs &args );
+	static void				Mute_f( const idCmdArgs &args );
+	static void				Status_f( const idCmdArgs &args );
 
 // jscott: made public
 	pvsHandle_t				GetClientPVS( idPlayer *player, pvsType_t type );
@@ -1573,9 +1592,17 @@ public:
 
 private:
 	char					clientGuids[ MAX_CLIENTS ][ CLIENT_GUID_LENGTH ];
-	idList<mpBanInfo_t>		banList;
+	mpModBanList_t *		modBans;				// NULL until the list is first needed
+	idStrList				modBanKeptLines;		// lines of banlist.txt that are not bans this build reads
 	bool					banListLoaded;
 	bool					banListChanged;
+	mpModAddress_t			clientModAddress[ MAX_CLIENTS ];
+	mpModTime_t				modTextMuteUntil[ MAX_CLIENTS ];	// 0 not muted, -1 until lifted, else when it ends
+	mpModMuteList_t			modMutes;				// mutes by address, so a reconnect keeps one
+	mpModFlood_t			modChatFlood[ MAX_CLIENTS ];
+	int						modNoticeTime[ MAX_CLIENTS ];	// game time of the next "you are muted" notice
+	mpModAddress_t			modLastRefused;			// the last banned address the admin log recorded
+	mpModTime_t				modLastRefusedTime;
 // RAVEN END
 };
 

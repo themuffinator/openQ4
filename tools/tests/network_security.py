@@ -1396,6 +1396,81 @@ def validate_mp_audit_round_2026_11_17() -> None:
     reject(capture, "gameTime - lastSnapshotGameTime < static_cast<int>( header.snapshotDelay )", "MVD pacing on the 16 ms label")
 
 
+def validate_server_moderation() -> None:
+    """MP-18 (22 November 2026): bans by address, the per-address connection limit, the chat
+    flood window, the name policy and the admin log. tools/tests/mp_moderation.py runs the
+    engine-free core and pins each console command."""
+    core = read_game("src/mpgame/mp/Moderation.h")
+    for cap in (
+        "static const int MP_MOD_MAX_BANS = 512;",
+        "static const int MP_MOD_MAX_MUTES = 64;",
+        "static const int MP_MOD_MIN_PREFIX_V4 = 8;",
+        "static const int MP_MOD_MIN_PREFIX_V6 = 16;",
+        "static const int MP_MOD_NAME_VISIBLE_MAX = 32;",
+        "static const int MP_MOD_FLOOD_MAX_MESSAGES = 16;",
+        "static const int MP_MOD_LINE_BYTES = 512;",
+        "static const int MP_MOD_LOG_LINE_BYTES = 1024;",
+        "static const mpModTime_t MP_MOD_MAX_DURATION_SECONDS = 10LL * 365 * 24 * 3600;",
+    ):
+        require(core, cap, "moderation caps")
+    add = function_body(core, "inline int MPModBanAdd(", "ban list add")
+    require_before(add, "if ( !MPModRangeIsAllowed( address, prefixBits ) ) {", "index = list.count++;",
+                   "a range too wide to be a ban is refused before it is stored")
+    require_before(add, "if ( list.count >= MP_MOD_MAX_BANS ) {\n\t\t\treturn -1;", "index = list.count++;", "a full ban list refuses")
+    require(function_body(core, "inline int MPModBanFind(", "ban list find"), "!MPModBanExpired( ban, now )", "an expired ban matches nobody")
+    parse = function_body(core, "inline bool MPModParseAddress(", "address parser")
+    require(parse, "if ( length <= 0 || length >= 128 ) {", "address text is bounded before it is read")
+    require(parse, "static const unsigned char mapped[ 12 ]", "an IPv4-mapped address is its IPv4 address")
+    require(function_body(core, "inline void MPModCopyText(", "stored text"), "if ( c < 0x20 || c == 0x7f ) {",
+            "control characters never reach the ban list or its file")
+    require(function_body(core, "inline void MPModLogValue(", "admin log value"), "if ( c == '\"' || c == '\\\\' ) {",
+            "player text is escaped in the admin log")
+    loader = read_game("src/mpgame/mp/ModerationFile.h")
+    require(loader, "static const int MP_MOD_BANLIST_MAX_BYTES = 512 * 1024;", "ban file size cap")
+    require(loader, "static const int MP_MOD_BANLIST_MAX_KEPT_LINES = 256;", "ban file kept-line cap")
+
+    server = read("src/framework/async/AsyncServer.cpp")
+    connect = function_body(server, "void idAsyncServer::ProcessConnectMessage(", "connect")
+    require_before(connect, "ValidateChallenge( from, challenge, clientId )", "idAsyncNetwork::serverMaxClientsPerAddress.GetInteger()",
+                   "the per-address limit counts only proven addresses")
+    require_before(connect, "if ( sameAddress >= perAddressLimit ) {", "game->ServerAllowClient(",
+                   "the per-address limit refuses before the game is asked")
+    require(read("src/framework/async/AsyncNetwork.cpp"),
+            'idAsyncNetwork::serverMaxClientsPerAddress( "net_serverMaxClientsPerAddress", "0",', "the per-address limit is off by default")
+
+    network = read_game("src/mpgame/Game_network.cpp")
+    for signature in ("allowReply_t idGameLocal::ServerAllowClient(", "allowReply_t idGameLocal::RepeaterAllowClient("):
+        require_before(function_body(network, signature, signature), "if ( ModerationRefuseBanned( IP ) ) {", "si_pure",
+                       "a banned address is refused first")
+    reject(network, "IsGuidBanned", "a ban keyed to the GUID no client sends")
+    reliable = function_body(network, "void idGameLocal::ServerProcessReliableMessage(", "client reliable messages")
+    if reliable.count("if ( !ModerationAllowChat( clientNum, true ) ) {") != 2:
+        raise AssertionError("chat and voice-menu lines both answer to the mute and the flood window")
+    require_before(reliable, "RELIABLE_FLOOD_CHAT_DELAY ) ) {", "if ( !ModerationAllowChat( clientNum, true ) ) {",
+                   "the per-line delay still runs ahead of the flood window")
+    cvars = read_game("src/mpgame/gamesys/SysCvar.cpp")
+    for declaration in (
+        'idCVar g_chatFloodMessages(\t\t"g_chatFloodMessages",\t\t"4",',
+        'idCVar g_chatFloodSeconds(\t\t\t"g_chatFloodSeconds",\t\t"4",',
+        'idCVar g_chatFloodWait(\t\t\t\t"g_chatFloodWait",\t\t\t"10",',
+        'idCVar g_adminLog(\t\t\t\t\t"g_adminLog",\t\t\t\t"1",',
+        'idCVar g_reservedNames(\t\t\t\t"g_reservedNames",\t\t\t"admin;console;referee",',
+    ):
+        require(cvars, declaration, "moderation defaults")
+    names = function_body(read_game("src/mpgame/Game_local.cpp"), "const idDict* idGameLocal::SetUserInfo(", "user info")
+    require_before(names, "MPModCleanName(", "idStr::IsNumeric(", "the name policy runs on every server-side name")
+    require(names, "MP_MOD_NAME_VISIBLE_MAX", "names are bounded")
+
+    guide = read("docs/user/server-security.md")
+    for token in ("banlist.txt", "logs/admin.ndjson", "net_serverMaxClientsPerAddress", "A ban follows the address, not the person"):
+        require(guide, token, "moderation administrator guidance")
+    for path in (".github/workflows/commit-validation.yml", ".github/workflows/push-verification.yml"):
+        workflow = read(path)
+        require(workflow, "tools/tests/mp_moderation.py \\", f"{path} syntax-check registration")
+        require(workflow, "python tools/tests/mp_moderation.py", f"{path} execution registration")
+    require(read("tools/validation/openq4_validate.py"), '"mp_moderation.py"', "local validation registration")
+
+
 def main() -> None:
     validate_crypto_and_native_vectors()
     validate_secure_random_and_connection_challenges()
@@ -1412,6 +1487,7 @@ def main() -> None:
     validate_session_lifecycle_and_flood_bounds()
     validate_protocol_2_42()
     validate_mp_audit_round_2026_11_17()
+    validate_server_moderation()
     validate_documentation_and_registration()
     print("network_security: ok")
 

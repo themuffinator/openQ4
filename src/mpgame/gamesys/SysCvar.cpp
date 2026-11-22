@@ -883,6 +883,13 @@ idCVar si_timeoutLength(			"si_timeoutLength",			"60",			CVAR_GAME | CVAR_SERVER
 idCVar si_spectatorLock(			"si_spectatorLock",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "during live play: 1 spectators cannot join the game, 2 players cannot leave it either; 0 off", 0, 2 );
 idCVar g_inactivity(				"g_inactivity",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a playing human may send no input before being moved to spectators (dropped when spectators are off); 0 off", 0, 3600 );
 idCVar g_pauseOnDisconnect(			"g_pauseOnDisconnect",		"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a casual team match pauses when a playing human disconnects, so they can reconnect; 0 off", 0, 300 );
+// openQ4 MP-18: server moderation (mp/Moderation.h). The flood window is Quake II's
+// flood_msgs, flood_persecond and flood_waitdelay with its defaults.
+idCVar g_chatFloodMessages(		"g_chatFloodMessages",		"4",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "chat lines one player may send within g_chatFloodSeconds before being silenced for g_chatFloodWait; 0 for no limit", 0, 16 );
+idCVar g_chatFloodSeconds(			"g_chatFloodSeconds",		"4",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "length in seconds of the window g_chatFloodMessages counts", 1, 60 );
+idCVar g_chatFloodWait(				"g_chatFloodWait",			"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who passed the chat flood window stays silenced", 0, 600 );
+idCVar g_adminLog(					"g_adminLog",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "write kicks, bans, mutes, chat floods and refused connections to logs/admin.ndjson in the save folder" );
+idCVar g_reservedNames(				"g_reservedNames",			"admin;console;referee",	CVAR_GAME | CVAR_ARCHIVE, "player names nobody may take, separated by ';', whatever their case or colours; a player who asks for one gets it with '_' added" );
 
 idCVar g_mapCycle(					"g_mapCycle",				"mapcycle",		CVAR_GAME | CVAR_ARCHIVE, "map cycling script for multiplayer games - see mapcycle.scriptcfg" );
 

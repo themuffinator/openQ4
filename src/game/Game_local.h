@@ -1371,10 +1371,9 @@ public:
 	void					LoadBanList();
 	void					SaveBanList();
 	void					FlushBanList();
-	bool					IsPlayerBanned( const char *name );
 	bool					IsGuidBanned( const char *guid );
-	void					AddGuidToBanList( const char *guid );
 	void					RemoveGuidFromBanList( const char *guid );
+	void					AddGuidToBanList( const char *guid );
 	virtual void			RegisterClientGuid( int clientNum, const char *guid );
 
 	int						GetBanListCount();
@@ -1402,7 +1401,9 @@ private:
 // jmarshall end
 private:
 	char					clientGuids[ MAX_CLIENTS ][ CLIENT_GUID_LENGTH ];
-	idList<mpBanInfo_t>		banList;
+	// openQ4 MP-18: banlist.txt as the multiplayer module keeps it (../mpgame/mp/Moderation.h)
+	mpModBanList_t *		modBans;				// NULL until the list is first needed
+	idStrList				modBanKeptLines;		// lines of banlist.txt that are not bans this build reads
 	bool					banListLoaded;
 	bool					banListChanged;
 // RAVEN END

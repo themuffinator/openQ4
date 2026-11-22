@@ -117,6 +117,20 @@ void idNetworkSystem::ServerRecordInstanceReliableMessage( int instance, int exc
 
 /*
 ==================
+idNetworkSystem::GetClientAddress
+==================
+*/
+const char *idNetworkSystem::GetClientAddress( int clientNum ) {
+	static char clientAddress[ MAX_STRING_CHARS ];
+	clientAddress[ 0 ] = '\0';
+	if ( idAsyncNetwork::server.IsActive() ) {
+		idAsyncNetwork::server.CopyClientAddress( clientNum, clientAddress, sizeof( clientAddress ) );
+	}
+	return clientAddress;
+}
+
+/*
+==================
 idNetworkSystem::ServerStartMVDRecording
 ==================
 */

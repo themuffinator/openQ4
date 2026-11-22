@@ -1836,4 +1836,8 @@
 	"#str_232632"	"Allow Forced Models"
 	"#str_232633"	"Ambient Occlusion"
 	"#str_232634"	"Off;SSAO;HBAO;GTAO"
+	"#str_232640"	"Too many players are connected from your address."
+	"#str_232641"	"You are muted on this server. Your chat reaches nobody."
+	"#str_232642"	"You are sending messages too fast. Wait a few seconds."
+	"#str_232643"	"You are no longer muted."
 }

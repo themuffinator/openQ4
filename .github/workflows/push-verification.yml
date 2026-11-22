@@ -285,6 +285,8 @@ jobs:
             tools/tests/mp_classic_grapple_contract.py \
             tools/tests/mp_casual_match_flow_contract.py \
             tools/tests/mp_client_options.py \
+            tools/tests/mp_moderation.py \
+            tools/tests/mp_moderation_smoke.py \
             tools/tests/awakening_turret_skin_contract.py \
             tools/tests/awakening_m01_dropship_contract.py \
             tools/tests/awakening_m01_retch_contract.py \
@@ -881,6 +883,7 @@ jobs:
           python tools/tests/mp_classic_grapple_contract.py
           python tools/tests/mp_casual_match_flow_contract.py
           python tools/tests/mp_client_options.py
+          python tools/tests/mp_moderation.py
           python tools/tests/awakening_turret_skin_contract.py
           python tools/tests/awakening_m01_dropship_contract.py
           python tools/tests/awakening_m01_retch_contract.py

@@ -5,9 +5,9 @@
 // RAVEN BEGIN
 // bdube: client entities
 #include "client/ClientEffect.h"
-// shouchard:  ban list support
-#define BANLIST_FILENAME "banlist.txt"
 // RAVEN END
+// openQ4 MP-18: banlist.txt is the multiplayer module's text list; this module reads it for the menus
+#include "../mpgame/mp/ModerationFile.h"
 
 /*
 ===============================================================================
@@ -2293,17 +2293,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 
 // mekberg: get ban list for server
 		case GAME_RELIABLE_MESSAGE_GETADMINBANLIST: {
-			mpBanInfo_t banInfo;
-			char name[MAX_STRING_CHARS];
-			char guid[MAX_STRING_CHARS];
-
-			FlushBanList( );
-			while ( msg.ReadString( name, MAX_STRING_CHARS ) && msg.ReadString( guid, MAX_STRING_CHARS ) ) {
-				banInfo.name = name;
-				idStr::Copynz( banInfo.guid, guid, CLIENT_GUID_LENGTH );
-				banList.Append( banInfo );
-			}
-
+			// openQ4 MP-18: no server sends its ban list any more
 			break;
 		}
 // RAVEN END
@@ -2858,6 +2848,11 @@ void idEventQueue::Enqueue( entityNetEvent_t *event, outOfOrderBehaviour_t behav
 
 // RAVEN BEGIN
 // shouchard:  ban list stuff here
+// openQ4 MP-18: the multiplayer module owns bans now: address ranges with an
+// expiry and a reason, kept as text in banlist.txt (../mpgame/mp/Moderation.h,
+// ../mpgame/mp/ModerationFile.h). This module hosts no network game; it reads
+// and trims the same file for the Create Server page, which runs on whichever
+// module the menu has loaded.
 
 /*
 ================
@@ -2865,35 +2860,22 @@ idGameLocal::LoadBanList
 ================
 */
 void idGameLocal::LoadBanList() {
-
-	// open file
-	idStr token;
-	idFile *banFile = fileSystem->OpenFileRead( BANLIST_FILENAME );
-	mpBanInfo_t banInfo;
-	if ( NULL == banFile ) {
-		common->DPrintf( "idGameLocal::LoadBanList:  unable to open ban list file!\n" ); // fixme:  need something better here
-		return;
+	if ( modBans == NULL ) {
+		modBans = new mpModBanList_t;
 	}
-
-	// parse file (read three consecutive strings per banInfo (real complex ;) ) )
-	while ( banFile->ReadString( token ) > 0 ) {
-		// name
-		banInfo.name = token;
-
-		// guid
-		if ( banFile->ReadString( token ) > 0 && token.Length() >= 11 ) {
-			idStr::Copynz( banInfo.guid, token.c_str(), CLIENT_GUID_LENGTH );
-
-			banList.Append( banInfo );
-			continue;
-		}
-
-		gameLocal.Warning( "idGameLocal::LoadBanList:  Potential curruption of banlist file (%s).", BANLIST_FILENAME );
-	}
-	fileSystem->CloseFile( banFile );
-
+	mpModBanFileResult_t result;
+	MPModLoadBanFile( *modBans, modBanKeptLines, result );
 	banListLoaded = true;
-	banListChanged = false;
+	banListChanged = result.rewrite;
+	if ( result.unreadable ) {
+		common->Warning( "ban list: %s was not a ban list; it was copied to %s and replaced", MP_MOD_BANLIST_FILENAME, MP_MOD_BANLIST_UNREADABLE );
+	} else if ( result.legacy > 0 ) {
+		common->Printf( "ban list: %d Quake 4 GUID ban(s) in %s are kept as comments; they never matched a player\n", result.legacy, MP_MOD_BANLIST_FILENAME );
+	}
+	if ( MPModBanPurgeExpired( *modBans, static_cast<mpModTime_t>( ::time( NULL ) ) ) > 0 ) {
+		banListChanged = true;
+	}
+	SaveBanList();
 }
 
 /*
@@ -2902,27 +2884,13 @@ idGameLocal::SaveBanList
 ================
 */
 void idGameLocal::SaveBanList() {
-	if ( !banListChanged ) {
+	if ( !banListChanged || modBans == NULL ) {
 		return;
 	}
-
-	// open file
-	idFile *banFile = fileSystem->OpenFileWrite( BANLIST_FILENAME );
-	if ( NULL == banFile ) {
-		common->DPrintf( "idGameLocal::SaveBanList:  unable to open ban list file!\n" ); // fixme:  need something better here
+	if ( !MPModSaveBanFile( *modBans, modBanKeptLines ) ) {
+		common->Warning( "ban list: %s could not be written", MP_MOD_BANLIST_FILENAME );
 		return;
 	}
-
-	for ( int i = 0; i < banList.Num(); i++ ) {
-		const mpBanInfo_t& banInfo = banList[ i ];
-		char temp[ 16 ] = { 0, };
-		banFile->WriteString( va( "%s", banInfo.name.c_str() ) );
-		idStr::Copynz( temp, banInfo.guid, CLIENT_GUID_LENGTH );
-		banFile->WriteString( temp );
-//		idStr::Copynz( temp, (const char*)banInfo.ip, 15 );
-//		banFile->WriteString( "255.255.255.255" );
-	}
-	fileSystem->CloseFile( banFile );
 	banListChanged = false;
 }
 
@@ -2932,97 +2900,53 @@ idGameLocal::FlushBanList
 ================
 */
 void idGameLocal::FlushBanList() {
-	banList.Clear();
+	delete modBans;
+	modBans = NULL;
+	modBanKeptLines.Clear();
 	banListLoaded = false;
 	banListChanged = false;
 }
 
 /*
 ================
-idGameLocal::IsPlayerBanned
-================
-*/
-bool idGameLocal::IsPlayerBanned( const char *name ) {
-	assert( name );
-
-	if ( !banListLoaded ) {
-		LoadBanList();
-	}
-
-	// check vs. each line in the list, if we found one return true
-	for ( int i = 0; i < banList.Num(); i++ ) {
-		if ( 0 == idStr::Icmp( name, banList[ i ].name ) ) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-/*
-================
 idGameLocal::IsGuidBanned
+No client sends a GUID, and this module hosts no network game.
 ================
 */
 bool idGameLocal::IsGuidBanned( const char *guid ) {
-	assert( guid );
-
-	if ( !banListLoaded ) {
-		LoadBanList();
-	}
-
-	// check vs. each line in the list, if we found one return true
-	for ( int i = 0; i < banList.Num(); i++ ) {
-		if ( 0 == idStr::Icmp( guid, banList[ i ].guid ) ) {
-			return true;
-		}
-	}
-
 	return false;
-}
-
-/*
-================
-idGameLocal::AddGuidToBanList
-================
-*/
-void idGameLocal::AddGuidToBanList( const char *guid ) {
-	assert( guid );
-
-	if ( !banListLoaded ) {
-		LoadBanList();
-	}
-
-	mpBanInfo_t banInfo;
-	char name[ 512 ];	// TODO: clean this up
-	gameLocal.GetPlayerName( gameLocal.GetClientNumByGuid( guid ), name );
-	banInfo.name = name;
-	idStr::Copynz( banInfo.guid, guid, CLIENT_GUID_LENGTH );
-//	SIMDProcessor->Memset( banInfo.ip, 0xFF, 15 );
-	banList.Append( banInfo );
-	banListChanged = true;
 }
 
 /*
 ================
 idGameLocal::RemoveGuidFromBanList
+The menus name a ban by the text PopulateBanList gave them. That was a GUID in
+Quake 4; it is the banned range now.
 ================
 */
 void idGameLocal::RemoveGuidFromBanList( const char *guid ) {
-	assert( guid );
-
+	mpModAddress_t address;
+	int prefixBits = 0;
+	if ( guid == NULL || !MPModParseAddress( guid, address, prefixBits ) ) {
+		return;
+	}
 	if ( !banListLoaded ) {
 		LoadBanList();
 	}
-
-	// check vs. each line in the list, if we find a match remove it.
-	for ( int i = 0; i < banList.Num(); i++ ) {
-		if ( 0 == idStr::Icmp( guid, banList[ i ].guid ) ) {
-			banList.RemoveIndex( i );
-			banListChanged = true;
-			return;
-		}
+	if ( MPModBanRemove( *modBans, MPModBanFindRange( *modBans, address, prefixBits ) ) ) {
+		banListChanged = true;
+		SaveBanList();
 	}
+}
+
+/*
+================
+idGameLocal::AddGuidToBanList
+Part of the engine's game interface. No client sends a GUID, so there is
+nothing to add; bans are made by address (mp/Moderation.h).
+================
+*/
+void idGameLocal::AddGuidToBanList( const char *guid ) {
 }
 
 /*
@@ -3040,31 +2964,40 @@ void idGameLocal::RegisterClientGuid( int clientNum, const char *guid ) {
 /*
 ================
 idGameLocal::GetBanListCount
+Bans that ran out leave the list here, so a menu never shows one.
 ================
 */
 int idGameLocal::GetBanListCount() {
 	if ( !banListLoaded ) {
 		LoadBanList();
 	}
-
-	return banList.Num();
+	if ( MPModBanPurgeExpired( *modBans, static_cast<mpModTime_t>( ::time( NULL ) ) ) > 0 ) {
+		banListChanged = true;
+		SaveBanList();
+	}
+	return modBans->count;
 }
 
 /*
 ================
 idGameLocal::GetBanListEntry
+The row as the menus read it. The result is valid until the next call.
 ================
 */
 const mpBanInfo_t* idGameLocal::GetBanListEntry( int entry ) {
+	static mpBanInfo_t info;
 	if ( !banListLoaded ) {
 		LoadBanList();
 	}
-
-	if ( entry < 0 || entry >= banList.Num() ) {
+	if ( entry < 0 || entry >= modBans->count ) {
 		return NULL;
 	}
-
-	return &banList[ entry ];
+	const mpModBan_t &ban = modBans->bans[ entry ];
+	idStr::Copynz( info.name, ban.name, sizeof( info.name ) );
+	MPModFormatRange( ban.address, ban.prefixBits, info.guid, sizeof( info.guid ) );
+	idStr::Copynz( info.reason, ban.reason, sizeof( info.reason ) );
+	info.expires = ban.expires;
+	return &info;
 }
 
 /*
@@ -3081,16 +3014,10 @@ const char *idGameLocal::GetGuidByClientNum( int clientNum ) {
 /*
 ================
 idGameLocal::GetClientNumByGuid
+No client sends a GUID, so none matches.
 ================
 */
 int idGameLocal::GetClientNumByGuid( const char * guid ) {
-	assert( guid );
-
-	for ( int i = 0; i < MAX_CLIENTS; i++ ) {
-		if ( !idStr::Icmp( networkSystem->GetClientGUID( i ), guid ) ) {
-			return i;
-		}
-	}
 	return -1;
 }
 
@@ -3098,27 +3025,10 @@ int idGameLocal::GetClientNumByGuid( const char * guid ) {
 /*
 ================
 idGameLocal::ServerSendBanList
+The host reads the list it already holds; nothing is sent.
 ================
 */
 void idGameLocal::ServerSendBanList( int clientNum ) {
-	idBitMsg	outMsg;
-	byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
-
-	outMsg.Init( msgBuf, sizeof( msgBuf ) );
-	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_GETADMINBANLIST ) ;
-
-	if ( !banListLoaded ) {
-		LoadBanList();
-	}
-	
-	int i;
-	int c = banList.Num();
-	for ( i = 0; i < c; i++ ) {
-		outMsg.WriteString( banList[ i ].name.c_str() );
-		outMsg.WriteString( banList[ i ].guid, CLIENT_GUID_LENGTH );
-	}
-
-	networkSystem->ServerSendReliableMessage( clientNum, outMsg );
 }
 
 // mekberg: so we can populate ban list outside of multiplayer game
@@ -3135,7 +3045,7 @@ void idGameLocal::PopulateBanList( idUserInterface* hud ) {
 	int bans = GetBanListCount();
 	for ( int i = 0; i < bans; i++ ) {
 		const mpBanInfo_t * banInfo = GetBanListEntry( i );
-		hud->SetStateString( va( "sa_banList_item_%d", i ), va( "%d:  %s\t%s", i+1, banInfo->name.c_str(), banInfo->guid ) );
+		hud->SetStateString( va( "sa_banList_item_%d", i ), va( "%d:  %s\t%s", i+1, banInfo->name, banInfo->guid ) );
 	}
 	hud->DeleteStateVar( va( "sa_banList_item_%d", bans ) );
 	hud->SetStateString( "sa_banList_sel_0", "-1" );

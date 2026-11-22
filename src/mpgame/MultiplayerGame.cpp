@@ -12929,6 +12929,7 @@ void idMultiplayerGame::ExecuteVote( void ) {
 				common->Warning( "Ignoring vote execution for invalid kick slot '%s'", voteValue.c_str() );
 				break;
 			}
+			gameLocal.ModerationLogClient( "kick", "vote", kickClientNum, "", 0 );
 			BeginServerDrop( kickClientNum );
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d", kickClientNum ) );
 			EndServerDrop( kickClientNum );
@@ -13928,6 +13929,7 @@ void idMultiplayerGame::ExecutePackedVote( void ) {
 	}
 	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_KICK ) ) {
 		if ( IsValidVotePlayerSlot( currentVoteData.m_kick ) && currentVoteData.m_kick != gameLocal.localClientNum ) {
+			gameLocal.ModerationLogClient( "kick", "vote", currentVoteData.m_kick, "", 0 );
 			BeginServerDrop( currentVoteData.m_kick );
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d", currentVoteData.m_kick ) );
 			EndServerDrop( currentVoteData.m_kick );
@@ -19162,7 +19164,7 @@ void idMultiplayerGame::PublishRetainedAdmin( idUserInterface *card, bool &chang
 	}
 	for ( int row = 0; row < RETAINED_ADMIN_BANS; row++ ) {
 		const mpBanInfo_t *ban = row < bans ? gameLocal.GetBanListEntry( row ) : NULL;
-		publish( va( "mp.admin.ban%d.name", row ), ban != NULL ? MPRetainedPlainText( ban->name.c_str(), 64, 1 ).c_str() : "" );
+		publish( va( "mp.admin.ban%d.name", row ), ban != NULL ? MPRetainedPlainText( ban->name, 64, 1 ).c_str() : "" );
 		publish( va( "mp.admin.ban%d.guid", row ), ban != NULL ? MPRetainedPlainText( ban->guid, 64, 1 ).c_str() : "" );
 	}
 	publish( "mp.admin.ban_count", va( "%d", bans ) );
@@ -24125,6 +24127,7 @@ void idMultiplayerGame::RunQueuedClientDrops( void ) {
 		if ( occupant == NULL || gameLocal.GetSpawnId( occupant ) != spawnId ) {
 			continue;
 		}
+		gameLocal.ModerationLogClient( "kick", "server", clientNum, "inactive", 0 );
 		BeginServerDrop( clientNum );
 		networkSystem->ServerDropClient( clientNum, reason );
 		EndServerDrop( clientNum );
@@ -24951,35 +24954,9 @@ idMultiplayerGame::RemoveClientFromBanList_f
 ================
 */
 void idMultiplayerGame::RemoveClientFromBanList_f( const idCmdArgs& args )	{
-
-	if( !gameLocal.isMultiplayer )	{
-		common->Printf( "[MP ONLY] Remove player from banlist. Usage: RemoveClientFromBanList <client number>\n" );
-		return;
-	}
-	
-	idStr clientId;
-	clientId = args.Argv( 1 );
-	int clientNum;
-
-	if ( !clientId.IsNumeric() ) {
-		common->Printf( "Usage: RemoveClientFromBanList <client number>\n" );
-		return;
-	}
-
-	clientNum = atoi( clientId );
-
-	const char *clientGuid = networkSystem->GetClientGUID( clientNum ); //  gameLocal.GetGuidByClientNum( clientNum );
-
-	if ( NULL == clientGuid || !clientGuid[ 0 ]) {
-		common->DPrintf( "idMultiplayerGame::HandleServerAdminRemoveBan:  bad guid!\n" );
-		return;
-	}
-
-	if ( gameLocal.isServer || gameLocal.isListenServer ) {
-		// remove from the ban list
-		gameLocal.RemoveGuidFromBanList( clientGuid );
-	}
-
+	// openQ4 MP-18: Quake 4 looked up the GUID of a connected client here, and a
+	// banned player is not connected. The old name now does what unban does.
+	idGameLocal::Unban_f( args );
 }
 
 /*
@@ -26154,6 +26131,11 @@ void idMultiplayerGame::ProcessChatMessage( int clientNum, bool team, const char
 			return;
 		}
 
+		// openQ4 MP-18: the server's text mute covers every path a line can take
+		if ( gameLocal.isServer && gameLocal.IsClientTextMuted( clientNum ) ) {
+			return;
+		}
+
 		// openQ4: never broadcast a client supplied display name.  The caller side of
 		// the chat path is reachable from a modified client, so a doctored name would
 		// let one player speak as another - or as the server.  Resolve the name from
@@ -26825,7 +26807,15 @@ void idMultiplayerGame::ServerAdminTarget_f( const idCmdArgs &args ) {
 void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum ) {
 	if ( RejectManagedLegacyMutation( "server admin ban" ) || !IsValidVotePlayerSlot( clientNum ) ||
 		clientNum == gameLocal.localClientNum || SendRemoteAdminPlayerTarget( "ban", clientNum ) ) return;
-	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %i ban", clientNum ) );
+	// openQ4 MP-18: Quake 4 ran "kick <n> ban" here, and the engine's kick reads
+	// one word, so Ban only ever kicked. A bot has no address: it is removed.
+	const mpModAddress_t address = gameLocal.GetClientModAddress( clientNum );
+	if ( address.family == 0 ) {
+		HandleServerAdminKickPlayer( clientNum );
+		return;
+	}
+	const idStr name = gameLocal.userInfo[ clientNum ].GetString( "ui_name" );
+	gameLocal.ServerBan( address, MPModAddressBits( address ), 0, name.c_str(), "", "admin" );
 }
 
 /*
@@ -26834,16 +26824,19 @@ idMultiplayerGame::HandleServerAdminRemoveBan
 ================
 */
 void idMultiplayerGame::HandleServerAdminRemoveBan( const char * clientGuid ) {
-	if ( NULL == clientGuid || !clientGuid[ 0 ]) {
-		common->DPrintf( "idMultiplayerGame::HandleServerAdminRemoveBan:  bad guid!\n" );
+	// openQ4 MP-18: the menus name a ban by its range, where Quake 4 passed a GUID
+	mpModAddress_t address;
+	int prefixBits = 0;
+	if ( NULL == clientGuid || !MPModParseAddress( clientGuid, address, prefixBits ) ) {
 		return;
 	}
 
 	if ( gameLocal.isServer || gameLocal.isListenServer ) {
 		gameLocal.RemoveGuidFromBanList( clientGuid );
 	} else {
-		int clientNum = gameLocal.GetClientNumByGuid( clientGuid );
-		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon removeClientFromBanList %d", clientNum ) ); 
+		char range[ MP_MOD_RANGE_TEXT_BYTES ];
+		MPModFormatRange( address, prefixBits, range, sizeof( range ) );
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon unban %s", range ) );
 	}
 }
 
@@ -26855,6 +26848,7 @@ idMultiplayerGame::HandleServerAdminKickPlayer
 void idMultiplayerGame::HandleServerAdminKickPlayer( int clientNum ) {
 	if ( RejectManagedLegacyMutation( "server admin kick" ) || !IsValidVotePlayerSlot( clientNum ) ||
 		clientNum == gameLocal.localClientNum || SendRemoteAdminPlayerTarget( "kick", clientNum ) ) return;
+	gameLocal.ModerationLogClient( "kick", "admin", clientNum, "", 0 );
 	BeginServerDrop( clientNum );
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %i", clientNum ) );
 	EndServerDrop( clientNum );

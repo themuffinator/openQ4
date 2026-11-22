@@ -12,6 +12,55 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Server bans that work, mutes and chat limits, 22 November 2026
+
+- **A ban now keeps the player out.** In Quake 4, and in openQ4 up to 0.15.0,
+  the ban list stored an ID the game never sends, and the Admin page's **Ban**
+  button only kicked. `ban` now bans a player's network address, or a whole
+  range of addresses, for a set time or for good, with a reason. The player is
+  removed, and their next connection is refused with "You have been banned
+  from this server." `unban` and `banlist` manage the list, and the Admin
+  page's **Ban** does the same as the command.
+- **Mute a player instead of removing them.** `mute` stops a player's text
+  chat and voice-menu lines reaching anyone, for a set time or until `unmute`.
+  The player is told, can keep playing, and stays muted if they leave and
+  join again.
+- **Chat flooding stops itself.** A player may send four chat lines in any
+  four seconds; one more silences them for ten seconds, and they are told
+  why. `g_chatFloodMessages`, `g_chatFloodSeconds` and `g_chatFloodWait`
+  change the numbers, and `g_chatFloodMessages 0` turns the limit off.
+- **Names that cannot mislead.** Nobody can take `admin`, `console`, `referee`
+  or any name in `g_reservedNames`, whatever colours they add. A name can no
+  longer copy another player's by changing its colours, hold control
+  characters, or show more than 32 characters.
+- **See who is connected.** `status` lists each player's slot, ping, address,
+  and whether they are muted.
+- **A record of every action.** Kicks, bans, lifted bans, mutes, chat-limit
+  silences and refused connections are written to `logs/admin.ndjson` in the
+  server's save folder, one line of JSON each. `g_adminLog 0` turns it off.
+- **An optional limit on players from one address.**
+  `net_serverMaxClientsPerAddress` stops one address filling the server. It is
+  off by default, because players behind one router share an address.
+- **What to do.** Server hosts need to change nothing. Bans made before this
+  never worked; a ban list left by Quake 4 is kept as comment lines in the new
+  `banlist.txt`. Run the commands at the server's console, as the host of a
+  server started from the game, or with `rcon` in front. Players will notice
+  only the chat limit.
+- **Limits.** A ban follows the address, not the person: a changed address
+  gets back in, and a shared address bans everyone behind it. Bans tied to the
+  player wait for player identity. `kick <slot>` typed at the console is not
+  in the admin log yet; `gameKick`, the Admin page, votes, bans and idle drops
+  are. A vote to mute, an admin role below rcon and a graceful shutdown are
+  still to come. Checked on Windows over loopback only.
+- **Guide:** [bans, mutes and chat limits](../user/server-security.md#bans-mutes-and-chat-limits).
+- **Evidence:** `tools/tests/mp_moderation.py` compiles and runs the
+  engine-free core (addresses and ranges, the ban list and its file lines,
+  mutes, the flood window, names, log lines) and pins each command and call
+  site; `network_security.py` pins the caps. `mp_moderation_smoke.py` ran a
+  pure dedicated server with a bot and two hidden clients on Windows:
+  49 checks, all passing.
+- **Developer detail:** [server administration and moderation](mp-moderation.md).
+
 ## The mouse works on the campaign's difficulty and CHAPTERS pages again, 22 November 2026
 
 - **You can click the difficulty, TURBO MODE, START GAME and BACK again.**

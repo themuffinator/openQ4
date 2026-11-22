@@ -1836,4 +1836,8 @@
 	"#str_232632"	"Permitir modelos forzados"
 	"#str_232633"	"Oclusión ambiental"
 	"#str_232634"	"Off;SSAO;HBAO;GTAO"
+	"#str_232640"	"Hay demasiados jugadores conectados desde tu dirección."
+	"#str_232641"	"Estás silenciado en este servidor. Tu chat no llega a nadie."
+	"#str_232642"	"Envías mensajes demasiado rápido. Espera unos segundos."
+	"#str_232643"	"Ya no estás silenciado."
 }
