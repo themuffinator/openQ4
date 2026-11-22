@@ -9,6 +9,7 @@
 #include "ShadowMapClassification.h"
 #include "ShadowMapProjected.h"
 #include "ShadowMapArb2Parity.h"
+#include <memory>
 
 const int MODERN_SHADOW_PLAN_MAX_LIGHTS = 1024;
 const int MODERN_SHADOW_PLAN_MIN_SIZE = 128;
@@ -2433,9 +2434,11 @@ bool RendererShadowPlanner_RunSelfTest( void ) {
 	// before the cvar restores so it runs after them and records user values.
 	struct rendererShadowPlannerSelfTestStateReset_t {
 		~rendererShadowPlannerSelfTestStateReset_t() {
-			idScenePacketFrame emptyFrame;
-			emptyFrame.Clear();
-			R_ModernShadowPlanner_PrepareFrame( emptyFrame, false );
+			// Heap, not stack: this runs while the test's own multi-MB frame is
+			// still live, and two frames outgrow macOS's 8 MB main stack.
+			const std::unique_ptr<idScenePacketFrame> emptyFrame( new idScenePacketFrame );
+			emptyFrame->Clear();
+			R_ModernShadowPlanner_PrepareFrame( *emptyFrame, false );
 			R_ModernShadowPlanner_ResetFairnessHistory();
 			R_ModernShadowPlanner_SetStatus( rg_modernShadowPlannerStats, "selftest-complete" );
 		}
@@ -2600,7 +2603,8 @@ bool RendererShadowPlanner_RunSelfTest( void ) {
 	view.scissor.x2 = 1279;
 	view.scissor.y2 = 719;
 	view.viewLights = &lights[0];
-	idScenePacketFrame packetFrame;
+	const std::unique_ptr<idScenePacketFrame> packetFrameStorage( new idScenePacketFrame );
+	idScenePacketFrame &packetFrame = *packetFrameStorage;
 	packetFrame.Clear();
 	if ( !packetFrame.AddScene( &view, true ) ) {
 		common->Printf( "RendererShadowPlanner self-test failed: could not add scene\n" );
