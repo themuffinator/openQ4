@@ -59,7 +59,8 @@ def check_votes() -> None:
                         ("OVERTIME", 0x10000), ("COINTOSS", 0x20000), ("RANDOMMAP", 0x40000), ("READYALL", 0x80000)):
         require(re.search(rf"VOTEFLAG_{name}\s*=\s*0x{value:X},", header, re.IGNORECASE) is not None,
                 f"VOTEFLAG_{name} keeps bit value 0x{value:X}")
-    require(re.search(r"#define\s+NUM_VOTES\s+20\b", header) is not None, "NUM_VOTES covers the new flags")
+    # MP-18 added VOTEFLAG_MUTE at bit 20 (tools/tests/mp_moderation.py pins it)
+    require(re.search(r"#define\s+NUM_VOTES\s+21\b", header) is not None, "NUM_VOTES covers the new flags")
     for field in ("m_roundLimit", "m_ruleset", "m_instagib", "m_overtime"):
         require(field in function_body(header, "struct voteStruct_t"), f"voteStruct_t carries {field}")
 

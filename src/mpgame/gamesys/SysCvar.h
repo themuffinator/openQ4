@@ -481,6 +481,7 @@ extern idCVar	g_chatFloodMessages;
 extern idCVar	g_chatFloodSeconds;
 extern idCVar	g_chatFloodWait;
 extern idCVar	g_adminLog;
+extern idCVar	g_voteMuteMinutes;
 extern idCVar	g_reservedNames;
 extern idCVar	g_mapCycle;
 // RAVEN BEGIN

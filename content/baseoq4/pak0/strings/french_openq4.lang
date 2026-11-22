@@ -1849,4 +1849,11 @@
 	"#str_232641"	"Vous êtes réduit au silence sur ce serveur. Vos messages n'atteignent personne."
 	"#str_232642"	"Vous envoyez des messages trop vite. Patientez quelques secondes."
 	"#str_232643"	"Vous n'êtes plus réduit au silence."
+	"#str_232644"	"Le serveur s'arrêtera à la fin de ce match."
+	"#str_232645"	"Le serveur s'arrêtera dans "
+	"#str_232646"	"L'arrêt du serveur a été annulé."
+	"#str_232647"	"Le serveur s'arrête."
+	"#str_232648"	"RENDRE MUET JOUEUR %s"
+	"#str_232649"	"Utilisation : callvote mute <nom du joueur>"
+	"#str_232650"	"Ce joueur est déjà réduit au silence."
 }

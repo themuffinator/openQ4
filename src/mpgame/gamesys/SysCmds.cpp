@@ -4691,6 +4691,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "mute",					idGameLocal::Mute_f,		CMD_FL_GAME,	"stop a player's text chat reaching anyone: mute <client slot|name> [time]" );
 	cmdSystem->AddCommand( "unmute",				idGameLocal::Mute_f,		CMD_FL_GAME,	"lift a text mute: unmute <client slot|name>" );
 	cmdSystem->AddCommand( "status",				idGameLocal::Status_f,		CMD_FL_GAME,	"list the connected clients with their address, ping and mute state" );
+	cmdSystem->AddCommand( "serverShutdown",		idGameLocal::Shutdown_f,	CMD_FL_GAME,	"stop the server once the players are told: serverShutdown <match|now|time|cancel> [reason]" );
 
 #ifndef _XBOX
 // shouchard:  more voice chat stuff (non-XBOX)

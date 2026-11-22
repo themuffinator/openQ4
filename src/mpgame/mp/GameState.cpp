@@ -542,6 +542,10 @@ void rvGameState::Run( void ) {
 			}
 
 			if ( nextState == INACTIVE ) {
+				// openQ4 MP-18: a shutdown that waited for this match stops the server here
+				if ( gameLocal.RunServerShutdown( true ) ) {
+					return;
+				}
 				// game rotation, new map, gametype etc.
 				// only cycle in tourney if tourneylimit is higher than the specified value
 				if( gameLocal.gameType != GAME_TOURNEY || ((rvTourneyGameState*)this)->GetTourneyCount() >= gameLocal.serverInfo.GetInt( "si_tourneyLimit" ) ) {

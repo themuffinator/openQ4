@@ -1461,6 +1461,17 @@ def validate_server_moderation() -> None:
     require_before(names, "MPModCleanName(", "idStr::IsNumeric(", "the name policy runs on every server-side name")
     require(names, "MP_MOD_NAME_VISIBLE_MAX", "names are bounded")
 
+    # The mute vote, graceful shutdown and the engine's kick in the admin log.
+    require(read("src/framework/async/AsyncNetwork.cpp"),
+            'idAsyncNetwork::serverLastDrop( "net_serverLastDrop", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ROM,',
+            "only the engine writes the last drop's reason")
+    vote = function_body(read_game("src/mpgame/MultiplayerGame.cpp"), "void idMultiplayerGame::ServerCallPackedVote(", "packed vote")
+    require_before(vote, "if ( ( wireFieldFlags & VOTEFLAG_MUTE ) != 0 && ( wireFieldFlags & VOTEFLAG_KICK ) == 0 ) {",
+                   "voteData.m_kick = msg.ReadByte();", "a mute vote must name its player in the kick field")
+    shutdown = function_body(network, "void idGameLocal::Shutdown_f(", "serverShutdown")
+    require_before(shutdown, 'if ( !ModerationServerCommand( "serverShutdown" ) ) {', "gameLocal.ScheduleServerShutdown(",
+                   "only the server can schedule its shutdown")
+
     guide = read("docs/user/server-security.md")
     for token in ("banlist.txt", "logs/admin.ndjson", "net_serverMaxClientsPerAddress", "A ban follows the address, not the person"):
         require(guide, token, "moderation administrator guidance")

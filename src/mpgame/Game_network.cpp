@@ -4010,6 +4010,8 @@ void idEventQueue::Enqueue( entityNetEvent_t *event, outOfOrderBehaviour_t behav
 #define MP_MOD_ADMIN_LOG_FILENAME	"logs/admin.ndjson"
 // how often a silenced or muted sender is told why their line went nowhere
 static const int MP_MOD_NOTICE_MSEC = 10000;
+// the reason the engine's own "kick <slot>" drops a client with
+#define MP_MOD_ENGINE_KICK_REASON	"#str_07134"
 // how often one refused address is written to the admin log
 static const int MP_MOD_REFUSAL_LOG_SECONDS = 60;
 
@@ -4374,6 +4376,13 @@ void idGameLocal::ModerationClientDisconnect( int clientNum ) {
 	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
 		return;
 	}
+	// "kick <slot>" is the engine's command and reaches the game only as this
+	// disconnect. The engine publishes why it drops a client in
+	// net_serverLastDrop; a removal the game began itself was logged where it began.
+	if ( isServer && !mpGame.ServerDropInFlight( clientNum ) && !botManager.IsBot( clientNum ) &&
+		idStr::Cmp( cvarSystem->GetCVarString( "net_serverLastDrop" ), va( "%d %s", clientNum, MP_MOD_ENGINE_KICK_REASON ) ) == 0 ) {
+		ModerationLogClient( "kick", "console", clientNum, "", 0 );
+	}
 	MPModClearAddress( clientModAddress[ clientNum ] );
 	modTextMuteUntil[ clientNum ] = 0;
 	modNoticeTime[ clientNum ] = 0;
@@ -4540,6 +4549,171 @@ bool idGameLocal::ModerationAllowChat( int clientNum, bool fromNetwork ) {
 		}
 	}
 	return false;
+}
+
+// openQ4 MP-18: graceful shutdown. The server tells its players, lets the match
+// end or a time run out, says goodbye and stops: a dedicated server's process
+// quits, a server hosted from the game goes back to its menu.
+enum {
+	MOD_SHUTDOWN_NONE = 0,
+	MOD_SHUTDOWN_MATCH,			// when this match ends, or at once on a server with no human on it
+	MOD_SHUTDOWN_TIME,			// at modShutdownAt
+	MOD_SHUTDOWN_STOPPING,		// the goodbye is on its way; the stop command follows
+	MOD_SHUTDOWN_STOPPED		// the stop command is queued: nothing more may start until the server is gone
+};
+// how long the goodbye has to reach the players before the stop command runs
+static const int MP_MOD_SHUTDOWN_STOP_MSEC = 1500;
+// seconds left at which players are told again
+static const int modShutdownNotices[] = { 3600, 1800, 600, 300, 60, 30, 10 };
+
+static int ModerationNextShutdownNotice( mpModTime_t left ) {
+	for ( int i = 0; i < static_cast<int>( sizeof( modShutdownNotices ) / sizeof( modShutdownNotices[ 0 ] ) ); i++ ) {
+		if ( modShutdownNotices[ i ] < left ) {
+			return modShutdownNotices[ i ];
+		}
+	}
+	return -1;
+}
+
+/*
+================
+idGameLocal::ModerationLogShutdown
+================
+*/
+void idGameLocal::ModerationLogShutdown( const char *event, const char *by, const char *when, mpModTime_t seconds ) {
+	mpModLogLine_t line;
+	MPModLogBegin( line, ModerationNow(), event );
+	MPModLogString( line, "by", by );
+	MPModLogString( line, "when", when );
+	if ( seconds > 0 ) {
+		MPModLogNumber( line, "seconds", seconds );
+	}
+	MPModLogString( line, "reason", modShutdownReason.c_str() );
+	ModerationWriteLog( line );
+}
+
+/*
+================
+idGameLocal::ScheduleServerShutdown
+After this match (afterMatch), or in so many seconds; 0 seconds is now.
+================
+*/
+void idGameLocal::ScheduleServerShutdown( bool afterMatch, mpModTime_t seconds, const char *reason, const char *by ) {
+	char clean[ MP_MOD_REASON_BYTES ];
+	MPModCopyText( clean, sizeof( clean ), reason );
+	modShutdownReason = clean;
+	modShutdownMode = afterMatch ? MOD_SHUTDOWN_MATCH : MOD_SHUTDOWN_TIME;
+	modShutdownAt = ModerationNow() + ( seconds > 0 ? seconds : 0 );
+	modShutdownNextNotice = afterMatch ? -1 : ModerationNextShutdownNotice( seconds );
+
+	char length[ 32 ];
+	MPModFormatDuration( seconds, length, sizeof( length ) );
+	if ( afterMatch ) {
+		ServerSendChatMessage( -1, "server", "#str_232644", "" );
+		common->Printf( "server shutdown: when this match ends\n" );
+	} else if ( seconds > 0 ) {
+		ServerSendChatMessage( -1, "server", "#str_232645", length );
+		common->Printf( "server shutdown: in %s\n", length );
+	}
+	if ( clean[ 0 ] != '\0' && ( afterMatch || seconds > 0 ) ) {
+		ServerSendChatMessage( -1, "server", clean, "" );
+	}
+	ModerationLogShutdown( "shutdown_scheduled", by, afterMatch ? "match" : "time", afterMatch ? 0 : seconds );
+}
+
+/*
+================
+idGameLocal::CancelServerShutdown
+False when no shutdown was waiting.
+================
+*/
+bool idGameLocal::CancelServerShutdown( const char *by ) {
+	if ( modShutdownMode != MOD_SHUTDOWN_MATCH && modShutdownMode != MOD_SHUTDOWN_TIME ) {
+		return false;
+	}
+	modShutdownMode = MOD_SHUTDOWN_NONE;
+	ServerSendChatMessage( -1, "server", "#str_232646", "" );
+	common->Printf( "server shutdown: called off\n" );
+	ModerationLogShutdown( "shutdown_cancelled", by, "", 0 );
+	modShutdownReason.Clear();
+	return true;
+}
+
+/*
+================
+idGameLocal::ServerShutdownMapEnded
+The map is being shut down. A server hosted from the game stops with
+"disconnect" and its process lives on: the next server it starts must not
+inherit a shutdown that has already happened.
+================
+*/
+void idGameLocal::ServerShutdownMapEnded( void ) {
+	if ( modShutdownMode == MOD_SHUTDOWN_STOPPED ) {
+		modShutdownMode = MOD_SHUTDOWN_NONE;
+		modShutdownReason.Clear();
+	}
+}
+
+/*
+================
+idGameLocal::RunServerShutdown
+Every server frame, and with matchEnded when a match is over and the next map
+is about to be chosen. True while the server is stopping: the caller must not
+start another map.
+================
+*/
+bool idGameLocal::RunServerShutdown( bool matchEnded ) {
+	if ( !isServer || modShutdownMode == MOD_SHUTDOWN_NONE ) {
+		return false;
+	}
+	if ( modShutdownMode == MOD_SHUTDOWN_STOPPED ) {
+		return true;
+	}
+	if ( modShutdownMode == MOD_SHUTDOWN_STOPPING ) {
+		// a restart winds game time back: a stop time far ahead is stale
+		if ( time >= modShutdownStopTime || modShutdownStopTime - time > MP_MOD_SHUTDOWN_STOP_MSEC ) {
+			// The command runs with the next command buffer, frames from now. Until the
+			// server is gone this still answers true, or the game state would choose
+			// and start the next map in between.
+			modShutdownMode = MOD_SHUTDOWN_STOPPED;
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, cvarSystem->GetCVarInteger( "net_serverDedicated" ) != 0 ? "quit\n" : "disconnect\n" );
+		}
+		return true;
+	}
+
+	bool stop = false;
+	if ( modShutdownMode == MOD_SHUTDOWN_MATCH ) {
+		stop = matchEnded;
+		if ( !stop ) {
+			// nobody is playing a match on a server with no human on it
+			stop = true;
+			for ( int i = 0; i < numClients; i++ ) {
+				if ( entities[ i ] != NULL && entities[ i ]->IsType( idPlayer::GetClassType() ) && !botManager.IsBot( i ) ) {
+					stop = false;
+					break;
+				}
+			}
+		}
+	} else {
+		const mpModTime_t left = modShutdownAt - ModerationNow();
+		if ( left <= 0 ) {
+			stop = true;
+		} else if ( modShutdownNextNotice > 0 && left <= modShutdownNextNotice ) {
+			char length[ 32 ];
+			MPModFormatDuration( left, length, sizeof( length ) );
+			ServerSendChatMessage( -1, "server", "#str_232645", length );
+			modShutdownNextNotice = ModerationNextShutdownNotice( left );
+		}
+	}
+	if ( !stop ) {
+		return false;
+	}
+	ServerSendChatMessage( -1, "server", "#str_232647", "" );
+	common->Printf( "server shutdown: stopping\n" );
+	ModerationLogShutdown( "shutdown", "server", modShutdownMode == MOD_SHUTDOWN_MATCH ? "match" : "time", 0 );
+	modShutdownMode = MOD_SHUTDOWN_STOPPING;
+	modShutdownStopTime = time + MP_MOD_SHUTDOWN_STOP_MSEC;
+	return true;
 }
 
 // A connected player's slot from a slot number or a name, or -1.
@@ -4774,6 +4948,66 @@ void idGameLocal::Status_f( const idCmdArgs &args ) {
 		players++;
 	}
 	common->Printf( "%d client(s)\n", players );
+}
+
+/*
+================
+idGameLocal::Shutdown_f
+"serverShutdown": stop the server without cutting a match short.
+================
+*/
+void idGameLocal::Shutdown_f( const idCmdArgs &args ) {
+	if ( !ModerationServerCommand( "serverShutdown" ) ) {
+		return;
+	}
+	const char *argv[ MODERATION_MAX_ARGS ];
+	const int argc = ModerationArgs( args, argv );
+	if ( argc < 2 ) {
+		common->Printf( "usage: serverShutdown <match|now|time|cancel> [reason]\n"
+			"  match: when this match ends; time: 90s, 5m, 1h or a number of minutes\n" );
+		if ( gameLocal.modShutdownMode == MOD_SHUTDOWN_MATCH ) {
+			common->Printf( "the server shuts down when this match ends\n" );
+		} else if ( gameLocal.modShutdownMode == MOD_SHUTDOWN_TIME ) {
+			char length[ 32 ];
+			const mpModTime_t left = gameLocal.modShutdownAt - ModerationNow();
+			MPModFormatDuration( left > 0 ? left : 1, length, sizeof( length ) );
+			common->Printf( "the server shuts down in %s\n", length );
+		} else if ( gameLocal.modShutdownMode == MOD_SHUTDOWN_NONE ) {
+			common->Printf( "no shutdown is waiting\n" );
+		}
+		return;
+	}
+	if ( gameLocal.modShutdownMode == MOD_SHUTDOWN_STOPPING || gameLocal.modShutdownMode == MOD_SHUTDOWN_STOPPED ) {
+		common->Printf( "serverShutdown: the server is stopping now\n" );
+		return;
+	}
+	if ( idStr::Icmp( argv[ 1 ], "cancel" ) == 0 ) {
+		if ( !gameLocal.CancelServerShutdown( "console" ) ) {
+			common->Printf( "serverShutdown: no shutdown is waiting\n" );
+		}
+		return;
+	}
+	bool afterMatch = false;
+	mpModTime_t seconds = 0;
+	int next = 2;
+	if ( idStr::Icmp( argv[ 1 ], "match" ) == 0 ) {
+		afterMatch = true;
+	} else if ( idStr::Icmp( argv[ 1 ], "now" ) != 0 ) {
+		const int used = MPModJoinDurationArgs( argc, argv, 1, seconds );
+		if ( used == 0 || seconds <= 0 ) {
+			common->Printf( "serverShutdown: '%s' is not match, now, cancel or a time\n", argv[ 1 ] );
+			return;
+		}
+		next = 1 + used;
+	}
+	idStr reason;
+	for ( int i = next; i < argc; i++ ) {
+		if ( reason.Length() > 0 ) {
+			reason += " ";
+		}
+		reason += argv[ i ];
+	}
+	gameLocal.ScheduleServerShutdown( afterMatch, seconds, reason.c_str(), "console" );
 }
 // RAVEN END
 

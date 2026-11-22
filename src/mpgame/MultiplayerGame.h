@@ -109,9 +109,14 @@ typedef enum {
 	VOTEFLAG_COINTOSS		= 0x20000,
 	VOTEFLAG_RANDOMMAP		= 0x40000,
 	VOTEFLAG_READYALL		= 0x80000,
+	// openQ4 MP-18: with VOTEFLAG_KICK, the vote silences the named player's text
+	// chat instead of removing them. It carries no payload of its own: the
+	// player and their identity are the kick field's, so every check on a kick
+	// target covers a mute target. Never valid without VOTEFLAG_KICK.
+	VOTEFLAG_MUTE			= 0x100000,
 } voteFlag_t;
 
-#define NUM_VOTES			20	// VOTEFLAG_READYALL is bit 19 and must participate in vote masking
+#define NUM_VOTES			21	// VOTEFLAG_MUTE is bit 20 and must participate in vote masking
 #define VOTEFLAG_ALL			( ( 1 << NUM_VOTES ) - 1 )
 #define MAX_PRINT_LEN 128
 
@@ -868,6 +873,7 @@ public:
 	// the server is removing this client itself (a kick, an idle drop): not a lost connection
 	void			BeginServerDrop( int clientNum ) { if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) { serverDropInFlight[ clientNum ] = true; } }
 	void			EndServerDrop( int clientNum ) { if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) { serverDropInFlight[ clientNum ] = false; } }
+	bool			ServerDropInFlight( int clientNum ) const { return clientNum >= 0 && clientNum < MAX_CLIENTS && serverDropInFlight[ clientNum ]; }
 	// g_pauseOnDisconnect: the pause is held for this side's player to come back
 	bool			DisconnectPauseAdmits( const char *teamName ) const;
 	void			RulesRestartRefused( void ) { modifierRestartPending = false; }

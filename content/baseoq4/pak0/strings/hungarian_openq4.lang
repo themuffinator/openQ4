@@ -1840,4 +1840,11 @@
 	"#str_232641"	"Némítva vagy ezen a szerveren. A csevegésed senkihez sem jut el."
 	"#str_232642"	"Túl gyorsan küldesz üzeneteket. Várj néhány másodpercet."
 	"#str_232643"	"Már nem vagy némítva."
+	"#str_232644"	"A szerver leáll, amint ez a mérkőzés véget ér."
+	"#str_232645"	"A szerver leáll ennyi idő múlva: "
+	"#str_232646"	"A szerver leállítása visszavonva."
+	"#str_232647"	"A szerver leáll."
+	"#str_232648"	"JÁTÉKOS NÉMÍTÁSA: %s"
+	"#str_232649"	"Használat: callvote mute <játékos neve>"
+	"#str_232650"	"Ez a játékos már némítva van."
 }

@@ -207,7 +207,7 @@ def main() -> None:
     for token in (
         "wireFieldFlags & ~VOTEFLAG_ALL",
         "msg.GetRemainingReadBits() != 0",
-        "wireFieldFlags & disallowedVotes",
+        "policyFlags & disallowedVotes",
         "if ( !validVote )",
         # the buying choice: off, Quake 4's rules or The Awakening's (mp/Buying.h)
         "outMsg.WriteByte( idMath::ClampInt( BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, voteData.m_buying ) );",
@@ -418,11 +418,28 @@ def main() -> None:
     require(callvote, "MPGameTypeIsSelectable", "console hidden-gametype rejection")
     require(callvote, "ParseVoteIntegerRange", "console typed numeric parsing")
 
-    if not re.search(r"#define\s+NUM_VOTES\s+20\b", multiplayer_h):
-        raise AssertionError("vote-mask loop must cover READYALL bit 19")
+    if not re.search(r"#define\s+NUM_VOTES\s+21\b", multiplayer_h):
+        raise AssertionError("vote-mask loop must cover MUTE bit 20")
     require(multiplayer_h, "#define VOTEFLAG_ALL", "known packed vote mask")
     require(cvars, '"bit 11 (+2048) control time\\n"', "CONTROLTIME vote-mask help")
-    require(cvars, '"bit 19 (+524288) ready all"', "READYALL vote-mask help")
+    require(cvars, '"bit 19 (+524288) ready all\\n"', "READYALL vote-mask help")
+    require(cvars, '"bit 20 (+1048576) mute player"', "MUTE vote-mask help")
+    # MP-18: a mute vote is the kick field plus VOTEFLAG_MUTE, so the kick
+    # target's slot, host and identity checks all apply to it.
+    require(multiplayer_h, "VOTEFLAG_MUTE\t\t\t= 0x100000,", "mute vote flag")
+    server_vote = body(multiplayer, "void idMultiplayerGame::ServerCallPackedVote")
+    require_before(
+        server_vote,
+        "if ( ( wireFieldFlags & VOTEFLAG_MUTE ) != 0 && ( wireFieldFlags & VOTEFLAG_KICK ) == 0 ) {",
+        "voteData.m_kick = msg.ReadByte();",
+        "a mute vote without a player is refused before any field is read",
+    )
+    require(
+        server_vote,
+        "const int policyFlags = ( wireFieldFlags & VOTEFLAG_MUTE ) != 0 ? ( wireFieldFlags & ~VOTEFLAG_KICK ) : wireFieldFlags;",
+        "a mute vote answers to the mute policy bit, not the kick bit",
+    )
+    require(server_vote, "if ( ( policyFlags & disallowedVotes ) != 0 ) {", "server vote policy")
 
     server_messages = body(network, "void idGameLocal::ServerProcessReliableMessage")
     admin = case_block(

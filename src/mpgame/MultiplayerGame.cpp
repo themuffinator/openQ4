@@ -13229,6 +13229,11 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 		return;
 	}
 	voteData.m_fieldFlags = wireFieldFlags;
+	// openQ4 MP-18: a mute vote names its player in the kick field
+	if ( ( wireFieldFlags & VOTEFLAG_MUTE ) != 0 && ( wireFieldFlags & VOTEFLAG_KICK ) == 0 ) {
+		common->Warning( "Ignoring packed vote from client %d: a mute vote without a player", clientNum );
+		return;
+	}
 
 	// kick
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_KICK ) ) {
@@ -13242,6 +13247,10 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 			common->DPrintf( "client %d: called kick for the server host\n", clientNum );
 			validVote = false;
 			voteData.m_fieldFlags &= ( ~VOTEFLAG_KICK );
+		} else if ( ( wireFieldFlags & VOTEFLAG_MUTE ) != 0 && gameLocal.IsClientTextMuted( voteData.m_kick ) ) {
+			gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232650" );
+			validVote = false;
+			voteData.m_fieldFlags &= ( ~( VOTEFLAG_KICK | VOTEFLAG_MUTE ) );
 		}
 	}
 
@@ -13505,8 +13514,11 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 	// Policy is applied only after the complete, structurally valid payload has
 	// been consumed.  A disabled field can no longer desynchronize later reads.
 	const int disallowedVotes = gameLocal.serverInfo.GetInt( "si_voteFlags" ) & VOTEFLAG_ALL;
-	if ( ( wireFieldFlags & disallowedVotes ) != 0 ) {
-		common->DPrintf( "client %d: packed vote contains server-disabled fields 0x%x\n", clientNum, wireFieldFlags & disallowedVotes );
+	// openQ4 MP-18: a mute vote answers to the mute bit alone. A server may forbid
+	// kick votes and still let its players vote to silence someone.
+	const int policyFlags = ( wireFieldFlags & VOTEFLAG_MUTE ) != 0 ? ( wireFieldFlags & ~VOTEFLAG_KICK ) : wireFieldFlags;
+	if ( ( policyFlags & disallowedVotes ) != 0 ) {
+		common->DPrintf( "client %d: packed vote contains server-disabled fields 0x%x\n", clientNum, policyFlags & disallowedVotes );
 		return;
 	}
 
@@ -13595,11 +13607,13 @@ void idMultiplayerGame::ClientStartPackedVote( int clientNum, const voteStruct_t
 			// mpGui here, not mpHud
 			//mpHud->SetStateString( "vote_data0", va( common->GetLocalizedString( "#str_104422" ), player->GetName() );
 			kickActive = true;
+			// openQ4 MP-18: "MUTE PLAYER" when the vote is to silence them
+			const char *playerLine = ( currentVoteData.m_fieldFlags & VOTEFLAG_MUTE ) != 0 ? "#str_232648" : "#str_104422";
 			mpHud->SetStateString( va( "voteInfo_%d", voteLineCount ), 
-				va( common->GetLocalizedString( "#str_104422" ), gameLocal.userInfo[ currentVoteData.m_kick ].GetString( "ui_name" ) ) );
+				va( common->GetLocalizedString( playerLine ), gameLocal.userInfo[ currentVoteData.m_kick ].GetString( "ui_name" ) ) );
 
 			mainGui->SetStateString( va( "voteData_item_%d", menuVoteLineCount ), 
-				va( common->GetLocalizedString( "#str_104422" ), gameLocal.userInfo[ currentVoteData.m_kick ].GetString( "ui_name" ) ) );
+				va( common->GetLocalizedString( playerLine ), gameLocal.userInfo[ currentVoteData.m_kick ].GetString( "ui_name" ) ) );
 
 			voteLineCount++;
 			menuVoteLineCount++;
@@ -13928,7 +13942,11 @@ void idMultiplayerGame::ExecutePackedVote( void ) {
 		ShuffleTeams();
 	}
 	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_KICK ) ) {
-		if ( IsValidVotePlayerSlot( currentVoteData.m_kick ) && currentVoteData.m_kick != gameLocal.localClientNum ) {
+		if ( IsValidVotePlayerSlot( currentVoteData.m_kick ) && currentVoteData.m_kick != gameLocal.localClientNum &&
+			0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_MUTE ) ) {
+			// openQ4 MP-18: the vote was to silence the player, not to remove them
+			gameLocal.SetClientTextMute( currentVoteData.m_kick, true, static_cast<mpModTime_t>( g_voteMuteMinutes.GetInteger() ) * 60, "vote" );
+		} else if ( IsValidVotePlayerSlot( currentVoteData.m_kick ) && currentVoteData.m_kick != gameLocal.localClientNum ) {
 			gameLocal.ModerationLogClient( "kick", "vote", currentVoteData.m_kick, "", 0 );
 			BeginServerDrop( currentVoteData.m_kick );
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d", currentVoteData.m_kick ) );
@@ -16911,6 +16929,8 @@ void idMultiplayerGame::Run( void ) {
 	assert( gameLocal.isMultiplayer && gameLocal.isServer && gameState );
 
 	RunQueuedClientDrops();
+	// openQ4 MP-18: a shutdown the operator scheduled (serverShutdown)
+	gameLocal.RunServerShutdown( false );
 	CommonRun();
 	PublishMVDMarkers();
 	// openQ4: the map database publishes the map it would load next
@@ -18640,7 +18660,7 @@ the stock vote menu (ClientStartPackedVote).
 void idMultiplayerGame::RetainedVoteLines( const voteStruct_t &data, idStrList &lines ) {
 	const char *yes = common->GetLocalizedString( "#str_104341" ), *no = common->GetLocalizedString( "#str_104342" );
 	if ( ( data.m_fieldFlags & VOTEFLAG_KICK ) && data.m_kick >= 0 && data.m_kick < MAX_CLIENTS ) {
-		lines.Append( va( common->GetLocalizedString( "#str_104422" ),
+		lines.Append( va( common->GetLocalizedString( ( data.m_fieldFlags & VOTEFLAG_MUTE ) != 0 ? "#str_232648" : "#str_104422" ),
 			MPRetainedPlainText( gameLocal.userInfo[ data.m_kick ].GetString( "ui_name" ), 64, 1 ).c_str() ) );
 	}
 	if ( data.m_fieldFlags & VOTEFLAG_RESTART ) {
@@ -24763,6 +24783,17 @@ void idMultiplayerGame::CallVote_f( const idCmdArgs &args ) {
 		voteData.m_kick = gameLocal.mpGame.GetClientNumFromPlayerName( szArg2 );
 		if ( voteData.m_kick >= 0 ) {
 			voteData.m_fieldFlags |= VOTEFLAG_KICK;
+		}
+	} else if ( 0 == idStr::Icmp( szArg1, "mute" ) ) {
+		// openQ4 MP-18: silence a player's text chat by vote. The player is named in
+		// the kick field, so a mute target passes every check a kick target does.
+		if ( '\0' == *szArg2 ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232649" ) );
+			return;
+		}
+		voteData.m_kick = gameLocal.mpGame.GetClientNumFromPlayerName( szArg2 );
+		if ( voteData.m_kick >= 0 ) {
+			voteData.m_fieldFlags |= VOTEFLAG_KICK | VOTEFLAG_MUTE;
 		}
 	} else if ( 0 == idStr::Icmp( szArg1, "map" ) ) {
 		if ( '\0' == *szArg2 ) {

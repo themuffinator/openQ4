@@ -1840,4 +1840,11 @@
 	"#str_232641"	"Na tomto serveru jste ztlumeni. Váš chat se k nikomu nedostane."
 	"#str_232642"	"Posíláte zprávy příliš rychle. Počkejte několik sekund."
 	"#str_232643"	"Už nejste ztlumeni."
+	"#str_232644"	"Server se vypne, až tento zápas skončí."
+	"#str_232645"	"Server se vypne za "
+	"#str_232646"	"Vypnutí serveru bylo zrušeno."
+	"#str_232647"	"Server se vypíná."
+	"#str_232648"	"ZTLUMIT HRÁČE %s"
+	"#str_232649"	"Použití: callvote mute <jméno hráče>"
+	"#str_232650"	"Tento hráč je už ztlumen."
 }

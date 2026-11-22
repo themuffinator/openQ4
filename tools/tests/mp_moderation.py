@@ -30,6 +30,7 @@ COMMANDS = {
     "mute": ("idGameLocal::Mute_f", "void idGameLocal::Mute_f( const idCmdArgs &args )", 'mute ? "mute" : "unmute"'),
     "unmute": ("idGameLocal::Mute_f", "void idGameLocal::Mute_f( const idCmdArgs &args )", 'mute ? "mute" : "unmute"'),
     "status": ("idGameLocal::Status_f", "void idGameLocal::Status_f( const idCmdArgs &args )", '"status"'),
+    "serverShutdown": ("idGameLocal::Shutdown_f", "void idGameLocal::Shutdown_f( const idCmdArgs &args )", '"serverShutdown"'),
 }
 
 
@@ -247,8 +248,89 @@ def check_engine() -> None:
             "GetClientAddress keeps its slot in the game-module interface")
 
 
+def check_console_kick() -> None:
+    """The engine's own kick reaches the admin log without a change to the game interface."""
+    server = read("src/framework/async/AsyncServer.cpp")
+    drop = function_body(server, "void idAsyncServer::DropClient( int clientNum, const char *reason )")
+    publish = drop.find('idAsyncNetwork::serverLastDrop.SetString( va( "%d %s", clientNum, reason ) );')
+    require(0 < publish < drop.find("reason = common->GetLanguageDict()->GetString( reason );") < drop.find("game->ServerClientDisconnect( clientNum );"),
+            "the engine publishes the slot and the untranslated reason before the game hears of the disconnect")
+    declared = re.search(r'^idCVar\s+idAsyncNetwork::serverLastDrop\(.*$', read("src/framework/async/AsyncNetwork.cpp"), re.M)
+    require(declared is not None and '"net_serverLastDrop", ""' in declared.group(0) and "CVAR_ROM" in declared.group(0),
+            "net_serverLastDrop is read-only: only the engine writes it")
+    network = read("src/mpgame/Game_network.cpp")
+    left = function_body(network, "void idGameLocal::ModerationClientDisconnect( int clientNum )")
+    require('#define MP_MOD_ENGINE_KICK_REASON\t"#str_07134"' in network, "the engine's kick reason")
+    require("!mpGame.ServerDropInFlight( clientNum )" in left and "!botManager.IsBot( clientNum )" in left
+            and 'cvarSystem->GetCVarString( "net_serverLastDrop" )' in left
+            and left.index('ModerationLogClient( "kick", "console", clientNum, "", 0 );') < left.index("MPModClearAddress( clientModAddress[ clientNum ] );"),
+            "a console kick is logged once, with the address, and never for a removal the game logged itself or for a bot")
+    require(function_body(read("src/framework/async/AsyncNetwork.cpp"), "void idAsyncNetwork::Kick_f( const idCmdArgs &args )")
+            .count('server.DropClient( iclient, "#str_07134" );') == 1, "the engine's kick drops with the reason the game looks for")
+
+
+def check_mute_vote() -> None:
+    header = read("src/mpgame/MultiplayerGame.h")
+    mp = read("src/mpgame/MultiplayerGame.cpp")
+    require("VOTEFLAG_MUTE\t\t\t= 0x100000," in header and re.search(r"#define\s+NUM_VOTES\s+21\b", header) is not None,
+            "the mute vote is flag bit 20 and inside the vote mask")
+    call = function_body(mp, "void idMultiplayerGame::CallVote_f( const idCmdArgs &args )")
+    word = call.find('idStr::Icmp( szArg1, "mute" )')
+    require(0 < word and "voteData.m_fieldFlags |= VOTEFLAG_KICK | VOTEFLAG_MUTE;" in call[word:word + 900]
+            and '"#str_232649"' in call[word:word + 900], "callvote mute names its player in the kick field")
+    server = function_body(mp, "void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg )")
+    require("gameLocal.IsClientTextMuted( voteData.m_kick )" in server and '"#str_232650"' in server,
+            "a vote to mute a player who is already muted is refused")
+    require('gameLocal.SetClientTextMute( currentVoteData.m_kick, true, static_cast<mpModTime_t>( g_voteMuteMinutes.GetInteger() ) * 60, "vote" );' in mp,
+            "a passed mute vote silences its target for g_voteMuteMinutes and is logged as a vote")
+    passed = mp[mp.index("0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_MUTE ) ) {"):]
+    require(passed.index("gameLocal.SetClientTextMute(") < passed.index('va( "kick %d", currentVoteData.m_kick )'),
+            "a mute vote never reaches the kick")
+    require(mp.count('"#str_232648"') == 2, "the HUD, the stock menu and the retained page say MUTE PLAYER for a mute vote")
+    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    declared = re.search(r'^idCVar g_voteMuteMinutes\(.*$', cvars, re.M)
+    require(declared is not None and '"10"' in declared.group(0) and ", 0, 1440 )" in declared.group(0)
+            and "CVAR_GAME | CVAR_ARCHIVE" in declared.group(0), "a mute vote lasts ten minutes by default")
+    require('"bit 20 (+1048576) mute player"' in cvars, "si_voteFlags documents the mute bit")
+
+
+def check_shutdown() -> None:
+    network = read("src/mpgame/Game_network.cpp")
+    run = function_body(network, "bool idGameLocal::RunServerShutdown( bool matchEnded )")
+    require('cvarSystem->GetCVarInteger( "net_serverDedicated" ) != 0 ? "quit\\n" : "disconnect\\n"' in run,
+            "a dedicated server's process quits; a server hosted from the game returns to its menu")
+    stopped = run.index("if ( modShutdownMode == MOD_SHUTDOWN_STOPPED ) {")
+    require(stopped < run.index("modShutdownMode = MOD_SHUTDOWN_STOPPED;") and "modShutdownMode = MOD_SHUTDOWN_NONE;" not in run,
+            "once the stop command is queued nothing may start another map: the state holds until the server is gone")
+    ended = function_body(network, "void idGameLocal::ServerShutdownMapEnded( void )")
+    require("modShutdownMode = MOD_SHUTDOWN_NONE;" in ended and "ServerShutdownMapEnded();" in function_body(
+        read("src/mpgame/Game_local.cpp"), "void idGameLocal::MapShutdown( void )"),
+            "a listen server that stopped itself does not hand its shutdown to the next server the host starts")
+    goodbye = run.index('ServerSendChatMessage( -1, "server", "#str_232647", "" );')
+    require(goodbye < run.index("modShutdownMode = MOD_SHUTDOWN_STOPPING;") < run.index("modShutdownStopTime = time + MP_MOD_SHUTDOWN_STOP_MSEC;"),
+            "the goodbye is sent before the stop is armed")
+    require("stop = matchEnded;" in run and "!botManager.IsBot( i )" in run,
+            "a shutdown after the match also stops a server with no human on it")
+    require("modShutdownNextNotice = ModerationNextShutdownNotice( left );" in run, "a timed shutdown repeats its notice as the time runs down")
+    state = function_body(read("src/mpgame/mp/GameState.cpp"), "void rvGameState::Run( void )") if "void rvGameState::Run( void )" in read(
+        "src/mpgame/mp/GameState.cpp") else read("src/mpgame/mp/GameState.cpp")
+    hook = state.index("if ( gameLocal.RunServerShutdown( true ) ) {")
+    require(hook < state.index("if ( gameLocal.NextMap() ) {", hook), "the shutdown is asked before the next map is chosen")
+    restart = function_body(read("src/mpgame/Game_local.cpp"), "void idGameLocal::MapRestart( int instance )")
+    require(0 < restart.index("if ( RunServerShutdown( true ) ) {") < restart.index("mpGame.PickMap("),
+            "a map change a vote or an operator forces also ends the last match")
+    frame = function_body(read("src/mpgame/MultiplayerGame.cpp"), "void idMultiplayerGame::Run( void )")
+    require("gameLocal.RunServerShutdown( false );" in frame, "the shutdown runs every server frame")
+    command = function_body(network, "void idGameLocal::Shutdown_f( const idCmdArgs &args )")
+    require('idStr::Icmp( argv[ 1 ], "cancel" ) == 0' in command and 'idStr::Icmp( argv[ 1 ], "match" ) == 0' in command
+            and "MPModJoinDurationArgs( argc, argv, 1, seconds )" in command, "serverShutdown takes match, now, a time or cancel")
+    for event in ('"shutdown_scheduled"', '"shutdown_cancelled"', '"shutdown"'):
+        require("ModerationLogShutdown( " + event in network, f"{event} reaches the admin log")
+
+
 def check_text() -> None:
-    expected = {"232640": None, "232641": None, "232642": None, "232643": None}
+    expected = {"232640": None, "232641": None, "232642": None, "232643": None, "232644": None, "232645": None,
+                "232646": None, "232647": None, "232648": None, "232649": None, "232650": None}
     for language in LANGUAGES:
         table = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
         for ident in expected:
@@ -260,8 +342,12 @@ def check_text() -> None:
     guide = read("docs/user/server-security.md")
     for token in ("ban <", "unban <", "banlist", "mute <", "unmute <", "status", "banlist.txt", "logs/admin.ndjson",
                   "g_chatFloodMessages", "g_chatFloodSeconds", "g_chatFloodWait", "g_reservedNames", "g_adminLog",
-                  "net_serverMaxClientsPerAddress"):
+                  "net_serverMaxClientsPerAddress", "serverShutdown", "callvote mute", "g_voteMuteMinutes"):
         require(token in guide, f"the server security guide covers {token}")
+    for language in LANGUAGES:
+        table = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
+        require(re.search(r'^\t"#str_232648"\t"[^"\n]*%s[^"\n]*"$', table, re.M) is not None,
+                f"{language}: the mute vote line names its player")
 
 
 def main() -> None:
@@ -271,6 +357,9 @@ def main() -> None:
     check_enforcement()
     check_files()
     check_engine()
+    check_console_kick()
+    check_mute_vote()
+    check_shutdown()
     check_text()
     print("mp_moderation: ok")
 

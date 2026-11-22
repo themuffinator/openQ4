@@ -1580,6 +1580,13 @@ public:
 	static void				BanList_f( const idCmdArgs &args );
 	static void				Mute_f( const idCmdArgs &args );
 	static void				Status_f( const idCmdArgs &args );
+	// graceful shutdown: tell the players, let the match end or a time run out, stop
+	void					ScheduleServerShutdown( bool afterMatch, mpModTime_t seconds, const char *reason, const char *by );
+	bool					CancelServerShutdown( const char *by );
+	bool					RunServerShutdown( bool matchEnded );
+	void					ServerShutdownMapEnded( void );
+	void					ModerationLogShutdown( const char *event, const char *by, const char *when, mpModTime_t seconds );
+	static void				Shutdown_f( const idCmdArgs &args );
 
 // jscott: made public
 	pvsHandle_t				GetClientPVS( idPlayer *player, pvsType_t type );
@@ -1603,6 +1610,11 @@ private:
 	int						modNoticeTime[ MAX_CLIENTS ];	// game time of the next "you are muted" notice
 	mpModAddress_t			modLastRefused;			// the last banned address the admin log recorded
 	mpModTime_t				modLastRefusedTime;
+	int						modShutdownMode;		// MOD_SHUTDOWN_* in Game_network.cpp
+	mpModTime_t				modShutdownAt;			// when a timed shutdown stops the server
+	int						modShutdownNextNotice;	// seconds left at which players are told again; -1 none
+	int						modShutdownStopTime;	// game time the stop command runs, once the goodbye is sent
+	idStr					modShutdownReason;
 // RAVEN END
 };
 

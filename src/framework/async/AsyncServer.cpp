@@ -1329,6 +1329,11 @@ void idAsyncServer::DropClient( int clientNum, const char *reason ) {
 		}
 	}
 
+	// openQ4 MP-18: the game's disconnect call carries no reason. Publish it first,
+	// so the game's admin log can tell a kick typed at the console from a lost
+	// connection without a change to the game interface.
+	idAsyncNetwork::serverLastDrop.SetString( va( "%d %s", clientNum, reason ) );
+
 	reason = common->GetLanguageDict()->GetString( reason );
 	common->Printf( "client %d %s\n", clientNum, reason );
 	idAsyncNetwork::ShowClientDisconnectMessage(

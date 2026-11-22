@@ -195,6 +195,7 @@ public:
 	static idCVar			serverMaxUsercmdRelay;			// maximum number of usercmds relayed to other clients
 	static idCVar			serverZombieTimeout;			// time out in seconds for zombie clients
 	static idCVar			serverMaxClientsPerAddress;		// most clients one address may hold; 0 for no limit
+	static idCVar			serverLastDrop;					// "<slot> <reason>" of the client the server last removed
 	static idCVar			serverClientTimeout;			// time out in seconds for connected clients
 	static idCVar			clientServerTimeout;			// time out in seconds for server
 	static idCVar			serverDrawClient;				// the server draws the view of this client

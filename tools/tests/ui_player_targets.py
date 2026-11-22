@@ -80,6 +80,10 @@ struct Network {std::vector<idBitMsg> sent;void ClientSendReliableMessage(const 
 struct voteStruct_t {int m_fieldFlags=0,m_kick=-1;idStr m_map;int m_gameType=0,m_timeLimit=0,m_fragLimit=0,m_tourneyLimit=0,m_captureLimit=0,m_buying=0,m_teamBalance=0,m_controlTime=0,
     m_roundLimit=0,m_ruleset=0,m_instagib=0,m_overtime=0;};
 struct serverAdminData_t {};
+// MP-18: the Admin page's Ban bans the player's address (mp/Moderation.h); a bot has none.
+typedef long long mpModTime_t;
+struct mpModAddress_t {unsigned char bytes[16]={};int family=0;};
+static int MPModAddressBits(const mpModAddress_t& a){return a.family==4?32:a.family==6?128:0;}
 static bool IsValidVotePlayerSlot(int);
 static bool IsCurrentPlayerTarget(int,int);
 struct idMultiplayerGame {
@@ -127,6 +131,11 @@ struct Game {
     idDict* GetUserInfo(int i){return &userInfo[i];}
     bool IsTeamGame()const{return team;}
     template<class... T>void Warning(T...){}
+    bool addressed=true;std::vector<std::string> logged;
+    void ModerationLogClient(const char* event,const char* by,int client,const char*,mpModTime_t){logged.push_back(std::string(event)+" "+by+" "+std::to_string(client));}
+    mpModAddress_t GetClientModAddress(int)const{mpModAddress_t a;a.family=addressed?4:0;return a;}
+    int ServerBan(const mpModAddress_t&,int bits,mpModTime_t seconds,const char*,const char*,const char* by){
+        commandsObject.commands.emplace_back("ServerBan /"+std::to_string(bits)+" "+std::to_string(seconds)+" "+by);return 0;}
 }gameLocal;
 @VALID@
 @CURRENT@
@@ -226,6 +235,14 @@ int main(){
     for(const char* operation:{"adminKick","adminBan","adminSwitch"}){
         m.Handle("adminSelect",{"31",identity});commandsObject.commands.clear();m.Handle(operation,{"31",identity});assert(commandsObject.commands.size()==1);
     }
+    // Ban bans the selected player's whole address for good, and is the admin's act; Quake 4 ran
+    // "kick <n> ban", which the engine read as a kick.
+    m.Handle("adminSelect",{"31",identity});commandsObject.commands.clear();g.logged.clear();m.Handle("adminBan",{"31",identity});
+    assert(commandsObject.commands.size()==1&&commandsObject.commands[0]=="ServerBan /32 0 admin"&&g.logged.empty());
+    // A bot has no address: Ban removes it as a kick does, and the kick is recorded.
+    g.addressed=false;m.Handle("adminSelect",{"31",identity});commandsObject.commands.clear();m.Handle("adminBan",{"31",identity});
+    assert(commandsObject.commands.size()==1&&commandsObject.commands[0].rfind("kick 31",0)==0);
+    assert(g.logged.size()==1&&g.logged[0]=="kick admin 31");g.addressed=true;
     m.Handle("adminSelect",{"31",identity});++g.generations[31];commandsObject.commands.clear();
     for(const char* operation:{"adminKick","adminBan","adminSwitch"})m.Handle(operation,{"31",identity});
     assert(commandsObject.commands.empty());m.retainedAdminClient=-1;m.Handle("adminSelect",{"31",identity});assert(m.retainedAdminClient==-1);

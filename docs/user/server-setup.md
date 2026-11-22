@@ -501,6 +501,7 @@ queue and the pick are off and a map's `set` lines are not applied.
 | `kick` | Kicks a player by slot number |
 | `gameKick` | Kicks a player by name |
 | `status`, `ban`, `unban`, `banlist`, `mute`, `unmute` | See who is connected, ban an address and mute a player; see [Bans, mutes and chat limits](server-security.md#bans-mutes-and-chat-limits). **After 0.15.0** |
+| `serverShutdown <match\|now\|time\|cancel>` | Stops the server after telling the players, at the end of the match or after a time; see [Stopping the server](server-security.md#stopping-the-server). **After 0.15.0** |
 | `addbot` | Adds one bot, optionally by name and skill |
 | `removebot` | Removes one bot, optionally by name |
 | `kickbots` | Removes every bot |

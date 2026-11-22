@@ -1840,4 +1840,11 @@
 	"#str_232641"	"You are muted on this server. Your chat reaches nobody."
 	"#str_232642"	"You are sending messages too fast. Wait a few seconds."
 	"#str_232643"	"You are no longer muted."
+	"#str_232644"	"The server will shut down when this match ends."
+	"#str_232645"	"The server will shut down in "
+	"#str_232646"	"The server shutdown was called off."
+	"#str_232647"	"The server is shutting down."
+	"#str_232648"	"MUTE PLAYER %s"
+	"#str_232649"	"Usage: callvote mute <player name>"
+	"#str_232650"	"That player is already muted."
 }

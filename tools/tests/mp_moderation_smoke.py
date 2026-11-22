@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Qualify server moderation on a running dedicated server (MP-18).
 
-One pure dedicated server with one bot and one hidden client play Deathmatch
+One pure dedicated server with two bots and one hidden client play Deathmatch
 over loopback. Later connections are each a fresh hidden client: one from the
 banned address, one after the ban is lifted, and one that tries to share the
 address. (A client that was refused or removed sits in a dialog whose network
@@ -22,6 +22,11 @@ The run must show:
 * a ban removing the player, refusing their next connection with the reason,
   written to `banlist.txt`, and lifted by `unban`;
 * `net_serverMaxClientsPerAddress` refusing a second client from one address;
+* `kick <slot>` typed at the console recorded like every other removal;
+* a vote to mute passing while kick votes are forbidden, and silencing its
+  target for `g_voteMuteMinutes`;
+* `serverShutdown` announced, called off, and then waiting for the match to
+  end before the server says goodbye and its process exits by itself;
 * every one of those events as a line of valid JSON in `logs/admin.ndjson`.
 
 Peers bind 127.0.0.1 only, so a runtime at a new path raises no firewall prompt.
@@ -49,6 +54,11 @@ TEXT_TOO_MANY = "Too many players are connected from your address."
 TEXT_MUTED = "You are muted on this server. Your chat reaches nobody."
 TEXT_FLOOD = "You are sending messages too fast. Wait a few seconds."
 TEXT_UNMUTED = "You are no longer muted."
+TEXT_KICKED = "Kicked from server."
+TEXT_SHUTDOWN_MATCH = "The server will shut down when this match ends."
+TEXT_SHUTDOWN_IN = "The server will shut down in "
+TEXT_SHUTDOWN_OFF = "The server shutdown was called off."
+TEXT_SHUTDOWN_NOW = "The server is shutting down."
 BANLIST_HEADER = "openq4-banlist 1"
 
 
@@ -98,7 +108,7 @@ def main() -> int:
         "runtime_dir": str(runtime), "runtime_sha256": {key: digest(path) for key, path in paths.items()},
         "checks": [], "commands": {}, "exit_codes": {}, "failures": [], "admin_log": [],
     }
-    names = ("server", "client", "banned", "returning") + (() if args.skip_address_limit else ("second",))
+    names = ("server", "client", "banned", "returning", "kicked") + (() if args.skip_address_limit else ("second",))
     games = {role: output / role / "baseoq4" for role in names}
     for game in games.values():
         game.mkdir(parents=True)
@@ -110,7 +120,11 @@ def main() -> int:
     # Game settings are set once the game module is up; the command line is read before it loads.
     # A short flood silence keeps the run short; the window itself keeps its defaults.
     write_script(games["server"] / "rot_server_start.cfg", [
-        "set bot_minPlayers 0", "set bot_skill 3", "set g_chatFloodWait 4", "addbot", "echo ROT_SERVER_READY",
+        # With no frag or time limit the server idles in warmup, which keeps the moderation stages
+        # still: a live match is abandoned and restarted when its only human reconnects. The
+        # shutdown stage starts a real match. Two bots give that match its frags.
+        "set bot_minPlayers 0", "set bot_skill 3", "set g_chatFloodWait 4", "set g_gameReviewPause 5", "addbot", "addbot",
+        "echo ROT_SERVER_READY",
         *server.start_lines()])
     for name in names[1:]:
         write_script(games[name] / f"rot_{name}_start.cfg", roles[name].start_lines())
@@ -209,6 +223,7 @@ def main() -> int:
         launch("server", dict(common, fs_savepath=str(games["server"].parent), fs_devpath=str(games["server"].parent),
                               net_port=str(args.port), net_serverDedicated="1", si_pure="1", si_name="MP18 moderation",
                               si_maxPlayers="8", si_warmup="0", si_timeLimit="0", si_fragLimit="0", si_mapCycle="",
+                              si_allowVoting="1", si_voteFlags="0",
                               g_autoExecAfterMapLoad="rot_server_start.cfg"), ["+spawnServer", "mp/q4dm1"])
         wait("server startup", lambda t: "\nROT_SERVER_READY" in t["server"], args.startup_timeout)
 
@@ -231,7 +246,7 @@ def main() -> int:
         row = re.search(r"^\s*(\d+)\s+\d+\s+\S+\s+no\s+127\.0\.0\.1\s+-\s+ModPlayer\s*$", status, re.MULTILINE)
         check("status names the client's address", row is not None, status)
         check("status marks the bot", re.search(r"^\s*\d+\s+\d+\s+\S+\s+no\s+bot\s+-\s+\S", status, re.MULTILINE) is not None, status)
-        check("status counts both", "\n2 client(s)" in status, status)
+        check("status counts the player and both bots", "\n3 client(s)" in status, status)
         slot = row[1] if row else "0"
         remote = step(client, "moderation commands on a client", ["ban 0", "mute 0", "status", "banlist"])
         check("a client's console cannot ban, mute or list", remote.count("only the server runs this") == 4, remote)
@@ -339,6 +354,75 @@ def main() -> int:
             step(server, "lift the limit", ["set net_serverMaxClientsPerAddress 0"])
             retire("second")
 
+        # --- a kick typed at the console ---------------------------------------
+        kicked = roles["kicked"]
+        start_client("kicked", "KickMe", args.second_port)
+        wait("the player to kick joins", lambda t: MAP_OPENED in t["kicked"], args.startup_timeout)
+        become_player("the player to kick", kicked)
+        status = step(server, "status before the kick", ["status"])
+        row = re.search(r"^\s*(\d+)\s+\d+\s+\S+\s+no\s+127\.0\.0\.1\s+-\s+KickMe\s*$", status, re.MULTILINE)
+        check("the second player is listed", row is not None, status)
+        step(server, "kick from the console", [f"kick {row[1] if row else 99}"])
+        wait("the kicked player is told", lambda t: TEXT_KICKED in t["kicked"], 30)
+        kicks = [event for event in events() if event["event"] == "kick"]
+        check("a console kick is recorded with who and where", len(kicks) == 2 and kicks[-1].get("by") == "console"
+              and kicks[-1].get("name") == "KickMe" and kicks[-1].get("address") == "127.0.0.1" and "reason" not in kicks[-1],
+              json.dumps(kicks))
+        retire("kicked")
+
+        # --- a vote to mute, with kick votes forbidden -------------------------
+        step(server, "forbid kick votes", ["set si_voteFlags 16", "rescanSI"])
+        status = step(server, "status before the vote", ["status"])
+        bot = re.search(r"^\s*\d+\s+\d+\s+\S+\s+no\s+bot\s+-\s+(\S+)\s*$", status, re.MULTILINE)
+        check("the bot is listed and not muted", bot is not None, status)
+        bot_name = bot[1] if bot else "nobody"
+        step(returning, "vote to mute the bot", ["callvote mute " + bot_name, "waitMsec 3500"])
+        status = step(server, "status after the vote", ["status"])
+        check("a lone voter's mute vote passes while kick votes are forbidden",
+              re.search(r"\byes\s+bot\s+-\s+" + re.escape(bot_name) + r"\s*$", status, re.MULTILINE) is not None, status)
+        check("the bot was silenced, not removed", "\n3 client(s)" in status, status)
+        voted = [event for event in events() if event["event"] == "mute" and event.get("by") == "vote"]
+        check("the vote's mute is recorded with its length", len(voted) == 1 and voted[0].get("name") == bot_name
+              and voted[0].get("seconds") == 600, json.dumps(voted))
+
+        # --- graceful shutdown --------------------------------------------------
+        idle = step(server, "shutdown state", ["serverShutdown"])
+        check("no shutdown waits by default", "no shutdown is waiting" in idle, idle)
+        mark = len(read_log(returning.log))
+        timed = step(server, "shutdown in five minutes", ["serverShutdown 5m update tonight", "serverShutdown", "serverShutdown soon"])
+        check("a timed shutdown is scheduled", "server shutdown: in 5m" in timed and "the server shuts down in 5m" in timed, timed)
+        check("a word that is no time is refused", "serverShutdown: 'soon' is not match, now, cancel or a time" in timed, timed)
+        told = wait("players are told when and why", lambda t: TEXT_SHUTDOWN_IN + "5m" in t["returning"][mark:]
+                    and "update tonight" in t["returning"][mark:], 20)["returning"][mark:]
+        check("players are told when and why", TEXT_SHUTDOWN_IN + "5m" in told)
+        called_off = step(server, "call the shutdown off", ["serverShutdown cancel", "serverShutdown cancel"])
+        check("a shutdown is called off once", "server shutdown: called off" in called_off
+              and "serverShutdown: no shutdown is waiting" in called_off, called_off)
+        wait("players are told it is off", lambda t: TEXT_SHUTDOWN_OFF in t["returning"][mark:], 20)
+        check("players are told it is off", True)
+
+        # a match that can end: a frag limit, which takes effect when the map restarts
+        live_matches = read_log(server.log).count("MP match phase: 2 -> 3")
+        step(server, "start a match that can end", ["set si_fragLimit 2", "serverMapRestart"])
+        wait("the match goes live", lambda t: t["server"].count("MP match phase: 2 -> 3") > live_matches, 120)
+        become_player("the last match", returning)
+        check("a real match is running before the shutdown is asked for", True)
+        mark = len(read_log(returning.log))
+        step(server, "shut down after the match", ["serverShutdown match"])
+        wait("players are told the match is the last", lambda t: TEXT_SHUTDOWN_MATCH in t["returning"][mark:], 20)
+        check("players are told the match is the last", True)
+        wait("the match ends and the server stops", lambda t: "\nserver shutdown: stopping" in t["server"], 600)
+        ended = read_log(server.log)
+        check("the server waited for the match", ended.rindex("server shutdown: when this match ends") < ended.rindex("server shutdown: stopping"))
+        # the dedicated server's process quits by itself; take it out of the watch before it does
+        report["exit_codes"]["server"] = processes.pop("server").wait(timeout=60)
+        check("the server process exits by itself", report["exit_codes"]["server"] == 0, str(report["exit_codes"]["server"]))
+        check("players get the goodbye before the server goes", TEXT_SHUTDOWN_NOW in read_log(returning.log)[mark:])
+        after = read_log(server.log).rpartition("server shutdown: stopping")[2]
+        check("nothing starts after the goodbye: no next map, no new match", "map database: next map" not in after
+              and "MP match phase: 0 -> 1" not in after and MAP_OPENED not in after, after[:800])
+        retire("returning")
+
         # --- the admin log -----------------------------------------------------
         logged = events()
         report["admin_log"] = logged
@@ -346,8 +430,9 @@ def main() -> int:
         check("every admin log line is one JSON object with a time", all(
             re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", event.get("time", "")) for event in logged) and len(logged) > 0)
         check("the log holds each kind of event in order",
-              [kind for kind in kinds if kind != "kick"] == ["mute", "unmute", "flood", "ban", "ban", "unban", "unban", "ban", "refused", "unban"],
-              " ".join(kinds))
+              [kind for kind in kinds if kind != "kick"] == [
+                  "mute", "unmute", "flood", "ban", "ban", "unban", "unban", "ban", "refused", "unban", "mute",
+                  "shutdown_scheduled", "shutdown_cancelled", "shutdown_scheduled", "shutdown"], " ".join(kinds))
         ban = next((event for event in logged if event["event"] == "ban" and event.get("range") == "127.0.0.1/32"), {})
         check("a ban records who, what and until when", ban.get("by") == "console" and ban.get("name") == "ModPlayer"
               and ban.get("reason") == "smoke test" and "expires" in ban, json.dumps(ban))
@@ -358,10 +443,11 @@ def main() -> int:
         check("a mute records the player and the address", mute.get("name") == "ModPlayer" and mute.get("address") == "127.0.0.1", json.dumps(mute))
         flood = next((event for event in logged if event["event"] == "flood"), {})
         check("a chat flood is recorded", flood.get("by") == "server" and flood.get("seconds") == 4, json.dumps(flood))
+        scheduled = [event for event in logged if event["event"] == "shutdown_scheduled"]
+        check("a scheduled shutdown records when and why", len(scheduled) == 2 and scheduled[0].get("when") == "time"
+              and scheduled[0].get("seconds") == 300 and scheduled[0].get("reason") == "update tonight"
+              and scheduled[1].get("when") == "match", json.dumps(scheduled))
 
-        retire("returning")
-        server.inject(["quit"])
-        report["exit_codes"]["server"] = processes["server"].wait(timeout=30)
         if any(report["exit_codes"].values()):
             report["failures"].append(f"unclean exits: {report['exit_codes']}")
     except (RuntimeError, OSError, subprocess.TimeoutExpired, IndexError, ValueError) as error:

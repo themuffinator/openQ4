@@ -748,6 +748,10 @@ void idGameLocal::Init( void ) {
 	memset( modNoticeTime, 0, sizeof( modNoticeTime ) );
 	memset( &modLastRefused, 0, sizeof( modLastRefused ) );
 	modLastRefusedTime = 0;
+	modShutdownMode = 0;
+	modShutdownAt = 0;
+	modShutdownNextNotice = -1;
+	modShutdownStopTime = 0;
 // RAVEN END
 
 // RAVEN BEGIN
@@ -2123,6 +2127,12 @@ void idGameLocal::MapRestart( int instance ) {
 		SetGameType();
 		LocalMapRestart( instance );
 	} else {
+		// openQ4 MP-18: a shutdown that waited for this match takes the place of
+		// whatever map would come next, whether the match ran out, a vote passed
+		// or an operator asked for the next map
+		if ( RunServerShutdown( true ) ) {
+			return;
+		}
 
 		if ( mpGame.PickMap( "", true ) ) {
 			common->Warning( "map %s and gametype %s are incompatible, aborting map change", si_map.GetString(), si_gameType.GetString() );
@@ -3148,6 +3158,8 @@ void idGameLocal::MapShutdown( void ) {
 		// openQ4: a server that stops gives the map's settings back; a change
 		// of map already settled them in ValidateServerSettings
 		mpMapHost.ServerMapShutdown();
+		// openQ4 MP-18: a server that stopped itself (serverShutdown) is gone now
+		ServerShutdownMapEnded();
 	}
 	gamestate = GAMESTATE_SHUTDOWN;
 	idRestoreGame::PrepareMapShutdown();

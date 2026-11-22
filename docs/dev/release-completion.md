@@ -48,7 +48,14 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **Mute a player instead of removing them.** `mute` stops a player's text
   chat and voice-menu lines reaching anyone, for a set time or until `unmute`.
   The player is told, can keep playing, and stays muted if they leave and
-  join again.
+  join again. Players can do it themselves with `callvote mute <name>`, for
+  ten minutes by default (`g_voteMuteMinutes`), even on a server that
+  forbids kick votes.
+- **Stop a server without cutting a match short.** `serverShutdown match`
+  tells the players, waits for the match to end, says goodbye and stops the
+  server; `serverShutdown 5m` does the same after a time, with reminders,
+  and `serverShutdown cancel` calls it off. A dedicated server's program
+  exits, so a script can update and restart it.
 - **Chat flooding stops itself.** A player may send four chat lines in any
   four seconds; one more silences them for ten seconds, and they are told
   why. `g_chatFloodMessages`, `g_chatFloodSeconds` and `g_chatFloodWait`
@@ -60,8 +67,9 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **See who is connected.** `status` lists each player's slot, ping, address,
   and whether they are muted.
 - **A record of every action.** Kicks, bans, lifted bans, mutes, chat-limit
-  silences and refused connections are written to `logs/admin.ndjson` in the
-  server's save folder, one line of JSON each. `g_adminLog 0` turns it off.
+  silences, refused connections and shutdowns are written to
+  `logs/admin.ndjson` in the server's save folder, one line of JSON each.
+  `g_adminLog 0` turns it off.
 - **An optional limit on players from one address.**
   `net_serverMaxClientsPerAddress` stops one address filling the server. It is
   off by default, because players behind one router share an address.
@@ -72,17 +80,19 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   only the chat limit.
 - **Limits.** A ban follows the address, not the person: a changed address
   gets back in, and a shared address bans everyone behind it. Bans tied to the
-  player wait for player identity. `kick <slot>` typed at the console is not
-  in the admin log yet; `gameKick`, the Admin page, votes, bans and idle drops
-  are. A vote to mute, an admin role below rcon and a graceful shutdown are
-  still to come. Checked on Windows over loopback only.
+  player wait for player identity. The mute vote is typed at the console: the
+  Vote page has no row for it yet, and players still on 0.15.0 do not see it.
+  An admin role below rcon is still to come. Checked on Windows over loopback
+  only.
 - **Guide:** [bans, mutes and chat limits](../user/server-security.md#bans-mutes-and-chat-limits).
 - **Evidence:** `tools/tests/mp_moderation.py` compiles and runs the
   engine-free core (addresses and ranges, the ban list and its file lines,
   mutes, the flood window, names, log lines) and pins each command and call
   site; `network_security.py` pins the caps. `mp_moderation_smoke.py` ran a
-  pure dedicated server with a bot and two hidden clients on Windows:
-  49 checks, all passing.
+  pure dedicated server with two bots and five hidden clients in turn on
+  Windows: 68 checks, all passing, ending with the server waiting for
+  its match and exiting by itself. `mp_map_rotation_smoke.py` still passes
+  on the same build (44 checks).
 - **Developer detail:** [server administration and moderation](mp-moderation.md).
 
 ## The mouse works on the campaign's difficulty and CHAPTERS pages again, 22 November 2026

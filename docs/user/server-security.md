@@ -77,6 +77,7 @@ nothing.
 | `mute <slot\|name> [time]` | Stops a player's text chat and voice-menu lines reaching anyone |
 | `unmute <slot\|name>` | Lifts a mute |
 | `kick <slot>`, `gameKick <slot\|name>` | Removes a player without banning them |
+| `serverShutdown <match\|now\|time\|cancel> [reason]` | Stops the server after telling the players; see [Stopping the server](#stopping-the-server) |
 
 The Admin page's **Ban** button now bans the chosen player's address for good,
 and the ban lists in the menus show addresses instead of IDs.
@@ -111,6 +112,12 @@ follows their address, so leaving and joining again does not lift it. It covers
 text chat and the voice-menu lines. Microphone voice is separate: each player
 can silence another player's voice for themselves.
 
+Players can also vote to mute someone with `callvote mute <name>` where
+voting is on (`si_allowVoting 1`). A passed vote mutes for
+`g_voteMuteMinutes` (default `10`; `0` lasts until you lift it). To forbid
+the vote, add 1048576 to `si_voteFlags`; forbidding kick votes (16) leaves
+it available.
+
 **Chat limits.** A player may send four chat lines in any four seconds. One
 more silences them for ten seconds, and they are told why.
 
@@ -121,15 +128,16 @@ more silences them for ten seconds, and they are told why.
 | `g_chatFloodWait` | Seconds a player who passed the limit stays silenced (default `10`) |
 | `g_reservedNames` | Names nobody may take, separated by `;` (default `admin;console;referee`). A player who asks for one gets it with `_` added |
 | `net_serverMaxClientsPerAddress` | Most players one address may hold (default `0`, no limit). Players behind one router share an address, so choose a number that still fits a household |
+| `g_voteMuteMinutes` | Minutes a player stays muted after a mute vote passes (default `10`); `0` until you lift it |
 | `g_adminLog` | `1` (default) writes the admin log described below; `0` turns it off |
 
 **Names.** A player's name can hold at most 32 characters that show, never
 control characters, and is never empty. Two players cannot share a name, even
 with different colours, and `server` is always reserved.
 
-**The admin log.** Every kick, ban, lifted ban, mute, chat-limit silence and
-refused connection is written to `logs/admin.ndjson` in the server's save
-folder, one line of JSON each:
+**The admin log.** Every kick, ban, lifted ban, mute, chat-limit silence,
+refused connection and shutdown is written to `logs/admin.ndjson` in the
+server's save folder, one line of JSON each:
 
 ```text
 {"time":"2026-11-22T18:04:11Z","event":"ban","by":"console","range":"203.0.113.7/32","name":"Spammer","reason":"spamming","expires":"2026-11-22T20:04:11Z"}
@@ -138,10 +146,26 @@ folder, one line of JSON each:
 `by` says who acted: `console` (the console or rcon), `admin` (the Admin
 page), `vote` (a kick vote), `menu` (a ban lifted from a menu) or `server` (an
 automatic action). A banned address that keeps trying is logged once a minute.
-`kick <slot>` typed at the console is the one action that is not logged yet;
-use `gameKick` or the Admin page when you want a record. The log holds
-players' network addresses, so keep it as private as the rest of the server's
-files.
+The log holds players' network addresses, so keep it as private as the rest
+of the server's files.
+
+### Stopping the server
+
+`serverShutdown` stops the server without cutting players off mid-match:
+
+| Command | What happens |
+|---|---|
+| `serverShutdown match [reason]` | The server stops when the current match ends, or when a vote or a command would change or restart the map. With no human player connected it stops at once |
+| `serverShutdown 5m [reason]` | The server stops after that time (`90s`, `5m`, `1h`, or a number of minutes) whatever the match is doing. Players are told again at one hour, thirty, ten, five and one minute, and at thirty and ten seconds |
+| `serverShutdown now [reason]` | The server says goodbye and stops |
+| `serverShutdown cancel` | Calls a waiting shutdown off |
+| `serverShutdown` | Shows whether a shutdown is waiting |
+
+Players see the announcement and your reason in chat. When the time comes a
+dedicated server's program exits, so a service manager or script can update
+and restart it; a server you host from the game returns you to the menu. A
+match with no time, frag or score limit never ends, so give such a server a
+time instead of `match`.
 
 ## Legacy compatibility mode
 

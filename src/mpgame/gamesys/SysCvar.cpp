@@ -868,7 +868,8 @@ idCVar si_voteFlags(				"si_voteFlags",				"0",			CVAR_GAME | CVAR_SERVERINFO | 
 																	"bit 16 (+65536) overtime\n"
 																	"bit 17 (+131072) coin toss\n"
 																	"bit 18 (+262144) random map\n"
-																	"bit 19 (+524288) ready all" );
+																	"bit 19 (+524288) ready all\n"
+																	"bit 20 (+1048576) mute player" );
 // openQ4 MP-12: casual vote policy. The defaults reproduce the inherited rule
 // (a strict majority of the frozen electorate, no per-map limit, players only).
 idCVar g_votePercent(				"g_votePercent",			"51",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "percentage of the players eligible when a vote starts that must vote yes for it to pass", 1, 100 );
@@ -889,6 +890,7 @@ idCVar g_chatFloodMessages(		"g_chatFloodMessages",		"4",			CVAR_GAME | CVAR_ARC
 idCVar g_chatFloodSeconds(			"g_chatFloodSeconds",		"4",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "length in seconds of the window g_chatFloodMessages counts", 1, 60 );
 idCVar g_chatFloodWait(				"g_chatFloodWait",			"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who passed the chat flood window stays silenced", 0, 600 );
 idCVar g_adminLog(					"g_adminLog",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "write kicks, bans, mutes, chat floods and refused connections to logs/admin.ndjson in the save folder" );
+idCVar g_voteMuteMinutes(			"g_voteMuteMinutes",		"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "minutes a player stays silenced after a mute vote passes; 0 until unmute or a server restart", 0, 1440 );
 idCVar g_reservedNames(				"g_reservedNames",			"admin;console;referee",	CVAR_GAME | CVAR_ARCHIVE, "player names nobody may take, separated by ';', whatever their case or colours; a player who asks for one gets it with '_' added" );
 
 idCVar g_mapCycle(					"g_mapCycle",				"mapcycle",		CVAR_GAME | CVAR_ARCHIVE, "map cycling script for multiplayer games - see mapcycle.scriptcfg" );

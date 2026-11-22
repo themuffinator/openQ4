@@ -83,6 +83,16 @@ ban address 203.0.113.0/24 1795385700 0 "Spammer" "ban evasion"
   does not lift it. It ends when it expires, when it is lifted or when the
   server process stops.
 - Microphone voice is not touched; players mute voices for themselves.
+- **By vote.** `callvote mute <name>` is `VOTEFLAG_KICK | VOTEFLAG_MUTE` (bit
+  20, `NUM_VOTES` 21). The mute flag has no payload: the player and their
+  identity travel in the kick field, so the slot, host, identity and
+  target-left checks of a kick vote all cover it, and the packed vote's
+  layout is unchanged. A mute flag without the kick field is refused. Policy
+  reads the mute bit alone, so `si_voteFlags 16` (no kick votes) still allows
+  it. A passed vote mutes for `g_voteMuteMinutes` (10) and logs `by: vote`.
+  A 0.15.0 client (same protocol 2.42) drops a vote state whose flags it
+  does not know, so it neither sees nor casts this vote; it still counts in
+  the electorate. The retained Vote page has no row for it yet.
 
 ### Chat flood window
 
@@ -114,17 +124,41 @@ reconnect would take over.
 
 `logs/admin.ndjson` in the save folder, one JSON object a line, appended and
 synced, on by default (`g_adminLog`). Events: `ban`, `unban`, `mute`,
-`unmute`, `kick`, `flood`, `refused`. Fields as they apply: `time` (UTC),
+`unmute`, `kick`, `flood`, `refused`, `shutdown_scheduled`,
+`shutdown_cancelled`, `shutdown`. Fields as they apply: `time` (UTC),
 `event`, `by` (`console`, `admin`, `vote`, `menu`, `server`), `slot`, `name`,
-`address`, `range`, `reason`, `seconds`, `expires`. A value too long for the
-1,024-byte line is cut on a whole escape and the line stays valid JSON.
+`address`, `range`, `reason`, `seconds`, `expires`, `when`. A value too long
+for the 1,024-byte line is cut on a whole escape and the line stays valid
+JSON.
+
+**The engine's own kick.** `kick <slot>` is an engine command, and the game
+hears of it only as `ServerClientDisconnect`, which carries no reason. The
+engine now writes the slot and the untranslated reason to the read-only
+`net_serverLastDrop` just before that call, and the game's disconnect handler
+logs a kick when it reads the engine's kick reason there for a human whose
+removal the game did not begin itself (`BeginServerDrop`). This needs no new
+slot in the game interface, so `GAME_API_VERSION` stays 61.
+
+### Graceful shutdown
+
+`serverShutdown <match|now|time|cancel> [reason]` (`idGameLocal::Shutdown_f`).
+The state lives in `idGameLocal`, so it survives a map change.
+`RunServerShutdown` runs every server frame from `idMultiplayerGame::Run`
+(the timed deadline, its repeated notices, and a `match` shutdown on a server
+with no human on it), from the game state's `NEXTGAME` step just before the
+next map is chosen, and from `idGameLocal::MapRestart`, so a map change or a
+restart that a vote or an operator forces also ends the last match. When it
+fires it sends the
+goodbye, arms a 1.5 second delay so the line can reach the players, and then
+appends `quit` on a dedicated server or `disconnect` on a listen server; the
+engine's own shutdown tells each client the server has shut down.
 
 ## Commands
 
 All are game commands that refuse to run anywhere but on the server (its
 console, a listen host, or rcon): `ban`, `unban`, `banlist [reload]`, `mute`,
-`unmute`, `status`. `removeClientFromBanList` is kept as another name for
-`unban`.
+`unmute`, `status`, `serverShutdown`. `removeClientFromBanList` is kept as
+another name for `unban`.
 
 **Words the console cuts apart.** `idCmdArgs` tokenizes with the script lexer,
 so `192.0.2.0/24` arrives as `192.0.2.0` and `/24`, `10m` as `10` and `m`, and
@@ -144,24 +178,26 @@ of the address.
   call sites, each command and its server-only guard, the file reader, the
   engine limit, the text in twelve languages and the guide. No assets.
 - `tools/tests/network_security.py`: pins the caps and policies.
-- `tools/tests/mp_moderation_smoke.py`: a pure dedicated server, one bot and
-  four hidden clients in turn over loopback (the player, one from the banned
-  address, one after the ban is lifted, one sharing the address). Needs a
-  staged runtime and retail assets, so CI compiles it and does not run it.
-  22 November 2026, Windows x64, debugoptimized build of this change over
-  `590f2a20e`: 49 checks pass and every process exits cleanly. A client that
-  was removed or refused waits in a dialog whose loop does not run its
-  network client, which is why each later connection is a fresh process.
+- `tools/tests/mp_moderation_smoke.py`: a pure dedicated server, two bots and
+  five hidden clients in turn over loopback (the player, one from the banned
+  address, one after the ban is lifted, one sharing the address, one to
+  kick). Needs a staged runtime and retail assets, so CI compiles it and
+  does not run it. 22 November 2026, Windows x64, debugoptimized build of
+  this change over `590f2a20e`: 68 checks pass and every process exits
+  cleanly, the server by itself after its last match. The same build passes
+  `mp_map_rotation_smoke.py` (44 checks). Two things shape the harness. A
+  client that was removed or refused waits in a dialog whose loop does not
+  run its network client, so each later connection is a fresh process. And
+  a server launched with no frag or time limit stays in warmup, which keeps
+  the moderation stages still; the shutdown stage sets a frag limit and
+  restarts the map to get a match that ends.
 
 ## Not done yet
 
 - Bans by identity (waits for MP-17) and `status` showing an identity.
-- A `mute` vote (MP-12 reserved the word).
-- The engine's own `kick <slot>` is not in the admin log; `gameKick`, the
-  Admin page, votes, bans and idle drops are.
+- A row for the mute vote on the retained Vote page.
 - An NDJSON match log for casual servers.
 - An admin role between referee and rcon.
-- Graceful shutdown (announce, finish the match, stop).
 - An atomic write of `banlist.txt`.
 - The retained Admin page still labels the range column as it did the GUID
   and does not show a ban's reason or expiry.

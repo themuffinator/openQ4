@@ -1840,4 +1840,11 @@
 	"#str_232641"	"Estás silenciado en este servidor. Tu chat no llega a nadie."
 	"#str_232642"	"Envías mensajes demasiado rápido. Espera unos segundos."
 	"#str_232643"	"Ya no estás silenciado."
+	"#str_232644"	"El servidor se apagará cuando termine esta partida."
+	"#str_232645"	"El servidor se apagará en "
+	"#str_232646"	"Se ha cancelado el apagado del servidor."
+	"#str_232647"	"El servidor se está apagando."
+	"#str_232648"	"SILENCIAR JUGADOR %s"
+	"#str_232649"	"Uso: callvote mute <nombre del jugador>"
+	"#str_232650"	"Ese jugador ya está silenciado."
 }

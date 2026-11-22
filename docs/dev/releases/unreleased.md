@@ -482,6 +482,14 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Server hosts can ban, mute and stop a server properly. `ban` keeps an address
+  or a range of addresses out for a set time or for good, where a ban used to
+  keep nobody out. `mute`, or the players' own `callvote mute`, silences a
+  player's text chat without removing them, and chat flooding silences itself
+  for ten seconds. `serverShutdown match` tells the players, waits for the
+  match to end and then stops the server. Every such action is recorded in
+  `logs/admin.ndjson`. See
+  [bans, mutes and chat limits](../../user/server-security.md#bans-mutes-and-chat-limits).
 - The Strogg HUD draws without offscreen passes. The moving static on its ammo,
   health and armor gauges is one fixed panel with a scrolling texture instead of
   ten sliding tiles, so the HUD no longer renders each gauge through three

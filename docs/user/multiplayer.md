@@ -304,6 +304,7 @@ The votes are:
 | `readyall` | Mark everyone ready, during a warmup that waits for ready players |
 | `kick <name>`, `restart`, `buying 0\|1\|2`, `controlTime <sec>` | Kick a player, restart the map, change the buying rules, change DeadZone's control time |
 | `cointoss` | Nothing changes; the server announces heads or tails for everyone |
+| `mute <name>` | Stop that player's text chat reaching anyone, for ten minutes unless the server sets another time. **After 0.15.0**; typed at the console only, and players on 0.15.0 do not see the vote |
 
 The operator chooses the rules of voting: `g_votePercent` (the share of the
 eligible players that must say yes, 51 by default, so a plain majority),

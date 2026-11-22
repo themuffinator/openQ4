@@ -1896,4 +1896,11 @@
 	"#str_232641"	"Jesteś wyciszony na tym serwerze. Twój czat do nikogo nie dociera."
 	"#str_232642"	"Wysyłasz wiadomości zbyt szybko. Poczekaj kilka sekund."
 	"#str_232643"	"Nie jesteś już wyciszony."
+	"#str_232644"	"Serwer zostanie wyłączony po zakończeniu tego meczu."
+	"#str_232645"	"Serwer zostanie wyłączony za "
+	"#str_232646"	"Wyłączenie serwera zostało odwołane."
+	"#str_232647"	"Serwer jest wyłączany."
+	"#str_232648"	"WYCISZ GRACZA %s"
+	"#str_232649"	"Użycie: callvote mute <nazwa gracza>"
+	"#str_232650"	"Ten gracz jest już wyciszony."
 }
