@@ -2,9 +2,10 @@
 
 > **Development status:** This document describes the current source tree and its evidence, not the contents of the latest available 0.15.0 package. The 0.14.0 release was withdrawn. See [release status](../user/release-status.md).
 
-Updated 8 November 2026 with the frame-rate recovery category (FPS) and
+Updated 8 November 2026 with the frame-rate recovery category (FPS),
 21 November 2026 with the controller experience category (PAD) and a staged
-splitscreen plan (MP-25). The progress
+splitscreen plan (MP-25), and 22 November 2026 with a gap review of the
+ray-tracing category (RT). The progress
 review below otherwise dates from 4 November and uses the integrated source and
 recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`. The MP-02
 closeout and task counts additionally include its later integrated safety
@@ -981,9 +982,11 @@ rendered with real-time ray-traced lighting, shadows, reflections, refraction an
 indirect light from its original assets. This work brings that class of rendering
 to openQ4's Vulkan renderer: first ray-traced effects on top of the existing
 rasterized frame, then a full path-traced mode. The current Vulkan baseline
-(Vulkan 1.3 with dynamic rendering, synchronization2, timeline semaphores,
-descriptor indexing, buffer device addresses and VMA) already provides most of the
-device features ray tracing builds on. Every item honors five product rules:
+(Vulkan 1.3 with dynamic rendering, synchronization2, timeline semaphores and
+VMA) enables descriptor indexing and buffer device addresses at device creation
+but uses neither yet; the
+[gap review](#what-quake-ii-rtx-does-and-what-id-tech-4-changes) below lists what
+ray tracing still needs. Every item honors five product rules:
 
 1. **Opt-in and isolated.** An archived CVar (proposed `r_rayTracing`: `0` off,
    `1` hybrid effects, `2` path tracing; default `0`) with localized Settings rows
@@ -1014,20 +1017,46 @@ device features ray tracing builds on. Every item honors five product rules:
    is reimplemented from published techniques, and proprietary SDKs stay
    optional decisions. Credits follow the attribution rules.
 
+### What Quake II RTX does and what id Tech 4 changes
+
+Reviewed 22 November 2026 against Q2RTX's `src/refresh/vkpt/` and openQ4's Vulkan
+backend at `e2c580b29`. Q2RTX path-traces a game whose lighting was baked, so it
+derives its emitters from textures and keeps the whole map on the GPU. Quake 4
+lights every surface from authored dynamic lights through scripted materials, and
+its renderer builds only what the view can see. Those differences, more than the
+path tracer itself, are the work. This table feeds RT-01; it records gaps, not
+decisions.
+
+| Area | Quake II RTX | openQ4 today | Needed (task) |
+| --- | --- | --- | --- |
+| Geometry on the device | The static world sits in one device buffer and a compute pass writes animated models into a per-frame buffer. Static and per-frame bottom-level structures feed one top-level structure a frame. | The Vulkan module keeps the vertex cache in CPU memory and copies each frame's drawn surfaces into per-frame rings (96 MiB of vertices, 8 MiB of indexes). No geometry persists on the device, no buffer has a device address and VMA is created without its device-address flag. | Persistent device geometry for static world and model surfaces; a per-frame buffer for skinned, deformed and generated surfaces with their previous positions; build-input usage on both (RT-02). |
+| Scene extent | The whole map and every entity are in the structure, so geometry behind the camera casts shadows and shows in reflections. | The front end instantiates dynamic models and runs entity callbacks only for entities the view's portal walk, or a light visible in it, reaches. | A ray-tracing scene set that reaches beyond the view, bounded by area connectivity and distance, with its CPU cost priced (RT-02). |
+| Textures and materials | Every image is in one global texture array (8,192 slots) with one material record per surface. Physically based properties come from replacement textures NVIDIA ships. | Descriptor sets are bound per draw; nothing is bindless. Materials are multi-stage scripts with per-entity expression registers, texture matrices, vertex color, alpha-test thresholds, authored programs and deforms. | A bindless image array and a per-frame material table holding evaluated registers (RT-02). Rules that derive roughness, metalness and emission from stock stages, since replacement textures are excluded (RT-01). |
+| Lights | Emissive map polygons listed per visibility cluster, up to 32 dynamic sphere lights, a sun and a physical sky. The map's own light entities were baked and are not used. | Authored point and projected lights with projection and falloff images, animated light shaders and box-bounded falloff that is not inverse-square. Fog, blend and ambient lights. Glow stages accompany a light instead of replacing it, and fill lights imitate bounce light. | A device light table that samples the authored images, with light lists per portal area or cluster (RT-02, RT-05). Decisions on double counting, light size and falloff bounds (RT-01). |
+| Shadow rules | Every opaque triangle occludes. | `noShadows` materials, lights and entities, `noSelfShadow`, shadow-only hull surfaces, and per-view suppression of the player's body and view weapon. | Instance masks and ray flags that reproduce those rules, including the view a ray belongs to (RT-01, RT-03). |
+| Primary visibility | Primary rays write a visibility buffer and everything is shaded from hits. | Decals, model overlays, coplanar polygon-offset surfaces, deforms, the weapon depth hack and authored vertex programs depend on rasterization. | A decision between rasterized primary visibility feeding traced lighting, and traced primary rays with those cases rebuilt (RT-01, then RT-03 and RT-04). |
+| Screens in the world | Security-camera monitors are traced. | Interactive GUIs, video maps, remote cameras and mirrors are surfaces redrawn every frame. | Render them to textures before tracing so rays see them as emitters; mirrors become reflection rays (RT-04, RT-06). |
+| Effects | Particles, beams, sprites and explosions get their own structures and any-hit shaders. | BSE effects, particle models, beams and sprite deforms are built on the CPU facing one view. | Composite from the raster path first; separate masked instances only where reflections need them (RT-04). |
+| Denoising and reconstruction | A-SVGF over separate diffuse and specular signals, temporal upscaling and FSR 1. | TAAU, rigid, skinned and view-weapon motion vectors and reactive coverage exist. No per-signal denoiser. | A denoiser fed by the existing vectors, with last frame's surface identity for disocclusion (RT-05). |
+| Ground truth | A reference mode accumulates frames into a converged image. | Laboratory maps and deterministic capture exist, with nothing converged to compare against. | The same accumulation as the oracle for sampling and denoising, as REN-10's brute-force reference is for ambient occlusion (RT-04, RT-05). |
+| Shaders | GLSL ray-generation, hit and miss stages compiled at build time; ray pipelines or ray queries chosen at startup. | SPIR-V ships in committed headers pinned by `vk_shader_header_pin.py`, so builds need no shader compiler. No ray-tracing stage exists. | Ray-tracing stages in the generator and its pin; RT-01 chooses ray queries, ray pipelines or both (RT-02). |
+| Licence | In the reviewed checkout, 40 of 41 `vkpt` C sources and 69 of 70 shaders state GPL version 2 or any later version. FSR 1 is MIT. Bundled media has separate terms. | GPLv3 engine. | The headers permit porting in principle. RT-01 still reviews each file and embedded table before any is taken. |
+| Hardware | Not applicable. | The development laptop's RTX 4060 (8 GB) is the only ray-tracing device available; its Intel Iris Xe lacks the extensions. | RT-01 sets budgets for an 8 GB card. RT-07's second vendor needs hardware this project does not have. |
+
 ### RT completion checkpoints
 
-**Estimate: 0%; 0/7 tasks closed (15 November 2026).** Scope only; no ray-tracing
-code exists. The Vulkan 1.3 device baseline, motion vectors, TAAU, HDR scene
-targets and GPU skinning compute paths are existing dependencies, not credited
-RT progress.
+**Estimate: 0%; 0/7 tasks closed (22 November 2026).** Scope and a gap review
+only; no ray-tracing code exists. The Vulkan 1.3 device baseline, motion vectors,
+TAAU, HDR scene targets and GPU skinning compute paths are existing dependencies,
+not credited RT progress.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| RT-01 — Decision pending | Product rules, mode CVar and capability gate proposed. | Reference hardware and budgets, Q2RTX/SDK licence review, material/light translation rules, Settings contract and reference scenes. |
-| RT-02 — Not started | Vulkan 1.3 baseline with buffer device addresses and VMA exists. | Extension admission and fallback; BLAS/TLAS for world, entities, skinned and deformed surfaces; memory budgets and lifetime across map change, restart and device loss. |
+| RT-01 — Decision pending | Product rules, mode CVar and capability gate proposed. Gap review against Q2RTX and the Vulkan backend recorded (22 November). | Reference hardware and budgets, Q2RTX/SDK licence review, material/light translation rules, the primary-visibility, double-counting and ray-interface decisions, Settings contract and reference scenes. |
+| RT-02 — Not started | Vulkan 1.3 baseline with VMA exists; descriptor indexing and buffer device addresses are enabled but unused. | Extension admission and fallback; persistent device geometry, a bindless image array, material and light tables and a scene set beyond the view; BLAS/TLAS for world, entities, skinned and deformed surfaces; memory budgets and lifetime across map change, restart and device loss. |
 | RT-03 — Not started | Shadow maps, stencil shadows and SSAO provide the rasterized references. | Ray-traced shadows for interaction lights, ambient occlusion and reflections on the raster frame, each with its own fallback. |
-| RT-04 — Not started | Specified only. | Path-traced mode: id Tech 4 lights and derived emitters, sky, indirect bounces, translucency, water and glass, with raster overlays for GUIs, particles and the view weapon. |
-| RT-05 — Not started | TAAU, motion vectors and reactive coverage exist. | Light sampling, temporal and spatial denoising, reconstruction with TAAU and dynamic resolution, and an open upscaler. |
+| RT-04 — Not started | Specified only. | Path-traced mode: id Tech 4 lights and derived emitters, sky, indirect bounces, translucency, water and glass, in-world screens as textures, raster overlays for GUIs, particles and the view weapon, and a converged reference mode. |
+| RT-05 — Not started | TAAU, motion vectors and reactive coverage exist. | Light sampling, temporal and spatial denoising checked against the converged reference, reconstruction with TAAU and dynamic resolution, and an open upscaler. |
 | RT-06 — Not started | Specified only. | Captures, HDR, subviews and mirrors, VR stereo, render demos, BSE, MP and the Settings UI in all language tables. |
 | RT-07 — Not started | Specified only. | Budgets on reference hardware from at least two vendors, image review against classic, SP/Awakening/MP coverage, Linux, soaks and the availability decision. |
 
@@ -1043,13 +1072,28 @@ RT progress.
   stages (diffuse, bump, specular) to a physically based approximation, light
   shaders with projection and falloff images, fog and blend lights, `noShadows`
   and suppression flags, alpha-tested and translucent stages, additive and glow
-  stages as emitters, and the sky. Define the CVar and Settings contract and
+  stages as emitters, and the sky. Decide what the
+  [gap review](#what-quake-ii-rtx-does-and-what-id-tech-4-changes) leaves open:
+  rasterized or traced primary visibility; ray queries, ray pipelines or both;
+  how a glow surface and the light beside it, and fill and ambient lights, avoid
+  double counting once bounce light is traced; whether lights gain a size for
+  soft shadows while keeping their authored bounds; and how shadow flags and
+  per-view suppression map to instance masks. Budgets assume the 8 GB reference
+  card. Define the CVar and Settings contract and
   where hybrid effects replace rather than add to raster ones. Close when the
   contract is recorded in a ray-tracing reference doc and the reference scenes
   have classic captures.
-- [ ] **RT-02 — P2, implementation: device admission and acceleration
-  structures.** Admit the RT-01 extensions without changing device choice for
-  `r_rayTracing 0`, and fall back cleanly when any step fails. Build bottom-level
+- [ ] **RT-02 — P2, implementation: device admission, ray-tracing scene and
+  acceleration structures.** Admit the RT-01 extensions without changing device
+  choice for `r_rayTracing 0`, and fall back cleanly when any step fails. Keep
+  static world and model geometry in persistent device buffers with device
+  addresses, and write skinned, deformed and generated surfaces, with their
+  previous positions, to a per-frame buffer. Publish every loaded image through
+  one bindless array, and each frame a material table of evaluated registers and
+  a light table. Build a scene set that reaches beyond the view, bounded by area
+  connectivity and distance, which instantiates off-screen dynamic models
+  without changing game state. Ray-tracing shader stages join the committed
+  SPIR-V headers and their pin. Build bottom-level
   structures for the world (per area or per model), static and moving entities,
   skinned meshes (reusing the GPU skinning compute output, or CPU-skinned
   vertices when it refuses) and deformed or animated surfaces, with refit or
@@ -1057,12 +1101,13 @@ RT progress.
   with compaction and budgets reported through VK-06's resource counters.
   Structures survive or rebuild correctly across map change, `vid_restart`,
   renderer reload and device loss. Gate: the stock maps build without failures
-  or leaks across a five-cycle soak, and `r_rayTracing 0` captures stay
-  byte-identical.
+  or leaks across a five-cycle soak, the scene set's CPU time and device memory
+  are reported per map, and `r_rayTracing 0` captures stay byte-identical.
 - [ ] **RT-03 — P2, implementation: hybrid ray-traced effects.** In mode `1`,
   using ray queries from the rasterized frame: ray-traced shadows for
-  interaction lights that honor light projection, falloff, shadow flags and
-  alpha-tested casters; ray-traced ambient occlusion; and reflections on
+  interaction lights that honor light projection, falloff, shadow flags,
+  per-view suppression of the player's body and view weapon, and alpha-tested
+  casters; ray-traced ambient occlusion; and reflections on
   surfaces the RT-01 rules mark reflective, including authored PBR materials.
   Each effect has a developer CVar and falls back to its raster equivalent.
   Gate: the reference scenes show no missing, detached or light-leaking shadows
@@ -1074,11 +1119,15 @@ RT progress.
   emissive surfaces, sky and environment light, a bounded number of indirect
   bounces, and refraction and reflection through glass, water and other
   translucent materials. Material expressions, scrolling and animated stages
-  and remote-camera textures evaluate as in the raster path. GUIs, BSE
+  and remote-camera textures evaluate as in the raster path. Interactive GUIs,
+  video maps and remote cameras render to textures before tracing, so they
+  light the scene and show in reflections. Full-screen GUIs, BSE
   particles, decals, the view weapon's depth hack and post effects that the
   path tracer cannot own are composited from the raster path with correct
-  depth. Gate: every stock SP and MP map renders without missing surfaces,
-  black materials or uncovered pixels on the reference hardware.
+  depth. A reference mode accumulates frames into a converged image for
+  comparison. Gate: every stock SP and MP map renders without missing surfaces,
+  black materials or uncovered pixels on the reference hardware, and the
+  reference mode converges on the reference scenes.
 - [ ] **RT-05 — P2, implementation: sampling, denoising and reconstruction.**
   Importance sampling for many lights and emitters (for example a ReSTIR-style
   reservoir scheme), a temporal and spatial denoiser that separates direct,
@@ -1087,7 +1136,8 @@ RT progress.
   GPLv3-compatible licence; vendor upscalers remain optional decisions. Gate:
   the reference scenes meet the RT-01 budget without visible smearing, ghosting
   on moving actors and the view weapon, or fireflies, in windowed review at play
-  speed.
+  speed, and the denoised image's difference from RT-04's converged reference is
+  recorded for each scene.
 - [ ] **RT-06 — P2, integration: the rest of the renderer and the product.**
   Screenshots, `envshot`, tiled and multisampled captures (VK-07), HDR output
   and exposure (VK-05, VK-08), mirrors and remote cameras, VR stereo with per-eye cost
