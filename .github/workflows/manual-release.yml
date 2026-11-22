@@ -1088,6 +1088,7 @@ jobs:
             ".install/openQ4-ded_${{ matrix.binary_arch }}"
             ".install/baseoq4/game-sp_${{ matrix.binary_arch }}.so"
             ".install/baseoq4/game-mp_${{ matrix.binary_arch }}.so"
+            ".install/openQ4-updater_${{ matrix.binary_arch }}"
           )
 
           for binary in "${binaries[@]}"; do

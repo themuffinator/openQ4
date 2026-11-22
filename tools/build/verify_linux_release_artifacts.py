@@ -136,6 +136,7 @@ def reject_unexpected_binary_variants(
     game_dir = runtime_root / "baseoq4"
     candidates = set(runtime_root.glob("openQ4-client_*"))
     candidates.update(runtime_root.glob("openQ4-ded_*"))
+    candidates.update(runtime_root.glob("openQ4-updater_*"))
     for module_dir in (game_dir, *(runtime_root / name for name in packaged_layer_dirs(runtime_root))):
         candidates.update(module_dir.glob("game-sp_*"))
         candidates.update(module_dir.glob("game-mp_*"))
