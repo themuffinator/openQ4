@@ -33,6 +33,8 @@ The run must show:
   target for `g_voteMuteMinutes`;
 * `serverShutdown` announced, called off, and then waiting for the match to
   end before the server says goodbye and its process exits by itself;
+* the admin and referee passwords given on the server's command line redacted in
+  its log and found in none of its files;
 * every one of those events as a line of valid JSON in `logs/admin.ndjson`;
 * `g_matchLog` appending the run's stream to a `logs/match.ndjson` that already
   held one, begun with the UTC time and holding the match's kills and standings;
@@ -78,6 +80,7 @@ TEXT_NOT_ADMIN = "You are not logged in as a server admin."
 TEXT_ADMIN_DONE = "Done: "
 TEXT_ADMIN_NO = "Refused: that cannot be done to that player."
 ADMIN_PASSWORD = "smoke-admin-password-1"
+REF_PASSWORD = "smoke-referee-password-1"
 OTHER_ADDRESS = "127.0.0.2"
 BANLIST_HEADER = "openq4-banlist 1"
 
@@ -254,7 +257,7 @@ def main() -> int:
         launch("server", dict(common, fs_savepath=str(games["server"].parent), fs_devpath=str(games["server"].parent),
                               net_port=str(args.port), net_serverDedicated="1", si_pure="1", si_name="MP18 moderation",
                               si_maxPlayers="8", si_warmup="0", si_timeLimit="0", si_fragLimit="0", si_mapCycle="",
-                              si_allowVoting="1", si_voteFlags="0", net_serverAdminPassword=ADMIN_PASSWORD,
+                              si_allowVoting="1", si_voteFlags="0", net_serverAdminPassword=ADMIN_PASSWORD, g_refPassword=REF_PASSWORD,
                               g_autoExecAfterMapLoad="rot_server_start.cfg"), ["+spawnServer", "mp/q4dm1"])
         wait("server startup", lambda t: "\nROT_SERVER_READY" in t["server"], args.startup_timeout)
 
@@ -271,6 +274,16 @@ def main() -> int:
         check("banlist.txt is rewritten as text", text.startswith(BANLIST_HEADER + "\n"), text[:200])
         check("the GUID entry survives as a comment", '# Quake 4 GUID ban, never enforced (clients send no GUID): "OldCheater" ABCDEFGHIJK' in text, text)
         check("a GUID entry bans nobody", re.search(r"^ban ", text, re.MULTILINE) is None, text)
+
+        # --- passwords on the command line -------------------------------------
+        # the log echoes the parsed command line (developer 1, logFile 2); both passwords were on it
+        check("the server's log redacts the admin and referee passwords it was started with",
+              startup.count("<private command redacted>") == 2 and ADMIN_PASSWORD not in startup and REF_PASSWORD not in startup,
+              startup[startup.find("Command line (parsed)"):][:1500])
+        kept = [str(path.relative_to(games["server"])) for path in games["server"].rglob("*") if path.is_file()
+                and not path.name.startswith("rot_")
+                and any(secret.encode() in path.read_bytes() for secret in (ADMIN_PASSWORD, REF_PASSWORD))]
+        check("neither password is in any file the server wrote", not kept, " ".join(kept))
 
         # --- status ------------------------------------------------------------
         status = step(server, "status", ["status"])
@@ -450,8 +463,8 @@ def main() -> int:
 
             leaked = holding(games[admin.name], ADMIN_PASSWORD) + holding(games[admin.name], "not-the-password")
             check("neither password reaches the client's log, console history or config", not leaked, " ".join(leaked))
-            leaked = holding(games["server"], ADMIN_PASSWORD)
-            check("the password is nowhere in the server's files once it is read", not leaked, " ".join(leaked))
+            leaked = holding(games["server"], ADMIN_PASSWORD) + holding(games["server"], REF_PASSWORD)
+            check("the passwords are nowhere in the server's files once they are read", not leaked, " ".join(leaked))
 
             # mute and unmute
             mark = len(read_log(target.log))

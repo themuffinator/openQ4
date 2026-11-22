@@ -354,6 +354,11 @@ configuration or at the server's own console before the match starts. The game
 keeps only a check value made from it and clears the setting when the match
 begins. It is not the rcon password; do not reuse your administration password.
 
+After 0.15.0 the setting is private: it stays out of the console history, the
+server's log and its configuration file. In 0.15.0 it does not, so there put
+it in a configuration file only you can read, and do not type it at a console
+or pass it on the command line.
+
 ### Set the map pool for a series
 
 List the maps in `si_mapCycle`, separated by semicolons:

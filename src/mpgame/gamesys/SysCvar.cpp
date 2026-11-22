@@ -69,7 +69,8 @@ idCVar si_arenaCampaign(				"si_arenaCampaign",			"0",					CVAR_GAME | CVAR_SERV
 idCVar g_matchProfile(				"g_matchProfile",			"casual",				CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "typed match-rules profile token" );
 idCVar si_matchRules(				"si_matchRules",			"",					CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "committed match-rules profile, schema and digest" );
 idCVar si_managedMatch(			"si_managedMatch",		"0",					CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM | CVAR_BOOL, "committed managed-match state for client participation" );
-idCVar g_refPassword(				"g_refPassword",			"",					CVAR_GAME, "one-shot server-only referee credential; converted to a verifier and cleared at session start" );
+// openQ4 (MP-18): private, and declared in the engine as well (AsyncNetwork.cpp) so that it is private before this module loads
+idCVar g_refPassword(				"g_refPassword",			"",					CVAR_GAME | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private one-shot server-only referee credential; converted to a verifier and cleared at session start" );
 idCVar g_matchEvidence(				"g_matchEvidence",			"2",					CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_INTEGER, "competitive match evidence: 0 off, 1 final reports, 2 journal and reports", 0, 2 );
 idCVar g_matchSeriesRecoveryId(		"g_matchSeriesRecoveryId",	"0",					CVAR_GAME | PC_CVAR_ARCHIVE, "server-owned active competition-series recovery identity" );
 // bdube: raise player limit

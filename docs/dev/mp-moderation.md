@@ -225,6 +225,22 @@ not yet private, while the other game module is loaded, and the main menu
 runs the single-player module, which is where a host or an admin is likely
 to type the password.
 
+**The referee password had that gap.** `g_refPassword` was an ordinary game
+cvar. A server started with it on the command line wrote it into its log's
+parsed command line (with `developer` and `logFile` on), and one typed at a
+console was saved in `consolehistory.dat`. It keeps its name, is
+`CVAR_PRIVATE` in the game module, and is declared in the engine as well
+(`idAsyncNetwork::serverRefereePassword`), so it is private before the module
+loads; two declarations of one cvar merge their flags. The engine already
+drops lines that name a private cvar when it next reads an existing history
+file. Before the change a dedicated server started with
+`+set g_refPassword <secret> +quit` left the secret in its log beside a
+redacted admin password; after it, both lines are redacted and no file holds
+either. `network_security.py` pins the three declarations, the moderation
+smoke starts its server with both passwords and finds them in none of its
+files, and `mp_control_smoke.py --role-matrix --net-ip 127.0.0.1` (a remote
+referee's login) passes on the same build.
+
 ## Commands
 
 On the server (its console, a listen host, or rcon): `ban`, `unban`,
@@ -257,8 +273,8 @@ of the address.
   address, one after the ban is lifted, one sharing the address, one to
   kick, and two for an admin to kick and to ban). Needs a staged runtime and
   retail assets, so CI compiles it and does not run it. 22 November 2026,
-  Windows x64, debugoptimized build of the admin change over `66ef78793`:
-  102 checks pass and every process exits cleanly, the server by itself
+  Windows x64, debugoptimized build of the referee password change over
+  `945dbea77`: 104 checks pass and every process exits cleanly, the server by itself
   after its last match. The players an admin acts on bind 127.0.0.2, so the
   server sees a second address and the ban is a real one; `--skip-admin`
   leaves the stage out where only 127.0.0.1 exists. The hidden clients take

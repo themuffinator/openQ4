@@ -34,6 +34,8 @@ def main() -> int:
     parser.add_argument("--startup-timeout", type=int, default=90,
                         help="per-client cold map loading and admission budget in seconds")
     parser.add_argument("--basepath", type=Path, default=Path(r"C:\Program Files (x86)\Steam\steamapps\common\Quake 4"))
+    parser.add_argument("--net-ip", default="",
+                        help="bind every peer to this address; 127.0.0.1 keeps a runtime at a new path from raising a firewall prompt")
     args = parser.parse_args()
     if not 1024 <= args.port <= 65533:
         parser.error("port must reserve three consecutive unprivileged ports")
@@ -95,6 +97,8 @@ def main() -> int:
             "com_skipLoadingContinue": "1", "g_autoExecAfterMapLoad": "control_start.cfg",
             "g_autoExecAfterMapLoadDelayMs": "500", "net_port": str(args.port + roles.index(role)),
         }
+        if args.net_ip:
+            cvars["net_ip"] = args.net_ip
         if role == "host":
             cvars.update(net_serverDedicated="0", net_LANServer="1", si_pure="0", si_maxPlayers="4",
                          si_gameType="Duel" if args.duel else "Team DM", bot_minPlayers="0",
@@ -402,6 +406,11 @@ def main() -> int:
                 "GUI_VALUE summ_marine_teamname::text=MARINES",
                 "GUI_VALUE summ_strogg_teamname::text=STROGG")):
             failures.append(f"{role} did not show neutral managed team summary headings")
+    if args.role_matrix and logs["host"].is_file():
+        # g_refPassword is private: the host's log echoes its command line with that line redacted
+        host_log = read_log(logs["host"])
+        if referee_credential in host_log or "<private command redacted>" not in host_log:
+            failures.append("the host's log holds the referee password it was started with")
     if stage != "complete" or len(exits) != len(roles) or any(exits.values()):
         failures.append(f"incomplete run: stage={stage}, exits={exits}")
     images = [path for game in games.values() for path in (game / "screenshots").glob("*.tga")]

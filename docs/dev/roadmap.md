@@ -6169,7 +6169,9 @@ Completion substeps:
   ban cut to `g_adminMaxBanMinutes`; lifting bans, addresses, ranges and
   shutdown stay with the console and rcon; an admin who is watching is a
   referee as well. `mp_moderation_smoke.py` covers it with a second loopback
-  address (102 checks).
+  address (104 checks). The admin passwords and the referee's
+  `g_refPassword` are private cvars declared in the engine, so none of them
+  reaches the console history or the log whichever game module is loaded.
   Still open: identity bans and identity in `status` (MP-17), command flood
   beyond the engine's existing reliable-message budget, the menu rows for a
   ban's reason and for the mute vote, a menu for admins, an admin login that

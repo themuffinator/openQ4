@@ -497,6 +497,10 @@ the [development roadmap](../roadmap.md) for current scope.
   a second password (`net_serverAdminPassword`, then `admin`) and can kick, mute and
   give short bans from their own game, without the rcon password. See
   [bans, mutes and chat limits](../../user/server-security.md#bans-mutes-and-chat-limits).
+- The referee password (`g_refPassword`) is no longer saved in the console
+  history or written to the server's log. If you typed it at a console in an
+  earlier build, the old line is removed from the history file the next time
+  the game starts; consider changing the password anyway.
 - The Strogg HUD draws without offscreen passes. The moving static on its ammo,
   health and armor gauges is one fixed panel with a scrolling texture instead of
   ten sliding tiles, so the HUD no longer renders each gauge through three

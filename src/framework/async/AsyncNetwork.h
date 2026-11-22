@@ -201,6 +201,7 @@ public:
 	static idCVar			serverDrawClient;				// the server draws the view of this client
 	static idCVar			serverRemoteConsolePassword;	// remote console password
 	static idCVar			serverAdminPassword;			// the game's admin password, read at map start and cleared
+	static idCVar			serverRefereePassword;			// g_refPassword: the game's referee password, declared here to be private from startup
 	static idCVar			clientAdminPassword;			// the admin password this client logs in with
 	static idCVar			serverAllowLegacyRcon;			// explicit plaintext compatibility opt-in
 	static idCVar			clientPrediction;				// how many additional milliseconds the clients runs ahead

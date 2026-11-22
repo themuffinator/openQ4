@@ -77,6 +77,9 @@ idCVar				idAsyncNetwork::serverRemoteConsolePassword( "net_serverRemoteConsoleP
 // it is private from the moment the engine starts: a game cvar is unknown, and so not yet
 // private, while the other game module is loaded (the main menu runs the single-player one).
 idCVar				idAsyncNetwork::serverAdminPassword( "net_serverAdminPassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private password trusted players log in with as admins ('admin'); read when a map starts and then cleared, none leaves admin logins off" );
+// The referee password (competitive matches) is older and keeps its game-cvar name; the game module
+// declares it as well, and reads and clears it. Declared here for the same reason: private from startup.
+idCVar				idAsyncNetwork::serverRefereePassword( "g_refPassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private one-shot server-only referee credential; converted to a verifier and cleared at session start" );
 idCVar				idAsyncNetwork::clientAdminPassword( "net_clientAdminPassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private admin password the 'admin' command logs in to a server with; it is never sent" );
 idCVar				idAsyncNetwork::serverAllowLegacyRcon( "net_serverAllowLegacyRcon", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NOCHEAT, "allow the insecure legacy plaintext rcon protocol" );
 idCVar				idAsyncNetwork::clientPrediction( "net_clientPrediction", "16", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "additional client side prediction in milliseconds (legacy value 16 follows one exact base tic)" );

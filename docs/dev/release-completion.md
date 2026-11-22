@@ -112,6 +112,10 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   an admin cannot lift bans, see addresses, ban a range or stop the server.
   The password is never sent over the network, and everything an admin does
   is in the admin log beside their name.
+- **The referee password stays private.** `g_refPassword` is now kept out of
+  the console history and the server's log, as the rcon password already
+  was. Before, a password typed at a console was saved in the history file,
+  and one given on the command line could appear in the log.
 - **What to do.** Server hosts need to change nothing. Bans made before this
   never worked; a ban list left by Quake 4 is kept as comment lines in the new
   `banlist.txt`. Run the commands at the server's console, as the host of a

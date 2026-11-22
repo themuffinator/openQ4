@@ -1396,6 +1396,33 @@ def validate_mp_audit_round_2026_11_17() -> None:
     reject(capture, "gameTime - lastSnapshotGameTime < static_cast<int>( header.snapshotDelay )", "MVD pacing on the 16 ms label")
 
 
+def validate_password_cvars_private() -> None:
+    """22 November 2026: the game's passwords are private before the game module is loaded.
+
+    A private cvar is kept out of the console history, the log's parsed command line, listings
+    and the config, but only once it is registered. The main menu runs the single-player game
+    module, so a password cvar that only the multiplayer module declared was still an ordinary
+    cvar when a host typed it there or passed it on the command line. The engine declares them."""
+    network = read("src/framework/async/AsyncNetwork.cpp")
+    for name in ("g_refPassword", "net_serverAdminPassword", "net_clientAdminPassword"):
+        lines = [line for line in network.splitlines() if f'( "{name}", "", ' in line]
+        if len(lines) != 1 or not lines[0].startswith("idCVar") or "idAsyncNetwork::" not in lines[0]:
+            raise AssertionError(f"{name} must be declared once by the engine")
+        require(lines[0], "CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE", f"{name} engine declaration")
+        for flag in ("CVAR_ARCHIVE", "CVAR_SERVERINFO", "CVAR_USERINFO", "CVAR_NETWORKSYNC"):
+            reject(lines[0], flag, f"{name} engine declaration")
+    game = [line for line in read_game("src/mpgame/gamesys/SysCvar.cpp").splitlines() if line.startswith("idCVar g_refPassword(")]
+    if len(game) != 1:
+        raise AssertionError("the multiplayer module declares g_refPassword once")
+    require(game[0], '"",\t\t\t\t\tCVAR_GAME | CVAR_PRIVATE | CVAR_CASE_SENSITIVE,', "g_refPassword game declaration")
+    reject(game[0], "CVAR_ARCHIVE", "g_refPassword game declaration")
+    reject(read_game("src/mpgame/gamesys/SysCvar.cpp"), "AdminPassword", "the admin passwords are the engine's cvars")
+    common = read("src/framework/Common.cpp")
+    require_before(common, "\t\tInitGame();", "Printf( \"Command line (parsed):\\n\" );", "the command line is echoed after the game is up")
+    require_before(common, "if ( cvarSystem->CommandContainsPrivateCVar( lineText ) ) {",
+                   "Printf( \"  %d: <private command redacted>\\n\", i );", "private startup command redaction")
+
+
 def validate_server_moderation() -> None:
     """MP-18 (22 November 2026): bans by address, the per-address connection limit, the chat
     flood window, the name policy and the admin log. tools/tests/mp_moderation.py runs the
@@ -1492,6 +1519,7 @@ def main() -> None:
     validate_rcon2_flow()
     validate_pure_admission_fail_closed()
     validate_private_cvar_handling()
+    validate_password_cvars_private()
     validate_remote_dictionary_authority()
     validate_network_rate_budget()
     validate_channel_and_message_abuse_bounds()
