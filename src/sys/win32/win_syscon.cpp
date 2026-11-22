@@ -1269,6 +1269,32 @@ void Conbuf_AppendText(const char* pMsg)
 }
 
 /*
+** Conbuf_WriteText
+**
+** Writes the console log window's text to an open file, for the fatal error
+** record. It runs after engine shutdown, so it allocates from the process
+** heap rather than the engine's allocator.
+*/
+bool Conbuf_WriteText(HANDLE file) {
+	if (file == INVALID_HANDLE_VALUE || s_wcd.hwndBuffer == NULL) {
+		return false;
+	}
+	const int length = GetWindowTextLengthA(s_wcd.hwndBuffer);
+	if (length <= 0) {
+		return false;
+	}
+	char* text = static_cast<char*>(HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(length) + 1));
+	if (text == NULL) {
+		return false;
+	}
+	const int copied = GetWindowTextA(s_wcd.hwndBuffer, text, length + 1);
+	DWORD written = 0;
+	const bool ok = copied > 0 && WriteFile(file, text, static_cast<DWORD>(copied), &written, NULL) && written == static_cast<DWORD>(copied);
+	HeapFree(GetProcessHeap(), 0, text);
+	return ok;
+}
+
+/*
 ** Win_SetErrorText
 */
 void Win_SetErrorText(const char* buf) {

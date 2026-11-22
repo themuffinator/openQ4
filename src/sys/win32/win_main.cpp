@@ -983,6 +983,94 @@ void Sys_FlushCacheMemory(void* base, int bytes) {
 
 /*
 =============
+Fatal error record
+
+Windows writes no log file unless logFile is set, so a player whose game stopped
+on a fatal error had nothing to attach to a report. Sys_Error saves the message
+and the console window's text to <fs_savepath>\baseoq4\logs\fatal.log, replacing
+the previous record. FatalError resolves the path through Sys_SetFatalError
+while the cvars still exist; a direct Sys_Error resolves it then, falling back
+to the default save folder.
+=============
+*/
+static char sys_fatalRecordPath[MAX_PATH];
+
+static void Sys_ResolveFatalRecordPath( void ) {
+	idStr path;
+	if ( cvarSystem != NULL && cvarSystem->IsInitialized() ) {
+		path = cvarSystem->GetCVarString( "fs_savepath" );
+	}
+	if ( path.IsEmpty() ) {
+		path = Sys_DefaultSavePath();
+	}
+	path.AppendPath( OPENQ4_GAMEDIR );
+	path.AppendPath( "logs" );
+	path.AppendPath( "fatal.log" );
+	path.SlashesToBackSlashes();
+	if ( path.Length() < static_cast<int>( sizeof( sys_fatalRecordPath ) ) ) {
+		idStr::Copynz( sys_fatalRecordPath, path.c_str(), sizeof( sys_fatalRecordPath ) );
+	}
+}
+
+static void Sys_CreateParentDirectories( const char *filePath ) {
+	char dir[MAX_PATH];
+	idStr::Copynz( dir, filePath, sizeof( dir ) );
+	char *lastSeparator = strrchr( dir, '\\' );
+	if ( lastSeparator == NULL ) {
+		return;
+	}
+	*lastSeparator = '\0';
+	for ( char *p = dir + 2; *p != '\0'; p++ ) {
+		if ( *p == '\\' && p[-1] != ':' ) {
+			*p = '\0';
+			CreateDirectoryA( dir, NULL );
+			*p = '\\';
+		}
+	}
+	CreateDirectoryA( dir, NULL );
+}
+
+static void Sys_WriteFatalRecord( const char *message ) {
+	if ( sys_fatalRecordPath[0] == '\0' ) {
+		Sys_ResolveFatalRecordPath();
+	}
+	if ( sys_fatalRecordPath[0] == '\0' ) {
+		return;
+	}
+	Sys_CreateParentDirectories( sys_fatalRecordPath );
+	HANDLE file = CreateFileA( sys_fatalRecordPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+	if ( file == INVALID_HANDLE_VALUE ) {
+		return;
+	}
+
+	SYSTEMTIME localTime;
+	GetLocalTime( &localTime );
+	char header[1024];
+	idStr::snPrintf( header, sizeof( header ),
+		"openQ4 fatal error\r\n"
+		"Timestamp: %04u-%02u-%02u %02u:%02u:%02u\r\n"
+		"CommandLine: %s\r\n"
+		"\r\n",
+		(unsigned)localTime.wYear, (unsigned)localTime.wMonth, (unsigned)localTime.wDay,
+		(unsigned)localTime.wHour, (unsigned)localTime.wMinute, (unsigned)localTime.wSecond,
+		GetCommandLineA() );
+
+	DWORD written = 0;
+	bool ok = WriteFile( file, header, static_cast<DWORD>( strlen( header ) ), &written, NULL ) != FALSE;
+	ok = ok && WriteFile( file, message, static_cast<DWORD>( strlen( message ) ), &written, NULL ) != FALSE;
+	static const char consoleHeading[] = "\r\n\r\n----- console -----\r\n";
+	ok = ok && WriteFile( file, consoleHeading, sizeof( consoleHeading ) - 1, &written, NULL ) != FALSE;
+	if ( ok ) {
+		Conbuf_WriteText( file );
+	}
+	CloseHandle( file );
+	if ( ok ) {
+		Conbuf_AppendText( va( "\nThis report was saved to %s\n", sys_fatalRecordPath ) );
+	}
+}
+
+/*
+=============
 Sys_Error
 
 Show the early console as an error dialog
@@ -1010,6 +1098,8 @@ void Sys_Error(const char* error, ...) {
 
 	Conbuf_AppendText(text);
 	Conbuf_AppendText("\n");
+
+	Sys_WriteFatalRecord(text);
 
 	Win_SetErrorText(text);
 	Sys_ShowConsole(1, true);
@@ -2424,6 +2514,11 @@ Sys_SetFatalError
 ==================
 */
 void Sys_SetFatalError(const char* error) {
+	// Resolve the fatal record's path now: FatalError calls this before the
+	// engine shutdown that releases the cvars Sys_Error can no longer read.
+	if (error != NULL) {
+		Sys_ResolveFatalRecordPath();
+	}
 }
 
 /*

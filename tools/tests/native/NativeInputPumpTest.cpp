@@ -26,6 +26,7 @@ static bool TerminateProcess(int handle,unsigned code){CHECK(handle==4&&code==1)
 [[noreturn]] static void TestFastFail(int code){CHECK(code==FAST_FAIL_FATAL_APP_EXIT);calls.emplace_back("failfast");throw 2;}
 struct idStr{static void vsnPrintf(char* out,std::size_t size,const char* fmt,va_list args){std::vsnprintf(out,size,fmt,args);}};
 static void Conbuf_AppendText(const char* text){calls.emplace_back("conbuf");diagnostic+=text;}
+static void Sys_WriteFatalRecord(const char*){calls.emplace_back("fatal-record");}
 static void Win_SetErrorText(const char*){calls.emplace_back("window-error");}
 static void Sys_ShowConsole(int,bool){calls.emplace_back("show");}
 static void timeEndPeriod(int){calls.emplace_back("timer");}
@@ -48,6 +49,8 @@ int main(){
   CHECK(ended==(succeeds?1:2));CHECK(calls.size()==(succeeds?5u:6u));CHECK(calls[0]=="retire"&&calls[1]=="stderr"&&calls[2]=="write"&&calls[3]=="current-process"&&calls[4]=="terminate");if(!succeeds)CHECK(calls.back()=="failfast");}
  calls.clear();retired=true;int ended=0;try{Sys_Error("original %s","failure");}catch(int value){ended=value;}
  CHECK(ended==3);CHECK(calls.front()=="retire"&&calls[1]=="conbuf"&&calls.back()=="quit");
+ // The fatal record is saved once the console holds the message, before the window shows it.
+ CHECK(calls[2]=="conbuf"&&calls[3]=="fatal-record"&&calls[4]=="window-error");
  for(const auto& c:calls)CHECK(c!="write"&&c!="terminate"&&c!="failfast");
  calls.clear();owned=true;Sys_PumpEvents();CHECK(calls.empty());
  owned=false;Sys_PumpEvents();CHECK(calls.size()==2&&calls[0]=="SDL-pump"&&calls[1]=="peek-message");

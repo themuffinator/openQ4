@@ -501,6 +501,10 @@ the [development roadmap](../roadmap.md) for current scope.
   history or written to the server's log. If you typed it at a console in an
   earlier build, the old line is removed from the history file the next time
   the game starts; consider changing the password anyway.
+- When openQ4 stops with an error on Windows, it now saves the message and
+  the startup log to `fatal.log` in the `baseoq4\logs` folder of your save
+  folder, and the error window says where. Attach that file to a report: until
+  now nothing was written unless logging had been turned on beforehand.
 - The Strogg HUD draws without offscreen passes. The moving static on its ammo,
   health and armor gauges is one fixed panel with a scrolling texture instead of
   ten sliding tiles, so the HUD no longer renders each gauge through three

@@ -175,6 +175,8 @@ Reproduce the problem, quit, and find `openq4.log` in the `baseoq4/logs` folder 
 
 Attach the log to a new [issue](https://github.com/themuffinator/openQ4/issues) with your system, graphics card and the openQ4 version. After a Windows crash, also attach the files from the `crashes/` folder. On a Mac, follow [macOS Support Data](macos-support-data.md).
 
+**If openQ4 stops with an error window on Windows**, you don't need to capture a log first: the game saves the error and its startup log to `fatal.log` in the same `baseoq4\logs` folder, and the window shows the full path. Attach that file.
+
 ## Next steps
 
 - Find your way around the menus: [Client Settings](client-settings.md).

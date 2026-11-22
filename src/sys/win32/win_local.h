@@ -97,6 +97,7 @@ void	DisableTaskKeys( BOOL bDisable, BOOL bBeep, BOOL bTaskMgr );
 LRESULT CALLBACK MainWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam );
 
 void Conbuf_AppendText( const char *msg );
+bool Conbuf_WriteText( HANDLE file );
 
 struct Win32Vars_t {
 	HWND			hWnd;
