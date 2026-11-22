@@ -12,6 +12,30 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The opening's QUAKE 4 logo shines over the stars again, 22 November 2026
+
+- **No black box behind the title.** With the new interface on, the opening
+  cinematic of Air Defense 1 drew the QUAKE 4 lettering inside an opaque black
+  rectangle that hid the starfield and cut through the emblem. The lettering's
+  stock material adds its light to the scene, but the retained HUD drew the
+  picture with ordinary alpha blending, so its black texels covered what was
+  behind. It now adds its light, as the classic interface always did.
+- **The emblem looks as it did in 2005.** The same moment showed the Quake
+  emblem as a flat orange shape. The stock picture is a dark silhouette inside
+  a soft orange halo; the retained HUD had swapped it for the flat vector
+  emblem. The opening's emblem and the ending's weathered green one are now
+  drawn from the installed pictures, like the lettering.
+- **Same fix elsewhere.** The walker cockpit's mech diagram (`mdisp_mech` in
+  `guis/vehicles/mdisp.gui`) had the same additive-material gap and adds its
+  light too.
+- **Soft focus.** The opening was checked for an authored soft focus on the
+  space backdrop: the shipped intro uses no blur effect, special effect or GUI
+  overlay, so there is nothing to restore. The starfield is plain textures.
+- **Checks.** Captures of the logo on OpenGL and Vulkan with the retained
+  interface now match the classic one; `ui_hud_coverage.py` with the stock
+  asset audit and the `openq4-ui-hud`, `-hud-coverage`, `-remastered-hud` and
+  `-retained-screens-loading-hud` tests pass.
+
 ## Vulkan depth captures cost a quarter of what they did, 22 November 2026
 
 - **Smoke, haze and SSAO are cheaper on Vulkan with MSAA on.** Soft particles,

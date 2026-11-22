@@ -419,10 +419,17 @@ def build():
         add('input-'+name,[path(d)],['gfx/guis/showinput/hud_showinput_'+name])
     for name,target in [('ammo_napalmgun','simple_ammo_napalmgun'),('item_napalmgun','simple_item_napalmgun'),('deadzone','simple_item_deadzone')]:aliases(target,'gfx/guis/hud/simpleicons/'+name)
     aliases('arrow','gfx/guis/monitors/marine/mcc1_triangle')
-    aliases('quakelogo','gfx/guis/mainmenu/intro_logo','gfx/guis/mainmenu/endlogo')
     # Detailed body diagrams, campaign maps and the Quake title treatment are
     # complex imagery; they remain installed-content pictures, never copied.
-    images += ['gfx/guis/vehicles/mdisp_main','gfx/guis/vehicles/mdisp_mech','gfx/guis/monitors/marine/mcc13_bigmap','gfx/guis/monitors/marine/mcc13_key','gfx/guis/mainmenu/q4text']
+    # The cinematic emblems are title treatment too: the opening's is a dark
+    # silhouette inside a soft halo, the ending's a weathered green emblem.
+    # The flat quakelogo symbol drew both as one solid orange shape.
+    images += ['gfx/guis/vehicles/mdisp_main','gfx/guis/vehicles/mdisp_mech','gfx/guis/monitors/marine/mcc13_bigmap','gfx/guis/monitors/marine/mcc13_key','gfx/guis/mainmenu/q4text',
+               'gfx/guis/mainmenu/intro_logo','gfx/guis/mainmenu/endlogo']
+    # Pictures whose stock material adds its light ("blend add") draw additively:
+    # drawn with alpha blending, their opaque black texels covered the scene,
+    # such as a black box behind the opening's QUAKE 4 lettering.
+    image_aliases.update({name:'q4-add/'+name for name in ('gfx/guis/mainmenu/q4text','gfx/guis/vehicles/mdisp_mech')})
     images += ['gfx/guis/mainmenu/e3_'+n for n in ('0','0_add','1','2')]
     # Complex earned medals are explicit bitmap exceptions (design section 6).
     # Register every stock award during level precache, including Holy Shit.

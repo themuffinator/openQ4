@@ -791,12 +791,8 @@
     "gfx/guis/mainmenu/corner.tga": "marker-corner",
     "gfx/guis/mainmenu/ctrls_tab1": "tab-strip-1",
     "gfx/guis/mainmenu/ctrls_tab1.tga": "tab-strip-1",
-    "gfx/guis/mainmenu/endlogo": "quakelogo",
-    "gfx/guis/mainmenu/endlogo.tga": "quakelogo",
     "gfx/guis/mainmenu/horiz_line2": "separator-h",
     "gfx/guis/mainmenu/horiz_line2.tga": "separator-h",
-    "gfx/guis/mainmenu/intro_logo": "quakelogo",
-    "gfx/guis/mainmenu/intro_logo.tga": "quakelogo",
     "gfx/guis/mainmenu/marinelogo": "marinelogo",
     "gfx/guis/mainmenu/marinelogo.tga": "marinelogo",
     "gfx/guis/mainmenu/quakelogo": "quakelogo",
@@ -999,6 +995,8 @@
     "gfx/guis/mainmenu/e3_0_add",
     "gfx/guis/mainmenu/e3_1",
     "gfx/guis/mainmenu/e3_2",
+    "gfx/guis/mainmenu/endlogo",
+    "gfx/guis/mainmenu/intro_logo",
     "gfx/guis/mainmenu/q4text",
     "gfx/guis/monitors/marine/mcc13_bigmap",
     "gfx/guis/monitors/marine/mcc13_key",
@@ -1074,6 +1072,8 @@
     "gfx/guis/hud/icons/gun_rocketlauncher_colored.tga": "gfx/guis/hud/icons/gun_rocketlauncher",
     "gfx/guis/hud/icons/gun_shotgun.tga": "gfx/guis/hud/icons/gun_shotgun",
     "gfx/guis/hud/icons/gun_shotgun_colored": "gfx/guis/hud/icons/gun_shotgun",
-    "gfx/guis/hud/icons/gun_shotgun_colored.tga": "gfx/guis/hud/icons/gun_shotgun"
+    "gfx/guis/hud/icons/gun_shotgun_colored.tga": "gfx/guis/hud/icons/gun_shotgun",
+    "gfx/guis/mainmenu/q4text": "q4-add/gfx/guis/mainmenu/q4text",
+    "gfx/guis/vehicles/mdisp_mech": "q4-add/gfx/guis/vehicles/mdisp_mech"
   }
 }
