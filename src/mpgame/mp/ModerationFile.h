@@ -20,6 +20,8 @@
 #include "Moderation.h"
 
 #define MP_MOD_BANLIST_FILENAME		"banlist.txt"
+// the list is written here in full, then put in the list's place in one step
+#define MP_MOD_BANLIST_STAGED		MP_MOD_BANLIST_FILENAME ".new"
 // where a file that is neither form is copied before it is replaced
 #define MP_MOD_BANLIST_UNREADABLE	"banlist.unreadable.txt"
 // the explanation SaveBanFile writes under the header; never read back
@@ -183,10 +185,14 @@ inline void MPModLoadBanFile( mpModBanList_t &list, idStrList &keptLines, mpModB
 /*
 ================
 MPModSaveBanFile
+
+The whole list goes to a staged file first and takes the list's place in one
+step (idFileSystem::PromoteFile), so a crash or a full disk during the write
+leaves the previous list as it was rather than a list cut short.
 ================
 */
 inline bool MPModSaveBanFile( const mpModBanList_t &list, const idStrList &keptLines ) {
-	idFile *file = fileSystem->OpenFileWrite( MP_MOD_BANLIST_FILENAME, "fs_savepath" );
+	idFile *file = fileSystem->OpenFileWrite( MP_MOD_BANLIST_STAGED, "fs_savepath" );
 	if ( file == NULL ) {
 		return false;
 	}
@@ -203,6 +209,10 @@ inline bool MPModSaveBanFile( const mpModBanList_t &list, const idStrList &keptL
 		}
 	}
 	fileSystem->CloseFile( file );
+	if ( !fileSystem->PromoteFile( MP_MOD_BANLIST_STAGED, MP_MOD_BANLIST_FILENAME, "fs_savepath" ) ) {
+		fileSystem->RemoveFileChecked( MP_MOD_BANLIST_STAGED, "fs_savepath" );
+		return false;
+	}
 	return true;
 }
 

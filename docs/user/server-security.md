@@ -130,6 +130,7 @@ more silences them for ten seconds, and they are told why.
 | `net_serverMaxClientsPerAddress` | Most players one address may hold (default `0`, no limit). Players behind one router share an address, so choose a number that still fits a household |
 | `g_voteMuteMinutes` | Minutes a player stays muted after a mute vote passes (default `10`); `0` until you lift it |
 | `g_adminLog` | `1` (default) writes the admin log described below; `0` turns it off |
+| `g_matchLog` | `1` keeps a record of every match in `logs/match.ndjson` (default `0`) |
 
 **Names.** A player's name can hold at most 32 characters that show, never
 control characters, and is never empty. Two players cannot share a name, even
@@ -148,6 +149,17 @@ page), `vote` (a kick vote), `menu` (a ban lifted from a menu) or `server` (an
 automatic action). A banned address that keeps trying is logged once a minute.
 The log holds players' network addresses, so keep it as private as the rest
 of the server's files.
+
+**The match log.** Set `g_matchLog 1` and the server also keeps a record of
+the matches it runs in `logs/match.ndjson`, in the same folder: who joined and
+left, every kill, the scores, flag and powerup events, and the final
+standings, one line of JSON each. It is off by default because a busy server
+writes a line for every kill. The file only ever grows, so move or delete it
+from time to time. Each map begins with a `stream` line that gives the map,
+the game type, the players and the UTC time. It holds names and scores, and
+no network addresses. The lines are the ones the
+[live event stream](competitive-matches.md#feed-a-broadcast-overlay) writes
+for broadcast overlays, so the same tools read both.
 
 ### Stopping the server
 

@@ -81,6 +81,24 @@ A `kill` line is written when the death is scored; the `playerScore` and
 On a client, `powerup` lines cover the players that client was sent, which is
 everyone for a spectator and the visible players otherwise.
 
+## The match log
+
+`g_matchLog 1` (MP-18, off by default) makes a server keep the same events
+for good in `logs/match.ndjson` under the save path. It differs from the live
+file in three ways:
+
+- **Servers only.** A client keeps no match log.
+- **Appended, never truncated.** Where the live file starts again, the match
+  log begins a new stream: a `stream` line, with `seq` back at 0 and `t` at
+  the new map's clock. A reader splits the file on `stream` lines.
+- **Wall-clock time.** Its `stream` lines carry `utc`, the time the stream
+  began (`"2026-11-22T10:15:00Z"`), after `gameType`. The live file's do
+  not. Add `t` to it for the time of a later line, bearing in mind that game
+  time stops during a pause.
+
+Everything else on this page holds for both files. The match log has no
+rotation: an operator moves or deletes it.
+
 ## Compatibility
 
 New event types and new members may be added without changing `v`; a reader
@@ -110,8 +128,8 @@ counts `seq` gaps and starts over on a `stream` line.
 | File | Role |
 | --- | --- |
 | `src/mpgame/mp/LiveEvents.h` | The state that is compared, the line builder and the diff. No engine dependency. |
-| `src/mpgame/mp/LiveEventStream.cpp` | Captures the state from the game, owns the file, declares the cvar and asserts that the header's tables match the game's enums. |
-| `src/mpgame/MultiplayerGame.cpp` | Calls `liveEvents.Update()` once a frame on servers and clients, `Kill()` where a death is scored (server) or received (client), and `Close()` on reset and shutdown. |
+| `src/mpgame/mp/LiveEventStream.cpp` | Captures the state from the game, owns the file, declares both cvars and asserts that the header's tables match the game's enums. One class, `mpLiveEventStream`, of two kinds: `LIVE` and `MATCH_LOG`. |
+| `src/mpgame/MultiplayerGame.cpp` | Calls `liveEvents.Update()` once a frame on servers and clients, `Kill()` where a death is scored (server) or received (client), and `Close()` on reset and shutdown; and the same on `matchLog`, which acts only on a server with `g_matchLog` set. |
 
 ## Checks
 

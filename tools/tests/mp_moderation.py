@@ -212,7 +212,11 @@ def check_files() -> None:
     require("MP_MOD_BANLIST_MAX_BYTES" in load and "MP_MOD_BANLIST_UNREADABLE" in load,
             "an oversized file is not read, and a file in neither form is copied before it is replaced")
     save = function_body(loader, "inline bool MPModSaveBanFile(")
-    require('fileSystem->OpenFileWrite( MP_MOD_BANLIST_FILENAME, "fs_savepath" )' in save and "keptLines[ i ].c_str()" in save,
+    promote = save.find('fileSystem->PromoteFile( MP_MOD_BANLIST_STAGED, MP_MOD_BANLIST_FILENAME, "fs_savepath" )')
+    require(0 < save.find("fileSystem->CloseFile( file );") < promote and 'OpenFileWrite( MP_MOD_BANLIST_FILENAME' not in save
+            and 'fileSystem->RemoveFileChecked( MP_MOD_BANLIST_STAGED, "fs_savepath" );' in save[promote:],
+            "the list is written whole to a staged file and takes the list's place in one step, so a crash cannot cut it short")
+    require('fileSystem->OpenFileWrite( MP_MOD_BANLIST_STAGED, "fs_savepath" )' in save and "keptLines[ i ].c_str()" in save,
             "the ban list is written to the save folder with the lines this build did not understand")
     for tree in ("src/mpgame", "src/game"):
         network = read(f"{tree}/Game_network.cpp")
@@ -328,6 +332,35 @@ def check_shutdown() -> None:
         require("ModerationLogShutdown( " + event in network, f"{event} reaches the admin log")
 
 
+def check_match_log() -> None:
+    """g_matchLog: the live event stream's events, kept for good on a server."""
+    stream = read("src/mpgame/mp/LiveEventStream.cpp")
+    declared = re.search(r'^idCVar g_matchLog\( "g_matchLog", "0", CVAR_GAME \| CVAR_ARCHIVE \| CVAR_BOOL \| CVAR_NOCHEAT,', stream, re.M)
+    require(declared is not None, "the match log is off by default: a busy server writes a line for every kill")
+    require('static const char *const MP_MATCH_LOG_FILE = "logs/match.ndjson";' in stream, "the match log's path")
+    wanted = function_body(stream, "bool mpLiveEventStream::Wanted( void ) const")
+    require("kind == MATCH_LOG ? ( g_matchLog.GetBool() && gameLocal.isServer ) : g_matchEventStream.GetBool()" in wanted
+            and "gameLocal.GetDemoState() != DEMO_PLAYING" in wanted,
+            "only a server keeps a match log, and never from a demo")
+    opened = function_body(stream, "bool mpLiveEventStream::Open( const mpLiveEventState &current )")
+    require('fileSystem->OpenFileAppend( Path(), false, "fs_savepath" )' in opened
+            and 'fileSystem->OpenFileWrite( Path(), "fs_savepath" )' in opened
+            and opened.index("OpenFileAppend") < opened.index("OpenFileWrite"),
+            "the match log is appended and the live file is started again")
+    require("MPModFormatUtc( static_cast<mpModTime_t>( ::time( NULL ) ), utc );" in opened
+            and "gameType.c_str(), current, utc )" in opened, "each stream in the match log says when it began")
+    events = read("src/mpgame/mp/LiveEvents.h")
+    line = function_body(events, "inline bool MPLiveEventStreamLine(")
+    require('line.String( "utc", utc );' in line and line.index('"gameType"') < line.index('"utc"') < line.index("MPLiveEventRoster("),
+            "the UTC time is an optional member of the stream line, so the live file's format is unchanged")
+    header = read("src/mpgame/MultiplayerGame.h")
+    require("mpLiveEventStream matchLog { mpLiveEventStream::MATCH_LOG };" in header, "the game owns a match log beside the live stream")
+    mp = read("src/mpgame/MultiplayerGame.cpp")
+    require(mp.count("matchLog.Close();") == 2 and mp.count("matchLog.Update();") == 1
+            and mp.count("matchLog.Kill( attacker, victim, methodOfDeath, quadKill );") == 1,
+            "the match log follows the live stream: every frame, every death the server scores, closed with the map")
+
+
 def check_text() -> None:
     expected = {"232640": None, "232641": None, "232642": None, "232643": None, "232644": None, "232645": None,
                 "232646": None, "232647": None, "232648": None, "232649": None, "232650": None}
@@ -342,7 +375,8 @@ def check_text() -> None:
     guide = read("docs/user/server-security.md")
     for token in ("ban <", "unban <", "banlist", "mute <", "unmute <", "status", "banlist.txt", "logs/admin.ndjson",
                   "g_chatFloodMessages", "g_chatFloodSeconds", "g_chatFloodWait", "g_reservedNames", "g_adminLog",
-                  "net_serverMaxClientsPerAddress", "serverShutdown", "callvote mute", "g_voteMuteMinutes"):
+                  "net_serverMaxClientsPerAddress", "serverShutdown", "callvote mute", "g_voteMuteMinutes",
+                  "g_matchLog", "logs/match.ndjson"):
         require(token in guide, f"the server security guide covers {token}")
     for language in LANGUAGES:
         table = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
@@ -360,6 +394,7 @@ def main() -> None:
     check_console_kick()
     check_mute_vote()
     check_shutdown()
+    check_match_log()
     check_text()
     print("mp_moderation: ok")
 

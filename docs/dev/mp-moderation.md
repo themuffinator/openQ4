@@ -71,8 +71,9 @@ ban address 203.0.113.0/24 1795385700 0 "Spammer" "ban evasion"
   and trims the same file through the shared header. The menus' "GUID" column
   now carries the range text, and `RemoveGuidFromBanList` takes that text.
   `AddGuidToBanList` stays in the engine's game interface and does nothing.
-- The file is rewritten whole on each change. A crash during the write can
-  lose the list; a temporary file and a rename are not done yet.
+- The list is written whole to `banlist.txt.new` and then takes the list's
+  place in one step (`idFileSystem::PromoteFile`), so a crash or a full disk
+  during the write leaves the previous list as it was.
 
 ### Text mute
 
@@ -139,6 +140,17 @@ logs a kick when it reads the engine's kick reason there for a human whose
 removal the game did not begin itself (`BeginServerDrop`). This needs no new
 slot in the game interface, so `GAME_API_VERSION` stays 61.
 
+### Match log
+
+`g_matchLog 1` (off by default) appends the typed events of the
+[live event stream](mp-live-event-stream.md#the-match-log) to
+`logs/match.ndjson` on a server: joins and leaves, kills, scores, flag and
+powerup events, phases and final standings. It is the same class as the live
+stream in a second mode, so there is one event format and one set of
+fixtures. It never truncates, begins a new stream with each map, and stamps
+each stream's first line with the UTC time. It holds no addresses; those
+stay in the admin log.
+
 ### Graceful shutdown
 
 `serverShutdown <match|now|time|cancel> [reason]` (`idGameLocal::Shutdown_f`).
@@ -183,7 +195,7 @@ of the address.
   address, one after the ban is lifted, one sharing the address, one to
   kick). Needs a staged runtime and retail assets, so CI compiles it and
   does not run it. 22 November 2026, Windows x64, debugoptimized build of
-  this change over `590f2a20e`: 68 checks pass and every process exits
+  this change over `b6f8c624c`: 77 checks pass and every process exits
   cleanly, the server by itself after its last match. The same build passes
   `mp_map_rotation_smoke.py` (44 checks). Two things shape the harness. A
   client that was removed or refused waits in a dialog whose loop does not
@@ -196,9 +208,7 @@ of the address.
 
 - Bans by identity (waits for MP-17) and `status` showing an identity.
 - A row for the mute vote on the retained Vote page.
-- An NDJSON match log for casual servers.
 - An admin role between referee and rcon.
-- An atomic write of `banlist.txt`.
 - The retained Admin page still labels the range column as it did the GUID
   and does not show a ban's reason or expiry.
 - Linux, macOS and a real remote address: the smoke ran on Windows over

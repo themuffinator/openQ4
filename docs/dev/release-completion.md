@@ -95,6 +95,13 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   silences, refused connections and shutdowns are written to
   `logs/admin.ndjson` in the server's save folder, one line of JSON each.
   `g_adminLog 0` turns it off.
+- **A record of every match, if you want one.** `g_matchLog 1` makes the
+  server keep who joined and left, every kill, the scores and the final
+  standings in `logs/match.ndjson`, in the format the broadcast overlay
+  stream already uses. It is off by default and holds no network addresses.
+- **The ban list survives a crash.** It is written to a second file and
+  swapped into place in one step, so an interrupted write cannot leave a
+  list cut short.
 - **An optional limit on players from one address.**
   `net_serverMaxClientsPerAddress` stops one address filling the server. It is
   off by default, because players behind one router share an address.
@@ -115,7 +122,7 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   mutes, the flood window, names, log lines) and pins each command and call
   site; `network_security.py` pins the caps. `mp_moderation_smoke.py` ran a
   pure dedicated server with two bots and five hidden clients in turn on
-  Windows: 68 checks, all passing, ending with the server waiting for
+  Windows: 77 checks, all passing, ending with the server waiting for
   its match and exiting by itself. `mp_map_rotation_smoke.py` still passes
   on the same build (44 checks).
 - **Developer detail:** [server administration and moderation](mp-moderation.md).

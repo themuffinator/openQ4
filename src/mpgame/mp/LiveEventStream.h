@@ -13,9 +13,19 @@ class idPlayer;
 // it grows. A server writes the match it runs; a client writes the match it is
 // shown, which is how a caster who does not host feeds an overlay. The file
 // starts again with every map, and with the cvar turned on.
+//
+// The match log (MP-18, g_matchLog) is the same events kept for good: a server
+// appends them to <fs_savepath>/<game>/logs/match.ndjson and never truncates
+// the file. Each map begins a new stream there, whose first line
+// carries the UTC time.
 class mpLiveEventStream {
 public:
-							mpLiveEventStream();
+	typedef enum {
+		LIVE = 0,		// g_matchEventStream: a file overlay tools follow, started again with every map
+		MATCH_LOG		// g_matchLog: a server's durable record, appended
+	} kind_t;
+
+	explicit				mpLiveEventStream( kind_t kind = LIVE );
 							~mpLiveEventStream();
 
 	// Once a frame, on servers and clients: publishes what changed.
@@ -26,6 +36,7 @@ public:
 	void					Close( void );
 
 private:
+	kind_t					kind;
 	idFile *				file;
 	bool					failed;			// the file could not be opened; do not retry every frame
 	int						sequence;
@@ -34,6 +45,8 @@ private:
 	mpLiveEventLine			line;
 
 	bool					Wanted( void ) const;
+	const char *			Path( void ) const;
+	const char *			Setting( void ) const;
 	int						Stamp( void );
 	void					Capture( mpLiveEventState &current ) const;
 	bool					Open( const mpLiveEventState &current );

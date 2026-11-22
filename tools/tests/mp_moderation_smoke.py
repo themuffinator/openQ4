@@ -27,7 +27,10 @@ The run must show:
   target for `g_voteMuteMinutes`;
 * `serverShutdown` announced, called off, and then waiting for the match to
   end before the server says goodbye and its process exits by itself;
-* every one of those events as a line of valid JSON in `logs/admin.ndjson`.
+* every one of those events as a line of valid JSON in `logs/admin.ndjson`;
+* `g_matchLog` appending the run's stream to a `logs/match.ndjson` that already
+  held one, begun with the UTC time and holding the match's kills and standings;
+* `banlist.txt` never left beside a half-written copy.
 
 Peers bind 127.0.0.1 only, so a runtime at a new path raises no firewall prompt.
 """
@@ -115,6 +118,11 @@ def main() -> int:
     banlist = games["server"] / "banlist.txt"
     banlist.write_bytes(quake4_banlist([("OldCheater", "ABCDEFGHIJK")]))
     admin_log = games["server"] / "logs/admin.ndjson"
+    # an earlier run's stream: the match log must keep it and write after it
+    match_log = games["server"] / "logs/match.ndjson"
+    match_log.parent.mkdir(parents=True)
+    match_log.write_text('{"v":1,"seq":0,"t":0,"type":"stream","game":"openQ4","source":"server","map":"mp/earlier",'
+                         '"gameType":"DM","utc":"2026-01-01T00:00:00Z","players":[]}\n', encoding="utf-8")
     roles = {name: Role(name, game) for name, game in games.items()}
     server, client = roles["server"], roles["client"]
     # Game settings are set once the game module is up; the command line is read before it loads.
@@ -123,7 +131,9 @@ def main() -> int:
         # With no frag or time limit the server idles in warmup, which keeps the moderation stages
         # still: a live match is abandoned and restarted when its only human reconnects. The
         # shutdown stage starts a real match. Two bots give that match its frags.
-        "set bot_minPlayers 0", "set bot_skill 3", "set g_chatFloodWait 4", "set g_gameReviewPause 5", "addbot", "addbot",
+        "set bot_minPlayers 0", "set bot_skill 3", "set g_chatFloodWait 4", "set g_gameReviewPause 5", "set g_matchLog 1",
+        "set g_matchEventStream 1",
+        "addbot", "addbot",
         "echo ROT_SERVER_READY",
         *server.start_lines()])
     for name in names[1:]:
@@ -447,6 +457,37 @@ def main() -> int:
         check("a scheduled shutdown records when and why", len(scheduled) == 2 and scheduled[0].get("when") == "time"
               and scheduled[0].get("seconds") == 300 and scheduled[0].get("reason") == "update tonight"
               and scheduled[1].get("when") == "match", json.dumps(scheduled))
+
+        # --- the match log -----------------------------------------------------
+        lines = [json.loads(line) for line in match_log.read_text(encoding="utf-8").splitlines()]
+        report["match_log_lines"] = len(lines)
+        begins = [index for index, line in enumerate(lines) if line.get("type") == "stream"]
+        check("the match log is one JSON object a line", len(lines) > 1 and all(line.get("v") == 1 for line in lines), str(lines[:1]))
+        check("an earlier stream is kept and this run's is written after it",
+              len(begins) >= 2 and begins[0] == 0 and lines[0].get("map") == "mp/earlier" and begins[1] == 1, str(begins))
+        ours = begins[1:]
+        check("each stream says when it began, where and by whom", len(ours) > 0 and all(
+            re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", lines[index].get("utc", "")) and lines[index].get("map") == "mp/q4dm1"
+            and lines[index].get("source") == "server" and lines[index].get("seq") == 0 for index in ours), str([lines[i] for i in ours])[:600])
+        numbered = all(lines[i]["seq"] == lines[i - 1]["seq"] + 1 for i in range(1, len(lines)) if i not in begins)
+        check("sequence numbers rise by one within a stream", numbered)
+        last = lines[begins[-1]:] if begins else []
+        kinds = [line.get("type") for line in last]
+        check("the stream holds the match: live, its kills, the review and the standings",
+              any(line.get("type") == "phase" and line.get("to") == "live" for line in last) and kinds.count("kill") >= 2
+              and any(line.get("type") == "phase" and line.get("to") == "review" for line in last) and "standings" in kinds,
+              " ".join(kind or "?" for kind in kinds)[-600:])
+        # the live file shares the match log's writer: it still starts again and carries no wall-clock time
+        live_file = games["server"] / "match-events/live.ndjson"
+        live_lines = [json.loads(line) for line in live_file.read_text(encoding="utf-8").splitlines()] if live_file.is_file() else []
+        check("the live event file still begins with its own stream line, without a wall-clock time",
+              len(live_lines) > 1 and live_lines[0].get("type") == "stream" and "utc" not in live_lines[0]
+              and [line.get("type") for line in live_lines].count("stream") == 1, str(live_lines[:1])[:300])
+        check("the live event file and the match log record the same match",
+              [line for line in live_lines if line.get("type") == "kill"] == [line for line in last if line.get("type") == "kill"])
+        text = match_log.read_text(encoding="utf-8")
+        check("the match log names players and holds no address", "ModPlayer" in text and "127.0.0.1" not in text)
+        check("no half-written ban list is left behind", not (games["server"] / "banlist.txt.new").exists())
 
         if any(report["exit_codes"].values()):
             report["failures"].append(f"unclean exits: {report['exit_codes']}")

@@ -492,7 +492,8 @@ the [development roadmap](../roadmap.md) for current scope.
   player's text chat without removing them, and chat flooding silences itself
   for ten seconds. `serverShutdown match` tells the players, waits for the
   match to end and then stops the server. Every such action is recorded in
-  `logs/admin.ndjson`. See
+  `logs/admin.ndjson`, and `g_matchLog 1` keeps a record of every match in
+  `logs/match.ndjson`. See
   [bans, mutes and chat limits](../../user/server-security.md#bans-mutes-and-chat-limits).
 - The Strogg HUD draws without offscreen passes. The moving static on its ammo,
   health and armor gauges is one fixed panel with a scrolling texture instead of

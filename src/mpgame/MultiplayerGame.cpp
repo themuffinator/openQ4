@@ -10050,6 +10050,7 @@ void idMultiplayerGame::Shutdown( void ) {
 		gameLocal.Warning( "competitive finalization remains pending at shutdown; "
 			"the durable active-map checkpoint was retained" );
 	}
+	matchLog.Close();
 	liveEvents.Close();
 	Clear();
 	statManager->Shutdown();
@@ -10069,6 +10070,8 @@ void idMultiplayerGame::Reset() {
 	if ( !FinalizeMatchEvidence( true ) ) {
 		gameLocal.Warning( "competitive finalization remains pending across map reset" );
 	}
+	// ...and its own stream in the match log
+	matchLog.Close();
 	// the next map starts its own event stream
 	liveEvents.Close();
 	Clear();
@@ -10809,6 +10812,7 @@ idMultiplayerGame::SendDeathMessage
 void idMultiplayerGame::SendDeathMessage( idPlayer* attacker, idPlayer* victim, int methodOfDeath, bool quadKill ) { 
 	if( !gameLocal.isClient ) {
 		liveEvents.Kill( attacker, victim, methodOfDeath, quadKill );
+		matchLog.Kill( attacker, victim, methodOfDeath, quadKill );
 		idBitMsg outMsg;
 		byte msgBuf[1024];
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
@@ -14367,6 +14371,8 @@ void idMultiplayerGame::CommonRun( void ) {
 
 	// openQ4: servers and clients both publish the match they are in
 	liveEvents.Update();
+	// ...and a server that keeps a match log appends the same events to it
+	matchLog.Update();
 
 	// twhitaker r282
 	// TTimo: sure is a nasty way to do it

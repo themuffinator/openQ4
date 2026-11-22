@@ -84,7 +84,9 @@ SOURCE_CONTRACTS = (
     ("src/mpgame/mp/LiveEventStream.cpp", (
         'idCVar g_matchEventStream( "g_matchEventStream", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NOCHEAT,',
         'static const char *const MP_LIVE_EVENT_FILE = "match-events/live.ndjson";',
-        'file = fileSystem->OpenFileWrite( MP_LIVE_EVENT_FILE, "fs_savepath" );',
+        # the live file is started again; the match log (MP-18, g_matchLog) is appended
+        'file = fileSystem->OpenFileWrite( Path(), "fs_savepath" );',
+        'return kind == MATCH_LOG ? MP_MATCH_LOG_FILE : MP_LIVE_EVENT_FILE;',
         "gameLocal.GetDemoState() != DEMO_PLAYING && !gameLocal.isRepeater &&",
         "MP_LIVE_EVENT_PHASES == STATE_COUNT && INACTIVE == 0",
         "MP_LIVE_FLAG_AT_BASE == FS_AT_BASE",

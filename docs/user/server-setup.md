@@ -339,6 +339,7 @@ it, for example `connect [2001:db8::1]:28004`. Every address form is under
 | `si_spectatorLock` | During live play, `1` keeps spectators, and anyone who connects, from joining the game until it ends and `2` keeps players from leaving it too. **New in 0.15.0** |
 | `g_inactivity` | Seconds a playing human may send no input before being moved to spectators (or dropped when `si_spectators` is off); `0` turns it off. **New in 0.15.0** |
 | `g_pauseOnDisconnect` | Seconds a live team match pauses when a playing human loses their connection, so they can reconnect; `0` turns it off. One pause a side a match; it ends when the player is back, and a kick or an idle drop does not start one. **New in 0.15.0** |
+| `g_matchLog` | `1` keeps a record of every match the server runs (joins, kills, scores, standings) in `logs/match.ndjson`; see [the match log](server-security.md#bans-mutes-and-chat-limits). **After 0.15.0** |
 | `g_precachePlayerModels` | `1` (default) loads every player model with a multiplayer map, so a player or bot arriving with a model nobody has used yet does not hitch the match; `0` loads only your own and the defaults, for a machine short of memory. Set on each machine; it is not a server rule. **New in 0.15.0** |
 
 Bot settings are listed under [Bots](#bots).

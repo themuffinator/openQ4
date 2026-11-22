@@ -15,7 +15,14 @@ idCVar g_matchEventStream( "g_matchEventStream", "0", CVAR_GAME | CVAR_ARCHIVE |
 	"write typed multiplayer match events, one JSON object per line, to match-events/live.ndjson under the save path "
 	"for overlay tools; a server writes the match it runs, a client the match it is shown" );
 
+// openQ4 MP-18: the same events as a server's durable record. Off by default: a
+// busy server writes a line for every kill, score and roster change.
+idCVar g_matchLog( "g_matchLog", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NOCHEAT,
+	"on a server, append typed multiplayer match events, one JSON object per line, to logs/match.ndjson under the "
+	"save path; the file is never truncated, and each map begins a stream whose first line gives the UTC time" );
+
 static const char *const MP_LIVE_EVENT_FILE = "match-events/live.ndjson";
+static const char *const MP_MATCH_LOG_FILE = "logs/match.ndjson";
 
 static_assert( MP_LIVE_EVENT_CLIENTS == MAX_CLIENTS && MP_LIVE_EVENT_FLAGS == MAX_CTF_FLAGS &&
 	MP_LIVE_EVENT_TEAMS == TEAM_MAX && TEAM_MARINE == 0 && TEAM_STROGG == 1, "live event state sizes" );
@@ -38,7 +45,8 @@ static const std::uint32_t MP_LIVE_EVENT_TRACKED_POWERUPS =
 	( 1u << POWERUP_DOUBLER ) | ( 1u << POWERUP_SCOUT ) | ( 1u << POWERUP_ADRENALINE ) |
 	( 1u << POWERUP_FC_ARMOR_REGEN );
 
-mpLiveEventStream::mpLiveEventStream() {
+mpLiveEventStream::mpLiveEventStream( kind_t streamKind ) {
+	kind = streamKind;
 	file = NULL;
 	failed = false;
 	sequence = 0;
@@ -59,10 +67,26 @@ A demo being played back is not a live match, and its clock can run backwards.
 ================
 */
 bool mpLiveEventStream::Wanted( void ) const {
-	return g_matchEventStream.GetBool() && gameLocal.isMultiplayer &&
+	// the match log is the server's record of the match it ran; a client has none
+	const bool enabled = kind == MATCH_LOG ? ( g_matchLog.GetBool() && gameLocal.isServer ) : g_matchEventStream.GetBool();
+	return enabled && gameLocal.isMultiplayer &&
 		( gameLocal.isServer || gameLocal.isClient ) &&
 		gameLocal.GetDemoState() != DEMO_PLAYING && !gameLocal.isRepeater &&
 		gameLocal.mpGame.GetGameState() != NULL;
+}
+
+/*
+================
+mpLiveEventStream::Path
+mpLiveEventStream::Setting
+================
+*/
+const char *mpLiveEventStream::Path( void ) const {
+	return kind == MATCH_LOG ? MP_MATCH_LOG_FILE : MP_LIVE_EVENT_FILE;
+}
+
+const char *mpLiveEventStream::Setting( void ) const {
+	return kind == MATCH_LOG ? "g_matchLog" : "g_matchEventStream";
 }
 
 /*
@@ -137,17 +161,25 @@ bool mpLiveEventStream::Open( const mpLiveEventState &current ) {
 	if ( failed ) {
 		return false;
 	}
-	file = fileSystem->OpenFileWrite( MP_LIVE_EVENT_FILE, "fs_savepath" );
+	// The live file begins again with every stream. The match log keeps every
+	// stream it was ever given, and says when each one began.
+	char utc[ MP_MOD_UTC_TEXT_BYTES ] = "";
+	if ( kind == MATCH_LOG ) {
+		file = fileSystem->OpenFileAppend( Path(), false, "fs_savepath" );
+		MPModFormatUtc( static_cast<mpModTime_t>( ::time( NULL ) ), utc );
+	} else {
+		file = fileSystem->OpenFileWrite( Path(), "fs_savepath" );
+	}
 	if ( file == NULL ) {
 		failed = true;
-		common->Warning( "g_matchEventStream: could not write %s", MP_LIVE_EVENT_FILE );
+		common->Warning( "%s: could not write %s", Setting(), Path() );
 		return false;
 	}
 	sequence = 0;
 	lastTime = gameLocal.time;
 	idStr gameType = gameLocal.serverInfo.GetString( "si_gameType" );
 	if ( MPLiveEventStreamLine( line, sequence, lastTime, gameLocal.isServer ? "server" : "client",
-			gameLocal.serverInfo.GetString( "si_map" ), gameType.c_str(), current ) ) {
+			gameLocal.serverInfo.GetString( "si_map" ), gameType.c_str(), current, utc ) ) {
 		Write( line );
 	}
 	sequence++;
@@ -167,7 +199,7 @@ void mpLiveEventStream::Write( const mpLiveEventLine &complete ) {
 		return;
 	}
 	if ( file->Write( complete.Text(), complete.Length() ) != complete.Length() ) {
-		common->Warning( "g_matchEventStream: write to %s failed; the stream is closed", MP_LIVE_EVENT_FILE );
+		common->Warning( "%s: write to %s failed; the stream is closed", Setting(), Path() );
 		fileSystem->CloseFile( file );
 		file = NULL;
 		failed = true;

@@ -99,6 +99,14 @@ static void TestRoster() {
 	CHECK( MPLiveEventStreamLine( line, 0, 0, "server", "mp/q4ctf1", "CTF", full ) );
 	CHECK( !line.Overflowed() && line.Text()[ line.Length() - 1 ] == '\n' );
 	CHECK( std::strchr( line.Text(), '\n' ) == line.Text() + line.Length() - 1 );
+	// The live file's opening line has no wall-clock time. The match log's has
+	// one, after the game type, and a full roster still fits beside it.
+	CHECK( std::strstr( line.Text(), "\"utc\"" ) == 0 );
+	CHECK( MPLiveEventStreamLine( line, 0, 0, "server", "mp/q4ctf1", "CTF", full, "2026-11-22T10:15:00Z" ) );
+	CHECK( !line.Overflowed() && line.Text()[ line.Length() - 1 ] == '\n' );
+	CHECK( std::strstr( line.Text(), "\"gameType\":\"CTF\",\"utc\":\"2026-11-22T10:15:00Z\",\"" ) != 0 );
+	CHECK( MPLiveEventStreamLine( line, 0, 0, "server", "mp/q4ctf1", "CTF", full, "" ) );
+	CHECK( std::strstr( line.Text(), "\"utc\"" ) == 0 );
 }
 
 static void TestDiff() {

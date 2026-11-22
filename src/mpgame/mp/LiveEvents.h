@@ -323,14 +323,19 @@ inline void MPLiveEventRoster( mpLiveEventLine &line, const mpLiveEventState &st
 	line.EndArray();
 }
 
-// The line that opens a stream. `source` is "server" or "client".
+// The line that opens a stream. `source` is "server" or "client". `utc` is the
+// wall-clock time the stream began ("2026-11-22T10:15:00Z"); the live file
+// leaves it out, and the match log, which keeps every stream, gives it.
 inline bool MPLiveEventStreamLine( mpLiveEventLine &line, int sequence, int timeMsec, const char *source,
-		const char *map, const char *gameType, const mpLiveEventState &state ) {
+		const char *map, const char *gameType, const mpLiveEventState &state, const char *utc = 0 ) {
 	line.Begin( sequence, timeMsec, "stream" );
 	line.String( "game", "openQ4" );
 	line.String( "source", source );
 	line.String( "map", map );
 	line.String( "gameType", gameType );
+	if ( utc != 0 && utc[ 0 ] != '\0' ) {
+		line.String( "utc", utc );
+	}
 	MPLiveEventRoster( line, state );
 	return line.End();
 }

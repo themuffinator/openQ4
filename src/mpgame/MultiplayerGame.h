@@ -1723,6 +1723,8 @@ private:
 	bool			pureReady;				// defaults to false, set to true once server game is running with pure checksums
 	// openQ4: typed match events for overlay tools (g_matchEventStream)
 	mpLiveEventStream liveEvents;
+	// openQ4 MP-18: the same events appended to a server's match log (g_matchLog)
+	mpLiveEventStream matchLog { mpLiveEventStream::MATCH_LOG };
 	// openQ4: match state last compared for MVD markers; primed while recording
 	mpMVDMarkerState mvdMarkerState;
 	bool			mvdMarkersPrimed;
