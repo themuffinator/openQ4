@@ -12,6 +12,19 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The mouse works on the campaign's difficulty and CHAPTERS pages again, 22 November 2026
+
+- **You can click the difficulty, TURBO MODE, START GAME and BACK again.**
+  Since the campaign's NEW GAME and CHAPTERS became pages of their own (0.15.0),
+  the mouse lit and clicked nothing on them; only the keyboard and controllers
+  worked. The page's title sat over the whole page and caught every click.
+  CHAPTERS' levels, START CHAPTER and BACK had the same fault and work again
+  too, in both Quake 4 and The Awakening.
+- **What to do.** Nothing.
+- **Developer detail:** the fourth-level frame's `titles` group ignores the
+  pointer, and `UiRetainedScreensTest`'s pointer-reach group now probes both
+  pages and the Campaign page with The Awakening available.
+
 ## Volume settings that match Quake 4, 22 November 2026
 
 - **Master volume goes up to 2 again.** Quake 4's own slider runs from 0 to 2,

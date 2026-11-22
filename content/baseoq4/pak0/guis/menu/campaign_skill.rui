@@ -14627,7 +14627,8 @@
      "width": {"type": "length", "value": 960.0, "unit": "dp"},
      "height": {"type": "length", "value": 720, "unit": "dp"},
      "left": {"type": "length", "value": 50, "unit": "%"},
-     "margin-left": {"type": "length", "value": -480.0, "unit": "dp"}
+     "margin-left": {"type": "length", "value": -480.0, "unit": "dp"},
+     "pointer-events": {"type": "keyword", "value": "none"}
     },
     "children": [
      {

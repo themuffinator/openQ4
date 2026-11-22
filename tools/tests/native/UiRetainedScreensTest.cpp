@@ -5683,6 +5683,7 @@ static std::set<std::string> CheckPointerReach(ScreenHost& host, const char* pat
 // so that their rows show and their plates are enabled, and the probe must
 // reach the plates a later full-size group once covered: Load Game's, Restart
 // Level's, Demos' and Save Game's.
+static std::string Sibling(const char* path, const char* name);
 static void CheckMenusPointerReach(ScreenHost& host, char** argv) {
 	host.recordDraws = false;
 	const auto probed = [](const std::set<std::string>& reached, std::initializer_list<const char*> ids) {
@@ -5727,6 +5728,17 @@ static void CheckMenusPointerReach(ScreenHost& host, char** argv) {
 	CheckPointerReach(host,argv[4],"guis/menu/pause_strogg.rui",{},"open");
 	CheckPointerReach(host,argv[5],"guis/menu/singleplayer.rui",{},"onActivate");
 	CheckPointerReach(host,argv[6],"guis/menu/campaigns.rui",{},"onActivate");
+	CheckPointerReach(host,argv[6],"guis/menu/campaigns.rui",{{"awakening_ready",true},{"awakening_present",true}},"onActivate");
+	// The campaign's fourth-level pages: their titles stand over the content
+	// in the page's full box, and once took every hit meant for the tiles,
+	// rows and plates under them.
+	Check(probed(CheckPointerReach(host,argv[13],"guis/menu/campaign_skill.rui",{{"skill",1.0}},"onActivate"),
+		{"skill0","skill1","skill2","skill3","skill4","turbo","start","back"}),
+		"the difficulty page's ranks, TURBO MODE, START GAME and BACK take the pointer");
+	StateValues chapters{{"chapter.count",3.0},{"chapter.first",0.0},{"chapter.selected",0.0},{"chapter.open",true}};
+	for (int row = 0; row < 3; ++row) chapters["chapter.row"+std::to_string(row)+".open"] = true;
+	Check(probed(CheckPointerReach(host,Sibling(argv[13],"chapters.rui").c_str(),"guis/menu/chapters.rui",chapters,"onActivate"),
+		{"row-0","row-2","chapter_start","chapter_back"}),"CHAPTERS' levels, START CHAPTER and BACK take the pointer");
 	CheckPointerReach(host,argv[7],"guis/menu/mp_escape.rui",{{"mp.action0.shown",true},{"mp.action0.available",true},
 		{"mp.action1.shown",true},{"mp.action1.available",true}},"open",1);
 	CheckPointerReach(host,argv[8],"guis/menu/mp_welcome.rui",{},"open");

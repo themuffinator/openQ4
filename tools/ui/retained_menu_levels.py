@@ -277,7 +277,10 @@ def detail_page_frame(ui, doc, title_key, content_parts):
         titles.append(breadcrumb(ui,doc,'crumb'+str(i),key,39+97*i))
     titles.append(ui.page_title('title',title_key,233,19))
     titles[-1]['properties']['opacity']=ui.number(1)
-    title_group=ui.group('titles',bounds,titles)
+    # The titles stand over the content in the page's full 960 x 720 box and
+    # hold only labels: without this the box takes every pointer hit meant
+    # for the tiles, rows and plates under it.
+    title_group=ui.group('titles',{**bounds,'pointer-events':ui.keyword('none')},titles)
     doc.timelines.add('arrive',150,[ui.track('content','opacity',[(0,ui.number(0)),(150,ui.number(1))])])
     doc.events['onActivate'].append({'op':'playTimeline','timeline':'arrive'})
     return bands,content,title_group
