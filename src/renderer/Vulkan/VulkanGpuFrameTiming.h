@@ -28,6 +28,11 @@ enum vkGpuPhase_t {
 	VK_GPU_PHASE_SHADOW_PROJECTED, VK_GPU_PHASE_SHADOW_CACHE, VK_GPU_PHASE_SHADOW_COMPOSE,
 	VK_GPU_PHASE_SHADOW_POINT,
 	VK_GPU_PHASE_SSAO_SNAPSHOT,		// the prepass world-depth copy SSAO samples
+	// The first _currentDepth feedback capture of the frame (soft particles,
+	// the heat haze's depth test, depth-reading post materials): the
+	// multisample resolve, then the copy into the sampled image.
+	VK_GPU_PHASE_FEEDBACK_DEPTH_RESOLVE, VK_GPU_PHASE_FEEDBACK_DEPTH_COPY,
+	VK_GPU_PHASE_FEEDBACK_COLOR,		// the frame's first colour copy out of the active target
 	VK_GPU_PHASE_COUNT
 };
 bool VK_GpuPhaseTiming_Begin( VkCommandBuffer commandBuffer, vkGpuPhase_t phase );

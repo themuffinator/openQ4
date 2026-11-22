@@ -379,6 +379,19 @@ def main() -> int:
                   "VK_GPU_PHASE_SMAA_WEIGHTS", "VK_GPU_PHASE_SMAA_BLEND",
                   "VK_GPU_PHASE_WORLD_VIEW", "VK_GPU_PHASE_PORTAL_VIEW", "VK_GPU_PHASE_TARGET_RESOLVE"):
         require(vk_gui, token, "ambient/composition/SMAA phase attribution")
+    # FPS-06: the depth feedback capture is timed, and it leaves a multisampled
+    # depth target in its attachment layout instead of moving it to the sampled
+    # layout and back (0.48 ms per capture at 8x on the reference GPU).
+    for token in ("VK_GPU_PHASE_FEEDBACK_DEPTH_RESOLVE", "VK_GPU_PHASE_FEEDBACK_DEPTH_COPY",
+                  "VK_GPU_PHASE_FEEDBACK_COLOR"):
+        require(vk_gui, token, "feedback capture phase attribution")
+    for token in ('"feedbackDepthResolve"', '"feedbackDepthCopy"', '"feedbackColor"'):
+        require(vk_timing, token, "feedback capture phase names")
+    copy_render = function_body(vk_gui, "bool VK_Exec_CopyRender(")
+    require(copy_render, "!r_vkDepthCaptureLayoutReference.GetBool() ) ) {",
+            "depth captures keep the source in its attachment layout unless the reference is asked for")
+    resolve_barrier = function_body(vk_gui, "static void VK_Exec_DepthResolveBarrier(")
+    require(resolve_barrier, "if ( i == 0 && sourceStaysAttachment ) {", "the resolve barrier can leave the source's layout alone")
     require(vk_timing, "VK_GPU_PHASE_COUNT <= 32", "phase mask capacity")
     require(vk_timing, "slot.profile && VK_GpuFrameTiming_EnsurePipelineQueryPool()", "profile-only pipeline query reset")
     require(vk_timing, "slot.pipelineComplete && vkGpuPipelineQueryPool != VK_NULL_HANDLE", "completed pipeline query read")

@@ -482,6 +482,10 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Vulkan spends less GPU time on scenes with smoke, heat haze or SSAO when MSAA is
+  on: each copy of the scene depth those effects read costs about a quarter of
+  what it did (about 1 ms a frame outdoors at 8x on the reference laptop, less at
+  4x). The picture is unchanged.
 - Server hosts can ban, mute and stop a server properly. `ban` keeps an address
   or a range of addresses out for a set time or for good, where a ban used to
   keep nobody out. `mute`, or the players' own `callvote mute`, silences a

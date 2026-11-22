@@ -2169,13 +2169,86 @@ display to themselves, and neither was available: other sessions were building a
 running clients throughout, and a hidden-window GPU ladder attempted alongside them
 moved by more than a millisecond between identical windows. FPS-06's closure test (within
 3% average and 10% p99 of 0.13.2 on every suite scene on both backends) is therefore still
-open for storage2, as is the Vulkan soft-particle depth capture.
+open for storage2. The Vulkan soft-particle depth capture is section 19.
 
 Runtimes: a worktree build of `main` at 590f2a20e (`debugoptimized`, `b_ndebug=true`,
 client `137d167db54f59af...` with the documents as committed there and
 `bb8e051175a7ed0f...` with the regenerated ones; the client embeds its pack's hash, so
 the two differ by that alone). Scripts and raw runs: `.tmp/fps06/` (`phases.py`,
 `pictures2.py`, `final.sh`, `final/`).
+
+## 19. The Vulkan depth capture (FPS-06), 22 November 2026
+
+Section 3.3 put 1.3 ms of the Vulkan backend's airdefense1 share on the soft-particle
+depth capture, four times OpenGL's cost for the same effect. This section finds where
+that time went and removes most of it.
+
+**Where it went.** Two timing phases around the first depth capture of a frame
+(`feedbackDepthResolve` and `feedbackDepthCopy` in `r_vkGpuPhaseProfile`) split it: at
+the 0.13.2 settings (8 samples) the multisample resolve took 0.60 ms and the flipping copy
+into `_currentDepth` 0.04 ms. A trace of the callers found two captures a frame in the
+outdoor scenes, both for soft particles and both needed: one in the portal-sky view and
+one in the main view, each against its own depth. Two captures of 0.64 ms are the 1.3 ms.
+
+The resolve itself was not the cost. After the resolve pass, `VK_Exec_DepthResolveBarrier`
+moved the multisampled depth target to the sampled layout, and the capture then moved it
+straight back to the attachment layout to resume rendering; nothing sampled it in between.
+On the reference GPU a multisampled depth image leaving its attachment layout costs a pass
+over every sample.
+
+**The change.** A depth capture (`VK_Exec_CopyRender`) now leaves a multisampled source
+in its attachment layout: the barrier after the resolve synchronizes it without changing
+the layout. The resolve, its sample-zero mode, the scratch image and the copy are
+unchanged, so the captured depth is the same. `r_vkDepthCaptureLayoutReference 1` restores
+the two transitions for comparison. Every depth capture takes the path: soft particles,
+the heat haze's depth test, depth-reading post materials and the SSAO and cel-ink world
+depth copies.
+
+**Cost.** Hidden-window launches on Vulkan, 300 profiled frames per window while the view
+turns once, mean GPU time; `reference` is `r_vkDepthCaptureLayoutReference 1` in the same
+launch, and the two windows of each setting agreed within 0.03 ms on the resolve:
+
+| Scene, 0.13.2 settings (8 samples) | captures a frame | resolve, reference | resolve, now | portal-sky view | main view's post-fog pass |
+|---|---:|---:|---:|---:|---:|
+| outdoor_airdefense1 | 2 | 0.60 ms | 0.12 ms | 1.25 to 0.67-0.71 ms | 0.79 to 0.24-0.25 ms |
+| combat_airdefense1 | 2 | 0.60 ms | 0.12 ms | 1.25 to 0.64 ms | 0.98-1.05 to 0.30 ms |
+| effects_airdefense1 | 2 | 0.60 ms | 0.12 ms | 1.25 to 0.64 ms | 0.98 to 0.34 ms |
+| outdoor_convoy1 | 2 | not captured | 0.13 ms | 0.77 ms now | 0.40-0.45 ms now |
+| vehicle_walker | 2 | 0.63 ms | 0.15 ms | 1.66 to 1.13-1.20 ms | 0.85 to 0.29-0.31 ms |
+| indoor_hub2 | 1 | 0.58 ms | 0.14 ms | none | 0.89-1.01 to 0.31 ms |
+| indoor_storage2 | 1 | 0.84-0.85 ms | 0.18-0.21 ms | none | 0.64-0.77 to 0.24-0.38 ms |
+
+Each capture is 0.44 to 0.65 ms cheaper, so a frame with a portal sky saves about 1 ms of
+GPU time and an indoor frame about 0.5 ms. In airdefense1 the two views together went from
+5.0 ms to 4.2-4.3 ms. The capture that was 1.3 ms a frame is now about 0.33 ms (two
+resolves of 0.12 ms and two copies of 0.04 ms).
+
+At today's Ultra preset (4 samples), which takes three depth captures a frame in the
+airdefense1 scenes (SSAO's world depth among them), the resolve fell from 0.31 ms to
+0.08 ms, the main view from 4.53-4.55 ms to 4.16-4.17 ms in outdoor_airdefense1 and the
+portal-sky view from 0.88 ms to 0.62 ms. So the change reaches every multisampled preset,
+not only the 0.13.2 comparison.
+
+**Pictures and validation.** With the game stopped, shots with the change and with the
+reference in one launch are identical in outdoor_airdefense1, effects_airdefense1,
+indoor_hub2 and vehicle_walker outside the HUD's scrolling EKG (zero differing pixels of
+3.3 million; the EKG box differs equally between two shots of the same setting). The
+Vulkan validation layer reported nothing in those scenes or in indoor_storage2.
+
+**Also priced.** A third phase, `feedbackColor`, times the frame's first colour copy out of
+the active target: 0.15-0.23 ms at 8 samples and 0.12-0.13 ms at 4 where a scene takes
+one. It is a resolve of the colour target and shows no comparable waste.
+
+**Not measured.** Frame times: these are GPU phase timings from hidden windows on a
+machine other sessions were using, which the per-phase means tolerated (windows of one
+setting repeat within 0.03 ms) but which say nothing about fullscreen frame rate. OpenGL's
+cost for the same capture was not re-measured here. FPS-06's closure test against 0.13.2
+remains open.
+
+Runtime: a worktree build of `main` at 1848bdde8 plus this change (`debugoptimized`,
+`b_ndebug=true`; client `3bbc1a30b7432647...`, renderer-vk `758a6a723ea91992...`).
+Scripts and raw runs: `.tmp/fps06/` (`vkphase.py`, `vkpic.py`, `vksurvey.sh`, `vksurvey/`,
+`vkpic1/`, `vkpic2/`).
 
 ## Appendix: artifacts
 

@@ -12,6 +12,31 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Vulkan depth captures cost a quarter of what they did, 22 November 2026
+
+- **Smoke, haze and SSAO are cheaper on Vulkan with MSAA on.** Soft particles,
+  the heat haze's depth test, SSAO and the cel ink all read a copy of the
+  scene's depth. Each copy moved the multisampled depth buffer out of the
+  layout it is rendered in and straight back, which on the reference GPU cost
+  far more than the copy itself. The buffer now stays where it is.
+- **What it changes.** GPU time per frame on the reference laptop, hidden
+  window, 2538x1312. At 8 samples (the 0.13.2 Ultra settings) each capture's
+  resolve fell from 0.60 ms to 0.12 ms; outdoor scenes take two a frame (the
+  sky and the main view), so about 1 ms a frame, and indoor scenes about
+  0.5 ms. At today's Ultra (4 samples) it fell from 0.31 ms to 0.08 ms, three
+  times a frame in Air Defense 1. The picture is identical, pixel for pixel,
+  in the four scenes compared.
+- **What is not shown yet.** Frame rates. No fullscreen comparison against
+  0.13.2 has been run, so no frame-rate figure is claimed. OpenGL is
+  unchanged.
+- **For comparison.** `r_vkDepthCaptureLayoutReference 1` restores the old
+  behaviour, and `r_vkGpuPhaseProfile` now reports `feedbackDepthResolve`,
+  `feedbackDepthCopy` and `feedbackColor`.
+- **Checks.** The Vulkan validation layer reports nothing in five scenes; the
+  GPU frame timing contract pins the new phases and the kept layout.
+- **Developer detail:** [performance report, section 19](performance-report.md#19-the-vulkan-depth-capture-fps-06-22-november-2026)
+  and FPS-06 in the [roadmap](roadmap.md).
+
 ## The Strogg HUD draws without offscreen passes, 22 November 2026
 
 - **The static on the Strogg gauges costs far less to draw.** After the

@@ -80,6 +80,8 @@
 extern idCVar r_skipDynamicTextures;
 static idCVar r_vkCopyResolveScratchReference( "r_vkCopyResolveScratchReference", "0", CVAR_RENDERER | CVAR_BOOL,
 	"resolve color captures through an intermediate image even when no conversion is needed" );
+static idCVar r_vkDepthCaptureLayoutReference( "r_vkDepthCaptureLayoutReference", "0", CVAR_RENDERER | CVAR_BOOL,
+	"move a multisampled depth target to the sampled layout and back around each depth capture, as before" );
 static idCVar r_vkResourceProfile( "r_vkResourceProfile", "0", CVAR_RENDERER | CVAR_BOOL,
 	"count executor resource operations for rendererVulkanMemoryInfo; reset its interval with rendererVulkanMemoryInfo reset" );
 static idCVar r_vkWindowViewMultisample( "r_vkWindowViewMultisample", "1", CVAR_RENDERER | CVAR_BOOL,
@@ -6350,7 +6352,8 @@ static bool VK_Exec_PrepareCopyDestination( idImage *image, int width, int heigh
 
 static VkResolveModeFlagBits VK_Exec_DepthResolveMode( void );
 static bool VK_Exec_ResolveDepthImage( vkImageEntry_t *sourceDepth,
-		vkImageEntry_t *destinationDepth, uint32_t width, uint32_t height );
+		vkImageEntry_t *destinationDepth, uint32_t width, uint32_t height,
+		bool sourceStaysAttachment = false );
 
 bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 		int cubeFace, bool copyDepth ) {
@@ -6451,6 +6454,7 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 	}
 
 	VK_Exec_EndMainRendering();
+	vkGpuPhaseScope colorTiming( vkExec.cmd, VK_GPU_PHASE_FEEDBACK_COLOR, !copyDepth );
 	if ( resolveDepthSource ) {
 		// stays a depth attachment; the resolve pass reads it as one
 	} else if ( sourceEntry != NULL ) {
@@ -6536,11 +6540,15 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 	if ( copyDepth ) {
 		VkImage depthSource = sourceImage;
 		uint32_t depthSourceLayer = sourceLayer;
+		vkGpuPhaseScope resolveTiming( vkExec.cmd, VK_GPU_PHASE_FEEDBACK_DEPTH_RESOLVE, resolveDepthSource );
 		if ( resolveDepthSource ) {
 			vkImageEntry_t *scratch = VK_Image_AcquireDepthResolveScratch( sourceWidth,
 					sourceHeight, sourceFormat );
+			// The capture resumes rendering into the source at once, so the
+			// source never takes the sampled layout.
 			if ( scratch == NULL || !VK_Exec_ResolveDepthImage( sourceEntry, scratch,
-					(uint32_t)sourceWidth, (uint32_t)sourceHeight ) ) {
+					(uint32_t)sourceWidth, (uint32_t)sourceHeight,
+					!r_vkDepthCaptureLayoutReference.GetBool() ) ) {
 				VK_Exec_TransitionImage( destination, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 				VK_Exec_TransitionImage( sourceEntry, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 				VK_Exec_BeginMainRendering( false );
@@ -6550,6 +6558,8 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 			depthSource = scratch->image;
 			depthSourceLayer = 0;
 		}
+		resolveTiming.End();
+		vkGpuPhaseScope copyTiming( vkExec.cmd, VK_GPU_PHASE_FEEDBACK_DEPTH_COPY );
 		if ( VK_Exec_DepthBlitSupported( sourceFormat ) ) {
 			// One flipped NEAREST blit reproduces the per-row copy's GL
 			// bottom-left orientation texel-exactly (identical format + NEAREST),
@@ -6614,6 +6624,7 @@ bool VK_Exec_CopyRender( idImage *image, int x, int y, int width, int height,
 		destination->everUploaded = true;
 		destination->materialSampleFlipY = false;
 		VK_Exec_TransitionImage( destination, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+		copyTiming.End();
 		if ( sourceEntry != NULL ) {
 			VK_Exec_TransitionImage( sourceEntry, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 		} else {
@@ -6864,7 +6875,8 @@ static VkResolveModeFlagBits VK_Exec_DepthResolveMode( void ) {
 }
 
 static void VK_Exec_DepthResolveBarrier( vkImageEntry_t *sourceDepth,
-		vkImageEntry_t *destinationDepth, bool beforeResolve ) {
+		vkImageEntry_t *destinationDepth, bool beforeResolve,
+		bool sourceStaysAttachment = false ) {
 	VkImageMemoryBarrier2 barriers[ 2 ];
 	VkSampleLocationsInfoEXT depthLocations[ 2 ];
 	memset( barriers, 0, sizeof( barriers ) );
@@ -6913,6 +6925,17 @@ static void VK_Exec_DepthResolveBarrier( vkImageEntry_t *sourceDepth,
 			barrier.oldLayout =
 					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			if ( i == 0 && sourceStaysAttachment ) {
+				// The source goes straight back to rendering. Leaving the
+				// attachment layout and returning to it costs a pass over
+				// every sample where the driver keeps multisampled depth
+				// compressed: 0.48 ms per capture at 8x on the reference GPU.
+				barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
+						| VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+				barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+						| VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			}
 		}
 	}
 
@@ -6924,10 +6947,11 @@ static void VK_Exec_DepthResolveBarrier( vkImageEntry_t *sourceDepth,
 	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
 	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
 
-	sourceDepth->layout = beforeResolve
+	destinationDepth->layout = beforeResolve
 			? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 			: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	destinationDepth->layout = sourceDepth->layout;
+	sourceDepth->layout = sourceStaysAttachment
+			? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : destinationDepth->layout;
 }
 
 static bool VK_Exec_CanResolveDepthImage( const vkImageEntry_t *sourceDepth,
@@ -6949,7 +6973,8 @@ static bool VK_Exec_CanResolveDepthImage( const vkImageEntry_t *sourceDepth,
 }
 
 static bool VK_Exec_ResolveDepthImage( vkImageEntry_t *sourceDepth,
-		vkImageEntry_t *destinationDepth, uint32_t width, uint32_t height ) {
+		vkImageEntry_t *destinationDepth, uint32_t width, uint32_t height,
+		bool sourceStaysAttachment ) {
 	if ( !VK_Exec_CanResolveDepthImage( sourceDepth, destinationDepth, width, height ) ) {
 		return false;
 	}
@@ -7015,7 +7040,7 @@ static bool VK_Exec_ResolveDepthImage( vkImageEntry_t *sourceDepth,
 		vkCmdEndRendering( vkExec.cmd );
 
 		VK_Exec_DepthResolveBarrier(
-				sourceDepth, destinationDepth, false );
+				sourceDepth, destinationDepth, false, sourceStaysAttachment );
 		sourceDepth->everUploaded = true;
 		destinationDepth->everUploaded = true;
 		destinationDepth->materialSampleFlipY = sourceDepth->materialSampleFlipY;
